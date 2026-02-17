@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { Calendar, Tag, ListChecks, FolderOpen, Trash2 } from 'lucide-react'
+import { Calendar, Tag, ListChecks, FolderOpen, Trash2, Bell } from 'lucide-react'
 import { useDraggable } from '@dnd-kit/core'
 import { useSortable, defaultAnimateLayoutChanges } from '@dnd-kit/sortable'
 import type { AnimateLayoutChanges } from '@dnd-kit/sortable'
@@ -8,7 +8,7 @@ import { cn } from '@/lib/cn'
 import { useSelectionStore } from '@/stores/selection-store'
 import { useUpdateTask, useCompleteTask, useDeleteTask } from '@/hooks/use-task-mutations'
 import { isNullDate } from '@/lib/date-utils'
-import type { Task } from '@/lib/vikunja-types'
+import type { Task, TaskReminder } from '@/lib/vikunja-types'
 import { TaskCheckbox } from './TaskCheckbox'
 import { TaskDueBadge } from './TaskDueBadge'
 import { PriorityDot } from '@/components/shared/PriorityDot'
@@ -16,8 +16,9 @@ import { DatePickerPopover } from './DatePickerPopover'
 import { LabelPickerPopover } from './LabelPickerPopover'
 import { SubtaskList } from './SubtaskList'
 import { ProjectPickerPopover } from './ProjectPickerPopover'
+import { ReminderPickerPopover } from './ReminderPickerPopover'
 
-type PopoverType = 'date' | 'label' | 'project' | 'subtasks' | null
+type PopoverType = 'date' | 'label' | 'project' | 'subtasks' | 'reminder' | null
 
 interface TaskRowProps {
   task: Task
@@ -123,6 +124,13 @@ export function TaskRow({ task, sortable = false }: TaskRowProps) {
     [task, updateTask]
   )
 
+  const handleReminderChange = useCallback(
+    (reminders: TaskReminder[]) => {
+      updateTask.mutate({ id: task.id, task: { ...task, reminders } })
+    },
+    [task, updateTask]
+  )
+
   const setDateToToday = useCallback(() => {
     const today = new Date()
     today.setHours(0, 0, 0, 0)
@@ -218,6 +226,9 @@ export function TaskRow({ task, sortable = false }: TaskRowProps) {
                 />
               ))}
             </div>
+          )}
+          {(task.reminders?.length ?? 0) > 0 && (
+            <Bell className="h-3 w-3 text-[var(--text-secondary)]" />
           )}
           <PriorityDot priority={task.priority} />
           <TaskDueBadge dueDate={task.due_date} />
@@ -348,6 +359,19 @@ export function TaskRow({ task, sortable = false }: TaskRowProps) {
           </button>
           <button
             type="button"
+            onClick={() => togglePopover('reminder')}
+            className={cn(
+              'flex h-6 w-6 items-center justify-center rounded transition-colors',
+              activePopover === 'reminder'
+                ? 'bg-[var(--accent-blue)]/10 text-[var(--accent-blue)]'
+                : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]'
+            )}
+            title="Reminders"
+          >
+            <Bell className="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
             onClick={() => togglePopover('project')}
             className={cn(
               'flex h-6 w-6 items-center justify-center rounded transition-colors',
@@ -389,6 +413,13 @@ export function TaskRow({ task, sortable = false }: TaskRowProps) {
           {activePopover === 'project' && (
             <ProjectPickerPopover
               task={task}
+              onClose={() => setActivePopover(null)}
+            />
+          )}
+          {activePopover === 'reminder' && (
+            <ReminderPickerPopover
+              task={task}
+              onReminderChange={handleReminderChange}
               onClose={() => setActivePopover(null)}
             />
           )}

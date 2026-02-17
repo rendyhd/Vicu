@@ -10,6 +10,9 @@ const NULL_DATE = '0001-01-01T00:00:00Z'
 let dailyTimerId: ReturnType<typeof setTimeout> | null = null
 let secondaryTimerId: ReturnType<typeof setTimeout> | null = null
 
+// Per-task reminder timers (key: "taskId-timestamp")
+const reminderTimers = new Map<string, ReturnType<typeof setTimeout>>()
+
 // Reference to main window (set during init)
 let mainWindowRef: BrowserWindow | null = null
 
@@ -18,15 +21,53 @@ let mainWindowRef: BrowserWindow | null = null
 export function initNotifications(mainWindow: BrowserWindow | null): void {
   mainWindowRef = mainWindow
   scheduleAll()
+  refreshTaskReminders()
 }
 
 export function rescheduleNotifications(): void {
   clearTimers()
   scheduleAll()
+  refreshTaskReminders()
 }
 
 export function stopNotifications(): void {
   clearTimers()
+  clearReminderTimers()
+}
+
+export async function refreshTaskReminders(): Promise<void> {
+  clearReminderTimers()
+
+  const config = loadConfig()
+  if (!config || config.standalone_mode) return
+
+  const result = await fetchTasks({ per_page: 200, filter: 'done = false' })
+  if (!result.success || !Array.isArray(result.data)) return
+
+  const tasks = result.data as Array<Record<string, unknown>>
+  const now = Date.now()
+
+  for (const task of tasks) {
+    const reminders = task.reminders as Array<{ reminder: string }> | null | undefined
+    if (!reminders || !Array.isArray(reminders)) continue
+
+    const taskId = task.id as number
+    const taskTitle = task.title as string
+
+    for (const r of reminders) {
+      if (!r.reminder) continue
+      const reminderTime = new Date(r.reminder).getTime()
+      if (isNaN(reminderTime) || reminderTime <= now) continue
+
+      const key = `${taskId}-${r.reminder}`
+      const delay = reminderTime - now
+      const timerId = setTimeout(() => {
+        fireTaskReminder(taskId, taskTitle, config)
+        reminderTimers.delete(key)
+      }, delay)
+      reminderTimers.set(key, timerId)
+    }
+  }
 }
 
 export function sendTestNotification(): void {
@@ -52,6 +93,32 @@ function clearTimers(): void {
     clearTimeout(secondaryTimerId)
     secondaryTimerId = null
   }
+}
+
+function clearReminderTimers(): void {
+  for (const timerId of reminderTimers.values()) {
+    clearTimeout(timerId)
+  }
+  reminderTimers.clear()
+}
+
+function fireTaskReminder(taskId: number, title: string, configSnapshot: AppConfig): void {
+  const config = loadConfig() || configSnapshot
+
+  const notification = new Notification({
+    title: `Reminder: ${title}`,
+    body: 'Task reminder',
+    silent: !config.notifications_sound,
+    timeoutType: config.notifications_persistent ? 'never' : 'default',
+    icon: getIcon(),
+  })
+
+  notification.on('click', () => {
+    showMainWindow()
+    mainWindowRef?.webContents.send('navigate-to-task', taskId)
+  })
+
+  notification.show()
 }
 
 function scheduleAll(): void {

@@ -1,3 +1,9 @@
+export interface TaskReminder {
+  reminder: string          // absolute ISO timestamp
+  relative_period?: number  // seconds relative to relative_to date
+  relative_to?: 'due_date' | 'start_date' | 'end_date'
+}
+
 export interface Task {
   id: number
   title: string
@@ -10,6 +16,7 @@ export interface Task {
   priority: number // 0=unset, 1=low, 2=medium, 3=high, 4=urgent
   project_id: number
   labels: Label[] | null
+  reminders: TaskReminder[] | null
   related_tasks?: Record<string, Task[]> | null
   created: string
   updated: string
@@ -58,6 +65,7 @@ export interface CreateTaskPayload {
   start_date?: string
   priority?: number
   labels?: { id: number }[]
+  reminders?: TaskReminder[]
 }
 
 export interface UpdateTaskPayload extends Partial<Task> {}

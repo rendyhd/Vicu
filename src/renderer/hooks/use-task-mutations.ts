@@ -140,6 +140,8 @@ export function useUpdateTask() {
       qc.invalidateQueries({ queryKey: ['tasks'] })
       qc.invalidateQueries({ queryKey: ['view-tasks'] })
       qc.invalidateQueries({ queryKey: ['section-tasks'] })
+      // Refresh per-task reminder timers in main process (fire-and-forget)
+      api.refreshTaskReminders()
     },
   })
 }

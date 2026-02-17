@@ -74,6 +74,8 @@ const api = {
     ipcRenderer.invoke('notifications:test'),
   rescheduleNotifications: () =>
     ipcRenderer.invoke('notifications:reschedule'),
+  refreshTaskReminders: () =>
+    ipcRenderer.invoke('notifications:refresh-task-reminders'),
 
   // Quick Entry settings
   applyQuickEntrySettings: () =>

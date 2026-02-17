@@ -1,5 +1,5 @@
 import { useNavigate, useMatches } from '@tanstack/react-router'
-import { Inbox, Star, Calendar, Layers, BookOpen } from 'lucide-react'
+import { Inbox, Sun, Calendar, Layers, BookOpen } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import type { LucideIcon } from 'lucide-react'
 
@@ -13,8 +13,8 @@ interface SmartListItem {
 
 const smartLists: SmartListItem[] = [
   { id: 'inbox', label: 'Inbox', icon: Inbox, path: '/inbox', iconColor: 'text-accent-blue' },
-  { id: 'today', label: 'Today', icon: Star, path: '/today', iconColor: 'text-accent-yellow' },
-  { id: 'upcoming', label: 'Upcoming', icon: Calendar, path: '/upcoming', iconColor: 'text-accent-red' },
+  { id: 'today', label: 'Today', icon: Sun, path: '/today', iconColor: 'text-accent-red' },
+  { id: 'upcoming', label: 'Upcoming', icon: Calendar, path: '/upcoming', iconColor: 'text-accent-orange' },
   { id: 'anytime', label: 'Anytime', icon: Layers, path: '/anytime', iconColor: 'text-[#5AC8FA]' },
   { id: 'logbook', label: 'Logbook', icon: BookOpen, path: '/logbook', iconColor: 'text-accent-green' },
 ]

@@ -110,6 +110,9 @@ export const api = {
   rescheduleNotifications: () =>
     window.api.rescheduleNotifications() as Promise<void>,
 
+  refreshTaskReminders: () =>
+    window.api.refreshTaskReminders() as Promise<void>,
+
   applyQuickEntrySettings: () =>
     window.api.applyQuickEntrySettings() as Promise<{ entry: boolean; viewer: boolean }>,
 

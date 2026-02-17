@@ -35,7 +35,7 @@ import {
   getQuickViewWindow,
   applyQuickEntrySettings,
 } from './quick-entry-state'
-import { sendTestNotification, rescheduleNotifications } from './notifications'
+import { sendTestNotification, rescheduleNotifications, refreshTaskReminders } from './notifications'
 import {
   addPendingAction,
   removePendingAction,
@@ -462,6 +462,10 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle('notifications:reschedule', () => {
     rescheduleNotifications()
+  })
+
+  ipcMain.handle('notifications:refresh-task-reminders', () => {
+    refreshTaskReminders()
   })
 
   // --- Apply Quick Entry Settings (called from renderer settings page) ---

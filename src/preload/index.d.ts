@@ -44,6 +44,7 @@ export interface ElectronAPI {
   logout(): Promise<void>
   testNotification(): Promise<void>
   rescheduleNotifications(): Promise<void>
+  refreshTaskReminders(): Promise<void>
   applyQuickEntrySettings(): Promise<void>
 
   // Window controls
