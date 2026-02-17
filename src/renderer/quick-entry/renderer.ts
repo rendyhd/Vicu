@@ -1,0 +1,330 @@
+declare global {
+  interface Window {
+    quickEntryApi: {
+      saveTask(title: string, description: string | null, dueDate: string | null, projectId: number | null): Promise<{ success: boolean; cached?: boolean; error?: string }>
+      closeWindow(): Promise<void>
+      getConfig(): Promise<QuickEntryConfig | null>
+      getPendingCount(): Promise<number>
+      onShowWindow(callback: () => void): void
+      onHideWindow(callback: () => void): void
+      onSyncCompleted(callback: () => void): void
+      onDragHover(callback: (_event: unknown, hovering: boolean) => void): void
+    }
+  }
+}
+
+interface QuickEntryConfig {
+  vikunja_url: string
+  quick_entry_default_project_id: number
+  inbox_project_id: number
+  exclamation_today: boolean
+  secondary_projects: Array<{ id: number; title: string }>
+  project_cycle_modifier: string
+  standalone_mode: boolean
+}
+
+const input = document.getElementById('task-input') as HTMLInputElement
+const descriptionHint = document.getElementById('description-hint')!
+const descriptionInput = document.getElementById('description-input') as HTMLTextAreaElement
+const container = document.getElementById('container')!
+const errorMessage = document.getElementById('error-message')!
+const todayHintInline = document.getElementById('today-hint-inline')!
+const todayHintBelow = document.getElementById('today-hint-below')!
+const projectHint = document.getElementById('project-hint')!
+const projectName = document.getElementById('project-name')!
+const pendingIndicator = document.getElementById('pending-indicator')!
+const pendingCountEl = document.getElementById('pending-count')!
+const dragHandle = document.querySelector('.drag-handle')!
+
+let errorTimeout: ReturnType<typeof setTimeout> | null = null
+let exclamationTodayEnabled = true
+let projectCycle: Array<{ id: number; title: string | null }> = []
+let currentProjectIndex = 0
+let projectCycleModifier = 'ctrl'
+
+function showError(msg: string): void {
+  errorMessage.textContent = msg
+  errorMessage.hidden = false
+  void errorMessage.offsetHeight
+  errorMessage.classList.add('show')
+
+  if (errorTimeout) clearTimeout(errorTimeout)
+  errorTimeout = setTimeout(() => {
+    errorMessage.classList.remove('show')
+    setTimeout(() => { errorMessage.hidden = true }, 200)
+  }, 3000)
+}
+
+function showOfflineMessage(): void {
+  errorMessage.textContent = 'Saved offline \u2014 will sync when connected'
+  errorMessage.hidden = false
+  errorMessage.classList.add('offline')
+  void errorMessage.offsetHeight
+  errorMessage.classList.add('show')
+
+  if (errorTimeout) clearTimeout(errorTimeout)
+  errorTimeout = setTimeout(() => {
+    errorMessage.classList.remove('show')
+    setTimeout(() => {
+      errorMessage.hidden = true
+      errorMessage.classList.remove('offline')
+      window.quickEntryApi.closeWindow()
+    }, 200)
+  }, 1200)
+}
+
+function clearError(): void {
+  if (errorTimeout) clearTimeout(errorTimeout)
+  errorMessage.classList.remove('show', 'offline')
+  errorMessage.hidden = true
+}
+
+function collapseDescription(): void {
+  descriptionInput.classList.add('hidden')
+  descriptionInput.value = ''
+  descriptionHint.classList.remove('hidden')
+  updateTodayHints()
+}
+
+function expandDescription(): void {
+  descriptionHint.classList.add('hidden')
+  descriptionInput.classList.remove('hidden')
+  descriptionInput.focus()
+  updateTodayHints()
+}
+
+function isDescriptionExpanded(): boolean {
+  return !descriptionInput.classList.contains('hidden')
+}
+
+function updateTodayHints(): void {
+  const hasExclamation = exclamationTodayEnabled && input.value.includes('!')
+
+  if (hasExclamation && !isDescriptionExpanded()) {
+    todayHintInline.classList.remove('hidden')
+    todayHintBelow.classList.add('hidden')
+  } else if (hasExclamation && isDescriptionExpanded()) {
+    todayHintInline.classList.add('hidden')
+    todayHintBelow.classList.remove('hidden')
+  } else {
+    todayHintInline.classList.add('hidden')
+    todayHintBelow.classList.add('hidden')
+  }
+}
+
+async function updatePendingIndicator(): Promise<void> {
+  const count = await window.quickEntryApi.getPendingCount()
+  if (count > 0) {
+    pendingCountEl.textContent = String(count)
+    pendingIndicator.classList.remove('hidden')
+  } else {
+    pendingIndicator.classList.add('hidden')
+  }
+}
+
+function resetInput(): void {
+  input.value = ''
+  input.disabled = false
+  descriptionInput.disabled = false
+  collapseDescription()
+  clearError()
+  todayHintInline.classList.add('hidden')
+  todayHintBelow.classList.add('hidden')
+  currentProjectIndex = 0
+  updateProjectHint()
+  input.focus()
+}
+
+function buildProjectCycle(cfg: QuickEntryConfig): void {
+  const defaultId = cfg.quick_entry_default_project_id || cfg.inbox_project_id
+  projectCycle = [{ id: defaultId, title: null }]
+  if (cfg.secondary_projects && cfg.secondary_projects.length > 0) {
+    for (const p of cfg.secondary_projects) {
+      projectCycle.push({ id: p.id, title: p.title })
+    }
+  }
+  currentProjectIndex = 0
+  updateProjectHint()
+}
+
+function updateProjectHint(): void {
+  if (currentProjectIndex === 0 || projectCycle.length <= 1) {
+    projectHint.classList.add('hidden')
+  } else {
+    projectName.textContent = projectCycle[currentProjectIndex].title || ''
+    projectHint.classList.remove('hidden')
+  }
+}
+
+function cycleProject(direction: number): void {
+  if (projectCycle.length <= 1) return
+  currentProjectIndex += direction
+  if (currentProjectIndex >= projectCycle.length) currentProjectIndex = 0
+  if (currentProjectIndex < 0) currentProjectIndex = projectCycle.length - 1
+  updateProjectHint()
+}
+
+function isProjectCycleModifierPressed(e: KeyboardEvent): boolean {
+  switch (projectCycleModifier) {
+    case 'alt':
+      return e.altKey && !e.ctrlKey
+    case 'ctrl+alt':
+      return e.ctrlKey && e.altKey
+    case 'ctrl':
+    default:
+      return e.ctrlKey && !e.altKey
+  }
+}
+
+async function saveTask(): Promise<void> {
+  let title = input.value.trim()
+  if (!title) return
+
+  const description = descriptionInput.value.trim()
+
+  let dueDate: string | null = null
+  if (exclamationTodayEnabled && title.includes('!')) {
+    title = title.replace(/!/g, '').trim()
+    if (!title) return
+    const today = new Date()
+    today.setHours(23, 59, 59, 0)
+    dueDate = today.toISOString()
+  }
+
+  input.disabled = true
+  descriptionInput.disabled = true
+  clearError()
+
+  const projectId = projectCycle.length > 0 ? projectCycle[currentProjectIndex].id : null
+  const result = await window.quickEntryApi.saveTask(title, description || null, dueDate, projectId)
+
+  if (result.success) {
+    if (result.cached) {
+      showOfflineMessage()
+    } else {
+      window.quickEntryApi.closeWindow()
+    }
+  } else {
+    showError(result.error || 'Failed to save task')
+    input.disabled = false
+    descriptionInput.disabled = false
+    input.focus()
+  }
+}
+
+// When the window is hidden, reset state immediately so next show starts clean
+window.quickEntryApi.onHideWindow(() => {
+  container.classList.remove('visible')
+  resetInput()
+})
+
+// When the main process signals the window is shown
+window.quickEntryApi.onShowWindow(async () => {
+  resetInput()
+
+  const cfg = await window.quickEntryApi.getConfig()
+  if (cfg) {
+    exclamationTodayEnabled = cfg.exclamation_today !== false
+    projectCycleModifier = cfg.project_cycle_modifier || 'ctrl'
+    buildProjectCycle(cfg)
+  }
+
+  await updatePendingIndicator()
+  input.focus()
+
+  container.classList.remove('visible')
+  void container.offsetHeight
+  container.classList.add('visible')
+})
+
+// When background sync completes, update the pending count
+window.quickEntryApi.onSyncCompleted(async () => {
+  await updatePendingIndicator()
+})
+
+window.quickEntryApi.onDragHover((_: unknown, hovering: boolean) => {
+  if (dragHandle) dragHandle.classList.toggle('hover', hovering)
+})
+
+// Keyboard handling on title input
+input.addEventListener('keydown', async (e) => {
+  if (isProjectCycleModifierPressed(e) && e.key === 'ArrowRight') {
+    e.preventDefault()
+    cycleProject(1)
+    return
+  }
+  if (isProjectCycleModifierPressed(e) && e.key === 'ArrowLeft') {
+    e.preventDefault()
+    cycleProject(-1)
+    return
+  }
+  if (e.key === 'Escape') {
+    e.preventDefault()
+    window.quickEntryApi.closeWindow()
+    return
+  }
+  if (e.key === 'Tab') {
+    e.preventDefault()
+    expandDescription()
+    return
+  }
+  if (e.key === 'Enter') {
+    e.preventDefault()
+    await saveTask()
+  }
+})
+
+// Keyboard handling on description textarea
+descriptionInput.addEventListener('keydown', async (e) => {
+  if (isProjectCycleModifierPressed(e) && e.key === 'ArrowRight') {
+    e.preventDefault()
+    cycleProject(1)
+    return
+  }
+  if (isProjectCycleModifierPressed(e) && e.key === 'ArrowLeft') {
+    e.preventDefault()
+    cycleProject(-1)
+    return
+  }
+  if (e.key === 'Escape') {
+    e.preventDefault()
+    window.quickEntryApi.closeWindow()
+    return
+  }
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault()
+    await saveTask()
+  }
+})
+
+// Detect ! in task title to show today scheduling hint
+input.addEventListener('input', () => {
+  updateTodayHints()
+})
+
+// Load config on startup
+async function loadInitialConfig(): Promise<void> {
+  const cfg = await window.quickEntryApi.getConfig()
+  if (cfg) {
+    exclamationTodayEnabled = cfg.exclamation_today !== false
+    projectCycleModifier = cfg.project_cycle_modifier || 'ctrl'
+    buildProjectCycle(cfg)
+  }
+  await updatePendingIndicator()
+}
+loadInitialConfig()
+
+// Close window when clicking outside the container (transparent area)
+document.addEventListener('mousedown', (e) => {
+  if (!container.contains(e.target as Node)) {
+    window.quickEntryApi.closeWindow()
+  }
+})
+
+// Initial animation on first load
+requestAnimationFrame(() => {
+  container.classList.add('visible')
+  input.focus()
+})
+
+export {}

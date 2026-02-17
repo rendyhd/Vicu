@@ -1,0 +1,228 @@
+.hidden {
+  display: none;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+body {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 20px;
+}
+
+/* Drag handle — visible on hover (hover driven by main-process cursor polling) */
+.drag-handle {
+  -webkit-app-region: drag;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+.drag-handle-pill {
+  width: 36px;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(0, 0, 0, 0.15);
+  opacity: 0;
+  transition: opacity 200ms ease;
+  pointer-events: none;
+}
+
+.drag-handle.hover .drag-handle-pill {
+  opacity: 1;
+}
+
+/* Container card */
+.container {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.90);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12), 0 1px 4px rgba(0, 0, 0, 0.08);
+  opacity: 0;
+  transform: translateY(-4px);
+  transition: opacity 150ms ease, transform 150ms ease;
+  overflow: hidden;
+}
+
+.container.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Project hint (shown when cycling away from default) */
+.project-hint {
+  padding: 4px 20px 0;
+  font-size: 12px;
+  color: #7c6fa0;
+  font-style: italic;
+}
+
+.project-hint span {
+  font-weight: 500;
+}
+
+/* Task input */
+#task-input {
+  -webkit-app-region: no-drag;
+  width: 100%;
+  padding: 16px 20px;
+  font-size: 18px;
+  font-weight: 400;
+  color: #1a1a1a;
+  background: transparent;
+  border: none;
+  outline: none;
+  letter-spacing: -0.01em;
+}
+
+#task-input::placeholder {
+  color: #999;
+  font-weight: 300;
+}
+
+#task-input:disabled {
+  opacity: 0.5;
+}
+
+/* Hints row (TAB hint + today hint inline) */
+.hints-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 2px 20px 8px;
+}
+
+/* Description hint */
+.description-hint {
+  font-size: 12px;
+  color: #999;
+}
+
+/* Today scheduling hint */
+.today-hint {
+  font-size: 12px;
+  color: #999;
+  font-style: italic;
+}
+
+#today-hint-below {
+  padding: 2px 20px 8px;
+  text-align: right;
+}
+
+/* Description textarea */
+.description-input {
+  -webkit-app-region: no-drag;
+  width: 100%;
+  padding: 8px 20px 12px;
+  font-size: 14px;
+  font-family: inherit;
+  color: #1a1a1a;
+  background: transparent;
+  border: none;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+  outline: none;
+  resize: none;
+}
+
+.description-input::placeholder {
+  color: #999;
+}
+
+/* Error message */
+.error-message {
+  padding: 6px 20px 12px;
+  font-size: 13px;
+  color: #e53e3e;
+  opacity: 0;
+  transition: opacity 200ms ease;
+}
+
+.error-message.show {
+  opacity: 1;
+}
+
+/* Offline saved message (amber instead of red) */
+.error-message.offline {
+  color: #b7791f;
+}
+
+/* Pending sync indicator */
+.pending-indicator {
+  padding: 4px 20px 8px;
+  font-size: 11px;
+  color: #b7791f;
+  font-style: italic;
+}
+
+/* Dark mode */
+@media (prefers-color-scheme: dark) {
+  .drag-handle-pill {
+    background: rgba(255, 255, 255, 0.2);
+  }
+
+  .container {
+    background: rgba(30, 30, 30, 0.90);
+    border-color: rgba(255, 255, 255, 0.08);
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4), 0 1px 4px rgba(0, 0, 0, 0.2);
+  }
+
+  #task-input {
+    color: #f0f0f0;
+  }
+
+  #task-input::placeholder {
+    color: #666;
+  }
+
+  .project-hint {
+    color: #b0a0d0;
+  }
+
+  .description-hint {
+    color: #666;
+  }
+
+  .today-hint {
+    color: #666;
+  }
+
+  .description-input {
+    color: #f0f0f0;
+    border-top-color: rgba(255, 255, 255, 0.06);
+  }
+
+  .description-input::placeholder {
+    color: #666;
+  }
+
+  .error-message {
+    color: #fc8181;
+  }
+
+  .error-message.offline {
+    color: #ecc94b;
+  }
+
+  .pending-indicator {
+    color: #ecc94b;
+  }
+}
