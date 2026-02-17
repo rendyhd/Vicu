@@ -1,4 +1,4 @@
-import { app, BrowserWindow, globalShortcut, ipcMain, Menu, screen } from 'electron'
+import { app, BrowserWindow, globalShortcut, ipcMain, Menu, powerMonitor, screen } from 'electron'
 import { createMainWindow, createQuickEntryWindow, createQuickViewWindow } from './window-manager'
 import { registerIpcHandlers } from './ipc-handlers'
 import { loadConfig, saveConfig, type AppConfig } from './config'
@@ -6,6 +6,7 @@ import { authManager } from './auth/auth-manager'
 import { createTray, destroyTray, hasTray } from './tray'
 import { returnFocusToPreviousWindow } from './focus'
 import { registerQuickEntryState } from './quick-entry-state'
+import { initNotifications, rescheduleNotifications, stopNotifications } from './notifications'
 
 let mainWindow: BrowserWindow | null = null
 let quickEntryWindow: BrowserWindow | null = null
@@ -395,6 +396,12 @@ if (!gotLock) {
       mainWindow = null
     })
 
+    // Initialize notification scheduler
+    initNotifications(mainWindow)
+    powerMonitor.on('resume', () => {
+      rescheduleNotifications()
+    })
+
     // Quick Entry: if enabled, set up tray + windows + hotkeys
     if (config?.quick_entry_enabled) {
       setupTray()
@@ -421,6 +428,7 @@ if (!gotLock) {
   })
 
   app.on('will-quit', () => {
+    stopNotifications()
     globalShortcut.unregisterAll()
     if (dragHoverTimer) {
       clearInterval(dragHoverTimer)

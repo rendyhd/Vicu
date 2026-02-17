@@ -35,6 +35,7 @@ import {
   getQuickViewWindow,
   applyQuickEntrySettings,
 } from './quick-entry-state'
+import { sendTestNotification, rescheduleNotifications } from './notifications'
 import {
   addPendingAction,
   removePendingAction,
@@ -452,6 +453,15 @@ export function registerIpcHandlers(): void {
     return {
       standalone_mode: config.standalone_mode === true,
     }
+  })
+
+  // --- Notifications IPC ---
+  ipcMain.handle('notifications:test', () => {
+    sendTestNotification()
+  })
+
+  ipcMain.handle('notifications:reschedule', () => {
+    rescheduleNotifications()
   })
 
   // --- Apply Quick Entry Settings (called from renderer settings page) ---

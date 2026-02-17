@@ -69,6 +69,12 @@ const api = {
   logout: () =>
     ipcRenderer.invoke('auth:logout'),
 
+  // Notifications
+  testNotification: () =>
+    ipcRenderer.invoke('notifications:test'),
+  rescheduleNotifications: () =>
+    ipcRenderer.invoke('notifications:reschedule'),
+
   // Quick Entry settings
   applyQuickEntrySettings: () =>
     ipcRenderer.invoke('apply-quick-entry-settings') as Promise<{ entry: boolean; viewer: boolean }>,

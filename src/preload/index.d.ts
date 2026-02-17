@@ -42,6 +42,8 @@ export interface ElectronAPI {
   oidcLogin(url: string, providerKey: string): Promise<ApiResult<void>>
   checkAuth(): Promise<boolean>
   logout(): Promise<void>
+  testNotification(): Promise<void>
+  rescheduleNotifications(): Promise<void>
   applyQuickEntrySettings(): Promise<void>
 
   // Window controls

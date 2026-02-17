@@ -53,6 +53,17 @@ export interface AppConfig {
   viewer_filter?: ViewerFilter
   launch_on_startup?: boolean
   standalone_mode?: boolean
+  // Notifications
+  notifications_enabled?: boolean
+  notifications_persistent?: boolean
+  notifications_daily_reminder_enabled?: boolean
+  notifications_daily_reminder_time?: string
+  notifications_secondary_reminder_enabled?: boolean
+  notifications_secondary_reminder_time?: string
+  notifications_overdue_enabled?: boolean
+  notifications_due_today_enabled?: boolean
+  notifications_upcoming_enabled?: boolean
+  notifications_sound?: boolean
 }
 
 const CONFIG_FILENAME = 'config.json'
@@ -124,6 +135,19 @@ function normalizeConfig(raw: Record<string, unknown>): AppConfig {
     },
     launch_on_startup: raw.launch_on_startup === true,
     standalone_mode: raw.standalone_mode === true,
+    // Notifications
+    notifications_enabled: raw.notifications_enabled === true,
+    notifications_persistent: raw.notifications_persistent === true,
+    notifications_daily_reminder_enabled: raw.notifications_daily_reminder_enabled !== false,
+    notifications_daily_reminder_time: typeof raw.notifications_daily_reminder_time === 'string'
+      ? raw.notifications_daily_reminder_time : '08:00',
+    notifications_secondary_reminder_enabled: raw.notifications_secondary_reminder_enabled === true,
+    notifications_secondary_reminder_time: typeof raw.notifications_secondary_reminder_time === 'string'
+      ? raw.notifications_secondary_reminder_time : '16:00',
+    notifications_overdue_enabled: raw.notifications_overdue_enabled !== false,
+    notifications_due_today_enabled: raw.notifications_due_today_enabled !== false,
+    notifications_upcoming_enabled: raw.notifications_upcoming_enabled === true,
+    notifications_sound: raw.notifications_sound !== false,
   }
 }
 

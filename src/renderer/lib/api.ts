@@ -104,6 +104,12 @@ export const api = {
   logout: () =>
     window.api.logout() as Promise<void>,
 
+  testNotification: () =>
+    window.api.testNotification() as Promise<void>,
+
+  rescheduleNotifications: () =>
+    window.api.rescheduleNotifications() as Promise<void>,
+
   applyQuickEntrySettings: () =>
     window.api.applyQuickEntrySettings() as Promise<{ entry: boolean; viewer: boolean }>,
 

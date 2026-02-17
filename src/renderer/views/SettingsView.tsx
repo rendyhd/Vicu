@@ -5,11 +5,12 @@ import { applyTheme } from '@/lib/theme'
 import { TokenPermissionsInfo } from '@/views/SetupView'
 import { QuickEntrySettings } from '@/components/settings/QuickEntrySettings'
 import { KeyboardShortcuts } from '@/components/settings/KeyboardShortcuts'
+import { NotificationSettings } from '@/components/settings/NotificationSettings'
 import type { AppConfig, Project } from '@/lib/vikunja-types'
 
 import type { ThemeOption } from '@/lib/theme'
 
-type SettingsTab = 'general' | 'shortcuts'
+type SettingsTab = 'general' | 'notifications' | 'shortcuts'
 
 export function SettingsView() {
   const [activeTab, setActiveTab] = useState<SettingsTab>('general')
@@ -79,6 +80,8 @@ export function SettingsView() {
     await api.saveConfig(config)
     // Apply Quick Entry settings (re-register hotkeys, tray, etc.)
     const result = await api.applyQuickEntrySettings()
+    // Reschedule notifications with new config
+    await api.rescheduleNotifications()
     setHotkeyWarnings(result)
     setSaveStatus('saved')
     setTimeout(() => setSaveStatus('idle'), 2000)
@@ -106,6 +109,7 @@ export function SettingsView() {
       <div className="flex gap-1 border-b border-[var(--border-color)] px-6">
         {([
           { key: 'general' as const, label: 'General' },
+          { key: 'notifications' as const, label: 'Notifications' },
           { key: 'shortcuts' as const, label: 'Keyboard Shortcuts' },
         ]).map((tab) => (
           <button
@@ -126,6 +130,13 @@ export function SettingsView() {
 
       {activeTab === 'shortcuts' ? (
         <KeyboardShortcuts />
+      ) : activeTab === 'notifications' ? (
+        fullConfig && (
+          <NotificationSettings
+            config={fullConfig}
+            onChange={handleQuickEntryChange}
+          />
+        )
       ) : (
       <div className="mx-6 max-w-lg space-y-6 pb-8 pt-4">
         <div className="rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] p-5">
