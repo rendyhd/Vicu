@@ -25,6 +25,16 @@
     <textarea id="description-input" class="description-input hidden"
               placeholder="Description..." rows="4"></textarea>
     <div id="today-hint-below" class="today-hint hidden">scheduling for Today</div>
+    <div id="obsidian-hint" class="obsidian-hint hidden">
+      <span class="obsidian-hint-key">Ctrl+L</span> to link <span id="obsidian-hint-name"></span>
+    </div>
+    <div id="obsidian-badge" class="obsidian-badge hidden">
+      <svg class="obsidian-badge-icon" width="12" height="12" viewBox="0 0 100 100">
+        <path d="M68.6 2.2 32.8 19.8a4 4 0 0 0-2.2 2.7L18.2 80.1a4 4 0 0 0 1 3.7l16.7 16a4 4 0 0 0 3.6 1.1l42-9.6a4 4 0 0 0 2.8-2.3L97.7 46a4 4 0 0 0-.5-3.8L72.3 3a4 4 0 0 0-3.7-1.8z" fill="currentColor"/>
+      </svg>
+      <span id="obsidian-badge-name"></span>
+      <button id="obsidian-badge-remove" class="obsidian-badge-remove" title="Remove link">&times;</button>
+    </div>
     <div id="error-message" class="error-message" hidden></div>
     <div id="pending-indicator" class="pending-indicator hidden">
       <span id="pending-count">0</span> task(s) pending sync

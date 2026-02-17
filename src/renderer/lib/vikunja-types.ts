@@ -154,6 +154,7 @@ export interface AppConfig {
   custom_lists?: CustomList[]
   // Quick Entry / Quick View
   quick_entry_enabled?: boolean
+  quick_view_enabled?: boolean
   quick_entry_hotkey?: string
   quick_view_hotkey?: string
   quick_entry_default_project_id?: number
@@ -165,4 +166,9 @@ export interface AppConfig {
   viewer_filter?: ViewerFilter
   launch_on_startup?: boolean
   standalone_mode?: boolean
+  // Obsidian
+  obsidian_mode?: 'off' | 'ask' | 'always'
+  obsidian_api_key?: string
+  obsidian_port?: number
+  obsidian_vault_name?: string
 }

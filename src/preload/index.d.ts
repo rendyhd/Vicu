@@ -47,6 +47,10 @@ export interface ElectronAPI {
   refreshTaskReminders(): Promise<void>
   applyQuickEntrySettings(): Promise<void>
 
+  // Obsidian
+  openDeepLink(url: string): Promise<void>
+  testObsidianConnection(): Promise<{ success: boolean; error?: string; data?: unknown }>
+
   // Window controls
   windowMinimize(): Promise<void>
   windowMaximize(): Promise<void>

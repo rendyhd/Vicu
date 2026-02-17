@@ -26,4 +26,5 @@ contextBridge.exposeInMainWorld('quickViewApi', {
   onDragHover: (callback: (_event: unknown, hovering: boolean) => void) => {
     ipcRenderer.on('drag-hover', callback)
   },
+  openDeepLink: (url: string) => ipcRenderer.invoke('open-deep-link', url),
 })

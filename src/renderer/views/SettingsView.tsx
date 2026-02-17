@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { api } from '@/lib/api'
 import { cn } from '@/lib/cn'
 import { applyTheme } from '@/lib/theme'
 import { TokenPermissionsInfo } from '@/views/SetupView'
 import { QuickEntrySettings } from '@/components/settings/QuickEntrySettings'
+import { ObsidianSettings } from '@/components/settings/ObsidianSettings'
 import { KeyboardShortcuts } from '@/components/settings/KeyboardShortcuts'
 import { NotificationSettings } from '@/components/settings/NotificationSettings'
 import type { AppConfig, Project } from '@/lib/vikunja-types'
@@ -24,11 +25,15 @@ export function SettingsView() {
   const [projects, setProjects] = useState<Project[]>([])
   const [testStatus, setTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle')
   const [testError, setTestError] = useState('')
-  const [saveStatus, setSaveStatus] = useState<'idle' | 'saved'>('idle')
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle')
   const [hotkeyWarnings, setHotkeyWarnings] = useState<{ entry: boolean; viewer: boolean } | undefined>(undefined)
 
   // Keep full config for preserving fields during save
   const [fullConfig, setFullConfig] = useState<AppConfig | null>(null)
+
+  // Auto-save with debounce
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const pendingConfigRef = useRef<AppConfig | null>(null)
 
   useEffect(() => {
     api.getConfig().then((config) => {
@@ -58,34 +63,44 @@ export function SettingsView() {
     if (result.success) {
       setTestStatus('success')
       setProjects(result.data)
+      // Auto-save connection settings on successful test
+      handleQuickEntryChange({
+        vikunja_url: url,
+        api_token: authMethod === 'api_token' ? token : '',
+        auth_method: authMethod,
+      })
     } else {
       setTestStatus('error')
       setTestError(result.error)
     }
   }
 
-  const handleQuickEntryChange = (partial: Partial<AppConfig>) => {
-    setFullConfig((prev) => prev ? { ...prev, ...partial } : null)
-  }
-
-  const handleSave = async () => {
-    const config: AppConfig = {
-      ...fullConfig,
-      vikunja_url: url,
-      api_token: authMethod === 'api_token' ? token : '',
-      inbox_project_id: inboxProjectId,
-      auth_method: authMethod,
-      theme,
-    }
+  const flushSave = useCallback(async (config: AppConfig) => {
+    setSaveStatus('saving')
     await api.saveConfig(config)
-    // Apply Quick Entry settings (re-register hotkeys, tray, etc.)
     const result = await api.applyQuickEntrySettings()
-    // Reschedule notifications with new config
     await api.rescheduleNotifications()
     setHotkeyWarnings(result)
     setSaveStatus('saved')
     setTimeout(() => setSaveStatus('idle'), 2000)
-  }
+  }, [])
+
+  const scheduleSave = useCallback((config: AppConfig) => {
+    pendingConfigRef.current = config
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
+    saveTimerRef.current = setTimeout(() => {
+      if (pendingConfigRef.current) flushSave(pendingConfigRef.current)
+    }, 500)
+  }, [flushSave])
+
+  const handleQuickEntryChange = useCallback((partial: Partial<AppConfig>) => {
+    setFullConfig((prev) => {
+      if (!prev) return null
+      const next = { ...prev, ...partial }
+      scheduleSave(next)
+      return next
+    })
+  }, [scheduleSave])
 
   const handleLogout = async () => {
     await api.logout()
@@ -241,7 +256,7 @@ export function SettingsView() {
               <label className="mb-1 block text-xs text-[var(--text-secondary)]">Inbox Project</label>
               <select
                 value={inboxProjectId}
-                onChange={(e) => setInboxProjectId(Number(e.target.value))}
+                onChange={(e) => { const id = Number(e.target.value); setInboxProjectId(id); handleQuickEntryChange({ inbox_project_id: id }) }}
                 className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] focus:border-accent-blue focus:outline-none"
               >
                 <option value={0}>Select a project...</option>
@@ -269,7 +284,7 @@ export function SettingsView() {
                       name="theme"
                       value={opt}
                       checked={theme === opt}
-                      onChange={() => { setTheme(opt); applyTheme(opt) }}
+                      onChange={() => { setTheme(opt); applyTheme(opt); handleQuickEntryChange({ theme: opt }) }}
                       className="sr-only"
                     />
                     {opt.charAt(0).toUpperCase() + opt.slice(1)}
@@ -301,18 +316,19 @@ export function SettingsView() {
           />
         )}
 
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={handleSave}
-            className="rounded-md bg-accent-blue px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-blue/90"
-          >
-            Save Settings
-          </button>
-          {saveStatus === 'saved' && (
-            <span className="text-xs text-accent-green">Saved</span>
-          )}
-        </div>
+        {fullConfig && (
+          <ObsidianSettings
+            config={fullConfig}
+            onChange={handleQuickEntryChange}
+          />
+        )}
+
+        {saveStatus === 'saving' && (
+          <p className="text-xs text-[var(--text-secondary)]">Saving...</p>
+        )}
+        {saveStatus === 'saved' && (
+          <p className="text-xs text-accent-green">Settings saved</p>
+        )}
       </div>
       )}
     </div>

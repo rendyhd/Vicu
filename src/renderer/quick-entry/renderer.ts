@@ -9,6 +9,9 @@ declare global {
       onHideWindow(callback: () => void): void
       onSyncCompleted(callback: () => void): void
       onDragHover(callback: (_event: unknown, hovering: boolean) => void): void
+      onObsidianContext(callback: (context: {
+        deepLink: string; noteName: string; vaultName: string; isUidBased: boolean; mode: 'ask' | 'always'
+      } | null) => void): void
     }
   }
 }
@@ -35,12 +38,19 @@ const projectName = document.getElementById('project-name')!
 const pendingIndicator = document.getElementById('pending-indicator')!
 const pendingCountEl = document.getElementById('pending-count')!
 const dragHandle = document.querySelector('.drag-handle')!
+const obsidianHint = document.getElementById('obsidian-hint')!
+const obsidianHintName = document.getElementById('obsidian-hint-name')!
+const obsidianBadge = document.getElementById('obsidian-badge')!
+const obsidianBadgeName = document.getElementById('obsidian-badge-name')!
+const obsidianBadgeRemove = document.getElementById('obsidian-badge-remove')!
 
 let errorTimeout: ReturnType<typeof setTimeout> | null = null
 let exclamationTodayEnabled = true
 let projectCycle: Array<{ id: number; title: string | null }> = []
 let currentProjectIndex = 0
 let projectCycleModifier = 'ctrl'
+let obsidianContext: { deepLink: string; noteName: string; isUidBased: boolean } | null = null
+let obsidianLinked = false
 
 function showError(msg: string): void {
   errorMessage.textContent = msg
@@ -164,6 +174,33 @@ function cycleProject(direction: number): void {
   updateProjectHint()
 }
 
+function updateObsidianUI(): void {
+  if (!obsidianContext) {
+    obsidianHint.classList.add('hidden')
+    obsidianBadge.classList.add('hidden')
+    return
+  }
+  if (obsidianLinked) {
+    obsidianBadgeName.textContent = obsidianContext.noteName
+    obsidianBadge.classList.remove('hidden')
+    obsidianHint.classList.add('hidden')
+  } else {
+    obsidianHintName.textContent = `"${obsidianContext.noteName}"`
+    obsidianHint.classList.remove('hidden')
+    obsidianBadge.classList.add('hidden')
+  }
+}
+
+function escapeHtml(str: string): string {
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+}
+
+function buildNoteLinkHtml(deepLink: string, noteName: string): string {
+  const safeLink = escapeHtml(deepLink)
+  const safeName = escapeHtml(noteName)
+  return `<!-- notelink:${safeLink} --><p><a href="${safeLink}">\u{1F4CE} ${safeName}</a></p>`
+}
+
 function isProjectCycleModifierPressed(e: KeyboardEvent): boolean {
   switch (projectCycleModifier) {
     case 'alt':
@@ -180,7 +217,13 @@ async function saveTask(): Promise<void> {
   let title = input.value.trim()
   if (!title) return
 
-  const description = descriptionInput.value.trim()
+  let description: string | null = descriptionInput.value.trim() || null
+
+  // Inject Obsidian note link into description
+  if (obsidianLinked && obsidianContext) {
+    const linkHtml = buildNoteLinkHtml(obsidianContext.deepLink, obsidianContext.noteName)
+    description = description ? `<p>${escapeHtml(description)}</p>${linkHtml}` : linkHtml
+  }
 
   let dueDate: string | null = null
   if (exclamationTodayEnabled && title.includes('!')) {
@@ -216,6 +259,9 @@ async function saveTask(): Promise<void> {
 window.quickEntryApi.onHideWindow(() => {
   container.classList.remove('visible')
   resetInput()
+  obsidianContext = null
+  obsidianLinked = false
+  updateObsidianUI()
 })
 
 // When the main process signals the window is shown
@@ -248,6 +294,14 @@ window.quickEntryApi.onDragHover((_: unknown, hovering: boolean) => {
 
 // Keyboard handling on title input
 input.addEventListener('keydown', async (e) => {
+  if (e.ctrlKey && e.key === 'l') {
+    e.preventDefault()
+    if (obsidianContext) {
+      obsidianLinked = !obsidianLinked
+      updateObsidianUI()
+    }
+    return
+  }
   if (isProjectCycleModifierPressed(e) && e.key === 'ArrowRight') {
     e.preventDefault()
     cycleProject(1)
@@ -276,6 +330,14 @@ input.addEventListener('keydown', async (e) => {
 
 // Keyboard handling on description textarea
 descriptionInput.addEventListener('keydown', async (e) => {
+  if (e.ctrlKey && e.key === 'l') {
+    e.preventDefault()
+    if (obsidianContext) {
+      obsidianLinked = !obsidianLinked
+      updateObsidianUI()
+    }
+    return
+  }
   if (isProjectCycleModifierPressed(e) && e.key === 'ArrowRight') {
     e.preventDefault()
     cycleProject(1)
@@ -300,6 +362,25 @@ descriptionInput.addEventListener('keydown', async (e) => {
 // Detect ! in task title to show today scheduling hint
 input.addEventListener('input', () => {
   updateTodayHints()
+})
+
+// Obsidian badge remove button
+obsidianBadgeRemove.addEventListener('click', () => {
+  obsidianLinked = false
+  updateObsidianUI()
+})
+
+// Obsidian context listener
+window.quickEntryApi.onObsidianContext((ctx) => {
+  if (!ctx) {
+    obsidianContext = null
+    obsidianLinked = false
+    updateObsidianUI()
+    return
+  }
+  obsidianContext = { deepLink: ctx.deepLink, noteName: ctx.noteName, isUidBased: ctx.isUidBased }
+  obsidianLinked = ctx.mode === 'always'
+  updateObsidianUI()
 })
 
 // Load config on startup

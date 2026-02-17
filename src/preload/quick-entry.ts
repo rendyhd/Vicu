@@ -18,4 +18,9 @@ contextBridge.exposeInMainWorld('quickEntryApi', {
   onDragHover: (callback: (_event: unknown, hovering: boolean) => void) => {
     ipcRenderer.on('drag-hover', callback)
   },
+  onObsidianContext: (callback: (context: {
+    deepLink: string; noteName: string; vaultName: string; isUidBased: boolean; mode: 'ask' | 'always'
+  } | null) => void) => {
+    ipcRenderer.on('obsidian-context', (_event, context) => callback(context))
+  },
 })

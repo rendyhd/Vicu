@@ -17,6 +17,7 @@ import { LabelPickerPopover } from './LabelPickerPopover'
 import { SubtaskList } from './SubtaskList'
 import { ProjectPickerPopover } from './ProjectPickerPopover'
 import { ReminderPickerPopover } from './ReminderPickerPopover'
+import { ObsidianLinkIcon } from '@/components/ObsidianLinkIcon'
 
 type PopoverType = 'date' | 'label' | 'project' | 'subtasks' | 'reminder' | null
 
@@ -214,6 +215,8 @@ export function TaskRow({ task, sortable = false }: TaskRowProps) {
         >
           {task.title}
         </span>
+
+        <ObsidianLinkIcon description={task.description} />
 
         <div className="flex items-center gap-2">
           {labels.length > 0 && (

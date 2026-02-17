@@ -77,6 +77,10 @@ const api = {
   refreshTaskReminders: () =>
     ipcRenderer.invoke('notifications:refresh-task-reminders'),
 
+  // Obsidian
+  openDeepLink: (url: string) => ipcRenderer.invoke('open-deep-link', url),
+  testObsidianConnection: () => ipcRenderer.invoke('test-obsidian-connection'),
+
   // Quick Entry settings
   applyQuickEntrySettings: () =>
     ipcRenderer.invoke('apply-quick-entry-settings') as Promise<{ entry: boolean; viewer: boolean }>,

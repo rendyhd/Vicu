@@ -12,8 +12,11 @@ interface QuickEntrySettingsProps {
 
 
 export function QuickEntrySettings({ config, projects, onChange, hotkeyWarnings }: QuickEntrySettingsProps) {
-  const [expanded, setExpanded] = useState(config.quick_entry_enabled ?? false)
-  const enabled = config.quick_entry_enabled ?? false
+  const [expanded, setExpanded] = useState(
+    (config.quick_entry_enabled ?? false) || (config.quick_view_enabled !== false)
+  )
+  const entryEnabled = config.quick_entry_enabled ?? false
+  const viewEnabled = config.quick_view_enabled !== false
   const viewerFilter = config.viewer_filter ?? {
     project_ids: [],
     sort_by: 'due_date',
@@ -56,20 +59,33 @@ export function QuickEntrySettings({ config, projects, onChange, hotkeyWarnings 
 
       {expanded && (
         <div className="mt-4 space-y-4">
-          {/* Enable toggle */}
-          <label className="flex cursor-pointer items-center gap-2">
-            <input
-              type="checkbox"
-              checked={enabled}
-              onChange={(e) => onChange({ quick_entry_enabled: e.target.checked })}
-              className="h-4 w-4 rounded border-[var(--border-color)] accent-accent-blue"
-            />
-            <span className="text-sm text-[var(--text-primary)]">
-              Enable Quick Entry & Quick View
-            </span>
-          </label>
+          {/* Enable toggles */}
+          <div className="space-y-2">
+            <label className="flex cursor-pointer items-center gap-2">
+              <input
+                type="checkbox"
+                checked={entryEnabled}
+                onChange={(e) => onChange({ quick_entry_enabled: e.target.checked })}
+                className="h-4 w-4 rounded border-[var(--border-color)] accent-accent-blue"
+              />
+              <span className="text-sm text-[var(--text-primary)]">
+                Enable Quick Entry
+              </span>
+            </label>
+            <label className="flex cursor-pointer items-center gap-2">
+              <input
+                type="checkbox"
+                checked={viewEnabled}
+                onChange={(e) => onChange({ quick_view_enabled: e.target.checked })}
+                className="h-4 w-4 rounded border-[var(--border-color)] accent-accent-blue"
+              />
+              <span className="text-sm text-[var(--text-primary)]">
+                Enable Quick View
+              </span>
+            </label>
+          </div>
 
-          {enabled && (
+          {entryEnabled && (
             <>
               {/* Quick Entry section */}
               <div className="space-y-3 border-t border-[var(--border-color)] pt-4">
@@ -173,7 +189,11 @@ export function QuickEntrySettings({ config, projects, onChange, hotkeyWarnings 
                 </div>
 
               </div>
+            </>
+          )}
 
+          {viewEnabled && (
+            <>
               {/* Quick View section */}
               <div className="space-y-3 border-t border-[var(--border-color)] pt-4">
                 <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
@@ -255,7 +275,11 @@ export function QuickEntrySettings({ config, projects, onChange, hotkeyWarnings 
                   </span>
                 </label>
               </div>
+            </>
+          )}
 
+          {(entryEnabled || viewEnabled) && (
+            <>
               {/* Launch on startup */}
               <div className="border-t border-[var(--border-color)] pt-4">
                 <label className="flex cursor-pointer items-center gap-2">

@@ -15,6 +15,7 @@ declare global {
       onShowWindow(callback: () => void): void
       onSyncCompleted(callback: () => void): void
       onDragHover(callback: (_event: unknown, hovering: boolean) => void): void
+      openDeepLink(url: string): Promise<void>
     }
   }
 }
@@ -51,6 +52,8 @@ interface ActionResult {
 interface QuickViewConfig {
   standalone_mode: boolean
 }
+
+import { extractNoteLink } from '@/lib/note-link'
 
 const container = document.getElementById('container')!
 const taskList = document.getElementById('task-list')!
@@ -204,6 +207,16 @@ function buildTaskItemDOM(task: TaskData): HTMLElement {
     })
   }
   titleRow.appendChild(title)
+
+  const noteLink = extractNoteLink(task.description)
+  if (noteLink) {
+    const btn = document.createElement('button')
+    btn.className = 'obsidian-link-btn'
+    btn.title = `Open "${noteLink.name}" in Obsidian`
+    btn.innerHTML = `<svg width="12" height="12" viewBox="0 0 100 100"><path d="M68.6 2.2 32.8 19.8a4 4 0 0 0-2.2 2.7L18.2 80.1a4 4 0 0 0 1 3.7l16.7 16a4 4 0 0 0 3.6 1.1l42-9.6a4 4 0 0 0 2.8-2.3L97.7 46a4 4 0 0 0-.5-3.8L72.3 3a4 4 0 0 0-3.7-1.8z" fill="currentColor"/></svg>`
+    btn.addEventListener('click', (e) => { e.stopPropagation(); window.quickViewApi.openDeepLink(noteLink.url) })
+    titleRow.appendChild(btn)
+  }
 
   if (task.description) {
     const descIcon = document.createElement('span')

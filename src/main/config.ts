@@ -42,6 +42,7 @@ export interface AppConfig {
   }>
   // Quick Entry / Quick View
   quick_entry_enabled?: boolean
+  quick_view_enabled?: boolean
   quick_entry_hotkey?: string
   quick_view_hotkey?: string
   quick_entry_default_project_id?: number
@@ -53,6 +54,11 @@ export interface AppConfig {
   viewer_filter?: ViewerFilter
   launch_on_startup?: boolean
   standalone_mode?: boolean
+  // Obsidian
+  obsidian_mode?: 'off' | 'ask' | 'always'
+  obsidian_api_key?: string
+  obsidian_port?: number
+  obsidian_vault_name?: string
   // Notifications
   notifications_enabled?: boolean
   notifications_persistent?: boolean
@@ -115,6 +121,7 @@ function normalizeConfig(raw: Record<string, unknown>): AppConfig {
     custom_lists: Array.isArray(raw.custom_lists) ? raw.custom_lists as AppConfig['custom_lists'] : undefined,
     // Quick Entry / Quick View
     quick_entry_enabled: raw.quick_entry_enabled === true,
+    quick_view_enabled: raw.quick_view_enabled !== false,
     quick_entry_hotkey: typeof raw.quick_entry_hotkey === 'string' ? raw.quick_entry_hotkey : 'Alt+Shift+V',
     quick_view_hotkey: typeof raw.quick_view_hotkey === 'string' ? raw.quick_view_hotkey : 'Alt+Shift+B',
     quick_entry_default_project_id: typeof raw.quick_entry_default_project_id === 'number'
@@ -135,6 +142,11 @@ function normalizeConfig(raw: Record<string, unknown>): AppConfig {
     },
     launch_on_startup: raw.launch_on_startup === true,
     standalone_mode: raw.standalone_mode === true,
+    // Obsidian
+    obsidian_mode: raw.obsidian_mode === 'off' || raw.obsidian_mode === 'always' ? raw.obsidian_mode : 'ask',
+    obsidian_api_key: typeof raw.obsidian_api_key === 'string' ? raw.obsidian_api_key : '',
+    obsidian_port: typeof raw.obsidian_port === 'number' ? raw.obsidian_port : 27124,
+    obsidian_vault_name: typeof raw.obsidian_vault_name === 'string' ? raw.obsidian_vault_name : '',
     // Notifications
     notifications_enabled: raw.notifications_enabled === true,
     notifications_persistent: raw.notifications_persistent === true,

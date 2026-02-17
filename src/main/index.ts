@@ -7,6 +7,7 @@ import { createTray, destroyTray, hasTray } from './tray'
 import { returnFocusToPreviousWindow } from './focus'
 import { registerQuickEntryState } from './quick-entry-state'
 import { initNotifications, rescheduleNotifications, stopNotifications } from './notifications'
+import { getObsidianContext, type ObsidianNoteContext } from './obsidian-client'
 
 let mainWindow: BrowserWindow | null = null
 let quickEntryWindow: BrowserWindow | null = null
@@ -77,9 +78,18 @@ let quickViewShowTime = 0
 const BLUR_DEBOUNCE_MS = 300
 
 // --- Quick Entry show/hide ---
-function showQuickEntry(): void {
+async function showQuickEntry(): Promise<void> {
   if (!quickEntryWindow) return
   const config = loadConfig()
+
+  // Obsidian detection — run before show, but never block
+  let obsidianContext: ObsidianNoteContext | null = null
+  if (config?.obsidian_mode && config.obsidian_mode !== 'off' && config.obsidian_api_key) {
+    obsidianContext = await Promise.race([
+      getObsidianContext(),
+      new Promise<null>(resolve => setTimeout(() => resolve(null), 350))
+    ])
+  }
 
   if (config?.quick_entry_position) {
     const displays = screen.getAllDisplays()
@@ -103,6 +113,14 @@ function showQuickEntry(): void {
   quickEntryShowTime = Date.now()
   quickEntryWindow.webContents.send('window-shown')
   startDragHoverPolling()
+
+  // Send Obsidian context after show
+  if (obsidianContext && config?.obsidian_mode) {
+    quickEntryWindow.webContents.send('obsidian-context', {
+      ...obsidianContext,
+      mode: config.obsidian_mode,
+    })
+  }
 }
 
 function centerQuickEntry(): void {
@@ -197,20 +215,24 @@ function setViewerHeight(height: number): void {
 function registerQuickEntryShortcuts(config: AppConfig): { entry: boolean; viewer: boolean } {
   const result = { entry: false, viewer: false }
 
-  const entryHotkey = config.quick_entry_hotkey || 'Alt+Shift+V'
-  try {
-    result.entry = globalShortcut.register(entryHotkey, toggleQuickEntry)
-    if (!result.entry) console.error(`Failed to register Quick Entry shortcut: ${entryHotkey}`)
-  } catch (err) {
-    console.error(`Error registering entry shortcut "${entryHotkey}":`, err)
+  if (config.quick_entry_enabled) {
+    const entryHotkey = config.quick_entry_hotkey || 'Alt+Shift+V'
+    try {
+      result.entry = globalShortcut.register(entryHotkey, toggleQuickEntry)
+      if (!result.entry) console.error(`Failed to register Quick Entry shortcut: ${entryHotkey}`)
+    } catch (err) {
+      console.error(`Error registering entry shortcut "${entryHotkey}":`, err)
+    }
   }
 
-  const viewerHotkey = config.quick_view_hotkey || 'Alt+Shift+B'
-  try {
-    result.viewer = globalShortcut.register(viewerHotkey, toggleQuickView)
-    if (!result.viewer) console.error(`Failed to register Quick View shortcut: ${viewerHotkey}`)
-  } catch (err) {
-    console.error(`Error registering viewer shortcut "${viewerHotkey}":`, err)
+  if (config.quick_view_enabled !== false) {
+    const viewerHotkey = config.quick_view_hotkey || 'Alt+Shift+B'
+    try {
+      result.viewer = globalShortcut.register(viewerHotkey, toggleQuickView)
+      if (!result.viewer) console.error(`Failed to register Quick View shortcut: ${viewerHotkey}`)
+    } catch (err) {
+      console.error(`Error registering viewer shortcut "${viewerHotkey}":`, err)
+    }
   }
 
   return result
@@ -238,7 +260,7 @@ function setupTray(): void {
 
 // --- Quick Entry/View initialization ---
 function initQuickEntryWindows(config: AppConfig): void {
-  if (!quickEntryWindow) {
+  if (config.quick_entry_enabled && !quickEntryWindow) {
     quickEntryWindow = createQuickEntryWindow(config)
     quickEntryWindow.on('close', (e) => {
       if (!app.isQuitting) {
@@ -262,7 +284,7 @@ function initQuickEntryWindows(config: AppConfig): void {
     })
   }
 
-  if (!quickViewWindow) {
+  if (config.quick_view_enabled !== false && !quickViewWindow) {
     quickViewWindow = createQuickViewWindow(config)
     quickViewWindow.on('close', (e) => {
       if (!app.isQuitting) {
@@ -305,15 +327,27 @@ function applyQuickEntrySettings(): { entry: boolean; viewer: boolean } {
   // Unregister existing shortcuts
   globalShortcut.unregisterAll()
 
-  if (config.quick_entry_enabled) {
+  const eitherEnabled = config.quick_entry_enabled || config.quick_view_enabled !== false
+
+  if (eitherEnabled) {
     setupTray()
     initQuickEntryWindows(config)
     const result = registerQuickEntryShortcuts(config)
 
+    // Clean up windows that were disabled
+    if (!config.quick_entry_enabled && quickEntryWindow && !quickEntryWindow.isDestroyed()) {
+      quickEntryWindow.destroy()
+      quickEntryWindow = null
+    }
+    if (config.quick_view_enabled === false && quickViewWindow && !quickViewWindow.isDestroyed()) {
+      quickViewWindow.destroy()
+      quickViewWindow = null
+    }
+
     app.setLoginItemSettings({ openAtLogin: config.launch_on_startup === true })
     return result
   } else {
-    // Clean up quick entry windows and tray
+    // Clean up all windows and tray
     if (quickEntryWindow && !quickEntryWindow.isDestroyed()) {
       quickEntryWindow.destroy()
       quickEntryWindow = null
@@ -352,6 +386,23 @@ if (!gotLock) {
       mainWindow.focus()
     }
   })
+
+  // Allow self-signed certs for Obsidian Local REST API (localhost only)
+  app.on('certificate-error', (event, _webContents, url, _error, _certificate, callback) => {
+    try {
+      const parsed = new URL(url)
+      const config = loadConfig()
+      const port = config?.obsidian_port || 27124
+      if (parsed.hostname === '127.0.0.1' && parsed.port === String(port)) {
+        event.preventDefault()
+        callback(true)
+        return
+      }
+    } catch { /* fall through */ }
+    callback(false)
+  })
+
+  app.setAppUserModelId('com.vicu.app')
 
   app.whenReady().then(async () => {
     Menu.setApplicationMenu(null)
@@ -402,15 +453,15 @@ if (!gotLock) {
       rescheduleNotifications()
     })
 
-    // Quick Entry: if enabled, set up tray + windows + hotkeys
-    if (config?.quick_entry_enabled) {
+    // Quick Entry/View: if either enabled, set up tray + windows + hotkeys
+    if (config?.quick_entry_enabled || config?.quick_view_enabled !== false) {
       setupTray()
       initQuickEntryWindows(config)
       globalShortcut.unregisterAll() // Clear stale registrations from crashes
       registerQuickEntryShortcuts(config)
       app.setLoginItemSettings({ openAtLogin: config.launch_on_startup === true })
 
-      // When QE is enabled, hide main window on close instead of quitting
+      // When QE/QV is enabled, hide main window on close instead of quitting
       mainWindow.on('close', (e) => {
         if (!app.isQuitting) {
           e.preventDefault()

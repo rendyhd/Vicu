@@ -173,6 +173,50 @@ body {
   font-style: italic;
 }
 
+/* Obsidian hint */
+.obsidian-hint {
+  padding: 2px 16px;
+  font-size: 11px;
+  color: #7C3AED;
+  opacity: 0.6;
+}
+.obsidian-hint.hidden { display: none; }
+.obsidian-hint-key {
+  font-family: monospace;
+  background: rgba(124, 58, 237, 0.1);
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 10px;
+}
+
+/* Obsidian badge */
+.obsidian-badge {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  margin: 4px 16px 0;
+  border-radius: 10px;
+  background: rgba(124, 58, 237, 0.12);
+  color: #7C3AED;
+  font-size: 11px;
+  line-height: 1;
+  max-width: fit-content;
+}
+.obsidian-badge.hidden { display: none; }
+.obsidian-badge-icon { flex-shrink: 0; }
+.obsidian-badge-remove {
+  background: none;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  padding: 0 2px;
+  opacity: 0.6;
+}
+.obsidian-badge-remove:hover { opacity: 1; }
+
 /* Dark mode */
 @media (prefers-color-scheme: dark) {
   .drag-handle-pill {
@@ -225,4 +269,8 @@ body {
   .pending-indicator {
     color: #ecc94b;
   }
+
+  .obsidian-hint { color: #a78bfa; }
+  .obsidian-hint-key { background: rgba(124, 58, 237, 0.2); }
+  .obsidian-badge { background: rgba(124, 58, 237, 0.2); color: #a78bfa; }
 }

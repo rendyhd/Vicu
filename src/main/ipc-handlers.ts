@@ -36,6 +36,7 @@ import {
   applyQuickEntrySettings,
 } from './quick-entry-state'
 import { sendTestNotification, rescheduleNotifications, refreshTaskReminders } from './notifications'
+import { getActiveNote, testObsidianConnection } from './obsidian-client'
 import {
   addPendingAction,
   removePendingAction,
@@ -476,6 +477,33 @@ export function registerIpcHandlers(): void {
   // --- Standalone mode IPC ---
   ipcMain.handle('qe:get-standalone-task-count', () => {
     return getAllStandaloneTasks().length
+  })
+
+  // --- Obsidian IPC ---
+  const ALLOWED_EXTERNAL_PROTOCOLS = new Set(['https:', 'http:', 'obsidian:'])
+
+  ipcMain.handle('open-deep-link', (_event, url: string) => {
+    if (typeof url !== 'string') return
+    try {
+      const parsed = new URL(url)
+      if (ALLOWED_EXTERNAL_PROTOCOLS.has(parsed.protocol)) {
+        shell.openExternal(url)
+      }
+    } catch { /* invalid URL */ }
+  })
+
+  ipcMain.handle('test-obsidian-connection', async () => {
+    const config = loadConfig()
+    if (!config?.obsidian_api_key) return { success: false, error: 'No API key configured' }
+    try {
+      const result = await testObsidianConnection(config.obsidian_api_key, config.obsidian_port || 27124)
+      if (result.reachable) {
+        return { success: true, data: result.noteName ? { noteName: result.noteName } : null }
+      }
+      return { success: false, error: 'Cannot reach Obsidian. Is the Local REST API plugin enabled?' }
+    } catch {
+      return { success: false, error: 'Cannot reach Obsidian. Is the Local REST API plugin enabled?' }
+    }
   })
 
   ipcMain.handle('qe:upload-standalone-tasks', async (_event, projectId: number) => {
