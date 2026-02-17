@@ -18,6 +18,7 @@ import { SubtaskList } from './SubtaskList'
 import { ProjectPickerPopover } from './ProjectPickerPopover'
 import { ReminderPickerPopover } from './ReminderPickerPopover'
 import { ObsidianLinkIcon } from '@/components/ObsidianLinkIcon'
+import { stripNoteLink, extractNoteLinkHtml } from '@/lib/note-link'
 
 type PopoverType = 'date' | 'label' | 'project' | 'subtasks' | 'reminder' | null
 
@@ -84,7 +85,8 @@ export function TaskRow({ task, sortable = false }: TaskRowProps) {
   const { attributes, listeners, setNodeRef, isDragging, style } = useDragBehavior(task, sortable)
 
   const [editTitle, setEditTitle] = useState(task.title)
-  const [editDescription, setEditDescription] = useState(task.description)
+  const [editDescription, setEditDescription] = useState(stripNoteLink(task.description))
+  const noteLinkHtml = extractNoteLinkHtml(task.description)
   const [activePopover, setActivePopover] = useState<PopoverType>(null)
   const titleRef = useRef<HTMLInputElement>(null)
   const descRef = useRef<HTMLTextAreaElement>(null)
@@ -95,13 +97,21 @@ export function TaskRow({ task, sortable = false }: TaskRowProps) {
   }, [task.title])
 
   useEffect(() => {
-    setEditDescription(task.description)
+    setEditDescription(stripNoteLink(task.description))
   }, [task.description])
 
-  // Focus title input when expanded
+  // Focus title input when expanded, and auto-size description textarea
   useEffect(() => {
-    if (isExpanded && titleRef.current) {
-      titleRef.current.focus()
+    if (isExpanded) {
+      titleRef.current?.focus()
+      // Auto-size description textarea for existing content
+      if (descRef.current) {
+        const el = descRef.current
+        el.style.height = 'auto'
+        const maxH = 10 * 18
+        el.style.height = `${Math.min(el.scrollHeight, maxH)}px`
+        el.style.overflowY = el.scrollHeight > maxH ? 'auto' : 'hidden'
+      }
     }
   }, [isExpanded])
 
@@ -110,13 +120,14 @@ export function TaskRow({ task, sortable = false }: TaskRowProps) {
     if (editTitle.trim() && editTitle !== task.title) {
       changes.title = editTitle.trim()
     }
-    if (editDescription !== task.description) {
-      changes.description = editDescription
+    const fullDescription = noteLinkHtml ? (editDescription ? editDescription + noteLinkHtml : noteLinkHtml) : editDescription
+    if (fullDescription !== task.description) {
+      changes.description = fullDescription
     }
     if (Object.keys(changes).length > 0) {
       updateTask.mutate({ id: task.id, task: { ...task, ...changes } })
     }
-  }, [editTitle, editDescription, task, updateTask])
+  }, [editTitle, editDescription, noteLinkHtml, task, updateTask])
 
   const handleDateChange = useCallback(
     (isoDate: string) => {
@@ -269,6 +280,7 @@ export function TaskRow({ task, sortable = false }: TaskRowProps) {
           className="flex-1 bg-transparent text-[13px] font-medium text-[var(--text-primary)] placeholder:text-[var(--text-secondary)] focus:outline-none"
           placeholder="Task title"
         />
+        <ObsidianLinkIcon description={task.description} />
       </div>
 
       {/* Description */}
@@ -276,7 +288,15 @@ export function TaskRow({ task, sortable = false }: TaskRowProps) {
         <textarea
           ref={descRef}
           value={editDescription}
-          onChange={(e) => setEditDescription(e.target.value)}
+          onChange={(e) => {
+            setEditDescription(e.target.value)
+            // Auto-resize textarea
+            const el = e.target
+            el.style.height = 'auto'
+            const maxH = 10 * 18
+            el.style.height = `${Math.min(el.scrollHeight, maxH)}px`
+            el.style.overflowY = el.scrollHeight > maxH ? 'auto' : 'hidden'
+          }}
           onBlur={handleSave}
           onKeyDown={(e) => {
             if (e.key === 'Escape') {
@@ -285,8 +305,9 @@ export function TaskRow({ task, sortable = false }: TaskRowProps) {
             }
           }}
           placeholder="Notes"
-          rows={2}
-          className="w-full resize-none bg-transparent text-xs text-[var(--text-primary)] placeholder:text-[var(--text-secondary)] focus:outline-none"
+          rows={1}
+          className="custom-scrollbar w-full resize-none bg-transparent text-xs leading-[18px] text-[var(--text-primary)] placeholder:text-[var(--text-secondary)] focus:outline-none"
+          style={{ overflowY: 'hidden' }}
         />
       </div>
 

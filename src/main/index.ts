@@ -7,7 +7,7 @@ import { createTray, destroyTray, hasTray } from './tray'
 import { returnFocusToPreviousWindow } from './focus'
 import { registerQuickEntryState } from './quick-entry-state'
 import { initNotifications, rescheduleNotifications, stopNotifications } from './notifications'
-import { getObsidianContext, type ObsidianNoteContext } from './obsidian-client'
+import { getObsidianContext, isObsidianForeground, type ObsidianNoteContext } from './obsidian-client'
 
 let mainWindow: BrowserWindow | null = null
 let quickEntryWindow: BrowserWindow | null = null
@@ -82,9 +82,10 @@ async function showQuickEntry(): Promise<void> {
   if (!quickEntryWindow) return
   const config = loadConfig()
 
-  // Obsidian detection — run before show, but never block
+  // Obsidian detection — check foreground window instantly (koffi FFI, ~1μs),
+  // then fetch context only if Obsidian is actually focused
   let obsidianContext: ObsidianNoteContext | null = null
-  if (config?.obsidian_mode && config.obsidian_mode !== 'off' && config.obsidian_api_key) {
+  if (config?.obsidian_mode && config.obsidian_mode !== 'off' && config.obsidian_api_key && isObsidianForeground()) {
     obsidianContext = await Promise.race([
       getObsidianContext(),
       new Promise<null>(resolve => setTimeout(() => resolve(null), 350))
@@ -108,19 +109,19 @@ async function showQuickEntry(): Promise<void> {
     centerQuickEntry()
   }
 
-  quickEntryWindow.show()
-  quickEntryWindow.focus()
-  quickEntryShowTime = Date.now()
-  quickEntryWindow.webContents.send('window-shown')
-  startDragHoverPolling()
-
-  // Send Obsidian context after show
+  // Send Obsidian context BEFORE window-shown so renderer sets up UI before animating in
   if (obsidianContext && config?.obsidian_mode) {
     quickEntryWindow.webContents.send('obsidian-context', {
       ...obsidianContext,
       mode: config.obsidian_mode,
     })
   }
+
+  quickEntryWindow.show()
+  quickEntryWindow.focus()
+  quickEntryShowTime = Date.now()
+  quickEntryWindow.webContents.send('window-shown')
+  startDragHoverPolling()
 }
 
 function centerQuickEntry(): void {
