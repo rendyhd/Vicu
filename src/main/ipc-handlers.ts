@@ -43,6 +43,7 @@ import {
 } from './quick-entry-state'
 import { sendTestNotification, rescheduleNotifications, refreshTaskReminders } from './notifications'
 import { getActiveNote, testObsidianConnection } from './obsidian-client'
+import { isRegistered, registerHosts } from './browser-host-registration'
 import {
   addPendingAction,
   removePendingAction,
@@ -597,6 +598,33 @@ export function registerIpcHandlers(): void {
       return { success: false, uploaded, error: errors[0], totalErrors: errors.length }
     }
     return { success: true, uploaded }
+  })
+
+  // --- Browser Link IPC ---
+  ipcMain.handle('check-browser-host-registration', () => isRegistered())
+
+  ipcMain.handle('register-browser-hosts', () => {
+    const config = loadConfig()
+    registerHosts({
+      chromeExtensionId: config?.browser_extension_id || '',
+      firefoxExtensionId: 'browser-link@vicu.app',
+    })
+    return isRegistered()
+  })
+
+  ipcMain.handle('get-browser-extension-path', () => {
+    const base = app.isPackaged
+      ? path.join(process.resourcesPath, 'extensions', 'browser')
+      : path.join(app.getAppPath(), 'extensions', 'browser')
+    return base
+  })
+
+  ipcMain.handle('open-browser-extension-folder', () => {
+    const base = app.isPackaged
+      ? path.join(process.resourcesPath, 'extensions', 'browser')
+      : path.join(app.getAppPath(), 'extensions', 'browser')
+    const manifest = path.join(base, 'manifest.json')
+    shell.showItemInFolder(manifest)
   })
 }
 

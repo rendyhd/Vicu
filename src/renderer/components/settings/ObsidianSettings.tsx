@@ -4,9 +4,10 @@ import type { AppConfig } from '@/lib/vikunja-types'
 interface ObsidianSettingsProps {
   config: AppConfig
   onChange: (partial: Partial<AppConfig>) => void
+  disabled?: boolean
 }
 
-export function ObsidianSettings({ config, onChange }: ObsidianSettingsProps) {
+export function ObsidianSettings({ config, onChange, disabled }: ObsidianSettingsProps) {
   const [expanded, setExpanded] = useState(false)
   const [showKey, setShowKey] = useState(false)
   const [showSetupInfo, setShowSetupInfo] = useState(false)
@@ -28,17 +29,19 @@ export function ObsidianSettings({ config, onChange }: ObsidianSettingsProps) {
   }, [])
 
   return (
-    <div className="rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] p-5">
+    <div className={`rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] p-5${disabled ? ' opacity-50 pointer-events-none' : ''}`}>
       <button
         type="button"
-        className="flex w-full items-center justify-between"
-        onClick={() => setExpanded(!expanded)}
+        className="flex w-full items-center justify-between pointer-events-auto"
+        onClick={() => !disabled && setExpanded(!expanded)}
       >
-        <h2 className="text-sm font-semibold text-[var(--text-primary)]">Obsidian Integration</h2>
-        <span className="text-xs text-[var(--text-secondary)]">{expanded ? '\u25B2' : '\u25BC'}</span>
+        <h2 className="text-sm font-semibold text-[var(--text-primary)]">
+          Obsidian Integration{disabled ? ' (requires Quick Entry)' : ''}
+        </h2>
+        {!disabled && <span className="text-xs text-[var(--text-secondary)]">{expanded ? '\u25B2' : '\u25BC'}</span>}
       </button>
 
-      {expanded && (
+      {!disabled && expanded && (
         <div className="mt-4 space-y-3">
           <div>
             <label className="mb-1 block text-xs text-[var(--text-secondary)]">Note Linking</label>

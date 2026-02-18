@@ -432,6 +432,23 @@ html, body {
 }
 .obsidian-link-btn:hover { opacity: 1; background: rgba(124, 58, 237, 0.12); }
 
+/* Browser link button */
+.browser-link-btn {
+  -webkit-app-region: no-drag;
+  background: none;
+  border: none;
+  color: #2563EB;
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 3px;
+  display: inline-flex;
+  align-items: center;
+  opacity: 0.5;
+  transition: opacity 150ms, background 150ms;
+  flex-shrink: 0;
+}
+.browser-link-btn:hover { opacity: 1; background: rgba(37, 99, 235, 0.12); }
+
 /* Dark mode */
 @media (prefers-color-scheme: dark) {
   .drag-handle-pill {
@@ -587,4 +604,7 @@ html, body {
   .task-edit-hint {
     color: #555;
   }
+
+  .browser-link-btn { color: #60a5fa; }
+  .browser-link-btn:hover { background: rgba(96, 165, 250, 0.15); }
 }

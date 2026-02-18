@@ -122,6 +122,7 @@ export interface TaskQueryParams {
   sort_by?: string
   order_by?: string
   filter_include_nulls?: boolean
+  filter_timezone?: string
 }
 
 export type ApiResult<T> =
@@ -189,4 +190,7 @@ export interface AppConfig {
   obsidian_api_key?: string
   obsidian_port?: number
   obsidian_vault_name?: string
+  // Browser
+  browser_link_mode?: 'off' | 'ask' | 'always'
+  browser_extension_id?: string
 }

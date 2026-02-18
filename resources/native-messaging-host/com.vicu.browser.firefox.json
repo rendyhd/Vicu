@@ -1,0 +1,7 @@
+{
+  "name": "com.vicu.browser",
+  "description": "Vicu Browser Link native messaging bridge",
+  "path": "PLACEHOLDER_PATH",
+  "type": "stdio",
+  "allowed_extensions": ["browser-link@vicu.app"]
+}

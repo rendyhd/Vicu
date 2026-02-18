@@ -53,7 +53,7 @@ interface QuickViewConfig {
   standalone_mode: boolean
 }
 
-import { extractNoteLink } from '@/lib/note-link'
+import { extractTaskLink } from '@/lib/note-link'
 
 const container = document.getElementById('container')!
 const taskList = document.getElementById('task-list')!
@@ -208,13 +208,18 @@ function buildTaskItemDOM(task: TaskData): HTMLElement {
   }
   titleRow.appendChild(title)
 
-  const noteLink = extractNoteLink(task.description)
-  if (noteLink) {
+  const taskLink = extractTaskLink(task.description)
+  if (taskLink) {
     const btn = document.createElement('button')
-    btn.className = 'obsidian-link-btn'
-    btn.title = `Open "${noteLink.name}" in Obsidian`
-    btn.innerHTML = `<svg width="12" height="12" viewBox="0 0 100 100"><path d="M68.6 2.2 32.8 19.8a4 4 0 0 0-2.2 2.7L18.2 80.1a4 4 0 0 0 1 3.7l16.7 16a4 4 0 0 0 3.6 1.1l42-9.6a4 4 0 0 0 2.8-2.3L97.7 46a4 4 0 0 0-.5-3.8L72.3 3a4 4 0 0 0-3.7-1.8z" fill="currentColor"/></svg>`
-    btn.addEventListener('click', (e) => { e.stopPropagation(); window.quickViewApi.openDeepLink(noteLink.url) })
+    btn.className = taskLink.kind === 'note' ? 'obsidian-link-btn' : 'browser-link-btn'
+    btn.title = taskLink.kind === 'note' ? `Open "${taskLink.name}" in Obsidian` : `Open "${taskLink.title}"`
+    btn.innerHTML = taskLink.kind === 'note'
+      ? `<svg width="12" height="12" viewBox="0 0 100 100"><path d="M68.6 2.2 32.8 19.8a4 4 0 0 0-2.2 2.7L18.2 80.1a4 4 0 0 0 1 3.7l16.7 16a4 4 0 0 0 3.6 1.1l42-9.6a4 4 0 0 0 2.8-2.3L97.7 46a4 4 0 0 0-.5-3.8L72.3 3a4 4 0 0 0-3.7-1.8z" fill="currentColor"/></svg>`
+      : `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>`
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation()
+      window.quickViewApi.openDeepLink(taskLink.kind === 'note' ? taskLink.url : taskLink.url)
+    })
     titleRow.appendChild(btn)
   }
 

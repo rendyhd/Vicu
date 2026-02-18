@@ -93,6 +93,12 @@ const api = {
   openDeepLink: (url: string) => ipcRenderer.invoke('open-deep-link', url),
   testObsidianConnection: () => ipcRenderer.invoke('test-obsidian-connection'),
 
+  // Browser Link
+  checkBrowserHostRegistration: () => ipcRenderer.invoke('check-browser-host-registration'),
+  registerBrowserHosts: () => ipcRenderer.invoke('register-browser-hosts'),
+  getBrowserExtensionPath: () => ipcRenderer.invoke('get-browser-extension-path') as Promise<string>,
+  openBrowserExtensionFolder: () => ipcRenderer.invoke('open-browser-extension-folder'),
+
   // Quick Entry settings
   applyQuickEntrySettings: () =>
     ipcRenderer.invoke('apply-quick-entry-settings') as Promise<{ entry: boolean; viewer: boolean }>,

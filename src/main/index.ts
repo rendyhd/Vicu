@@ -7,7 +7,10 @@ import { createTray, destroyTray, hasTray } from './tray'
 import { returnFocusToPreviousWindow } from './focus'
 import { registerQuickEntryState } from './quick-entry-state'
 import { initNotifications, rescheduleNotifications, stopNotifications } from './notifications'
-import { getObsidianContext, isObsidianForeground, type ObsidianNoteContext } from './obsidian-client'
+import { getObsidianContext, getForegroundProcessName, isObsidianForeground, type ObsidianNoteContext } from './obsidian-client'
+import { getBrowserContext, type BrowserContext } from './browser-client'
+import { getBrowserUrlFromWindow, prewarmUrlReader, shutdownUrlReader, BROWSER_PROCESSES } from './window-url-reader'
+import { isRegistered, unregisterHosts } from './browser-host-registration'
 
 let mainWindow: BrowserWindow | null = null
 let quickEntryWindow: BrowserWindow | null = null
@@ -92,6 +95,22 @@ async function showQuickEntry(): Promise<void> {
     ])
   }
 
+  // Browser tab detection — only if Obsidian didn't match
+  let browserContext: BrowserContext | null = null
+  if (!obsidianContext && config?.browser_link_mode && config.browser_link_mode !== 'off') {
+    browserContext = getBrowserContext() // extension path (<1ms)
+    if (!browserContext) {
+      // Fallback: read URL bar directly via Windows UI Automation
+      const fgProcess = getForegroundProcessName()
+      if (BROWSER_PROCESSES.has(fgProcess)) {
+        browserContext = await Promise.race([
+          getBrowserUrlFromWindow(fgProcess),
+          new Promise<null>(resolve => setTimeout(() => resolve(null), 1500))
+        ])
+      }
+    }
+  }
+
   if (config?.quick_entry_position) {
     const displays = screen.getAllDisplays()
     const pos = config.quick_entry_position
@@ -114,6 +133,14 @@ async function showQuickEntry(): Promise<void> {
     quickEntryWindow.webContents.send('obsidian-context', {
       ...obsidianContext,
       mode: config.obsidian_mode,
+    })
+  }
+
+  // Send browser context if available (Obsidian takes priority)
+  if (!obsidianContext && browserContext && config?.browser_link_mode) {
+    quickEntryWindow.webContents.send('browser-context', {
+      ...browserContext,
+      mode: config.browser_link_mode,
     })
   }
 
@@ -454,12 +481,24 @@ if (!gotLock) {
       rescheduleNotifications()
     })
 
+    // Clean up stale browser host registrations if mode is off
+    if (!config?.browser_link_mode || config.browser_link_mode === 'off') {
+      const reg = isRegistered()
+      if (reg.chrome || reg.firefox) unregisterHosts()
+    }
+
+    // Pre-warm PowerShell + UI Automation assemblies for faster browser URL fallback
+    if (config?.browser_link_mode && config.browser_link_mode !== 'off') {
+      prewarmUrlReader()
+    }
+
     // Quick Entry/View: if either enabled, set up tray + windows + hotkeys
     if (config?.quick_entry_enabled || config?.quick_view_enabled !== false) {
       setupTray()
       initQuickEntryWindows(config)
       globalShortcut.unregisterAll() // Clear stale registrations from crashes
       registerQuickEntryShortcuts(config)
+
       app.setLoginItemSettings({ openAtLogin: config.launch_on_startup === true })
 
       // When QE/QV is enabled, hide main window on close instead of quitting
@@ -481,6 +520,7 @@ if (!gotLock) {
 
   app.on('will-quit', () => {
     stopNotifications()
+    shutdownUrlReader()
     globalShortcut.unregisterAll()
     if (dragHoverTimer) {
       clearInterval(dragHoverTimer)

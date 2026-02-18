@@ -23,4 +23,9 @@ contextBridge.exposeInMainWorld('quickEntryApi', {
   } | null) => void) => {
     ipcRenderer.on('obsidian-context', (_event, context) => callback(context))
   },
+  onBrowserContext: (callback: (context: {
+    url: string; title: string; displayTitle: string; mode: 'ask' | 'always'
+  } | null) => void) => {
+    ipcRenderer.on('browser-context', (_event, context) => callback(context))
+  },
 })

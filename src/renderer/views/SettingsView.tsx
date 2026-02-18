@@ -5,6 +5,7 @@ import { applyTheme } from '@/lib/theme'
 import { TokenPermissionsInfo } from '@/views/SetupView'
 import { QuickEntrySettings } from '@/components/settings/QuickEntrySettings'
 import { ObsidianSettings } from '@/components/settings/ObsidianSettings'
+import { BrowserSettings } from '@/components/settings/BrowserSettings'
 import { KeyboardShortcuts } from '@/components/settings/KeyboardShortcuts'
 import { NotificationSettings } from '@/components/settings/NotificationSettings'
 import type { AppConfig, Project } from '@/lib/vikunja-types'
@@ -320,6 +321,15 @@ export function SettingsView() {
           <ObsidianSettings
             config={fullConfig}
             onChange={handleQuickEntryChange}
+            disabled={!fullConfig.quick_entry_enabled}
+          />
+        )}
+
+        {fullConfig && (
+          <BrowserSettings
+            config={fullConfig}
+            onChange={handleQuickEntryChange}
+            disabled={!fullConfig.quick_entry_enabled}
           />
         )}
 

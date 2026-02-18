@@ -1,9 +1,11 @@
 import { useMemo } from 'react'
 import { useTasks } from '@/hooks/use-tasks'
+import { useProjects } from '@/hooks/use-projects'
 import { useFilters } from '@/hooks/use-filters'
 import { isNullDate } from '@/lib/date-utils'
 import { TaskList } from '@/components/task-list/TaskList'
 import { TaskRow } from '@/components/task-list/TaskRow'
+import type { Task } from '@/lib/vikunja-types'
 
 function formatDateHeader(dateStr: string): string {
   const d = new Date(dateStr)
@@ -25,15 +27,32 @@ function getDateKey(date: string): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
+function groupByProject(tasks: Task[], projectsFlat?: { id: number; title: string }[]) {
+  const byProject = new Map<number, { name: string; tasks: Task[] }>()
+  for (const task of tasks) {
+    const pid = task.project_id
+    if (!byProject.has(pid)) {
+      byProject.set(pid, {
+        name: projectsFlat?.find((p) => p.id === pid)?.title ?? 'Unknown Project',
+        tasks: [],
+      })
+    }
+    byProject.get(pid)!.tasks.push(task)
+  }
+  return Array.from(byProject.values()).sort((a, b) => a.name.localeCompare(b.name))
+}
+
 interface DateGroup {
   key: string
   label: string
-  tasks: typeof import('@/lib/vikunja-types').Task extends never ? never : any[]
+  tasks: Task[]
 }
 
 export function UpcomingView() {
   const params = useFilters({ view: 'upcoming' })
   const { data: tasks = [], isLoading } = useTasks(params)
+  const { data: projects } = useProjects()
+
 
   const groups = useMemo(() => {
     const grouped = new Map<string, DateGroup>()
@@ -68,18 +87,30 @@ export function UpcomingView() {
       emptyTitle="Nothing upcoming"
       emptySubtitle="Tasks with future due dates appear here"
     >
-      {groups.map((group) => (
-        <div key={group.key}>
-          <div className="px-6 pb-1 pt-3">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
-              {group.label}
-            </span>
+      {groups.map((group) => {
+        const projectGroups = groupByProject(group.tasks, projects?.flat)
+        return (
+          <div key={group.key}>
+            <div className="px-6 pb-1 pt-3">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
+                {group.label}
+              </span>
+            </div>
+            {projectGroups.map((pg) => (
+              <div key={pg.name}>
+                <div className="px-6 pb-0.5 pt-1.5">
+                  <span className="text-[10px] font-medium tracking-wide text-[var(--text-secondary)]">
+                    {pg.name}
+                  </span>
+                </div>
+                {pg.tasks.map((task) => (
+                  <TaskRow key={task.id} task={task} />
+                ))}
+              </div>
+            ))}
           </div>
-          {group.tasks.map((task) => (
-            <TaskRow key={task.id} task={task} />
-          ))}
-        </div>
-      ))}
+        )
+      })}
     </TaskList>
   )
 }

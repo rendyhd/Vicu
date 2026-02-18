@@ -12,6 +12,7 @@ import type {
   CreateLabelPayload,
   UpdateLabelPayload,
 } from '@/lib/vikunja-types'
+import type { SectionData } from './use-project-sections'
 
 export function useAddLabel() {
   const qc = useQueryClient()
@@ -150,6 +151,7 @@ export function useUpdateTask() {
 
 export function useDeleteTask() {
   const qc = useQueryClient()
+  const removeCompleted = useCompletedTasksStore((s) => s.remove)
 
   return useMutation({
     mutationFn: async (id: number) => {
@@ -157,10 +159,18 @@ export function useDeleteTask() {
       if (!result.success) throw new Error(result.error)
     },
     onMutate: async (id) => {
+      // Remove from completed-tasks store so merge logic doesn't re-inject it
+      const completedEntry = useCompletedTasksStore.getState().tasks.get(id)
+      removeCompleted(id)
+
       await qc.cancelQueries({ queryKey: ['tasks'] })
       await qc.cancelQueries({ queryKey: ['view-tasks'] })
+      await qc.cancelQueries({ queryKey: ['section-tasks'] })
       const previousTaskQueries = qc.getQueriesData<Task[]>({ queryKey: ['tasks'] })
       const previousViewQueries = qc.getQueriesData<Task[]>({ queryKey: ['view-tasks'] })
+      const previousSectionQueries = qc.getQueriesData<SectionData[]>({
+        queryKey: ['section-tasks'],
+      })
 
       qc.setQueriesData<Task[]>({ queryKey: ['tasks'] }, (old) =>
         old?.filter((t) => t.id !== id)
@@ -168,10 +178,21 @@ export function useDeleteTask() {
       qc.setQueriesData<Task[]>({ queryKey: ['view-tasks'] }, (old) =>
         old?.filter((t) => t.id !== id)
       )
+      qc.setQueriesData<SectionData[]>({ queryKey: ['section-tasks'] }, (old) =>
+        old?.map((section) => ({
+          ...section,
+          tasks: section.tasks.filter((t) => t.id !== id),
+        }))
+      )
 
-      return { previousTaskQueries, previousViewQueries }
+      return { previousTaskQueries, previousViewQueries, previousSectionQueries, completedEntry }
     },
     onError: (_err, _vars, context) => {
+      if (context?.completedEntry) {
+        useCompletedTasksStore
+          .getState()
+          .add(context.completedEntry.task, context.completedEntry.path)
+      }
       if (context?.previousTaskQueries) {
         for (const [key, data] of context.previousTaskQueries) {
           qc.setQueryData(key, data)
@@ -179,6 +200,11 @@ export function useDeleteTask() {
       }
       if (context?.previousViewQueries) {
         for (const [key, data] of context.previousViewQueries) {
+          qc.setQueryData(key, data)
+        }
+      }
+      if (context?.previousSectionQueries) {
+        for (const [key, data] of context.previousSectionQueries) {
           qc.setQueryData(key, data)
         }
       }

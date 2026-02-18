@@ -1,47 +1,58 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { useTasks } from '@/hooks/use-tasks'
 import { useFilters } from '@/hooks/use-filters'
 import { useProjects } from '@/hooks/use-projects'
-import { api } from '@/lib/api'
 import { TaskList } from '@/components/task-list/TaskList'
 import { TaskRow } from '@/components/task-list/TaskRow'
 import type { Task } from '@/lib/vikunja-types'
 
 export function AnytimeView() {
-  const [inboxProjectId, setInboxProjectId] = useState<number>(0)
-
-  useEffect(() => {
-    api.getConfig().then((config) => {
-      if (config) {
-        setInboxProjectId(config.inbox_project_id ?? 0)
-      }
-    })
-  }, [])
-
   const params = useFilters({ view: 'anytime' })
   const { data: tasks = [], isLoading } = useTasks(params)
   const { data: projectData } = useProjects()
 
-  const filteredTasks = useMemo(() => {
-    return tasks.filter((t) => {
-      if (inboxProjectId && t.project_id === inboxProjectId) return false
-      return true
-    })
-  }, [tasks, inboxProjectId])
-
   const groups = useMemo(() => {
-    const byProject = new Map<number, Task[]>()
-    for (const task of filteredTasks) {
-      const pid = task.project_id
-      if (!byProject.has(pid)) byProject.set(pid, [])
-      byProject.get(pid)!.push(task)
+    const projectMap = new Map(projectData?.flat.map((p) => [p.id, p]))
+
+    // Group tasks by their root (top-level) project
+    const getRootId = (id: number): number => {
+      const p = projectMap.get(id)
+      if (!p || !p.parent_project_id) return id
+      return getRootId(p.parent_project_id)
     }
-    return Array.from(byProject.entries()).map(([pid, tasks]) => ({
-      projectId: pid,
-      projectName: projectData?.flat.find((p) => p.id === pid)?.title ?? `Project ${pid}`,
-      tasks,
+
+    interface SubGroup {
+      projectId: number
+      projectName: string
+      tasks: Task[]
+    }
+    interface RootGroup {
+      projectId: number
+      projectName: string
+      subGroups: SubGroup[]
+    }
+
+    // Group tasks by root project, then by direct project
+    const byRoot = new Map<number, Map<number, Task[]>>()
+    for (const task of tasks) {
+      const rootId = getRootId(task.project_id)
+      if (!byRoot.has(rootId)) byRoot.set(rootId, new Map())
+      const sub = byRoot.get(rootId)!
+      const pid = task.project_id
+      if (!sub.has(pid)) sub.set(pid, [])
+      sub.get(pid)!.push(task)
+    }
+
+    return Array.from(byRoot.entries()).map(([rootId, subMap]): RootGroup => ({
+      projectId: rootId,
+      projectName: projectMap.get(rootId)?.title ?? `Project ${rootId}`,
+      subGroups: Array.from(subMap.entries()).map(([pid, tasks]) => ({
+        projectId: pid,
+        projectName: projectMap.get(pid)?.title ?? `Project ${pid}`,
+        tasks,
+      })),
     }))
-  }, [filteredTasks, projectData])
+  }, [tasks, projectData])
 
   if (isLoading) {
     return (
@@ -66,9 +77,26 @@ export function AnytimeView() {
               {group.projectName}
             </span>
           </div>
-          {group.tasks.map((task) => (
-            <TaskRow key={task.id} task={task} />
-          ))}
+          {group.subGroups.map((sub) =>
+            sub.projectId === group.projectId ? (
+              sub.tasks.map((task) => (
+                <TaskRow key={task.id} task={task} />
+              ))
+            ) : (
+              <div key={sub.projectId}>
+                <div className="pb-1 pt-2 pl-10">
+                  <span className="text-[10px] font-medium uppercase tracking-wider text-[var(--text-secondary)] opacity-70">
+                    {sub.projectName}
+                  </span>
+                </div>
+                <div className="pl-4">
+                  {sub.tasks.map((task) => (
+                    <TaskRow key={task.id} task={task} />
+                  ))}
+                </div>
+              </div>
+            )
+          )}
         </div>
       ))}
     </TaskList>

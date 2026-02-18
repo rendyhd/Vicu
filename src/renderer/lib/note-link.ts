@@ -33,3 +33,43 @@ export function extractNoteLinkHtml(description: string | undefined | null): str
   const anchor = description.match(/<p><a href="obsidian:\/\/[^"]*">\u{1F4CE}\s*[^<]*<\/a><\/p>/u)
   return (comment?.[0] ?? '') + (anchor?.[0] ?? '')
 }
+
+export interface PageLink {
+  url: string
+  title: string
+  app: 'browser'
+}
+
+export type TaskLink = (NoteLink & { kind: 'note' }) | (PageLink & { kind: 'page' })
+
+export function extractPageLink(description: string | undefined | null): PageLink | null {
+  if (!description) return null
+  const match = description.match(/<!-- pagelink:(https?:\/\/[^">\s]+) -->/)
+  if (!match) return null
+  const titleMatch = description.match(/\u{1F517}\s*([^<]+)<\/a>/u)
+  const title = titleMatch ? titleMatch[1].trim() : match[1]
+  return { url: unescapeHtml(match[1]), title, app: 'browser' }
+}
+
+export function extractTaskLink(description: string | undefined | null): TaskLink | null {
+  const noteLink = extractNoteLink(description)
+  if (noteLink) return { ...noteLink, kind: 'note' }
+  const pageLink = extractPageLink(description)
+  if (pageLink) return { ...pageLink, kind: 'page' }
+  return null
+}
+
+export function stripPageLink(description: string | undefined | null): string {
+  if (!description) return ''
+  return description
+    .replace(/<!-- pagelink:https?:\/\/[^>]+ -->/, '')
+    .replace(/<p><a href="https?:\/\/[^"]*">\u{1F517}\s*[^<]*<\/a><\/p>/u, '')
+    .trim()
+}
+
+export function extractPageLinkHtml(description: string | undefined | null): string {
+  if (!description) return ''
+  const comment = description.match(/<!-- pagelink:https?:\/\/[^>]+ -->/)
+  const anchor = description.match(/<p><a href="https?:\/\/[^"]*">\u{1F517}\s*[^<]*<\/a><\/p>/u)
+  return (comment?.[0] ?? '') + (anchor?.[0] ?? '')
+}

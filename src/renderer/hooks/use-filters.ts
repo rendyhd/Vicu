@@ -2,10 +2,11 @@ import { useMemo } from 'react'
 import type { TaskQueryParams } from '@/lib/vikunja-types'
 import { NULL_DATE } from '@/lib/constants'
 
-function endOfToday(): string {
+/** Today's date as YYYY-MM-DD (local). */
+function todayDate(): string {
   const d = new Date()
-  d.setHours(23, 59, 59, 999)
-  return d.toISOString()
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 }
 
 export type ViewType =
@@ -31,7 +32,9 @@ export function useFilters({
   labelId,
 }: UseFiltersOptions): TaskQueryParams {
   return useMemo(() => {
-    const eot = endOfToday()
+    // Use date-only values (YYYY-MM-DD) to avoid timezone mismatch
+    // between the filter (UTC) and stored dates (local offset like +01:00).
+    const today = todayDate()
 
     switch (view) {
       case 'inbox':
@@ -43,14 +46,14 @@ export function useFilters({
 
       case 'today':
         return {
-          filter: `done = false && due_date <= '${eot}' && due_date != '${NULL_DATE}'`,
+          filter: `done = false && due_date <= '${today}' && due_date != '${NULL_DATE}'`,
           sort_by: 'due_date',
           order_by: 'asc',
         }
 
       case 'upcoming':
         return {
-          filter: `done = false && due_date > '${eot}' && due_date != '${NULL_DATE}'`,
+          filter: `done = false && due_date > '${today}' && due_date != '${NULL_DATE}'`,
           sort_by: 'due_date',
           order_by: 'asc',
         }
@@ -87,5 +90,5 @@ export function useFilters({
       default:
         return {}
     }
-  }, [view, inboxProjectId, projectId, labelId, /* eot recalculated each render */])
+  }, [view, inboxProjectId, projectId, labelId])
 }

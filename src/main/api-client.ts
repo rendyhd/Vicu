@@ -178,6 +178,7 @@ export function fetchTasks(params: Record<string, unknown>): Promise<ApiResult<u
   if (params.per_page) qs.set('per_page', String(params.per_page))
   if (params.page) qs.set('page', String(params.page))
   if (params.filter_include_nulls) qs.set('filter_include_nulls', String(params.filter_include_nulls))
+  if (params.filter_timezone) qs.set('filter_timezone', String(params.filter_timezone))
 
   const queryString = qs.toString()
   const fullUrl = queryString
@@ -365,6 +366,7 @@ export function fetchViewTasks(
   if (params.per_page) qs.set('per_page', String(params.per_page))
   if (params.page) qs.set('page', String(params.page))
   if (params.filter_include_nulls) qs.set('filter_include_nulls', String(params.filter_include_nulls))
+  if (params.filter_timezone) qs.set('filter_timezone', String(params.filter_timezone))
 
   const queryString = qs.toString()
   const fullUrl = queryString

@@ -12,6 +12,9 @@ declare global {
       onObsidianContext(callback: (context: {
         deepLink: string; noteName: string; vaultName: string; isUidBased: boolean; mode: 'ask' | 'always'
       } | null) => void): void
+      onBrowserContext(callback: (context: {
+        url: string; title: string; displayTitle: string; mode: 'ask' | 'always'
+      } | null) => void): void
     }
   }
 }
@@ -43,6 +46,11 @@ const obsidianHintName = document.getElementById('obsidian-hint-name')!
 const obsidianBadge = document.getElementById('obsidian-badge')!
 const obsidianBadgeName = document.getElementById('obsidian-badge-name')!
 const obsidianBadgeRemove = document.getElementById('obsidian-badge-remove')!
+const browserHint = document.getElementById('browser-hint')!
+const browserHintName = document.getElementById('browser-hint-name')!
+const browserBadge = document.getElementById('browser-badge')!
+const browserBadgeName = document.getElementById('browser-badge-name')!
+const browserBadgeRemove = document.getElementById('browser-badge-remove')!
 
 let errorTimeout: ReturnType<typeof setTimeout> | null = null
 let exclamationTodayEnabled = true
@@ -51,6 +59,8 @@ let currentProjectIndex = 0
 let projectCycleModifier = 'ctrl'
 let obsidianContext: { deepLink: string; noteName: string; isUidBased: boolean } | null = null
 let obsidianLinked = false
+let browserContext: { url: string; title: string; displayTitle: string } | null = null
+let browserLinked = false
 
 function showError(msg: string): void {
   errorMessage.textContent = msg
@@ -191,6 +201,23 @@ function updateObsidianUI(): void {
   }
 }
 
+function updateBrowserUI(): void {
+  if (!browserContext) {
+    browserHint.classList.add('hidden')
+    browserBadge.classList.add('hidden')
+    return
+  }
+  if (browserLinked) {
+    browserBadgeName.textContent = browserContext.displayTitle
+    browserBadge.classList.remove('hidden')
+    browserHint.classList.add('hidden')
+  } else {
+    browserHintName.textContent = `"${browserContext.displayTitle}"`
+    browserHint.classList.remove('hidden')
+    browserBadge.classList.add('hidden')
+  }
+}
+
 function escapeHtml(str: string): string {
   return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 }
@@ -199,6 +226,12 @@ function buildNoteLinkHtml(deepLink: string, noteName: string): string {
   const safeLink = escapeHtml(deepLink)
   const safeName = escapeHtml(noteName)
   return `<!-- notelink:${safeLink} --><p><a href="${safeLink}">\u{1F4CE} ${safeName}</a></p>`
+}
+
+function buildPageLinkHtml(url: string, title: string): string {
+  const safeUrl = escapeHtml(url)
+  const safeTitle = escapeHtml(title)
+  return `<!-- pagelink:${safeUrl} --><p><a href="${safeUrl}">\u{1F517} ${safeTitle}</a></p>`
 }
 
 function isProjectCycleModifierPressed(e: KeyboardEvent): boolean {
@@ -222,6 +255,12 @@ async function saveTask(): Promise<void> {
   // Inject Obsidian note link into description
   if (obsidianLinked && obsidianContext) {
     const linkHtml = buildNoteLinkHtml(obsidianContext.deepLink, obsidianContext.noteName)
+    description = description ? `<p>${escapeHtml(description)}</p>${linkHtml}` : linkHtml
+  }
+
+  // Inject browser page link into description
+  if (!obsidianLinked && browserLinked && browserContext) {
+    const linkHtml = buildPageLinkHtml(browserContext.url, browserContext.title)
     description = description ? `<p>${escapeHtml(description)}</p>${linkHtml}` : linkHtml
   }
 
@@ -262,6 +301,9 @@ window.quickEntryApi.onHideWindow(() => {
   obsidianContext = null
   obsidianLinked = false
   updateObsidianUI()
+  browserContext = null
+  browserLinked = false
+  updateBrowserUI()
 })
 
 // When the main process signals the window is shown
@@ -299,6 +341,9 @@ input.addEventListener('keydown', async (e) => {
     if (obsidianContext) {
       obsidianLinked = !obsidianLinked
       updateObsidianUI()
+    } else if (browserContext) {
+      browserLinked = !browserLinked
+      updateBrowserUI()
     }
     return
   }
@@ -335,6 +380,9 @@ descriptionInput.addEventListener('keydown', async (e) => {
     if (obsidianContext) {
       obsidianLinked = !obsidianLinked
       updateObsidianUI()
+    } else if (browserContext) {
+      browserLinked = !browserLinked
+      updateBrowserUI()
     }
     return
   }
@@ -370,6 +418,11 @@ obsidianBadgeRemove.addEventListener('click', () => {
   updateObsidianUI()
 })
 
+browserBadgeRemove.addEventListener('click', () => {
+  browserLinked = false
+  updateBrowserUI()
+})
+
 // Obsidian context listener
 window.quickEntryApi.onObsidianContext((ctx) => {
   if (!ctx) {
@@ -381,6 +434,19 @@ window.quickEntryApi.onObsidianContext((ctx) => {
   obsidianContext = { deepLink: ctx.deepLink, noteName: ctx.noteName, isUidBased: ctx.isUidBased }
   obsidianLinked = ctx.mode === 'always'
   updateObsidianUI()
+})
+
+// Browser context listener
+window.quickEntryApi.onBrowserContext((ctx) => {
+  if (!ctx) {
+    browserContext = null
+    browserLinked = false
+    updateBrowserUI()
+    return
+  }
+  browserContext = { url: ctx.url, title: ctx.title, displayTitle: ctx.displayTitle }
+  browserLinked = ctx.mode === 'always'
+  updateBrowserUI()
 })
 
 // Load config on startup

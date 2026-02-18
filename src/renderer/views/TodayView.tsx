@@ -1,13 +1,31 @@
 import { useMemo } from 'react'
 import { useTasks } from '@/hooks/use-tasks'
+import { useProjects } from '@/hooks/use-projects'
 import { useFilters } from '@/hooks/use-filters'
 import { isOverdue, isToday } from '@/lib/date-utils'
 import { TaskList } from '@/components/task-list/TaskList'
 import { TaskRow } from '@/components/task-list/TaskRow'
+import type { Task } from '@/lib/vikunja-types'
+
+function groupByProject(tasks: Task[], projectsFlat?: { id: number; title: string }[]) {
+  const byProject = new Map<number, { name: string; tasks: Task[] }>()
+  for (const task of tasks) {
+    const pid = task.project_id
+    if (!byProject.has(pid)) {
+      byProject.set(pid, {
+        name: projectsFlat?.find((p) => p.id === pid)?.title ?? 'Unknown Project',
+        tasks: [],
+      })
+    }
+    byProject.get(pid)!.tasks.push(task)
+  }
+  return Array.from(byProject.values()).sort((a, b) => a.name.localeCompare(b.name))
+}
 
 export function TodayView() {
   const params = useFilters({ view: 'today' })
   const { data: tasks = [], isLoading } = useTasks(params)
+  const { data: projects } = useProjects()
 
   const { overdueTasks, todayTasks } = useMemo(() => {
     const overdue: typeof tasks = []
@@ -21,6 +39,15 @@ export function TodayView() {
     }
     return { overdueTasks: overdue, todayTasks: today }
   }, [tasks])
+
+  const overdueGroups = useMemo(
+    () => groupByProject(overdueTasks, projects?.flat),
+    [overdueTasks, projects?.flat]
+  )
+  const todayGroups = useMemo(
+    () => groupByProject(todayTasks, projects?.flat),
+    [todayTasks, projects?.flat]
+  )
 
   const dateStr = new Date().toLocaleDateString('en-US', {
     weekday: 'long',
@@ -53,8 +80,17 @@ export function TodayView() {
               Overdue
             </span>
           </div>
-          {overdueTasks.map((task) => (
-            <TaskRow key={task.id} task={task} />
+          {overdueGroups.map((group) => (
+            <div key={group.name}>
+              <div className="px-6 pb-0.5 pt-1.5">
+                <span className="text-[10px] font-medium tracking-wide text-[var(--text-secondary)]">
+                  {group.name}
+                </span>
+              </div>
+              {group.tasks.map((task) => (
+                <TaskRow key={task.id} task={task} />
+              ))}
+            </div>
           ))}
         </div>
       )}
@@ -68,8 +104,17 @@ export function TodayView() {
               </span>
             </div>
           )}
-          {todayTasks.map((task) => (
-            <TaskRow key={task.id} task={task} />
+          {todayGroups.map((group) => (
+            <div key={group.name}>
+              <div className="px-6 pb-0.5 pt-1.5">
+                <span className="text-[10px] font-medium tracking-wide text-[var(--text-secondary)]">
+                  {group.name}
+                </span>
+              </div>
+              {group.tasks.map((task) => (
+                <TaskRow key={task.id} task={task} />
+              ))}
+            </div>
           ))}
         </div>
       )}

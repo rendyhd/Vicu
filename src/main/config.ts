@@ -59,6 +59,9 @@ export interface AppConfig {
   obsidian_api_key?: string
   obsidian_port?: number
   obsidian_vault_name?: string
+  // Browser
+  browser_link_mode?: 'off' | 'ask' | 'always'
+  browser_extension_id?: string
   // Notifications
   notifications_enabled?: boolean
   notifications_persistent?: boolean
@@ -147,6 +150,9 @@ function normalizeConfig(raw: Record<string, unknown>): AppConfig {
     obsidian_api_key: typeof raw.obsidian_api_key === 'string' ? raw.obsidian_api_key : '',
     obsidian_port: typeof raw.obsidian_port === 'number' ? raw.obsidian_port : 27124,
     obsidian_vault_name: typeof raw.obsidian_vault_name === 'string' ? raw.obsidian_vault_name : '',
+    // Browser
+    browser_link_mode: raw.browser_link_mode === 'ask' || raw.browser_link_mode === 'always' ? raw.browser_link_mode : 'off',
+    browser_extension_id: typeof raw.browser_extension_id === 'string' ? raw.browser_extension_id : '',
     // Notifications
     notifications_enabled: raw.notifications_enabled === true,
     notifications_persistent: raw.notifications_persistent === true,

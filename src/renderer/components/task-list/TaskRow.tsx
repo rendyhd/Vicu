@@ -18,11 +18,30 @@ import { SubtaskList } from './SubtaskList'
 import { ProjectPickerPopover } from './ProjectPickerPopover'
 import { ReminderPickerPopover } from './ReminderPickerPopover'
 import { AttachmentPickerPopover } from './AttachmentPickerPopover'
-import { ObsidianLinkIcon } from '@/components/ObsidianLinkIcon'
-import { stripNoteLink, extractNoteLinkHtml } from '@/lib/note-link'
+import { TaskLinkIcon } from '@/components/TaskLinkIcon'
+import { stripNoteLink, stripPageLink, extractNoteLinkHtml, extractPageLinkHtml } from '@/lib/note-link'
 import { formatRecurrenceLabel } from '@/lib/recurrence'
 
 type PopoverType = 'date' | 'label' | 'project' | 'subtasks' | 'reminder' | 'attachment' | null
+
+function getLabelStyle(hex: string | undefined): React.CSSProperties {
+  if (!hex) return { backgroundColor: 'var(--bg-hover)', color: 'var(--text-secondary)' }
+  const isDark = document.documentElement.classList.contains('dark')
+  if (isDark) {
+    // Lighten the color for readable text on dark backgrounds
+    const r = parseInt(hex.slice(1, 3), 16)
+    const g = parseInt(hex.slice(3, 5), 16)
+    const b = parseInt(hex.slice(5, 7), 16)
+    const lr = Math.min(255, r + Math.round((255 - r) * 0.45))
+    const lg = Math.min(255, g + Math.round((255 - g) * 0.45))
+    const lb = Math.min(255, b + Math.round((255 - b) * 0.45))
+    return {
+      backgroundColor: `rgba(${r}, ${g}, ${b}, 0.2)`,
+      color: `rgb(${lr}, ${lg}, ${lb})`,
+    }
+  }
+  return { backgroundColor: `${hex}20`, color: hex }
+}
 
 interface TaskRowProps {
   task: Task
@@ -88,10 +107,10 @@ export function TaskRow({ task, sortable = false }: TaskRowProps) {
   const { attributes, listeners, setNodeRef, isDragging, style } = useDragBehavior(task, sortable)
 
   const [editTitle, setEditTitle] = useState(task.title)
-  const [editDescription, setEditDescription] = useState(stripNoteLink(task.description))
+  const [editDescription, setEditDescription] = useState(stripPageLink(stripNoteLink(task.description)))
   const [isDragOver, setIsDragOver] = useState(false)
   const [dropError, setDropError] = useState<string | null>(null)
-  const noteLinkHtml = extractNoteLinkHtml(task.description)
+  const noteLinkHtml = extractNoteLinkHtml(task.description) + extractPageLinkHtml(task.description)
   const [activePopover, setActivePopover] = useState<PopoverType>(null)
   const titleRef = useRef<HTMLInputElement>(null)
   const descRef = useRef<HTMLTextAreaElement>(null)
@@ -111,7 +130,7 @@ export function TaskRow({ task, sortable = false }: TaskRowProps) {
   }, [task.title])
 
   useEffect(() => {
-    setEditDescription(stripNoteLink(task.description))
+    setEditDescription(stripPageLink(stripNoteLink(task.description)))
   }, [task.description])
 
   // Focus title input when expanded, and auto-size description textarea
@@ -282,6 +301,20 @@ export function TaskRow({ task, sortable = false }: TaskRowProps) {
       >
         <TaskCheckbox task={task} />
 
+        {labels.length > 0 && (
+          <div className="flex shrink-0 items-center gap-1">
+            {labels.map((l) => (
+              <span
+                key={l.id}
+                className="rounded-full px-1.5 py-px text-[10px] font-medium leading-tight"
+                style={getLabelStyle(l.hex_color)}
+              >
+                {l.title}
+              </span>
+            ))}
+          </div>
+        )}
+
         <span
           className={cn(
             'min-w-0 flex-1 truncate text-[13px] text-[var(--text-primary)]',
@@ -295,20 +328,9 @@ export function TaskRow({ task, sortable = false }: TaskRowProps) {
           )}
         </span>
 
-        <ObsidianLinkIcon description={task.description} />
+        <TaskLinkIcon description={task.description} />
 
         <div className="flex items-center gap-2">
-          {labels.length > 0 && (
-            <div className="hidden items-center gap-1 group-hover:flex">
-              {labels.slice(0, 2).map((l) => (
-                <span
-                  key={l.id}
-                  className="h-1.5 w-1.5 rounded-full"
-                  style={{ backgroundColor: l.hex_color || 'var(--text-secondary)' }}
-                />
-              ))}
-            </div>
-          )}
           {(task.repeat_after ?? 0) > 0 || (task.repeat_mode ?? 0) > 0 ? (
             <Repeat className="h-3 w-3 text-[var(--text-secondary)]" />
           ) : null}
@@ -371,7 +393,7 @@ export function TaskRow({ task, sortable = false }: TaskRowProps) {
           className="flex-1 bg-transparent text-[13px] font-medium text-[var(--text-primary)] placeholder:text-[var(--text-secondary)] focus:outline-none"
           placeholder="Task title"
         />
-        <ObsidianLinkIcon description={task.description} />
+        <TaskLinkIcon description={task.description} />
         {(task.attachments?.length ?? 0) > 0 && (
           <button
             type="button"
@@ -427,10 +449,7 @@ export function TaskRow({ task, sortable = false }: TaskRowProps) {
             <span
               key={l.id}
               className="rounded-full px-2 py-0.5 text-2xs font-medium"
-              style={{
-                backgroundColor: l.hex_color ? `${l.hex_color}20` : 'var(--bg-hover)',
-                color: l.hex_color || 'var(--text-secondary)',
-              }}
+              style={getLabelStyle(l.hex_color)}
             >
               {l.title}
             </span>
