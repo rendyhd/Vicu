@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { Outlet } from '@tanstack/react-router'
+import { Outlet, useMatches } from '@tanstack/react-router'
 import {
   DndContext,
   DragOverlay,
@@ -22,6 +22,7 @@ import { applyTheme } from '@/lib/theme'
 import type { ThemeOption } from '@/lib/theme'
 import type { Task, Project, CustomList } from '@/lib/vikunja-types'
 import type { ProjectTreeNode } from '@/hooks/use-projects'
+import { useCompletedTasksStore } from '@/stores/completed-tasks-store'
 import { Sidebar } from './Sidebar'
 import { ContentArea } from './ContentArea'
 import { WindowControls } from './WindowControls'
@@ -77,6 +78,23 @@ export function AppShell() {
   const [appState, setAppState] = useState<AppState>('loading')
   const [dragItem, setDragItem] = useState<DragItem | null>(null)
   const themeRef = useRef<ThemeOption>('system')
+
+  // Clear recently-completed-tasks store on route change so completed tasks
+  // don't bleed into the next view.
+  const routeMatches = useMatches()
+  const routePath = routeMatches[routeMatches.length - 1]?.pathname ?? ''
+  const prevRouteRef = useRef(routePath)
+  useEffect(() => {
+    if (prevRouteRef.current !== routePath) {
+      useCompletedTasksStore.getState().clear()
+      // Flush stale optimistic data (complete/uncomplete skip invalidation
+      // to keep tasks in-place, so we sync on navigation instead).
+      queryClient.invalidateQueries({ queryKey: ['tasks'] })
+      queryClient.invalidateQueries({ queryKey: ['view-tasks'] })
+      queryClient.invalidateQueries({ queryKey: ['section-tasks'] })
+      prevRouteRef.current = routePath
+    }
+  }, [routePath, queryClient])
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } })

@@ -18,7 +18,14 @@ function LogbookRow({ task }: { task: Task }) {
   return (
     <div className="flex h-10 items-center gap-3 border-b border-[var(--border-color)] px-4">
       <TaskCheckbox task={task} />
-      <span className="min-w-0 flex-1 truncate text-[13px] text-[var(--text-secondary)] line-through">
+      <span
+        className={cn(
+          'min-w-0 flex-1 truncate text-[13px]',
+          task.done
+            ? 'text-[var(--text-secondary)] line-through'
+            : 'text-[var(--text-primary)]'
+        )}
+      >
         {task.title}
       </span>
       <span className="shrink-0 text-2xs text-[var(--text-secondary)]">

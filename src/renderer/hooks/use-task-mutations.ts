@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useMatches } from '@tanstack/react-router'
 import { api } from '@/lib/api'
+import { useCompletedTasksStore } from '@/stores/completed-tasks-store'
 import type {
   Task,
   TaskAttachment,
@@ -251,6 +252,10 @@ export function useReorderTask() {
 
 export function useCompleteTask() {
   const qc = useQueryClient()
+  const matches = useMatches()
+  const pathname = matches[matches.length - 1]?.pathname ?? ''
+  const addCompleted = useCompletedTasksStore((s) => s.add)
+  const removeCompleted = useCompletedTasksStore((s) => s.remove)
 
   return useMutation({
     mutationFn: async (task: Task) => {
@@ -263,6 +268,9 @@ export function useCompleteTask() {
       return result.data
     },
     onMutate: async (task) => {
+      // Track completed task so it stays visible (with strikethrough) until navigation
+      addCompleted({ ...task, done: true }, pathname)
+
       await qc.cancelQueries({ queryKey: ['tasks'] })
       await qc.cancelQueries({ queryKey: ['view-tasks'] })
       const previousTaskQueries = qc.getQueriesData<Task[]>({ queryKey: ['tasks'] })
@@ -277,7 +285,8 @@ export function useCompleteTask() {
 
       return { previousTaskQueries, previousViewQueries }
     },
-    onError: (_err, _vars, context) => {
+    onError: (_err, task, context) => {
+      removeCompleted(task.id)
       if (context?.previousTaskQueries) {
         for (const [key, data] of context.previousTaskQueries) {
           qc.setQueryData(key, data)
@@ -289,11 +298,74 @@ export function useCompleteTask() {
         }
       }
     },
-    onSettled: () => {
-      qc.invalidateQueries({ queryKey: ['tasks'] })
-      qc.invalidateQueries({ queryKey: ['view-tasks'] })
-      qc.invalidateQueries({ queryKey: ['section-tasks'] })
+    // Skip invalidation — the optimistic update keeps the task at its original
+    // position with strikethrough. The store provides a fallback if another
+    // mutation triggers a refetch. Full sync happens on navigation.
+  })
+}
+
+export function useUncompleteTask() {
+  const qc = useQueryClient()
+  const matches = useMatches()
+  const pathname = matches[matches.length - 1]?.pathname ?? ''
+  const addToStore = useCompletedTasksStore((s) => s.add)
+  const updateCompleted = useCompletedTasksStore((s) => s.update)
+  const removeCompleted = useCompletedTasksStore((s) => s.remove)
+
+  return useMutation({
+    mutationFn: async (task: Task) => {
+      const result = await api.updateTask(task.id, {
+        ...task,
+        done: false,
+      })
+      if (!result.success) throw new Error(result.error)
+      return result.data
     },
+    onMutate: async (task) => {
+      // If task was recently completed (in store), update to done:false.
+      // Otherwise (e.g. logbook uncomplete), add a new store entry so it
+      // stays visible without strikethrough until navigation.
+      const wasInStore = useCompletedTasksStore.getState().tasks.has(task.id)
+      if (wasInStore) {
+        updateCompleted(task.id, { done: false })
+      } else {
+        addToStore({ ...task, done: false }, pathname)
+      }
+
+      await qc.cancelQueries({ queryKey: ['tasks'] })
+      await qc.cancelQueries({ queryKey: ['view-tasks'] })
+      const previousTaskQueries = qc.getQueriesData<Task[]>({ queryKey: ['tasks'] })
+      const previousViewQueries = qc.getQueriesData<Task[]>({ queryKey: ['view-tasks'] })
+
+      qc.setQueriesData<Task[]>({ queryKey: ['tasks'] }, (old) =>
+        old?.map((t) => (t.id === task.id ? { ...t, done: false } : t))
+      )
+      qc.setQueriesData<Task[]>({ queryKey: ['view-tasks'] }, (old) =>
+        old?.map((t) => (t.id === task.id ? { ...t, done: false } : t))
+      )
+
+      return { previousTaskQueries, previousViewQueries, wasInStore }
+    },
+    onError: (_err, task, context) => {
+      if (context?.wasInStore) {
+        updateCompleted(task.id, { done: true })
+      } else {
+        removeCompleted(task.id)
+      }
+      if (context?.previousTaskQueries) {
+        for (const [key, data] of context.previousTaskQueries) {
+          qc.setQueryData(key, data)
+        }
+      }
+      if (context?.previousViewQueries) {
+        for (const [key, data] of context.previousViewQueries) {
+          qc.setQueryData(key, data)
+        }
+      }
+    },
+    // Skip invalidation — the optimistic update keeps the task at its original
+    // position. The store provides a fallback if another mutation triggers a
+    // refetch. Full sync happens on navigation.
   })
 }
 
