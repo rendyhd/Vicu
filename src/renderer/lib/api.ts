@@ -1,5 +1,6 @@
 import type {
   Task,
+  TaskAttachment,
   Project,
   ProjectView,
   Label,
@@ -115,6 +116,18 @@ export const api = {
 
   applyQuickEntrySettings: () =>
     window.api.applyQuickEntrySettings() as Promise<{ entry: boolean; viewer: boolean }>,
+
+  // Attachments
+  fetchTaskAttachments: (taskId: number) =>
+    window.api.fetchTaskAttachments(taskId) as Promise<ApiResult<TaskAttachment[]>>,
+  uploadTaskAttachment: (taskId: number, fileData: Uint8Array, fileName: string, mimeType: string) =>
+    window.api.uploadTaskAttachment(taskId, fileData, fileName, mimeType) as Promise<ApiResult<unknown>>,
+  deleteTaskAttachment: (taskId: number, attachmentId: number) =>
+    window.api.deleteTaskAttachment(taskId, attachmentId) as Promise<ApiResult<void>>,
+  openTaskAttachment: (taskId: number, attachmentId: number, fileName: string) =>
+    window.api.openTaskAttachment(taskId, attachmentId, fileName) as Promise<ApiResult<void>>,
+  pickAndUploadAttachment: (taskId: number) =>
+    window.api.pickAndUploadAttachment(taskId) as Promise<ApiResult<{ count: number }>>,
 
   // Window controls
   windowMinimize: () => window.api.windowMinimize(),

@@ -1,8 +1,9 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useMatches } from '@tanstack/react-router'
 import { api } from '@/lib/api'
 import type {
   Task,
+  TaskAttachment,
   CreateTaskPayload,
   UpdateTaskPayload,
   CreateProjectPayload,
@@ -441,6 +442,80 @@ export function useDeleteLabel() {
       qc.invalidateQueries({ queryKey: ['labels'] })
       qc.invalidateQueries({ queryKey: ['tasks'] })
       qc.invalidateQueries({ queryKey: ['task-detail'] })
+    },
+  })
+}
+
+// --- Attachments ---
+
+export function useTaskAttachments(taskId: number, enabled: boolean) {
+  return useQuery<TaskAttachment[]>({
+    queryKey: ['task-attachments', taskId],
+    queryFn: async () => {
+      const result = await api.fetchTaskAttachments(taskId)
+      if (!result.success) throw new Error(result.error)
+      return result.data
+    },
+    enabled,
+  })
+}
+
+export function useUploadAttachment() {
+  const qc = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (taskId: number) => {
+      const result = await api.pickAndUploadAttachment(taskId)
+      if (!result.success) throw new Error(result.error)
+      return result.data
+    },
+    onSettled: (_data, _err, taskId) => {
+      qc.invalidateQueries({ queryKey: ['task-attachments', taskId] })
+      qc.invalidateQueries({ queryKey: ['tasks'] })
+      qc.invalidateQueries({ queryKey: ['view-tasks'] })
+    },
+  })
+}
+
+export function useUploadAttachmentFromDrop() {
+  const qc = useQueryClient()
+
+  return useMutation({
+    mutationFn: async ({
+      taskId,
+      fileData,
+      fileName,
+      mimeType,
+    }: {
+      taskId: number
+      fileData: Uint8Array
+      fileName: string
+      mimeType: string
+    }) => {
+      const result = await api.uploadTaskAttachment(taskId, fileData, fileName, mimeType)
+      if (!result.success) throw new Error(result.error)
+      return result.data
+    },
+    onSettled: (_data, _err, vars) => {
+      qc.invalidateQueries({ queryKey: ['task-attachments', vars.taskId] })
+      qc.invalidateQueries({ queryKey: ['tasks'] })
+      qc.invalidateQueries({ queryKey: ['view-tasks'] })
+    },
+  })
+}
+
+export function useDeleteAttachment() {
+  const qc = useQueryClient()
+
+  return useMutation({
+    mutationFn: async ({ taskId, attachmentId }: { taskId: number; attachmentId: number }) => {
+      const result = await api.deleteTaskAttachment(taskId, attachmentId)
+      if (!result.success) throw new Error(result.error)
+    },
+    onSettled: (_data, _err, vars) => {
+      qc.invalidateQueries({ queryKey: ['task-attachments', vars.taskId] })
+      qc.invalidateQueries({ queryKey: ['tasks'] })
+      qc.invalidateQueries({ queryKey: ['view-tasks'] })
     },
   })
 }

@@ -77,6 +77,18 @@ const api = {
   refreshTaskReminders: () =>
     ipcRenderer.invoke('notifications:refresh-task-reminders'),
 
+  // Attachments
+  fetchTaskAttachments: (taskId: number) =>
+    ipcRenderer.invoke('fetch-task-attachments', taskId),
+  uploadTaskAttachment: (taskId: number, fileData: Uint8Array, fileName: string, mimeType: string) =>
+    ipcRenderer.invoke('upload-task-attachment', taskId, fileData, fileName, mimeType),
+  deleteTaskAttachment: (taskId: number, attachmentId: number) =>
+    ipcRenderer.invoke('delete-task-attachment', taskId, attachmentId),
+  openTaskAttachment: (taskId: number, attachmentId: number, fileName: string) =>
+    ipcRenderer.invoke('open-task-attachment', taskId, attachmentId, fileName),
+  pickAndUploadAttachment: (taskId: number) =>
+    ipcRenderer.invoke('pick-and-upload-attachment', taskId),
+
   // Obsidian
   openDeepLink: (url: string) => ipcRenderer.invoke('open-deep-link', url),
   testObsidianConnection: () => ipcRenderer.invoke('test-obsidian-connection'),

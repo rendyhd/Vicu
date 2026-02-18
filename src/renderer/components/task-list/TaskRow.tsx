@@ -1,12 +1,12 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { Calendar, Tag, ListChecks, FolderOpen, Trash2, Bell } from 'lucide-react'
+import { Calendar, Tag, ListChecks, FolderOpen, Trash2, Bell, Repeat, Paperclip } from 'lucide-react'
 import { useDraggable } from '@dnd-kit/core'
 import { useSortable, defaultAnimateLayoutChanges } from '@dnd-kit/sortable'
 import type { AnimateLayoutChanges } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { cn } from '@/lib/cn'
 import { useSelectionStore } from '@/stores/selection-store'
-import { useUpdateTask, useCompleteTask, useDeleteTask } from '@/hooks/use-task-mutations'
+import { useUpdateTask, useCompleteTask, useDeleteTask, useUploadAttachmentFromDrop } from '@/hooks/use-task-mutations'
 import { isNullDate } from '@/lib/date-utils'
 import type { Task, TaskReminder } from '@/lib/vikunja-types'
 import { TaskCheckbox } from './TaskCheckbox'
@@ -17,10 +17,12 @@ import { LabelPickerPopover } from './LabelPickerPopover'
 import { SubtaskList } from './SubtaskList'
 import { ProjectPickerPopover } from './ProjectPickerPopover'
 import { ReminderPickerPopover } from './ReminderPickerPopover'
+import { AttachmentPickerPopover } from './AttachmentPickerPopover'
 import { ObsidianLinkIcon } from '@/components/ObsidianLinkIcon'
 import { stripNoteLink, extractNoteLinkHtml } from '@/lib/note-link'
+import { formatRecurrenceLabel } from '@/lib/recurrence'
 
-type PopoverType = 'date' | 'label' | 'project' | 'subtasks' | 'reminder' | null
+type PopoverType = 'date' | 'label' | 'project' | 'subtasks' | 'reminder' | 'attachment' | null
 
 interface TaskRowProps {
   task: Task
@@ -79,6 +81,7 @@ export function TaskRow({ task, sortable = false }: TaskRowProps) {
   const updateTask = useUpdateTask()
   const completeTask = useCompleteTask()
   const deleteTask = useDeleteTask()
+  const uploadFromDrop = useUploadAttachmentFromDrop()
   const isExpanded = expandedTaskId === task.id
   const isFocused = focusedTaskId === task.id
 
@@ -86,10 +89,21 @@ export function TaskRow({ task, sortable = false }: TaskRowProps) {
 
   const [editTitle, setEditTitle] = useState(task.title)
   const [editDescription, setEditDescription] = useState(stripNoteLink(task.description))
+  const [isDragOver, setIsDragOver] = useState(false)
+  const [dropError, setDropError] = useState<string | null>(null)
   const noteLinkHtml = extractNoteLinkHtml(task.description)
   const [activePopover, setActivePopover] = useState<PopoverType>(null)
   const titleRef = useRef<HTMLInputElement>(null)
   const descRef = useRef<HTMLTextAreaElement>(null)
+
+  // Flash red border briefly when drag-drop upload fails, show error message
+  useEffect(() => {
+    if (uploadFromDrop.isError) {
+      setDropError(uploadFromDrop.error?.message || 'Upload failed')
+      const timer = setTimeout(() => setDropError(null), 4000)
+      return () => clearTimeout(timer)
+    }
+  }, [uploadFromDrop.isError, uploadFromDrop.failureCount, uploadFromDrop.error])
 
   // Sync local state when task changes from server
   useEffect(() => {
@@ -143,6 +157,13 @@ export function TaskRow({ task, sortable = false }: TaskRowProps) {
     [task, updateTask]
   )
 
+  const handleRecurrenceChange = useCallback(
+    (repeat_after: number, repeat_mode: number) => {
+      updateTask.mutate({ id: task.id, task: { ...task, repeat_after, repeat_mode } })
+    },
+    [task, updateTask]
+  )
+
   const setDateToToday = useCallback(() => {
     const today = new Date()
     today.setHours(0, 0, 0, 0)
@@ -190,6 +211,44 @@ export function TaskRow({ task, sortable = false }: TaskRowProps) {
     [handleSave, collapseAll, completeTask, deleteTask, task, setDateToToday]
   )
 
+  const handleFileDragOver = useCallback((e: React.DragEvent) => {
+    if (e.dataTransfer.types.includes('Files')) {
+      e.preventDefault()
+      e.stopPropagation()
+      setIsDragOver(true)
+    }
+  }, [])
+
+  const handleFileDragLeave = useCallback((e: React.DragEvent) => {
+    e.stopPropagation()
+    setIsDragOver(false)
+  }, [])
+
+  const handleFileDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault()
+      e.stopPropagation()
+      setIsDragOver(false)
+      const files = e.dataTransfer.files
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i]
+        const reader = new FileReader()
+        reader.onload = () => {
+          if (reader.result instanceof ArrayBuffer) {
+            uploadFromDrop.mutate({
+              taskId: task.id,
+              fileData: new Uint8Array(reader.result),
+              fileName: file.name,
+              mimeType: file.type || 'application/octet-stream',
+            })
+          }
+        }
+        reader.readAsArrayBuffer(file)
+      }
+    },
+    [task.id, uploadFromDrop]
+  )
+
   const labels = task.labels ?? []
 
   // Collapsed row — entire row is draggable (PointerSensor distance:8 distinguishes click vs drag)
@@ -201,7 +260,9 @@ export function TaskRow({ task, sortable = false }: TaskRowProps) {
         className={cn(
           'group flex h-10 cursor-default items-center gap-3 border-b border-[var(--border-color)] px-4 transition-colors hover:bg-[var(--bg-hover)]',
           isFocused && !isExpanded && 'bg-[var(--accent-blue)]/8 ring-1 ring-inset ring-[var(--accent-blue)]/30',
-          isDragging && 'opacity-30'
+          isDragging && 'opacity-30',
+          isDragOver && 'ring-2 ring-inset ring-[var(--accent-blue)] bg-[var(--accent-blue)]/5',
+          dropError && 'ring-2 ring-inset ring-red-500 bg-red-500/5'
         )}
         style={style}
         onClick={() => {
@@ -211,6 +272,9 @@ export function TaskRow({ task, sortable = false }: TaskRowProps) {
         onKeyDown={(e) => {
           if (e.key === 'Enter') toggleExpandedTask(task.id)
         }}
+        onDragOver={handleFileDragOver}
+        onDragLeave={handleFileDragLeave}
+        onDrop={handleFileDrop}
         role="button"
         tabIndex={0}
         {...listeners}
@@ -224,7 +288,11 @@ export function TaskRow({ task, sortable = false }: TaskRowProps) {
             task.done && 'text-[var(--text-secondary)] line-through'
           )}
         >
-          {task.title}
+          {dropError ? (
+            <span className="text-red-500">{dropError}</span>
+          ) : (
+            task.title
+          )}
         </span>
 
         <ObsidianLinkIcon description={task.description} />
@@ -241,6 +309,22 @@ export function TaskRow({ task, sortable = false }: TaskRowProps) {
               ))}
             </div>
           )}
+          {(task.repeat_after ?? 0) > 0 || (task.repeat_mode ?? 0) > 0 ? (
+            <Repeat className="h-3 w-3 text-[var(--text-secondary)]" />
+          ) : null}
+          {(task.attachments?.length ?? 0) > 0 && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation()
+                toggleExpandedTask(task.id)
+                setActivePopover('attachment')
+              }}
+              className="text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+            >
+              <Paperclip className="h-3 w-3" />
+            </button>
+          )}
           {(task.reminders?.length ?? 0) > 0 && (
             <Bell className="h-3 w-3 text-[var(--text-secondary)]" />
           )}
@@ -255,8 +339,15 @@ export function TaskRow({ task, sortable = false }: TaskRowProps) {
   return (
     <div
       data-task-id={task.id}
-      className="mx-2 my-1 rounded-xl border border-[var(--border-color)] bg-[var(--bg-primary)] shadow-md"
+      className={cn(
+        'mx-2 my-1 rounded-xl border border-[var(--border-color)] bg-[var(--bg-primary)] shadow-md',
+        isDragOver && 'ring-2 ring-[var(--accent-blue)] bg-[var(--accent-blue)]/5',
+        dropError && 'ring-2 ring-red-500 bg-red-500/5'
+      )}
       onKeyDown={handleExpandedKeyDown}
+      onDragOver={handleFileDragOver}
+      onDragLeave={handleFileDragLeave}
+      onDrop={handleFileDrop}
     >
       {/* Title row */}
       <div className="flex items-center gap-3 px-4 pt-3">
@@ -281,6 +372,16 @@ export function TaskRow({ task, sortable = false }: TaskRowProps) {
           placeholder="Task title"
         />
         <ObsidianLinkIcon description={task.description} />
+        {(task.attachments?.length ?? 0) > 0 && (
+          <button
+            type="button"
+            onClick={() => togglePopover('attachment')}
+            className="shrink-0 text-[var(--text-secondary)]"
+            title="Attachments"
+          >
+            <Paperclip className="h-3.5 w-3.5" />
+          </button>
+        )}
       </div>
 
       {/* Description */}
@@ -336,6 +437,12 @@ export function TaskRow({ task, sortable = false }: TaskRowProps) {
           ))}
           {!isNullDate(task.due_date) && (
             <TaskDueBadge dueDate={task.due_date} />
+          )}
+          {((task.repeat_after ?? 0) > 0 || (task.repeat_mode ?? 0) > 0) && (
+            <span className="flex items-center gap-0.5 text-2xs text-[var(--text-secondary)]">
+              <Repeat className="h-3 w-3" />
+              {formatRecurrenceLabel(task.repeat_after ?? 0, task.repeat_mode ?? 0)}
+            </span>
           )}
           <PriorityDot priority={task.priority} />
         </div>
@@ -396,6 +503,19 @@ export function TaskRow({ task, sortable = false }: TaskRowProps) {
           </button>
           <button
             type="button"
+            onClick={() => togglePopover('attachment')}
+            className={cn(
+              'flex h-6 w-6 items-center justify-center rounded transition-colors',
+              activePopover === 'attachment' || (task.attachments?.length ?? 0) > 0
+                ? 'bg-[var(--accent-blue)]/10 text-[var(--accent-blue)]'
+                : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]'
+            )}
+            title="Attachments"
+          >
+            <Paperclip className="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
             onClick={() => togglePopover('project')}
             className={cn(
               'flex h-6 w-6 items-center justify-center rounded transition-colors',
@@ -425,6 +545,9 @@ export function TaskRow({ task, sortable = false }: TaskRowProps) {
               currentDate={task.due_date}
               onDateChange={handleDateChange}
               onClose={() => setActivePopover(null)}
+              repeatAfter={task.repeat_after ?? 0}
+              repeatMode={task.repeat_mode ?? 0}
+              onRecurrenceChange={handleRecurrenceChange}
             />
           )}
           {activePopover === 'label' && (
@@ -444,6 +567,12 @@ export function TaskRow({ task, sortable = false }: TaskRowProps) {
             <ReminderPickerPopover
               task={task}
               onReminderChange={handleReminderChange}
+              onClose={() => setActivePopover(null)}
+            />
+          )}
+          {activePopover === 'attachment' && (
+            <AttachmentPickerPopover
+              taskId={task.id}
               onClose={() => setActivePopover(null)}
             />
           )}

@@ -4,6 +4,22 @@ export interface TaskReminder {
   relative_to?: 'due_date' | 'start_date' | 'end_date'
 }
 
+export interface TaskFile {
+  id: number
+  name: string
+  size: number
+  mime: string
+  created: string
+}
+
+export interface TaskAttachment {
+  id: number
+  task_id: number
+  created: string
+  created_by: { id: number; username: string }
+  file: TaskFile
+}
+
 export interface Task {
   id: number
   title: string
@@ -17,6 +33,7 @@ export interface Task {
   project_id: number
   labels: Label[] | null
   reminders: TaskReminder[] | null
+  attachments?: TaskAttachment[] | null
   related_tasks?: Record<string, Task[]> | null
   created: string
   updated: string
@@ -25,6 +42,7 @@ export interface Task {
   bucket_id: number
   percent_done: number
   repeat_after: number
+  repeat_mode: number // 0=default, 1=monthly, 2=from current date
   hex_color: string
 }
 

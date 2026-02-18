@@ -3,6 +3,7 @@ import { loadConfig } from './config'
 import { authManager } from './auth/auth-manager'
 
 const REQUEST_TIMEOUT = 10_000
+const UPLOAD_TIMEOUT = 60_000
 
 interface ApiSuccess<T> {
   success: true
@@ -396,4 +397,187 @@ export function testConnection(
 ): Promise<ApiResult<unknown[]>> {
   const cleanUrl = url.replace(/\/+$/, '')
   return request<unknown[]>('GET', `${cleanUrl}/api/v1/projects`, token)
+}
+
+// --- Attachments ---
+
+function requestMultipart<T>(
+  method: string,
+  url: string,
+  token: string,
+  fileBuffer: Buffer,
+  fileName: string,
+  mimeType: string
+): Promise<ApiResult<T>> {
+  const validation = validateHttpUrl(url)
+  if (!validation.valid) {
+    return Promise.resolve({ success: false, error: validation.error })
+  }
+
+  return new Promise((resolve) => {
+    const timeout = setTimeout(() => {
+      resolve({ success: false, error: `Upload timed out (${UPLOAD_TIMEOUT / 1000}s)` })
+    }, UPLOAD_TIMEOUT)
+
+    try {
+      const boundary = `----ViCU${Date.now()}${Math.random().toString(36).slice(2)}`
+      const header = Buffer.from(
+        `--${boundary}\r\nContent-Disposition: form-data; name="files"; filename="${fileName}"\r\nContent-Type: ${mimeType}\r\n\r\n`
+      )
+      const footer = Buffer.from(`\r\n--${boundary}--\r\n`)
+      const body = Buffer.concat([header, fileBuffer, footer])
+
+      const req = net.request({ method, url })
+      req.setHeader('Authorization', `Bearer ${token}`)
+      req.setHeader('Content-Type', `multipart/form-data; boundary=${boundary}`)
+      // Content-Length is a forbidden header in Chromium's network stack —
+      // Electron's net.request rejects it with ERR_INVALID_ARGUMENT.
+      // Chromium calculates it automatically from the body.
+
+      let responseBody = ''
+      let statusCode = 0
+
+      req.on('response', (response) => {
+        statusCode = response.statusCode
+
+        response.on('data', (chunk) => {
+          responseBody += chunk.toString()
+        })
+
+        response.on('end', () => {
+          clearTimeout(timeout)
+          if (statusCode >= 200 && statusCode < 300) {
+            try {
+              const data = JSON.parse(responseBody) as T
+              resolve({ success: true, data })
+            } catch {
+              resolve({ success: true, data: null as T })
+            }
+          } else {
+            console.error(`[upload] HTTP ${statusCode} for ${method} ${url}:`, responseBody)
+            resolve({ success: false, error: describeHttpError(statusCode, responseBody) })
+          }
+        })
+      })
+
+      req.on('error', (err) => {
+        clearTimeout(timeout)
+        console.error(`[upload] Network error for ${method} ${url}:`, err.message)
+        resolve({ success: false, error: err.message || 'Upload failed' })
+      })
+
+      // Send complete body in one call to avoid chunked transfer issues
+      req.end(body)
+    } catch (err: unknown) {
+      clearTimeout(timeout)
+      const message = err instanceof Error ? err.message : 'Upload failed'
+      resolve({ success: false, error: message })
+    }
+  })
+}
+
+function requestBinary(
+  url: string,
+  token: string
+): Promise<ApiResult<Buffer>> {
+  const validation = validateHttpUrl(url)
+  if (!validation.valid) {
+    return Promise.resolve({ success: false, error: validation.error })
+  }
+
+  return new Promise((resolve) => {
+    const timeout = setTimeout(() => {
+      resolve({ success: false, error: `Download timed out (${UPLOAD_TIMEOUT / 1000}s)` })
+    }, UPLOAD_TIMEOUT)
+
+    try {
+      const req = net.request({ method: 'GET', url })
+      req.setHeader('Authorization', `Bearer ${token}`)
+
+      const chunks: Buffer[] = []
+      let statusCode = 0
+
+      req.on('response', (response) => {
+        statusCode = response.statusCode
+
+        response.on('data', (chunk) => {
+          chunks.push(Buffer.from(chunk))
+        })
+
+        response.on('end', () => {
+          clearTimeout(timeout)
+          if (statusCode >= 200 && statusCode < 300) {
+            resolve({ success: true, data: Buffer.concat(chunks) })
+          } else {
+            const body = Buffer.concat(chunks).toString()
+            resolve({ success: false, error: describeHttpError(statusCode, body) })
+          }
+        })
+      })
+
+      req.on('error', (err) => {
+        clearTimeout(timeout)
+        resolve({ success: false, error: err.message || 'Download failed' })
+      })
+
+      req.end()
+    } catch (err: unknown) {
+      clearTimeout(timeout)
+      const message = err instanceof Error ? err.message : 'Download failed'
+      resolve({ success: false, error: message })
+    }
+  })
+}
+
+export function fetchTaskAttachments(taskId: number): Promise<ApiResult<unknown[]>> {
+  const c = getConfigOrFail()
+  if ('success' in c) return Promise.resolve(c)
+
+  return request<unknown[]>('GET', `${c.url}/api/v1/tasks/${taskId}/attachments`, c.token)
+}
+
+export function uploadTaskAttachment(
+  taskId: number,
+  fileBuffer: Buffer,
+  fileName: string,
+  mimeType: string
+): Promise<ApiResult<unknown>> {
+  const c = getConfigOrFail()
+  if ('success' in c) return Promise.resolve(c)
+
+  return requestMultipart<unknown>(
+    'PUT',
+    `${c.url}/api/v1/tasks/${taskId}/attachments`,
+    c.token,
+    fileBuffer,
+    fileName,
+    mimeType
+  )
+}
+
+export function deleteTaskAttachment(
+  taskId: number,
+  attachmentId: number
+): Promise<ApiResult<void>> {
+  const c = getConfigOrFail()
+  if ('success' in c) return Promise.resolve(c)
+
+  return request<void>(
+    'DELETE',
+    `${c.url}/api/v1/tasks/${taskId}/attachments/${attachmentId}`,
+    c.token
+  )
+}
+
+export function downloadTaskAttachment(
+  taskId: number,
+  attachmentId: number
+): Promise<ApiResult<Buffer>> {
+  const c = getConfigOrFail()
+  if ('success' in c) return Promise.resolve(c)
+
+  return requestBinary(
+    `${c.url}/api/v1/tasks/${taskId}/attachments/${attachmentId}`,
+    c.token
+  )
 }

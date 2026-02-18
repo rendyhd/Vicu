@@ -1,4 +1,6 @@
-import { ipcMain, shell } from 'electron'
+import { ipcMain, shell, dialog, app } from 'electron'
+import * as fs from 'fs'
+import * as path from 'path'
 import {
   fetchTasks,
   createTask,
@@ -21,6 +23,10 @@ import {
   fetchProjectViews,
   fetchViewTasks,
   updateTaskPosition,
+  fetchTaskAttachments,
+  uploadTaskAttachment,
+  deleteTaskAttachment,
+  downloadTaskAttachment,
 } from './api-client'
 import { loadConfig, saveConfig, type AppConfig } from './config'
 import { discoverProviders } from './auth/oidc-discovery'
@@ -479,6 +485,60 @@ export function registerIpcHandlers(): void {
     return getAllStandaloneTasks().length
   })
 
+  // --- Attachments IPC ---
+  ipcMain.handle('fetch-task-attachments', (_event, taskId: number) => {
+    return fetchTaskAttachments(taskId)
+  })
+
+  ipcMain.handle('upload-task-attachment', (_event, taskId: number, fileData: Uint8Array, fileName: string, mimeType: string) => {
+    return uploadTaskAttachment(taskId, Buffer.from(fileData), fileName, mimeType)
+  })
+
+  ipcMain.handle('delete-task-attachment', (_event, taskId: number, attachmentId: number) => {
+    return deleteTaskAttachment(taskId, attachmentId)
+  })
+
+  ipcMain.handle('open-task-attachment', async (_event, taskId: number, attachmentId: number, fileName: string) => {
+    const result = await downloadTaskAttachment(taskId, attachmentId)
+    if (!result.success) return result
+
+    try {
+      const tempDir = path.join(app.getPath('temp'), 'vicu-attachments')
+      if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true })
+      const filePath = path.join(tempDir, `${attachmentId}-${fileName}`)
+      fs.writeFileSync(filePath, result.data)
+      await shell.openPath(filePath)
+      return { success: true, data: undefined }
+    } catch (err: unknown) {
+      return { success: false, error: err instanceof Error ? err.message : 'Failed to open file' }
+    }
+  })
+
+  ipcMain.handle('pick-and-upload-attachment', async (_event, taskId: number) => {
+    const win = getMainWindow()
+    const dialogResult = await dialog.showOpenDialog(win!, {
+      properties: ['openFile', 'multiSelections'],
+    })
+    if (dialogResult.canceled || dialogResult.filePaths.length === 0) {
+      return { success: true, data: { count: 0 } }
+    }
+
+    let count = 0
+    let lastError = ''
+    for (const filePath of dialogResult.filePaths) {
+      const fileBuffer = fs.readFileSync(filePath)
+      const fileName = path.basename(filePath)
+      const mimeType = getMimeType(fileName)
+      const result = await uploadTaskAttachment(taskId, fileBuffer, fileName, mimeType)
+      if (result.success) count++
+      else lastError = result.error
+    }
+    if (count === 0 && dialogResult.filePaths.length > 0) {
+      return { success: false, error: lastError || 'Upload failed' }
+    }
+    return { success: true, data: { count } }
+  })
+
   // --- Obsidian IPC ---
   const ALLOWED_EXTERNAL_PROTOCOLS = new Set(['https:', 'http:', 'obsidian:'])
 
@@ -558,4 +618,35 @@ function notifyViewerSync(): void {
       viewerWindow.webContents.send('sync-completed')
     }
   } catch { /* ignore */ }
+}
+
+// Helper: guess MIME type from file extension
+function getMimeType(fileName: string): string {
+  const ext = path.extname(fileName).toLowerCase()
+  const mimeMap: Record<string, string> = {
+    '.pdf': 'application/pdf',
+    '.doc': 'application/msword',
+    '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    '.xls': 'application/vnd.ms-excel',
+    '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    '.ppt': 'application/vnd.ms-powerpoint',
+    '.pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    '.txt': 'text/plain',
+    '.csv': 'text/csv',
+    '.json': 'application/json',
+    '.xml': 'application/xml',
+    '.zip': 'application/zip',
+    '.gz': 'application/gzip',
+    '.png': 'image/png',
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.gif': 'image/gif',
+    '.svg': 'image/svg+xml',
+    '.webp': 'image/webp',
+    '.mp3': 'audio/mpeg',
+    '.wav': 'audio/wav',
+    '.mp4': 'video/mp4',
+    '.webm': 'video/webm',
+  }
+  return mimeMap[ext] || 'application/octet-stream'
 }

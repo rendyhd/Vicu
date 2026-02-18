@@ -42,18 +42,23 @@ function TokenPermissionsInfo() {
               </tr>
               <tr className="border-b border-[var(--border-color)]/50">
                 <td className="py-1.5 pr-2 font-mono text-[10px]">projects</td>
-                <td className="py-1.5 pr-2">read_all, create</td>
-                <td className="py-1.5">Project listing + creation</td>
+                <td className="py-1.5 pr-2">read_all, create, update, delete</td>
+                <td className="py-1.5">Project CRUD</td>
               </tr>
               <tr className="border-b border-[var(--border-color)]/50">
                 <td className="py-1.5 pr-2 font-mono text-[10px]">labels</td>
-                <td className="py-1.5 pr-2">read_all</td>
-                <td className="py-1.5">Label listing</td>
+                <td className="py-1.5 pr-2">read_all, create, update, delete</td>
+                <td className="py-1.5">Label CRUD</td>
               </tr>
-              <tr>
+              <tr className="border-b border-[var(--border-color)]/50">
                 <td className="py-1.5 pr-2 font-mono text-[10px]">task_labels</td>
                 <td className="py-1.5 pr-2">create, delete</td>
                 <td className="py-1.5">Adding/removing labels</td>
+              </tr>
+              <tr>
+                <td className="py-1.5 pr-2 font-mono text-[10px]">task_relations</td>
+                <td className="py-1.5 pr-2">create, delete</td>
+                <td className="py-1.5">Subtasks & relations</td>
               </tr>
             </tbody>
           </table>
