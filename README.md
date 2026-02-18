@@ -1,6 +1,6 @@
 # Vicu
 
-A GTD-focused desktop task manager powered by [Vikunja](https://vikunja.io/).
+A personal task manager for your desktop, powered by [Vikunja](https://vikunja.io/).
 
 ![License](https://img.shields.io/badge/license-MIT-blue)
 ![Platform](https://img.shields.io/badge/platform-Windows-lightgrey)
@@ -10,7 +10,7 @@ A GTD-focused desktop task manager powered by [Vikunja](https://vikunja.io/).
 
 ## What is Vicu?
 
-Vicu turns Vikunja into a fast, keyboard-driven personal task manager built around Getting Things Done. Press a hotkey from any app to capture a task in two seconds — you never leave what you're doing. Press another hotkey to review your list. Everything flows through time: tasks land in your **Inbox**, get scheduled into **Today** or **Upcoming**, live in **Anytime** as your open backlog, and end up in the **Logbook** when done. No Kanban boards, no Gantt charts, no team features — just the GTD cycle of capture, process, do, review.
+Vicu turns Vikunja into a fast, keyboard-driven task manager that lives on your desktop. Press a hotkey from any app to capture a task in two seconds — you never leave what you're doing. Press another hotkey to check your list. Everything is organized around when things need to happen: tasks land in your **Inbox**, get scheduled into **Today** or **Upcoming**, sit in **Anytime** as your open backlog, and end up in the **Logbook** when done. No Kanban boards, no Gantt charts, no team features — just a simple flow from "I need to do this" to "it's done."
 
 If you work in Obsidian, Vicu bridges your notes and your tasks: link the active note to a task with a keystroke, and jump back to it from anywhere in the app.
 
@@ -40,7 +40,7 @@ Vicu also includes smart lists (Inbox, Today, Upcoming, Anytime, Logbook), custo
 
 ## Vicu vs the official Vikunja app
 
-The [official Vikunja frontend](https://vikunja.io/) is a full project management suite — Kanban, Gantt, table views, team collaboration, dependencies, and more. Vicu is a personal task manager that trades all of that for a simpler GTD workflow. Both talk to the same backend, so you can use them side by side.
+The [official Vikunja frontend](https://vikunja.io/) is a full project management suite — Kanban, Gantt, table views, team collaboration, dependencies, and more. Vicu is a personal task manager that trades all of that for speed and a simple workflow. Both talk to the same backend, so you can use them side by side.
 
 ## Getting started
 
