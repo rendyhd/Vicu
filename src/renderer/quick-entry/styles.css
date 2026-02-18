@@ -175,7 +175,7 @@ body {
 
 /* Obsidian hint */
 .obsidian-hint {
-  padding: 2px 16px;
+  padding: 2px 16px 8px;
   font-size: 11px;
   color: #7C3AED;
   opacity: 0.6;
@@ -195,7 +195,7 @@ body {
   align-items: center;
   gap: 4px;
   padding: 2px 8px;
-  margin: 4px 16px 0;
+  margin: 4px 16px 8px;
   border-radius: 10px;
   background: rgba(124, 58, 237, 0.12);
   color: #7C3AED;
