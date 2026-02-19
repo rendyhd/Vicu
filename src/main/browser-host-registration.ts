@@ -12,7 +12,7 @@ export interface RegistrationOptions {
 
 export function getBridgePath(): string {
   if (app.isPackaged) {
-    return join(process.resourcesPath, 'native-messaging-host', 'vicu-bridge.js')
+    return join(process.resourcesPath, 'resources', 'native-messaging-host', 'vicu-bridge.js')
   }
   return join(app.getAppPath(), 'resources', 'native-messaging-host', 'vicu-bridge.js')
 }

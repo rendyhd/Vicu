@@ -16,6 +16,10 @@ extraResources:
     to: resources/
     filter:
       - "**/*"
+  - from: extensions/
+    to: extensions/
+    filter:
+      - "**/*"
 
 asarUnpack:
   - "node_modules/koffi/**"
@@ -41,3 +45,4 @@ publish:
   provider: github
   owner: rendyhd
   repo: vicu
+  releaseType: release

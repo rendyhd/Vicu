@@ -1,4 +1,4 @@
-import { Tray, Menu, nativeImage } from 'electron'
+import { app, Tray, Menu, nativeImage } from 'electron'
 import { join } from 'path'
 
 let tray: Tray | null = null
@@ -13,7 +13,9 @@ export interface TrayCallbacks {
 let callbacks: TrayCallbacks | null = null
 
 function createTrayIcon(): Electron.NativeImage {
-  const iconPath = join(__dirname, '../../resources/icon.png')
+  const iconPath = app.isPackaged
+    ? join(process.resourcesPath, 'resources', 'icon.png')
+    : join(app.getAppPath(), 'resources', 'icon.png')
   try {
     const icon = nativeImage.createFromPath(iconPath)
     if (!icon.isEmpty()) {

@@ -640,6 +640,7 @@ export function registerIpcHandlers(): void {
     const base = app.isPackaged
       ? path.join(process.resourcesPath, 'extensions', 'browser')
       : path.join(app.getAppPath(), 'extensions', 'browser')
+    if (!require('fs').existsSync(base)) return
     const manifest = path.join(base, 'manifest.json')
     shell.showItemInFolder(manifest)
   })

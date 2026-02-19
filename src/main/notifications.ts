@@ -1,4 +1,4 @@
-import { Notification, nativeImage, BrowserWindow } from 'electron'
+import { app, Notification, nativeImage, BrowserWindow } from 'electron'
 import { join } from 'path'
 import { loadConfig, type AppConfig } from './config'
 import { fetchTasks } from './api-client'
@@ -397,7 +397,9 @@ function formatDueDate(dueDateStr: string, category: 'overdue' | 'due_today' | '
 
 function getIcon(): Electron.NativeImage | undefined {
   try {
-    const iconPath = join(__dirname, '../../resources/icon.png')
+    const iconPath = app.isPackaged
+      ? join(process.resourcesPath, 'resources', 'icon.png')
+      : join(app.getAppPath(), 'resources', 'icon.png')
     const icon = nativeImage.createFromPath(iconPath)
     return icon.isEmpty() ? undefined : icon
   } catch {
