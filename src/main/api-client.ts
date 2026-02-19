@@ -149,7 +149,7 @@ function getConfigOrFail(): { url: string; token: string } | ApiError {
     return { success: false, error: 'Vikunja is not configured. Open Settings to connect.' }
   }
 
-  if (config.auth_method === 'oidc') {
+  if (config.auth_method === 'oidc' || config.auth_method === 'password') {
     const token = authManager.getTokenSync()
     if (!token) {
       return { success: false, error: 'Session expired. Please sign in again.' }

@@ -29,7 +29,8 @@ import {
   downloadTaskAttachment,
 } from './api-client'
 import { loadConfig, saveConfig, type AppConfig } from './config'
-import { discoverProviders } from './auth/oidc-discovery'
+import { discoverProviders, discoverAuthMethods } from './auth/oidc-discovery'
+import { fetchCurrentUser } from './auth/user-info'
 import { authManager } from './auth/auth-manager'
 import { buildViewerFilterParams } from './quick-entry/filter-builder'
 import {
@@ -181,6 +182,22 @@ export function registerIpcHandlers(): void {
     } catch (err: unknown) {
       return { success: false, error: err instanceof Error ? err.message : 'Login failed' }
     }
+  })
+
+  ipcMain.handle('auth:discover-methods', (_event, url: string) => {
+    return discoverAuthMethods(url)
+  })
+
+  ipcMain.handle('auth:login-password', async (_event, url: string, username: string, password: string, totpPasscode?: string) => {
+    return authManager.loginPassword(url, username, password, totpPasscode)
+  })
+
+  ipcMain.handle('auth:get-user', async () => {
+    const config = loadConfig()
+    if (!config?.vikunja_url) return null
+    const token = config.auth_method === 'api_token' ? config.api_token : authManager.getTokenSync()
+    if (!token) return null
+    return fetchCurrentUser(config.vikunja_url, token)
   })
 
   ipcMain.handle('auth:check', () => {

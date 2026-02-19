@@ -21,7 +21,7 @@ export interface AppConfig {
   vikunja_url: string
   api_token: string
   inbox_project_id: number
-  auth_method?: 'api_token' | 'oidc'
+  auth_method?: 'api_token' | 'oidc' | 'password'
   theme: 'light' | 'dark' | 'system'
   window_bounds?: { x: number; y: number; width: number; height: number }
   sidebar_width?: number
@@ -115,7 +115,7 @@ function normalizeConfig(raw: Record<string, unknown>): AppConfig {
     inbox_project_id: typeof raw.inbox_project_id === 'number'
       ? raw.inbox_project_id
       : DEFAULT_CONFIG.inbox_project_id,
-    auth_method: raw.auth_method === 'oidc' ? 'oidc' : 'api_token',
+    auth_method: raw.auth_method === 'oidc' ? 'oidc' : raw.auth_method === 'password' ? 'password' : 'api_token',
     theme: raw.theme === 'light' || raw.theme === 'dark' || raw.theme === 'system'
       ? raw.theme
       : DEFAULT_CONFIG.theme,

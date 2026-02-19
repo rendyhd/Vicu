@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { api, type OIDCProvider } from '@/lib/api'
+import { api, type OIDCProvider, type ServerAuthInfo } from '@/lib/api'
 import { cn } from '@/lib/cn'
 import type { Project } from '@/lib/vikunja-types'
 
@@ -55,10 +55,20 @@ function TokenPermissionsInfo() {
                 <td className="py-1.5 pr-2">create, delete</td>
                 <td className="py-1.5">Adding/removing labels</td>
               </tr>
-              <tr>
+              <tr className="border-b border-[var(--border-color)]/50">
                 <td className="py-1.5 pr-2 font-mono text-[10px]">task_relations</td>
                 <td className="py-1.5 pr-2">create, delete</td>
                 <td className="py-1.5">Subtasks & relations</td>
+              </tr>
+              <tr className="border-b border-[var(--border-color)]/50">
+                <td className="py-1.5 pr-2 font-mono text-[10px]">task_attachments</td>
+                <td className="py-1.5 pr-2">read_all, create, delete</td>
+                <td className="py-1.5">File attachments</td>
+              </tr>
+              <tr>
+                <td className="py-1.5 pr-2 font-mono text-[10px]">project_views</td>
+                <td className="py-1.5 pr-2">read_all</td>
+                <td className="py-1.5">Position sorting</td>
               </tr>
             </tbody>
           </table>
@@ -70,7 +80,7 @@ function TokenPermissionsInfo() {
 
 export { TokenPermissionsInfo }
 
-type Step = 'url' | 'auth-method' | 'oidc-login' | 'api-token' | 'project'
+type Step = 'url' | 'auth-method' | 'oidc-login' | 'password-login' | 'totp' | 'api-token' | 'project'
 
 interface SetupViewProps {
   onComplete: () => void
@@ -83,11 +93,20 @@ export function SetupView({ onComplete }: SetupViewProps) {
   const [showToken, setShowToken] = useState(false)
   const [inboxProjectId, setInboxProjectId] = useState(0)
 
+  const [serverAuth, setServerAuth] = useState<ServerAuthInfo | null>(null)
   const [oidcProviders, setOidcProviders] = useState<OIDCProvider[]>([])
   const [discovering, setDiscovering] = useState(false)
   const [oidcLogging, setOidcLogging] = useState(false)
   const [oidcError, setOidcError] = useState('')
-  const [authMethod, setAuthMethod] = useState<'api_token' | 'oidc'>('api_token')
+  const [authMethod, setAuthMethod] = useState<'api_token' | 'oidc' | 'password'>('api_token')
+
+  // Password login state
+  const [username, setUsername] = useState('')
+  const [password, setPassword] = useState('')
+  const [totpCode, setTotpCode] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+  const [passwordLogging, setPasswordLogging] = useState(false)
+  const [passwordError, setPasswordError] = useState('')
 
   const [projects, setProjects] = useState<Project[]>([])
   const [testStatus, setTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle')
@@ -96,11 +115,12 @@ export function SetupView({ onComplete }: SetupViewProps) {
 
   const handleUrlContinue = async () => {
     setDiscovering(true)
-    const providers = await api.discoverOidc(url.replace(/\/+$/, ''))
-    setOidcProviders(providers)
+    const authInfo = await api.discoverAuthMethods(url.replace(/\/+$/, ''))
+    setServerAuth(authInfo)
+    setOidcProviders(authInfo.oidc_providers)
     setDiscovering(false)
 
-    if (providers.length > 0) {
+    if (authInfo.local_enabled || authInfo.oidc_enabled) {
       setStep('auth-method')
     } else {
       setStep('api-token')
@@ -143,6 +163,48 @@ export function SetupView({ onComplete }: SetupViewProps) {
     }
   }
 
+  const handlePasswordLogin = async (totpPasscode?: string) => {
+    setPasswordLogging(true)
+    setPasswordError('')
+
+    // Save partial config so the main process knows the URL and auth method
+    await api.saveConfig({
+      vikunja_url: url.replace(/\/+$/, ''),
+      api_token: '',
+      inbox_project_id: 0,
+      auth_method: 'password',
+      theme: 'system',
+    })
+
+    try {
+      const result = await api.loginPassword(
+        url.replace(/\/+$/, ''),
+        username,
+        password,
+        totpPasscode
+      )
+
+      if (result.success) {
+        setAuthMethod('password')
+        const projectsResult = await api.fetchProjects()
+        if (projectsResult.success) {
+          setProjects(projectsResult.data)
+          setStep('project')
+        } else {
+          setPasswordError(projectsResult.error)
+        }
+      } else if (result.totpRequired) {
+        setStep('totp')
+      } else {
+        setPasswordError(result.error)
+      }
+    } catch {
+      setPasswordError('Login failed unexpectedly. Please try again.')
+    } finally {
+      setPasswordLogging(false)
+    }
+  }
+
   const handleTestConnection = async () => {
     setTestStatus('testing')
     setTestError('')
@@ -181,6 +243,8 @@ export function SetupView({ onComplete }: SetupViewProps) {
           {step === 'url' && 'Enter your server URL to get started.'}
           {step === 'auth-method' && 'Choose how to sign in.'}
           {step === 'oidc-login' && 'Complete sign-in in your browser.'}
+          {step === 'password-login' && 'Sign in with your credentials.'}
+          {step === 'totp' && 'Enter your two-factor authentication code.'}
           {step === 'api-token' && 'Enter your API token to connect.'}
           {step === 'project' && 'Choose your inbox project.'}
         </p>
@@ -239,6 +303,34 @@ export function SetupView({ onComplete }: SetupViewProps) {
                 </button>
               ))}
 
+              {serverAuth?.local_enabled && (
+                <>
+                  {oidcProviders.length > 0 && (
+                    <div className="flex items-center gap-3">
+                      <div className="h-px flex-1 bg-[var(--border-color)]" />
+                      <span className="text-xs text-[var(--text-secondary)]">or</span>
+                      <div className="h-px flex-1 bg-[var(--border-color)]" />
+                    </div>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPasswordError('')
+                      setStep('password-login')
+                    }}
+                    className={cn(
+                      'w-full rounded-md px-4 py-2.5 text-sm font-medium transition-colors',
+                      oidcProviders.length > 0
+                        ? 'border border-[var(--border-color)] text-[var(--text-primary)] hover:bg-[var(--bg-primary)]'
+                        : 'bg-accent-blue text-white hover:bg-accent-blue/90'
+                    )}
+                  >
+                    Sign in with username & password
+                  </button>
+                </>
+              )}
+
               {oidcError && (
                 <p className="text-xs text-accent-red">{oidcError}</p>
               )}
@@ -260,6 +352,137 @@ export function SetupView({ onComplete }: SetupViewProps) {
               <button
                 type="button"
                 onClick={() => setStep('url')}
+                className="w-full text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+              >
+                Back
+              </button>
+            </>
+          )}
+
+          {/* Step 3a: Password Login */}
+          {step === 'password-login' && (
+            <>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">
+                  Username or Email
+                </label>
+                <input
+                  type="text"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  placeholder="Enter your username or email"
+                  autoComplete="username"
+                  className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-accent-blue focus:outline-none"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && username && password) handlePasswordLogin()
+                  }}
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">
+                  Password
+                </label>
+                <div className="relative">
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Enter your password"
+                    autoComplete="current-password"
+                    className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2 pr-16 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-accent-blue focus:outline-none"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && username && password) handlePasswordLogin()
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded px-2 py-0.5 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                  >
+                    {showPassword ? 'Hide' : 'Show'}
+                  </button>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => handlePasswordLogin()}
+                disabled={!username || !password || passwordLogging}
+                className={cn(
+                  'w-full rounded-md px-4 py-2 text-sm font-medium transition-colors',
+                  'bg-accent-blue text-white hover:bg-accent-blue/90',
+                  'disabled:cursor-not-allowed disabled:opacity-50'
+                )}
+              >
+                {passwordLogging ? 'Signing in...' : 'Sign In'}
+              </button>
+
+              {passwordError && (
+                <p className="text-xs text-accent-red">{passwordError}</p>
+              )}
+
+              <button
+                type="button"
+                onClick={() => {
+                  setPasswordError('')
+                  setStep(serverAuth?.oidc_enabled ? 'auth-method' : 'url')
+                }}
+                className="w-full text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+              >
+                Back
+              </button>
+            </>
+          )}
+
+          {/* Step 3a-ii: TOTP */}
+          {step === 'totp' && (
+            <>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">
+                  Two-Factor Code
+                </label>
+                <input
+                  type="text"
+                  value={totpCode}
+                  onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  placeholder="000000"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2 text-center text-lg tracking-widest text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-accent-blue focus:outline-none"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && totpCode.length === 6) handlePasswordLogin(totpCode)
+                  }}
+                />
+                <p className="mt-1.5 text-xs text-[var(--text-secondary)]">
+                  Enter the 6-digit code from your authenticator app.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => handlePasswordLogin(totpCode)}
+                disabled={totpCode.length !== 6 || passwordLogging}
+                className={cn(
+                  'w-full rounded-md px-4 py-2 text-sm font-medium transition-colors',
+                  'bg-accent-blue text-white hover:bg-accent-blue/90',
+                  'disabled:cursor-not-allowed disabled:opacity-50'
+                )}
+              >
+                {passwordLogging ? 'Verifying...' : 'Verify'}
+              </button>
+
+              {passwordError && (
+                <p className="text-xs text-accent-red">{passwordError}</p>
+              )}
+
+              <button
+                type="button"
+                onClick={() => {
+                  setTotpCode('')
+                  setPasswordError('')
+                  setStep('password-login')
+                }}
                 className="w-full text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
               >
                 Back
@@ -324,7 +547,7 @@ export function SetupView({ onComplete }: SetupViewProps) {
                 onClick={() => {
                   setTestStatus('idle')
                   setTestError('')
-                  setStep(oidcProviders.length > 0 ? 'auth-method' : 'url')
+                  setStep(serverAuth ? 'auth-method' : 'url')
                 }}
                 className="w-full text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
               >
@@ -338,6 +561,9 @@ export function SetupView({ onComplete }: SetupViewProps) {
             <>
               {authMethod === 'oidc' && (
                 <p className="text-xs text-accent-green">Signed in via SSO</p>
+              )}
+              {authMethod === 'password' && (
+                <p className="text-xs text-accent-green">Signed in successfully</p>
               )}
               {authMethod === 'api_token' && (
                 <p className="text-xs text-accent-green">Connected successfully</p>

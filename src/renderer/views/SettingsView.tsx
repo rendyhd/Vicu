@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { api } from '@/lib/api'
+import { api, type VikunjaUser } from '@/lib/api'
 import { cn } from '@/lib/cn'
 import { applyTheme } from '@/lib/theme'
 import { TokenPermissionsInfo } from '@/views/SetupView'
@@ -21,7 +21,8 @@ export function SettingsView() {
   const [showToken, setShowToken] = useState(false)
   const [inboxProjectId, setInboxProjectId] = useState(0)
   const [theme, setTheme] = useState<ThemeOption>('system')
-  const [authMethod, setAuthMethod] = useState<'api_token' | 'oidc'>('api_token')
+  const [authMethod, setAuthMethod] = useState<'api_token' | 'oidc' | 'password'>('api_token')
+  const [currentUser, setCurrentUser] = useState<VikunjaUser | null>(null)
 
   const [projects, setProjects] = useState<Project[]>([])
   const [testStatus, setTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle')
@@ -45,12 +46,18 @@ export function SettingsView() {
         setInboxProjectId(config.inbox_project_id || 0)
         setTheme(config.theme || 'system')
         setAuthMethod(config.auth_method || 'api_token')
+
+        if (config.auth_method === 'password' || config.auth_method === 'oidc') {
+          api.getUser().then((user) => {
+            if (user) setCurrentUser(user)
+          })
+        }
       }
     })
   }, [])
 
   useEffect(() => {
-    if (url && (token || authMethod === 'oidc')) {
+    if (url && (token || authMethod === 'oidc' || authMethod === 'password')) {
       api.fetchProjects().then((res) => {
         if (res.success) setProjects(res.data)
       })
@@ -158,7 +165,7 @@ export function SettingsView() {
         <div className="rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] p-5">
           <h2 className="mb-4 text-sm font-semibold text-[var(--text-primary)]">Connection</h2>
 
-          {authMethod === 'oidc' ? (
+          {authMethod === 'oidc' || authMethod === 'password' ? (
             <div className="space-y-3">
               <div>
                 <label className="mb-1 block text-xs text-[var(--text-secondary)]">Vikunja URL</label>
@@ -169,7 +176,13 @@ export function SettingsView() {
 
               <div className="flex items-center gap-2">
                 <span className="inline-block h-2 w-2 rounded-full bg-accent-green" />
-                <span className="text-xs text-accent-green">Signed in via SSO</span>
+                <span className="text-xs text-accent-green">
+                  {authMethod === 'oidc'
+                    ? 'Signed in via SSO'
+                    : currentUser
+                      ? `Signed in as ${currentUser.name || currentUser.username}`
+                      : 'Signed in'}
+                </span>
               </div>
 
               <button

@@ -23,6 +23,24 @@ export interface OIDCProvider {
   scope: string
 }
 
+export interface ServerAuthInfo {
+  local_enabled: boolean
+  oidc_enabled: boolean
+  oidc_providers: OIDCProvider[]
+  totp_enabled: boolean
+}
+
+export type PasswordLoginResult =
+  | { success: true; token: string }
+  | { success: false; error: string; totpRequired?: boolean }
+
+export interface VikunjaUser {
+  id: number
+  username: string
+  email: string
+  name: string
+}
+
 export const api = {
   fetchTasks: (params: TaskQueryParams) =>
     window.api.fetchTasks(params) as Promise<ApiResult<Task[]>>,
@@ -96,8 +114,17 @@ export const api = {
   discoverOidc: (url: string) =>
     window.api.discoverOidc(url) as Promise<OIDCProvider[]>,
 
+  discoverAuthMethods: (url: string) =>
+    window.api.discoverAuthMethods(url) as Promise<ServerAuthInfo>,
+
   oidcLogin: (url: string, providerKey: string) =>
     window.api.oidcLogin(url, providerKey) as Promise<ApiResult<void>>,
+
+  loginPassword: (url: string, username: string, password: string, totpPasscode?: string) =>
+    window.api.loginPassword(url, username, password, totpPasscode) as Promise<PasswordLoginResult>,
+
+  getUser: () =>
+    window.api.getUser() as Promise<VikunjaUser | null>,
 
   checkAuth: () =>
     window.api.checkAuth() as Promise<boolean>,

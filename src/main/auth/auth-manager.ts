@@ -9,6 +9,8 @@ import {
 } from './token-store'
 import { loginWithOIDC } from './oidc-login'
 import { silentReauth } from './silent-reauth'
+import { loginWithPassword, type PasswordLoginResult } from './password-login'
+import { renewJWT } from './jwt-renewal'
 
 // Re-auth 1 hour before JWT expiry
 const REFRESH_BUFFER_SECONDS = 3600
@@ -26,7 +28,7 @@ class AuthManager {
    */
   async initialize(): Promise<boolean> {
     const config = loadConfig()
-    if (!config || config.auth_method !== 'oidc') return false
+    if (!config || (config.auth_method !== 'oidc' && config.auth_method !== 'password')) return false
 
     const token = getBestToken()
     if (!token) return false
@@ -101,6 +103,22 @@ class AuthManager {
   async login(vikunjaUrl: string, providerKey?: string): Promise<void> {
     await loginWithOIDC(vikunjaUrl, providerKey)
     this._scheduleProactiveRefresh()
+  }
+
+  /**
+   * Username/password login with optional TOTP.
+   */
+  async loginPassword(
+    vikunjaUrl: string,
+    username: string,
+    password: string,
+    totpPasscode?: string
+  ): Promise<PasswordLoginResult> {
+    const result = await loginWithPassword(vikunjaUrl, username, password, totpPasscode)
+    if (result.success) {
+      this._scheduleProactiveRefresh()
+    }
+    return result
   }
 
   /**
@@ -189,7 +207,12 @@ class AuthManager {
       return Promise.reject(new Error('No Vikunja URL configured'))
     }
 
-    this._refreshInProgress = silentReauth(config.vikunja_url)
+    const refreshPromise =
+      config.auth_method === 'password'
+        ? renewJWT(config.vikunja_url)
+        : silentReauth(config.vikunja_url)
+
+    this._refreshInProgress = refreshPromise
       .then((jwt) => {
         this._refreshInProgress = null
         this._scheduleProactiveRefresh()
