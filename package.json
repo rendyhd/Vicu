@@ -1,6 +1,6 @@
 {
   "name": "vicu",
-  "version": "0.1.0",
+  "version": "1.0.0-beta.1",
   "description": "A task management app powered by Vikunja",
   "main": "./out/main/index.js",
   "scripts": {
@@ -8,8 +8,8 @@
     "build": "electron-vite build",
     "preview": "electron-vite preview",
     "start": "electron-vite preview",
-    "package": "electron-forge package",
-    "make": "electron-forge make"
+    "dist": "electron-vite build && electron-builder --win",
+    "dist:publish": "electron-vite build && electron-builder --win --publish always"
   },
   "author": "rendyhd",
   "license": "MIT",
@@ -29,12 +29,6 @@
     "zustand": "^4.5.0"
   },
   "devDependencies": {
-    "@electron-forge/cli": "^7.4.0",
-    "@electron-forge/maker-deb": "^7.4.0",
-    "@electron-forge/maker-dmg": "^7.4.0",
-    "@electron-forge/maker-rpm": "^7.4.0",
-    "@electron-forge/maker-wix": "^7.4.0",
-    "@electron-forge/plugin-fuses": "^7.4.0",
     "@types/react": "^18.3.0",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.0",
@@ -43,6 +37,7 @@
     "electron-vite": "^2.3.0",
     "postcss": "^8.4.0",
     "tailwindcss": "^3.4.0",
+    "electron-builder": "^25.1.8",
     "typescript": "^5.5.0"
   }
 }

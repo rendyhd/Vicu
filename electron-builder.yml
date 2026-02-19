@@ -1,0 +1,43 @@
+appId: com.rendyhd.vicu
+productName: Vicu
+copyright: Copyright (c) 2024-2026 rendyhd
+
+directories:
+  buildResources: build
+  output: dist
+
+files:
+  - out/**/*
+  - resources/**/*
+  - "!node_modules/**/{test,__tests__,tests,*.test.*,*.spec.*}"
+
+extraResources:
+  - from: resources/
+    to: resources/
+    filter:
+      - "**/*"
+
+asarUnpack:
+  - "node_modules/koffi/**"
+
+win:
+  icon: build/icon.ico
+  target:
+    - target: nsis
+      arch:
+        - x64
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  license: LICENSE
+  installerIcon: build/icon.ico
+  uninstallerIcon: build/icon.ico
+  installerHeaderIcon: build/icon.ico
+  deleteAppDataOnUninstall: false
+  differentialPackage: false
+
+publish:
+  provider: github
+  owner: rendyhd
+  repo: vicu
