@@ -12,7 +12,7 @@ import type { AppConfig, Project } from '@/lib/vikunja-types'
 
 import type { ThemeOption } from '@/lib/theme'
 
-type SettingsTab = 'general' | 'notifications' | 'shortcuts'
+type SettingsTab = 'general' | 'integrations' | 'notifications' | 'shortcuts'
 
 export function SettingsView() {
   const [activeTab, setActiveTab] = useState<SettingsTab>('general')
@@ -132,6 +132,7 @@ export function SettingsView() {
       <div className="flex gap-1 border-b border-[var(--border-color)] px-6">
         {([
           { key: 'general' as const, label: 'General' },
+          { key: 'integrations' as const, label: 'Quick Entry / View' },
           { key: 'notifications' as const, label: 'Notifications' },
           { key: 'shortcuts' as const, label: 'Keyboard Shortcuts' },
         ]).map((tab) => (
@@ -160,7 +161,7 @@ export function SettingsView() {
             onChange={handleQuickEntryChange}
           />
         )
-      ) : (
+      ) : activeTab === 'general' ? (
       <div className="mx-6 max-w-lg space-y-6 pb-8 pt-4">
         <div className="rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] p-5">
           <h2 className="mb-4 text-sm font-semibold text-[var(--text-primary)]">Connection</h2>
@@ -266,6 +267,19 @@ export function SettingsView() {
           <h2 className="mb-4 text-sm font-semibold text-[var(--text-primary)]">Preferences</h2>
 
           <div className="space-y-3">
+            <label className="flex cursor-pointer items-center gap-2">
+              <input
+                type="checkbox"
+                checked={fullConfig?.launch_on_startup ?? false}
+                onChange={(e) => handleQuickEntryChange({ launch_on_startup: e.target.checked })}
+                className="h-4 w-4 rounded border-[var(--border-color)] accent-accent-blue"
+              />
+              <span className="text-sm text-[var(--text-primary)]">
+                Launch on startup
+              </span>
+              <span className="text-xs text-[var(--text-secondary)]">(advised for Quick Entry / View)</span>
+            </label>
+
             <div>
               <label className="mb-1 block text-xs text-[var(--text-secondary)]">Inbox Project</label>
               <select
@@ -321,6 +335,15 @@ export function SettingsView() {
           </div>
         </div>
 
+        {saveStatus === 'saving' && (
+          <p className="text-xs text-[var(--text-secondary)]">Saving...</p>
+        )}
+        {saveStatus === 'saved' && (
+          <p className="text-xs text-accent-green">Settings saved</p>
+        )}
+      </div>
+      ) : activeTab === 'integrations' ? (
+      <div className="mx-6 max-w-lg space-y-6 pb-8 pt-4">
         {fullConfig && (
           <QuickEntrySettings
             config={fullConfig}
@@ -353,7 +376,7 @@ export function SettingsView() {
           <p className="text-xs text-accent-green">Settings saved</p>
         )}
       </div>
-      )}
+      ) : null}
     </div>
   )
 }

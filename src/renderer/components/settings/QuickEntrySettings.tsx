@@ -278,24 +278,6 @@ export function QuickEntrySettings({ config, projects, onChange, hotkeyWarnings 
             </>
           )}
 
-          {(entryEnabled || viewEnabled) && (
-            <>
-              {/* Launch on startup */}
-              <div className="border-t border-[var(--border-color)] pt-4">
-                <label className="flex cursor-pointer items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={config.launch_on_startup ?? false}
-                    onChange={(e) => onChange({ launch_on_startup: e.target.checked })}
-                    className="h-4 w-4 rounded border-[var(--border-color)] accent-accent-blue"
-                  />
-                  <span className="text-sm text-[var(--text-primary)]">
-                    Launch on startup
-                  </span>
-                </label>
-              </div>
-            </>
-          )}
         </div>
       )}
     </div>

@@ -40,9 +40,3 @@ nsis:
   installerHeaderIcon: build/icon.ico
   deleteAppDataOnUninstall: false
   differentialPackage: false
-
-publish:
-  provider: github
-  owner: rendyhd
-  repo: vicu
-  releaseType: release
