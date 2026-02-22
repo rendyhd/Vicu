@@ -6,7 +6,9 @@ A personal task manager for your desktop, powered by [Vikunja](https://vikunja.i
 ![Platform](https://img.shields.io/badge/platform-Windows-lightgrey)
 ![Built with](https://img.shields.io/badge/electron%20+%20react%20+%20typescript-47848F)
 
-<!-- screenshot: main-window -->
+<p align="center">
+  <img width="2260" height="1000" src="https://github.com/user-attachments/assets/6d70e449-0339-45cd-8616-42524476ee86">
+</p>
 
 ## What is Vicu?
 
@@ -14,7 +16,9 @@ Vicu turns Vikunja into a fast, keyboard-driven task manager that lives on your 
 
 If you work in Obsidian, Vicu bridges your notes and your tasks: link the active note to a task with a keystroke, and jump back to it from anywhere in the app.
 
-<!-- screenshots: quick-entry, quick-view side by side -->
+<p align="center">
+  <img width="2260" height="1000" src="https://github.com/user-attachments/assets/87c36829-f7d9-458a-b5f4-9cfaca1053af">
+</p>
 
 ## Capture from anywhere
 
@@ -57,7 +61,7 @@ Same three modes as Obsidian: **ask** (`Ctrl+L`), **always**, and **off**.
 
 ## Vicu vs the official Vikunja app
 
-The [official Vikunja frontend](https://vikunja.io/) is a full project management suite — Kanban, Gantt, table views, team collaboration, dependencies, and more. Vicu is a personal task manager that trades all of that for speed and a simple workflow. Both talk to the same backend, so you can use them side by side.
+The [official Vikunja frontend](https://vikunja.io/) is a full project management suite — Kanban, Gantt, table views, team collaboration, dependencies, and more. Vicu is a personal task manager that trades all of that for simplicity. Both talk to the same backend, so you can use them side by side.
 
 ## Getting started
 
@@ -65,28 +69,9 @@ The [official Vikunja frontend](https://vikunja.io/) is a full project managemen
 
 Grab the latest Windows installer from [GitHub Releases](https://github.com/rendyhd/Vicu/releases).
 
-### Build from source
-
-You'll need Node.js 20+ and a running [Vikunja](https://vikunja.io/docs/) instance.
-
-```bash
-git clone https://github.com/rendyhd/Vicu.git
-cd Vicu
-npm install
-npm run dev
-```
-
-On first launch, connect to your Vikunja instance, pick your Inbox project, and configure your hotkeys. For Obsidian integration, enable the Local REST API and Advanced URI plugins, then set your API key in Vicu's settings.
-
-## Building
-
-```bash
-npm run build        # Production build
-npm run dist         # Build + create Windows NSIS installer
-```
-
 ## See also
 
+- **[Vicu Android](https://github.com/rendyhd/Vicu-Android)** - Android version of Vicu
 - **[vikunja-quick-entry](https://github.com/rendyhd/vikunja-quick-entry)** — lightweight tray app for Quick Entry and Quick View only, without the full UI
 - **[Vikunja](https://vikunja.io/)** — the open-source backend that powers Vicu
 
