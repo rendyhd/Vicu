@@ -40,3 +40,8 @@ nsis:
   installerHeaderIcon: build/icon.ico
   deleteAppDataOnUninstall: false
   differentialPackage: false
+
+publish:
+  provider: github
+  releaseType: release
+  publishAutoUpdate: false

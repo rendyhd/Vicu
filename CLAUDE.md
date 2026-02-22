@@ -13,11 +13,19 @@ npm install          # Install dependencies
 npm run dev          # Start dev mode (electron-vite dev, opens app with HMR + DevTools)
 npm run build        # Production build (electron-vite build)
 npm run start        # Preview production build (electron-vite preview)
-npm run package      # Package with Electron Forge
-npm run make         # Create distributable installer (Electron Forge)
+npm run dist         # Build + package Windows installer (electron-builder)
+npm run dist:publish # Build + package + upload to GitHub release (used by CI)
 ```
 
 No test runner or linter is configured.
+
+## CI/CD
+
+GitHub Actions workflow at `.github/workflows/release.yml` triggers on tag pushes matching `v*`. It builds the Windows installer (`npm run dist:publish`) and uploads the artifact to the GitHub release automatically via `electron-builder --publish always`.
+
+**Do NOT manually create releases or attach build artifacts** — CI handles everything. `electron-builder --publish always` creates its own **draft** release, uploads the installer, then publishes it. If you manually create a release first via `gh release create`, electron-builder will create a separate draft and the manual release will have no assets.
+
+**Release workflow**: Just push a `v*` tag. CI will create the release, build the installer, and publish it. After CI completes, edit the release notes with `gh release edit` if needed.
 
 ## Architecture
 
