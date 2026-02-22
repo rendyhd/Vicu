@@ -24,7 +24,7 @@ If you work in Obsidian, Vicu bridges your notes and your tasks: link the active
 
 **Quick Entry** is Vicu's defining feature. Press `Alt+Shift+V` from any app and a floating popup appears. Type your task, set a date, pick a project, hit Enter — it's captured and the popup is gone. You stay in flow.
 
-Dates are flexible: type "tomorrow" or "next friday" for natural language scheduling, or just end the title with `!` to set it due today. Hold a modifier key and press arrow keys to cycle through projects without opening a dropdown.
+Just end the title with `!` to set it due today. Hold a modifier key and press arrow keys to cycle through projects without opening a dropdown.
 
 Quick Entry was originally a standalone companion app ([vikunja-quick-entry](https://github.com/rendyhd/vikunja-quick-entry)) that has been integrated directly into Vicu.
 
