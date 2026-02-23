@@ -1,4 +1,4 @@
-import { app, BrowserWindow, globalShortcut, ipcMain, Menu, powerMonitor, screen } from 'electron'
+import { app, BrowserWindow, globalShortcut, ipcMain, powerMonitor, screen } from 'electron'
 import { createMainWindow, createQuickEntryWindow, createQuickViewWindow } from './window-manager'
 import { registerIpcHandlers } from './ipc-handlers'
 import { loadConfig, saveConfig, type AppConfig } from './config'
@@ -13,6 +13,7 @@ import { getBrowserUrlFromWindow, prewarmUrlReader, shutdownUrlReader, BROWSER_P
 import { isRegistered, unregisterHosts } from './browser-host-registration'
 import { checkForUpdates } from './update-checker'
 import { isMac, isWindows } from './platform'
+import { setupApplicationMenu } from './app-menu'
 
 let mainWindow: BrowserWindow | null = null
 let quickEntryWindow: BrowserWindow | null = null
@@ -435,7 +436,7 @@ if (!gotLock) {
   app.setAppUserModelId('com.vicu.app')
 
   app.whenReady().then(async () => {
-    Menu.setApplicationMenu(null)
+    setupApplicationMenu(() => mainWindow)
     registerIpcHandlers()
     await authManager.initialize()
 
