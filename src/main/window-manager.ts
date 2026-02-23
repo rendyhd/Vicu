@@ -1,6 +1,7 @@
 import { BrowserWindow, session } from 'electron'
 import { join } from 'path'
 import type { AppConfig } from './config'
+import { isMac } from './platform'
 
 const SHADOW_PADDING = 20
 const DRAG_HANDLE_HEIGHT = 14
@@ -15,7 +16,18 @@ export function createMainWindow(config: AppConfig | null): BrowserWindow {
     y: bounds?.y,
     minWidth: 800,
     minHeight: 500,
-    frame: false,
+    ...(isMac
+      ? {
+          titleBarStyle: 'hiddenInset' as const,
+          trafficLightPosition: { x: 16, y: 14 },
+          vibrancy: 'sidebar' as const,
+          visualEffectState: 'followWindow' as const,
+          backgroundColor: '#00000000',
+          acceptFirstMouse: true,
+        }
+      : {
+          frame: false,
+        }),
     show: false,
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),

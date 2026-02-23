@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from 'react'
 import { api } from '@/lib/api'
 
 export function WindowControls() {
+  if (window.api.platform === 'darwin') return null
+
   const [maximized, setMaximized] = useState(false)
 
   useEffect(() => {

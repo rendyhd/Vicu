@@ -399,7 +399,10 @@ export function AppShell() {
         {/* Window drag region overlay */}
         <div
           className="absolute inset-x-0 top-0 z-30 flex h-8"
-          style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
+          style={{
+            WebkitAppRegion: 'drag',
+            ...(window.api.platform === 'darwin' ? { paddingLeft: '80px' } : {}),
+          } as React.CSSProperties}
         >
           <div className="flex-1" />
           <SearchBar />

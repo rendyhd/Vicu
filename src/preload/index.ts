@@ -1,6 +1,8 @@
 import { contextBridge, ipcRenderer } from 'electron'
 
 const api = {
+  platform: process.platform as 'darwin' | 'win32' | 'linux',
+
   // Tasks
   fetchTasks: (params: Record<string, unknown>) =>
     ipcRenderer.invoke('fetch-tasks', params),
