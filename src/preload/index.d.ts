@@ -19,6 +19,14 @@ export interface OIDCProvider {
   scope: string
 }
 
+export interface UpdateStatus {
+  available: boolean
+  currentVersion: string
+  latestVersion: string
+  releaseUrl: string
+  releaseNotes: string
+}
+
 export interface ElectronAPI {
   fetchTasks(params: TaskQueryParams): Promise<ApiResult<Task[]>>
   createTask(projectId: number, task: CreateTaskPayload): Promise<ApiResult<Task>>
@@ -56,6 +64,12 @@ export interface ElectronAPI {
   registerBrowserHosts(): Promise<{ chrome: boolean; firefox: boolean }>
   getBrowserExtensionPath(): Promise<string>
   openBrowserExtensionFolder(): Promise<void>
+
+  // Update checker
+  checkForUpdate(): Promise<UpdateStatus | null>
+  getUpdateStatus(): Promise<UpdateStatus | null>
+  dismissUpdate(version: string): Promise<void>
+  onUpdateAvailable(cb: (status: UpdateStatus) => void): () => void
 
   // Window controls
   windowMinimize(): Promise<void>

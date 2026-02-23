@@ -165,4 +165,14 @@ export const api = {
     window.api.onWindowMaximizedChange(cb),
   onTasksChanged: (cb: () => void) =>
     window.api.onTasksChanged?.(cb) ?? (() => {}),
+
+  // Update checker
+  checkForUpdate: () =>
+    window.api.checkForUpdate(),
+  getUpdateStatus: () =>
+    window.api.getUpdateStatus(),
+  dismissUpdate: (version: string) =>
+    window.api.dismissUpdate(version),
+  onUpdateAvailable: (cb: (status: { available: boolean; currentVersion: string; latestVersion: string; releaseUrl: string; releaseNotes: string }) => void) =>
+    window.api.onUpdateAvailable(cb),
 }

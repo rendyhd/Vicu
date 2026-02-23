@@ -11,6 +11,7 @@ import { getObsidianContext, getForegroundProcessName, isObsidianForeground, typ
 import { getBrowserContext, type BrowserContext } from './browser-client'
 import { getBrowserUrlFromWindow, prewarmUrlReader, shutdownUrlReader, BROWSER_PROCESSES } from './window-url-reader'
 import { isRegistered, unregisterHosts } from './browser-host-registration'
+import { checkForUpdates } from './update-checker'
 
 let mainWindow: BrowserWindow | null = null
 let quickEntryWindow: BrowserWindow | null = null
@@ -491,6 +492,16 @@ if (!gotLock) {
     if (config?.browser_link_mode && config.browser_link_mode !== 'off') {
       prewarmUrlReader()
     }
+
+    // Check for updates after a short delay so it doesn't block startup
+    setTimeout(async () => {
+      try {
+        const status = await checkForUpdates()
+        if (status.available && mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('update-available', status)
+        }
+      } catch { /* never block app */ }
+    }, 5000)
 
     // Quick Entry/View: if either enabled, set up tray + windows + hotkeys
     if (config?.quick_entry_enabled || config?.quick_view_enabled !== false) {

@@ -73,6 +73,8 @@ export interface AppConfig {
   notifications_due_today_enabled?: boolean
   notifications_upcoming_enabled?: boolean
   notifications_sound?: boolean
+  // Update checker
+  update_check_dismissed_version?: string
 }
 
 const CONFIG_FILENAME = 'config.json'
@@ -166,6 +168,9 @@ function normalizeConfig(raw: Record<string, unknown>): AppConfig {
     notifications_due_today_enabled: raw.notifications_due_today_enabled !== false,
     notifications_upcoming_enabled: raw.notifications_upcoming_enabled === true,
     notifications_sound: raw.notifications_sound !== false,
+    // Update checker
+    update_check_dismissed_version: typeof raw.update_check_dismissed_version === 'string'
+      ? raw.update_check_dismissed_version : undefined,
   }
 }
 

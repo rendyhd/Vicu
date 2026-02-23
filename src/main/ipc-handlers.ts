@@ -45,6 +45,7 @@ import {
 import { sendTestNotification, rescheduleNotifications, refreshTaskReminders } from './notifications'
 import { getActiveNote, testObsidianConnection } from './obsidian-client'
 import { isRegistered, registerHosts } from './browser-host-registration'
+import { checkForUpdates, getCachedUpdateStatus } from './update-checker'
 import {
   addPendingAction,
   removePendingAction,
@@ -634,6 +635,23 @@ export function registerIpcHandlers(): void {
       ? path.join(process.resourcesPath, 'extensions', 'browser')
       : path.join(app.getAppPath(), 'extensions', 'browser')
     return base
+  })
+
+  // --- Update Checker IPC ---
+  ipcMain.handle('update:check', () => {
+    return checkForUpdates(true)
+  })
+
+  ipcMain.handle('update:get-status', () => {
+    return getCachedUpdateStatus()
+  })
+
+  ipcMain.handle('update:dismiss', (_event, version: string) => {
+    const config = loadConfig()
+    if (config) {
+      config.update_check_dismissed_version = version
+      saveConfig(config)
+    }
   })
 
   ipcMain.handle('open-browser-extension-folder', () => {

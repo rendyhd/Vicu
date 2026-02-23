@@ -109,6 +109,16 @@ const api = {
   applyQuickEntrySettings: () =>
     ipcRenderer.invoke('apply-quick-entry-settings') as Promise<{ entry: boolean; viewer: boolean }>,
 
+  // Update checker
+  checkForUpdate: () => ipcRenderer.invoke('update:check'),
+  getUpdateStatus: () => ipcRenderer.invoke('update:get-status'),
+  dismissUpdate: (version: string) => ipcRenderer.invoke('update:dismiss', version),
+  onUpdateAvailable: (cb: (status: unknown) => void) => {
+    const handler = (_: unknown, status: unknown) => cb(status)
+    ipcRenderer.on('update-available', handler)
+    return () => { ipcRenderer.removeListener('update-available', handler) }
+  },
+
   // Window controls
   windowMinimize: () => ipcRenderer.invoke('window-minimize'),
   windowMaximize: () => ipcRenderer.invoke('window-maximize'),

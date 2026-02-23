@@ -32,6 +32,7 @@ import { TaskDragOverlay } from '@/components/task-list/TaskDragOverlay'
 import { ProjectDragOverlay } from '@/components/sidebar/ProjectDragOverlay'
 import { CustomListDragOverlay } from '@/components/sidebar/CustomListDragOverlay'
 import { SectionDragOverlay } from '@/components/task-list/SectionDragOverlay'
+import { UpdateBanner } from '@/components/UpdateBanner'
 
 const MIN_WIDTH = 180
 const MAX_WIDTH = 360
@@ -425,6 +426,7 @@ export function AppShell() {
 
         <div className="flex flex-1 flex-col overflow-hidden">
           <div className="h-8 shrink-0" />
+          <UpdateBanner />
           <ContentArea>
             <Outlet />
           </ContentArea>
