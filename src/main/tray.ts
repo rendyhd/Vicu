@@ -1,5 +1,6 @@
 import { app, Tray, Menu, nativeImage } from 'electron'
 import { join } from 'path'
+import { isMac } from './platform'
 
 let tray: Tray | null = null
 
@@ -13,13 +14,32 @@ export interface TrayCallbacks {
 let callbacks: TrayCallbacks | null = null
 
 function createTrayIcon(): Electron.NativeImage {
+  // macOS: use template images for auto-inversion on dark/light menu bars
+  if (isMac) {
+    const templatePath = app.isPackaged
+      ? join(process.resourcesPath, 'resources', 'iconTemplate.png')
+      : join(app.getAppPath(), 'resources', 'iconTemplate.png')
+    try {
+      const icon = nativeImage.createFromPath(templatePath)
+      if (!icon.isEmpty()) {
+        icon.setTemplateImage(true)
+        return icon
+      }
+    } catch {
+      // fall through to programmatic icon
+    }
+  }
+
+  // Windows: use the app icon resized to 16x16
   const iconPath = app.isPackaged
     ? join(process.resourcesPath, 'resources', 'icon.png')
     : join(app.getAppPath(), 'resources', 'icon.png')
   try {
     const icon = nativeImage.createFromPath(iconPath)
     if (!icon.isEmpty()) {
-      return icon.resize({ width: 16, height: 16 })
+      const resized = icon.resize({ width: 16, height: 16 })
+      if (isMac) resized.setTemplateImage(true)
+      return resized
     }
   } catch {
     // fall through to programmatic icon
@@ -45,7 +65,9 @@ function createTrayIcon(): Electron.NativeImage {
     buf[offset + 3] = 255 // A
   }
 
-  return nativeImage.createFromBuffer(buf, { width: size, height: size })
+  const fallback = nativeImage.createFromBuffer(buf, { width: size, height: size })
+  if (isMac) fallback.setTemplateImage(true)
+  return fallback
 }
 
 export function createTray(cbs: TrayCallbacks): void {
@@ -57,9 +79,16 @@ export function createTray(cbs: TrayCallbacks): void {
   tray.setToolTip('Vicu')
   updateTrayMenu()
 
-  tray.on('click', () => {
-    callbacks?.onShowMainWindow()
-  })
+  if (isMac) {
+    // macOS: single-click shows context menu (set via setContextMenu in updateTrayMenu).
+    // The click event does NOT fire when setContextMenu() has been called (macOS convention).
+    tray.setIgnoreDoubleClickEvents(true)
+  } else {
+    // Windows: left-click toggles main window, right-click shows context menu
+    tray.on('click', () => {
+      callbacks?.onShowMainWindow()
+    })
+  }
 }
 
 export function updateTrayMenu(): void {
