@@ -91,7 +91,7 @@ async function showQuickEntry(): Promise<void> {
   // Obsidian detection — check foreground window instantly (koffi FFI, ~1μs),
   // then fetch context only if Obsidian is actually focused
   let obsidianContext: ObsidianNoteContext | null = null
-  if (config?.obsidian_mode && config.obsidian_mode !== 'off' && config.obsidian_api_key && isObsidianForeground()) {
+  if (config?.obsidian_mode && config.obsidian_mode !== 'off' && config.obsidian_api_key && await isObsidianForeground()) {
     obsidianContext = await Promise.race([
       getObsidianContext(),
       new Promise<null>(resolve => setTimeout(() => resolve(null), 350))
@@ -103,8 +103,8 @@ async function showQuickEntry(): Promise<void> {
   if (!obsidianContext && config?.browser_link_mode && config.browser_link_mode !== 'off') {
     browserContext = getBrowserContext() // extension path (<1ms)
     if (!browserContext) {
-      // Fallback: read URL bar directly via Windows UI Automation
-      const fgProcess = getForegroundProcessName()
+      // Fallback: read URL bar directly (PowerShell on Windows, AppleScript on macOS)
+      const fgProcess = await getForegroundProcessName()
       if (BROWSER_PROCESSES.has(fgProcess)) {
         browserContext = await Promise.race([
           getBrowserUrlFromWindow(fgProcess),
