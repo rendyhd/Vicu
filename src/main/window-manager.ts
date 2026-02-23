@@ -86,6 +86,11 @@ export function createQuickEntryWindow(_config: AppConfig | null): BrowserWindow
     },
   })
 
+  // Ensure no traffic lights appear on this frameless popup on macOS
+  if (isMac) {
+    win.setWindowButtonVisibility(false)
+  }
+
   if (process.env.ELECTRON_RENDERER_URL) {
     win.loadURL(`${process.env.ELECTRON_RENDERER_URL}/quick-entry/index.html`)
   } else {
@@ -117,6 +122,11 @@ export function createQuickViewWindow(_config: AppConfig | null): BrowserWindow 
       sandbox: true,
     },
   })
+
+  // Ensure no traffic lights appear on this frameless popup on macOS
+  if (isMac) {
+    win.setWindowButtonVisibility(false)
+  }
 
   if (process.env.ELECTRON_RENDERER_URL) {
     win.loadURL(`${process.env.ELECTRON_RENDERER_URL}/quick-view/index.html`)
