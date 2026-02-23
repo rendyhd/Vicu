@@ -12,6 +12,7 @@ import { getBrowserContext, type BrowserContext } from './browser-client'
 import { getBrowserUrlFromWindow, prewarmUrlReader, shutdownUrlReader, BROWSER_PROCESSES } from './window-url-reader'
 import { isRegistered, unregisterHosts } from './browser-host-registration'
 import { checkForUpdates } from './update-checker'
+import { isMac, isWindows } from './platform'
 
 let mainWindow: BrowserWindow | null = null
 let quickEntryWindow: BrowserWindow | null = null
@@ -503,6 +504,17 @@ if (!gotLock) {
       } catch { /* never block app */ }
     }, 5000)
 
+    // macOS: ALWAYS hide on close instead of destroying (standard macOS behavior).
+    // Use app.isQuitting flag to allow actual quit via ⌘Q or tray Quit.
+    if (isMac) {
+      mainWindow.on('close', (e) => {
+        if (!app.isQuitting) {
+          e.preventDefault()
+          mainWindow?.hide()
+        }
+      })
+    }
+
     // Quick Entry/View: if either enabled, set up tray + windows + hotkeys
     if (config?.quick_entry_enabled || config?.quick_view_enabled !== false) {
       setupTray()
@@ -512,21 +524,37 @@ if (!gotLock) {
 
       app.setLoginItemSettings({ openAtLogin: config.launch_on_startup === true })
 
-      // When QE/QV is enabled, hide main window on close instead of quitting
-      mainWindow.on('close', (e) => {
-        if (!app.isQuitting) {
-          e.preventDefault()
-          mainWindow?.hide()
-        }
-      })
+      // Windows: when QE/QV is enabled, hide main window on close instead of quitting
+      if (!isMac) {
+        mainWindow.on('close', (e) => {
+          if (!app.isQuitting) {
+            e.preventDefault()
+            mainWindow?.hide()
+          }
+        })
+      }
     }
   })
 
   app.on('window-all-closed', () => {
-    // Don't quit if tray is active (Quick Entry enabled)
-    if (!hasTray()) {
+    // macOS: never quit on window-all-closed (standard macOS behavior)
+    // Windows: only quit if tray is not active
+    if (!isMac && !hasTray()) {
       app.quit()
     }
+  })
+
+  app.on('activate', () => {
+    // macOS: dock click or Cmd+Tab — show the existing hidden window
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.show()
+      if (mainWindow.isMinimized()) mainWindow.restore()
+      mainWindow.focus()
+    }
+  })
+
+  app.on('before-quit', () => {
+    app.isQuitting = true
   })
 
   app.on('will-quit', () => {

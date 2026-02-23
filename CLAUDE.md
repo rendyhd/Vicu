@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Vicu** — a task management desktop app for Windows, powered by [Vikunja](https://vikunja.io/) as the backend. Built with Electron + React + TypeScript + Tailwind CSS.
+**Vicu** — a task management desktop app for Windows and macOS, powered by [Vikunja](https://vikunja.io/) as the backend. Built with Electron + React + TypeScript + Tailwind CSS.
 
 ## Commands
 
@@ -101,6 +101,15 @@ Two auth methods supported:
 ### Config
 
 `AppConfig` in `src/main/config.ts` — persisted as JSON in Electron's `userData` directory. Includes Vikunja connection settings, theme, window bounds, sidebar width, custom lists, quick entry settings, and viewer filter config.
+
+### Platform Notes
+
+- **Platform constants**: `src/main/platform.ts` exports `isMac`, `isWindows`, `isLinux` — use these for all platform branching (not raw `process.platform` checks)
+- **Native integrations**: koffi FFI is Windows-only; macOS uses osascript-based alternatives in `src/main/platform-window/`
+- **Main window chrome**: `titleBarStyle: 'hiddenInset'` on macOS (native traffic lights), `frame: false` on Windows (custom WindowControls)
+- **Quick Entry/View popups**: on macOS, use `alwaysOnTop: true` with `level: 'pop-up-menu'` (not `type: 'panel'` — panels auto-hide on app deactivation)
+- **macOS icon assets**: `resources/icon.icns` (app bundle), `resources/iconTemplate.png` + `@2x.png` (menu bar tray — "Template" suffix is case-sensitive for auto-inversion)
+- **Forge config**: `forge.config.ts` at project root, referenced from package.json `config.forge`
 
 ### Vikunja API docs
 
