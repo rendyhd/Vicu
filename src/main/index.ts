@@ -1,7 +1,7 @@
 import { app, BrowserWindow, globalShortcut, ipcMain, powerMonitor, screen } from 'electron'
 import { createMainWindow, createQuickEntryWindow, createQuickViewWindow } from './window-manager'
 import { registerIpcHandlers } from './ipc-handlers'
-import { loadConfig, saveConfig, type AppConfig } from './config'
+import { loadConfig, saveConfig, type AppConfig, DEFAULT_QUICK_ENTRY_HOTKEY, DEFAULT_QUICK_VIEW_HOTKEY } from './config'
 import { authManager } from './auth/auth-manager'
 import { createTray, destroyTray, hasTray } from './tray'
 import { returnFocusToPreviousWindow } from './focus'
@@ -247,7 +247,7 @@ function registerQuickEntryShortcuts(config: AppConfig): { entry: boolean; viewe
   const result = { entry: false, viewer: false }
 
   if (config.quick_entry_enabled) {
-    const entryHotkey = config.quick_entry_hotkey || 'Alt+Shift+V'
+    const entryHotkey = config.quick_entry_hotkey || DEFAULT_QUICK_ENTRY_HOTKEY
     try {
       result.entry = globalShortcut.register(entryHotkey, toggleQuickEntry)
       if (!result.entry) console.error(`Failed to register Quick Entry shortcut: ${entryHotkey}`)
@@ -257,7 +257,7 @@ function registerQuickEntryShortcuts(config: AppConfig): { entry: boolean; viewe
   }
 
   if (config.quick_view_enabled !== false) {
-    const viewerHotkey = config.quick_view_hotkey || 'Alt+Shift+B'
+    const viewerHotkey = config.quick_view_hotkey || DEFAULT_QUICK_VIEW_HOTKEY
     try {
       result.viewer = globalShortcut.register(viewerHotkey, toggleQuickView)
       if (!result.viewer) console.error(`Failed to register Quick View shortcut: ${viewerHotkey}`)
@@ -375,7 +375,10 @@ function applyQuickEntrySettings(): { entry: boolean; viewer: boolean } {
       quickViewWindow = null
     }
 
-    app.setLoginItemSettings({ openAtLogin: config.launch_on_startup === true })
+    app.setLoginItemSettings({
+      openAtLogin: config.launch_on_startup === true,
+      ...(isMac ? { openAsHidden: true, name: 'Vicu' } : {}),
+    })
     return result
   } else {
     // Clean up all windows and tray
@@ -394,7 +397,10 @@ function applyQuickEntrySettings(): { entry: boolean; viewer: boolean } {
     }
   }
 
-  app.setLoginItemSettings({ openAtLogin: config.launch_on_startup === true })
+  app.setLoginItemSettings({
+    openAtLogin: config.launch_on_startup === true,
+    ...(isMac ? { openAsHidden: true, name: 'Vicu' } : {}),
+  })
   return { entry: false, viewer: false }
 }
 
@@ -523,7 +529,10 @@ if (!gotLock) {
       globalShortcut.unregisterAll() // Clear stale registrations from crashes
       registerQuickEntryShortcuts(config)
 
-      app.setLoginItemSettings({ openAtLogin: config.launch_on_startup === true })
+      app.setLoginItemSettings({
+      openAtLogin: config.launch_on_startup === true,
+      ...(isMac ? { openAsHidden: true, name: 'Vicu' } : {}),
+    })
 
       // Windows: when QE/QV is enabled, hide main window on close instead of quitting
       if (!isMac) {

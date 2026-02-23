@@ -1,6 +1,7 @@
 import { app } from 'electron'
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs'
 import { join, dirname } from 'path'
+import { isMac } from './platform'
 
 export interface ViewerFilter {
   project_ids: number[]
@@ -75,7 +76,13 @@ export interface AppConfig {
   notifications_sound?: boolean
   // Update checker
   update_check_dismissed_version?: string
+  // Migration flags
+  hotkeys_migrated_macos?: boolean
 }
+
+// Platform-aware hotkey defaults
+export const DEFAULT_QUICK_ENTRY_HOTKEY = isMac ? 'Command+Shift+Space' : 'Alt+Shift+V'
+export const DEFAULT_QUICK_VIEW_HOTKEY = isMac ? 'Command+Shift+B' : 'Alt+Shift+B'
 
 const CONFIG_FILENAME = 'config.json'
 
@@ -100,7 +107,24 @@ export function loadConfig(): AppConfig | null {
   try {
     const raw = readFileSync(configPath, 'utf-8')
     const parsed = JSON.parse(raw)
-    return normalizeConfig(parsed)
+    const config = normalizeConfig(parsed)
+
+    // One-time migration: replace Windows hotkey defaults that never worked on macOS
+    if (isMac && !config.hotkeys_migrated_macos) {
+      let changed = false
+      if (config.quick_entry_hotkey === 'Alt+Shift+V') {
+        config.quick_entry_hotkey = DEFAULT_QUICK_ENTRY_HOTKEY
+        changed = true
+      }
+      if (config.quick_view_hotkey === 'Alt+Shift+B') {
+        config.quick_view_hotkey = DEFAULT_QUICK_VIEW_HOTKEY
+        changed = true
+      }
+      config.hotkeys_migrated_macos = true
+      if (changed) saveConfig(config)
+    }
+
+    return config
   } catch {
     return null
   }
@@ -127,8 +151,8 @@ function normalizeConfig(raw: Record<string, unknown>): AppConfig {
     // Quick Entry / Quick View
     quick_entry_enabled: raw.quick_entry_enabled === true,
     quick_view_enabled: raw.quick_view_enabled !== false,
-    quick_entry_hotkey: typeof raw.quick_entry_hotkey === 'string' ? raw.quick_entry_hotkey : 'Alt+Shift+V',
-    quick_view_hotkey: typeof raw.quick_view_hotkey === 'string' ? raw.quick_view_hotkey : 'Alt+Shift+B',
+    quick_entry_hotkey: typeof raw.quick_entry_hotkey === 'string' ? raw.quick_entry_hotkey : DEFAULT_QUICK_ENTRY_HOTKEY,
+    quick_view_hotkey: typeof raw.quick_view_hotkey === 'string' ? raw.quick_view_hotkey : DEFAULT_QUICK_VIEW_HOTKEY,
     quick_entry_default_project_id: typeof raw.quick_entry_default_project_id === 'number'
       ? raw.quick_entry_default_project_id : undefined,
     exclamation_today: raw.exclamation_today !== false,
@@ -171,6 +195,8 @@ function normalizeConfig(raw: Record<string, unknown>): AppConfig {
     // Update checker
     update_check_dismissed_version: typeof raw.update_check_dismissed_version === 'string'
       ? raw.update_check_dismissed_version : undefined,
+    // Migration flags
+    hotkeys_migrated_macos: raw.hotkeys_migrated_macos === true,
   }
 }
 

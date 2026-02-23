@@ -182,7 +182,11 @@ export function QuickEntrySettings({ config, projects, onChange, hotkeyWarnings 
                           onChange={() => onChange({ project_cycle_modifier: mod })}
                           className="sr-only"
                         />
-                        {mod === 'ctrl' ? 'Ctrl' : mod === 'alt' ? 'Alt' : 'Ctrl+Alt'}
+                        {mod === 'ctrl'
+                          ? (window.api.platform === 'darwin' ? '\u2318 Cmd' : 'Ctrl')
+                          : mod === 'alt'
+                            ? (window.api.platform === 'darwin' ? '\u2325 Option' : 'Alt')
+                            : (window.api.platform === 'darwin' ? '\u2318\u2325 Cmd+Option' : 'Ctrl+Alt')}
                       </label>
                     ))}
                   </div>

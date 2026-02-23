@@ -44,9 +44,16 @@ const MODIFIER_CODES = new Set([
   'ShiftLeft', 'ShiftRight', 'MetaLeft', 'MetaRight',
 ])
 
+const isMacRenderer = window.api.platform === 'darwin'
+
 function keyEventToAccelerator(e: KeyboardEvent): string | null {
   const parts: string[] = []
-  if (e.ctrlKey) parts.push('Ctrl')
+  if (isMacRenderer) {
+    if (e.metaKey) parts.push('Command')
+    if (e.ctrlKey) parts.push('Ctrl')
+  } else {
+    if (e.ctrlKey) parts.push('Ctrl')
+  }
   if (e.altKey) parts.push('Alt')
   if (e.shiftKey) parts.push('Shift')
 
@@ -58,6 +65,16 @@ function keyEventToAccelerator(e: KeyboardEvent): string | null {
 
   parts.push(key)
   return parts.join('+')
+}
+
+/** Convert Electron accelerator strings to macOS symbols for display */
+function formatAcceleratorForDisplay(accelerator: string): string {
+  if (!isMacRenderer) return accelerator
+  return accelerator
+    .replace(/Command\+?/g, '\u2318')
+    .replace(/Ctrl\+?/g, '\u2303')
+    .replace(/Alt\+?/g, '\u2325')
+    .replace(/Shift\+?/g, '\u21E7')
 }
 
 interface HotkeyRecorderProps {
@@ -118,7 +135,7 @@ export function HotkeyRecorder({ value, onChange, defaultValue, warning }: Hotke
         ref={inputRef}
         type="text"
         readOnly
-        value={recording ? '' : value}
+        value={recording ? '' : formatAcceleratorForDisplay(value)}
         placeholder={recording ? 'Press keys...' : undefined}
         className={`flex-1 rounded-md border px-3 py-2 text-sm focus:outline-none ${
           warning
