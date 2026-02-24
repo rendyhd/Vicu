@@ -6,6 +6,10 @@ import { homedir } from 'os'
 import { isMac, isWindows } from './platform'
 
 const HOST_NAME = 'com.vicu.browser'
+// The existing signed Firefox extension (on AMO) from vikunja-quick-entry
+// connects to this host name. Register under both so users can use one
+// Firefox extension with either app.
+const VQE_HOST_NAME = 'com.vikunja_quick_entry.browser'
 
 export interface RegistrationOptions {
   chromeExtensionId: string
@@ -38,8 +42,8 @@ function getChromeHostManifestPath(): string {
   return join(app.getPath('userData'), `${HOST_NAME}.json`)
 }
 
-function getFirefoxHostManifestPath(): string {
-  return join(app.getPath('userData'), `${HOST_NAME}.firefox.json`)
+function getFirefoxHostManifestPath(hostName: string = HOST_NAME): string {
+  return join(app.getPath('userData'), `${hostName}.firefox.json`)
 }
 
 // --- macOS manifest paths ---
@@ -57,8 +61,8 @@ function getMacEdgeHostDir(): string {
   return join(home, 'Library', 'Application Support', 'Microsoft Edge', 'NativeMessagingHosts')
 }
 
-function getMacManifestPath(browserDir: string): string {
-  return join(browserDir, `${HOST_NAME}.json`)
+function getMacManifestPath(browserDir: string, hostName: string = HOST_NAME): string {
+  return join(browserDir, `${hostName}.json`)
 }
 
 // macOS GUI apps have PATH = /usr/bin:/bin:/usr/sbin:/sbin which won't find
@@ -124,36 +128,62 @@ export function registerChromeHost(extensionId: string): void {
 export function registerFirefoxHost(): void {
   if (isMac) {
     const hostPath = ensureShellWrapper()
-    const manifest = {
+    const firefoxDir = getMacFirefoxHostDir()
+    mkdirSync(firefoxDir, { recursive: true })
+
+    // Vicu's own future Firefox extension
+    const vicuManifest = {
       name: HOST_NAME,
       description: 'Vicu Browser Link native messaging bridge',
       path: hostPath,
       type: 'stdio',
       allowed_extensions: ['browser-link@vicu.app'],
     }
+    writeFileSync(getMacManifestPath(firefoxDir, HOST_NAME), JSON.stringify(vicuManifest, null, 2), 'utf-8')
 
-    const firefoxDir = getMacFirefoxHostDir()
-    mkdirSync(firefoxDir, { recursive: true })
-    writeFileSync(getMacManifestPath(firefoxDir), JSON.stringify(manifest, null, 2), 'utf-8')
+    // vikunja-quick-entry's signed Firefox extension (already on AMO)
+    const vqeManifest = {
+      name: VQE_HOST_NAME,
+      description: 'Vicu Browser Link native messaging bridge (vikunja-quick-entry compat)',
+      path: hostPath,
+      type: 'stdio',
+      allowed_extensions: ['browser-link@vikunja-quick-entry.app'],
+    }
+    writeFileSync(getMacManifestPath(firefoxDir, VQE_HOST_NAME), JSON.stringify(vqeManifest, null, 2), 'utf-8')
     return
   }
 
   if (!isWindows) return
   const hostPath = ensureBatWrapper()
-  const manifestPath = getFirefoxHostManifestPath()
-  const manifest = {
+
+  // Vicu's own future Firefox extension
+  const vicuManifestPath = getFirefoxHostManifestPath(HOST_NAME)
+  const vicuManifest = {
     name: HOST_NAME,
     description: 'Vicu Browser Link native messaging bridge',
     path: hostPath,
     type: 'stdio',
     allowed_extensions: ['browser-link@vicu.app'],
   }
-  const dir = dirname(manifestPath)
-  if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
-  writeFileSync(manifestPath, JSON.stringify(manifest, null, 2), 'utf-8')
-
+  const vicuDir = dirname(vicuManifestPath)
+  if (!existsSync(vicuDir)) mkdirSync(vicuDir, { recursive: true })
+  writeFileSync(vicuManifestPath, JSON.stringify(vicuManifest, null, 2), 'utf-8')
   try {
-    execSync(`reg add "HKCU\\Software\\Mozilla\\NativeMessagingHosts\\${HOST_NAME}" /ve /d "${manifestPath}" /f`, { stdio: 'ignore' })
+    execSync(`reg add "HKCU\\Software\\Mozilla\\NativeMessagingHosts\\${HOST_NAME}" /ve /d "${vicuManifestPath}" /f`, { stdio: 'ignore' })
+  } catch { /* ignore */ }
+
+  // vikunja-quick-entry's signed Firefox extension (already on AMO)
+  const vqeManifestPath = getFirefoxHostManifestPath(VQE_HOST_NAME)
+  const vqeManifest = {
+    name: VQE_HOST_NAME,
+    description: 'Vicu Browser Link native messaging bridge (vikunja-quick-entry compat)',
+    path: hostPath,
+    type: 'stdio',
+    allowed_extensions: ['browser-link@vikunja-quick-entry.app'],
+  }
+  writeFileSync(vqeManifestPath, JSON.stringify(vqeManifest, null, 2), 'utf-8')
+  try {
+    execSync(`reg add "HKCU\\Software\\Mozilla\\NativeMessagingHosts\\${VQE_HOST_NAME}" /ve /d "${vqeManifestPath}" /f`, { stdio: 'ignore' })
   } catch { /* ignore */ }
 }
 
@@ -161,8 +191,10 @@ export function unregisterHosts(): void {
   if (isMac) {
     // Remove manifests from all browser directories
     try { unlinkSync(getMacManifestPath(getMacChromeHostDir())) } catch { /* ignore */ }
-    try { unlinkSync(getMacManifestPath(getMacFirefoxHostDir())) } catch { /* ignore */ }
     try { unlinkSync(getMacManifestPath(getMacEdgeHostDir())) } catch { /* ignore */ }
+    // Firefox: remove both Vicu and VQE compat manifests
+    try { unlinkSync(getMacManifestPath(getMacFirefoxHostDir(), HOST_NAME)) } catch { /* ignore */ }
+    try { unlinkSync(getMacManifestPath(getMacFirefoxHostDir(), VQE_HOST_NAME)) } catch { /* ignore */ }
     // Remove shell wrapper
     try { unlinkSync(join(app.getPath('userData'), 'vicu-bridge.sh')) } catch { /* ignore */ }
     return
@@ -170,25 +202,30 @@ export function unregisterHosts(): void {
 
   if (!isWindows) return
   const chromePath = getChromeHostManifestPath()
-  const firefoxPath = getFirefoxHostManifestPath()
   try { unlinkSync(chromePath) } catch { /* ignore */ }
-  try { unlinkSync(firefoxPath) } catch { /* ignore */ }
+  // Firefox: remove both Vicu and VQE compat manifests + registry keys
+  try { unlinkSync(getFirefoxHostManifestPath(HOST_NAME)) } catch { /* ignore */ }
+  try { unlinkSync(getFirefoxHostManifestPath(VQE_HOST_NAME)) } catch { /* ignore */ }
   try { execSync(`reg delete "HKCU\\Software\\Google\\Chrome\\NativeMessagingHosts\\${HOST_NAME}" /f`, { stdio: 'ignore' }) } catch { /* ignore */ }
   try { execSync(`reg delete "HKCU\\Software\\Mozilla\\NativeMessagingHosts\\${HOST_NAME}" /f`, { stdio: 'ignore' }) } catch { /* ignore */ }
+  try { execSync(`reg delete "HKCU\\Software\\Mozilla\\NativeMessagingHosts\\${VQE_HOST_NAME}" /f`, { stdio: 'ignore' }) } catch { /* ignore */ }
 }
 
 export function isRegistered(): { chrome: boolean; firefox: boolean } {
   if (isMac) {
+    const firefoxDir = getMacFirefoxHostDir()
     return {
       chrome: existsSync(getMacManifestPath(getMacChromeHostDir())),
-      firefox: existsSync(getMacManifestPath(getMacFirefoxHostDir())),
+      firefox: existsSync(getMacManifestPath(firefoxDir, HOST_NAME))
+        && existsSync(getMacManifestPath(firefoxDir, VQE_HOST_NAME)),
     }
   }
 
   if (!isWindows) return { chrome: false, firefox: false }
   return {
     chrome: existsSync(getChromeHostManifestPath()),
-    firefox: existsSync(getFirefoxHostManifestPath()),
+    firefox: existsSync(getFirefoxHostManifestPath(HOST_NAME))
+      && existsSync(getFirefoxHostManifestPath(VQE_HOST_NAME)),
   }
 }
 

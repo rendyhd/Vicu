@@ -7,10 +7,10 @@ import { createTray, destroyTray, hasTray } from './tray'
 import { returnFocusToPreviousWindow } from './focus'
 import { registerQuickEntryState } from './quick-entry-state'
 import { initNotifications, rescheduleNotifications, stopNotifications } from './notifications'
-import { getObsidianContext, getForegroundProcessName, isObsidianForeground, type ObsidianNoteContext } from './obsidian-client'
+import { getObsidianContext, getForegroundProcessName, type ObsidianNoteContext } from './obsidian-client'
 import { getBrowserContext, type BrowserContext } from './browser-client'
 import { getBrowserUrlFromWindow, prewarmUrlReader, shutdownUrlReader, BROWSER_PROCESSES } from './window-url-reader'
-import { isRegistered, unregisterHosts } from './browser-host-registration'
+import { isRegistered, unregisterHosts, registerHosts } from './browser-host-registration'
 import { checkForUpdates } from './update-checker'
 import { isMac, isWindows } from './platform'
 import { setupApplicationMenu } from './app-menu'
@@ -88,29 +88,32 @@ async function showQuickEntry(): Promise<void> {
   if (!quickEntryWindow) return
   const config = loadConfig()
 
-  // Obsidian detection — check foreground window instantly (koffi FFI, ~1μs),
-  // then fetch context only if Obsidian is actually focused
+  // Detect foreground app once — used by both Obsidian and browser detection.
+  // Done before showing window, while the previous app still has focus.
+  const fgProcess = await getForegroundProcessName()
+
+  // Obsidian detection — only if Obsidian is actually the foreground app
   let obsidianContext: ObsidianNoteContext | null = null
-  if (config?.obsidian_mode && config.obsidian_mode !== 'off' && config.obsidian_api_key && await isObsidianForeground()) {
+  const isObsidian = fgProcess === 'Obsidian' || fgProcess === 'obsidian'
+  if (config?.obsidian_mode && config.obsidian_mode !== 'off' && config.obsidian_api_key && isObsidian) {
     obsidianContext = await Promise.race([
       getObsidianContext(),
       new Promise<null>(resolve => setTimeout(() => resolve(null), 350))
     ])
   }
 
-  // Browser tab detection — only if Obsidian didn't match
+  // Browser tab detection — only if Obsidian didn't match AND foreground IS a browser.
+  // Without the BROWSER_PROCESSES gate, stale heartbeat data from Chrome/Firefox
+  // would leak into non-browser apps (Obsidian, VS Code, Finder, etc.).
   let browserContext: BrowserContext | null = null
-  if (!obsidianContext && config?.browser_link_mode && config.browser_link_mode !== 'off') {
+  if (!obsidianContext && config?.browser_link_mode && config.browser_link_mode !== 'off' && BROWSER_PROCESSES.has(fgProcess)) {
     browserContext = getBrowserContext() // extension path (<1ms)
     if (!browserContext) {
       // Fallback: read URL bar directly (PowerShell on Windows, AppleScript on macOS)
-      const fgProcess = await getForegroundProcessName()
-      if (BROWSER_PROCESSES.has(fgProcess)) {
-        browserContext = await Promise.race([
-          getBrowserUrlFromWindow(fgProcess),
-          new Promise<null>(resolve => setTimeout(() => resolve(null), 1500))
-        ])
-      }
+      browserContext = await Promise.race([
+        getBrowserUrlFromWindow(fgProcess),
+        new Promise<null>(resolve => setTimeout(() => resolve(null), 1500))
+      ])
     }
   }
 
@@ -490,8 +493,13 @@ if (!gotLock) {
       rescheduleNotifications()
     })
 
-    // Clean up stale browser host registrations if mode is off
-    if (!config?.browser_link_mode || config.browser_link_mode === 'off') {
+    // Auto-register browser native messaging hosts on startup so manifests
+    // always point to the current app's bridge (important when switching
+    // between Vicu and vikunja-quick-entry during development/testing).
+    // Clean up stale registrations if the feature is off.
+    if (config?.browser_link_mode && config.browser_link_mode !== 'off') {
+      registerHosts({ chromeExtensionId: config.browser_extension_id || '' })
+    } else {
       const reg = isRegistered()
       if (reg.chrome || reg.firefox) unregisterHosts()
     }

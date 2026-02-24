@@ -70,11 +70,17 @@ export function BrowserSettings({ config, onChange, disabled }: BrowserSettingsP
                 />
               </div>
 
-              {config.browser_extension_id && regStatus && (
+              {regStatus && (
                 <div className="flex items-center gap-3 text-xs text-[var(--text-secondary)]">
+                  {config.browser_extension_id && (
+                    <span className="flex items-center gap-1">
+                      <span className={`inline-block h-2 w-2 rounded-full ${regStatus.chrome ? 'bg-accent-green' : 'bg-[var(--text-secondary)]'}`} />
+                      Chrome bridge: {regStatus.chrome ? 'Registered' : 'Not registered'}
+                    </span>
+                  )}
                   <span className="flex items-center gap-1">
-                    <span className={`inline-block h-2 w-2 rounded-full ${regStatus.chrome ? 'bg-accent-green' : 'bg-[var(--text-secondary)]'}`} />
-                    Chrome bridge: {regStatus.chrome ? 'Registered' : 'Not registered'}
+                    <span className={`inline-block h-2 w-2 rounded-full ${regStatus.firefox ? 'bg-accent-green' : 'bg-[var(--text-secondary)]'}`} />
+                    Firefox bridge: {regStatus.firefox ? 'Registered' : 'Not registered'}
                   </span>
                 </div>
               )}
@@ -103,13 +109,21 @@ export function BrowserSettings({ config, onChange, disabled }: BrowserSettingsP
                     <p className="mb-2 font-semibold">How it works</p>
                     <p className="mb-3">
                       Vicu automatically reads the URL bar from the active browser window when
-                      Quick Entry opens. This works with Chrome, Firefox, Edge, Brave, Opera, and Vivaldi
-                      &mdash; no extension required.
+                      Quick Entry opens. This works with Chrome, Firefox, Edge, Brave, Opera, and Vivaldi.
+                      Browser extensions provide instant (&lt;1ms) detection; without them Vicu falls back to{' '}
+                      {window.api.platform === 'darwin' ? 'AppleScript' : 'Windows accessibility APIs'} (~300ms).
                     </p>
 
-                    <p className="mb-2 font-semibold">Firefox, Edge, Brave, Opera, Vivaldi</p>
+                    <p className="mb-2 font-semibold">Firefox (recommended extension)</p>
                     <p className="mb-3">
-                      No setup needed. Vicu detects URLs automatically via Windows accessibility APIs.
+                      Install the{' '}
+                      <button
+                        type="button"
+                        onClick={() => window.api.openDeepLink('https://addons.mozilla.org/en-US/firefox/addon/vikunja-quick-entry-browser-link/')}
+                        className="inline cursor-pointer text-accent-blue underline hover:text-accent-blue/80"
+                      >Vikunja Quick Entry Browser Link</button>
+                      {' '}extension from Firefox Add-ons for instant, reliable URL detection.
+                      No additional setup needed &mdash; Vicu registers the native messaging host automatically.
                     </p>
 
                     <p className="mb-2 font-semibold">Chrome (optional extension for instant detection)</p>
@@ -130,6 +144,12 @@ export function BrowserSettings({ config, onChange, disabled }: BrowserSettingsP
                     </p>
                     <p>Copy the Extension ID shown on the card and paste it in the field above</p>
                     <p className="mb-3">Then click &ldquo;Re-register Bridge&rdquo; above</p>
+
+                    <p className="mb-2 font-semibold">Edge, Brave, Opera, Vivaldi</p>
+                    <p className="mb-3">
+                      No setup needed. Vicu detects URLs automatically via{' '}
+                      {window.api.platform === 'darwin' ? 'AppleScript' : 'accessibility APIs'}.
+                    </p>
 
                     <p className="mt-2 border-t border-[var(--border-color)] pt-2">
                       Open Quick Entry while a browser tab is active to see the link hint.
