@@ -43,3 +43,12 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_IDENTITY_AUTO_DISCOVERY: false
+
+      - name: Remove blockmap assets
+        run: |
+          for asset in dist/*.blockmap; do
+            name=$(basename "$asset")
+            gh release delete-asset "${{ github.ref_name }}" "$name" --yes || true
+          done
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

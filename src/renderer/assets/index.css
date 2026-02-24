@@ -34,6 +34,15 @@
   --bg-selected: #1C3049;
 }
 
+/* macOS sidebar transparency for vibrancy */
+[data-platform="darwin"] {
+  --bg-sidebar: rgba(0, 0, 0, 0.02);
+}
+
+.dark[data-platform="darwin"] {
+  --bg-sidebar: rgba(255, 255, 255, 0.02);
+}
+
 /* Thin overlay scrollbar — light mode */
 .custom-scrollbar::-webkit-scrollbar,
 .overflow-y-auto::-webkit-scrollbar {

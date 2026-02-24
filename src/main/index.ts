@@ -1,4 +1,4 @@
-import { app, BrowserWindow, globalShortcut, ipcMain, powerMonitor, screen } from 'electron'
+import { app, BrowserWindow, globalShortcut, ipcMain, nativeTheme, powerMonitor, screen } from 'electron'
 import { createMainWindow, createQuickEntryWindow, createQuickViewWindow } from './window-manager'
 import { registerIpcHandlers } from './ipc-handlers'
 import { loadConfig, saveConfig, type AppConfig, DEFAULT_QUICK_ENTRY_HOTKEY, DEFAULT_QUICK_VIEW_HOTKEY } from './config'
@@ -451,6 +451,10 @@ if (!gotLock) {
 
     const config = loadConfig()
     mainWindow = createMainWindow(config)
+
+    // Sync Electron's native theme with the user's config setting
+    const themeValue = config?.theme ?? 'system'
+    nativeTheme.themeSource = themeValue === 'system' ? 'system' : themeValue
 
     // Window control IPC handlers
     ipcMain.handle('window-minimize', () => mainWindow?.minimize())

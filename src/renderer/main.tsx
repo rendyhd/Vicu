@@ -6,6 +6,9 @@ import { queryClient } from './lib/query-client'
 import { router } from './router'
 import './assets/index.css'
 
+// Set platform data attribute for CSS targeting (e.g., macOS vibrancy)
+document.documentElement.dataset.platform = window.api.platform
+
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>

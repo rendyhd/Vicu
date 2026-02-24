@@ -1,6 +1,7 @@
 declare global {
   interface Window {
     quickEntryApi: {
+      platform: 'darwin' | 'win32' | 'linux'
       saveTask(title: string, description: string | null, dueDate: string | null, projectId: number | null): Promise<{ success: boolean; cached?: boolean; error?: string }>
       closeWindow(): Promise<void>
       getConfig(): Promise<QuickEntryConfig | null>
@@ -61,6 +62,13 @@ let obsidianContext: { deepLink: string; noteName: string; isUidBased: boolean }
 let obsidianLinked = false
 let browserContext: { url: string; title: string; displayTitle: string } | null = null
 let browserLinked = false
+
+// Set platform-aware hint key text
+const isMac = window.quickEntryApi.platform === 'darwin'
+const linkKeyLabel = isMac ? '\u2318L' : 'Ctrl+L'
+document.querySelectorAll('.obsidian-hint-key, .browser-hint-key').forEach((el) => {
+  el.textContent = linkKeyLabel
+})
 
 function showError(msg: string): void {
   errorMessage.textContent = msg
@@ -235,14 +243,15 @@ function buildPageLinkHtml(url: string, title: string): string {
 }
 
 function isProjectCycleModifierPressed(e: KeyboardEvent): boolean {
+  const cmdOrCtrl = isMac ? e.metaKey : e.ctrlKey
   switch (projectCycleModifier) {
     case 'alt':
-      return e.altKey && !e.ctrlKey
+      return e.altKey && !cmdOrCtrl
     case 'ctrl+alt':
-      return e.ctrlKey && e.altKey
+      return cmdOrCtrl && e.altKey
     case 'ctrl':
     default:
-      return e.ctrlKey && !e.altKey
+      return cmdOrCtrl && !e.altKey
   }
 }
 
@@ -336,7 +345,7 @@ window.quickEntryApi.onDragHover((_: unknown, hovering: boolean) => {
 
 // Keyboard handling on title input
 input.addEventListener('keydown', async (e) => {
-  if (e.ctrlKey && e.key === 'l') {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'l') {
     e.preventDefault()
     if (obsidianContext) {
       obsidianLinked = !obsidianLinked
@@ -375,7 +384,7 @@ input.addEventListener('keydown', async (e) => {
 
 // Keyboard handling on description textarea
 descriptionInput.addEventListener('keydown', async (e) => {
-  if (e.ctrlKey && e.key === 'l') {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'l') {
     e.preventDefault()
     if (obsidianContext) {
       obsidianLinked = !obsidianLinked

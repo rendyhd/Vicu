@@ -34,6 +34,11 @@ export function NotificationSettings({ config, onChange }: NotificationSettingsP
             />
             <span className="text-sm text-[var(--text-primary)]">Enable desktop notifications</span>
           </label>
+          {window.api.platform === 'darwin' && (
+            <p className="text-xs text-[var(--text-secondary)]">
+              On macOS, the first notification will prompt you to allow notifications from Vicu.
+            </p>
+          )}
 
           {/* Daily Reminder */}
           <div className={cn(

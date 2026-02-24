@@ -172,8 +172,8 @@ export function TaskList({
 
       const taskCount = tasks.length
 
-      // Ctrl+N: New task
-      if (e.ctrlKey && e.key === 'n') {
+      // Ctrl+N / ⌘N: New task
+      if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
         e.preventDefault()
         if (showNewTask && projectId) {
           setIsAdding(true)
@@ -181,8 +181,8 @@ export function TaskList({
         return
       }
 
-      // Ctrl+V: New task from clipboard
-      if (e.ctrlKey && e.key === 'v') {
+      // Ctrl+V / ⌘V: New task from clipboard
+      if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
         e.preventDefault()
         if (!projectId) return
         navigator.clipboard.readText().then((text) => {
@@ -219,7 +219,7 @@ export function TaskList({
       }
 
       // Enter: expand focused task
-      if (e.key === 'Enter' && !e.ctrlKey) {
+      if (e.key === 'Enter' && !e.ctrlKey && !e.metaKey) {
         e.preventDefault()
         if (focusedTaskId && !expandedTaskId) {
           toggleExpandedTask(focusedTaskId)
@@ -238,8 +238,8 @@ export function TaskList({
         return
       }
 
-      // Ctrl+K: complete focused/expanded task
-      if (e.ctrlKey && e.key === 'k') {
+      // Ctrl+K / ⌘K: complete focused/expanded task
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
         e.preventDefault()
         const targetId = expandedTaskId || focusedTaskId
         if (!targetId) return
@@ -260,8 +260,8 @@ export function TaskList({
         return
       }
 
-      // Ctrl+Backspace: delete focused task
-      if (e.ctrlKey && e.key === 'Backspace') {
+      // Ctrl+Backspace / ⌘⌫: delete focused task
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Backspace') {
         e.preventDefault()
         const targetId = expandedTaskId || focusedTaskId
         if (!targetId) return
@@ -278,8 +278,8 @@ export function TaskList({
         return
       }
 
-      // Ctrl+T or "!" : set due date to today
-      if ((e.ctrlKey && e.key === 't') || (!e.ctrlKey && !e.altKey && !e.metaKey && e.key === '!')) {
+      // Ctrl+T / ⌘T or "!" : set due date to today
+      if (((e.ctrlKey || e.metaKey) && e.key === 't') || (!e.ctrlKey && !e.altKey && !e.metaKey && e.key === '!')) {
         e.preventDefault()
         const targetId = expandedTaskId || focusedTaskId
         if (!targetId) return
@@ -292,8 +292,8 @@ export function TaskList({
         return
       }
 
-      // Ctrl+Enter: save and collapse
-      if (e.ctrlKey && e.key === 'Enter') {
+      // Ctrl+Enter / ⌘Enter: save and collapse
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
         e.preventDefault()
         if (expandedTaskId) {
           collapseAll()
@@ -400,7 +400,7 @@ export function TaskList({
                       e.preventDefault()
                       inputRef.current?.focus()
                     }
-                    if (e.ctrlKey && e.key === 'Enter') {
+                    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
                       e.preventDefault()
                       handleSubmit()
                     }
