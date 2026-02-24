@@ -1,6 +1,6 @@
 {
   "name": "vicu",
-  "version": "1.0.2",
+  "version": "1.1.0-beta.1",
   "description": "A task management app powered by Vikunja",
   "main": "./out/main/index.js",
   "scripts": {
