@@ -105,9 +105,9 @@ Two auth methods supported:
 ### Platform Notes
 
 - **Platform constants**: `src/main/platform.ts` exports `isMac`, `isWindows`, `isLinux` — use these for all platform branching (not raw `process.platform` checks)
-- **Native integrations**: koffi FFI is Windows-only; macOS uses osascript-based alternatives in `src/main/platform-window/`
+- **Native integrations**: koffi FFI is Windows-only; macOS uses osascript-based alternatives in `obsidian-client.ts` and `window-url-reader.ts`
 - **Main window chrome**: `titleBarStyle: 'hiddenInset'` on macOS (native traffic lights), `frame: false` on Windows (custom WindowControls)
-- **Quick Entry/View popups**: on macOS, use `alwaysOnTop: true` with `level: 'pop-up-menu'` (not `type: 'panel'` — panels auto-hide on app deactivation)
+- **Quick Entry/View popups**: on macOS, use `alwaysOnTop: true` (not `type: 'panel'` — panels auto-hide on app deactivation)
 - **macOS icon assets**: `resources/icon.icns` (app bundle), `resources/iconTemplate.png` + `@2x.png` (menu bar tray — "Template" suffix is case-sensitive for auto-inversion)
 - **Forge config**: `forge.config.ts` at project root, referenced from package.json `config.forge`
 
