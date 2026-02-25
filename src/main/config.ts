@@ -78,6 +78,9 @@ export interface AppConfig {
   update_check_dismissed_version?: string
   // Migration flags
   hotkeys_migrated_macos?: boolean
+  // NLP task parser
+  nlp_enabled?: boolean
+  nlp_syntax_mode?: 'todoist' | 'vikunja'
 }
 
 // Platform-aware hotkey defaults
@@ -197,6 +200,9 @@ function normalizeConfig(raw: Record<string, unknown>): AppConfig {
       ? raw.update_check_dismissed_version : undefined,
     // Migration flags
     hotkeys_migrated_macos: raw.hotkeys_migrated_macos === true,
+    // NLP task parser
+    nlp_enabled: raw.nlp_enabled !== false,
+    nlp_syntax_mode: raw.nlp_syntax_mode === 'vikunja' ? 'vikunja' : 'todoist',
   }
 }
 

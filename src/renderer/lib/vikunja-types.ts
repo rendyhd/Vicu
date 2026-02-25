@@ -193,4 +193,7 @@ export interface AppConfig {
   // Browser
   browser_link_mode?: 'off' | 'ask' | 'always'
   browser_extension_id?: string
+  // NLP task parser
+  nlp_enabled?: boolean
+  nlp_syntax_mode?: 'todoist' | 'vikunja'
 }

@@ -268,6 +268,8 @@ export function registerIpcHandlers(): void {
       secondary_projects: config.secondary_projects || [],
       project_cycle_modifier: config.project_cycle_modifier || 'ctrl',
       standalone_mode: config.standalone_mode === true,
+      nlp_enabled: config.nlp_enabled,
+      nlp_syntax_mode: config.nlp_syntax_mode,
     }
   })
 

@@ -28,6 +28,8 @@ interface QuickEntryConfig {
   secondary_projects: Array<{ id: number; title: string }>
   project_cycle_modifier: string
   standalone_mode: boolean
+  nlp_enabled: boolean
+  nlp_syntax_mode: 'todoist' | 'vikunja'
 }
 
 const input = document.getElementById('task-input') as HTMLInputElement
