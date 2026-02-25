@@ -1,8 +1,7 @@
 # macOS CI Build
 #
 # Builds and packages Vicu for macOS on every push to main, PRs targeting main,
-# and manual triggers. Produces unsigned .dmg and .zip artifacts for both
-# Apple Silicon (arm64) and Intel (x64).
+# and manual triggers. Produces unsigned .dmg artifact for Apple Silicon (arm64).
 #
 # Required secrets (optional — builds work without them):
 #   BUILD_CERTIFICATE_BASE64  - Base64-encoded .p12 signing certificate
@@ -23,16 +22,7 @@ on:
 
 jobs:
   build-macos:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - arch: arm64
-            runner: macos-15
-          - arch: x64
-            runner: macos-13
-
-    runs-on: ${{ matrix.runner }}
+    runs-on: macos-15
 
     steps:
       - uses: actions/checkout@v4
@@ -46,9 +36,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/Library/Caches/electron
-          key: electron-${{ matrix.arch }}-${{ hashFiles('package-lock.json') }}
+          key: electron-arm64-${{ hashFiles('package-lock.json') }}
           restore-keys: |
-            electron-${{ matrix.arch }}-
+            electron-arm64-
 
       - name: Import signing certificate
         if: env.BUILD_CERTIFICATE_BASE64 != ''
@@ -75,23 +65,23 @@ jobs:
       - name: Build app
         run: npm run build
 
-      - name: Package macOS (${{ matrix.arch }})
+      - name: Package macOS (arm64)
         timeout-minutes: 30
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: ${{ secrets.BUILD_CERTIFICATE_BASE64 != '' && 'true' || 'false' }}
-        run: npx electron-builder --mac --${{ matrix.arch }}
+        run: npx electron-builder --mac --arm64 --publish never
 
       - name: Upload DMG artifact
         uses: actions/upload-artifact@v4
         with:
-          name: vicu-macos-${{ matrix.arch }}-dmg
+          name: vicu-macos-arm64-dmg
           path: dist/*.dmg
           if-no-files-found: warn
 
       - name: Upload ZIP artifact
         uses: actions/upload-artifact@v4
         with:
-          name: vicu-macos-${{ matrix.arch }}-zip
+          name: vicu-macos-arm64-zip
           path: dist/*.zip
           if-no-files-found: warn
 
