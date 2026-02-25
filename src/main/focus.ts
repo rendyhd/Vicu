@@ -6,6 +6,9 @@ import { BrowserWindow } from 'electron'
  * returns focus. If it doesn't, we create a tiny transparent dummy window,
  * focus it, then immediately destroy it — triggering Windows to cycle
  * focus back to the previously active app.
+ *
+ * macOS: no-op. Focus returns automatically to the previously active app
+ * when our window hides — no dummy-window trick needed.
  */
 export function returnFocusToPreviousWindow(): void {
   if (process.platform !== 'win32') return

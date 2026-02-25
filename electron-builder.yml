@@ -41,6 +41,25 @@ nsis:
   deleteAppDataOnUninstall: false
   differentialPackage: false
 
+mac:
+  icon: resources/icon.icns
+  category: public.app-category.productivity
+  darkModeSupport: true
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  entitlements: build/entitlements.mac.plist
+  entitlementsInherit: build/entitlements.mac.plist
+  target:
+    - target: dmg
+      arch:
+        - arm64
+  extendInfo:
+    NSAppleEventsUsageDescription: "Vicu needs automation access to detect the active browser tab for quick task entry."
+
+dmg:
+  sign: false
+  artifactName: "${productName}-${version}-${arch}.${ext}"
+
 publish:
   provider: github
   releaseType: release

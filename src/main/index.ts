@@ -1,17 +1,19 @@
-import { app, BrowserWindow, globalShortcut, ipcMain, Menu, powerMonitor, screen } from 'electron'
+import { app, BrowserWindow, globalShortcut, ipcMain, nativeTheme, powerMonitor, screen } from 'electron'
 import { createMainWindow, createQuickEntryWindow, createQuickViewWindow } from './window-manager'
 import { registerIpcHandlers } from './ipc-handlers'
-import { loadConfig, saveConfig, type AppConfig } from './config'
+import { loadConfig, saveConfig, type AppConfig, DEFAULT_QUICK_ENTRY_HOTKEY, DEFAULT_QUICK_VIEW_HOTKEY } from './config'
 import { authManager } from './auth/auth-manager'
 import { createTray, destroyTray, hasTray } from './tray'
 import { returnFocusToPreviousWindow } from './focus'
 import { registerQuickEntryState } from './quick-entry-state'
 import { initNotifications, rescheduleNotifications, stopNotifications } from './notifications'
-import { getObsidianContext, getForegroundProcessName, isObsidianForeground, type ObsidianNoteContext } from './obsidian-client'
+import { getObsidianContext, getForegroundProcessName, type ObsidianNoteContext } from './obsidian-client'
 import { getBrowserContext, type BrowserContext } from './browser-client'
 import { getBrowserUrlFromWindow, prewarmUrlReader, shutdownUrlReader, BROWSER_PROCESSES } from './window-url-reader'
-import { isRegistered, unregisterHosts } from './browser-host-registration'
+import { isRegistered, unregisterHosts, registerHosts } from './browser-host-registration'
 import { checkForUpdates } from './update-checker'
+import { isMac, isWindows } from './platform'
+import { setupApplicationMenu } from './app-menu'
 
 let mainWindow: BrowserWindow | null = null
 let quickEntryWindow: BrowserWindow | null = null
@@ -86,29 +88,32 @@ async function showQuickEntry(): Promise<void> {
   if (!quickEntryWindow) return
   const config = loadConfig()
 
-  // Obsidian detection — check foreground window instantly (koffi FFI, ~1μs),
-  // then fetch context only if Obsidian is actually focused
+  // Detect foreground app once — used by both Obsidian and browser detection.
+  // Done before showing window, while the previous app still has focus.
+  const fgProcess = await getForegroundProcessName()
+
+  // Obsidian detection — only if Obsidian is actually the foreground app
   let obsidianContext: ObsidianNoteContext | null = null
-  if (config?.obsidian_mode && config.obsidian_mode !== 'off' && config.obsidian_api_key && isObsidianForeground()) {
+  const isObsidian = fgProcess === 'Obsidian' || fgProcess === 'obsidian'
+  if (config?.obsidian_mode && config.obsidian_mode !== 'off' && config.obsidian_api_key && isObsidian) {
     obsidianContext = await Promise.race([
       getObsidianContext(),
       new Promise<null>(resolve => setTimeout(() => resolve(null), 350))
     ])
   }
 
-  // Browser tab detection — only if Obsidian didn't match
+  // Browser tab detection — only if Obsidian didn't match AND foreground IS a browser.
+  // Without the BROWSER_PROCESSES gate, stale heartbeat data from Chrome/Firefox
+  // would leak into non-browser apps (Obsidian, VS Code, Finder, etc.).
   let browserContext: BrowserContext | null = null
-  if (!obsidianContext && config?.browser_link_mode && config.browser_link_mode !== 'off') {
+  if (!obsidianContext && config?.browser_link_mode && config.browser_link_mode !== 'off' && BROWSER_PROCESSES.has(fgProcess)) {
     browserContext = getBrowserContext() // extension path (<1ms)
     if (!browserContext) {
-      // Fallback: read URL bar directly via Windows UI Automation
-      const fgProcess = getForegroundProcessName()
-      if (BROWSER_PROCESSES.has(fgProcess)) {
-        browserContext = await Promise.race([
-          getBrowserUrlFromWindow(fgProcess),
-          new Promise<null>(resolve => setTimeout(() => resolve(null), 1500))
-        ])
-      }
+      // Fallback: read URL bar directly (PowerShell on Windows, AppleScript on macOS)
+      browserContext = await Promise.race([
+        getBrowserUrlFromWindow(fgProcess),
+        new Promise<null>(resolve => setTimeout(() => resolve(null), 1500))
+      ])
     }
   }
 
@@ -245,7 +250,7 @@ function registerQuickEntryShortcuts(config: AppConfig): { entry: boolean; viewe
   const result = { entry: false, viewer: false }
 
   if (config.quick_entry_enabled) {
-    const entryHotkey = config.quick_entry_hotkey || 'Alt+Shift+V'
+    const entryHotkey = config.quick_entry_hotkey || DEFAULT_QUICK_ENTRY_HOTKEY
     try {
       result.entry = globalShortcut.register(entryHotkey, toggleQuickEntry)
       if (!result.entry) console.error(`Failed to register Quick Entry shortcut: ${entryHotkey}`)
@@ -255,7 +260,7 @@ function registerQuickEntryShortcuts(config: AppConfig): { entry: boolean; viewe
   }
 
   if (config.quick_view_enabled !== false) {
-    const viewerHotkey = config.quick_view_hotkey || 'Alt+Shift+B'
+    const viewerHotkey = config.quick_view_hotkey || DEFAULT_QUICK_VIEW_HOTKEY
     try {
       result.viewer = globalShortcut.register(viewerHotkey, toggleQuickView)
       if (!result.viewer) console.error(`Failed to register Quick View shortcut: ${viewerHotkey}`)
@@ -373,7 +378,10 @@ function applyQuickEntrySettings(): { entry: boolean; viewer: boolean } {
       quickViewWindow = null
     }
 
-    app.setLoginItemSettings({ openAtLogin: config.launch_on_startup === true })
+    app.setLoginItemSettings({
+      openAtLogin: config.launch_on_startup === true,
+      ...(isMac ? { openAsHidden: true, name: 'Vicu' } : {}),
+    })
     return result
   } else {
     // Clean up all windows and tray
@@ -392,7 +400,10 @@ function applyQuickEntrySettings(): { entry: boolean; viewer: boolean } {
     }
   }
 
-  app.setLoginItemSettings({ openAtLogin: config.launch_on_startup === true })
+  app.setLoginItemSettings({
+    openAtLogin: config.launch_on_startup === true,
+    ...(isMac ? { openAsHidden: true, name: 'Vicu' } : {}),
+  })
   return { entry: false, viewer: false }
 }
 
@@ -434,12 +445,16 @@ if (!gotLock) {
   app.setAppUserModelId('com.vicu.app')
 
   app.whenReady().then(async () => {
-    Menu.setApplicationMenu(null)
+    setupApplicationMenu(() => mainWindow)
     registerIpcHandlers()
     await authManager.initialize()
 
     const config = loadConfig()
     mainWindow = createMainWindow(config)
+
+    // Sync Electron's native theme with the user's config setting
+    const themeValue = config?.theme ?? 'system'
+    nativeTheme.themeSource = themeValue === 'system' ? 'system' : themeValue
 
     // Window control IPC handlers
     ipcMain.handle('window-minimize', () => mainWindow?.minimize())
@@ -482,8 +497,13 @@ if (!gotLock) {
       rescheduleNotifications()
     })
 
-    // Clean up stale browser host registrations if mode is off
-    if (!config?.browser_link_mode || config.browser_link_mode === 'off') {
+    // Auto-register browser native messaging hosts on startup so manifests
+    // always point to the current app's bridge (important when switching
+    // between Vicu and vikunja-quick-entry during development/testing).
+    // Clean up stale registrations if the feature is off.
+    if (config?.browser_link_mode && config.browser_link_mode !== 'off') {
+      registerHosts({ chromeExtensionId: config.browser_extension_id || '' })
+    } else {
       const reg = isRegistered()
       if (reg.chrome || reg.firefox) unregisterHosts()
     }
@@ -503,16 +523,9 @@ if (!gotLock) {
       } catch { /* never block app */ }
     }, 5000)
 
-    // Quick Entry/View: if either enabled, set up tray + windows + hotkeys
-    if (config?.quick_entry_enabled || config?.quick_view_enabled !== false) {
-      setupTray()
-      initQuickEntryWindows(config)
-      globalShortcut.unregisterAll() // Clear stale registrations from crashes
-      registerQuickEntryShortcuts(config)
-
-      app.setLoginItemSettings({ openAtLogin: config.launch_on_startup === true })
-
-      // When QE/QV is enabled, hide main window on close instead of quitting
+    // macOS: ALWAYS hide on close instead of destroying (standard macOS behavior).
+    // Use app.isQuitting flag to allow actual quit via ⌘Q or tray Quit.
+    if (isMac) {
       mainWindow.on('close', (e) => {
         if (!app.isQuitting) {
           e.preventDefault()
@@ -520,13 +533,50 @@ if (!gotLock) {
         }
       })
     }
+
+    // Quick Entry/View: if either enabled, set up tray + windows + hotkeys
+    if (config?.quick_entry_enabled || config?.quick_view_enabled !== false) {
+      setupTray()
+      initQuickEntryWindows(config)
+      globalShortcut.unregisterAll() // Clear stale registrations from crashes
+      registerQuickEntryShortcuts(config)
+
+      app.setLoginItemSettings({
+      openAtLogin: config.launch_on_startup === true,
+      ...(isMac ? { openAsHidden: true, name: 'Vicu' } : {}),
+    })
+
+      // Windows: when QE/QV is enabled, hide main window on close instead of quitting
+      if (!isMac) {
+        mainWindow.on('close', (e) => {
+          if (!app.isQuitting) {
+            e.preventDefault()
+            mainWindow?.hide()
+          }
+        })
+      }
+    }
   })
 
   app.on('window-all-closed', () => {
-    // Don't quit if tray is active (Quick Entry enabled)
-    if (!hasTray()) {
+    // macOS: never quit on window-all-closed (standard macOS behavior)
+    // Windows: only quit if tray is not active
+    if (!isMac && !hasTray()) {
       app.quit()
     }
+  })
+
+  app.on('activate', () => {
+    // macOS: dock click or Cmd+Tab — show the existing hidden window
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.show()
+      if (mainWindow.isMinimized()) mainWindow.restore()
+      mainWindow.focus()
+    }
+  })
+
+  app.on('before-quit', () => {
+    app.isQuitting = true
   })
 
   app.on('will-quit', () => {

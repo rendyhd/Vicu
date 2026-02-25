@@ -28,6 +28,7 @@ export interface UpdateStatus {
 }
 
 export interface ElectronAPI {
+  platform: 'darwin' | 'win32' | 'linux'
   fetchTasks(params: TaskQueryParams): Promise<ApiResult<Task[]>>
   createTask(projectId: number, task: CreateTaskPayload): Promise<ApiResult<Task>>
   updateTask(id: number, task: UpdateTaskPayload): Promise<ApiResult<Task>>

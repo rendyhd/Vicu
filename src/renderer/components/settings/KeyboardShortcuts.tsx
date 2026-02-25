@@ -1,3 +1,6 @@
+const isMac = window.api.platform === 'darwin'
+const mod = isMac ? '\u2318' : 'Ctrl'
+
 const shortcuts = [
   { category: 'Navigation', items: [
     { keys: ['Up'], description: 'Move to previous task' },
@@ -6,21 +9,21 @@ const shortcuts = [
     { keys: ['Escape'], description: 'Collapse task / clear focus' },
   ]},
   { category: 'Task Actions', items: [
-    { keys: ['Ctrl', 'N'], description: 'New task' },
-    { keys: ['Ctrl', 'V'], description: 'New task from clipboard' },
-    { keys: ['Ctrl', 'Enter'], description: 'Save and close task' },
-    { keys: ['Ctrl', 'K'], description: 'Complete selected task' },
+    { keys: [mod, 'N'], description: 'New task' },
+    { keys: [mod, 'V'], description: 'New task from clipboard' },
+    { keys: [mod, 'Enter'], description: 'Save and close task' },
+    { keys: [mod, 'K'], description: 'Complete selected task' },
   ]},
   { category: 'Scheduling', items: [
-    { keys: ['Ctrl', 'T'], description: 'Set due date to today' },
+    { keys: [mod, 'T'], description: 'Set due date to today' },
     { keys: ['!'], description: 'Set due date to today' },
   ]},
   { category: 'Editing (while task is open)', items: [
     { keys: ['Enter'], description: 'Move focus to notes' },
     { keys: ['Escape'], description: 'Save and close task' },
-    { keys: ['Ctrl', 'Enter'], description: 'Save and close task' },
-    { keys: ['Ctrl', 'K'], description: 'Complete and close task' },
-    { keys: ['Ctrl', 'T'], description: 'Set due date to today' },
+    { keys: [mod, 'Enter'], description: 'Save and close task' },
+    { keys: [mod, 'K'], description: 'Complete and close task' },
+    { keys: [mod, 'T'], description: 'Set due date to today' },
   ]},
 ]
 

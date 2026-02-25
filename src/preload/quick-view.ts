@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron'
 
 contextBridge.exposeInMainWorld('quickViewApi', {
+  platform: process.platform as 'darwin' | 'win32' | 'linux',
   fetchTasks: () => ipcRenderer.invoke('qv:fetch-tasks'),
   markTaskDone: (taskId: number, taskData: Record<string, unknown>) =>
     ipcRenderer.invoke('qv:mark-task-done', taskId, taskData),

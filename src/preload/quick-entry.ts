@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron'
 
 contextBridge.exposeInMainWorld('quickEntryApi', {
+  platform: process.platform as 'darwin' | 'win32' | 'linux',
   saveTask: (title: string, description: string | null, dueDate: string | null, projectId: number | null) =>
     ipcRenderer.invoke('qe:save-task', title, description, dueDate, projectId),
   closeWindow: () => ipcRenderer.invoke('qe:close-window'),

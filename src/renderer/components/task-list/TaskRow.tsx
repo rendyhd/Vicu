@@ -196,15 +196,15 @@ export function TaskRow({ task, sortable = false }: TaskRowProps) {
   // Handle keyboard shortcuts inside expanded task inputs
   const handleExpandedKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
-      // Ctrl+Enter: save and close
-      if (e.ctrlKey && e.key === 'Enter') {
+      // Ctrl+Enter / ⌘Enter: save and close
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
         e.preventDefault()
         handleSave()
         collapseAll()
         return
       }
-      // Ctrl+K: complete task
-      if (e.ctrlKey && e.key === 'k') {
+      // Ctrl+K / ⌘K: complete task
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
         e.preventDefault()
         if (!task.done) {
           handleSave()
@@ -213,14 +213,14 @@ export function TaskRow({ task, sortable = false }: TaskRowProps) {
         }
         return
       }
-      // Ctrl+T: set date to today
-      if (e.ctrlKey && e.key === 't') {
+      // Ctrl+T / ⌘T: set date to today
+      if ((e.ctrlKey || e.metaKey) && e.key === 't') {
         e.preventDefault()
         setDateToToday()
         return
       }
-      // Ctrl+Backspace: delete task
-      if (e.ctrlKey && e.key === 'Backspace') {
+      // Ctrl+Backspace / ⌘⌫: delete task
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Backspace') {
         e.preventDefault()
         deleteTask.mutate(task.id)
         collapseAll()
@@ -381,7 +381,7 @@ export function TaskRow({ task, sortable = false }: TaskRowProps) {
           onChange={(e) => setEditTitle(e.target.value)}
           onBlur={handleSave}
           onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.ctrlKey) {
+            if (e.key === 'Enter' && !e.ctrlKey && !e.metaKey) {
               e.preventDefault()
               descRef.current?.focus()
             }
@@ -553,7 +553,7 @@ export function TaskRow({ task, sortable = false }: TaskRowProps) {
               collapseAll()
             }}
             className="flex h-6 w-6 items-center justify-center rounded text-[var(--text-secondary)] transition-colors hover:bg-accent-red/10 hover:text-accent-red"
-            title="Delete task (Ctrl+Backspace)"
+            title={`Delete task (${window.api.platform === 'darwin' ? '\u2318\u232B' : 'Ctrl+Backspace'})`}
           >
             <Trash2 className="h-3.5 w-3.5" />
           </button>

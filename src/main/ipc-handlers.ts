@@ -1,4 +1,4 @@
-import { ipcMain, shell, dialog, app } from 'electron'
+import { ipcMain, shell, dialog, app, nativeTheme } from 'electron'
 import * as fs from 'fs'
 import * as path from 'path'
 import {
@@ -164,6 +164,10 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle('save-config', (_event, config: AppConfig) => {
     saveConfig(config)
+    // Sync native theme when config changes
+    if (config.theme) {
+      nativeTheme.themeSource = config.theme === 'system' ? 'system' : config.theme
+    }
   })
 
   // Connection test

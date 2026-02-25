@@ -3,7 +3,7 @@
 A personal task manager for your desktop, powered by [Vikunja](https://vikunja.io/).
 
 ![License](https://img.shields.io/badge/license-MIT-blue)
-![Platform](https://img.shields.io/badge/platform-Windows-lightgrey)
+![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS-lightgrey)
 ![Built with](https://img.shields.io/badge/electron%20+%20react%20+%20typescript-47848F)
 
 <p align="center">
@@ -67,7 +67,34 @@ The [official Vikunja frontend](https://vikunja.io/) is a full project managemen
 
 ### Download
 
-Grab the latest Windows installer from [GitHub Releases](https://github.com/rendyhd/Vicu/releases).
+| Platform | Format |
+|----------|--------|
+| Windows  | `.exe` (NSIS installer) |
+| macOS    | `.dmg` (Apple Silicon) |
+
+Grab the latest installer from [GitHub Releases](https://github.com/rendyhd/Vicu/releases).
+
+### macOS — first launch (unsigned app)
+
+This app is not signed with an Apple Developer certificate. macOS will block it on first launch.
+
+**Option A** — Open **System Settings → Privacy & Security**, scroll to the Security section, and click **Open Anyway** next to the blocked app message.
+
+**Option B** — Run once in Terminal:
+
+```bash
+xattr -cr /Applications/Vicu.app
+```
+
+Either method is a one-time step. The app opens normally after that.
+
+### Setup
+
+1. Launch the app
+2. Enter your Vikunja server URL (e.g. `https://app.vikunja.cloud`)
+3. Authenticate with an API token, username/password, or OpenID Connect
+4. Pick a project to use as your **Inbox**
+5. Configure global hotkeys for Quick Entry and Quick View in Settings
 
 ## See also
 

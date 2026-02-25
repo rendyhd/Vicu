@@ -51,7 +51,7 @@ export function ObsidianSettings({ config, onChange, disabled }: ObsidianSetting
               className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] focus:border-accent-blue focus:outline-none"
             >
               <option value="off">Off</option>
-              <option value="ask">Ask (Ctrl+L)</option>
+              <option value="ask">Ask ({window.api.platform === 'darwin' ? '\u2318L' : 'Ctrl+L'})</option>
               <option value="always">Always auto-link</option>
             </select>
           </div>

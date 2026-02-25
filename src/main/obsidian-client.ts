@@ -1,5 +1,6 @@
 import * as https from 'node:https'
 import * as crypto from 'node:crypto'
+import { execFile } from 'child_process'
 import { loadConfig } from './config'
 
 const OBSIDIAN_TIMEOUT = 300
@@ -189,7 +190,7 @@ function loadForegroundCheck(): boolean {
 
 const PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
 
-export function getForegroundProcessName(): string {
+function getForegroundProcessNameSync(): string {
   if (!loadForegroundCheck()) return ''
   try {
     const hwnd = _GetForegroundWindow!()
@@ -217,8 +218,51 @@ export function getForegroundProcessName(): string {
   }
 }
 
-export function isObsidianForeground(): boolean {
-  return getForegroundProcessName() === 'obsidian'
+const JXA_FOREGROUND_SCRIPT = `(() => {
+  const se = Application("System Events");
+  const procs = se.processes.whose({frontmost: true});
+  if (procs.length === 0) return "null";
+  const proc = procs[0];
+  const name = proc.displayedName();
+  let bid = ""; try { bid = proc.bundleIdentifier(); } catch(e) {}
+  return JSON.stringify({ processName: name, bundleId: bid });
+})()`
+
+function getForegroundAppMacOS(): Promise<{processName: string, bundleId: string} | null> {
+  return new Promise((resolve) => {
+    execFile('osascript', ['-l', 'JavaScript', '-e', JXA_FOREGROUND_SCRIPT],
+      { timeout: 2000 }, (err, stdout) => {
+        if (err) { resolve(null); return }
+        try {
+          const result = JSON.parse(stdout.trim())
+          if (result === null) { resolve(null); return }
+          resolve(result)
+        } catch { resolve(null) }
+      })
+  })
+}
+
+export async function getForegroundProcessName(): Promise<string> {
+  if (process.platform === 'win32') {
+    return getForegroundProcessNameSync()
+  }
+  if (process.platform === 'darwin') {
+    const app = await getForegroundAppMacOS()
+    return app ? app.processName : ''
+  }
+  return ''
+}
+
+export async function isObsidianForeground(): Promise<boolean> {
+  if (process.platform === 'win32') {
+    return getForegroundProcessNameSync() === 'obsidian'
+  }
+  if (process.platform === 'darwin') {
+    const app = await getForegroundAppMacOS()
+    if (!app) return false
+    return app.processName === 'Obsidian' || app.bundleId === 'md.obsidian'
+  }
+  return false
 }
 
 export async function getObsidianContext(): Promise<ObsidianNoteContext | null> {

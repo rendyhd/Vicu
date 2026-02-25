@@ -52,7 +52,7 @@ export function BrowserSettings({ config, onChange, disabled }: BrowserSettingsP
               className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] focus:border-accent-blue focus:outline-none"
             >
               <option value="off">Off</option>
-              <option value="ask">Ask (Ctrl+L)</option>
+              <option value="ask">Ask ({window.api.platform === 'darwin' ? '\u2318L' : 'Ctrl+L'})</option>
               <option value="always">Always auto-link</option>
             </select>
           </div>
@@ -70,11 +70,17 @@ export function BrowserSettings({ config, onChange, disabled }: BrowserSettingsP
                 />
               </div>
 
-              {config.browser_extension_id && regStatus && (
+              {regStatus && (
                 <div className="flex items-center gap-3 text-xs text-[var(--text-secondary)]">
+                  {config.browser_extension_id && (
+                    <span className="flex items-center gap-1">
+                      <span className={`inline-block h-2 w-2 rounded-full ${regStatus.chrome ? 'bg-accent-green' : 'bg-[var(--text-secondary)]'}`} />
+                      Chrome bridge: {regStatus.chrome ? 'Registered' : 'Not registered'}
+                    </span>
+                  )}
                   <span className="flex items-center gap-1">
-                    <span className={`inline-block h-2 w-2 rounded-full ${regStatus.chrome ? 'bg-accent-green' : 'bg-[var(--text-secondary)]'}`} />
-                    Chrome bridge: {regStatus.chrome ? 'Registered' : 'Not registered'}
+                    <span className={`inline-block h-2 w-2 rounded-full ${regStatus.firefox ? 'bg-accent-green' : 'bg-[var(--text-secondary)]'}`} />
+                    Firefox bridge: {regStatus.firefox ? 'Registered' : 'Not registered'}
                   </span>
                 </div>
               )}
@@ -102,15 +108,37 @@ export function BrowserSettings({ config, onChange, disabled }: BrowserSettingsP
                   <div className="mt-2 rounded-lg bg-[var(--bg-secondary)] p-3 text-xs text-[var(--text-secondary)]">
                     <p className="mb-2 font-semibold">How it works</p>
                     <p className="mb-3">
-                      Vicu automatically reads the URL bar from the active browser window when
-                      Quick Entry opens. This works with Chrome, Firefox, Edge, Brave, Opera, and Vivaldi
-                      &mdash; no extension required.
+                      {window.api.platform === 'darwin'
+                        ? 'Vicu reads the URL from the active browser tab using AppleScript when Quick Entry opens. This works with Chrome, Safari, Edge, Brave, Opera, Vivaldi, and Arc. Firefox has limited support.'
+                        : 'Vicu automatically reads the URL bar from the active browser window when Quick Entry opens. This works with Chrome, Firefox, Edge, Brave, Opera, and Vivaldi.'}
+                      {' '}Browser extensions provide instant (&lt;1ms) detection; without them Vicu falls back to{' '}
+                      {window.api.platform === 'darwin' ? 'AppleScript' : 'Windows accessibility APIs'} (~300ms).
                     </p>
+                    {window.api.platform === 'darwin' && (
+                      <p className="mb-3">
+                        No setup needed for Chrome, Safari, Edge, Brave, Vivaldi, and Arc. On first use, macOS will ask you to allow Vicu to control the browser.
+                      </p>
+                    )}
 
-                    <p className="mb-2 font-semibold">Firefox, Edge, Brave, Opera, Vivaldi</p>
-                    <p className="mb-3">
-                      No setup needed. Vicu detects URLs automatically via Windows accessibility APIs.
+                    <p className="mb-2 font-semibold">Firefox (extension for instant detection)</p>
+                    {window.api.platform === 'darwin' && (
+                      <p className="mb-2">
+                        Firefox fallback detection via AppleScript is unreliable on macOS. Installing the extension is strongly recommended for Firefox support.
+                      </p>
+                    )}
+                    <p>
+                      Open the{' '}
+                      <button
+                        type="button"
+                        onClick={() => window.api.openBrowserExtensionFolder()}
+                        className="inline cursor-pointer text-accent-blue underline hover:text-accent-blue/80"
+                      >extensions/browser</button>
+                      {' '}folder and locate the <code className="rounded bg-[var(--bg-primary)] px-1">.xpi</code> file
                     </p>
+                    <p>Open Firefox and go to <code className="rounded bg-[var(--bg-primary)] px-1">about:addons</code></p>
+                    <p>Click the gear icon &rarr; &ldquo;Install Add-on From File&hellip;&rdquo;</p>
+                    <p>Select the <code className="rounded bg-[var(--bg-primary)] px-1">.xpi</code> file and click &ldquo;Add&rdquo;</p>
+                    <p className="mb-3">Then click &ldquo;Re-register Bridge&rdquo; above</p>
 
                     <p className="mb-2 font-semibold">Chrome (optional extension for instant detection)</p>
                     <p>
@@ -130,6 +158,16 @@ export function BrowserSettings({ config, onChange, disabled }: BrowserSettingsP
                     </p>
                     <p>Copy the Extension ID shown on the card and paste it in the field above</p>
                     <p className="mb-3">Then click &ldquo;Re-register Bridge&rdquo; above</p>
+
+                    <p className="mb-2 font-semibold">
+                      {window.api.platform === 'darwin'
+                        ? 'Safari, Arc, Edge, Brave, Opera, Vivaldi'
+                        : 'Edge, Brave, Opera, Vivaldi'}
+                    </p>
+                    <p className="mb-3">
+                      No setup needed. Vicu detects URLs automatically via{' '}
+                      {window.api.platform === 'darwin' ? 'AppleScript' : 'accessibility APIs'}.
+                    </p>
 
                     <p className="mt-2 border-t border-[var(--border-color)] pt-2">
                       Open Quick Entry while a browser tab is active to see the link hint.

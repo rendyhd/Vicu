@@ -12,7 +12,7 @@ export function SearchBar() {
   // Ctrl+F global listener
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.ctrlKey && e.key === 'f') {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
         e.preventDefault()
         setOpen(true)
       }
@@ -56,7 +56,7 @@ export function SearchBar() {
             'flex shrink-0 items-center justify-center rounded',
             open ? 'h-6 w-7' : 'h-7 w-7 hover:bg-[var(--bg-secondary)]'
           )}
-          title="Search tasks (Ctrl+F)"
+          title={`Search tasks (${window.api.platform === 'darwin' ? '\u2318F' : 'Ctrl+F'})`}
         >
           <Search className="h-3.5 w-3.5 text-[var(--text-secondary)]" />
         </button>
