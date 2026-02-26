@@ -2,11 +2,15 @@ import { useState, useRef, useEffect, useCallback, Fragment } from 'react'
 import { Plus, Inbox } from 'lucide-react'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { cn } from '@/lib/cn'
-import { useCreateTask, useCompleteTask, useUpdateTask, useDeleteTask } from '@/hooks/use-task-mutations'
+import { useCreateTask, useCompleteTask, useUpdateTask, useDeleteTask, useAddLabel } from '@/hooks/use-task-mutations'
 import { useSelectionStore } from '@/stores/selection-store'
-import { api } from '@/lib/api'
+import { useParserConfig } from '@/hooks/use-parser-config'
+import { useLabels } from '@/hooks/use-labels'
+import { parse, recurrenceToVikunja } from '@/lib/task-parser'
+import type { ParseResult } from '@/lib/task-parser'
 import type { Task, CreateTaskPayload } from '@/lib/vikunja-types'
 import { TaskRow } from './TaskRow'
+import { NlpParsePreview, NlpInputHighlight } from './NlpParsePreview'
 import { EmptyState } from '@/components/shared/EmptyState'
 
 interface TaskListProps {
@@ -40,12 +44,15 @@ export function TaskList({
   const [newTitle, setNewTitle] = useState('')
   const [showNotes, setShowNotes] = useState(false)
   const [newDescription, setNewDescription] = useState('')
-  const [exclamationToday, setExclamationToday] = useState(true)
+  const [parseResult, setParseResult] = useState<ParseResult | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const descriptionRef = useRef<HTMLTextAreaElement>(null)
   const creationRef = useRef<HTMLDivElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
+  const parserConfig = useParserConfig()
+  const { data: allLabels } = useLabels()
   const createTask = useCreateTask()
+  const addLabel = useAddLabel()
   const completeTask = useCompleteTask()
   const updateTask = useUpdateTask()
   const deleteTask = useDeleteTask()
@@ -64,15 +71,6 @@ export function TaskList({
     }
   }, [isAdding])
 
-  // Load exclamation_today setting from config
-  useEffect(() => {
-    api.getConfig().then((config) => {
-      if (config) {
-        setExclamationToday(config.exclamation_today !== false)
-      }
-    })
-  }, [])
-
   // Focus notes textarea when expanded
   useEffect(() => {
     if (showNotes && descriptionRef.current) {
@@ -87,25 +85,60 @@ export function TaskList({
       setNewTitle('')
       setNewDescription('')
       setShowNotes(false)
+      setParseResult(null)
       return
     }
 
     const payload: CreateTaskPayload = { title: trimmed }
+    let parsedLabels: string[] = []
 
-    // Handle ! for scheduling today
-    if (exclamationToday && trimmed.includes('!')) {
-      trimmed = trimmed.replace(/!/g, '').trim()
-      if (!trimmed) {
+    if (parserConfig.enabled && parseResult) {
+      // Use NLP parse result
+      const title = parseResult.title.trim()
+      if (!title) {
         setIsAdding(false)
         setNewTitle('')
         setNewDescription('')
         setShowNotes(false)
+        setParseResult(null)
         return
       }
-      payload.title = trimmed
-      const today = new Date()
-      today.setHours(23, 59, 59, 0)
-      payload.due_date = today.toISOString()
+      payload.title = title
+
+      if (parseResult.dueDate) {
+        const d = new Date(parseResult.dueDate.getTime())
+        d.setHours(23, 59, 59, 0)
+        payload.due_date = d.toISOString()
+      }
+
+      if (parseResult.priority !== null && parseResult.priority > 0) {
+        payload.priority = parseResult.priority
+      }
+
+      if (parseResult.recurrence) {
+        const vik = recurrenceToVikunja(parseResult.recurrence)
+        payload.repeat_after = vik.repeat_after
+        payload.repeat_mode = vik.repeat_mode
+      }
+
+      parsedLabels = parseResult.labels
+    } else {
+      // Legacy ! → today behavior
+      if (parserConfig.bangToday && trimmed.includes('!')) {
+        trimmed = trimmed.replace(/!/g, '').trim()
+        if (!trimmed) {
+          setIsAdding(false)
+          setNewTitle('')
+          setNewDescription('')
+          setShowNotes(false)
+          setParseResult(null)
+          return
+        }
+        payload.title = trimmed
+        const today = new Date()
+        today.setHours(23, 59, 59, 0)
+        payload.due_date = today.toISOString()
+      }
     }
 
     const desc = newDescription.trim()
@@ -116,10 +149,23 @@ export function TaskList({
     createTask.mutate(
       { projectId, task: payload },
       {
-        onSuccess: () => {
+        onSuccess: (data) => {
+          // Attach labels post-creation
+          if (parsedLabels.length > 0 && data && typeof data === 'object' && 'id' in data) {
+            const taskId = (data as Task).id
+            for (const labelName of parsedLabels) {
+              const match = allLabels?.find(
+                (l) => l.title.toLowerCase() === labelName.toLowerCase()
+              )
+              if (match) {
+                addLabel.mutate({ taskId, labelId: match.id })
+              }
+            }
+          }
           setNewTitle('')
           setNewDescription('')
           setShowNotes(false)
+          setParseResult(null)
           inputRef.current?.focus()
         },
       }
@@ -360,35 +406,52 @@ export function TaskList({
           <div ref={creationRef} className="border-b border-[var(--border-color)]">
             <div className="flex h-10 items-center gap-3 px-4">
               <div className="h-[18px] w-[18px] shrink-0 rounded-full border border-[var(--border-color)]" />
-              <input
-                ref={inputRef}
-                type="text"
-                value={newTitle}
-                onChange={(e) => setNewTitle(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleSubmit()
-                  if (e.key === 'Escape') {
-                    setIsAdding(false)
-                    setNewTitle('')
-                    setNewDescription('')
-                    setShowNotes(false)
-                  }
-                  if (e.key === 'Tab') {
-                    e.preventDefault()
-                    setShowNotes(true)
-                  }
-                }}
-                onBlur={(e) => {
-                  if (creationRef.current?.contains(e.relatedTarget as Node)) return
-                  handleSubmit()
-                }}
-                placeholder="New Task"
-                className="flex-1 bg-transparent text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-secondary)] focus:outline-none"
-              />
-              {exclamationToday && newTitle.includes('!') && (
+              <div className="relative flex-1">
+                {parserConfig.enabled && parseResult && (
+                  <NlpInputHighlight value={newTitle} tokens={parseResult.tokens} />
+                )}
+                <input
+                  ref={inputRef}
+                  type="text"
+                  value={newTitle}
+                  onChange={(e) => {
+                    const val = e.target.value
+                    setNewTitle(val)
+                    if (parserConfig.enabled && val.trim()) {
+                      setParseResult(parse(val, parserConfig))
+                    } else {
+                      setParseResult(null)
+                    }
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleSubmit()
+                    if (e.key === 'Escape') {
+                      setIsAdding(false)
+                      setNewTitle('')
+                      setNewDescription('')
+                      setShowNotes(false)
+                      setParseResult(null)
+                    }
+                    if (e.key === 'Tab') {
+                      e.preventDefault()
+                      setShowNotes(true)
+                    }
+                  }}
+                  onBlur={(e) => {
+                    if (creationRef.current?.contains(e.relatedTarget as Node)) return
+                    handleSubmit()
+                  }}
+                  placeholder="New Task"
+                  className="relative w-full bg-transparent text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-secondary)] focus:outline-none"
+                />
+              </div>
+              {!parserConfig.enabled && parserConfig.bangToday && newTitle.includes('!') && (
                 <span className="shrink-0 text-[11px] font-medium text-accent-blue">Today</span>
               )}
             </div>
+            {parserConfig.enabled && parseResult && (
+              <NlpParsePreview result={parseResult} />
+            )}
             {showNotes && (
               <div className="pb-2 pl-[46px] pr-4">
                 <textarea

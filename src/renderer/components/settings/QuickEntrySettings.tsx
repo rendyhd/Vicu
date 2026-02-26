@@ -206,7 +206,7 @@ export function QuickEntrySettings({ config, projects, onChange, hotkeyWarnings 
                         Parse task metadata from text
                       </span>
                       <p className="text-xs text-[var(--text-secondary)]">
-                        Extract labels, projects, priority, dates, and recurrence from your input
+                        Extract labels, projects, priority, dates, and recurrence from your input in Quick Entry and task lists
                       </p>
                     </div>
                   </label>
@@ -240,8 +240,7 @@ export function QuickEntrySettings({ config, projects, onChange, hotkeyWarnings 
                           <p className="mt-1.5 font-mono text-xs">
                             <code className="text-blue-500">#project</code>{' '}
                             <code className="text-orange-500">@label</code>{' '}
-                            <code className="text-red-500">p1-p4</code>{' '}
-                            <code className="text-green-600">! today</code>
+                            <code className="text-red-500">p1-p4</code>
                           </p>
                         </label>
                         <label
@@ -267,13 +266,30 @@ export function QuickEntrySettings({ config, projects, onChange, hotkeyWarnings 
                           <p className="mt-1.5 font-mono text-xs">
                             <code className="text-blue-500">+project</code>{' '}
                             <code className="text-orange-500">*label</code>{' '}
-                            <code className="text-red-500">!1-!4</code>{' '}
-                            <code className="text-green-600">! today</code>
+                            <code className="text-red-500">!1-!4</code>
                           </p>
                         </label>
                       </div>
                     </div>
                   )}
+
+                  {/* Trailing ! → today shortcut */}
+                  <label className="flex cursor-pointer items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={config.exclamation_today !== false}
+                      onChange={(e) => onChange({ exclamation_today: e.target.checked })}
+                      className="h-4 w-4 rounded border-[var(--border-color)] accent-accent-blue"
+                    />
+                    <div>
+                      <span className="text-sm text-[var(--text-primary)]">
+                        Trailing <code className="rounded bg-[var(--bg-secondary)] px-1 py-0.5 text-xs font-mono text-green-600">!</code> sets due date to today
+                      </span>
+                      <p className="text-xs text-[var(--text-secondary)]">
+                        Append ! to a task to set it due today (e.g. "buy groceries !")
+                      </p>
+                    </div>
+                  </label>
                 </div>
 
               </div>

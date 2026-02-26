@@ -84,6 +84,8 @@ export interface CreateTaskPayload {
   priority?: number
   labels?: { id: number }[]
   reminders?: TaskReminder[]
+  repeat_after?: number
+  repeat_mode?: number
 }
 
 export interface UpdateTaskPayload extends Partial<Task> {}
