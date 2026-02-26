@@ -36,7 +36,9 @@ interface QuickEntryConfig {
 }
 
 import { parse, getParserConfig, recurrenceToVikunja } from '../lib/task-parser'
-import type { ParseResult, ParserConfig, ParsedToken } from '../lib/task-parser'
+import type { ParseResult, ParserConfig, ParsedToken, TokenType } from '../lib/task-parser'
+import { AutocompleteDropdown } from './autocomplete'
+import { cache } from './vikunja-cache'
 
 const input = document.getElementById('task-input') as HTMLInputElement
 const descriptionHint = document.getElementById('description-hint')!
@@ -77,6 +79,24 @@ let cachedLabels: Array<{ id: number; title: string }> = []
 let cachedProjects: Array<{ id: number; title: string }> = []
 let lastParseResult: ParseResult | null = null
 let isComposing = false
+let suppressedTypes: Map<TokenType, string[]> = new Map()
+
+// --- Autocomplete ---
+const autocomplete = new AutocompleteDropdown('autocomplete-container', (item, triggerStart, prefix) => {
+  const val = input.value
+  // Find the end of the current token (next space or end of string)
+  let tokenEnd = val.indexOf(' ', triggerStart)
+  if (tokenEnd === -1) tokenEnd = val.length
+
+  const hasSpaces = item.title.includes(' ')
+  const replacement = hasSpaces ? `${prefix}"${item.title}" ` : `${prefix}${item.title} `
+
+  input.value = val.substring(0, triggerStart) + replacement + val.substring(tokenEnd)
+  const newCursorPos = triggerStart + replacement.length
+  input.setSelectionRange(newCursorPos, newCursorPos)
+  input.dispatchEvent(new Event('input'))
+  input.focus()
+})
 
 // Set platform-aware hint key text
 const isMac = window.quickEntryApi.platform === 'darwin'
@@ -179,6 +199,7 @@ function resetInput(): void {
   collapseDescription()
   clearError()
   clearNlpState()
+  autocomplete.hide()
   todayHintInline.classList.add('hidden')
   todayHintBelow.classList.add('hidden')
   currentProjectIndex = 0
@@ -286,8 +307,14 @@ function refreshLabelsAndProjects(): void {
     window.quickEntryApi.fetchLabels(),
     window.quickEntryApi.fetchProjects(),
   ]).then(([labelsResult, projectsResult]) => {
-    if (labelsResult.success && labelsResult.data) cachedLabels = labelsResult.data
-    if (projectsResult.success && projectsResult.data) cachedProjects = projectsResult.data
+    if (labelsResult.success && labelsResult.data) {
+      cachedLabels = labelsResult.data
+      cache.setLabels(labelsResult.data)
+    }
+    if (projectsResult.success && projectsResult.data) {
+      cachedProjects = projectsResult.data
+      cache.setProjects(projectsResult.data)
+    }
   }).catch(() => {
     // Offline or standalone — keep existing cache
   })
@@ -327,24 +354,24 @@ function renderParsePreview(result: ParseResult): void {
 
   if (result.dueDate) {
     const label = formatDateLabel(result.dueDate)
-    chips.push(`<span class="parse-chip parse-chip-date">${escapeHtml(label)}</span>`)
+    chips.push(`<span class="parse-chip parse-chip-date">${escapeHtml(label)}<button class="parse-chip-dismiss" data-type="date">&times;</button></span>`)
   }
   if (result.priority !== null && result.priority > 0) {
     const labels = ['', 'Low', 'Medium', 'High', 'Urgent']
     const label = labels[result.priority] || `P${result.priority}`
-    chips.push(`<span class="parse-chip parse-chip-priority">${escapeHtml(label)}</span>`)
+    chips.push(`<span class="parse-chip parse-chip-priority">${escapeHtml(label)}<button class="parse-chip-dismiss" data-type="priority">&times;</button></span>`)
   }
   for (const lbl of result.labels) {
-    chips.push(`<span class="parse-chip parse-chip-label">${escapeHtml(lbl)}</span>`)
+    chips.push(`<span class="parse-chip parse-chip-label">${escapeHtml(lbl)}<button class="parse-chip-dismiss" data-type="label">&times;</button></span>`)
   }
   if (result.project) {
-    chips.push(`<span class="parse-chip parse-chip-project">${escapeHtml(result.project)}</span>`)
+    chips.push(`<span class="parse-chip parse-chip-project">${escapeHtml(result.project)}<button class="parse-chip-dismiss" data-type="project">&times;</button></span>`)
   }
   if (result.recurrence) {
     const unit = result.recurrence.unit
     const interval = result.recurrence.interval
     const label = interval === 1 ? `Every ${unit}` : `Every ${interval} ${unit}s`
-    chips.push(`<span class="parse-chip parse-chip-recurrence">${escapeHtml(label)}</span>`)
+    chips.push(`<span class="parse-chip parse-chip-recurrence">${escapeHtml(label)}<button class="parse-chip-dismiss" data-type="recurrence">&times;</button></span>`)
   }
 
   if (chips.length > 0) {
@@ -375,6 +402,7 @@ function clearNlpState(): void {
   parsePreview.innerHTML = ''
   parsePreview.classList.add('hidden')
   lastParseResult = null
+  suppressedTypes = new Map()
 }
 
 async function saveTask(): Promise<void> {
@@ -498,7 +526,9 @@ window.quickEntryApi.onShowWindow(async () => {
     exclamationTodayEnabled = cfg.exclamation_today !== false
     projectCycleModifier = cfg.project_cycle_modifier || 'ctrl'
     buildProjectCycle(cfg)
-    parserConfig = getParserConfig({ nlp_enabled: cfg.nlp_enabled, nlp_syntax_mode: cfg.nlp_syntax_mode })
+    parserConfig = getParserConfig({ nlp_enabled: cfg.nlp_enabled, nlp_syntax_mode: cfg.nlp_syntax_mode, exclamation_today: cfg.exclamation_today })
+    autocomplete.setSyntaxMode(parserConfig.syntaxMode)
+    autocomplete.setEnabled(parserConfig.enabled)
   }
 
   refreshLabelsAndProjects()
@@ -522,6 +552,7 @@ window.quickEntryApi.onDragHover((_: unknown, hovering: boolean) => {
 
 // Keyboard handling on title input
 input.addEventListener('keydown', async (e) => {
+  if (autocomplete.handleKeyDown(e)) return
   if ((e.ctrlKey || e.metaKey) && e.key === 'l') {
     e.preventDefault()
     if (obsidianContext) {
@@ -608,14 +639,20 @@ input.addEventListener('scroll', () => {
 function handleInputChange(): void {
   updateTodayHints()
 
-
   const raw = input.value
+
+  // Update autocomplete on every input change
+  autocomplete.update(raw, input.selectionStart ?? raw.length)
+
   if (!parserConfig.enabled || !raw) {
     clearNlpState()
     return
   }
 
-  const result = parse(raw, parserConfig)
+  const configWithSuppress: ParserConfig = suppressedTypes.size > 0
+    ? { ...parserConfig, suppressTypes: [...suppressedTypes.keys()] }
+    : parserConfig
+  const result = parse(raw, configWithSuppress)
   lastParseResult = result
   renderHighlights(raw, result.tokens)
   renderParsePreview(result)
@@ -630,6 +667,18 @@ function handleInputChange(): void {
 // Detect input changes and run parser
 input.addEventListener('input', () => {
   if (isComposing) return
+  // Lift suppressions only for types whose raw token text was modified
+  if (suppressedTypes.size > 0) {
+    const val = input.value
+    let changed = false
+    for (const [type, rawTexts] of suppressedTypes) {
+      if (!rawTexts.every((t) => val.includes(t))) {
+        suppressedTypes.delete(type)
+        changed = true
+      }
+    }
+    if (changed && suppressedTypes.size === 0) suppressedTypes = new Map()
+  }
   handleInputChange()
 })
 
@@ -642,6 +691,21 @@ obsidianBadgeRemove.addEventListener('click', () => {
 browserBadgeRemove.addEventListener('click', () => {
   browserLinked = false
   updateBrowserUI()
+})
+
+// Dismiss parsed token chips — event delegation on the preview container
+parsePreview.addEventListener('click', (e) => {
+  const btn = (e.target as HTMLElement).closest('.parse-chip-dismiss') as HTMLElement | null
+  if (!btn) return
+  const tokenType = btn.dataset.type as TokenType | undefined
+  if (!tokenType) return
+  // Store the raw token texts so we can lift suppression when they're edited
+  const rawTexts = lastParseResult?.tokens
+    .filter((t) => t.type === tokenType)
+    .map((t) => input.value.substring(t.start, t.end)) ?? []
+  suppressedTypes.set(tokenType, rawTexts)
+  handleInputChange()
+  input.focus()
 })
 
 // Obsidian context listener
@@ -677,7 +741,9 @@ async function loadInitialConfig(): Promise<void> {
     exclamationTodayEnabled = cfg.exclamation_today !== false
     projectCycleModifier = cfg.project_cycle_modifier || 'ctrl'
     buildProjectCycle(cfg)
-    parserConfig = getParserConfig({ nlp_enabled: cfg.nlp_enabled, nlp_syntax_mode: cfg.nlp_syntax_mode })
+    parserConfig = getParserConfig({ nlp_enabled: cfg.nlp_enabled, nlp_syntax_mode: cfg.nlp_syntax_mode, exclamation_today: cfg.exclamation_today })
+    autocomplete.setSyntaxMode(parserConfig.syntaxMode)
+    autocomplete.setEnabled(parserConfig.enabled)
   }
   refreshLabelsAndProjects()
 

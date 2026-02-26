@@ -17,8 +17,8 @@ export { extractBangToday } from './extract-dates'
  *
  * Extraction order: Labels → Projects → Priority → Recurrence → Dates → Title
  *
- * The `!` → today shortcut is ALWAYS processed (even when parser is disabled),
- * since it's an existing feature. Use `extractBangToday()` directly for that.
+ * The trailing `!` → today shortcut is controlled by `config.bangToday`.
+ * When the parser is disabled, the caller should handle it via `extractBangToday()` directly.
  *
  * @param rawInput - The raw user input string
  * @param config - Parser configuration (enabled, syntax mode, suppress types)
@@ -84,6 +84,15 @@ export function parse(
 
   // 6. Build title from non-consumed regions
   result.title = buildTitle(rawInput, consumed)
+
+  // 7. Leading/trailing ! → today (only when enabled and no date was found by chrono)
+  if (config.bangToday && !result.dueDate) {
+    const bang = extractBangToday(result.title)
+    if (bang.dueDate) {
+      result.title = bang.title
+      result.dueDate = bang.dueDate
+    }
+  }
 
   return result
 }

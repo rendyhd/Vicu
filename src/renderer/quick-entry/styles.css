@@ -146,6 +146,54 @@ body {
   opacity: 0.5;
 }
 
+/* Autocomplete dropdown */
+.autocomplete-container {
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+}
+.autocomplete-container.hidden { display: none; }
+
+.autocomplete-list {
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.autocomplete-item {
+  padding: 6px 20px;
+  font-size: 13px;
+  cursor: pointer;
+  color: #1a1a1a;
+}
+
+.autocomplete-item.active {
+  background: rgba(59, 130, 246, 0.10);
+}
+
+.autocomplete-item:hover {
+  background: rgba(59, 130, 246, 0.06);
+}
+
+.autocomplete-item-project::before {
+  content: '';
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  background: rgba(59, 130, 246, 0.5);
+  margin-right: 8px;
+  vertical-align: middle;
+}
+
+.autocomplete-item-label::before {
+  content: '';
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(249, 115, 22, 0.5);
+  margin-right: 8px;
+  vertical-align: middle;
+}
+
 /* Hints row (TAB hint + today hint inline) */
 .hints-row {
   display: flex;
@@ -344,6 +392,21 @@ body {
   color: #9333ea;
 }
 
+.parse-chip-dismiss {
+  background: none;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+  padding: 0 0 0 4px;
+  opacity: 0.5;
+  transition: opacity 120ms ease;
+}
+.parse-chip-dismiss:hover {
+  opacity: 1;
+}
+
 /* Dark mode */
 @media (prefers-color-scheme: dark) {
   .drag-handle-pill {
@@ -416,4 +479,11 @@ body {
   .parse-chip-label { background: rgba(249, 115, 22, 0.2); color: #fb923c; }
   .parse-chip-project { background: rgba(59, 130, 246, 0.2); color: #60a5fa; }
   .parse-chip-recurrence { background: rgba(168, 85, 247, 0.2); color: #c084fc; }
+
+  .autocomplete-container { border-top-color: rgba(255, 255, 255, 0.06); }
+  .autocomplete-item { color: #f0f0f0; }
+  .autocomplete-item.active { background: rgba(59, 130, 246, 0.20); }
+  .autocomplete-item:hover { background: rgba(59, 130, 246, 0.12); }
+  .autocomplete-item-project::before { background: rgba(59, 130, 246, 0.7); }
+  .autocomplete-item-label::before { background: rgba(249, 115, 22, 0.7); }
 }

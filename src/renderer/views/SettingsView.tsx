@@ -321,17 +321,112 @@ export function SettingsView() {
               </div>
             </div>
 
+          </div>
+        </div>
+
+        {/* Task Parser */}
+        <div className="rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] p-5">
+          <h2 className="mb-4 text-sm font-semibold text-[var(--text-primary)]">Task Parser</h2>
+
+          <div className="space-y-3">
             <label className="flex cursor-pointer items-center gap-2">
               <input
                 type="checkbox"
-                checked={fullConfig?.exclamation_today !== false}
-                onChange={(e) => handleQuickEntryChange({ exclamation_today: e.target.checked })}
+                checked={fullConfig?.nlp_enabled !== false}
+                onChange={(e) => handleQuickEntryChange({ nlp_enabled: e.target.checked })}
                 className="h-4 w-4 rounded border-[var(--border-color)] accent-accent-blue"
               />
-              <span className="text-sm text-[var(--text-primary)]">
-                <code className="rounded bg-[var(--bg-secondary)] px-1 py-0.5 text-xs">!</code> in task title schedules for today
-              </span>
+              <div>
+                <span className="text-sm text-[var(--text-primary)]">
+                  Parse task metadata from text
+                </span>
+                <p className="text-xs text-[var(--text-secondary)]">
+                  Extract labels, projects, priority, dates, and recurrence from your input
+                </p>
+              </div>
             </label>
+
+            {fullConfig?.nlp_enabled !== false && (
+              <>
+                <div>
+                  <label className="mb-2 block text-xs text-[var(--text-secondary)]">
+                    Syntax Mode
+                  </label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <label
+                      className={cn(
+                        'cursor-pointer rounded-lg border p-3 transition-colors',
+                        (fullConfig?.nlp_syntax_mode || 'todoist') === 'todoist'
+                          ? 'border-accent-blue bg-accent-blue/5'
+                          : 'border-[var(--border-color)]'
+                      )}
+                    >
+                      <input
+                        type="radio"
+                        name="nlp-syntax-mode"
+                        value="todoist"
+                        checked={(fullConfig?.nlp_syntax_mode || 'todoist') === 'todoist'}
+                        onChange={() => handleQuickEntryChange({ nlp_syntax_mode: 'todoist' })}
+                        className="sr-only"
+                      />
+                      <div className="text-sm font-medium text-[var(--text-primary)]">Todoist</div>
+                      <p className="mt-0.5 text-xs text-[var(--text-secondary)]">
+                        Familiar Todoist-style prefixes
+                      </p>
+                      <p className="mt-1.5 font-mono text-xs">
+                        <code className="text-blue-500">#project</code>{' '}
+                        <code className="text-orange-500">@label</code>{' '}
+                        <code className="text-red-500">p1-p4</code>
+                      </p>
+                    </label>
+                    <label
+                      className={cn(
+                        'cursor-pointer rounded-lg border p-3 transition-colors',
+                        fullConfig?.nlp_syntax_mode === 'vikunja'
+                          ? 'border-accent-blue bg-accent-blue/5'
+                          : 'border-[var(--border-color)]'
+                      )}
+                    >
+                      <input
+                        type="radio"
+                        name="nlp-syntax-mode"
+                        value="vikunja"
+                        checked={fullConfig?.nlp_syntax_mode === 'vikunja'}
+                        onChange={() => handleQuickEntryChange({ nlp_syntax_mode: 'vikunja' })}
+                        className="sr-only"
+                      />
+                      <div className="text-sm font-medium text-[var(--text-primary)]">Vikunja</div>
+                      <p className="mt-0.5 text-xs text-[var(--text-secondary)]">
+                        Native Vikunja-style prefixes
+                      </p>
+                      <p className="mt-1.5 font-mono text-xs">
+                        <code className="text-blue-500">+project</code>{' '}
+                        <code className="text-orange-500">*label</code>{' '}
+                        <code className="text-red-500">!1-!4</code>
+                      </p>
+                    </label>
+                  </div>
+                </div>
+
+                {/* ! → today shortcut */}
+                <label className="flex cursor-pointer items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={fullConfig?.exclamation_today !== false}
+                    onChange={(e) => handleQuickEntryChange({ exclamation_today: e.target.checked })}
+                    className="h-4 w-4 rounded border-[var(--border-color)] accent-accent-blue"
+                  />
+                  <div>
+                    <span className="text-sm text-[var(--text-primary)]">
+                      <code className="rounded bg-[var(--bg-secondary)] px-1 py-0.5 text-xs font-mono text-green-600">!</code> in task title sets due date to today
+                    </span>
+                    <p className="text-xs text-[var(--text-secondary)]">
+                      Add ! before or after a task title to set it due today (e.g. "buy groceries !" or "! buy groceries")
+                    </p>
+                  </div>
+                </label>
+              </>
+            )}
           </div>
         </div>
 

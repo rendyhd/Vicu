@@ -8,6 +8,7 @@ import { DEFAULT_PARSER_CONFIG } from './types'
 interface AppConfigLike {
   nlp_enabled?: boolean
   nlp_syntax_mode?: 'todoist' | 'vikunja'
+  exclamation_today?: boolean
 }
 
 /**
@@ -17,5 +18,6 @@ export function getParserConfig(appConfig: AppConfigLike): ParserConfig {
   return {
     enabled: appConfig.nlp_enabled !== false,
     syntaxMode: appConfig.nlp_syntax_mode === 'vikunja' ? 'vikunja' : DEFAULT_PARSER_CONFIG.syntaxMode,
+    bangToday: appConfig.exclamation_today !== false,
   }
 }

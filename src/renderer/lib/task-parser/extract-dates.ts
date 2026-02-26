@@ -44,26 +44,46 @@ export function extractDate(
  * Extract the `!` → today shortcut. This is independent of the NLP parser
  * and always runs (even when parser is disabled).
  *
- * Only matches a trailing `!` (with optional preceding whitespace) or a standalone `!`.
+ * Matches:
+ * - Trailing `!` (with optional preceding whitespace): "call dentist !" or "call dentist!"
+ * - Leading `!` (with optional following whitespace): "! call dentist" or "!call dentist"
+ *   BUT NOT when followed by a priority token like `!1`, `!urgent`, `!high`, `!medium`, `!low`
+ * - Standalone `!`
  */
 export function extractBangToday(input: string): {
   title: string
   dueDate: Date | null
 } {
-  // Match trailing `!` at end of string (not `!word` or `!digit`)
-  const bangRe = /^(.+?)\s*!$/
-  const match = bangRe.exec(input.trim())
-  if (match) {
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    return { title: match[1].trim(), dueDate: today }
-  }
+  const trimmed = input.trim()
 
   // Standalone `!`
-  if (input.trim() === '!') {
+  if (trimmed === '!') {
     const today = new Date()
     today.setHours(0, 0, 0, 0)
     return { title: '', dueDate: today }
+  }
+
+  // Match trailing `!` at end of string (not `!word` or `!digit`)
+  const trailingRe = /^(.+?)\s*!$/
+  const trailingMatch = trailingRe.exec(trimmed)
+  if (trailingMatch) {
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    return { title: trailingMatch[1].trim(), dueDate: today }
+  }
+
+  // Match leading `!` at start of string, but NOT if followed by a priority token
+  // Priority tokens: !1-!4, !urgent, !high, !medium, !low
+  const leadingRe = /^!\s*(.+)$/
+  const leadingMatch = leadingRe.exec(trimmed)
+  if (leadingMatch) {
+    // Check that the text after `!` doesn't start with a priority token
+    const rest = leadingMatch[1]
+    if (!/^[1-4](?:\s|$)/.test(rest) && !/^(?:urgent|high|medium|low)(?:\s|$)/i.test(rest)) {
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+      return { title: rest.trim(), dueDate: today }
+    }
   }
 
   return { title: input, dueDate: null }

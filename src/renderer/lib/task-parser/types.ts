@@ -34,6 +34,7 @@ export interface ParserConfig {
   enabled: boolean
   syntaxMode: SyntaxMode
   suppressTypes?: TokenType[]
+  bangToday?: boolean
 }
 
 const SYNTAX_PREFIXES: Record<SyntaxMode, SyntaxPrefixes> = {
