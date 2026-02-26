@@ -2,10 +2,13 @@ declare global {
   interface Window {
     quickEntryApi: {
       platform: 'darwin' | 'win32' | 'linux'
-      saveTask(title: string, description: string | null, dueDate: string | null, projectId: number | null): Promise<{ success: boolean; cached?: boolean; error?: string }>
+      saveTask(title: string, description: string | null, dueDate: string | null, projectId: number | null, priority?: number, repeatAfter?: number, repeatMode?: number): Promise<{ success: boolean; cached?: boolean; error?: string; data?: { id: number } }>
       closeWindow(): Promise<void>
       getConfig(): Promise<QuickEntryConfig | null>
       getPendingCount(): Promise<number>
+      fetchLabels(): Promise<{ success: boolean; data?: Array<{ id: number; title: string }> }>
+      fetchProjects(): Promise<{ success: boolean; data?: Array<{ id: number; title: string }> }>
+      addLabelToTask(taskId: number, labelId: number): Promise<{ success: boolean }>
       onShowWindow(callback: () => void): void
       onHideWindow(callback: () => void): void
       onSyncCompleted(callback: () => void): void
@@ -32,6 +35,9 @@ interface QuickEntryConfig {
   nlp_syntax_mode: 'todoist' | 'vikunja'
 }
 
+import { parse, getParserConfig, recurrenceToVikunja } from '../lib/task-parser'
+import type { ParseResult, ParserConfig, ParsedToken } from '../lib/task-parser'
+
 const input = document.getElementById('task-input') as HTMLInputElement
 const descriptionHint = document.getElementById('description-hint')!
 const descriptionInput = document.getElementById('description-input') as HTMLTextAreaElement
@@ -54,6 +60,8 @@ const browserHintName = document.getElementById('browser-hint-name')!
 const browserBadge = document.getElementById('browser-badge')!
 const browserBadgeName = document.getElementById('browser-badge-name')!
 const browserBadgeRemove = document.getElementById('browser-badge-remove')!
+const inputHighlight = document.getElementById('input-highlight')!
+const parsePreview = document.getElementById('parse-preview')!
 
 let errorTimeout: ReturnType<typeof setTimeout> | null = null
 let exclamationTodayEnabled = true
@@ -64,6 +72,11 @@ let obsidianContext: { deepLink: string; noteName: string; isUidBased: boolean }
 let obsidianLinked = false
 let browserContext: { url: string; title: string; displayTitle: string } | null = null
 let browserLinked = false
+let parserConfig: ParserConfig = { enabled: true, syntaxMode: 'todoist' }
+let cachedLabels: Array<{ id: number; title: string }> = []
+let cachedProjects: Array<{ id: number; title: string }> = []
+let lastParseResult: ParseResult | null = null
+let isComposing = false
 
 // Set platform-aware hint key text
 const isMac = window.quickEntryApi.platform === 'darwin'
@@ -128,6 +141,13 @@ function isDescriptionExpanded(): boolean {
 }
 
 function updateTodayHints(): void {
+  // When parser is enabled, it handles ! via date/priority parsing — suppress legacy hints
+  if (parserConfig.enabled) {
+    todayHintInline.classList.add('hidden')
+    todayHintBelow.classList.add('hidden')
+    return
+  }
+
   const hasExclamation = exclamationTodayEnabled && input.value.includes('!')
 
   if (hasExclamation && !isDescriptionExpanded()) {
@@ -158,6 +178,7 @@ function resetInput(): void {
   descriptionInput.disabled = false
   collapseDescription()
   clearError()
+  clearNlpState()
   todayHintInline.classList.add('hidden')
   todayHintBelow.classList.add('hidden')
   currentProjectIndex = 0
@@ -257,9 +278,108 @@ function isProjectCycleModifierPressed(e: KeyboardEvent): boolean {
   }
 }
 
+// --- NLP Parser Helpers ---
+
+function refreshLabelsAndProjects(): void {
+  // Fire-and-forget — runs in background while window is already visible
+  Promise.all([
+    window.quickEntryApi.fetchLabels(),
+    window.quickEntryApi.fetchProjects(),
+  ]).then(([labelsResult, projectsResult]) => {
+    if (labelsResult.success && labelsResult.data) cachedLabels = labelsResult.data
+    if (projectsResult.success && projectsResult.data) cachedProjects = projectsResult.data
+  }).catch(() => {
+    // Offline or standalone — keep existing cache
+  })
+}
+
+function renderHighlights(inputValue: string, tokens: ParsedToken[]): void {
+  if (!tokens.length) {
+    inputHighlight.innerHTML = ''
+    return
+  }
+  const sorted = [...tokens].sort((a, b) => a.start - b.start)
+  let html = ''
+  let pos = 0
+  for (const token of sorted) {
+    if (token.start > pos) {
+      html += escapeHighlightText(inputValue.slice(pos, token.start))
+    }
+    html += `<span class="token-${token.type}">${escapeHighlightText(inputValue.slice(token.start, token.end))}</span>`
+    pos = token.end
+  }
+  if (pos < inputValue.length) {
+    html += escapeHighlightText(inputValue.slice(pos))
+  }
+  inputHighlight.innerHTML = html
+}
+
+function escapeHighlightText(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/ /g, '\u00a0')
+}
+
+function renderParsePreview(result: ParseResult): void {
+  const chips: string[] = []
+
+  if (result.dueDate) {
+    const label = formatDateLabel(result.dueDate)
+    chips.push(`<span class="parse-chip parse-chip-date">${escapeHtml(label)}</span>`)
+  }
+  if (result.priority !== null && result.priority > 0) {
+    const labels = ['', 'Low', 'Medium', 'High', 'Urgent']
+    const label = labels[result.priority] || `P${result.priority}`
+    chips.push(`<span class="parse-chip parse-chip-priority">${escapeHtml(label)}</span>`)
+  }
+  for (const lbl of result.labels) {
+    chips.push(`<span class="parse-chip parse-chip-label">${escapeHtml(lbl)}</span>`)
+  }
+  if (result.project) {
+    chips.push(`<span class="parse-chip parse-chip-project">${escapeHtml(result.project)}</span>`)
+  }
+  if (result.recurrence) {
+    const unit = result.recurrence.unit
+    const interval = result.recurrence.interval
+    const label = interval === 1 ? `Every ${unit}` : `Every ${interval} ${unit}s`
+    chips.push(`<span class="parse-chip parse-chip-recurrence">${escapeHtml(label)}</span>`)
+  }
+
+  if (chips.length > 0) {
+    parsePreview.innerHTML = chips.join('')
+    parsePreview.classList.remove('hidden')
+  } else {
+    parsePreview.innerHTML = ''
+    parsePreview.classList.add('hidden')
+  }
+}
+
+function formatDateLabel(date: Date): string {
+  const now = new Date()
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const target = new Date(date.getFullYear(), date.getMonth(), date.getDate())
+  const diffDays = Math.round((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+  if (diffDays === 0) return 'Today'
+  if (diffDays === 1) return 'Tomorrow'
+  if (diffDays === -1) return 'Yesterday'
+  if (diffDays > 1 && diffDays <= 7) {
+    return target.toLocaleDateString(undefined, { weekday: 'long' })
+  }
+  return target.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+}
+
+function clearNlpState(): void {
+  inputHighlight.innerHTML = ''
+  parsePreview.innerHTML = ''
+  parsePreview.classList.add('hidden')
+  lastParseResult = null
+}
+
 async function saveTask(): Promise<void> {
-  let title = input.value.trim()
-  if (!title) return
+  const raw = input.value.trim()
+  if (!raw) return
 
   let description: string | null = descriptionInput.value.trim() || null
 
@@ -275,23 +395,75 @@ async function saveTask(): Promise<void> {
     description = description ? `<p>${escapeHtml(description)}</p>${linkHtml}` : linkHtml
   }
 
+  let title = raw
   let dueDate: string | null = null
-  if (exclamationTodayEnabled && title.includes('!')) {
-    title = title.replace(/!/g, '').trim()
+  let priority: number | undefined
+  let repeatAfter: number | undefined
+  let repeatMode: number | undefined
+  let projectId = projectCycle.length > 0 ? projectCycle[currentProjectIndex].id : null
+  let parsedLabels: string[] = []
+
+  if (parserConfig.enabled && lastParseResult) {
+    title = lastParseResult.title
     if (!title) return
-    const today = new Date()
-    today.setHours(23, 59, 59, 0)
-    dueDate = today.toISOString()
+
+    if (lastParseResult.dueDate) {
+      const d = lastParseResult.dueDate
+      d.setHours(23, 59, 59, 0)
+      dueDate = d.toISOString()
+    }
+
+    if (lastParseResult.priority !== null && lastParseResult.priority > 0) {
+      priority = lastParseResult.priority
+    }
+
+    if (lastParseResult.recurrence) {
+      const vik = recurrenceToVikunja(lastParseResult.recurrence)
+      repeatAfter = vik.repeat_after
+      repeatMode = vik.repeat_mode
+    }
+
+    // Resolve project name to ID
+    if (lastParseResult.project) {
+      const projName = lastParseResult.project.toLowerCase()
+      const match = cachedProjects.find((p) => p.title.toLowerCase() === projName)
+      if (match) projectId = match.id
+    }
+
+    parsedLabels = lastParseResult.labels
+  } else {
+    // Legacy ! → today behavior
+    if (exclamationTodayEnabled && title.includes('!')) {
+      title = title.replace(/!/g, '').trim()
+      if (!title) return
+      const today = new Date()
+      today.setHours(23, 59, 59, 0)
+      dueDate = today.toISOString()
+    }
   }
 
   input.disabled = true
   descriptionInput.disabled = true
   clearError()
 
-  const projectId = projectCycle.length > 0 ? projectCycle[currentProjectIndex].id : null
-  const result = await window.quickEntryApi.saveTask(title, description || null, dueDate, projectId)
+  const result = await window.quickEntryApi.saveTask(title, description || null, dueDate, projectId, priority, repeatAfter, repeatMode)
 
   if (result.success) {
+    // Attach labels post-creation
+    if (parsedLabels.length > 0 && result.data?.id) {
+      const taskId = result.data.id
+      for (const labelName of parsedLabels) {
+        const match = cachedLabels.find((l) => l.title.toLowerCase() === labelName.toLowerCase())
+        if (match) {
+          try {
+            await window.quickEntryApi.addLabelToTask(taskId, match.id)
+          } catch {
+            // Skip silently
+          }
+        }
+      }
+    }
+
     if (result.cached) {
       showOfflineMessage()
     } else {
@@ -326,7 +498,10 @@ window.quickEntryApi.onShowWindow(async () => {
     exclamationTodayEnabled = cfg.exclamation_today !== false
     projectCycleModifier = cfg.project_cycle_modifier || 'ctrl'
     buildProjectCycle(cfg)
+    parserConfig = getParserConfig({ nlp_enabled: cfg.nlp_enabled, nlp_syntax_mode: cfg.nlp_syntax_mode })
   }
+
+  refreshLabelsAndProjects()
 
   await updatePendingIndicator()
   input.focus()
@@ -418,9 +593,44 @@ descriptionInput.addEventListener('keydown', async (e) => {
   }
 })
 
-// Detect ! in task title to show today scheduling hint
-input.addEventListener('input', () => {
+// IME composition guard
+input.addEventListener('compositionstart', () => { isComposing = true })
+input.addEventListener('compositionend', () => {
+  isComposing = false
+  handleInputChange()
+})
+
+// Scroll sync for highlight overlay
+input.addEventListener('scroll', () => {
+  inputHighlight.scrollLeft = input.scrollLeft
+})
+
+function handleInputChange(): void {
   updateTodayHints()
+
+
+  const raw = input.value
+  if (!parserConfig.enabled || !raw) {
+    clearNlpState()
+    return
+  }
+
+  const result = parse(raw, parserConfig)
+  lastParseResult = result
+  renderHighlights(raw, result.tokens)
+  renderParsePreview(result)
+
+  // Hide legacy today hints when parser is active and found a date
+  if (result.dueDate) {
+    todayHintInline.classList.add('hidden')
+    todayHintBelow.classList.add('hidden')
+  }
+}
+
+// Detect input changes and run parser
+input.addEventListener('input', () => {
+  if (isComposing) return
+  handleInputChange()
 })
 
 // Obsidian badge remove button
@@ -467,7 +677,10 @@ async function loadInitialConfig(): Promise<void> {
     exclamationTodayEnabled = cfg.exclamation_today !== false
     projectCycleModifier = cfg.project_cycle_modifier || 'ctrl'
     buildProjectCycle(cfg)
+    parserConfig = getParserConfig({ nlp_enabled: cfg.nlp_enabled, nlp_syntax_mode: cfg.nlp_syntax_mode })
   }
+  refreshLabelsAndProjects()
+
   await updatePendingIndicator()
 }
 loadInitialConfig()

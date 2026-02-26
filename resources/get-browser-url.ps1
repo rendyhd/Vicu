@@ -1,5 +1,6 @@
 param(
-    [string]$ProcessName
+    [string]$ProcessName,
+    [long]$Hwnd = 0
 )
 
 # Immediately capture the foreground window handle before any .NET loading
@@ -20,7 +21,11 @@ public class Win32 {
 }
 "@
 
-$hwnd = [Win32]::GetForegroundWindow()
+if ($Hwnd -ne 0) {
+    $hwnd = [IntPtr]$Hwnd
+} else {
+    $hwnd = [Win32]::GetForegroundWindow()
+}
 if ($hwnd -eq [IntPtr]::Zero) { exit 0 }
 
 # Get window title

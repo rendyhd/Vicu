@@ -192,6 +192,90 @@ export function QuickEntrySettings({ config, projects, onChange, hotkeyWarnings 
                   </div>
                 </div>
 
+                {/* NLP task parser */}
+                <div className="space-y-3 border-t border-[var(--border-color)] pt-4">
+                  <label className="flex cursor-pointer items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={config.nlp_enabled !== false}
+                      onChange={(e) => onChange({ nlp_enabled: e.target.checked })}
+                      className="h-4 w-4 rounded border-[var(--border-color)] accent-accent-blue"
+                    />
+                    <div>
+                      <span className="text-sm text-[var(--text-primary)]">
+                        Parse task metadata from text
+                      </span>
+                      <p className="text-xs text-[var(--text-secondary)]">
+                        Extract labels, projects, priority, dates, and recurrence from your input
+                      </p>
+                    </div>
+                  </label>
+
+                  {config.nlp_enabled !== false && (
+                    <div>
+                      <label className="mb-2 block text-xs text-[var(--text-secondary)]">
+                        Syntax Mode
+                      </label>
+                      <div className="grid grid-cols-2 gap-3">
+                        <label
+                          className={cn(
+                            'cursor-pointer rounded-lg border p-3 transition-colors',
+                            (config.nlp_syntax_mode || 'todoist') === 'todoist'
+                              ? 'border-accent-blue bg-accent-blue/5'
+                              : 'border-[var(--border-color)]'
+                          )}
+                        >
+                          <input
+                            type="radio"
+                            name="nlp-syntax-mode"
+                            value="todoist"
+                            checked={(config.nlp_syntax_mode || 'todoist') === 'todoist'}
+                            onChange={() => onChange({ nlp_syntax_mode: 'todoist' })}
+                            className="sr-only"
+                          />
+                          <div className="text-sm font-medium text-[var(--text-primary)]">Todoist</div>
+                          <p className="mt-0.5 text-xs text-[var(--text-secondary)]">
+                            Familiar Todoist-style prefixes
+                          </p>
+                          <p className="mt-1.5 font-mono text-xs">
+                            <code className="text-blue-500">#project</code>{' '}
+                            <code className="text-orange-500">@label</code>{' '}
+                            <code className="text-red-500">p1-p4</code>{' '}
+                            <code className="text-green-600">! today</code>
+                          </p>
+                        </label>
+                        <label
+                          className={cn(
+                            'cursor-pointer rounded-lg border p-3 transition-colors',
+                            config.nlp_syntax_mode === 'vikunja'
+                              ? 'border-accent-blue bg-accent-blue/5'
+                              : 'border-[var(--border-color)]'
+                          )}
+                        >
+                          <input
+                            type="radio"
+                            name="nlp-syntax-mode"
+                            value="vikunja"
+                            checked={config.nlp_syntax_mode === 'vikunja'}
+                            onChange={() => onChange({ nlp_syntax_mode: 'vikunja' })}
+                            className="sr-only"
+                          />
+                          <div className="text-sm font-medium text-[var(--text-primary)]">Vikunja</div>
+                          <p className="mt-0.5 text-xs text-[var(--text-secondary)]">
+                            Native Vikunja-style prefixes
+                          </p>
+                          <p className="mt-1.5 font-mono text-xs">
+                            <code className="text-blue-500">+project</code>{' '}
+                            <code className="text-orange-500">*label</code>{' '}
+                            <code className="text-red-500">!1-!4</code>{' '}
+                            <code className="text-green-600">! today</code>
+                          </p>
+                        </label>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
               </div>
             </>
           )}

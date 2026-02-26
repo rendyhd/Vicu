@@ -87,7 +87,7 @@ function getBrowserUrlMacOS(appName: string): Promise<BrowserContext | null> {
 
 // --- Main entry point: platform-aware URL detection ---
 
-export function getBrowserUrlFromWindow(processName: string): Promise<BrowserContext | null> {
+export function getBrowserUrlFromWindow(processName: string, hwnd?: number): Promise<BrowserContext | null> {
   if (process.platform === 'darwin') {
     return getBrowserUrlMacOS(processName)
   }
@@ -101,7 +101,8 @@ export function getBrowserUrlFromWindow(processName: string): Promise<BrowserCon
         '-NonInteractive',
         '-ExecutionPolicy', 'Bypass',
         '-File', scriptPath,
-        '-ProcessName', processName
+        '-ProcessName', processName,
+        ...(hwnd ? ['-Hwnd', String(hwnd)] : [])
       ], {
         stdio: ['ignore', 'pipe', 'ignore'],
         windowsHide: true

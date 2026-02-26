@@ -7,7 +7,7 @@ import { createTray, destroyTray, hasTray } from './tray'
 import { returnFocusToPreviousWindow } from './focus'
 import { registerQuickEntryState } from './quick-entry-state'
 import { initNotifications, rescheduleNotifications, stopNotifications } from './notifications'
-import { getObsidianContext, getForegroundProcessName, type ObsidianNoteContext } from './obsidian-client'
+import { getObsidianContext, getForegroundProcessName, getForegroundWindowHandle, type ObsidianNoteContext } from './obsidian-client'
 import { getBrowserContext, type BrowserContext } from './browser-client'
 import { getBrowserUrlFromWindow, prewarmUrlReader, shutdownUrlReader, BROWSER_PROCESSES } from './window-url-reader'
 import { isRegistered, unregisterHosts, registerHosts } from './browser-host-registration'
@@ -88,35 +88,34 @@ async function showQuickEntry(): Promise<void> {
   if (!quickEntryWindow) return
   const config = loadConfig()
 
-  // Detect foreground app once — used by both Obsidian and browser detection.
-  // Done before showing window, while the previous app still has focus.
+  // 1. Detect foreground app — must happen before we steal focus.
+  //    On Windows this is sync FFI (~0μs), on macOS it's osascript (~2ms).
   const fgProcess = await getForegroundProcessName()
 
-  // Obsidian detection — only if Obsidian is actually the foreground app
-  let obsidianContext: ObsidianNoteContext | null = null
-  const isObsidian = fgProcess === 'Obsidian' || fgProcess === 'obsidian'
-  if (config?.obsidian_mode && config.obsidian_mode !== 'off' && config.obsidian_api_key && isObsidian) {
-    obsidianContext = await Promise.race([
-      getObsidianContext(),
-      new Promise<null>(resolve => setTimeout(() => resolve(null), 350))
-    ])
-  }
+  // 2. Capture the browser's HWND before anything else (~0μs, Windows only).
+  //    This allows PowerShell to use the correct window even after Electron steals focus.
+  const fgHwnd = getForegroundWindowHandle()
 
-  // Browser tab detection — only if Obsidian didn't match AND foreground IS a browser.
-  // Without the BROWSER_PROCESSES gate, stale heartbeat data from Chrome/Firefox
-  // would leak into non-browser apps (Obsidian, VS Code, Finder, etc.).
+  const isObsidian = fgProcess === 'Obsidian' || fgProcess === 'obsidian'
+  const wantObsidian = !!(config?.obsidian_mode && config.obsidian_mode !== 'off' && config.obsidian_api_key && isObsidian)
+  const wantBrowser = !isObsidian && !!(config?.browser_link_mode && config.browser_link_mode !== 'off' && BROWSER_PROCESSES.has(fgProcess))
+
+  // 3. Browser context: try extension cache first (<1ms sync file read).
   let browserContext: BrowserContext | null = null
-  if (!obsidianContext && config?.browser_link_mode && config.browser_link_mode !== 'off' && BROWSER_PROCESSES.has(fgProcess)) {
-    browserContext = getBrowserContext() // extension path (<1ms)
+  let browserFallbackPromise: Promise<BrowserContext | null> | null = null
+  if (wantBrowser) {
+    browserContext = getBrowserContext() // extension cache (<1ms)
     if (!browserContext) {
-      // Fallback: read URL bar directly (PowerShell on Windows, AppleScript on macOS)
-      browserContext = await Promise.race([
-        getBrowserUrlFromWindow(fgProcess),
+      // 4. Cache miss — spawn PowerShell with captured HWND (non-blocking).
+      //    The script uses the pre-captured HWND, so it works even after window.show().
+      browserFallbackPromise = Promise.race([
+        getBrowserUrlFromWindow(fgProcess, fgHwnd || undefined),
         new Promise<null>(resolve => setTimeout(() => resolve(null), 1500))
       ])
     }
   }
 
+  // 5. Position window
   if (config?.quick_entry_position) {
     const displays = screen.getAllDisplays()
     const pos = config.quick_entry_position
@@ -134,27 +133,43 @@ async function showQuickEntry(): Promise<void> {
     centerQuickEntry()
   }
 
-  // Send Obsidian context BEFORE window-shown so renderer sets up UI before animating in
-  if (obsidianContext && config?.obsidian_mode) {
-    quickEntryWindow.webContents.send('obsidian-context', {
-      ...obsidianContext,
-      mode: config.obsidian_mode,
-    })
-  }
-
-  // Send browser context if available (Obsidian takes priority)
-  if (!obsidianContext && browserContext && config?.browser_link_mode) {
+  // 6. Send cached browser context before window-shown so renderer has it during animation
+  if (browserContext && config?.browser_link_mode) {
     quickEntryWindow.webContents.send('browser-context', {
       ...browserContext,
       mode: config.browser_link_mode,
     })
   }
 
+  // 7. Show window IMMEDIATELY — only sync operations before this point
   quickEntryWindow.show()
   quickEntryWindow.focus()
   quickEntryShowTime = Date.now()
   quickEntryWindow.webContents.send('window-shown')
   startDragHoverPolling()
+
+  // 8. Await PowerShell result (already running in background with correct HWND)
+  if (browserFallbackPromise && config?.browser_link_mode) {
+    const win = quickEntryWindow
+    browserFallbackPromise.then((ctx) => {
+      if (ctx && !win.isDestroyed() && win.isVisible()) {
+        win.webContents.send('browser-context', { ...ctx, mode: config.browser_link_mode })
+      }
+    }).catch(() => {})
+  }
+
+  // 9. Obsidian: HTTP to localhost doesn't need foreground — safe to run after show
+  if (wantObsidian) {
+    const win = quickEntryWindow
+    Promise.race([
+      getObsidianContext(),
+      new Promise<null>(resolve => setTimeout(() => resolve(null), 350))
+    ]).then((ctx) => {
+      if (ctx && !win.isDestroyed() && win.isVisible() && config?.obsidian_mode) {
+        win.webContents.send('obsidian-context', { ...ctx, mode: config.obsidian_mode })
+      }
+    }).catch(() => {})
+  }
 }
 
 function centerQuickEntry(): void {

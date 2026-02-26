@@ -160,6 +160,7 @@ export function testObsidianConnection(apiKey: string, port = 27124): Promise<{ 
  * Executes in ~1-2 microseconds — no process spawn, no timing issues.
  */
 let _fgCheckLoaded = false
+let _koffi: { address(ptr: unknown): number } | null = null
 let _GetForegroundWindow: (() => unknown) | null = null
 let _GetWindowThreadProcessId: ((hWnd: unknown, pid: number[]) => number) | null = null
 let _OpenProcess: ((access: number, inherit: number, pid: number) => unknown) | null = null
@@ -173,6 +174,7 @@ function loadForegroundCheck(): boolean {
   try {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const koffi = require('koffi')
+    _koffi = koffi
     const user32 = koffi.load('user32.dll')
     const kernel32 = koffi.load('kernel32.dll')
 
@@ -240,6 +242,23 @@ function getForegroundAppMacOS(): Promise<{processName: string, bundleId: string
         } catch { resolve(null) }
       })
   })
+}
+
+/**
+ * Return the foreground window's HWND as a number (Windows only, sync).
+ * Used to pass to the PowerShell browser-URL script so it doesn't need
+ * to call GetForegroundWindow() itself (avoids race with Electron stealing focus).
+ */
+export function getForegroundWindowHandle(): number {
+  if (!loadForegroundCheck()) return 0
+  try {
+    const hwnd = _GetForegroundWindow!()
+    if (!hwnd) return 0
+    // koffi pointers need koffi.address() to get the numeric value
+    return _koffi!.address(hwnd) || 0
+  } catch {
+    return 0
+  }
 }
 
 export async function getForegroundProcessName(): Promise<string> {

@@ -2,11 +2,14 @@ import { contextBridge, ipcRenderer } from 'electron'
 
 contextBridge.exposeInMainWorld('quickEntryApi', {
   platform: process.platform as 'darwin' | 'win32' | 'linux',
-  saveTask: (title: string, description: string | null, dueDate: string | null, projectId: number | null) =>
-    ipcRenderer.invoke('qe:save-task', title, description, dueDate, projectId),
+  saveTask: (title: string, description: string | null, dueDate: string | null, projectId: number | null, priority?: number, repeatAfter?: number, repeatMode?: number) =>
+    ipcRenderer.invoke('qe:save-task', title, description, dueDate, projectId, priority, repeatAfter, repeatMode),
   closeWindow: () => ipcRenderer.invoke('qe:close-window'),
   getConfig: () => ipcRenderer.invoke('qe:get-config'),
   getPendingCount: () => ipcRenderer.invoke('qe:get-pending-count'),
+  fetchLabels: () => ipcRenderer.invoke('fetch-labels'),
+  fetchProjects: () => ipcRenderer.invoke('fetch-projects'),
+  addLabelToTask: (taskId: number, labelId: number) => ipcRenderer.invoke('add-label-to-task', taskId, labelId),
   onShowWindow: (callback: () => void) => {
     ipcRenderer.on('window-shown', callback)
   },

@@ -214,7 +214,7 @@ export function registerIpcHandlers(): void {
   })
 
   // --- Quick Entry IPC ---
-  ipcMain.handle('qe:save-task', async (_event, title: string, description: string | null, dueDate: string | null, projectId: number | null) => {
+  ipcMain.handle('qe:save-task', async (_event, title: string, description: string | null, dueDate: string | null, projectId: number | null, priority?: number, repeatAfter?: number, repeatMode?: number) => {
     const config = loadConfig()
     if (!config) return { success: false, error: 'Configuration not loaded' }
 
@@ -229,6 +229,9 @@ export function registerIpcHandlers(): void {
     const taskPayload: Record<string, unknown> = { title }
     if (description) taskPayload.description = description
     if (dueDate) taskPayload.due_date = dueDate
+    if (priority && priority > 0) taskPayload.priority = priority
+    if (repeatAfter !== undefined) taskPayload.repeat_after = repeatAfter
+    if (repeatMode !== undefined) taskPayload.repeat_mode = repeatMode
 
     const result = await createTask(targetProjectId, taskPayload)
 

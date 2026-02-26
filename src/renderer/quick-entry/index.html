@@ -11,17 +11,21 @@
   <div id="container" class="container">
     <div class="drag-handle"><div class="drag-handle-pill"></div></div>
     <div id="project-hint" class="project-hint hidden">saving to <span id="project-name"></span></div>
-    <input
-      id="task-input"
-      type="text"
-      placeholder="Add a task..."
-      autocomplete="off"
-      spellcheck="false"
-    />
+    <div class="input-wrapper">
+      <div id="input-highlight" class="input-highlight" aria-hidden="true"></div>
+      <input
+        id="task-input"
+        type="text"
+        placeholder="Add a task..."
+        autocomplete="off"
+        spellcheck="false"
+      />
+    </div>
     <div id="hints-row" class="hints-row">
       <div id="description-hint" class="description-hint">Press TAB to add a description</div>
       <div id="today-hint-inline" class="today-hint hidden">scheduling for Today</div>
     </div>
+    <div id="parse-preview" class="parse-preview hidden"></div>
     <textarea id="description-input" class="description-input hidden"
               placeholder="Description..." rows="4"></textarea>
     <div id="today-hint-below" class="today-hint hidden">scheduling for Today</div>
