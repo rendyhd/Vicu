@@ -44,6 +44,23 @@ Vicu can link tasks to your active browser tab. A bundled Manifest V3 extension 
 
 Same three modes as Obsidian: **ask** (`Ctrl+L`), **always**, and **off**.
 
+## Natural language input
+
+Type tasks the way you think. Vicu parses freeform text into structured fields as you type, with real-time highlighting and autocomplete.
+
+| Token | Example | Effect |
+|-------|---------|--------|
+| Dates | `tomorrow`, `next Monday`, `Dec 25`, `in 3 days` | Sets due date |
+| `!` | `Buy milk !` | Due today |
+| Priority | `p1`–`p4`, `!urgent`, `!high`, `!medium`, `!low` | Sets priority |
+| Labels | `@shopping`, `@"grocery list"` | Applies labels |
+| Projects | `#work`, `#"side project"` | Assigns to project |
+| Recurrence | `every 3 days`, `weekly`, `monthly` | Sets repeat interval |
+
+Everything that isn't a recognized token becomes the task title. Tokens can appear anywhere in the input and are shown as dismissible chips below the text field.
+
+Two syntax modes are available in Settings: **Todoist** (default — `@` for labels, `#` for projects) and **Vikunja** (`*` for labels, `+` for projects).
+
 ## Features
 
 - **Smart lists** — Inbox, Today, Upcoming, Anytime, Logbook
