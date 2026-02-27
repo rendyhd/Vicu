@@ -44,6 +44,10 @@ Vicu can link tasks to your active browser tab. A bundled Manifest V3 extension 
 
 Same three modes as Obsidian: **ask** (`Ctrl+L`), **always**, and **off**.
 
+<p align="center">
+  <img width="718" height="261" src="https://github.com/user-attachments/assets/31293b9f-2ce5-4b3c-bf9e-c7ea9fd8702b">
+</p>
+
 ## Natural language input
 
 Type tasks the way you think. Vicu parses freeform text into structured fields as you type, with real-time highlighting and autocomplete.
