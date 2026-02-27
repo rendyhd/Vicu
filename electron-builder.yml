@@ -58,6 +58,7 @@ mac:
 
 dmg:
   sign: false
+  writeUpdateInfo: false
   artifactName: "${productName}-${version}-${arch}.${ext}"
 
 publish:
