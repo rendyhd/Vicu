@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { Outlet, useMatches } from '@tanstack/react-router'
+import { Outlet, useMatches, useNavigate } from '@tanstack/react-router'
 import {
   DndContext,
   DragOverlay,
@@ -79,6 +79,7 @@ export function AppShell() {
   const [appState, setAppState] = useState<AppState>('loading')
   const [dragItem, setDragItem] = useState<DragItem | null>(null)
   const themeRef = useRef<ThemeOption>('system')
+  const navigate = useNavigate()
 
   // Clear recently-completed-tasks store on route change so completed tasks
   // don't bleed into the next view.
@@ -315,14 +316,14 @@ export function AppShell() {
 
   useEffect(() => {
     api.getConfig().then(async (config) => {
+      const t = ((config?.theme as ThemeOption) || 'system')
+      themeRef.current = t
+      applyTheme(t)
+
       if (!config || !config.vikunja_url) {
         setAppState('setup')
         return
       }
-
-      const t = (config.theme as ThemeOption) || 'system'
-      themeRef.current = t
-      applyTheme(t)
 
       const isAuthed = await api.checkAuth()
       setAppState(isAuthed ? 'ready' : 'setup')
@@ -350,6 +351,13 @@ export function AppShell() {
     })
     return cleanup
   }, [queryClient])
+
+  // Handle navigate events from main process (e.g. Cmd+, for Settings)
+  useEffect(() => {
+    return api.onNavigate((path) => {
+      navigate({ to: path })
+    })
+  }, [navigate])
 
   const handleMouseDown = useCallback(
     (e: React.MouseEvent) => {

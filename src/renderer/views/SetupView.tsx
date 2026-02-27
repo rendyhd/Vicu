@@ -113,9 +113,13 @@ export function SetupView({ onComplete }: SetupViewProps) {
   const [testError, setTestError] = useState('')
   const [saving, setSaving] = useState(false)
 
+  const DEFAULT_URL = 'https://app.vikunja.cloud'
+
   const handleUrlContinue = async () => {
+    const effectiveUrl = url.trim() || DEFAULT_URL
+    if (!url.trim()) setUrl(effectiveUrl)
     setDiscovering(true)
-    const authInfo = await api.discoverAuthMethods(url.replace(/\/+$/, ''))
+    const authInfo = await api.discoverAuthMethods(effectiveUrl.replace(/\/+$/, ''))
     setServerAuth(authInfo)
     setOidcProviders(authInfo.oidc_providers)
     setDiscovering(false)
@@ -261,10 +265,10 @@ export function SetupView({ onComplete }: SetupViewProps) {
                   type="url"
                   value={url}
                   onChange={(e) => setUrl(e.target.value)}
-                  placeholder="https://vikunja.example.com"
+                  placeholder="https://app.vikunja.cloud"
                   className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-accent-blue focus:outline-none"
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter' && url) handleUrlContinue()
+                    if (e.key === 'Enter' && !discovering) handleUrlContinue()
                   }}
                 />
               </div>
@@ -272,7 +276,7 @@ export function SetupView({ onComplete }: SetupViewProps) {
               <button
                 type="button"
                 onClick={handleUrlContinue}
-                disabled={!url || discovering}
+                disabled={discovering}
                 className={cn(
                   'w-full rounded-md px-4 py-2 text-sm font-medium transition-colors',
                   'bg-accent-blue text-white hover:bg-accent-blue/90',
@@ -281,6 +285,17 @@ export function SetupView({ onComplete }: SetupViewProps) {
               >
                 {discovering ? 'Checking...' : 'Continue'}
               </button>
+
+              <p className="text-center text-xs text-[var(--text-secondary)]">
+                Don't have an account?{' '}
+                <button
+                  type="button"
+                  onClick={() => window.api.openDeepLink('https://vikunja.cloud/register')}
+                  className="text-accent-blue hover:underline"
+                >
+                  Sign up
+                </button>
+              </p>
             </>
           )}
 

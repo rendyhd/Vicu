@@ -165,6 +165,8 @@ export const api = {
     window.api.onWindowMaximizedChange(cb),
   onTasksChanged: (cb: () => void) =>
     window.api.onTasksChanged?.(cb) ?? (() => {}),
+  onNavigate: (cb: (path: string) => void) =>
+    window.api.onNavigate?.(cb) ?? (() => {}),
 
   // Update checker
   checkForUpdate: () =>

@@ -136,6 +136,11 @@ const api = {
     ipcRenderer.on('tasks-changed', handler)
     return () => { ipcRenderer.removeListener('tasks-changed', handler) }
   },
+  onNavigate: (cb: (path: string) => void) => {
+    const handler = (_: unknown, path: string) => cb(path)
+    ipcRenderer.on('navigate', handler)
+    return () => { ipcRenderer.removeListener('navigate', handler) }
+  },
 }
 
 contextBridge.exposeInMainWorld('api', api)

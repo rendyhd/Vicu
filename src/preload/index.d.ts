@@ -79,6 +79,7 @@ export interface ElectronAPI {
   windowIsMaximized(): Promise<boolean>
   onWindowMaximizedChange(cb: (maximized: boolean) => void): () => void
   onTasksChanged(cb: () => void): () => void
+  onNavigate(cb: (path: string) => void): () => void
 }
 
 declare global {
