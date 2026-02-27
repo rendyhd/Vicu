@@ -115,6 +115,11 @@ export function SetupView({ onComplete }: SetupViewProps) {
 
   const DEFAULT_URL = 'https://app.vikunja.cloud'
 
+  const autoSelectInbox = (projectList: Project[]) => {
+    const inbox = projectList.find((p) => p.title.toLowerCase() === 'inbox')
+    if (inbox) setInboxProjectId(inbox.id)
+  }
+
   const handleUrlContinue = async () => {
     const effectiveUrl = url.trim() || DEFAULT_URL
     if (!url.trim()) setUrl(effectiveUrl)
@@ -153,6 +158,7 @@ export function SetupView({ onComplete }: SetupViewProps) {
         const projectsResult = await api.fetchProjects()
         if (projectsResult.success) {
           setProjects(projectsResult.data)
+          autoSelectInbox(projectsResult.data)
           setStep('project')
         } else {
           setOidcError(projectsResult.error)
@@ -193,6 +199,7 @@ export function SetupView({ onComplete }: SetupViewProps) {
         const projectsResult = await api.fetchProjects()
         if (projectsResult.success) {
           setProjects(projectsResult.data)
+          autoSelectInbox(projectsResult.data)
           setStep('project')
         } else {
           setPasswordError(projectsResult.error)
@@ -216,6 +223,7 @@ export function SetupView({ onComplete }: SetupViewProps) {
     if (result.success) {
       setTestStatus('success')
       setProjects(result.data)
+      autoSelectInbox(result.data)
       setAuthMethod('api_token')
       setStep('project')
     } else {
