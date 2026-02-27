@@ -1,7 +1,8 @@
 import { BrowserWindow, net } from 'electron'
 import { randomUUID } from 'crypto'
 import { discoverProviders, type OIDCProvider } from './oidc-discovery'
-import { storeJWT, storeAPIToken, storeProviderKey } from './token-store'
+import { storeJWT, storeAPIToken, storeProviderKey, storeRefreshToken } from './token-store'
+import { extractRefreshToken } from './cookie-utils'
 
 const TOKEN_EXCHANGE_TIMEOUT = 15_000
 const LOGIN_TIMEOUT = 5 * 60 * 1000 // 5 minutes
@@ -47,6 +48,9 @@ export async function loginWithOIDC(
   const state = randomUUID()
 
   // 4. Build authorization URL
+  // NOTE: No PKCE (code_challenge) — Vikunja's backend handles the token
+  // exchange with the IdP using its own client secret, so it won't forward
+  // our code_verifier. Sending PKCE here causes "invalid_grant" errors.
   const authUrl =
     `${provider.auth_url}?client_id=${provider.client_id}` +
     `&redirect_uri=${encodeURIComponent(redirectUri)}` +
@@ -64,6 +68,7 @@ export async function loginWithOIDC(
       partition: 'persist:oidc-auth',
       nodeIntegration: false,
       contextIsolation: true,
+      sandbox: true,
     },
   })
 
@@ -154,8 +159,12 @@ export async function loginWithOIDC(
       throw new Error('Token exchange response missing "token" field')
     }
 
-    // 11. Store JWT and provider key
+    // 11. Store JWT, refresh token, and provider key
     storeJWT(jwt)
+    const refreshToken = extractRefreshToken(tokenResponse)
+    if (refreshToken) {
+      storeRefreshToken(refreshToken)
+    }
     storeProviderKey(provider.key)
     succeeded = true
 

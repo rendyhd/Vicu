@@ -1,6 +1,7 @@
 import { net } from 'electron'
 import { loadConfig } from './config'
 import { authManager } from './auth/auth-manager'
+import { getAPIToken } from './auth/token-store'
 
 const REQUEST_TIMEOUT = 10_000
 const UPLOAD_TIMEOUT = 60_000
@@ -13,6 +14,8 @@ interface ApiSuccess<T> {
 interface ApiError {
   success: false
   error: string
+  statusCode?: number
+  errorCode?: number
 }
 
 type ApiResult<T> = ApiSuccess<T> | ApiError
@@ -121,7 +124,17 @@ function request<T>(
               resolve({ success: true, data: null as T })
             }
           } else {
-            resolve({ success: false, error: describeHttpError(statusCode, responseBody) })
+            let errorCode: number | undefined
+            try {
+              const parsed = JSON.parse(responseBody)
+              if (typeof parsed.code === 'number') errorCode = parsed.code
+            } catch { /* ignore */ }
+            resolve({
+              success: false,
+              error: describeHttpError(statusCode, responseBody),
+              statusCode,
+              errorCode,
+            })
           }
         })
       })
@@ -143,6 +156,77 @@ function request<T>(
   })
 }
 
+/**
+ * Check if a failed result is a 401 with Vikunja error code 11 (expired token).
+ */
+function isExpiredTokenError(result: ApiError): boolean {
+  return result.statusCode === 401 && result.errorCode === 11
+}
+
+/**
+ * Wrapper that retries a request once on expired-token 401.
+ * Refreshes the token via authManager.getToken() and retries with the new token.
+ */
+async function requestWithRetry<T>(
+  method: string,
+  url: string,
+  token: string,
+  body?: unknown
+): Promise<ApiResult<T>> {
+  const result = await request<T>(method, url, token, body)
+
+  if (!result.success && isExpiredTokenError(result)) {
+    try {
+      const newToken = await authManager.getToken()
+      return await request<T>(method, url, newToken, body)
+    } catch {
+      return result
+    }
+  }
+
+  return result
+}
+
+async function requestMultipartWithRetry<T>(
+  method: string,
+  url: string,
+  token: string,
+  fileBuffer: Buffer,
+  fileName: string,
+  mimeType: string
+): Promise<ApiResult<T>> {
+  const result = await requestMultipart<T>(method, url, token, fileBuffer, fileName, mimeType)
+
+  if (!result.success && isExpiredTokenError(result)) {
+    try {
+      const newToken = await authManager.getToken()
+      return await requestMultipart<T>(method, url, newToken, fileBuffer, fileName, mimeType)
+    } catch {
+      return result
+    }
+  }
+
+  return result
+}
+
+async function requestBinaryWithRetry(
+  url: string,
+  token: string
+): Promise<ApiResult<Buffer>> {
+  const result = await requestBinary(url, token)
+
+  if (!result.success && isExpiredTokenError(result)) {
+    try {
+      const newToken = await authManager.getToken()
+      return await requestBinary(url, newToken)
+    } catch {
+      return result
+    }
+  }
+
+  return result
+}
+
 function getConfigOrFail(): { url: string; token: string } | ApiError {
   const config = loadConfig()
   if (!config || !config.vikunja_url) {
@@ -157,11 +241,12 @@ function getConfigOrFail(): { url: string; token: string } | ApiError {
     return { url: config.vikunja_url, token }
   }
 
-  // API token path
-  if (!config.api_token) {
+  // API token path — prefer encrypted store, fall back to config (pre-migration)
+  const token = getAPIToken() || config.api_token
+  if (!token) {
     return { success: false, error: 'Vikunja is not configured. Open Settings to connect.' }
   }
-  return { url: config.vikunja_url, token: config.api_token }
+  return { url: config.vikunja_url, token }
 }
 
 // --- Tasks ---
@@ -185,7 +270,7 @@ export function fetchTasks(params: Record<string, unknown>): Promise<ApiResult<u
     ? `${c.url}/api/v1/tasks?${queryString}`
     : `${c.url}/api/v1/tasks`
 
-  return request<unknown[]>('GET', fullUrl, c.token)
+  return requestWithRetry<unknown[]>('GET', fullUrl, c.token)
 }
 
 export function createTask(
@@ -195,7 +280,7 @@ export function createTask(
   const c = getConfigOrFail()
   if ('success' in c) return Promise.resolve(c)
 
-  return request<unknown>('PUT', `${c.url}/api/v1/projects/${projectId}/tasks`, c.token, task)
+  return requestWithRetry<unknown>('PUT', `${c.url}/api/v1/projects/${projectId}/tasks`, c.token, task)
 }
 
 // CRITICAL: Go zero-value problem — always send the complete task object on update.
@@ -207,14 +292,14 @@ export function updateTask(
   const c = getConfigOrFail()
   if ('success' in c) return Promise.resolve(c)
 
-  return request<unknown>('POST', `${c.url}/api/v1/tasks/${id}`, c.token, task)
+  return requestWithRetry<unknown>('POST', `${c.url}/api/v1/tasks/${id}`, c.token, task)
 }
 
 export function deleteTask(id: number): Promise<ApiResult<void>> {
   const c = getConfigOrFail()
   if ('success' in c) return Promise.resolve(c)
 
-  return request<void>('DELETE', `${c.url}/api/v1/tasks/${id}`, c.token)
+  return requestWithRetry<void>('DELETE', `${c.url}/api/v1/tasks/${id}`, c.token)
 }
 
 // --- Projects ---
@@ -223,14 +308,14 @@ export function fetchProjects(): Promise<ApiResult<unknown[]>> {
   const c = getConfigOrFail()
   if ('success' in c) return Promise.resolve(c)
 
-  return request<unknown[]>('GET', `${c.url}/api/v1/projects`, c.token)
+  return requestWithRetry<unknown[]>('GET', `${c.url}/api/v1/projects`, c.token)
 }
 
 export function createProject(project: Record<string, unknown>): Promise<ApiResult<unknown>> {
   const c = getConfigOrFail()
   if ('success' in c) return Promise.resolve(c)
 
-  return request<unknown>('PUT', `${c.url}/api/v1/projects`, c.token, project)
+  return requestWithRetry<unknown>('PUT', `${c.url}/api/v1/projects`, c.token, project)
 }
 
 export function updateProject(
@@ -240,14 +325,14 @@ export function updateProject(
   const c = getConfigOrFail()
   if ('success' in c) return Promise.resolve(c)
 
-  return request<unknown>('POST', `${c.url}/api/v1/projects/${id}`, c.token, project)
+  return requestWithRetry<unknown>('POST', `${c.url}/api/v1/projects/${id}`, c.token, project)
 }
 
 export function deleteProject(id: number): Promise<ApiResult<void>> {
   const c = getConfigOrFail()
   if ('success' in c) return Promise.resolve(c)
 
-  return request<void>('DELETE', `${c.url}/api/v1/projects/${id}`, c.token)
+  return requestWithRetry<void>('DELETE', `${c.url}/api/v1/projects/${id}`, c.token)
 }
 
 // --- Labels ---
@@ -256,14 +341,14 @@ export function fetchLabels(): Promise<ApiResult<unknown[]>> {
   const c = getConfigOrFail()
   if ('success' in c) return Promise.resolve(c)
 
-  return request<unknown[]>('GET', `${c.url}/api/v1/labels`, c.token)
+  return requestWithRetry<unknown[]>('GET', `${c.url}/api/v1/labels`, c.token)
 }
 
 export function addLabelToTask(taskId: number, labelId: number): Promise<ApiResult<void>> {
   const c = getConfigOrFail()
   if ('success' in c) return Promise.resolve(c)
 
-  return request<void>(
+  return requestWithRetry<void>(
     'PUT',
     `${c.url}/api/v1/tasks/${taskId}/labels`,
     c.token,
@@ -275,14 +360,14 @@ export function removeLabelFromTask(taskId: number, labelId: number): Promise<Ap
   const c = getConfigOrFail()
   if ('success' in c) return Promise.resolve(c)
 
-  return request<void>('DELETE', `${c.url}/api/v1/tasks/${taskId}/labels/${labelId}`, c.token)
+  return requestWithRetry<void>('DELETE', `${c.url}/api/v1/tasks/${taskId}/labels/${labelId}`, c.token)
 }
 
 export function createLabel(label: Record<string, unknown>): Promise<ApiResult<unknown>> {
   const c = getConfigOrFail()
   if ('success' in c) return Promise.resolve(c)
 
-  return request<unknown>('PUT', `${c.url}/api/v1/labels`, c.token, label)
+  return requestWithRetry<unknown>('PUT', `${c.url}/api/v1/labels`, c.token, label)
 }
 
 export function updateLabel(
@@ -292,14 +377,14 @@ export function updateLabel(
   const c = getConfigOrFail()
   if ('success' in c) return Promise.resolve(c)
 
-  return request<unknown>('PUT', `${c.url}/api/v1/labels/${id}`, c.token, label)
+  return requestWithRetry<unknown>('PUT', `${c.url}/api/v1/labels/${id}`, c.token, label)
 }
 
 export function deleteLabel(id: number): Promise<ApiResult<void>> {
   const c = getConfigOrFail()
   if ('success' in c) return Promise.resolve(c)
 
-  return request<void>('DELETE', `${c.url}/api/v1/labels/${id}`, c.token)
+  return requestWithRetry<void>('DELETE', `${c.url}/api/v1/labels/${id}`, c.token)
 }
 
 // --- Single Task ---
@@ -308,7 +393,7 @@ export function fetchTaskById(id: number): Promise<ApiResult<unknown>> {
   const c = getConfigOrFail()
   if ('success' in c) return Promise.resolve(c)
 
-  return request<unknown>('GET', `${c.url}/api/v1/tasks/${id}`, c.token)
+  return requestWithRetry<unknown>('GET', `${c.url}/api/v1/tasks/${id}`, c.token)
 }
 
 // --- Task Relations ---
@@ -321,7 +406,7 @@ export function createTaskRelation(
   const c = getConfigOrFail()
   if ('success' in c) return Promise.resolve(c)
 
-  return request<unknown>('PUT', `${c.url}/api/v1/tasks/${taskId}/relations`, c.token, {
+  return requestWithRetry<unknown>('PUT', `${c.url}/api/v1/tasks/${taskId}/relations`, c.token, {
     other_task_id: otherTaskId,
     relation_kind: relationKind,
   })
@@ -335,7 +420,7 @@ export function deleteTaskRelation(
   const c = getConfigOrFail()
   if ('success' in c) return Promise.resolve(c)
 
-  return request<void>(
+  return requestWithRetry<void>(
     'DELETE',
     `${c.url}/api/v1/tasks/${taskId}/relations/${relationKind}/${otherTaskId}`,
     c.token
@@ -348,7 +433,7 @@ export function fetchProjectViews(projectId: number): Promise<ApiResult<unknown[
   const c = getConfigOrFail()
   if ('success' in c) return Promise.resolve(c)
 
-  return request<unknown[]>('GET', `${c.url}/api/v1/projects/${projectId}/views`, c.token)
+  return requestWithRetry<unknown[]>('GET', `${c.url}/api/v1/projects/${projectId}/views`, c.token)
 }
 
 export function fetchViewTasks(
@@ -373,7 +458,7 @@ export function fetchViewTasks(
     ? `${c.url}/api/v1/projects/${projectId}/views/${viewId}/tasks?${queryString}`
     : `${c.url}/api/v1/projects/${projectId}/views/${viewId}/tasks`
 
-  return request<unknown[]>('GET', fullUrl, c.token)
+  return requestWithRetry<unknown[]>('GET', fullUrl, c.token)
 }
 
 export function updateTaskPosition(
@@ -384,7 +469,7 @@ export function updateTaskPosition(
   const c = getConfigOrFail()
   if ('success' in c) return Promise.resolve(c)
 
-  return request<unknown>('POST', `${c.url}/api/v1/tasks/${taskId}/position`, c.token, {
+  return requestWithRetry<unknown>('POST', `${c.url}/api/v1/tasks/${taskId}/position`, c.token, {
     task_id: taskId,
     project_view_id: viewId,
     position,
@@ -457,7 +542,17 @@ function requestMultipart<T>(
             }
           } else {
             console.error(`[upload] HTTP ${statusCode} for ${method} ${url}:`, responseBody)
-            resolve({ success: false, error: describeHttpError(statusCode, responseBody) })
+            let errorCode: number | undefined
+            try {
+              const parsed = JSON.parse(responseBody)
+              if (typeof parsed.code === 'number') errorCode = parsed.code
+            } catch { /* ignore */ }
+            resolve({
+              success: false,
+              error: describeHttpError(statusCode, responseBody),
+              statusCode,
+              errorCode,
+            })
           }
         })
       })
@@ -512,7 +607,17 @@ function requestBinary(
             resolve({ success: true, data: Buffer.concat(chunks) })
           } else {
             const body = Buffer.concat(chunks).toString()
-            resolve({ success: false, error: describeHttpError(statusCode, body) })
+            let errorCode: number | undefined
+            try {
+              const parsed = JSON.parse(body)
+              if (typeof parsed.code === 'number') errorCode = parsed.code
+            } catch { /* ignore */ }
+            resolve({
+              success: false,
+              error: describeHttpError(statusCode, body),
+              statusCode,
+              errorCode,
+            })
           }
         })
       })
@@ -535,7 +640,7 @@ export function fetchTaskAttachments(taskId: number): Promise<ApiResult<unknown[
   const c = getConfigOrFail()
   if ('success' in c) return Promise.resolve(c)
 
-  return request<unknown[]>('GET', `${c.url}/api/v1/tasks/${taskId}/attachments`, c.token)
+  return requestWithRetry<unknown[]>('GET', `${c.url}/api/v1/tasks/${taskId}/attachments`, c.token)
 }
 
 export function uploadTaskAttachment(
@@ -547,7 +652,7 @@ export function uploadTaskAttachment(
   const c = getConfigOrFail()
   if ('success' in c) return Promise.resolve(c)
 
-  return requestMultipart<unknown>(
+  return requestMultipartWithRetry<unknown>(
     'PUT',
     `${c.url}/api/v1/tasks/${taskId}/attachments`,
     c.token,
@@ -564,7 +669,7 @@ export function deleteTaskAttachment(
   const c = getConfigOrFail()
   if ('success' in c) return Promise.resolve(c)
 
-  return request<void>(
+  return requestWithRetry<void>(
     'DELETE',
     `${c.url}/api/v1/tasks/${taskId}/attachments/${attachmentId}`,
     c.token
@@ -578,7 +683,7 @@ export function downloadTaskAttachment(
   const c = getConfigOrFail()
   if ('success' in c) return Promise.resolve(c)
 
-  return requestBinary(
+  return requestBinaryWithRetry(
     `${c.url}/api/v1/tasks/${taskId}/attachments/${attachmentId}`,
     c.token
   )

@@ -324,12 +324,8 @@ export function AppShell() {
       themeRef.current = t
       applyTheme(t)
 
-      if (config.auth_method === 'oidc') {
-        const isAuthed = await api.checkAuth()
-        setAppState(isAuthed ? 'ready' : 'setup')
-      } else {
-        setAppState(config.api_token ? 'ready' : 'setup')
-      }
+      const isAuthed = await api.checkAuth()
+      setAppState(isAuthed ? 'ready' : 'setup')
     })
   }, [])
 

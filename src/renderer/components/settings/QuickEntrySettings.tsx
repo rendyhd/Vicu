@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { cn } from '@/lib/cn'
 import { HotkeyRecorder } from './HotkeyRecorder'
 import type { AppConfig, Project, SecondaryProject, ViewerFilter } from '@/lib/vikunja-types'
@@ -12,11 +11,8 @@ interface QuickEntrySettingsProps {
 
 
 export function QuickEntrySettings({ config, projects, onChange, hotkeyWarnings }: QuickEntrySettingsProps) {
-  const [expanded, setExpanded] = useState(
-    (config.quick_entry_enabled ?? false) || (config.quick_view_enabled !== false)
-  )
   const entryEnabled = config.quick_entry_enabled ?? false
-  const viewEnabled = config.quick_view_enabled !== false
+  const viewEnabled = config.quick_view_enabled === true
   const viewerFilter = config.viewer_filter ?? {
     project_ids: [],
     sort_by: 'due_date',
@@ -48,44 +44,36 @@ export function QuickEntrySettings({ config, projects, onChange, hotkeyWarnings 
 
   return (
     <div className="rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] p-5">
-      <button
-        type="button"
-        className="flex w-full items-center justify-between"
-        onClick={() => setExpanded(!expanded)}
-      >
-        <h2 className="text-sm font-semibold text-[var(--text-primary)]">Quick Entry & Quick View</h2>
-        <span className="text-xs text-[var(--text-secondary)]">{expanded ? '\u25B2' : '\u25BC'}</span>
-      </button>
+      <h2 className="text-sm font-semibold text-[var(--text-primary)]">Quick Entry & Quick View</h2>
 
-      {expanded && (
-        <div className="mt-4 space-y-4">
-          {/* Enable toggles */}
-          <div className="space-y-2">
-            <label className="flex cursor-pointer items-center gap-2">
-              <input
-                type="checkbox"
-                checked={entryEnabled}
-                onChange={(e) => onChange({ quick_entry_enabled: e.target.checked })}
-                className="h-4 w-4 rounded border-[var(--border-color)] accent-accent-blue"
-              />
-              <span className="text-sm text-[var(--text-primary)]">
-                Enable Quick Entry
-              </span>
-            </label>
-            <label className="flex cursor-pointer items-center gap-2">
-              <input
-                type="checkbox"
-                checked={viewEnabled}
-                onChange={(e) => onChange({ quick_view_enabled: e.target.checked })}
-                className="h-4 w-4 rounded border-[var(--border-color)] accent-accent-blue"
-              />
-              <span className="text-sm text-[var(--text-primary)]">
-                Enable Quick View
-              </span>
-            </label>
-          </div>
+      <div className="mt-4 space-y-4">
+        {/* Enable toggles */}
+        <div className="space-y-2">
+          <label className="flex cursor-pointer items-center gap-2">
+            <input
+              type="checkbox"
+              checked={entryEnabled}
+              onChange={(e) => onChange({ quick_entry_enabled: e.target.checked })}
+              className="h-4 w-4 rounded border-[var(--border-color)] accent-accent-blue"
+            />
+            <span className="text-sm text-[var(--text-primary)]">
+              Enable Quick Entry
+            </span>
+          </label>
+          <label className="flex cursor-pointer items-center gap-2">
+            <input
+              type="checkbox"
+              checked={viewEnabled}
+              onChange={(e) => onChange({ quick_view_enabled: e.target.checked })}
+              className="h-4 w-4 rounded border-[var(--border-color)] accent-accent-blue"
+            />
+            <span className="text-sm text-[var(--text-primary)]">
+              Enable Quick View
+            </span>
+          </label>
+        </div>
 
-          {entryEnabled && (
+        {entryEnabled && (
             <>
               {/* Quick Entry section */}
               <div className="space-y-3 border-t border-[var(--border-color)] pt-4">
@@ -283,7 +271,6 @@ export function QuickEntrySettings({ config, projects, onChange, hotkeyWarnings 
           )}
 
         </div>
-      )}
     </div>
   )
 }

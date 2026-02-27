@@ -1,5 +1,6 @@
 import { net } from 'electron'
-import { storeJWT, storeAPIToken } from './token-store'
+import { storeJWT, storeAPIToken, storeRefreshToken } from './token-store'
+import { extractRefreshToken } from './cookie-utils'
 
 const LOGIN_TIMEOUT = 15_000
 
@@ -79,6 +80,12 @@ export async function loginWithPassword(
 
     // Store JWT
     storeJWT(jwt)
+
+    // Capture refresh token from Set-Cookie (Vikunja 2.0+; harmlessly null on pre-2.0)
+    const refreshToken = extractRefreshToken(response)
+    if (refreshToken) {
+      storeRefreshToken(refreshToken)
+    }
 
     // Fire-and-forget: create backup API token
     createBackupAPIToken(baseUrl, jwt).catch(() => {})

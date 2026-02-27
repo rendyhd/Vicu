@@ -1,4 +1,11 @@
 import { app, safeStorage } from 'electron'
+
+/** Expiry far in the future for user-provided API tokens with no inherent expiry */
+export const API_TOKEN_NO_EXPIRY = 4102444800 // 2100-01-01T00:00:00Z
+
+export function isEncryptionAvailable(): boolean {
+  return safeStorage.isEncryptionAvailable()
+}
 import { readFileSync, writeFileSync, existsSync, unlinkSync, mkdirSync } from 'fs'
 import { join, dirname } from 'path'
 
@@ -8,6 +15,7 @@ interface AuthStore {
   api_token?: string
   api_token_exp?: number
   provider_key?: string
+  refresh_token?: string
 }
 
 const AUTH_FILENAME = 'auth.json'
@@ -112,6 +120,18 @@ export function storeProviderKey(key: string): void {
 export function getProviderKey(): string | null {
   const store = readStore()
   return store.provider_key ?? null
+}
+
+export function storeRefreshToken(token: string): void {
+  const store = readStore()
+  store.refresh_token = encrypt(token)
+  writeStore(store)
+}
+
+export function getRefreshToken(): string | null {
+  const store = readStore()
+  if (!store.refresh_token) return null
+  return decrypt(store.refresh_token)
 }
 
 export function getBestToken(): string | null {

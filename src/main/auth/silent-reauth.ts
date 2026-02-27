@@ -1,7 +1,8 @@
 import { BrowserWindow, net } from 'electron'
 import { randomUUID } from 'crypto'
 import { discoverProviders } from './oidc-discovery'
-import { getProviderKey, storeJWT } from './token-store'
+import { getProviderKey, storeJWT, storeRefreshToken } from './token-store'
+import { extractRefreshToken } from './cookie-utils'
 
 const SILENT_AUTH_TIMEOUT = 15_000
 const TOKEN_EXCHANGE_TIMEOUT = 15_000
@@ -46,7 +47,7 @@ export async function silentReauth(vikunjaUrl: string): Promise<string> {
   // 4. Generate state
   const state = randomUUID()
 
-  // 5. Build auth URL with prompt=none
+  // 5. Build auth URL with prompt=none (no PKCE — same reason as interactive login)
   const authUrl =
     `${provider.auth_url}?client_id=${provider.client_id}` +
     `&redirect_uri=${encodeURIComponent(redirectUri)}` +
@@ -65,6 +66,7 @@ export async function silentReauth(vikunjaUrl: string): Promise<string> {
       partition: 'persist:oidc-auth',
       nodeIntegration: false,
       contextIsolation: true,
+      sandbox: true,
     },
   })
 
@@ -144,8 +146,12 @@ export async function silentReauth(vikunjaUrl: string): Promise<string> {
       throw new Error('Token exchange response missing "token" field')
     }
 
-    // 12. Store the new JWT
+    // 12. Store the new JWT and refresh token
     storeJWT(jwt)
+    const refreshToken = extractRefreshToken(tokenResponse)
+    if (refreshToken) {
+      storeRefreshToken(refreshToken)
+    }
 
     return jwt
   } finally {

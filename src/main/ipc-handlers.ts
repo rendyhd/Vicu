@@ -42,6 +42,7 @@ import {
   getQuickViewWindow,
   applyQuickEntrySettings,
 } from './quick-entry-state'
+import { getAPIToken, storeAPIToken, isEncryptionAvailable, API_TOKEN_NO_EXPIRY } from './auth/token-store'
 import { sendTestNotification, rescheduleNotifications, refreshTaskReminders } from './notifications'
 import { getActiveNote, testObsidianConnection } from './obsidian-client'
 import { isRegistered, registerHosts } from './browser-host-registration'
@@ -163,6 +164,11 @@ export function registerIpcHandlers(): void {
   })
 
   ipcMain.handle('save-config', (_event, config: AppConfig) => {
+    // Encrypt API token into token-store if available
+    if (config.auth_method === 'api_token' && config.api_token && isEncryptionAvailable()) {
+      storeAPIToken(config.api_token, API_TOKEN_NO_EXPIRY)
+      config.api_token = ''
+    }
     saveConfig(config)
     // Sync native theme when config changes
     if (config.theme) {
@@ -200,17 +206,23 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('auth:get-user', async () => {
     const config = loadConfig()
     if (!config?.vikunja_url) return null
-    const token = config.auth_method === 'api_token' ? config.api_token : authManager.getTokenSync()
+    const token = config.auth_method === 'api_token'
+      ? (getAPIToken() || config.api_token)
+      : authManager.getTokenSync()
     if (!token) return null
     return fetchCurrentUser(config.vikunja_url, token)
   })
 
   ipcMain.handle('auth:check', () => {
+    const config = loadConfig()
+    if (config?.auth_method === 'api_token') {
+      return !!(getAPIToken() || config.api_token)
+    }
     return authManager.getTokenSync() !== null
   })
 
-  ipcMain.handle('auth:logout', () => {
-    authManager.logout()
+  ipcMain.handle('auth:logout', async () => {
+    await authManager.logout()
   })
 
   // --- Quick Entry IPC ---
@@ -533,7 +545,13 @@ export function registerIpcHandlers(): void {
     try {
       const tempDir = path.join(app.getPath('temp'), 'vicu-attachments')
       if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true })
-      const filePath = path.join(tempDir, `${attachmentId}-${fileName}`)
+      const safeName = path.basename(fileName)
+      const filePath = path.join(tempDir, `${attachmentId}-${safeName}`)
+      // Defense-in-depth: verify resolved path is inside tempDir
+      const resolved = path.resolve(filePath)
+      if (!resolved.startsWith(path.resolve(tempDir) + path.sep)) {
+        return { success: false, error: 'Invalid attachment filename' }
+      }
       fs.writeFileSync(filePath, result.data)
       await shell.openPath(filePath)
       return { success: true, data: undefined }

@@ -170,7 +170,8 @@ export function isAuthError(error: string): boolean {
   return (
     error.includes('API token is invalid') ||
     error.includes('API token has insufficient') ||
-    error.includes('API token lacks')
+    error.includes('API token lacks') ||
+    error.includes('Session expired')
   )
 }
 

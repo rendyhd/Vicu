@@ -108,8 +108,8 @@ function fireTaskReminder(taskId: number, title: string, configSnapshot: AppConf
   const notification = new Notification({
     title: `Reminder: ${title}`,
     body: 'Task reminder',
-    silent: !config.notifications_sound,
-    timeoutType: config.notifications_persistent ? 'never' : 'default',
+    silent: !(config.notifications_task_reminder_sound ?? config.notifications_sound),
+    timeoutType: (config.notifications_task_reminder_persistent ?? config.notifications_persistent) ? 'never' : 'default',
     icon: getIcon(),
   })
 

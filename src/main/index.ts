@@ -14,6 +14,7 @@ import { isRegistered, unregisterHosts, registerHosts } from './browser-host-reg
 import { checkForUpdates } from './update-checker'
 import { isMac, isWindows } from './platform'
 import { setupApplicationMenu } from './app-menu'
+import { storeAPIToken, getAPIToken, isEncryptionAvailable, API_TOKEN_NO_EXPIRY } from './auth/token-store'
 
 let mainWindow: BrowserWindow | null = null
 let quickEntryWindow: BrowserWindow | null = null
@@ -463,6 +464,19 @@ if (!gotLock) {
     setupApplicationMenu(() => mainWindow)
     registerIpcHandlers()
     await authManager.initialize()
+
+    // One-time migration: move plaintext API token to encrypted store
+    const preConfig = loadConfig()
+    if (
+      preConfig?.auth_method === 'api_token' &&
+      preConfig.api_token &&
+      isEncryptionAvailable() &&
+      !getAPIToken()
+    ) {
+      storeAPIToken(preConfig.api_token, API_TOKEN_NO_EXPIRY)
+      preConfig.api_token = ''
+      saveConfig(preConfig)
+    }
 
     const config = loadConfig()
     mainWindow = createMainWindow(config)

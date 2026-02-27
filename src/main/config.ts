@@ -74,6 +74,11 @@ export interface AppConfig {
   notifications_due_today_enabled?: boolean
   notifications_upcoming_enabled?: boolean
   notifications_sound?: boolean
+  // Task reminder settings
+  notifications_task_reminder_sound?: boolean
+  notifications_task_reminder_persistent?: boolean
+  notifications_default_reminder_offset?: number  // seconds, 0 = disabled
+  notifications_default_reminder_relative_to?: 'due_date' | 'start_date' | 'end_date'
   // Update checker
   update_check_dismissed_version?: string
   // Migration flags
@@ -153,7 +158,7 @@ function normalizeConfig(raw: Record<string, unknown>): AppConfig {
     custom_lists: Array.isArray(raw.custom_lists) ? raw.custom_lists as AppConfig['custom_lists'] : undefined,
     // Quick Entry / Quick View
     quick_entry_enabled: raw.quick_entry_enabled === true,
-    quick_view_enabled: raw.quick_view_enabled !== false,
+    quick_view_enabled: raw.quick_view_enabled === true,
     quick_entry_hotkey: typeof raw.quick_entry_hotkey === 'string' ? raw.quick_entry_hotkey : DEFAULT_QUICK_ENTRY_HOTKEY,
     quick_view_hotkey: typeof raw.quick_view_hotkey === 'string' ? raw.quick_view_hotkey : DEFAULT_QUICK_VIEW_HOTKEY,
     quick_entry_default_project_id: typeof raw.quick_entry_default_project_id === 'number'
@@ -195,6 +200,14 @@ function normalizeConfig(raw: Record<string, unknown>): AppConfig {
     notifications_due_today_enabled: raw.notifications_due_today_enabled !== false,
     notifications_upcoming_enabled: raw.notifications_upcoming_enabled === true,
     notifications_sound: raw.notifications_sound !== false,
+    // Task reminder settings
+    notifications_task_reminder_sound: raw.notifications_task_reminder_sound !== false,
+    notifications_task_reminder_persistent: raw.notifications_task_reminder_persistent === true,
+    notifications_default_reminder_offset: typeof raw.notifications_default_reminder_offset === 'number'
+      ? raw.notifications_default_reminder_offset : 0,
+    notifications_default_reminder_relative_to: raw.notifications_default_reminder_relative_to === 'start_date'
+      || raw.notifications_default_reminder_relative_to === 'end_date'
+      ? raw.notifications_default_reminder_relative_to : 'due_date',
     // Update checker
     update_check_dismissed_version: typeof raw.update_check_dismissed_version === 'string'
       ? raw.update_check_dismissed_version : undefined,

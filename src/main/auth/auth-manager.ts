@@ -1,4 +1,5 @@
 import { loadConfig } from '../config'
+import { net } from 'electron'
 import {
   getBestToken,
   getJWT,
@@ -12,8 +13,8 @@ import { silentReauth } from './silent-reauth'
 import { loginWithPassword, type PasswordLoginResult } from './password-login'
 import { renewJWT } from './jwt-renewal'
 
-// Re-auth 1 hour before JWT expiry
-const REFRESH_BUFFER_SECONDS = 3600
+// Re-auth 2 minutes before JWT expiry (Vikunja 2.0 uses ~10-min JWTs)
+const REFRESH_BUFFER_SECONDS = 120
 
 type AuthEvent = 'auth-required'
 
@@ -123,10 +124,28 @@ class AuthManager {
 
   /**
    * Clear all stored tokens and stop refresh timer.
+   * Also destroys the server-side session (Vikunja 2.0+; best-effort).
    */
-  logout(): void {
+  async logout(): Promise<void> {
     this._cancelRefreshTimer()
     this._refreshInProgress = null
+
+    // Best-effort server-side logout (Vikunja 2.0+)
+    // On pre-2.0 servers this returns 404 — caught and ignored.
+    try {
+      const config = loadConfig()
+      const jwt = getJWT()
+      if (config?.vikunja_url && jwt) {
+        const baseUrl = config.vikunja_url.replace(/\/+$/, '')
+        await net.fetch(`${baseUrl}/api/v1/user/logout`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${jwt}` },
+        }).catch(() => {})
+      }
+    } catch {
+      // Swallow — local cleanup is what matters
+    }
+
     clear()
   }
 
@@ -177,8 +196,8 @@ class AuthManager {
     // Calculate delay: (exp - buffer) - now
     // We need the raw exp, so use isJWTExpired logic inversely
     // JWT is valid and not within buffer, so we schedule for later
-    // Use a simpler approach: check every 5 minutes
-    const checkInterval = 5 * 60 * 1000
+    // Use a simpler approach: check every 2 minutes
+    const checkInterval = 2 * 60 * 1000
     this._cancelRefreshTimer()
     this._refreshTimer = setTimeout(() => {
       if (isJWTExpired(REFRESH_BUFFER_SECONDS)) {
@@ -195,7 +214,15 @@ class AuthManager {
   }
 
   /**
-   * Perform silent re-auth. Deduplicates concurrent calls.
+   * Perform token refresh. Deduplicates concurrent calls.
+   *
+   * Strategy (unified for all auth methods):
+   * 1. Try refresh token endpoint (Vikunja 2.0+) — works for both password and OIDC.
+   *    On pre-2.0 servers this throws immediately ("No refresh token available")
+   *    without making any HTTP call.
+   * 2. If that fails and auth method is OIDC, fall back to silent reauth
+   *    (BrowserWindow-based prompt=none flow).
+   * 3. If that also fails, throw — caller falls back to API token.
    */
   private _doRefresh(): Promise<string> {
     if (this._refreshInProgress) {
@@ -207,10 +234,24 @@ class AuthManager {
       return Promise.reject(new Error('No Vikunja URL configured'))
     }
 
-    const refreshPromise =
-      config.auth_method === 'password'
-        ? renewJWT(config.vikunja_url)
-        : silentReauth(config.vikunja_url)
+    const vikunjaUrl = config.vikunja_url
+    const authMethod = config.auth_method
+
+    const refreshPromise = (async (): Promise<string> => {
+      // 1. Try refresh token endpoint first (Vikunja 2.0+)
+      try {
+        return await renewJWT(vikunjaUrl)
+      } catch {
+        // Refresh token not available or endpoint failed
+      }
+
+      // 2. OIDC fallback: silent reauth via BrowserWindow
+      if (authMethod === 'oidc') {
+        return await silentReauth(vikunjaUrl)
+      }
+
+      throw new Error('Token refresh failed')
+    })()
 
     this._refreshInProgress = refreshPromise
       .then((jwt) => {

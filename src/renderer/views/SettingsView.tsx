@@ -449,7 +449,7 @@ export function SettingsView() {
         )}
 
         {fullConfig && (
-          <ObsidianSettings
+          <BrowserSettings
             config={fullConfig}
             onChange={handleQuickEntryChange}
             disabled={!fullConfig.quick_entry_enabled}
@@ -457,7 +457,7 @@ export function SettingsView() {
         )}
 
         {fullConfig && (
-          <BrowserSettings
+          <ObsidianSettings
             config={fullConfig}
             onChange={handleQuickEntryChange}
             disabled={!fullConfig.quick_entry_enabled}

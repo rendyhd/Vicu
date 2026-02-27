@@ -195,6 +195,22 @@ export interface AppConfig {
   // Browser
   browser_link_mode?: 'off' | 'ask' | 'always'
   browser_extension_id?: string
+  // Notifications
+  notifications_enabled?: boolean
+  notifications_persistent?: boolean
+  notifications_daily_reminder_enabled?: boolean
+  notifications_daily_reminder_time?: string
+  notifications_secondary_reminder_enabled?: boolean
+  notifications_secondary_reminder_time?: string
+  notifications_overdue_enabled?: boolean
+  notifications_due_today_enabled?: boolean
+  notifications_upcoming_enabled?: boolean
+  notifications_sound?: boolean
+  // Task reminder settings
+  notifications_task_reminder_sound?: boolean
+  notifications_task_reminder_persistent?: boolean
+  notifications_default_reminder_offset?: number
+  notifications_default_reminder_relative_to?: 'due_date' | 'start_date' | 'end_date'
   // NLP task parser
   nlp_enabled?: boolean
   nlp_syntax_mode?: 'todoist' | 'vikunja'
