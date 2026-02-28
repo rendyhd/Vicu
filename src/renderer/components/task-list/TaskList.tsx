@@ -12,6 +12,7 @@ import type { Task, CreateTaskPayload } from '@/lib/vikunja-types'
 import { TaskRow } from './TaskRow'
 import { TaskInputParser } from '@/components/task-input/TaskInputParser'
 import { EmptyState } from '@/components/shared/EmptyState'
+import type { ChipData } from '@/components/task-input/TokenChip'
 
 interface TaskListProps {
   title: string
@@ -25,6 +26,8 @@ interface TaskListProps {
   className?: string
   children?: React.ReactNode
   insertIndex?: number
+  /** When set, new tasks get this due date by default. Shown as a dismissible chip. */
+  defaultDueDate?: Date
 }
 
 export function TaskList({
@@ -39,9 +42,11 @@ export function TaskList({
   className,
   children,
   insertIndex,
+  defaultDueDate,
 }: TaskListProps) {
   const [isAdding, setIsAdding] = useState(false)
   const [showNotes, setShowNotes] = useState(false)
+  const [defaultDateDismissed, setDefaultDateDismissed] = useState(false)
   const [newDescription, setNewDescription] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
   const descriptionRef = useRef<HTMLTextAreaElement>(null)
@@ -65,6 +70,21 @@ export function TaskList({
     toggleExpandedTask,
     collapseAll,
   } = useSelectionStore()
+
+  // Build context chips (e.g. "Today" default on Today view)
+  const hasNlpDate = parser.parseResult?.dueDate != null
+  const contextChips = useMemo<ChipData[]>(() => {
+    if (!defaultDueDate || defaultDateDismissed || hasNlpDate) return []
+    const now = new Date()
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    const target = new Date(defaultDueDate.getFullYear(), defaultDueDate.getMonth(), defaultDueDate.getDate())
+    const diffDays = Math.round((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+    let label: string
+    if (diffDays === 0) label = 'Today'
+    else if (diffDays === 1) label = 'Tomorrow'
+    else label = target.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+    return [{ type: 'date' as const, label, key: 'context-date' }]
+  }, [defaultDueDate, defaultDateDismissed, hasNlpDate])
 
   useEffect(() => {
     if (isAdding && inputRef.current) {
@@ -139,6 +159,13 @@ export function TaskList({
       }
     }
 
+    // Apply context default due date if no date was parsed/set and it wasn't dismissed
+    if (!payload.due_date && defaultDueDate && !defaultDateDismissed) {
+      const d = new Date(defaultDueDate.getTime())
+      d.setHours(23, 59, 59, 0)
+      payload.due_date = d.toISOString()
+    }
+
     const desc = newDescription.trim()
     if (desc) {
       payload.description = desc
@@ -163,6 +190,7 @@ export function TaskList({
           parser.reset()
           setNewDescription('')
           setShowNotes(false)
+          setDefaultDateDismissed(false)
           inputRef.current?.focus()
         },
       }
@@ -412,6 +440,7 @@ export function TaskList({
                   parser.reset()
                   setNewDescription('')
                   setShowNotes(false)
+                  setDefaultDateDismissed(false)
                 }}
                 onTab={() => setShowNotes(true)}
                 parseResult={parser.parseResult}
@@ -429,6 +458,8 @@ export function TaskList({
                 }}
                 showBangTodayHint={!parser.enabled && !!parser.parserConfig.bangToday}
                 className="flex-1"
+                contextChips={contextChips}
+                onDismissContextChip={() => setDefaultDateDismissed(true)}
               />
             </div>
             {showNotes && (

@@ -5,6 +5,7 @@ import { TokenChip, buildChips } from './TokenChip'
 import { AutocompleteDropdown } from './AutocompleteDropdown'
 import type { AutocompleteHandle } from './AutocompleteDropdown'
 import { cn } from '@/lib/cn'
+import type { ChipData } from './TokenChip'
 
 interface AutocompleteItem {
   id: number
@@ -29,6 +30,9 @@ interface TaskInputParserProps {
   onBlur?: (e: React.FocusEvent) => void
   showBangTodayHint?: boolean
   className?: string
+  /** Extra chips injected by the parent (e.g. context-based "Today" default). */
+  contextChips?: ChipData[]
+  onDismissContextChip?: (key: string) => void
 }
 
 export function TaskInputParser({
@@ -49,6 +53,8 @@ export function TaskInputParser({
   onBlur,
   showBangTodayHint,
   className,
+  contextChips,
+  onDismissContextChip,
 }: TaskInputParserProps) {
   const autocompleteRef = useRef<AutocompleteHandle>(null)
   const internalInputRef = useRef<HTMLInputElement>(null)
@@ -203,8 +209,8 @@ export function TaskInputParser({
         </span>
       )}
 
-      {/* Dismissible parse chips */}
-      {chips.length > 0 && (
+      {/* Dismissible parse chips + context chips */}
+      {(chips.length > 0 || (contextChips && contextChips.length > 0)) && (
         <div className="flex flex-wrap gap-1.5 pb-1.5 pt-1">
           {chips.map((chip) => (
             <TokenChip
@@ -212,6 +218,14 @@ export function TaskInputParser({
               type={chip.type}
               label={chip.label}
               onDismiss={() => onSuppressType(chip.type)}
+            />
+          ))}
+          {contextChips?.map((chip) => (
+            <TokenChip
+              key={chip.key}
+              type={chip.type}
+              label={chip.label}
+              onDismiss={onDismissContextChip ? () => onDismissContextChip(chip.key) : undefined}
             />
           ))}
         </div>

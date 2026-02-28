@@ -1,10 +1,11 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useTasks } from '@/hooks/use-tasks'
 import { useProjects } from '@/hooks/use-projects'
 import { useFilters } from '@/hooks/use-filters'
 import { isOverdue, isToday } from '@/lib/date-utils'
 import { TaskList } from '@/components/task-list/TaskList'
 import { TaskRow } from '@/components/task-list/TaskRow'
+import { api } from '@/lib/api'
 import type { Task } from '@/lib/vikunja-types'
 
 function groupByProject(tasks: Task[], projectsFlat?: { id: number; title: string }[]) {
@@ -22,10 +23,21 @@ function groupByProject(tasks: Task[], projectsFlat?: { id: number; title: strin
   return Array.from(byProject.values()).sort((a, b) => a.name.localeCompare(b.name))
 }
 
+const TODAY = new Date()
+
 export function TodayView() {
   const params = useFilters({ view: 'today' })
   const { data: tasks = [], isLoading } = useTasks(params)
   const { data: projects } = useProjects()
+  const [inboxProjectId, setInboxProjectId] = useState<number | undefined>()
+
+  useEffect(() => {
+    api.getConfig().then((config) => {
+      if (config?.inbox_project_id) {
+        setInboxProjectId(config.inbox_project_id)
+      }
+    })
+  }, [])
 
   const { overdueTasks, todayTasks } = useMemo(() => {
     const overdue: typeof tasks = []
@@ -67,7 +79,9 @@ export function TodayView() {
     <TaskList
       title="Today"
       tasks={[]}
-      showNewTask={false}
+      projectId={inboxProjectId}
+      showNewTask={!!inboxProjectId}
+      defaultDueDate={TODAY}
       emptyTitle="All clear for today"
       emptySubtitle="Tasks due today will appear here"
     >
