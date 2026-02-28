@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import { useTasks } from '@/hooks/use-tasks'
 import { useProjects } from '@/hooks/use-projects'
 import { useFilters } from '@/hooks/use-filters'
-import { isNullDate } from '@/lib/date-utils'
+import { isNullDate, isToday, isOverdue } from '@/lib/date-utils'
 import { TaskList } from '@/components/task-list/TaskList'
 import { TaskRow } from '@/components/task-list/TaskRow'
 import type { Task } from '@/lib/vikunja-types'
@@ -58,6 +58,8 @@ export function UpcomingView() {
     const grouped = new Map<string, DateGroup>()
     for (const task of tasks) {
       if (isNullDate(task.due_date)) continue
+      // Client-side filter: exclude today and overdue tasks
+      if (isToday(task.due_date) || isOverdue(task.due_date)) continue
       const key = getDateKey(task.due_date)
       if (!grouped.has(key)) {
         grouped.set(key, {
