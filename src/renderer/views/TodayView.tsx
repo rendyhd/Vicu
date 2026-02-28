@@ -82,11 +82,10 @@ export function TodayView() {
       projectId={inboxProjectId}
       showNewTask={!!inboxProjectId}
       defaultDueDate={TODAY}
+      headerContent={<p className="px-6 pb-3 text-xs text-[var(--text-secondary)]">{dateStr}</p>}
       emptyTitle="All clear for today"
       emptySubtitle="Tasks due today will appear here"
     >
-      <p className="px-6 pb-3 text-xs text-[var(--text-secondary)]">{dateStr}</p>
-
       {overdueTasks.length > 0 && (
         <div>
           <div className="px-6 pb-1 pt-2">

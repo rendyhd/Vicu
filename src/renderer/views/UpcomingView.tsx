@@ -1,10 +1,11 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useTasks } from '@/hooks/use-tasks'
 import { useProjects } from '@/hooks/use-projects'
 import { useFilters } from '@/hooks/use-filters'
 import { isNullDate, isToday, isOverdue } from '@/lib/date-utils'
 import { TaskList } from '@/components/task-list/TaskList'
 import { TaskRow } from '@/components/task-list/TaskRow'
+import { api } from '@/lib/api'
 import type { Task } from '@/lib/vikunja-types'
 
 function formatDateHeader(dateStr: string): string {
@@ -52,7 +53,15 @@ export function UpcomingView() {
   const params = useFilters({ view: 'upcoming' })
   const { data: tasks = [], isLoading } = useTasks(params)
   const { data: projects } = useProjects()
+  const [inboxProjectId, setInboxProjectId] = useState<number | undefined>()
 
+  useEffect(() => {
+    api.getConfig().then((config) => {
+      if (config?.inbox_project_id) {
+        setInboxProjectId(config.inbox_project_id)
+      }
+    })
+  }, [])
 
   const groups = useMemo(() => {
     const grouped = new Map<string, DateGroup>()
@@ -85,7 +94,8 @@ export function UpcomingView() {
     <TaskList
       title="Upcoming"
       tasks={[]}
-      showNewTask={false}
+      projectId={inboxProjectId}
+      showNewTask={!!inboxProjectId}
       emptyTitle="Nothing upcoming"
       emptySubtitle="Tasks with future due dates appear here"
     >

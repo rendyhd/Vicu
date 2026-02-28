@@ -1,15 +1,25 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useTasks } from '@/hooks/use-tasks'
 import { useFilters } from '@/hooks/use-filters'
 import { useProjects } from '@/hooks/use-projects'
 import { TaskList } from '@/components/task-list/TaskList'
 import { TaskRow } from '@/components/task-list/TaskRow'
+import { api } from '@/lib/api'
 import type { Task } from '@/lib/vikunja-types'
 
 export function AnytimeView() {
   const params = useFilters({ view: 'anytime' })
   const { data: tasks = [], isLoading } = useTasks(params)
   const { data: projectData } = useProjects()
+  const [inboxProjectId, setInboxProjectId] = useState<number | undefined>()
+
+  useEffect(() => {
+    api.getConfig().then((config) => {
+      if (config?.inbox_project_id) {
+        setInboxProjectId(config.inbox_project_id)
+      }
+    })
+  }, [])
 
   const groups = useMemo(() => {
     const projectMap = new Map(projectData?.flat.map((p) => [p.id, p]))
@@ -66,7 +76,8 @@ export function AnytimeView() {
     <TaskList
       title="Anytime"
       tasks={[]}
-      showNewTask={false}
+      projectId={inboxProjectId}
+      showNewTask={!!inboxProjectId}
       emptyTitle="Nothing here"
       emptySubtitle="Open tasks from all projects"
     >

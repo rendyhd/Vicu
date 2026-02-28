@@ -28,6 +28,8 @@ interface TaskListProps {
   insertIndex?: number
   /** When set, new tasks get this due date by default. Shown as a dismissible chip. */
   defaultDueDate?: Date
+  /** Content rendered inside the scroll area above the task input (e.g. date subtitle) */
+  headerContent?: React.ReactNode
 }
 
 export function TaskList({
@@ -43,6 +45,7 @@ export function TaskList({
   children,
   insertIndex,
   defaultDueDate,
+  headerContent,
 }: TaskListProps) {
   const [isAdding, setIsAdding] = useState(false)
   const [showNotes, setShowNotes] = useState(false)
@@ -403,6 +406,70 @@ export function TaskList({
     }
   }, [focusedTaskId])
 
+  const taskInputElement = (
+    <div ref={creationRef} className="border-b border-[var(--border-color)]">
+      <div className="flex items-start gap-3 px-4 pt-2.5">
+        <div className="mt-[7px] h-[18px] w-[18px] shrink-0 rounded-full border border-[var(--border-color)]" />
+        <TaskInputParser
+          value={parser.inputValue}
+          onChange={parser.setInputValue}
+          onSubmit={handleSubmit}
+          onCancel={() => {
+            setIsAdding(false)
+            parser.reset()
+            setNewDescription('')
+            setShowNotes(false)
+            setDefaultDateDismissed(false)
+          }}
+          onTab={() => setShowNotes(true)}
+          parseResult={parser.parseResult}
+          parserConfig={parser.parserConfig}
+          onSuppressType={parser.suppressType}
+          prefixes={parser.prefixes}
+          enabled={parser.enabled}
+          projects={projectItems}
+          labels={labelItems}
+          inputRef={inputRef}
+          placeholder="New Task"
+          onBlur={(e) => {
+            if (creationRef.current?.contains(e.relatedTarget as Node)) return
+            handleSubmit()
+          }}
+          showBangTodayHint={!parser.enabled && !!parser.parserConfig.bangToday}
+          className="flex-1"
+          contextChips={contextChips}
+          onDismissContextChip={() => setDefaultDateDismissed(true)}
+        />
+      </div>
+      {showNotes && (
+        <div className="pb-2 pl-[46px] pr-4">
+          <textarea
+            ref={descriptionRef}
+            value={newDescription}
+            onChange={(e) => setNewDescription(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') {
+                e.preventDefault()
+                inputRef.current?.focus()
+              }
+              if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                e.preventDefault()
+                handleSubmit()
+              }
+            }}
+            onBlur={(e) => {
+              if (creationRef.current?.contains(e.relatedTarget as Node)) return
+              handleSubmit()
+            }}
+            placeholder="Notes"
+            rows={3}
+            className="w-full resize-none bg-transparent text-[12px] text-[var(--text-secondary)] placeholder:text-[var(--text-secondary)]/50 focus:outline-none"
+          />
+        </div>
+      )}
+    </div>
+  )
+
   return (
     <div className={cn('flex h-full flex-col', className)} onClick={handleContainerClick}>
       <div
@@ -427,69 +494,9 @@ export function TaskList({
         className="flex-1 overflow-y-auto"
         onClick={handleScrollAreaClick}
       >
-        {isAdding && (
-          <div ref={creationRef} className="border-b border-[var(--border-color)]">
-            <div className="flex items-start gap-3 px-4 pt-2.5">
-              <div className="mt-[7px] h-[18px] w-[18px] shrink-0 rounded-full border border-[var(--border-color)]" />
-              <TaskInputParser
-                value={parser.inputValue}
-                onChange={parser.setInputValue}
-                onSubmit={handleSubmit}
-                onCancel={() => {
-                  setIsAdding(false)
-                  parser.reset()
-                  setNewDescription('')
-                  setShowNotes(false)
-                  setDefaultDateDismissed(false)
-                }}
-                onTab={() => setShowNotes(true)}
-                parseResult={parser.parseResult}
-                parserConfig={parser.parserConfig}
-                onSuppressType={parser.suppressType}
-                prefixes={parser.prefixes}
-                enabled={parser.enabled}
-                projects={projectItems}
-                labels={labelItems}
-                inputRef={inputRef}
-                placeholder="New Task"
-                onBlur={(e) => {
-                  if (creationRef.current?.contains(e.relatedTarget as Node)) return
-                  handleSubmit()
-                }}
-                showBangTodayHint={!parser.enabled && !!parser.parserConfig.bangToday}
-                className="flex-1"
-                contextChips={contextChips}
-                onDismissContextChip={() => setDefaultDateDismissed(true)}
-              />
-            </div>
-            {showNotes && (
-              <div className="pb-2 pl-[46px] pr-4">
-                <textarea
-                  ref={descriptionRef}
-                  value={newDescription}
-                  onChange={(e) => setNewDescription(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Escape') {
-                      e.preventDefault()
-                      inputRef.current?.focus()
-                    }
-                    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-                      e.preventDefault()
-                      handleSubmit()
-                    }
-                  }}
-                  onBlur={(e) => {
-                    if (creationRef.current?.contains(e.relatedTarget as Node)) return
-                    handleSubmit()
-                  }}
-                  placeholder="Notes"
-                  rows={3}
-                  className="w-full resize-none bg-transparent text-[12px] text-[var(--text-secondary)] placeholder:text-[var(--text-secondary)]/50 focus:outline-none"
-                />
-              </div>
-            )}
-          </div>
-        )}
+        {headerContent}
+
+        {isAdding && taskInputElement}
 
         {tasks.length === 0 && !isAdding && !children ? (
           <EmptyState icon={Inbox} title={emptyTitle} subtitle={emptySubtitle} />
