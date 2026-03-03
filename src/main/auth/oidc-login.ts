@@ -51,12 +51,16 @@ export async function loginWithOIDC(
   // NOTE: No PKCE (code_challenge) — Vikunja's backend handles the token
   // exchange with the IdP using its own client secret, so it won't forward
   // our code_verifier. Sending PKCE here causes "invalid_grant" errors.
+  // Add offline_access scope so the IdP issues longer-lived refresh tokens.
+  const scope = provider.scope.includes('offline_access')
+    ? provider.scope
+    : `${provider.scope} offline_access`
   const authUrl =
     `${provider.auth_url}?client_id=${provider.client_id}` +
     `&redirect_uri=${encodeURIComponent(redirectUri)}` +
     `&response_type=code` +
     `&state=${state}` +
-    `&scope=${encodeURIComponent(provider.scope)}`
+    `&scope=${encodeURIComponent(scope)}`
 
   // 5. Create visible BrowserWindow for login
   let win: BrowserWindow | null = new BrowserWindow({
@@ -168,10 +172,12 @@ export async function loginWithOIDC(
     storeProviderKey(provider.key)
     succeeded = true
 
-    // 12. Fire-and-forget: create backup API token
-    createBackupAPIToken(baseUrl, jwt).catch(() => {
-      // Silently ignore — the JWT is already stored and usable
-    })
+    // 12. Create backup API token (awaited, but login succeeds even if this fails)
+    try {
+      await createBackupAPIToken(baseUrl, jwt)
+    } catch (err) {
+      console.warn('[OIDC] Failed to create backup API token:', err)
+    }
 
     // 13. Return JWT
     return jwt
@@ -187,30 +193,42 @@ export async function loginWithOIDC(
   }
 }
 
-async function createBackupAPIToken(
+export async function createBackupAPIToken(
   baseUrl: string,
   jwt: string
 ): Promise<void> {
   const expirationDate = new Date()
   expirationDate.setDate(expirationDate.getDate() + 365)
 
-  const response = await net.fetch(`${baseUrl}/api/v1/tokens`, {
-    method: 'PUT',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${jwt}`,
-    },
-    body: JSON.stringify({
-      title: 'Vicu Desktop',
-      expiration_date: expirationDate.toISOString(),
-    }),
-  })
+  const doCreate = async (): Promise<void> => {
+    const response = await net.fetch(`${baseUrl}/api/v1/tokens`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${jwt}`,
+      },
+      body: JSON.stringify({
+        title: 'Vicu Desktop',
+        expiration_date: expirationDate.toISOString(),
+      }),
+    })
 
-  if (!response.ok) return
+    if (!response.ok) {
+      throw new Error(`API token creation failed (${response.status})`)
+    }
 
-  const data: { token: string } = await response.json()
-  if (data.token) {
-    const expiresAtUnix = Math.floor(expirationDate.getTime() / 1000)
-    storeAPIToken(data.token, expiresAtUnix)
+    const data: { token: string } = await response.json()
+    if (data.token) {
+      const expiresAtUnix = Math.floor(expirationDate.getTime() / 1000)
+      storeAPIToken(data.token, expiresAtUnix)
+    }
+  }
+
+  try {
+    await doCreate()
+  } catch (firstErr) {
+    // Retry once on failure (network errors, transient server errors)
+    console.warn('[Auth] Backup API token creation failed, retrying once:', firstErr)
+    await doCreate()
   }
 }

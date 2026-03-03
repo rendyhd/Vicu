@@ -111,6 +111,16 @@ export function isAPITokenExpired(): boolean {
   return Date.now() / 1000 >= store.api_token_exp
 }
 
+export function hasAPIToken(): boolean {
+  const store = readStore()
+  return !!store.api_token
+}
+
+export function getAPITokenExpiry(): number | null {
+  const store = readStore()
+  return store.api_token_exp ?? null
+}
+
 export function storeProviderKey(key: string): void {
   const store = readStore()
   store.provider_key = key

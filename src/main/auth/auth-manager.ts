@@ -6,9 +6,11 @@ import {
   isJWTExpired,
   getAPIToken,
   isAPITokenExpired,
+  hasAPIToken,
+  getAPITokenExpiry,
   clear,
 } from './token-store'
-import { loginWithOIDC } from './oidc-login'
+import { loginWithOIDC, createBackupAPIToken } from './oidc-login'
 import { silentReauth } from './silent-reauth'
 import { loginWithPassword, type PasswordLoginResult } from './password-login'
 import { renewJWT } from './jwt-renewal'
@@ -150,6 +152,31 @@ class AuthManager {
   }
 
   /**
+   * Called when the system resumes from sleep/hibernate.
+   * Cancels stale timers, checks JWT validity, and triggers refresh if needed.
+   */
+  onSystemResume(): void {
+    this._cancelRefreshTimer()
+
+    if (!isJWTExpired()) {
+      // JWT still valid — just reschedule proactive refresh
+      this._scheduleProactiveRefresh()
+      return
+    }
+
+    // JWT expired during sleep — trigger immediate refresh
+    this._doRefresh()
+      .then(() => {
+        console.log('[Auth] Post-resume refresh succeeded')
+      })
+      .catch((err) => {
+        console.warn('[Auth] Post-resume refresh failed, rescheduling:', err)
+        // Even if refresh fails, API token covers us. Reschedule so we try again later.
+        this._scheduleProactiveRefresh()
+      })
+  }
+
+  /**
    * Subscribe to auth events. Returns unsubscribe function.
    */
   on(listener: (event: AuthEvent) => void): () => void {
@@ -176,8 +203,10 @@ class AuthManager {
   private _scheduleRefresh(delayMs: number): void {
     this._cancelRefreshTimer()
     this._refreshTimer = setTimeout(() => {
-      this._doRefresh().catch(() => {
-        // Silent refresh failed — API token still covers us
+      this._doRefresh().catch((err) => {
+        console.warn('[Auth] Scheduled refresh failed:', err)
+        // Reschedule so we keep trying
+        this._scheduleProactiveRefresh()
       })
     }, delayMs)
   }
@@ -257,6 +286,10 @@ class AuthManager {
       .then((jwt) => {
         this._refreshInProgress = null
         this._scheduleProactiveRefresh()
+        // Ensure backup API token exists after every successful refresh
+        this._ensureBackupAPIToken(jwt).catch((err) => {
+          console.warn('[Auth] Failed to ensure backup API token:', err)
+        })
         return jwt
       })
       .catch((err) => {
@@ -265,6 +298,33 @@ class AuthManager {
       })
 
     return this._refreshInProgress
+  }
+
+  /**
+   * Ensure a backup API token exists and is not expiring soon.
+   * Creates one if missing, renews if within 30 days of expiry.
+   * Runs async — does not block the caller.
+   */
+  private async _ensureBackupAPIToken(jwt: string): Promise<void> {
+    const config = loadConfig()
+    if (!config?.vikunja_url) return
+
+    const THIRTY_DAYS = 30 * 24 * 60 * 60
+
+    if (hasAPIToken()) {
+      const expiry = getAPITokenExpiry()
+      // If expiry is unknown or more than 30 days away, skip
+      if (expiry != null && expiry - Date.now() / 1000 > THIRTY_DAYS) {
+        return
+      }
+      // Within 30 days of expiry (or expiry unknown) — renew
+      console.log('[Auth] Backup API token expiring soon, renewing')
+    } else {
+      console.log('[Auth] No backup API token found, creating one')
+    }
+
+    const baseUrl = config.vikunja_url.replace(/\/+$/, '')
+    await createBackupAPIToken(baseUrl, jwt)
   }
 }
 

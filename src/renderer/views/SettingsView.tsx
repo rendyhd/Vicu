@@ -112,12 +112,20 @@ export function SettingsView() {
 
   const handleLogout = async () => {
     await api.logout()
+    // Preserve app preferences (theme, hotkeys, window bounds, notifications, etc.)
+    // but clear connection and account-specific data (project IDs, custom lists, etc.)
+    const existing = await api.getConfig()
     await api.saveConfig({
+      ...existing,
       vikunja_url: '',
       api_token: '',
-      inbox_project_id: 0,
       auth_method: 'api_token',
-      theme,
+      inbox_project_id: 0,
+      custom_lists: undefined,
+      quick_entry_default_project_id: undefined,
+      secondary_projects: undefined,
+      viewer_filter: undefined,
+      standalone_mode: undefined,
     })
     window.location.reload()
   }

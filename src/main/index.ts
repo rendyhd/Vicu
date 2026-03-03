@@ -524,6 +524,7 @@ if (!gotLock) {
     initNotifications(mainWindow)
     powerMonitor.on('resume', () => {
       rescheduleNotifications()
+      authManager.onSystemResume()
     })
 
     // Auto-register browser native messaging hosts on startup so manifests

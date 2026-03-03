@@ -1,6 +1,7 @@
 import { net } from 'electron'
-import { storeJWT, storeAPIToken, storeRefreshToken } from './token-store'
+import { storeJWT, storeRefreshToken } from './token-store'
 import { extractRefreshToken } from './cookie-utils'
+import { createBackupAPIToken } from './oidc-login'
 
 const LOGIN_TIMEOUT = 15_000
 
@@ -87,8 +88,12 @@ export async function loginWithPassword(
       storeRefreshToken(refreshToken)
     }
 
-    // Fire-and-forget: create backup API token
-    createBackupAPIToken(baseUrl, jwt).catch(() => {})
+    // Create backup API token (awaited, but login succeeds even if this fails)
+    try {
+      await createBackupAPIToken(baseUrl, jwt)
+    } catch (err) {
+      console.warn('[Password] Failed to create backup API token:', err)
+    }
 
     return { success: true, token: jwt }
   } catch (err: unknown) {
@@ -102,30 +107,3 @@ export async function loginWithPassword(
   }
 }
 
-async function createBackupAPIToken(
-  baseUrl: string,
-  jwt: string
-): Promise<void> {
-  const expirationDate = new Date()
-  expirationDate.setDate(expirationDate.getDate() + 365)
-
-  const response = await net.fetch(`${baseUrl}/api/v1/tokens`, {
-    method: 'PUT',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${jwt}`,
-    },
-    body: JSON.stringify({
-      title: 'Vicu Desktop',
-      expiration_date: expirationDate.toISOString(),
-    }),
-  })
-
-  if (!response.ok) return
-
-  const data: { token: string } = await response.json()
-  if (data.token) {
-    const expiresAtUnix = Math.floor(expirationDate.getTime() / 1000)
-    storeAPIToken(data.token, expiresAtUnix)
-  }
-}

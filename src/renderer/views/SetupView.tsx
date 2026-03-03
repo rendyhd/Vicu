@@ -234,12 +234,27 @@ export function SetupView({ onComplete }: SetupViewProps) {
 
   const handleSave = async () => {
     setSaving(true)
+    // Merge connection details into existing config to preserve app preferences.
+    // If the server URL changed, reset account-specific data (project IDs, custom lists, etc.)
+    // since those IDs belong to the previous server/account.
+    const existing = await api.getConfig()
+    const newUrl = url.replace(/\/+$/, '')
+    const sameServer = existing?.vikunja_url === newUrl
     await api.saveConfig({
-      vikunja_url: url.replace(/\/+$/, ''),
+      ...existing,
+      vikunja_url: newUrl,
       api_token: authMethod === 'api_token' ? token : '',
       inbox_project_id: inboxProjectId,
       auth_method: authMethod,
-      theme: 'system',
+      theme: existing?.theme ?? 'system',
+      // Reset account-specific data when switching servers
+      ...(!sameServer && {
+        custom_lists: undefined,
+        quick_entry_default_project_id: undefined,
+        secondary_projects: undefined,
+        viewer_filter: undefined,
+        standalone_mode: undefined,
+      }),
     })
     setSaving(false)
     onComplete()

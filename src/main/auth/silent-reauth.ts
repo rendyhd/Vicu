@@ -48,12 +48,16 @@ export async function silentReauth(vikunjaUrl: string): Promise<string> {
   const state = randomUUID()
 
   // 5. Build auth URL with prompt=none (no PKCE — same reason as interactive login)
+  // Add offline_access scope so the IdP issues longer-lived refresh tokens.
+  const scope = provider.scope.includes('offline_access')
+    ? provider.scope
+    : `${provider.scope} offline_access`
   const authUrl =
     `${provider.auth_url}?client_id=${provider.client_id}` +
     `&redirect_uri=${encodeURIComponent(redirectUri)}` +
     `&response_type=code` +
     `&state=${state}` +
-    `&scope=${encodeURIComponent(provider.scope)}` +
+    `&scope=${encodeURIComponent(scope)}` +
     `&prompt=none`
 
   // 6. Create hidden BrowserWindow with persistent session partition
