@@ -97,6 +97,14 @@ const api = {
   pickAndUploadAttachment: (taskId: number) =>
     ipcRenderer.invoke('pick-and-upload-attachment', taskId),
 
+  // Assignees
+  searchUsers: (query: string) =>
+    ipcRenderer.invoke('search-users', query),
+  addAssigneeToTask: (taskId: number, userId: number) =>
+    ipcRenderer.invoke('add-assignee-to-task', taskId, userId),
+  removeAssigneeFromTask: (taskId: number, userId: number) =>
+    ipcRenderer.invoke('remove-assignee-from-task', taskId, userId),
+
   // Obsidian
   openDeepLink: (url: string) => ipcRenderer.invoke('open-deep-link', url),
   testObsidianConnection: () => ipcRenderer.invoke('test-obsidian-connection'),

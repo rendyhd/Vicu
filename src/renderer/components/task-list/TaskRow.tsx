@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { Calendar, Tag, ListChecks, FolderOpen, Trash2, Bell, Repeat, Paperclip } from 'lucide-react'
+import { Calendar, Tag, ListChecks, FolderOpen, Trash2, Bell, Repeat, Paperclip, UserPlus } from 'lucide-react'
 import { useDraggable } from '@dnd-kit/core'
 import { useSortable, defaultAnimateLayoutChanges } from '@dnd-kit/sortable'
 import type { AnimateLayoutChanges } from '@dnd-kit/sortable'
@@ -18,11 +18,12 @@ import { SubtaskList } from './SubtaskList'
 import { ProjectPickerPopover } from './ProjectPickerPopover'
 import { ReminderPickerPopover } from './ReminderPickerPopover'
 import { AttachmentPickerPopover } from './AttachmentPickerPopover'
+import { AssigneePickerPopover } from './AssigneePickerPopover'
 import { TaskLinkIcon } from '@/components/TaskLinkIcon'
 import { stripNoteLink, stripPageLink, extractNoteLinkHtml, extractPageLinkHtml } from '@/lib/note-link'
 import { formatRecurrenceLabel } from '@/lib/recurrence'
 
-type PopoverType = 'date' | 'label' | 'project' | 'subtasks' | 'reminder' | 'attachment' | null
+type PopoverType = 'date' | 'label' | 'project' | 'subtasks' | 'reminder' | 'attachment' | 'assignee' | null
 
 function getLabelStyle(hex: string | undefined): React.CSSProperties {
   if (!hex) return { backgroundColor: 'var(--bg-hover)', color: 'var(--text-secondary)' }
@@ -315,6 +316,29 @@ export function TaskRow({ task, sortable = false }: TaskRowProps) {
           </div>
         )}
 
+        {(task.assignees?.length ?? 0) > 0 && (
+          <div className="flex shrink-0 items-center gap-1">
+            {task.assignees!.map((u) => {
+              const display = u.name?.trim() || u.username
+              const initials = display
+                .split(' ')
+                .map((w) => w[0])
+                .slice(0, 2)
+                .join('')
+                .toUpperCase()
+              return (
+                <span
+                  key={u.id}
+                  title={display}
+                  className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[var(--accent-blue)]/20 text-[9px] font-semibold text-[var(--accent-blue)]"
+                >
+                  {initials}
+                </span>
+              )
+            })}
+          </div>
+        )}
+
         <span
           className={cn(
             'min-w-0 flex-1 truncate text-[13px] text-[var(--text-primary)]',
@@ -535,6 +559,19 @@ export function TaskRow({ task, sortable = false }: TaskRowProps) {
           </button>
           <button
             type="button"
+            onClick={() => togglePopover('assignee')}
+            className={cn(
+              'flex h-6 w-6 items-center justify-center rounded transition-colors',
+              activePopover === 'assignee' || (task.assignees?.length ?? 0) > 0
+                ? 'bg-[var(--accent-blue)]/10 text-[var(--accent-blue)]'
+                : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]'
+            )}
+            title="Assign members"
+          >
+            <UserPlus className="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
             onClick={() => togglePopover('project')}
             className={cn(
               'flex h-6 w-6 items-center justify-center rounded transition-colors',
@@ -592,6 +629,13 @@ export function TaskRow({ task, sortable = false }: TaskRowProps) {
           {activePopover === 'attachment' && (
             <AttachmentPickerPopover
               taskId={task.id}
+              onClose={() => setActivePopover(null)}
+            />
+          )}
+          {activePopover === 'assignee' && (
+            <AssigneePickerPopover
+              taskId={task.id}
+              currentAssignees={task.assignees ?? []}
               onClose={() => setActivePopover(null)}
             />
           )}

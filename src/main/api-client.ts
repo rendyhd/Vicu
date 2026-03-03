@@ -476,6 +476,50 @@ export function updateTaskPosition(
   })
 }
 
+// --- Current user ---
+
+export function fetchUser(): Promise<ApiResult<unknown>> {
+  const c = getConfigOrFail()
+  if ('success' in c) return Promise.resolve(c)
+
+  return requestWithRetry<unknown>('GET', `${c.url}/api/v1/user`, c.token)
+}
+
+// --- Assignees ---
+
+export function searchUsers(query: string): Promise<ApiResult<unknown[]>> {
+  const c = getConfigOrFail()
+  if ('success' in c) return Promise.resolve(c)
+
+  const qs = new URLSearchParams()
+  if (query) qs.set('s', query)
+  const url = qs.toString() ? `${c.url}/api/v1/users?${qs}` : `${c.url}/api/v1/users`
+  return requestWithRetry<unknown[]>('GET', url, c.token)
+}
+
+export function addAssigneeToTask(taskId: number, userId: number): Promise<ApiResult<unknown>> {
+  const c = getConfigOrFail()
+  if ('success' in c) return Promise.resolve(c)
+
+  return requestWithRetry<unknown>(
+    'PUT',
+    `${c.url}/api/v1/tasks/${taskId}/assignees`,
+    c.token,
+    { user_id: userId }
+  )
+}
+
+export function removeAssigneeFromTask(taskId: number, userId: number): Promise<ApiResult<void>> {
+  const c = getConfigOrFail()
+  if ('success' in c) return Promise.resolve(c)
+
+  return requestWithRetry<void>(
+    'DELETE',
+    `${c.url}/api/v1/tasks/${taskId}/assignees/${userId}`,
+    c.token
+  )
+}
+
 // --- Connection Test (takes explicit url/token, not from config) ---
 
 export function testConnection(

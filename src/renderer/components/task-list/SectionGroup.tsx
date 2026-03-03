@@ -10,6 +10,7 @@ import type { Task, Project, CreateTaskPayload } from '@/lib/vikunja-types'
 import { TaskRow } from './TaskRow'
 import { SectionHeader } from './SectionHeader'
 import { TaskInputParser } from '@/components/task-input/TaskInputParser'
+import { useTaskFilter } from './TaskFilterContext'
 
 interface SectionGroupProps {
   project: Project
@@ -31,6 +32,11 @@ export function SectionGroup({ project, tasks, viewId, siblings, insertIndex }: 
   const projectItems = useMemo(() => (projectData?.flat ?? []).map((p) => ({ id: p.id, title: p.title })), [projectData])
   const labelItems = useMemo(() => (allLabels ?? []).map((l) => ({ id: l.id, title: l.title })), [allLabels])
   const setSectionReorderContext = useReorderStore((s) => s.setSectionReorderContext)
+  const { filterMyTasks, currentUserId } = useTaskFilter()
+  const visibleTasks = useMemo(() => {
+    if (!filterMyTasks || !currentUserId) return tasks
+    return tasks.filter((t) => t.assignees?.some((a) => a.id === currentUserId))
+  }, [tasks, filterMyTasks, currentUserId])
 
   useEffect(() => {
     if (viewId != null) {
@@ -130,10 +136,10 @@ export function SectionGroup({ project, tasks, viewId, siblings, insertIndex }: 
       />
 
       <SortableContext
-        items={tasks.map((t) => `task-${t.id}`)}
+        items={visibleTasks.map((t) => `task-${t.id}`)}
         strategy={verticalListSortingStrategy}
       >
-        {tasks.map((task, i) => (
+        {visibleTasks.map((task, i) => (
           <Fragment key={task.id}>
             {insertIndex === i && (
               <div className="mx-4 flex items-center gap-1 py-0.5">
@@ -144,7 +150,7 @@ export function SectionGroup({ project, tasks, viewId, siblings, insertIndex }: 
             <TaskRow task={task} sortable />
           </Fragment>
         ))}
-        {insertIndex != null && insertIndex >= tasks.length && (
+        {insertIndex != null && insertIndex >= visibleTasks.length && (
           <div className="mx-4 flex items-center gap-1 py-0.5">
             <div className="h-1.5 w-1.5 rounded-full bg-[var(--accent-blue)]" />
             <div className="h-[2px] flex-1 rounded-full bg-[var(--accent-blue)]" />

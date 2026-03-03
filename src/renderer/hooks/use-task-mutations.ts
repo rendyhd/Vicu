@@ -544,6 +544,40 @@ export function useDeleteLabel() {
   })
 }
 
+// --- Assignees ---
+
+export function useAddAssignee() {
+  const qc = useQueryClient()
+
+  return useMutation({
+    mutationFn: async ({ taskId, userId }: { taskId: number; userId: number }) => {
+      const result = await api.addAssigneeToTask(taskId, userId)
+      if (!result.success) throw new Error(result.error)
+    },
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: ['tasks'] })
+      qc.invalidateQueries({ queryKey: ['view-tasks'] })
+      qc.invalidateQueries({ queryKey: ['section-tasks'] })
+    },
+  })
+}
+
+export function useRemoveAssignee() {
+  const qc = useQueryClient()
+
+  return useMutation({
+    mutationFn: async ({ taskId, userId }: { taskId: number; userId: number }) => {
+      const result = await api.removeAssigneeFromTask(taskId, userId)
+      if (!result.success) throw new Error(result.error)
+    },
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: ['tasks'] })
+      qc.invalidateQueries({ queryKey: ['view-tasks'] })
+      qc.invalidateQueries({ queryKey: ['section-tasks'] })
+    },
+  })
+}
+
 // --- Attachments ---
 
 export function useTaskAttachments(taskId: number, enabled: boolean) {

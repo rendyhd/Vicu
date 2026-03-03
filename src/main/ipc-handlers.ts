@@ -27,10 +27,13 @@ import {
   uploadTaskAttachment,
   deleteTaskAttachment,
   downloadTaskAttachment,
+  searchUsers,
+  addAssigneeToTask,
+  removeAssigneeFromTask,
+  fetchUser,
 } from './api-client'
 import { loadConfig, saveConfig, type AppConfig } from './config'
 import { discoverProviders, discoverAuthMethods } from './auth/oidc-discovery'
-import { fetchCurrentUser } from './auth/user-info'
 import { authManager } from './auth/auth-manager'
 import { buildViewerFilterParams } from './quick-entry/filter-builder'
 import {
@@ -204,13 +207,9 @@ export function registerIpcHandlers(): void {
   })
 
   ipcMain.handle('auth:get-user', async () => {
-    const config = loadConfig()
-    if (!config?.vikunja_url) return null
-    const token = config.auth_method === 'api_token'
-      ? (getAPIToken() || config.api_token)
-      : authManager.getTokenSync()
-    if (!token) return null
-    return fetchCurrentUser(config.vikunja_url, token)
+    const result = await fetchUser()
+    if (!result.success) return null
+    return result.data
   })
 
   ipcMain.handle('auth:check', () => {
@@ -558,6 +557,19 @@ export function registerIpcHandlers(): void {
     } catch (err: unknown) {
       return { success: false, error: err instanceof Error ? err.message : 'Failed to open file' }
     }
+  })
+
+  // --- Assignees IPC ---
+  ipcMain.handle('search-users', (_event, query: string) => {
+    return searchUsers(query)
+  })
+
+  ipcMain.handle('add-assignee-to-task', (_event, taskId: number, userId: number) => {
+    return addAssigneeToTask(taskId, userId)
+  })
+
+  ipcMain.handle('remove-assignee-from-task', (_event, taskId: number, userId: number) => {
+    return removeAssigneeFromTask(taskId, userId)
   })
 
   ipcMain.handle('pick-and-upload-attachment', async (_event, taskId: number) => {
