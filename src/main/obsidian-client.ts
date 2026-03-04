@@ -190,6 +190,13 @@ function loadForegroundCheck(): boolean {
   }
 }
 
+/**
+ * Pre-load koffi + DLLs at startup so the first hotkey press doesn't pay the cost.
+ */
+export function prewarmForegroundCheck(): void {
+  loadForegroundCheck()
+}
+
 const PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
 
 function getForegroundProcessNameSync(): string {

@@ -80,6 +80,7 @@ let cachedProjects: Array<{ id: number; title: string }> = []
 let lastParseResult: ParseResult | null = null
 let isComposing = false
 let suppressedTypes: Map<TokenType, string[]> = new Map()
+let lastConfig: QuickEntryConfig | null = null
 
 // --- Autocomplete ---
 const autocomplete = new AutocompleteDropdown('autocomplete-container', (item, triggerStart, prefix) => {
@@ -517,28 +518,38 @@ window.quickEntryApi.onHideWindow(() => {
   updateBrowserUI()
 })
 
+function applyConfig(cfg: QuickEntryConfig): void {
+  exclamationTodayEnabled = cfg.exclamation_today !== false
+  projectCycleModifier = cfg.project_cycle_modifier || 'ctrl'
+  buildProjectCycle(cfg)
+  parserConfig = getParserConfig({ nlp_enabled: cfg.nlp_enabled, nlp_syntax_mode: cfg.nlp_syntax_mode, exclamation_today: cfg.exclamation_today })
+  autocomplete.setSyntaxMode(parserConfig.syntaxMode)
+  autocomplete.setEnabled(parserConfig.enabled)
+}
+
 // When the main process signals the window is shown
-window.quickEntryApi.onShowWindow(async () => {
+window.quickEntryApi.onShowWindow(() => {
   resetInput()
 
-  const cfg = await window.quickEntryApi.getConfig()
-  if (cfg) {
-    exclamationTodayEnabled = cfg.exclamation_today !== false
-    projectCycleModifier = cfg.project_cycle_modifier || 'ctrl'
-    buildProjectCycle(cfg)
-    parserConfig = getParserConfig({ nlp_enabled: cfg.nlp_enabled, nlp_syntax_mode: cfg.nlp_syntax_mode, exclamation_today: cfg.exclamation_today })
-    autocomplete.setSyntaxMode(parserConfig.syntaxMode)
-    autocomplete.setEnabled(parserConfig.enabled)
-  }
+  // Apply cached config synchronously for instant UI
+  if (lastConfig) applyConfig(lastConfig)
 
-  refreshLabelsAndProjects()
-
-  await updatePendingIndicator()
-  input.focus()
-
+  // Show animation + focus immediately — no awaits before this
   container.classList.remove('visible')
   void container.offsetHeight
   container.classList.add('visible')
+  input.focus()
+
+  // Refresh config, pending count, and labels/projects in the background
+  window.quickEntryApi.getConfig().then((cfg) => {
+    if (cfg) {
+      lastConfig = cfg
+      applyConfig(cfg)
+    }
+  }).catch(() => {})
+
+  updatePendingIndicator().catch(() => {})
+  refreshLabelsAndProjects()
 })
 
 // When background sync completes, update the pending count
@@ -738,12 +749,8 @@ window.quickEntryApi.onBrowserContext((ctx) => {
 async function loadInitialConfig(): Promise<void> {
   const cfg = await window.quickEntryApi.getConfig()
   if (cfg) {
-    exclamationTodayEnabled = cfg.exclamation_today !== false
-    projectCycleModifier = cfg.project_cycle_modifier || 'ctrl'
-    buildProjectCycle(cfg)
-    parserConfig = getParserConfig({ nlp_enabled: cfg.nlp_enabled, nlp_syntax_mode: cfg.nlp_syntax_mode, exclamation_today: cfg.exclamation_today })
-    autocomplete.setSyntaxMode(parserConfig.syntaxMode)
-    autocomplete.setEnabled(parserConfig.enabled)
+    lastConfig = cfg
+    applyConfig(cfg)
   }
   refreshLabelsAndProjects()
 

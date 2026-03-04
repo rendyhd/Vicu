@@ -4,10 +4,10 @@ import { registerIpcHandlers } from './ipc-handlers'
 import { loadConfig, saveConfig, type AppConfig, DEFAULT_QUICK_ENTRY_HOTKEY, DEFAULT_QUICK_VIEW_HOTKEY } from './config'
 import { authManager } from './auth/auth-manager'
 import { createTray, destroyTray, hasTray } from './tray'
-import { returnFocusToPreviousWindow } from './focus'
+import { returnFocusToPreviousWindow, destroyDummyWindow } from './focus'
 import { registerQuickEntryState } from './quick-entry-state'
 import { initNotifications, rescheduleNotifications, stopNotifications } from './notifications'
-import { getObsidianContext, getForegroundProcessName, getForegroundWindowHandle, type ObsidianNoteContext } from './obsidian-client'
+import { getObsidianContext, getForegroundProcessName, getForegroundWindowHandle, prewarmForegroundCheck, type ObsidianNoteContext } from './obsidian-client'
 import { getBrowserContext, type BrowserContext } from './browser-client'
 import { getBrowserUrlFromWindow, prewarmUrlReader, shutdownUrlReader, BROWSER_PROCESSES } from './window-url-reader'
 import { isRegistered, unregisterHosts, registerHosts } from './browser-host-registration'
@@ -463,6 +463,7 @@ if (!gotLock) {
   app.whenReady().then(async () => {
     setupApplicationMenu(() => mainWindow)
     registerIpcHandlers()
+    if (isWindows) prewarmForegroundCheck()
     await authManager.initialize()
 
     // One-time migration: move plaintext API token to encrypted store
@@ -612,6 +613,7 @@ if (!gotLock) {
   app.on('will-quit', () => {
     stopNotifications()
     shutdownUrlReader()
+    destroyDummyWindow()
     globalShortcut.unregisterAll()
     if (dragHoverTimer) {
       clearInterval(dragHoverTimer)

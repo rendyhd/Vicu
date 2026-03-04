@@ -78,11 +78,13 @@ export function createQuickEntryWindow(_config: AppConfig | null): BrowserWindow
     skipTaskbar: true,
     resizable: false,
     show: false,
+    paintWhenInitiallyHidden: true,
     webPreferences: {
       preload: join(__dirname, '../preload/quick-entry.js'),
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      backgroundThrottling: false,
     },
   })
 
@@ -115,11 +117,13 @@ export function createQuickViewWindow(_config: AppConfig | null): BrowserWindow 
     minHeight: 60 + SHADOW_PADDING * 2,
     maxHeight: 460 + DRAG_HANDLE_HEIGHT + SHADOW_PADDING * 2,
     show: false,
+    paintWhenInitiallyHidden: true,
     webPreferences: {
       preload: join(__dirname, '../preload/quick-view.js'),
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      backgroundThrottling: false,
     },
   })
 
