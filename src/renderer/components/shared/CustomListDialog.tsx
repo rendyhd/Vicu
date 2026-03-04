@@ -184,9 +184,36 @@ export function CustomListDialog({ open, list, onSave, onClose }: CustomListDial
 
           {/* Projects */}
           <div>
-            <label className="mb-1 block text-xs text-[var(--text-secondary)]">
-              Projects {filter.project_ids.length === 0 && <span className="text-[var(--text-secondary)]">(all)</span>}
-            </label>
+            <div className="mb-1 flex items-center justify-between">
+              <label className="text-xs text-[var(--text-secondary)]">
+                Projects{' '}
+                {filter.project_ids.length === 0 && (
+                  <span className="text-[var(--text-secondary)]">
+                    {(filter.project_filter_mode ?? 'include') === 'include' ? '(all)' : '(none excluded)'}
+                  </span>
+                )}
+                {filter.project_ids.length > 0 && (filter.project_filter_mode ?? 'include') === 'exclude' && (
+                  <span className="text-[var(--text-secondary)]">({filter.project_ids.length} excluded)</span>
+                )}
+              </label>
+              <div className="flex overflow-hidden rounded-md border border-[var(--border-color)]">
+                {(['include', 'exclude'] as const).map((mode) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    onClick={() => setFilter((f) => ({ ...f, project_filter_mode: mode, project_ids: [] }))}
+                    className={cn(
+                      'px-2.5 py-0.5 text-[10px] font-medium capitalize transition-colors',
+                      (filter.project_filter_mode ?? 'include') === mode
+                        ? 'bg-accent-blue text-white'
+                        : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'
+                    )}
+                  >
+                    {mode}
+                  </button>
+                ))}
+              </div>
+            </div>
             <div className="max-h-32 overflow-y-auto rounded-md border border-[var(--border-color)] bg-[var(--bg-secondary)] p-2">
               {allProjects.map((p) => (
                 <label

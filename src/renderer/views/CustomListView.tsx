@@ -42,7 +42,7 @@ function buildQueryParams(list: CustomList): TaskQueryParams {
     parts.push('done = false')
   }
 
-  if (filter.project_ids.length === 1) {
+  if ((filter.project_filter_mode ?? 'include') === 'include' && filter.project_ids.length === 1) {
     parts.push(`project_id = ${filter.project_ids[0]}`)
   }
 
@@ -71,8 +71,8 @@ function buildQueryParams(list: CustomList): TaskQueryParams {
       break
   }
 
-  // Union mode: include tasks due today from all projects
-  if (filter.include_today_all_projects && filter.project_ids.length > 0) {
+  // Union mode: include tasks due today from all projects (only for include mode)
+  if (filter.include_today_all_projects && filter.project_ids.length > 0 && (filter.project_filter_mode ?? 'include') === 'include') {
     const basePart = parts.length > 0 ? parts.join(' && ') : null
     const dueTodayClause = `due_date >= '${startOfToday()}' && due_date <= '${endOfToday()}' && due_date != '${NULL_DATE}'`
 
@@ -115,9 +115,14 @@ export function CustomListView() {
     const { filter } = customList
 
     return tasks.filter((t: Task) => {
-      // Multi-project filter (API only supports single project_id filter)
-      if (filter.project_ids.length > 1 && !filter.project_ids.includes(t.project_id)) {
-        return false
+      // Project filter (API only supports single project_id in include mode)
+      if (filter.project_ids.length > 0) {
+        const isExclude = (filter.project_filter_mode ?? 'include') === 'exclude'
+        if (isExclude) {
+          if (filter.project_ids.includes(t.project_id)) return false
+        } else if (filter.project_ids.length > 1) {
+          if (!filter.project_ids.includes(t.project_id)) return false
+        }
       }
 
       // Priority filter (client-side)

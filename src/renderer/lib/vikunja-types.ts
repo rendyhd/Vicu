@@ -133,6 +133,7 @@ export type ApiResult<T> =
 
 export interface CustomListFilter {
   project_ids: number[]
+  project_filter_mode?: 'include' | 'exclude'
   sort_by: 'due_date' | 'priority' | 'created' | 'updated' | 'title'
   order_by: 'asc' | 'desc'
   due_date_filter: 'all' | 'overdue' | 'today' | 'this_week' | 'this_month' | 'has_due_date' | 'no_due_date'
