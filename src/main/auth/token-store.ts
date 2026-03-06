@@ -55,7 +55,8 @@ function decrypt(encoded: string): string | null {
   try {
     const buffer = Buffer.from(encoded, 'base64')
     return safeStorage.decryptString(buffer)
-  } catch {
+  } catch (err) {
+    console.warn('[Auth] Failed to decrypt stored token:', err instanceof Error ? err.message : err)
     return null
   }
 }
@@ -142,6 +143,11 @@ export function getRefreshToken(): string | null {
   const store = readStore()
   if (!store.refresh_token) return null
   return decrypt(store.refresh_token)
+}
+
+export function hasRefreshToken(): boolean {
+  const store = readStore()
+  return !!store.refresh_token
 }
 
 export function getBestToken(): string | null {

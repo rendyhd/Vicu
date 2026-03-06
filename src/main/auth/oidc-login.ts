@@ -1,4 +1,5 @@
-import { BrowserWindow, net } from 'electron'
+import { BrowserWindow, net, screen } from 'electron'
+import { getMainWindow } from '../quick-entry-state'
 import { randomUUID } from 'crypto'
 import { discoverProviders, type OIDCProvider } from './oidc-discovery'
 import { storeJWT, storeAPIToken, storeProviderKey, storeRefreshToken } from './token-store'
@@ -62,11 +63,22 @@ export async function loginWithOIDC(
     `&state=${state}` +
     `&scope=${encodeURIComponent(scope)}`
 
-  // 5. Create visible BrowserWindow for login
+  // 5. Create visible BrowserWindow for login, centered on the main window's display
+  const mainWin = getMainWindow()
+  const parentBounds = mainWin?.getBounds()
+  const display = parentBounds
+    ? screen.getDisplayMatching(parentBounds)
+    : screen.getPrimaryDisplay()
+  const winWidth = 800
+  const winHeight = 600
+  const { x: wx, y: wy, width: dw, height: dh } = display.workArea
   let win: BrowserWindow | null = new BrowserWindow({
-    width: 800,
-    height: 600,
+    width: winWidth,
+    height: winHeight,
+    x: Math.round(wx + (dw - winWidth) / 2),
+    y: Math.round(wy + (dh - winHeight) / 2),
     show: true,
+    parent: mainWin ?? undefined,
     title: 'Sign in',
     webPreferences: {
       partition: 'persist:oidc-auth',

@@ -7,6 +7,7 @@ import {
   getAPIToken,
   isAPITokenExpired,
   hasAPIToken,
+  hasRefreshToken,
   getAPITokenExpiry,
   clear,
 } from './token-store'
@@ -18,6 +19,9 @@ import { renewJWT } from './jwt-renewal'
 // Re-auth 2 minutes before JWT expiry (Vikunja 2.0 uses ~10-min JWTs)
 const REFRESH_BUFFER_SECONDS = 120
 
+// Max time to wait for network-based token recovery at startup
+const STARTUP_RECOVERY_TIMEOUT = 15_000
+
 type AuthEvent = 'auth-required'
 
 class AuthManager {
@@ -28,23 +32,40 @@ class AuthManager {
   /**
    * Check stored tokens and schedule proactive refresh if needed.
    * Call once at app startup.
+   *
+   * If no valid local tokens exist, attempts network-based recovery
+   * (refresh token → silent OIDC reauth) before giving up.
    */
   async initialize(): Promise<boolean> {
     const config = loadConfig()
     if (!config || (config.auth_method !== 'oidc' && config.auth_method !== 'password')) return false
 
     const token = getBestToken()
-    if (!token) return false
 
-    // If JWT is present but expiring soon, schedule refresh
-    if (!isJWTExpired() && !isJWTExpired(REFRESH_BUFFER_SECONDS)) {
-      this._scheduleProactiveRefresh()
-    } else if (isJWTExpired() && !isAPITokenExpired()) {
-      // JWT expired but API token valid — trigger background refresh
-      this._scheduleRefresh(0)
+    if (token) {
+      // Happy path: valid local token exists
+      if (!isJWTExpired() && !isJWTExpired(REFRESH_BUFFER_SECONDS)) {
+        this._scheduleProactiveRefresh()
+      } else if (isJWTExpired() && !isAPITokenExpired()) {
+        // JWT expired but API token valid — trigger background refresh
+        this._scheduleRefresh(0)
+      }
+      return true
     }
 
-    return true
+    // No valid local tokens — attempt network recovery
+    if (!config.vikunja_url) return false
+    if (!hasRefreshToken() && config.auth_method !== 'oidc') return false
+
+    console.log('[Auth] No valid local tokens, attempting startup recovery...')
+    try {
+      await this._doRefreshWithTimeout(STARTUP_RECOVERY_TIMEOUT)
+      console.log('[Auth] Startup recovery succeeded')
+      return true
+    } catch (err) {
+      console.warn('[Auth] Startup recovery failed:', err instanceof Error ? err.message : err)
+      return false
+    }
   }
 
   /**
@@ -240,6 +261,24 @@ class AuthManager {
         this._scheduleProactiveRefresh()
       }
     }, checkInterval)
+  }
+
+  /**
+   * Wrap _doRefresh() with a timeout for startup recovery.
+   * Prevents the app from hanging indefinitely if the server is unreachable.
+   */
+  private _doRefreshWithTimeout(timeoutMs: number): Promise<string> {
+    let timer: ReturnType<typeof setTimeout>
+    const timeoutPromise = new Promise<never>((_resolve, reject) => {
+      timer = setTimeout(
+        () => reject(new Error(`Startup recovery timed out after ${timeoutMs}ms`)),
+        timeoutMs,
+      )
+    })
+    return Promise.race([
+      this._doRefresh().finally(() => clearTimeout(timer!)),
+      timeoutPromise,
+    ])
   }
 
   /**
