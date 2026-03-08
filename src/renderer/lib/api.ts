@@ -127,7 +127,11 @@ export const api = {
     window.api.getUser() as Promise<VikunjaUser | null>,
 
   checkAuth: () =>
-    window.api.checkAuth() as Promise<boolean>,
+    window.api.checkAuth() as Promise<
+      | { status: 'authenticated' }
+      | { status: 'reauth-needed'; authMethod: string; vikunjaUrl: string; lastUsername?: string }
+      | { status: 'unconfigured' }
+    >,
 
   logout: () =>
     window.api.logout() as Promise<void>,
@@ -177,4 +181,6 @@ export const api = {
     window.api.dismissUpdate(version),
   onUpdateAvailable: (cb: (status: { available: boolean; currentVersion: string; latestVersion: string; releaseUrl: string; releaseNotes: string }) => void) =>
     window.api.onUpdateAvailable(cb),
+  onAuthRequired: (cb: () => void) =>
+    window.api.onAuthRequired?.(cb) ?? (() => {}),
 }

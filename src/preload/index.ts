@@ -141,6 +141,11 @@ const api = {
     ipcRenderer.on('navigate', handler)
     return () => { ipcRenderer.removeListener('navigate', handler) }
   },
+  onAuthRequired: (cb: () => void) => {
+    const handler = () => cb()
+    ipcRenderer.on('auth-required', handler)
+    return () => { ipcRenderer.removeListener('auth-required', handler) }
+  },
 }
 
 contextBridge.exposeInMainWorld('api', api)

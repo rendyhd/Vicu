@@ -10,6 +10,8 @@ import {
   hasRefreshToken,
   getAPITokenExpiry,
   clear,
+  extractJWTExp,
+  storeAPIToken,
 } from './token-store'
 import { loginWithOIDC, createBackupAPIToken } from './oidc-login'
 import { silentReauth } from './silent-reauth'
@@ -22,6 +24,7 @@ const REFRESH_BUFFER_SECONDS = 120
 // Max time to wait for network-based token recovery at startup
 const STARTUP_RECOVERY_TIMEOUT = 15_000
 
+export type AuthInitResult = 'authenticated' | 'reauth-needed' | 'unconfigured'
 type AuthEvent = 'auth-required'
 
 class AuthManager {
@@ -33,12 +36,14 @@ class AuthManager {
    * Check stored tokens and schedule proactive refresh if needed.
    * Call once at app startup.
    *
-   * If no valid local tokens exist, attempts network-based recovery
-   * (refresh token → silent OIDC reauth) before giving up.
+   * Returns:
+   * - 'authenticated': valid tokens exist (or were recovered)
+   * - 'reauth-needed': config is intact but tokens expired and recovery failed
+   * - 'unconfigured': no config or not using OIDC/password auth
    */
-  async initialize(): Promise<boolean> {
+  async initialize(): Promise<AuthInitResult> {
     const config = loadConfig()
-    if (!config || (config.auth_method !== 'oidc' && config.auth_method !== 'password')) return false
+    if (!config || (config.auth_method !== 'oidc' && config.auth_method !== 'password')) return 'unconfigured'
 
     const token = getBestToken()
 
@@ -50,21 +55,20 @@ class AuthManager {
         // JWT expired but API token valid — trigger background refresh
         this._scheduleRefresh(0)
       }
-      return true
+      return 'authenticated'
     }
 
-    // No valid local tokens — attempt network recovery
-    if (!config.vikunja_url) return false
-    if (!hasRefreshToken() && config.auth_method !== 'oidc') return false
+    // No valid local tokens — attempt network recovery (all auth methods)
+    if (!config.vikunja_url) return 'unconfigured'
 
     console.log('[Auth] No valid local tokens, attempting startup recovery...')
     try {
       await this._doRefreshWithTimeout(STARTUP_RECOVERY_TIMEOUT)
       console.log('[Auth] Startup recovery succeeded')
-      return true
+      return 'authenticated'
     } catch (err) {
       console.warn('[Auth] Startup recovery failed:', err instanceof Error ? err.message : err)
-      return false
+      return 'reauth-needed'
     }
   }
 
@@ -363,7 +367,22 @@ class AuthManager {
     }
 
     const baseUrl = config.vikunja_url.replace(/\/+$/, '')
-    await createBackupAPIToken(baseUrl, jwt)
+    try {
+      await createBackupAPIToken(baseUrl, jwt)
+    } catch (err) {
+      // Fallback: if the JWT is long-lived (>24h, pre-2.0 Vikunja),
+      // store it as the backup API token.
+      const jwtExp = extractJWTExp(jwt)
+      if (jwtExp != null) {
+        const lifetimeSeconds = jwtExp - Date.now() / 1000
+        if (lifetimeSeconds > 24 * 60 * 60) {
+          console.log('[Auth] JWT is long-lived, storing as backup API token')
+          storeAPIToken(jwt, jwtExp)
+          return
+        }
+      }
+      throw err
+    }
   }
 }
 

@@ -61,7 +61,7 @@ function decrypt(encoded: string): string | null {
   }
 }
 
-function extractJWTExp(jwt: string): number | null {
+export function extractJWTExp(jwt: string): number | null {
   try {
     const parts = jwt.split('.')
     if (parts.length !== 3) return null

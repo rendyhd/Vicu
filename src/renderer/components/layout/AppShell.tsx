@@ -28,6 +28,7 @@ import { ContentArea } from './ContentArea'
 import { WindowControls } from './WindowControls'
 import { SearchBar } from './SearchBar'
 import { SetupView } from '@/views/SetupView'
+import { ReauthView } from '@/views/ReauthView'
 import { TaskDragOverlay } from '@/components/task-list/TaskDragOverlay'
 import { ProjectDragOverlay } from '@/components/sidebar/ProjectDragOverlay'
 import { CustomListDragOverlay } from '@/components/sidebar/CustomListDragOverlay'
@@ -57,7 +58,13 @@ function calculateProjectPosition(
   return (above + below) / 2
 }
 
-type AppState = 'loading' | 'setup' | 'ready'
+type AppState = 'loading' | 'setup' | 'ready' | 'reauth'
+
+interface ReauthInfo {
+  authMethod: string
+  vikunjaUrl: string
+  lastUsername?: string
+}
 
 type DragItem =
   | { type: 'task'; task: Task }
@@ -77,6 +84,7 @@ export function AppShell() {
   const startX = useRef(0)
   const startWidth = useRef(0)
   const [appState, setAppState] = useState<AppState>('loading')
+  const [reauthInfo, setReauthInfo] = useState<ReauthInfo | null>(null)
   const [dragItem, setDragItem] = useState<DragItem | null>(null)
   const themeRef = useRef<ThemeOption>('system')
   const navigate = useNavigate()
@@ -325,8 +333,19 @@ export function AppShell() {
         return
       }
 
-      const isAuthed = await api.checkAuth()
-      setAppState(isAuthed ? 'ready' : 'setup')
+      const authResult = await api.checkAuth()
+      if (authResult.status === 'authenticated') {
+        setAppState('ready')
+      } else if (authResult.status === 'reauth-needed') {
+        setReauthInfo({
+          authMethod: authResult.authMethod,
+          vikunjaUrl: authResult.vikunjaUrl,
+          lastUsername: authResult.lastUsername,
+        })
+        setAppState('reauth')
+      } else {
+        setAppState('setup')
+      }
     })
   }, [])
 
@@ -358,6 +377,22 @@ export function AppShell() {
       navigate({ to: path })
     })
   }, [navigate])
+
+  // Listen for auth-required events (runtime token expiry)
+  useEffect(() => {
+    return api.onAuthRequired(async () => {
+      if (appState === 'reauth' || appState === 'setup') return
+      const authResult = await api.checkAuth()
+      if (authResult.status === 'reauth-needed') {
+        setReauthInfo({
+          authMethod: authResult.authMethod,
+          vikunjaUrl: authResult.vikunjaUrl,
+          lastUsername: authResult.lastUsername,
+        })
+        setAppState('reauth')
+      }
+    })
+  }, [appState])
 
   const handleMouseDown = useCallback(
     (e: React.MouseEvent) => {
@@ -391,6 +426,24 @@ export function AppShell() {
 
   if (appState === 'loading') {
     return <div className="flex h-screen w-screen items-center justify-center bg-[var(--bg-primary)]" />
+  }
+
+  if (appState === 'reauth' && reauthInfo) {
+    return (
+      <ReauthView
+        authMethod={reauthInfo.authMethod}
+        vikunjaUrl={reauthInfo.vikunjaUrl}
+        lastUsername={reauthInfo.lastUsername}
+        onSuccess={() => {
+          setReauthInfo(null)
+          setAppState('ready')
+        }}
+        onSwitchAccount={() => {
+          setReauthInfo(null)
+          setAppState('setup')
+        }}
+      />
+    )
   }
 
   if (appState === 'setup') {

@@ -213,12 +213,35 @@ export function registerIpcHandlers(): void {
     return fetchCurrentUser(config.vikunja_url, token)
   })
 
-  ipcMain.handle('auth:check', () => {
+  ipcMain.handle('auth:check', async () => {
     const config = loadConfig()
-    if (config?.auth_method === 'api_token') {
-      return !!(getAPIToken() || config.api_token)
+    if (!config || !config.vikunja_url) {
+      return { status: 'unconfigured' as const }
     }
-    return authManager.getTokenSync() !== null
+
+    if (config.auth_method === 'api_token') {
+      const hasToken = !!(getAPIToken() || config.api_token)
+      return { status: hasToken ? 'authenticated' as const : 'unconfigured' as const }
+    }
+
+    // OIDC / password: try sync first, then async recovery
+    const syncToken = authManager.getTokenSync()
+    if (syncToken) {
+      return { status: 'authenticated' as const }
+    }
+
+    // Sync check failed — try async recovery
+    try {
+      await authManager.getToken()
+      return { status: 'authenticated' as const }
+    } catch {
+      return {
+        status: 'reauth-needed' as const,
+        authMethod: config.auth_method,
+        vikunjaUrl: config.vikunja_url,
+        lastUsername: config.last_username,
+      }
+    }
   })
 
   ipcMain.handle('auth:logout', async () => {

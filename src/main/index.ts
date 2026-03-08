@@ -466,6 +466,17 @@ if (!gotLock) {
     if (isWindows) prewarmForegroundCheck()
     await authManager.initialize()
 
+    // Forward auth-required events to all renderer windows
+    authManager.on(() => {
+      for (const win of BrowserWindow.getAllWindows()) {
+        try {
+          if (!win.isDestroyed()) {
+            win.webContents.send('auth-required')
+          }
+        } catch { /* ignore */ }
+      }
+    })
+
     // One-time migration: move plaintext API token to encrypted store
     const preConfig = loadConfig()
     if (

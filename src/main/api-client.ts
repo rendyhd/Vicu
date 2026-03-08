@@ -1,7 +1,20 @@
-import { net } from 'electron'
+import { net, BrowserWindow } from 'electron'
 import { loadConfig } from './config'
 import { authManager } from './auth/auth-manager'
 import { getAPIToken } from './auth/token-store'
+
+/**
+ * Send 'auth-required' IPC event to all renderer windows.
+ */
+function notifyAuthRequired(): void {
+  for (const win of BrowserWindow.getAllWindows()) {
+    try {
+      if (!win.isDestroyed()) {
+        win.webContents.send('auth-required')
+      }
+    } catch { /* ignore */ }
+  }
+}
 
 const REQUEST_TIMEOUT = 10_000
 const UPLOAD_TIMEOUT = 60_000
@@ -227,18 +240,25 @@ async function requestBinaryWithRetry(
   return result
 }
 
-function getConfigOrFail(): { url: string; token: string } | ApiError {
+async function getConfigOrFail(): Promise<{ url: string; token: string } | ApiError> {
   const config = loadConfig()
   if (!config || !config.vikunja_url) {
     return { success: false, error: 'Vikunja is not configured. Open Settings to connect.' }
   }
 
   if (config.auth_method === 'oidc' || config.auth_method === 'password') {
-    const token = authManager.getTokenSync()
-    if (!token) {
+    // Fast path: sync token check
+    const syncToken = authManager.getTokenSync()
+    if (syncToken) return { url: config.vikunja_url, token: syncToken }
+
+    // Slow path: async recovery (refresh token / silent reauth)
+    try {
+      const asyncToken = await authManager.getToken()
+      return { url: config.vikunja_url, token: asyncToken }
+    } catch {
+      notifyAuthRequired()
       return { success: false, error: 'Session expired. Please sign in again.' }
     }
-    return { url: config.vikunja_url, token }
   }
 
   // API token path — prefer encrypted store, fall back to config (pre-migration)
@@ -251,9 +271,9 @@ function getConfigOrFail(): { url: string; token: string } | ApiError {
 
 // --- Tasks ---
 
-export function fetchTasks(params: Record<string, unknown>): Promise<ApiResult<unknown[]>> {
-  const c = getConfigOrFail()
-  if ('success' in c) return Promise.resolve(c)
+export async function fetchTasks(params: Record<string, unknown>): Promise<ApiResult<unknown[]>> {
+  const c = await getConfigOrFail()
+  if ('success' in c) return c
 
   const qs = new URLSearchParams()
   if (params.s) qs.set('s', String(params.s))
@@ -273,80 +293,80 @@ export function fetchTasks(params: Record<string, unknown>): Promise<ApiResult<u
   return requestWithRetry<unknown[]>('GET', fullUrl, c.token)
 }
 
-export function createTask(
+export async function createTask(
   projectId: number,
   task: Record<string, unknown>
 ): Promise<ApiResult<unknown>> {
-  const c = getConfigOrFail()
-  if ('success' in c) return Promise.resolve(c)
+  const c = await getConfigOrFail()
+  if ('success' in c) return c
 
   return requestWithRetry<unknown>('PUT', `${c.url}/api/v1/projects/${projectId}/tasks`, c.token, task)
 }
 
 // CRITICAL: Go zero-value problem — always send the complete task object on update.
 // Sending only changed fields (e.g. { done: true }) will zero out due_date, priority, etc.
-export function updateTask(
+export async function updateTask(
   id: number,
   task: Record<string, unknown>
 ): Promise<ApiResult<unknown>> {
-  const c = getConfigOrFail()
-  if ('success' in c) return Promise.resolve(c)
+  const c = await getConfigOrFail()
+  if ('success' in c) return c
 
   return requestWithRetry<unknown>('POST', `${c.url}/api/v1/tasks/${id}`, c.token, task)
 }
 
-export function deleteTask(id: number): Promise<ApiResult<void>> {
-  const c = getConfigOrFail()
-  if ('success' in c) return Promise.resolve(c)
+export async function deleteTask(id: number): Promise<ApiResult<void>> {
+  const c = await getConfigOrFail()
+  if ('success' in c) return c
 
   return requestWithRetry<void>('DELETE', `${c.url}/api/v1/tasks/${id}`, c.token)
 }
 
 // --- Projects ---
 
-export function fetchProjects(): Promise<ApiResult<unknown[]>> {
-  const c = getConfigOrFail()
-  if ('success' in c) return Promise.resolve(c)
+export async function fetchProjects(): Promise<ApiResult<unknown[]>> {
+  const c = await getConfigOrFail()
+  if ('success' in c) return c
 
   return requestWithRetry<unknown[]>('GET', `${c.url}/api/v1/projects`, c.token)
 }
 
-export function createProject(project: Record<string, unknown>): Promise<ApiResult<unknown>> {
-  const c = getConfigOrFail()
-  if ('success' in c) return Promise.resolve(c)
+export async function createProject(project: Record<string, unknown>): Promise<ApiResult<unknown>> {
+  const c = await getConfigOrFail()
+  if ('success' in c) return c
 
   return requestWithRetry<unknown>('PUT', `${c.url}/api/v1/projects`, c.token, project)
 }
 
-export function updateProject(
+export async function updateProject(
   id: number,
   project: Record<string, unknown>
 ): Promise<ApiResult<unknown>> {
-  const c = getConfigOrFail()
-  if ('success' in c) return Promise.resolve(c)
+  const c = await getConfigOrFail()
+  if ('success' in c) return c
 
   return requestWithRetry<unknown>('POST', `${c.url}/api/v1/projects/${id}`, c.token, project)
 }
 
-export function deleteProject(id: number): Promise<ApiResult<void>> {
-  const c = getConfigOrFail()
-  if ('success' in c) return Promise.resolve(c)
+export async function deleteProject(id: number): Promise<ApiResult<void>> {
+  const c = await getConfigOrFail()
+  if ('success' in c) return c
 
   return requestWithRetry<void>('DELETE', `${c.url}/api/v1/projects/${id}`, c.token)
 }
 
 // --- Labels ---
 
-export function fetchLabels(): Promise<ApiResult<unknown[]>> {
-  const c = getConfigOrFail()
-  if ('success' in c) return Promise.resolve(c)
+export async function fetchLabels(): Promise<ApiResult<unknown[]>> {
+  const c = await getConfigOrFail()
+  if ('success' in c) return c
 
   return requestWithRetry<unknown[]>('GET', `${c.url}/api/v1/labels`, c.token)
 }
 
-export function addLabelToTask(taskId: number, labelId: number): Promise<ApiResult<void>> {
-  const c = getConfigOrFail()
-  if ('success' in c) return Promise.resolve(c)
+export async function addLabelToTask(taskId: number, labelId: number): Promise<ApiResult<void>> {
+  const c = await getConfigOrFail()
+  if ('success' in c) return c
 
   return requestWithRetry<void>(
     'PUT',
@@ -356,55 +376,55 @@ export function addLabelToTask(taskId: number, labelId: number): Promise<ApiResu
   )
 }
 
-export function removeLabelFromTask(taskId: number, labelId: number): Promise<ApiResult<void>> {
-  const c = getConfigOrFail()
-  if ('success' in c) return Promise.resolve(c)
+export async function removeLabelFromTask(taskId: number, labelId: number): Promise<ApiResult<void>> {
+  const c = await getConfigOrFail()
+  if ('success' in c) return c
 
   return requestWithRetry<void>('DELETE', `${c.url}/api/v1/tasks/${taskId}/labels/${labelId}`, c.token)
 }
 
-export function createLabel(label: Record<string, unknown>): Promise<ApiResult<unknown>> {
-  const c = getConfigOrFail()
-  if ('success' in c) return Promise.resolve(c)
+export async function createLabel(label: Record<string, unknown>): Promise<ApiResult<unknown>> {
+  const c = await getConfigOrFail()
+  if ('success' in c) return c
 
   return requestWithRetry<unknown>('PUT', `${c.url}/api/v1/labels`, c.token, label)
 }
 
-export function updateLabel(
+export async function updateLabel(
   id: number,
   label: Record<string, unknown>
 ): Promise<ApiResult<unknown>> {
-  const c = getConfigOrFail()
-  if ('success' in c) return Promise.resolve(c)
+  const c = await getConfigOrFail()
+  if ('success' in c) return c
 
   return requestWithRetry<unknown>('PUT', `${c.url}/api/v1/labels/${id}`, c.token, label)
 }
 
-export function deleteLabel(id: number): Promise<ApiResult<void>> {
-  const c = getConfigOrFail()
-  if ('success' in c) return Promise.resolve(c)
+export async function deleteLabel(id: number): Promise<ApiResult<void>> {
+  const c = await getConfigOrFail()
+  if ('success' in c) return c
 
   return requestWithRetry<void>('DELETE', `${c.url}/api/v1/labels/${id}`, c.token)
 }
 
 // --- Single Task ---
 
-export function fetchTaskById(id: number): Promise<ApiResult<unknown>> {
-  const c = getConfigOrFail()
-  if ('success' in c) return Promise.resolve(c)
+export async function fetchTaskById(id: number): Promise<ApiResult<unknown>> {
+  const c = await getConfigOrFail()
+  if ('success' in c) return c
 
   return requestWithRetry<unknown>('GET', `${c.url}/api/v1/tasks/${id}`, c.token)
 }
 
 // --- Task Relations ---
 
-export function createTaskRelation(
+export async function createTaskRelation(
   taskId: number,
   otherTaskId: number,
   relationKind: string
 ): Promise<ApiResult<unknown>> {
-  const c = getConfigOrFail()
-  if ('success' in c) return Promise.resolve(c)
+  const c = await getConfigOrFail()
+  if ('success' in c) return c
 
   return requestWithRetry<unknown>('PUT', `${c.url}/api/v1/tasks/${taskId}/relations`, c.token, {
     other_task_id: otherTaskId,
@@ -412,13 +432,13 @@ export function createTaskRelation(
   })
 }
 
-export function deleteTaskRelation(
+export async function deleteTaskRelation(
   taskId: number,
   relationKind: string,
   otherTaskId: number
 ): Promise<ApiResult<void>> {
-  const c = getConfigOrFail()
-  if ('success' in c) return Promise.resolve(c)
+  const c = await getConfigOrFail()
+  if ('success' in c) return c
 
   return requestWithRetry<void>(
     'DELETE',
@@ -429,20 +449,20 @@ export function deleteTaskRelation(
 
 // --- Project Views ---
 
-export function fetchProjectViews(projectId: number): Promise<ApiResult<unknown[]>> {
-  const c = getConfigOrFail()
-  if ('success' in c) return Promise.resolve(c)
+export async function fetchProjectViews(projectId: number): Promise<ApiResult<unknown[]>> {
+  const c = await getConfigOrFail()
+  if ('success' in c) return c
 
   return requestWithRetry<unknown[]>('GET', `${c.url}/api/v1/projects/${projectId}/views`, c.token)
 }
 
-export function fetchViewTasks(
+export async function fetchViewTasks(
   projectId: number,
   viewId: number,
   params: Record<string, unknown>
 ): Promise<ApiResult<unknown[]>> {
-  const c = getConfigOrFail()
-  if ('success' in c) return Promise.resolve(c)
+  const c = await getConfigOrFail()
+  if ('success' in c) return c
 
   const qs = new URLSearchParams()
   if (params.filter) qs.set('filter', String(params.filter))
@@ -461,13 +481,13 @@ export function fetchViewTasks(
   return requestWithRetry<unknown[]>('GET', fullUrl, c.token)
 }
 
-export function updateTaskPosition(
+export async function updateTaskPosition(
   taskId: number,
   viewId: number,
   position: number
 ): Promise<ApiResult<unknown>> {
-  const c = getConfigOrFail()
-  if ('success' in c) return Promise.resolve(c)
+  const c = await getConfigOrFail()
+  if ('success' in c) return c
 
   return requestWithRetry<unknown>('POST', `${c.url}/api/v1/tasks/${taskId}/position`, c.token, {
     task_id: taskId,
@@ -636,21 +656,21 @@ function requestBinary(
   })
 }
 
-export function fetchTaskAttachments(taskId: number): Promise<ApiResult<unknown[]>> {
-  const c = getConfigOrFail()
-  if ('success' in c) return Promise.resolve(c)
+export async function fetchTaskAttachments(taskId: number): Promise<ApiResult<unknown[]>> {
+  const c = await getConfigOrFail()
+  if ('success' in c) return c
 
   return requestWithRetry<unknown[]>('GET', `${c.url}/api/v1/tasks/${taskId}/attachments`, c.token)
 }
 
-export function uploadTaskAttachment(
+export async function uploadTaskAttachment(
   taskId: number,
   fileBuffer: Buffer,
   fileName: string,
   mimeType: string
 ): Promise<ApiResult<unknown>> {
-  const c = getConfigOrFail()
-  if ('success' in c) return Promise.resolve(c)
+  const c = await getConfigOrFail()
+  if ('success' in c) return c
 
   return requestMultipartWithRetry<unknown>(
     'PUT',
@@ -662,12 +682,12 @@ export function uploadTaskAttachment(
   )
 }
 
-export function deleteTaskAttachment(
+export async function deleteTaskAttachment(
   taskId: number,
   attachmentId: number
 ): Promise<ApiResult<void>> {
-  const c = getConfigOrFail()
-  if ('success' in c) return Promise.resolve(c)
+  const c = await getConfigOrFail()
+  if ('success' in c) return c
 
   return requestWithRetry<void>(
     'DELETE',
@@ -676,12 +696,12 @@ export function deleteTaskAttachment(
   )
 }
 
-export function downloadTaskAttachment(
+export async function downloadTaskAttachment(
   taskId: number,
   attachmentId: number
 ): Promise<ApiResult<Buffer>> {
-  const c = getConfigOrFail()
-  if ('success' in c) return Promise.resolve(c)
+  const c = await getConfigOrFail()
+  if ('success' in c) return c
 
   return requestBinaryWithRetry(
     `${c.url}/api/v1/tasks/${taskId}/attachments/${attachmentId}`,

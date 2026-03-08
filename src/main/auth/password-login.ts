@@ -1,7 +1,8 @@
 import { net } from 'electron'
-import { storeJWT, storeRefreshToken } from './token-store'
+import { storeJWT, storeRefreshToken, storeAPIToken, extractJWTExp } from './token-store'
 import { extractRefreshToken } from './cookie-utils'
 import { createBackupAPIToken } from './oidc-login'
+import { loadConfig, saveConfig } from '../config'
 
 const LOGIN_TIMEOUT = 15_000
 
@@ -93,7 +94,26 @@ export async function loginWithPassword(
       await createBackupAPIToken(baseUrl, jwt)
     } catch (err) {
       console.warn('[Password] Failed to create backup API token:', err)
+      // Fallback: if the JWT itself is long-lived (>24h, i.e. pre-2.0 Vikunja),
+      // store it as the backup API token so we survive restarts.
+      const jwtExp = extractJWTExp(jwt)
+      if (jwtExp != null) {
+        const lifetimeSeconds = jwtExp - Date.now() / 1000
+        if (lifetimeSeconds > 24 * 60 * 60) {
+          console.log('[Password] JWT is long-lived, storing as backup API token')
+          storeAPIToken(jwt, jwtExp)
+        }
+      }
     }
+
+    // Persist username for re-login screen
+    try {
+      const config = loadConfig()
+      if (config) {
+        config.last_username = username
+        saveConfig(config)
+      }
+    } catch { /* non-critical */ }
 
     return { success: true, token: jwt }
   } catch (err: unknown) {

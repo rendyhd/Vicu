@@ -86,6 +86,8 @@ export interface AppConfig {
   // NLP task parser
   nlp_enabled?: boolean
   nlp_syntax_mode?: 'todoist' | 'vikunja'
+  // Cached username for re-login screen
+  last_username?: string
 }
 
 // Platform-aware hotkey defaults
@@ -216,6 +218,7 @@ function normalizeConfig(raw: Record<string, unknown>): AppConfig {
     // NLP task parser
     nlp_enabled: raw.nlp_enabled !== false,
     nlp_syntax_mode: raw.nlp_syntax_mode === 'vikunja' ? 'vikunja' : 'todoist',
+    last_username: typeof raw.last_username === 'string' ? raw.last_username : undefined,
   }
 }
 
