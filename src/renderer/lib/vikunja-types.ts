@@ -20,6 +20,13 @@ export interface TaskAttachment {
   file: TaskFile
 }
 
+export interface VikunjaUser {
+  id: number
+  username: string
+  name: string
+  email?: string
+}
+
 export interface Task {
   id: number
   title: string
@@ -32,6 +39,7 @@ export interface Task {
   priority: number // 0=unset, 1=low, 2=medium, 3=high, 4=urgent
   project_id: number
   labels: Label[] | null
+  assignees?: VikunjaUser[] | null
   reminders: TaskReminder[] | null
   attachments?: TaskAttachment[] | null
   related_tasks?: Record<string, Task[]> | null

@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect, useCallback, useMemo, Fragment } from 'react'
-import { Plus, Inbox } from 'lucide-react'
+import { Plus, Inbox, UserCheck } from 'lucide-react'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { cn } from '@/lib/cn'
 import { useCreateTask, useCompleteTask, useUpdateTask, useDeleteTask, useAddLabel } from '@/hooks/use-task-mutations'
+import { useCurrentUser } from '@/hooks/use-current-user'
 import { useSelectionStore } from '@/stores/selection-store'
 import { useTaskParser } from '@/hooks/use-task-parser'
 import { useLabels } from '@/hooks/use-labels'
@@ -12,6 +13,7 @@ import type { Task, CreateTaskPayload } from '@/lib/vikunja-types'
 import { TaskRow } from './TaskRow'
 import { TaskInputParser } from '@/components/task-input/TaskInputParser'
 import { EmptyState } from '@/components/shared/EmptyState'
+import { TaskFilterContext } from './TaskFilterContext'
 import type { ChipData } from '@/components/task-input/TokenChip'
 
 interface TaskListProps {
@@ -49,6 +51,8 @@ export function TaskList({
 }: TaskListProps) {
   const [isAdding, setIsAdding] = useState(false)
   const [showNotes, setShowNotes] = useState(false)
+  const [filterMyTasks, setFilterMyTasks] = useState(false)
+  const { data: currentUser, isLoading: userLoading } = useCurrentUser()
   const [defaultDateDismissed, setDefaultDateDismissed] = useState(false)
   const [newDescription, setNewDescription] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
@@ -236,6 +240,11 @@ export function TaskList({
     [collapseAll, setFocusedTask]
   )
 
+  const visibleTasks = useMemo(() => {
+    if (!filterMyTasks || !currentUser) return tasks
+    return tasks.filter((t) => t.assignees?.some((a) => a.id === currentUser.id))
+  }, [tasks, filterMyTasks, currentUser])
+
   // Keyboard navigation
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
@@ -244,7 +253,7 @@ export function TaskList({
       const tag = active?.tagName.toLowerCase()
       if (tag === 'input' || tag === 'textarea' || tag === 'select') return
 
-      const taskCount = tasks.length
+      const taskCount = visibleTasks.length
 
       // Ctrl+N / ⌘N: New task
       if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
@@ -271,7 +280,7 @@ export function TaskList({
       if (taskCount === 0) return
 
       const currentIndex = focusedTaskId
-        ? tasks.findIndex((t) => t.id === focusedTaskId)
+        ? visibleTasks.findIndex((t) => t.id === focusedTaskId)
         : -1
 
       // Arrow Up
@@ -279,7 +288,7 @@ export function TaskList({
         e.preventDefault()
         if (expandedTaskId) return // don't navigate while editing
         const newIndex = currentIndex <= 0 ? 0 : currentIndex - 1
-        setFocusedTask(tasks[newIndex].id)
+        setFocusedTask(visibleTasks[newIndex].id)
         return
       }
 
@@ -288,7 +297,7 @@ export function TaskList({
         e.preventDefault()
         if (expandedTaskId) return // don't navigate while editing
         const newIndex = currentIndex >= taskCount - 1 ? taskCount - 1 : currentIndex + 1
-        setFocusedTask(tasks[newIndex].id)
+        setFocusedTask(visibleTasks[newIndex].id)
         return
       }
 
@@ -317,16 +326,16 @@ export function TaskList({
         e.preventDefault()
         const targetId = expandedTaskId || focusedTaskId
         if (!targetId) return
-        const task = tasks.find((t) => t.id === targetId)
+        const task = visibleTasks.find((t) => t.id === targetId)
         if (task && !task.done) {
           completeTask.mutate(task)
           collapseAll()
           // Move focus to next task
-          const idx = tasks.findIndex((t) => t.id === targetId)
+          const idx = visibleTasks.findIndex((t) => t.id === targetId)
           if (idx < taskCount - 1) {
-            setFocusedTask(tasks[idx + 1].id)
+            setFocusedTask(visibleTasks[idx + 1].id)
           } else if (idx > 0) {
-            setFocusedTask(tasks[idx - 1].id)
+            setFocusedTask(visibleTasks[idx - 1].id)
           } else {
             setFocusedTask(null)
           }
@@ -339,13 +348,13 @@ export function TaskList({
         e.preventDefault()
         const targetId = expandedTaskId || focusedTaskId
         if (!targetId) return
-        const idx = tasks.findIndex((t) => t.id === targetId)
+        const idx = visibleTasks.findIndex((t) => t.id === targetId)
         deleteTask.mutate(targetId)
         collapseAll()
         if (idx < taskCount - 1) {
-          setFocusedTask(tasks[idx + 1].id)
+          setFocusedTask(visibleTasks[idx + 1].id)
         } else if (idx > 0) {
-          setFocusedTask(tasks[idx - 1].id)
+          setFocusedTask(visibleTasks[idx - 1].id)
         } else {
           setFocusedTask(null)
         }
@@ -357,7 +366,7 @@ export function TaskList({
         e.preventDefault()
         const targetId = expandedTaskId || focusedTaskId
         if (!targetId) return
-        const task = tasks.find((t) => t.id === targetId)
+        const task = visibleTasks.find((t) => t.id === targetId)
         if (task) {
           const today = new Date()
           today.setHours(0, 0, 0, 0)
@@ -376,7 +385,7 @@ export function TaskList({
       }
     },
     [
-      tasks,
+      visibleTasks,
       focusedTaskId,
       expandedTaskId,
       projectId,
@@ -471,22 +480,39 @@ export function TaskList({
   )
 
   return (
+    <TaskFilterContext.Provider value={{ filterMyTasks, currentUserId: currentUser?.id }}>
     <div className={cn('flex h-full flex-col', className)} onClick={handleContainerClick}>
       <div
         className="flex items-center justify-between px-6 pb-2 pt-6"
         onClick={handleHeaderClick}
       >
         <h1 className="text-xl font-bold text-[var(--text-primary)]">{title}</h1>
-        {showNewTask && projectId && (
+        <div className="flex items-center gap-1">
           <button
             type="button"
-            onClick={() => setIsAdding(true)}
-            className="flex h-7 w-7 items-center justify-center rounded-md text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--accent-blue)]"
-            aria-label="New task"
+            onClick={() => setFilterMyTasks((v) => !v)}
+            className={cn(
+              'flex h-7 w-7 items-center justify-center rounded-md transition-colors',
+              filterMyTasks
+                ? 'bg-[var(--accent-blue)]/10 text-[var(--accent-blue)]'
+                : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--accent-blue)]'
+            )}
+            aria-label="Filter: assigned to me"
+            title="Assigned to me"
           >
-            <Plus className="h-4 w-4" />
+            <UserCheck className="h-4 w-4" />
           </button>
-        )}
+          {showNewTask && projectId && (
+            <button
+              type="button"
+              onClick={() => setIsAdding(true)}
+              className="flex h-7 w-7 items-center justify-center rounded-md text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--accent-blue)]"
+              aria-label="New task"
+            >
+              <Plus className="h-4 w-4" />
+            </button>
+          )}
+        </div>
       </div>
 
       <div
@@ -498,14 +524,20 @@ export function TaskList({
 
         {isAdding && taskInputElement}
 
-        {tasks.length === 0 && !isAdding && !children ? (
-          <EmptyState icon={Inbox} title={emptyTitle} subtitle={emptySubtitle} />
+        {visibleTasks.length === 0 && !isAdding && !children ? (
+          filterMyTasks ? (
+            userLoading
+              ? <EmptyState icon={UserCheck} title="Loading user info…" subtitle="Identifying your account" />
+              : <EmptyState icon={UserCheck} title="No tasks assigned to you" subtitle="Assign yourself to a task using the person icon in any task row" />
+          ) : (
+            <EmptyState icon={Inbox} title={emptyTitle} subtitle={emptySubtitle} />
+          )
         ) : sortable ? (
           <SortableContext
-            items={tasks.map((t) => `task-${t.id}`)}
+            items={visibleTasks.map((t) => `task-${t.id}`)}
             strategy={verticalListSortingStrategy}
           >
-            {tasks.map((task, i) => (
+            {visibleTasks.map((task, i) => (
               <Fragment key={task.id}>
                 {insertIndex === i && (
                   <div className="mx-4 flex items-center gap-1 py-0.5">
@@ -516,7 +548,7 @@ export function TaskList({
                 <TaskRow task={task} sortable />
               </Fragment>
             ))}
-            {insertIndex != null && insertIndex >= tasks.length && (
+            {insertIndex != null && insertIndex >= visibleTasks.length && (
               <div className="mx-4 flex items-center gap-1 py-0.5">
                 <div className="h-1.5 w-1.5 rounded-full bg-[var(--accent-blue)]" />
                 <div className="h-[2px] flex-1 rounded-full bg-[var(--accent-blue)]" />
@@ -524,11 +556,12 @@ export function TaskList({
             )}
           </SortableContext>
         ) : (
-          tasks.map((task) => <TaskRow key={task.id} task={task} />)
+          visibleTasks.map((task) => <TaskRow key={task.id} task={task} />)
         )}
 
         {children}
       </div>
     </div>
+    </TaskFilterContext.Provider>
   )
 }

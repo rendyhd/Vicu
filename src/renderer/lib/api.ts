@@ -160,6 +160,14 @@ export const api = {
   pickAndUploadAttachment: (taskId: number) =>
     window.api.pickAndUploadAttachment(taskId) as Promise<ApiResult<{ count: number }>>,
 
+  // Assignees
+  searchUsers: (query: string) =>
+    window.api.searchUsers(query) as Promise<ApiResult<VikunjaUser[]>>,
+  addAssigneeToTask: (taskId: number, userId: number) =>
+    window.api.addAssigneeToTask(taskId, userId) as Promise<ApiResult<VikunjaUser>>,
+  removeAssigneeFromTask: (taskId: number, userId: number) =>
+    window.api.removeAssigneeFromTask(taskId, userId) as Promise<ApiResult<void>>,
+
   // Window controls
   windowMinimize: () => window.api.windowMinimize(),
   windowMaximize: () => window.api.windowMaximize(),
