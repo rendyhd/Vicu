@@ -19,6 +19,7 @@ import { storeAPIToken, getAPIToken, isEncryptionAvailable, API_TOKEN_NO_EXPIRY 
 let mainWindow: BrowserWindow | null = null
 let quickEntryWindow: BrowserWindow | null = null
 let quickViewWindow: BrowserWindow | null = null
+let startupComplete = false
 
 // Register shared state so ipc-handlers can access these without a circular import.
 // The actual function bodies are defined below; the closures capture the module-level
@@ -492,6 +493,7 @@ if (!gotLock) {
 
     const config = loadConfig()
     mainWindow = createMainWindow(config)
+    startupComplete = true
 
     // Sync Electron's native theme with the user's config setting
     const themeValue = config?.theme ?? 'system'
@@ -601,6 +603,9 @@ if (!gotLock) {
   })
 
   app.on('window-all-closed', () => {
+    // Ignore window-all-closed during startup — the silent reauth window
+    // may close before the main window is created, which would quit the app.
+    if (!startupComplete) return
     // macOS: never quit on window-all-closed (standard macOS behavior)
     // Windows: only quit if tray is not active
     if (!isMac && !hasTray()) {
