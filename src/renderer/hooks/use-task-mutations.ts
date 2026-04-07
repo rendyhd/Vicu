@@ -25,6 +25,7 @@ export function useAddLabel() {
     onSettled: () => {
       qc.invalidateQueries({ queryKey: ['tasks'] })
       qc.invalidateQueries({ queryKey: ['view-tasks'] })
+      qc.invalidateQueries({ queryKey: ['section-tasks'] })
       qc.invalidateQueries({ queryKey: ['task-detail'] })
     },
   })
@@ -41,6 +42,7 @@ export function useRemoveLabel() {
     onSettled: () => {
       qc.invalidateQueries({ queryKey: ['tasks'] })
       qc.invalidateQueries({ queryKey: ['view-tasks'] })
+      qc.invalidateQueries({ queryKey: ['section-tasks'] })
       qc.invalidateQueries({ queryKey: ['task-detail'] })
     },
   })
@@ -75,6 +77,7 @@ export function useCreateSubtask() {
     onSettled: () => {
       qc.invalidateQueries({ queryKey: ['tasks'] })
       qc.invalidateQueries({ queryKey: ['view-tasks'] })
+      qc.invalidateQueries({ queryKey: ['section-tasks'] })
       qc.invalidateQueries({ queryKey: ['task-detail'] })
     },
   })
@@ -299,8 +302,12 @@ export function useCompleteTask() {
 
       await qc.cancelQueries({ queryKey: ['tasks'] })
       await qc.cancelQueries({ queryKey: ['view-tasks'] })
+      await qc.cancelQueries({ queryKey: ['section-tasks'] })
       const previousTaskQueries = qc.getQueriesData<Task[]>({ queryKey: ['tasks'] })
       const previousViewQueries = qc.getQueriesData<Task[]>({ queryKey: ['view-tasks'] })
+      const previousSectionQueries = qc.getQueriesData<SectionData[]>({
+        queryKey: ['section-tasks'],
+      })
 
       qc.setQueriesData<Task[]>({ queryKey: ['tasks'] }, (old) =>
         old?.map((t) => (t.id === task.id ? { ...t, done: true } : t))
@@ -308,8 +315,16 @@ export function useCompleteTask() {
       qc.setQueriesData<Task[]>({ queryKey: ['view-tasks'] }, (old) =>
         old?.map((t) => (t.id === task.id ? { ...t, done: true } : t))
       )
+      qc.setQueriesData<SectionData[]>({ queryKey: ['section-tasks'] }, (old) =>
+        old?.map((section) => ({
+          ...section,
+          tasks: section.tasks.map((t) =>
+            t.id === task.id ? { ...t, done: true } : t
+          ),
+        }))
+      )
 
-      return { previousTaskQueries, previousViewQueries }
+      return { previousTaskQueries, previousViewQueries, previousSectionQueries }
     },
     onError: (_err, task, context) => {
       removeCompleted(task.id)
@@ -320,6 +335,11 @@ export function useCompleteTask() {
       }
       if (context?.previousViewQueries) {
         for (const [key, data] of context.previousViewQueries) {
+          qc.setQueryData(key, data)
+        }
+      }
+      if (context?.previousSectionQueries) {
+        for (const [key, data] of context.previousSectionQueries) {
           qc.setQueryData(key, data)
         }
       }
@@ -360,8 +380,12 @@ export function useUncompleteTask() {
 
       await qc.cancelQueries({ queryKey: ['tasks'] })
       await qc.cancelQueries({ queryKey: ['view-tasks'] })
+      await qc.cancelQueries({ queryKey: ['section-tasks'] })
       const previousTaskQueries = qc.getQueriesData<Task[]>({ queryKey: ['tasks'] })
       const previousViewQueries = qc.getQueriesData<Task[]>({ queryKey: ['view-tasks'] })
+      const previousSectionQueries = qc.getQueriesData<SectionData[]>({
+        queryKey: ['section-tasks'],
+      })
 
       qc.setQueriesData<Task[]>({ queryKey: ['tasks'] }, (old) =>
         old?.map((t) => (t.id === task.id ? { ...t, done: false } : t))
@@ -369,8 +393,16 @@ export function useUncompleteTask() {
       qc.setQueriesData<Task[]>({ queryKey: ['view-tasks'] }, (old) =>
         old?.map((t) => (t.id === task.id ? { ...t, done: false } : t))
       )
+      qc.setQueriesData<SectionData[]>({ queryKey: ['section-tasks'] }, (old) =>
+        old?.map((section) => ({
+          ...section,
+          tasks: section.tasks.map((t) =>
+            t.id === task.id ? { ...t, done: false } : t
+          ),
+        }))
+      )
 
-      return { previousTaskQueries, previousViewQueries, wasInStore }
+      return { previousTaskQueries, previousViewQueries, previousSectionQueries, wasInStore }
     },
     onError: (_err, task, context) => {
       if (context?.wasInStore) {
@@ -385,6 +417,11 @@ export function useUncompleteTask() {
       }
       if (context?.previousViewQueries) {
         for (const [key, data] of context.previousViewQueries) {
+          qc.setQueryData(key, data)
+        }
+      }
+      if (context?.previousSectionQueries) {
+        for (const [key, data] of context.previousSectionQueries) {
           qc.setQueryData(key, data)
         }
       }
@@ -515,6 +552,8 @@ export function useUpdateLabel() {
     onSettled: () => {
       qc.invalidateQueries({ queryKey: ['labels'] })
       qc.invalidateQueries({ queryKey: ['tasks'] })
+      qc.invalidateQueries({ queryKey: ['view-tasks'] })
+      qc.invalidateQueries({ queryKey: ['section-tasks'] })
       qc.invalidateQueries({ queryKey: ['task-detail'] })
     },
   })
@@ -539,6 +578,8 @@ export function useDeleteLabel() {
     onSettled: () => {
       qc.invalidateQueries({ queryKey: ['labels'] })
       qc.invalidateQueries({ queryKey: ['tasks'] })
+      qc.invalidateQueries({ queryKey: ['view-tasks'] })
+      qc.invalidateQueries({ queryKey: ['section-tasks'] })
       qc.invalidateQueries({ queryKey: ['task-detail'] })
     },
   })
