@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback, useMemo, Fragment } from 'rea
 import { Plus, Inbox } from 'lucide-react'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { cn } from '@/lib/cn'
-import { useCreateTask, useCompleteTask, useUpdateTask, useDeleteTask, useAddLabel } from '@/hooks/use-task-mutations'
+import { useCreateTask, useCompleteTask, useUpdateTask, useDeleteTask, useAddLabel, useCreateLabel } from '@/hooks/use-task-mutations'
 import { useSelectionStore } from '@/stores/selection-store'
 import { useTaskParser } from '@/hooks/use-task-parser'
 import { useLabels } from '@/hooks/use-labels'
@@ -62,6 +62,7 @@ export function TaskList({
   const labelItems = useMemo(() => (allLabels ?? []).map((l) => ({ id: l.id, title: l.title })), [allLabels])
   const createTask = useCreateTask()
   const addLabel = useAddLabel()
+  const createLabel = useCreateLabel()
   const completeTask = useCompleteTask()
   const updateTask = useUpdateTask()
   const deleteTask = useDeleteTask()
@@ -187,6 +188,15 @@ export function TaskList({
               )
               if (match) {
                 addLabel.mutate({ taskId, labelId: match.id })
+              } else {
+                createLabel.mutate(
+                  { title: labelName },
+                  {
+                    onSuccess: (newLabel) => {
+                      addLabel.mutate({ taskId, labelId: newLabel.id })
+                    },
+                  }
+                )
               }
             }
           }

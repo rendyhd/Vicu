@@ -10,6 +10,7 @@ contextBridge.exposeInMainWorld('quickEntryApi', {
   fetchLabels: () => ipcRenderer.invoke('fetch-labels'),
   fetchProjects: () => ipcRenderer.invoke('fetch-projects'),
   addLabelToTask: (taskId: number, labelId: number) => ipcRenderer.invoke('add-label-to-task', taskId, labelId),
+  createLabel: (label: { title: string; hex_color?: string }) => ipcRenderer.invoke('create-label', label),
   onShowWindow: (callback: () => void) => {
     ipcRenderer.on('window-shown', callback)
   },

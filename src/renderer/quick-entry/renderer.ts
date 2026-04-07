@@ -9,6 +9,7 @@ declare global {
       fetchLabels(): Promise<{ success: boolean; data?: Array<{ id: number; title: string }> }>
       fetchProjects(): Promise<{ success: boolean; data?: Array<{ id: number; title: string }> }>
       addLabelToTask(taskId: number, labelId: number): Promise<{ success: boolean }>
+      createLabel(label: { title: string; hex_color?: string }): Promise<{ success: boolean; data?: { id: number; title: string } }>
       onShowWindow(callback: () => void): void
       onHideWindow(callback: () => void): void
       onSyncCompleted(callback: () => void): void
@@ -488,6 +489,15 @@ async function saveTask(): Promise<void> {
             await window.quickEntryApi.addLabelToTask(taskId, match.id)
           } catch {
             // Skip silently
+          }
+        } else {
+          try {
+            const created = await window.quickEntryApi.createLabel({ title: labelName })
+            if (created.success && created.data?.id) {
+              await window.quickEntryApi.addLabelToTask(taskId, created.data.id)
+            }
+          } catch {
+            // Skip silently — label creation failed (e.g. offline)
           }
         }
       }
