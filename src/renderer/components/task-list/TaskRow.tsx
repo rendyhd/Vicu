@@ -219,13 +219,6 @@ export function TaskRow({ task, sortable = false }: TaskRowProps) {
         setDateToToday()
         return
       }
-      // Ctrl+Backspace / ⌘⌫: delete task
-      if ((e.ctrlKey || e.metaKey) && e.key === 'Backspace') {
-        e.preventDefault()
-        deleteTask.mutate(task.id)
-        collapseAll()
-        return
-      }
     },
     [handleSave, collapseAll, completeTask, deleteTask, task, setDateToToday]
   )
@@ -553,7 +546,7 @@ export function TaskRow({ task, sortable = false }: TaskRowProps) {
               collapseAll()
             }}
             className="flex h-6 w-6 items-center justify-center rounded text-[var(--text-secondary)] transition-colors hover:bg-accent-red/10 hover:text-accent-red"
-            title={`Delete task (${window.api.platform === 'darwin' ? '\u2318\u232B' : 'Ctrl+Backspace'})`}
+            title="Delete task"
           >
             <Trash2 className="h-3.5 w-3.5" />
           </button>

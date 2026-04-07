@@ -334,23 +334,6 @@ export function TaskList({
         return
       }
 
-      // Ctrl+Backspace / ⌘⌫: delete focused task
-      if ((e.ctrlKey || e.metaKey) && e.key === 'Backspace') {
-        e.preventDefault()
-        const targetId = expandedTaskId || focusedTaskId
-        if (!targetId) return
-        const idx = tasks.findIndex((t) => t.id === targetId)
-        deleteTask.mutate(targetId)
-        collapseAll()
-        if (idx < taskCount - 1) {
-          setFocusedTask(tasks[idx + 1].id)
-        } else if (idx > 0) {
-          setFocusedTask(tasks[idx - 1].id)
-        } else {
-          setFocusedTask(null)
-        }
-        return
-      }
 
       // Ctrl+T / ⌘T or "!" : set due date to today
       if (((e.ctrlKey || e.metaKey) && e.key === 't') || (!e.ctrlKey && !e.altKey && !e.metaKey && e.key === '!')) {
