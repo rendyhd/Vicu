@@ -142,12 +142,15 @@ export function useUpdateTask() {
         }
       }
     },
-    onSettled: () => {
+    onSettled: (_data, _err, variables) => {
       qc.invalidateQueries({ queryKey: ['tasks'] })
       qc.invalidateQueries({ queryKey: ['view-tasks'] })
       qc.invalidateQueries({ queryKey: ['section-tasks'] })
-      // Refresh per-task reminder timers in main process (fire-and-forget)
-      api.refreshTaskReminders()
+      // Only refresh reminder timers when reminder-relevant fields changed
+      const t = variables.task
+      if ('reminders' in t || 'due_date' in t) {
+        api.refreshTaskReminders()
+      }
     },
   })
 }

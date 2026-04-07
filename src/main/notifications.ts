@@ -61,6 +61,10 @@ export async function refreshTaskReminders(): Promise<void> {
 
       const key = `${taskId}-${r.reminder}`
       const delay = reminderTime - now
+      // setTimeout uses a 32-bit signed int internally; delays > 2^31-1 ms (~24.85 days)
+      // overflow and fire immediately. Skip far-future reminders — they'll be picked up
+      // on a future refresh once they're within range.
+      if (delay > 2_147_483_647) continue
       const timerId = setTimeout(() => {
         fireTaskReminder(taskId, taskTitle, config)
         reminderTimers.delete(key)
