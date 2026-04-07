@@ -4,6 +4,8 @@ import { useDroppable } from '@dnd-kit/core'
 import { Pencil, Trash2, X } from 'lucide-react'
 import { useLabels } from '@/hooks/use-labels'
 import { useCreateLabel, useUpdateLabel, useDeleteLabel } from '@/hooks/use-task-mutations'
+import { useConfirmDelete } from '@/hooks/use-confirm-delete'
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { useSidebarStore } from '@/stores/sidebar-store'
 import { cn } from '@/lib/cn'
 import type { Label } from '@/lib/vikunja-types'
@@ -183,6 +185,7 @@ function TagListItem({
 export function TagList() {
   const { data: labels, isLoading } = useLabels()
   const deleteLabel = useDeleteLabel()
+  const { confirmDelete, dialogProps: deleteDialogProps } = useConfirmDelete()
   const { labelDialogOpen, setLabelDialogOpen } = useSidebarStore()
 
   const [editingLabel, setEditingLabel] = useState<Label | null>(null)
@@ -240,9 +243,13 @@ export function TagList() {
           </button>
           <button
             type="button"
-            onClick={() => {
-              deleteLabel.mutate(contextMenu.label.id)
+            onClick={async () => {
+              const label = contextMenu.label
               setContextMenu(null)
+              const ok = await confirmDelete('Delete this label? It will be removed from all tasks. This cannot be undone.')
+              if (ok) {
+                deleteLabel.mutate(label.id)
+              }
             }}
             className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-accent-red hover:bg-[var(--bg-hover)]"
           >
@@ -257,6 +264,7 @@ export function TagList() {
         label={editingLabel}
         onClose={handleCloseDialog}
       />
+      <ConfirmDialog {...deleteDialogProps} />
     </>
   )
 }

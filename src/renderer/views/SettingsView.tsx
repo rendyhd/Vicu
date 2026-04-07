@@ -288,6 +288,18 @@ export function SettingsView() {
               <span className="text-xs text-[var(--text-secondary)]">(advised for Quick Entry / View)</span>
             </label>
 
+            <label className="flex cursor-pointer items-center gap-2">
+              <input
+                type="checkbox"
+                checked={fullConfig?.confirm_before_delete !== false}
+                onChange={(e) => handleQuickEntryChange({ confirm_before_delete: e.target.checked })}
+                className="h-4 w-4 rounded border-[var(--border-color)] accent-accent-blue"
+              />
+              <span className="text-sm text-[var(--text-primary)]">
+                Confirm before deleting
+              </span>
+            </label>
+
             <div>
               <label className="mb-1 block text-xs text-[var(--text-secondary)]">Inbox Project</label>
               <select

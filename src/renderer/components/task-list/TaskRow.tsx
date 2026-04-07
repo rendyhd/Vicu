@@ -7,6 +7,8 @@ import { CSS } from '@dnd-kit/utilities'
 import { cn } from '@/lib/cn'
 import { useSelectionStore } from '@/stores/selection-store'
 import { useUpdateTask, useCompleteTask, useDeleteTask, useUploadAttachmentFromDrop } from '@/hooks/use-task-mutations'
+import { useConfirmDelete } from '@/hooks/use-confirm-delete'
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { isNullDate } from '@/lib/date-utils'
 import type { Task, TaskReminder } from '@/lib/vikunja-types'
 import { TaskCheckbox } from './TaskCheckbox'
@@ -100,6 +102,7 @@ export function TaskRow({ task, sortable = false }: TaskRowProps) {
   const updateTask = useUpdateTask()
   const completeTask = useCompleteTask()
   const deleteTask = useDeleteTask()
+  const { confirmDelete, dialogProps } = useConfirmDelete()
   const uploadFromDrop = useUploadAttachmentFromDrop()
   const isExpanded = expandedTaskId === task.id
   const isFocused = focusedTaskId === task.id
@@ -541,9 +544,12 @@ export function TaskRow({ task, sortable = false }: TaskRowProps) {
           </button>
           <button
             type="button"
-            onClick={() => {
-              deleteTask.mutate(task.id)
-              collapseAll()
+            onClick={async () => {
+              const ok = await confirmDelete('Delete this task? This cannot be undone.')
+              if (ok) {
+                deleteTask.mutate(task.id)
+                collapseAll()
+              }
             }}
             className="flex h-6 w-6 items-center justify-center rounded text-[var(--text-secondary)] transition-colors hover:bg-accent-red/10 hover:text-accent-red"
             title="Delete task"
@@ -590,6 +596,7 @@ export function TaskRow({ task, sortable = false }: TaskRowProps) {
           )}
         </div>
       </div>
+      <ConfirmDialog {...dialogProps} />
     </div>
   )
 }

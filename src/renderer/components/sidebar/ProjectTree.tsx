@@ -3,6 +3,8 @@ import { Pencil, Trash2, X } from 'lucide-react'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { useProjects, type ProjectTreeNode } from '@/hooks/use-projects'
 import { useCreateProject, useUpdateProject, useDeleteProject } from '@/hooks/use-task-mutations'
+import { useConfirmDelete } from '@/hooks/use-confirm-delete'
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { useSidebarStore } from '@/stores/sidebar-store'
 import { cn } from '@/lib/cn'
 import { api } from '@/lib/api'
@@ -142,6 +144,7 @@ function ProjectDialog({
 export function ProjectTree() {
   const { data, isLoading } = useProjects()
   const deleteProject = useDeleteProject()
+  const { confirmDelete, dialogProps: deleteDialogProps } = useConfirmDelete()
   const { projectDialogOpen, setProjectDialogOpen } = useSidebarStore()
 
   const [inboxProjectId, setInboxProjectId] = useState<number | undefined>()
@@ -236,9 +239,13 @@ export function ProjectTree() {
           </button>
           <button
             type="button"
-            onClick={() => {
-              deleteProject.mutate(contextMenu.project.id)
+            onClick={async () => {
+              const project = contextMenu.project
               setContextMenu(null)
+              const ok = await confirmDelete('Delete this project? All tasks in it will be deleted. This cannot be undone.')
+              if (ok) {
+                deleteProject.mutate(project.id)
+              }
             }}
             className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-accent-red hover:bg-[var(--bg-hover)]"
           >
@@ -253,6 +260,7 @@ export function ProjectTree() {
         project={editingProject}
         onClose={handleCloseDialog}
       />
+      <ConfirmDialog {...deleteDialogProps} />
     </>
   )
 }

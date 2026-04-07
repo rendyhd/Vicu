@@ -215,4 +215,6 @@ export interface AppConfig {
   // NLP task parser
   nlp_enabled?: boolean
   nlp_syntax_mode?: 'todoist' | 'vikunja'
+  // Delete confirmation
+  confirm_before_delete?: boolean
 }

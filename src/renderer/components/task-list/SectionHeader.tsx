@@ -6,6 +6,8 @@ import { CSS } from '@dnd-kit/utilities'
 import { useDndContext } from '@dnd-kit/core'
 import { cn } from '@/lib/cn'
 import { useUpdateProject, useDeleteProject } from '@/hooks/use-task-mutations'
+import { useConfirmDelete } from '@/hooks/use-confirm-delete'
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import type { Project } from '@/lib/vikunja-types'
 
 interface SectionHeaderProps {
@@ -30,6 +32,7 @@ export function SectionHeader({ project, siblings, onAddTask }: SectionHeaderPro
   const menuBtnRef = useRef<HTMLButtonElement>(null)
   const updateProject = useUpdateProject()
   const deleteProject = useDeleteProject()
+  const { confirmDelete, dialogProps: deleteDialogProps } = useConfirmDelete()
   const { active } = useDndContext()
 
   const {
@@ -96,9 +99,12 @@ export function SectionHeader({ project, siblings, onAddTask }: SectionHeaderPro
     setIsRenaming(false)
   }
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     setShowMenu(false)
-    deleteProject.mutate(project.id)
+    const ok = await confirmDelete('Delete this project? All tasks in it will be deleted. This cannot be undone.')
+    if (ok) {
+      deleteProject.mutate(project.id)
+    }
   }
 
   return (
@@ -195,6 +201,7 @@ export function SectionHeader({ project, siblings, onAddTask }: SectionHeaderPro
           )}
         </div>
       </div>
+      <ConfirmDialog {...deleteDialogProps} />
     </div>
   )
 }
