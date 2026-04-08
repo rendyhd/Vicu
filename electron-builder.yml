@@ -34,7 +34,7 @@ win:
 nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true
-  createDesktopShortcut: always
+  createDesktopShortcut: false
   license: LICENSE
   installerIcon: build/icon.ico
   uninstallerIcon: build/icon.ico
