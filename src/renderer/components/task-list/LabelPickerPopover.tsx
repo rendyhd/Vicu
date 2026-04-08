@@ -3,6 +3,7 @@ import { Check, Plus } from 'lucide-react'
 import { useLabels } from '@/hooks/use-labels'
 import { useAddLabel, useRemoveLabel, useCreateLabel } from '@/hooks/use-task-mutations'
 import type { Label } from '@/lib/vikunja-types'
+import { normalizeHex } from '@/lib/constants'
 
 interface LabelPickerPopoverProps {
   taskId: number
@@ -71,7 +72,7 @@ export function LabelPickerPopover({ taskId, currentLabels, onClose }: LabelPick
           type="text"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Search tags..."
+          placeholder="Search labels..."
           autoFocus
           className="w-full bg-transparent text-xs text-[var(--text-primary)] placeholder:text-[var(--text-secondary)] focus:outline-none"
           onKeyDown={(e) => {
@@ -84,7 +85,7 @@ export function LabelPickerPopover({ taskId, currentLabels, onClose }: LabelPick
 
       <div className="max-h-60 overflow-y-auto py-1">
         {filteredLabels.length === 0 && !trimmedQuery && (
-          <div className="px-3 py-2 text-xs text-[var(--text-secondary)]">No tags</div>
+          <div className="px-3 py-2 text-xs text-[var(--text-secondary)]">No labels</div>
         )}
 
         {filteredLabels.map((label) => (
@@ -96,7 +97,7 @@ export function LabelPickerPopover({ taskId, currentLabels, onClose }: LabelPick
           >
             <span
               className="h-2.5 w-2.5 shrink-0 rounded-full"
-              style={{ backgroundColor: label.hex_color || 'var(--text-secondary)' }}
+              style={{ backgroundColor: normalizeHex(label.hex_color) || 'var(--text-secondary)' }}
             />
             <span className="min-w-0 flex-1 truncate">{label.title}</span>
             {currentIds.has(label.id) && (
@@ -105,7 +106,7 @@ export function LabelPickerPopover({ taskId, currentLabels, onClose }: LabelPick
           </button>
         ))}
 
-        {/* Create new tag option */}
+        {/* Create new label option */}
         {trimmedQuery && !exactMatch && (
           <button
             type="button"

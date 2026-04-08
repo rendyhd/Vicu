@@ -397,7 +397,7 @@ export async function updateLabel(
   const c = await getConfigOrFail()
   if ('success' in c) return c
 
-  return requestWithRetry<unknown>('PUT', `${c.url}/api/v1/labels/${id}`, c.token, label)
+  return requestWithRetry<unknown>('POST', `${c.url}/api/v1/labels/${id}`, c.token, label)
 }
 
 export async function deleteLabel(id: number): Promise<ApiResult<void>> {

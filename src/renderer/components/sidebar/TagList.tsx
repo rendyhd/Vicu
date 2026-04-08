@@ -9,6 +9,7 @@ import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { useSidebarStore } from '@/stores/sidebar-store'
 import { cn } from '@/lib/cn'
 import type { Label } from '@/lib/vikunja-types'
+import { normalizeHex } from '@/lib/constants'
 
 function LabelDialog({
   open,
@@ -27,7 +28,7 @@ function LabelDialog({
   useEffect(() => {
     if (open) {
       setTitle(label?.title ?? '')
-      setHexColor(label?.hex_color ?? '')
+      setHexColor(normalizeHex(label?.hex_color) ?? '')
     }
   }, [open, label])
 
@@ -51,14 +52,13 @@ function LabelDialog({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}>
       <div
         className="w-[360px] rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] shadow-xl"
-        onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-[var(--border-color)] px-5 py-3">
           <h2 className="text-sm font-semibold text-[var(--text-primary)]">
-            {label ? 'Edit Tag' : 'New Tag'}
+            {label ? 'Edit Label' : 'New Label'}
           </h2>
           <button
             type="button"
@@ -76,7 +76,7 @@ function LabelDialog({
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="Tag name"
+              placeholder="Label name"
               autoFocus
               className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)] focus:border-accent-blue focus:outline-none"
               onKeyDown={(e) => {
@@ -87,19 +87,31 @@ function LabelDialog({
 
           <div>
             <label className="mb-1 block text-xs text-[var(--text-secondary)]">Color</label>
-            <div className="flex items-center gap-2">
-              <input
-                type="color"
-                value={hexColor || '#6b7280'}
-                onChange={(e) => setHexColor(e.target.value)}
-                className="h-8 w-8 cursor-pointer rounded border border-[var(--border-color)]"
+            <div className="flex flex-wrap gap-1.5">
+              {['#e74c3c', '#e67e22', '#f1c40f', '#2ecc71', '#1abc9c', '#3498db', '#9b59b6', '#e91e63', '#795548', '#607d8b', '#34495e', '#000000'].map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => setHexColor(c)}
+                  className={cn(
+                    'h-6 w-6 rounded-full transition-transform hover:scale-110',
+                    hexColor === c && 'ring-2 ring-[var(--text-primary)] ring-offset-1 ring-offset-[var(--bg-primary)]'
+                  )}
+                  style={{ backgroundColor: c }}
+                />
+              ))}
+            </div>
+            <div className="mt-2 flex items-center gap-2">
+              <span
+                className="h-6 w-6 shrink-0 rounded-full border border-[var(--border-color)]"
+                style={{ backgroundColor: hexColor || 'var(--bg-hover)' }}
               />
               <input
                 type="text"
                 value={hexColor}
                 onChange={(e) => setHexColor(e.target.value)}
                 placeholder="#hex"
-                className="flex-1 rounded-md border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)] focus:border-accent-blue focus:outline-none"
+                className="flex-1 rounded-md border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-1.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)] focus:border-accent-blue focus:outline-none"
               />
               {hexColor && (
                 <button
@@ -174,8 +186,8 @@ function TagListItem({
       )}
     >
       <span
-        className="h-2 w-2 shrink-0 rounded-full"
-        style={{ backgroundColor: label.hex_color || 'var(--text-secondary)' }}
+        className="h-2.5 w-2.5 shrink-0 rounded-full bg-[var(--text-secondary)]"
+        style={normalizeHex(label.hex_color) ? { backgroundColor: normalizeHex(label.hex_color) } : undefined}
       />
       <span className="min-w-0 flex-1 truncate text-left">{label.title}</span>
     </button>

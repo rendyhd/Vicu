@@ -10,6 +10,7 @@ import { useUpdateTask, useCompleteTask, useDeleteTask, useUploadAttachmentFromD
 import { useConfirmDelete } from '@/hooks/use-confirm-delete'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { isNullDate } from '@/lib/date-utils'
+import { normalizeHex } from '@/lib/constants'
 import type { Task, TaskReminder } from '@/lib/vikunja-types'
 import { TaskCheckbox } from './TaskCheckbox'
 import { TaskDueBadge } from './TaskDueBadge'
@@ -26,23 +27,23 @@ import { formatRecurrenceLabel } from '@/lib/recurrence'
 
 type PopoverType = 'date' | 'label' | 'project' | 'subtasks' | 'reminder' | 'attachment' | null
 
-function getLabelStyle(hex: string | undefined): React.CSSProperties {
+function getLabelStyle(rawHex: string | undefined): React.CSSProperties {
+  const hex = normalizeHex(rawHex)
   if (!hex) return { backgroundColor: 'var(--bg-hover)', color: 'var(--text-secondary)' }
+  const r = parseInt(hex.slice(1, 3), 16)
+  const g = parseInt(hex.slice(3, 5), 16)
+  const b = parseInt(hex.slice(5, 7), 16)
   const isDark = document.documentElement.classList.contains('dark')
   if (isDark) {
-    // Lighten the color for readable text on dark backgrounds
-    const r = parseInt(hex.slice(1, 3), 16)
-    const g = parseInt(hex.slice(3, 5), 16)
-    const b = parseInt(hex.slice(5, 7), 16)
     const lr = Math.min(255, r + Math.round((255 - r) * 0.45))
     const lg = Math.min(255, g + Math.round((255 - g) * 0.45))
     const lb = Math.min(255, b + Math.round((255 - b) * 0.45))
     return {
-      backgroundColor: `rgba(${r}, ${g}, ${b}, 0.2)`,
+      backgroundColor: `rgba(${r}, ${g}, ${b}, 0.12)`,
       color: `rgb(${lr}, ${lg}, ${lb})`,
     }
   }
-  return { backgroundColor: `${hex}20`, color: hex }
+  return { backgroundColor: `rgba(${r}, ${g}, ${b}, 0.12)`, color: hex }
 }
 
 interface TaskRowProps {
