@@ -12,7 +12,7 @@ import { getBrowserContext, type BrowserContext } from './browser-client'
 import { getBrowserUrlFromWindow, prewarmUrlReader, shutdownUrlReader, BROWSER_PROCESSES } from './window-url-reader'
 import { isRegistered, unregisterHosts, registerHosts } from './browser-host-registration'
 import { checkForUpdates } from './update-checker'
-import { isMac, isWindows } from './platform'
+import { isMac, isWindows, isLinux } from './platform'
 import { setupApplicationMenu } from './app-menu'
 import { storeAPIToken, getAPIToken, isEncryptionAvailable, API_TOKEN_NO_EXPIRY } from './auth/token-store'
 
@@ -32,6 +32,7 @@ registerQuickEntryState({
   hideQuickView: () => hideQuickView(),
   setViewerHeight: (h) => setViewerHeight(h),
   applyQuickEntrySettings: () => applyQuickEntrySettings(),
+  getLastShortcutStatus: () => lastShortcutStatus,
 })
 
 // --- Quick Entry/View constants ---
@@ -99,8 +100,16 @@ async function showQuickEntry(): Promise<void> {
   const fgHwnd = getForegroundWindowHandle()
 
   const isObsidian = fgProcess === 'Obsidian' || fgProcess === 'obsidian'
-  const wantObsidian = !!(config?.obsidian_mode && config.obsidian_mode !== 'off' && config.obsidian_api_key && isObsidian)
-  const wantBrowser = !isObsidian && !!(config?.browser_link_mode && config.browser_link_mode !== 'off' && BROWSER_PROCESSES.has(fgProcess))
+  // Obsidian integration is disabled on Linux by design — Wayland restricts
+  // foreground-process detection and "always-fire" Obsidian fetches would
+  // surprise users who aren't exclusively working in Obsidian. Users on Linux
+  // can still open Obsidian deep links via plain text URIs in task notes.
+  const wantObsidian = !isLinux && !!(config?.obsidian_mode && config.obsidian_mode !== 'off' && config.obsidian_api_key && isObsidian)
+  // Browser link: on Linux we trust the extension cache's 3-second freshness
+  // window to gate stale data instead of foreground checks, so skip the
+  // BROWSER_PROCESSES gate (fgProcess is always '' on Wayland).
+  const processIsBrowser = isLinux ? true : BROWSER_PROCESSES.has(fgProcess)
+  const wantBrowser = !isObsidian && !!(config?.browser_link_mode && config.browser_link_mode !== 'off' && processIsBrowser)
 
   // 3. Browser context: try extension cache first (<1ms sync file read).
   let browserContext: BrowserContext | null = null
@@ -263,8 +272,28 @@ function setViewerHeight(height: number): void {
 }
 
 // --- Shortcut registration ---
-function registerQuickEntryShortcuts(config: AppConfig): { entry: boolean; viewer: boolean } {
-  const result = { entry: false, viewer: false }
+// Latest global-shortcut registration state. Surfaced to the renderer via the
+// `get-global-shortcut-status` IPC so Settings can show a warning banner when
+// registration fails (most common on Wayland, where Electron 33 can't talk to
+// the XDG portal).
+//
+// `waylandLimited` is a Linux-specific caveat: on Wayland, Electron's
+// globalShortcut.register() happily returns true, but the key only fires when
+// Vicu itself is focused because Wayland's security model doesn't forward keys
+// to unfocused clients. We detect the session type and surface it so Settings
+// can show a proactive warning even when registration "succeeded".
+const isWaylandSession = isLinux && (
+  process.env.XDG_SESSION_TYPE === 'wayland' || !!process.env.WAYLAND_DISPLAY
+)
+
+let lastShortcutStatus: { entry: boolean; viewer: boolean; waylandLimited: boolean } = {
+  entry: false,
+  viewer: false,
+  waylandLimited: isWaylandSession,
+}
+
+function registerQuickEntryShortcuts(config: AppConfig): { entry: boolean; viewer: boolean; waylandLimited: boolean } {
+  const result = { entry: false, viewer: false, waylandLimited: isWaylandSession }
 
   if (config.quick_entry_enabled) {
     const entryHotkey = config.quick_entry_hotkey || DEFAULT_QUICK_ENTRY_HOTKEY
@@ -286,6 +315,7 @@ function registerQuickEntryShortcuts(config: AppConfig): { entry: boolean; viewe
     }
   }
 
+  lastShortcutStatus = result
   return result
 }
 
@@ -371,9 +401,13 @@ function initQuickEntryWindows(config: AppConfig): void {
 }
 
 // Apply quick entry settings (called from IPC when settings change)
-function applyQuickEntrySettings(): { entry: boolean; viewer: boolean } {
+function applyQuickEntrySettings(): { entry: boolean; viewer: boolean; waylandLimited: boolean } {
   const config = loadConfig()
-  if (!config) return { entry: false, viewer: false }
+  if (!config) {
+    const empty = { entry: false, viewer: false, waylandLimited: isWaylandSession }
+    lastShortcutStatus = empty
+    return empty
+  }
 
   // Unregister existing shortcuts
   globalShortcut.unregisterAll()
@@ -421,7 +455,9 @@ function applyQuickEntrySettings(): { entry: boolean; viewer: boolean } {
     openAtLogin: config.launch_on_startup === true,
     ...(isMac ? { openAsHidden: true, name: 'Vicu' } : {}),
   })
-  return { entry: false, viewer: false }
+  const empty = { entry: false, viewer: false, waylandLimited: isWaylandSession }
+  lastShortcutStatus = empty
+  return empty
 }
 
 // Augment the app type
@@ -431,12 +467,56 @@ declare module 'electron' {
   }
 }
 
+// Pin the app name so `app.getPath('userData')` resolves to ~/.config/vicu on
+// Linux whether we're running the packaged AppImage (which has a package.json
+// inside the asar with name: "vicu") or a bare `electron ./out/main/index.js`
+// dev run (which otherwise falls back to Electron's default "Electron" name
+// and diverges from the bundled vicu-bridge.js that hardcodes "vicu").
+app.setName('vicu')
+
+// Linux: force Chromium's "basic" password-store backend. The default is
+// "detect", which tries libsecret (gnome-keyring / KWallet) and falls back
+// to the basic backend if nothing is found. The detection path, however,
+// deadlocks when the secrets service is running but the "login" keyring
+// collection doesn't exist — common on fresh user accounts and minimal
+// desktop installs — and in that state `safeStorage.isEncryptionAvailable()`
+// returns false so `encryptString()` throws. Pinning to "basic" avoids the
+// deadlock and gives safeStorage a working (if obfuscated-not-encrypted)
+// backend on any Linux system without requiring an unlocked keyring.
+// Must be set before `app.whenReady()`.
+if (isLinux) {
+  app.commandLine.appendSwitch('password-store', 'basic')
+}
+
+// CLI argument parsing. Primarily used on Wayland as an escape hatch for
+// Vicu's global hotkeys: users bind their DE's keyboard shortcut to
+// `vicu --quick-entry` / `vicu --quick-view`, and the already-running instance
+// opens the respective window via the second-instance handler below.
+function parseIntent(argv: readonly string[]): 'quick-entry' | 'quick-view' | null {
+  if (argv.includes('--quick-entry')) return 'quick-entry'
+  if (argv.includes('--quick-view')) return 'quick-view'
+  return null
+}
+let startupIntent: 'quick-entry' | 'quick-view' | null = parseIntent(process.argv)
+
 // Single instance lock — quit if another instance is already running
 const gotLock = app.requestSingleInstanceLock()
 if (!gotLock) {
   app.quit()
 } else {
-  app.on('second-instance', () => {
+  app.on('second-instance', (_event, argv) => {
+    // If the second instance was launched with --quick-entry/--quick-view
+    // (typically from a DE keyboard-shortcut binding on Wayland), show that
+    // window and do NOT raise the main window.
+    const intent = parseIntent(argv)
+    if (intent === 'quick-entry') {
+      showQuickEntry()
+      return
+    }
+    if (intent === 'quick-view') {
+      showQuickView()
+      return
+    }
     if (mainWindow) {
       mainWindow.show()
       if (mainWindow.isMinimized()) mainWindow.restore()
@@ -578,8 +658,12 @@ if (!gotLock) {
       })
     }
 
-    // Quick Entry/View: if either enabled, set up tray + windows + hotkeys
-    if (config?.quick_entry_enabled || config?.quick_view_enabled !== false) {
+    // Quick Entry/View: if either enabled, set up tray + windows + hotkeys.
+    // Require config to be non-null: on first launch loadConfig() returns null,
+    // and `config?.quick_view_enabled !== false` is vacuously true (undefined
+    // !== false), which previously caused initQuickEntryWindows(null) to throw
+    // an unhandled rejection before the user finished setup.
+    if (config && (config.quick_entry_enabled || config.quick_view_enabled !== false)) {
       setupTray()
       initQuickEntryWindows(config)
       globalShortcut.unregisterAll() // Clear stale registrations from crashes
@@ -600,6 +684,18 @@ if (!gotLock) {
         })
       }
     }
+
+    // If the app was launched with --quick-entry/--quick-view (e.g. a DE
+    // keyboard shortcut on Wayland starting a cold instance), open the
+    // requested window and hide the main window so it feels like a hotkey.
+    if (startupIntent === 'quick-entry' && quickEntryWindow) {
+      mainWindow.hide()
+      showQuickEntry()
+    } else if (startupIntent === 'quick-view' && quickViewWindow) {
+      mainWindow.hide()
+      showQuickView()
+    }
+    startupIntent = null
   })
 
   app.on('window-all-closed', () => {

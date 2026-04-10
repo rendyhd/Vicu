@@ -1,7 +1,7 @@
-import { BrowserWindow, session } from 'electron'
+import { BrowserWindow, screen, session } from 'electron'
 import { join } from 'path'
 import type { AppConfig } from './config'
-import { isMac } from './platform'
+import { isMac, isLinux } from './platform'
 
 const SHADOW_PADDING = 20
 const DRAG_HANDLE_HEIGHT = 14
@@ -9,11 +9,24 @@ const DRAG_HANDLE_HEIGHT = 14
 export function createMainWindow(config: AppConfig | null): BrowserWindow {
   const bounds = config?.window_bounds
 
+  // First-launch safety: compute an explicit centered position from the primary
+  // display's work area when no bounds are saved. Wayland compositors cannot
+  // let clients self-position; passing undefined x/y for a frameless window can
+  // trigger a maximize on mutter, which is why Linux first-launches looked
+  // fullscreen before this fix.
+  const defaultWidth = bounds?.width ?? 1100
+  const defaultHeight = bounds?.height ?? 720
+  const workArea = screen.getPrimaryDisplay().workArea
+  const centeredX = workArea.x + Math.max(0, Math.round((workArea.width - defaultWidth) / 2))
+  const centeredY = workArea.y + Math.max(0, Math.round((workArea.height - defaultHeight) / 2))
+  const fallbackX = bounds?.x ?? centeredX
+  const fallbackY = bounds?.y ?? centeredY
+
   const win = new BrowserWindow({
-    width: bounds?.width ?? 1100,
-    height: bounds?.height ?? 720,
-    x: bounds?.x,
-    y: bounds?.y,
+    width: defaultWidth,
+    height: defaultHeight,
+    x: fallbackX,
+    y: fallbackY,
     minWidth: 800,
     minHeight: 500,
     ...(isMac
@@ -52,9 +65,21 @@ export function createMainWindow(config: AppConfig | null): BrowserWindow {
     })
   }
 
-  // Show window once ready to avoid flash
+  // Show window once ready to avoid flash.
+  // On Linux (Wayland/mutter in particular) frameless xdg_toplevels without
+  // server-side decorations get auto-maximized by the compositor when first
+  // mapped. Explicitly unmaximize and force the bounds we asked for.
   win.once('ready-to-show', () => {
     win.show()
+    if (isLinux) {
+      if (win.isMaximized()) win.unmaximize()
+      win.setBounds({
+        x: fallbackX,
+        y: fallbackY,
+        width: defaultWidth,
+        height: defaultHeight,
+      })
+    }
   })
 
   // Load renderer

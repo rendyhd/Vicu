@@ -261,7 +261,13 @@ export function SetupView({ onComplete }: SetupViewProps) {
   }
 
   return (
-    <div className="flex h-screen w-screen items-center justify-center bg-[var(--bg-primary)]">
+    <div className="relative flex h-screen w-screen items-center justify-center bg-[var(--bg-primary)]">
+      {/* Window drag strip — frameless windows need an explicit drag region,
+          especially on Wayland where the compositor can't auto-detect one. */}
+      <div
+        className="absolute inset-x-0 top-0 z-50 h-8"
+        style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
+      />
       <div className="w-full max-w-md rounded-xl border border-[var(--border-color)] bg-[var(--bg-secondary)] p-8 shadow-lg">
         <h1 className="mb-1 text-xl font-bold text-[var(--text-primary)]">
           Connect to Vikunja

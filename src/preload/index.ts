@@ -109,7 +109,11 @@ const api = {
 
   // Quick Entry settings
   applyQuickEntrySettings: () =>
-    ipcRenderer.invoke('apply-quick-entry-settings') as Promise<{ entry: boolean; viewer: boolean }>,
+    ipcRenderer.invoke('apply-quick-entry-settings') as Promise<{ entry: boolean; viewer: boolean; waylandLimited: boolean }>,
+  getGlobalShortcutStatus: () =>
+    ipcRenderer.invoke('get-global-shortcut-status') as Promise<{ entry: boolean; viewer: boolean; waylandLimited: boolean }>,
+  getHotkeyLauncherCommand: () =>
+    ipcRenderer.invoke('get-hotkey-launcher-command') as Promise<{ quickEntry: string; quickView: string; kind: 'appimage' | 'packaged' | 'dev' }>,
 
   // Update checker
   checkForUpdate: () => ipcRenderer.invoke('update:check'),

@@ -54,7 +54,9 @@ export interface ElectronAPI {
   testNotification(): Promise<void>
   rescheduleNotifications(): Promise<void>
   refreshTaskReminders(): Promise<void>
-  applyQuickEntrySettings(): Promise<void>
+  applyQuickEntrySettings(): Promise<{ entry: boolean; viewer: boolean; waylandLimited: boolean }>
+  getGlobalShortcutStatus(): Promise<{ entry: boolean; viewer: boolean; waylandLimited: boolean }>
+  getHotkeyLauncherCommand(): Promise<{ quickEntry: string; quickView: string; kind: 'appimage' | 'packaged' | 'dev' }>
 
   // Obsidian
   openDeepLink(url: string): Promise<void>

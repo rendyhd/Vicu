@@ -28,7 +28,7 @@ export function SettingsView() {
   const [testStatus, setTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle')
   const [testError, setTestError] = useState('')
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle')
-  const [hotkeyWarnings, setHotkeyWarnings] = useState<{ entry: boolean; viewer: boolean } | undefined>(undefined)
+  const [hotkeyWarnings, setHotkeyWarnings] = useState<{ entry: boolean; viewer: boolean; waylandLimited: boolean } | undefined>(undefined)
 
   // Keep full config for preserving fields during save
   const [fullConfig, setFullConfig] = useState<AppConfig | null>(null)
@@ -54,6 +54,9 @@ export function SettingsView() {
         }
       }
     })
+    // Pull current global-shortcut registration state so the banner shows on
+    // cold start, not only after the user edits a hotkey.
+    api.getGlobalShortcutStatus().then(setHotkeyWarnings).catch(() => {})
   }, [])
 
   useEffect(() => {
@@ -468,7 +471,10 @@ export function SettingsView() {
           />
         )}
 
-        {fullConfig && (
+        {/* Obsidian integration is unavailable on Linux (Wayland blocks the
+            foreground-process detection it relies on) — hide the section
+            entirely so users aren't offered a dead setting. */}
+        {fullConfig && window.api.platform !== 'linux' && (
           <ObsidianSettings
             config={fullConfig}
             onChange={handleQuickEntryChange}

@@ -92,6 +92,12 @@ export function getBrowserUrlFromWindow(processName: string, hwnd?: number): Pro
     return getBrowserUrlMacOS(processName)
   }
 
+  // Linux/Wayland: no cross-browser way to read the active tab URL. The bundled
+  // browser extension (native-messaging host) is the only supported path.
+  if (process.platform === 'linux') {
+    return Promise.resolve(null)
+  }
+
   // Windows: PowerShell implementation
   return new Promise((resolve) => {
     try {
