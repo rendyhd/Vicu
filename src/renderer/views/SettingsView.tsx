@@ -369,26 +369,22 @@ export function SettingsView() {
             {fullConfig?.nlp_enabled !== false && (
               <>
                 <div>
-                  <label className="mb-2 block text-xs text-[var(--text-secondary)]">
+                  <div className="mb-2 block text-xs text-[var(--text-secondary)]">
                     Syntax Mode
-                  </label>
-                  <div className="grid grid-cols-2 gap-3">
-                    <label
+                  </div>
+                  <div role="radiogroup" className="grid grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      role="radio"
+                      aria-checked={(fullConfig?.nlp_syntax_mode || 'todoist') === 'todoist'}
+                      onClick={() => handleQuickEntryChange({ nlp_syntax_mode: 'todoist' })}
                       className={cn(
-                        'cursor-pointer rounded-lg border p-3 transition-colors',
+                        'cursor-pointer rounded-lg border p-3 text-left transition-colors',
                         (fullConfig?.nlp_syntax_mode || 'todoist') === 'todoist'
                           ? 'border-accent-blue bg-accent-blue/5'
                           : 'border-[var(--border-color)]'
                       )}
                     >
-                      <input
-                        type="radio"
-                        name="nlp-syntax-mode"
-                        value="todoist"
-                        checked={(fullConfig?.nlp_syntax_mode || 'todoist') === 'todoist'}
-                        onChange={() => handleQuickEntryChange({ nlp_syntax_mode: 'todoist' })}
-                        className="sr-only"
-                      />
                       <div className="text-sm font-medium text-[var(--text-primary)]">Todoist</div>
                       <p className="mt-0.5 text-xs text-[var(--text-secondary)]">
                         Familiar Todoist-style prefixes
@@ -398,23 +394,19 @@ export function SettingsView() {
                         <code className="text-orange-500">@label</code>{' '}
                         <code className="text-red-500">p1-p4</code>
                       </p>
-                    </label>
-                    <label
+                    </button>
+                    <button
+                      type="button"
+                      role="radio"
+                      aria-checked={fullConfig?.nlp_syntax_mode === 'vikunja'}
+                      onClick={() => handleQuickEntryChange({ nlp_syntax_mode: 'vikunja' })}
                       className={cn(
-                        'cursor-pointer rounded-lg border p-3 transition-colors',
+                        'cursor-pointer rounded-lg border p-3 text-left transition-colors',
                         fullConfig?.nlp_syntax_mode === 'vikunja'
                           ? 'border-accent-blue bg-accent-blue/5'
                           : 'border-[var(--border-color)]'
                       )}
                     >
-                      <input
-                        type="radio"
-                        name="nlp-syntax-mode"
-                        value="vikunja"
-                        checked={fullConfig?.nlp_syntax_mode === 'vikunja'}
-                        onChange={() => handleQuickEntryChange({ nlp_syntax_mode: 'vikunja' })}
-                        className="sr-only"
-                      />
                       <div className="text-sm font-medium text-[var(--text-primary)]">Vikunja</div>
                       <p className="mt-0.5 text-xs text-[var(--text-secondary)]">
                         Native Vikunja-style prefixes
@@ -424,7 +416,7 @@ export function SettingsView() {
                         <code className="text-orange-500">*label</code>{' '}
                         <code className="text-red-500">!1-!4</code>
                       </p>
-                    </label>
+                    </button>
                   </div>
                 </div>
 
