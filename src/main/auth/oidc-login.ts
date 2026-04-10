@@ -188,7 +188,10 @@ export async function loginWithOIDC(
     try {
       await createBackupAPIToken(baseUrl, jwt)
     } catch (err) {
-      console.warn('[OIDC] Failed to create backup API token:', err)
+      console.error(
+        '[OIDC] CRITICAL: failed to create backup API token — user will be locked out on next refresh failure:',
+        err instanceof Error ? err.message : err
+      )
     }
 
     // 13. Return JWT
@@ -205,6 +208,44 @@ export async function loginWithOIDC(
   }
 }
 
+/**
+ * Shape of `GET /api/v1/routes`: a group → method → route-detail map.
+ * We only care about the second-level keys (the permission names).
+ */
+type AvailableRoutes = Record<string, Record<string, unknown>>
+
+/**
+ * Fetch the full list of API token permission groups from Vikunja.
+ * Requires authentication (JWT or valid API token).
+ */
+async function fetchAvailableRoutes(baseUrl: string, jwt: string): Promise<AvailableRoutes> {
+  const response = await net.fetch(`${baseUrl}/api/v1/routes`, {
+    method: 'GET',
+    headers: { Authorization: `Bearer ${jwt}` },
+  })
+  if (!response.ok) {
+    const body = await response.text().catch(() => '')
+    throw new Error(`Failed to fetch available routes (${response.status}): ${body}`)
+  }
+  return (await response.json()) as AvailableRoutes
+}
+
+/**
+ * Expand the routes map into a concrete full-access permissions object,
+ * mirroring the Vikunja frontend's "Full access" preset (`{"*": "*"}`).
+ * The wire format is always the expanded form — `*` is UI shorthand only.
+ */
+function buildFullAccessPermissions(routes: AvailableRoutes): Record<string, string[]> {
+  const permissions: Record<string, string[]> = {}
+  for (const [group, methods] of Object.entries(routes)) {
+    const keys = Object.keys(methods)
+    if (keys.length > 0) {
+      permissions[group] = keys
+    }
+  }
+  return permissions
+}
+
 export async function createBackupAPIToken(
   baseUrl: string,
   jwt: string
@@ -213,6 +254,12 @@ export async function createBackupAPIToken(
   expirationDate.setDate(expirationDate.getDate() + 365)
 
   const doCreate = async (): Promise<void> => {
+    const routes = await fetchAvailableRoutes(baseUrl, jwt)
+    const permissions = buildFullAccessPermissions(routes)
+    if (Object.keys(permissions).length === 0) {
+      throw new Error('No API permission groups returned from /api/v1/routes')
+    }
+
     const response = await net.fetch(`${baseUrl}/api/v1/tokens`, {
       method: 'PUT',
       headers: {
@@ -221,19 +268,22 @@ export async function createBackupAPIToken(
       },
       body: JSON.stringify({
         title: 'Vicu Desktop',
-        expiration_date: expirationDate.toISOString(),
+        expires_at: expirationDate.toISOString(),
+        permissions,
       }),
     })
 
     if (!response.ok) {
-      throw new Error(`API token creation failed (${response.status})`)
+      const body = await response.text().catch(() => '')
+      throw new Error(`API token creation failed (${response.status}): ${body}`)
     }
 
-    const data: { token: string } = await response.json()
-    if (data.token) {
-      const expiresAtUnix = Math.floor(expirationDate.getTime() / 1000)
-      storeAPIToken(data.token, expiresAtUnix)
+    const data: { token?: string } = await response.json()
+    if (!data.token) {
+      throw new Error('API token creation response missing "token" field')
     }
+    const expiresAtUnix = Math.floor(expirationDate.getTime() / 1000)
+    storeAPIToken(data.token, expiresAtUnix)
   }
 
   try {

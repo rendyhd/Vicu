@@ -93,7 +93,10 @@ export async function loginWithPassword(
     try {
       await createBackupAPIToken(baseUrl, jwt)
     } catch (err) {
-      console.warn('[Password] Failed to create backup API token:', err)
+      console.error(
+        '[Password] CRITICAL: failed to create backup API token — user will be locked out on next refresh failure:',
+        err instanceof Error ? err.message : err
+      )
       // Fallback: if the JWT itself is long-lived (>24h, i.e. pre-2.0 Vikunja),
       // store it as the backup API token so we survive restarts.
       const jwtExp = extractJWTExp(jwt)

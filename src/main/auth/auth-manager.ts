@@ -329,9 +329,16 @@ class AuthManager {
       .then((jwt) => {
         this._refreshInProgress = null
         this._scheduleProactiveRefresh()
-        // Ensure backup API token exists after every successful refresh
+        // Ensure backup API token exists after every successful refresh.
+        // This is load-bearing: without a valid API token, a failed refresh
+        // leaves the user at the "Session Expired" screen with no fallback.
+        // We use console.error (not warn) so failures are visible in packaged
+        // logs and can be diagnosed when users report lockouts.
         this._ensureBackupAPIToken(jwt).catch((err) => {
-          console.warn('[Auth] Failed to ensure backup API token:', err)
+          console.error(
+            '[Auth] CRITICAL: failed to ensure backup API token — user will be locked out on next refresh failure:',
+            err instanceof Error ? err.message : err
+          )
         })
         return jwt
       })
