@@ -1,0 +1,59 @@
+# Linux CI Build
+#
+# Builds and packages Vicu for Linux on every push to main, PRs targeting main,
+# and manual triggers. Produces AppImage artifacts for x64 and arm64 without
+# publishing to GitHub Releases. Use this to smoke-test the Linux build without
+# tagging a release.
+
+name: Build Linux
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build-linux:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            arch: x64
+          - runner: ubuntu-24.04-arm
+            arch: arm64
+    runs-on: ${{ matrix.runner }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Cache Electron
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/electron
+          key: electron-${{ matrix.arch }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            electron-${{ matrix.arch }}-
+
+      - run: npm ci
+
+      - name: Build app
+        run: npm run build
+
+      - name: Package Linux (${{ matrix.arch }})
+        timeout-minutes: 30
+        run: npx electron-builder --linux --${{ matrix.arch }} --publish never
+
+      - name: Upload AppImage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: vicu-linux-${{ matrix.arch }}-appimage
+          path: dist/*.AppImage
+          if-no-files-found: warn
