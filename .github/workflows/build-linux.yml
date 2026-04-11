@@ -47,9 +47,15 @@ jobs:
       - name: Build app
         run: npm run build
 
+      # electron-builder.yml lists both x64 and arm64 under linux.target so
+      # local `npm run dist:linux` builds everything. In CI we restrict each
+      # matrix runner to a single arch using the positional `target:arch`
+      # syntax, which overrides the yml arch list. Plain `--${{ matrix.arch }}`
+      # is additive, not restrictive, so without this override each runner
+      # would duplicate the work by also building the other arch.
       - name: Package Linux (${{ matrix.arch }})
         timeout-minutes: 30
-        run: npx electron-builder --linux --${{ matrix.arch }} --publish never
+        run: npx electron-builder --linux AppImage:${{ matrix.arch }} --publish never
 
       - name: Upload AppImage artifact
         uses: actions/upload-artifact@v4

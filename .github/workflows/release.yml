@@ -73,8 +73,13 @@ jobs:
 
       - run: npm ci
 
+      # electron-builder.yml lists both arches under linux.target; we override
+      # via the positional `AppImage:<arch>` target so each matrix runner only
+      # builds and publishes its matrix arch. Without this override both
+      # runners would build both arches AND publish them, leading to duplicate
+      # asset-upload conflicts on the second runner.
       - name: Build and publish (${{ matrix.arch }})
-        run: npm run dist:linux:publish
+        run: npm run build && npx electron-builder --linux AppImage:${{ matrix.arch }} --publish always
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
