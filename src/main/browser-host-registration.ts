@@ -3,7 +3,7 @@ import { execSync } from 'child_process'
 import { existsSync, writeFileSync, unlinkSync, mkdirSync } from 'fs'
 import { join, dirname } from 'path'
 import { homedir } from 'os'
-import { isMac, isWindows } from './platform'
+import { isMac, isWindows, isLinux } from './platform'
 
 const HOST_NAME = 'com.vicu.browser'
 // The existing signed Firefox extension (on AMO) from vikunja-quick-entry
@@ -20,7 +20,21 @@ export function getBridgePath(): string {
   if (app.isPackaged) {
     return join(process.resourcesPath, 'resources', 'native-messaging-host', 'vicu-bridge.js')
   }
-  return join(app.getAppPath(), 'resources', 'native-messaging-host', 'vicu-bridge.js')
+  // Dev mode: resources live at <project>/resources/, but app.getAppPath() can
+  // resolve to different places depending on how electron-vite runs us
+  // (sometimes the project root, sometimes out/main/ when launched directly).
+  // Probe candidate paths in order and pick the first that exists.
+  const appPath = app.getAppPath()
+  const candidates = [
+    join(appPath, 'resources', 'native-messaging-host', 'vicu-bridge.js'),
+    join(appPath, '..', '..', 'resources', 'native-messaging-host', 'vicu-bridge.js'),
+    join(appPath, '..', 'resources', 'native-messaging-host', 'vicu-bridge.js'),
+    join(process.cwd(), 'resources', 'native-messaging-host', 'vicu-bridge.js'),
+  ]
+  for (const p of candidates) {
+    if (existsSync(p)) return p
+  }
+  return candidates[0] // fallback, even if non-existent, so the error is visible
 }
 
 function getBatWrapperPath(): string {
@@ -65,6 +79,30 @@ function getMacManifestPath(browserDir: string, hostName: string = HOST_NAME): s
   return join(browserDir, `${hostName}.json`)
 }
 
+// --- Linux manifest paths ---
+// Linux stores native messaging host manifests per-browser under ~/.config (or
+// $XDG_CONFIG_HOME). We iterate all known browser config dirs; we only write
+// into dirs whose parent (the browser's config root) already exists, so we
+// don't fabricate config directories for browsers the user doesn't have.
+function getLinuxConfigRoot(): string {
+  return process.env.XDG_CONFIG_HOME || join(home, '.config')
+}
+
+function getLinuxChromeHostDirs(): Array<{ browserRoot: string; hostDir: string }> {
+  const xdg = getLinuxConfigRoot()
+  return [
+    { browserRoot: join(xdg, 'google-chrome'), hostDir: join(xdg, 'google-chrome', 'NativeMessagingHosts') },
+    { browserRoot: join(xdg, 'chromium'), hostDir: join(xdg, 'chromium', 'NativeMessagingHosts') },
+    { browserRoot: join(xdg, 'microsoft-edge'), hostDir: join(xdg, 'microsoft-edge', 'NativeMessagingHosts') },
+    { browserRoot: join(xdg, 'BraveSoftware', 'Brave-Browser'), hostDir: join(xdg, 'BraveSoftware', 'Brave-Browser', 'NativeMessagingHosts') },
+    { browserRoot: join(xdg, 'vivaldi'), hostDir: join(xdg, 'vivaldi', 'NativeMessagingHosts') },
+  ]
+}
+
+function getLinuxFirefoxHostDir(): string {
+  return join(home, '.mozilla', 'native-messaging-hosts')
+}
+
 // macOS GUI apps have PATH = /usr/bin:/bin:/usr/sbin:/sbin which won't find
 // node installed via Homebrew, nvm, fnm, etc. Resolve the full path at
 // registration time and embed it in a shell wrapper.
@@ -103,6 +141,26 @@ export function registerChromeHost(extensionId: string): void {
     const edgeDir = getMacEdgeHostDir()
     mkdirSync(edgeDir, { recursive: true })
     writeFileSync(getMacManifestPath(edgeDir), JSON.stringify(manifest, null, 2), 'utf-8')
+    return
+  }
+
+  if (isLinux) {
+    const hostPath = ensureShellWrapper()
+    const manifest = {
+      name: HOST_NAME,
+      description: 'Vicu Browser Link native messaging bridge',
+      path: hostPath,
+      type: 'stdio',
+      allowed_origins: extensionId ? [`chrome-extension://${extensionId}/`] : [],
+    }
+    for (const { browserRoot, hostDir } of getLinuxChromeHostDirs()) {
+      // Only write into browsers the user actually has configured.
+      if (!existsSync(browserRoot)) continue
+      try {
+        mkdirSync(hostDir, { recursive: true })
+        writeFileSync(join(hostDir, `${HOST_NAME}.json`), JSON.stringify(manifest, null, 2), 'utf-8')
+      } catch { /* ignore per-browser failures */ }
+    }
     return
   }
 
@@ -153,6 +211,39 @@ export function registerFirefoxHost(): void {
     return
   }
 
+  if (isLinux) {
+    const hostPath = ensureShellWrapper()
+    const firefoxDir = getLinuxFirefoxHostDir()
+    try {
+      mkdirSync(firefoxDir, { recursive: true })
+    } catch { /* ignore */ }
+
+    // Vicu's own future Firefox extension
+    const vicuManifest = {
+      name: HOST_NAME,
+      description: 'Vicu Browser Link native messaging bridge',
+      path: hostPath,
+      type: 'stdio',
+      allowed_extensions: ['browser-link@vicu.app'],
+    }
+    try {
+      writeFileSync(join(firefoxDir, `${HOST_NAME}.json`), JSON.stringify(vicuManifest, null, 2), 'utf-8')
+    } catch { /* ignore */ }
+
+    // vikunja-quick-entry's signed Firefox extension (already on AMO)
+    const vqeManifest = {
+      name: VQE_HOST_NAME,
+      description: 'Vicu Browser Link native messaging bridge (vikunja-quick-entry compat)',
+      path: hostPath,
+      type: 'stdio',
+      allowed_extensions: ['browser-link@vikunja-quick-entry.app'],
+    }
+    try {
+      writeFileSync(join(firefoxDir, `${VQE_HOST_NAME}.json`), JSON.stringify(vqeManifest, null, 2), 'utf-8')
+    } catch { /* ignore */ }
+    return
+  }
+
   if (!isWindows) return
   const hostPath = ensureBatWrapper()
 
@@ -200,6 +291,17 @@ export function unregisterHosts(): void {
     return
   }
 
+  if (isLinux) {
+    for (const { hostDir } of getLinuxChromeHostDirs()) {
+      try { unlinkSync(join(hostDir, `${HOST_NAME}.json`)) } catch { /* ignore */ }
+    }
+    const firefoxDir = getLinuxFirefoxHostDir()
+    try { unlinkSync(join(firefoxDir, `${HOST_NAME}.json`)) } catch { /* ignore */ }
+    try { unlinkSync(join(firefoxDir, `${VQE_HOST_NAME}.json`)) } catch { /* ignore */ }
+    try { unlinkSync(join(app.getPath('userData'), 'vicu-bridge.sh')) } catch { /* ignore */ }
+    return
+  }
+
   if (!isWindows) return
   const chromePath = getChromeHostManifestPath()
   try { unlinkSync(chromePath) } catch { /* ignore */ }
@@ -219,6 +321,16 @@ export function isRegistered(): { chrome: boolean; firefox: boolean } {
       firefox: existsSync(getMacManifestPath(firefoxDir, HOST_NAME))
         && existsSync(getMacManifestPath(firefoxDir, VQE_HOST_NAME)),
     }
+  }
+
+  if (isLinux) {
+    const chrome = getLinuxChromeHostDirs().some(({ hostDir }) =>
+      existsSync(join(hostDir, `${HOST_NAME}.json`))
+    )
+    const firefoxDir = getLinuxFirefoxHostDir()
+    const firefox = existsSync(join(firefoxDir, `${HOST_NAME}.json`))
+      && existsSync(join(firefoxDir, `${VQE_HOST_NAME}.json`))
+    return { chrome, firefox }
   }
 
   if (!isWindows) return { chrome: false, firefox: false }

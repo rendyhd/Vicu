@@ -41,6 +41,7 @@ import {
   getQuickEntryWindow,
   getQuickViewWindow,
   applyQuickEntrySettings,
+  getLastShortcutStatus,
 } from './quick-entry-state'
 import { getAPIToken, storeAPIToken, isEncryptionAvailable, API_TOKEN_NO_EXPIRY } from './auth/token-store'
 import { sendTestNotification, rescheduleNotifications, refreshTaskReminders } from './notifications'
@@ -541,6 +542,49 @@ export function registerIpcHandlers(): void {
   // --- Apply Quick Entry Settings (called from renderer settings page) ---
   ipcMain.handle('apply-quick-entry-settings', () => {
     return applyQuickEntrySettings()
+  })
+
+  // --- Global shortcut registration status ---
+  // Returns the latest success/failure state of the Quick Entry / Quick View
+  // globalShortcut.register() calls. The Settings view uses this to surface a
+  // warning banner on platforms where registration can silently fail (notably
+  // Wayland).
+  ipcMain.handle('get-global-shortcut-status', () => {
+    return getLastShortcutStatus()
+  })
+
+  // --- Hotkey launcher command (Linux/Wayland escape hatch) ---
+  // Returns the exact shell command a user should bind in their desktop
+  // environment's keyboard settings to trigger Quick Entry / Quick View on
+  // Wayland. All paths returned are absolute so the command works regardless
+  // of the spawning process's working directory (GNOME/KDE custom-shortcut
+  // spawners run with cwd = $HOME or /, not the project root).
+  ipcMain.handle('get-hotkey-launcher-command', () => {
+    const quote = (s: string) => (/[\s"']/.test(s) ? `"${s.replace(/"/g, '\\"')}"` : s)
+
+    let base: string
+    let kind: 'appimage' | 'packaged' | 'dev'
+    const appImage = process.env.APPIMAGE
+    if (appImage && appImage.length > 0) {
+      // AppImage: a single self-contained executable, no app path arg needed.
+      base = quote(appImage)
+      kind = 'appimage'
+    } else if (app.isPackaged) {
+      // Other packaged Linux formats (snap, .deb, tarball, etc.).
+      base = quote(process.execPath)
+      kind = 'packaged'
+    } else {
+      // Dev mode: electron binary + absolute app path.
+      const appPath = process.argv[1] ? path.resolve(process.argv[1]) : ''
+      base = appPath ? `${quote(process.execPath)} ${quote(appPath)}` : quote(process.execPath)
+      kind = 'dev'
+    }
+
+    return {
+      quickEntry: `${base} --quick-entry`,
+      quickView: `${base} --quick-view`,
+      kind,
+    }
   })
 
   // --- Standalone mode IPC ---

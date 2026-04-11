@@ -4,11 +4,12 @@ import type { BrowserWindow } from 'electron'
 // This avoids a circular dependency between the two modules.
 
 type WindowGetter = () => BrowserWindow | null
-export type HotkeyRegistrationResult = { entry: boolean; viewer: boolean }
+export type HotkeyRegistrationResult = { entry: boolean; viewer: boolean; waylandLimited: boolean }
 
 type VoidFn = () => void
 type HeightFn = (h: number) => void
 type ApplySettingsFn = () => HotkeyRegistrationResult
+type StatusFn = () => HotkeyRegistrationResult
 
 let _getMainWindow: WindowGetter = () => null
 let _getQuickEntryWindow: WindowGetter = () => null
@@ -16,7 +17,8 @@ let _getQuickViewWindow: WindowGetter = () => null
 let _hideQuickEntry: VoidFn = () => {}
 let _hideQuickView: VoidFn = () => {}
 let _setViewerHeight: HeightFn = () => {}
-let _applyQuickEntrySettings: ApplySettingsFn = () => ({ entry: false, viewer: false })
+let _applyQuickEntrySettings: ApplySettingsFn = () => ({ entry: false, viewer: false, waylandLimited: false })
+let _getLastShortcutStatus: StatusFn = () => ({ entry: false, viewer: false, waylandLimited: false })
 
 export function registerQuickEntryState(fns: {
   getMainWindow: WindowGetter
@@ -26,6 +28,7 @@ export function registerQuickEntryState(fns: {
   hideQuickView: VoidFn
   setViewerHeight: HeightFn
   applyQuickEntrySettings: ApplySettingsFn
+  getLastShortcutStatus: StatusFn
 }): void {
   _getMainWindow = fns.getMainWindow
   _getQuickEntryWindow = fns.getQuickEntryWindow
@@ -34,6 +37,7 @@ export function registerQuickEntryState(fns: {
   _hideQuickView = fns.hideQuickView
   _setViewerHeight = fns.setViewerHeight
   _applyQuickEntrySettings = fns.applyQuickEntrySettings
+  _getLastShortcutStatus = fns.getLastShortcutStatus
 }
 
 export function getMainWindow(): BrowserWindow | null { return _getMainWindow() }
@@ -43,3 +47,4 @@ export function hideQuickEntry(): void { _hideQuickEntry() }
 export function hideQuickView(): void { _hideQuickView() }
 export function setViewerHeight(h: number): void { _setViewerHeight(h) }
 export function applyQuickEntrySettings(): HotkeyRegistrationResult { return _applyQuickEntrySettings() }
+export function getLastShortcutStatus(): HotkeyRegistrationResult { return _getLastShortcutStatus() }

@@ -12,6 +12,8 @@
     "dist:publish": "electron-vite build && electron-builder --win --publish always",
     "dist:mac": "electron-vite build && electron-builder --mac",
     "dist:mac:publish": "electron-vite build && electron-builder --mac --publish always",
+    "dist:linux": "electron-vite build && electron-builder --linux",
+    "dist:linux:publish": "electron-vite build && electron-builder --linux --publish always",
     "test": "vitest run",
     "test:watch": "vitest"
   },

@@ -14,12 +14,6 @@ export function BrowserSettings({ config, onChange, disabled }: BrowserSettingsP
   const [registering, setRegistering] = useState(false)
   const mode = config.browser_link_mode ?? 'ask'
 
-  useEffect(() => {
-    if (expanded && mode !== 'off') {
-      window.api.checkBrowserHostRegistration().then(setRegStatus)
-    }
-  }, [expanded, mode])
-
   const handleRegister = useCallback(async () => {
     setRegistering(true)
     try {
@@ -28,6 +22,22 @@ export function BrowserSettings({ config, onChange, disabled }: BrowserSettingsP
     } catch { /* ignore */ }
     setRegistering(false)
   }, [])
+
+  useEffect(() => {
+    if (!expanded || mode === 'off') return
+    let cancelled = false
+    window.api.checkBrowserHostRegistration().then((status) => {
+      if (cancelled) return
+      setRegStatus(status)
+      // If the user toggled browser link on but nothing is registered yet,
+      // write the manifests automatically so Firefox-only users don't have
+      // to hunt for a button.
+      if (!status.chrome && !status.firefox) {
+        handleRegister()
+      }
+    })
+    return () => { cancelled = true }
+  }, [expanded, mode, handleRegister])
 
   return (
     <div className={`rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] p-5${disabled ? ' opacity-50 pointer-events-none' : ''}`}>
@@ -85,16 +95,14 @@ export function BrowserSettings({ config, onChange, disabled }: BrowserSettingsP
                 </div>
               )}
 
-              {config.browser_extension_id && (
-                <button
-                  type="button"
-                  onClick={handleRegister}
-                  disabled={registering}
-                  className="rounded-md border border-[var(--border-color)] px-4 py-2 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-hover)] disabled:opacity-50"
-                >
-                  {registering ? 'Registering...' : 'Re-register Bridge'}
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={handleRegister}
+                disabled={registering}
+                className="rounded-md border border-[var(--border-color)] px-4 py-2 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-hover)] disabled:opacity-50"
+              >
+                {registering ? 'Registering...' : 'Re-register Bridge'}
+              </button>
 
               <div>
                 <button
