@@ -2,9 +2,10 @@ import { app } from 'electron'
 import { spawn, execFile, type ChildProcess } from 'child_process'
 import { join } from 'path'
 import type { BrowserContext } from './browser-client'
+import { isMac, isWindows, isLinux } from './platform'
 
 export const BROWSER_PROCESSES = new Set(
-  process.platform === 'darwin'
+  isMac
     ? ['Google Chrome', 'Firefox', 'Microsoft Edge', 'Brave Browser', 'Safari', 'Opera', 'Vivaldi', 'Arc']
     : ['chrome', 'firefox', 'msedge', 'brave', 'opera', 'vivaldi']
 )
@@ -88,13 +89,13 @@ function getBrowserUrlMacOS(appName: string): Promise<BrowserContext | null> {
 // --- Main entry point: platform-aware URL detection ---
 
 export function getBrowserUrlFromWindow(processName: string, hwnd?: number): Promise<BrowserContext | null> {
-  if (process.platform === 'darwin') {
+  if (isMac) {
     return getBrowserUrlMacOS(processName)
   }
 
   // Linux/Wayland: no cross-browser way to read the active tab URL. The bundled
   // browser extension (native-messaging host) is the only supported path.
-  if (process.platform === 'linux') {
+  if (isLinux) {
     return Promise.resolve(null)
   }
 
@@ -139,7 +140,7 @@ export function getBrowserUrlFromWindow(processName: string, hwnd?: number): Pro
 }
 
 export function prewarmUrlReader(): void {
-  if (process.platform !== 'win32') return
+  if (!isWindows) return
   try {
     prewarmProcess = spawn('powershell.exe', [
       '-NoProfile',
@@ -156,7 +157,7 @@ export function prewarmUrlReader(): void {
 }
 
 export function shutdownUrlReader(): void {
-  if (process.platform !== 'win32') return
+  if (!isWindows) return
   if (prewarmProcess && !prewarmProcess.killed) {
     try { prewarmProcess.kill() } catch { /* ignore */ }
     prewarmProcess = null
