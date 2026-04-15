@@ -92,6 +92,8 @@ const api = {
     ipcRenderer.invoke('upload-task-attachment', taskId, fileData, fileName, mimeType),
   deleteTaskAttachment: (taskId: number, attachmentId: number) =>
     ipcRenderer.invoke('delete-task-attachment', taskId, attachmentId),
+  fetchTaskAttachmentBytes: (taskId: number, attachmentId: number) =>
+    ipcRenderer.invoke('fetch-task-attachment-bytes', taskId, attachmentId),
   openTaskAttachment: (taskId: number, attachmentId: number, fileName: string) =>
     ipcRenderer.invoke('open-task-attachment', taskId, attachmentId, fileName),
   pickAndUploadAttachment: (taskId: number) =>
