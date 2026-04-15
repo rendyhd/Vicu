@@ -38,6 +38,7 @@ export interface Task {
   created: string
   updated: string
   created_by: { id: number; username: string; name?: string }
+  identifier: string
   position: number
   bucket_id: number
   percent_done: number
