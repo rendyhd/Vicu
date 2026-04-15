@@ -2,17 +2,18 @@ export type ImageToken =
   | { kind: 'image'; attachmentId: number; raw: string }
   | { kind: 'pending'; uuid: string; raw: string }
 
-const IMAGE_RE = /\[\[image:(\d+)\]\]/g
 const PENDING_RE = /\[\[image-pending:([a-z0-9-]+)\]\]/g
 
 /** Find all image/pending tokens in a description string, in order of appearance. */
 export function findImageTokens(text: string): ImageToken[] {
+  const combined = /\[\[image:(\d+)\]\]|\[\[image-pending:([a-z0-9-]+)\]\]/g
   const tokens: ImageToken[] = []
-  for (const m of text.matchAll(IMAGE_RE)) {
-    tokens.push({ kind: 'image', attachmentId: Number(m[1]), raw: m[0] })
-  }
-  for (const m of text.matchAll(PENDING_RE)) {
-    tokens.push({ kind: 'pending', uuid: m[1], raw: m[0] })
+  for (const m of text.matchAll(combined)) {
+    if (m[1] !== undefined) {
+      tokens.push({ kind: 'image', attachmentId: Number(m[1]), raw: m[0] })
+    } else if (m[2] !== undefined) {
+      tokens.push({ kind: 'pending', uuid: m[2], raw: m[0] })
+    }
   }
   return tokens
 }
