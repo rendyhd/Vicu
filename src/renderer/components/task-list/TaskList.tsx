@@ -483,6 +483,16 @@ export function TaskList({
             pendingImages={pendingImages}
             placeholder="Notes"
             startInPreview={false}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') {
+                e.preventDefault()
+                inputRef.current?.focus()
+              }
+              if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                e.preventDefault()
+                handleSubmit()
+              }
+            }}
           />
         </div>
       )}
