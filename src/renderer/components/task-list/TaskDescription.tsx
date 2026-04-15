@@ -110,7 +110,7 @@ export function TaskDescription({
           const bytes = await fileToUint8Array(img.file)
           // 8-char UUID slice — only needs to be unique within this paste session.
           const uuid = crypto.randomUUID().slice(0, 8)
-          const blobUrl = URL.createObjectURL(new Blob([bytes], { type: img.mime }))
+          const blobUrl = URL.createObjectURL(new Blob([bytes as BlobPart], { type: img.mime }))
           const token = pendingToken(uuid)
           currentText = insertTokenAt(currentText, currentCursor, token)
           currentCursor = currentText.indexOf(token, currentCursor) + token.length

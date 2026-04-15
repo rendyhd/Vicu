@@ -27,7 +27,7 @@ export function useAttachmentBlobUrl(
 
   const url = useMemo(() => {
     if (!query.data) return null
-    const blob = new Blob([query.data], { type: mime })
+    const blob = new Blob([query.data as BlobPart], { type: mime })
     return URL.createObjectURL(blob)
   }, [query.data, mime])
 
