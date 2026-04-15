@@ -18,6 +18,7 @@ import { PriorityDot } from '@/components/shared/PriorityDot'
 import { DatePickerPopover } from './DatePickerPopover'
 import { LabelPickerPopover } from './LabelPickerPopover'
 import { SubtaskList } from './SubtaskList'
+import { TaskDescription } from './TaskDescription'
 import { ProjectPickerPopover } from './ProjectPickerPopover'
 import { ReminderPickerPopover } from './ReminderPickerPopover'
 import { AttachmentPickerPopover } from './AttachmentPickerPopover'
@@ -118,7 +119,6 @@ export function TaskRow({ task, sortable = false }: TaskRowProps) {
   const noteLinkHtml = extractNoteLinkHtml(task.description) + extractPageLinkHtml(task.description)
   const [activePopover, setActivePopover] = useState<PopoverType>(null)
   const titleRef = useRef<HTMLInputElement>(null)
-  const descRef = useRef<HTMLTextAreaElement>(null)
 
   // Flash red border briefly when drag-drop upload fails, show error message
   useEffect(() => {
@@ -138,18 +138,10 @@ export function TaskRow({ task, sortable = false }: TaskRowProps) {
     setEditDescription(stripPageLink(stripNoteLink(task.description)))
   }, [task.description])
 
-  // Focus title input when expanded, and auto-size description textarea
+  // Focus title input when expanded
   useEffect(() => {
     if (isExpanded) {
       titleRef.current?.focus()
-      // Auto-size description textarea for existing content
-      if (descRef.current) {
-        const el = descRef.current
-        el.style.height = 'auto'
-        const maxH = 10 * 18
-        el.style.height = `${Math.min(el.scrollHeight, maxH)}px`
-        el.style.overflowY = el.scrollHeight > maxH ? 'auto' : 'hidden'
-      }
     }
   }, [isExpanded])
 
@@ -381,7 +373,7 @@ export function TaskRow({ task, sortable = false }: TaskRowProps) {
           onKeyDown={(e) => {
             if (e.key === 'Enter' && !e.ctrlKey && !e.metaKey) {
               e.preventDefault()
-              descRef.current?.focus()
+              // Description focus is now managed by TaskDescription on click.
             }
             if (e.key === 'Escape') {
               handleSave()
@@ -406,18 +398,10 @@ export function TaskRow({ task, sortable = false }: TaskRowProps) {
 
       {/* Description */}
       <div className="px-4 pt-2 pl-[43px]">
-        <textarea
-          ref={descRef}
+        <TaskDescription
+          taskId={task.id}
           value={editDescription}
-          onChange={(e) => {
-            setEditDescription(e.target.value)
-            // Auto-resize textarea
-            const el = e.target
-            el.style.height = 'auto'
-            const maxH = 10 * 18
-            el.style.height = `${Math.min(el.scrollHeight, maxH)}px`
-            el.style.overflowY = el.scrollHeight > maxH ? 'auto' : 'hidden'
-          }}
+          onChange={setEditDescription}
           onBlur={handleSave}
           onKeyDown={(e) => {
             if (e.key === 'Escape') {
@@ -425,10 +409,7 @@ export function TaskRow({ task, sortable = false }: TaskRowProps) {
               collapseAll()
             }
           }}
-          placeholder="Notes"
-          rows={1}
-          className="custom-scrollbar w-full resize-none bg-transparent text-xs leading-[18px] text-[var(--text-primary)] placeholder:text-[var(--text-secondary)] focus:outline-none"
-          style={{ overflowY: 'hidden' }}
+          startInPreview={editDescription.trim().length > 0}
         />
       </div>
 
