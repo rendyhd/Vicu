@@ -1,8 +1,13 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { X } from 'lucide-react'
 import { cn } from '@/lib/cn'
-import { segmentDescription, insertTokenAt, imageToken, pendingToken } from '@/lib/image-tokens'
+import { segmentDescription, imageToken, pendingToken } from '@/lib/image-tokens'
 import { getClipboardImages, fileToUint8Array } from '@/lib/clipboard-images'
-import { useTaskAttachments, useUploadAttachmentFromPaste } from '@/hooks/use-task-mutations'
+import {
+  useTaskAttachments,
+  useUploadAttachmentFromPaste,
+  useDeleteAttachment,
+} from '@/hooks/use-task-mutations'
 import { useAttachmentBlobUrl } from '@/hooks/use-attachment-bytes'
 
 export interface PendingImage {
@@ -15,6 +20,10 @@ export interface PendingImage {
   mime: string
 }
 
+type ImageRef =
+  | { kind: 'image'; attachmentId: number }
+  | { kind: 'pending'; uuid: string }
+
 type Props = {
   value: string
   onChange: (value: string) => void
@@ -22,19 +31,46 @@ type Props = {
   onKeyDown?: (e: React.KeyboardEvent) => void
   placeholder?: string
   className?: string
-  /** When provided, paste will upload to this task and insert `[[image:<id>]]`. */
+  /** When provided, paste will upload to this task and append the image token. */
   taskId?: number
   /**
-   * When no taskId, pasted images are reported here. The component inserts
-   * `[[image-pending:<uuid>]]` into the text via `onChange` itself; the caller
-   * stages the image and OWNS the `blobUrl` lifecycle — must revoke on
-   * cancel/unmount/post-upload.
+   * When no taskId, pasted images are reported here. The component appends the
+   * pending token; the caller stages the image and OWNS the `blobUrl` lifecycle.
    */
   onStagePending?: (image: PendingImage) => void
-  /** Map of pending uuid → blob URL for rendering staged previews. */
+  /** Called when the user removes a pending image (clicks the X). Caller revokes blobUrl. */
+  onRemovePending?: (uuid: string) => void
+  /** Map of pending uuid → image record, used to render staged previews. */
   pendingImages?: Record<string, PendingImage>
-  /** Start in preview mode (default true). Edit mode activates on click. */
-  startInPreview?: boolean
+  /** Focus the textarea on mount. */
+  autoFocus?: boolean
+}
+
+const MAX_TEXTAREA_HEIGHT_PX = 180
+
+function parseValue(value: string): { text: string; images: ImageRef[] } {
+  const segments = segmentDescription(value)
+  let text = ''
+  const images: ImageRef[] = []
+  for (const seg of segments) {
+    if (seg.kind === 'text') text += seg.text
+    else if (seg.kind === 'image') images.push({ kind: 'image', attachmentId: seg.attachmentId })
+    else if (seg.kind === 'pending') images.push({ kind: 'pending', uuid: seg.uuid })
+  }
+  return { text: text.replace(/^\n+|\n+$/g, ''), images }
+}
+
+function buildValue(text: string, images: ImageRef[]): string {
+  const tokens = images
+    .map((img) => (img.kind === 'image' ? imageToken(img.attachmentId) : pendingToken(img.uuid)))
+    .join('\n')
+  if (!tokens) return text
+  if (!text) return tokens
+  return `${text}\n${tokens}`
+}
+
+function imageRefKey(img: ImageRef): string {
+  return img.kind === 'image' ? `a:${img.attachmentId}` : `p:${img.uuid}`
 }
 
 export function TaskDescription({
@@ -46,30 +82,25 @@ export function TaskDescription({
   className,
   taskId,
   onStagePending,
+  onRemovePending,
   pendingImages,
-  startInPreview = true,
+  autoFocus = false,
 }: Props) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
-  const valueRef = useRef(value)
-  useEffect(() => {
-    valueRef.current = value
-  }, [value])
-  const hasContent = value.trim().length > 0
-  const [isEditing, setIsEditing] = useState(!startInPreview || !hasContent)
   const [uploadError, setUploadError] = useState<string | null>(null)
   const uploadMutation = useUploadAttachmentFromPaste()
+  const deleteMutation = useDeleteAttachment()
 
-  const MAX_TEXTAREA_HEIGHT_PX = 180 // 10 rows × 18px line-height
+  const { text, images } = useMemo(() => parseValue(value), [value])
 
-  // Auto-resize textarea while editing
+  // Auto-resize the textarea
   useEffect(() => {
-    if (!isEditing) return
     const el = textareaRef.current
     if (!el) return
     el.style.height = 'auto'
     el.style.height = `${Math.min(el.scrollHeight, MAX_TEXTAREA_HEIGHT_PX)}px`
     el.style.overflowY = el.scrollHeight > MAX_TEXTAREA_HEIGHT_PX ? 'auto' : 'hidden'
-  }, [isEditing, value])
+  }, [text])
 
   // Clear stale upload errors after 4s
   useEffect(() => {
@@ -78,155 +109,178 @@ export function TaskDescription({
     return () => clearTimeout(t)
   }, [uploadError])
 
+  const handleTextChange = useCallback(
+    (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+      onChange(buildValue(e.target.value, images))
+    },
+    [onChange, images]
+  )
+
+  const removeImage = useCallback(
+    (toRemove: ImageRef) => {
+      const next = images.filter((img) => imageRefKey(img) !== imageRefKey(toRemove))
+      onChange(buildValue(text, next))
+      if (toRemove.kind === 'image' && taskId != null) {
+        deleteMutation.mutate({ taskId, attachmentId: toRemove.attachmentId })
+      } else if (toRemove.kind === 'pending') {
+        onRemovePending?.(toRemove.uuid)
+      }
+    },
+    [images, text, onChange, taskId, deleteMutation, onRemovePending]
+  )
+
   const handlePaste = useCallback(
     async (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
-      const images = getClipboardImages(e)
-      if (images.length === 0) return
+      const clipboardImages = getClipboardImages(e)
+      if (clipboardImages.length === 0) return // allow native text paste
       e.preventDefault()
-
-      const target = e.currentTarget
-      const cursor = target.selectionStart ?? target.value.length
-      let currentText = valueRef.current
-      let currentCursor = cursor
-
-      for (const img of images) {
-        if (taskId != null) {
-          try {
-            const bytes = await fileToUint8Array(img.file)
+      const currentText = textareaRef.current?.value ?? text
+      const next = images.slice()
+      for (const img of clipboardImages) {
+        try {
+          const bytes = await fileToUint8Array(img.file)
+          if (taskId != null) {
             const result = await uploadMutation.mutateAsync({
               taskId,
               fileData: bytes,
               fileName: img.name,
               mimeType: img.mime,
             })
-            const token = imageToken(result.attachmentId)
-            currentText = insertTokenAt(currentText, currentCursor, token)
-            currentCursor = currentText.indexOf(token, currentCursor) + token.length
-            onChange(currentText)
-          } catch (err) {
-            setUploadError(err instanceof Error ? err.message : 'Upload failed')
+            next.push({ kind: 'image', attachmentId: result.attachmentId })
+          } else if (onStagePending) {
+            const uuid = crypto.randomUUID().slice(0, 8)
+            const blobUrl = URL.createObjectURL(
+              new Blob([bytes as BlobPart], { type: img.mime })
+            )
+            onStagePending({ uuid, blobUrl, bytes, name: img.name, mime: img.mime })
+            next.push({ kind: 'pending', uuid })
           }
-        } else if (onStagePending) {
-          const bytes = await fileToUint8Array(img.file)
-          // 8-char UUID slice — only needs to be unique within this paste session.
-          const uuid = crypto.randomUUID().slice(0, 8)
-          const blobUrl = URL.createObjectURL(new Blob([bytes as BlobPart], { type: img.mime }))
-          const token = pendingToken(uuid)
-          currentText = insertTokenAt(currentText, currentCursor, token)
-          currentCursor = currentText.indexOf(token, currentCursor) + token.length
-          onStagePending({ uuid, blobUrl, bytes, name: img.name, mime: img.mime })
-          onChange(currentText)
+        } catch (err) {
+          setUploadError(err instanceof Error ? err.message : 'Upload failed')
         }
       }
+      onChange(buildValue(currentText, next))
     },
-    [taskId, onChange, onStagePending, uploadMutation]
+    [images, text, taskId, onChange, onStagePending, uploadMutation]
   )
 
-  if (!isEditing) {
-    return (
-      <div
-        className={cn('cursor-text', className)}
-        onClick={() => setIsEditing(true)}
-      >
-        <PreviewContent value={value} taskId={taskId} pendingImages={pendingImages} />
-      </div>
-    )
-  }
-
   return (
-    <div className={cn('relative', className)}>
+    <div className={cn('flex flex-col gap-2', className)}>
       <textarea
         ref={textareaRef}
-        value={value}
-        autoFocus
-        onChange={(e) => onChange(e.target.value)}
+        value={text}
+        autoFocus={autoFocus}
+        onChange={handleTextChange}
         onPaste={handlePaste}
-        onBlur={() => {
-          setIsEditing(false)
-          onBlur?.()
-        }}
+        onBlur={onBlur}
         onKeyDown={onKeyDown}
         placeholder={placeholder}
         rows={1}
         className="custom-scrollbar w-full resize-none bg-transparent text-xs leading-[18px] text-[var(--text-primary)] placeholder:text-[var(--text-secondary)] focus:outline-none"
         style={{ overflowY: 'hidden' }}
       />
+
+      {images.length > 0 && (
+        <div className="flex flex-wrap items-start gap-2">
+          {images.map((img) => (
+            <ImageThumb
+              key={imageRefKey(img)}
+              img={img}
+              taskId={taskId}
+              pendingImages={pendingImages}
+              onRemove={() => removeImage(img)}
+            />
+          ))}
+        </div>
+      )}
+
       {uploadMutation.isPending && (
-        <div className="text-2xs text-[var(--text-secondary)] italic">Uploading image…</div>
+        <div className="text-2xs italic text-[var(--text-secondary)]">
+          Uploading image…
+        </div>
       )}
-      {uploadError && (
-        <div className="text-2xs text-red-500">{uploadError}</div>
-      )}
+      {uploadError && <div className="text-2xs text-red-500">{uploadError}</div>}
     </div>
   )
 }
 
-function PreviewContent({
-  value,
+function ImageThumb({
+  img,
   taskId,
   pendingImages,
+  onRemove,
 }: {
-  value: string
+  img: ImageRef
   taskId?: number
   pendingImages?: Record<string, PendingImage>
+  onRemove: () => void
 }) {
-  const segments = segmentDescription(value)
-  if (segments.length === 0) {
+  if (img.kind === 'pending') {
+    const pending = pendingImages?.[img.uuid]
+    if (!pending) return null
     return (
-      <p className="text-xs text-[var(--text-secondary)]">Notes</p>
+      <Thumb
+        src={pending.blobUrl}
+        alt={pending.name}
+        onRemove={onRemove}
+      />
     )
   }
-  return (
-    <div className="flex min-w-0 max-w-full flex-col gap-1 text-xs leading-[18px] text-[var(--text-primary)]">
-      {segments.map((seg, i) => {
-        if (seg.kind === 'text') {
-          return (
-            <p key={i} className="whitespace-pre-wrap">
-              {seg.text}
-            </p>
-          )
-        }
-        if (seg.kind === 'image' && taskId != null) {
-          return <AttachmentImage key={i} taskId={taskId} attachmentId={seg.attachmentId} />
-        }
-        if (seg.kind === 'pending' && pendingImages?.[seg.uuid]) {
-          const img = pendingImages[seg.uuid]
-          return (
-            <img
-              key={i}
-              src={img.blobUrl}
-              alt={img.name}
-              className="h-auto max-h-40 w-auto max-w-md rounded border border-[var(--border-color)] object-contain"
-            />
-          )
-        }
-        return null
-      })}
-    </div>
-  )
+  return <AttachmentThumb taskId={taskId} attachmentId={img.attachmentId} onRemove={onRemove} />
 }
 
-function AttachmentImage({ taskId, attachmentId }: { taskId: number; attachmentId: number }) {
-  const { data: attachments } = useTaskAttachments(taskId, true)
+function AttachmentThumb({
+  taskId,
+  attachmentId,
+  onRemove,
+}: {
+  taskId?: number
+  attachmentId: number
+  onRemove: () => void
+}) {
+  const { data: attachments } = useTaskAttachments(taskId ?? -1, taskId != null)
   const mime = attachments?.find((a) => a.id === attachmentId)?.file.mime || 'image/png'
   const { url, isLoading, error } = useAttachmentBlobUrl(taskId, attachmentId, mime)
-  if (isLoading) {
-    return (
-      <div className="h-20 w-40 animate-pulse rounded bg-[var(--bg-hover)]" />
-    )
+  if (isLoading || !url) {
+    if (error) {
+      return (
+        <div className="rounded border border-red-500/30 bg-red-500/10 px-2 py-1 text-2xs text-red-500">
+          Failed to load image
+        </div>
+      )
+    }
+    return <div className="h-20 w-32 animate-pulse rounded bg-[var(--bg-hover)]" />
   }
-  if (error || !url) {
-    return (
-      <div className="rounded border border-red-500/30 bg-red-500/10 px-2 py-1 text-2xs text-red-500">
-        Failed to load image
-      </div>
-    )
-  }
+  return <Thumb src={url} alt={`Attachment ${attachmentId}`} onRemove={onRemove} />
+}
+
+function Thumb({
+  src,
+  alt,
+  onRemove,
+}: {
+  src: string
+  alt: string
+  onRemove: () => void
+}) {
   return (
-    <img
-      src={url}
-      alt={`Attachment ${attachmentId}`}
-      className="h-auto max-h-40 w-auto max-w-md rounded border border-[var(--border-color)] object-contain"
-    />
+    <div className="group relative inline-block">
+      <img
+        src={src}
+        alt={alt}
+        draggable={false}
+        className="block h-auto max-h-40 w-auto max-w-md rounded border border-[var(--border-color)] object-contain"
+      />
+      <button
+        type="button"
+        tabIndex={-1}
+        title="Remove image"
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={onRemove}
+        className="absolute right-1 top-1 hidden h-5 w-5 cursor-pointer items-center justify-center rounded-full bg-black/70 text-white shadow-sm transition-colors hover:bg-black/90 group-hover:flex"
+      >
+        <X className="h-3 w-3" strokeWidth={2.5} />
+      </button>
+    </div>
   )
 }

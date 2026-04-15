@@ -287,10 +287,11 @@ export function TaskList({
   // Keyboard navigation
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
-      // Don't handle if focus is in an input/textarea (let the expanded task handle it)
-      const active = document.activeElement
+      // Don't handle if focus is in an input/textarea/contentEditable (let the field handle it)
+      const active = document.activeElement as HTMLElement | null
       const tag = active?.tagName.toLowerCase()
       if (tag === 'input' || tag === 'textarea' || tag === 'select') return
+      if (active?.isContentEditable) return
 
       const taskCount = tasks.length
 
@@ -480,9 +481,17 @@ export function TaskList({
             value={newDescription}
             onChange={setNewDescription}
             onStagePending={(img) => setPendingImages((prev) => ({ ...prev, [img.uuid]: img }))}
+            onRemovePending={(uuid) =>
+              setPendingImages((prev) => {
+                const entry = prev[uuid]
+                if (entry) URL.revokeObjectURL(entry.blobUrl)
+                const { [uuid]: _removed, ...rest } = prev
+                return rest
+              })
+            }
             pendingImages={pendingImages}
             placeholder="Notes"
-            startInPreview={false}
+            autoFocus
             onKeyDown={(e) => {
               if (e.key === 'Escape') {
                 e.preventDefault()

@@ -409,7 +409,6 @@ export function TaskRow({ task, sortable = false }: TaskRowProps) {
               collapseAll()
             }
           }}
-          startInPreview={editDescription.trim().length > 0}
         />
       </div>
 
