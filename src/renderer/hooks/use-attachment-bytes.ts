@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { useEffect, useMemo } from 'react'
+import { useEffect, useState } from 'react'
 import { api } from '@/lib/api'
 
 /**
@@ -25,16 +25,22 @@ export function useAttachmentBlobUrl(
     gcTime: 1000 * 60 * 10,
   })
 
-  const url = useMemo(() => {
-    if (!query.data) return null
-    const blob = new Blob([query.data as BlobPart], { type: mime })
-    return URL.createObjectURL(blob)
-  }, [query.data, mime])
-
+  // Create + revoke the URL inside the same effect so strict-mode double-invoke
+  // makes a fresh URL after the cleanup, instead of leaving the img pointing at
+  // a revoked one.
+  const [url, setUrl] = useState<string | null>(null)
   useEffect(() => {
-    if (!url) return
-    return () => URL.revokeObjectURL(url)
-  }, [url])
+    if (!query.data) {
+      setUrl(null)
+      return
+    }
+    const blob = new Blob([query.data as BlobPart], { type: mime })
+    const created = URL.createObjectURL(blob)
+    setUrl(created)
+    return () => {
+      URL.revokeObjectURL(created)
+    }
+  }, [query.data, mime])
 
   return { url, isLoading: query.isLoading, error: query.error }
 }

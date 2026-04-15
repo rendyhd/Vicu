@@ -230,7 +230,7 @@ export function TaskList({
                 if (patched !== snapshotDesc) {
                   updateTask.mutate({
                     id: newTaskId,
-                    task: { id: newTaskId, description: patched } as Task,
+                    task: { ...(data as Task), description: patched },
                   })
                 }
               }

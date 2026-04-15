@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { cn } from '@/lib/cn'
 import { segmentDescription, insertTokenAt, imageToken, pendingToken } from '@/lib/image-tokens'
 import { getClipboardImages, fileToUint8Array } from '@/lib/clipboard-images'
-import { useUploadAttachmentFromPaste } from '@/hooks/use-task-mutations'
+import { useTaskAttachments, useUploadAttachmentFromPaste } from '@/hooks/use-task-mutations'
 import { useAttachmentBlobUrl } from '@/hooks/use-attachment-bytes'
 
 export interface PendingImage {
@@ -177,7 +177,7 @@ function PreviewContent({
     )
   }
   return (
-    <div className="flex flex-col gap-1 text-xs leading-[18px] text-[var(--text-primary)]">
+    <div className="flex min-w-0 max-w-full flex-col gap-1 text-xs leading-[18px] text-[var(--text-primary)]">
       {segments.map((seg, i) => {
         if (seg.kind === 'text') {
           return (
@@ -196,7 +196,7 @@ function PreviewContent({
               key={i}
               src={img.blobUrl}
               alt={img.name}
-              className="max-h-40 max-w-full rounded border border-[var(--border-color)]"
+              className="h-auto max-h-40 w-auto max-w-md rounded border border-[var(--border-color)] object-contain"
             />
           )
         }
@@ -207,7 +207,9 @@ function PreviewContent({
 }
 
 function AttachmentImage({ taskId, attachmentId }: { taskId: number; attachmentId: number }) {
-  const { url, isLoading, error } = useAttachmentBlobUrl(taskId, attachmentId, 'image/*')
+  const { data: attachments } = useTaskAttachments(taskId, true)
+  const mime = attachments?.find((a) => a.id === attachmentId)?.file.mime || 'image/png'
+  const { url, isLoading, error } = useAttachmentBlobUrl(taskId, attachmentId, mime)
   if (isLoading) {
     return (
       <div className="h-20 w-40 animate-pulse rounded bg-[var(--bg-hover)]" />
@@ -224,7 +226,7 @@ function AttachmentImage({ taskId, attachmentId }: { taskId: number; attachmentI
     <img
       src={url}
       alt={`Attachment ${attachmentId}`}
-      className="max-h-40 max-w-full rounded border border-[var(--border-color)]"
+      className="h-auto max-h-40 w-auto max-w-md rounded border border-[var(--border-color)] object-contain"
     />
   )
 }
