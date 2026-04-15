@@ -3,7 +3,11 @@ declare global {
     quickEntryApi: {
       platform: 'darwin' | 'win32' | 'linux'
       saveTask(title: string, description: string | null, dueDate: string | null, projectId: number | null, priority?: number, repeatAfter?: number, repeatMode?: number): Promise<{ success: boolean; cached?: boolean; error?: string; data?: { id: number } }>
+      uploadAttachment(taskId: number, fileData: Uint8Array, fileName: string, mimeType: string): Promise<{ success: boolean; error?: string }>
+      fetchTaskAttachments(taskId: number): Promise<{ success: boolean; data?: Array<{ id: number }>; error?: string }>
+      updateTask(taskId: number, task: Record<string, unknown>): Promise<{ success: boolean; error?: string; data?: unknown }>
       closeWindow(): Promise<void>
+      setHeight(height: number): Promise<void>
       getConfig(): Promise<QuickEntryConfig | null>
       getPendingCount(): Promise<number>
       fetchLabels(): Promise<{ success: boolean; data?: Array<{ id: number; title: string }> }>
@@ -38,6 +42,8 @@ interface QuickEntryConfig {
 
 import { parse, getParserConfig, recurrenceToVikunja } from '../lib/task-parser'
 import type { ParseResult, ParserConfig, ParsedToken, TokenType } from '../lib/task-parser'
+import { getClipboardImages, fileToUint8Array } from '../lib/clipboard-images'
+import { imageToken } from '../lib/image-tokens'
 import { AutocompleteDropdown } from './autocomplete'
 import { cache } from './vikunja-cache'
 
@@ -65,6 +71,7 @@ const browserBadgeName = document.getElementById('browser-badge-name')!
 const browserBadgeRemove = document.getElementById('browser-badge-remove')!
 const inputHighlight = document.getElementById('input-highlight')!
 const parsePreview = document.getElementById('parse-preview')!
+const imageGallery = document.getElementById('image-gallery')!
 
 let errorTimeout: ReturnType<typeof setTimeout> | null = null
 let exclamationTodayEnabled = true
@@ -82,6 +89,15 @@ let lastParseResult: ParseResult | null = null
 let isComposing = false
 let suppressedTypes: Map<TokenType, string[]> = new Map()
 let lastConfig: QuickEntryConfig | null = null
+
+interface PendingImage {
+  uuid: string
+  blobUrl: string
+  bytes: Uint8Array
+  name: string
+  mime: string
+}
+let pendingImages: PendingImage[] = []
 
 // --- Autocomplete ---
 const autocomplete = new AutocompleteDropdown('autocomplete-container', (item, triggerStart, prefix) => {
@@ -155,8 +171,21 @@ function expandDescription(): void {
   descriptionHint.classList.add('hidden')
   descriptionInput.classList.remove('hidden')
   descriptionInput.focus()
+  autoresizeDescription()
   updateTodayHints()
 }
+
+const MAX_DESCRIPTION_HEIGHT_PX = 200
+
+function autoresizeDescription(): void {
+  if (descriptionInput.classList.contains('hidden')) return
+  descriptionInput.style.height = 'auto'
+  const next = Math.min(descriptionInput.scrollHeight, MAX_DESCRIPTION_HEIGHT_PX)
+  descriptionInput.style.height = `${next}px`
+  descriptionInput.style.overflowY = descriptionInput.scrollHeight > MAX_DESCRIPTION_HEIGHT_PX ? 'auto' : 'hidden'
+}
+
+descriptionInput.addEventListener('input', autoresizeDescription)
 
 function isDescriptionExpanded(): boolean {
   return !descriptionInput.classList.contains('hidden')
@@ -201,6 +230,7 @@ function resetInput(): void {
   collapseDescription()
   clearError()
   clearNlpState()
+  clearPendingImages()
   autocomplete.hide()
   todayHintInline.classList.add('hidden')
   todayHintBelow.classList.add('hidden')
@@ -399,6 +429,62 @@ function formatDateLabel(date: Date): string {
   return target.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 }
 
+// --- Image staging ---
+
+function renderImageGallery(): void {
+  imageGallery.innerHTML = ''
+  if (pendingImages.length === 0) {
+    imageGallery.classList.add('hidden')
+    return
+  }
+  imageGallery.classList.remove('hidden')
+  for (const img of pendingImages) {
+    const item = document.createElement('div')
+    item.className = 'image-gallery-item'
+    item.dataset.uuid = img.uuid
+
+    const el = document.createElement('img')
+    el.src = img.blobUrl
+    el.alt = img.name
+    el.draggable = false
+    item.appendChild(el)
+
+    const del = document.createElement('button')
+    del.type = 'button'
+    del.className = 'image-gallery-delete'
+    del.title = 'Remove image'
+    del.innerHTML = '&times;'
+    del.addEventListener('mousedown', (e) => e.preventDefault())
+    del.addEventListener('click', (e) => {
+      e.preventDefault()
+      e.stopPropagation()
+      removePendingImage(img.uuid)
+    })
+    item.appendChild(del)
+
+    imageGallery.appendChild(item)
+  }
+}
+
+function addPendingImage(img: PendingImage): void {
+  pendingImages.push(img)
+  renderImageGallery()
+}
+
+function removePendingImage(uuid: string): void {
+  const idx = pendingImages.findIndex((p) => p.uuid === uuid)
+  if (idx < 0) return
+  URL.revokeObjectURL(pendingImages[idx].blobUrl)
+  pendingImages.splice(idx, 1)
+  renderImageGallery()
+}
+
+function clearPendingImages(): void {
+  for (const img of pendingImages) URL.revokeObjectURL(img.blobUrl)
+  pendingImages = []
+  renderImageGallery()
+}
+
 function clearNlpState(): void {
   inputHighlight.innerHTML = ''
   parsePreview.innerHTML = ''
@@ -479,9 +565,11 @@ async function saveTask(): Promise<void> {
   const result = await window.quickEntryApi.saveTask(title, description || null, dueDate, projectId, priority, repeatAfter, repeatMode)
 
   if (result.success) {
+    const createdTask = result.data as (Record<string, unknown> & { id?: number }) | undefined
+    const taskId = createdTask?.id
+
     // Attach labels post-creation
-    if (parsedLabels.length > 0 && result.data?.id) {
-      const taskId = result.data.id
+    if (parsedLabels.length > 0 && taskId) {
       for (const labelName of parsedLabels) {
         const match = cachedLabels.find((l) => l.title.toLowerCase() === labelName.toLowerCase())
         if (match) {
@@ -499,6 +587,41 @@ async function saveTask(): Promise<void> {
           } catch {
             // Skip silently — label creation failed (e.g. offline)
           }
+        }
+      }
+    }
+
+    // Upload staged images and patch description with [[image:N]] tokens.
+    // If we couldn't get a task ID (offline cache), images are dropped silently.
+    if (pendingImages.length > 0 && taskId && createdTask) {
+      let uploaded = 0
+      for (const img of pendingImages) {
+        try {
+          const upload = await window.quickEntryApi.uploadAttachment(taskId, img.bytes, img.name, img.mime)
+          if (upload.success) uploaded++
+        } catch {
+          // Skip silently
+        }
+      }
+      // Vikunja's upload endpoint doesn't reliably return the new attachment id,
+      // so refetch the task's attachments. The task is brand new, so every
+      // attachment here is one we just added — sort ascending = upload order.
+      if (uploaded > 0) {
+        try {
+          const after = await window.quickEntryApi.fetchTaskAttachments(taskId)
+          if (after.success && after.data && after.data.length > 0) {
+            const ids = after.data.map((a) => a.id).sort((a, b) => a - b)
+            const tokens = ids.map((id) => imageToken(id))
+            const patchedDescription = description
+              ? `${description}\n${tokens.join('\n')}`
+              : tokens.join('\n')
+            await window.quickEntryApi.updateTask(taskId, {
+              ...createdTask,
+              description: patchedDescription,
+            })
+          }
+        } catch {
+          // Best effort — task already exists with images attached.
         }
       }
     }
@@ -703,6 +826,32 @@ input.addEventListener('input', () => {
   handleInputChange()
 })
 
+// Image paste — works on both title and description; auto-expands description.
+async function handleImagePaste(e: ClipboardEvent): Promise<void> {
+  const images = getClipboardImages(e)
+  if (images.length === 0) return // allow native text paste
+  e.preventDefault()
+  if (!isDescriptionExpanded()) expandDescription()
+  for (const img of images) {
+    try {
+      const bytes = await fileToUint8Array(img.file)
+      const blobUrl = URL.createObjectURL(new Blob([bytes as BlobPart], { type: img.mime }))
+      addPendingImage({
+        uuid: crypto.randomUUID().slice(0, 8),
+        blobUrl,
+        bytes,
+        name: img.name,
+        mime: img.mime,
+      })
+    } catch {
+      showError('Failed to read pasted image')
+    }
+  }
+}
+
+input.addEventListener('paste', handleImagePaste)
+descriptionInput.addEventListener('paste', handleImagePaste)
+
 // Obsidian badge remove button
 obsidianBadgeRemove.addEventListener('click', () => {
   obsidianLinked = false
@@ -780,5 +929,13 @@ requestAnimationFrame(() => {
   container.classList.add('visible')
   input.focus()
 })
+
+// Keep the window height matched to the container so rounded corners stay visible
+// as the description grows or images are added/removed.
+const resizeObserver = new ResizeObserver(() => {
+  const h = container.offsetHeight
+  if (h > 0) window.quickEntryApi.setHeight(h)
+})
+resizeObserver.observe(container)
 
 export {}

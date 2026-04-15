@@ -16,6 +16,7 @@ let _getQuickViewWindow: WindowGetter = () => null
 let _hideQuickEntry: VoidFn = () => {}
 let _hideQuickView: VoidFn = () => {}
 let _setViewerHeight: HeightFn = () => {}
+let _setQuickEntryHeight: HeightFn = () => {}
 let _applyQuickEntrySettings: ApplySettingsFn = () => ({ entry: false, viewer: false })
 
 export function registerQuickEntryState(fns: {
@@ -25,6 +26,7 @@ export function registerQuickEntryState(fns: {
   hideQuickEntry: VoidFn
   hideQuickView: VoidFn
   setViewerHeight: HeightFn
+  setQuickEntryHeight: HeightFn
   applyQuickEntrySettings: ApplySettingsFn
 }): void {
   _getMainWindow = fns.getMainWindow
@@ -33,6 +35,7 @@ export function registerQuickEntryState(fns: {
   _hideQuickEntry = fns.hideQuickEntry
   _hideQuickView = fns.hideQuickView
   _setViewerHeight = fns.setViewerHeight
+  _setQuickEntryHeight = fns.setQuickEntryHeight
   _applyQuickEntrySettings = fns.applyQuickEntrySettings
 }
 
@@ -42,4 +45,5 @@ export function getQuickViewWindow(): BrowserWindow | null { return _getQuickVie
 export function hideQuickEntry(): void { _hideQuickEntry() }
 export function hideQuickView(): void { _hideQuickView() }
 export function setViewerHeight(h: number): void { _setViewerHeight(h) }
+export function setQuickEntryHeight(h: number): void { _setQuickEntryHeight(h) }
 export function applyQuickEntrySettings(): HotkeyRegistrationResult { return _applyQuickEntrySettings() }

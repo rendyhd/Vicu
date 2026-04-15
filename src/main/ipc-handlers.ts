@@ -36,6 +36,7 @@ import { buildViewerFilterParams } from './quick-entry/filter-builder'
 import {
   hideQuickEntry,
   hideQuickView,
+  setQuickEntryHeight,
   setViewerHeight,
   getMainWindow,
   getQuickEntryWindow,
@@ -81,7 +82,10 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle('update-task', async (_event, id: number, task: Record<string, unknown>) => {
     const result = await updateTask(id, task)
-    if (result.success) notifyViewerSync()
+    if (result.success) {
+      notifyViewerSync()
+      notifyMainWindow()
+    }
     return result
   })
 
@@ -507,6 +511,10 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle('qv:close-window', () => {
     hideQuickView()
+  })
+
+  ipcMain.handle('qe:set-height', (_event, height: number) => {
+    setQuickEntryHeight(height)
   })
 
   ipcMain.handle('qv:set-height', (_event, height: number) => {

@@ -4,7 +4,14 @@ contextBridge.exposeInMainWorld('quickEntryApi', {
   platform: process.platform as 'darwin' | 'win32' | 'linux',
   saveTask: (title: string, description: string | null, dueDate: string | null, projectId: number | null, priority?: number, repeatAfter?: number, repeatMode?: number) =>
     ipcRenderer.invoke('qe:save-task', title, description, dueDate, projectId, priority, repeatAfter, repeatMode),
+  uploadAttachment: (taskId: number, fileData: Uint8Array, fileName: string, mimeType: string) =>
+    ipcRenderer.invoke('upload-task-attachment', taskId, fileData, fileName, mimeType),
+  fetchTaskAttachments: (taskId: number) =>
+    ipcRenderer.invoke('fetch-task-attachments', taskId),
+  updateTask: (taskId: number, task: Record<string, unknown>) =>
+    ipcRenderer.invoke('update-task', taskId, task),
   closeWindow: () => ipcRenderer.invoke('qe:close-window'),
+  setHeight: (height: number) => ipcRenderer.invoke('qe:set-height', height),
   getConfig: () => ipcRenderer.invoke('qe:get-config'),
   getPendingCount: () => ipcRenderer.invoke('qe:get-pending-count'),
   fetchLabels: () => ipcRenderer.invoke('fetch-labels'),
