@@ -37,7 +37,7 @@ export interface Task {
   related_tasks?: Record<string, Task[]> | null
   created: string
   updated: string
-  created_by: { id: number; username: string }
+  created_by: { id: number; username: string; name?: string }
   position: number
   bucket_id: number
   percent_done: number
