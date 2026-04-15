@@ -7,7 +7,9 @@ import { useAttachmentBlobUrl } from '@/hooks/use-attachment-bytes'
 
 export interface PendingImage {
   uuid: string
+  /** Object URL for rendering before the task exists. Caller owns lifecycle; must revoke on cancel/unmount/post-upload. */
   blobUrl: string
+  /** Raw bytes retained for re-upload once a task ID is available. */
   bytes: Uint8Array
   name: string
   mime: string
@@ -22,7 +24,12 @@ type Props = {
   className?: string
   /** When provided, paste will upload to this task and insert `[[image:<id>]]`. */
   taskId?: number
-  /** When no taskId, pasted images are reported here; caller stages and inserts `[[image-pending:<uuid>]]`. */
+  /**
+   * When no taskId, pasted images are reported here. The component inserts
+   * `[[image-pending:<uuid>]]` into the text via `onChange` itself; the caller
+   * stages the image and OWNS the `blobUrl` lifecycle — must revoke on
+   * cancel/unmount/post-upload.
+   */
   onStagePending?: (image: PendingImage) => void
   /** Map of pending uuid → blob URL for rendering staged previews. */
   pendingImages?: Record<string, PendingImage>
@@ -43,10 +50,16 @@ export function TaskDescription({
   startInPreview = true,
 }: Props) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const valueRef = useRef(value)
+  useEffect(() => {
+    valueRef.current = value
+  }, [value])
   const hasContent = value.trim().length > 0
   const [isEditing, setIsEditing] = useState(!startInPreview || !hasContent)
   const [uploadError, setUploadError] = useState<string | null>(null)
   const uploadMutation = useUploadAttachmentFromPaste()
+
+  const MAX_TEXTAREA_HEIGHT_PX = 180 // 10 rows × 18px line-height
 
   // Auto-resize textarea while editing
   useEffect(() => {
@@ -54,9 +67,8 @@ export function TaskDescription({
     const el = textareaRef.current
     if (!el) return
     el.style.height = 'auto'
-    const maxH = 10 * 18
-    el.style.height = `${Math.min(el.scrollHeight, maxH)}px`
-    el.style.overflowY = el.scrollHeight > maxH ? 'auto' : 'hidden'
+    el.style.height = `${Math.min(el.scrollHeight, MAX_TEXTAREA_HEIGHT_PX)}px`
+    el.style.overflowY = el.scrollHeight > MAX_TEXTAREA_HEIGHT_PX ? 'auto' : 'hidden'
   }, [isEditing, value])
 
   // Clear stale upload errors after 4s
@@ -74,7 +86,7 @@ export function TaskDescription({
 
       const target = e.currentTarget
       const cursor = target.selectionStart ?? target.value.length
-      let currentText = value
+      let currentText = valueRef.current
       let currentCursor = cursor
 
       for (const img of images) {
@@ -96,17 +108,18 @@ export function TaskDescription({
           }
         } else if (onStagePending) {
           const bytes = await fileToUint8Array(img.file)
-          const uuid = (crypto as Crypto).randomUUID().slice(0, 8)
+          // 8-char UUID slice — only needs to be unique within this paste session.
+          const uuid = crypto.randomUUID().slice(0, 8)
           const blobUrl = URL.createObjectURL(new Blob([bytes], { type: img.mime }))
           const token = pendingToken(uuid)
           currentText = insertTokenAt(currentText, currentCursor, token)
           currentCursor = currentText.indexOf(token, currentCursor) + token.length
-          onChange(currentText)
           onStagePending({ uuid, blobUrl, bytes, name: img.name, mime: img.mime })
+          onChange(currentText)
         }
       }
     },
-    [value, taskId, onChange, onStagePending, uploadMutation]
+    [taskId, onChange, onStagePending, uploadMutation]
   )
 
   if (!isEditing) {
