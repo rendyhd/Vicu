@@ -646,6 +646,50 @@ export function useUploadAttachmentFromDrop() {
   })
 }
 
+export function useUploadAttachmentFromPaste() {
+  const qc = useQueryClient()
+
+  return useMutation({
+    mutationFn: async ({
+      taskId,
+      fileData,
+      fileName,
+      mimeType,
+    }: {
+      taskId: number
+      fileData: Uint8Array
+      fileName: string
+      mimeType: string
+    }): Promise<{ attachmentId: number }> => {
+      // Snapshot current attachment IDs so we can identify the new one after upload.
+      const beforeResult = await api.fetchTaskAttachments(taskId)
+      const beforeIds = new Set<number>(
+        beforeResult.success ? beforeResult.data.map((a) => a.id) : []
+      )
+
+      const uploadResult = await api.uploadTaskAttachment(taskId, fileData, fileName, mimeType)
+      if (!uploadResult.success) throw new Error(uploadResult.error)
+
+      // Refetch and find the new attachment. If multiple new entries appear, prefer
+      // the one matching fileName; otherwise take the highest ID.
+      const afterResult = await api.fetchTaskAttachments(taskId)
+      if (!afterResult.success) throw new Error(afterResult.error)
+
+      const newAttachments = afterResult.data.filter((a) => !beforeIds.has(a.id))
+      const byName = newAttachments.find((a) => a.file.name === fileName)
+      const picked = byName ?? newAttachments.sort((a, b) => b.id - a.id)[0]
+      if (!picked) throw new Error('Upload succeeded but new attachment not found')
+
+      return { attachmentId: picked.id }
+    },
+    onSettled: (_data, _err, vars) => {
+      qc.invalidateQueries({ queryKey: ['task-attachments', vars.taskId] })
+      qc.invalidateQueries({ queryKey: ['tasks'] })
+      qc.invalidateQueries({ queryKey: ['view-tasks'] })
+    },
+  })
+}
+
 export function useDeleteAttachment() {
   const qc = useQueryClient()
 
