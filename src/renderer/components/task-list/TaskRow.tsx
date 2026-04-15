@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { Calendar, Tag, ListChecks, FolderOpen, Trash2, Bell, Repeat, Paperclip } from 'lucide-react'
+import { Calendar, Tag, ListChecks, FolderOpen, Trash2, Bell, Repeat, Paperclip, Info } from 'lucide-react'
 import { useDraggable } from '@dnd-kit/core'
 import { useSortable, defaultAnimateLayoutChanges } from '@dnd-kit/sortable'
 import type { AnimateLayoutChanges } from '@dnd-kit/sortable'
@@ -21,11 +21,12 @@ import { SubtaskList } from './SubtaskList'
 import { ProjectPickerPopover } from './ProjectPickerPopover'
 import { ReminderPickerPopover } from './ReminderPickerPopover'
 import { AttachmentPickerPopover } from './AttachmentPickerPopover'
+import { InfoPopover } from './InfoPopover'
 import { TaskLinkIcon } from '@/components/TaskLinkIcon'
 import { stripNoteLink, stripPageLink, extractNoteLinkHtml, extractPageLinkHtml } from '@/lib/note-link'
 import { formatRecurrenceLabel } from '@/lib/recurrence'
 
-type PopoverType = 'date' | 'label' | 'project' | 'subtasks' | 'reminder' | 'attachment' | null
+type PopoverType = 'date' | 'label' | 'project' | 'subtasks' | 'reminder' | 'attachment' | 'info' | null
 
 function getLabelStyle(rawHex: string | undefined): React.CSSProperties {
   const hex = normalizeHex(rawHex)
@@ -467,6 +468,19 @@ export function TaskRow({ task, sortable = false }: TaskRowProps) {
         <div className="relative flex items-center gap-1">
           <button
             type="button"
+            onClick={() => togglePopover('info')}
+            className={cn(
+              'flex h-6 w-6 items-center justify-center rounded transition-colors',
+              activePopover === 'info'
+                ? 'bg-[var(--accent-blue)]/10 text-[var(--accent-blue)]'
+                : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]'
+            )}
+            title="Task info"
+          >
+            <Info className="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
             onClick={() => togglePopover('date')}
             className={cn(
               'flex h-6 w-6 items-center justify-center rounded transition-colors',
@@ -559,6 +573,12 @@ export function TaskRow({ task, sortable = false }: TaskRowProps) {
           </button>
 
           {/* Popovers */}
+          {activePopover === 'info' && (
+            <InfoPopover
+              task={task}
+              onClose={() => setActivePopover(null)}
+            />
+          )}
           {activePopover === 'date' && (
             <DatePickerPopover
               currentDate={task.due_date}
