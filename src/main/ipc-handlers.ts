@@ -561,6 +561,12 @@ export function registerIpcHandlers(): void {
     return deleteTaskAttachment(taskId, attachmentId)
   })
 
+  ipcMain.handle('fetch-task-attachment-bytes', async (_event, taskId: number, attachmentId: number) => {
+    const result = await downloadTaskAttachment(taskId, attachmentId)
+    if (!result.success) return result
+    return { success: true, data: new Uint8Array(result.data) }
+  })
+
   ipcMain.handle('open-task-attachment', async (_event, taskId: number, attachmentId: number, fileName: string) => {
     const result = await downloadTaskAttachment(taskId, attachmentId)
     if (!result.success) return result
