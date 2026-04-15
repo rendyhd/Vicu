@@ -36,6 +36,7 @@ import { buildViewerFilterParams } from './quick-entry/filter-builder'
 import {
   hideQuickEntry,
   hideQuickView,
+  setQuickEntryHeight,
   setViewerHeight,
   getMainWindow,
   getQuickEntryWindow,
@@ -81,7 +82,10 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle('update-task', async (_event, id: number, task: Record<string, unknown>) => {
     const result = await updateTask(id, task)
-    if (result.success) notifyViewerSync()
+    if (result.success) {
+      notifyViewerSync()
+      notifyMainWindow()
+    }
     return result
   })
 
@@ -509,6 +513,10 @@ export function registerIpcHandlers(): void {
     hideQuickView()
   })
 
+  ipcMain.handle('qe:set-height', (_event, height: number) => {
+    setQuickEntryHeight(height)
+  })
+
   ipcMain.handle('qv:set-height', (_event, height: number) => {
     setViewerHeight(height)
   })
@@ -559,6 +567,12 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle('delete-task-attachment', (_event, taskId: number, attachmentId: number) => {
     return deleteTaskAttachment(taskId, attachmentId)
+  })
+
+  ipcMain.handle('fetch-task-attachment-bytes', async (_event, taskId: number, attachmentId: number) => {
+    const result = await downloadTaskAttachment(taskId, attachmentId)
+    if (!result.success) return result
+    return { success: true, data: new Uint8Array(result.data) }
   })
 
   ipcMain.handle('open-task-attachment', async (_event, taskId: number, attachmentId: number, fileName: string) => {

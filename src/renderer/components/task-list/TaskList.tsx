@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback, useMemo, Fragment } from 'rea
 import { Plus, Inbox } from 'lucide-react'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { cn } from '@/lib/cn'
-import { useCreateTask, useCompleteTask, useUpdateTask, useDeleteTask, useAddLabel, useCreateLabel } from '@/hooks/use-task-mutations'
+import { useCreateTask, useCompleteTask, useUpdateTask, useDeleteTask, useAddLabel, useCreateLabel, useUploadAttachmentFromPaste } from '@/hooks/use-task-mutations'
 import { useSelectionStore } from '@/stores/selection-store'
 import { useTaskParser } from '@/hooks/use-task-parser'
 import { useLabels } from '@/hooks/use-labels'
@@ -13,6 +13,8 @@ import { TaskRow } from './TaskRow'
 import { TaskInputParser } from '@/components/task-input/TaskInputParser'
 import { EmptyState } from '@/components/shared/EmptyState'
 import type { ChipData } from '@/components/task-input/TokenChip'
+import { TaskDescription, type PendingImage } from './TaskDescription'
+import { replacePendingTokens } from '@/lib/image-tokens'
 
 interface TaskListProps {
   title: string
@@ -51,8 +53,8 @@ export function TaskList({
   const [showNotes, setShowNotes] = useState(false)
   const [defaultDateDismissed, setDefaultDateDismissed] = useState(false)
   const [newDescription, setNewDescription] = useState('')
+  const [pendingImages, setPendingImages] = useState<Record<string, PendingImage>>({})
   const inputRef = useRef<HTMLInputElement>(null)
-  const descriptionRef = useRef<HTMLTextAreaElement>(null)
   const creationRef = useRef<HTMLDivElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
   const parser = useTaskParser()
@@ -66,6 +68,7 @@ export function TaskList({
   const completeTask = useCompleteTask()
   const updateTask = useUpdateTask()
   const deleteTask = useDeleteTask()
+  const uploadFromPaste = useUploadAttachmentFromPaste()
   const {
     expandedTaskId,
     focusedTaskId,
@@ -96,19 +99,14 @@ export function TaskList({
     }
   }, [isAdding])
 
-  // Focus notes textarea when expanded
-  useEffect(() => {
-    if (showNotes && descriptionRef.current) {
-      descriptionRef.current.focus()
-    }
-  }, [showNotes])
-
   const handleSubmit = () => {
     let trimmed = parser.inputValue.trim()
     if (!trimmed || !projectId) {
       setIsAdding(false)
       parser.reset()
       setNewDescription('')
+      Object.values(pendingImages).forEach((p) => URL.revokeObjectURL(p.blobUrl))
+      setPendingImages({})
       setShowNotes(false)
       return
     }
@@ -123,6 +121,8 @@ export function TaskList({
         setIsAdding(false)
         parser.reset()
         setNewDescription('')
+        Object.values(pendingImages).forEach((p) => URL.revokeObjectURL(p.blobUrl))
+        setPendingImages({})
         setShowNotes(false)
         return
       }
@@ -153,6 +153,8 @@ export function TaskList({
           setIsAdding(false)
           parser.reset()
           setNewDescription('')
+          Object.values(pendingImages).forEach((p) => URL.revokeObjectURL(p.blobUrl))
+          setPendingImages({})
           setShowNotes(false)
           return
         }
@@ -174,6 +176,8 @@ export function TaskList({
     if (desc) {
       payload.description = desc
     }
+    const snapshotDesc = desc
+    const snapshotPending = pendingImages
 
     createTask.mutate(
       { projectId, task: payload },
@@ -200,8 +204,42 @@ export function TaskList({
               }
             }
           }
+
+          // Upload any images that were pasted before the task had an ID.
+          const stagedEntries = Object.entries(snapshotPending)
+          if (stagedEntries.length > 0 && data && typeof data === 'object' && 'id' in data) {
+            const newTaskId = (data as Task).id
+            ;(async () => {
+              const mapping: Record<string, number> = {}
+              for (const [uuid, img] of stagedEntries) {
+                try {
+                  const result = await uploadFromPaste.mutateAsync({
+                    taskId: newTaskId,
+                    fileData: img.bytes,
+                    fileName: img.name,
+                    mimeType: img.mime,
+                  })
+                  mapping[uuid] = result.attachmentId
+                } catch {
+                  // Leave pending token in place; user can retry by editing.
+                }
+                URL.revokeObjectURL(img.blobUrl)
+              }
+              if (Object.keys(mapping).length > 0) {
+                const patched = replacePendingTokens(snapshotDesc, mapping)
+                if (patched !== snapshotDesc) {
+                  updateTask.mutate({
+                    id: newTaskId,
+                    task: { ...(data as Task), description: patched },
+                  })
+                }
+              }
+            })()
+          }
+
           parser.reset()
           setNewDescription('')
+          setPendingImages({})
           setShowNotes(false)
           setDefaultDateDismissed(false)
           inputRef.current?.focus()
@@ -249,10 +287,11 @@ export function TaskList({
   // Keyboard navigation
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
-      // Don't handle if focus is in an input/textarea (let the expanded task handle it)
-      const active = document.activeElement
+      // Don't handle if focus is in an input/textarea/contentEditable (let the field handle it)
+      const active = document.activeElement as HTMLElement | null
       const tag = active?.tagName.toLowerCase()
       if (tag === 'input' || tag === 'textarea' || tag === 'select') return
+      if (active?.isContentEditable) return
 
       const taskCount = tasks.length
 
@@ -411,6 +450,8 @@ export function TaskList({
             setIsAdding(false)
             parser.reset()
             setNewDescription('')
+            Object.values(pendingImages).forEach((p) => URL.revokeObjectURL(p.blobUrl))
+            setPendingImages({})
             setShowNotes(false)
             setDefaultDateDismissed(false)
           }}
@@ -436,10 +477,21 @@ export function TaskList({
       </div>
       {showNotes && (
         <div className="pb-2 pl-[46px] pr-4">
-          <textarea
-            ref={descriptionRef}
+          <TaskDescription
             value={newDescription}
-            onChange={(e) => setNewDescription(e.target.value)}
+            onChange={setNewDescription}
+            onStagePending={(img) => setPendingImages((prev) => ({ ...prev, [img.uuid]: img }))}
+            onRemovePending={(uuid) =>
+              setPendingImages((prev) => {
+                const entry = prev[uuid]
+                if (entry) URL.revokeObjectURL(entry.blobUrl)
+                const { [uuid]: _removed, ...rest } = prev
+                return rest
+              })
+            }
+            pendingImages={pendingImages}
+            placeholder="Notes"
+            autoFocus
             onKeyDown={(e) => {
               if (e.key === 'Escape') {
                 e.preventDefault()
@@ -450,13 +502,6 @@ export function TaskList({
                 handleSubmit()
               }
             }}
-            onBlur={(e) => {
-              if (creationRef.current?.contains(e.relatedTarget as Node)) return
-              handleSubmit()
-            }}
-            placeholder="Notes"
-            rows={3}
-            className="w-full resize-none bg-transparent text-[12px] text-[var(--text-secondary)] placeholder:text-[var(--text-secondary)]/50 focus:outline-none"
           />
         </div>
       )}

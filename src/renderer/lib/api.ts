@@ -155,6 +155,8 @@ export const api = {
     window.api.uploadTaskAttachment(taskId, fileData, fileName, mimeType) as Promise<ApiResult<unknown>>,
   deleteTaskAttachment: (taskId: number, attachmentId: number) =>
     window.api.deleteTaskAttachment(taskId, attachmentId) as Promise<ApiResult<void>>,
+  fetchTaskAttachmentBytes: (taskId: number, attachmentId: number) =>
+    window.api.fetchTaskAttachmentBytes(taskId, attachmentId) as Promise<ApiResult<Uint8Array>>,
   openTaskAttachment: (taskId: number, attachmentId: number, fileName: string) =>
     window.api.openTaskAttachment(taskId, attachmentId, fileName) as Promise<ApiResult<void>>,
   pickAndUploadAttachment: (taskId: number) =>

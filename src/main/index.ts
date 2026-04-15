@@ -31,6 +31,7 @@ registerQuickEntryState({
   hideQuickEntry: () => hideQuickEntry(),
   hideQuickView: () => hideQuickView(),
   setViewerHeight: (h) => setViewerHeight(h),
+  setQuickEntryHeight: (h) => setQuickEntryHeight(h),
   applyQuickEntrySettings: () => applyQuickEntrySettings(),
 })
 
@@ -193,6 +194,15 @@ function toggleQuickEntry(): void {
   if (!quickEntryWindow) return
   if (quickEntryWindow.isVisible()) hideQuickEntry()
   else showQuickEntry()
+}
+
+function setQuickEntryHeight(height: number): void {
+  if (!quickEntryWindow || quickEntryWindow.isDestroyed()) return
+  if (!quickEntryWindow.isVisible()) return
+  const clamped = Math.max(80, Math.min(720, Math.round(height))) + SHADOW_PADDING * 2
+  const [currentWidth, currentHeight] = quickEntryWindow.getSize()
+  if (Math.abs(currentHeight - clamped) <= 1) return
+  quickEntryWindow.setSize(currentWidth, clamped)
 }
 
 // --- Quick View show/hide ---

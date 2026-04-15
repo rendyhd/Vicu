@@ -1,13 +1,24 @@
-import { BrowserWindow, session } from 'electron'
+import { BrowserWindow, screen, session } from 'electron'
 import { join } from 'path'
 import type { AppConfig } from './config'
 import { isMac } from './platform'
 
 const SHADOW_PADDING = 20
 const DRAG_HANDLE_HEIGHT = 14
+const MIN_VISIBLE_PX = 100
+
+function boundsAreVisible(bounds: NonNullable<AppConfig['window_bounds']>): boolean {
+  return screen.getAllDisplays().some((d) => {
+    const wa = d.workArea
+    const overlapX = Math.max(0, Math.min(bounds.x + bounds.width, wa.x + wa.width) - Math.max(bounds.x, wa.x))
+    const overlapY = Math.max(0, Math.min(bounds.y + bounds.height, wa.y + wa.height) - Math.max(bounds.y, wa.y))
+    return overlapX >= MIN_VISIBLE_PX && overlapY >= MIN_VISIBLE_PX
+  })
+}
 
 export function createMainWindow(config: AppConfig | null): BrowserWindow {
-  const bounds = config?.window_bounds
+  const saved = config?.window_bounds
+  const bounds = saved && boundsAreVisible(saved) ? saved : undefined
 
   const win = new BrowserWindow({
     width: bounds?.width ?? 1100,
@@ -45,7 +56,7 @@ export function createMainWindow(config: AppConfig | null): BrowserWindow {
         responseHeaders: {
           ...details.responseHeaders,
           'Content-Security-Policy': [
-            "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'",
+            "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; font-src 'self' data:",
           ],
         },
       })

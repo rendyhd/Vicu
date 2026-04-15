@@ -239,6 +239,63 @@ body {
   color: #999;
 }
 
+/* Image gallery — staged paste images shown below description */
+.image-gallery {
+  -webkit-app-region: no-drag;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 0 20px 12px;
+}
+
+.image-gallery-item {
+  position: relative;
+  display: inline-block;
+  line-height: 0;
+}
+
+.image-gallery-item img {
+  display: block;
+  height: auto;
+  width: auto;
+  max-height: 120px;
+  max-width: 240px;
+  border-radius: 6px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  object-fit: contain;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.image-gallery-delete {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 20px;
+  height: 20px;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.7);
+  color: #fff;
+  cursor: pointer;
+  padding: 0;
+  font-size: 14px;
+  line-height: 1;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  transition: background-color 120ms ease;
+}
+
+.image-gallery-delete:hover {
+  background: rgba(0, 0, 0, 0.9);
+}
+
+.image-gallery-item:hover .image-gallery-delete {
+  display: flex;
+}
+
 /* Error message */
 .error-message {
   padding: 6px 20px 12px;
@@ -446,6 +503,10 @@ body {
 
   .description-input::placeholder {
     color: #666;
+  }
+
+  .image-gallery-item img {
+    border-color: rgba(255, 255, 255, 0.08);
   }
 
   .error-message {
