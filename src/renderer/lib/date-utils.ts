@@ -69,3 +69,19 @@ export function parseNaturalDate(text: string): Date | null {
   if (results.length === 0) return null
   return results[0].start.date()
 }
+
+export function formatAbsoluteDateTime(date: string): string {
+  if (isNullDate(date)) return ''
+  const d = new Date(date)
+  const datePart = d.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  })
+  const timePart = d.toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  })
+  return `${datePart} at ${timePart}`
+}
