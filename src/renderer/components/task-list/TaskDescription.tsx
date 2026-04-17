@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { X } from 'lucide-react'
+import type { Editor } from '@tiptap/react'
 import { cn } from '@/lib/cn'
 import { segmentDescription, imageToken, pendingToken } from '@/lib/image-tokens'
 import { getClipboardImages, fileToUint8Array } from '@/lib/clipboard-images'
@@ -9,6 +10,7 @@ import {
   useDeleteAttachment,
 } from '@/hooks/use-task-mutations'
 import { useAttachmentBlobUrl } from '@/hooks/use-attachment-bytes'
+import { RichTextEditor } from '@/components/rich-text/RichTextEditor'
 
 export interface PendingImage {
   uuid: string
@@ -28,7 +30,7 @@ type Props = {
   value: string
   onChange: (value: string) => void
   onBlur?: () => void
-  onKeyDown?: (e: React.KeyboardEvent) => void
+  onKeyDown?: (e: KeyboardEvent) => boolean | void
   placeholder?: string
   className?: string
   /** When provided, paste will upload to this task and append the image token. */
@@ -42,11 +44,13 @@ type Props = {
   onRemovePending?: (uuid: string) => void
   /** Map of pending uuid → image record, used to render staged previews. */
   pendingImages?: Record<string, PendingImage>
-  /** Focus the textarea on mount. */
+  /** Focus the editor on mount. */
   autoFocus?: boolean
+  /** Expose the underlying TipTap editor for programmatic focus. */
+  editorRef?: React.MutableRefObject<Editor | null>
+  /** Fired once with the editor's normalized HTML of the initial content. */
+  onReady?: (normalizedHtml: string) => void
 }
-
-const MAX_TEXTAREA_HEIGHT_PX = 180
 
 function parseValue(value: string): { text: string; images: ImageRef[] } {
   const segments = segmentDescription(value)
@@ -85,22 +89,21 @@ export function TaskDescription({
   onRemovePending,
   pendingImages,
   autoFocus = false,
+  editorRef,
+  onReady,
 }: Props) {
-  const textareaRef = useRef<HTMLTextAreaElement>(null)
   const [uploadError, setUploadError] = useState<string | null>(null)
   const uploadMutation = useUploadAttachmentFromPaste()
   const deleteMutation = useDeleteAttachment()
+  // Refs to latest text/images — paste is async and closes over stale deps otherwise.
+  const textRef = useRef('')
+  const imagesRef = useRef<ImageRef[]>([])
+  const onChangeRef = useRef(onChange)
+  onChangeRef.current = onChange
 
   const { text, images } = useMemo(() => parseValue(value), [value])
-
-  // Auto-resize the textarea
-  useEffect(() => {
-    const el = textareaRef.current
-    if (!el) return
-    el.style.height = 'auto'
-    el.style.height = `${Math.min(el.scrollHeight, MAX_TEXTAREA_HEIGHT_PX)}px`
-    el.style.overflowY = el.scrollHeight > MAX_TEXTAREA_HEIGHT_PX ? 'auto' : 'hidden'
-  }, [text])
+  textRef.current = text
+  imagesRef.current = images
 
   // Clear stale upload errors after 4s
   useEffect(() => {
@@ -110,74 +113,75 @@ export function TaskDescription({
   }, [uploadError])
 
   const handleTextChange = useCallback(
-    (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-      onChange(buildValue(e.target.value, images))
+    (html: string) => {
+      onChange(buildValue(html, imagesRef.current))
     },
-    [onChange, images]
+    [onChange]
   )
 
   const removeImage = useCallback(
     (toRemove: ImageRef) => {
-      const next = images.filter((img) => imageRefKey(img) !== imageRefKey(toRemove))
-      onChange(buildValue(text, next))
+      const next = imagesRef.current.filter((img) => imageRefKey(img) !== imageRefKey(toRemove))
+      onChange(buildValue(textRef.current, next))
       if (toRemove.kind === 'image' && taskId != null) {
         deleteMutation.mutate({ taskId, attachmentId: toRemove.attachmentId })
       } else if (toRemove.kind === 'pending') {
         onRemovePending?.(toRemove.uuid)
       }
     },
-    [images, text, onChange, taskId, deleteMutation, onRemovePending]
+    [onChange, taskId, deleteMutation, onRemovePending]
   )
 
   const handlePaste = useCallback(
-    async (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    (e: ClipboardEvent): boolean => {
       const clipboardImages = getClipboardImages(e)
-      if (clipboardImages.length === 0) return // allow native text paste
+      if (clipboardImages.length === 0) return false // allow native text/HTML paste
       e.preventDefault()
-      const currentText = textareaRef.current?.value ?? text
-      const next = images.slice()
-      for (const img of clipboardImages) {
-        try {
-          const bytes = await fileToUint8Array(img.file)
-          if (taskId != null) {
-            const result = await uploadMutation.mutateAsync({
-              taskId,
-              fileData: bytes,
-              fileName: img.name,
-              mimeType: img.mime,
-            })
-            next.push({ kind: 'image', attachmentId: result.attachmentId })
-          } else if (onStagePending) {
-            const uuid = crypto.randomUUID().slice(0, 8)
-            const blobUrl = URL.createObjectURL(
-              new Blob([bytes as BlobPart], { type: img.mime })
-            )
-            onStagePending({ uuid, blobUrl, bytes, name: img.name, mime: img.mime })
-            next.push({ kind: 'pending', uuid })
+      void (async () => {
+        const next = imagesRef.current.slice()
+        for (const img of clipboardImages) {
+          try {
+            const bytes = await fileToUint8Array(img.file)
+            if (taskId != null) {
+              const result = await uploadMutation.mutateAsync({
+                taskId,
+                fileData: bytes,
+                fileName: img.name,
+                mimeType: img.mime,
+              })
+              next.push({ kind: 'image', attachmentId: result.attachmentId })
+            } else if (onStagePending) {
+              const uuid = crypto.randomUUID().slice(0, 8)
+              const blobUrl = URL.createObjectURL(
+                new Blob([bytes as BlobPart], { type: img.mime })
+              )
+              onStagePending({ uuid, blobUrl, bytes, name: img.name, mime: img.mime })
+              next.push({ kind: 'pending', uuid })
+            }
+          } catch (err) {
+            setUploadError(err instanceof Error ? err.message : 'Upload failed')
           }
-        } catch (err) {
-          setUploadError(err instanceof Error ? err.message : 'Upload failed')
         }
-      }
-      onChange(buildValue(currentText, next))
+        onChangeRef.current(buildValue(textRef.current, next))
+      })()
+      return true
     },
-    [images, text, taskId, onChange, onStagePending, uploadMutation]
+    [taskId, onStagePending, uploadMutation]
   )
 
   return (
     <div className={cn('flex flex-col gap-2', className)}>
-      <textarea
-        ref={textareaRef}
+      <RichTextEditor
         value={text}
-        autoFocus={autoFocus}
         onChange={handleTextChange}
-        onPaste={handlePaste}
         onBlur={onBlur}
         onKeyDown={onKeyDown}
+        onPaste={handlePaste}
+        onReady={onReady}
+        editorRef={editorRef}
+        autoFocus={autoFocus}
         placeholder={placeholder}
-        rows={1}
-        className="custom-scrollbar w-full resize-none bg-transparent text-xs leading-[18px] text-[var(--text-primary)] placeholder:text-[var(--text-secondary)] focus:outline-none"
-        style={{ overflowY: 'hidden' }}
+        className="text-xs leading-[18px]"
       />
 
       {images.length > 0 && (

@@ -53,7 +53,22 @@ interface QuickViewConfig {
   standalone_mode: boolean
 }
 
-import { extractTaskLink } from '@/lib/note-link'
+import { extractTaskLink, stripNoteLink, stripPageLink, extractNoteLinkHtml, extractPageLinkHtml } from '@/lib/note-link'
+import { sanitizeTaskHtml } from '@/lib/sanitize-html'
+
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+}
+
+function plainTextFromHtml(html: string): string {
+  const tmp = document.createElement('div')
+  tmp.innerHTML = sanitizeTaskHtml(html)
+  return tmp.textContent ?? ''
+}
 
 const container = document.getElementById('container')!
 const taskList = document.getElementById('task-list')!
@@ -251,8 +266,8 @@ function buildTaskItemDOM(task: TaskData): HTMLElement {
 
   if (task.description) {
     const desc = document.createElement('div')
-    desc.className = 'task-description hidden'
-    desc.textContent = task.description
+    desc.className = 'task-description task-description-rich hidden'
+    desc.innerHTML = sanitizeTaskHtml(stripPageLink(stripNoteLink(task.description)))
     desc.addEventListener('click', (e) => {
       e.stopPropagation()
       const items = getTaskItems()
@@ -423,7 +438,8 @@ function enterEditMode(focusDescription = false): void {
 
   const descTextarea = document.createElement('textarea') as HTMLTextAreaElement
   descTextarea.className = 'task-edit-description'
-  descTextarea.value = taskData.description || ''
+  // Edit as plain text — rich formatting (if any) round-trips through the main window.
+  descTextarea.value = plainTextFromHtml(stripPageLink(stripNoteLink(taskData.description || '')))
   descTextarea.placeholder = 'Description (optional)'
   descTextarea.rows = 3
 
@@ -469,14 +485,19 @@ async function saveEdit(item: HTMLElement, newTitle: string, newDescription: str
 
   const taskId = item.dataset.taskId!
   const taskData: TaskData = JSON.parse(item.dataset.task || '{}')
-  const updatedData = { ...taskData, title: trimmedTitle, description: newDescription }
+  // User typed plain text — wrap as <p>…</p> for Vikunja and re-attach preserved link comments.
+  const trimmedDesc = newDescription.trim()
+  const linkHtml = extractNoteLinkHtml(taskData.description) + extractPageLinkHtml(taskData.description)
+  const wrapped = trimmedDesc ? `<p>${escapeHtml(trimmedDesc).replace(/\n/g, '<br>')}</p>` : ''
+  const finalDescription = wrapped + linkHtml
+  const updatedData = { ...taskData, title: trimmedTitle, description: finalDescription }
 
   const result = await window.quickViewApi.updateTask(Number(taskId), updatedData)
 
   if (result.success) {
     lastFetchResult = null
     taskData.title = trimmedTitle
-    taskData.description = newDescription
+    taskData.description = finalDescription
     item.dataset.task = JSON.stringify(taskData)
     exitEditMode(item)
     const newItem = buildTaskItemDOM(taskData)

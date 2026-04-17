@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { Calendar, Tag, ListChecks, FolderOpen, Trash2, Bell, Repeat, Paperclip, Info } from 'lucide-react'
+import type { Editor } from '@tiptap/react'
 import { useDraggable } from '@dnd-kit/core'
 import { useSortable, defaultAnimateLayoutChanges } from '@dnd-kit/sortable'
 import type { AnimateLayoutChanges } from '@dnd-kit/sortable'
@@ -26,6 +27,7 @@ import { InfoPopover } from './InfoPopover'
 import { TaskLinkIcon } from '@/components/TaskLinkIcon'
 import { stripNoteLink, stripPageLink, extractNoteLinkHtml, extractPageLinkHtml } from '@/lib/note-link'
 import { formatRecurrenceLabel } from '@/lib/recurrence'
+import { RichTextEditor } from '@/components/rich-text/RichTextEditor'
 
 type PopoverType = 'date' | 'label' | 'project' | 'subtasks' | 'reminder' | 'attachment' | 'info' | null
 
@@ -119,6 +121,8 @@ export function TaskRow({ task, sortable = false }: TaskRowProps) {
   const noteLinkHtml = extractNoteLinkHtml(task.description) + extractPageLinkHtml(task.description)
   const [activePopover, setActivePopover] = useState<PopoverType>(null)
   const titleRef = useRef<HTMLInputElement>(null)
+  const descEditorRef = useRef<Editor | null>(null)
+  const descBaselineRef = useRef<string | null>(null)
 
   // Flash red border briefly when drag-drop upload fails, show error message
   useEffect(() => {
@@ -150,9 +154,16 @@ export function TaskRow({ task, sortable = false }: TaskRowProps) {
     if (editTitle.trim() && editTitle !== task.title) {
       changes.title = editTitle.trim()
     }
-    const fullDescription = noteLinkHtml ? (editDescription ? editDescription + noteLinkHtml : noteLinkHtml) : editDescription
-    if (fullDescription !== task.description) {
+    // Only diff against the TipTap-normalized baseline, not the raw server value —
+    // opening a task shouldn't trigger a save just because TipTap re-serializes whitespace.
+    const baseline = descBaselineRef.current
+    const descChanged = baseline !== null && editDescription !== baseline
+    if (descChanged) {
+      const fullDescription = noteLinkHtml
+        ? (editDescription ? editDescription + noteLinkHtml : noteLinkHtml)
+        : editDescription
       changes.description = fullDescription
+      descBaselineRef.current = editDescription
     }
     if (Object.keys(changes).length > 0) {
       updateTask.mutate({ id: task.id, task: { ...task, ...changes } })
@@ -373,7 +384,7 @@ export function TaskRow({ task, sortable = false }: TaskRowProps) {
           onKeyDown={(e) => {
             if (e.key === 'Enter' && !e.ctrlKey && !e.metaKey) {
               e.preventDefault()
-              // Description focus is now managed by TaskDescription on click.
+              descEditorRef.current?.commands.focus('end')
             }
             if (e.key === 'Escape') {
               handleSave()
@@ -404,11 +415,21 @@ export function TaskRow({ task, sortable = false }: TaskRowProps) {
           onChange={setEditDescription}
           onBlur={handleSave}
           onKeyDown={(e) => {
+            // Escape is the only shortcut that needs handling inside the editor —
+            // outer handleExpandedKeyDown catches Ctrl+Enter / Ctrl+K / Ctrl+T via bubbling.
             if (e.key === 'Escape') {
+              e.preventDefault()
               handleSave()
               collapseAll()
+              return true
             }
+            return false
           }}
+          onReady={(normalized) => {
+            descBaselineRef.current = normalized
+          }}
+          editorRef={descEditorRef}
+          placeholder="Notes"
         />
       </div>
 

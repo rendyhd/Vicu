@@ -261,6 +261,52 @@ html, body {
   cursor: text;
 }
 
+/* Rich-text description — HTML content from Vikunja (TipTap output). */
+.task-description-rich {
+  white-space: normal;
+}
+.task-description-rich p { margin: 0 0 0.4em 0; }
+.task-description-rich p:last-child { margin-bottom: 0; }
+.task-description-rich ul,
+.task-description-rich ol { margin: 0.25em 0 0.4em 1.2em; padding: 0; }
+.task-description-rich li { margin: 0.1em 0; }
+.task-description-rich h1,
+.task-description-rich h2,
+.task-description-rich h3,
+.task-description-rich h4 { margin: 0.5em 0 0.25em; font-weight: 600; }
+.task-description-rich strong { font-weight: 600; color: inherit; }
+.task-description-rich em { font-style: italic; }
+.task-description-rich s { text-decoration: line-through; }
+.task-description-rich a { color: #4a90d9; text-decoration: underline; }
+.task-description-rich code {
+  background: rgba(0, 0, 0, 0.06);
+  padding: 0.1em 0.3em;
+  border-radius: 3px;
+  font-size: 0.9em;
+}
+.task-description-rich pre {
+  background: rgba(0, 0, 0, 0.06);
+  padding: 0.4em 0.6em;
+  border-radius: 4px;
+  font-size: 0.9em;
+  overflow-x: auto;
+}
+.task-description-rich blockquote {
+  border-left: 2px solid rgba(0, 0, 0, 0.15);
+  padding-left: 0.6em;
+  margin: 0.3em 0;
+  color: #888;
+}
+.task-description-rich ul[data-type="taskList"] {
+  list-style: none;
+  padding-left: 0;
+}
+.task-description-rich ul[data-type="taskList"] li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.35em;
+}
+
 .task-description:hover {
   background: rgba(0, 0, 0, 0.06);
 }
@@ -568,6 +614,14 @@ html, body {
 
   .task-description:hover {
     background: rgba(255, 255, 255, 0.08);
+  }
+
+  .task-description-rich a { color: #5a9be6; }
+  .task-description-rich code,
+  .task-description-rich pre { background: rgba(255, 255, 255, 0.08); }
+  .task-description-rich blockquote {
+    border-left-color: rgba(255, 255, 255, 0.2);
+    color: #888;
   }
 
   .description-icon {
