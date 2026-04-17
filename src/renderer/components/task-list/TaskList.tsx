@@ -439,7 +439,14 @@ export function TaskList({
   }, [focusedTaskId])
 
   const taskInputElement = (
-    <div ref={creationRef} className="border-b border-[var(--border-color)]">
+    <div
+      ref={creationRef}
+      className="border-b border-[var(--border-color)]"
+      onBlur={(e) => {
+        if (creationRef.current?.contains(e.relatedTarget as Node)) return
+        handleSubmit()
+      }}
+    >
       <div className="flex items-start gap-3 px-4 pt-2.5">
         <div className="mt-[7px] h-[18px] w-[18px] shrink-0 rounded-full border border-[var(--border-color)]" />
         <TaskInputParser
@@ -465,10 +472,6 @@ export function TaskList({
           labels={labelItems}
           inputRef={inputRef}
           placeholder="New Task"
-          onBlur={(e) => {
-            if (creationRef.current?.contains(e.relatedTarget as Node)) return
-            handleSubmit()
-          }}
           showBangTodayHint={!parser.enabled && !!parser.parserConfig.bangToday}
           className="flex-1"
           contextChips={contextChips}
