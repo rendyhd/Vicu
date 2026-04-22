@@ -34,6 +34,9 @@ import { ProjectDragOverlay } from '@/components/sidebar/ProjectDragOverlay'
 import { CustomListDragOverlay } from '@/components/sidebar/CustomListDragOverlay'
 import { SectionDragOverlay } from '@/components/task-list/SectionDragOverlay'
 import { UpdateBanner } from '@/components/UpdateBanner'
+import { useAppConfig } from '@/hooks/use-app-config'
+import { useTodayOverdueCount } from '@/hooks/use-today-overdue-count'
+import { renderBadgeDataUrl } from '@/lib/render-badge-icon'
 
 const MIN_WIDTH = 180
 const MAX_WIDTH = 360
@@ -71,6 +74,24 @@ type DragItem =
   | { type: 'project'; node: ProjectTreeNode }
   | { type: 'custom-list'; list: CustomList }
   | { type: 'section'; project: Project; siblings: Project[] }
+
+function BadgeSyncEnabled() {
+  const count = useTodayOverdueCount()
+  useEffect(() => {
+    const dataUrl = renderBadgeDataUrl(count)
+    api.setTaskBadge(count, dataUrl)
+  }, [count])
+  useEffect(() => {
+    return () => { api.setTaskBadge(0, null) }
+  }, [])
+  return null
+}
+
+function BadgeSync() {
+  const { data: config } = useAppConfig()
+  const enabled = config?.show_today_overdue_badge === true
+  return enabled ? <BadgeSyncEnabled /> : null
+}
 
 export function AppShell() {
   const queryClient = useQueryClient()
@@ -491,6 +512,7 @@ export function AppShell() {
             <Outlet />
           </ContentArea>
         </div>
+        <BadgeSync />
       </div>
 
       <DragOverlay

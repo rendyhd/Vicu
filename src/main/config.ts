@@ -55,6 +55,7 @@ export interface AppConfig {
   viewer_filter?: ViewerFilter
   launch_on_startup?: boolean
   standalone_mode?: boolean
+  show_today_overdue_badge?: boolean
   // Obsidian
   obsidian_mode?: 'off' | 'ask' | 'always'
   obsidian_api_key?: string
@@ -183,6 +184,7 @@ function normalizeConfig(raw: Record<string, unknown>): AppConfig {
     },
     launch_on_startup: raw.launch_on_startup === true,
     standalone_mode: raw.standalone_mode === true,
+    show_today_overdue_badge: raw.show_today_overdue_badge === true,
     // Obsidian
     obsidian_mode: raw.obsidian_mode === 'off' || raw.obsidian_mode === 'always' ? raw.obsidian_mode : 'ask',
     obsidian_api_key: typeof raw.obsidian_api_key === 'string' ? raw.obsidian_api_key : '',

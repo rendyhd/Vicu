@@ -57,6 +57,10 @@ const api = {
   saveConfig: (config: Record<string, unknown>) =>
     ipcRenderer.invoke('save-config', config),
 
+  // Badge
+  setTaskBadge: (count: number, dataUrl: string | null) =>
+    ipcRenderer.invoke('set-task-badge', count, dataUrl),
+
   // Connection test
   testConnection: (url: string, token: string) =>
     ipcRenderer.invoke('test-connection', url, token),

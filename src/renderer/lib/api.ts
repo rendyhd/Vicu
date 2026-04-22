@@ -108,6 +108,9 @@ export const api = {
   saveConfig: (config: AppConfig) =>
     window.api.saveConfig(config) as Promise<void>,
 
+  setTaskBadge: (count: number, dataUrl: string | null) =>
+    window.api.setTaskBadge(count, dataUrl) as Promise<void>,
+
   testConnection: (url: string, token: string) =>
     window.api.testConnection(url, token) as Promise<ApiResult<Project[]>>,
 

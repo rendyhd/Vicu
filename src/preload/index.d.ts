@@ -46,6 +46,7 @@ export interface ElectronAPI {
   removeLabelFromTask(taskId: number, labelId: number): Promise<ApiResult<void>>
   getConfig(): Promise<AppConfig | null>
   saveConfig(config: AppConfig): Promise<void>
+  setTaskBadge(count: number, dataUrl: string | null): Promise<void>
   testConnection(url: string, token: string): Promise<ApiResult<Project[]>>
   discoverOidc(url: string): Promise<OIDCProvider[]>
   oidcLogin(url: string, providerKey: string): Promise<ApiResult<void>>

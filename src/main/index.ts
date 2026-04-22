@@ -15,6 +15,7 @@ import { checkForUpdates } from './update-checker'
 import { isMac, isWindows } from './platform'
 import { setupApplicationMenu } from './app-menu'
 import { storeAPIToken, getAPIToken, isEncryptionAvailable, API_TOKEN_NO_EXPIRY } from './auth/token-store'
+import { clearTaskBadge } from './badge'
 
 let mainWindow: BrowserWindow | null = null
 let quickEntryWindow: BrowserWindow | null = null
@@ -646,5 +647,6 @@ if (!gotLock) {
       dragHoverTimer = null
     }
     destroyTray()
+    clearTaskBadge()
   })
 }

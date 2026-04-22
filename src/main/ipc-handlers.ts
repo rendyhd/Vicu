@@ -45,6 +45,7 @@ import {
 } from './quick-entry-state'
 import { getAPIToken, storeAPIToken, isEncryptionAvailable, API_TOKEN_NO_EXPIRY } from './auth/token-store'
 import { sendTestNotification, rescheduleNotifications, refreshTaskReminders } from './notifications'
+import { setTaskBadge, clearTaskBadge } from './badge'
 import { getActiveNote, testObsidianConnection } from './obsidian-client'
 import { isRegistered, registerHosts } from './browser-host-registration'
 import { checkForUpdates, getCachedUpdateStatus } from './update-checker'
@@ -177,6 +178,20 @@ export function registerIpcHandlers(): void {
     // Sync native theme when config changes
     if (config.theme) {
       nativeTheme.themeSource = config.theme === 'system' ? 'system' : config.theme
+    }
+    // If the task badge was just turned off, clear it right away so the
+    // dock/taskbar icon updates without waiting for the renderer to push.
+    if (config.show_today_overdue_badge !== true) {
+      clearTaskBadge()
+    }
+  })
+
+  ipcMain.handle('set-task-badge', (_event, count: number, dataUrl: string | null) => {
+    const cfg = loadConfig()
+    if (cfg?.show_today_overdue_badge === true) {
+      setTaskBadge(typeof count === 'number' ? count : 0, dataUrl ?? null)
+    } else {
+      clearTaskBadge()
     }
   })
 

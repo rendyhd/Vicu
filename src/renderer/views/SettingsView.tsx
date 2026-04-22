@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { api, type VikunjaUser } from '@/lib/api'
+import { APP_CONFIG_QUERY_KEY } from '@/hooks/use-app-config'
 import { cn } from '@/lib/cn'
 import { applyTheme } from '@/lib/theme'
 import { TokenPermissionsInfo } from '@/views/SetupView'
@@ -15,6 +17,7 @@ import type { ThemeOption } from '@/lib/theme'
 type SettingsTab = 'general' | 'integrations' | 'notifications' | 'shortcuts'
 
 export function SettingsView() {
+  const queryClient = useQueryClient()
   const [activeTab, setActiveTab] = useState<SettingsTab>('general')
   const [url, setUrl] = useState('')
   const [token, setToken] = useState('')
@@ -88,10 +91,11 @@ export function SettingsView() {
     await api.saveConfig(config)
     const result = await api.applyQuickEntrySettings()
     await api.rescheduleNotifications()
+    queryClient.invalidateQueries({ queryKey: APP_CONFIG_QUERY_KEY })
     setHotkeyWarnings(result)
     setSaveStatus('saved')
     setTimeout(() => setSaveStatus('idle'), 2000)
-  }, [])
+  }, [queryClient])
 
   const scheduleSave = useCallback((config: AppConfig) => {
     pendingConfigRef.current = config
@@ -297,6 +301,18 @@ export function SettingsView() {
               />
               <span className="text-sm text-[var(--text-primary)]">
                 Confirm before deleting
+              </span>
+            </label>
+
+            <label className="flex cursor-pointer items-center gap-2">
+              <input
+                type="checkbox"
+                checked={fullConfig?.show_today_overdue_badge === true}
+                onChange={(e) => handleQuickEntryChange({ show_today_overdue_badge: e.target.checked })}
+                className="h-4 w-4 rounded border-[var(--border-color)] accent-accent-blue"
+              />
+              <span className="text-sm text-[var(--text-primary)]">
+                Show today &amp; overdue count on app icon
               </span>
             </label>
 
