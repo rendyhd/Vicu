@@ -15,7 +15,7 @@ import { checkForUpdates } from './update-checker'
 import { isMac, isWindows } from './platform'
 import { setupApplicationMenu } from './app-menu'
 import { storeAPIToken, getAPIToken, isEncryptionAvailable, API_TOKEN_NO_EXPIRY } from './auth/token-store'
-import { clearTaskBadge } from './badge'
+import { clearTaskBadge, reapplyTaskBadge } from './badge'
 
 let mainWindow: BrowserWindow | null = null
 let quickEntryWindow: BrowserWindow | null = null
@@ -543,6 +543,12 @@ if (!gotLock) {
 
     mainWindow.on('closed', () => {
       mainWindow = null
+    })
+
+    // Windows drops the taskbar overlay icon when the window is hidden and
+    // re-shown. Repaint the badge whenever the window reappears.
+    mainWindow.on('show', () => {
+      reapplyTaskBadge()
     })
 
     // Initialize notification scheduler
