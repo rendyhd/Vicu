@@ -474,46 +474,76 @@ export function TaskRow({ task, sortable = false }: TaskRowProps) {
         </div>
 
         {/* Action buttons */}
-        <div className="relative flex items-center gap-1">
-          <button
-            type="button"
-            onClick={() => togglePopover('date')}
-            className={cn(
-              'flex h-6 w-6 items-center justify-center rounded transition-colors',
-              activePopover === 'date'
-                ? 'bg-[var(--accent-blue)]/10 text-[var(--accent-blue)]'
-                : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]'
+        <div className="flex items-center gap-1">
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => togglePopover('date')}
+              className={cn(
+                'flex h-6 w-6 items-center justify-center rounded transition-colors',
+                activePopover === 'date'
+                  ? 'bg-[var(--accent-blue)]/10 text-[var(--accent-blue)]'
+                  : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]'
+              )}
+              title="Schedule"
+            >
+              <Calendar className="h-3.5 w-3.5" />
+            </button>
+            {activePopover === 'date' && (
+              <DatePickerPopover
+                currentDate={task.due_date}
+                onDateChange={handleDateChange}
+                onClose={() => setActivePopover(null)}
+                repeatAfter={task.repeat_after ?? 0}
+                repeatMode={task.repeat_mode ?? 0}
+                onRecurrenceChange={handleRecurrenceChange}
+              />
             )}
-            title="Schedule"
-          >
-            <Calendar className="h-3.5 w-3.5" />
-          </button>
-          <button
-            type="button"
-            onClick={() => togglePopover('priority')}
-            className={cn(
-              'flex h-6 w-6 items-center justify-center rounded transition-colors',
-              activePopover === 'priority'
-                ? 'bg-[var(--accent-blue)]/10 text-[var(--accent-blue)]'
-                : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]'
+          </div>
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => togglePopover('priority')}
+              className={cn(
+                'flex h-6 w-6 items-center justify-center rounded transition-colors',
+                activePopover === 'priority'
+                  ? 'bg-[var(--accent-blue)]/10 text-[var(--accent-blue)]'
+                  : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]'
+              )}
+              title="Priority"
+            >
+              <Flag className="h-3.5 w-3.5" />
+            </button>
+            {activePopover === 'priority' && (
+              <PriorityPickerPopover
+                currentPriority={task.priority}
+                onPriorityChange={handlePriorityChange}
+                onClose={() => setActivePopover(null)}
+              />
             )}
-            title="Priority"
-          >
-            <Flag className="h-3.5 w-3.5" />
-          </button>
-          <button
-            type="button"
-            onClick={() => togglePopover('label')}
-            className={cn(
-              'flex h-6 w-6 items-center justify-center rounded transition-colors',
-              activePopover === 'label'
-                ? 'bg-[var(--accent-blue)]/10 text-[var(--accent-blue)]'
-                : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]'
+          </div>
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => togglePopover('label')}
+              className={cn(
+                'flex h-6 w-6 items-center justify-center rounded transition-colors',
+                activePopover === 'label'
+                  ? 'bg-[var(--accent-blue)]/10 text-[var(--accent-blue)]'
+                  : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]'
+              )}
+              title="Labels"
+            >
+              <Tag className="h-3.5 w-3.5" />
+            </button>
+            {activePopover === 'label' && (
+              <LabelPickerPopover
+                taskId={task.id}
+                currentLabels={labels}
+                onClose={() => setActivePopover(null)}
+              />
             )}
-            title="Labels"
-          >
-            <Tag className="h-3.5 w-3.5" />
-          </button>
+          </div>
           <button
             type="button"
             onClick={() => togglePopover('subtasks')}
@@ -527,58 +557,91 @@ export function TaskRow({ task, sortable = false }: TaskRowProps) {
           >
             <ListChecks className="h-3.5 w-3.5" />
           </button>
-          <button
-            type="button"
-            onClick={() => togglePopover('reminder')}
-            className={cn(
-              'flex h-6 w-6 items-center justify-center rounded transition-colors',
-              activePopover === 'reminder'
-                ? 'bg-[var(--accent-blue)]/10 text-[var(--accent-blue)]'
-                : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]'
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => togglePopover('reminder')}
+              className={cn(
+                'flex h-6 w-6 items-center justify-center rounded transition-colors',
+                activePopover === 'reminder'
+                  ? 'bg-[var(--accent-blue)]/10 text-[var(--accent-blue)]'
+                  : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]'
+              )}
+              title="Reminders"
+            >
+              <Bell className="h-3.5 w-3.5" />
+            </button>
+            {activePopover === 'reminder' && (
+              <ReminderPickerPopover
+                task={task}
+                onReminderChange={handleReminderChange}
+                onClose={() => setActivePopover(null)}
+              />
             )}
-            title="Reminders"
-          >
-            <Bell className="h-3.5 w-3.5" />
-          </button>
-          <button
-            type="button"
-            onClick={() => togglePopover('attachment')}
-            className={cn(
-              'flex h-6 w-6 items-center justify-center rounded transition-colors',
-              activePopover === 'attachment' || (task.attachments?.length ?? 0) > 0
-                ? 'bg-[var(--accent-blue)]/10 text-[var(--accent-blue)]'
-                : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]'
+          </div>
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => togglePopover('attachment')}
+              className={cn(
+                'flex h-6 w-6 items-center justify-center rounded transition-colors',
+                activePopover === 'attachment' || (task.attachments?.length ?? 0) > 0
+                  ? 'bg-[var(--accent-blue)]/10 text-[var(--accent-blue)]'
+                  : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]'
+              )}
+              title="Attachments"
+            >
+              <Paperclip className="h-3.5 w-3.5" />
+            </button>
+            {activePopover === 'attachment' && (
+              <AttachmentPickerPopover
+                taskId={task.id}
+                onClose={() => setActivePopover(null)}
+              />
             )}
-            title="Attachments"
-          >
-            <Paperclip className="h-3.5 w-3.5" />
-          </button>
-          <button
-            type="button"
-            onClick={() => togglePopover('project')}
-            className={cn(
-              'flex h-6 w-6 items-center justify-center rounded transition-colors',
-              activePopover === 'project'
-                ? 'bg-[var(--accent-blue)]/10 text-[var(--accent-blue)]'
-                : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]'
+          </div>
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => togglePopover('project')}
+              className={cn(
+                'flex h-6 w-6 items-center justify-center rounded transition-colors',
+                activePopover === 'project'
+                  ? 'bg-[var(--accent-blue)]/10 text-[var(--accent-blue)]'
+                  : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]'
+              )}
+              title="Move to project"
+            >
+              <FolderOpen className="h-3.5 w-3.5" />
+            </button>
+            {activePopover === 'project' && (
+              <ProjectPickerPopover
+                task={task}
+                onClose={() => setActivePopover(null)}
+              />
             )}
-            title="Move to project"
-          >
-            <FolderOpen className="h-3.5 w-3.5" />
-          </button>
-          <button
-            type="button"
-            onClick={() => togglePopover('info')}
-            className={cn(
-              'flex h-6 w-6 items-center justify-center rounded transition-colors',
-              activePopover === 'info'
-                ? 'bg-[var(--accent-blue)]/10 text-[var(--accent-blue)]'
-                : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]'
+          </div>
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => togglePopover('info')}
+              className={cn(
+                'flex h-6 w-6 items-center justify-center rounded transition-colors',
+                activePopover === 'info'
+                  ? 'bg-[var(--accent-blue)]/10 text-[var(--accent-blue)]'
+                  : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]'
+              )}
+              title="Task info"
+            >
+              <Info className="h-3.5 w-3.5" />
+            </button>
+            {activePopover === 'info' && (
+              <InfoPopover
+                task={task}
+                onClose={() => setActivePopover(null)}
+              />
             )}
-            title="Task info"
-          >
-            <Info className="h-3.5 w-3.5" />
-          </button>
+          </div>
           <button
             type="button"
             onClick={async () => {
@@ -593,57 +656,6 @@ export function TaskRow({ task, sortable = false }: TaskRowProps) {
           >
             <Trash2 className="h-3.5 w-3.5" />
           </button>
-
-          {/* Popovers */}
-          {activePopover === 'info' && (
-            <InfoPopover
-              task={task}
-              onClose={() => setActivePopover(null)}
-            />
-          )}
-          {activePopover === 'date' && (
-            <DatePickerPopover
-              currentDate={task.due_date}
-              onDateChange={handleDateChange}
-              onClose={() => setActivePopover(null)}
-              repeatAfter={task.repeat_after ?? 0}
-              repeatMode={task.repeat_mode ?? 0}
-              onRecurrenceChange={handleRecurrenceChange}
-            />
-          )}
-          {activePopover === 'priority' && (
-            <PriorityPickerPopover
-              currentPriority={task.priority}
-              onPriorityChange={handlePriorityChange}
-              onClose={() => setActivePopover(null)}
-            />
-          )}
-          {activePopover === 'label' && (
-            <LabelPickerPopover
-              taskId={task.id}
-              currentLabels={labels}
-              onClose={() => setActivePopover(null)}
-            />
-          )}
-          {activePopover === 'project' && (
-            <ProjectPickerPopover
-              task={task}
-              onClose={() => setActivePopover(null)}
-            />
-          )}
-          {activePopover === 'reminder' && (
-            <ReminderPickerPopover
-              task={task}
-              onReminderChange={handleReminderChange}
-              onClose={() => setActivePopover(null)}
-            />
-          )}
-          {activePopover === 'attachment' && (
-            <AttachmentPickerPopover
-              taskId={task.id}
-              onClose={() => setActivePopover(null)}
-            />
-          )}
         </div>
       </div>
       <ConfirmDialog {...dialogProps} />

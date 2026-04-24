@@ -1,5 +1,6 @@
 import { useRef, useEffect } from 'react'
 import { Check } from 'lucide-react'
+import { usePopoverAlignment } from './use-popover-alignment'
 
 interface PriorityPickerPopoverProps {
   currentPriority: number
@@ -21,6 +22,7 @@ export function PriorityPickerPopover({
   onClose,
 }: PriorityPickerPopoverProps) {
   const ref = useRef<HTMLDivElement>(null)
+  const align = usePopoverAlignment(ref)
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -40,7 +42,7 @@ export function PriorityPickerPopover({
   return (
     <div
       ref={ref}
-      className="absolute right-0 top-full z-50 mt-1 w-40 rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] py-1 shadow-lg"
+      className={`absolute ${align} top-full z-50 mt-1 w-40 rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] py-1 shadow-lg`}
     >
       {PRIORITY_OPTIONS.map((option) => (
         <button

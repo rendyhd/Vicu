@@ -4,6 +4,7 @@ import { useLabels } from '@/hooks/use-labels'
 import { useAddLabel, useRemoveLabel, useCreateLabel } from '@/hooks/use-task-mutations'
 import type { Label } from '@/lib/vikunja-types'
 import { normalizeHex } from '@/lib/constants'
+import { usePopoverAlignment } from './use-popover-alignment'
 
 interface LabelPickerPopoverProps {
   taskId: number
@@ -13,6 +14,7 @@ interface LabelPickerPopoverProps {
 
 export function LabelPickerPopover({ taskId, currentLabels, onClose }: LabelPickerPopoverProps) {
   const ref = useRef<HTMLDivElement>(null)
+  const align = usePopoverAlignment(ref)
   const { data: allLabels } = useLabels()
   const addLabel = useAddLabel()
   const removeLabel = useRemoveLabel()
@@ -64,7 +66,7 @@ export function LabelPickerPopover({ taskId, currentLabels, onClose }: LabelPick
   return (
     <div
       ref={ref}
-      className="absolute right-0 top-full z-50 mt-1 w-52 rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] shadow-lg"
+      className={`absolute ${align} top-full z-50 mt-1 w-52 rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] shadow-lg`}
     >
       {/* Search field */}
       <div className="border-b border-[var(--border-color)] px-3 py-2">

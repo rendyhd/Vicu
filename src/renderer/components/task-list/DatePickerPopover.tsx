@@ -3,6 +3,7 @@ import { X, Repeat } from 'lucide-react'
 import { isNullDate } from '@/lib/date-utils'
 import { detectRecurrencePreset, formatRecurrenceLabel } from '@/lib/recurrence'
 import { RecurrencePickerPopover } from './RecurrencePickerPopover'
+import { usePopoverAlignment } from './use-popover-alignment'
 
 interface DatePickerPopoverProps {
   currentDate: string
@@ -22,6 +23,7 @@ export function DatePickerPopover({
   onRecurrenceChange,
 }: DatePickerPopoverProps) {
   const ref = useRef<HTMLDivElement>(null)
+  const align = usePopoverAlignment(ref)
   const [dateValue, setDateValue] = useState(
     isNullDate(currentDate) ? '' : currentDate.slice(0, 10)
   )
@@ -59,7 +61,7 @@ export function DatePickerPopover({
   return (
     <div
       ref={ref}
-      className="absolute right-0 top-full z-50 mt-1 w-56 rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] p-3 shadow-lg"
+      className={`absolute ${align} top-full z-50 mt-1 w-56 rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] p-3 shadow-lg`}
     >
       <div className="mb-2 flex flex-col gap-1">
         <button

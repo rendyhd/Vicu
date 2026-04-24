@@ -7,6 +7,7 @@ import {
   getPresetValues,
   type RecurrencePreset,
 } from '@/lib/recurrence'
+import { usePopoverAlignment } from './use-popover-alignment'
 
 interface RecurrencePickerPopoverProps {
   repeatAfter: number
@@ -27,6 +28,7 @@ export function RecurrencePickerPopover({
   onClose,
 }: RecurrencePickerPopoverProps) {
   const ref = useRef<HTMLDivElement>(null)
+  const align = usePopoverAlignment(ref)
   const activePreset = detectRecurrencePreset(repeatAfter, repeatMode)
   const hasRecurrence = activePreset !== 'none'
 
@@ -81,7 +83,7 @@ export function RecurrencePickerPopover({
   return (
     <div
       ref={ref}
-      className="absolute right-0 top-full z-[60] mt-1 w-60 rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] p-3 shadow-lg"
+      className={`absolute ${align} top-full z-[60] mt-1 w-60 rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] p-3 shadow-lg`}
     >
       {/* Current recurrence display */}
       {hasRecurrence && (

@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { X } from 'lucide-react'
 import type { Task, TaskReminder } from '@/lib/vikunja-types'
 import { NULL_DATE } from '@/lib/constants'
+import { usePopoverAlignment } from './use-popover-alignment'
 
 interface ReminderPickerPopoverProps {
   task: Task
@@ -18,6 +19,7 @@ const RELATIVE_PRESETS = [
 
 export function ReminderPickerPopover({ task, onReminderChange, onClose }: ReminderPickerPopoverProps) {
   const ref = useRef<HTMLDivElement>(null)
+  const align = usePopoverAlignment(ref)
   const [customDateTime, setCustomDateTime] = useState('')
 
   const reminders = task.reminders ?? []
@@ -95,7 +97,7 @@ export function ReminderPickerPopover({ task, onReminderChange, onClose }: Remin
   return (
     <div
       ref={ref}
-      className="absolute right-0 top-full z-50 mt-1 w-64 rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] p-3 shadow-lg"
+      className={`absolute ${align} top-full z-50 mt-1 w-64 rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] p-3 shadow-lg`}
     >
       {/* Existing reminders */}
       {reminders.length > 0 && (

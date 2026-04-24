@@ -2,6 +2,7 @@ import { useRef, useEffect } from 'react'
 import { X, FileText, Image, File, Loader2 } from 'lucide-react'
 import { useTaskAttachments, useUploadAttachment, useDeleteAttachment } from '@/hooks/use-task-mutations'
 import { api } from '@/lib/api'
+import { usePopoverAlignment } from './use-popover-alignment'
 
 interface AttachmentPickerPopoverProps {
   taskId: number
@@ -22,6 +23,7 @@ function getFileIcon(mime: string) {
 
 export function AttachmentPickerPopover({ taskId, onClose }: AttachmentPickerPopoverProps) {
   const ref = useRef<HTMLDivElement>(null)
+  const align = usePopoverAlignment(ref)
   const { data: attachments, isLoading } = useTaskAttachments(taskId, true)
   const uploadAttachment = useUploadAttachment()
   const deleteAttachment = useDeleteAttachment()
@@ -51,7 +53,7 @@ export function AttachmentPickerPopover({ taskId, onClose }: AttachmentPickerPop
   return (
     <div
       ref={ref}
-      className="absolute right-0 top-full z-50 mt-1 w-72 rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] p-3 shadow-lg"
+      className={`absolute ${align} top-full z-50 mt-1 w-72 rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] p-3 shadow-lg`}
     >
       {isLoading ? (
         <div className="flex items-center justify-center py-4">

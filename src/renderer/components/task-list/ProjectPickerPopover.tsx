@@ -4,6 +4,7 @@ import { useProjects } from '@/hooks/use-projects'
 import { useUpdateTask } from '@/hooks/use-task-mutations'
 import type { Task } from '@/lib/vikunja-types'
 import type { ProjectTreeNode } from '@/hooks/use-projects'
+import { usePopoverAlignment } from './use-popover-alignment'
 
 interface ProjectPickerPopoverProps {
   task: Task
@@ -23,6 +24,7 @@ function flattenTree(nodes: ProjectTreeNode[], depth = 0): { node: ProjectTreeNo
 
 export function ProjectPickerPopover({ task, onClose }: ProjectPickerPopoverProps) {
   const ref = useRef<HTMLDivElement>(null)
+  const align = usePopoverAlignment(ref)
   const { data } = useProjects()
   const updateTask = useUpdateTask()
 
@@ -48,7 +50,7 @@ export function ProjectPickerPopover({ task, onClose }: ProjectPickerPopoverProp
   return (
     <div
       ref={ref}
-      className="absolute right-0 top-full z-50 mt-1 w-56 rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] py-1 shadow-lg"
+      className={`absolute ${align} top-full z-50 mt-1 w-56 rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] py-1 shadow-lg`}
     >
       {items.length === 0 ? (
         <div className="px-3 py-2 text-xs text-[var(--text-secondary)]">No projects</div>

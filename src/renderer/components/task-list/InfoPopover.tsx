@@ -1,6 +1,7 @@
 import { useRef, useEffect } from 'react'
 import type { Task } from '@/lib/vikunja-types'
 import { formatAbsoluteDateTime, isNullDate } from '@/lib/date-utils'
+import { usePopoverAlignment } from './use-popover-alignment'
 
 interface InfoPopoverProps {
   task: Task
@@ -9,6 +10,7 @@ interface InfoPopoverProps {
 
 export function InfoPopover({ task, onClose }: InfoPopoverProps) {
   const ref = useRef<HTMLDivElement>(null)
+  const align = usePopoverAlignment(ref)
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -34,7 +36,7 @@ export function InfoPopover({ task, onClose }: InfoPopoverProps) {
   return (
     <div
       ref={ref}
-      className="absolute right-0 top-full z-50 mt-1 w-64 rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] p-3 shadow-lg"
+      className={`absolute ${align} top-full z-50 mt-1 w-64 rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] p-3 shadow-lg`}
     >
       <div className="flex flex-col gap-2">
         <Row label="Identifier" value={identifier} />
