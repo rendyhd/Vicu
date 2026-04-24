@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { Calendar, Tag, ListChecks, FolderOpen, Trash2, Bell, Repeat, Paperclip, Info } from 'lucide-react'
+import { Calendar, Tag, ListChecks, FolderOpen, Trash2, Bell, Repeat, Paperclip, Info, Flag } from 'lucide-react'
 import type { Editor } from '@tiptap/react'
 import { useDraggable } from '@dnd-kit/core'
 import { useSortable, defaultAnimateLayoutChanges } from '@dnd-kit/sortable'
@@ -23,13 +23,14 @@ import { TaskDescription } from './TaskDescription'
 import { ProjectPickerPopover } from './ProjectPickerPopover'
 import { ReminderPickerPopover } from './ReminderPickerPopover'
 import { AttachmentPickerPopover } from './AttachmentPickerPopover'
+import { PriorityPickerPopover } from './PriorityPickerPopover'
 import { InfoPopover } from './InfoPopover'
 import { TaskLinkIcon } from '@/components/TaskLinkIcon'
 import { stripNoteLink, stripPageLink, extractNoteLinkHtml, extractPageLinkHtml } from '@/lib/note-link'
 import { formatRecurrenceLabel } from '@/lib/recurrence'
 import { RichTextEditor } from '@/components/rich-text/RichTextEditor'
 
-type PopoverType = 'date' | 'label' | 'project' | 'subtasks' | 'reminder' | 'attachment' | 'info' | null
+type PopoverType = 'date' | 'label' | 'project' | 'subtasks' | 'reminder' | 'attachment' | 'info' | 'priority' | null
 
 function getLabelStyle(rawHex: string | undefined): React.CSSProperties {
   const hex = normalizeHex(rawHex)
@@ -187,6 +188,13 @@ export function TaskRow({ task, sortable = false }: TaskRowProps) {
   const handleRecurrenceChange = useCallback(
     (repeat_after: number, repeat_mode: number) => {
       updateTask.mutate({ id: task.id, task: { ...task, repeat_after, repeat_mode } })
+    },
+    [task, updateTask]
+  )
+
+  const handlePriorityChange = useCallback(
+    (priority: number) => {
+      updateTask.mutate({ id: task.id, task: { ...task, priority } })
     },
     [task, updateTask]
   )
@@ -469,19 +477,6 @@ export function TaskRow({ task, sortable = false }: TaskRowProps) {
         <div className="relative flex items-center gap-1">
           <button
             type="button"
-            onClick={() => togglePopover('info')}
-            className={cn(
-              'flex h-6 w-6 items-center justify-center rounded transition-colors',
-              activePopover === 'info'
-                ? 'bg-[var(--accent-blue)]/10 text-[var(--accent-blue)]'
-                : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]'
-            )}
-            title="Task info"
-          >
-            <Info className="h-3.5 w-3.5" />
-          </button>
-          <button
-            type="button"
             onClick={() => togglePopover('date')}
             className={cn(
               'flex h-6 w-6 items-center justify-center rounded transition-colors',
@@ -492,6 +487,19 @@ export function TaskRow({ task, sortable = false }: TaskRowProps) {
             title="Schedule"
           >
             <Calendar className="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={() => togglePopover('priority')}
+            className={cn(
+              'flex h-6 w-6 items-center justify-center rounded transition-colors',
+              activePopover === 'priority'
+                ? 'bg-[var(--accent-blue)]/10 text-[var(--accent-blue)]'
+                : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]'
+            )}
+            title="Priority"
+          >
+            <Flag className="h-3.5 w-3.5" />
           </button>
           <button
             type="button"
@@ -560,6 +568,19 @@ export function TaskRow({ task, sortable = false }: TaskRowProps) {
           </button>
           <button
             type="button"
+            onClick={() => togglePopover('info')}
+            className={cn(
+              'flex h-6 w-6 items-center justify-center rounded transition-colors',
+              activePopover === 'info'
+                ? 'bg-[var(--accent-blue)]/10 text-[var(--accent-blue)]'
+                : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]'
+            )}
+            title="Task info"
+          >
+            <Info className="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
             onClick={async () => {
               const ok = await confirmDelete('Delete this task? This cannot be undone.')
               if (ok) {
@@ -588,6 +609,13 @@ export function TaskRow({ task, sortable = false }: TaskRowProps) {
               repeatAfter={task.repeat_after ?? 0}
               repeatMode={task.repeat_mode ?? 0}
               onRecurrenceChange={handleRecurrenceChange}
+            />
+          )}
+          {activePopover === 'priority' && (
+            <PriorityPickerPopover
+              currentPriority={task.priority}
+              onPriorityChange={handlePriorityChange}
+              onClose={() => setActivePopover(null)}
             />
           )}
           {activePopover === 'label' && (
