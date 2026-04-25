@@ -250,6 +250,7 @@ function centerQuickView(): void {
 
 function hideQuickView(): void {
   if (!quickViewWindow) return
+  quickViewWindow.webContents.send('viewer-hidden')
   quickViewWindow.hide()
   stopDragHoverPolling()
   returnFocusToPreviousWindow()

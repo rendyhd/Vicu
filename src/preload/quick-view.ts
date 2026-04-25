@@ -21,6 +21,9 @@ contextBridge.exposeInMainWorld('quickViewApi', {
   onShowWindow: (callback: () => void) => {
     ipcRenderer.on('viewer-shown', callback)
   },
+  onHideWindow: (callback: () => void) => {
+    ipcRenderer.on('viewer-hidden', callback)
+  },
   onSyncCompleted: (callback: () => void) => {
     ipcRenderer.on('sync-completed', callback)
   },

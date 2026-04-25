@@ -13,6 +13,7 @@ declare global {
       getPendingCount(): Promise<number>
       getConfig(): Promise<QuickViewConfig | null>
       onShowWindow(callback: () => void): void
+      onHideWindow(callback: () => void): void
       onSyncCompleted(callback: () => void): void
       onDragHover(callback: (_event: unknown, hovering: boolean) => void): void
       openDeepLink(url: string): Promise<void>
@@ -580,13 +581,24 @@ async function applyFetchResult(result: FetchResult): Promise<void> {
 }
 
 // Event listeners
-window.quickViewApi.onShowWindow(async () => {
-  await loadConfig()
-  await loadTasks()
+window.quickViewApi.onShowWindow(() => {
+  // Trigger entrance animation immediately — no awaits before this, so the
+  // panel doesn't appear at full opacity then re-animate after the data load.
   container.classList.remove('visible')
   void container.offsetHeight
   container.classList.add('visible')
-  requestAnimationFrame(() => notifyHeight())
+
+  // Refresh config and tasks in the background.
+  void (async () => {
+    await loadConfig()
+    await loadTasks()
+    requestAnimationFrame(() => notifyHeight())
+  })()
+})
+
+// When the window is hidden, reset visibility so next show starts clean
+window.quickViewApi.onHideWindow(() => {
+  container.classList.remove('visible')
 })
 
 window.quickViewApi.onSyncCompleted(async () => {
