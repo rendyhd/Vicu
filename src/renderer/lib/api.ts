@@ -13,32 +13,19 @@ import type {
   TaskQueryParams,
   ApiResult,
   AppConfig,
+  OIDCProvider,
+  ServerAuthInfo,
+  PasswordLoginResult,
+  VikunjaUser,
+  AuthCheckResult,
 } from './vikunja-types'
 
-export interface OIDCProvider {
-  name: string
-  key: string
-  auth_url: string
-  client_id: string
-  scope: string
-}
-
-export interface ServerAuthInfo {
-  local_enabled: boolean
-  oidc_enabled: boolean
-  oidc_providers: OIDCProvider[]
-  totp_enabled: boolean
-}
-
-export type PasswordLoginResult =
-  | { success: true; token: string }
-  | { success: false; error: string; totpRequired?: boolean }
-
-export interface VikunjaUser {
-  id: number
-  username: string
-  email: string
-  name: string
+export type {
+  OIDCProvider,
+  ServerAuthInfo,
+  PasswordLoginResult,
+  VikunjaUser,
+  AuthCheckResult,
 }
 
 export const api = {
@@ -130,11 +117,7 @@ export const api = {
     window.api.getUser() as Promise<VikunjaUser | null>,
 
   checkAuth: () =>
-    window.api.checkAuth() as Promise<
-      | { status: 'authenticated' }
-      | { status: 'reauth-needed'; authMethod: string; vikunjaUrl: string; lastUsername?: string }
-      | { status: 'unconfigured' }
-    >,
+    window.api.checkAuth() as Promise<AuthCheckResult>,
 
   logout: () =>
     window.api.logout() as Promise<void>,

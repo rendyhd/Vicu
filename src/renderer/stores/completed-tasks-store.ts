@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import type { Task } from '@/lib/vikunja-types'
 
-interface CompletedTaskEntry {
+export interface CompletedTaskEntry {
   task: Task
   path: string
 }

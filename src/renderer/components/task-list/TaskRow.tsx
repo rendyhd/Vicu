@@ -311,8 +311,6 @@ export function TaskRow({ task, sortable = false }: TaskRowProps) {
         onDragOver={handleFileDragOver}
         onDragLeave={handleFileDragLeave}
         onDrop={handleFileDrop}
-        role="button"
-        tabIndex={0}
         {...listeners}
         {...attributes}
       >

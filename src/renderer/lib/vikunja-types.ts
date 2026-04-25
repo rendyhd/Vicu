@@ -189,6 +189,7 @@ export interface AppConfig {
   viewer_filter?: ViewerFilter
   launch_on_startup?: boolean
   standalone_mode?: boolean
+  show_today_overdue_badge?: boolean
   // Obsidian
   obsidian_mode?: 'off' | 'ask' | 'always'
   obsidian_api_key?: string
@@ -218,4 +219,37 @@ export interface AppConfig {
   nlp_syntax_mode?: 'todoist' | 'vikunja'
   // Delete confirmation
   confirm_before_delete?: boolean
+  // Update checker
+  update_check_dismissed_version?: string
 }
+
+export interface OIDCProvider {
+  name: string
+  key: string
+  auth_url: string
+  client_id: string
+  scope: string
+}
+
+export interface ServerAuthInfo {
+  local_enabled: boolean
+  oidc_enabled: boolean
+  oidc_providers: OIDCProvider[]
+  totp_enabled: boolean
+}
+
+export type PasswordLoginResult =
+  | { success: true; token: string }
+  | { success: false; error: string; totpRequired?: boolean }
+
+export interface VikunjaUser {
+  id: number
+  username: string
+  email: string
+  name: string
+}
+
+export type AuthCheckResult =
+  | { status: 'authenticated' }
+  | { status: 'reauth-needed'; authMethod: string; vikunjaUrl: string; lastUsername?: string }
+  | { status: 'unconfigured' }
