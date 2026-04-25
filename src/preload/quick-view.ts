@@ -27,6 +27,9 @@ contextBridge.exposeInMainWorld('quickViewApi', {
   onSyncCompleted: (callback: () => void) => {
     ipcRenderer.on('sync-completed', callback)
   },
+  onConfigChanged: (callback: () => void) => {
+    ipcRenderer.on('viewer-config-changed', callback)
+  },
   onDragHover: (callback: (_event: unknown, hovering: boolean) => void) => {
     ipcRenderer.on('drag-hover', callback)
   },

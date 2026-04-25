@@ -184,6 +184,12 @@ export function registerIpcHandlers(): void {
     if (config.show_today_overdue_badge !== true) {
       clearTaskBadge()
     }
+    // Tell the Quick View renderer to drop its 30s task cache so the next
+    // show reflects the updated viewer_filter instead of stale data.
+    const viewerWindow = getQuickViewWindow()
+    if (viewerWindow && !viewerWindow.isDestroyed()) {
+      viewerWindow.webContents.send('viewer-config-changed')
+    }
   })
 
   ipcMain.handle('set-task-badge', (_event, count: number, dataUrl: string | null) => {

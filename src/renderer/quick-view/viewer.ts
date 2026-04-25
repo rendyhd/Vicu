@@ -15,6 +15,7 @@ declare global {
       onShowWindow(callback: () => void): void
       onHideWindow(callback: () => void): void
       onSyncCompleted(callback: () => void): void
+      onConfigChanged(callback: () => void): void
       onDragHover(callback: (_event: unknown, hovering: boolean) => void): void
       openDeepLink(url: string): Promise<void>
     }
@@ -603,6 +604,12 @@ window.quickViewApi.onHideWindow(() => {
 
 window.quickViewApi.onSyncCompleted(async () => {
   await loadTasks(true)
+})
+
+// When settings change in the main app, drop the cached fetch so the next
+// show fetches fresh tasks with the updated viewer_filter.
+window.quickViewApi.onConfigChanged(() => {
+  lastFetchTime = 0
 })
 
 window.quickViewApi.onDragHover((_: unknown, hovering: boolean) => {
