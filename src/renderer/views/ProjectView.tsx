@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useParams } from '@tanstack/react-router'
 import { useDndMonitor } from '@dnd-kit/core'
-import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
+import { SortableContext } from '@dnd-kit/sortable'
+import { verticalListSortingStrategyForeignSafe } from '@/lib/sortable-strategy'
 import { useProjectTasks } from '@/hooks/use-project-tasks'
 import { useProjectSections } from '@/hooks/use-project-sections'
 import { useProjects } from '@/hooks/use-projects'
@@ -63,6 +64,10 @@ export function ProjectView() {
         const project = overData.project as Project
         overContainerId = String(project.id)
         overIndex = 0
+      } else if (overData?.type === 'section-bottom') {
+        // Hovering at the bottom of a section — insert at the end
+        overContainerId = String(overData.projectId)
+        overIndex = (overData.taskCount as number | undefined) ?? 0
       } else if (overData?.type === 'parent-project') {
         overContainerId = 'parent'
         overIndex = tasks.length
@@ -151,7 +156,7 @@ export function ProjectView() {
         {hasSections && (
           <SortableContext
             items={sectionProjects.map((p) => `section-${p.id}`)}
-            strategy={verticalListSortingStrategy}
+            strategy={verticalListSortingStrategyForeignSafe}
           >
             {sections.map((section) => (
               <SectionGroup

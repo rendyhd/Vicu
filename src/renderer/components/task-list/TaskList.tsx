@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect, useCallback, useMemo, Fragment } from 'react'
 import { Plus, Inbox } from 'lucide-react'
-import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
+import { SortableContext } from '@dnd-kit/sortable'
 import { cn } from '@/lib/cn'
+import { verticalListSortingStrategyForeignSafe } from '@/lib/sortable-strategy'
 import { useCreateTask, useCompleteTask, useUpdateTask, useDeleteTask, useAddLabel, useCreateLabel, useUploadAttachmentFromPaste } from '@/hooks/use-task-mutations'
 import { useSelectionStore } from '@/stores/selection-store'
 import { useTaskParser } from '@/hooks/use-task-parser'
@@ -544,7 +545,7 @@ export function TaskList({
         ) : sortable ? (
           <SortableContext
             items={tasks.map((t) => `task-${t.id}`)}
-            strategy={verticalListSortingStrategy}
+            strategy={verticalListSortingStrategyForeignSafe}
           >
             {tasks.map((task, i) => (
               <Fragment key={task.id}>

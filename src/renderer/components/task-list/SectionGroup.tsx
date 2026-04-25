@@ -1,5 +1,8 @@
 import { useState, useRef, useEffect, useMemo, Fragment } from 'react'
-import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
+import { SortableContext } from '@dnd-kit/sortable'
+import { useDroppable, useDndContext } from '@dnd-kit/core'
+import { cn } from '@/lib/cn'
+import { verticalListSortingStrategyForeignSafe } from '@/lib/sortable-strategy'
 import { useReorderStore } from '@/stores/reorder-store'
 import { useCreateTask, useAddLabel } from '@/hooks/use-task-mutations'
 import { useTaskParser } from '@/hooks/use-task-parser'
@@ -31,6 +34,16 @@ export function SectionGroup({ project, tasks, viewId, siblings, insertIndex }: 
   const projectItems = useMemo(() => (projectData?.flat ?? []).map((p) => ({ id: p.id, title: p.title })), [projectData])
   const labelItems = useMemo(() => (allLabels ?? []).map((l) => ({ id: l.id, title: l.title })), [allLabels])
   const setSectionReorderContext = useReorderStore((s) => s.setSectionReorderContext)
+  const { active } = useDndContext()
+  const activeType = (active?.data.current as Record<string, unknown> | undefined)?.type as
+    | string
+    | undefined
+  const isDraggingTask = !!active && activeType === 'task'
+
+  const { setNodeRef: setBottomDropRef } = useDroppable({
+    id: `section-bottom-${project.id}`,
+    data: { type: 'section-bottom', projectId: project.id, taskCount: tasks.length },
+  })
 
   useEffect(() => {
     if (viewId != null) {
@@ -131,7 +144,7 @@ export function SectionGroup({ project, tasks, viewId, siblings, insertIndex }: 
 
       <SortableContext
         items={tasks.map((t) => `task-${t.id}`)}
-        strategy={verticalListSortingStrategy}
+        strategy={verticalListSortingStrategyForeignSafe}
       >
         {tasks.map((task, i) => (
           <Fragment key={task.id}>
@@ -151,6 +164,8 @@ export function SectionGroup({ project, tasks, viewId, siblings, insertIndex }: 
           </div>
         )}
       </SortableContext>
+
+      <div ref={setBottomDropRef} className={cn(isDraggingTask ? 'h-3' : 'h-0')} />
 
       {isAdding && (
         <div ref={creationRef} className="border-b border-[var(--border-color)]">

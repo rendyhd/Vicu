@@ -223,6 +223,41 @@ export function AppShell() {
               task: { ...task, project_id: projectId },
             })
           }
+        } else if (overData?.type === 'section-bottom') {
+          // Task dropped at the end of a section
+          const sectionProjectId = overData.projectId as number
+          const { sectionContexts } = useReorderStore.getState()
+          const ctx = sectionContexts.get(sectionProjectId)
+          if (ctx) {
+            const otherTasks = ctx.tasks.filter((t) => t.id !== task.id)
+            const lastPos = otherTasks[otherTasks.length - 1]?.position ?? 0
+            const newPosition = lastPos + 2 ** 15
+
+            if (sectionProjectId !== task.project_id) {
+              const finalViewId = ctx.viewId
+              updateTask.mutate(
+                { id: task.id, task: { ...task, project_id: sectionProjectId } },
+                {
+                  onSuccess: () => {
+                    reorderTask.mutate({
+                      taskId: task.id,
+                      viewId: finalViewId,
+                      position: newPosition,
+                    })
+                  },
+                }
+              )
+            } else if (
+              ctx.tasks.length > 0 &&
+              ctx.tasks[ctx.tasks.length - 1].id !== task.id
+            ) {
+              reorderTask.mutate({
+                taskId: task.id,
+                viewId: ctx.viewId,
+                position: newPosition,
+              })
+            }
+          }
         } else if (overData?.sortable && active.id !== over.id) {
           const { orderedTasks, viewId, sectionContexts } = useReorderStore.getState()
           const targetTaskId = Number(String(over.id).replace('task-', ''))
