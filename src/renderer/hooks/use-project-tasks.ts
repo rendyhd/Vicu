@@ -4,6 +4,7 @@ import { useMatches } from '@tanstack/react-router'
 import { api } from '@/lib/api'
 import { useCompletedTasksStore } from '@/stores/completed-tasks-store'
 import { DEFAULT_PAGE_SIZE } from '@/lib/constants'
+import { sortProjectTasks } from '@/lib/task-sort'
 
 export function useProjectTasks(projectId: number | undefined) {
   const matches = useMatches()
@@ -33,7 +34,7 @@ export function useProjectTasks(projectId: number | undefined) {
       return result.data
     },
     enabled: !!viewQuery.data?.id,
-    select: (tasks) => [...tasks].sort((a, b) => a.position - b.position),
+    select: (tasks) => sortProjectTasks(tasks),
   })
 
   // Merge recently completed tasks back so they stay visible with strikethrough
@@ -45,7 +46,7 @@ export function useProjectTasks(projectId: number | undefined) {
       .map((entry) => entry.task)
 
     if (extras.length === 0) return tasks
-    return [...tasks, ...extras].sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
+    return sortProjectTasks([...tasks, ...extras])
   }, [tasksQuery.data, completedTasks, pathname])
 
   return { ...tasksQuery, data, viewId: viewQuery.data?.id }

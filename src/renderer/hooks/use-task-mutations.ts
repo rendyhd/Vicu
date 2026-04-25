@@ -2,9 +2,11 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useMatches } from '@tanstack/react-router'
 import { api } from '@/lib/api'
 import { useCompletedTasksStore } from '@/stores/completed-tasks-store'
+import { sortProjectTasks } from '@/lib/task-sort'
 import type {
   Task,
   TaskAttachment,
+  ProjectView,
   CreateTaskPayload,
   UpdateTaskPayload,
   CreateProjectPayload,
@@ -13,6 +15,22 @@ import type {
   UpdateLabelPayload,
 } from '@/lib/vikunja-types'
 import type { SectionData } from './use-project-sections'
+
+// Place a freshly-created task at the end of its project's list view so
+// position-0 (Vikunja's default for the create endpoint) doesn't make it
+// jump to the top. Best-effort: skips if the view/tasks aren't cached.
+async function placeNewTaskAtEnd(
+  qc: ReturnType<typeof useQueryClient>,
+  projectId: number,
+  taskId: number
+): Promise<void> {
+  const views = qc.getQueryData<ProjectView[]>(['project-views', projectId])
+  const listView = views?.find((v) => v.view_kind === 'list')
+  if (!listView) return
+  const tasks = qc.getQueryData<Task[]>(['view-tasks', projectId, listView.id]) ?? []
+  const maxPos = tasks.reduce((m, t) => Math.max(m, t.position ?? 0), 0)
+  await api.updateTaskPosition(taskId, listView.id, maxPos + 2 ** 16)
+}
 
 export function useAddLabel() {
   const qc = useQueryClient()
@@ -63,6 +81,7 @@ export function useCreateSubtask() {
       const createResult = await api.createTask(parentTask.project_id, { title })
       if (!createResult.success) throw new Error(createResult.error)
       const childTask = createResult.data as Task
+      await placeNewTaskAtEnd(qc, parentTask.project_id, childTask.id)
 
       // Create the subtask relation (parent → child)
       const relationResult = await api.createTaskRelation(
@@ -96,7 +115,9 @@ export function useCreateTask() {
     }) => {
       const result = await api.createTask(projectId, task)
       if (!result.success) throw new Error(result.error)
-      return result.data
+      const newTask = result.data as Task
+      await placeNewTaskAtEnd(qc, projectId, newTask.id)
+      return newTask
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['tasks'] })
@@ -251,7 +272,7 @@ export function useReorderTask() {
       const reorder = (old: Task[] | undefined) => {
         if (!old) return old
         const updated = old.map((t) => (t.id === taskId ? { ...t, position } : t))
-        return updated.sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
+        return sortProjectTasks(updated)
       }
 
       qc.setQueriesData<Task[]>({ queryKey: ['view-tasks'] }, reorder)

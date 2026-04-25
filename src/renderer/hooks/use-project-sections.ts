@@ -5,6 +5,7 @@ import { api } from '@/lib/api'
 import { useProjects } from './use-projects'
 import { useCompletedTasksStore } from '@/stores/completed-tasks-store'
 import { DEFAULT_PAGE_SIZE } from '@/lib/constants'
+import { sortProjectTasks } from '@/lib/task-sort'
 import type { Task, Project, ProjectView } from '@/lib/vikunja-types'
 
 export interface SectionData {
@@ -40,7 +41,7 @@ export function useProjectSections(projectId: number) {
           })
           if (!tasksResult.success) return { project: cp, tasks: [] as Task[], viewId: listView.id }
 
-          const tasks = [...(tasksResult.data as Task[])].sort((a, b) => a.position - b.position)
+          const tasks = sortProjectTasks(tasksResult.data as Task[])
           return { project: cp, tasks, viewId: listView.id }
         })
       )
@@ -69,9 +70,7 @@ export function useProjectSections(projectId: number) {
       if (extras.length === 0) return section
       return {
         ...section,
-        tasks: [...section.tasks, ...extras].sort(
-          (a, b) => (a.position ?? 0) - (b.position ?? 0)
-        ),
+        tasks: sortProjectTasks([...section.tasks, ...extras]),
       }
     })
   }, [sectionTasksQuery.data, completedTasks, pathname])
