@@ -448,7 +448,7 @@ export function TaskList({
         handleSubmit()
       }}
     >
-      <div className="flex items-start gap-3 px-4 pt-2.5">
+      <div className="flex items-start gap-3 px-4 py-2.5">
         <div className="mt-[7px] h-[18px] w-[18px] shrink-0 rounded-full border border-[var(--border-color)]" />
         <TaskInputParser
           value={parser.inputValue}
