@@ -121,7 +121,7 @@ export function TaskRow({ task, sortable = false }: TaskRowProps) {
   const [dropError, setDropError] = useState<string | null>(null)
   const noteLinkHtml = extractNoteLinkHtml(task.description) + extractPageLinkHtml(task.description)
   const [activePopover, setActivePopover] = useState<PopoverType>(null)
-  const titleRef = useRef<HTMLInputElement>(null)
+  const titleRef = useRef<HTMLTextAreaElement>(null)
   const descEditorRef = useRef<Editor | null>(null)
   const descBaselineRef = useRef<string | null>(null)
 
@@ -149,6 +149,14 @@ export function TaskRow({ task, sortable = false }: TaskRowProps) {
       titleRef.current?.focus()
     }
   }, [isExpanded])
+
+  // Auto-grow the title textarea so long titles wrap onto multiple lines
+  useEffect(() => {
+    const el = titleRef.current
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = `${el.scrollHeight}px`
+  }, [editTitle, isExpanded])
 
   const handleSave = useCallback(() => {
     const changes: Partial<Task> = {}
@@ -381,13 +389,13 @@ export function TaskRow({ task, sortable = false }: TaskRowProps) {
       onDrop={handleFileDrop}
     >
       {/* Title row */}
-      <div className="flex items-center gap-3 px-4 pt-3">
+      <div className="flex items-start gap-3 px-4 pt-3">
         <TaskCheckbox task={task} className="mt-0.5" />
-        <input
+        <textarea
           ref={titleRef}
-          type="text"
+          rows={1}
           value={editTitle}
-          onChange={(e) => setEditTitle(e.target.value)}
+          onChange={(e) => setEditTitle(e.target.value.replace(/\n/g, ''))}
           onBlur={handleSave}
           onKeyDown={(e) => {
             if (e.key === 'Enter' && !e.ctrlKey && !e.metaKey) {
@@ -399,7 +407,7 @@ export function TaskRow({ task, sortable = false }: TaskRowProps) {
               collapseAll()
             }
           }}
-          className="flex-1 bg-transparent text-[13px] font-medium text-[var(--text-primary)] placeholder:text-[var(--text-secondary)] focus:outline-none"
+          className="flex-1 resize-none overflow-hidden bg-transparent text-[13px] font-medium leading-snug text-[var(--text-primary)] placeholder:text-[var(--text-secondary)] focus:outline-none"
           placeholder="Task title"
         />
         <TaskLinkIcon description={task.description} />
