@@ -37,17 +37,46 @@ import { UpdateBanner } from '@/components/UpdateBanner'
 import { useAppConfig } from '@/hooks/use-app-config'
 import { useTodayOverdueCount } from '@/hooks/use-today-overdue-count'
 import { renderBadgeDataUrl } from '@/lib/render-badge-icon'
+import { NULL_DATE } from '@/lib/constants'
 
 const MIN_WIDTH = 180
 const MAX_WIDTH = 360
 
+function isUndatedTask(t: Task): boolean {
+  return !t.due_date || t.due_date === NULL_DATE
+}
+
+// Position is only meaningful for undated tasks — sortProjectTasks puts dated
+// tasks above (sorted by date) regardless of their position. So when computing
+// a gap between visual neighbors, use the nearest undated neighbors' positions;
+// dated tasks' positions are arbitrary and would pull the midpoint outside the
+// intended slot.
+function calculateInsertPosition(tasks: Task[], targetIdx: number): number {
+  let above = 0
+  const startAbove = Math.min(targetIdx - 1, tasks.length - 1)
+  for (let i = startAbove; i >= 0; i--) {
+    const t = tasks[i]
+    if (t && isUndatedTask(t)) {
+      above = t.position ?? 0
+      break
+    }
+  }
+
+  let below = above + 2 ** 16
+  for (let i = targetIdx; i < tasks.length; i++) {
+    const t = tasks[i]
+    if (t && isUndatedTask(t)) {
+      below = t.position ?? above + 2 ** 16
+      break
+    }
+  }
+
+  return (above + below) / 2
+}
+
 function calculatePosition(tasks: Task[], oldIndex: number, newIndex: number): number {
   const without = tasks.filter((_, i) => i !== oldIndex)
-  const targetIdx = newIndex
-
-  const above = without[targetIdx - 1]?.position ?? 0
-  const below = without[targetIdx]?.position ?? (above + 2 ** 16)
-  return (above + below) / 2
+  return calculateInsertPosition(without, newIndex)
 }
 
 function calculateProjectPosition(
@@ -230,13 +259,23 @@ export function AppShell() {
           const ctx = sectionContexts.get(sectionProjectId)
           if (ctx) {
             const otherTasks = ctx.tasks.filter((t) => t.id !== task.id)
-            const lastPos = otherTasks[otherTasks.length - 1]?.position ?? 0
-            const newPosition = lastPos + 2 ** 15
+            // Anchor past the last UNDATED task — dated-task positions are
+            // arbitrary so they can't anchor "end of list".
+            let lastUndatedPos = 0
+            for (const t of otherTasks) {
+              if (isUndatedTask(t)) {
+                lastUndatedPos = Math.max(lastUndatedPos, t.position ?? 0)
+              }
+            }
+            const newPosition = lastUndatedPos + 2 ** 15
 
             if (sectionProjectId !== task.project_id) {
               const finalViewId = ctx.viewId
               updateTask.mutate(
-                { id: task.id, task: { ...task, project_id: sectionProjectId } },
+                {
+                  id: task.id,
+                  task: { ...task, project_id: sectionProjectId, position: newPosition },
+                },
                 {
                   onSuccess: () => {
                     reorderTask.mutate({
@@ -305,15 +344,23 @@ export function AppShell() {
               reorderTask.mutate({ taskId: task.id, viewId: sourceViewId, position: newPosition })
             }
           } else if (destViewId && destProjectId && destProjectId !== task.project_id) {
-            // Cross-section — move task to destination project + position
+            // Cross-section — move task to destination project + position.
+            // Pass the new position to updateTask so the optimistic update lands
+            // the task at the right slot in the destination on the very first
+            // render — without it, the task pops in at its old position and
+            // visibly jumps once reorderTask resolves a moment later.
+            // (useUpdateTask strips position from the API body and defers
+            // section-tasks invalidation when both project_id and position are
+            // set, leaving the trailing reorderTask in charge.)
             const targetIndex = destTasks.findIndex((t) => t.id === targetTaskId)
-            const above = destTasks[targetIndex - 1]?.position ?? 0
-            const below = destTasks[targetIndex]?.position ?? (above + 2 ** 16)
-            const insertPosition = (above + below) / 2
+            const insertPosition = calculateInsertPosition(destTasks, targetIndex)
 
             const finalDestViewId = destViewId
             updateTask.mutate(
-              { id: task.id, task: { ...task, project_id: destProjectId } },
+              {
+                id: task.id,
+                task: { ...task, project_id: destProjectId, position: insertPosition },
+              },
               {
                 onSuccess: () => {
                   reorderTask.mutate({ taskId: task.id, viewId: finalDestViewId, position: insertPosition })

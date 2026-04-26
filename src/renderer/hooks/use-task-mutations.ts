@@ -132,15 +132,24 @@ export function useUpdateTask() {
 
   return useMutation({
     mutationFn: async ({ id, task }: { id: number; task: UpdateTaskPayload }) => {
-      const result = await api.updateTask(id, task)
+      // Position is per-view in Vikunja and only honored by /tasks/{id}/position
+      // (see useReorderTask). Strip it from the regular update body so it
+      // can't be written to an unintended view; we still keep it on `task`
+      // for the optimistic-update path so the UI lands at the right slot.
+      const { position: _position, ...apiTask } = task
+      const result = await api.updateTask(id, apiTask)
       if (!result.success) throw new Error(result.error)
       return result.data
     },
     onMutate: async ({ id, task }) => {
       await qc.cancelQueries({ queryKey: ['tasks'] })
       await qc.cancelQueries({ queryKey: ['view-tasks'] })
+      await qc.cancelQueries({ queryKey: ['section-tasks'] })
       const previousTaskQueries = qc.getQueriesData<Task[]>({ queryKey: ['tasks'] })
       const previousViewQueries = qc.getQueriesData<Task[]>({ queryKey: ['view-tasks'] })
+      const previousSectionQueries = qc.getQueriesData<SectionData[]>({
+        queryKey: ['section-tasks'],
+      })
 
       qc.setQueriesData<Task[]>({ queryKey: ['tasks'] }, (old) =>
         old?.map((t) => (t.id === id ? { ...t, ...task } : t))
@@ -148,8 +157,35 @@ export function useUpdateTask() {
       qc.setQueriesData<Task[]>({ queryKey: ['view-tasks'] }, (old) =>
         old?.map((t) => (t.id === id ? { ...t, ...task } : t))
       )
+      qc.setQueriesData<SectionData[]>({ queryKey: ['section-tasks'] }, (old) => {
+        if (!old) return old
+        const current = old
+          .flatMap((s) => s.tasks)
+          .find((t) => t.id === id)
+        if (!current) return old
+        const merged = { ...current, ...task } as Task
+        const newProjectId = merged.project_id
+        return old.map((section) => {
+          const has = section.tasks.some((t) => t.id === id)
+          if (has && section.project.id !== newProjectId) {
+            return { ...section, tasks: section.tasks.filter((t) => t.id !== id) }
+          }
+          if (has) {
+            return {
+              ...section,
+              tasks: sortProjectTasks(
+                section.tasks.map((t) => (t.id === id ? merged : t))
+              ),
+            }
+          }
+          if (!has && section.project.id === newProjectId) {
+            return { ...section, tasks: sortProjectTasks([...section.tasks, merged]) }
+          }
+          return section
+        })
+      })
 
-      return { previousTaskQueries, previousViewQueries }
+      return { previousTaskQueries, previousViewQueries, previousSectionQueries }
     },
     onError: (_err, _vars, context) => {
       if (context?.previousTaskQueries) {
@@ -162,13 +198,27 @@ export function useUpdateTask() {
           qc.setQueryData(key, data)
         }
       }
+      if (context?.previousSectionQueries) {
+        for (const [key, data] of context.previousSectionQueries) {
+          qc.setQueryData(key, data)
+        }
+      }
     },
     onSettled: (_data, _err, variables) => {
       qc.invalidateQueries({ queryKey: ['tasks'] })
-      qc.invalidateQueries({ queryKey: ['view-tasks'] })
-      qc.invalidateQueries({ queryKey: ['section-tasks'] })
-      // Only refresh reminder timers when reminder-relevant fields changed
       const t = variables.task
+      // Cross-section drag passes both project_id AND position. A reorderTask
+      // call follows immediately and owns view-tasks/section-tasks invalidation
+      // (with a short delay). Refetching here would race the in-flight per-view
+      // position update and clobber it on the way back, making the task jump
+      // to position 0 before settling at the right slot. Skip those two.
+      const isCrossSectionMove =
+        t.project_id !== undefined && t.position !== undefined
+      if (!isCrossSectionMove) {
+        qc.invalidateQueries({ queryKey: ['view-tasks'] })
+        qc.invalidateQueries({ queryKey: ['section-tasks'] })
+      }
+      // Only refresh reminder timers when reminder-relevant fields changed
       if ('reminders' in t || 'due_date' in t) {
         api.refreshTaskReminders()
       }
@@ -265,18 +315,27 @@ export function useReorderTask() {
       qc.cancelQueries({ queryKey: ['view-tasks'] })
       qc.cancelQueries({ queryKey: ['section-tasks'] })
       const previousViewQueries = qc.getQueriesData<Task[]>({ queryKey: ['view-tasks'] })
-      const previousSectionQueries = qc.getQueriesData<Task[]>({ queryKey: ['section-tasks'] })
+      const previousSectionQueries = qc.getQueriesData<SectionData[]>({ queryKey: ['section-tasks'] })
 
       // Update position AND sort so the array order matches the new visual order immediately.
       // Without sorting, @dnd-kit clears transforms on drop and items snap back to the old array order.
-      const reorder = (old: Task[] | undefined) => {
+      const reorderTasks = (old: Task[] | undefined) => {
         if (!old) return old
         const updated = old.map((t) => (t.id === taskId ? { ...t, position } : t))
         return sortProjectTasks(updated)
       }
 
-      qc.setQueriesData<Task[]>({ queryKey: ['view-tasks'] }, reorder)
-      qc.setQueriesData<Task[]>({ queryKey: ['section-tasks'] }, reorder)
+      qc.setQueriesData<Task[]>({ queryKey: ['view-tasks'] }, reorderTasks)
+      qc.setQueriesData<SectionData[]>({ queryKey: ['section-tasks'] }, (old) => {
+        if (!old) return old
+        return old.map((section) => {
+          if (!section.tasks.some((t) => t.id === taskId)) return section
+          const updated = section.tasks.map((t) =>
+            t.id === taskId ? { ...t, position } : t
+          )
+          return { ...section, tasks: sortProjectTasks(updated) }
+        })
+      })
 
       return { previousViewQueries, previousSectionQueries }
     },
