@@ -131,7 +131,17 @@ export function useUpdateTask() {
   const qc = useQueryClient()
 
   return useMutation({
-    mutationFn: async ({ id, task }: { id: number; task: UpdateTaskPayload }) => {
+    mutationFn: async ({
+      id,
+      task,
+    }: {
+      id: number
+      task: UpdateTaskPayload
+      // Caller signals that a reorderTask call follows and will own
+      // view-tasks/section-tasks invalidation. Don't read it here; it's
+      // consumed in onSettled.
+      deferInvalidation?: boolean
+    }) => {
       // Position is per-view in Vikunja and only honored by /tasks/{id}/position
       // (see useReorderTask). Strip it from the regular update body so it
       // can't be written to an unintended view; we still keep it on `task`
@@ -154,17 +164,60 @@ export function useUpdateTask() {
       qc.setQueriesData<Task[]>({ queryKey: ['tasks'] }, (old) =>
         old?.map((t) => (t.id === id ? { ...t, ...task } : t))
       )
-      qc.setQueriesData<Task[]>({ queryKey: ['view-tasks'] }, (old) =>
-        old?.map((t) => (t.id === id ? { ...t, ...task } : t))
-      )
+      // view-tasks is keyed ['view-tasks', projectId, viewId]. When the task's
+      // project_id changes (drag-drop cross-section / sidebar / header drops),
+      // updating in place would leave the task rendered in the SOURCE
+      // project's TaskList AND in the destination's section — visible
+      // duplication that reads as "the task didn't move" because the user
+      // looks at where it was. Iterate keys so we can compare each cache's
+      // projectId against the new project_id and either remove from
+      // mismatched views or add to a matched one.
+      const newProjectId = (task as Partial<Task>).project_id
+      const taskHasFullSpread = (task as Partial<Task>).title !== undefined
+      const allViewTasks = qc.getQueriesData<Task[]>({ queryKey: ['view-tasks'] })
+      for (const [key, oldData] of allViewTasks) {
+        if (!oldData) continue
+        const queryProjectId = (key as readonly unknown[])[1] as number | undefined
+        const has = oldData.some((t) => t.id === id)
+        let next: Task[] = oldData
+        if (has) {
+          if (
+            newProjectId !== undefined &&
+            queryProjectId !== undefined &&
+            newProjectId !== queryProjectId
+          ) {
+            next = oldData.filter((t) => t.id !== id)
+          } else {
+            next = oldData.map((t) => (t.id === id ? { ...t, ...task } : t))
+          }
+        } else if (
+          taskHasFullSpread &&
+          newProjectId !== undefined &&
+          queryProjectId !== undefined &&
+          newProjectId === queryProjectId
+        ) {
+          next = sortProjectTasks([...oldData, { ...task, id } as Task])
+        }
+        if (next !== oldData) qc.setQueryData(key, next)
+      }
       qc.setQueriesData<SectionData[]>({ queryKey: ['section-tasks'] }, (old) => {
         if (!old) return old
-        const current = old
-          .flatMap((s) => s.tasks)
-          .find((t) => t.id === id)
-        if (!current) return old
-        const merged = { ...current, ...task } as Task
+        const current = old.flatMap((s) => s.tasks).find((t) => t.id === id)
+        // For tasks already in a section, merge over the cached row. For tasks
+        // moving INTO a section from outside (parent/main → sub), fall back to
+        // `task` itself — drag-drop callers spread the full Task on top of the
+        // updates, so it's a complete row. Other call sites (title change,
+        // date change, etc.) pass a partial body; in that case `current` will
+        // be defined for any task that's actually in a section, so this branch
+        // doesn't hurt them.
+        const merged: Task | null = current
+          ? ({ ...current, ...task } as Task)
+          : ((task as Partial<Task>).title !== undefined
+              ? ({ ...task, id } as Task)
+              : null)
+        if (!merged) return old
         const newProjectId = merged.project_id
+        if (newProjectId === undefined) return old
         return old.map((section) => {
           const has = section.tasks.some((t) => t.id === id)
           if (has && section.project.id !== newProjectId) {
@@ -206,19 +259,16 @@ export function useUpdateTask() {
     },
     onSettled: (_data, _err, variables) => {
       qc.invalidateQueries({ queryKey: ['tasks'] })
-      const t = variables.task
-      // Cross-section drag passes both project_id AND position. A reorderTask
-      // call follows immediately and owns view-tasks/section-tasks invalidation
-      // (with a short delay). Refetching here would race the in-flight per-view
-      // position update and clobber it on the way back, making the task jump
-      // to position 0 before settling at the right slot. Skip those two.
-      const isCrossSectionMove =
-        t.project_id !== undefined && t.position !== undefined
-      if (!isCrossSectionMove) {
+      // When the caller has a reorderTask queued behind us, skip the two
+      // view-related invalidations and let reorderTask handle them after its
+      // per-view position write completes — otherwise the refetch races the
+      // in-flight position update and the task briefly snaps to position 0.
+      if (!variables.deferInvalidation) {
         qc.invalidateQueries({ queryKey: ['view-tasks'] })
         qc.invalidateQueries({ queryKey: ['section-tasks'] })
       }
       // Only refresh reminder timers when reminder-relevant fields changed
+      const t = variables.task
       if ('reminders' in t || 'due_date' in t) {
         api.refreshTaskReminders()
       }

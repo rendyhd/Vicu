@@ -31,10 +31,20 @@ export function ProjectView() {
 
   const [insertIndicator, setInsertIndicator] = useState<InsertIndicator | null>(null)
 
+  // Push parent-project reorder context whenever its tasks shift.
   useEffect(() => {
     setReorderContext(viewId ?? null, tasks)
+  }, [viewId, tasks, setReorderContext])
+
+  // Clear section reorder contexts only when navigating to a different project
+  // (or unmounting). Tying clearance to `tasks` would wipe contexts on every
+  // re-render, but a SectionGroup only re-pushes its own context when ITS
+  // tasks reference changes — so untouched siblings would silently lose their
+  // entry until the next time their tasks happened to update, and any drop
+  // targeting one of them would fail to resolve a destination.
+  useEffect(() => {
     return () => clearSectionContexts()
-  }, [viewId, tasks, setReorderContext, clearSectionContexts])
+  }, [pid, clearSectionContexts])
 
   // Track cross-container drag hover for visual insertion line
   useDndMonitor({

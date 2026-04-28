@@ -275,6 +275,7 @@ export function AppShell() {
                 {
                   id: task.id,
                   task: { ...task, project_id: sectionProjectId, position: newPosition },
+                  deferInvalidation: true,
                 },
                 {
                   onSuccess: () => {
@@ -347,11 +348,8 @@ export function AppShell() {
             // Cross-section — move task to destination project + position.
             // Pass the new position to updateTask so the optimistic update lands
             // the task at the right slot in the destination on the very first
-            // render — without it, the task pops in at its old position and
-            // visibly jumps once reorderTask resolves a moment later.
-            // (useUpdateTask strips position from the API body and defers
-            // section-tasks invalidation when both project_id and position are
-            // set, leaving the trailing reorderTask in charge.)
+            // render. deferInvalidation tells useUpdateTask to skip refetching
+            // view-tasks/section-tasks; the trailing reorderTask owns that.
             const targetIndex = destTasks.findIndex((t) => t.id === targetTaskId)
             const insertPosition = calculateInsertPosition(destTasks, targetIndex)
 
@@ -360,6 +358,7 @@ export function AppShell() {
               {
                 id: task.id,
                 task: { ...task, project_id: destProjectId, position: insertPosition },
+                deferInvalidation: true,
               },
               {
                 onSuccess: () => {
