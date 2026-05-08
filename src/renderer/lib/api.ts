@@ -134,6 +134,22 @@ export const api = {
   applyQuickEntrySettings: () =>
     window.api.applyQuickEntrySettings() as Promise<{ entry: boolean; viewer: boolean }>,
 
+  pickCompletionSound: () =>
+    window.api.pickCompletionSound() as Promise<
+      { success: true; path: string; fileName: string } | { success: false; error: string }
+    >,
+
+  resetCompletionSound: () =>
+    window.api.resetCompletionSound() as Promise<void>,
+
+  readCompletionSound: () =>
+    window.api.readCompletionSound() as Promise<
+      { success: true; data: Uint8Array; mimeType: string } | { success: false; error: string }
+    >,
+
+  getCompletionSoundInfo: () =>
+    window.api.getCompletionSoundInfo() as Promise<{ path: string; fileName: string; isDefault: boolean }>,
+
   // Attachments
   fetchTaskAttachments: (taskId: number) =>
     window.api.fetchTaskAttachments(taskId) as Promise<ApiResult<TaskAttachment[]>>,

@@ -89,6 +89,9 @@ export interface AppConfig {
   nlp_syntax_mode?: 'todoist' | 'vikunja'
   // Delete confirmation
   confirm_before_delete?: boolean
+  // Task completion sound
+  task_completion_sound_enabled?: boolean
+  task_completion_sound_path?: string | null
   // Cached username for re-login screen
   last_username?: string
 }
@@ -222,6 +225,10 @@ function normalizeConfig(raw: Record<string, unknown>): AppConfig {
     // NLP task parser
     nlp_enabled: raw.nlp_enabled !== false,
     nlp_syntax_mode: raw.nlp_syntax_mode === 'vikunja' ? 'vikunja' : 'todoist',
+    // Task completion sound
+    task_completion_sound_enabled: raw.task_completion_sound_enabled !== false,
+    task_completion_sound_path: typeof raw.task_completion_sound_path === 'string'
+      ? raw.task_completion_sound_path : null,
     last_username: typeof raw.last_username === 'string' ? raw.last_username : undefined,
   }
 }

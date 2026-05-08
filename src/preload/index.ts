@@ -117,6 +117,20 @@ const api = {
   applyQuickEntrySettings: () =>
     ipcRenderer.invoke('apply-quick-entry-settings') as Promise<{ entry: boolean; viewer: boolean }>,
 
+  // Task completion sound
+  pickCompletionSound: () =>
+    ipcRenderer.invoke('sound:pick') as Promise<
+      { success: true; path: string; fileName: string } | { success: false; error: string }
+    >,
+  resetCompletionSound: () =>
+    ipcRenderer.invoke('sound:reset') as Promise<void>,
+  readCompletionSound: () =>
+    ipcRenderer.invoke('sound:read') as Promise<
+      { success: true; data: Uint8Array; mimeType: string } | { success: false; error: string }
+    >,
+  getCompletionSoundInfo: () =>
+    ipcRenderer.invoke('sound:get-info') as Promise<{ path: string; fileName: string; isDefault: boolean }>,
+
   // Update checker
   checkForUpdate: () => ipcRenderer.invoke('update:check'),
   getUpdateStatus: () => ipcRenderer.invoke('update:get-status'),

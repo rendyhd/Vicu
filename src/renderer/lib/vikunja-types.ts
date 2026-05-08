@@ -219,6 +219,9 @@ export interface AppConfig {
   nlp_syntax_mode?: 'todoist' | 'vikunja'
   // Delete confirmation
   confirm_before_delete?: boolean
+  // Task completion sound
+  task_completion_sound_enabled?: boolean
+  task_completion_sound_path?: string | null
   // Update checker
   update_check_dismissed_version?: string
 }

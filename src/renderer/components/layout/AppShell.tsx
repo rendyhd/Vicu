@@ -35,6 +35,7 @@ import { CustomListDragOverlay } from '@/components/sidebar/CustomListDragOverla
 import { SectionDragOverlay } from '@/components/task-list/SectionDragOverlay'
 import { UpdateBanner } from '@/components/UpdateBanner'
 import { useAppConfig } from '@/hooks/use-app-config'
+import { reloadCompletionSound, setCompletionSoundEnabled } from '@/lib/completion-sound'
 import { useTodayOverdueCount } from '@/hooks/use-today-overdue-count'
 import { renderBadgeDataUrl } from '@/lib/render-badge-icon'
 import { NULL_DATE } from '@/lib/constants'
@@ -120,6 +121,19 @@ function BadgeSync() {
   const { data: config } = useAppConfig()
   const enabled = config?.show_today_overdue_badge === true
   return enabled ? <BadgeSyncEnabled /> : null
+}
+
+function CompletionSoundSync() {
+  const { data: config } = useAppConfig()
+  const soundEnabled = config?.task_completion_sound_enabled !== false
+  const soundPath = config?.task_completion_sound_path ?? null
+  useEffect(() => {
+    setCompletionSoundEnabled(soundEnabled)
+  }, [soundEnabled])
+  useEffect(() => {
+    void reloadCompletionSound()
+  }, [soundPath])
+  return null
 }
 
 export function AppShell() {
@@ -594,6 +608,7 @@ export function AppShell() {
           </ContentArea>
         </div>
         <BadgeSync />
+        <CompletionSoundSync />
       </div>
 
       <DragOverlay

@@ -3,6 +3,7 @@ import { useNavigate, useMatches } from '@tanstack/react-router'
 import { api } from '@/lib/api'
 import { useCompletedTasksStore } from '@/stores/completed-tasks-store'
 import { sortProjectTasks } from '@/lib/task-sort'
+import { playCompletionSound } from '@/lib/completion-sound'
 import type {
   Task,
   TaskAttachment,
@@ -432,6 +433,7 @@ export function useCompleteTask() {
     onMutate: async (task) => {
       // Track completed task so it stays visible (with strikethrough) until navigation
       addCompleted({ ...task, done: true }, pathname)
+      playCompletionSound()
 
       await qc.cancelQueries({ queryKey: ['tasks'] })
       await qc.cancelQueries({ queryKey: ['view-tasks'] })

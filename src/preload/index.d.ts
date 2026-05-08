@@ -90,6 +90,16 @@ export interface ElectronAPI {
   // Quick Entry/View
   applyQuickEntrySettings(): Promise<{ entry: boolean; viewer: boolean }>
 
+  // Task completion sound
+  pickCompletionSound(): Promise<
+    { success: true; path: string; fileName: string } | { success: false; error: string }
+  >
+  resetCompletionSound(): Promise<void>
+  readCompletionSound(): Promise<
+    { success: true; data: Uint8Array; mimeType: string } | { success: false; error: string }
+  >
+  getCompletionSoundInfo(): Promise<{ path: string; fileName: string; isDefault: boolean }>
+
   // Obsidian
   openDeepLink(url: string): Promise<void>
   testObsidianConnection(): Promise<{ success: boolean; error?: string; data?: unknown }>

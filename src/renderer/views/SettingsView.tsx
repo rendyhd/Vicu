@@ -10,6 +10,7 @@ import { ObsidianSettings } from '@/components/settings/ObsidianSettings'
 import { BrowserSettings } from '@/components/settings/BrowserSettings'
 import { KeyboardShortcuts } from '@/components/settings/KeyboardShortcuts'
 import { NotificationSettings } from '@/components/settings/NotificationSettings'
+import { CompletionSoundSettings } from '@/components/settings/CompletionSoundSettings'
 import type { AppConfig, Project } from '@/lib/vikunja-types'
 
 import type { ThemeOption } from '@/lib/theme'
@@ -361,6 +362,13 @@ export function SettingsView() {
 
           </div>
         </div>
+
+        {fullConfig && (
+          <CompletionSoundSettings
+            config={fullConfig}
+            onChange={handleQuickEntryChange}
+          />
+        )}
 
         {/* Task Parser */}
         <div className="rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] p-5">

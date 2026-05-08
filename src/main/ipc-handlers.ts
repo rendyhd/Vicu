@@ -50,6 +50,12 @@ import { getActiveNote, testObsidianConnection } from './obsidian-client'
 import { isRegistered, registerHosts } from './browser-host-registration'
 import { checkForUpdates, getCachedUpdateStatus } from './update-checker'
 import {
+  pickAndCopySoundFile,
+  resetSoundToDefault,
+  readSoundBytes,
+  getSoundInfo,
+} from './sound'
+import {
   addPendingAction,
   removePendingAction,
   removePendingActionByTaskId,
@@ -746,6 +752,24 @@ export function registerIpcHandlers(): void {
     if (!require('fs').existsSync(base)) return
     const manifest = path.join(base, 'manifest.json')
     shell.showItemInFolder(manifest)
+  })
+
+  // --- Task completion sound IPC ---
+  ipcMain.handle('sound:pick', async () => {
+    const win = getMainWindow()
+    return pickAndCopySoundFile(win ?? null)
+  })
+
+  ipcMain.handle('sound:reset', () => {
+    resetSoundToDefault()
+  })
+
+  ipcMain.handle('sound:read', () => {
+    return readSoundBytes()
+  })
+
+  ipcMain.handle('sound:get-info', () => {
+    return getSoundInfo()
   })
 }
 
