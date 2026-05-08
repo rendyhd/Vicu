@@ -52,6 +52,7 @@ export function TaskList({
   headerContent,
 }: TaskListProps) {
   const [isAdding, setIsAdding] = useState(false)
+  const [addPosition, setAddPosition] = useState<'top' | 'bottom'>('top')
   const [showNotes, setShowNotes] = useState(false)
   const [defaultDateDismissed, setDefaultDateDismissed] = useState(false)
   const [newDescription, setNewDescription] = useState('')
@@ -331,6 +332,7 @@ export function TaskList({
       if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
         e.preventDefault()
         if (showNewTask && projectId) {
+          setAddPosition('top')
           setIsAdding(true)
         }
         return
@@ -563,7 +565,10 @@ export function TaskList({
         {showNewTask && projectId && (
           <button
             type="button"
-            onClick={() => setIsAdding(true)}
+            onClick={() => {
+              setAddPosition('top')
+              setIsAdding(true)
+            }}
             className="flex h-7 w-7 items-center justify-center rounded-md text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--accent-blue)]"
             aria-label="New task"
           >
@@ -579,7 +584,7 @@ export function TaskList({
       >
         {headerContent}
 
-        {isAdding && taskInputElement}
+        {isAdding && addPosition === 'top' && taskInputElement}
 
         {tasks.length === 0 && !isAdding && !children ? (
           <EmptyState icon={Inbox} title={emptyTitle} subtitle={emptySubtitle} />
@@ -610,8 +615,15 @@ export function TaskList({
           tasks.map((task) => <TaskRow key={task.id} task={task} />)
         )}
 
+        {isAdding && addPosition === 'bottom' && taskInputElement}
+
         {showNewTask && projectId && !isAdding && (
-          <AddTaskButton onClick={() => setIsAdding(true)} />
+          <AddTaskButton
+            onClick={() => {
+              setAddPosition('bottom')
+              setIsAdding(true)
+            }}
+          />
         )}
 
         {children}

@@ -13,7 +13,7 @@ export function AddTaskButton({ onClick, label = 'Add Task', className }: AddTas
       type="button"
       onClick={onClick}
       className={cn(
-        'mx-4 my-2 flex items-center justify-center gap-1.5 rounded-md border border-dashed border-[var(--border-color)] py-1.5 text-[12px] text-[var(--text-secondary)] transition-colors hover:border-[var(--accent-blue)] hover:text-[var(--accent-blue)]',
+        'mx-4 my-2 flex items-center justify-center gap-1.5 rounded-full border border-dashed border-[var(--border-color)] px-4 py-2 text-[12px] leading-none text-[var(--text-secondary)] transition-colors hover:border-[var(--accent-blue)] hover:text-[var(--accent-blue)]',
         className
       )}
       aria-label={label}
