@@ -294,7 +294,7 @@ export function TaskRow({ task, sortable = false }: TaskRowProps) {
         ref={setNodeRef}
         data-task-id={task.id}
         className={cn(
-          'group flex h-10 cursor-default items-center gap-3 border-b border-[var(--border-color)] px-4 transition-colors hover:bg-[var(--bg-hover)]',
+          'group flex min-h-10 cursor-default items-center gap-3 border-b border-[var(--border-color)] px-4 py-2 transition-colors hover:bg-[var(--bg-hover)]',
           isFocused && !isExpanded && 'bg-[var(--accent-blue)]/8 ring-1 ring-inset ring-[var(--accent-blue)]/30',
           isDragging && 'opacity-30',
           isDragOver && 'ring-2 ring-inset ring-[var(--accent-blue)] bg-[var(--accent-blue)]/5',
@@ -332,7 +332,7 @@ export function TaskRow({ task, sortable = false }: TaskRowProps) {
 
         <span
           className={cn(
-            'min-w-0 flex-1 truncate text-[13px] text-[var(--text-primary)]',
+            'min-w-0 flex-1 break-words text-[13px] text-[var(--text-primary)]',
             task.done && 'text-[var(--text-secondary)] line-through'
           )}
         >
