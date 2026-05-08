@@ -58,6 +58,7 @@ export function TaskList({
   const inputRef = useRef<HTMLInputElement>(null)
   const creationRef = useRef<HTMLDivElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
+  const pendingTaskClickRef = useRef<number | null>(null)
   const parser = useTaskParser()
   const { data: allLabels } = useLabels()
   const { data: projectData } = useProjects()
@@ -98,6 +99,35 @@ export function TaskList({
     if (isAdding && inputRef.current) {
       inputRef.current.focus()
     }
+  }, [isAdding])
+
+  // While the new-task UI is open, record which task row the user mousedowns on.
+  // Mousedown fires before the input's blur, which is the only signal we have
+  // before the layout shifts from removing the input — by the time the click
+  // event fires, the cursor is no longer over the intended row.
+  useEffect(() => {
+    if (!isAdding) {
+      pendingTaskClickRef.current = null
+      return
+    }
+    const handleMouseDown = (e: MouseEvent) => {
+      const target = e.target
+      if (!(target instanceof Node)) return
+      if (creationRef.current?.contains(target)) {
+        pendingTaskClickRef.current = null
+        return
+      }
+      const el = target instanceof HTMLElement ? target : null
+      const taskEl = el?.closest('[data-task-id]') as HTMLElement | null
+      if (!taskEl) {
+        pendingTaskClickRef.current = null
+        return
+      }
+      const id = Number(taskEl.getAttribute('data-task-id'))
+      pendingTaskClickRef.current = Number.isNaN(id) ? null : id
+    }
+    document.addEventListener('mousedown', handleMouseDown)
+    return () => document.removeEventListener('mousedown', handleMouseDown)
   }, [isAdding])
 
   const handleSubmit = () => {
@@ -445,7 +475,17 @@ export function TaskList({
       className="border-b border-[var(--border-color)]"
       onBlur={(e) => {
         if (creationRef.current?.contains(e.relatedTarget as Node)) return
+        const pendingTaskId = pendingTaskClickRef.current
+        pendingTaskClickRef.current = null
         handleSubmit()
+        if (pendingTaskId !== null) {
+          // Defer past the spurious post-layout-shift click so it can't toggle
+          // our expansion off.
+          setTimeout(() => {
+            setExpandedTask(pendingTaskId)
+            setFocusedTask(pendingTaskId)
+          }, 0)
+        }
       }}
     >
       <div className="flex items-start gap-3 px-4 py-2.5">

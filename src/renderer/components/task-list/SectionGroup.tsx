@@ -4,6 +4,7 @@ import { useDroppable, useDndContext } from '@dnd-kit/core'
 import { cn } from '@/lib/cn'
 import { verticalListSortingStrategyForeignSafe } from '@/lib/sortable-strategy'
 import { useReorderStore } from '@/stores/reorder-store'
+import { useSelectionStore } from '@/stores/selection-store'
 import { useCreateTask, useAddLabel } from '@/hooks/use-task-mutations'
 import { useTaskParser } from '@/hooks/use-task-parser'
 import { useProjects } from '@/hooks/use-projects'
@@ -26,6 +27,7 @@ export function SectionGroup({ project, tasks, viewId, siblings, insertIndex }: 
   const [isAdding, setIsAdding] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const creationRef = useRef<HTMLDivElement>(null)
+  const pendingTaskClickRef = useRef<number | null>(null)
   const parser = useTaskParser()
   const createTask = useCreateTask()
   const addLabel = useAddLabel()
@@ -34,6 +36,8 @@ export function SectionGroup({ project, tasks, viewId, siblings, insertIndex }: 
   const projectItems = useMemo(() => (projectData?.flat ?? []).map((p) => ({ id: p.id, title: p.title })), [projectData])
   const labelItems = useMemo(() => (allLabels ?? []).map((l) => ({ id: l.id, title: l.title })), [allLabels])
   const setSectionReorderContext = useReorderStore((s) => s.setSectionReorderContext)
+  const setExpandedTask = useSelectionStore((s) => s.setExpandedTask)
+  const setFocusedTask = useSelectionStore((s) => s.setFocusedTask)
   const { active } = useDndContext()
   const activeType = (active?.data.current as Record<string, unknown> | undefined)?.type as
     | string
@@ -55,6 +59,33 @@ export function SectionGroup({ project, tasks, viewId, siblings, insertIndex }: 
     if (isAdding && inputRef.current) {
       inputRef.current.focus()
     }
+  }, [isAdding])
+
+  // While the new-task UI is open, record which task row the user mousedowns on
+  // so we can open it after blur — see the matching effect in TaskList for why.
+  useEffect(() => {
+    if (!isAdding) {
+      pendingTaskClickRef.current = null
+      return
+    }
+    const handleMouseDown = (e: MouseEvent) => {
+      const target = e.target
+      if (!(target instanceof Node)) return
+      if (creationRef.current?.contains(target)) {
+        pendingTaskClickRef.current = null
+        return
+      }
+      const el = target instanceof HTMLElement ? target : null
+      const taskEl = el?.closest('[data-task-id]') as HTMLElement | null
+      if (!taskEl) {
+        pendingTaskClickRef.current = null
+        return
+      }
+      const id = Number(taskEl.getAttribute('data-task-id'))
+      pendingTaskClickRef.current = Number.isNaN(id) ? null : id
+    }
+    document.addEventListener('mousedown', handleMouseDown)
+    return () => document.removeEventListener('mousedown', handleMouseDown)
   }, [isAdding])
 
   const handleSubmit = () => {
@@ -190,7 +221,15 @@ export function SectionGroup({ project, tasks, viewId, siblings, insertIndex }: 
               placeholder="New Task"
               onBlur={(e) => {
                 if (creationRef.current?.contains(e.relatedTarget as Node)) return
+                const pendingTaskId = pendingTaskClickRef.current
+                pendingTaskClickRef.current = null
                 handleSubmit()
+                if (pendingTaskId !== null) {
+                  setTimeout(() => {
+                    setExpandedTask(pendingTaskId)
+                    setFocusedTask(pendingTaskId)
+                  }, 0)
+                }
               }}
               showBangTodayHint={!parser.enabled && !!parser.parserConfig.bangToday}
               className="flex-1"
