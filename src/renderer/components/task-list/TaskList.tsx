@@ -11,6 +11,7 @@ import { useProjects } from '@/hooks/use-projects'
 import { recurrenceToVikunja } from '@/lib/task-parser'
 import type { Task, CreateTaskPayload } from '@/lib/vikunja-types'
 import { TaskRow } from './TaskRow'
+import { AddTaskButton } from './AddTaskButton'
 import { TaskInputParser } from '@/components/task-input/TaskInputParser'
 import { EmptyState } from '@/components/shared/EmptyState'
 import type { ChipData } from '@/components/task-input/TokenChip'
@@ -607,6 +608,10 @@ export function TaskList({
           </SortableContext>
         ) : (
           tasks.map((task) => <TaskRow key={task.id} task={task} />)
+        )}
+
+        {showNewTask && projectId && !isAdding && (
+          <AddTaskButton onClick={() => setIsAdding(true)} />
         )}
 
         {children}

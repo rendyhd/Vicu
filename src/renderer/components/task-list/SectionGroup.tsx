@@ -13,6 +13,7 @@ import { recurrenceToVikunja } from '@/lib/task-parser'
 import type { Task, Project, CreateTaskPayload } from '@/lib/vikunja-types'
 import { TaskRow } from './TaskRow'
 import { SectionHeader } from './SectionHeader'
+import { AddTaskButton } from './AddTaskButton'
 import { TaskInputParser } from '@/components/task-input/TaskInputParser'
 
 interface SectionGroupProps {
@@ -197,6 +198,10 @@ export function SectionGroup({ project, tasks, viewId, siblings, insertIndex }: 
       </SortableContext>
 
       <div ref={setBottomDropRef} className={cn(isDraggingTask ? 'h-3' : 'h-0')} />
+
+      {!isAdding && (
+        <AddTaskButton onClick={() => setIsAdding(true)} />
+      )}
 
       {isAdding && (
         <div ref={creationRef} className="border-b border-[var(--border-color)]">
