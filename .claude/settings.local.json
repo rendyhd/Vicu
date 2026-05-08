@@ -3,7 +3,16 @@
     "allow": [
       "Bash(npm run build:*)",
       "WebSearch",
-      "WebFetch(domain:github.com)"
+      "WebFetch(domain:github.com)",
+      "Bash(npm run:*)",
+      "Bash(python:*)",
+      "Bash(grep:*)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:vikunja.io)",
+      "Bash(gh search:*)",
+      "Bash(gh api:*)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)"
     ]
   }
 }
