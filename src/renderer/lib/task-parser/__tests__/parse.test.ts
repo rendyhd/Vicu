@@ -197,6 +197,21 @@ describe('dates', () => {
     expect(r.dueDate).toBeNull()
     expect(r.title).toBe('task')
   })
+
+  it('does not parse standalone "now" as a date', () => {
+    const r = parse('call john now', todoist)
+    expect(r.dueDate).toBeNull()
+    expect(r.title).toBe('call john now')
+  })
+
+  it('still extracts a later date when "now" appears earlier', () => {
+    const r = parse('do this now and tomorrow', todoist)
+    expect(r.dueDate).toBeInstanceOf(Date)
+    const tomorrow = new Date()
+    tomorrow.setDate(tomorrow.getDate() + 1)
+    expect(r.dueDate!.getDate()).toBe(tomorrow.getDate())
+    expect(r.title).toBe('do this now and')
+  })
 })
 
 // ─── Bang Today (!→ today) ──────────────────────────────────

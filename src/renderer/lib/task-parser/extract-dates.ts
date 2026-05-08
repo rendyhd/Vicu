@@ -17,8 +17,12 @@ export function extractDate(
   const results = chrono.parse(working, new Date(), { forwardDate: true })
   if (results.length === 0) return { dueDate: null, tokens }
 
-  // Use the first result
-  const result = results[0]
+  // Use the first result whose matched text isn't a standalone "now".
+  // Chrono treats "now" as the current time, but we don't want a casual
+  // "do this now" to get tagged with a due date.
+  const result = results.find((r) => r.text.trim().toLowerCase() !== 'now')
+  if (!result) return { dueDate: null, tokens }
+
   const start = result.index
   const end = start + result.text.length
 
