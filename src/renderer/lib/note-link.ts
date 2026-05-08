@@ -73,3 +73,10 @@ export function extractPageLinkHtml(description: string | undefined | null): str
   const anchor = description.match(/<p><a href="https?:\/\/[^"]*">\u{1F517}\s*[^<]*<\/a><\/p>/u)
   return (comment?.[0] ?? '') + (anchor?.[0] ?? '')
 }
+
+/** Whether the description contains real notes content beyond an embedded note/page link. */
+export function hasNotesContent(description: string | undefined | null): boolean {
+  if (!description) return false
+  const stripped = stripPageLink(stripNoteLink(description))
+  return stripped.replace(/<[^>]+>/g, '').replace(/\s|&nbsp;/g, '').length > 0
+}

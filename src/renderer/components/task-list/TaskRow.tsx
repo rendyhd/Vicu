@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { Calendar, Tag, ListChecks, FolderOpen, Trash2, Bell, Repeat, Paperclip, Info, Flag } from 'lucide-react'
+import { Calendar, Tag, ListChecks, FolderOpen, Trash2, Bell, Repeat, Paperclip, Info, Flag, AlignLeft } from 'lucide-react'
 import type { Editor } from '@tiptap/react'
 import { useDraggable } from '@dnd-kit/core'
 import { useSortable, defaultAnimateLayoutChanges } from '@dnd-kit/sortable'
@@ -26,7 +26,7 @@ import { AttachmentPickerPopover } from './AttachmentPickerPopover'
 import { PriorityPickerPopover } from './PriorityPickerPopover'
 import { InfoPopover } from './InfoPopover'
 import { TaskLinkIcon } from '@/components/TaskLinkIcon'
-import { stripNoteLink, stripPageLink, extractNoteLinkHtml, extractPageLinkHtml } from '@/lib/note-link'
+import { stripNoteLink, stripPageLink, extractNoteLinkHtml, extractPageLinkHtml, hasNotesContent } from '@/lib/note-link'
 import { formatRecurrenceLabel } from '@/lib/recurrence'
 import { RichTextEditor } from '@/components/rich-text/RichTextEditor'
 
@@ -346,6 +346,12 @@ export function TaskRow({ task, sortable = false }: TaskRowProps) {
         <TaskLinkIcon description={task.description} />
 
         <div className="flex items-center gap-2">
+          {hasNotesContent(task.description) && (
+            <AlignLeft
+              className="h-3 w-3 text-[var(--text-secondary)]"
+              aria-label="Has notes"
+            />
+          )}
           {(task.repeat_after ?? 0) > 0 || (task.repeat_mode ?? 0) > 0 ? (
             <Repeat className="h-3 w-3 text-[var(--text-secondary)]" />
           ) : null}
