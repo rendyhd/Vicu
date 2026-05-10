@@ -1,6 +1,7 @@
 import { BrowserWindow, net, screen } from 'electron'
 import { getMainWindow } from '../quick-entry-state'
 import { randomUUID } from 'crypto'
+import { hostname } from 'node:os'
 import { discoverProviders, type OIDCProvider } from './oidc-discovery'
 import { storeJWT, storeAPIToken, storeProviderKey, storeRefreshToken } from './token-store'
 import { extractRefreshToken } from './cookie-utils'
@@ -260,6 +261,8 @@ export async function createBackupAPIToken(
       throw new Error('No API permission groups returned from /api/v1/routes')
     }
 
+    const deviceName = hostname() || 'Unknown device'
+
     const response = await net.fetch(`${baseUrl}/api/v1/tokens`, {
       method: 'PUT',
       headers: {
@@ -267,7 +270,7 @@ export async function createBackupAPIToken(
         Authorization: `Bearer ${jwt}`,
       },
       body: JSON.stringify({
-        title: 'Vicu Desktop',
+        title: `Vicu — ${deviceName}`,
         expires_at: expirationDate.toISOString(),
         permissions,
       }),
@@ -278,12 +281,24 @@ export async function createBackupAPIToken(
       throw new Error(`API token creation failed (${response.status}): ${body}`)
     }
 
-    const data: { token?: string } = await response.json()
+    const data: { id?: number; token?: string } = await response.json()
     if (!data.token) {
       throw new Error('API token creation response missing "token" field')
     }
     const expiresAtUnix = Math.floor(expirationDate.getTime() / 1000)
     storeAPIToken(data.token, expiresAtUnix)
+
+    // Best-effort: delete other tokens on the server that match our exact title.
+    // Fire-and-forget — local + server-side new token are already in place, so
+    // a failure here can never leave the user without a backup token.
+    if (data.id != null) {
+      cleanupOldTokens(baseUrl, jwt, data.id, deviceName).catch((err) => {
+        console.warn(
+          '[Auth] Old token cleanup failed (non-fatal):',
+          err instanceof Error ? err.message : err
+        )
+      })
+    }
   }
 
   try {
@@ -292,5 +307,63 @@ export async function createBackupAPIToken(
     // Retry once on failure (network errors, transient server errors)
     console.warn('[Auth] Backup API token creation failed, retrying once:', firstErr)
     await doCreate()
+  }
+}
+
+interface ListedToken {
+  id: number
+  title: string
+}
+
+async function listAPITokens(baseUrl: string, jwt: string): Promise<ListedToken[]> {
+  const all: ListedToken[] = []
+  const PER_PAGE = 100
+  const MAX_PAGES = 10
+  for (let page = 1; page <= MAX_PAGES; page++) {
+    const resp = await net.fetch(
+      `${baseUrl}/api/v1/tokens?page=${page}&per_page=${PER_PAGE}`,
+      { headers: { Authorization: `Bearer ${jwt}` } },
+    )
+    if (!resp.ok) {
+      throw new Error(`List tokens failed (${resp.status})`)
+    }
+    const batch = (await resp.json()) as ListedToken[]
+    if (!Array.isArray(batch) || batch.length === 0) break
+    all.push(...batch)
+    // Don't break on `batch.length < PER_PAGE` — Vikunja can silently cap
+    // per_page below the requested value, so a short page is not the last page.
+  }
+  return all
+}
+
+async function cleanupOldTokens(
+  baseUrl: string,
+  jwt: string,
+  keepId: number,
+  deviceName: string,
+): Promise<void> {
+  if (!deviceName) return
+  const targetTitle = `Vicu — ${deviceName}`
+  const tokens = await listAPITokens(baseUrl, jwt)
+  const toDelete = tokens.filter((t) => t.id !== keepId && t.title === targetTitle)
+  if (toDelete.length === 0) return
+  console.log(
+    `[Auth] Cleaning up ${toDelete.length} stale "${targetTitle}" token(s)`,
+  )
+  for (const t of toDelete) {
+    try {
+      const resp = await net.fetch(`${baseUrl}/api/v1/tokens/${t.id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${jwt}` },
+      })
+      if (!resp.ok && resp.status !== 404) {
+        console.warn(`[Auth] Delete token ${t.id} failed (${resp.status})`)
+      }
+    } catch (err) {
+      console.warn(
+        `[Auth] Delete token ${t.id} threw:`,
+        err instanceof Error ? err.message : err,
+      )
+    }
   }
 }
