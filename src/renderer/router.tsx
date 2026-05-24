@@ -10,6 +10,7 @@ import { TodayView } from '@/views/TodayView'
 import { UpcomingView } from '@/views/UpcomingView'
 import { AnytimeView } from '@/views/AnytimeView'
 import { LogbookView } from '@/views/LogbookView'
+import { ReviewView } from '@/views/ReviewView'
 import { ProjectView } from '@/views/ProjectView'
 import { TagView } from '@/views/TagView'
 import { SettingsView } from '@/views/SettingsView'
@@ -49,6 +50,12 @@ const anytimeRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/anytime',
   component: AnytimeView,
+})
+
+const reviewRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/review',
+  component: ReviewView,
 })
 
 const logbookRoute = createRoute({
@@ -96,6 +103,7 @@ const routeTree = rootRoute.addChildren([
   todayRoute,
   upcomingRoute,
   anytimeRoute,
+  reviewRoute,
   logbookRoute,
   projectRoute,
   tagRoute,
