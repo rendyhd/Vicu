@@ -18,6 +18,12 @@ export interface SecondaryProject {
   title: string
 }
 
+export interface ReviewConfig {
+  enabled: boolean
+  default_cadence_days: number
+  exclude_inbox: boolean
+}
+
 export interface AppConfig {
   vikunja_url: string
   api_token: string
@@ -94,6 +100,8 @@ export interface AppConfig {
   task_completion_sound_path?: string | null
   // Cached username for re-login screen
   last_username?: string
+  // Project review
+  review?: ReviewConfig
 }
 
 // Platform-aware hotkey defaults
@@ -107,6 +115,11 @@ const DEFAULT_CONFIG: AppConfig = {
   api_token: '',
   inbox_project_id: 0,
   theme: 'system',
+  review: {
+    enabled: true,
+    default_cadence_days: 14,
+    exclude_inbox: true,
+  },
 }
 
 function getConfigPath(): string {
@@ -143,6 +156,17 @@ export function loadConfig(): AppConfig | null {
     return config
   } catch {
     return null
+  }
+}
+
+function normalizeReview(raw: unknown): ReviewConfig {
+  const src = (raw && typeof raw === 'object') ? raw as Record<string, unknown> : {}
+  const n = Number(src.default_cadence_days)
+  const cadence = Number.isFinite(n) ? Math.min(365, Math.max(1, Math.round(n))) : 14
+  return {
+    enabled: typeof src.enabled === 'boolean' ? src.enabled : true,
+    default_cadence_days: cadence,
+    exclude_inbox: typeof src.exclude_inbox === 'boolean' ? src.exclude_inbox : true,
   }
 }
 
@@ -230,6 +254,7 @@ function normalizeConfig(raw: Record<string, unknown>): AppConfig {
     task_completion_sound_path: typeof raw.task_completion_sound_path === 'string'
       ? raw.task_completion_sound_path : null,
     last_username: typeof raw.last_username === 'string' ? raw.last_username : undefined,
+    review: normalizeReview(raw.review),
   }
 }
 

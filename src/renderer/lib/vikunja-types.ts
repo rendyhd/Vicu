@@ -166,6 +166,12 @@ export interface SecondaryProject {
   title: string
 }
 
+export interface ReviewConfig {
+  enabled: boolean
+  default_cadence_days: number
+  exclude_inbox: boolean
+}
+
 export interface AppConfig {
   vikunja_url: string
   api_token: string
@@ -224,6 +230,8 @@ export interface AppConfig {
   task_completion_sound_path?: string | null
   // Update checker
   update_check_dismissed_version?: string
+  // Project review
+  review?: ReviewConfig
 }
 
 export interface OIDCProvider {
