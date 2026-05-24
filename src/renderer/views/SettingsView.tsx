@@ -11,6 +11,7 @@ import { BrowserSettings } from '@/components/settings/BrowserSettings'
 import { KeyboardShortcuts } from '@/components/settings/KeyboardShortcuts'
 import { NotificationSettings } from '@/components/settings/NotificationSettings'
 import { CompletionSoundSettings } from '@/components/settings/CompletionSoundSettings'
+import { ReviewSettingsPanel } from '@/components/review/ReviewSettingsPanel'
 import type { AppConfig, Project } from '@/lib/vikunja-types'
 
 import type { ThemeOption } from '@/lib/theme'
@@ -365,6 +366,13 @@ export function SettingsView() {
 
         {fullConfig && (
           <CompletionSoundSettings
+            config={fullConfig}
+            onChange={handleQuickEntryChange}
+          />
+        )}
+
+        {fullConfig && (
+          <ReviewSettingsPanel
             config={fullConfig}
             onChange={handleQuickEntryChange}
           />
