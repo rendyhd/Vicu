@@ -55,6 +55,7 @@ export function ReviewView() {
     }
   }, [due.data, reviewedThisSession])
   const remaining = total - done
+  const allCount = useMemo(() => flattenReviewTree(all.data).length, [all.data])
 
   const navList = useMemo(() => flattenReviewTree(currentTree), [currentTree])
 
@@ -217,10 +218,10 @@ export function ReviewView() {
 
         {/* Tabs */}
         <div style={{ display: 'flex', gap: 6, marginTop: 12 }} role="tablist">
-          <TabButton active={tab === 'due'} onClick={() => setTab('due')}>
+          <TabButton active={tab === 'due'} onClick={() => setTab('due')} count={remaining}>
             Due
           </TabButton>
-          <TabButton active={tab === 'all'} onClick={() => setTab('all')}>
+          <TabButton active={tab === 'all'} onClick={() => setTab('all')} count={allCount}>
             All tracked
           </TabButton>
         </div>
@@ -317,21 +318,41 @@ export function ReviewView() {
   )
 }
 
-function TabButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+function TabButton({
+  active,
+  onClick,
+  count,
+  children,
+}: {
+  active: boolean
+  onClick: () => void
+  count: number
+  children: React.ReactNode
+}) {
   return (
     <button
       type="button"
       role="tab"
       aria-selected={active}
       onClick={onClick}
-      className={cn('rounded-md px-3 py-1 text-[13px] font-medium transition-colors')}
+      className={cn('flex items-center gap-1.5 rounded-md px-3 py-1 text-[13px] transition-colors')}
       style={
         active
-          ? { background: 'rgba(175,82,222,0.15)', color: 'var(--accent-purple)' }
-          : { background: 'transparent', color: 'var(--text-secondary)' }
+          ? { background: 'rgba(175,82,222,0.15)', color: 'var(--accent-purple)', fontWeight: 600 }
+          : { background: 'transparent', color: 'var(--text-secondary)', fontWeight: 500 }
       }
     >
       {children}
+      <span
+        style={{
+          fontSize: 11,
+          fontWeight: 600,
+          fontVariantNumeric: 'tabular-nums',
+          color: active ? 'var(--accent-purple)' : 'var(--text-tertiary)',
+        }}
+      >
+        {count}
+      </span>
     </button>
   )
 }
