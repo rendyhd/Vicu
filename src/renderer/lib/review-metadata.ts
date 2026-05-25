@@ -180,3 +180,13 @@ export function formatStatusPill(status: ReviewStatus): { label: string; tone: '
   if (d === 0) return { label: 'Due today', tone: 'amber' }
   return { label: `Due in ${d}d`, tone: 'gray' }
 }
+
+// "Time since reviewed" pill for the Review tree, per the redesign spec.
+// Staleness severity: never / >=21d → red, >=14d → orange, else gray.
+export function formatStalenessPill(status: ReviewStatus): { text: string; tone: 'red' | 'orange' | 'gray' } {
+  if (status.metadata.state === 'never') return { text: 'Never reviewed', tone: 'red' }
+  const days = status.daysSinceReviewed ?? 0
+  if (days >= 21) return { text: `${days}d ago`, tone: 'red' }
+  if (days >= 14) return { text: `${days}d ago`, tone: 'orange' }
+  return { text: `${days}d ago`, tone: 'gray' }
+}

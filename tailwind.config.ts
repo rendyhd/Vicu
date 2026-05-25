@@ -16,6 +16,8 @@ const config: Config = {
           orange: 'var(--accent-orange)',
           yellow: 'var(--accent-yellow)',
           green: 'var(--accent-green)',
+          purple: 'var(--accent-purple)',
+          teal: 'var(--accent-teal)',
         },
       },
       fontSize: {

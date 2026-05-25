@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import { useProjects } from './use-projects'
+import type { ProjectTreeNode } from './use-projects'
 import { useAppConfig } from './use-app-config'
 import { useUpdateProject } from './use-task-mutations'
 import {
@@ -71,6 +72,81 @@ export function useReviewBadgeCount(): number {
 export function useReviewFeatureEnabled(): boolean {
   const { data: cfg } = useAppConfig()
   return cfg?.review?.enabled ?? true
+}
+
+// ---- Hierarchical tree (for the Review screen) ----
+
+export interface ReviewTreeNode {
+  project: Project
+  status: ReviewStatus
+  children: ReviewTreeNode[]
+}
+
+const EMPTY_KEEP: ReadonlySet<number> = new Set()
+
+function buildTrackedTree(
+  nodes: ProjectTreeNode[],
+  defaultCadence: number,
+  excludeInbox: boolean,
+  inboxId: number,
+  now: Date,
+): ReviewTreeNode[] {
+  const result: ReviewTreeNode[] = []
+  for (const node of nodes) {
+    if (node.is_archived) continue
+    if (excludeInbox && node.id === inboxId) continue
+    const meta = parseReviewFooter(node.description)
+    const status = computeStatus(meta, defaultCadence, now)
+    if (status.metadata.state === 'excluded') continue
+    const children = buildTrackedTree(node.children, defaultCadence, excludeInbox, inboxId, now)
+    result.push({ project: node, status, children })
+  }
+  return result
+}
+
+// Keep a branch when the node itself is overdue, was reviewed this session
+// (so it stays visible + faded instead of vanishing on refetch), or has a kept
+// descendant — preserving hierarchy context above due children.
+function pruneToDue(nodes: ReviewTreeNode[], keepVisible: ReadonlySet<number>): ReviewTreeNode[] {
+  const out: ReviewTreeNode[] = []
+  for (const node of nodes) {
+    const children = pruneToDue(node.children, keepVisible)
+    if (node.status.isOverdue || keepVisible.has(node.project.id) || children.length > 0) {
+      out.push({ ...node, children })
+    }
+  }
+  return out
+}
+
+export function useReviewTree(filter: 'due' | 'all', keepVisible: ReadonlySet<number> = EMPTY_KEEP) {
+  const { data: projectsData, isLoading: projectsLoading } = useProjects()
+  const { data: cfg, isLoading: cfgLoading } = useAppConfig()
+  const data = useMemo<ReviewTreeNode[]>(() => {
+    if (!projectsData?.tree || !cfg?.review?.enabled) return []
+    const now = new Date()
+    const tracked = buildTrackedTree(
+      projectsData.tree,
+      cfg.review.default_cadence_days,
+      cfg.review.exclude_inbox,
+      cfg.inbox_project_id,
+      now,
+    )
+    return filter === 'all' ? tracked : pruneToDue(tracked, keepVisible)
+  }, [projectsData, cfg, filter, keepVisible])
+  return { data, isLoading: projectsLoading || cfgLoading }
+}
+
+// DFS flatten, parents before children — used for keyboard nav + counts.
+export function flattenReviewTree(nodes: ReviewTreeNode[]): ReviewTreeNode[] {
+  const out: ReviewTreeNode[] = []
+  const walk = (ns: ReviewTreeNode[]) => {
+    for (const n of ns) {
+      out.push(n)
+      walk(n.children)
+    }
+  }
+  walk(nodes)
+  return out
 }
 
 function applyMetaUpdate(project: Project, mutator: (m: ReviewMetadata) => ReviewMetadata): Project {
