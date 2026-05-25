@@ -1,0 +1,77 @@
+/* Vicu design tokens — lifted from src/renderer/assets/index.css */
+:root {
+  --bg-primary: #FFFFFF;
+  --bg-secondary: #F5F5F7;
+  --bg-sidebar: #F5F5F7;
+  --text-primary: #1D1D1F;
+  --text-secondary: #86868B;
+  --text-tertiary: #AEAEB2;
+  --accent-blue: #007AFF;
+  --accent-red: #FF3B30;
+  --accent-orange: #FF9500;
+  --accent-yellow: #FFCC00;
+  --accent-green: #34C759;
+  --accent-purple: #AF52DE;
+  --accent-teal: #5AC8FA;
+  --accent-pink: #FF2D55;
+  --border-color: #E5E5EA;
+  --bg-hover: #F2F2F7;
+  --bg-selected: #E8F0FE;
+  --bg-elevated: #FFFFFF;
+  --shadow-md: 0 4px 14px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.04);
+}
+.dark {
+  --bg-primary: #1C1C1E;
+  --bg-secondary: #2C2C2E;
+  --bg-sidebar: #2C2C2E;
+  --text-primary: #F5F5F7;
+  --text-secondary: #98989D;
+  --text-tertiary: #636366;
+  --accent-blue: #0A84FF;
+  --accent-red: #FF453A;
+  --accent-orange: #FF9F0A;
+  --accent-yellow: #FFD60A;
+  --accent-green: #30D158;
+  --accent-purple: #BF5AF2;
+  --accent-teal: #64D2FF;
+  --accent-pink: #FF375F;
+  --border-color: #38383A;
+  --bg-hover: #3A3A3C;
+  --bg-selected: #1C3049;
+  --bg-elevated: #2C2C2E;
+  --shadow-md: 0 4px 14px rgba(0,0,0,0.35), 0 1px 2px rgba(0,0,0,0.2);
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.2);
+}
+
+html, body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif; color: var(--text-primary); }
+body { background: #e9e9eb; }
+* { box-sizing: border-box; }
+
+/* thin scrollbar */
+.vicu-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
+.vicu-scroll::-webkit-scrollbar-track { background: transparent; }
+.vicu-scroll::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); border-radius: 3px; }
+.dark .vicu-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); }
+
+/* Window chrome — mac traffic-lights */
+.traffic { display: inline-flex; gap: 8px; align-items: center; padding: 0 14px; height: 28px; }
+.traffic i { display: inline-block; width: 12px; height: 12px; border-radius: 50%; }
+.traffic i.r { background: #FF5F56; }
+.traffic i.y { background: #FFBD2E; }
+.traffic i.g { background: #27C93F; }
+
+/* Utility */
+.truncate { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mono { font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace; }
+
+/* Avatar colors — deterministic from initial */
+.av { display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; color: #fff; font-weight: 600; flex-shrink: 0; }
+.av-r { background: #007AFF; }    /* Rendy — blue */
+.av-m { background: #FF9500; }    /* Maya — orange */
+.av-s { background: #34C759; }    /* Sam — green */
+.av-k { background: #AF52DE; }    /* Kai — purple */
+
+/* Ring stack */
+.av-ring { box-shadow: 0 0 0 2px var(--bg-primary); }
+.av-ring-s { box-shadow: 0 0 0 1.5px var(--bg-primary); }

@@ -1,0 +1,57 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8"/>
+<title>Vicu — Review flow explorations</title>
+<link rel="stylesheet" href="lib/vicu-tokens.css"/>
+<style>
+  body { background: #e9e9eb; overflow: hidden; height: 100vh; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" src="design-canvas.jsx"></script>
+<script type="text/babel" src="lib/vicu-data.jsx"></script>
+<script type="text/babel" src="lib/vicu-review-data.jsx"></script>
+<script type="text/babel" src="lib/vicu-ui.jsx"></script>
+<script type="text/babel" src="directions/review-notes.jsx"></script>
+<script type="text/babel" src="directions/review-a.jsx"></script>
+<script type="text/babel" src="directions/review-b.jsx"></script>
+<script type="text/babel" src="directions/review-c.jsx"></script>
+
+<script type="text/babel">
+const { DesignCanvas, DCSection, DCArtboard } = window;
+
+function App() {
+  return (
+    <DesignCanvas>
+      <DCSection id="notes" title="01 · Diagnosis & approach" subtitle="What's wrong with today's Review, and the principles guiding the three directions">
+        <DCArtboard id="review-notes" label="Design notes" width={820} height={820}>
+          <ReviewNotes/>
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection id="directions" title="02 · Review flow directions" subtitle="Three flows on a spectrum: familiar list → deliberate ritual. All preserve sidebar order + parent/child hierarchy and let you do real review work without ever leaving the page.">
+        <DCArtboard id="review-a" label="A · Inline accordion — list expands in place" width={1280} height={820}>
+          <ReviewA/>
+        </DCArtboard>
+        <DCArtboard id="review-b" label="B · Master-detail split — list + embedded project" width={1280} height={820}>
+          <ReviewB/>
+        </DCArtboard>
+        <DCArtboard id="review-c" label="C · Focus stepper — one project at a time, ritual pace" width={1280} height={820}>
+          <ReviewC/>
+        </DCArtboard>
+      </DCSection>
+    </DesignCanvas>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
