@@ -88,7 +88,9 @@ export interface ElectronAPI {
   pickAndUploadAttachment(taskId: number): Promise<ApiResult<{ count: number }>>
 
   // Quick Entry/View
-  applyQuickEntrySettings(): Promise<{ entry: boolean; viewer: boolean }>
+  applyQuickEntrySettings(): Promise<{ entry: boolean; viewer: boolean; waylandLimited: boolean }>
+  getGlobalShortcutStatus(): Promise<{ entry: boolean; viewer: boolean; waylandLimited: boolean }>
+  getHotkeyLauncherCommand(): Promise<{ quickEntry: string; quickView: string; kind: 'appimage' | 'packaged' | 'dev' }>
 
   // Task completion sound
   pickCompletionSound(): Promise<

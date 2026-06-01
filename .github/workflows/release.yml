@@ -52,3 +52,43 @@ jobs:
           done
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-linux:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            arch: x64
+          - runner: ubuntu-24.04-arm
+            arch: arm64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      # electron-builder.yml lists both arches under linux.target; we override
+      # via the positional `AppImage:<arch>` target so each matrix runner only
+      # builds and publishes its matrix arch. Without this override both
+      # runners would build both arches AND publish them, leading to duplicate
+      # asset-upload conflicts on the second runner.
+      - name: Build and publish (${{ matrix.arch }})
+        run: npm run build && npx electron-builder --linux AppImage:${{ matrix.arch }} --publish always
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Remove blockmap assets
+        run: |
+          for asset in dist/*.blockmap; do
+            [ -f "$asset" ] || continue
+            name=$(basename "$asset")
+            gh release delete-asset "${{ github.ref_name }}" "$name" --yes || true
+          done
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

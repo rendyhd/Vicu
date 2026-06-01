@@ -3,7 +3,7 @@
 A personal task manager for your desktop, powered by [Vikunja](https://vikunja.io/).
 
 ![License](https://img.shields.io/badge/license-MIT-blue)
-![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS-lightgrey)
+![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)
 ![Built with](https://img.shields.io/badge/electron%20+%20react%20+%20typescript-47848F)
 
 <p align="center">
@@ -92,6 +92,7 @@ The [official Vikunja frontend](https://vikunja.io/) is a full project managemen
 |----------|--------|
 | Windows  | `.exe` (NSIS installer) |
 | macOS    | `.dmg` (Apple Silicon) |
+| Linux    | `.AppImage` (x64, arm64) |
 
 Grab the latest installer from [GitHub Releases](https://github.com/rendyhd/Vicu/releases).
 
@@ -108,6 +109,22 @@ xattr -cr /Applications/Vicu.app
 ```
 
 Either method is a one-time step. The app opens normally after that.
+
+### Linux — AppImage notes
+
+Make the AppImage executable before running it:
+
+```bash
+chmod +x Vicu-*.AppImage
+./Vicu-*.AppImage
+```
+
+A few platform caveats:
+
+- **Global hotkeys on Wayland**: Electron cannot register global shortcuts on Wayland without portal support. If Vicu shows a warning in Settings that it couldn't register the Quick Entry / Quick View hotkey, bind the keys via your desktop environment's keyboard settings instead, or trigger them from the tray icon. On X11 sessions, the hotkeys work as on Windows/macOS.
+- **System tray**: works out of the box on KDE, XFCE, Cinnamon, and most Wayland compositors. On GNOME you'll need the **AppIndicator and KStatusNotifierItem Support** extension.
+- **Browser link mode**: supported via the bundled Chrome/Firefox extension + native messaging. Enable it in Settings and click "Register browser hosts" — the manifests are written to `~/.config/<browser>/NativeMessagingHosts/` and `~/.mozilla/native-messaging-hosts/`. The Windows/macOS URL-from-window-title fallback is not available on Linux.
+- **Obsidian integration**: Windows and macOS only. On Linux the setting is visible but no foreground-app detection runs.
 
 ### Setup
 

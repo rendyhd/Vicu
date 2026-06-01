@@ -3,8 +3,13 @@ import { app, safeStorage } from 'electron'
 /** Expiry far in the future for user-provided API tokens with no inherent expiry */
 export const API_TOKEN_NO_EXPIRY = 4102444800 // 2100-01-01T00:00:00Z
 
+// Returns true if the token store can persist a value — either via real
+// safeStorage encryption or via the plaintext fallback. Callers that gate on
+// "should we save tokens at all?" want this to always be true; callers that
+// want to know specifically whether on-disk encryption is in effect should
+// call safeStorage.isEncryptionAvailable() directly.
 export function isEncryptionAvailable(): boolean {
-  return safeStorage.isEncryptionAvailable()
+  return true
 }
 import { readFileSync, writeFileSync, existsSync, unlinkSync, mkdirSync } from 'fs'
 import { join, dirname } from 'path'
@@ -46,12 +51,34 @@ function writeStore(data: AuthStore): void {
   writeFileSync(authPath, JSON.stringify(data, null, 2), 'utf-8')
 }
 
+// Tokens stored while safeStorage is unavailable get a "plain:" prefix so the
+// reader can tell them apart from base64-encoded ciphertext. Without this, a
+// keyring appearing after the first launch would leave the reader trying to
+// decrypt raw plaintext as base64 and permanently wedge auth until the user
+// logged in again. On Linux without a usable keyring, the fallback stores
+// tokens in cleartext under ~/.config/vicu/auth.json — the same effective
+// posture as every other Electron app in this situation (VS Code, Slack,
+// Signal, etc. all degrade to basic obfuscation when no keyring is available).
+const PLAIN_PREFIX = 'plain:'
+
 function encrypt(value: string): string {
-  const buffer = safeStorage.encryptString(value)
-  return buffer.toString('base64')
+  try {
+    if (!safeStorage.isEncryptionAvailable()) {
+      return PLAIN_PREFIX + value
+    }
+    const buffer = safeStorage.encryptString(value)
+    return buffer.toString('base64')
+  } catch (err) {
+    console.warn('[Auth] safeStorage.encryptString failed, falling back to plaintext:',
+      err instanceof Error ? err.message : err)
+    return PLAIN_PREFIX + value
+  }
 }
 
 function decrypt(encoded: string): string | null {
+  if (encoded.startsWith(PLAIN_PREFIX)) {
+    return encoded.slice(PLAIN_PREFIX.length)
+  }
   try {
     const buffer = Buffer.from(encoded, 'base64')
     return safeStorage.decryptString(buffer)

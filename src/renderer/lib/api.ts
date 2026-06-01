@@ -132,7 +132,13 @@ export const api = {
     window.api.refreshTaskReminders() as Promise<void>,
 
   applyQuickEntrySettings: () =>
-    window.api.applyQuickEntrySettings() as Promise<{ entry: boolean; viewer: boolean }>,
+    window.api.applyQuickEntrySettings() as Promise<{ entry: boolean; viewer: boolean; waylandLimited: boolean }>,
+
+  getGlobalShortcutStatus: () =>
+    window.api.getGlobalShortcutStatus() as Promise<{ entry: boolean; viewer: boolean; waylandLimited: boolean }>,
+
+  getHotkeyLauncherCommand: () =>
+    window.api.getHotkeyLauncherCommand() as Promise<{ quickEntry: string; quickView: string; kind: 'appimage' | 'packaged' | 'dev' }>,
 
   pickCompletionSound: () =>
     window.api.pickCompletionSound() as Promise<

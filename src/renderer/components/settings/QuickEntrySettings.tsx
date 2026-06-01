@@ -1,3 +1,5 @@
+import { useEffect, useState } from 'react'
+import { api } from '@/lib/api'
 import { cn } from '@/lib/cn'
 import { HotkeyRecorder } from './HotkeyRecorder'
 import type { AppConfig, Project, SecondaryProject, ViewerFilter } from '@/lib/vikunja-types'
@@ -6,11 +8,36 @@ interface QuickEntrySettingsProps {
   config: AppConfig
   projects: Project[]
   onChange: (partial: Partial<AppConfig>) => void
-  hotkeyWarnings?: { entry: boolean; viewer: boolean }
+  hotkeyWarnings?: { entry: boolean; viewer: boolean; waylandLimited: boolean }
 }
 
 
+const HOTKEY_FAILURE_COPY = window.api.platform === 'linux'
+  ? 'Failed to register. On Wayland this usually means the compositor blocked the shortcut — see the Wayland notice above for a workaround.'
+  : 'Failed to register — hotkey may be in use by another application'
+
 export function QuickEntrySettings({ config, projects, onChange, hotkeyWarnings }: QuickEntrySettingsProps) {
+  const [launcherCmd, setLauncherCmd] = useState<{ quickEntry: string; quickView: string; kind: 'appimage' | 'packaged' | 'dev' } | null>(null)
+  const [copied, setCopied] = useState<'entry' | 'view' | null>(null)
+
+  // Fetch the launcher command once on mount on Linux. Done unconditionally
+  // (not gated on hotkeyWarnings) so it's always ready by the time the
+  // Wayland warning renders, and so a slow or missed warning state doesn't
+  // leave the banner showing instructions with no copyable command.
+  useEffect(() => {
+    if (window.api.platform !== 'linux') return
+    api.getHotkeyLauncherCommand().then(setLauncherCmd).catch((err) => {
+      console.error('[Settings] getHotkeyLauncherCommand failed:', err)
+    })
+  }, [])
+
+  const copy = (text: string, which: 'entry' | 'view') => {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(which)
+      setTimeout(() => setCopied(null), 1500)
+    })
+  }
+
   const entryEnabled = config.quick_entry_enabled ?? false
   const viewEnabled = config.quick_view_enabled === true
   const viewerFilter = config.viewer_filter ?? {
@@ -47,6 +74,68 @@ export function QuickEntrySettings({ config, projects, onChange, hotkeyWarnings 
       <h2 className="text-sm font-semibold text-[var(--text-primary)]">Quick Entry & Quick View</h2>
 
       <div className="mt-4 space-y-4">
+        {hotkeyWarnings?.waylandLimited && (entryEnabled || viewEnabled) && (
+          <div className="rounded-md border border-accent-orange/40 bg-accent-orange/10 px-3 py-3 text-xs text-[var(--text-primary)]">
+            <p className="mb-2 font-semibold text-accent-orange">
+              Wayland: Vicu hotkeys only fire when Vicu is focused
+            </p>
+            <p className="mb-2 text-[var(--text-secondary)]">
+              Wayland doesn't let applications grab global keyboard shortcuts. To get true global capture, bind a shortcut in your desktop environment's keyboard settings that runs Vicu with a command-line flag:
+            </p>
+            <ol className="mb-3 list-decimal space-y-1 pl-5 text-[var(--text-secondary)]">
+              <li>Open <strong className="text-[var(--text-primary)]">Settings → Keyboard → Custom Shortcuts</strong> (GNOME) or <strong className="text-[var(--text-primary)]">System Settings → Shortcuts → Custom Shortcuts</strong> (KDE).</li>
+              <li>Add a new shortcut. Paste the command below as the <em>Command</em>.</li>
+              <li>Set the key combo (e.g. <code className="rounded bg-[var(--bg-tertiary)] px-1">Alt+Shift+V</code>).</li>
+              <li>Keep Vicu running in the tray — the shortcut wakes the running instance.</li>
+            </ol>
+            {!launcherCmd && (
+              <div className="text-[var(--text-secondary)]">Loading command…</div>
+            )}
+            {launcherCmd?.kind === 'dev' && (
+              <div className="mb-2 rounded border border-yellow-500/40 bg-yellow-500/10 px-2 py-1.5 text-[11px] text-yellow-600 dark:text-yellow-400">
+                <strong>Dev build notice:</strong> the command below points at the unpackaged source tree and won't work outside this dev session. Use this feature from the installed AppImage for real keybinds.
+              </div>
+            )}
+            {launcherCmd && (
+              <div className="space-y-2">
+                {entryEnabled && (
+                  <div>
+                    <div className="mb-1 text-[var(--text-secondary)]">Quick Entry command:</div>
+                    <div className="flex items-center gap-2">
+                      <code className="flex-1 overflow-x-auto whitespace-nowrap rounded border border-[var(--border-color)] bg-[var(--bg-tertiary)] px-2 py-1 font-mono text-[11px] text-[var(--text-primary)]">
+                        {launcherCmd.quickEntry}
+                      </code>
+                      <button
+                        type="button"
+                        onClick={() => copy(launcherCmd.quickEntry, 'entry')}
+                        className="shrink-0 rounded border border-[var(--border-color)] bg-[var(--bg-secondary)] px-2 py-1 text-[11px] font-medium text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]"
+                      >
+                        {copied === 'entry' ? 'Copied' : 'Copy'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+                {viewEnabled && (
+                  <div>
+                    <div className="mb-1 text-[var(--text-secondary)]">Quick View command:</div>
+                    <div className="flex items-center gap-2">
+                      <code className="flex-1 overflow-x-auto whitespace-nowrap rounded border border-[var(--border-color)] bg-[var(--bg-tertiary)] px-2 py-1 font-mono text-[11px] text-[var(--text-primary)]">
+                        {launcherCmd.quickView}
+                      </code>
+                      <button
+                        type="button"
+                        onClick={() => copy(launcherCmd.quickView, 'view')}
+                        className="shrink-0 rounded border border-[var(--border-color)] bg-[var(--bg-secondary)] px-2 py-1 text-[11px] font-medium text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]"
+                      >
+                        {copied === 'view' ? 'Copied' : 'Copy'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
         {/* Enable toggles */}
         <div className="space-y-2">
           <label className="flex cursor-pointer items-center gap-2">
@@ -91,7 +180,7 @@ export function QuickEntrySettings({ config, projects, onChange, hotkeyWarnings 
                   />
                   {hotkeyWarnings?.entry === false && (
                     <p className="mt-1 text-xs text-accent-orange">
-                      Failed to register — hotkey may be in use by another application
+                      {HOTKEY_FAILURE_COPY}
                     </p>
                   )}
                 </div>
@@ -202,7 +291,7 @@ export function QuickEntrySettings({ config, projects, onChange, hotkeyWarnings 
                   />
                   {hotkeyWarnings?.viewer === false && (
                     <p className="mt-1 text-xs text-accent-orange">
-                      Failed to register — hotkey may be in use by another application
+                      {HOTKEY_FAILURE_COPY}
                     </p>
                   )}
                 </div>

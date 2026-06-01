@@ -4,24 +4,32 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Vicu** — a task management desktop app for Windows and macOS, powered by [Vikunja](https://vikunja.io/) as the backend. Built with Electron + React + TypeScript + Tailwind CSS.
+**Vicu** — a task management desktop app for Windows, macOS, and Linux (AppImage), powered by [Vikunja](https://vikunja.io/) as the backend. Built with Electron + React + TypeScript + Tailwind CSS.
 
 ## Commands
 
 ```bash
-npm install          # Install dependencies
-npm run dev          # Start dev mode (electron-vite dev, opens app with HMR + DevTools)
-npm run build        # Production build (electron-vite build)
-npm run start        # Preview production build (electron-vite preview)
-npm run dist         # Build + package Windows installer (electron-builder)
-npm run dist:publish # Build + package + upload to GitHub release (used by CI)
+npm install            # Install dependencies
+npm run dev            # Start dev mode (electron-vite dev, opens app with HMR + DevTools)
+npm run build          # Production build (electron-vite build)
+npm run start          # Preview production build (electron-vite preview)
+npm run dist           # Build + package Windows installer (electron-builder)
+npm run dist:publish   # Build + package + upload to GitHub release (used by CI)
+npm run dist:mac       # Build + package macOS DMG
+npm run dist:linux     # Build + package Linux AppImage (x64 + arm64 per builder config)
 ```
 
 No test runner or linter is configured.
 
 ## CI/CD
 
-GitHub Actions workflow at `.github/workflows/release.yml` triggers on tag pushes matching `v*`. It builds the Windows installer (`npm run dist:publish`) and uploads the artifact to the GitHub release automatically via `electron-builder --publish always`.
+GitHub Actions workflow at `.github/workflows/release.yml` triggers on tag pushes matching `v*`. It builds:
+
+- **Windows** NSIS x64 (`build-windows`, `windows-latest`, `npm run dist:publish`)
+- **macOS** DMG arm64 (`build-macos`, `macos-latest`, `npm run dist:mac:publish`)
+- **Linux** AppImage x64 + arm64 (`build-linux` matrix — `ubuntu-latest` for x64, `ubuntu-24.04-arm` for arm64, `npm run dist:linux:publish`)
+
+All three publish to the same GitHub draft release via `electron-builder --publish always`.
 
 **Do NOT manually create releases or attach build artifacts** — CI handles everything. `electron-builder --publish always` creates its own **draft** release, uploads the installer, then publishes it. If you manually create a release first via `gh release create`, electron-builder will create a separate draft and the manual release will have no assets.
 
@@ -105,11 +113,17 @@ Two auth methods supported:
 ### Platform Notes
 
 - **Platform constants**: `src/main/platform.ts` exports `isMac`, `isWindows`, `isLinux` — use these for all platform branching (not raw `process.platform` checks)
-- **Native integrations**: koffi FFI is Windows-only; macOS uses osascript-based alternatives in `obsidian-client.ts` and `window-url-reader.ts`
-- **Main window chrome**: `titleBarStyle: 'hiddenInset'` on macOS (native traffic lights), `frame: false` on Windows (custom WindowControls)
+- **Native integrations**: koffi FFI is Windows-only; macOS uses osascript-based alternatives in `obsidian-client.ts` and `window-url-reader.ts`; Linux has no equivalent and those features degrade gracefully
+- **Main window chrome**: `titleBarStyle: 'hiddenInset'` on macOS (native traffic lights); `frame: false` on Windows and Linux (custom WindowControls)
 - **Quick Entry/View popups**: on macOS, use `alwaysOnTop: true` (not `type: 'panel'` — panels auto-hide on app deactivation)
 - **macOS icon assets**: `resources/icon.icns` (app bundle), `resources/iconTemplate.png` + `@2x.png` (menu bar tray — "Template" suffix is case-sensitive for auto-inversion)
-- **Forge config**: `forge.config.ts` at project root, referenced from package.json `config.forge`
+- **Linux (AppImage)**:
+  - Target defined in `electron-builder.yml` `linux:` section — AppImage, x64 + arm64. Uses `build/icon.png` (512×512). `desktop.StartupWMClass: Vicu` is load-bearing on GNOME/Wayland so the app groups under its own dock icon instead of generic "Electron".
+  - Tray icon reuses `resources/icon.png` resized to 16×16 via the existing Windows fallback in `tray.ts`.
+  - Global shortcuts: Electron's `globalShortcut.register()` is unreliable on Wayland. `registerQuickEntryShortcuts` in `src/main/index.ts` already reports `{entry, viewer}` booleans; the latest state is surfaced via the `get-global-shortcut-status` IPC and rendered as a warning banner in Settings → Quick Entry / View with Linux-specific copy.
+  - Browser link mode: native-messaging host manifests are written to `~/.config/google-chrome|chromium|microsoft-edge|BraveSoftware/Brave-Browser|vivaldi/NativeMessagingHosts/` and `~/.mozilla/native-messaging-hosts/` (`browser-host-registration.ts`). The shell wrapper `vicu-bridge.sh` is generated in `app.getPath('userData')`, reusing the macOS `ensureShellWrapper()` code. PowerShell / AppleScript URL-from-window-title fallback does not run on Linux (Wayland blocks foreground introspection).
+  - Obsidian integration is stubbed out on Linux — `getForegroundProcessName()` returns `''` and `getObsidianContext()` silently returns `null`. The setting remains visible but no foreground-app detection runs.
+- **Forge config**: stale reference — Vicu uses electron-vite + electron-builder, not electron-forge. No `forge.config.ts` exists.
 
 ### Vikunja API docs
 

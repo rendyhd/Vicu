@@ -57,6 +57,26 @@ mac:
   extendInfo:
     NSAppleEventsUsageDescription: "Vicu needs automation access to detect the active browser tab for quick task entry."
 
+linux:
+  icon: build/icon.png
+  category: Utility
+  synopsis: Task management app powered by Vikunja
+  description: A personal task manager for your desktop, powered by Vikunja. Frictionless capture, keyboard-driven review, and deep integration with your browser.
+  maintainer: rendyhd
+  target:
+    - target: AppImage
+      arch:
+        - x64
+        - arm64
+  desktop:
+    entry:
+      StartupWMClass: Vicu
+      Comment: Task management app powered by Vikunja
+      Keywords: task;todo;productivity;vikunja;
+
+appImage:
+  artifactName: "${productName}-${version}-${arch}.${ext}"
+
 dmg:
   sign: false
   writeUpdateInfo: false
