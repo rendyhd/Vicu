@@ -9,7 +9,39 @@ permissions:
   contents: write
 
 jobs:
+  # Create the draft release up-front so build-windows, build-macos, and
+  # build-linux all see an existing release when they call
+  # `electron-builder --publish always`. Without this, each runner races
+  # to POST /repos/.../releases and whoever loses gets `422 already_exists`
+  # and fails the job. Pre-release flag is set from the tag: vX.Y.Z-* is
+  # treated as a pre-release, plain vX.Y.Z as a stable release.
+  create-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ensure draft release exists
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+          REPO: ${{ github.repository }}
+        run: |
+          if gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; then
+            echo "Release $TAG already exists, skipping create."
+            exit 0
+          fi
+          if [[ "$TAG" == *-* ]]; then
+            PRERELEASE_FLAG=--prerelease
+          else
+            PRERELEASE_FLAG=
+          fi
+          gh release create "$TAG" \
+            --repo "$REPO" \
+            --draft \
+            $PRERELEASE_FLAG \
+            --title "$TAG" \
+            --notes ""
+
   build-windows:
+    needs: create-release
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -27,6 +59,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   build-macos:
+    needs: create-release
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
@@ -54,6 +87,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   build-linux:
+    needs: create-release
     strategy:
       fail-fast: false
       matrix:
