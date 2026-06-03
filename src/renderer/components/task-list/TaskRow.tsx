@@ -7,6 +7,7 @@ import type { AnimateLayoutChanges } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { cn } from '@/lib/cn'
 import { useSelectionStore } from '@/stores/selection-store'
+import { orderedTaskIds } from '@/lib/task-selection'
 import { useUpdateTask, useCompleteTask, useDeleteTask, useUploadAttachmentFromDrop } from '@/hooks/use-task-mutations'
 import { useConfirmDelete } from '@/hooks/use-confirm-delete'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
@@ -104,8 +105,20 @@ function useDragBehavior(task: Task, sortable: boolean) {
 }
 
 export function TaskRow({ task, sortable = false }: TaskRowProps) {
-  const { expandedTaskId, focusedTaskId, toggleExpandedTask, setFocusedTask, collapseAll } =
-    useSelectionStore()
+  const {
+    expandedTaskId,
+    focusedTaskId,
+    toggleExpandedTask,
+    setFocusedTask,
+    setExpandedTask,
+    collapseAll,
+    selectedTaskIds,
+    selectionAnchorId,
+    toggleSelected,
+    selectOnly,
+    setSelectedRange,
+    clearSelection,
+  } = useSelectionStore()
   const updateTask = useUpdateTask()
   const completeTask = useCompleteTask()
   const deleteTask = useDeleteTask()
@@ -113,6 +126,7 @@ export function TaskRow({ task, sortable = false }: TaskRowProps) {
   const uploadFromDrop = useUploadAttachmentFromDrop()
   const isExpanded = expandedTaskId === task.id
   const isFocused = focusedTaskId === task.id
+  const isSelected = selectedTaskIds.has(task.id)
 
   const { attributes, listeners, setNodeRef, isDragging, style } = useDragBehavior(task, sortable)
 
@@ -298,13 +312,41 @@ export function TaskRow({ task, sortable = false }: TaskRowProps) {
         data-task-id={task.id}
         className={cn(
           'group flex min-h-10 cursor-default items-center gap-3 border-b border-[var(--border-color)] px-4 py-2 transition-colors hover:bg-[var(--bg-hover)]',
-          isFocused && !isExpanded && 'bg-[var(--accent-blue)]/8 ring-1 ring-inset ring-[var(--accent-blue)]/30',
+          isSelected && 'bg-[var(--accent-blue)]/15 ring-1 ring-inset ring-[var(--accent-blue)]/40',
+          isFocused && !isSelected && !isExpanded && 'bg-[var(--accent-blue)]/8 ring-1 ring-inset ring-[var(--accent-blue)]/30',
           isDragging && 'opacity-30',
           isDragOver && 'ring-2 ring-inset ring-[var(--accent-blue)] bg-[var(--accent-blue)]/5',
           dropError && 'ring-2 ring-inset ring-red-500 bg-red-500/5'
         )}
         style={style}
-        onClick={() => {
+        onClick={(e) => {
+          // Cmd/Ctrl-click: toggle this row in the multi-selection (no expand).
+          if (e.metaKey || e.ctrlKey) {
+            e.preventDefault()
+            setExpandedTask(null)
+            toggleSelected(task.id)
+            setFocusedTask(task.id)
+            return
+          }
+          // Shift-click: select the contiguous visual range from the anchor.
+          if (e.shiftKey) {
+            e.preventDefault()
+            const order = orderedTaskIds()
+            const anchor = selectionAnchorId ?? focusedTaskId ?? task.id
+            const a = order.indexOf(anchor)
+            const b = order.indexOf(task.id)
+            if (a === -1 || b === -1) {
+              selectOnly(task.id)
+            } else {
+              const [lo, hi] = a < b ? [a, b] : [b, a]
+              setExpandedTask(null)
+              setSelectedRange(order.slice(lo, hi + 1))
+            }
+            setFocusedTask(task.id)
+            return
+          }
+          // Plain click: drop any multi-selection, then focus + expand as before.
+          if (selectedTaskIds.size > 0) clearSelection()
           setFocusedTask(task.id)
           toggleExpandedTask(task.id)
         }}
@@ -317,6 +359,8 @@ export function TaskRow({ task, sortable = false }: TaskRowProps) {
         onContextMenu={(e) => {
           e.preventDefault()
           e.stopPropagation()
+          // Right-clicking outside the selection narrows it to just this row.
+          if (!selectedTaskIds.has(task.id)) selectOnly(task.id)
           setFocusedTask(task.id)
           setContextMenu({ x: e.clientX, y: e.clientY })
         }}
@@ -386,7 +430,7 @@ export function TaskRow({ task, sortable = false }: TaskRowProps) {
       </div>
       {contextMenu && (
         <TaskContextMenu
-          task={task}
+          fallbackTask={task}
           x={contextMenu.x}
           y={contextMenu.y}
           onClose={() => setContextMenu(null)}
@@ -568,8 +612,7 @@ export function TaskRow({ task, sortable = false }: TaskRowProps) {
             </button>
             {activePopover === 'label' && (
               <LabelPickerPopover
-                taskId={task.id}
-                currentLabels={labels}
+                tasks={[task]}
                 onClose={() => setActivePopover(null)}
               />
             )}
@@ -646,7 +689,8 @@ export function TaskRow({ task, sortable = false }: TaskRowProps) {
             </button>
             {activePopover === 'project' && (
               <ProjectPickerPopover
-                task={task}
+                currentProjectId={task.project_id}
+                onSelect={(pid) => updateTask.mutate({ id: task.id, task: { ...task, project_id: pid } })}
                 onClose={() => setActivePopover(null)}
               />
             )}

@@ -1,0 +1,21 @@
+/**
+ * Global delete-confirmation bridge.
+ *
+ * The right-click context menu can't host its own confirm dialog — the menu
+ * closes on outside-mousedown, which would unmount a child dialog before the
+ * user answers. Instead a single `<GlobalConfirm>` (mounted in AppShell)
+ * registers the real `useConfirmDelete().confirmDelete` here, so any code —
+ * the menu, the keyboard handler, bulk actions — can `await confirmDelete(msg)`
+ * and get the styled dialog that respects the `confirm_before_delete` setting.
+ */
+let confirmFn: ((message: string) => Promise<boolean>) | null = null
+
+export function registerConfirm(fn: ((message: string) => Promise<boolean>) | null): void {
+  confirmFn = fn
+}
+
+export function confirmDelete(message: string): Promise<boolean> {
+  if (confirmFn) return confirmFn(message)
+  // Defensive fallback if the global dialog isn't mounted yet.
+  return Promise.resolve(window.confirm(message))
+}

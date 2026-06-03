@@ -16,6 +16,10 @@ import { CSS } from '@dnd-kit/utilities'
 import { useSidebarStore } from '@/stores/sidebar-store'
 import { useSelectionStore } from '@/stores/selection-store'
 import { useUpdateTask, useReorderTask, useReorderProject, useAddLabel } from '@/hooks/use-task-mutations'
+import { useConfirmDelete } from '@/hooks/use-confirm-delete'
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
+import { registerConfirm } from '@/lib/confirm-bridge'
+import { resolveSelectedTasks } from '@/lib/task-selection'
 import { useReorderStore } from '@/stores/reorder-store'
 import { api } from '@/lib/api'
 import { applyTheme } from '@/lib/theme'
@@ -100,7 +104,7 @@ interface ReauthInfo {
 }
 
 type DragItem =
-  | { type: 'task'; task: Task }
+  | { type: 'task'; task: Task; tasks: Task[] }
   | { type: 'project'; node: ProjectTreeNode }
   | { type: 'custom-list'; list: CustomList }
   | { type: 'section'; project: Project; siblings: Project[] }
@@ -136,6 +140,17 @@ function CompletionSoundSync() {
   return null
 }
 
+// Single confirm dialog mounted app-wide so non-component code (the context
+// menu, the keyboard handler) can `await confirmDelete(msg)` via the bridge.
+function GlobalConfirm() {
+  const { confirmDelete, dialogProps } = useConfirmDelete()
+  useEffect(() => {
+    registerConfirm(confirmDelete)
+    return () => registerConfirm(null)
+  }, [confirmDelete])
+  return <ConfirmDialog {...dialogProps} />
+}
+
 export function AppShell() {
   const queryClient = useQueryClient()
   const { sidebarWidth, setSidebarWidth } = useSidebarStore()
@@ -161,6 +176,8 @@ export function AppShell() {
   useEffect(() => {
     if (prevRouteRef.current !== routePath) {
       useCompletedTasksStore.getState().clear()
+      // Drop any multi-selection so its ids can't act on a different view's tasks.
+      useSelectionStore.getState().clearSelection()
       // Flush stale optimistic data (complete/uncomplete skip invalidation
       // to keep tasks in-place, so we sync on navigation instead).
       queryClient.invalidateQueries({ queryKey: ['tasks'] })
@@ -204,7 +221,15 @@ export function AppShell() {
 
       if (type === 'task') {
         const task = data.task as Task
-        setDragItem({ type: 'task', task })
+        // If the grabbed row is part of the multi-selection, carry all of it;
+        // otherwise drag just this task.
+        const { selectedTaskIds } = useSelectionStore.getState()
+        let dragTasks: Task[] = [task]
+        if (selectedTaskIds.has(task.id) && selectedTaskIds.size > 1) {
+          const resolved = resolveSelectedTasks(queryClient, selectedTaskIds)
+          if (resolved.some((t) => t.id === task.id)) dragTasks = resolved
+        }
+        setDragItem({ type: 'task', task, tasks: dragTasks })
         setExpandedTask(null)
       } else if (type === 'project') {
         const node = data.node as ProjectTreeNode
@@ -218,7 +243,7 @@ export function AppShell() {
         setDragItem({ type: 'custom-list', list })
       }
     },
-    [setExpandedTask]
+    [setExpandedTask, queryClient]
   )
 
   const handleDragEnd = useCallback(
@@ -233,39 +258,48 @@ export function AppShell() {
 
       if (dragItem.type === 'task') {
         const task = dragItem.task
+        // Multi-drag: a grabbed row that's part of the selection carries the
+        // whole selection; otherwise just itself. Sidebar/section/parent drops
+        // apply to every dragged task.
+        const dragTasks = dragItem.tasks
+        const isMulti = dragTasks.length > 1
+        const clearIfMulti = () => {
+          if (isMulti) useSelectionStore.getState().clearSelection()
+        }
 
         if (overData?.type === 'project') {
           const projectId = overData.projectId as number
-          if (projectId !== task.project_id) {
-            updateTask.mutate({
-              id: task.id,
-              task: { ...task, project_id: projectId },
-            })
-          }
+          dragTasks.forEach((t) => {
+            if (projectId !== t.project_id) {
+              updateTask.mutate({ id: t.id, task: { ...t, project_id: projectId } })
+            }
+          })
+          clearIfMulti()
         } else if (overData?.type === 'label') {
           const labelId = overData.labelId as number
-          const currentLabels = task.labels ?? []
-          if (!currentLabels.some((l) => l.id === labelId)) {
-            addLabel.mutate({ taskId: task.id, labelId })
-          }
+          dragTasks.forEach((t) => {
+            if (!(t.labels ?? []).some((l) => l.id === labelId)) {
+              addLabel.mutate({ taskId: t.id, labelId })
+            }
+          })
         } else if (overData?.type === 'section') {
-          // Task dropped on a section header — move task to that section's project
+          // Dropped on a section header — move every dragged task to that project.
           const sectionProject = overData.project as Project
-          if (sectionProject.id !== task.project_id) {
-            updateTask.mutate({
-              id: task.id,
-              task: { ...task, project_id: sectionProject.id },
-            })
-          }
+          dragTasks.forEach((t) => {
+            if (sectionProject.id !== t.project_id) {
+              updateTask.mutate({ id: t.id, task: { ...t, project_id: sectionProject.id } })
+            }
+          })
+          clearIfMulti()
         } else if (overData?.type === 'parent-project') {
-          // Task dropped on parent project drop zone — move back to parent
+          // Dropped on the parent-project drop zone — move back to the parent.
           const projectId = overData.projectId as number
-          if (projectId !== task.project_id) {
-            updateTask.mutate({
-              id: task.id,
-              task: { ...task, project_id: projectId },
-            })
-          }
+          dragTasks.forEach((t) => {
+            if (projectId !== t.project_id) {
+              updateTask.mutate({ id: t.id, task: { ...t, project_id: projectId } })
+            }
+          })
+          clearIfMulti()
         } else if (overData?.type === 'section-bottom') {
           // Task dropped at the end of a section
           const sectionProjectId = overData.projectId as number
@@ -609,6 +643,7 @@ export function AppShell() {
         </div>
         <BadgeSync />
         <CompletionSoundSync />
+        <GlobalConfirm />
       </div>
 
       <DragOverlay
@@ -624,7 +659,9 @@ export function AppShell() {
           }),
         }}
       >
-        {dragItem?.type === 'task' && <TaskDragOverlay task={dragItem.task} />}
+        {dragItem?.type === 'task' && (
+          <TaskDragOverlay task={dragItem.task} count={dragItem.tasks.length} />
+        )}
         {dragItem?.type === 'project' && (
           <ProjectDragOverlay title={dragItem.node.title} hexColor={dragItem.node.hex_color} />
         )}

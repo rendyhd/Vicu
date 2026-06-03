@@ -2,29 +2,45 @@ import { useCallback } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import { APP_CONFIG_QUERY_KEY } from '@/hooks/use-app-config'
-import { useUpdateTask, useAddLabel } from '@/hooks/use-task-mutations'
+import {
+  useUpdateTask,
+  useAddLabel,
+  useCompleteTask,
+  useDeleteTask,
+} from '@/hooks/use-task-mutations'
+import { useSelectionStore } from '@/stores/selection-store'
+import { confirmDelete } from '@/lib/confirm-bridge'
+import { copySelectedTitles } from '@/lib/task-selection'
 import { tomorrowAtMidnightISO, nextMondayAtMidnightISO } from '@/lib/date-utils'
 import { NULL_DATE } from '@/lib/constants'
 import type { Task, Label } from '@/lib/vikunja-types'
 
 /**
- * Task actions for the right-click context menu. Every field change goes through
- * a full `{ ...task }` spread to dodge Vikunja's Go zero-value wipe (see the note
- * in src/main/api-client.ts). The `record*` helpers persist the most recent
+ * Actions for the right-click context menu, applied to one OR many tasks.
+ * Every field change goes through a full `{ ...task }` spread to dodge Vikunja's
+ * Go zero-value wipe (see the note in src/main/api-client.ts). Bulk operations
+ * loop per task — Vikunja has no batch endpoint — letting each mutation's own
+ * optimistic update + invalidation reconcile the caches (React Query dedupes the
+ * concurrent refetches). The `record*` helpers persist the most recent
  * project/label to config so the menu can offer one-click "Move to last" /
- * "Apply last" — they invalidate the app-config query because its staleTime is
+ * "Apply last"; they invalidate the app-config query because its staleTime is
  * Infinity and would otherwise serve the old value.
  */
-export function useTaskActions(task: Task) {
+export function useTaskActions(tasks: Task[]) {
   const qc = useQueryClient()
   const updateTask = useUpdateTask()
   const addLabel = useAddLabel()
+  const completeTask = useCompleteTask()
+  const deleteTask = useDeleteTask()
+  const clearSelection = useSelectionStore((s) => s.clearSelection)
 
   const patch = useCallback(
     (changes: Partial<Task>) => {
-      updateTask.mutate({ id: task.id, task: { ...task, ...changes } })
+      tasks.forEach((t) => {
+        updateTask.mutate({ id: t.id, task: { ...t, ...changes } })
+      })
     },
-    [task, updateTask]
+    [tasks, updateTask]
   )
 
   const setDueToday = useCallback(() => {
@@ -55,17 +71,50 @@ export function useTaskActions(task: Task) {
 
   const moveToProject = useCallback(
     (projectId: number) => {
-      if (projectId === task.project_id) return
-      patch({ project_id: projectId })
+      tasks.forEach((t) => {
+        if (t.project_id === projectId) return
+        updateTask.mutate({ id: t.id, task: { ...t, project_id: projectId } })
+      })
+      // Moved tasks leave the current view — drop the now-orphaned selection
+      // (parity with drag-to-project).
+      clearSelection()
     },
-    [task.project_id, patch]
+    [tasks, updateTask, clearSelection]
   )
 
   const applyLabel = useCallback(
     (labelId: number) => {
-      addLabel.mutate({ taskId: task.id, labelId })
+      tasks.forEach((t) => {
+        if (!(t.labels ?? []).some((l) => l.id === labelId)) {
+          addLabel.mutate({ taskId: t.id, labelId })
+        }
+      })
     },
-    [task.id, addLabel]
+    [tasks, addLabel]
+  )
+
+  const completeAll = useCallback(() => {
+    tasks.forEach((t) => {
+      if (!t.done) completeTask.mutate(t)
+    })
+    clearSelection()
+  }, [tasks, completeTask, clearSelection])
+
+  const deleteAll = useCallback(async () => {
+    if (tasks.length === 0) return
+    const message =
+      tasks.length > 1
+        ? `Delete ${tasks.length} tasks? This cannot be undone.`
+        : 'Delete this task? This cannot be undone.'
+    const ok = await confirmDelete(message)
+    if (!ok) return
+    tasks.forEach((t) => deleteTask.mutate(t.id))
+    clearSelection()
+  }, [tasks, deleteTask, clearSelection])
+
+  const copyAll = useCallback(
+    () => copySelectedTitles(qc, new Set(tasks.map((t) => t.id))),
+    [qc, tasks]
   )
 
   const recordLastProject = useCallback(
@@ -99,6 +148,9 @@ export function useTaskActions(task: Task) {
     clearPriority,
     moveToProject,
     applyLabel,
+    completeAll,
+    deleteAll,
+    copyAll,
     recordLastProject,
     recordLastLabel,
   }

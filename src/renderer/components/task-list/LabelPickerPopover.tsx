@@ -2,18 +2,18 @@ import { useRef, useEffect, useState } from 'react'
 import { Check, Plus } from 'lucide-react'
 import { useLabels } from '@/hooks/use-labels'
 import { useAddLabel, useRemoveLabel, useCreateLabel } from '@/hooks/use-task-mutations'
-import type { Label } from '@/lib/vikunja-types'
+import type { Label, Task } from '@/lib/vikunja-types'
 import { normalizeHex } from '@/lib/constants'
 import { usePopoverAlignment } from './use-popover-alignment'
 
 interface LabelPickerPopoverProps {
-  taskId: number
-  currentLabels: Label[]
+  /** Tasks to apply labels to. One for the expanded card; many for a multi-selection. */
+  tasks: Task[]
   onClose: () => void
   onApplied?: (label: Label) => void
 }
 
-export function LabelPickerPopover({ taskId, currentLabels, onClose, onApplied }: LabelPickerPopoverProps) {
+export function LabelPickerPopover({ tasks, onClose, onApplied }: LabelPickerPopoverProps) {
   const ref = useRef<HTMLDivElement>(null)
   const align = usePopoverAlignment(ref)
   const { data: allLabels } = useLabels()
@@ -23,7 +23,17 @@ export function LabelPickerPopover({ taskId, currentLabels, onClose, onApplied }
 
   const [searchQuery, setSearchQuery] = useState('')
 
-  const currentIds = new Set(currentLabels.map((l) => l.id))
+  // Labels present on EVERY selected task → checkmarked, and clicking removes
+  // from all. A label on only some tasks shows unchecked, and clicking adds it
+  // to the tasks that lack it.
+  const commonIds = new Set<number>()
+  if (tasks.length > 0) {
+    for (const l of tasks[0].labels ?? []) {
+      if (tasks.every((t) => (t.labels ?? []).some((x) => x.id === l.id))) {
+        commonIds.add(l.id)
+      }
+    }
+  }
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -36,10 +46,14 @@ export function LabelPickerPopover({ taskId, currentLabels, onClose, onApplied }
   }, [onClose])
 
   const toggle = (label: Label) => {
-    if (currentIds.has(label.id)) {
-      removeLabel.mutate({ taskId, labelId: label.id })
+    if (commonIds.has(label.id)) {
+      tasks.forEach((t) => removeLabel.mutate({ taskId: t.id, labelId: label.id }))
     } else {
-      addLabel.mutate({ taskId, labelId: label.id })
+      tasks.forEach((t) => {
+        if (!(t.labels ?? []).some((x) => x.id === label.id)) {
+          addLabel.mutate({ taskId: t.id, labelId: label.id })
+        }
+      })
       onApplied?.(label)
     }
   }
@@ -49,7 +63,7 @@ export function LabelPickerPopover({ taskId, currentLabels, onClose, onApplied }
       { title: title.trim() },
       {
         onSuccess: (newLabel) => {
-          addLabel.mutate({ taskId, labelId: newLabel.id })
+          tasks.forEach((t) => addLabel.mutate({ taskId: t.id, labelId: newLabel.id }))
           onApplied?.(newLabel)
           setSearchQuery('')
         },
@@ -105,7 +119,7 @@ export function LabelPickerPopover({ taskId, currentLabels, onClose, onApplied }
               style={{ backgroundColor: normalizeHex(label.hex_color) || 'var(--text-secondary)' }}
             />
             <span className="min-w-0 flex-1 truncate">{label.title}</span>
-            {currentIds.has(label.id) && (
+            {commonIds.has(label.id) && (
               <Check className="h-3.5 w-3.5 shrink-0 text-[var(--accent-blue)]" />
             )}
           </button>

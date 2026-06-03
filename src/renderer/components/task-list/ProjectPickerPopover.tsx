@@ -1,15 +1,15 @@
 import { useRef, useEffect } from 'react'
 import { Check, FolderOpen } from 'lucide-react'
 import { useProjects } from '@/hooks/use-projects'
-import { useUpdateTask } from '@/hooks/use-task-mutations'
-import type { Task } from '@/lib/vikunja-types'
 import type { ProjectTreeNode } from '@/hooks/use-projects'
 import { usePopoverAlignment } from './use-popover-alignment'
 
 interface ProjectPickerPopoverProps {
-  task: Task
+  /** The task(s)' current project — shows a checkmark; undefined for a mixed multi-selection. */
+  currentProjectId?: number
+  /** Called with the chosen project id. The caller owns the move mutation(s). */
+  onSelect: (projectId: number) => void
   onClose: () => void
-  onPicked?: (projectId: number) => void
 }
 
 function flattenTree(nodes: ProjectTreeNode[], depth = 0): { node: ProjectTreeNode; depth: number }[] {
@@ -23,11 +23,10 @@ function flattenTree(nodes: ProjectTreeNode[], depth = 0): { node: ProjectTreeNo
   return result
 }
 
-export function ProjectPickerPopover({ task, onClose, onPicked }: ProjectPickerPopoverProps) {
+export function ProjectPickerPopover({ currentProjectId, onSelect, onClose }: ProjectPickerPopoverProps) {
   const ref = useRef<HTMLDivElement>(null)
   const align = usePopoverAlignment(ref)
   const { data } = useProjects()
-  const updateTask = useUpdateTask()
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -40,9 +39,8 @@ export function ProjectPickerPopover({ task, onClose, onPicked }: ProjectPickerP
   }, [onClose])
 
   const handleSelect = (projectId: number) => {
-    if (projectId !== task.project_id) {
-      updateTask.mutate({ id: task.id, task: { ...task, project_id: projectId } })
-      onPicked?.(projectId)
+    if (projectId !== currentProjectId) {
+      onSelect(projectId)
     }
     onClose()
   }
@@ -72,7 +70,7 @@ export function ProjectPickerPopover({ task, onClose, onPicked }: ProjectPickerP
                 strokeWidth={1.8}
               />
               <span className="min-w-0 flex-1 truncate">{node.title}</span>
-              {node.id === task.project_id && (
+              {node.id === currentProjectId && (
                 <Check className="h-3.5 w-3.5 shrink-0 text-[var(--accent-blue)]" />
               )}
             </button>

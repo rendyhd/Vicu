@@ -1,12 +1,15 @@
-import { useState, useRef, useEffect, useLayoutEffect } from 'react'
-import { Check } from 'lucide-react'
+import { useState, useRef, useEffect, useLayoutEffect, useMemo } from 'react'
+import { Check, Copy, CheckCircle2, Trash2 } from 'lucide-react'
+import { useQueryClient } from '@tanstack/react-query'
 import { cn } from '@/lib/cn'
 import { isNullDate } from '@/lib/date-utils'
-import { normalizeHex } from '@/lib/constants'
+import { normalizeHex, NULL_DATE } from '@/lib/constants'
 import { useAppConfig } from '@/hooks/use-app-config'
 import { useTaskActions } from '@/hooks/use-task-actions'
 import { useProjects } from '@/hooks/use-projects'
 import { useLabels } from '@/hooks/use-labels'
+import { useSelectionStore } from '@/stores/selection-store'
+import { resolveSelectedTasks } from '@/lib/task-selection'
 import type { Task } from '@/lib/vikunja-types'
 import { DatePickerPopover } from './DatePickerPopover'
 import { ProjectPickerPopover } from './ProjectPickerPopover'
@@ -14,7 +17,8 @@ import { LabelPickerPopover } from './LabelPickerPopover'
 import { PRIORITY_OPTIONS } from './PriorityPickerPopover'
 
 interface TaskContextMenuProps {
-  task: Task
+  /** The right-clicked row — guarantees at least one target if the cache can't resolve the selection. */
+  fallbackTask: Task
   x: number
   y: number
   onClose: () => void
@@ -29,12 +33,21 @@ function Divider() {
   return <div className="my-1 h-px bg-[var(--border-color)]" />
 }
 
-export function TaskContextMenu({ task, x, y, onClose }: TaskContextMenuProps) {
+export function TaskContextMenu({ fallbackTask, x, y, onClose }: TaskContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null)
+  const qc = useQueryClient()
   const { data: config } = useAppConfig()
   const { data: projectData } = useProjects()
   const { data: labels } = useLabels()
-  const actions = useTaskActions(task)
+  const selectedTaskIds = useSelectionStore((s) => s.selectedTaskIds)
+
+  // Targets = the resolved multi-selection, or just the right-clicked row.
+  const tasks = useMemo(() => {
+    const resolved = resolveSelectedTasks(qc, selectedTaskIds)
+    return resolved.length > 0 ? resolved : [fallbackTask]
+  }, [qc, selectedTaskIds, fallbackTask])
+
+  const actions = useTaskActions(tasks)
 
   const [sub, setSub] = useState<SubMenu>(null)
   const [pos, setPos] = useState({ left: x, top: y })
@@ -95,6 +108,15 @@ export function TaskContextMenu({ task, x, y, onClose }: TaskContextMenuProps) {
   const lastLabelId = config?.last_used_label_id
   const lastLabel = lastLabelId != null ? labels?.find((l) => l.id === lastLabelId) : undefined
 
+  // Aggregates across the target set.
+  const multi = tasks.length > 1
+  const anyHasDate = tasks.some((t) => !isNullDate(t.due_date))
+  const anyHasPriority = tasks.some((t) => (t.priority ?? 0) > 0)
+  const anyNotDone = tasks.some((t) => !t.done)
+  const allSameProject = tasks.every((t) => t.project_id === tasks[0].project_id)
+  const currentProjectId = allSameProject ? tasks[0].project_id : undefined
+  const datePickerCurrent = tasks.length === 1 ? tasks[0].due_date : NULL_DATE
+
   return (
     <div
       ref={menuRef}
@@ -102,6 +124,15 @@ export function TaskContextMenu({ task, x, y, onClose }: TaskContextMenuProps) {
       style={{ left: pos.left, top: pos.top, visibility: measured ? 'visible' : 'hidden' }}
       onContextMenu={(e) => e.preventDefault()}
     >
+      {multi && (
+        <>
+          <div className="px-3 py-1 text-2xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
+            {tasks.length} tasks
+          </div>
+          <Divider />
+        </>
+      )}
+
       {/* Adaptive top item — driven by the "What does urgent mean?" setting */}
       <button
         type="button"
@@ -130,13 +161,13 @@ export function TaskContextMenu({ task, x, y, onClose }: TaskContextMenuProps) {
         </button>
         {sub === 'date' && (
           <DatePickerPopover
-            currentDate={task.due_date}
+            currentDate={datePickerCurrent}
             onDateChange={actions.setDueDateIso}
             onClose={closeSubAndMenu}
           />
         )}
       </div>
-      {!isNullDate(task.due_date) && (
+      {anyHasDate && (
         <button type="button" className={itemClass} onClick={run(actions.clearDate)}>
           Clear date
         </button>
@@ -154,12 +185,12 @@ export function TaskContextMenu({ task, x, y, onClose }: TaskContextMenuProps) {
         >
           <span className={cn('h-2.5 w-2.5 shrink-0 rounded-full', option.dot)} />
           <span className="min-w-0 flex-1 truncate">{option.label}</span>
-          {task.priority === option.value && (
+          {tasks.every((t) => t.priority === option.value) && (
             <Check className="h-3.5 w-3.5 shrink-0 text-[var(--accent-blue)]" />
           )}
         </button>
       ))}
-      {(task.priority ?? 0) > 0 && (
+      {anyHasPriority && (
         <button type="button" className={itemClass} onClick={run(actions.clearPriority)}>
           <span className="h-2.5 w-2.5 shrink-0" />
           <span className="min-w-0 flex-1 truncate">Clear priority</span>
@@ -169,11 +200,14 @@ export function TaskContextMenu({ task, x, y, onClose }: TaskContextMenuProps) {
       <Divider />
 
       {/* Project */}
-      {lastProject && lastProject.id !== task.project_id && (
+      {lastProject && tasks.some((t) => t.project_id !== lastProject.id) && (
         <button
           type="button"
           className={itemClass}
-          onClick={run(() => actions.moveToProject(lastProject.id))}
+          onClick={run(() => {
+            actions.moveToProject(lastProject.id)
+            actions.recordLastProject(lastProject.id)
+          })}
         >
           <span className="min-w-0 flex-1 truncate">{`Move to "${lastProject.title}"`}</span>
         </button>
@@ -188,8 +222,11 @@ export function TaskContextMenu({ task, x, y, onClose }: TaskContextMenuProps) {
         </button>
         {sub === 'project' && (
           <ProjectPickerPopover
-            task={task}
-            onPicked={actions.recordLastProject}
+            currentProjectId={currentProjectId}
+            onSelect={(pid) => {
+              actions.moveToProject(pid)
+              actions.recordLastProject(pid)
+            }}
             onClose={closeSubAndMenu}
           />
         )}
@@ -198,7 +235,7 @@ export function TaskContextMenu({ task, x, y, onClose }: TaskContextMenuProps) {
       <Divider />
 
       {/* Labels */}
-      {lastLabel && !(task.labels ?? []).some((l) => l.id === lastLabel.id) && (
+      {lastLabel && tasks.some((t) => !(t.labels ?? []).some((l) => l.id === lastLabel.id)) && (
         <button
           type="button"
           className={itemClass}
@@ -220,14 +257,34 @@ export function TaskContextMenu({ task, x, y, onClose }: TaskContextMenuProps) {
           Apply label…
         </button>
         {sub === 'label' && (
-          <LabelPickerPopover
-            taskId={task.id}
-            currentLabels={task.labels ?? []}
-            onApplied={actions.recordLastLabel}
-            onClose={closeSubAndMenu}
-          />
+          <LabelPickerPopover tasks={tasks} onApplied={actions.recordLastLabel} onClose={closeSubAndMenu} />
         )}
       </div>
+
+      <Divider />
+
+      {/* Bulk-friendly actions */}
+      <button type="button" className={itemClass} onClick={run(actions.copyAll)}>
+        <Copy className="h-3.5 w-3.5 shrink-0 text-[var(--text-secondary)]" />
+        <span className="min-w-0 flex-1 truncate">{multi ? 'Copy tasks' : 'Copy task'}</span>
+      </button>
+      {anyNotDone && (
+        <button type="button" className={itemClass} onClick={run(actions.completeAll)}>
+          <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-[var(--text-secondary)]" />
+          <span className="min-w-0 flex-1 truncate">{multi ? 'Complete tasks' : 'Complete task'}</span>
+        </button>
+      )}
+      <button
+        type="button"
+        className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-accent-red hover:bg-accent-red/10"
+        onClick={() => {
+          onClose()
+          actions.deleteAll()
+        }}
+      >
+        <Trash2 className="h-3.5 w-3.5 shrink-0" />
+        <span className="min-w-0 flex-1 truncate">{multi ? 'Delete tasks' : 'Delete task'}</span>
+      </button>
     </div>
   )
 }

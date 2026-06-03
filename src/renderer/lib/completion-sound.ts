@@ -4,6 +4,9 @@ let audio: HTMLAudioElement | null = null
 let objectUrl: string | null = null
 let loadingPromise: Promise<void> | null = null
 let enabled = true
+// Throttle so a bulk-complete (which fires playCompletionSound once per task)
+// produces a single sound instead of a rapid stutter.
+let lastPlayedAt = 0
 
 function disposeAudio(): void {
   if (audio) {
@@ -41,6 +44,9 @@ export function setCompletionSoundEnabled(value: boolean): void {
 
 export function playCompletionSound(): void {
   if (!enabled || !audio) return
+  const now = Date.now()
+  if (now - lastPlayedAt < 250) return
+  lastPlayedAt = now
   try {
     audio.currentTime = 0
     void audio.play().catch(() => { /* ignore autoplay/decode errors */ })

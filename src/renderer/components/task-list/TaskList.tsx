@@ -1,10 +1,13 @@
 import { useState, useRef, useEffect, useCallback, useMemo, Fragment } from 'react'
 import { Plus, Inbox } from 'lucide-react'
 import { SortableContext } from '@dnd-kit/sortable'
+import { useQueryClient } from '@tanstack/react-query'
 import { cn } from '@/lib/cn'
 import { verticalListSortingStrategyForeignSafe } from '@/lib/sortable-strategy'
 import { useCreateTask, useCompleteTask, useUpdateTask, useDeleteTask, useAddLabel, useCreateLabel, useUploadAttachmentFromPaste } from '@/hooks/use-task-mutations'
 import { useSelectionStore } from '@/stores/selection-store'
+import { orderedTaskIds, resolveSelectedTasks, copySelectedTitles } from '@/lib/task-selection'
+import { confirmDelete } from '@/lib/confirm-bridge'
 import { useTaskParser } from '@/hooks/use-task-parser'
 import { useLabels } from '@/hooks/use-labels'
 import { useProjects } from '@/hooks/use-projects'
@@ -73,6 +76,7 @@ export function TaskList({
   const updateTask = useUpdateTask()
   const deleteTask = useDeleteTask()
   const uploadFromPaste = useUploadAttachmentFromPaste()
+  const qc = useQueryClient()
   const {
     expandedTaskId,
     focusedTaskId,
@@ -80,6 +84,9 @@ export function TaskList({
     setExpandedTask,
     toggleExpandedTask,
     collapseAll,
+    selectedTaskIds,
+    setSelectedRange,
+    clearSelection,
   } = useSelectionStore()
 
   // Build context chips (e.g. "Today" default on Today view)
@@ -289,9 +296,10 @@ export function TaskList({
       if (target === e.currentTarget) {
         collapseAll()
         setFocusedTask(null)
+        clearSelection()
       }
     },
-    [collapseAll, setFocusedTask]
+    [collapseAll, setFocusedTask, clearSelection]
   )
 
   const handleHeaderClick = useCallback(
@@ -301,8 +309,9 @@ export function TaskList({
       if (target.closest('button')) return
       collapseAll()
       setFocusedTask(null)
+      clearSelection()
     },
-    [collapseAll, setFocusedTask]
+    [collapseAll, setFocusedTask, clearSelection]
   )
 
   const handleScrollAreaClick = useCallback(
@@ -312,9 +321,10 @@ export function TaskList({
       if (target === e.currentTarget) {
         collapseAll()
         setFocusedTask(null)
+        clearSelection()
       }
     },
-    [collapseAll, setFocusedTask]
+    [collapseAll, setFocusedTask, clearSelection]
   )
 
   // Keyboard navigation
@@ -327,6 +337,61 @@ export function TaskList({
       if (active?.isContentEditable) return
 
       const taskCount = tasks.length
+
+      // --- Multi-selection shortcuts (work even when this list's own `tasks`
+      // prop is empty, e.g. a project whose tasks all live in sections) ---
+
+      // Ctrl+A / ⌘A: select all visible rows (DOM order spans parent + sections)
+      if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
+        e.preventDefault()
+        setSelectedRange(orderedTaskIds())
+        setExpandedTask(null)
+        return
+      }
+
+      // Ctrl+C / ⌘C: copy selected titles, one per line. Only hijack when there
+      // IS a selection; otherwise let native copy run.
+      if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
+        if (selectedTaskIds.size > 0) {
+          e.preventDefault()
+          void copySelectedTitles(qc, selectedTaskIds)
+        }
+        return
+      }
+
+      // Escape clears an active multi-selection first.
+      if (e.key === 'Escape' && selectedTaskIds.size > 0) {
+        e.preventDefault()
+        clearSelection()
+        return
+      }
+
+      // Ctrl+K / ⌘K with a multi-selection: complete every selected task.
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k' && selectedTaskIds.size > 0) {
+        e.preventDefault()
+        resolveSelectedTasks(qc, selectedTaskIds).forEach((t) => {
+          if (!t.done) completeTask.mutate(t)
+        })
+        clearSelection()
+        return
+      }
+
+      // Delete / Backspace with a multi-selection: delete all (single confirm).
+      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedTaskIds.size > 0) {
+        e.preventDefault()
+        const targets = resolveSelectedTasks(qc, selectedTaskIds)
+        if (targets.length === 0) return
+        const message =
+          targets.length > 1
+            ? `Delete ${targets.length} tasks? This cannot be undone.`
+            : 'Delete this task? This cannot be undone.'
+        void confirmDelete(message).then((ok) => {
+          if (!ok) return
+          targets.forEach((t) => deleteTask.mutate(t.id))
+          clearSelection()
+        })
+        return
+      }
 
       // Ctrl+N / ⌘N: New task
       if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
@@ -455,6 +520,11 @@ export function TaskList({
       toggleExpandedTask,
       collapseAll,
       setIsAdding,
+      qc,
+      selectedTaskIds,
+      setSelectedRange,
+      setExpandedTask,
+      clearSelection,
     ]
   )
 
