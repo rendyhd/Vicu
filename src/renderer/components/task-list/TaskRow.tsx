@@ -24,6 +24,7 @@ import { ProjectPickerPopover } from './ProjectPickerPopover'
 import { ReminderPickerPopover } from './ReminderPickerPopover'
 import { AttachmentPickerPopover } from './AttachmentPickerPopover'
 import { PriorityPickerPopover } from './PriorityPickerPopover'
+import { TaskContextMenu } from './TaskContextMenu'
 import { InfoPopover } from './InfoPopover'
 import { TaskLinkIcon } from '@/components/TaskLinkIcon'
 import { stripNoteLink, stripPageLink, extractNoteLinkHtml, extractPageLinkHtml, hasNotesContent } from '@/lib/note-link'
@@ -121,6 +122,7 @@ export function TaskRow({ task, sortable = false }: TaskRowProps) {
   const [dropError, setDropError] = useState<string | null>(null)
   const noteLinkHtml = extractNoteLinkHtml(task.description) + extractPageLinkHtml(task.description)
   const [activePopover, setActivePopover] = useState<PopoverType>(null)
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null)
   const titleRef = useRef<HTMLTextAreaElement>(null)
   const descEditorRef = useRef<Editor | null>(null)
   const descBaselineRef = useRef<string | null>(null)
@@ -290,6 +292,7 @@ export function TaskRow({ task, sortable = false }: TaskRowProps) {
   // Collapsed row — entire row is draggable (PointerSensor distance:8 distinguishes click vs drag)
   if (!isExpanded) {
     return (
+      <>
       <div
         ref={setNodeRef}
         data-task-id={task.id}
@@ -311,6 +314,12 @@ export function TaskRow({ task, sortable = false }: TaskRowProps) {
         onDragOver={handleFileDragOver}
         onDragLeave={handleFileDragLeave}
         onDrop={handleFileDrop}
+        onContextMenu={(e) => {
+          e.preventDefault()
+          e.stopPropagation()
+          setFocusedTask(task.id)
+          setContextMenu({ x: e.clientX, y: e.clientY })
+        }}
         {...listeners}
         {...attributes}
       >
@@ -375,6 +384,15 @@ export function TaskRow({ task, sortable = false }: TaskRowProps) {
           <TaskDueBadge dueDate={task.due_date} />
         </div>
       </div>
+      {contextMenu && (
+        <TaskContextMenu
+          task={task}
+          x={contextMenu.x}
+          y={contextMenu.y}
+          onClose={() => setContextMenu(null)}
+        />
+      )}
+      </>
     )
   }
 

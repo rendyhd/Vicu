@@ -85,3 +85,19 @@ export function formatAbsoluteDateTime(date: string): string {
   })
   return `${datePart} at ${timePart}`
 }
+
+export function tomorrowAtMidnightISO(): string {
+  const d = new Date()
+  d.setDate(d.getDate() + 1)
+  d.setHours(0, 0, 0, 0)
+  return d.toISOString()
+}
+
+export function nextMondayAtMidnightISO(): string {
+  const d = new Date()
+  // Sun(0)→+1, Mon(1)→+7, Wed(3)→+5; always the strictly-future Monday
+  const offset = (1 - d.getDay() + 7) % 7 || 7
+  d.setDate(d.getDate() + offset)
+  d.setHours(0, 0, 0, 0)
+  return d.toISOString()
+}

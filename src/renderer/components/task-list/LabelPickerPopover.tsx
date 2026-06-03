@@ -10,9 +10,10 @@ interface LabelPickerPopoverProps {
   taskId: number
   currentLabels: Label[]
   onClose: () => void
+  onApplied?: (label: Label) => void
 }
 
-export function LabelPickerPopover({ taskId, currentLabels, onClose }: LabelPickerPopoverProps) {
+export function LabelPickerPopover({ taskId, currentLabels, onClose, onApplied }: LabelPickerPopoverProps) {
   const ref = useRef<HTMLDivElement>(null)
   const align = usePopoverAlignment(ref)
   const { data: allLabels } = useLabels()
@@ -34,11 +35,12 @@ export function LabelPickerPopover({ taskId, currentLabels, onClose }: LabelPick
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [onClose])
 
-  const toggle = (labelId: number) => {
-    if (currentIds.has(labelId)) {
-      removeLabel.mutate({ taskId, labelId })
+  const toggle = (label: Label) => {
+    if (currentIds.has(label.id)) {
+      removeLabel.mutate({ taskId, labelId: label.id })
     } else {
-      addLabel.mutate({ taskId, labelId })
+      addLabel.mutate({ taskId, labelId: label.id })
+      onApplied?.(label)
     }
   }
 
@@ -48,6 +50,7 @@ export function LabelPickerPopover({ taskId, currentLabels, onClose }: LabelPick
       {
         onSuccess: (newLabel) => {
           addLabel.mutate({ taskId, labelId: newLabel.id })
+          onApplied?.(newLabel)
           setSearchQuery('')
         },
       }
@@ -94,7 +97,7 @@ export function LabelPickerPopover({ taskId, currentLabels, onClose }: LabelPick
           <button
             key={label.id}
             type="button"
-            onClick={() => toggle(label.id)}
+            onClick={() => toggle(label)}
             className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-[var(--text-primary)] hover:bg-[var(--bg-hover)]"
           >
             <span

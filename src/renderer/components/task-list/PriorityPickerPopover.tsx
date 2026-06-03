@@ -8,7 +8,7 @@ interface PriorityPickerPopoverProps {
   onClose: () => void
 }
 
-const PRIORITY_OPTIONS: { value: number; label: string; dot: string | null }[] = [
+export const PRIORITY_OPTIONS: { value: number; label: string; dot: string | null }[] = [
   { value: 0, label: 'None', dot: null },
   { value: 1, label: 'Low', dot: 'bg-accent-blue' },
   { value: 2, label: 'Medium', dot: 'bg-accent-yellow' },

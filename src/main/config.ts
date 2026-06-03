@@ -100,6 +100,10 @@ export interface AppConfig {
   task_completion_sound_path?: string | null
   // Cached username for re-login screen
   last_username?: string
+  // Task context menu
+  urgency_mode?: 'today' | 'important'
+  last_used_project_id?: number
+  last_used_label_id?: number
   // Project review
   review?: ReviewConfig
 }
@@ -254,6 +258,9 @@ function normalizeConfig(raw: Record<string, unknown>): AppConfig {
     task_completion_sound_path: typeof raw.task_completion_sound_path === 'string'
       ? raw.task_completion_sound_path : null,
     last_username: typeof raw.last_username === 'string' ? raw.last_username : undefined,
+    urgency_mode: raw.urgency_mode === 'important' ? 'important' : 'today',
+    last_used_project_id: typeof raw.last_used_project_id === 'number' ? raw.last_used_project_id : undefined,
+    last_used_label_id: typeof raw.last_used_label_id === 'number' ? raw.last_used_label_id : undefined,
     review: normalizeReview(raw.review),
   }
 }

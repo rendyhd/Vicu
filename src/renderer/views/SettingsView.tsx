@@ -364,6 +364,42 @@ export function SettingsView() {
               </div>
             </div>
 
+            <div>
+              <label className="mb-2 block text-xs text-[var(--text-secondary)]">What does urgent mean?</label>
+              <div className="flex gap-3">
+                {([
+                  { value: 'today' as const, label: 'Schedule for Today' },
+                  { value: 'important' as const, label: 'Mark Important' },
+                ]).map((opt) => {
+                  const current = fullConfig?.urgency_mode ?? 'today'
+                  return (
+                    <label
+                      key={opt.value}
+                      className={cn(
+                        'flex cursor-pointer items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium transition-colors',
+                        current === opt.value
+                          ? 'border-accent-blue bg-accent-blue/10 text-accent-blue'
+                          : 'border-[var(--border-color)] text-[var(--text-secondary)] hover:border-[var(--text-secondary)]'
+                      )}
+                    >
+                      <input
+                        type="radio"
+                        name="urgency_mode"
+                        value={opt.value}
+                        checked={current === opt.value}
+                        onChange={() => handleQuickEntryChange({ urgency_mode: opt.value })}
+                        className="sr-only"
+                      />
+                      {opt.label}
+                    </label>
+                  )
+                })}
+              </div>
+              <p className="mt-1.5 text-xs text-[var(--text-secondary)]">
+                Sets what the top action in a task&rsquo;s right-click menu does.
+              </p>
+            </div>
+
           </div>
         </div>
 

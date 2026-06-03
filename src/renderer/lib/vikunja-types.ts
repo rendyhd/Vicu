@@ -230,6 +230,10 @@ export interface AppConfig {
   task_completion_sound_path?: string | null
   // Update checker
   update_check_dismissed_version?: string
+  // Task context menu
+  urgency_mode?: 'today' | 'important'
+  last_used_project_id?: number
+  last_used_label_id?: number
   // Project review
   review?: ReviewConfig
 }

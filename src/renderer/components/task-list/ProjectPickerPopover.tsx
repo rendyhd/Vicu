@@ -9,6 +9,7 @@ import { usePopoverAlignment } from './use-popover-alignment'
 interface ProjectPickerPopoverProps {
   task: Task
   onClose: () => void
+  onPicked?: (projectId: number) => void
 }
 
 function flattenTree(nodes: ProjectTreeNode[], depth = 0): { node: ProjectTreeNode; depth: number }[] {
@@ -22,7 +23,7 @@ function flattenTree(nodes: ProjectTreeNode[], depth = 0): { node: ProjectTreeNo
   return result
 }
 
-export function ProjectPickerPopover({ task, onClose }: ProjectPickerPopoverProps) {
+export function ProjectPickerPopover({ task, onClose, onPicked }: ProjectPickerPopoverProps) {
   const ref = useRef<HTMLDivElement>(null)
   const align = usePopoverAlignment(ref)
   const { data } = useProjects()
@@ -41,6 +42,7 @@ export function ProjectPickerPopover({ task, onClose }: ProjectPickerPopoverProp
   const handleSelect = (projectId: number) => {
     if (projectId !== task.project_id) {
       updateTask.mutate({ id: task.id, task: { ...task, project_id: projectId } })
+      onPicked?.(projectId)
     }
     onClose()
   }
