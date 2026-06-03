@@ -150,7 +150,7 @@ export const api = {
 
   readCompletionSound: () =>
     window.api.readCompletionSound() as Promise<
-      { success: true; data: Uint8Array; mimeType: string } | { success: false; error: string }
+      { success: true; data: Uint8Array<ArrayBuffer>; mimeType: string } | { success: false; error: string }
     >,
 
   getCompletionSoundInfo: () =>

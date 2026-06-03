@@ -130,7 +130,7 @@ const api = {
     ipcRenderer.invoke('sound:reset') as Promise<void>,
   readCompletionSound: () =>
     ipcRenderer.invoke('sound:read') as Promise<
-      { success: true; data: Uint8Array; mimeType: string } | { success: false; error: string }
+      { success: true; data: Uint8Array<ArrayBuffer>; mimeType: string } | { success: false; error: string }
     >,
   getCompletionSoundInfo: () =>
     ipcRenderer.invoke('sound:get-info') as Promise<{ path: string; fileName: string; isDefault: boolean }>,

@@ -98,7 +98,7 @@ export interface ElectronAPI {
   >
   resetCompletionSound(): Promise<void>
   readCompletionSound(): Promise<
-    { success: true; data: Uint8Array; mimeType: string } | { success: false; error: string }
+    { success: true; data: Uint8Array<ArrayBuffer>; mimeType: string } | { success: false; error: string }
   >
   getCompletionSoundInfo(): Promise<{ path: string; fileName: string; isDefault: boolean }>
 
