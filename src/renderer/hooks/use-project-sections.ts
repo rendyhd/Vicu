@@ -6,6 +6,7 @@ import { useProjects } from './use-projects'
 import { useCompletedTasksStore } from '@/stores/completed-tasks-store'
 import { DEFAULT_PAGE_SIZE } from '@/lib/constants'
 import { sortProjectTasks } from '@/lib/task-sort'
+import { evictForeignCompletions } from '@/lib/undo-window'
 import type { Task, Project, ProjectView } from '@/lib/vikunja-types'
 
 export interface SectionData {
@@ -53,13 +54,17 @@ export function useProjectSections(projectId: number) {
   // Merge recently completed tasks back into each section
   const sections = useMemo(() => {
     const raw = sectionTasksQuery.data ?? []
+    if (completedTasks.size === 0) return raw
     const entries = Array.from(completedTasks.values()).filter(
       (entry) => entry.path === pathname
     )
-    if (entries.length === 0) return raw
 
     return raw.map((section) => {
-      const serverIds = new Set(section.tasks.map((t) => t.id))
+      // Drop tasks completed on another path — a completion made on the
+      // subproject's own page leaks its done:true into this section cache (and
+      // vice versa). Only the page where it was completed keeps it visible.
+      const visible = evictForeignCompletions(section.tasks, completedTasks, pathname)
+      const serverIds = new Set(visible.map((t) => t.id))
       const extras = entries
         .filter(
           (entry) =>
@@ -67,10 +72,10 @@ export function useProjectSections(projectId: number) {
         )
         .map((entry) => entry.task)
 
-      if (extras.length === 0) return section
+      if (visible === section.tasks && extras.length === 0) return section
       return {
         ...section,
-        tasks: sortProjectTasks([...section.tasks, ...extras]),
+        tasks: sortProjectTasks([...visible, ...extras]),
       }
     })
   }, [sectionTasksQuery.data, completedTasks, pathname])
