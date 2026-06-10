@@ -94,12 +94,6 @@ export function buildPrintHtml(payload: PrintablePayload, options: PrintOptions)
   const allTasks = payload.sections.flatMap((s) => s.groups.flatMap((g) => g.tasks))
   const countLine = `${allTasks.length} ${allTasks.length === 1 ? 'task' : 'tasks'}`
 
-  // Check if any task has notes with text content
-  const hasAnyNotes = allTasks.some((task) => {
-    const notes = options.sanitize(task.description ?? '')
-    return hasText(notes)
-  })
-
   const body =
     allTasks.length === 0
       ? '<p class="empty">No tasks in this view.</p>'
@@ -120,15 +114,6 @@ export function buildPrintHtml(payload: PrintablePayload, options: PrintOptions)
             }${groups}</section>`
           })
           .join('')
-
-  const taskNotesStyles = hasAnyNotes
-    ? `  .task-notes { font-size: 11.5px; color: #444; margin-top: 3px; }
-  .task-notes p { margin: 0 0 4px; }
-  .task-notes ul, .task-notes ol { margin: 2px 0 4px; padding-left: 18px; }
-  .task-notes a { color: #444; }
-  .task-notes pre, .task-notes code { font-family: Consolas, monospace; font-size: 10.5px; }
-  .task-notes blockquote { margin: 2px 0; padding-left: 8px; border-left: 2px solid #ccc; color: #666; }`
-    : ''
 
   return `<!DOCTYPE html>
 <html>
@@ -184,7 +169,12 @@ export function buildPrintHtml(payload: PrintablePayload, options: PrintOptions)
   .task-meta { font-size: 11px; color: #777; margin-top: 1px; }
   .task-meta .sep { margin: 0 5px; color: #bbb; }
   .meta-priority { font-weight: 600; color: #444; }
-${taskNotesStyles}
+  .task-notes { font-size: 11.5px; color: #444; margin-top: 3px; }
+  .task-notes p { margin: 0 0 4px; }
+  .task-notes ul, .task-notes ol { margin: 2px 0 4px; padding-left: 18px; }
+  .task-notes a { color: #444; }
+  .task-notes pre, .task-notes code { font-family: Consolas, monospace; font-size: 10.5px; }
+  .task-notes blockquote { margin: 2px 0; padding-left: 8px; border-left: 2px solid #ccc; color: #666; }
   .empty { color: #777; font-size: 13px; }
   footer {
     margin-top: 28px; padding-top: 8px; border-top: 1px solid #ddd;

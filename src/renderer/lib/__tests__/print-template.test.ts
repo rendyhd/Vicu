@@ -151,7 +151,7 @@ describe('buildPrintHtml', () => {
       viewTitle: 'T',
       sections: [{ groups: [{ tasks: [makeTask({ description: '<p></p>' })] }] }],
     })
-    expect(html).not.toContain('task-notes')
+    expect(html).not.toContain('<div class="task-notes">')
   })
 
   it('marks done tasks (checked box, done class, completion date)', () => {
