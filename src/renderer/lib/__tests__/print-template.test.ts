@@ -96,7 +96,7 @@ describe('buildPrintHtml', () => {
       sections: [
         {
           groups: [
-            { tasks: [makeTask({ due_date: '2026-06-12T00:00:00Z', start_date: NULL_DATE })] },
+            { tasks: [makeTask({ due_date: '2026-06-12T12:00:00Z', start_date: NULL_DATE })] },
           ],
         },
       ],

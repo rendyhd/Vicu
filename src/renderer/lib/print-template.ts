@@ -33,6 +33,7 @@ function escapeHtml(s: string): string {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
 }
 
 function formatPrintDate(date: string): string {
@@ -183,7 +184,7 @@ export function buildPrintHtml(payload: PrintablePayload, options: PrintOptions)
 </style>
 </head>
 <body>
-  <div class="brand"><img src="${options.logoDataUrl}" alt=""><span>Vicu</span></div>
+  <div class="brand"><img src="${escapeHtml(options.logoDataUrl)}" alt=""><span>Vicu</span></div>
   <h1>${escapeHtml(payload.viewTitle)}</h1>
   <p class="date-line">${dateLine} <span class="count">· ${countLine}</span></p>
   <hr class="rule">
