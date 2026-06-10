@@ -71,7 +71,7 @@ export function TodayView() {
             ? [{ heading: 'Overdue', groups: overdueGroups.map((g) => ({ heading: g.name, tasks: g.tasks })) }]
             : []),
           ...(todayGroups.length > 0
-            ? [{ heading: 'Today', groups: todayGroups.map((g) => ({ heading: g.name, tasks: g.tasks })) }]
+            ? [{ heading: overdueGroups.length > 0 ? 'Today' : undefined, groups: todayGroups.map((g) => ({ heading: g.name, tasks: g.tasks })) }]
             : []),
         ],
       }),
