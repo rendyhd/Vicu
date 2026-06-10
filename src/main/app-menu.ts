@@ -52,6 +52,17 @@ export function setupApplicationMenu(getMainWindow: () => BrowserWindow | null):
         },
       },
       { type: 'separator' },
+      {
+        label: 'Print…',
+        accelerator: 'CmdOrCtrl+P',
+        click: () => {
+          const win = getMainWindow()
+          if (win) {
+            win.webContents.send('print-view')
+          }
+        },
+      },
+      { type: 'separator' },
       isMac ? { role: 'close' } : { role: 'quit' },
     ],
   })

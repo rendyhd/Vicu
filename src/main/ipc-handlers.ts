@@ -56,6 +56,7 @@ import {
   readSoundBytes,
   getSoundInfo,
 } from './sound'
+import { printHtml } from './print'
 import {
   addPendingAction,
   removePendingAction,
@@ -106,6 +107,9 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('fetch-task-by-id', (_event, id: number) => {
     return fetchTaskById(id)
   })
+
+  // Print
+  ipcMain.handle('print-html', (_event, html: string) => printHtml(html))
 
   ipcMain.handle('create-task-relation', (_event, taskId: number, otherTaskId: number, relationKind: string) => {
     return createTaskRelation(taskId, otherTaskId, relationKind)

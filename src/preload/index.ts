@@ -165,6 +165,14 @@ const api = {
     ipcRenderer.on('navigate', handler)
     return () => { ipcRenderer.removeListener('navigate', handler) }
   },
+  // Print
+  printHtml: (html: string) =>
+    ipcRenderer.invoke('print-html', html),
+  onPrintView: (cb: () => void) => {
+    const handler = () => cb()
+    ipcRenderer.on('print-view', handler)
+    return () => { ipcRenderer.removeListener('print-view', handler) }
+  },
   onAuthRequired: (cb: () => void) => {
     const handler = () => cb()
     ipcRenderer.on('auth-required', handler)
