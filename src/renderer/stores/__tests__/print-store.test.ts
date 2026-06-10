@@ -1,7 +1,11 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 import { usePrintStore } from '../print-store'
 
 describe('print store', () => {
+  beforeEach(() => {
+    usePrintStore.setState({ payload: null })
+  })
+
   it('starts with no payload', () => {
     expect(usePrintStore.getState().payload).toBeNull()
   })
