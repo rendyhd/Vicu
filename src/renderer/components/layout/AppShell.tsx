@@ -46,7 +46,7 @@ import { NULL_DATE } from '@/lib/constants'
 import { usePrintStore } from '@/stores/print-store'
 import { buildPrintHtml } from '@/lib/print-template'
 import { sanitizeTaskHtml } from '@/lib/sanitize-html'
-import vicuLogo from '@/assets/icon.png?inline'
+import { VICU_LOGO_DATA_URL } from '@/assets/vicu-logo'
 
 const MIN_WIDTH = 180
 const MAX_WIDTH = 360
@@ -541,7 +541,7 @@ export function AppShell() {
       if (!payload) return
       const html = buildPrintHtml(payload, {
         sanitize: sanitizeTaskHtml,
-        logoDataUrl: vicuLogo,
+        logoDataUrl: VICU_LOGO_DATA_URL,
       })
       const result = await api.printHtml(html)
       if (!result.success) {
