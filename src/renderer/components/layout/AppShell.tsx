@@ -537,15 +537,19 @@ export function AppShell() {
   // means nothing to print.
   useEffect(() => {
     return api.onPrintView(async () => {
-      const payload = usePrintStore.getState().payload
-      if (!payload) return
-      const html = buildPrintHtml(payload, {
-        sanitize: sanitizeTaskHtml,
-        logoDataUrl: VICU_LOGO_DATA_URL,
-      })
-      const result = await api.printHtml(html)
-      if (!result.success) {
-        console.error('Print failed:', result.error)
+      try {
+        const payload = usePrintStore.getState().payload
+        if (!payload) return
+        const html = buildPrintHtml(payload, {
+          sanitize: sanitizeTaskHtml,
+          logoDataUrl: VICU_LOGO_DATA_URL,
+        })
+        const result = await api.printHtml(html)
+        if (!result.success) {
+          console.error('Print failed:', result.error)
+        }
+      } catch (err) {
+        console.error('Print failed:', err)
       }
     })
   }, [])
