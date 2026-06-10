@@ -43,6 +43,10 @@ import { reloadCompletionSound, setCompletionSoundEnabled } from '@/lib/completi
 import { useTodayOverdueCount } from '@/hooks/use-today-overdue-count'
 import { renderBadgeDataUrl } from '@/lib/render-badge-icon'
 import { NULL_DATE } from '@/lib/constants'
+import { usePrintStore } from '@/stores/print-store'
+import { buildPrintHtml } from '@/lib/print-template'
+import { sanitizeTaskHtml } from '@/lib/sanitize-html'
+import vicuLogo from '@/assets/icon.png?inline'
 
 const MIN_WIDTH = 180
 const MAX_WIDTH = 360
@@ -527,6 +531,24 @@ export function AppShell() {
       navigate({ to: path })
     })
   }, [navigate])
+
+  // Print the current view when the File menu / Ctrl+P fires. Views register
+  // their on-screen tasks via usePrintable; no payload (Settings, Setup)
+  // means nothing to print.
+  useEffect(() => {
+    return api.onPrintView(async () => {
+      const payload = usePrintStore.getState().payload
+      if (!payload) return
+      const html = buildPrintHtml(payload, {
+        sanitize: sanitizeTaskHtml,
+        logoDataUrl: vicuLogo,
+      })
+      const result = await api.printHtml(html)
+      if (!result.success) {
+        console.error('Print failed:', result.error)
+      }
+    })
+  }, [])
 
   // Listen for auth-required events (runtime token expiry)
   useEffect(() => {
