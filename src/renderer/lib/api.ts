@@ -184,7 +184,7 @@ export const api = {
   printHtml: (html: string) =>
     window.api.printHtml(html) as Promise<{ success: true } | { success: false; error: string }>,
   onPrintView: (cb: () => void) =>
-    window.api.onPrintView?.(cb) ?? (() => {}),
+    window.api.onPrintView(cb),
 
   // Update checker
   checkForUpdate: () =>

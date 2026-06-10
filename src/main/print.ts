@@ -14,20 +14,21 @@ export async function printHtml(
   if (printInFlight) return { success: false, error: 'A print job is already in progress' }
   printInFlight = true
 
-  const tempFile = path.join(app.getPath('temp'), `vicu-print-${Date.now()}.html`)
+  const tempFile = path.join(app.getPath('temp'), 'vicu-print.html')
   let win: BrowserWindow | null = null
   try {
-    await fs.promises.writeFile(tempFile, html, 'utf-8')
+    await fs.promises.writeFile(tempFile, html, { encoding: 'utf-8', mode: 0o600 })
     win = new BrowserWindow({
       show: false,
-      webPreferences: { sandbox: true, contextIsolation: true },
+      webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false, javascript: false },
     })
+    win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
     await win.loadURL(pathToFileURL(tempFile).toString())
 
     const result = await new Promise<{ ok: boolean; reason: string }>((resolve) => {
-      win!.webContents.print({ printBackground: true }, (ok, reason) =>
-        resolve({ ok, reason })
-      )
+      win!.once('closed', () => resolve({ ok: false, reason: 'Print window closed' }))
+      win!.webContents.on('render-process-gone', () => resolve({ ok: false, reason: 'Print renderer crashed' }))
+      win!.webContents.print({ printBackground: true }, (ok, reason) => resolve({ ok, reason }))
     })
 
     if (!result.ok && !/cancel/i.test(result.reason)) {

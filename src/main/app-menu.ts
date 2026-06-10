@@ -57,7 +57,7 @@ export function setupApplicationMenu(getMainWindow: () => BrowserWindow | null):
         accelerator: 'CmdOrCtrl+P',
         click: () => {
           const win = getMainWindow()
-          if (win) {
+          if (win && win.isVisible() && win.isFocused()) {
             win.webContents.send('print-view')
           }
         },
