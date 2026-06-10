@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useParams } from '@tanstack/react-router'
 import { useDndMonitor } from '@dnd-kit/core'
 import { SortableContext } from '@dnd-kit/sortable'
@@ -7,6 +7,7 @@ import { useProjectTasks } from '@/hooks/use-project-tasks'
 import { useProjectSections } from '@/hooks/use-project-sections'
 import { useProjects } from '@/hooks/use-projects'
 import { useReorderStore } from '@/stores/reorder-store'
+import { usePrintable } from '@/stores/print-store'
 import type { Task, Project } from '@/lib/vikunja-types'
 import { TaskList } from '@/components/task-list/TaskList'
 import { SectionGroup } from '@/components/task-list/SectionGroup'
@@ -45,6 +46,19 @@ export function ProjectView() {
   useEffect(() => {
     return () => clearSectionContexts()
   }, [pid, clearSectionContexts])
+
+  usePrintable(
+    useMemo(
+      () => ({
+        viewTitle: projectName,
+        sections: [
+          ...(tasks.length > 0 ? [{ groups: [{ tasks }] }] : []),
+          ...sections.map((s) => ({ heading: s.project.title, groups: [{ tasks: s.tasks }] })),
+        ],
+      }),
+      [projectName, tasks, sections]
+    )
+  )
 
   // Track cross-container drag hover for visual insertion line
   useDndMonitor({

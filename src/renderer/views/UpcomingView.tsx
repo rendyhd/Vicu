@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useTasks } from '@/hooks/use-tasks'
 import { useProjects } from '@/hooks/use-projects'
 import { useFilters } from '@/hooks/use-filters'
+import { usePrintable } from '@/stores/print-store'
 import { isNullDate, isToday, isOverdue } from '@/lib/date-utils'
 import { TaskList } from '@/components/task-list/TaskList'
 import { TaskRow } from '@/components/task-list/TaskRow'
@@ -81,6 +82,22 @@ export function UpcomingView() {
     }
     return Array.from(grouped.values()).sort((a, b) => a.key.localeCompare(b.key))
   }, [tasks])
+
+  usePrintable(
+    useMemo(
+      () => ({
+        viewTitle: 'Upcoming',
+        sections: groups.map((g) => ({
+          heading: g.label,
+          groups: groupByProject(g.tasks, projects?.flat).map((pg) => ({
+            heading: pg.name,
+            tasks: pg.tasks,
+          })),
+        })),
+      }),
+      [groups, projects?.flat]
+    )
+  )
 
   if (isLoading) {
     return (

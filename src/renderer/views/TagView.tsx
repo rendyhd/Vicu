@@ -4,6 +4,7 @@ import { useTasks } from '@/hooks/use-tasks'
 import { useLabels } from '@/hooks/use-labels'
 import { useProjects } from '@/hooks/use-projects'
 import { useFilters } from '@/hooks/use-filters'
+import { usePrintable } from '@/stores/print-store'
 import { TaskList } from '@/components/task-list/TaskList'
 import { TaskRow } from '@/components/task-list/TaskRow'
 
@@ -38,6 +39,16 @@ export function TagView() {
       a.name.localeCompare(b.name)
     )
   }, [filtered, projects?.flat])
+
+  usePrintable(
+    useMemo(
+      () => ({
+        viewTitle: labelName,
+        sections: [{ groups: groups.map((g) => ({ heading: g.name, tasks: g.tasks })) }],
+      }),
+      [labelName, groups]
+    )
+  )
 
   if (isLoading) {
     return (

@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useProjectTasks } from '@/hooks/use-project-tasks'
 import { useReorderStore } from '@/stores/reorder-store'
+import { usePrintable } from '@/stores/print-store'
 import { api } from '@/lib/api'
 import { TaskList } from '@/components/task-list/TaskList'
 
@@ -21,6 +22,10 @@ export function InboxView() {
   useEffect(() => {
     setReorderContext(viewId ?? null, tasks)
   }, [viewId, tasks, setReorderContext])
+
+  usePrintable(
+    useMemo(() => ({ viewTitle: 'Inbox', sections: [{ groups: [{ tasks }] }] }), [tasks])
+  )
 
   if (isLoading) {
     return (

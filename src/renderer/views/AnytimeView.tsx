@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useTasks } from '@/hooks/use-tasks'
 import { useFilters } from '@/hooks/use-filters'
 import { useProjects } from '@/hooks/use-projects'
+import { usePrintable } from '@/stores/print-store'
 import { TaskList } from '@/components/task-list/TaskList'
 import { TaskRow } from '@/components/task-list/TaskRow'
 import { api } from '@/lib/api'
@@ -63,6 +64,22 @@ export function AnytimeView() {
       })),
     }))
   }, [tasks, projectData])
+
+  usePrintable(
+    useMemo(
+      () => ({
+        viewTitle: 'Anytime',
+        sections: groups.map((group) => ({
+          heading: group.projectName,
+          groups: group.subGroups.map((sub) => ({
+            heading: sub.projectId === group.projectId ? undefined : sub.projectName,
+            tasks: sub.tasks,
+          })),
+        })),
+      }),
+      [groups]
+    )
+  )
 
   if (isLoading) {
     return (

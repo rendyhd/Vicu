@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useTasks } from '@/hooks/use-tasks'
 import { useProjects } from '@/hooks/use-projects'
 import { useFilters } from '@/hooks/use-filters'
+import { usePrintable } from '@/stores/print-store'
 import { isOverdue, isToday } from '@/lib/date-utils'
 import { TaskList } from '@/components/task-list/TaskList'
 import { TaskRow } from '@/components/task-list/TaskRow'
@@ -59,6 +60,23 @@ export function TodayView() {
   const todayGroups = useMemo(
     () => groupByProject(todayTasks, projects?.flat),
     [todayTasks, projects?.flat]
+  )
+
+  usePrintable(
+    useMemo(
+      () => ({
+        viewTitle: 'Today',
+        sections: [
+          ...(overdueGroups.length > 0
+            ? [{ heading: 'Overdue', groups: overdueGroups.map((g) => ({ heading: g.name, tasks: g.tasks })) }]
+            : []),
+          ...(todayGroups.length > 0
+            ? [{ heading: 'Today', groups: todayGroups.map((g) => ({ heading: g.name, tasks: g.tasks })) }]
+            : []),
+        ],
+      }),
+      [overdueGroups, todayGroups]
+    )
   )
 
   const dateStr = new Date().toLocaleDateString('en-US', {

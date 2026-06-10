@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import { useTasks } from '@/hooks/use-tasks'
 import { useFilters } from '@/hooks/use-filters'
+import { usePrintable } from '@/stores/print-store'
 import { isNullDate } from '@/lib/date-utils'
 import { cn } from '@/lib/cn'
 import { TaskCheckbox } from '@/components/task-list/TaskCheckbox'
@@ -38,6 +39,10 @@ function LogbookRow({ task }: { task: Task }) {
 export function LogbookView() {
   const params = useFilters({ view: 'logbook' })
   const { data: tasks = [], isLoading } = useTasks(params)
+
+  usePrintable(
+    useMemo(() => ({ viewTitle: 'Logbook', sections: [{ groups: [{ tasks }] }] }), [tasks])
+  )
 
   if (isLoading) {
     return (

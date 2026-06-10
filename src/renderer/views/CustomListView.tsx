@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useParams } from '@tanstack/react-router'
 import { useTasks } from '@/hooks/use-tasks'
 import { api } from '@/lib/api'
+import { usePrintable } from '@/stores/print-store'
 import { TaskList } from '@/components/task-list/TaskList'
 import { NULL_DATE } from '@/lib/constants'
 import type { CustomList, Task, TaskQueryParams } from '@/lib/vikunja-types'
@@ -141,6 +142,16 @@ export function CustomListView() {
       return true
     })
   }, [tasks, customList])
+
+  usePrintable(
+    useMemo(
+      () => ({
+        viewTitle: customList?.name ?? 'List',
+        sections: [{ groups: [{ tasks: filteredTasks }] }],
+      }),
+      [customList?.name, filteredTasks]
+    )
+  )
 
   if (isLoading) {
     return (
