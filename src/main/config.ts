@@ -131,7 +131,19 @@ function getConfigPath(): string {
   return join(app.getPath('userData'), CONFIG_FILENAME)
 }
 
+// In-memory cache: the config file is only ever written through saveConfig,
+// so disk reads after the first are redundant. Callers receive clones —
+// mutating a returned config object must not leak into the cache.
+let cachedConfig: AppConfig | null | undefined
+
 export function loadConfig(): AppConfig | null {
+  if (cachedConfig === undefined) {
+    cachedConfig = readConfigFromDisk()
+  }
+  return cachedConfig ? structuredClone(cachedConfig) : null
+}
+
+function readConfigFromDisk(): AppConfig | null {
   const configPath = getConfigPath()
 
   if (!existsSync(configPath)) {
@@ -290,6 +302,7 @@ function isWindowBounds(v: unknown): v is { x: number; y: number; width: number;
 }
 
 export function saveConfig(config: AppConfig): void {
+  cachedConfig = structuredClone(config)
   const configPath = getConfigPath()
   const dir = dirname(configPath)
   if (!existsSync(dir)) {
