@@ -628,7 +628,11 @@ if (!gotLock) {
     setupApplicationMenu(() => mainWindow)
     registerIpcHandlers()
     if (isWindows) prewarmForegroundCheck()
-    await authManager.initialize()
+    // Don't block window creation on auth recovery (up to 15s offline).
+    // authManager has single-flight refresh, so the renderer's auth:check
+    // joins any in-flight recovery instead of racing it; AppShell already
+    // renders Loading → ReauthView from the auth:check result.
+    void authManager.initialize()
 
     // Forward auth-required events to all renderer windows
     authManager.on(() => {
