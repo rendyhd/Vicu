@@ -38,6 +38,7 @@ export interface AppConfig {
     icon?: string
     filter: {
       project_ids: number[]
+      project_filter_mode?: 'include' | 'exclude'
       sort_by: string
       order_by: string
       due_date_filter: string

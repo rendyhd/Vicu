@@ -33,6 +33,7 @@ import { discoverProviders, discoverAuthMethods } from './auth/oidc-discovery'
 import { fetchCurrentUser } from './auth/user-info'
 import { authManager } from './auth/auth-manager'
 import { buildViewerFilterParams } from './quick-entry/filter-builder'
+import { applyCustomListTaskFilter, type CustomListClientFilter } from './quick-entry/custom-list-filter'
 import {
   hideQuickEntry,
   hideQuickView,
@@ -371,15 +372,23 @@ export function registerIpcHandlers(): void {
 
     // Resolve custom list filter if set
     let effectiveFilter = config.viewer_filter
+    let clientFilter: CustomListClientFilter | null = null
     if (config.viewer_filter.custom_list_id) {
       const list = config.custom_lists?.find(l => l.id === config.viewer_filter!.custom_list_id)
       if (list) {
+        const isExclude = list.filter.project_filter_mode === 'exclude'
         effectiveFilter = {
-          project_ids: list.filter.project_ids,
+          project_ids: isExclude ? [] : list.filter.project_ids,
           sort_by: list.filter.sort_by,
           order_by: list.filter.order_by,
           due_date_filter: list.filter.due_date_filter,
           include_today_all_projects: list.filter.include_today_all_projects,
+        }
+        clientFilter = {
+          project_ids: list.filter.project_ids,
+          project_filter_mode: list.filter.project_filter_mode,
+          priority_filter: list.filter.priority_filter,
+          label_ids: list.filter.label_ids,
         }
       }
     }
@@ -404,14 +413,20 @@ export function registerIpcHandlers(): void {
           allTasks.push(...viewResult.data)
         }
       }
-      setCachedTasks(allTasks)
-      return { success: true, tasks: allTasks }
+      const filteredAll = clientFilter
+        ? applyCustomListTaskFilter(allTasks as Array<{ project_id?: number; priority?: number; labels?: Array<{ id: number }> }>, clientFilter)
+        : allTasks
+      setCachedTasks(filteredAll)
+      return { success: true, tasks: filteredAll }
     }
 
     const result = await fetchTasks(filterParams)
     if (result.success) {
-      setCachedTasks(result.data)
-      return { success: true, tasks: result.data }
+      const tasks = clientFilter
+        ? applyCustomListTaskFilter((result.data ?? []) as Array<{ project_id?: number; priority?: number; labels?: Array<{ id: number }> }>, clientFilter)
+        : result.data
+      setCachedTasks(tasks ?? [])
+      return { success: true, tasks }
     }
 
     // API failed — serve cached tasks if available
