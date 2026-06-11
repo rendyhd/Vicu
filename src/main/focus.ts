@@ -1,4 +1,5 @@
 import { BrowserWindow } from 'electron'
+import { isWindows } from './platform'
 
 /**
  * Attempts to return focus to the previously active window after hiding
@@ -40,7 +41,7 @@ function getDummyWindow(): BrowserWindow {
 }
 
 export function returnFocusToPreviousWindow(): void {
-  if (process.platform !== 'win32') return
+  if (!isWindows) return
 
   const dummy = getDummyWindow()
   dummy.showInactive()

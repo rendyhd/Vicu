@@ -2,6 +2,7 @@ import * as https from 'node:https'
 import * as crypto from 'node:crypto'
 import { execFile } from 'child_process'
 import { loadConfig } from './config'
+import { isWindows, isMac } from './platform'
 
 const OBSIDIAN_TIMEOUT = 300
 
@@ -170,7 +171,7 @@ let _CloseHandle: ((handle: unknown) => number) | null = null
 function loadForegroundCheck(): boolean {
   if (_fgCheckLoaded) return _GetForegroundWindow !== null
   _fgCheckLoaded = true
-  if (process.platform !== 'win32') return false
+  if (!isWindows) return false
   try {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const koffi = require('koffi')
@@ -269,10 +270,10 @@ export function getForegroundWindowHandle(): number {
 }
 
 export async function getForegroundProcessName(): Promise<string> {
-  if (process.platform === 'win32') {
+  if (isWindows) {
     return getForegroundProcessNameSync()
   }
-  if (process.platform === 'darwin') {
+  if (isMac) {
     const app = await getForegroundAppMacOS()
     return app ? app.processName : ''
   }
@@ -280,10 +281,10 @@ export async function getForegroundProcessName(): Promise<string> {
 }
 
 export async function isObsidianForeground(): Promise<boolean> {
-  if (process.platform === 'win32') {
+  if (isWindows) {
     return getForegroundProcessNameSync() === 'obsidian'
   }
-  if (process.platform === 'darwin') {
+  if (isMac) {
     const app = await getForegroundAppMacOS()
     if (!app) return false
     return app.processName === 'Obsidian' || app.bundleId === 'md.obsidian'
