@@ -24,13 +24,14 @@ function groupByProject(tasks: Task[], projectsFlat?: { id: number; title: strin
   return Array.from(byProject.values()).sort((a, b) => a.name.localeCompare(b.name))
 }
 
-const TODAY = new Date()
-
 export function TodayView() {
   const params = useFilters({ view: 'today' })
   const { data: tasks = [], isLoading } = useTasks(params)
   const { data: projects } = useProjects()
   const [inboxProjectId, setInboxProjectId] = useState<number | undefined>()
+  // Captured per mount (views remount on navigation) — never per app launch,
+  // which made tasks created after midnight land on yesterday.
+  const [today] = useState(() => new Date())
 
   useEffect(() => {
     api.getConfig().then((config) => {
@@ -99,7 +100,7 @@ export function TodayView() {
       tasks={[]}
       projectId={inboxProjectId}
       showNewTask={!!inboxProjectId}
-      defaultDueDate={TODAY}
+      defaultDueDate={today}
       headerContent={<p className="px-6 pb-3 text-xs text-[var(--text-secondary)]">{dateStr}</p>}
       emptyTitle="All clear for today"
       emptySubtitle="Tasks due today will appear here"
