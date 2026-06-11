@@ -46,6 +46,7 @@ export function AnytimeView() {
     // Group tasks by root project, then by direct project
     const byRoot = new Map<number, Map<number, Task[]>>()
     for (const task of tasks) {
+      if (inboxProjectId && task.project_id === inboxProjectId) continue
       const rootId = getRootId(task.project_id)
       if (!byRoot.has(rootId)) byRoot.set(rootId, new Map())
       const sub = byRoot.get(rootId)!
@@ -63,7 +64,7 @@ export function AnytimeView() {
         tasks,
       })),
     }))
-  }, [tasks, projectData])
+  }, [tasks, projectData, inboxProjectId])
 
   usePrintable(
     useMemo(
