@@ -5,6 +5,7 @@ import { api } from '@/lib/api'
 import { useCompletedTasksStore } from '@/stores/completed-tasks-store'
 import type { TaskQueryParams } from '@/lib/vikunja-types'
 import { DEFAULT_PAGE_SIZE } from '@/lib/constants'
+import { fetchAllPages } from '@/lib/fetch-all-pages'
 
 export function useTasks(params: TaskQueryParams, enabled = true) {
   const matches = useMatches()
@@ -14,12 +15,14 @@ export function useTasks(params: TaskQueryParams, enabled = true) {
   const query = useQuery({
     queryKey: ['tasks', params],
     queryFn: async () => {
-      const result = await api.fetchTasks({
-        per_page: DEFAULT_PAGE_SIZE,
-        ...params,
-      })
-      if (!result.success) throw new Error(result.error)
-      return result.data
+      return fetchAllPages(
+        async (page) => {
+          const result = await api.fetchTasks({ per_page: DEFAULT_PAGE_SIZE, ...params, page })
+          if (!result.success) throw new Error(result.error)
+          return result.data ?? []
+        },
+        { pageSize: DEFAULT_PAGE_SIZE }
+      )
     },
     enabled,
   })
