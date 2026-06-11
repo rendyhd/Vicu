@@ -16,6 +16,7 @@ import { isMac, isWindows, isLinux } from './platform'
 import { setupApplicationMenu } from './app-menu'
 import { storeAPIToken, getAPIToken, isEncryptionAvailable, API_TOKEN_NO_EXPIRY } from './auth/token-store'
 import { clearTaskBadge, reapplyTaskBadge } from './badge'
+import { replayPendingActions } from './sync'
 
 let mainWindow: BrowserWindow | null = null
 let quickEntryWindow: BrowserWindow | null = null
@@ -637,7 +638,13 @@ if (!gotLock) {
     powerMonitor.on('resume', () => {
       rescheduleNotifications()
       authManager.onSystemResume()
+      void replayPendingActions()
     })
+
+    // Replay any offline-queued actions: once shortly after startup, then
+    // every 5 minutes as a safety net while the app runs.
+    setTimeout(() => { void replayPendingActions() }, 10_000)
+    setInterval(() => { void replayPendingActions() }, 5 * 60_000)
 
     // Auto-register browser native messaging hosts on startup so manifests
     // always point to the current app's bridge (important when switching
