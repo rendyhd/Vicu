@@ -83,6 +83,7 @@ let selectedIndex = -1
 let isStandaloneMode = false
 let lastFetchResult: FetchResult | null = null
 let lastFetchTime = 0
+let isWindowVisible = false
 const CACHE_TTL_MS = 30000
 const completedTasks = new Map<string, TaskData>()
 const cachedCompletions = new Set<string>()
@@ -583,6 +584,7 @@ async function applyFetchResult(result: FetchResult): Promise<void> {
 
 // Event listeners
 window.quickViewApi.onShowWindow(() => {
+  isWindowVisible = true
   // Trigger entrance animation immediately — no awaits before this, so the
   // panel doesn't appear at full opacity then re-animate after the data load.
   container.classList.remove('visible')
@@ -599,10 +601,16 @@ window.quickViewApi.onShowWindow(() => {
 
 // When the window is hidden, reset visibility so next show starts clean
 window.quickViewApi.onHideWindow(() => {
+  isWindowVisible = false
   container.classList.remove('visible')
 })
 
 window.quickViewApi.onSyncCompleted(async () => {
+  if (!isWindowVisible) {
+    // Don't fetch while hidden — just invalidate so the next show refetches.
+    lastFetchTime = 0
+    return
+  }
   await loadTasks(true)
 })
 
