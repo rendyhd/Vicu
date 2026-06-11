@@ -2,6 +2,7 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync, renameSync } from '
 import { join, dirname } from 'path'
 import { app } from 'electron'
 import { randomBytes } from 'crypto'
+import { overlayPendingActions } from './cache-overlay'
 
 const CACHE_FILENAME = 'offline-cache.json'
 
@@ -122,31 +123,10 @@ export function setCachedTasks(tasks: unknown[]): void {
 export function getCachedTasks(): { tasks: unknown[] | null; timestamp: string | null } {
   const cache = loadCache()
   if (!cache.cachedTasks) return { tasks: null, timestamp: null }
-
-  const pendingCompleteIds = cache.pendingActions
-    .filter((a) => a.type === 'complete')
-    .map((a) => String(a.taskId))
-
-  const tasks = cache.cachedTasks.filter(
-    (t: any) => !pendingCompleteIds.includes(String(t.id)),
-  )
-
-  // Include tasks created offline
-  const pendingCreates = cache.pendingActions
-    .filter((a) => a.type === 'create')
-    .map((a) => ({
-      id: `pending_${a.id}`,
-      title: a.title,
-      description: a.description || '',
-      due_date: a.dueDate || '0001-01-01T00:00:00Z',
-      priority: 0,
-      done: false,
-      created: a.createdAt,
-      updated: a.createdAt,
-    }))
-
-  tasks.push(...pendingCreates)
-  return { tasks, timestamp: cache.cachedTasksTimestamp }
+  return {
+    tasks: overlayPendingActions(cache.cachedTasks, cache.pendingActions),
+    timestamp: cache.cachedTasksTimestamp,
+  }
 }
 
 // --- Error Classification ---
