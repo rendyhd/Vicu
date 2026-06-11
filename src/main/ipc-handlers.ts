@@ -295,7 +295,7 @@ export function registerIpcHandlers(): void {
     if (config.standalone_mode) {
       const task = addStandaloneTask(title, description, dueDate)
       notifyViewerSync()
-      return { success: true, task }
+      return { success: true, task, data: task }
     }
 
     const targetProjectId = projectId || config.quick_entry_default_project_id || config.inbox_project_id

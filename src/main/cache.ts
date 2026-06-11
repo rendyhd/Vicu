@@ -252,6 +252,9 @@ export function updateStandaloneTask(taskId: string, updates: Record<string, unk
   if (!task) return null
   if (updates.title !== undefined) task.title = updates.title as string
   if (updates.description !== undefined) task.description = updates.description as string
+  if (updates.due_date !== undefined) task.due_date = updates.due_date as string
+  if (typeof updates.priority === 'number') task.priority = updates.priority
+  if (typeof updates.done === 'boolean') task.done = updates.done
   task.updated = new Date().toISOString()
   saveCache(cache)
   return task
