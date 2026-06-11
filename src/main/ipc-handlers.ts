@@ -91,11 +91,11 @@ export function registerIpcHandlers(): void {
     return result
   })
 
-  ipcMain.handle('update-task', async (_event, id: number, task: Record<string, unknown>) => {
+  ipcMain.handle('update-task', async (event, id: number, task: Record<string, unknown>) => {
     const result = await updateTask(id, task)
     if (result.success) {
       notifyViewerSync()
-      notifyMainWindow()
+      notifyMainWindow(event.sender.id)
     }
     return result
   })
@@ -838,11 +838,13 @@ export function registerIpcHandlers(): void {
   })
 }
 
-// Helper: notify main window to refresh its query cache
-function notifyMainWindow(): void {
+// Helper: notify main window to refresh its query cache. Pass the sender's
+// webContents id to skip the echo when the main window initiated the change —
+// its own mutation hooks already invalidate.
+function notifyMainWindow(excludeWebContentsId?: number): void {
   try {
     const win = getMainWindow()
-    if (win && !win.isDestroyed()) {
+    if (win && !win.isDestroyed() && win.webContents.id !== excludeWebContentsId) {
       win.webContents.send('tasks-changed')
     }
   } catch { /* ignore */ }
