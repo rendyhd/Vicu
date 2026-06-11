@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useMatches } from '@tanstack/react-router'
 import { api } from '@/lib/api'
 import { useProjects } from './use-projects'
@@ -19,6 +19,7 @@ export function useProjectSections(projectId: number) {
   const matches = useMatches()
   const pathname = matches[matches.length - 1]?.pathname ?? ''
   const completedTasks = useCompletedTasksStore((s) => s.tasks)
+  const qc = useQueryClient()
   const { data: projectData } = useProjects()
   const childProjects = (projectData?.flat ?? [])
     .filter((p) => p.parent_project_id === projectId)
@@ -31,9 +32,19 @@ export function useProjectSections(projectId: number) {
     queryFn: async () => {
       const results = await Promise.all(
         childProjects.map(async (cp) => {
-          const viewsResult = await api.fetchProjectViews(cp.id)
-          if (!viewsResult.success) return { project: cp, tasks: [] as Task[], viewId: undefined }
-          const listView = (viewsResult.data as ProjectView[]).find((v) => v.view_kind === 'list')
+          const views = await qc
+            .fetchQuery({
+              queryKey: ['project-views', cp.id],
+              queryFn: async () => {
+                const result = await api.fetchProjectViews(cp.id)
+                if (!result.success) throw new Error(result.error)
+                return result.data
+              },
+              staleTime: Infinity,
+            })
+            .catch(() => null)
+          if (!views) return { project: cp, tasks: [] as Task[], viewId: undefined }
+          const listView = (views as ProjectView[]).find((v) => v.view_kind === 'list')
           if (!listView) return { project: cp, tasks: [] as Task[], viewId: undefined }
 
           const tasksResult = await api.fetchViewTasks(cp.id, listView.id, {
