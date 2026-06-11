@@ -256,6 +256,17 @@ export function SetupView({ onComplete }: SetupViewProps) {
         standalone_mode: undefined,
       }),
     })
+    // If the user is coming from standalone mode, push their local tasks to
+    // the freshly chosen inbox so nothing is stranded in offline-cache.json.
+    try {
+      const standaloneCount = await api.getStandaloneTaskCount()
+      if (standaloneCount > 0 && inboxProjectId) {
+        await api.uploadStandaloneTasks(inboxProjectId)
+      }
+    } catch {
+      // Best effort — tasks stay in the local store and upload can be retried
+      // by re-running setup.
+    }
     setSaving(false)
     onComplete()
   }

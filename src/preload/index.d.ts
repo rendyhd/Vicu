@@ -92,6 +92,10 @@ export interface ElectronAPI {
   getGlobalShortcutStatus(): Promise<{ entry: boolean; viewer: boolean; waylandLimited: boolean }>
   getHotkeyLauncherCommand(): Promise<{ quickEntry: string; quickView: string; kind: 'appimage' | 'packaged' | 'dev' }>
 
+  // Standalone mode
+  getStandaloneTaskCount(): Promise<number>
+  uploadStandaloneTasks(projectId: number): Promise<{ success: boolean; uploaded: number; error?: string; totalErrors?: number }>
+
   // Task completion sound
   pickCompletionSound(): Promise<
     { success: true; path: string; fileName: string } | { success: false; error: string }

@@ -121,6 +121,14 @@ const api = {
   getHotkeyLauncherCommand: () =>
     ipcRenderer.invoke('get-hotkey-launcher-command') as Promise<{ quickEntry: string; quickView: string; kind: 'appimage' | 'packaged' | 'dev' }>,
 
+  // Standalone mode
+  getStandaloneTaskCount: () =>
+    ipcRenderer.invoke('qe:get-standalone-task-count') as Promise<number>,
+  uploadStandaloneTasks: (projectId: number) =>
+    ipcRenderer.invoke('qe:upload-standalone-tasks', projectId) as Promise<
+      { success: boolean; uploaded: number; error?: string; totalErrors?: number }
+    >,
+
   // Task completion sound
   pickCompletionSound: () =>
     ipcRenderer.invoke('sound:pick') as Promise<

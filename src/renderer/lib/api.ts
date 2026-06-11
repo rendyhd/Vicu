@@ -140,6 +140,14 @@ export const api = {
   getHotkeyLauncherCommand: () =>
     window.api.getHotkeyLauncherCommand() as Promise<{ quickEntry: string; quickView: string; kind: 'appimage' | 'packaged' | 'dev' }>,
 
+  getStandaloneTaskCount: () =>
+    window.api.getStandaloneTaskCount() as Promise<number>,
+
+  uploadStandaloneTasks: (projectId: number) =>
+    window.api.uploadStandaloneTasks(projectId) as Promise<
+      { success: boolean; uploaded: number; error?: string; totalErrors?: number }
+    >,
+
   pickCompletionSound: () =>
     window.api.pickCompletionSound() as Promise<
       { success: true; path: string; fileName: string } | { success: false; error: string }
