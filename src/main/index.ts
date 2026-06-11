@@ -350,8 +350,18 @@ function createAndWireMainWindow(config: AppConfig | null): BrowserWindow {
       saveConfig(current)
     }
   }
-  win.on('moved', saveBounds)
-  win.on('resized', saveBounds)
+  // 'moved'/'resized' are macOS/Windows-only; 'move'/'resize' fire everywhere
+  // (including Linux) but continuously — debounce the config write.
+  let boundsSaveTimer: NodeJS.Timeout | null = null
+  const scheduleSaveBounds = (): void => {
+    if (boundsSaveTimer) clearTimeout(boundsSaveTimer)
+    boundsSaveTimer = setTimeout(saveBounds, 500)
+  }
+  win.on('move', scheduleSaveBounds)
+  win.on('resize', scheduleSaveBounds)
+  win.on('closed', () => {
+    if (boundsSaveTimer) clearTimeout(boundsSaveTimer)
+  })
 
   if (process.env.ELECTRON_RENDERER_URL) {
     win.webContents.openDevTools({ mode: 'detach' })
@@ -418,14 +428,18 @@ function initQuickEntryWindows(config: AppConfig): void {
         hideQuickEntry()
       }
     })
-    quickEntryWindow.on('moved', () => {
-      if (!quickEntryWindow) return
-      const [x, y] = quickEntryWindow.getPosition()
-      const current = loadConfig()
-      if (current) {
-        current.quick_entry_position = { x, y }
-        saveConfig(current)
-      }
+    let entryMoveTimer: NodeJS.Timeout | null = null
+    quickEntryWindow.on('move', () => {
+      if (entryMoveTimer) clearTimeout(entryMoveTimer)
+      entryMoveTimer = setTimeout(() => {
+        if (!quickEntryWindow || quickEntryWindow.isDestroyed()) return
+        const [x, y] = quickEntryWindow.getPosition()
+        const current = loadConfig()
+        if (current) {
+          current.quick_entry_position = { x, y }
+          saveConfig(current)
+        }
+      }, 500)
     })
   }
 
@@ -442,14 +456,18 @@ function initQuickEntryWindows(config: AppConfig): void {
         hideQuickView()
       }
     })
-    quickViewWindow.on('moved', () => {
-      if (!quickViewWindow) return
-      const [x, y] = quickViewWindow.getPosition()
-      const current = loadConfig()
-      if (current) {
-        current.quick_view_position = { x, y }
-        saveConfig(current)
-      }
+    let viewerMoveTimer: NodeJS.Timeout | null = null
+    quickViewWindow.on('move', () => {
+      if (viewerMoveTimer) clearTimeout(viewerMoveTimer)
+      viewerMoveTimer = setTimeout(() => {
+        if (!quickViewWindow || quickViewWindow.isDestroyed()) return
+        const [x, y] = quickViewWindow.getPosition()
+        const current = loadConfig()
+        if (current) {
+          current.quick_view_position = { x, y }
+          saveConfig(current)
+        }
+      }, 500)
     })
     // Lock height to desired value
     quickViewWindow.on('resize', () => {
