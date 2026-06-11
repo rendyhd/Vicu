@@ -106,12 +106,14 @@ function request<T>(
   }
 
   return new Promise((resolve) => {
+    let req: Electron.ClientRequest | null = null
     const timeout = setTimeout(() => {
+      try { req?.abort() } catch { /* ignore */ }
       resolve({ success: false, error: `Request timed out (${REQUEST_TIMEOUT / 1000}s)` })
     }, REQUEST_TIMEOUT)
 
     try {
-      const req = net.request({ method, url })
+      req = net.request({ method, url })
 
       req.setHeader('Authorization', `Bearer ${token}`)
       req.setHeader('Content-Type', 'application/json')
@@ -522,7 +524,9 @@ function requestMultipart<T>(
   }
 
   return new Promise((resolve) => {
+    let req: Electron.ClientRequest | null = null
     const timeout = setTimeout(() => {
+      try { req?.abort() } catch { /* ignore */ }
       resolve({ success: false, error: `Upload timed out (${UPLOAD_TIMEOUT / 1000}s)` })
     }, UPLOAD_TIMEOUT)
 
@@ -534,7 +538,7 @@ function requestMultipart<T>(
       const footer = Buffer.from(`\r\n--${boundary}--\r\n`)
       const body = Buffer.concat([header, fileBuffer, footer])
 
-      const req = net.request({ method, url })
+      req = net.request({ method, url })
       req.setHeader('Authorization', `Bearer ${token}`)
       req.setHeader('Content-Type', `multipart/form-data; boundary=${boundary}`)
       // Content-Length is a forbidden header in Chromium's network stack —
@@ -603,12 +607,14 @@ function requestBinary(
   }
 
   return new Promise((resolve) => {
+    let req: Electron.ClientRequest | null = null
     const timeout = setTimeout(() => {
+      try { req?.abort() } catch { /* ignore */ }
       resolve({ success: false, error: `Download timed out (${UPLOAD_TIMEOUT / 1000}s)` })
     }, UPLOAD_TIMEOUT)
 
     try {
-      const req = net.request({ method: 'GET', url })
+      req = net.request({ method: 'GET', url })
       req.setHeader('Authorization', `Bearer ${token}`)
 
       const chunks: Buffer[] = []

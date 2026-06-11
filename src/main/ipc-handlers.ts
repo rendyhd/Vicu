@@ -65,6 +65,7 @@ import {
   setCachedTasks,
   getCachedTasks,
   isRetriableError,
+  isConnectionError,
   isAuthError,
   addStandaloneTask,
   getStandaloneTasks,
@@ -312,8 +313,9 @@ export function registerIpcHandlers(): void {
       return result
     }
 
-    // If retriable error, cache for later sync
-    if (isRetriableError(result.error)) {
+    // Queue for later sync only when the request never reached the server —
+    // a timeout/reset may have been applied server-side and would duplicate.
+    if (isConnectionError(result.error)) {
       addPendingAction({
         type: 'create',
         title,

@@ -151,29 +151,7 @@ export function getCachedTasks(): { tasks: unknown[] | null; timestamp: string |
 
 // --- Error Classification ---
 
-export function isRetriableError(error: string): boolean {
-  if (!error) return false
-  const patterns = [
-    'timed out', 'Network error', 'network error', 'net::',
-    'ECONNREFUSED', 'ENOTFOUND', 'ETIMEDOUT', 'ECONNRESET',
-    'EHOSTUNREACH', 'ENETUNREACH', 'fetch failed', 'socket hang up',
-    'ERR_INTERNET_DISCONNECTED', 'ERR_NETWORK_CHANGED',
-    'ERR_NAME_NOT_RESOLVED', 'ERR_CONNECTION_REFUSED',
-    'ERR_CONNECTION_TIMED_OUT', 'ERR_ADDRESS_UNREACHABLE',
-    'Server error',
-  ]
-  return patterns.some((p) => error.includes(p))
-}
-
-export function isAuthError(error: string): boolean {
-  if (!error) return false
-  return (
-    error.includes('API token is invalid') ||
-    error.includes('API token has insufficient') ||
-    error.includes('API token lacks') ||
-    error.includes('Session expired')
-  )
-}
+export { isRetriableError, isConnectionError, isAuthError } from './error-classify'
 
 // --- Standalone Tasks ---
 
