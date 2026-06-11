@@ -166,6 +166,7 @@ export function AppShell() {
   const dragging = useRef(false)
   const startX = useRef(0)
   const startWidth = useRef(0)
+  const sidebarRef = useRef<HTMLDivElement>(null)
   const [appState, setAppState] = useState<AppState>('loading')
   const [reauthInfo, setReauthInfo] = useState<ReauthInfo | null>(null)
   const [dragItem, setDragItem] = useState<DragItem | null>(null)
@@ -482,6 +483,10 @@ export function AppShell() {
       themeRef.current = t
       applyTheme(t)
 
+      if (typeof config?.sidebar_width === 'number') {
+        setSidebarWidth(Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, config.sidebar_width)))
+      }
+
       if (!config || !config.vikunja_url) {
         setAppState('setup')
         return
@@ -576,12 +581,15 @@ export function AppShell() {
       dragging.current = true
       startX.current = e.clientX
       startWidth.current = sidebarWidth
+      let latestWidth = sidebarWidth
 
       const handleMouseMove = (ev: MouseEvent) => {
         if (!dragging.current) return
         const delta = ev.clientX - startX.current
-        const newWidth = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, startWidth.current + delta))
-        setSidebarWidth(newWidth)
+        latestWidth = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, startWidth.current + delta))
+        // Mutate the element directly during the drag — committing to the
+        // store per mousemove re-renders the entire app tree per pixel.
+        if (sidebarRef.current) sidebarRef.current.style.width = `${latestWidth}px`
       }
 
       const handleMouseUp = () => {
@@ -590,6 +598,10 @@ export function AppShell() {
         document.removeEventListener('mouseup', handleMouseUp)
         document.body.style.cursor = ''
         document.body.style.userSelect = ''
+        setSidebarWidth(latestWidth)
+        void api.getConfig().then((cfg) => {
+          if (cfg) return api.saveConfig({ ...cfg, sidebar_width: latestWidth })
+        })
       }
 
       document.body.style.cursor = 'col-resize'
@@ -644,6 +656,7 @@ export function AppShell() {
 
         {/* Sidebar — bg extends behind drag region */}
         <div
+          ref={sidebarRef}
           className="flex shrink-0 flex-col overflow-hidden border-r border-[var(--border-color)] bg-[var(--bg-sidebar)]"
           style={{ width: sidebarWidth }}
         >
