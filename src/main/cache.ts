@@ -5,7 +5,7 @@ import { randomBytes } from 'crypto'
 
 const CACHE_FILENAME = 'offline-cache.json'
 
-interface PendingAction {
+export interface PendingAction {
   id: string
   type: string
   createdAt: string
