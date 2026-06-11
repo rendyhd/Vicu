@@ -77,17 +77,16 @@ export function TaskList({
   const deleteTask = useDeleteTask()
   const uploadFromPaste = useUploadAttachmentFromPaste()
   const qc = useQueryClient()
-  const {
-    expandedTaskId,
-    focusedTaskId,
-    setFocusedTask,
-    setExpandedTask,
-    toggleExpandedTask,
-    collapseAll,
-    selectedTaskIds,
-    setSelectedRange,
-    clearSelection,
-  } = useSelectionStore()
+  // Narrow selectors: focusedTaskId drives the scroll-into-view effect, so it
+  // stays a subscription; expandedTaskId/selectedTaskIds are only read inside
+  // the keyboard handler and are fetched there via getState().
+  const focusedTaskId = useSelectionStore((s) => s.focusedTaskId)
+  const setFocusedTask = useSelectionStore((s) => s.setFocusedTask)
+  const setExpandedTask = useSelectionStore((s) => s.setExpandedTask)
+  const toggleExpandedTask = useSelectionStore((s) => s.toggleExpandedTask)
+  const collapseAll = useSelectionStore((s) => s.collapseAll)
+  const setSelectedRange = useSelectionStore((s) => s.setSelectedRange)
+  const clearSelection = useSelectionStore((s) => s.clearSelection)
 
   // Build context chips (e.g. "Today" default on Today view)
   const hasNlpDate = parser.parseResult?.dueDate != null
@@ -336,6 +335,10 @@ export function TaskList({
       if (tag === 'input' || tag === 'textarea' || tag === 'select') return
       if (active?.isContentEditable) return
 
+      // Handler wants current-at-keypress values — read imperatively instead
+      // of subscribing the whole list to selection/expansion changes.
+      const { expandedTaskId, selectedTaskIds } = useSelectionStore.getState()
+
       const taskCount = tasks.length
 
       // --- Multi-selection shortcuts (work even when this list's own `tasks`
@@ -509,7 +512,6 @@ export function TaskList({
     [
       tasks,
       focusedTaskId,
-      expandedTaskId,
       projectId,
       showNewTask,
       createTask,
@@ -521,7 +523,6 @@ export function TaskList({
       collapseAll,
       setIsAdding,
       qc,
-      selectedTaskIds,
       setSelectedRange,
       setExpandedTask,
       clearSelection,

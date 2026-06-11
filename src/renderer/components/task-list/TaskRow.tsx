@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { memo, useState, useRef, useEffect, useCallback } from 'react'
 import { Calendar, Tag, ListChecks, FolderOpen, Trash2, Bell, Repeat, Paperclip, Info, Flag, AlignLeft } from 'lucide-react'
 import type { Editor } from '@tiptap/react'
 import { useDraggable } from '@dnd-kit/core'
@@ -104,29 +104,25 @@ function useDragBehavior(task: Task, sortable: boolean) {
   }
 }
 
-export function TaskRow({ task, sortable = false }: TaskRowProps) {
-  const {
-    expandedTaskId,
-    focusedTaskId,
-    toggleExpandedTask,
-    setFocusedTask,
-    setExpandedTask,
-    collapseAll,
-    selectedTaskIds,
-    selectionAnchorId,
-    toggleSelected,
-    selectOnly,
-    setSelectedRange,
-    clearSelection,
-  } = useSelectionStore()
+function TaskRowInner({ task, sortable = false }: TaskRowProps) {
+  // Per-field subscriptions: each row re-renders only when *its own* derived
+  // state flips, not on every focus/selection change anywhere in the list.
+  const isExpanded = useSelectionStore((s) => s.expandedTaskId === task.id)
+  const isFocused = useSelectionStore((s) => s.focusedTaskId === task.id)
+  const isSelected = useSelectionStore((s) => s.selectedTaskIds.has(task.id))
+  const toggleExpandedTask = useSelectionStore((s) => s.toggleExpandedTask)
+  const setFocusedTask = useSelectionStore((s) => s.setFocusedTask)
+  const setExpandedTask = useSelectionStore((s) => s.setExpandedTask)
+  const collapseAll = useSelectionStore((s) => s.collapseAll)
+  const toggleSelected = useSelectionStore((s) => s.toggleSelected)
+  const selectOnly = useSelectionStore((s) => s.selectOnly)
+  const setSelectedRange = useSelectionStore((s) => s.setSelectedRange)
+  const clearSelection = useSelectionStore((s) => s.clearSelection)
   const updateTask = useUpdateTask()
   const completeTask = useCompleteTask()
   const deleteTask = useDeleteTask()
   const { confirmDelete, dialogProps } = useConfirmDelete()
   const uploadFromDrop = useUploadAttachmentFromDrop()
-  const isExpanded = expandedTaskId === task.id
-  const isFocused = focusedTaskId === task.id
-  const isSelected = selectedTaskIds.has(task.id)
 
   const { attributes, listeners, setNodeRef, isDragging, style } = useDragBehavior(task, sortable)
 
@@ -320,6 +316,9 @@ export function TaskRow({ task, sortable = false }: TaskRowProps) {
         )}
         style={style}
         onClick={(e) => {
+          // Event handlers want current-at-click values — read them
+          // imperatively instead of subscribing the row to every change.
+          const { selectionAnchorId, selectedTaskIds, focusedTaskId } = useSelectionStore.getState()
           // Cmd/Ctrl-click: toggle this row in the multi-selection (no expand).
           if (e.metaKey || e.ctrlKey) {
             e.preventDefault()
@@ -359,6 +358,7 @@ export function TaskRow({ task, sortable = false }: TaskRowProps) {
         onContextMenu={(e) => {
           e.preventDefault()
           e.stopPropagation()
+          const { selectedTaskIds } = useSelectionStore.getState()
           // Right-clicking outside the selection narrows it to just this row.
           if (!selectedTaskIds.has(task.id)) selectOnly(task.id)
           setFocusedTask(task.id)
@@ -736,3 +736,5 @@ export function TaskRow({ task, sortable = false }: TaskRowProps) {
     </div>
   )
 }
+
+export const TaskRow = memo(TaskRowInner)
