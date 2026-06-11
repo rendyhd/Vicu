@@ -5,6 +5,7 @@
 :root {
   --bg-primary: #FFFFFF;
   --bg-secondary: #F5F5F7;
+  --bg-tertiary: #E8E8ED;
   --bg-sidebar: #F5F5F7;
   --text-primary: #1D1D1F;
   --text-secondary: #86868B;
@@ -24,6 +25,7 @@
 .dark {
   --bg-primary: #1C1C1E;
   --bg-secondary: #2C2C2E;
+  --bg-tertiary: #3A3A3C;
   --bg-sidebar: #2C2C2E;
   --text-primary: #F5F5F7;
   --text-secondary: #98989D;
