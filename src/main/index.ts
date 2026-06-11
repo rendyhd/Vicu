@@ -6,7 +6,7 @@ import { authManager } from './auth/auth-manager'
 import { createTray, destroyTray, hasTray } from './tray'
 import { returnFocusToPreviousWindow, destroyDummyWindow } from './focus'
 import { registerQuickEntryState } from './quick-entry-state'
-import { initNotifications, rescheduleNotifications, stopNotifications } from './notifications'
+import { initNotifications, rescheduleNotifications, stopNotifications, setNotificationsMainWindow } from './notifications'
 import { getObsidianContext, getForegroundProcessName, getForegroundWindowHandle, prewarmForegroundCheck, type ObsidianNoteContext } from './obsidian-client'
 import { getBrowserContext, type BrowserContext } from './browser-client'
 import { getBrowserUrlFromWindow, prewarmUrlReader, shutdownUrlReader, BROWSER_PROCESSES } from './window-url-reader'
@@ -332,16 +332,67 @@ function registerQuickEntryShortcuts(config: AppConfig): { entry: boolean; viewe
   return result
 }
 
+// --- Main window creation + wiring ---
+// Everything window-instance-specific lives here so the window can be
+// recreated on demand (tray "Show Vicu" / second-instance after a close).
+function createAndWireMainWindow(config: AppConfig | null): BrowserWindow {
+  const win = createMainWindow(config)
+
+  win.on('maximize', () => win.webContents.send('window-maximized-change', true))
+  win.on('unmaximize', () => win.webContents.send('window-maximized-change', false))
+
+  const saveBounds = (): void => {
+    if (win.isDestroyed()) return
+    const bounds = win.getBounds()
+    const current = loadConfig()
+    if (current) {
+      current.window_bounds = bounds
+      saveConfig(current)
+    }
+  }
+  win.on('moved', saveBounds)
+  win.on('resized', saveBounds)
+
+  if (process.env.ELECTRON_RENDERER_URL) {
+    win.webContents.openDevTools({ mode: 'detach' })
+  }
+
+  win.on('closed', () => {
+    if (mainWindow === win) mainWindow = null
+  })
+
+  // Windows drops the taskbar overlay icon when the window is hidden and
+  // re-shown. Repaint the badge whenever the window reappears.
+  win.on('show', () => {
+    reapplyTaskBadge()
+  })
+
+  // Unified close policy, evaluated at close time (not startup time):
+  // hide instead of closing whenever that leaves the user a way back —
+  // always on macOS (dock), elsewhere when the tray is active.
+  win.on('close', (e) => {
+    if (app.isQuitting) return
+    if (isMac || hasTray()) {
+      e.preventDefault()
+      win.hide()
+    }
+  })
+
+  setNotificationsMainWindow(win)
+  return win
+}
+
 // --- Tray setup ---
 function setupTray(): void {
   if (hasTray()) return
   createTray({
     onShowMainWindow: () => {
-      if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.show()
-        if (mainWindow.isMinimized()) mainWindow.restore()
-        mainWindow.focus()
+      if (!mainWindow || mainWindow.isDestroyed()) {
+        mainWindow = createAndWireMainWindow(loadConfig())
       }
+      mainWindow.show()
+      if (mainWindow.isMinimized()) mainWindow.restore()
+      mainWindow.focus()
     },
     onShowQuickEntry: () => showQuickEntry(),
     onShowQuickView: () => showQuickView(),
@@ -530,11 +581,12 @@ if (!gotLock) {
       showQuickView()
       return
     }
-    if (mainWindow) {
-      mainWindow.show()
-      if (mainWindow.isMinimized()) mainWindow.restore()
-      mainWindow.focus()
+    if (!mainWindow || mainWindow.isDestroyed()) {
+      mainWindow = createAndWireMainWindow(loadConfig())
     }
+    mainWindow.show()
+    if (mainWindow.isMinimized()) mainWindow.restore()
+    mainWindow.focus()
   })
 
   // Allow self-signed certs for Obsidian Local REST API (localhost only)
@@ -585,7 +637,7 @@ if (!gotLock) {
     }
 
     const config = loadConfig()
-    mainWindow = createMainWindow(config)
+    mainWindow = createAndWireMainWindow(config)
     startupComplete = true
 
     // Sync Electron's native theme with the user's config setting
@@ -600,38 +652,6 @@ if (!gotLock) {
     })
     ipcMain.handle('window-close', () => mainWindow?.close())
     ipcMain.handle('window-is-maximized', () => mainWindow?.isMaximized() ?? false)
-
-    mainWindow.on('maximize', () => mainWindow?.webContents.send('window-maximized-change', true))
-    mainWindow.on('unmaximize', () => mainWindow?.webContents.send('window-maximized-change', false))
-
-    // Save window bounds on move/resize
-    const saveBounds = (): void => {
-      if (!mainWindow || mainWindow.isDestroyed()) return
-      const bounds = mainWindow.getBounds()
-      const current = loadConfig()
-      if (current) {
-        current.window_bounds = bounds
-        saveConfig(current)
-      }
-    }
-
-    mainWindow.on('moved', saveBounds)
-    mainWindow.on('resized', saveBounds)
-
-    // Open DevTools in development
-    if (process.env.ELECTRON_RENDERER_URL) {
-      mainWindow.webContents.openDevTools({ mode: 'detach' })
-    }
-
-    mainWindow.on('closed', () => {
-      mainWindow = null
-    })
-
-    // Windows drops the taskbar overlay icon when the window is hidden and
-    // re-shown. Repaint the badge whenever the window reappears.
-    mainWindow.on('show', () => {
-      reapplyTaskBadge()
-    })
 
     // Initialize notification scheduler
     initNotifications(mainWindow)
@@ -672,17 +692,6 @@ if (!gotLock) {
       } catch { /* never block app */ }
     }, 5000)
 
-    // macOS: ALWAYS hide on close instead of destroying (standard macOS behavior).
-    // Use app.isQuitting flag to allow actual quit via ⌘Q or tray Quit.
-    if (isMac) {
-      mainWindow.on('close', (e) => {
-        if (!app.isQuitting) {
-          e.preventDefault()
-          mainWindow?.hide()
-        }
-      })
-    }
-
     // Quick Entry/View: if either enabled, set up tray + windows + hotkeys.
     // Require config to be non-null: on first launch loadConfig() returns null,
     // and `config?.quick_view_enabled !== false` is vacuously true (undefined
@@ -698,16 +707,6 @@ if (!gotLock) {
       openAtLogin: config.launch_on_startup === true,
       ...(isMac ? { openAsHidden: true, name: 'Vicu' } : {}),
     })
-
-      // Windows: when QE/QV is enabled, hide main window on close instead of quitting
-      if (!isMac) {
-        mainWindow.on('close', (e) => {
-          if (!app.isQuitting) {
-            e.preventDefault()
-            mainWindow?.hide()
-          }
-        })
-      }
     }
 
     // If the app was launched with --quick-entry/--quick-view (e.g. a DE

@@ -24,6 +24,11 @@ export function initNotifications(mainWindow: BrowserWindow | null): void {
   refreshTaskReminders()
 }
 
+/** Update the main-window ref after a recreation without rescheduling timers. */
+export function setNotificationsMainWindow(mainWindow: BrowserWindow | null): void {
+  mainWindowRef = mainWindow
+}
+
 export function rescheduleNotifications(): void {
   clearTimers()
   scheduleAll()
