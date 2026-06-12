@@ -69,6 +69,9 @@ jobs:
         timeout-minutes: 30
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: ${{ secrets.BUILD_CERTIFICATE_BASE64 != '' && 'true' || 'false' }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: npx electron-builder --mac --arm64 --publish never
 
       - name: Upload DMG artifact

@@ -96,19 +96,9 @@ The [official Vikunja frontend](https://vikunja.io/) is a full project managemen
 
 Grab the latest installer from [GitHub Releases](https://github.com/rendyhd/Vicu/releases).
 
-### macOS — first launch (unsigned app)
+### macOS — install
 
-This app is not signed with an Apple Developer certificate. macOS will block it on first launch.
-
-**Option A** — Open **System Settings → Privacy & Security**, scroll to the Security section, and click **Open Anyway** next to the blocked app message.
-
-**Option B** — Run once in Terminal:
-
-```bash
-xattr -cr /Applications/Vicu.app
-```
-
-Either method is a one-time step. The app opens normally after that.
+Open the downloaded `.dmg`, drag **Vicu** into **Applications**, and launch it. The app is signed with an Apple Developer ID and notarized by Apple, so it opens without any extra steps. (macOS may show a one-time "downloaded from the internet — are you sure you want to open it?" prompt on first launch; that's normal.)
 
 ### Linux — AppImage notes
 
