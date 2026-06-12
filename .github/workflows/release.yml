@@ -163,3 +163,26 @@ jobs:
           done
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Publish the draft release once every platform build has uploaded its assets.
+  # The build jobs upload via `electron-builder --publish always` but leave the
+  # release as the draft that create-release made, so nothing publishes it on its
+  # own. This flips it to published only after all builds succeed — a failed
+  # build leaves the release as a draft instead of shipping a partial release.
+  # Stable tags (vX.Y.Z) become the "Latest" release; pre-release tags (vX.Y.Z-*)
+  # publish with the pre-release flag.
+  publish-release:
+    needs: [build-windows, build-macos, build-linux]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+          REPO: ${{ github.repository }}
+        run: |
+          if [[ "$TAG" == *-* ]]; then
+            gh release edit "$TAG" --repo "$REPO" --draft=false --prerelease
+          else
+            gh release edit "$TAG" --repo "$REPO" --draft=false --latest
+          fi
