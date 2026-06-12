@@ -98,7 +98,7 @@ Grab the latest installer from [GitHub Releases](https://github.com/rendyhd/Vicu
 
 ### macOS — install
 
-Open the downloaded `.dmg`, drag **Vicu** into **Applications**, and launch it. The app is signed with an Apple Developer ID and notarized by Apple, so it opens without any extra steps. (macOS may show a one-time "downloaded from the internet — are you sure you want to open it?" prompt on first launch; that's normal.)
+Vicu ships as a signed, notarized `.dmg` for **Apple Silicon** Macs. Open the `.dmg`, drag **Vicu** into **Applications**, and launch it. Because the app is signed with an Apple Developer ID and notarized by Apple, it opens normally — no right-click → **Open** or `xattr` step needed. macOS may show a one-time "downloaded from the internet — are you sure you want to open it?" prompt on first launch; that's expected.
 
 ### Linux — AppImage notes
 
