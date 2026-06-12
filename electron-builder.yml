@@ -48,6 +48,7 @@ mac:
   darkModeSupport: true
   hardenedRuntime: true
   gatekeeperAssess: false
+  notarize: true
   entitlements: build/entitlements.mac.plist
   entitlementsInherit: build/entitlements.mac.plist
   target:
