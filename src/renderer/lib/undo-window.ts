@@ -1,3 +1,4 @@
+import { sortProjectTasks } from './task-sort'
 import type { Task } from './vikunja-types'
 import type { CompletedTaskEntry } from '@/stores/completed-tasks-store'
 
@@ -11,11 +12,14 @@ import type { CompletedTaskEntry } from '@/stores/completed-tasks-store'
  * that leaked `done: true` lingers (staleTime 30s) and the task renders as
  * completed in views where it doesn't belong.
  *
- * The completed-tasks store records the single `path` whose undo window should
- * keep the task visible. On that path we keep it (strikethrough); on any other
- * path a done task is a leaked optimistic write, so drop it. `done: false`
- * store entries are tasks that were just *un*completed and are active again —
- * never evict those.
+ * These views only ever query `done = false`, so the server never returns a
+ * done task — any `done: true` row is therefore a leaked optimistic write. Keep
+ * such a row ONLY while it is the active undo window for the CURRENT path (the
+ * completed-tasks store records that single path); drop it everywhere else.
+ * That includes the case where the store has already been cleared on navigation
+ * and the row has NO entry at all — without this it lingers until a refetch
+ * happens to win (potentially never, e.g. offline). Active (`done: false`) rows
+ * are always kept, including tasks just *un*completed and active again.
  *
  * Only safe for views that always query `done = false` (project list views and
  * section views). Do NOT use for the logbook, which legitimately shows done
@@ -29,10 +33,46 @@ export function evictForeignCompletions(
   completed: Map<number, CompletedTaskEntry>,
   pathname: string
 ): Task[] {
-  if (completed.size === 0) return tasks
   const filtered = tasks.filter((t) => {
+    // Active rows are always legitimate — the view filters done = false.
+    if (!t.done) return true
+    // A done row is a leaked optimistic completion. Keep it only as the active
+    // undo window for THIS path; drop it on any other path, and also when no
+    // store entry survives (cleared on navigation) rather than waiting on a
+    // refetch that may never win.
     const entry = completed.get(t.id)
-    return !entry || entry.path === pathname || !entry.task.done
+    return entry !== undefined && entry.path === pathname
   })
   return filtered.length === tasks.length ? tasks : filtered
+}
+
+/**
+ * Apply the undo window to a parent project's subproject sections. For each
+ * section: drop leaked optimistic completions (see `evictForeignCompletions`)
+ * and re-add any task whose active undo window belongs to THIS path — the
+ * server, queried `done = false`, no longer returns it, so it must be merged
+ * back to linger with strikethrough. Mirrors the per-list merge in
+ * `useProjectTasks`.
+ *
+ * Unlike the previous inline version, this evicts even when the store is empty
+ * (the post-navigation state), so a leaked completion can't survive in a
+ * section's cache until a refetch happens to win. Returns the original
+ * `sections` reference when nothing changed so callers can skip re-renders.
+ */
+export function mergeSectionUndoWindow<
+  S extends { tasks: Task[]; project: { id: number } },
+>(sections: S[], completed: Map<number, CompletedTaskEntry>, pathname: string): S[] {
+  const samePath = Array.from(completed.values()).filter((e) => e.path === pathname)
+  let changed = false
+  const next = sections.map((section) => {
+    const visible = evictForeignCompletions(section.tasks, completed, pathname)
+    const serverIds = new Set(visible.map((t) => t.id))
+    const extras = samePath
+      .filter((e) => e.task.project_id === section.project.id && !serverIds.has(e.task.id))
+      .map((e) => e.task)
+    if (visible === section.tasks && extras.length === 0) return section
+    changed = true
+    return { ...section, tasks: sortProjectTasks([...visible, ...extras]) }
+  })
+  return changed ? next : sections
 }

@@ -1,10 +1,10 @@
 import { describe, it, expect } from 'vitest'
-import { evictForeignCompletions } from '../undo-window'
+import { evictForeignCompletions, mergeSectionUndoWindow } from '../undo-window'
 import type { Task } from '../vikunja-types'
 import type { CompletedTaskEntry } from '@/stores/completed-tasks-store'
 
-function task(id: number, done = false): Task {
-  return { id, done } as Task
+function task(id: number, done = false, project_id?: number): Task {
+  return { id, done, project_id } as Task
 }
 
 function store(entries: CompletedTaskEntry[]): Map<number, CompletedTaskEntry> {
@@ -24,6 +24,18 @@ describe('evictForeignCompletions', () => {
     expect(evictForeignCompletions(tasks, completed, '/project/2')).toEqual([task(2, false)])
   })
 
+  // The persistent leak: after the user completes a subproject task and
+  // navigates to the parent, AppShell CLEARS the completed-tasks store — but the
+  // optimistic done:true still sits in the parent's section-tasks cache. With no
+  // store entry left, the task must STILL be dropped: these views only ever
+  // query done = false, so a done task is always a leak, never a real row. The
+  // old logic kept it (no entry → keep) and leaned on a refetch to clean up,
+  // which leaves it visible until restart when the refetch doesn't win.
+  it('drops a leaked done:true task with no store entry (store cleared on navigation)', () => {
+    const tasks = [task(1, true), task(2, false)]
+    expect(evictForeignCompletions(tasks, new Map(), '/project/2')).toEqual([task(2, false)])
+  })
+
   it('keeps a task completed on the current path (its undo window)', () => {
     const tasks = [task(1, true), task(2, false)]
     const completed = store([{ task: task(1, true), path: '/project/5' }])
@@ -39,12 +51,12 @@ describe('evictForeignCompletions', () => {
     expect(evictForeignCompletions(tasks, completed, '/project/2')).toEqual([task(1, false)])
   })
 
-  it('keeps tasks that are not in the completed store', () => {
-    const tasks = [task(1, false), task(2, true)]
+  it('keeps active tasks that are not in the completed store', () => {
+    const tasks = [task(1, false), task(2, false)]
     const completed = store([{ task: task(3, true), path: '/project/5' }])
     expect(evictForeignCompletions(tasks, completed, '/project/2')).toEqual([
       task(1, false),
-      task(2, true),
+      task(2, false),
     ])
   })
 
@@ -58,5 +70,38 @@ describe('evictForeignCompletions', () => {
     const completed = store([{ task: task(1, true), path: '/project/2' }])
     // Same path → kept → no new array allocated.
     expect(evictForeignCompletions(tasks, completed, '/project/2')).toBe(tasks)
+  })
+})
+
+describe('mergeSectionUndoWindow', () => {
+  const section = (projectId: number, tasks: Task[]) => ({
+    project: { id: projectId },
+    tasks,
+    viewId: projectId,
+  })
+
+  // The user-reported bug, at the section delivery point: after navigating to
+  // the parent the store is empty, but the subproject completion's done:true
+  // still sits in this section's cache. It must be dropped even with no entry,
+  // not left until a refetch wins.
+  it('drops a leaked done:true row from a section when the store is empty', () => {
+    const sections = [section(5, [task(1, true), task(2, false)])]
+    const merged = mergeSectionUndoWindow(sections, new Map(), '/project/2')
+    expect(merged[0].tasks).toEqual([task(2, false)])
+  })
+
+  it('re-adds a same-path completion as the section undo window', () => {
+    // Completed in the parent view (path /project/2); the server (done = false)
+    // no longer returns it, so it must be merged back to linger struck-through.
+    const done = task(1, true, 5)
+    const sections = [section(5, [task(2, false, 5)])]
+    const completed = store([{ task: done, path: '/project/2' }])
+    const merged = mergeSectionUndoWindow(sections, completed, '/project/2')
+    expect(merged[0].tasks.map((t) => t.id)).toContain(1)
+  })
+
+  it('returns the original sections reference when nothing changes', () => {
+    const sections = [section(5, [task(1, false)])]
+    expect(mergeSectionUndoWindow(sections, new Map(), '/project/2')).toBe(sections)
   })
 })
