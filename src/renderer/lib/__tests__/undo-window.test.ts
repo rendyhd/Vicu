@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest'
-import { evictForeignCompletions, mergeSectionUndoWindow } from '../undo-window'
+import {
+  evictForeignCompletions,
+  mergeProjectUndoWindow,
+  mergeSectionUndoWindow,
+} from '../undo-window'
 import type { Task } from '../vikunja-types'
 import type { CompletedTaskEntry } from '@/stores/completed-tasks-store'
 
@@ -103,5 +107,19 @@ describe('mergeSectionUndoWindow', () => {
   it('returns the original sections reference when nothing changes', () => {
     const sections = [section(5, [task(1, false)])]
     expect(mergeSectionUndoWindow(sections, new Map(), '/project/2')).toBe(sections)
+  })
+})
+
+describe('mergeProjectUndoWindow', () => {
+  it('does not add a same-path child project completion to the parent top list', () => {
+    const parentProjectId = 2
+    const childProjectId = 5
+    const childCompletion = task(1, true, childProjectId)
+    const parentTask = task(2, false, parentProjectId)
+    const completed = store([{ task: childCompletion, path: '/project/2' }])
+
+    expect(
+      mergeProjectUndoWindow([parentTask], completed, '/project/2', parentProjectId)
+    ).toEqual([parentTask])
   })
 })

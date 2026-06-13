@@ -47,6 +47,36 @@ export function evictForeignCompletions(
 }
 
 /**
+ * Apply the undo window to a project page's own task list. The top list belongs
+ * only to the current project; child-project tasks are rendered by
+ * `mergeSectionUndoWindow`. Without the project_id guard here, completing a
+ * child task from a section while still on the parent route re-adds that child
+ * task to the parent's top list as a same-path undo extra.
+ */
+export function mergeProjectUndoWindow(
+  tasks: Task[],
+  completed: Map<number, CompletedTaskEntry>,
+  pathname: string,
+  projectId: number | undefined
+): Task[] {
+  const visible = evictForeignCompletions(tasks, completed, pathname).filter(
+    (t) => projectId == null || t.project_id === projectId
+  )
+  const serverIds = new Set(visible.map((t) => t.id))
+  const extras = Array.from(completed.values())
+    .filter(
+      (entry) =>
+        entry.path === pathname &&
+        (projectId == null || entry.task.project_id === projectId) &&
+        !serverIds.has(entry.task.id)
+    )
+    .map((entry) => entry.task)
+
+  if (visible === tasks && extras.length === 0) return tasks
+  return sortProjectTasks([...visible, ...extras])
+}
+
+/**
  * Apply the undo window to a parent project's subproject sections. For each
  * section: drop leaked optimistic completions (see `evictForeignCompletions`)
  * and re-add any task whose active undo window belongs to THIS path — the
