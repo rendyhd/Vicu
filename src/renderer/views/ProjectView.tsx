@@ -4,7 +4,7 @@ import { useDndMonitor } from '@dnd-kit/core'
 import { SortableContext } from '@dnd-kit/sortable'
 import { verticalListSortingStrategyForeignSafe } from '@/lib/sortable-strategy'
 import { useProjectTasks } from '@/hooks/use-project-tasks'
-import { useProjectSections } from '@/hooks/use-project-sections'
+import { useProjectSections, type SectionData } from '@/hooks/use-project-sections'
 import { useProjects } from '@/hooks/use-projects'
 import { useReorderStore } from '@/stores/reorder-store'
 import { usePrintable } from '@/stores/print-store'
@@ -13,6 +13,28 @@ import { TaskList } from '@/components/task-list/TaskList'
 import { SectionGroup } from '@/components/task-list/SectionGroup'
 import { AddSectionButton } from '@/components/task-list/AddSectionButton'
 import { ParentDropZone } from '@/components/task-list/ParentDropZone'
+
+function findSectionForTask(
+  sections: SectionData[],
+  taskId: number
+): { containerId: string; index: number } | null {
+  for (const section of sections) {
+    const idx = section.tasks.findIndex((t) => t.id === taskId)
+    if (idx !== -1) return { containerId: String(section.project.id), index: idx }
+    const found = findSectionForTask(section.children, taskId)
+    if (found) return found
+  }
+  return null
+}
+
+function flattenForPrint(
+  secs: SectionData[]
+): { heading: string; groups: { tasks: Task[] }[] }[] {
+  return secs.flatMap((s) => [
+    { heading: s.project.title, groups: [{ tasks: s.tasks }] },
+    ...flattenForPrint(s.children),
+  ])
+}
 
 interface InsertIndicator {
   containerId: string // 'parent' or section project ID as string
@@ -53,7 +75,7 @@ export function ProjectView() {
         viewTitle: projectName,
         sections: [
           ...(tasks.length > 0 ? [{ groups: [{ tasks }] }] : []),
-          ...sections.map((s) => ({ heading: s.project.title, groups: [{ tasks: s.tasks }] })),
+          ...flattenForPrint(sections),
         ],
       }),
       [projectName, tasks, sections]
@@ -103,14 +125,10 @@ export function ProjectView() {
           overContainerId = 'parent'
           overIndex = parentIdx
         } else {
-          // Check section tasks
-          for (const section of sections) {
-            const sIdx = section.tasks.findIndex((t) => t.id === targetTaskId)
-            if (sIdx !== -1) {
-              overContainerId = String(section.project.id)
-              overIndex = sIdx
-              break
-            }
+          const sectionResult = findSectionForTask(sections, targetTaskId)
+          if (sectionResult) {
+            overContainerId = sectionResult.containerId
+            overIndex = sectionResult.index
           }
         }
       }
@@ -125,12 +143,8 @@ export function ProjectView() {
       if (tasks.some((t) => t.id === draggedTask.id)) {
         dragContainerId = 'parent'
       } else {
-        for (const section of sections) {
-          if (section.tasks.some((t) => t.id === draggedTask.id)) {
-            dragContainerId = String(section.project.id)
-            break
-          }
-        }
+        const dragResult = findSectionForTask(sections, draggedTask.id)
+        if (dragResult) dragContainerId = dragResult.containerId
       }
 
       // Only show insertion line for cross-container drags
@@ -189,11 +203,9 @@ export function ProjectView() {
                 tasks={section.tasks}
                 viewId={section.viewId}
                 siblings={sectionProjects}
-                insertIndex={
-                  insertIndicator?.containerId === String(section.project.id)
-                    ? insertIndicator.index
-                    : undefined
-                }
+                childSections={section.children}
+                depth={0}
+                insertIndicator={insertIndicator}
               />
             ))}
           </SortableContext>
