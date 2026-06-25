@@ -14,17 +14,36 @@ import type { Task, Project, CreateTaskPayload } from '@/lib/vikunja-types'
 import { TaskRow } from './TaskRow'
 import { SectionHeader } from './SectionHeader'
 import { AddTaskButton } from './AddTaskButton'
+import type { SectionData } from '@/hooks/use-project-sections'
+import { AddSectionButton } from './AddSectionButton'
 import { TaskInputParser } from '@/components/task-input/TaskInputParser'
+
+interface InsertIndicator {
+  containerId: string
+  index: number
+}
 
 interface SectionGroupProps {
   project: Project
   tasks: Task[]
   viewId: number | undefined
   siblings: Project[]
-  insertIndex?: number
+  insertIndicator?: InsertIndicator | null
+  childSections?: SectionData[]
+  depth?: number
 }
 
-export function SectionGroup({ project, tasks, viewId, siblings, insertIndex }: SectionGroupProps) {
+export function SectionGroup({
+  project,
+  tasks,
+  viewId,
+  siblings,
+  insertIndicator,
+  childSections = [],
+  depth = 0,
+}: SectionGroupProps) {
+  const insertIndex =
+    insertIndicator?.containerId === String(project.id) ? insertIndicator.index : undefined
   const [isAdding, setIsAdding] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const creationRef = useRef<HTMLDivElement>(null)
@@ -167,7 +186,7 @@ export function SectionGroup({ project, tasks, viewId, siblings, insertIndex }: 
   }
 
   return (
-    <div>
+    <div style={{ paddingLeft: depth * 16 }}>
       <SectionHeader
         project={project}
         siblings={siblings}
@@ -242,6 +261,28 @@ export function SectionGroup({ project, tasks, viewId, siblings, insertIndex }: 
           </div>
         </div>
       )}
+
+      {childSections.length > 0 && (
+        <SortableContext
+          items={childSections.map((c) => `section-${c.project.id}`)}
+          strategy={verticalListSortingStrategyForeignSafe}
+        >
+          {childSections.map((child) => (
+            <SectionGroup
+              key={child.project.id}
+              project={child.project}
+              tasks={child.tasks}
+              viewId={child.viewId}
+              siblings={childSections.map((c) => c.project)}
+              childSections={child.children}
+              depth={depth + 1}
+              insertIndicator={insertIndicator}
+            />
+          ))}
+        </SortableContext>
+      )}
+
+      <AddSectionButton parentProjectId={project.id} />
     </div>
   )
 }
