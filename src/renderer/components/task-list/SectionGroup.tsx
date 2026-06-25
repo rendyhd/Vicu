@@ -186,7 +186,10 @@ export function SectionGroup({
   }
 
   return (
-    <div style={{ paddingLeft: depth * 16 }}>
+    // Child sections render inside this div, so paddingLeft accumulates with
+    // nesting. Each level only adds a constant step (a depth-scaled value would
+    // compound quadratically); top-level sections sit flush with the project.
+    <div style={{ paddingLeft: depth === 0 ? 0 : 16 }}>
       <SectionHeader
         project={project}
         siblings={siblings}
