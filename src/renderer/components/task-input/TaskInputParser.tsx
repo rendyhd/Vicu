@@ -25,11 +25,13 @@ interface TaskInputParserProps {
   enabled: boolean
   projects: AutocompleteItem[]
   labels: AutocompleteItem[]
-  inputRef?: React.Ref<HTMLInputElement>
+  inputRef?: React.Ref<HTMLInputElement | HTMLTextAreaElement>
   placeholder?: string
   onBlur?: (e: React.FocusEvent) => void
   showBangTodayHint?: boolean
   className?: string
+  inputClassName?: string
+  multiline?: boolean
   /** Extra chips injected by the parent (e.g. context-based "Today" default). */
   contextChips?: ChipData[]
   onDismissContextChip?: (key: string) => void
@@ -53,11 +55,13 @@ export function TaskInputParser({
   onBlur,
   showBangTodayHint,
   className,
+  inputClassName,
+  multiline = false,
   contextChips,
   onDismissContextChip,
 }: TaskInputParserProps) {
   const autocompleteRef = useRef<AutocompleteHandle>(null)
-  const internalInputRef = useRef<HTMLInputElement>(null)
+  const internalInputRef = useRef<HTMLInputElement | HTMLTextAreaElement>(null)
   const [cursorPosition, setCursorPosition] = useState(0)
   const [isComposing, setIsComposing] = useState(false)
   const pendingSubmitRef = useRef(false)
@@ -75,12 +79,12 @@ export function TaskInputParser({
 
   // Merge refs — expose internal ref to parent via inputRef prop
   const setRefs = useCallback(
-    (el: HTMLInputElement | null) => {
-      ;(internalInputRef as React.MutableRefObject<HTMLInputElement | null>).current = el
+    (el: HTMLInputElement | HTMLTextAreaElement | null) => {
+      ;(internalInputRef as React.MutableRefObject<HTMLInputElement | HTMLTextAreaElement | null>).current = el
       if (typeof inputRef === 'function') {
         inputRef(el)
       } else if (inputRef && typeof inputRef === 'object') {
-        ;(inputRef as React.MutableRefObject<HTMLInputElement | null>).current = el
+        ;(inputRef as React.MutableRefObject<HTMLInputElement | HTMLTextAreaElement | null>).current = el
       }
     },
     [inputRef],
@@ -115,7 +119,7 @@ export function TaskInputParser({
   )
 
   const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent<HTMLInputElement>) => {
+    (e: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
       // Reset the autocomplete selection flag before handling
       autocompleteSelectedRef.current = false
 
@@ -129,6 +133,7 @@ export function TaskInputParser({
       }
       if (e.key === 'Enter') {
         if (isComposing) return
+        e.preventDefault()
         if (autocompleteSelectedRef.current) {
           // Autocomplete accepted a selection on Enter — the onChange state update
           // is async, so defer submit until parseResult reflects the new value.
@@ -147,15 +152,16 @@ export function TaskInputParser({
   )
 
   const handleChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      onChange(e.target.value)
-      setCursorPosition(e.target.selectionStart ?? e.target.value.length)
+    (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+      const value = multiline ? e.target.value.replace(/\n/g, '') : e.target.value
+      onChange(value)
+      setCursorPosition(e.target.selectionStart ?? value.length)
     },
-    [onChange],
+    [onChange, multiline],
   )
 
-  const handleSelect = useCallback((e: React.SyntheticEvent<HTMLInputElement>) => {
-    setCursorPosition((e.target as HTMLInputElement).selectionStart ?? 0)
+  const handleSelect = useCallback((e: React.SyntheticEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    setCursorPosition((e.target as HTMLInputElement | HTMLTextAreaElement).selectionStart ?? 0)
   }, [])
 
   const chips = parseResult ? buildChips(parseResult) : []
@@ -166,26 +172,52 @@ export function TaskInputParser({
       {/* Input wrapper with highlight overlay */}
       <div className="relative">
         {hasTokens && (
-          <NlpInputHighlight value={value} tokens={parseResult.tokens} />
+          <NlpInputHighlight value={value} tokens={parseResult.tokens} multiline={multiline} />
         )}
-        <input
-          ref={setRefs}
-          type="text"
-          value={value}
-          onChange={handleChange}
-          onKeyDown={handleKeyDown}
-          onSelect={handleSelect}
-          onBlur={onBlur}
-          onCompositionStart={() => setIsComposing(true)}
-          onCompositionEnd={() => {
-            setIsComposing(false)
-            // Re-sync cursor after composition
-            const el = internalInputRef.current
-            if (el) setCursorPosition(el.selectionStart ?? 0)
-          }}
-          placeholder={placeholder}
-          className="relative w-full bg-transparent text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-secondary)] focus:outline-none"
-        />
+        {multiline ? (
+          <textarea
+            ref={setRefs}
+            rows={1}
+            value={value}
+            onChange={handleChange}
+            onKeyDown={handleKeyDown}
+            onSelect={handleSelect}
+            onBlur={onBlur}
+            onCompositionStart={() => setIsComposing(true)}
+            onCompositionEnd={() => {
+              setIsComposing(false)
+              const el = internalInputRef.current
+              if (el) setCursorPosition(el.selectionStart ?? 0)
+            }}
+            placeholder={placeholder}
+            className={cn(
+              'relative w-full resize-none overflow-hidden bg-transparent text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-secondary)] focus:outline-none',
+              inputClassName,
+            )}
+          />
+        ) : (
+          <input
+            ref={setRefs}
+            type="text"
+            value={value}
+            onChange={handleChange}
+            onKeyDown={handleKeyDown}
+            onSelect={handleSelect}
+            onBlur={onBlur}
+            onCompositionStart={() => setIsComposing(true)}
+            onCompositionEnd={() => {
+              setIsComposing(false)
+              // Re-sync cursor after composition
+              const el = internalInputRef.current
+              if (el) setCursorPosition(el.selectionStart ?? 0)
+            }}
+            placeholder={placeholder}
+            className={cn(
+              'relative w-full bg-transparent text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-secondary)] focus:outline-none',
+              inputClassName,
+            )}
+          />
+        )}
 
         {/* Autocomplete dropdown */}
         {!isComposing && (

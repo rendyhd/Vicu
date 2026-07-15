@@ -119,9 +119,10 @@ function escapeHtml(str: string): string {
 interface NlpInputHighlightProps {
   value: string
   tokens: ParsedToken[]
+  multiline?: boolean
 }
 
-export function NlpInputHighlight({ value, tokens }: NlpInputHighlightProps) {
+export function NlpInputHighlight({ value, tokens, multiline = false }: NlpInputHighlightProps) {
   if (!tokens.length) return null
 
   const isDark = document.documentElement.classList.contains('dark')
@@ -146,7 +147,11 @@ export function NlpInputHighlight({ value, tokens }: NlpInputHighlightProps) {
 
   return (
     <div
-      className="pointer-events-none absolute inset-0 flex items-center overflow-hidden whitespace-pre text-[13px] text-transparent"
+      className={
+        multiline
+          ? 'pointer-events-none absolute inset-0 overflow-hidden whitespace-pre-wrap break-words text-[13px] font-medium leading-snug text-transparent'
+          : 'pointer-events-none absolute inset-0 flex items-center overflow-hidden whitespace-pre text-[13px] text-transparent'
+      }
       aria-hidden
     >
       {parts.map((part, i) =>

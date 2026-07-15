@@ -1,4 +1,4 @@
-import { memo, useState, useRef, useEffect, useCallback } from 'react'
+import { forwardRef, memo, useState, useRef, useEffect, useCallback, useImperativeHandle, useMemo } from 'react'
 import { Calendar, Tag, ListChecks, FolderOpen, Trash2, Bell, Repeat, Paperclip, Info, Flag, AlignLeft } from 'lucide-react'
 import type { Editor } from '@tiptap/react'
 import { useDraggable } from '@dnd-kit/core'
@@ -8,7 +8,7 @@ import { CSS } from '@dnd-kit/utilities'
 import { cn } from '@/lib/cn'
 import { useSelectionStore } from '@/stores/selection-store'
 import { orderedTaskIds } from '@/lib/task-selection'
-import { useUpdateTask, useCompleteTask, useDeleteTask, useUploadAttachmentFromDrop } from '@/hooks/use-task-mutations'
+import { useUpdateTask, useCompleteTask, useDeleteTask, useUploadAttachmentFromDrop, useAddLabel, useCreateLabel } from '@/hooks/use-task-mutations'
 import { useConfirmDelete } from '@/hooks/use-confirm-delete'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { isNullDate } from '@/lib/date-utils'
@@ -31,6 +31,11 @@ import { TaskLinkIcon } from '@/components/TaskLinkIcon'
 import { stripNoteLink, stripPageLink, extractNoteLinkHtml, extractPageLinkHtml, hasNotesContent } from '@/lib/note-link'
 import { formatRecurrenceLabel } from '@/lib/recurrence'
 import { RichTextEditor } from '@/components/rich-text/RichTextEditor'
+import { useTaskParser } from '@/hooks/use-task-parser'
+import { useLabels } from '@/hooks/use-labels'
+import { useProjects } from '@/hooks/use-projects'
+import { extractBangToday, recurrenceToVikunja } from '@/lib/task-parser'
+import { TaskInputParser } from '@/components/task-input/TaskInputParser'
 
 type PopoverType = 'date' | 'label' | 'project' | 'subtasks' | 'reminder' | 'attachment' | 'info' | 'priority' | null
 
@@ -104,6 +109,191 @@ function useDragBehavior(task: Task, sortable: boolean) {
   }
 }
 
+interface TaskTitleEditorHandle {
+  save: () => boolean
+}
+
+interface TaskTitleEditorProps {
+  task: Task
+  onSave: (changes: Partial<Task>) => void
+  onSubmit: () => void
+  onCancel: () => void
+}
+
+const TaskTitleEditor = forwardRef<TaskTitleEditorHandle, TaskTitleEditorProps>(
+  function TaskTitleEditor({ task, onSave, onSubmit, onCancel }, ref) {
+    const addLabel = useAddLabel()
+    const createLabel = useCreateLabel()
+    const parser = useTaskParser()
+    const { data: allLabels } = useLabels()
+    const { data: projectData } = useProjects()
+    const projectItems = useMemo(
+      () => (projectData?.flat ?? []).map((project) => ({ id: project.id, title: project.title })),
+      [projectData],
+    )
+    const labelItems = useMemo(
+      () => (allLabels ?? []).map((label) => ({ id: label.id, title: label.title })),
+      [allLabels],
+    )
+    const [title, setTitle] = useState(task.title)
+    const [isDirty, setIsDirty] = useState(false)
+    const inputRef = useRef<HTMLTextAreaElement>(null)
+    const dirtyRef = useRef(false)
+
+    useEffect(() => {
+      setTitle(task.title)
+      parser.setInputValue(task.title)
+      dirtyRef.current = false
+      setIsDirty(false)
+    }, [task.title, parser.setInputValue])
+
+    useEffect(() => {
+      inputRef.current?.focus()
+    }, [])
+
+    useEffect(() => {
+      const input = inputRef.current
+      if (!input) return
+      input.style.height = 'auto'
+      input.style.height = `${input.scrollHeight}px`
+    }, [title])
+
+    const save = useCallback(() => {
+      if (!dirtyRef.current) return false
+
+      const changes: Partial<Task> = {}
+      let nextTitle = title.trim()
+      let parsedLabels: string[] = []
+
+      if (parser.parserConfig.enabled && parser.parseResult) {
+        const parsed = parser.parseResult
+        nextTitle = parsed.title.trim()
+
+        if (nextTitle) {
+          if (parsed.dueDate) {
+            const dueDate = new Date(parsed.dueDate.getTime())
+            dueDate.setHours(23, 59, 59, 0)
+            changes.due_date = dueDate.toISOString()
+          }
+          if (parsed.priority !== null && parsed.priority > 0) {
+            changes.priority = parsed.priority
+          }
+          if (parsed.recurrence) {
+            const recurrence = recurrenceToVikunja(parsed.recurrence)
+            changes.repeat_after = recurrence.repeat_after
+            changes.repeat_mode = recurrence.repeat_mode
+          }
+          if (parsed.project) {
+            const projectName = parsed.project.toLowerCase()
+            const project = projectData?.flat.find(
+              (candidate) => candidate.title.toLowerCase() === projectName,
+            )
+            if (project) changes.project_id = project.id
+          }
+          parsedLabels = parsed.labels
+        }
+      } else if (parser.parserConfig.bangToday) {
+        const bang = extractBangToday(nextTitle)
+        if (bang.dueDate) {
+          nextTitle = bang.title.trim()
+          const dueDate = new Date(bang.dueDate.getTime())
+          dueDate.setHours(23, 59, 59, 0)
+          changes.due_date = dueDate.toISOString()
+        }
+      }
+
+      // Never replace a valid task title with an input made entirely of tokens.
+      if (!nextTitle) return false
+
+      if (nextTitle !== task.title) changes.title = nextTitle
+      setTitle(nextTitle)
+      parser.setInputValue(nextTitle)
+      dirtyRef.current = false
+      setIsDirty(false)
+
+      onSave(changes)
+
+      if (parsedLabels.length > 0) {
+        const existingLabels = new Set(
+          (task.labels ?? []).map((label) => label.title.toLowerCase()),
+        )
+        for (const labelName of new Set(parsedLabels)) {
+          if (existingLabels.has(labelName.toLowerCase())) continue
+          const label = allLabels?.find(
+            (candidate) => candidate.title.toLowerCase() === labelName.toLowerCase(),
+          )
+          if (label) {
+            addLabel.mutate({ taskId: task.id, labelId: label.id })
+          } else {
+            createLabel.mutate(
+              { title: labelName },
+              {
+                onSuccess: (newLabel) => {
+                  addLabel.mutate({ taskId: task.id, labelId: newLabel.id })
+                },
+              },
+            )
+          }
+        }
+      }
+      return true
+    }, [
+      title,
+      task,
+      onSave,
+      parser.parserConfig,
+      parser.parseResult,
+      parser.setInputValue,
+      projectData,
+      allLabels,
+      addLabel,
+      createLabel,
+    ])
+
+    useImperativeHandle(ref, () => ({ save }), [save])
+
+    return (
+      <div
+        className="min-w-0 flex-1"
+        onBlur={(e) => {
+          if (e.currentTarget.contains(e.relatedTarget as Node)) return
+          save()
+        }}
+      >
+        <TaskInputParser
+          value={title}
+          onChange={(value) => {
+            setTitle(value)
+            parser.setInputValue(value)
+            dirtyRef.current = true
+            setIsDirty(true)
+          }}
+          onSubmit={() => {
+            save()
+            onSubmit()
+          }}
+          onCancel={() => {
+            save()
+            onCancel()
+          }}
+          parseResult={isDirty ? parser.parseResult : null}
+          parserConfig={parser.parserConfig}
+          onSuppressType={parser.suppressType}
+          prefixes={parser.prefixes}
+          enabled={parser.enabled && isDirty}
+          projects={projectItems}
+          labels={labelItems}
+          inputRef={inputRef}
+          placeholder="Task title"
+          showBangTodayHint={isDirty && !parser.enabled && !!parser.parserConfig.bangToday}
+          inputClassName="font-medium leading-snug"
+          multiline
+        />
+      </div>
+    )
+  },
+)
+
 function TaskRowInner({ task, sortable = false }: TaskRowProps) {
   // Per-field subscriptions: each row re-renders only when *its own* derived
   // state flips, not on every focus/selection change anywhere in the list.
@@ -126,14 +316,13 @@ function TaskRowInner({ task, sortable = false }: TaskRowProps) {
 
   const { attributes, listeners, setNodeRef, isDragging, style } = useDragBehavior(task, sortable)
 
-  const [editTitle, setEditTitle] = useState(task.title)
   const [editDescription, setEditDescription] = useState(stripPageLink(stripNoteLink(task.description)))
   const [isDragOver, setIsDragOver] = useState(false)
   const [dropError, setDropError] = useState<string | null>(null)
   const noteLinkHtml = extractNoteLinkHtml(task.description) + extractPageLinkHtml(task.description)
   const [activePopover, setActivePopover] = useState<PopoverType>(null)
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null)
-  const titleRef = useRef<HTMLTextAreaElement>(null)
+  const titleEditorRef = useRef<TaskTitleEditorHandle>(null)
   const descEditorRef = useRef<Editor | null>(null)
   const descBaselineRef = useRef<string | null>(null)
 
@@ -146,35 +335,12 @@ function TaskRowInner({ task, sortable = false }: TaskRowProps) {
     }
   }, [uploadFromDrop.isError, uploadFromDrop.failureCount, uploadFromDrop.error])
 
-  // Sync local state when task changes from server
-  useEffect(() => {
-    setEditTitle(task.title)
-  }, [task.title])
-
   useEffect(() => {
     setEditDescription(stripPageLink(stripNoteLink(task.description)))
   }, [task.description])
 
-  // Focus title input when expanded
-  useEffect(() => {
-    if (isExpanded) {
-      titleRef.current?.focus()
-    }
-  }, [isExpanded])
-
-  // Auto-grow the title textarea so long titles wrap onto multiple lines
-  useEffect(() => {
-    const el = titleRef.current
-    if (!el) return
-    el.style.height = 'auto'
-    el.style.height = `${el.scrollHeight}px`
-  }, [editTitle, isExpanded])
-
-  const handleSave = useCallback(() => {
-    const changes: Partial<Task> = {}
-    if (editTitle.trim() && editTitle !== task.title) {
-      changes.title = editTitle.trim()
-    }
+  const saveTaskChanges = useCallback((titleChanges: Partial<Task> = {}) => {
+    const changes: Partial<Task> = { ...titleChanges }
     // Only diff against the TipTap-normalized baseline, not the raw server value —
     // opening a task shouldn't trigger a save just because TipTap re-serializes whitespace.
     const baseline = descBaselineRef.current
@@ -189,7 +355,13 @@ function TaskRowInner({ task, sortable = false }: TaskRowProps) {
     if (Object.keys(changes).length > 0) {
       updateTask.mutate({ id: task.id, task: { ...task, ...changes } })
     }
-  }, [editTitle, editDescription, noteLinkHtml, task, updateTask])
+  }, [editDescription, noteLinkHtml, task, updateTask])
+
+  const handleSave = useCallback(() => {
+    if (!titleEditorRef.current?.save()) {
+      saveTaskChanges()
+    }
+  }, [saveTaskChanges])
 
   const handleDateChange = useCallback(
     (isoDate: string) => {
@@ -457,24 +629,12 @@ function TaskRowInner({ task, sortable = false }: TaskRowProps) {
       {/* Title row */}
       <div className="flex items-start gap-3 px-4 pt-3">
         <TaskCheckbox task={task} className="mt-0.5" />
-        <textarea
-          ref={titleRef}
-          rows={1}
-          value={editTitle}
-          onChange={(e) => setEditTitle(e.target.value.replace(/\n/g, ''))}
-          onBlur={handleSave}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.ctrlKey && !e.metaKey) {
-              e.preventDefault()
-              descEditorRef.current?.commands.focus('end')
-            }
-            if (e.key === 'Escape') {
-              handleSave()
-              collapseAll()
-            }
-          }}
-          className="flex-1 resize-none overflow-hidden bg-transparent text-[13px] font-medium leading-snug text-[var(--text-primary)] placeholder:text-[var(--text-secondary)] focus:outline-none"
-          placeholder="Task title"
+        <TaskTitleEditor
+          ref={titleEditorRef}
+          task={task}
+          onSave={saveTaskChanges}
+          onSubmit={() => descEditorRef.current?.commands.focus('end')}
+          onCancel={collapseAll}
         />
         <TaskLinkIcon description={task.description} />
         {(task.attachments?.length ?? 0) > 0 && (
