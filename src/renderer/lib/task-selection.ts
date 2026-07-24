@@ -1,6 +1,6 @@
 import type { QueryClient } from '@tanstack/react-query'
 import type { Task } from '@/lib/vikunja-types'
-import type { SectionData } from '@/hooks/use-project-sections'
+import type { SectionTaskCacheEntry } from '@/lib/section-task-cache'
 
 /**
  * Visible task rows in document (visual) order. The only elements carrying
@@ -43,7 +43,9 @@ export function resolveSelectedTasks(qc: QueryClient, ids: Set<number>): Task[] 
     }
   }
 
-  for (const [, sections] of qc.getQueriesData<SectionData[]>({ queryKey: ['section-tasks'] })) {
+  for (const [, sections] of qc.getQueriesData<SectionTaskCacheEntry[]>({
+    queryKey: ['section-tasks'],
+  })) {
     if (!sections) continue
     for (const s of sections) {
       for (const t of s.tasks) {

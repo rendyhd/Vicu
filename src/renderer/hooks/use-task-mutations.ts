@@ -15,7 +15,10 @@ import type {
   CreateLabelPayload,
   UpdateLabelPayload,
 } from '@/lib/vikunja-types'
-import type { SectionData } from './use-project-sections'
+import {
+  updateSectionTaskCache,
+  type SectionTaskCacheEntry,
+} from '@/lib/section-task-cache'
 
 // Place a freshly-created task at the end of its project's list view so
 // position-0 (Vikunja's default for the create endpoint) doesn't make it
@@ -158,7 +161,7 @@ export function useUpdateTask() {
       await qc.cancelQueries({ queryKey: ['section-tasks'] })
       const previousTaskQueries = qc.getQueriesData<Task[]>({ queryKey: ['tasks'] })
       const previousViewQueries = qc.getQueriesData<Task[]>({ queryKey: ['view-tasks'] })
-      const previousSectionQueries = qc.getQueriesData<SectionData[]>({
+      const previousSectionQueries = qc.getQueriesData<SectionTaskCacheEntry[]>({
         queryKey: ['section-tasks'],
       })
 
@@ -201,43 +204,10 @@ export function useUpdateTask() {
         }
         if (next !== oldData) qc.setQueryData(key, next)
       }
-      qc.setQueriesData<SectionData[]>({ queryKey: ['section-tasks'] }, (old) => {
-        if (!old) return old
-        const current = old.flatMap((s) => s.tasks).find((t) => t.id === id)
-        // For tasks already in a section, merge over the cached row. For tasks
-        // moving INTO a section from outside (parent/main → sub), fall back to
-        // `task` itself — drag-drop callers spread the full Task on top of the
-        // updates, so it's a complete row. Other call sites (title change,
-        // date change, etc.) pass a partial body; in that case `current` will
-        // be defined for any task that's actually in a section, so this branch
-        // doesn't hurt them.
-        const merged: Task | null = current
-          ? ({ ...current, ...task } as Task)
-          : ((task as Partial<Task>).title !== undefined
-              ? ({ ...task, id } as Task)
-              : null)
-        if (!merged) return old
-        const newProjectId = merged.project_id
-        if (newProjectId === undefined) return old
-        return old.map((section) => {
-          const has = section.tasks.some((t) => t.id === id)
-          if (has && section.project.id !== newProjectId) {
-            return { ...section, tasks: section.tasks.filter((t) => t.id !== id) }
-          }
-          if (has) {
-            return {
-              ...section,
-              tasks: sortProjectTasks(
-                section.tasks.map((t) => (t.id === id ? merged : t))
-              ),
-            }
-          }
-          if (!has && section.project.id === newProjectId) {
-            return { ...section, tasks: sortProjectTasks([...section.tasks, merged]) }
-          }
-          return section
-        })
-      })
+      qc.setQueriesData<SectionTaskCacheEntry[]>(
+        { queryKey: ['section-tasks'] },
+        (old) => updateSectionTaskCache(old, id, task)
+      )
 
       return { previousTaskQueries, previousViewQueries, previousSectionQueries }
     },
@@ -296,7 +266,7 @@ export function useDeleteTask() {
       await qc.cancelQueries({ queryKey: ['section-tasks'] })
       const previousTaskQueries = qc.getQueriesData<Task[]>({ queryKey: ['tasks'] })
       const previousViewQueries = qc.getQueriesData<Task[]>({ queryKey: ['view-tasks'] })
-      const previousSectionQueries = qc.getQueriesData<SectionData[]>({
+      const previousSectionQueries = qc.getQueriesData<SectionTaskCacheEntry[]>({
         queryKey: ['section-tasks'],
       })
 
@@ -306,7 +276,7 @@ export function useDeleteTask() {
       qc.setQueriesData<Task[]>({ queryKey: ['view-tasks'] }, (old) =>
         old?.filter((t) => t.id !== id)
       )
-      qc.setQueriesData<SectionData[]>({ queryKey: ['section-tasks'] }, (old) =>
+      qc.setQueriesData<SectionTaskCacheEntry[]>({ queryKey: ['section-tasks'] }, (old) =>
         old?.map((section) => ({
           ...section,
           tasks: section.tasks.filter((t) => t.id !== id),
@@ -366,7 +336,9 @@ export function useReorderTask() {
       qc.cancelQueries({ queryKey: ['view-tasks'] })
       qc.cancelQueries({ queryKey: ['section-tasks'] })
       const previousViewQueries = qc.getQueriesData<Task[]>({ queryKey: ['view-tasks'] })
-      const previousSectionQueries = qc.getQueriesData<SectionData[]>({ queryKey: ['section-tasks'] })
+      const previousSectionQueries = qc.getQueriesData<SectionTaskCacheEntry[]>({
+        queryKey: ['section-tasks'],
+      })
 
       // Update position AND sort so the array order matches the new visual order immediately.
       // Without sorting, @dnd-kit clears transforms on drop and items snap back to the old array order.
@@ -377,7 +349,7 @@ export function useReorderTask() {
       }
 
       qc.setQueriesData<Task[]>({ queryKey: ['view-tasks'] }, reorderTasks)
-      qc.setQueriesData<SectionData[]>({ queryKey: ['section-tasks'] }, (old) => {
+      qc.setQueriesData<SectionTaskCacheEntry[]>({ queryKey: ['section-tasks'] }, (old) => {
         if (!old) return old
         return old.map((section) => {
           if (!section.tasks.some((t) => t.id === taskId)) return section
@@ -440,7 +412,7 @@ export function useCompleteTask() {
       await qc.cancelQueries({ queryKey: ['section-tasks'] })
       const previousTaskQueries = qc.getQueriesData<Task[]>({ queryKey: ['tasks'] })
       const previousViewQueries = qc.getQueriesData<Task[]>({ queryKey: ['view-tasks'] })
-      const previousSectionQueries = qc.getQueriesData<SectionData[]>({
+      const previousSectionQueries = qc.getQueriesData<SectionTaskCacheEntry[]>({
         queryKey: ['section-tasks'],
       })
 
@@ -450,7 +422,7 @@ export function useCompleteTask() {
       qc.setQueriesData<Task[]>({ queryKey: ['view-tasks'] }, (old) =>
         old?.map((t) => (t.id === task.id ? { ...t, done: true } : t))
       )
-      qc.setQueriesData<SectionData[]>({ queryKey: ['section-tasks'] }, (old) =>
+      qc.setQueriesData<SectionTaskCacheEntry[]>({ queryKey: ['section-tasks'] }, (old) =>
         old?.map((section) => ({
           ...section,
           tasks: section.tasks.map((t) =>
@@ -518,7 +490,7 @@ export function useUncompleteTask() {
       await qc.cancelQueries({ queryKey: ['section-tasks'] })
       const previousTaskQueries = qc.getQueriesData<Task[]>({ queryKey: ['tasks'] })
       const previousViewQueries = qc.getQueriesData<Task[]>({ queryKey: ['view-tasks'] })
-      const previousSectionQueries = qc.getQueriesData<SectionData[]>({
+      const previousSectionQueries = qc.getQueriesData<SectionTaskCacheEntry[]>({
         queryKey: ['section-tasks'],
       })
 
@@ -528,7 +500,7 @@ export function useUncompleteTask() {
       qc.setQueriesData<Task[]>({ queryKey: ['view-tasks'] }, (old) =>
         old?.map((t) => (t.id === task.id ? { ...t, done: false } : t))
       )
-      qc.setQueriesData<SectionData[]>({ queryKey: ['section-tasks'] }, (old) =>
+      qc.setQueriesData<SectionTaskCacheEntry[]>({ queryKey: ['section-tasks'] }, (old) =>
         old?.map((section) => ({
           ...section,
           tasks: section.tasks.map((t) =>

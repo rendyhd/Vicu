@@ -8,6 +8,7 @@ import { useCompletedTasksStore } from '@/stores/completed-tasks-store'
 import { DEFAULT_PAGE_SIZE } from '@/lib/constants'
 import { sortProjectTasks } from '@/lib/task-sort'
 import { mergeSectionUndoWindow } from '@/lib/undo-window'
+import type { SectionTaskCacheEntry } from '@/lib/section-task-cache'
 import type { Task, Project, ProjectView } from '@/lib/vikunja-types'
 import type { CompletedTaskEntry } from '@/stores/completed-tasks-store'
 
@@ -93,7 +94,7 @@ export function useProjectSections(projectId: number) {
 
   const hasSections = (projectNode?.children.length ?? 0) > 0
 
-  const sectionTasksQuery = useQuery({
+  const sectionTasksQuery = useQuery<SectionTaskCacheEntry[]>({
     queryKey: ['section-tasks', projectId, allDescendantIds],
     queryFn: async () => {
       const results = await Promise.all(
@@ -123,7 +124,7 @@ export function useProjectSections(projectId: number) {
           return { id: cp.id, tasks, viewId: listView.id }
         })
       )
-      return results as { id: number; tasks: Task[]; viewId: number | undefined }[]
+      return results
     },
     enabled: hasSections,
   })
