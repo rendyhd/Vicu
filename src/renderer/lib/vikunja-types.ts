@@ -120,7 +120,7 @@ export interface UpdateLabelPayload {
 export interface TaskQueryParams {
   page?: number
   per_page?: number
-  s?: string
+  q?: string
   filter?: string
   sort_by?: string
   order_by?: string

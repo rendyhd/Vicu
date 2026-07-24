@@ -5,6 +5,8 @@ import { createBackupAPIToken } from './oidc-login'
 import { loadConfig, saveConfig } from '../config'
 
 const LOGIN_TIMEOUT = 15_000
+const INVALID_TOTP_ERROR_CODE = 1017
+const USED_TOTP_ERROR_CODE = 1025
 
 interface LoginSuccess {
   success: true
@@ -25,7 +27,8 @@ export type PasswordLoginResult = LoginSuccess | LoginFailure
  * On success: stores the JWT via token-store and fire-and-forget creates
  * a backup 365-day API token (same pattern as OIDC).
  *
- * On 412: returns totpRequired so the UI can prompt for a TOTP code.
+ * On Vikunja's TOTP-specific 412 problem response, returns totpRequired so
+ * the UI can prompt for another passcode.
  */
 export async function loginWithPassword(
   vikunjaUrl: string,
@@ -48,17 +51,13 @@ export async function loginWithPassword(
       body.totp_passcode = totpPasscode
     }
 
-    const response = await net.fetch(`${baseUrl}/api/v1/login`, {
+    const response = await net.fetch(`${baseUrl}/api/v2/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
       signal: controller.signal,
     })
     clearTimeout(timer)
-
-    if (response.status === 412) {
-      return { success: false, error: 'TOTP required', totpRequired: true }
-    }
 
     if (response.status === 403) {
       return { success: false, error: 'Invalid username or password' }
@@ -67,10 +66,22 @@ export async function loginWithPassword(
     if (!response.ok) {
       const text = await response.text().catch(() => '')
       let message = `Login failed (${response.status})`
+      let errorCode: number | undefined
       try {
         const parsed = JSON.parse(text)
-        if (parsed.message) message = parsed.message
+        if (typeof parsed.code === 'number') errorCode = parsed.code
+        if (parsed.detail) {
+          message = parsed.detail
+        } else if (parsed.message) {
+          message = parsed.message
+        }
       } catch { /* use default */ }
+      if (
+        response.status === 412 &&
+        (errorCode === INVALID_TOTP_ERROR_CODE || errorCode === USED_TOTP_ERROR_CODE)
+      ) {
+        return { success: false, error: message, totpRequired: true }
+      }
       return { success: false, error: message }
     }
 

@@ -422,7 +422,7 @@ export function useCompleteTask() {
 
   return useMutation({
     mutationFn: async (task: Task) => {
-      // Send full task object to work around Go zero-value problem
+      // The API client filters the task state into a writable v2 merge patch.
       const result = await api.updateTask(task.id, {
         ...task,
         done: true,

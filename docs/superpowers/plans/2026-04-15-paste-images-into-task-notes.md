@@ -6,7 +6,7 @@
 
 **Architecture:** Description text gets inline tokens — `[[image:<attachmentId>]]` for uploaded images, `[[image-pending:<uuid>]]` for images staged during new-task creation. Tokens persist in the Vikunja description string alongside the note-link HTML already stored there. A new `TaskDescription` component replaces the raw textarea inside the expanded row and the new-task form: it renders tokens as `<img>` thumbnails in "preview" mode and as literal text in "edit" mode (auto-switches on focus/blur). Image bytes are fetched through a new main-process IPC handler and served to `<img>` elements via blob URLs.
 
-**Tech Stack:** React, TanStack Query, Electron IPC, existing Vikunja attachment API (`PUT /api/v1/tasks/{id}/attachments` already wired).
+**Tech Stack:** React, TanStack Query, Electron IPC, existing Vikunja attachment API (`POST /api/v2/tasks/{id}/attachments` already wired).
 
 **Note:** No test runner or linter is configured in this project. Steps that would normally be TDD are implementation-only with manual verification in the running dev app.
 

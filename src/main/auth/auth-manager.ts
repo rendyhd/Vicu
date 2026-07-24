@@ -188,7 +188,7 @@ class AuthManager {
       const jwt = getJWT()
       if (config?.vikunja_url && jwt) {
         const baseUrl = config.vikunja_url.replace(/\/+$/, '')
-        await net.fetch(`${baseUrl}/api/v1/user/logout`, {
+        await net.fetch(`${baseUrl}/api/v2/logout`, {
           method: 'POST',
           headers: { Authorization: `Bearer ${jwt}` },
         }).catch(() => {})

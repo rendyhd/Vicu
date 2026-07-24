@@ -28,7 +28,7 @@ describe('actionToRequest', () => {
     expect(req).toEqual({ kind: 'skip' })
   })
 
-  it('maps complete to a full-object update with done true (Go zero-value rule)', () => {
+  it('maps complete to an update that preserves stored task data and sets done', () => {
     const taskData = { id: 5, title: 'T', due_date: '2026-06-12T00:00:00Z', priority: 3 }
     const req = actionToRequest({ id: 'a4', type: 'complete', createdAt: '', taskId: 5, taskData })
     expect(req).toEqual({ kind: 'update', taskId: 5, payload: { ...taskData, done: true } })

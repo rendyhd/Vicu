@@ -9,8 +9,8 @@ export type ReplayRequest =
 
 /**
  * Map a queued offline action to the API request that replays it.
- * Updates spread the stored full task object first (Go zero-value rule —
- * Vikunja zeroes any field missing from an update body).
+ * Stored task data is retained when available so an offline replay preserves
+ * the state the user saw. The API client filters this into a v2 merge patch.
  */
 export function actionToRequest(action: PendingAction): ReplayRequest {
   switch (action.type) {

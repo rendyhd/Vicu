@@ -10,7 +10,7 @@ export interface VikunjaUser {
 const FETCH_TIMEOUT = 10_000
 
 /**
- * Fetch the current user's info from `GET /api/v1/user`.
+ * Fetch the current user's info from `GET /api/v2/user`.
  * Returns null on failure.
  */
 export async function fetchCurrentUser(
@@ -23,7 +23,7 @@ export async function fetchCurrentUser(
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT)
 
-    const response = await net.fetch(`${baseUrl}/api/v1/user`, {
+    const response = await net.fetch(`${baseUrl}/api/v2/user`, {
       headers: { Authorization: `Bearer ${token}` },
       signal: controller.signal,
     })

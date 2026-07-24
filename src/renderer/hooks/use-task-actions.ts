@@ -17,14 +17,11 @@ import type { Task, Label } from '@/lib/vikunja-types'
 
 /**
  * Actions for the right-click context menu, applied to one OR many tasks.
- * Every field change goes through a full `{ ...task }` spread to dodge Vikunja's
- * Go zero-value wipe (see the note in src/main/api-client.ts). Bulk operations
- * loop per task — Vikunja has no batch endpoint — letting each mutation's own
- * optimistic update + invalidation reconcile the caches (React Query dedupes the
- * concurrent refetches). The `record*` helpers persist the most recent
- * project/label to config so the menu can offer one-click "Move to last" /
- * "Apply last"; they invalidate the app-config query because its staleTime is
- * Infinity and would otherwise serve the old value.
+ * Full task data is kept in mutation inputs so optimistic cross-project moves
+ * can populate the destination cache immediately; the main-process API client
+ * filters it into a writable v2 merge patch. Bulk operations loop per task,
+ * letting each mutation reconcile its caches. The `record*` helpers persist the
+ * most recent project/label for one-click reuse.
  */
 export function useTaskActions(tasks: Task[]) {
   const qc = useQueryClient()

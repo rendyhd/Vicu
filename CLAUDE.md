@@ -59,9 +59,12 @@ All API calls go through IPC: renderer calls `window.api.someMethod()` → prelo
 
 API responses use a discriminated union: `{ success: true, data: T } | { success: false, error: string }`.
 
-### Vikunja API gotcha
+### Vikunja API
 
-**Go zero-value problem**: When updating tasks/projects, always send the *complete* object, not just changed fields. Sending `{ done: true }` alone will zero out `due_date`, `priority`, etc. See comment in `src/main/api-client.ts:198`.
+Vicu uses Vikunja API v2. List responses are unwrapped from their pagination
+envelopes in `src/main/api-client.ts`, and task/project/label updates use JSON
+Merge Patch. Only writable task fields are sent, so partial changes do not
+zero unrelated values.
 
 ### Renderer architecture
 

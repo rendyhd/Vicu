@@ -147,7 +147,7 @@ export async function loginWithOIDC(
     const code = await Promise.race([codePromise, timeoutPromise])
 
     // 10. Exchange code for JWT
-    const tokenUrl = `${baseUrl}/api/v1/auth/openid/${provider.key}/callback`
+    const tokenUrl = `${baseUrl}/api/v2/auth/openid/${provider.key}/callback`
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), TOKEN_EXCHANGE_TIMEOUT)
 
@@ -210,7 +210,7 @@ export async function loginWithOIDC(
 }
 
 /**
- * Shape of `GET /api/v1/routes`: a group → method → route-detail map.
+ * Shape of `GET /api/v2/routes`: a group → method → route-detail map.
  * We only care about the second-level keys (the permission names).
  */
 type AvailableRoutes = Record<string, Record<string, unknown>>
@@ -220,7 +220,7 @@ type AvailableRoutes = Record<string, Record<string, unknown>>
  * Requires authentication (JWT or valid API token).
  */
 async function fetchAvailableRoutes(baseUrl: string, jwt: string): Promise<AvailableRoutes> {
-  const response = await net.fetch(`${baseUrl}/api/v1/routes`, {
+  const response = await net.fetch(`${baseUrl}/api/v2/routes`, {
     method: 'GET',
     headers: { Authorization: `Bearer ${jwt}` },
   })
@@ -258,13 +258,13 @@ export async function createBackupAPIToken(
     const routes = await fetchAvailableRoutes(baseUrl, jwt)
     const permissions = buildFullAccessPermissions(routes)
     if (Object.keys(permissions).length === 0) {
-      throw new Error('No API permission groups returned from /api/v1/routes')
+      throw new Error('No API permission groups returned from /api/v2/routes')
     }
 
     const deviceName = hostname() || 'Unknown device'
 
-    const response = await net.fetch(`${baseUrl}/api/v1/tokens`, {
-      method: 'PUT',
+    const response = await net.fetch(`${baseUrl}/api/v2/tokens`, {
+      method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${jwt}`,
@@ -315,23 +315,28 @@ interface ListedToken {
   title: string
 }
 
+interface PaginatedTokens {
+  items: ListedToken[] | null
+  total_pages: number
+}
+
 async function listAPITokens(baseUrl: string, jwt: string): Promise<ListedToken[]> {
   const all: ListedToken[] = []
   const PER_PAGE = 100
   const MAX_PAGES = 10
   for (let page = 1; page <= MAX_PAGES; page++) {
     const resp = await net.fetch(
-      `${baseUrl}/api/v1/tokens?page=${page}&per_page=${PER_PAGE}`,
+      `${baseUrl}/api/v2/tokens?page=${page}&per_page=${PER_PAGE}`,
       { headers: { Authorization: `Bearer ${jwt}` } },
     )
     if (!resp.ok) {
       throw new Error(`List tokens failed (${resp.status})`)
     }
-    const batch = (await resp.json()) as ListedToken[]
-    if (!Array.isArray(batch) || batch.length === 0) break
+    const body = (await resp.json()) as PaginatedTokens
+    const batch = body.items ?? []
+    if (batch.length === 0) break
     all.push(...batch)
-    // Don't break on `batch.length < PER_PAGE` — Vikunja can silently cap
-    // per_page below the requested value, so a short page is not the last page.
+    if (page >= body.total_pages) break
   }
   return all
 }
@@ -352,7 +357,7 @@ async function cleanupOldTokens(
   )
   for (const t of toDelete) {
     try {
-      const resp = await net.fetch(`${baseUrl}/api/v1/tokens/${t.id}`, {
+      const resp = await net.fetch(`${baseUrl}/api/v2/tokens/${t.id}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${jwt}` },
       })

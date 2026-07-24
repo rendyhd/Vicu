@@ -157,8 +157,8 @@ function applyMetaUpdate(project: Project, mutator: (m: ReviewMetadata) => Revie
   return { ...project, description: newDescription }
 }
 
-// Project is a structural superset of UpdateProjectPayload, so passing the
-// full Project here keeps Vikunja's Go zero-value safety without a cast.
+// Project is a structural superset of UpdateProjectPayload. The API client
+// sends these fields as a v2 merge patch.
 function projectToPayload(p: Project): UpdateProjectPayload {
   return p as unknown as UpdateProjectPayload
 }

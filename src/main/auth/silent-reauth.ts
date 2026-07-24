@@ -121,7 +121,7 @@ export async function silentReauth(vikunjaUrl: string): Promise<string> {
     const code = await Promise.race([codePromise, timeoutPromise])
 
     // 11. Exchange code for JWT
-    const tokenUrl = `${baseUrl}/api/v1/auth/openid/${provider.key}/callback`
+    const tokenUrl = `${baseUrl}/api/v2/auth/openid/${provider.key}/callback`
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), TOKEN_EXCHANGE_TIMEOUT)
 

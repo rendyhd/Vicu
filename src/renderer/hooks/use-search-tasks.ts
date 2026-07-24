@@ -45,7 +45,7 @@ export function useSearchTasks(query: string) {
     queryFn: async () => {
       // Fetch a large batch with the server-side search param as a pre-filter
       const result = await api.fetchTasks({
-        s: query,
+        q: query,
         per_page: 200,
       })
       if (!result.success) throw new Error(result.error)

@@ -46,7 +46,7 @@ function classifyHttpStatus(status: number): JWTRenewalErrorKind {
 }
 
 /**
- * Renew the current JWT via `POST /api/v1/user/token/refresh`.
+ * Renew the current JWT via `POST /api/v2/user/token/refresh`.
  *
  * Vikunja 2.0+ uses short-lived JWTs with a rotating refresh token delivered
  * via Set-Cookie. We send the stored refresh token as a Cookie header and
@@ -68,7 +68,7 @@ export async function renewJWT(vikunjaUrl: string): Promise<string> {
 
   let response: Response
   try {
-    response = await net.fetch(`${baseUrl}/api/v1/user/token/refresh`, {
+    response = await net.fetch(`${baseUrl}/api/v2/user/token/refresh`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

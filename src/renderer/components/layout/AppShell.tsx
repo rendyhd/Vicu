@@ -455,7 +455,7 @@ export function AppShell() {
             const newIndex = siblings.findIndex((s) => s.id === overNode.id)
             if (oldIndex !== -1 && newIndex !== -1) {
               const newPosition = calculateProjectPosition(siblings, oldIndex, newIndex)
-              // Send full project object to avoid Go zero-value problem
+              // Keep known project fields in the optimistic reorder payload.
               reorderProject.mutate({
                 id: node.id,
                 project: {

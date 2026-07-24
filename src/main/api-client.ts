@@ -2,6 +2,7 @@ import { net, BrowserWindow } from 'electron'
 import { loadConfig } from './config'
 import { authManager } from './auth/auth-manager'
 import { getAPIToken } from './auth/token-store'
+import { createTaskPatch, type PaginatedResponse } from './api-v2'
 
 /**
  * Send 'auth-required' IPC event to all renderer windows.
@@ -18,6 +19,8 @@ function notifyAuthRequired(): void {
 
 const REQUEST_TIMEOUT = 10_000
 const UPLOAD_TIMEOUT = 60_000
+const API_BASE_PATH = '/api/v2'
+const JSON_MERGE_PATCH = 'application/merge-patch+json'
 
 interface ApiSuccess<T> {
   success: true
@@ -58,7 +61,13 @@ function describeHttpError(statusCode: number, responseBody: string): string {
   let serverMessage: string | null = null
   try {
     const parsed = JSON.parse(responseBody)
-    if (parsed.message) serverMessage = parsed.message
+    if (parsed.detail) {
+      serverMessage = parsed.detail
+    } else if (parsed.message) {
+      serverMessage = parsed.message
+    } else if (parsed.title) {
+      serverMessage = parsed.title
+    }
   } catch {
     // fall through
   }
@@ -98,7 +107,8 @@ function request<T>(
   method: string,
   url: string,
   token: string,
-  body?: unknown
+  body?: unknown,
+  contentType = 'application/json'
 ): Promise<ApiResult<T>> {
   const validation = validateHttpUrl(url)
   if (!validation.valid) {
@@ -116,7 +126,7 @@ function request<T>(
       req = net.request({ method, url })
 
       req.setHeader('Authorization', `Bearer ${token}`)
-      req.setHeader('Content-Type', 'application/json')
+      req.setHeader('Content-Type', contentType)
 
       let responseBody = ''
       let statusCode = 0
@@ -186,20 +196,50 @@ async function requestWithRetry<T>(
   method: string,
   url: string,
   token: string,
-  body?: unknown
+  body?: unknown,
+  contentType = 'application/json'
 ): Promise<ApiResult<T>> {
-  const result = await request<T>(method, url, token, body)
+  const result = await request<T>(method, url, token, body, contentType)
 
   if (!result.success && isExpiredTokenError(result)) {
     try {
       const newToken = await authManager.getToken()
-      return await request<T>(method, url, newToken, body)
+      return await request<T>(method, url, newToken, body, contentType)
     } catch {
       return result
     }
   }
 
   return result
+}
+
+async function requestPaginatedWithRetry<T>(
+  url: string,
+  token: string
+): Promise<ApiResult<T[]>> {
+  const result = await requestWithRetry<PaginatedResponse<T>>('GET', url, token)
+  if (!result.success) return result
+  return { success: true, data: result.data.items ?? [] }
+}
+
+async function requestAllPagesWithRetry<T>(
+  url: string,
+  token: string,
+  maxPages = 100
+): Promise<ApiResult<T[]>> {
+  const all: T[] = []
+  const pageUrl = new URL(url)
+
+  for (let page = 1; page <= maxPages; page++) {
+    pageUrl.searchParams.set('page', String(page))
+    const result = await requestWithRetry<PaginatedResponse<T>>('GET', pageUrl.toString(), token)
+    if (!result.success) return result
+
+    all.push(...(result.data.items ?? []))
+    if (page >= result.data.total_pages) break
+  }
+
+  return { success: true, data: all }
 }
 
 async function requestMultipartWithRetry<T>(
@@ -278,7 +318,7 @@ export async function fetchTasks(params: Record<string, unknown>): Promise<ApiRe
   if ('success' in c) return c
 
   const qs = new URLSearchParams()
-  if (params.s) qs.set('s', String(params.s))
+  if (params.q ?? params.s) qs.set('q', String(params.q ?? params.s))
   if (params.filter) qs.set('filter', String(params.filter))
   if (params.sort_by) qs.set('sort_by', String(params.sort_by))
   if (params.order_by) qs.set('order_by', String(params.order_by))
@@ -289,10 +329,12 @@ export async function fetchTasks(params: Record<string, unknown>): Promise<ApiRe
 
   const queryString = qs.toString()
   const fullUrl = queryString
-    ? `${c.url}/api/v1/tasks?${queryString}`
-    : `${c.url}/api/v1/tasks`
+    ? `${c.url}${API_BASE_PATH}/tasks?${queryString}`
+    : `${c.url}${API_BASE_PATH}/tasks`
 
-  return requestWithRetry<unknown[]>('GET', fullUrl, c.token)
+  return params.page
+    ? requestPaginatedWithRetry<unknown>(fullUrl, c.token)
+    : requestAllPagesWithRetry<unknown>(fullUrl, c.token)
 }
 
 export async function createTask(
@@ -302,11 +344,16 @@ export async function createTask(
   const c = await getConfigOrFail()
   if ('success' in c) return c
 
-  return requestWithRetry<unknown>('PUT', `${c.url}/api/v1/projects/${projectId}/tasks`, c.token, task)
+  return requestWithRetry<unknown>(
+    'POST',
+    `${c.url}${API_BASE_PATH}/projects/${projectId}/tasks`,
+    c.token,
+    task
+  )
 }
 
-// CRITICAL: Go zero-value problem — always send the complete task object on update.
-// Sending only changed fields (e.g. { done: true }) will zero out due_date, priority, etc.
+// API v2 supports JSON Merge Patch, so partial updates no longer zero fields omitted
+// from the request. Filter out read-only response fields before sending the patch.
 export async function updateTask(
   id: number,
   task: Record<string, unknown>
@@ -314,14 +361,20 @@ export async function updateTask(
   const c = await getConfigOrFail()
   if ('success' in c) return c
 
-  return requestWithRetry<unknown>('POST', `${c.url}/api/v1/tasks/${id}`, c.token, task)
+  return requestWithRetry<unknown>(
+    'PATCH',
+    `${c.url}${API_BASE_PATH}/tasks/${id}`,
+    c.token,
+    createTaskPatch(task),
+    JSON_MERGE_PATCH
+  )
 }
 
 export async function deleteTask(id: number): Promise<ApiResult<void>> {
   const c = await getConfigOrFail()
   if ('success' in c) return c
 
-  return requestWithRetry<void>('DELETE', `${c.url}/api/v1/tasks/${id}`, c.token)
+  return requestWithRetry<void>('DELETE', `${c.url}${API_BASE_PATH}/tasks/${id}`, c.token)
 }
 
 // --- Projects ---
@@ -330,14 +383,14 @@ export async function fetchProjects(): Promise<ApiResult<unknown[]>> {
   const c = await getConfigOrFail()
   if ('success' in c) return c
 
-  return requestWithRetry<unknown[]>('GET', `${c.url}/api/v1/projects`, c.token)
+  return requestAllPagesWithRetry<unknown>(`${c.url}${API_BASE_PATH}/projects`, c.token)
 }
 
 export async function createProject(project: Record<string, unknown>): Promise<ApiResult<unknown>> {
   const c = await getConfigOrFail()
   if ('success' in c) return c
 
-  return requestWithRetry<unknown>('PUT', `${c.url}/api/v1/projects`, c.token, project)
+  return requestWithRetry<unknown>('POST', `${c.url}${API_BASE_PATH}/projects`, c.token, project)
 }
 
 export async function updateProject(
@@ -347,14 +400,20 @@ export async function updateProject(
   const c = await getConfigOrFail()
   if ('success' in c) return c
 
-  return requestWithRetry<unknown>('POST', `${c.url}/api/v1/projects/${id}`, c.token, project)
+  return requestWithRetry<unknown>(
+    'PATCH',
+    `${c.url}${API_BASE_PATH}/projects/${id}`,
+    c.token,
+    project,
+    JSON_MERGE_PATCH
+  )
 }
 
 export async function deleteProject(id: number): Promise<ApiResult<void>> {
   const c = await getConfigOrFail()
   if ('success' in c) return c
 
-  return requestWithRetry<void>('DELETE', `${c.url}/api/v1/projects/${id}`, c.token)
+  return requestWithRetry<void>('DELETE', `${c.url}${API_BASE_PATH}/projects/${id}`, c.token)
 }
 
 // --- Labels ---
@@ -363,7 +422,7 @@ export async function fetchLabels(): Promise<ApiResult<unknown[]>> {
   const c = await getConfigOrFail()
   if ('success' in c) return c
 
-  return requestWithRetry<unknown[]>('GET', `${c.url}/api/v1/labels`, c.token)
+  return requestAllPagesWithRetry<unknown>(`${c.url}${API_BASE_PATH}/labels`, c.token)
 }
 
 export async function addLabelToTask(taskId: number, labelId: number): Promise<ApiResult<void>> {
@@ -371,8 +430,8 @@ export async function addLabelToTask(taskId: number, labelId: number): Promise<A
   if ('success' in c) return c
 
   return requestWithRetry<void>(
-    'PUT',
-    `${c.url}/api/v1/tasks/${taskId}/labels`,
+    'POST',
+    `${c.url}${API_BASE_PATH}/tasks/${taskId}/labels`,
     c.token,
     { label_id: labelId }
   )
@@ -382,14 +441,18 @@ export async function removeLabelFromTask(taskId: number, labelId: number): Prom
   const c = await getConfigOrFail()
   if ('success' in c) return c
 
-  return requestWithRetry<void>('DELETE', `${c.url}/api/v1/tasks/${taskId}/labels/${labelId}`, c.token)
+  return requestWithRetry<void>(
+    'DELETE',
+    `${c.url}${API_BASE_PATH}/tasks/${taskId}/labels/${labelId}`,
+    c.token
+  )
 }
 
 export async function createLabel(label: Record<string, unknown>): Promise<ApiResult<unknown>> {
   const c = await getConfigOrFail()
   if ('success' in c) return c
 
-  return requestWithRetry<unknown>('PUT', `${c.url}/api/v1/labels`, c.token, label)
+  return requestWithRetry<unknown>('POST', `${c.url}${API_BASE_PATH}/labels`, c.token, label)
 }
 
 export async function updateLabel(
@@ -399,14 +462,20 @@ export async function updateLabel(
   const c = await getConfigOrFail()
   if ('success' in c) return c
 
-  return requestWithRetry<unknown>('POST', `${c.url}/api/v1/labels/${id}`, c.token, label)
+  return requestWithRetry<unknown>(
+    'PATCH',
+    `${c.url}${API_BASE_PATH}/labels/${id}`,
+    c.token,
+    label,
+    JSON_MERGE_PATCH
+  )
 }
 
 export async function deleteLabel(id: number): Promise<ApiResult<void>> {
   const c = await getConfigOrFail()
   if ('success' in c) return c
 
-  return requestWithRetry<void>('DELETE', `${c.url}/api/v1/labels/${id}`, c.token)
+  return requestWithRetry<void>('DELETE', `${c.url}${API_BASE_PATH}/labels/${id}`, c.token)
 }
 
 // --- Single Task ---
@@ -415,7 +484,7 @@ export async function fetchTaskById(id: number): Promise<ApiResult<unknown>> {
   const c = await getConfigOrFail()
   if ('success' in c) return c
 
-  return requestWithRetry<unknown>('GET', `${c.url}/api/v1/tasks/${id}`, c.token)
+  return requestWithRetry<unknown>('GET', `${c.url}${API_BASE_PATH}/tasks/${id}`, c.token)
 }
 
 // --- Task Relations ---
@@ -428,7 +497,7 @@ export async function createTaskRelation(
   const c = await getConfigOrFail()
   if ('success' in c) return c
 
-  return requestWithRetry<unknown>('PUT', `${c.url}/api/v1/tasks/${taskId}/relations`, c.token, {
+  return requestWithRetry<unknown>('POST', `${c.url}${API_BASE_PATH}/tasks/${taskId}/relations`, c.token, {
     other_task_id: otherTaskId,
     relation_kind: relationKind,
   })
@@ -444,7 +513,7 @@ export async function deleteTaskRelation(
 
   return requestWithRetry<void>(
     'DELETE',
-    `${c.url}/api/v1/tasks/${taskId}/relations/${relationKind}/${otherTaskId}`,
+    `${c.url}${API_BASE_PATH}/tasks/${taskId}/relations/${relationKind}/${otherTaskId}`,
     c.token
   )
 }
@@ -455,7 +524,10 @@ export async function fetchProjectViews(projectId: number): Promise<ApiResult<un
   const c = await getConfigOrFail()
   if ('success' in c) return c
 
-  return requestWithRetry<unknown[]>('GET', `${c.url}/api/v1/projects/${projectId}/views`, c.token)
+  return requestAllPagesWithRetry<unknown>(
+    `${c.url}${API_BASE_PATH}/projects/${projectId}/views`,
+    c.token
+  )
 }
 
 export async function fetchViewTasks(
@@ -467,6 +539,7 @@ export async function fetchViewTasks(
   if ('success' in c) return c
 
   const qs = new URLSearchParams()
+  if (params.q ?? params.s) qs.set('q', String(params.q ?? params.s))
   if (params.filter) qs.set('filter', String(params.filter))
   if (params.sort_by) qs.set('sort_by', String(params.sort_by))
   if (params.order_by) qs.set('order_by', String(params.order_by))
@@ -477,10 +550,12 @@ export async function fetchViewTasks(
 
   const queryString = qs.toString()
   const fullUrl = queryString
-    ? `${c.url}/api/v1/projects/${projectId}/views/${viewId}/tasks?${queryString}`
-    : `${c.url}/api/v1/projects/${projectId}/views/${viewId}/tasks`
+    ? `${c.url}${API_BASE_PATH}/projects/${projectId}/views/${viewId}/tasks?${queryString}`
+    : `${c.url}${API_BASE_PATH}/projects/${projectId}/views/${viewId}/tasks`
 
-  return requestWithRetry<unknown[]>('GET', fullUrl, c.token)
+  return params.page
+    ? requestPaginatedWithRetry<unknown>(fullUrl, c.token)
+    : requestAllPagesWithRetry<unknown>(fullUrl, c.token)
 }
 
 export async function updateTaskPosition(
@@ -491,8 +566,7 @@ export async function updateTaskPosition(
   const c = await getConfigOrFail()
   if ('success' in c) return c
 
-  return requestWithRetry<unknown>('POST', `${c.url}/api/v1/tasks/${taskId}/position`, c.token, {
-    task_id: taskId,
+  return requestWithRetry<unknown>('PUT', `${c.url}${API_BASE_PATH}/tasks/${taskId}/position`, c.token, {
     project_view_id: viewId,
     position,
   })
@@ -505,7 +579,14 @@ export function testConnection(
   token: string
 ): Promise<ApiResult<unknown[]>> {
   const cleanUrl = url.replace(/\/+$/, '')
-  return request<unknown[]>('GET', `${cleanUrl}/api/v1/projects`, token)
+  return request<PaginatedResponse<unknown>>(
+    'GET',
+    `${cleanUrl}${API_BASE_PATH}/projects`,
+    token
+  ).then((result): ApiResult<unknown[]> => {
+    if (!result.success) return result
+    return { success: true, data: result.data.items ?? [] }
+  })
 }
 
 // --- Attachments ---
@@ -666,7 +747,10 @@ export async function fetchTaskAttachments(taskId: number): Promise<ApiResult<un
   const c = await getConfigOrFail()
   if ('success' in c) return c
 
-  return requestWithRetry<unknown[]>('GET', `${c.url}/api/v1/tasks/${taskId}/attachments`, c.token)
+  return requestAllPagesWithRetry<unknown>(
+    `${c.url}${API_BASE_PATH}/tasks/${taskId}/attachments`,
+    c.token
+  )
 }
 
 export async function uploadTaskAttachment(
@@ -679,8 +763,8 @@ export async function uploadTaskAttachment(
   if ('success' in c) return c
 
   return requestMultipartWithRetry<unknown>(
-    'PUT',
-    `${c.url}/api/v1/tasks/${taskId}/attachments`,
+    'POST',
+    `${c.url}${API_BASE_PATH}/tasks/${taskId}/attachments`,
     c.token,
     fileBuffer,
     fileName,
@@ -697,7 +781,7 @@ export async function deleteTaskAttachment(
 
   return requestWithRetry<void>(
     'DELETE',
-    `${c.url}/api/v1/tasks/${taskId}/attachments/${attachmentId}`,
+    `${c.url}${API_BASE_PATH}/tasks/${taskId}/attachments/${attachmentId}`,
     c.token
   )
 }
@@ -710,7 +794,7 @@ export async function downloadTaskAttachment(
   if ('success' in c) return c
 
   return requestBinaryWithRetry(
-    `${c.url}/api/v1/tasks/${taskId}/attachments/${attachmentId}`,
+    `${c.url}${API_BASE_PATH}/tasks/${taskId}/attachments/${attachmentId}`,
     c.token
   )
 }

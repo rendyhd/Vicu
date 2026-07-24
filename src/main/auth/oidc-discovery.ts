@@ -31,12 +31,12 @@ interface InfoResponse {
 const DISCOVERY_TIMEOUT = 10_000
 
 /**
- * Fetch OIDC providers from the Vikunja `/api/v1/info` endpoint.
+ * Fetch OIDC providers from the Vikunja `/api/v2/info` endpoint.
  * Returns an empty array if OIDC is not enabled, no providers exist,
  * or the request fails for any reason.
  */
 export async function discoverProviders(vikunjaUrl: string): Promise<OIDCProvider[]> {
-  const url = `${vikunjaUrl.replace(/\/+$/, '')}/api/v1/info`
+  const url = `${vikunjaUrl.replace(/\/+$/, '')}/api/v2/info`
 
   try {
     const controller = new AbortController()
@@ -59,11 +59,11 @@ export async function discoverProviders(vikunjaUrl: string): Promise<OIDCProvide
 }
 
 /**
- * Discover all available auth methods from the Vikunja `/api/v1/info` endpoint.
+ * Discover all available auth methods from the Vikunja `/api/v2/info` endpoint.
  * Defaults local_enabled to true (Vikunja's default when not specified).
  */
 export async function discoverAuthMethods(vikunjaUrl: string): Promise<ServerAuthInfo> {
-  const url = `${vikunjaUrl.replace(/\/+$/, '')}/api/v1/info`
+  const url = `${vikunjaUrl.replace(/\/+$/, '')}/api/v2/info`
 
   const fallback: ServerAuthInfo = {
     local_enabled: true,

@@ -51,7 +51,7 @@ PR #4 from `tyleisher:main` adds assignee support to Vicu — the ability to see
 - In `TaskList.tsx`, `useCurrentUser()` is called unconditionally regardless of auth method
 - **Impact**: For API token users, this will perpetually show error state or retry, wasting network calls. The `retry: false` mitigates infinite retries, but the hook still errors initially
 
-#### 6. `searchUsers` uses Vikunja `/api/v1/users` endpoint — may not return all users
+#### 6. `searchUsers` uses Vikunja `/api/v2/users` endpoint — may not return all users
 - Per the API spec, `/users` search: "Name (not username) or email require that the user has enabled this in their settings"
 - Users who haven't enabled discoverability won't appear in search results
 - This is a Vikunja limitation, not a bug per se, but worth documenting

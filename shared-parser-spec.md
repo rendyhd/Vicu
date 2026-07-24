@@ -245,7 +245,7 @@ function recurrenceToSeconds(r: { interval: number; unit: string }): number {
 ## Mapping ParseResult → Vikunja API
 
 ```typescript
-// PUT /api/v1/projects/{projectID}/tasks
+// POST /api/v2/projects/{projectID}/tasks
 interface VikunjaTaskPayload {
   title: string                    // ← parseResult.title
   due_date: string | null          // ← parseResult.dueDate?.toISOString()
@@ -383,7 +383,7 @@ Both apps must have a settings section with:
 The parser does NOT validate whether projects/labels exist in Vikunja. That's the autocomplete layer.
 
 Both apps implement fuzzy matching for autocomplete:
-- Project prefix typed → dropdown of all projects from `GET /api/v1/projects`
-- Label prefix typed → dropdown of all labels from `GET /api/v1/labels`
+- Project prefix typed → dropdown of all projects from `GET /api/v2/projects`
+- Label prefix typed → dropdown of all labels from `GET /api/v2/labels`
 - Match by substring, case-insensitive
 - Cache lists (refresh every 60s or on window focus)
