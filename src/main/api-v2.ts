@@ -6,6 +6,23 @@ export interface PaginatedResponse<T> {
   total_pages: number
 }
 
+export type AttachmentPreviewSize = 'sm' | 'md' | 'lg' | 'xl'
+
+export function buildTaskAttachmentDownloadUrl(
+  baseUrl: string,
+  taskId: number,
+  attachmentId: number,
+  previewSize?: AttachmentPreviewSize
+): string {
+  const url = new URL(
+    `${baseUrl.replace(/\/+$/, '')}/api/v2/tasks/${taskId}/attachments/${attachmentId}`
+  )
+  if (previewSize) {
+    url.searchParams.set('preview_size', previewSize)
+  }
+  return url.toString()
+}
+
 const WRITABLE_TASK_FIELDS = new Set([
   'bucket_id',
   'cover_image_attachment_id',

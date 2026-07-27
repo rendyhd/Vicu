@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createTaskPatch } from '../api-v2'
+import { buildTaskAttachmentDownloadUrl, createTaskPatch } from '../api-v2'
 
 describe('createTaskPatch', () => {
   it('keeps writable issue #24 fields and drops server-owned task fields', () => {
@@ -32,5 +32,17 @@ describe('createTaskPatch', () => {
       priority: 0,
       reminders: null,
     })
+  })
+})
+
+describe('buildTaskAttachmentDownloadUrl', () => {
+  it('builds the original attachment URL without a preview size', () => {
+    expect(buildTaskAttachmentDownloadUrl('https://vikunja.example/', 42, 7))
+      .toBe('https://vikunja.example/api/v2/tasks/42/attachments/7')
+  })
+
+  it('requests a bounded server-side image preview', () => {
+    expect(buildTaskAttachmentDownloadUrl('https://vikunja.example/base', 42, 7, 'lg'))
+      .toBe('https://vikunja.example/base/api/v2/tasks/42/attachments/7?preview_size=lg')
   })
 })

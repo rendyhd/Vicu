@@ -242,30 +242,51 @@ function AttachmentThumb({
   attachmentId: number
   onRemove: () => void
 }) {
+  const [decodeError, setDecodeError] = useState(false)
   const { data: attachments } = useTaskAttachments(taskId ?? -1, taskId != null)
   const mime = attachments?.find((a) => a.id === attachmentId)?.file.mime || 'image/png'
-  const { url, isLoading, error } = useAttachmentBlobUrl(taskId, attachmentId, mime)
-  if (isLoading || !url) {
-    if (error) {
-      return (
-        <div className="rounded border border-red-500/30 bg-red-500/10 px-2 py-1 text-2xs text-red-500">
-          Failed to load image
-        </div>
-      )
-    }
+  const { url, isLoading, error, retry } = useAttachmentBlobUrl(taskId, attachmentId, mime)
+
+  if (isLoading) {
     return <div className="h-20 w-32 animate-pulse rounded bg-[var(--bg-hover)]" />
   }
-  return <Thumb src={url} alt={`Attachment ${attachmentId}`} onRemove={onRemove} />
+  if (error || decodeError) {
+    return (
+      <button
+        type="button"
+        onClick={() => {
+          setDecodeError(false)
+          void retry()
+        }}
+        className="rounded border border-red-500/30 bg-red-500/10 px-2 py-1 text-2xs text-red-500 hover:bg-red-500/15"
+      >
+        Retry image
+      </button>
+    )
+  }
+  if (!url) {
+    return <div className="h-20 w-32 animate-pulse rounded bg-[var(--bg-hover)]" />
+  }
+  return (
+    <Thumb
+      src={url}
+      alt={`Attachment ${attachmentId}`}
+      onRemove={onRemove}
+      onError={() => setDecodeError(true)}
+    />
+  )
 }
 
 function Thumb({
   src,
   alt,
   onRemove,
+  onError,
 }: {
   src: string
   alt: string
   onRemove: () => void
+  onError?: () => void
 }) {
   return (
     <div className="group relative inline-block">
@@ -273,6 +294,7 @@ function Thumb({
         src={src}
         alt={alt}
         draggable={false}
+        onError={onError}
         className="block h-auto max-h-40 w-auto max-w-md rounded border border-[var(--border-color)] object-contain"
       />
       <button

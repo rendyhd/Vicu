@@ -2,7 +2,12 @@ import { net, BrowserWindow } from 'electron'
 import { loadConfig } from './config'
 import { authManager } from './auth/auth-manager'
 import { getAPIToken } from './auth/token-store'
-import { createTaskPatch, type PaginatedResponse } from './api-v2'
+import {
+  buildTaskAttachmentDownloadUrl,
+  createTaskPatch,
+  type AttachmentPreviewSize,
+  type PaginatedResponse,
+} from './api-v2'
 
 /**
  * Send 'auth-required' IPC event to all renderer windows.
@@ -788,13 +793,14 @@ export async function deleteTaskAttachment(
 
 export async function downloadTaskAttachment(
   taskId: number,
-  attachmentId: number
+  attachmentId: number,
+  previewSize?: AttachmentPreviewSize
 ): Promise<ApiResult<Buffer>> {
   const c = await getConfigOrFail()
   if ('success' in c) return c
 
   return requestBinaryWithRetry(
-    `${c.url}${API_BASE_PATH}/tasks/${taskId}/attachments/${attachmentId}`,
+    buildTaskAttachmentDownloadUrl(c.url, taskId, attachmentId, previewSize),
     c.token
   )
 }
