@@ -4,9 +4,11 @@ import { authManager } from './auth/auth-manager'
 import { getAPIToken } from './auth/token-store'
 import {
   buildTaskAttachmentDownloadUrl,
+  createTaskCollectionSearchParams,
   createTaskPatch,
   type AttachmentPreviewSize,
   type PaginatedResponse,
+  withoutNestedSubtasks,
 } from './api-v2'
 
 /**
@@ -322,24 +324,19 @@ export async function fetchTasks(params: Record<string, unknown>): Promise<ApiRe
   const c = await getConfigOrFail()
   if ('success' in c) return c
 
-  const qs = new URLSearchParams()
-  if (params.q ?? params.s) qs.set('q', String(params.q ?? params.s))
-  if (params.filter) qs.set('filter', String(params.filter))
-  if (params.sort_by) qs.set('sort_by', String(params.sort_by))
-  if (params.order_by) qs.set('order_by', String(params.order_by))
-  if (params.per_page) qs.set('per_page', String(params.per_page))
-  if (params.page) qs.set('page', String(params.page))
-  if (params.filter_include_nulls) qs.set('filter_include_nulls', String(params.filter_include_nulls))
-  if (params.filter_timezone) qs.set('filter_timezone', String(params.filter_timezone))
+  const qs = createTaskCollectionSearchParams(params)
 
   const queryString = qs.toString()
   const fullUrl = queryString
     ? `${c.url}${API_BASE_PATH}/tasks?${queryString}`
     : `${c.url}${API_BASE_PATH}/tasks`
 
-  return params.page
+  const result = params.page
     ? requestPaginatedWithRetry<unknown>(fullUrl, c.token)
     : requestAllPagesWithRetry<unknown>(fullUrl, c.token)
+  const tasks = await result
+  if (!tasks.success) return tasks
+  return { success: true, data: withoutNestedSubtasks(tasks.data) }
 }
 
 export async function createTask(
@@ -489,7 +486,11 @@ export async function fetchTaskById(id: number): Promise<ApiResult<unknown>> {
   const c = await getConfigOrFail()
   if ('success' in c) return c
 
-  return requestWithRetry<unknown>('GET', `${c.url}${API_BASE_PATH}/tasks/${id}`, c.token)
+  return requestWithRetry<unknown>(
+    'GET',
+    `${c.url}${API_BASE_PATH}/tasks/${id}?expand=subtasks`,
+    c.token
+  )
 }
 
 // --- Task Relations ---
@@ -543,24 +544,19 @@ export async function fetchViewTasks(
   const c = await getConfigOrFail()
   if ('success' in c) return c
 
-  const qs = new URLSearchParams()
-  if (params.q ?? params.s) qs.set('q', String(params.q ?? params.s))
-  if (params.filter) qs.set('filter', String(params.filter))
-  if (params.sort_by) qs.set('sort_by', String(params.sort_by))
-  if (params.order_by) qs.set('order_by', String(params.order_by))
-  if (params.per_page) qs.set('per_page', String(params.per_page))
-  if (params.page) qs.set('page', String(params.page))
-  if (params.filter_include_nulls) qs.set('filter_include_nulls', String(params.filter_include_nulls))
-  if (params.filter_timezone) qs.set('filter_timezone', String(params.filter_timezone))
+  const qs = createTaskCollectionSearchParams(params)
 
   const queryString = qs.toString()
   const fullUrl = queryString
     ? `${c.url}${API_BASE_PATH}/projects/${projectId}/views/${viewId}/tasks?${queryString}`
     : `${c.url}${API_BASE_PATH}/projects/${projectId}/views/${viewId}/tasks`
 
-  return params.page
+  const result = params.page
     ? requestPaginatedWithRetry<unknown>(fullUrl, c.token)
     : requestAllPagesWithRetry<unknown>(fullUrl, c.token)
+  const tasks = await result
+  if (!tasks.success) return tasks
+  return { success: true, data: withoutNestedSubtasks(tasks.data) }
 }
 
 export async function updateTaskPosition(

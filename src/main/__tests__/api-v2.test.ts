@@ -1,5 +1,38 @@
 import { describe, expect, it } from 'vitest'
-import { buildTaskAttachmentDownloadUrl, createTaskPatch } from '../api-v2'
+import {
+  buildTaskAttachmentDownloadUrl,
+  createTaskCollectionSearchParams,
+  createTaskPatch,
+  withoutNestedSubtasks,
+} from '../api-v2'
+
+describe('task hierarchy', () => {
+  it('requests complete subtask hierarchies for task collections', () => {
+    const params = createTaskCollectionSearchParams({
+      q: 'needle',
+      filter: 'done = false',
+      page: 2,
+    })
+
+    expect(params.getAll('expand')).toEqual(['subtasks'])
+    expect(params.get('q')).toBe('needle')
+    expect(params.get('filter')).toBe('done = false')
+    expect(params.get('page')).toBe('2')
+  })
+
+  it('keeps a child nested when its parent is in the same result', () => {
+    const parent = { id: 1, title: 'Parent', related_tasks: { subtask: [{ id: 2 }] } }
+    const child = { id: 2, title: 'Child', related_tasks: { parenttask: [{ id: 1 }] } }
+
+    expect(withoutNestedSubtasks([parent, child])).toEqual([parent])
+  })
+
+  it('keeps a matching child visible when its parent is outside the result', () => {
+    const child = { id: 2, title: 'Child', related_tasks: { parenttask: [{ id: 1 }] } }
+
+    expect(withoutNestedSubtasks([child])).toEqual([child])
+  })
+})
 
 describe('createTaskPatch', () => {
   it('keeps writable issue #24 fields and drops server-owned task fields', () => {
