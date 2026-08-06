@@ -320,6 +320,7 @@ function TaskRowInner({ task, sortable = false }: TaskRowProps) {
   const [isDragOver, setIsDragOver] = useState(false)
   const [dropError, setDropError] = useState<string | null>(null)
   const noteLinkHtml = extractNoteLinkHtml(task.description) + extractPageLinkHtml(task.description)
+  const subtaskCount = task.related_tasks?.subtask?.length ?? 0
   const [activePopover, setActivePopover] = useState<PopoverType>(null)
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null)
   const titleEditorRef = useRef<TaskTitleEditorHandle>(null)
@@ -577,6 +578,12 @@ function TaskRowInner({ task, sortable = false }: TaskRowProps) {
               aria-label="Has notes"
             />
           )}
+          {subtaskCount > 0 && (
+            <ListChecks
+              className="h-3 w-3 text-[var(--text-secondary)]"
+              aria-label={`${subtaskCount} ${subtaskCount === 1 ? 'subtask' : 'subtasks'}`}
+            />
+          )}
           {(task.repeat_after ?? 0) > 0 || (task.repeat_mode ?? 0) > 0 ? (
             <Repeat className="h-3 w-3 text-[var(--text-secondary)]" />
           ) : null}
@@ -675,12 +682,10 @@ function TaskRowInner({ task, sortable = false }: TaskRowProps) {
         />
       </div>
 
-      {/* Subtasks — only visible when toggled via ListChecks button */}
-      {activePopover === 'subtasks' && (
-        <div className="px-4 pl-[43px]">
-          <SubtaskList parentTask={task} />
-        </div>
-      )}
+      {/* Existing subtasks stay visible; the action button toggles the add input. */}
+      <div className="px-4 pl-[43px]">
+        <SubtaskList parentTask={task} showInput={activePopover === 'subtasks'} />
+      </div>
 
       {/* Action bar */}
       <div className="flex items-center justify-between px-4 pb-3 pt-2 pl-[43px]">
@@ -786,7 +791,7 @@ function TaskRowInner({ task, sortable = false }: TaskRowProps) {
                 ? 'bg-[var(--accent-blue)]/10 text-[var(--accent-blue)]'
                 : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]'
             )}
-            title="Subtasks"
+            title={activePopover === 'subtasks' ? 'Hide add subtask' : 'Add subtask'}
           >
             <ListChecks className="h-3.5 w-3.5" />
           </button>
