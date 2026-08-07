@@ -6,9 +6,18 @@ interface ConfirmDialogProps {
   message: string
   onConfirm: () => void
   onCancel: () => void
+  confirmLabel?: string
+  destructive?: boolean
 }
 
-export function ConfirmDialog({ open, message, onConfirm, onCancel }: ConfirmDialogProps) {
+export function ConfirmDialog({
+  open,
+  message,
+  onConfirm,
+  onCancel,
+  confirmLabel = 'Delete',
+  destructive = true,
+}: ConfirmDialogProps) {
   const cancelRef = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
@@ -56,10 +65,12 @@ export function ConfirmDialog({ open, message, onConfirm, onCancel }: ConfirmDia
             onClick={onConfirm}
             className={cn(
               'rounded-md px-4 py-1.5 text-sm font-medium',
-              'bg-accent-red text-white transition-colors hover:bg-accent-red/90'
+              destructive
+                ? 'bg-accent-red text-white transition-colors hover:bg-accent-red/90'
+                : 'bg-accent-blue text-white transition-colors hover:bg-accent-blue/90'
             )}
           >
-            Delete
+            {confirmLabel}
           </button>
         </div>
       </div>

@@ -10,9 +10,11 @@ import { api } from '@/lib/api'
 import type { Task } from '@/lib/vikunja-types'
 
 function groupByProject(tasks: Task[], projectsFlat?: { id: number; title: string }[]) {
+  const activeIds = new Set(projectsFlat?.map((project) => project.id) ?? [])
   const byProject = new Map<number, { name: string; tasks: Task[] }>()
   for (const task of tasks) {
     const pid = task.project_id
+    if (!activeIds.has(pid)) continue
     if (!byProject.has(pid)) {
       byProject.set(pid, {
         name: projectsFlat?.find((p) => p.id === pid)?.title ?? 'Unknown Project',
@@ -44,7 +46,9 @@ export function TodayView() {
   const { overdueTasks, todayTasks } = useMemo(() => {
     const overdue: typeof tasks = []
     const today: typeof tasks = []
+    const activeIds = new Set(projects?.flat.map((project) => project.id) ?? [])
     for (const t of tasks) {
+      if (!activeIds.has(t.project_id)) continue
       if (isOverdue(t.due_date)) {
         overdue.push(t)
       } else if (isToday(t.due_date)) {
@@ -52,7 +56,7 @@ export function TodayView() {
       }
     }
     return { overdueTasks: overdue, todayTasks: today }
-  }, [tasks])
+  }, [tasks, projects?.flat])
 
   const overdueGroups = useMemo(
     () => groupByProject(overdueTasks, projects?.flat),
@@ -99,7 +103,7 @@ export function TodayView() {
       title="Today"
       tasks={[]}
       projectId={inboxProjectId}
-      showNewTask={!!inboxProjectId}
+      showNewTask={!!inboxProjectId && projects?.flat.some((project) => project.id === inboxProjectId)}
       defaultDueDate={today}
       headerContent={<p className="px-6 pb-3 text-xs text-[var(--text-secondary)]">{dateStr}</p>}
       emptyTitle="All clear for today"

@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import { useTasks } from '@/hooks/use-tasks'
 import { useFilters } from '@/hooks/use-filters'
+import { useProjects } from '@/hooks/use-projects'
 import { usePrintable } from '@/stores/print-store'
 import { isNullDate } from '@/lib/date-utils'
 import { cn } from '@/lib/cn'
@@ -39,9 +40,14 @@ function LogbookRow({ task }: { task: Task }) {
 export function LogbookView() {
   const params = useFilters({ view: 'logbook' })
   const { data: tasks = [], isLoading } = useTasks(params)
+  const { data: projects } = useProjects()
+  const visibleTasks = useMemo(() => {
+    const activeIds = new Set(projects?.flat.map((project) => project.id) ?? [])
+    return tasks.filter((task) => activeIds.has(task.project_id))
+  }, [tasks, projects?.flat])
 
   usePrintable(
-    useMemo(() => ({ viewTitle: 'Logbook', sections: [{ groups: [{ tasks }] }] }), [tasks])
+    useMemo(() => ({ viewTitle: 'Logbook', sections: [{ groups: [{ tasks: visibleTasks }] }] }), [visibleTasks])
   )
 
   if (isLoading) {
@@ -59,10 +65,10 @@ export function LogbookView() {
       </div>
 
       <div className="flex-1 overflow-y-auto">
-        {tasks.length === 0 ? (
+        {visibleTasks.length === 0 ? (
           <EmptyState icon={Inbox} title="No completed tasks" subtitle="Completed tasks appear here" />
         ) : (
-          tasks.map((task) => <LogbookRow key={task.id} task={task} />)
+          visibleTasks.map((task) => <LogbookRow key={task.id} task={task} />)
         )}
       </div>
     </div>

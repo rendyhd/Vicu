@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useParams } from '@tanstack/react-router'
 import { useTasks } from '@/hooks/use-tasks'
+import { useProjects } from '@/hooks/use-projects'
 import { api } from '@/lib/api'
 import { usePrintable } from '@/stores/print-store'
 import { TaskList } from '@/components/task-list/TaskList'
@@ -96,6 +97,7 @@ function buildQueryParams(list: CustomList): TaskQueryParams {
 export function CustomListView() {
   const { listId } = useParams({ from: '/list/$listId' })
   const [customList, setCustomList] = useState<CustomList | null>(null)
+  const { data: projects } = useProjects()
 
   useEffect(() => {
     api.getConfig().then((config) => {
@@ -115,7 +117,9 @@ export function CustomListView() {
     if (!customList) return tasks
     const { filter } = customList
 
+    const activeIds = new Set(projects?.flat.map((project) => project.id) ?? [])
     return tasks.filter((t: Task) => {
+      if (!activeIds.has(t.project_id)) return false
       // Project filter (API only supports single project_id in include mode)
       if (filter.project_ids.length > 0) {
         const isExclude = (filter.project_filter_mode ?? 'include') === 'exclude'
@@ -141,7 +145,7 @@ export function CustomListView() {
 
       return true
     })
-  }, [tasks, customList])
+  }, [tasks, customList, projects?.flat])
 
   usePrintable(
     useMemo(

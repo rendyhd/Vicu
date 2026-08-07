@@ -122,8 +122,8 @@ export function registerIpcHandlers(): void {
   })
 
   // Projects
-  ipcMain.handle('fetch-projects', () => {
-    return fetchProjects()
+  ipcMain.handle('fetch-projects', (_event, includeArchived = false) => {
+    return fetchProjects(includeArchived)
   })
 
   ipcMain.handle('create-project', (_event, project: Record<string, unknown>) => {
@@ -370,6 +370,18 @@ export function registerIpcHandlers(): void {
 
     if (!config.viewer_filter) return { success: false, error: 'No filter configuration' }
 
+    const activeProjectsResult = await fetchProjects(false)
+    const activeProjectIds = activeProjectsResult.success
+      ? new Set((activeProjectsResult.data as Array<{ id?: number }>).map(project => project.id).filter((id): id is number => typeof id === 'number'))
+      : null
+    const keepActiveProjectTasks = (tasks: unknown[]): unknown[] => {
+      if (!activeProjectIds) return tasks
+      return tasks.filter(task => {
+        const projectId = (task as { project_id?: unknown })?.project_id
+        return typeof projectId === 'number' && activeProjectIds.has(projectId)
+      })
+    }
+
     // Resolve custom list filter if set
     let effectiveFilter = config.viewer_filter
     let clientFilter: CustomListClientFilter | null = null
@@ -397,7 +409,9 @@ export function registerIpcHandlers(): void {
 
     // Position sort needs special handling via project views
     if (effectiveFilter.sort_by === 'position') {
-      const projectIds = effectiveFilter.project_ids
+      const projectIds = activeProjectIds
+        ? effectiveFilter.project_ids.filter(projectId => activeProjectIds.has(projectId))
+        : effectiveFilter.project_ids
       if (!projectIds || projectIds.length === 0) {
         return { success: false, error: 'Position sort requires specific projects' }
       }
@@ -413,18 +427,18 @@ export function registerIpcHandlers(): void {
           allTasks.push(...viewResult.data)
         }
       }
-      const filteredAll = clientFilter
+      const filteredAll = keepActiveProjectTasks(clientFilter
         ? applyCustomListTaskFilter(allTasks as Array<{ project_id?: number; priority?: number; labels?: Array<{ id: number }> }>, clientFilter)
-        : allTasks
+        : allTasks)
       setCachedTasks(filteredAll)
       return { success: true, tasks: filteredAll }
     }
 
     const result = await fetchTasks(filterParams)
     if (result.success) {
-      const tasks = clientFilter
+      const tasks = keepActiveProjectTasks(clientFilter
         ? applyCustomListTaskFilter((result.data ?? []) as Array<{ project_id?: number; priority?: number; labels?: Array<{ id: number }> }>, clientFilter)
-        : result.data
+        : result.data)
       setCachedTasks(tasks ?? [])
       return { success: true, tasks }
     }

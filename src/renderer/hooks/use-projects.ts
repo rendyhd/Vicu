@@ -6,7 +6,7 @@ export interface ProjectTreeNode extends Project {
   children: ProjectTreeNode[]
 }
 
-function buildProjectTree(projects: Project[]): ProjectTreeNode[] {
+export function buildProjectTree(projects: Project[]): ProjectTreeNode[] {
   const map = new Map<number, ProjectTreeNode>()
   const roots: ProjectTreeNode[] = []
 
@@ -32,17 +32,28 @@ function buildProjectTree(projects: Project[]): ProjectTreeNode[] {
   return roots
 }
 
+export function selectProjectCollections(data: Project[]) {
+  const active = data.filter((project) => !project.is_archived)
+  const archived = data.filter((project) => project.is_archived)
+  return {
+    all: data,
+    active,
+    archived,
+    // Keep the established names active-only so every normal consumer is safe by default.
+    flat: active,
+    tree: buildProjectTree(active),
+    fullTree: buildProjectTree(data),
+  }
+}
+
 export function useProjects() {
   return useQuery({
     queryKey: ['projects'],
     queryFn: async () => {
-      const result = await api.fetchProjects()
+      const result = await api.fetchProjects(true)
       if (!result.success) throw new Error(result.error)
       return result.data
     },
-    select: (data) => ({
-      flat: data,
-      tree: buildProjectTree(data),
-    }),
+    select: selectProjectCollections,
   })
 }

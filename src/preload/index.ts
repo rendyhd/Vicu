@@ -20,8 +20,8 @@ const api = {
     ipcRenderer.invoke('delete-task-relation', taskId, relationKind, otherTaskId),
 
   // Projects
-  fetchProjects: () =>
-    ipcRenderer.invoke('fetch-projects'),
+  fetchProjects: (includeArchived = false) =>
+    ipcRenderer.invoke('fetch-projects', includeArchived),
   createProject: (project: Record<string, unknown>) =>
     ipcRenderer.invoke('create-project', project),
   updateProject: (id: number, project: Record<string, unknown>) =>

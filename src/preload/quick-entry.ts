@@ -15,7 +15,7 @@ contextBridge.exposeInMainWorld('quickEntryApi', {
   getConfig: () => ipcRenderer.invoke('qe:get-config'),
   getPendingCount: () => ipcRenderer.invoke('qe:get-pending-count'),
   fetchLabels: () => ipcRenderer.invoke('fetch-labels'),
-  fetchProjects: () => ipcRenderer.invoke('fetch-projects'),
+  fetchProjects: () => ipcRenderer.invoke('fetch-projects', false),
   addLabelToTask: (taskId: number, labelId: number) => ipcRenderer.invoke('add-label-to-task', taskId, labelId),
   createLabel: (label: { title: string; hex_color?: string }) => ipcRenderer.invoke('create-label', label),
   onShowWindow: (callback: () => void) => {

@@ -240,10 +240,17 @@ function resetInput(): void {
 }
 
 function buildProjectCycle(cfg: QuickEntryConfig): void {
-  const defaultId = cfg.quick_entry_default_project_id || cfg.inbox_project_id
+  const activeIds = new Set(cachedProjects.map((project) => project.id))
+  const configuredDefault = cfg.quick_entry_default_project_id || cfg.inbox_project_id
+  const defaultId = activeIds.size === 0 || activeIds.has(configuredDefault)
+    ? configuredDefault
+    : activeIds.has(cfg.inbox_project_id)
+      ? cfg.inbox_project_id
+      : cachedProjects[0]?.id ?? 0
   projectCycle = [{ id: defaultId, title: null }]
   if (cfg.secondary_projects && cfg.secondary_projects.length > 0) {
     for (const p of cfg.secondary_projects) {
+      if (activeIds.size > 0 && !activeIds.has(p.id)) continue
       projectCycle.push({ id: p.id, title: p.title })
     }
   }
@@ -346,6 +353,7 @@ function refreshLabelsAndProjects(): void {
     if (projectsResult.success && projectsResult.data) {
       cachedProjects = projectsResult.data
       cache.setProjects(projectsResult.data)
+      if (lastConfig) buildProjectCycle(lastConfig)
     }
   }).catch(() => {
     // Offline or standalone — keep existing cache

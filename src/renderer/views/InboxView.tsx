@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useProjectTasks } from '@/hooks/use-project-tasks'
+import { useProjects } from '@/hooks/use-projects'
 import { useReorderStore } from '@/stores/reorder-store'
 import { usePrintable } from '@/stores/print-store'
 import { api } from '@/lib/api'
@@ -7,6 +8,7 @@ import { TaskList } from '@/components/task-list/TaskList'
 
 export function InboxView() {
   const [inboxProjectId, setInboxProjectId] = useState<number | undefined>()
+  const { data: projects, isLoading: projectsLoading } = useProjects()
 
   useEffect(() => {
     api.getConfig().then((config) => {
@@ -16,7 +18,10 @@ export function InboxView() {
     })
   }, [])
 
-  const { data: tasks = [], isLoading, viewId } = useProjectTasks(inboxProjectId)
+  const activeInboxId = inboxProjectId && projects?.flat.some((project) => project.id === inboxProjectId)
+    ? inboxProjectId
+    : undefined
+  const { data: tasks = [], isLoading, viewId } = useProjectTasks(activeInboxId)
   const setReorderContext = useReorderStore((s) => s.setReorderContext)
 
   useEffect(() => {
@@ -27,7 +32,7 @@ export function InboxView() {
     useMemo(() => ({ viewTitle: 'Inbox', sections: [{ groups: [{ tasks }] }] }), [tasks])
   )
 
-  if (isLoading) {
+  if (isLoading || projectsLoading) {
     return (
       <div className="flex flex-1 items-center justify-center text-sm text-[var(--text-secondary)]">
         Loading...
@@ -39,11 +44,11 @@ export function InboxView() {
     <TaskList
       title="Inbox"
       tasks={tasks}
-      projectId={inboxProjectId}
+      projectId={activeInboxId}
       sortable
       viewId={viewId}
-      emptyTitle="Nothing in Inbox"
-      emptySubtitle="Tasks added here will be sorted later"
+      emptyTitle={inboxProjectId && !activeInboxId ? 'Inbox project is archived' : 'Nothing in Inbox'}
+      emptySubtitle={inboxProjectId && !activeInboxId ? 'Select an active Inbox project in Settings' : 'Tasks added here will be sorted later'}
     />
   )
 }

@@ -6,6 +6,12 @@ export interface PaginatedResponse<T> {
   total_pages: number
 }
 
+export function buildProjectCollectionUrl(baseUrl: string, includeArchived = false): string {
+  const url = new URL(`${baseUrl.replace(/\/+$/, '')}/api/v2/projects`)
+  if (includeArchived) url.searchParams.set('is_archived', 'true')
+  return url.toString()
+}
+
 /**
  * Build the query shared by flat task collection endpoints. Vikunja still
  * returns a flat array for this expansion, but guarantees every child rides

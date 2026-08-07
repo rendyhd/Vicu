@@ -46,7 +46,7 @@ export interface ElectronAPI {
   updateTaskPosition(taskId: number, viewId: number, position: number): Promise<ApiResult<unknown>>
 
   // Projects
-  fetchProjects(): Promise<ApiResult<Project[]>>
+  fetchProjects(includeArchived?: boolean): Promise<ApiResult<Project[]>>
   createProject(project: CreateProjectPayload): Promise<ApiResult<Project>>
   updateProject(id: number, project: UpdateProjectPayload): Promise<ApiResult<Project>>
   deleteProject(id: number): Promise<ApiResult<void>>

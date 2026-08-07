@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { api } from '@/lib/api'
 import { cn } from '@/lib/cn'
 import { HotkeyRecorder } from './HotkeyRecorder'
-import type { AppConfig, Project, SecondaryProject, ViewerFilter } from '@/lib/vikunja-types'
+import type { AppConfig, Project, ViewerFilter } from '@/lib/vikunja-types'
 
 interface QuickEntrySettingsProps {
   config: AppConfig
@@ -47,6 +47,17 @@ export function QuickEntrySettings({ config, projects, onChange, hotkeyWarnings 
     due_date_filter: 'all',
     include_today_all_projects: false,
   }
+  const activeProjectIds = new Set(projects.map((project) => project.id))
+  const configuredDefaultProjectId = config.quick_entry_default_project_id || config.inbox_project_id || 0
+  const defaultProjectAvailable = configuredDefaultProjectId === 0 || activeProjectIds.has(configuredDefaultProjectId)
+  const configuredSecondaryProjects = config.secondary_projects || []
+  const availableSecondaryProjects = configuredSecondaryProjects.filter((project) => activeProjectIds.has(project.id))
+  const unavailableSecondaryProjectCount = configuredSecondaryProjects.length - availableSecondaryProjects.length
+  const configuredViewerProjectId =
+    !viewerFilter.view_type && !viewerFilter.custom_list_id
+      ? (viewerFilter.project_ids || [])[0] || 0
+      : 0
+  const viewerProjectAvailable = configuredViewerProjectId === 0 || activeProjectIds.has(configuredViewerProjectId)
 
   const updateViewerFilter = (partial: Partial<ViewerFilter>) => {
     onChange({ viewer_filter: { ...viewerFilter, ...partial } })
@@ -188,7 +199,7 @@ export function QuickEntrySettings({ config, projects, onChange, hotkeyWarnings 
                 <div>
                   <label className="mb-1 block text-xs text-[var(--text-secondary)]">Default Project</label>
                   <select
-                    value={config.quick_entry_default_project_id || config.inbox_project_id || 0}
+                    value={defaultProjectAvailable ? configuredDefaultProjectId : 0}
                     onChange={(e) => onChange({ quick_entry_default_project_id: Number(e.target.value) })}
                     className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] focus:border-accent-blue focus:outline-none"
                   >
@@ -197,6 +208,11 @@ export function QuickEntrySettings({ config, projects, onChange, hotkeyWarnings 
                       <option key={p.id} value={p.id}>{p.title}</option>
                     ))}
                   </select>
+                  {!defaultProjectAvailable && (
+                    <p className="mt-1 text-xs text-accent-orange">
+                      The saved default project is archived. Quick Entry will use an active fallback until you choose another project.
+                    </p>
+                  )}
                 </div>
 
                 {/* Secondary projects */}
@@ -205,7 +221,7 @@ export function QuickEntrySettings({ config, projects, onChange, hotkeyWarnings 
                     Secondary Projects (cycle with modifier + arrow keys)
                   </label>
                   <div className="space-y-1">
-                    {(config.secondary_projects || []).map((sp) => (
+                    {availableSecondaryProjects.map((sp) => (
                       <div key={sp.id} className="flex items-center gap-2 text-sm text-[var(--text-primary)]">
                         <span className="flex-1">{sp.title}</span>
                         <button
@@ -217,6 +233,11 @@ export function QuickEntrySettings({ config, projects, onChange, hotkeyWarnings 
                         </button>
                       </div>
                     ))}
+                    {unavailableSecondaryProjectCount > 0 && (
+                      <p className="text-xs text-accent-orange">
+                        {unavailableSecondaryProjectCount} archived project{unavailableSecondaryProjectCount === 1 ? '' : 's'} hidden from the project cycle.
+                      </p>
+                    )}
                     <select
                       value=""
                       onChange={(e) => {
@@ -303,7 +324,7 @@ export function QuickEntrySettings({ config, projects, onChange, hotkeyWarnings 
                     value={
                       viewerFilter.view_type
                         ? `view:${viewerFilter.view_type}`
-                        : viewerFilter.custom_list_id || String((viewerFilter.project_ids || [])[0] || 0)
+                        : viewerFilter.custom_list_id || String(viewerProjectAvailable ? configuredViewerProjectId : 0)
                     }
                     onChange={(e) => {
                       const val = e.target.value
@@ -341,6 +362,11 @@ export function QuickEntrySettings({ config, projects, onChange, hotkeyWarnings 
                       </optgroup>
                     )}
                   </select>
+                  {!viewerProjectAvailable && (
+                    <p className="mt-1 text-xs text-accent-orange">
+                      The saved project is archived. Quick View will omit it until you select an active project or restore it.
+                    </p>
+                  )}
                 </div>
 
                 {/* Include today from all projects */}

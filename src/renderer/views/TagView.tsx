@@ -19,8 +19,9 @@ export function TagView() {
   const { data: tasks = [], isLoading } = useTasks(params)
 
   const filtered = useMemo(() => {
-    return tasks.filter((t) => t.labels?.some((l) => l.id === lid))
-  }, [tasks, lid])
+    const activeIds = new Set(projects?.flat.map((project) => project.id) ?? [])
+    return tasks.filter((t) => activeIds.has(t.project_id) && t.labels?.some((l) => l.id === lid))
+  }, [tasks, lid, projects?.flat])
 
   const groups = useMemo(() => {
     const projectMap = new Map<number, { name: string; tasks: typeof filtered }>()

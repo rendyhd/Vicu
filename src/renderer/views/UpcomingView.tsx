@@ -30,9 +30,11 @@ function getDateKey(date: string): string {
 }
 
 function groupByProject(tasks: Task[], projectsFlat?: { id: number; title: string }[]) {
+  const activeIds = new Set(projectsFlat?.map((project) => project.id) ?? [])
   const byProject = new Map<number, { name: string; tasks: Task[] }>()
   for (const task of tasks) {
     const pid = task.project_id
+    if (!activeIds.has(pid)) continue
     if (!byProject.has(pid)) {
       byProject.set(pid, {
         name: projectsFlat?.find((p) => p.id === pid)?.title ?? 'Unknown Project',
@@ -66,7 +68,9 @@ export function UpcomingView() {
 
   const groups = useMemo(() => {
     const grouped = new Map<string, DateGroup>()
+    const activeIds = new Set(projects?.flat.map((project) => project.id) ?? [])
     for (const task of tasks) {
+      if (!activeIds.has(task.project_id)) continue
       if (isNullDate(task.due_date)) continue
       // Client-side filter: exclude today and overdue tasks
       if (isToday(task.due_date) || isOverdue(task.due_date)) continue
@@ -81,7 +85,7 @@ export function UpcomingView() {
       grouped.get(key)!.tasks.push(task)
     }
     return Array.from(grouped.values()).sort((a, b) => a.key.localeCompare(b.key))
-  }, [tasks])
+  }, [tasks, projects?.flat])
 
   usePrintable(
     useMemo(
@@ -112,7 +116,7 @@ export function UpcomingView() {
       title="Upcoming"
       tasks={[]}
       projectId={inboxProjectId}
-      showNewTask={!!inboxProjectId}
+      showNewTask={!!inboxProjectId && projects?.flat.some((project) => project.id === inboxProjectId)}
       emptyTitle="Nothing upcoming"
       emptySubtitle="Tasks with future due dates appear here"
     >

@@ -44,10 +44,12 @@ interface InsertIndicator {
 export function ProjectView() {
   const { projectId } = useParams({ from: '/project/$projectId' })
   const pid = Number(projectId)
-  const { data: projectData } = useProjects()
-  const projectName = projectData?.flat.find((p) => p.id === pid)?.title ?? 'Project'
+  const { data: projectData, isLoading: projectsLoading } = useProjects()
+  const activeProject = projectData?.flat.find((p) => p.id === pid)
+  const archivedProject = projectData?.archived.find((p) => p.id === pid)
+  const projectName = activeProject?.title ?? archivedProject?.title ?? 'Project'
 
-  const { data: tasks = [], isLoading: tasksLoading, viewId } = useProjectTasks(pid)
+  const { data: tasks = [], isLoading: tasksLoading, viewId } = useProjectTasks(activeProject?.id)
   const { sections, hasSections, isLoading: sectionsLoading } = useProjectSections(pid)
   const setReorderContext = useReorderStore((s) => s.setReorderContext)
   const clearSectionContexts = useReorderStore((s) => s.clearSectionContexts)
@@ -164,12 +166,27 @@ export function ProjectView() {
     },
   })
 
-  const isLoading = tasksLoading || sectionsLoading
+  const isLoading = projectsLoading || tasksLoading || sectionsLoading
 
   if (isLoading) {
     return (
       <div className="flex flex-1 items-center justify-center text-sm text-[var(--text-secondary)]">
         Loading...
+      </div>
+    )
+  }
+
+  if (projectData && !activeProject) {
+    return (
+      <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 text-center">
+        <h1 className="text-lg font-semibold text-[var(--text-primary)]">
+          {archivedProject ? 'Project archived' : 'Project unavailable'}
+        </h1>
+        <p className="max-w-sm text-sm text-[var(--text-secondary)]">
+          {archivedProject
+            ? 'Restore this project from Settings to view its tasks.'
+            : 'This project may have been deleted or you may no longer have access.'}
+        </p>
       </div>
     )
   }

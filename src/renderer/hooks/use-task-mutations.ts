@@ -572,6 +572,55 @@ export function useUpdateProject() {
   })
 }
 
+/** Archive/restore preserves every mutable project field and updates the all-project cache. */
+export function useSetProjectArchived() {
+  const qc = useQueryClient()
+  const navigate = useNavigate()
+  const matches = useMatches()
+
+  return useMutation({
+    mutationFn: async ({ project, archived }: { project: import('@/lib/vikunja-types').Project; archived: boolean }) => {
+      const payload: UpdateProjectPayload = {
+        title: project.title,
+        description: project.description,
+        hex_color: project.hex_color,
+        is_archived: archived,
+        position: project.position,
+        parent_project_id: project.parent_project_id,
+      }
+      const result = await api.updateProject(project.id, payload)
+      if (!result.success) throw new Error(result.error)
+      return result.data
+    },
+    onMutate: async ({ project, archived }) => {
+      await qc.cancelQueries({ queryKey: ['projects'] })
+      const previous = qc.getQueryData<import('@/lib/vikunja-types').Project[]>(['projects'])
+      if (previous) {
+        qc.setQueryData<import('@/lib/vikunja-types').Project[]>(
+          ['projects'],
+          previous.map((item) => item.id === project.id ? { ...item, is_archived: archived } : item),
+        )
+      }
+      return { previous }
+    },
+    onError: (_error, _variables, context) => {
+      if (context?.previous) qc.setQueryData(['projects'], context.previous)
+    },
+    onSuccess: (_data, { project, archived }) => {
+      const currentPath = matches[matches.length - 1]?.pathname ?? ''
+      if (archived && currentPath === `/project/${project.id}`) {
+        navigate({ to: '/inbox' })
+      }
+    },
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: ['projects'] })
+      qc.invalidateQueries({ queryKey: ['tasks'] })
+      qc.invalidateQueries({ queryKey: ['view-tasks'] })
+      qc.invalidateQueries({ queryKey: ['section-tasks'] })
+    },
+  })
+}
+
 export function useReorderProject() {
   const qc = useQueryClient()
 

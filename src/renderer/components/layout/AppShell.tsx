@@ -192,6 +192,17 @@ export function AppShell() {
     }
   }, [routePath, queryClient])
 
+  // TanStack Query's browser focus manager only observes page visibility. An Electron
+  // window can lose and regain focus without becoming hidden, so explicitly refresh
+  // projects to pick up archives/restores made in Vikunja or another Vicu client.
+  useEffect(() => {
+    const refreshProjects = () => {
+      queryClient.invalidateQueries({ queryKey: ['projects'] })
+    }
+    window.addEventListener('focus', refreshProjects)
+    return () => window.removeEventListener('focus', refreshProjects)
+  }, [queryClient])
+
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
   )

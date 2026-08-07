@@ -12,11 +12,13 @@ import { KeyboardShortcuts } from '@/components/settings/KeyboardShortcuts'
 import { NotificationSettings } from '@/components/settings/NotificationSettings'
 import { CompletionSoundSettings } from '@/components/settings/CompletionSoundSettings'
 import { ReviewSettingsPanel } from '@/components/review/ReviewSettingsPanel'
+import { ProjectSettings } from '@/components/settings/ProjectSettings'
+import { useProjects } from '@/hooks/use-projects'
 import type { AppConfig, Project } from '@/lib/vikunja-types'
 
 import type { ThemeOption } from '@/lib/theme'
 
-type SettingsTab = 'general' | 'integrations' | 'notifications' | 'shortcuts'
+type SettingsTab = 'general' | 'projects' | 'integrations' | 'notifications' | 'shortcuts'
 
 export function SettingsView() {
   const queryClient = useQueryClient()
@@ -30,6 +32,7 @@ export function SettingsView() {
   const [currentUser, setCurrentUser] = useState<VikunjaUser | null>(null)
 
   const [projects, setProjects] = useState<Project[]>([])
+  const { data: liveProjectData } = useProjects()
   const [testStatus, setTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle')
   const [testError, setTestError] = useState('')
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle')
@@ -71,6 +74,10 @@ export function SettingsView() {
       })
     }
   }, [url, token, authMethod])
+
+  useEffect(() => {
+    if (liveProjectData) setProjects(liveProjectData.flat)
+  }, [liveProjectData])
 
   const handleTestConnection = async () => {
     setTestStatus('testing')
@@ -151,6 +158,7 @@ export function SettingsView() {
       <div className="flex gap-1 border-b border-[var(--border-color)] px-6">
         {([
           { key: 'general' as const, label: 'General' },
+          { key: 'projects' as const, label: 'Projects' },
           { key: 'integrations' as const, label: 'Quick Entry / View' },
           { key: 'notifications' as const, label: 'Notifications' },
           { key: 'shortcuts' as const, label: 'Keyboard Shortcuts' },
@@ -173,6 +181,8 @@ export function SettingsView() {
 
       {activeTab === 'shortcuts' ? (
         <KeyboardShortcuts />
+      ) : activeTab === 'projects' ? (
+        <ProjectSettings />
       ) : activeTab === 'notifications' ? (
         fullConfig && (
           <NotificationSettings
@@ -335,6 +345,11 @@ export function SettingsView() {
                   <option key={p.id} value={p.id}>{p.title}</option>
                 ))}
               </select>
+              {inboxProjectId !== 0 && !projects.some((project) => project.id === inboxProjectId) && (
+                <p className="mt-1 text-xs text-accent-red">
+                  The configured Inbox project is archived or unavailable. Select an active project.
+                </p>
+              )}
             </div>
 
             <div>

@@ -4,6 +4,7 @@ import { authManager } from './auth/auth-manager'
 import { getAPIToken } from './auth/token-store'
 import {
   buildTaskAttachmentDownloadUrl,
+  buildProjectCollectionUrl,
   createTaskCollectionSearchParams,
   createTaskPatch,
   type AttachmentPreviewSize,
@@ -381,11 +382,14 @@ export async function deleteTask(id: number): Promise<ApiResult<void>> {
 
 // --- Projects ---
 
-export async function fetchProjects(): Promise<ApiResult<unknown[]>> {
+export async function fetchProjects(includeArchived = false): Promise<ApiResult<unknown[]>> {
   const c = await getConfigOrFail()
   if ('success' in c) return c
 
-  return requestAllPagesWithRetry<unknown>(`${c.url}${API_BASE_PATH}/projects`, c.token)
+  return requestAllPagesWithRetry<unknown>(
+    buildProjectCollectionUrl(c.url, includeArchived),
+    c.token,
+  )
 }
 
 export async function createProject(project: Record<string, unknown>): Promise<ApiResult<unknown>> {

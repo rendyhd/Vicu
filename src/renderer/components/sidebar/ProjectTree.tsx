@@ -1,8 +1,8 @@
 import { useState, useEffect, useMemo } from 'react'
-import { Pencil, Trash2, X } from 'lucide-react'
+import { Archive, Pencil, Trash2, X } from 'lucide-react'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { useProjects, type ProjectTreeNode } from '@/hooks/use-projects'
-import { useCreateProject, useUpdateProject, useDeleteProject } from '@/hooks/use-task-mutations'
+import { useCreateProject, useUpdateProject, useDeleteProject, useSetProjectArchived } from '@/hooks/use-task-mutations'
 import { useConfirmDelete } from '@/hooks/use-confirm-delete'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { useSidebarStore } from '@/stores/sidebar-store'
@@ -40,7 +40,17 @@ function ProjectDialog({
 
     if (project) {
       updateProject.mutate(
-        { id: project.id, project: { title: trimmed, hex_color: hexColor || undefined } },
+        {
+          id: project.id,
+          project: {
+            title: trimmed,
+            description: project.description,
+            hex_color: hexColor,
+            is_archived: project.is_archived,
+            position: project.position,
+            parent_project_id: project.parent_project_id,
+          },
+        },
         { onSuccess: onClose }
       )
     } else {
@@ -155,11 +165,13 @@ function ProjectDialog({
 export function ProjectTree() {
   const { data, isLoading } = useProjects()
   const deleteProject = useDeleteProject()
+  const setArchived = useSetProjectArchived()
   const { confirmDelete, dialogProps: deleteDialogProps } = useConfirmDelete()
   const { projectDialogOpen, setProjectDialogOpen } = useSidebarStore()
 
   const [inboxProjectId, setInboxProjectId] = useState<number | undefined>()
   const [editingProject, setEditingProject] = useState<Project | null>(null)
+  const [archiveTarget, setArchiveTarget] = useState<Project | null>(null)
   const [contextMenu, setContextMenu] = useState<{
     x: number
     y: number
@@ -248,21 +260,36 @@ export function ProjectTree() {
             <Pencil className="h-3.5 w-3.5" />
             Edit
           </button>
-          <button
-            type="button"
-            onClick={async () => {
-              const project = contextMenu.project
-              setContextMenu(null)
-              const ok = await confirmDelete('Delete this project? All tasks in it will be deleted. This cannot be undone.')
-              if (ok) {
-                deleteProject.mutate(project.id)
-              }
-            }}
-            className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-accent-red hover:bg-[var(--bg-hover)]"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-            Delete
-          </button>
+          {contextMenu.project.id !== inboxProjectId && (
+            <>
+              <button
+                type="button"
+                onClick={() => {
+                  setArchiveTarget(contextMenu.project)
+                  setContextMenu(null)
+                }}
+                className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-[var(--text-primary)] hover:bg-[var(--bg-hover)]"
+              >
+                <Archive className="h-3.5 w-3.5" />
+                Archive
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  const project = contextMenu.project
+                  setContextMenu(null)
+                  const ok = await confirmDelete('Delete this project? All tasks in it will be deleted. This cannot be undone.')
+                  if (ok) {
+                    deleteProject.mutate(project.id)
+                  }
+                }}
+                className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-accent-red hover:bg-[var(--bg-hover)]"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                Delete
+              </button>
+            </>
+          )}
         </div>
       )}
 
@@ -272,6 +299,17 @@ export function ProjectTree() {
         onClose={handleCloseDialog}
       />
       <ConfirmDialog {...deleteDialogProps} />
+      <ConfirmDialog
+        open={archiveTarget != null}
+        message={archiveTarget ? `Archive “${archiveTarget.title}”? Its tasks will be kept and it can be restored from Settings.` : ''}
+        confirmLabel="Archive"
+        destructive={false}
+        onCancel={() => setArchiveTarget(null)}
+        onConfirm={() => {
+          if (archiveTarget) setArchived.mutate({ project: archiveTarget, archived: true })
+          setArchiveTarget(null)
+        }}
+      />
     </>
   )
 }

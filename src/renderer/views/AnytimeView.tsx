@@ -11,7 +11,7 @@ import type { Task } from '@/lib/vikunja-types'
 export function AnytimeView() {
   const params = useFilters({ view: 'anytime' })
   const { data: tasks = [], isLoading } = useTasks(params)
-  const { data: projectData } = useProjects()
+  const { data: projectData, isLoading: projectsLoading } = useProjects()
   const [inboxProjectId, setInboxProjectId] = useState<number | undefined>()
 
   useEffect(() => {
@@ -46,6 +46,7 @@ export function AnytimeView() {
     // Group tasks by root project, then by direct project
     const byRoot = new Map<number, Map<number, Task[]>>()
     for (const task of tasks) {
+      if (!projectMap.has(task.project_id)) continue
       if (inboxProjectId && task.project_id === inboxProjectId) continue
       const rootId = getRootId(task.project_id)
       if (!byRoot.has(rootId)) byRoot.set(rootId, new Map())
@@ -82,7 +83,7 @@ export function AnytimeView() {
     )
   )
 
-  if (isLoading) {
+  if (isLoading || projectsLoading) {
     return (
       <div className="flex flex-1 items-center justify-center text-sm text-[var(--text-secondary)]">
         Loading...
@@ -95,7 +96,7 @@ export function AnytimeView() {
       title="Anytime"
       tasks={[]}
       projectId={inboxProjectId}
-      showNewTask={!!inboxProjectId}
+      showNewTask={!!inboxProjectId && projectData?.flat.some((project) => project.id === inboxProjectId)}
       emptyTitle="Nothing here"
       emptySubtitle="Open tasks from all projects"
     >

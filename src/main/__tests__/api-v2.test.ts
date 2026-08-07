@@ -1,10 +1,20 @@
 import { describe, expect, it } from 'vitest'
 import {
   buildTaskAttachmentDownloadUrl,
+  buildProjectCollectionUrl,
   createTaskCollectionSearchParams,
   createTaskPatch,
   withoutNestedSubtasks,
 } from '../api-v2'
+
+describe('project collection URL', () => {
+  it('requests archived projects only when the complete snapshot is needed', () => {
+    expect(buildProjectCollectionUrl('https://vikunja.example/', true))
+      .toBe('https://vikunja.example/api/v2/projects?is_archived=true')
+    expect(buildProjectCollectionUrl('https://vikunja.example/', false))
+      .toBe('https://vikunja.example/api/v2/projects')
+  })
+})
 
 describe('task hierarchy', () => {
   it('requests complete subtask hierarchies for task collections', () => {
