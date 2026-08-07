@@ -1,0 +1,28 @@
+{
+  "contractVersion": 1,
+  "fixtures": [
+    { "name": "empty", "input": "", "canonical": "", "warnings": [] },
+    { "name": "legacy-text", "input": "Hello notes", "canonical": "<p>Hello notes</p>", "warnings": [] },
+    { "name": "legacy-lines", "input": "Line one\nLine two", "canonical": "<p>Line one</p>\n<p>Line two</p>", "warnings": [] },
+    { "name": "bold", "input": "<p><b>Bold</b></p>", "canonical": "<p><strong>Bold</strong></p>", "warnings": [] },
+    { "name": "italic", "input": "<p><i>Italic</i></p>", "canonical": "<p><em>Italic</em></p>", "warnings": [] },
+    { "name": "underline-strike-code", "input": "<p><u>Under</u> <del>gone</del> <code>x</code></p>", "canonical": "<p><u>Under</u> <s>gone</s> <code>x</code></p>", "warnings": [] },
+    { "name": "safe-link", "input": "<p><a href=\"https://example.com\">Example</a></p>", "canonical": "<p><a href=\"https://example.com\">Example</a></p>", "warnings": [] },
+    { "name": "mailto-link", "input": "<p><a href=\"mailto:test@example.com\">Mail</a></p>", "canonical": "<p><a href=\"mailto:test@example.com\">Mail</a></p>", "warnings": [] },
+    { "name": "unsafe-link", "input": "<p><a href=\"javascript:alert(1)\">Bad</a></p>", "canonical": "<p>Bad</p>", "warnings": ["unsafe-url"] },
+    { "name": "bullet-list", "input": "<ul><li>One</li><li>Two</li></ul>", "canonical": "<ul><li><p>One</p></li><li><p>Two</p></li></ul>", "warnings": [] },
+    { "name": "numbered-list", "input": "<ol><li>One</li><li>Two</li></ol>", "canonical": "<ol><li><p>One</p></li><li><p>Two</p></li></ol>", "warnings": [] },
+    { "name": "task-list", "input": "<ul data-type=\"taskList\"><li data-type=\"taskItem\" data-checked=\"false\"><div><p>Todo</p></div></li></ul>", "canonical": "<ul data-type=\"taskList\"><li data-type=\"taskItem\" data-checked=\"false\"><label contenteditable=\"false\"><input type=\"checkbox\"><span></span></label><div><p>Todo</p></div></li></ul>", "warnings": [] },
+    { "name": "checked-task", "input": "<ul data-type=\"taskList\"><li data-type=\"taskItem\" data-checked=\"true\"><div><p>Done</p></div></li></ul>", "canonical": "<ul data-type=\"taskList\"><li data-type=\"taskItem\" data-checked=\"true\"><label contenteditable=\"false\"><input type=\"checkbox\" checked=\"checked\"><span></span></label><div><p>Done</p></div></li></ul>", "warnings": [] },
+    { "name": "heading-blockquote", "input": "<h2>Heading</h2><blockquote><p>Quote</p></blockquote>", "canonical": "<h2>Heading</h2>\n<blockquote><p>Quote</p></blockquote>", "warnings": [] },
+    { "name": "top-level-script", "input": "<script>alert(1)</script><p>Safe</p>", "canonical": "<p>Safe</p>", "warnings": ["unsafe-element"] },
+    { "name": "nested-script", "input": "<table><tr><td><script>alert(1)</script>Safe</td></tr></table>", "canonical": "<table><tr><td>Safe</td></tr></table>", "warnings": ["unsafe-element", "opaque-block"] },
+    { "name": "event-attribute", "input": "<p onclick=\"alert(1)\">Safe</p>", "canonical": "<p>Safe</p>", "warnings": ["unsafe-attribute"] },
+    { "name": "iframe", "input": "<iframe src=\"https://example.com\"></iframe><p>Safe</p>", "canonical": "<p>Safe</p>", "warnings": ["unsafe-element"] },
+    { "name": "image-envelope", "input": "<p>Body</p>\n[[image:41]]", "canonical": "<p>Body</p>\n[[image:41]]", "warnings": [] },
+    { "name": "pending-image-envelope", "input": "<p>Body</p>\n[[image-pending:pending-7]]", "canonical": "<p>Body</p>\n[[image-pending:pending-7]]", "warnings": [] },
+    { "name": "page-link-envelope", "input": "<p>Body</p>\n<!-- pagelink:https://example.com --><p><a href=\"https://example.com\">🔗 Example</a></p>", "canonical": "<p>Body</p>\n<!-- pagelink:https://example.com --><p><a href=\"https://example.com\">🔗 Example</a></p>", "warnings": [] },
+    { "name": "note-link-envelope", "input": "<p>Body</p>\n<!-- notelink:obsidian://open?vault=Ops --><p><a href=\"obsidian://open?vault=Ops\">📎 Runbook</a></p>", "canonical": "<p>Body</p>\n<!-- notelink:obsidian://open?vault=Ops --><p><a href=\"obsidian://open?vault=Ops\">📎 Runbook</a></p>", "warnings": [] },
+    { "name": "unicode", "input": "<p>Zażółć 🧭 &amp; résumé</p>", "canonical": "<p>Zażółć 🧭 &amp; résumé</p>", "warnings": [] }
+  ]
+}

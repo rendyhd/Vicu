@@ -6,8 +6,10 @@ import { Link } from '@tiptap/extension-link'
 import { TaskList } from '@tiptap/extension-task-list'
 import { TaskItem } from '@tiptap/extension-task-item'
 import { Placeholder } from '@tiptap/extension-placeholder'
-import { Bold as BoldIcon, Italic as ItalicIcon, Strikethrough, Code as CodeIcon, List, ListOrdered, Link2 } from 'lucide-react'
+import { Bold as BoldIcon, Italic as ItalicIcon, Strikethrough, Underline as UnderlineIcon, Code as CodeIcon, List, ListOrdered, ListChecks, Link2 } from 'lucide-react'
 import { cn } from '@/lib/cn'
+import { normalizeEditableLink, isAllowedDescriptionUrl } from '@/lib/description-html'
+import { sanitizeTaskHtmlForStorage } from '@/lib/sanitize-html'
 
 interface RichTextEditorProps {
   value: string
@@ -51,13 +53,15 @@ export function RichTextEditor({
       Link.configure({
         openOnClick: false,
         autolink: true,
-        HTMLAttributes: { rel: 'noopener noreferrer', target: '_blank' },
+        protocols: ['mailto'],
+        isAllowedUri: (url) => isAllowedDescriptionUrl(url),
+        HTMLAttributes: {},
       }),
       TaskList,
       TaskItem.configure({ nested: true }),
       Placeholder.configure({ placeholder: placeholder ?? '' }),
     ],
-    content: value,
+    content: sanitizeTaskHtmlForStorage(value),
     autofocus: autoFocus ? 'end' : false,
     editorProps: {
       attributes: {
@@ -77,13 +81,15 @@ export function RichTextEditor({
       },
     },
     onUpdate: ({ editor: e }) => {
-      onChangeRef.current(e.getHTML())
+      onChangeRef.current(sanitizeTaskHtmlForStorage(e.getHTML()))
     },
     onBlur: () => {
       onBlurRef.current?.()
     },
     onCreate: ({ editor: e }) => {
-      onReadyRef.current?.(e.getHTML())
+      const sanitized = sanitizeTaskHtmlForStorage(e.getHTML())
+      if (sanitized !== e.getHTML()) e.commands.setContent(sanitized, { emitUpdate: false })
+      onReadyRef.current?.(sanitized)
     },
   })
 
@@ -96,8 +102,9 @@ export function RichTextEditor({
 
   useEffect(() => {
     if (!editor) return
-    if (editor.getHTML() !== value) {
-      editor.commands.setContent(value, { emitUpdate: false })
+    const sanitized = sanitizeTaskHtmlForStorage(value)
+    if (editor.getHTML() !== sanitized) {
+      editor.commands.setContent(sanitized, { emitUpdate: false })
     }
   }, [value, editor])
 
@@ -131,6 +138,13 @@ export function RichTextEditor({
           <Strikethrough className="h-3.5 w-3.5" />
         </ToolbarButton>
         <ToolbarButton
+          onClick={() => editor.chain().focus().toggleUnderline().run()}
+          active={editor.isActive('underline')}
+          title="Underline"
+        >
+          <UnderlineIcon className="h-3.5 w-3.5" />
+        </ToolbarButton>
+        <ToolbarButton
           onClick={() => editor.chain().focus().toggleCode().run()}
           active={editor.isActive('code')}
           title="Inline code"
@@ -152,14 +166,26 @@ export function RichTextEditor({
         >
           <ListOrdered className="h-3.5 w-3.5" />
         </ToolbarButton>
+        <ToolbarButton
+          onClick={() => editor.chain().focus().toggleTaskList().run()}
+          active={editor.isActive('taskList')}
+          title="Checklist"
+        >
+          <ListChecks className="h-3.5 w-3.5" />
+        </ToolbarButton>
         <span className="mx-0.5 h-4 w-px bg-[var(--border-color)]" />
         <ToolbarButton
           onClick={() => {
             const prev = editor.getAttributes('link').href as string | undefined
-            const url = window.prompt('Link URL', prev ?? 'https://')
-            if (url === null) return
-            if (url === '') {
+            const rawUrl = window.prompt('Link URL', prev ?? '')
+            if (rawUrl === null) return
+            if (rawUrl.trim() === '') {
               editor.chain().focus().unsetLink().run()
+              return
+            }
+            const url = normalizeEditableLink(rawUrl)
+            if (!url) {
+              window.alert('Use an http://, https://, or mailto: link.')
               return
             }
             editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run()

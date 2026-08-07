@@ -8,6 +8,7 @@ declare global {
       removeDueDate(taskId: number, taskData: Record<string, unknown>): Promise<ActionResult>
       updateTask(taskId: number, taskData: Record<string, unknown>): Promise<ActionResult>
       openTaskInBrowser(taskId: number): Promise<void>
+      openTaskInApp(taskId: number): Promise<void>
       closeWindow(): Promise<void>
       setHeight(height: number): Promise<void>
       getPendingCount(): Promise<number>
@@ -57,6 +58,7 @@ interface QuickViewConfig {
 
 import { extractTaskLink, stripNoteLink, stripPageLink, extractNoteLinkHtml, extractPageLinkHtml } from '@/lib/note-link'
 import { sanitizeTaskHtml } from '@/lib/sanitize-html'
+import { hasRichDescriptionBody } from '@/lib/description-html'
 
 function escapeHtml(s: string): string {
   return s
@@ -425,6 +427,12 @@ function enterEditMode(focusDescription = false): void {
   if (item.classList.contains('completed-undo') || item.classList.contains('editing')) return
 
   const taskData: TaskData = JSON.parse(item.dataset.task || '{}')
+  const descriptionBody = stripPageLink(stripNoteLink(taskData.description || ''))
+  const hasRichDescription = hasRichDescriptionBody(descriptionBody)
+  if (focusDescription && hasRichDescription) {
+    void window.quickViewApi.openTaskInApp(Number(taskData.id))
+    return
+  }
   editingItem = item
   item.classList.add('editing')
   ;(item as any)._originalHTML = item.innerHTML
@@ -432,6 +440,7 @@ function enterEditMode(focusDescription = false): void {
   item.innerHTML = ''
   const editWrapper = document.createElement('div')
   editWrapper.className = 'task-edit-wrapper'
+  editWrapper.dataset.preserveRichDescription = String(hasRichDescription)
 
   const titleInput = document.createElement('input') as HTMLInputElement
   titleInput.type = 'text'
@@ -442,8 +451,10 @@ function enterEditMode(focusDescription = false): void {
   const descTextarea = document.createElement('textarea') as HTMLTextAreaElement
   descTextarea.className = 'task-edit-description'
   // Edit as plain text — rich formatting (if any) round-trips through the main window.
-  descTextarea.value = plainTextFromHtml(stripPageLink(stripNoteLink(taskData.description || '')))
-  descTextarea.placeholder = 'Description (optional)'
+  descTextarea.value = plainTextFromHtml(descriptionBody)
+  descTextarea.placeholder = hasRichDescription ? 'Open in Vicu to edit rich description' : 'Description (optional)'
+  descTextarea.readOnly = hasRichDescription
+  descTextarea.title = hasRichDescription ? 'Open the main Vicu window to edit rich formatting' : ''
   descTextarea.rows = 3
 
   editWrapper.appendChild(titleInput)
@@ -452,6 +463,9 @@ function enterEditMode(focusDescription = false): void {
   const hint = document.createElement('div')
   hint.className = 'task-edit-hint'
   hint.textContent = 'Enter to save \u00b7 Shift+Enter for new line \u00b7 Esc to cancel'
+  if (hasRichDescription) {
+    hint.textContent = 'Rich description is preserved · click it to edit in Vicu · Enter saves the title'
+  }
   editWrapper.appendChild(hint)
   item.appendChild(editWrapper)
 
@@ -464,6 +478,11 @@ function enterEditMode(focusDescription = false): void {
 
   descTextarea.addEventListener('keydown', (e) => {
     e.stopPropagation()
+    if (hasRichDescription && e.key === 'Enter') {
+      e.preventDefault()
+      void window.quickViewApi.openTaskInApp(Number(taskData.id))
+      return
+    }
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); saveEdit(item, titleInput.value, descTextarea.value) }
     else if (e.key === 'Escape') { e.preventDefault(); cancelEdit(item) }
     else if (e.key === 'Tab' && e.shiftKey) { e.preventDefault(); titleInput.focus() }
@@ -471,6 +490,11 @@ function enterEditMode(focusDescription = false): void {
 
   titleInput.addEventListener('keypress', (e) => e.stopPropagation())
   descTextarea.addEventListener('keypress', (e) => e.stopPropagation())
+  if (hasRichDescription) {
+    descTextarea.addEventListener('click', () => {
+      void window.quickViewApi.openTaskInApp(Number(taskData.id))
+    })
+  }
 
   if (focusDescription) {
     descTextarea.focus()
@@ -489,10 +513,14 @@ async function saveEdit(item: HTMLElement, newTitle: string, newDescription: str
   const taskId = item.dataset.taskId!
   const taskData: TaskData = JSON.parse(item.dataset.task || '{}')
   // User typed plain text — wrap as <p>…</p> for Vikunja and re-attach preserved link comments.
-  const trimmedDesc = newDescription.trim()
-  const linkHtml = extractNoteLinkHtml(taskData.description) + extractPageLinkHtml(taskData.description)
-  const wrapped = trimmedDesc ? `<p>${escapeHtml(trimmedDesc).replace(/\n/g, '<br>')}</p>` : ''
-  const finalDescription = wrapped + linkHtml
+  const preserveRichDescription = item.querySelector<HTMLElement>('.task-edit-wrapper')?.dataset.preserveRichDescription === 'true'
+  let finalDescription = taskData.description || ''
+  if (!preserveRichDescription) {
+    const trimmedDesc = newDescription.trim()
+    const linkHtml = extractNoteLinkHtml(taskData.description) + extractPageLinkHtml(taskData.description)
+    const wrapped = trimmedDesc ? `<p>${escapeHtml(trimmedDesc).replace(/\n/g, '<br>')}</p>` : ''
+    finalDescription = wrapped + linkHtml
+  }
   const updatedData = { ...taskData, title: trimmedTitle, description: finalDescription }
 
   const result = await window.quickViewApi.updateTask(Number(taskId), updatedData)

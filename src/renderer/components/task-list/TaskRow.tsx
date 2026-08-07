@@ -676,6 +676,7 @@ function TaskRowInner({ task, sortable = false }: TaskRowProps) {
           }}
           onReady={(normalized) => {
             descBaselineRef.current = normalized
+            setEditDescription(normalized)
           }}
           editorRef={descEditorRef}
           placeholder="Notes"

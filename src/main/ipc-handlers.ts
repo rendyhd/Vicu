@@ -572,6 +572,16 @@ export function registerIpcHandlers(): void {
     }
   })
 
+  ipcMain.handle('qv:open-task-in-app', (_event, taskId: number) => {
+    const win = getMainWindow()
+    if (!win || win.isDestroyed()) return
+    if (win.isMinimized()) win.restore()
+    win.show()
+    win.focus()
+    win.webContents.send('navigate-to-task', taskId)
+    hideQuickView()
+  })
+
   ipcMain.handle('qv:close-window', () => {
     hideQuickView()
   })

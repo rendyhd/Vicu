@@ -14,6 +14,7 @@ contextBridge.exposeInMainWorld('quickViewApi', {
   updateTask: (taskId: number, taskData: Record<string, unknown>) =>
     ipcRenderer.invoke('qv:update-task', taskId, taskData),
   openTaskInBrowser: (taskId: number) => ipcRenderer.invoke('qv:open-task-in-browser', taskId),
+  openTaskInApp: (taskId: number) => ipcRenderer.invoke('qv:open-task-in-app', taskId),
   closeWindow: () => ipcRenderer.invoke('qv:close-window'),
   setHeight: (height: number) => ipcRenderer.invoke('qv:set-height', height),
   getPendingCount: () => ipcRenderer.invoke('qv:get-pending-count'),
