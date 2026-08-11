@@ -80,7 +80,7 @@ function TokenPermissionsInfo() {
 
 export { TokenPermissionsInfo }
 
-type Step = 'url' | 'auth-method' | 'oidc-login' | 'password-login' | 'totp' | 'api-token' | 'project'
+type Step = 'url' | 'auth-method' | 'oidc-login' | 'oidc-totp' | 'password-login' | 'totp' | 'api-token' | 'project'
 
 interface SetupViewProps {
   onComplete: () => void
@@ -98,6 +98,7 @@ export function SetupView({ onComplete }: SetupViewProps) {
   const [discovering, setDiscovering] = useState(false)
   const [oidcLogging, setOidcLogging] = useState(false)
   const [oidcError, setOidcError] = useState('')
+  const [selectedOidcProvider, setSelectedOidcProvider] = useState<OIDCProvider | null>(null)
   const [authMethod, setAuthMethod] = useState<'api_token' | 'oidc' | 'password'>('api_token')
 
   // Password login state
@@ -136,9 +137,10 @@ export function SetupView({ onComplete }: SetupViewProps) {
     }
   }
 
-  const handleOidcLogin = async (provider: OIDCProvider) => {
+  const handleOidcLogin = async (provider: OIDCProvider, totpPasscode?: string) => {
     setOidcLogging(true)
     setOidcError('')
+    setSelectedOidcProvider(provider)
 
     // Save partial config so the main process knows the URL and auth method
     await api.saveConfig({
@@ -150,7 +152,11 @@ export function SetupView({ onComplete }: SetupViewProps) {
     })
 
     try {
-      const result = await api.oidcLogin(url.replace(/\/+$/, ''), provider.key)
+      const result = await api.oidcLogin(
+        url.replace(/\/+$/, ''),
+        provider.key,
+        totpPasscode
+      )
 
       if (result.success) {
         setAuthMethod('oidc')
@@ -163,6 +169,10 @@ export function SetupView({ onComplete }: SetupViewProps) {
         } else {
           setOidcError(projectsResult.error)
         }
+      } else if (result.totpRequired) {
+        setStep('oidc-totp')
+        setTotpCode('')
+        if (totpPasscode) setOidcError(result.error)
       } else {
         setOidcError(result.error)
       }
@@ -206,6 +216,8 @@ export function SetupView({ onComplete }: SetupViewProps) {
         }
       } else if (result.totpRequired) {
         setStep('totp')
+        setTotpCode('')
+        if (totpPasscode) setPasswordError(result.error)
       } else {
         setPasswordError(result.error)
       }
@@ -287,6 +299,7 @@ export function SetupView({ onComplete }: SetupViewProps) {
           {step === 'url' && 'Enter your server URL to get started.'}
           {step === 'auth-method' && 'Choose how to sign in.'}
           {step === 'oidc-login' && 'Complete sign-in in your browser.'}
+          {step === 'oidc-totp' && 'Enter your two-factor code to complete SSO.'}
           {step === 'password-login' && 'Sign in with your credentials.'}
           {step === 'totp' && 'Enter your two-factor authentication code.'}
           {step === 'api-token' && 'Enter your API token to connect.'}
@@ -407,6 +420,64 @@ export function SetupView({ onComplete }: SetupViewProps) {
               <button
                 type="button"
                 onClick={() => setStep('url')}
+                className="w-full text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+              >
+                Back
+              </button>
+            </>
+          )}
+
+          {/* Step 2b: OIDC TOTP */}
+          {step === 'oidc-totp' && selectedOidcProvider && (
+            <>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">
+                  Two-Factor Code
+                </label>
+                <input
+                  type="text"
+                  value={totpCode}
+                  onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  placeholder="000000"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  autoFocus
+                  className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2 text-center text-lg tracking-widest text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-accent-blue focus:outline-none"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && totpCode.length === 6) {
+                      handleOidcLogin(selectedOidcProvider, totpCode)
+                    }
+                  }}
+                />
+                <p className="mt-1.5 text-xs text-[var(--text-secondary)]">
+                  Enter the 6-digit code from your authenticator app. Vikunja requires a fresh SSO authorization after the challenge.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => handleOidcLogin(selectedOidcProvider, totpCode)}
+                disabled={totpCode.length !== 6 || oidcLogging}
+                className={cn(
+                  'w-full rounded-md px-4 py-2 text-sm font-medium transition-colors',
+                  'bg-accent-blue text-white hover:bg-accent-blue/90',
+                  'disabled:cursor-not-allowed disabled:opacity-50'
+                )}
+              >
+                {oidcLogging ? 'Waiting for browser...' : 'Continue with SSO'}
+              </button>
+
+              {oidcError && (
+                <p className="text-xs text-accent-red">{oidcError}</p>
+              )}
+
+              <button
+                type="button"
+                onClick={() => {
+                  setTotpCode('')
+                  setOidcError('')
+                  setStep('auth-method')
+                }}
                 className="w-full text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
               >
                 Back

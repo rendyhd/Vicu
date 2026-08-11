@@ -20,6 +20,10 @@ import type {
   AuthCheckResult,
 } from '../renderer/lib/vikunja-types'
 
+type OidcLoginResult =
+  | { success: true }
+  | { success: false; error: string; totpRequired?: boolean }
+
 export interface UpdateStatus {
   available: boolean
   currentVersion: string
@@ -68,7 +72,7 @@ export interface ElectronAPI {
   // Auth
   discoverOidc(url: string): Promise<OIDCProvider[]>
   discoverAuthMethods(url: string): Promise<ServerAuthInfo>
-  oidcLogin(url: string, providerKey: string): Promise<ApiResult<void>>
+  oidcLogin(url: string, providerKey: string, totpPasscode?: string): Promise<OidcLoginResult>
   loginPassword(url: string, username: string, password: string, totpPasscode?: string): Promise<PasswordLoginResult>
   getUser(): Promise<VikunjaUser | null>
   checkAuth(): Promise<AuthCheckResult>

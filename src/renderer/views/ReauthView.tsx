@@ -24,6 +24,7 @@ export function ReauthView({
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [needsTotp, setNeedsTotp] = useState(false)
+  const [needsOidcTotp, setNeedsOidcTotp] = useState(false)
 
   const handlePasswordLogin = async (totpPasscode?: string) => {
     setLoading(true)
@@ -41,6 +42,8 @@ export function ReauthView({
         onSuccess()
       } else if (result.totpRequired) {
         setNeedsTotp(true)
+        setTotpCode('')
+        if (totpPasscode) setError(result.error)
       } else {
         setError(result.error)
       }
@@ -51,14 +54,18 @@ export function ReauthView({
     }
   }
 
-  const handleOidcLogin = async () => {
+  const handleOidcLogin = async (totpPasscode?: string) => {
     setLoading(true)
     setError('')
 
     try {
-      const result = await api.oidcLogin(vikunjaUrl, '')
+      const result = await api.oidcLogin(vikunjaUrl, '', totpPasscode)
       if (result.success) {
         onSuccess()
+      } else if (result.totpRequired) {
+        setNeedsOidcTotp(true)
+        setTotpCode('')
+        if (totpPasscode) setError(result.error)
       } else {
         setError(result.error)
       }
@@ -83,10 +90,10 @@ export function ReauthView({
         </p>
 
         <div className="space-y-4">
-          {authMethod === 'oidc' && (
+          {authMethod === 'oidc' && !needsOidcTotp && (
             <button
               type="button"
-              onClick={handleOidcLogin}
+              onClick={() => handleOidcLogin()}
               disabled={loading}
               className={cn(
                 'w-full rounded-md px-4 py-2.5 text-sm font-medium transition-colors',
@@ -96,6 +103,57 @@ export function ReauthView({
             >
               {loading ? 'Waiting for browser...' : 'Sign in with SSO'}
             </button>
+          )}
+
+          {authMethod === 'oidc' && needsOidcTotp && (
+            <>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">
+                  Two-Factor Code
+                </label>
+                <input
+                  type="text"
+                  value={totpCode}
+                  onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  placeholder="000000"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  autoFocus
+                  className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2 text-center text-lg tracking-widest text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-accent-blue focus:outline-none"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && totpCode.length === 6) handleOidcLogin(totpCode)
+                  }}
+                />
+                <p className="mt-1.5 text-xs text-[var(--text-secondary)]">
+                  Enter the 6-digit code from your authenticator app, then complete SSO once more.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => handleOidcLogin(totpCode)}
+                disabled={totpCode.length !== 6 || loading}
+                className={cn(
+                  'w-full rounded-md px-4 py-2 text-sm font-medium transition-colors',
+                  'bg-accent-blue text-white hover:bg-accent-blue/90',
+                  'disabled:cursor-not-allowed disabled:opacity-50'
+                )}
+              >
+                {loading ? 'Waiting for browser...' : 'Continue with SSO'}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setNeedsOidcTotp(false)
+                  setTotpCode('')
+                  setError('')
+                }}
+                className="w-full text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+              >
+                Back
+              </button>
+            </>
           )}
 
           {authMethod === 'password' && !needsTotp && (

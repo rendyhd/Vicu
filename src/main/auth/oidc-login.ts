@@ -5,9 +5,17 @@ import { hostname } from 'node:os'
 import { discoverProviders, type OIDCProvider } from './oidc-discovery'
 import { storeJWT, storeAPIToken, storeProviderKey, storeRefreshToken } from './token-store'
 import { extractRefreshToken } from './cookie-utils'
+import { isTotpChallenge, parseVikunjaProblem } from './totp'
 
 const TOKEN_EXCHANGE_TIMEOUT = 15_000
 const LOGIN_TIMEOUT = 5 * 60 * 1000 // 5 minutes
+
+export class OidcTotpRequiredError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'OidcTotpRequiredError'
+  }
+}
 
 /**
  * Run the full interactive OIDC login flow:
@@ -23,7 +31,8 @@ const LOGIN_TIMEOUT = 5 * 60 * 1000 // 5 minutes
  */
 export async function loginWithOIDC(
   vikunjaUrl: string,
-  providerKey?: string
+  providerKey?: string,
+  totpPasscode?: string
 ): Promise<string> {
   const baseUrl = vikunjaUrl.replace(/\/+$/, '')
 
@@ -95,6 +104,7 @@ export async function loginWithOIDC(
   console.log('[OIDC] authUrl:', authUrl)
 
   let succeeded = false
+  let preserveSessionForTotpRetry = false
   try {
     // 6. Intercept redirects to extract authorization code
     const codePromise = new Promise<string>((resolve, reject) => {
@@ -158,6 +168,7 @@ export async function loginWithOIDC(
         code,
         scope: provider.scope,
         redirect_url: redirectUri,
+        ...(totpPasscode ? { totp_passcode: totpPasscode } : {}),
       }),
       signal: controller.signal,
     })
@@ -165,6 +176,11 @@ export async function loginWithOIDC(
 
     if (!tokenResponse.ok) {
       const body = await tokenResponse.text().catch(() => '')
+      const { errorCode, message } = parseVikunjaProblem(body, tokenResponse.status)
+      if (isTotpChallenge(tokenResponse.status, errorCode)) {
+        preserveSessionForTotpRetry = true
+        throw new OidcTotpRequiredError(message)
+      }
       throw new Error(
         `Token exchange failed (${tokenResponse.status}): ${body}`
       )
@@ -199,7 +215,7 @@ export async function loginWithOIDC(
     return jwt
   } finally {
     if (win && !win.isDestroyed()) {
-      if (!succeeded) {
+      if (!succeeded && !preserveSessionForTotpRetry) {
         // Clear session cookies on failure so retries start fresh
         await win.webContents.session.clearStorageData().catch(() => {})
       }

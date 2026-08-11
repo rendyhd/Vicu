@@ -149,8 +149,8 @@ class AuthManager {
   /**
    * Interactive OIDC login via system browser.
    */
-  async login(vikunjaUrl: string, providerKey?: string): Promise<void> {
-    await loginWithOIDC(vikunjaUrl, providerKey)
+  async login(vikunjaUrl: string, providerKey?: string, totpPasscode?: string): Promise<void> {
+    await loginWithOIDC(vikunjaUrl, providerKey, totpPasscode)
     this._resetBackoff()
     this._scheduleProactiveRefresh()
   }

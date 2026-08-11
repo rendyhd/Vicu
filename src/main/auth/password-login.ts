@@ -3,10 +3,9 @@ import { storeJWT, storeRefreshToken, storeAPIToken, extractJWTExp } from './tok
 import { extractRefreshToken } from './cookie-utils'
 import { createBackupAPIToken } from './oidc-login'
 import { loadConfig, saveConfig } from '../config'
+import { isTotpChallenge, parseVikunjaProblem } from './totp'
 
 const LOGIN_TIMEOUT = 15_000
-const INVALID_TOTP_ERROR_CODE = 1017
-const USED_TOTP_ERROR_CODE = 1025
 
 interface LoginSuccess {
   success: true
@@ -65,21 +64,8 @@ export async function loginWithPassword(
 
     if (!response.ok) {
       const text = await response.text().catch(() => '')
-      let message = `Login failed (${response.status})`
-      let errorCode: number | undefined
-      try {
-        const parsed = JSON.parse(text)
-        if (typeof parsed.code === 'number') errorCode = parsed.code
-        if (parsed.detail) {
-          message = parsed.detail
-        } else if (parsed.message) {
-          message = parsed.message
-        }
-      } catch { /* use default */ }
-      if (
-        response.status === 412 &&
-        (errorCode === INVALID_TOTP_ERROR_CODE || errorCode === USED_TOTP_ERROR_CODE)
-      ) {
+      const { errorCode, message } = parseVikunjaProblem(text, response.status)
+      if (isTotpChallenge(response.status, errorCode)) {
         return { success: false, error: message, totpRequired: true }
       }
       return { success: false, error: message }

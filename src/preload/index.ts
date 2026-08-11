@@ -70,8 +70,8 @@ const api = {
     ipcRenderer.invoke('auth:discover-oidc', url),
   discoverAuthMethods: (url: string) =>
     ipcRenderer.invoke('auth:discover-methods', url),
-  oidcLogin: (url: string, providerKey: string) =>
-    ipcRenderer.invoke('auth:login-oidc', url, providerKey),
+  oidcLogin: (url: string, providerKey: string, totpPasscode?: string) =>
+    ipcRenderer.invoke('auth:login-oidc', url, providerKey, totpPasscode),
   loginPassword: (url: string, username: string, password: string, totpPasscode?: string) =>
     ipcRenderer.invoke('auth:login-password', url, username, password, totpPasscode),
   getUser: () =>

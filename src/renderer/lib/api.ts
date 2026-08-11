@@ -28,6 +28,10 @@ export type {
   AuthCheckResult,
 }
 
+export type OidcLoginResult =
+  | { success: true }
+  | { success: false; error: string; totpRequired?: boolean }
+
 export const api = {
   fetchTasks: (params: TaskQueryParams) =>
     window.api.fetchTasks(params) as Promise<ApiResult<Task[]>>,
@@ -107,8 +111,8 @@ export const api = {
   discoverAuthMethods: (url: string) =>
     window.api.discoverAuthMethods(url) as Promise<ServerAuthInfo>,
 
-  oidcLogin: (url: string, providerKey: string) =>
-    window.api.oidcLogin(url, providerKey) as Promise<ApiResult<void>>,
+  oidcLogin: (url: string, providerKey: string, totpPasscode?: string) =>
+    window.api.oidcLogin(url, providerKey, totpPasscode) as Promise<OidcLoginResult>,
 
   loginPassword: (url: string, username: string, password: string, totpPasscode?: string) =>
     window.api.loginPassword(url, username, password, totpPasscode) as Promise<PasswordLoginResult>,

@@ -32,6 +32,7 @@ import { loadConfig, saveConfig, type AppConfig } from './config'
 import { discoverProviders, discoverAuthMethods } from './auth/oidc-discovery'
 import { fetchCurrentUser } from './auth/user-info'
 import { authManager } from './auth/auth-manager'
+import { OidcTotpRequiredError } from './auth/oidc-login'
 import { buildViewerFilterParams } from './quick-entry/filter-builder'
 import { applyCustomListTaskFilter, type CustomListClientFilter } from './quick-entry/custom-list-filter'
 import {
@@ -224,12 +225,16 @@ export function registerIpcHandlers(): void {
     return discoverProviders(url)
   })
 
-  ipcMain.handle('auth:login-oidc', async (_event, url: string, providerKey: string) => {
+  ipcMain.handle('auth:login-oidc', async (_event, url: string, providerKey: string, totpPasscode?: string) => {
     try {
-      await authManager.login(url, providerKey)
+      await authManager.login(url, providerKey, totpPasscode)
       return { success: true }
     } catch (err: unknown) {
-      return { success: false, error: err instanceof Error ? err.message : 'Login failed' }
+      return {
+        success: false,
+        error: err instanceof Error ? err.message : 'Login failed',
+        ...(err instanceof OidcTotpRequiredError ? { totpRequired: true } : {}),
+      }
     }
   })
 
