@@ -88,6 +88,8 @@ const api = {
     ipcRenderer.invoke('notifications:reschedule'),
   refreshTaskReminders: () =>
     ipcRenderer.invoke('notifications:refresh-task-reminders'),
+  refreshRoutineReminders: () =>
+    ipcRenderer.invoke('notifications:refresh-routine-reminders'),
 
   // Attachments
   fetchTaskAttachments: (taskId: number) =>

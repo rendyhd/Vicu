@@ -135,6 +135,9 @@ export const api = {
   refreshTaskReminders: () =>
     window.api.refreshTaskReminders() as Promise<void>,
 
+  refreshRoutineReminders: () =>
+    window.api.refreshRoutineReminders() as Promise<void>,
+
   applyQuickEntrySettings: () =>
     window.api.applyQuickEntrySettings() as Promise<{ entry: boolean; viewer: boolean; waylandLimited: boolean }>,
 

@@ -6,6 +6,7 @@ import { useCompletedTasksStore } from '@/stores/completed-tasks-store'
 import type { TaskQueryParams } from '@/lib/vikunja-types'
 import { DEFAULT_PAGE_SIZE } from '@/lib/constants'
 import { fetchAllPages } from '@/lib/fetch-all-pages'
+import { hasRoutineMarker } from '@/lib/routines'
 
 export function useTasks(params: TaskQueryParams, enabled = true) {
   const matches = useMatches()
@@ -32,11 +33,11 @@ export function useTasks(params: TaskQueryParams, enabled = true) {
   // - Completed tasks shown with strikethrough in non-logbook views
   // - Uncompleted tasks shown without strikethrough in logbook
   const data = useMemo(() => {
-    const tasks = query.data ?? []
+    const tasks = (query.data ?? []).filter((task) => !hasRoutineMarker(task.description))
 
     const serverIds = new Set(tasks.map((t) => t.id))
     const extras = Array.from(completedTasks.values())
-      .filter((entry) => entry.path === pathname && !serverIds.has(entry.task.id))
+      .filter((entry) => entry.path === pathname && !serverIds.has(entry.task.id) && !hasRoutineMarker(entry.task.description))
       .map((entry) => entry.task)
 
     if (extras.length === 0) return tasks

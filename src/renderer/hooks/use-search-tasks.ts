@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import type { Task } from '@/lib/vikunja-types'
+import { hasRoutineMarker } from '@/lib/routines'
 
 /**
  * Score how well a task matches a search query.
@@ -50,11 +51,12 @@ export function useSearchTasks(query: string) {
       })
       if (!result.success) throw new Error(result.error)
 
+      const visibleTasks = result.data.filter((task) => !hasRoutineMarker(task.description))
       const terms = query.toLowerCase().split(/\s+/).filter(Boolean)
-      if (terms.length === 0) return result.data
+      if (terms.length === 0) return visibleTasks
 
       // Score and rank results client-side
-      const scored = result.data
+      const scored = visibleTasks
         .map((task) => ({ task, score: scoreTask(task, terms) }))
         .filter((r) => r.score > 0)
         .sort((a, b) => b.score - a.score)

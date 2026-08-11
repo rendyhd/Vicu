@@ -16,6 +16,7 @@ import { TagView } from '@/views/TagView'
 import { SettingsView } from '@/views/SettingsView'
 import { CustomListView } from '@/views/CustomListView'
 import { SearchView } from '@/views/SearchView'
+import { RoutinesView } from '@/views/RoutinesView'
 
 const rootRoute = createRootRoute({
   component: AppShell,
@@ -44,6 +45,12 @@ const upcomingRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/upcoming',
   component: UpcomingView,
+})
+
+const routinesRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/routines',
+  component: RoutinesView,
 })
 
 const anytimeRoute = createRoute({
@@ -101,6 +108,7 @@ const routeTree = rootRoute.addChildren([
   indexRoute,
   inboxRoute,
   todayRoute,
+  routinesRoute,
   upcomingRoute,
   anytimeRoute,
   reviewRoute,

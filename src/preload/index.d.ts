@@ -82,6 +82,7 @@ export interface ElectronAPI {
   testNotification(): Promise<void>
   rescheduleNotifications(): Promise<void>
   refreshTaskReminders(): Promise<void>
+  refreshRoutineReminders(): Promise<void>
 
   // Attachments
   fetchTaskAttachments(taskId: number): Promise<ApiResult<TaskAttachment[]>>

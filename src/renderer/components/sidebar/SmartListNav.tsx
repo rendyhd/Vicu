@@ -1,5 +1,5 @@
 import { useNavigate, useMatches } from '@tanstack/react-router'
-import { Inbox, Sun, Calendar, Layers, BookOpen, RefreshCw } from 'lucide-react'
+import { Inbox, Sun, Calendar, Layers, BookOpen, RefreshCw, HeartPulse } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import type { LucideIcon } from 'lucide-react'
 import { useReviewBadgeCount, useReviewFeatureEnabled } from '@/hooks/use-review'
@@ -15,6 +15,7 @@ interface SmartListItem {
 const ALL_SMART_LISTS: SmartListItem[] = [
   { id: 'inbox', label: 'Inbox', icon: Inbox, path: '/inbox', iconColor: 'text-accent-blue' },
   { id: 'today', label: 'Today', icon: Sun, path: '/today', iconColor: 'text-accent-red' },
+  { id: 'routines', label: 'Routines', icon: HeartPulse, path: '/routines', iconColor: 'text-accent-purple' },
   { id: 'upcoming', label: 'Upcoming', icon: Calendar, path: '/upcoming', iconColor: 'text-accent-orange' },
   { id: 'anytime', label: 'Anytime', icon: Layers, path: '/anytime', iconColor: 'text-accent-teal' },
   { id: 'review', label: 'Review', icon: RefreshCw, path: '/review', iconColor: 'text-accent-purple' },

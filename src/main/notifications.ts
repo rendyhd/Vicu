@@ -9,9 +9,11 @@ const NULL_DATE = '0001-01-01T00:00:00Z'
 // Active timer IDs so we can cancel on reschedule
 let dailyTimerId: ReturnType<typeof setTimeout> | null = null
 let secondaryTimerId: ReturnType<typeof setTimeout> | null = null
+let routineRefreshTimerId: ReturnType<typeof setTimeout> | null = null
 
 // Per-task reminder timers (key: "taskId-timestamp")
 const reminderTimers = new Map<string, ReturnType<typeof setTimeout>>()
+const routineReminderTimers = new Map<string, ReturnType<typeof setTimeout>>()
 
 // Reference to main window (set during init)
 let mainWindowRef: BrowserWindow | null = null
@@ -22,6 +24,8 @@ export function initNotifications(mainWindow: BrowserWindow | null): void {
   mainWindowRef = mainWindow
   scheduleAll()
   refreshTaskReminders()
+  refreshRoutineReminders()
+  scheduleRoutineRefresh()
 }
 
 /** Update the main-window ref after a recreation without rescheduling timers. */
@@ -33,11 +37,73 @@ export function rescheduleNotifications(): void {
   clearTimers()
   scheduleAll()
   refreshTaskReminders()
+  refreshRoutineReminders()
+  scheduleRoutineRefresh()
 }
 
 export function stopNotifications(): void {
   clearTimers()
   clearReminderTimers()
+  clearRoutineReminderTimers()
+}
+
+interface RoutineNotificationPayload {
+  definition: {
+    id: string
+    name: string
+    kind: 'HEALTH' | 'CHORE'
+    amount: string
+    unit: string
+    archived: boolean
+    activeFrom: string
+    schedule:
+      | { type: 'calendar'; weekdays: number[]; weekInterval: number; anchorDate: string }
+      | { type: 'after_completion'; intervalDays: number; firstDueDate: string }
+    slots: Array<{
+      id: string
+      label: string
+      reminderMinutes: number
+      reminderEnabled: boolean
+      followUpMinutes: number
+    }>
+  }
+  occurrences: Record<string, {
+    scheduledDate: string
+    status: 'PENDING' | 'COMPLETED' | 'SKIPPED' | 'NOT_LOGGED'
+  }>
+}
+
+/** Schedule the next three weeks of routine alarms stored in hidden carrier tasks. */
+export async function refreshRoutineReminders(): Promise<void> {
+  clearRoutineReminderTimers()
+  const config = loadConfig()
+  if (!config?.notifications_enabled || config.standalone_mode) return
+
+  const result = await fetchTasks({ per_page: 200, filter: 'done = true' })
+  if (!result.success || !Array.isArray(result.data)) return
+  const now = Date.now()
+  const today = localDateString(new Date())
+
+  for (const task of result.data as Array<Record<string, unknown>>) {
+    const payload = parseRoutinePayload(task.description)
+    if (!payload || payload.definition.archived) continue
+    for (let offset = 0; offset <= 21; offset += 1) {
+      const candidate = addLocalDays(today, offset)
+      const scheduledDate = scheduledRoutineDate(payload, candidate)
+      if (!scheduledDate || scheduledDate < payload.definition.activeFrom) continue
+      for (const slot of payload.definition.slots) {
+        if (!slot.reminderEnabled) continue
+        const key = `${payload.definition.id}:${scheduledDate}:${slot.id}`
+        const status = payload.occurrences[key]?.status ?? 'PENDING'
+        if (status !== 'PENDING') continue
+        const base = localDateAtMinutes(candidate, slot.reminderMinutes).getTime()
+        scheduleRoutineTimer(`${key}:primary`, base, now, payload, slot.label, false, config)
+        if (slot.followUpMinutes > 0) {
+          scheduleRoutineTimer(`${key}:followup`, base + slot.followUpMinutes * 60_000, now, payload, slot.label, true, config)
+        }
+      }
+    }
+  }
 }
 
 export async function refreshTaskReminders(): Promise<void> {
@@ -102,6 +168,20 @@ function clearTimers(): void {
     clearTimeout(secondaryTimerId)
     secondaryTimerId = null
   }
+  if (routineRefreshTimerId !== null) {
+    clearTimeout(routineRefreshTimerId)
+    routineRefreshTimerId = null
+  }
+}
+
+function scheduleRoutineRefresh(): void {
+  if (routineRefreshTimerId !== null) clearTimeout(routineRefreshTimerId)
+  const now = new Date()
+  const next = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 5, 0, 0)
+  routineRefreshTimerId = setTimeout(() => {
+    void refreshRoutineReminders()
+    scheduleRoutineRefresh()
+  }, next.getTime() - now.getTime())
 }
 
 function clearReminderTimers(): void {
@@ -109,6 +189,114 @@ function clearReminderTimers(): void {
     clearTimeout(timerId)
   }
   reminderTimers.clear()
+}
+
+function clearRoutineReminderTimers(): void {
+  for (const timerId of routineReminderTimers.values()) clearTimeout(timerId)
+  routineReminderTimers.clear()
+}
+
+function scheduleRoutineTimer(
+  key: string,
+  triggerAt: number,
+  now: number,
+  payload: RoutineNotificationPayload,
+  slotLabel: string,
+  followUp: boolean,
+  config: AppConfig,
+): void {
+  const delay = triggerAt - now
+  if (delay <= 0 || delay > 2_147_483_647 || routineReminderTimers.has(key)) return
+  const timerId = setTimeout(() => {
+    fireRoutineReminder(payload, slotLabel, followUp, config)
+    routineReminderTimers.delete(key)
+  }, delay)
+  routineReminderTimers.set(key, timerId)
+}
+
+function fireRoutineReminder(
+  payload: RoutineNotificationPayload,
+  slotLabel: string,
+  followUp: boolean,
+  configSnapshot: AppConfig,
+): void {
+  const config = loadConfig() || configSnapshot
+  if (!config.notifications_enabled) return
+  const definition = payload.definition
+  const amount = [definition.amount, definition.unit].filter(Boolean).join(' ')
+  const notification = new Notification({
+    title: followUp ? `Still pending: ${definition.name}` : definition.name,
+    body: [amount, slotLabel, followUp ? 'A gentle follow-up' : definition.kind === 'CHORE' ? 'Chore reminder' : 'Routine reminder'].filter(Boolean).join(' / '),
+    silent: !(config.notifications_task_reminder_sound ?? config.notifications_sound),
+    timeoutType: (config.notifications_task_reminder_persistent ?? config.notifications_persistent) ? 'never' : 'default',
+    icon: getIcon(),
+  })
+  notification.on('click', () => {
+    showMainWindow()
+    mainWindowRef?.webContents.send('navigate', '/routines')
+  })
+  notification.show()
+}
+
+function parseRoutinePayload(description: unknown): RoutineNotificationPayload | null {
+  if (typeof description !== 'string') return null
+  const marker = description.match(/<!--\s*vicu-routine:v1:([A-Za-z0-9_-]+={0,2})\s*-->/)
+  if (!marker) return null
+  try {
+    const payload = JSON.parse(Buffer.from(marker[1], 'base64url').toString('utf8')) as RoutineNotificationPayload
+    if (!payload?.definition?.id || !Array.isArray(payload.definition.slots)) return null
+    return payload
+  } catch {
+    return null
+  }
+}
+
+function localDateString(date: Date): string {
+  return `${date.getFullYear()}-${`${date.getMonth() + 1}`.padStart(2, '0')}-${`${date.getDate()}`.padStart(2, '0')}`
+}
+
+function parseLocalDate(value: string): Date {
+  const [year, month, day] = value.split('-').map(Number)
+  return new Date(year, month - 1, day, 12)
+}
+
+function addLocalDays(value: string, days: number): string {
+  const date = parseLocalDate(value)
+  date.setDate(date.getDate() + days)
+  return localDateString(date)
+}
+
+function isoWeekday(value: string): number {
+  return parseLocalDate(value).getDay() || 7
+}
+
+function isoWeekStart(value: string): Date {
+  const date = parseLocalDate(value)
+  date.setDate(date.getDate() + 1 - (date.getDay() || 7))
+  return date
+}
+
+function scheduledRoutineDate(payload: RoutineNotificationPayload, candidate: string): string | null {
+  const { schedule } = payload.definition
+  if (schedule.type === 'calendar') {
+    if (candidate < schedule.anchorDate) return null
+    if (schedule.weekdays.length > 0 && !schedule.weekdays.includes(isoWeekday(candidate))) return null
+    const weeks = Math.round((isoWeekStart(candidate).getTime() - isoWeekStart(schedule.anchorDate).getTime()) / (7 * 86_400_000))
+    return weeks % Math.max(1, schedule.weekInterval) === 0 ? candidate : null
+  }
+  const latest = Object.values(payload.occurrences)
+    .filter((record) => record.status === 'COMPLETED')
+    .map((record) => record.scheduledDate)
+    .sort()
+    .at(-1)
+  const due = latest ? addLocalDays(latest, Math.max(1, schedule.intervalDays)) : schedule.firstDueDate
+  return candidate === due ? due : null
+}
+
+function localDateAtMinutes(value: string, minutes: number): Date {
+  const date = parseLocalDate(value)
+  date.setHours(Math.max(0, Math.min(23, Math.floor(minutes / 60))), Math.max(0, Math.min(59, minutes % 60)), 0, 0)
+  return date
 }
 
 function fireTaskReminder(taskId: number, title: string, configSnapshot: AppConfig): void {

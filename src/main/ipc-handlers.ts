@@ -47,7 +47,7 @@ import {
   getLastShortcutStatus,
 } from './quick-entry-state'
 import { getAPIToken, storeAPIToken, isEncryptionAvailable, API_TOKEN_NO_EXPIRY } from './auth/token-store'
-import { sendTestNotification, rescheduleNotifications, refreshTaskReminders } from './notifications'
+import { sendTestNotification, rescheduleNotifications, refreshTaskReminders, refreshRoutineReminders } from './notifications'
 import { setTaskBadge, clearTaskBadge } from './badge'
 import { getActiveNote, testObsidianConnection } from './obsidian-client'
 import { isRegistered, registerHosts } from './browser-host-registration'
@@ -622,6 +622,10 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle('notifications:refresh-task-reminders', () => {
     refreshTaskReminders()
+  })
+
+  ipcMain.handle('notifications:refresh-routine-reminders', () => {
+    refreshRoutineReminders()
   })
 
   // --- Apply Quick Entry Settings (called from renderer settings page) ---

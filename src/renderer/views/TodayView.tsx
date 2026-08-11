@@ -8,6 +8,7 @@ import { TaskList } from '@/components/task-list/TaskList'
 import { TaskRow } from '@/components/task-list/TaskRow'
 import { api } from '@/lib/api'
 import type { Task } from '@/lib/vikunja-types'
+import { RoutineTodaySection } from '@/components/routines/RoutineTodaySection'
 
 function groupByProject(tasks: Task[], projectsFlat?: { id: number; title: string }[]) {
   const activeIds = new Set(projectsFlat?.map((project) => project.id) ?? [])
@@ -109,6 +110,7 @@ export function TodayView() {
       emptyTitle="All clear for today"
       emptySubtitle="Tasks due today will appear here"
     >
+      <RoutineTodaySection />
       {overdueTasks.length > 0 && (
         <div>
           <div className="px-6 pb-1 pt-2">
