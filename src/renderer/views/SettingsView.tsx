@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
+import { useNavigate, useRouter } from '@tanstack/react-router'
 import { api, type VikunjaUser } from '@/lib/api'
 import { APP_CONFIG_QUERY_KEY } from '@/hooks/use-app-config'
 import { cn } from '@/lib/cn'
@@ -22,6 +23,8 @@ type SettingsTab = 'general' | 'projects' | 'integrations' | 'notifications' | '
 
 export function SettingsView() {
   const queryClient = useQueryClient()
+  const navigate = useNavigate()
+  const router = useRouter()
   const [activeTab, setActiveTab] = useState<SettingsTab>('general')
   const [url, setUrl] = useState('')
   const [token, setToken] = useState('')
@@ -44,6 +47,22 @@ export function SettingsView() {
   // Auto-save with debounce
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const pendingConfigRef = useRef<AppConfig | null>(null)
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || event.defaultPrevented || event.isComposing) return
+
+      event.preventDefault()
+      if (router.history.canGoBack()) {
+        router.history.back()
+      } else {
+        navigate({ to: '/inbox', replace: true })
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [navigate, router])
 
   useEffect(() => {
     api.getConfig().then((config) => {
