@@ -96,6 +96,8 @@ export interface AppConfig {
   nlp_syntax_mode?: 'todoist' | 'vikunja'
   // Delete confirmation
   confirm_before_delete?: boolean
+  // Subtask presentation in task lists
+  subtask_display?: 'inside_task' | 'expandable'
   // Task completion sound
   task_completion_sound_enabled?: boolean
   task_completion_sound_path?: string | null
@@ -120,6 +122,7 @@ const DEFAULT_CONFIG: AppConfig = {
   api_token: '',
   inbox_project_id: 0,
   theme: 'system',
+  subtask_display: 'inside_task',
   review: {
     enabled: true,
     default_cadence_days: 14,
@@ -266,6 +269,8 @@ function normalizeConfig(raw: Record<string, unknown>): AppConfig {
     // NLP task parser
     nlp_enabled: raw.nlp_enabled !== false,
     nlp_syntax_mode: raw.nlp_syntax_mode === 'vikunja' ? 'vikunja' : 'todoist',
+    confirm_before_delete: raw.confirm_before_delete !== false,
+    subtask_display: raw.subtask_display === 'expandable' ? 'expandable' : 'inside_task',
     // Task completion sound
     task_completion_sound_enabled: raw.task_completion_sound_enabled !== false,
     task_completion_sound_path: typeof raw.task_completion_sound_path === 'string'

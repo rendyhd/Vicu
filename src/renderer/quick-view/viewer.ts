@@ -90,6 +90,24 @@ const CACHE_TTL_MS = 30000
 const completedTasks = new Map<string, TaskData>()
 const cachedCompletions = new Set<string>()
 
+function unfinishedDescendants(task: TaskData): TaskData[] {
+  const result: TaskData[] = []
+  const visited = new Set<number | string>([task.id])
+
+  const visit = (parent: TaskData) => {
+    const related = parent.related_tasks as Record<string, TaskData[]> | null | undefined
+    for (const child of related?.subtask ?? []) {
+      if (visited.has(child.id)) continue
+      visited.add(child.id)
+      if (!child.done) result.push(child)
+      visit(child)
+    }
+  }
+
+  visit(task)
+  return result
+}
+
 function measureContentHeight(): number {
   let height = 2
   const dh = container.querySelector('.drag-handle')
@@ -330,6 +348,16 @@ function showCompletedMessage(item: HTMLElement, taskId: number | string, wasCac
 
 async function completeTask(taskId: number | string, itemElement: HTMLElement, checkbox: HTMLInputElement | null): Promise<void> {
   const originalTask: TaskData = JSON.parse(itemElement.dataset.task || '{}')
+  const autoCompletedSubtasks = unfinishedDescendants(originalTask)
+  if (autoCompletedSubtasks.length > 0) {
+    const ok = window.confirm(
+      `Complete this task and ${autoCompletedSubtasks.length} unfinished ${autoCompletedSubtasks.length === 1 ? 'subtask' : 'subtasks'}?`,
+    )
+    if (!ok) {
+      if (checkbox) checkbox.checked = false
+      return
+    }
+  }
   if (checkbox) checkbox.disabled = true
   itemElement.classList.add('completing')
 
@@ -337,7 +365,10 @@ async function completeTask(taskId: number | string, itemElement: HTMLElement, c
 
   if (result.success) {
     lastFetchResult = null
-    completedTasks.set(String(taskId), originalTask)
+    completedTasks.set(String(taskId), {
+      ...originalTask,
+      __vicu_auto_completed_subtasks: autoCompletedSubtasks,
+    })
     const wasCached = !!result.cached
     if (wasCached) cachedCompletions.add(String(taskId))
     showCompletedMessage(itemElement, taskId, wasCached)

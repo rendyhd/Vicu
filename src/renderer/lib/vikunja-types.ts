@@ -225,6 +225,8 @@ export interface AppConfig {
   nlp_syntax_mode?: 'todoist' | 'vikunja'
   // Delete confirmation
   confirm_before_delete?: boolean
+  // Subtask presentation in task lists
+  subtask_display?: 'inside_task' | 'expandable'
   // Task completion sound
   task_completion_sound_enabled?: boolean
   task_completion_sound_path?: string | null

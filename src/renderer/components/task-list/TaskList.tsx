@@ -6,7 +6,7 @@ import { cn } from '@/lib/cn'
 import { verticalListSortingStrategyForeignSafe } from '@/lib/sortable-strategy'
 import { useCreateTask, useCompleteTask, useUpdateTask, useDeleteTask, useAddLabel, useCreateLabel, useUploadAttachmentFromPaste } from '@/hooks/use-task-mutations'
 import { useSelectionStore } from '@/stores/selection-store'
-import { orderedTaskIds, resolveSelectedTasks, copySelectedTitles } from '@/lib/task-selection'
+import { orderedTaskIds, resolveSelectedTasks, copySelectedTitles, isTaskNestedInCurrentList } from '@/lib/task-selection'
 import { confirmDelete } from '@/lib/confirm-bridge'
 import { useTaskParser } from '@/hooks/use-task-parser'
 import { useLabels } from '@/hooks/use-labels'
@@ -20,6 +20,8 @@ import { EmptyState } from '@/components/shared/EmptyState'
 import type { ChipData } from '@/components/task-input/TokenChip'
 import { TaskDescription, type PendingImage } from './TaskDescription'
 import { replacePendingTokens } from '@/lib/image-tokens'
+import { taskDescendants, unfinishedDescendants } from '@/lib/task-hierarchy'
+import { confirmTaskCompletion } from '@/lib/task-completion'
 
 interface TaskListProps {
   title: string
@@ -372,10 +374,25 @@ export function TaskList({
       // Ctrl+K / ⌘K with a multi-selection: complete every selected task.
       if ((e.ctrlKey || e.metaKey) && e.key === 'k' && selectedTaskIds.size > 0) {
         e.preventDefault()
-        resolveSelectedTasks(qc, selectedTaskIds).forEach((t) => {
-          if (!t.done) completeTask.mutate(t)
-        })
-        clearSelection()
+        const targets = resolveSelectedTasks(qc, selectedTaskIds).filter((task) => !task.done)
+        const descendantCount = new Set(
+          targets.flatMap((task) => unfinishedDescendants(task).map((child) => child.id)),
+        ).size
+        void (async () => {
+          if (descendantCount > 0) {
+            const ok = await confirmDelete(
+              `Complete ${targets.length} ${targets.length === 1 ? 'task' : 'tasks'} and ${descendantCount} unfinished ${descendantCount === 1 ? 'subtask' : 'subtasks'}?`,
+              { force: true, confirmLabel: 'Complete all', destructive: false },
+            )
+            if (!ok) return
+          }
+          targets.forEach((task) => completeTask.mutate(
+            isTaskNestedInCurrentList(task)
+              ? { task, suppressTopLevelUndo: true }
+              : task,
+          ))
+          clearSelection()
+        })()
         return
       }
 
@@ -384,13 +401,20 @@ export function TaskList({
         e.preventDefault()
         const targets = resolveSelectedTasks(qc, selectedTaskIds)
         if (targets.length === 0) return
+        if (targets.some((task) => taskDescendants(task).length > 0)) {
+          void confirmDelete(
+            'This selection includes a parent task. Open that parent to choose whether its subtasks should be deleted or kept.',
+            { force: true, confirmLabel: 'Close', destructive: false },
+          )
+          return
+        }
         const message =
           targets.length > 1
             ? `Delete ${targets.length} tasks? This cannot be undone.`
             : 'Delete this task? This cannot be undone.'
         void confirmDelete(message).then((ok) => {
           if (!ok) return
-          targets.forEach((t) => deleteTask.mutate(t.id))
+          targets.forEach((t) => deleteTask.mutate({ task: t }))
           clearSelection()
         })
         return
@@ -469,18 +493,26 @@ export function TaskList({
         const targetId = expandedTaskId || focusedTaskId
         if (!targetId) return
         const task = tasks.find((t) => t.id === targetId)
+          ?? resolveSelectedTasks(qc, new Set([targetId]))[0]
         if (task && !task.done) {
-          completeTask.mutate(task)
-          collapseAll()
-          // Move focus to next task
-          const idx = tasks.findIndex((t) => t.id === targetId)
-          if (idx < taskCount - 1) {
-            setFocusedTask(tasks[idx + 1].id)
-          } else if (idx > 0) {
-            setFocusedTask(tasks[idx - 1].id)
-          } else {
-            setFocusedTask(null)
-          }
+          void confirmTaskCompletion(task).then((ok) => {
+            if (!ok) return
+            completeTask.mutate(
+              isTaskNestedInCurrentList(task)
+                ? { task, suppressTopLevelUndo: true }
+                : task,
+            )
+            collapseAll()
+            // Move focus to the next top-level task; nested rows simply clear focus.
+            const idx = tasks.findIndex((item) => item.id === targetId)
+            if (idx >= 0 && idx < taskCount - 1) {
+              setFocusedTask(tasks[idx + 1].id)
+            } else if (idx > 0) {
+              setFocusedTask(tasks[idx - 1].id)
+            } else {
+              setFocusedTask(null)
+            }
+          })
         }
         return
       }

@@ -3,6 +3,7 @@ import { useSubtasks } from '@/hooks/use-subtasks'
 import { useCreateSubtask, useCompleteTask } from '@/hooks/use-task-mutations'
 import { cn } from '@/lib/cn'
 import type { Task } from '@/lib/vikunja-types'
+import { confirmTaskCompletion } from '@/lib/task-completion'
 
 interface SubtaskListProps {
   parentTask: Task
@@ -45,8 +46,10 @@ export function SubtaskList({ parentTask, showInput = false }: SubtaskListProps)
             <div key={st.id} className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={() => {
-                  if (!st.done) completeTask.mutate(st)
+                onClick={async () => {
+                  if (!st.done && await confirmTaskCompletion(st)) {
+                    completeTask.mutate({ task: st, suppressTopLevelUndo: true })
+                  }
                 }}
                 className={cn(
                   'flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded border transition-colors',

@@ -1,6 +1,7 @@
 import type { QueryClient } from '@tanstack/react-query'
 import type { Task } from '@/lib/vikunja-types'
 import type { SectionTaskCacheEntry } from '@/lib/section-task-cache'
+import { taskDescendants } from '@/lib/task-hierarchy'
 
 /**
  * Visible task rows in document (visual) order. The only elements carrying
@@ -22,6 +23,12 @@ export function orderedTaskIds(): number[] {
   return ids
 }
 
+export function isTaskNestedInCurrentList(task: Task): boolean {
+  return (task.related_tasks?.parenttask ?? []).some((parent) =>
+    document.querySelector(`[data-task-id="${parent.id}"]`) !== null,
+  )
+}
+
 /**
  * Resolve selected ids to full Task objects by scanning the same three TanStack
  * cache families the mutations read: ['tasks'] (smart lists/search),
@@ -39,7 +46,9 @@ export function resolveSelectedTasks(qc: QueryClient, ids: Set<number>): Task[] 
   for (const [, data] of flat) {
     if (!data) continue
     for (const t of data) {
-      if (ids.has(t.id) && !map.has(t.id)) map.set(t.id, t)
+      for (const candidate of [t, ...taskDescendants(t)]) {
+        if (ids.has(candidate.id) && !map.has(candidate.id)) map.set(candidate.id, candidate)
+      }
     }
   }
 
@@ -49,7 +58,9 @@ export function resolveSelectedTasks(qc: QueryClient, ids: Set<number>): Task[] 
     if (!sections) continue
     for (const s of sections) {
       for (const t of s.tasks) {
-        if (ids.has(t.id) && !map.has(t.id)) map.set(t.id, t)
+        for (const candidate of [t, ...taskDescendants(t)]) {
+          if (ids.has(candidate.id) && !map.has(candidate.id)) map.set(candidate.id, candidate)
+        }
       }
     }
   }

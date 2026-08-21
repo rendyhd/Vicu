@@ -1,5 +1,5 @@
 import { forwardRef, memo, useState, useRef, useEffect, useCallback, useImperativeHandle, useMemo } from 'react'
-import { Calendar, Tag, ListChecks, FolderOpen, Trash2, Bell, Repeat, Paperclip, Info, Flag, AlignLeft } from 'lucide-react'
+import { Calendar, Tag, ListChecks, FolderOpen, Trash2, Bell, Repeat, Paperclip, Info, Flag, AlignLeft, ChevronRight } from 'lucide-react'
 import type { Editor } from '@tiptap/react'
 import { useDraggable } from '@dnd-kit/core'
 import { useSortable, defaultAnimateLayoutChanges } from '@dnd-kit/sortable'
@@ -36,6 +36,13 @@ import { useLabels } from '@/hooks/use-labels'
 import { useProjects } from '@/hooks/use-projects'
 import { extractBangToday, recurrenceToVikunja } from '@/lib/task-parser'
 import { TaskInputParser } from '@/components/task-input/TaskInputParser'
+import { useAppConfig } from '@/hooks/use-app-config'
+import {
+  parentTitle,
+  subtaskProgress,
+  taskDescendants,
+} from '@/lib/task-hierarchy'
+import { confirmTaskCompletion } from '@/lib/task-completion'
 
 type PopoverType = 'date' | 'label' | 'project' | 'subtasks' | 'reminder' | 'attachment' | 'info' | 'priority' | null
 
@@ -61,6 +68,8 @@ function getLabelStyle(rawHex: string | undefined): React.CSSProperties {
 interface TaskRowProps {
   task: Task
   sortable?: boolean
+  nestedDepth?: number
+  parentProjectId?: number
 }
 
 // Animate displacement during active drag, but never animate layout changes after drop.
@@ -294,7 +303,7 @@ const TaskTitleEditor = forwardRef<TaskTitleEditorHandle, TaskTitleEditorProps>(
   },
 )
 
-function TaskRowInner({ task, sortable = false }: TaskRowProps) {
+function TaskRowInner({ task, sortable = false, nestedDepth = 0, parentProjectId }: TaskRowProps) {
   // Per-field subscriptions: each row re-renders only when *its own* derived
   // state flips, not on every focus/selection change anywhere in the list.
   const isExpanded = useSelectionStore((s) => s.expandedTaskId === task.id)
@@ -313,6 +322,7 @@ function TaskRowInner({ task, sortable = false }: TaskRowProps) {
   const deleteTask = useDeleteTask()
   const { confirmDelete, dialogProps } = useConfirmDelete()
   const uploadFromDrop = useUploadAttachmentFromDrop()
+  const { data: appConfig } = useAppConfig()
 
   const { attributes, listeners, setNodeRef, isDragging, style } = useDragBehavior(task, sortable)
 
@@ -320,7 +330,12 @@ function TaskRowInner({ task, sortable = false }: TaskRowProps) {
   const [isDragOver, setIsDragOver] = useState(false)
   const [dropError, setDropError] = useState<string | null>(null)
   const noteLinkHtml = extractNoteLinkHtml(task.description) + extractPageLinkHtml(task.description)
-  const subtaskCount = task.related_tasks?.subtask?.length ?? 0
+  const directSubtasks = task.related_tasks?.subtask ?? []
+  const progress = subtaskProgress(task)
+  const subtaskCount = progress.total
+  const canExpandSubtasks = appConfig?.subtask_display === 'expandable' && directSubtasks.length > 0
+  const [subtasksExpanded, setSubtasksExpanded] = useState(false)
+  const [structuralDeleteOpen, setStructuralDeleteOpen] = useState(false)
   const [activePopover, setActivePopover] = useState<PopoverType>(null)
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null)
   const titleEditorRef = useRef<TaskTitleEditorHandle>(null)
@@ -404,7 +419,7 @@ function TaskRowInner({ task, sortable = false }: TaskRowProps) {
 
   // Handle keyboard shortcuts inside expanded task inputs
   const handleExpandedKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
+    async (e: React.KeyboardEvent) => {
       // Ctrl+Enter / ⌘Enter: save and close
       if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
         e.preventDefault()
@@ -417,8 +432,10 @@ function TaskRowInner({ task, sortable = false }: TaskRowProps) {
         e.preventDefault()
         if (!task.done) {
           handleSave()
-          completeTask.mutate(task)
-          collapseAll()
+          if (await confirmTaskCompletion(task)) {
+            completeTask.mutate(nestedDepth > 0 ? { task, suppressTopLevelUndo: true } : task)
+            collapseAll()
+          }
         }
         return
       }
@@ -487,7 +504,10 @@ function TaskRowInner({ task, sortable = false }: TaskRowProps) {
           isDragOver && 'ring-2 ring-inset ring-[var(--accent-blue)] bg-[var(--accent-blue)]/5',
           dropError && 'ring-2 ring-inset ring-red-500 bg-red-500/5'
         )}
-        style={style}
+        style={{
+          ...style,
+          paddingLeft: `${16 + nestedDepth * 20}px`,
+        }}
         onClick={(e) => {
           // Event handlers want current-at-click values — read them
           // imperatively instead of subscribing the row to every change.
@@ -540,7 +560,7 @@ function TaskRowInner({ task, sortable = false }: TaskRowProps) {
         {...listeners}
         {...attributes}
       >
-        <TaskCheckbox task={task} />
+        <TaskCheckbox task={task} suppressTopLevelUndo={nestedDepth > 0} />
 
         {labels.length > 0 && (
           <div className="flex shrink-0 items-center gap-1">
@@ -556,18 +576,24 @@ function TaskRowInner({ task, sortable = false }: TaskRowProps) {
           </div>
         )}
 
-        <span
-          className={cn(
-            'min-w-0 flex-1 break-words text-[13px] text-[var(--text-primary)]',
-            task.done && 'text-[var(--text-secondary)] line-through'
+        <div className="min-w-0 flex-1">
+          <span
+            className={cn(
+              'block break-words text-[13px] text-[var(--text-primary)]',
+              task.done && 'text-[var(--text-secondary)] line-through'
+            )}
+          >
+            {dropError ? <span className="text-red-500">{dropError}</span> : task.title}
+          </span>
+          {nestedDepth === 0 && parentTitle(task) && (
+            <span className="block truncate text-[10px] text-[var(--text-secondary)]">
+              Subtask of {parentTitle(task)}
+            </span>
           )}
-        >
-          {dropError ? (
-            <span className="text-red-500">{dropError}</span>
-          ) : (
-            task.title
+          {nestedDepth > 0 && parentProjectId !== undefined && parentProjectId !== task.project_id && (
+            <span className="block text-[10px] text-[var(--text-secondary)]">Different project</span>
           )}
-        </span>
+        </div>
 
         <TaskLinkIcon description={task.description} />
 
@@ -579,10 +605,26 @@ function TaskRowInner({ task, sortable = false }: TaskRowProps) {
             />
           )}
           {subtaskCount > 0 && (
-            <ListChecks
-              className="h-3 w-3 text-[var(--text-secondary)]"
-              aria-label={`${subtaskCount} ${subtaskCount === 1 ? 'subtask' : 'subtasks'}`}
-            />
+            <button
+              type="button"
+              disabled={!canExpandSubtasks}
+              onClick={(e) => {
+                e.stopPropagation()
+                if (canExpandSubtasks) setSubtasksExpanded((expanded) => !expanded)
+              }}
+              className={cn(
+                'flex items-center gap-0.5 text-[10px] text-[var(--text-secondary)]',
+                canExpandSubtasks && 'rounded px-0.5 hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]',
+              )}
+              aria-label={`${progress.completed} of ${progress.total} subtasks complete`}
+              aria-expanded={canExpandSubtasks ? subtasksExpanded : undefined}
+            >
+              {canExpandSubtasks && (
+                <ChevronRight className={cn('h-3 w-3 transition-transform', subtasksExpanded && 'rotate-90')} />
+              )}
+              <ListChecks className="h-3 w-3" />
+              <span>{progress.completed}/{progress.total}</span>
+            </button>
           )}
           {(task.repeat_after ?? 0) > 0 || (task.repeat_mode ?? 0) > 0 ? (
             <Repeat className="h-3 w-3 text-[var(--text-secondary)]" />
@@ -615,6 +657,15 @@ function TaskRowInner({ task, sortable = false }: TaskRowProps) {
           onClose={() => setContextMenu(null)}
         />
       )}
+      {canExpandSubtasks && subtasksExpanded && directSubtasks.map((child) => (
+        <TaskRow
+          key={child.id}
+          task={child}
+          sortable={false}
+          nestedDepth={nestedDepth + 1}
+          parentProjectId={task.project_id}
+        />
+      ))}
       </>
     )
   }
@@ -635,7 +686,7 @@ function TaskRowInner({ task, sortable = false }: TaskRowProps) {
     >
       {/* Title row */}
       <div className="flex items-start gap-3 px-4 pt-3">
-        <TaskCheckbox task={task} className="mt-0.5" />
+        <TaskCheckbox task={task} className="mt-0.5" suppressTopLevelUndo={nestedDepth > 0} />
         <TaskTitleEditor
           ref={titleEditorRef}
           task={task}
@@ -885,9 +936,13 @@ function TaskRowInner({ task, sortable = false }: TaskRowProps) {
           <button
             type="button"
             onClick={async () => {
+              if (taskDescendants(task).length > 0) {
+                setStructuralDeleteOpen(true)
+                return
+              }
               const ok = await confirmDelete('Delete this task? This cannot be undone.')
               if (ok) {
-                deleteTask.mutate(task.id)
+                deleteTask.mutate({ task })
                 collapseAll()
               }
             }}
@@ -899,6 +954,23 @@ function TaskRowInner({ task, sortable = false }: TaskRowProps) {
         </div>
       </div>
       <ConfirmDialog {...dialogProps} />
+      <ConfirmDialog
+        open={structuralDeleteOpen}
+        message={`This task has ${taskDescendants(task).length} ${taskDescendants(task).length === 1 ? 'subtask' : 'subtasks'}. Delete them too, or keep them as standalone tasks?`}
+        confirmLabel="Delete all"
+        onConfirm={() => {
+          setStructuralDeleteOpen(false)
+          deleteTask.mutate({ task, deleteSubtasks: true })
+          collapseAll()
+        }}
+        secondaryLabel="Keep subtasks"
+        onSecondary={() => {
+          setStructuralDeleteOpen(false)
+          deleteTask.mutate({ task, deleteSubtasks: false })
+          collapseAll()
+        }}
+        onCancel={() => setStructuralDeleteOpen(false)}
+      />
     </div>
   )
 }

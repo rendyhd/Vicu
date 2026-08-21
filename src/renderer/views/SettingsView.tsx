@@ -340,6 +340,25 @@ export function SettingsView() {
               </span>
             </label>
 
+            <label className="flex items-center justify-between gap-4">
+              <span>
+                <span className="block text-sm text-[var(--text-primary)]">Subtasks in task lists</span>
+                <span className="block text-xs text-[var(--text-secondary)]">
+                  Keep them in task details, or expand them below the parent.
+                </span>
+              </span>
+              <select
+                value={fullConfig?.subtask_display ?? 'inside_task'}
+                onChange={(e) => handleQuickEntryChange({
+                  subtask_display: e.target.value as 'inside_task' | 'expandable',
+                })}
+                className="rounded-md border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-1.5 text-sm text-[var(--text-primary)]"
+              >
+                <option value="inside_task">Inside task</option>
+                <option value="expandable">Expandable</option>
+              </select>
+            </label>
+
             <label className="flex cursor-pointer items-center gap-2">
               <input
                 type="checkbox"

@@ -67,6 +67,7 @@ export function mergeProjectUndoWindow(
     .filter(
       (entry) =>
         entry.path === pathname &&
+        !entry.suppressTopLevelUndo &&
         (projectId == null || entry.task.project_id === projectId) &&
         !serverIds.has(entry.task.id)
     )
@@ -92,7 +93,9 @@ export function mergeProjectUndoWindow(
 export function mergeSectionUndoWindow<
   S extends { tasks: Task[]; project: { id: number } },
 >(sections: S[], completed: Map<number, CompletedTaskEntry>, pathname: string): S[] {
-  const samePath = Array.from(completed.values()).filter((e) => e.path === pathname)
+  const samePath = Array.from(completed.values()).filter(
+    (e) => e.path === pathname && !e.suppressTopLevelUndo,
+  )
   let changed = false
   const next = sections.map((section) => {
     const visible = evictForeignCompletions(section.tasks, completed, pathname)

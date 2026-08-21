@@ -37,7 +37,7 @@ export function useTasks(params: TaskQueryParams, enabled = true) {
 
     const serverIds = new Set(tasks.map((t) => t.id))
     const extras = Array.from(completedTasks.values())
-      .filter((entry) => entry.path === pathname && !serverIds.has(entry.task.id) && !hasRoutineMarker(entry.task.description))
+      .filter((entry) => entry.path === pathname && !entry.suppressTopLevelUndo && !serverIds.has(entry.task.id) && !hasRoutineMarker(entry.task.description))
       .map((entry) => entry.task)
 
     if (extras.length === 0) return tasks

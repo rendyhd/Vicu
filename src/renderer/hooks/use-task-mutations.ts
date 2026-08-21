@@ -4,6 +4,12 @@ import { api } from '@/lib/api'
 import { useCompletedTasksStore } from '@/stores/completed-tasks-store'
 import { sortProjectTasks } from '@/lib/task-sort'
 import { playCompletionSound } from '@/lib/completion-sound'
+import {
+  mapTaskDoneByIds,
+  removeTaskIdsFromTree,
+  taskDescendants,
+  unfinishedDescendants,
+} from '@/lib/task-hierarchy'
 import type {
   Task,
   TaskAttachment,
@@ -252,14 +258,25 @@ export function useDeleteTask() {
   const removeCompleted = useCompletedTasksStore((s) => s.remove)
 
   return useMutation({
-    mutationFn: async (id: number) => {
-      const result = await api.deleteTask(id)
-      if (!result.success) throw new Error(result.error)
+    mutationFn: async ({ task, deleteSubtasks = true }: { task: Task; deleteSubtasks?: boolean }) => {
+      const targets = deleteSubtasks
+        ? [...taskDescendants(task).reverse(), task]
+        : [task]
+      for (const target of targets) {
+        const result = await api.deleteTask(target.id)
+        if (!result.success) throw new Error(result.error)
+      }
     },
-    onMutate: async (id) => {
+    onMutate: async ({ task, deleteSubtasks = true }) => {
+      const ids = new Set<number>([
+        task.id,
+        ...(deleteSubtasks ? taskDescendants(task).map((item) => item.id) : []),
+      ])
       // Remove from completed-tasks store so merge logic doesn't re-inject it
-      const completedEntry = useCompletedTasksStore.getState().tasks.get(id)
-      removeCompleted(id)
+      const completedEntries = [...ids]
+        .map((id) => useCompletedTasksStore.getState().tasks.get(id))
+        .filter((entry) => entry !== undefined)
+      ids.forEach(removeCompleted)
 
       await qc.cancelQueries({ queryKey: ['tasks'] })
       await qc.cancelQueries({ queryKey: ['view-tasks'] })
@@ -271,25 +288,30 @@ export function useDeleteTask() {
       })
 
       qc.setQueriesData<Task[]>({ queryKey: ['tasks'] }, (old) =>
-        old?.filter((t) => t.id !== id)
+        old?.map((item) => removeTaskIdsFromTree(item, ids)).filter((item): item is Task => item !== null)
       )
       qc.setQueriesData<Task[]>({ queryKey: ['view-tasks'] }, (old) =>
-        old?.filter((t) => t.id !== id)
+        old?.map((item) => removeTaskIdsFromTree(item, ids)).filter((item): item is Task => item !== null)
       )
       qc.setQueriesData<SectionTaskCacheEntry[]>({ queryKey: ['section-tasks'] }, (old) =>
         old?.map((section) => ({
           ...section,
-          tasks: section.tasks.filter((t) => t.id !== id),
+          tasks: section.tasks
+            .map((item) => removeTaskIdsFromTree(item, ids))
+            .filter((item): item is Task => item !== null),
         }))
       )
 
-      return { previousTaskQueries, previousViewQueries, previousSectionQueries, completedEntry }
+      return { previousTaskQueries, previousViewQueries, previousSectionQueries, completedEntries }
     },
     onError: (_err, _vars, context) => {
-      if (context?.completedEntry) {
-        useCompletedTasksStore
-          .getState()
-          .add(context.completedEntry.task, context.completedEntry.path)
+      for (const entry of context?.completedEntries ?? []) {
+        useCompletedTasksStore.getState().add(
+          entry.task,
+          entry.path,
+          entry.autoCompletedSubtasks,
+          entry.suppressTopLevelUndo,
+        )
       }
       if (context?.previousTaskQueries) {
         for (const [key, data] of context.previousTaskQueries) {
@@ -393,18 +415,38 @@ export function useCompleteTask() {
   const removeCompleted = useCompletedTasksStore((s) => s.remove)
 
   return useMutation({
-    mutationFn: async (task: Task) => {
-      // The API client filters the task state into a writable v2 merge patch.
-      const result = await api.updateTask(task.id, {
-        ...task,
-        done: true,
-      })
-      if (!result.success) throw new Error(result.error)
-      return result.data
+    mutationFn: async (input: Task | { task: Task; suppressTopLevelUndo?: boolean }) => {
+      const task = 'task' in input ? input.task : input
+      const autoCompleted = unfinishedDescendants(task)
+      const completed: Task[] = []
+      try {
+        // Children first prevents the server from ever exposing them as standalone
+        // work while the parent completion is in flight.
+        for (const child of [...autoCompleted].reverse()) {
+          const result = await api.updateTask(child.id, { ...child, done: true })
+          if (!result.success) throw new Error(result.error)
+          completed.push(child)
+        }
+        const result = await api.updateTask(task.id, { ...task, done: true })
+        if (!result.success) throw new Error(result.error)
+        return result.data
+      } catch (error) {
+        await Promise.allSettled(
+          completed.map((child) => api.updateTask(child.id, { ...child, done: false })),
+        )
+        throw error
+      }
     },
-    onMutate: async (task) => {
+    onMutate: async (input) => {
+      const task = 'task' in input ? input.task : input
+      const suppressTopLevelUndo = 'task' in input && input.suppressTopLevelUndo === true
+      const autoCompleted = unfinishedDescendants(task)
+      const doneById = new Map<number, boolean>([
+        [task.id, true],
+        ...autoCompleted.map((child) => [child.id, true] as const),
+      ])
       // Track completed task so it stays visible (with strikethrough) until navigation
-      addCompleted({ ...task, done: true }, pathname)
+      addCompleted(mapTaskDoneByIds(task, doneById), pathname, autoCompleted, suppressTopLevelUndo)
       playCompletionSound()
 
       await qc.cancelQueries({ queryKey: ['tasks'] })
@@ -417,23 +459,22 @@ export function useCompleteTask() {
       })
 
       qc.setQueriesData<Task[]>({ queryKey: ['tasks'] }, (old) =>
-        old?.map((t) => (t.id === task.id ? { ...t, done: true } : t))
+        old?.map((item) => mapTaskDoneByIds(item, doneById))
       )
       qc.setQueriesData<Task[]>({ queryKey: ['view-tasks'] }, (old) =>
-        old?.map((t) => (t.id === task.id ? { ...t, done: true } : t))
+        old?.map((item) => mapTaskDoneByIds(item, doneById))
       )
       qc.setQueriesData<SectionTaskCacheEntry[]>({ queryKey: ['section-tasks'] }, (old) =>
         old?.map((section) => ({
           ...section,
-          tasks: section.tasks.map((t) =>
-            t.id === task.id ? { ...t, done: true } : t
-          ),
+          tasks: section.tasks.map((item) => mapTaskDoneByIds(item, doneById)),
         }))
       )
 
       return { previousTaskQueries, previousViewQueries, previousSectionQueries }
     },
-    onError: (_err, task, context) => {
+    onError: (_err, input, context) => {
+      const task = 'task' in input ? input.task : input
       removeCompleted(task.id)
       if (context?.previousTaskQueries) {
         for (const [key, data] of context.previousTaskQueries) {
@@ -467,18 +508,36 @@ export function useUncompleteTask() {
 
   return useMutation({
     mutationFn: async (task: Task) => {
-      const result = await api.updateTask(task.id, {
-        ...task,
-        done: false,
-      })
-      if (!result.success) throw new Error(result.error)
-      return result.data
+      const autoCompleted = useCompletedTasksStore.getState().tasks
+        .get(task.id)?.autoCompletedSubtasks ?? []
+      const restored: Task[] = []
+      try {
+        for (const child of [...autoCompleted].reverse()) {
+          const result = await api.updateTask(child.id, { ...child, done: false })
+          if (!result.success) throw new Error(result.error)
+          restored.push(child)
+        }
+        const result = await api.updateTask(task.id, { ...task, done: false })
+        if (!result.success) throw new Error(result.error)
+        return result.data
+      } catch (error) {
+        await Promise.allSettled(
+          restored.map((child) => api.updateTask(child.id, { ...child, done: true })),
+        )
+        throw error
+      }
     },
     onMutate: async (task) => {
       // If task was recently completed (in store), update to done:false.
       // Otherwise (e.g. logbook uncomplete), add a new store entry so it
       // stays visible without strikethrough until navigation.
       const wasInStore = useCompletedTasksStore.getState().tasks.has(task.id)
+      const autoCompleted = useCompletedTasksStore.getState().tasks
+        .get(task.id)?.autoCompletedSubtasks ?? []
+      const doneById = new Map<number, boolean>([
+        [task.id, false],
+        ...autoCompleted.map((child) => [child.id, false] as const),
+      ])
       if (wasInStore) {
         updateCompleted(task.id, { done: false })
       } else {
@@ -495,17 +554,15 @@ export function useUncompleteTask() {
       })
 
       qc.setQueriesData<Task[]>({ queryKey: ['tasks'] }, (old) =>
-        old?.map((t) => (t.id === task.id ? { ...t, done: false } : t))
+        old?.map((item) => mapTaskDoneByIds(item, doneById))
       )
       qc.setQueriesData<Task[]>({ queryKey: ['view-tasks'] }, (old) =>
-        old?.map((t) => (t.id === task.id ? { ...t, done: false } : t))
+        old?.map((item) => mapTaskDoneByIds(item, doneById))
       )
       qc.setQueriesData<SectionTaskCacheEntry[]>({ queryKey: ['section-tasks'] }, (old) =>
         old?.map((section) => ({
           ...section,
-          tasks: section.tasks.map((t) =>
-            t.id === task.id ? { ...t, done: false } : t
-          ),
+          tasks: section.tasks.map((item) => mapTaskDoneByIds(item, doneById)),
         }))
       )
 

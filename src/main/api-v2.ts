@@ -42,9 +42,9 @@ function taskId(value: unknown): number | null {
 }
 
 /**
- * Remove a task from the top-level list only when one of its parents is also
- * present. A matching child remains visible for searches/filters which omit
- * its parent.
+ * Remove a task from the top-level list when one of its parents is present,
+ * or when the embedded parent is completed. Active matching children remain
+ * visible for searches/filters which omit an active parent.
  */
 export function withoutNestedSubtasks<T>(tasks: T[]): T[] {
   const visibleIds = new Set(tasks.map(taskId).filter((id): id is number => id !== null))
@@ -57,7 +57,9 @@ export function withoutNestedSubtasks<T>(tasks: T[]): T[] {
     if (!Array.isArray(parents)) return true
     return !parents.some((parent) => {
       const parentId = taskId(parent)
-      return parentId !== null && visibleIds.has(parentId)
+      const parentDone = !!parent && typeof parent === 'object'
+        && (parent as { done?: unknown }).done === true
+      return parentDone || (parentId !== null && visibleIds.has(parentId))
     })
   })
 }

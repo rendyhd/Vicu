@@ -1,25 +1,27 @@
 import { cn } from '@/lib/cn'
 import { useCompleteTask, useUncompleteTask } from '@/hooks/use-task-mutations'
 import type { Task } from '@/lib/vikunja-types'
+import { confirmTaskCompletion } from '@/lib/task-completion'
 
 interface TaskCheckboxProps {
   task: Task
   className?: string
+  suppressTopLevelUndo?: boolean
 }
 
-export function TaskCheckbox({ task, className }: TaskCheckboxProps) {
+export function TaskCheckbox({ task, className, suppressTopLevelUndo = false }: TaskCheckboxProps) {
   const completeTask = useCompleteTask()
   const uncompleteTask = useUncompleteTask()
 
   return (
     <button
       type="button"
-      onClick={(e) => {
+      onClick={async (e) => {
         e.stopPropagation()
         if (task.done) {
           uncompleteTask.mutate(task)
-        } else {
-          completeTask.mutate(task)
+        } else if (await confirmTaskCompletion(task)) {
+          completeTask.mutate(suppressTopLevelUndo ? { task, suppressTopLevelUndo: true } : task)
         }
       }}
       className={cn(

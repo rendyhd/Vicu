@@ -42,6 +42,16 @@ describe('task hierarchy', () => {
 
     expect(withoutNestedSubtasks([child])).toEqual([child])
   })
+
+  it('does not promote a child whose omitted parent is completed', () => {
+    const child = {
+      id: 2,
+      title: 'Child',
+      related_tasks: { parenttask: [{ id: 1, title: 'Parent', done: true }] },
+    }
+
+    expect(withoutNestedSubtasks([child])).toEqual([])
+  })
 })
 
 describe('createTaskPatch', () => {

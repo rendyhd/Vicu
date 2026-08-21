@@ -111,6 +111,18 @@ describe('mergeSectionUndoWindow', () => {
 })
 
 describe('mergeProjectUndoWindow', () => {
+  it('does not promote a completed inline subtask into the project root list', () => {
+    const projectId = 2
+    const nestedCompletion = task(1, true, projectId)
+    const completed = store([{
+      task: nestedCompletion,
+      path: '/project/2',
+      suppressTopLevelUndo: true,
+    }])
+
+    expect(mergeProjectUndoWindow([], completed, '/project/2', projectId)).toEqual([])
+  })
+
   it('does not add a same-path child project completion to the parent top list', () => {
     const parentProjectId = 2
     const childProjectId = 5

@@ -58,6 +58,7 @@ import {
   readSoundBytes,
   getSoundInfo,
 } from './sound'
+
 import { printHtml } from './print'
 import {
   addPendingAction,
@@ -79,6 +80,38 @@ import {
   updateStandaloneTask,
   clearStandaloneTasks,
 } from './cache'
+
+const AUTO_COMPLETED_SUBTASKS_KEY = '__vicu_auto_completed_subtasks'
+
+function taskDescendants(task: Record<string, unknown>): Record<string, unknown>[] {
+  const result: Record<string, unknown>[] = []
+  const rootId = typeof task.id === 'number' ? task.id : null
+  const visited = new Set<number>(rootId === null ? [] : [rootId])
+
+  const visit = (parent: Record<string, unknown>) => {
+    const related = parent.related_tasks
+    if (!related || typeof related !== 'object') return
+    const children = (related as { subtask?: unknown }).subtask
+    if (!Array.isArray(children)) return
+    for (const value of children) {
+      if (!value || typeof value !== 'object') continue
+      const child = value as Record<string, unknown>
+      if (typeof child.id !== 'number' || visited.has(child.id)) continue
+      visited.add(child.id)
+      result.push(child)
+      visit(child)
+    }
+  }
+
+  visit(task)
+  return result
+}
+
+function withoutCompletionMetadata(task: Record<string, unknown>): Record<string, unknown> {
+  const clean = { ...task }
+  delete clean[AUTO_COMPLETED_SUBTASKS_KEY]
+  return clean
+}
 
 export function registerIpcHandlers(): void {
   // Tasks
@@ -466,17 +499,42 @@ export function registerIpcHandlers(): void {
       return task ? { success: true, task } : { success: false, error: 'Task not found' }
     }
 
-    const result = await updateTask(taskId, { ...taskData, done: true })
-    if (result.success) {
-      notifyMainWindow()
-      return result
+    const cleanTask = withoutCompletionMetadata(taskData)
+    const autoCompleted = taskDescendants(cleanTask).filter((task) => task.done !== true)
+    const changed: Array<{ task: Record<string, unknown>; queued: boolean }> = []
+
+    for (const child of [...autoCompleted].reverse()) {
+      const childId = child.id as number
+      const result = await updateTask(childId, { ...child, done: true })
+      if (result.success) {
+        changed.push({ task: child, queued: false })
+      } else if (isRetriableError(result.error)) {
+        addPendingAction({ type: 'complete', taskId: childId, taskData: child })
+        changed.push({ task: child, queued: true })
+      } else {
+        for (const entry of changed.reverse()) {
+          const id = entry.task.id as number
+          if (entry.queued) removePendingActionByTaskId(id, 'complete')
+          else await updateTask(id, { ...entry.task, done: false })
+        }
+        return result
+      }
     }
 
-    if (isRetriableError(result.error)) {
-      addPendingAction({ type: 'complete', taskId, taskData })
-      return { success: true, cached: true }
+    const result = await updateTask(taskId, { ...cleanTask, done: true })
+    if (!result.success && !isRetriableError(result.error)) {
+      for (const entry of changed.reverse()) {
+        const id = entry.task.id as number
+        if (entry.queued) removePendingActionByTaskId(id, 'complete')
+        else await updateTask(id, { ...entry.task, done: false })
+      }
+      return result
     }
-    return result
+    if (!result.success) {
+      addPendingAction({ type: 'complete', taskId, taskData: cleanTask })
+    }
+    notifyMainWindow()
+    return result.success ? result : { success: true, cached: true }
   })
 
   ipcMain.handle('qv:mark-task-undone', async (_event, taskId: number, taskData: Record<string, unknown>) => {
@@ -486,21 +544,41 @@ export function registerIpcHandlers(): void {
       return task ? { success: true, task } : { success: false, error: 'Task not found' }
     }
 
-    // Check if there's a pending 'complete' — if so, just cancel it
-    const cancelled = removePendingActionByTaskId(taskId, 'complete')
-    if (cancelled) return { success: true, cancelledPending: true }
+    const autoCompleted = Array.isArray(taskData[AUTO_COMPLETED_SUBTASKS_KEY])
+      ? (taskData[AUTO_COMPLETED_SUBTASKS_KEY] as Record<string, unknown>[])
+      : []
+    const cleanTask = withoutCompletionMetadata(taskData)
+    let usedCache = false
+    let cancelledPending = false
 
-    const result = await updateTask(taskId, { ...taskData, done: false })
-    if (result.success) {
-      notifyMainWindow()
+    const restore = async (id: number, task: Record<string, unknown>) => {
+      if (removePendingActionByTaskId(id, 'complete')) {
+        cancelledPending = true
+        return { success: true } as const
+      }
+      const result = await updateTask(id, { ...task, done: false })
+      if (!result.success && isRetriableError(result.error)) {
+        addPendingAction({ type: 'uncomplete', taskId: id, taskData: task })
+        usedCache = true
+        return { success: true } as const
+      }
       return result
     }
 
-    if (isRetriableError(result.error)) {
-      addPendingAction({ type: 'uncomplete', taskId, taskData })
-      return { success: true, cached: true }
+    const rootResult = await restore(taskId, cleanTask)
+    if (!rootResult.success) return rootResult
+    for (const child of [...autoCompleted].reverse()) {
+      if (typeof child.id !== 'number') continue
+      const childResult = await restore(child.id, child)
+      if (!childResult.success) return childResult
     }
-    return result
+
+    notifyMainWindow()
+    return {
+      success: true,
+      cached: usedCache || undefined,
+      cancelledPending: cancelledPending || undefined,
+    }
   })
 
   ipcMain.handle('qv:schedule-task-today', async (_event, taskId: number, taskData: Record<string, unknown>) => {

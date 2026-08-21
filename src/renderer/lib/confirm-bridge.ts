@@ -8,14 +8,18 @@
  * the menu, the keyboard handler, bulk actions — can `await confirmDelete(msg)`
  * and get the styled dialog that respects the `confirm_before_delete` setting.
  */
-let confirmFn: ((message: string) => Promise<boolean>) | null = null
+import type { ConfirmOptions } from '@/hooks/use-confirm-delete'
 
-export function registerConfirm(fn: ((message: string) => Promise<boolean>) | null): void {
+type ConfirmFn = (message: string, options?: ConfirmOptions) => Promise<boolean>
+
+let confirmFn: ConfirmFn | null = null
+
+export function registerConfirm(fn: ConfirmFn | null): void {
   confirmFn = fn
 }
 
-export function confirmDelete(message: string): Promise<boolean> {
-  if (confirmFn) return confirmFn(message)
+export function confirmDelete(message: string, options?: ConfirmOptions): Promise<boolean> {
+  if (confirmFn) return confirmFn(message, options)
   // Defensive fallback if the global dialog isn't mounted yet.
   return Promise.resolve(window.confirm(message))
 }

@@ -8,6 +8,9 @@ interface ConfirmDialogProps {
   onCancel: () => void
   confirmLabel?: string
   destructive?: boolean
+  secondaryLabel?: string
+  onSecondary?: () => void
+  secondaryDestructive?: boolean
 }
 
 export function ConfirmDialog({
@@ -17,6 +20,9 @@ export function ConfirmDialog({
   onCancel,
   confirmLabel = 'Delete',
   destructive = true,
+  secondaryLabel,
+  onSecondary,
+  secondaryDestructive = false,
 }: ConfirmDialogProps) {
   const cancelRef = useRef<HTMLButtonElement>(null)
 
@@ -60,6 +66,20 @@ export function ConfirmDialog({
           >
             Cancel
           </button>
+          {secondaryLabel && onSecondary && (
+            <button
+              type="button"
+              onClick={onSecondary}
+              className={cn(
+                'rounded-md px-4 py-1.5 text-sm font-medium transition-colors',
+                secondaryDestructive
+                  ? 'bg-accent-red text-white hover:bg-accent-red/90'
+                  : 'border border-[var(--border-color)] text-[var(--text-primary)] hover:bg-[var(--bg-hover)]'
+              )}
+            >
+              {secondaryLabel}
+            </button>
+          )}
           <button
             type="button"
             onClick={onConfirm}
