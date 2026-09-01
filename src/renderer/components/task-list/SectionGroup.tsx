@@ -1,22 +1,17 @@
-import { useState, useRef, useEffect, useMemo, Fragment } from 'react'
+import { useState, useRef, useEffect, Fragment } from 'react'
 import { SortableContext } from '@dnd-kit/sortable'
 import { useDroppable, useDndContext } from '@dnd-kit/core'
 import { cn } from '@/lib/cn'
 import { verticalListSortingStrategyForeignSafe } from '@/lib/sortable-strategy'
 import { useReorderStore } from '@/stores/reorder-store'
 import { useSelectionStore } from '@/stores/selection-store'
-import { useCreateTask, useAddLabel } from '@/hooks/use-task-mutations'
-import { useTaskParser } from '@/hooks/use-task-parser'
-import { useProjects } from '@/hooks/use-projects'
-import { useLabels } from '@/hooks/use-labels'
-import { recurrenceToVikunja } from '@/lib/task-parser'
-import type { Task, Project, CreateTaskPayload } from '@/lib/vikunja-types'
+import type { Task, Project } from '@/lib/vikunja-types'
 import { TaskRow } from './TaskRow'
 import { SectionHeader } from './SectionHeader'
 import { AddTaskButton } from './AddTaskButton'
 import type { SectionData } from '@/hooks/use-project-sections'
 import { AddSectionButton } from './AddSectionButton'
-import { TaskInputParser } from '@/components/task-input/TaskInputParser'
+import { NewTaskComposer } from './NewTaskComposer'
 
 interface InsertIndicator {
   containerId: string
@@ -48,13 +43,6 @@ export function SectionGroup({
   const inputRef = useRef<HTMLInputElement>(null)
   const creationRef = useRef<HTMLDivElement>(null)
   const pendingTaskClickRef = useRef<number | null>(null)
-  const parser = useTaskParser()
-  const createTask = useCreateTask()
-  const addLabel = useAddLabel()
-  const { data: allLabels } = useLabels()
-  const { data: projectData } = useProjects()
-  const projectItems = useMemo(() => (projectData?.flat ?? []).map((p) => ({ id: p.id, title: p.title })), [projectData])
-  const labelItems = useMemo(() => (allLabels ?? []).map((l) => ({ id: l.id, title: l.title })), [allLabels])
   const setSectionReorderContext = useReorderStore((s) => s.setSectionReorderContext)
   const setExpandedTask = useSelectionStore((s) => s.setExpandedTask)
   const setFocusedTask = useSelectionStore((s) => s.setFocusedTask)
@@ -108,83 +96,6 @@ export function SectionGroup({
     return () => document.removeEventListener('mousedown', handleMouseDown)
   }, [isAdding])
 
-  const handleSubmit = () => {
-    let trimmed = parser.inputValue.trim()
-    if (!trimmed) {
-      setIsAdding(false)
-      parser.reset()
-      return
-    }
-
-    const payload: CreateTaskPayload = { title: trimmed }
-    let parsedLabels: string[] = []
-
-    if (parser.parserConfig.enabled && parser.parseResult) {
-      const pr = parser.parseResult
-      const title = pr.title.trim()
-      if (!title) {
-        setIsAdding(false)
-        parser.reset()
-        return
-      }
-      payload.title = title
-
-      if (pr.dueDate) {
-        const d = new Date(pr.dueDate.getTime())
-        d.setHours(23, 59, 59, 0)
-        payload.due_date = d.toISOString()
-      }
-
-      if (pr.priority !== null && pr.priority > 0) {
-        payload.priority = pr.priority
-      }
-
-      if (pr.recurrence) {
-        const vik = recurrenceToVikunja(pr.recurrence)
-        payload.repeat_after = vik.repeat_after
-        payload.repeat_mode = vik.repeat_mode
-      }
-
-      parsedLabels = pr.labels
-    } else {
-      // Legacy ! → today behavior
-      if (parser.parserConfig.bangToday && trimmed.includes('!')) {
-        trimmed = trimmed.replace(/!/g, '').trim()
-        if (!trimmed) {
-          setIsAdding(false)
-          parser.reset()
-          return
-        }
-        payload.title = trimmed
-        const today = new Date()
-        today.setHours(23, 59, 59, 0)
-        payload.due_date = today.toISOString()
-      }
-    }
-
-    createTask.mutate(
-      { projectId: project.id, task: payload },
-      {
-        onSuccess: (data) => {
-          // Attach labels post-creation
-          if (parsedLabels.length > 0 && data && typeof data === 'object' && 'id' in data) {
-            const taskId = (data as Task).id
-            for (const labelName of parsedLabels) {
-              const match = allLabels?.find(
-                (l) => l.title.toLowerCase() === labelName.toLowerCase()
-              )
-              if (match) {
-                addLabel.mutate({ taskId, labelId: match.id })
-              }
-            }
-          }
-          parser.reset()
-          inputRef.current?.focus()
-        },
-      }
-    )
-  }
-
   return (
     // Child sections render inside this div, so paddingLeft accumulates with
     // nesting. Each level only adds a constant step (a depth-scaled value would
@@ -226,42 +137,23 @@ export function SectionGroup({
       )}
 
       {isAdding && (
-        <div ref={creationRef} className="border-b border-[var(--border-color)]">
-          <div className="flex items-start gap-3 px-4 py-2.5">
-            <div className="mt-[7px] h-[18px] w-[18px] shrink-0 rounded-full border border-[var(--border-color)]" />
-            <TaskInputParser
-              value={parser.inputValue}
-              onChange={parser.setInputValue}
-              onSubmit={handleSubmit}
-              onCancel={() => {
-                setIsAdding(false)
-                parser.reset()
-              }}
-              parseResult={parser.parseResult}
-              parserConfig={parser.parserConfig}
-              onSuppressType={parser.suppressType}
-              prefixes={parser.prefixes}
-              enabled={parser.enabled}
-              projects={projectItems}
-              labels={labelItems}
-              inputRef={inputRef}
-              placeholder="New Task"
-              onBlur={(e) => {
-                if (creationRef.current?.contains(e.relatedTarget as Node)) return
+        <div ref={creationRef}>
+          <NewTaskComposer
+            projectId={project.id}
+            inputRef={inputRef}
+            onCancel={() => setIsAdding(false)}
+            onCreated={() => inputRef.current?.focus()}
+            onBlurOutside={() => {
                 const pendingTaskId = pendingTaskClickRef.current
                 pendingTaskClickRef.current = null
-                handleSubmit()
                 if (pendingTaskId !== null) {
                   setTimeout(() => {
                     setExpandedTask(pendingTaskId)
                     setFocusedTask(pendingTaskId)
                   }, 0)
                 }
-              }}
-              showBangTodayHint={!parser.enabled && !!parser.parserConfig.bangToday}
-              className="flex-1"
-            />
-          </div>
+            }}
+          />
         </div>
       )}
 

@@ -56,6 +56,22 @@ const api = {
     ipcRenderer.invoke('get-config'),
   saveConfig: (config: Record<string, unknown>) =>
     ipcRenderer.invoke('save-config', config),
+  getCustomLists: () => ipcRenderer.invoke('custom-lists:get'),
+  upsertCustomList: (list: Record<string, unknown>) => ipcRenderer.invoke('custom-lists:upsert', list),
+  deleteCustomList: (id: string) => ipcRenderer.invoke('custom-lists:delete', id),
+  reorderCustomLists: (ids: string[]) => ipcRenderer.invoke('custom-lists:reorder', ids),
+  syncCustomLists: () => ipcRenderer.invoke('custom-lists:sync'),
+  getCustomListSyncStatus: () => ipcRenderer.invoke('custom-lists:status'),
+  onCustomListsChanged: (cb: (lists: unknown[]) => void) => {
+    const handler = (_: unknown, lists: unknown[]) => cb(lists)
+    ipcRenderer.on('custom-lists-changed', handler)
+    return () => { ipcRenderer.removeListener('custom-lists-changed', handler) }
+  },
+  onCustomListSyncStatus: (cb: (status: unknown) => void) => {
+    const handler = (_: unknown, status: unknown) => cb(status)
+    ipcRenderer.on('custom-list-sync-status', handler)
+    return () => { ipcRenderer.removeListener('custom-list-sync-status', handler) }
+  },
 
   // Badge
   setTaskBadge: (count: number, dataUrl: string | null) =>

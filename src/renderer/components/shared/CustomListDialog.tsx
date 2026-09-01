@@ -38,8 +38,17 @@ const PRIORITY_OPTIONS = [
   { value: 4, label: 'Urgent' },
 ]
 
+const ICON_OPTIONS = [
+  ['filter_list', 'Filter'], ['folder', 'Folder'], ['star', 'Star'], ['favorite', 'Heart'],
+  ['home', 'Home'], ['work', 'Work'], ['school', 'School'], ['shopping_cart', 'Cart'],
+  ['fitness', 'Fitness'], ['code', 'Code'], ['pets', 'Pets'], ['auto_awesome', 'Sparkle'],
+  ['lightbulb', 'Idea'], ['bookmark', 'Bookmark'], ['flag', 'Flag'], ['build', 'Build'],
+  ['palette', 'Palette'],
+] as const
+
 const DEFAULT_FILTER: CustomListFilter = {
   project_ids: [],
+  add_to_project_id: 0,
   sort_by: 'due_date',
   order_by: 'asc',
   due_date_filter: 'all',
@@ -47,6 +56,7 @@ const DEFAULT_FILTER: CustomListFilter = {
 
 export function CustomListDialog({ open, list, onSave, onClose }: CustomListDialogProps) {
   const [name, setName] = useState('')
+  const [icon, setIcon] = useState('filter_list')
   const [filter, setFilter] = useState<CustomListFilter>(DEFAULT_FILTER)
   const { data: projectData } = useProjects()
   const { data: labels } = useLabels()
@@ -54,9 +64,11 @@ export function CustomListDialog({ open, list, onSave, onClose }: CustomListDial
   useEffect(() => {
     if (list) {
       setName(list.name)
+      setIcon(list.icon || 'filter_list')
       setFilter({ ...DEFAULT_FILTER, ...list.filter })
     } else {
       setName('')
+      setIcon('filter_list')
       setFilter(DEFAULT_FILTER)
     }
   }, [list, open])
@@ -70,6 +82,7 @@ export function CustomListDialog({ open, list, onSave, onClose }: CustomListDial
     onSave({
       id: list?.id ?? crypto.randomUUID(),
       name: trimmed,
+      icon,
       filter,
     })
   }
@@ -140,6 +153,17 @@ export function CustomListDialog({ open, list, onSave, onClose }: CustomListDial
               }}
             />
           </div>
+
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">Icon</span>
+            <select
+              value={icon}
+              onChange={(event) => setIcon(event.target.value)}
+              className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)] focus:border-accent-blue focus:outline-none"
+            >
+              {ICON_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+            </select>
+          </label>
 
           {/* Sort + Order */}
           <div className="flex gap-3">
@@ -233,6 +257,24 @@ export function CustomListDialog({ open, list, onSave, onClose }: CustomListDial
                 <p className="px-2 py-1 text-xs text-[var(--text-secondary)]">No projects found</p>
               )}
             </div>
+          </div>
+
+          {/* New-task destination */}
+          <div>
+            <label className="mb-1 block text-xs text-[var(--text-secondary)]">Add tasks to</label>
+            <select
+              value={filter.add_to_project_id ?? 0}
+              onChange={(e) => setFilter((current) => ({ ...current, add_to_project_id: Number(e.target.value) }))}
+              className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] focus:border-accent-blue focus:outline-none"
+            >
+              <option value={0}>Inbox</option>
+              {allProjects.map((project) => (
+                <option key={project.id} value={project.id}>{project.title}</option>
+              ))}
+              {(filter.add_to_project_id ?? 0) > 0 && !allProjects.some((project) => project.id === filter.add_to_project_id) && (
+                <option value={filter.add_to_project_id}>Unavailable project (uses Inbox)</option>
+              )}
+            </select>
           </div>
 
           {/* Priority */}

@@ -18,6 +18,8 @@ import type {
   PasswordLoginResult,
   VikunjaUser,
   AuthCheckResult,
+  CustomList,
+  CustomListSyncStatus,
 } from '../renderer/lib/vikunja-types'
 
 type OidcLoginResult =
@@ -66,6 +68,14 @@ export interface ElectronAPI {
   // Config
   getConfig(): Promise<AppConfig | null>
   saveConfig(config: AppConfig): Promise<void>
+  getCustomLists(): Promise<CustomList[]>
+  upsertCustomList(list: CustomList): Promise<CustomList[]>
+  deleteCustomList(id: string): Promise<CustomList[]>
+  reorderCustomLists(ids: string[]): Promise<CustomList[]>
+  syncCustomLists(): Promise<CustomListSyncStatus>
+  getCustomListSyncStatus(): Promise<CustomListSyncStatus>
+  onCustomListsChanged(cb: (lists: CustomList[]) => void): () => void
+  onCustomListSyncStatus(cb: (status: CustomListSyncStatus) => void): () => void
   setTaskBadge(count: number, dataUrl: string | null): Promise<void>
   testConnection(url: string, token: string): Promise<ApiResult<Project[]>>
 

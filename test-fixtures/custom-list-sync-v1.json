@@ -1,0 +1,147 @@
+{
+  "empty": {
+    "version": 1,
+    "lists": {},
+    "order": {
+      "ids": [],
+      "revision": {
+        "wall_time_ms": 1000,
+        "counter": 0,
+        "device_id": "desktop-a"
+      }
+    }
+  },
+  "populated": {
+    "version": 1,
+    "lists": {
+      "list-a": {
+        "value": {
+          "id": "list-a",
+          "name": "Focused",
+          "icon": "target",
+          "filter": {
+            "project_ids": [10, 11],
+            "project_filter_mode": "include",
+            "add_to_project_id": 10,
+            "sort_by": "due_date",
+            "order_by": "asc",
+            "due_date_filter": "today",
+            "priority_filter": [3, 4],
+            "label_ids": [7],
+            "include_done": false,
+            "include_today_all_projects": true
+          }
+        },
+        "revision": {
+          "wall_time_ms": 2000,
+          "counter": 0,
+          "device_id": "desktop-a"
+        }
+      }
+    },
+    "order": {
+      "ids": ["list-a"],
+      "revision": {
+        "wall_time_ms": 2000,
+        "counter": 1,
+        "device_id": "desktop-a"
+      }
+    }
+  },
+  "deleted": {
+    "version": 1,
+    "lists": {
+      "list-a": {
+        "value": null,
+        "revision": {
+          "wall_time_ms": 3000,
+          "counter": 0,
+          "device_id": "android-a"
+        }
+      }
+    },
+    "order": {
+      "ids": [],
+      "revision": {
+        "wall_time_ms": 3000,
+        "counter": 1,
+        "device_id": "android-a"
+      }
+    }
+  },
+  "reordered": {
+    "version": 1,
+    "lists": {
+      "list-a": {
+        "value": {
+          "id": "list-a",
+          "name": "First",
+          "icon": "list",
+          "filter": {
+            "project_ids": [],
+            "project_filter_mode": "include",
+            "add_to_project_id": 0,
+            "sort_by": "due_date",
+            "order_by": "asc",
+            "due_date_filter": "all",
+            "priority_filter": [],
+            "label_ids": [],
+            "include_done": false,
+            "include_today_all_projects": false
+          }
+        },
+        "revision": {
+          "wall_time_ms": 4000,
+          "counter": 0,
+          "device_id": "desktop-a"
+        }
+      },
+      "list-b": {
+        "value": {
+          "id": "list-b",
+          "name": "Second",
+          "icon": "list",
+          "filter": {
+            "project_ids": [],
+            "project_filter_mode": "include",
+            "add_to_project_id": 0,
+            "sort_by": "due_date",
+            "order_by": "asc",
+            "due_date_filter": "all",
+            "priority_filter": [],
+            "label_ids": [],
+            "include_done": false,
+            "include_today_all_projects": false
+          }
+        },
+        "revision": {
+          "wall_time_ms": 4000,
+          "counter": 1,
+          "device_id": "desktop-a"
+        }
+      }
+    },
+    "order": {
+      "ids": ["list-b", "list-a"],
+      "revision": {
+        "wall_time_ms": 4100,
+        "counter": 0,
+        "device_id": "android-a"
+      }
+    }
+  },
+  "malformed": "<!-- vicu-custom-lists:v1:not-json -->",
+  "concurrent": {
+    "left_revision": {
+      "wall_time_ms": 5000,
+      "counter": 2,
+      "device_id": "desktop-a"
+    },
+    "right_revision": {
+      "wall_time_ms": 5000,
+      "counter": 2,
+      "device_id": "android-z"
+    },
+    "winner_device_id": "desktop-a"
+  }
+}

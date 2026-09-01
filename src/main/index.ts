@@ -17,11 +17,13 @@ import { setupApplicationMenu } from './app-menu'
 import { storeAPIToken, getAPIToken, isEncryptionAvailable, API_TOKEN_NO_EXPIRY } from './auth/token-store'
 import { clearTaskBadge, reapplyTaskBadge } from './badge'
 import { replayPendingActions } from './sync'
+import { syncCustomLists } from './custom-list-service'
 
 let mainWindow: BrowserWindow | null = null
 let quickEntryWindow: BrowserWindow | null = null
 let quickViewWindow: BrowserWindow | null = null
 let startupComplete = false
+let lastCustomListFocusSync = 0
 
 // Register shared state so ipc-handlers can access these without a circular import.
 // The actual function bodies are defined below; the closures capture the module-level
@@ -376,6 +378,11 @@ function createAndWireMainWindow(config: AppConfig | null): BrowserWindow {
   win.on('show', () => {
     reapplyTaskBadge()
   })
+  win.on('focus', () => {
+    if (Date.now() - lastCustomListFocusSync < 30_000) return
+    lastCustomListFocusSync = Date.now()
+    void syncCustomLists()
+  })
 
   // Unified close policy, evaluated at close time (not startup time):
   // hide instead of closing whenever that leaves the user a way back —
@@ -681,12 +688,15 @@ if (!gotLock) {
       rescheduleNotifications()
       authManager.onSystemResume()
       void replayPendingActions()
+      void syncCustomLists()
     })
 
     // Replay any offline-queued actions: once shortly after startup, then
     // every 5 minutes as a safety net while the app runs.
     setTimeout(() => { void replayPendingActions() }, 10_000)
     setInterval(() => { void replayPendingActions() }, 5 * 60_000)
+    setTimeout(() => { void syncCustomLists() }, 12_000)
+    setInterval(() => { void syncCustomLists() }, 5 * 60_000)
 
     // Auto-register browser native messaging hosts on startup so manifests
     // always point to the current app's bridge (important when switching

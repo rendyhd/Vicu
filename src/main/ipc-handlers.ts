@@ -29,6 +29,16 @@ import {
   downloadTaskAttachment,
 } from './api-client'
 import { loadConfig, saveConfig, type AppConfig } from './config'
+import {
+  deleteCustomList,
+  getCustomLists,
+  getCustomListSyncStatus,
+  reorderCustomLists,
+  syncCustomLists,
+  upsertCustomList,
+} from './custom-list-service'
+import type { CustomListWire } from './custom-list-protocol'
+import { hasVicuMetadataMarker } from './custom-list-protocol'
 import { discoverProviders, discoverAuthMethods } from './auth/oidc-discovery'
 import { fetchCurrentUser } from './auth/user-info'
 import { authManager } from './auth/auth-manager'
@@ -216,6 +226,17 @@ export function registerIpcHandlers(): void {
   })
 
   ipcMain.handle('save-config', (_event, config: AppConfig) => {
+    const latest = loadConfig()
+    const accountChanged = !!latest && latest.vikunja_url.replace(/\/+$/, '') !== config.vikunja_url.replace(/\/+$/, '')
+    // Renderer settings forms save a full config snapshot and may have been open while a
+    // custom-list mutation or remote merge completed. Preserve the main-owned slice unless
+    // setup/logout is deliberately switching accounts.
+    if (!accountChanged && latest?.custom_lists_sync) {
+      config.custom_lists_sync = latest.custom_lists_sync
+      config.custom_lists = latest.custom_lists
+    } else if (accountChanged) {
+      config.custom_lists_sync = undefined
+    }
     // Encrypt API token into token-store if available
     if (config.auth_method === 'api_token' && config.api_token && isEncryptionAvailable()) {
       storeAPIToken(config.api_token, API_TOKEN_NO_EXPIRY)
@@ -237,7 +258,15 @@ export function registerIpcHandlers(): void {
     if (viewerWindow && !viewerWindow.isDestroyed()) {
       viewerWindow.webContents.send('viewer-config-changed')
     }
+    if (config.custom_lists?.length || config.custom_lists_sync?.dirty) void syncCustomLists()
   })
+
+  ipcMain.handle('custom-lists:get', () => getCustomLists())
+  ipcMain.handle('custom-lists:upsert', (_event, list: CustomListWire) => upsertCustomList(list))
+  ipcMain.handle('custom-lists:delete', (_event, id: string) => deleteCustomList(id))
+  ipcMain.handle('custom-lists:reorder', (_event, ids: string[]) => reorderCustomLists(ids))
+  ipcMain.handle('custom-lists:sync', () => syncCustomLists())
+  ipcMain.handle('custom-lists:status', () => getCustomListSyncStatus())
 
   ipcMain.handle('set-task-badge', (_event, count: number, dataUrl: string | null) => {
     const cfg = loadConfig()
@@ -465,18 +494,18 @@ export function registerIpcHandlers(): void {
           allTasks.push(...viewResult.data)
         }
       }
-      const filteredAll = keepActiveProjectTasks(clientFilter
+      const filteredAll = keepActiveProjectTasks((clientFilter
         ? applyCustomListTaskFilter(allTasks as Array<{ project_id?: number; priority?: number; labels?: Array<{ id: number }> }>, clientFilter)
-        : allTasks)
+        : allTasks).filter((task) => !hasVicuMetadataMarker((task as { description?: string }).description)))
       setCachedTasks(filteredAll)
       return { success: true, tasks: filteredAll }
     }
 
     const result = await fetchTasks(filterParams)
     if (result.success) {
-      const tasks = keepActiveProjectTasks(clientFilter
+      const tasks = keepActiveProjectTasks((clientFilter
         ? applyCustomListTaskFilter((result.data ?? []) as Array<{ project_id?: number; priority?: number; labels?: Array<{ id: number }> }>, clientFilter)
-        : result.data)
+        : result.data).filter((task) => !hasVicuMetadataMarker((task as { description?: string }).description)))
       setCachedTasks(tasks ?? [])
       return { success: true, tasks }
     }

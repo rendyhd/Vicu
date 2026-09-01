@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { api } from '@/lib/api'
 import { cn } from '@/lib/cn'
 import { HotkeyRecorder } from './HotkeyRecorder'
+import { useCustomLists } from '@/hooks/use-custom-lists'
 import type { AppConfig, Project, ViewerFilter } from '@/lib/vikunja-types'
 
 interface QuickEntrySettingsProps {
@@ -17,6 +18,7 @@ const HOTKEY_FAILURE_COPY = window.api.platform === 'linux'
   : 'Failed to register — hotkey may be in use by another application'
 
 export function QuickEntrySettings({ config, projects, onChange, hotkeyWarnings }: QuickEntrySettingsProps) {
+  const { data: customLists = [] } = useCustomLists()
   const [launcherCmd, setLauncherCmd] = useState<{ quickEntry: string; quickView: string; kind: 'appimage' | 'packaged' | 'dev' } | null>(null)
   const [copied, setCopied] = useState<'entry' | 'view' | null>(null)
 
@@ -332,7 +334,6 @@ export function QuickEntrySettings({ config, projects, onChange, hotkeyWarnings 
                         const vt = val.slice(5) as 'today' | 'upcoming' | 'anytime'
                         updateViewerFilter({ view_type: vt, custom_list_id: undefined, project_ids: [] })
                       } else {
-                        const customLists = config.custom_lists || []
                         if (customLists.some((l) => l.id === val)) {
                           updateViewerFilter({ view_type: undefined, custom_list_id: val, project_ids: [] })
                         } else {
@@ -354,9 +355,9 @@ export function QuickEntrySettings({ config, projects, onChange, hotkeyWarnings 
                         <option key={p.id} value={String(p.id)}>{p.title}</option>
                       ))}
                     </optgroup>
-                    {(config.custom_lists || []).length > 0 && (
+                    {customLists.length > 0 && (
                       <optgroup label="Lists">
-                        {(config.custom_lists || []).map((l) => (
+                        {customLists.map((l) => (
                           <option key={l.id} value={l.id}>{l.name}</option>
                         ))}
                       </optgroup>

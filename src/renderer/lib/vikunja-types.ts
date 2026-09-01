@@ -135,6 +135,8 @@ export type ApiResult<T> =
 export interface CustomListFilter {
   project_ids: number[]
   project_filter_mode?: 'include' | 'exclude'
+  /** 0 resolves to the configured Inbox. */
+  add_to_project_id?: number
   sort_by: 'due_date' | 'priority' | 'created' | 'updated' | 'title'
   order_by: 'asc' | 'desc'
   due_date_filter: 'all' | 'overdue' | 'today' | 'this_week' | 'this_month' | 'has_due_date' | 'no_due_date'
@@ -150,6 +152,15 @@ export interface CustomList {
   icon?: string
   filter: CustomListFilter
 }
+
+export type CustomListSyncStatus =
+  | { state: 'idle'; last_synced_at?: string }
+  | { state: 'syncing' }
+  | { state: 'pending'; message?: string }
+  | { state: 'offline'; message: string }
+  | { state: 'error'; message: string }
+  | { state: 'update_required'; message: string }
+  | { state: 'local_only' }
 
 export interface ViewerFilter {
   project_ids: number[]

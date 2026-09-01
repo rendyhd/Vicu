@@ -1,25 +1,18 @@
-import { useState, useRef, useEffect, useCallback, useMemo, Fragment } from 'react'
+import { useState, useRef, useEffect, useCallback, Fragment } from 'react'
 import { Plus, Inbox } from 'lucide-react'
 import { SortableContext } from '@dnd-kit/sortable'
 import { useQueryClient } from '@tanstack/react-query'
 import { cn } from '@/lib/cn'
 import { verticalListSortingStrategyForeignSafe } from '@/lib/sortable-strategy'
-import { useCreateTask, useCompleteTask, useUpdateTask, useDeleteTask, useAddLabel, useCreateLabel, useUploadAttachmentFromPaste } from '@/hooks/use-task-mutations'
+import { useCreateTask, useCompleteTask, useUpdateTask, useDeleteTask } from '@/hooks/use-task-mutations'
 import { useSelectionStore } from '@/stores/selection-store'
 import { orderedTaskIds, resolveSelectedTasks, copySelectedTitles, isTaskNestedInCurrentList } from '@/lib/task-selection'
 import { confirmDelete } from '@/lib/confirm-bridge'
-import { useTaskParser } from '@/hooks/use-task-parser'
-import { useLabels } from '@/hooks/use-labels'
-import { useProjects } from '@/hooks/use-projects'
-import { recurrenceToVikunja } from '@/lib/task-parser'
-import type { Task, CreateTaskPayload } from '@/lib/vikunja-types'
+import type { Task } from '@/lib/vikunja-types'
 import { TaskRow } from './TaskRow'
 import { AddTaskButton } from './AddTaskButton'
-import { TaskInputParser } from '@/components/task-input/TaskInputParser'
 import { EmptyState } from '@/components/shared/EmptyState'
-import type { ChipData } from '@/components/task-input/TokenChip'
-import { TaskDescription, type PendingImage } from './TaskDescription'
-import { replacePendingTokens } from '@/lib/image-tokens'
+import { NewTaskComposer } from './NewTaskComposer'
 import { taskDescendants, unfinishedDescendants } from '@/lib/task-hierarchy'
 import { confirmTaskCompletion } from '@/lib/task-completion'
 
@@ -39,6 +32,7 @@ interface TaskListProps {
   defaultDueDate?: Date
   /** Content rendered inside the scroll area above the task input (e.g. date subtitle) */
   headerContent?: React.ReactNode
+  onTaskCreated?: (task: Task) => void
 }
 
 export function TaskList({
@@ -55,29 +49,18 @@ export function TaskList({
   insertIndex,
   defaultDueDate,
   headerContent,
+  onTaskCreated,
 }: TaskListProps) {
   const [isAdding, setIsAdding] = useState(false)
   const [addPosition, setAddPosition] = useState<'top' | 'bottom'>('top')
-  const [showNotes, setShowNotes] = useState(false)
-  const [defaultDateDismissed, setDefaultDateDismissed] = useState(false)
-  const [newDescription, setNewDescription] = useState('')
-  const [pendingImages, setPendingImages] = useState<Record<string, PendingImage>>({})
   const inputRef = useRef<HTMLInputElement>(null)
   const creationRef = useRef<HTMLDivElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
   const pendingTaskClickRef = useRef<number | null>(null)
-  const parser = useTaskParser()
-  const { data: allLabels } = useLabels()
-  const { data: projectData } = useProjects()
-  const projectItems = useMemo(() => (projectData?.flat ?? []).map((p) => ({ id: p.id, title: p.title })), [projectData])
-  const labelItems = useMemo(() => (allLabels ?? []).map((l) => ({ id: l.id, title: l.title })), [allLabels])
   const createTask = useCreateTask()
-  const addLabel = useAddLabel()
-  const createLabel = useCreateLabel()
   const completeTask = useCompleteTask()
   const updateTask = useUpdateTask()
   const deleteTask = useDeleteTask()
-  const uploadFromPaste = useUploadAttachmentFromPaste()
   const qc = useQueryClient()
   // Narrow selectors: focusedTaskId drives the scroll-into-view effect, so it
   // stays a subscription; expandedTaskId/selectedTaskIds are only read inside
@@ -89,21 +72,6 @@ export function TaskList({
   const collapseAll = useSelectionStore((s) => s.collapseAll)
   const setSelectedRange = useSelectionStore((s) => s.setSelectedRange)
   const clearSelection = useSelectionStore((s) => s.clearSelection)
-
-  // Build context chips (e.g. "Today" default on Today view)
-  const hasNlpDate = parser.parseResult?.dueDate != null
-  const contextChips = useMemo<ChipData[]>(() => {
-    if (!defaultDueDate || defaultDateDismissed || hasNlpDate) return []
-    const now = new Date()
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-    const target = new Date(defaultDueDate.getFullYear(), defaultDueDate.getMonth(), defaultDueDate.getDate())
-    const diffDays = Math.round((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
-    let label: string
-    if (diffDays === 0) label = 'Today'
-    else if (diffDays === 1) label = 'Tomorrow'
-    else label = target.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
-    return [{ type: 'date' as const, label, key: 'context-date' }]
-  }, [defaultDueDate, defaultDateDismissed, hasNlpDate])
 
   useEffect(() => {
     if (isAdding && inputRef.current) {
@@ -139,155 +107,6 @@ export function TaskList({
     document.addEventListener('mousedown', handleMouseDown)
     return () => document.removeEventListener('mousedown', handleMouseDown)
   }, [isAdding])
-
-  const handleSubmit = () => {
-    let trimmed = parser.inputValue.trim()
-    if (!trimmed || !projectId) {
-      setIsAdding(false)
-      parser.reset()
-      setNewDescription('')
-      Object.values(pendingImages).forEach((p) => URL.revokeObjectURL(p.blobUrl))
-      setPendingImages({})
-      setShowNotes(false)
-      return
-    }
-
-    const payload: CreateTaskPayload = { title: trimmed }
-    let parsedLabels: string[] = []
-
-    if (parser.parserConfig.enabled && parser.parseResult) {
-      const pr = parser.parseResult
-      const title = pr.title.trim()
-      if (!title) {
-        setIsAdding(false)
-        parser.reset()
-        setNewDescription('')
-        Object.values(pendingImages).forEach((p) => URL.revokeObjectURL(p.blobUrl))
-        setPendingImages({})
-        setShowNotes(false)
-        return
-      }
-      payload.title = title
-
-      if (pr.dueDate) {
-        const d = new Date(pr.dueDate.getTime())
-        d.setHours(23, 59, 59, 0)
-        payload.due_date = d.toISOString()
-      }
-
-      if (pr.priority !== null && pr.priority > 0) {
-        payload.priority = pr.priority
-      }
-
-      if (pr.recurrence) {
-        const vik = recurrenceToVikunja(pr.recurrence)
-        payload.repeat_after = vik.repeat_after
-        payload.repeat_mode = vik.repeat_mode
-      }
-
-      parsedLabels = pr.labels
-    } else {
-      // Legacy ! → today behavior
-      if (parser.parserConfig.bangToday && trimmed.includes('!')) {
-        trimmed = trimmed.replace(/!/g, '').trim()
-        if (!trimmed) {
-          setIsAdding(false)
-          parser.reset()
-          setNewDescription('')
-          Object.values(pendingImages).forEach((p) => URL.revokeObjectURL(p.blobUrl))
-          setPendingImages({})
-          setShowNotes(false)
-          return
-        }
-        payload.title = trimmed
-        const today = new Date()
-        today.setHours(23, 59, 59, 0)
-        payload.due_date = today.toISOString()
-      }
-    }
-
-    // Apply context default due date if no date was parsed/set and it wasn't dismissed
-    if (!payload.due_date && defaultDueDate && !defaultDateDismissed) {
-      const d = new Date(defaultDueDate.getTime())
-      d.setHours(23, 59, 59, 0)
-      payload.due_date = d.toISOString()
-    }
-
-    const desc = newDescription.trim()
-    if (desc) {
-      payload.description = desc
-    }
-    const snapshotDesc = desc
-    const snapshotPending = pendingImages
-
-    createTask.mutate(
-      { projectId, task: payload },
-      {
-        onSuccess: (data) => {
-          // Attach labels post-creation
-          if (parsedLabels.length > 0 && data && typeof data === 'object' && 'id' in data) {
-            const taskId = (data as Task).id
-            for (const labelName of parsedLabels) {
-              const match = allLabels?.find(
-                (l) => l.title.toLowerCase() === labelName.toLowerCase()
-              )
-              if (match) {
-                addLabel.mutate({ taskId, labelId: match.id })
-              } else {
-                createLabel.mutate(
-                  { title: labelName },
-                  {
-                    onSuccess: (newLabel) => {
-                      addLabel.mutate({ taskId, labelId: newLabel.id })
-                    },
-                  }
-                )
-              }
-            }
-          }
-
-          // Upload any images that were pasted before the task had an ID.
-          const stagedEntries = Object.entries(snapshotPending)
-          if (stagedEntries.length > 0 && data && typeof data === 'object' && 'id' in data) {
-            const newTaskId = (data as Task).id
-            ;(async () => {
-              const mapping: Record<string, number> = {}
-              for (const [uuid, img] of stagedEntries) {
-                try {
-                  const result = await uploadFromPaste.mutateAsync({
-                    taskId: newTaskId,
-                    fileData: img.bytes,
-                    fileName: img.name,
-                    mimeType: img.mime,
-                  })
-                  mapping[uuid] = result.attachmentId
-                } catch {
-                  // Leave pending token in place; user can retry by editing.
-                }
-                URL.revokeObjectURL(img.blobUrl)
-              }
-              if (Object.keys(mapping).length > 0) {
-                const patched = replacePendingTokens(snapshotDesc, mapping)
-                if (patched !== snapshotDesc) {
-                  updateTask.mutate({
-                    id: newTaskId,
-                    task: { ...(data as Task), description: patched },
-                  })
-                }
-              }
-            })()
-          }
-
-          parser.reset()
-          setNewDescription('')
-          setPendingImages({})
-          setShowNotes(false)
-          setDefaultDateDismissed(false)
-          inputRef.current?.focus()
-        },
-      }
-    )
-  }
 
   // Click on whitespace (title area or empty space) collapses expanded task
   const handleContainerClick = useCallback(
@@ -576,85 +395,27 @@ export function TaskList({
   }, [focusedTaskId])
 
   const taskInputElement = (
-    <div
-      ref={creationRef}
-      className="border-b border-[var(--border-color)]"
-      onBlur={(e) => {
-        if (creationRef.current?.contains(e.relatedTarget as Node)) return
+    <div ref={creationRef}>
+      <NewTaskComposer
+        projectId={projectId!}
+        defaultDueDate={defaultDueDate}
+        inputRef={inputRef}
+        onCancel={() => setIsAdding(false)}
+        onCreated={(task) => {
+          inputRef.current?.focus()
+          onTaskCreated?.(task)
+        }}
+        onBlurOutside={() => {
         const pendingTaskId = pendingTaskClickRef.current
         pendingTaskClickRef.current = null
-        handleSubmit()
         if (pendingTaskId !== null) {
-          // Defer past the spurious post-layout-shift click so it can't toggle
-          // our expansion off.
           setTimeout(() => {
             setExpandedTask(pendingTaskId)
             setFocusedTask(pendingTaskId)
           }, 0)
         }
-      }}
-    >
-      <div className="flex items-start gap-3 px-4 py-2.5">
-        <div className="mt-[7px] h-[18px] w-[18px] shrink-0 rounded-full border border-[var(--border-color)]" />
-        <TaskInputParser
-          value={parser.inputValue}
-          onChange={parser.setInputValue}
-          onSubmit={handleSubmit}
-          onCancel={() => {
-            setIsAdding(false)
-            parser.reset()
-            setNewDescription('')
-            Object.values(pendingImages).forEach((p) => URL.revokeObjectURL(p.blobUrl))
-            setPendingImages({})
-            setShowNotes(false)
-            setDefaultDateDismissed(false)
-          }}
-          onTab={() => setShowNotes(true)}
-          parseResult={parser.parseResult}
-          parserConfig={parser.parserConfig}
-          onSuppressType={parser.suppressType}
-          prefixes={parser.prefixes}
-          enabled={parser.enabled}
-          projects={projectItems}
-          labels={labelItems}
-          inputRef={inputRef}
-          placeholder="New Task"
-          showBangTodayHint={!parser.enabled && !!parser.parserConfig.bangToday}
-          className="flex-1"
-          contextChips={contextChips}
-          onDismissContextChip={() => setDefaultDateDismissed(true)}
-        />
-      </div>
-      {showNotes && (
-        <div className="pb-2 pl-[46px] pr-4">
-          <TaskDescription
-            value={newDescription}
-            onChange={setNewDescription}
-            onStagePending={(img) => setPendingImages((prev) => ({ ...prev, [img.uuid]: img }))}
-            onRemovePending={(uuid) =>
-              setPendingImages((prev) => {
-                const entry = prev[uuid]
-                if (entry) URL.revokeObjectURL(entry.blobUrl)
-                const { [uuid]: _removed, ...rest } = prev
-                return rest
-              })
-            }
-            pendingImages={pendingImages}
-            placeholder="Notes"
-            autoFocus
-            onKeyDown={(e) => {
-              if (e.key === 'Escape') {
-                e.preventDefault()
-                inputRef.current?.focus()
-              }
-              if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-                e.preventDefault()
-                handleSubmit()
-              }
-            }}
-          />
-        </div>
-      )}
+        }}
+      />
     </div>
   )
 

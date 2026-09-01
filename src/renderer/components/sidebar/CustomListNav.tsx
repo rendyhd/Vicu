@@ -1,13 +1,45 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate, useMatches } from '@tanstack/react-router'
-import { Plus, List, Pencil, Trash2 } from 'lucide-react'
+import {
+  Plus, List, ListFilter, Folder, Star, Heart, Home, Briefcase, GraduationCap,
+  ShoppingCart, Dumbbell, Code2, PawPrint, Sparkles, Lightbulb, Bookmark, Flag,
+  Wrench, Palette, Pencil, Trash2, CloudOff, Loader2, RefreshCw,
+  type LucideIcon,
+} from 'lucide-react'
 import { useSortable, SortableContext, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable'
 import { useDndMonitor } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
 import { cn } from '@/lib/cn'
-import { api } from '@/lib/api'
 import { CustomListDialog } from '@/components/shared/CustomListDialog'
 import type { CustomList } from '@/lib/vikunja-types'
+import {
+  useCustomLists,
+  useCustomListSyncStatus,
+  useDeleteCustomList,
+  useReorderCustomLists,
+  useSyncCustomLists,
+  useUpsertCustomList,
+} from '@/hooks/use-custom-lists'
+
+const CUSTOM_LIST_ICONS: Record<string, LucideIcon> = {
+  filter_list: ListFilter,
+  folder: Folder,
+  star: Star,
+  favorite: Heart,
+  home: Home,
+  work: Briefcase,
+  school: GraduationCap,
+  shopping_cart: ShoppingCart,
+  fitness: Dumbbell,
+  code: Code2,
+  pets: PawPrint,
+  auto_awesome: Sparkles,
+  lightbulb: Lightbulb,
+  bookmark: Bookmark,
+  flag: Flag,
+  build: Wrench,
+  palette: Palette,
+}
 
 function CustomListItem({
   item,
@@ -20,6 +52,7 @@ function CustomListItem({
   onNavigate: () => void
   onContextMenu: (e: React.MouseEvent) => void
 }) {
+  const ItemIcon = CUSTOM_LIST_ICONS[item.icon ?? ''] ?? List
   const {
     attributes,
     listeners,
@@ -55,7 +88,7 @@ function CustomListItem({
           : 'text-[var(--text-primary)] hover:bg-[var(--bg-hover)]'
       )}
     >
-      <List className="h-4 w-4 shrink-0 text-[var(--text-secondary)]" strokeWidth={1.8} />
+      <ItemIcon className="h-4 w-4 shrink-0 text-[var(--text-secondary)]" strokeWidth={1.8} />
       <span className="flex-1 truncate text-left">{item.name}</span>
     </button>
   )
@@ -66,20 +99,15 @@ export function CustomListNav() {
   const matches = useMatches()
   const currentPath = matches[matches.length - 1]?.pathname ?? ''
 
-  const [lists, setLists] = useState<CustomList[]>([])
+  const { data: lists = [] } = useCustomLists()
+  const { data: syncStatus } = useCustomListSyncStatus()
+  const upsertList = useUpsertCustomList()
+  const deleteList = useDeleteCustomList()
+  const reorderLists = useReorderCustomLists()
+  const syncLists = useSyncCustomLists()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingList, setEditingList] = useState<CustomList | null>(null)
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; list: CustomList } | null>(null)
-
-  const loadLists = useCallback(() => {
-    api.getConfig().then((config) => {
-      setLists(config?.custom_lists ?? [])
-    })
-  }, [])
-
-  useEffect(() => {
-    loadLists()
-  }, [loadLists])
 
   // Close context menu on click outside
   useEffect(() => {
@@ -107,40 +135,18 @@ export function CustomListNav() {
       if (oldIndex === -1 || newIndex === -1) return
 
       const reordered = arrayMove(lists, oldIndex, newIndex)
-      setLists(reordered)
-
-      // Persist to config
-      api.getConfig().then((config) => {
-        if (config) {
-          api.saveConfig({ ...config, custom_lists: reordered })
-        }
-      })
+      reorderLists.mutate(reordered.map((list) => list.id))
     },
   })
 
   const handleSave = async (list: CustomList) => {
-    const config = await api.getConfig()
-    if (!config) return
-
-    const existing = config.custom_lists ?? []
-    const idx = existing.findIndex((l) => l.id === list.id)
-    const updated = idx >= 0
-      ? existing.map((l) => (l.id === list.id ? list : l))
-      : [...existing, list]
-
-    await api.saveConfig({ ...config, custom_lists: updated })
-    setLists(updated)
+    await upsertList.mutateAsync(list)
     setDialogOpen(false)
     setEditingList(null)
   }
 
   const handleDelete = async (id: string) => {
-    const config = await api.getConfig()
-    if (!config) return
-
-    const updated = (config.custom_lists ?? []).filter((l) => l.id !== id)
-    await api.saveConfig({ ...config, custom_lists: updated })
-    setLists(updated)
+    await deleteList.mutateAsync(id)
     setContextMenu(null)
 
     // Navigate away if viewing the deleted list
@@ -163,17 +169,38 @@ export function CustomListNav() {
           <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
             Lists
           </span>
-          <button
-            type="button"
-            onClick={() => {
-              setEditingList(null)
-              setDialogOpen(true)
-            }}
-            className="flex h-5 w-5 items-center justify-center rounded text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
-            aria-label="New list"
-          >
-            <Plus className="h-3.5 w-3.5" />
-          </button>
+          <div className="flex items-center gap-0.5">
+            {syncStatus && !['idle', 'local_only'].includes(syncStatus.state) && (
+              <button
+                type="button"
+                onClick={() => syncLists.mutate()}
+                disabled={syncStatus.state === 'syncing'}
+                className={cn(
+                  'flex h-5 w-5 items-center justify-center rounded transition-colors hover:bg-[var(--bg-hover)]',
+                  syncStatus.state === 'error' || syncStatus.state === 'update_required'
+                    ? 'text-accent-red'
+                    : 'text-[var(--text-secondary)]',
+                )}
+                title={'message' in syncStatus ? syncStatus.message : syncStatus.state === 'pending' ? 'Custom-list sync pending' : 'Syncing custom lists'}
+                aria-label="Retry custom-list sync"
+              >
+                {syncStatus.state === 'syncing' ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  : syncStatus.state === 'offline' ? <CloudOff className="h-3.5 w-3.5" />
+                    : <RefreshCw className="h-3.5 w-3.5" />}
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                setEditingList(null)
+                setDialogOpen(true)
+              }}
+              className="flex h-5 w-5 items-center justify-center rounded text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
+              aria-label="New list"
+            >
+              <Plus className="h-3.5 w-3.5" />
+            </button>
+          </div>
         </div>
       </div>
 

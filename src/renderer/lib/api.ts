@@ -99,6 +99,17 @@ export const api = {
   saveConfig: (config: AppConfig) =>
     window.api.saveConfig(config) as Promise<void>,
 
+  getCustomLists: () => window.api.getCustomLists(),
+  upsertCustomList: (list: import('./vikunja-types').CustomList) => window.api.upsertCustomList(list),
+  deleteCustomList: (id: string) => window.api.deleteCustomList(id),
+  reorderCustomLists: (ids: string[]) => window.api.reorderCustomLists(ids),
+  syncCustomLists: () => window.api.syncCustomLists(),
+  getCustomListSyncStatus: () => window.api.getCustomListSyncStatus(),
+  onCustomListsChanged: (cb: (lists: import('./vikunja-types').CustomList[]) => void) =>
+    window.api.onCustomListsChanged(cb),
+  onCustomListSyncStatus: (cb: (status: import('./vikunja-types').CustomListSyncStatus) => void) =>
+    window.api.onCustomListSyncStatus(cb),
+
   setTaskBadge: (count: number, dataUrl: string | null) =>
     window.api.setTaskBadge(count, dataUrl) as Promise<void>,
 

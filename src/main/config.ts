@@ -2,6 +2,7 @@ import { app } from 'electron'
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs'
 import { join, dirname } from 'path'
 import { isMac } from './platform'
+import type { CustomListSyncDocumentV1 } from './custom-list-protocol'
 
 export interface ViewerFilter {
   project_ids: number[]
@@ -39,6 +40,7 @@ export interface AppConfig {
     filter: {
       project_ids: number[]
       project_filter_mode?: 'include' | 'exclude'
+      add_to_project_id?: number
       sort_by: string
       order_by: string
       due_date_filter: string
@@ -48,6 +50,13 @@ export interface AppConfig {
       include_today_all_projects?: boolean
     }
   }>
+  custom_lists_sync?: {
+    device_id: string
+    document: CustomListSyncDocumentV1
+    dirty: boolean
+    carrier_task_id?: number
+    last_synced_at?: string
+  }
   // Quick Entry / Quick View
   quick_entry_enabled?: boolean
   quick_view_enabled?: boolean
@@ -208,6 +217,9 @@ function normalizeConfig(raw: Record<string, unknown>): AppConfig {
     window_bounds: isWindowBounds(raw.window_bounds) ? raw.window_bounds : undefined,
     sidebar_width: typeof raw.sidebar_width === 'number' ? raw.sidebar_width : undefined,
     custom_lists: Array.isArray(raw.custom_lists) ? raw.custom_lists as AppConfig['custom_lists'] : undefined,
+    custom_lists_sync: raw.custom_lists_sync && typeof raw.custom_lists_sync === 'object'
+      ? raw.custom_lists_sync as AppConfig['custom_lists_sync']
+      : undefined,
     // Quick Entry / Quick View
     quick_entry_enabled: raw.quick_entry_enabled === true,
     quick_view_enabled: raw.quick_view_enabled === true,

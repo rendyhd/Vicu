@@ -5,7 +5,9 @@ import { NULL_DATE } from '@/lib/constants'
 import { usePopoverAlignment } from './use-popover-alignment'
 
 interface ReminderPickerPopoverProps {
-  task: Task
+  task?: Task
+  dueDate?: string
+  reminders?: TaskReminder[]
   onReminderChange: (reminders: TaskReminder[]) => void
   onClose: () => void
 }
@@ -17,13 +19,14 @@ const RELATIVE_PRESETS = [
   { label: '1 day before', offset: -86400 },
 ]
 
-export function ReminderPickerPopover({ task, onReminderChange, onClose }: ReminderPickerPopoverProps) {
+export function ReminderPickerPopover({ task, dueDate, reminders: controlledReminders, onReminderChange, onClose }: ReminderPickerPopoverProps) {
   const ref = useRef<HTMLDivElement>(null)
   const align = usePopoverAlignment(ref)
   const [customDateTime, setCustomDateTime] = useState('')
 
-  const reminders = task.reminders ?? []
-  const hasDueDate = task.due_date && task.due_date !== NULL_DATE
+  const reminders = controlledReminders ?? task?.reminders ?? []
+  const effectiveDueDate = dueDate ?? task?.due_date ?? NULL_DATE
+  const hasDueDate = effectiveDueDate && effectiveDueDate !== NULL_DATE
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -41,7 +44,7 @@ export function ReminderPickerPopover({ task, onReminderChange, onClose }: Remin
   }
 
   const addRelativeReminder = (offset: number) => {
-    const dueTime = new Date(task.due_date).getTime()
+    const dueTime = new Date(effectiveDueDate).getTime()
     const absoluteTime = new Date(dueTime + offset * 1000).toISOString()
     const newReminder: TaskReminder = {
       reminder: absoluteTime,
