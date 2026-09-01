@@ -413,6 +413,30 @@ export function NewTaskComposer({
         </button>
       </div>
 
+      {showNotes && (
+        <div className="pb-2 pl-[46px] pr-4">
+          <TaskDescription
+            value={description}
+            onChange={setDescription}
+            onStagePending={stagePendingImage}
+            onRemovePending={removeAttachment}
+            pendingImages={Object.fromEntries(attachments.filter((attachment) => attachment.pendingToken && attachment.blobUrl).map((attachment) => [attachment.id, {
+              uuid: attachment.id,
+              name: attachment.name,
+              mime: attachment.mime,
+              bytes: attachment.bytes,
+              blobUrl: attachment.blobUrl!,
+            }]))}
+            placeholder="Notes"
+            autoFocus
+            onKeyDown={(event) => {
+              if (event.key === 'Escape') (inputRef as React.RefObject<HTMLInputElement> | undefined)?.current?.focus()
+              if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') { event.preventDefault(); void submit() }
+            }}
+          />
+        </div>
+      )}
+
       <div className="flex flex-wrap items-center gap-0.5 pb-2 pl-[46px] pr-4">
         <div className="relative">
           <ActionButton active={effectiveDueDate !== NULL_DATE || repeatAfter > 0} label="Date and repeat" onClick={() => setOpenPicker(openPicker === 'date' ? null : 'date')}>
@@ -461,30 +485,6 @@ export function NewTaskComposer({
               <button type="button" onClick={() => removeAttachment(attachment.id)} aria-label={`Remove ${attachment.name}`}><X className="h-3 w-3" /></button>
             </span>
           ))}
-        </div>
-      )}
-
-      {showNotes && (
-        <div className="pb-2 pl-[46px] pr-4">
-          <TaskDescription
-            value={description}
-            onChange={setDescription}
-            onStagePending={stagePendingImage}
-            onRemovePending={removeAttachment}
-            pendingImages={Object.fromEntries(attachments.filter((attachment) => attachment.pendingToken && attachment.blobUrl).map((attachment) => [attachment.id, {
-              uuid: attachment.id,
-              name: attachment.name,
-              mime: attachment.mime,
-              bytes: attachment.bytes,
-              blobUrl: attachment.blobUrl!,
-            }]))}
-            placeholder="Notes"
-            autoFocus
-            onKeyDown={(event) => {
-              if (event.key === 'Escape') (inputRef as React.RefObject<HTMLInputElement> | undefined)?.current?.focus()
-              if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') { event.preventDefault(); void submit() }
-            }}
-          />
         </div>
       )}
 
