@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useEditor, EditorContent, type Editor } from '@tiptap/react'
 import { BubbleMenu } from '@tiptap/react/menus'
 import { StarterKit } from '@tiptap/starter-kit'
@@ -8,8 +8,9 @@ import { TaskItem } from '@tiptap/extension-task-item'
 import { Placeholder } from '@tiptap/extension-placeholder'
 import { Bold as BoldIcon, Italic as ItalicIcon, Strikethrough, Underline as UnderlineIcon, Code as CodeIcon, List, ListOrdered, ListChecks, Link2 } from 'lucide-react'
 import { cn } from '@/lib/cn'
-import { normalizeEditableLink, isAllowedDescriptionUrl } from '@/lib/description-html'
+import { isAllowedDescriptionUrl, resolveOpenableDescriptionHref } from '@/lib/description-html'
 import { sanitizeTaskHtmlForStorage } from '@/lib/sanitize-html'
+import { LinkDialog } from '@/components/rich-text/LinkDialog'
 
 interface RichTextEditorProps {
   value: string
@@ -47,6 +48,12 @@ export function RichTextEditor({
   onPasteRef.current = onPaste
   onReadyRef.current = onReady
 
+  const [linkDialog, setLinkDialog] = useState<{
+    open: boolean
+    initialUrl: string
+    canRemove: boolean
+  }>({ open: false, initialUrl: '', canRemove: false })
+
   const editor = useEditor({
     extensions: [
       StarterKit.configure({ link: false }),
@@ -79,6 +86,19 @@ export function RichTextEditor({
         const result = onPasteRef.current?.(event)
         return result === true
       },
+      handleClick: (_view, _pos, event) => {
+        if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+          return false
+        }
+        const target = event.target as HTMLElement | null
+        const anchor = target?.closest?.('a')
+        if (!anchor || !_view.dom.contains(anchor)) return false
+        const href = resolveOpenableDescriptionHref(anchor.getAttribute('href'))
+        if (!href) return false
+        event.preventDefault()
+        void window.api.openDeepLink(href)
+        return true
+      },
     },
     onUpdate: ({ editor: e }) => {
       onChangeRef.current(sanitizeTaskHtmlForStorage(e.getHTML()))
@@ -109,6 +129,10 @@ export function RichTextEditor({
   }, [value, editor])
 
   if (!editor) return null
+
+  const closeLinkDialog = () => {
+    setLinkDialog({ open: false, initialUrl: '', canRemove: false })
+  }
 
   return (
     <>
@@ -176,19 +200,8 @@ export function RichTextEditor({
         <span className="mx-0.5 h-4 w-px bg-[var(--border-color)]" />
         <ToolbarButton
           onClick={() => {
-            const prev = editor.getAttributes('link').href as string | undefined
-            const rawUrl = window.prompt('Link URL', prev ?? '')
-            if (rawUrl === null) return
-            if (rawUrl.trim() === '') {
-              editor.chain().focus().unsetLink().run()
-              return
-            }
-            const url = normalizeEditableLink(rawUrl)
-            if (!url) {
-              window.alert('Use an http://, https://, or mailto: link.')
-              return
-            }
-            editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run()
+            const prev = (editor.getAttributes('link').href as string | undefined) ?? ''
+            setLinkDialog({ open: true, initialUrl: prev, canRemove: editor.isActive('link') })
           }}
           active={editor.isActive('link')}
           title="Link"
@@ -197,6 +210,20 @@ export function RichTextEditor({
         </ToolbarButton>
       </BubbleMenu>
       <EditorContent editor={editor} />
+      <LinkDialog
+        open={linkDialog.open}
+        initialUrl={linkDialog.initialUrl}
+        canRemove={linkDialog.canRemove}
+        onApply={(url) => {
+          editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run()
+          closeLinkDialog()
+        }}
+        onRemove={() => {
+          editor.chain().focus().unsetLink().run()
+          closeLinkDialog()
+        }}
+        onCancel={closeLinkDialog}
+      />
     </>
   )
 }
