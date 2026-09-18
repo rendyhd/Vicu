@@ -3,6 +3,7 @@ import {
   hasRichDescriptionBody,
   isAllowedDescriptionUrl,
   normalizeEditableLink,
+  resolveOpenableDescriptionHref,
 } from '../description-html'
 
 describe('description link policy', () => {
@@ -18,6 +19,12 @@ describe('description link policy', () => {
 
   it('normalizes a bare host to HTTPS', () => {
     expect(normalizeEditableLink('example.com/path')).toBe('https://example.com/path')
+  })
+
+  it('resolveOpenableDescriptionHref accepts http(s) and mailto', () => {
+    expect(resolveOpenableDescriptionHref('https://example.com')).toBe('https://example.com')
+    expect(resolveOpenableDescriptionHref('mailto:a@b.com')).toBe('mailto:a@b.com')
+    expect(resolveOpenableDescriptionHref('javascript:alert(1)')).toBeNull()
   })
 })
 

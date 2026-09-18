@@ -860,7 +860,7 @@ export function registerIpcHandlers(): void {
   })
 
   // --- Obsidian IPC ---
-  const ALLOWED_EXTERNAL_PROTOCOLS = new Set(['https:', 'http:', 'obsidian:'])
+  const ALLOWED_EXTERNAL_PROTOCOLS = new Set(['https:', 'http:', 'obsidian:', 'mailto:'])
 
   ipcMain.handle('open-deep-link', (_event, url: string) => {
     if (typeof url !== 'string') return

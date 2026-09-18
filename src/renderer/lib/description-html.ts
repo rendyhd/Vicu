@@ -22,6 +22,12 @@ export function normalizeEditableLink(raw: string): string | null {
   return isAllowedDescriptionUrl(withScheme) ? withScheme : null
 }
 
+/** Href safe to open from the notes editor (same schemes as editable links). */
+export function resolveOpenableDescriptionHref(raw: string | null | undefined): string | null {
+  if (!raw) return null
+  return normalizeEditableLink(raw)
+}
+
 /**
  * Quick View intentionally has a plain-text editor. Any structured markup must
  * be edited in the main TipTap editor so a title-only edit cannot flatten it.
