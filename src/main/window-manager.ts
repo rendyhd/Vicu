@@ -113,6 +113,7 @@ export function createQuickEntryWindow(_config: AppConfig | null): BrowserWindow
     alwaysOnTop: true,
     skipTaskbar: true,
     resizable: false,
+    roundedCorners: false,
     show: false,
     paintWhenInitiallyHidden: true,
     webPreferences: {
@@ -148,6 +149,7 @@ export function createQuickViewWindow(_config: AppConfig | null): BrowserWindow 
     alwaysOnTop: true,
     skipTaskbar: true,
     resizable: true,
+    roundedCorners: false,
     minWidth: 300 + SHADOW_PADDING * 2,
     maxWidth: 800 + SHADOW_PADDING * 2,
     minHeight: 60 + SHADOW_PADDING * 2,

@@ -11,7 +11,10 @@ function task(overrides: Partial<Task>): Task {
     title: 'Task',
     description: '',
     done: false,
+    done_at: '0001-01-01T00:00:00Z',
     due_date: '0001-01-01T00:00:00Z',
+    start_date: '0001-01-01T00:00:00Z',
+    end_date: '0001-01-01T00:00:00Z',
     priority: 0,
     project_id: 10,
     labels: [],
@@ -20,8 +23,12 @@ function task(overrides: Partial<Task>): Task {
     repeat_mode: 0,
     percent_done: 0,
     position: 0,
+    bucket_id: 0,
+    identifier: '',
+    hex_color: '',
     created: '2026-01-01T00:00:00Z',
     updated: '2026-01-01T00:00:00Z',
+    created_by: { id: 1, username: 'test' },
     ...overrides,
   }
 }

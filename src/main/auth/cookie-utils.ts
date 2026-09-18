@@ -3,7 +3,7 @@ const REFRESH_TOKEN_NAME = 'vikunja_refresh_token'
 /**
  * Extract the Vikunja refresh token from a response's Set-Cookie headers.
  *
- * Uses `response.headers.getSetCookie()` (available in Electron 33+ / Node 20+)
+ * Uses `response.headers.getSetCookie()` (available in modern Electron / Node)
  * to parse `vikunja_refresh_token=<value>` from Set-Cookie headers.
  *
  * Returns `null` if the header is missing (backward compat with pre-2.0 servers).

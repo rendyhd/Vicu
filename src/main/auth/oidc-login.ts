@@ -186,7 +186,7 @@ export async function loginWithOIDC(
       )
     }
 
-    const tokenData: { token: string } = await tokenResponse.json()
+    const tokenData = await tokenResponse.json() as { token: string }
     const jwt = tokenData.token
     if (!jwt) {
       throw new Error('Token exchange response missing "token" field')
@@ -297,7 +297,7 @@ export async function createBackupAPIToken(
       throw new Error(`API token creation failed (${response.status}): ${body}`)
     }
 
-    const data: { id?: number; token?: string } = await response.json()
+    const data = await response.json() as { id?: number; token?: string }
     if (!data.token) {
       throw new Error('API token creation response missing "token" field')
     }

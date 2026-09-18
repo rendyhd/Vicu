@@ -2,6 +2,7 @@ import { app, dialog, BrowserWindow } from 'electron'
 import * as fs from 'fs'
 import * as path from 'path'
 import { loadConfig, saveConfig } from './config'
+import { directoryFromSelectedFile, resolveDialogDefaultPath } from './dialog-path'
 
 const ALLOWED_EXTENSIONS = new Set(['.mp3', '.wav', '.ogg', '.m4a', '.aac', '.flac'])
 
@@ -37,21 +38,22 @@ export function getSoundInfo(): { path: string; fileName: string; isDefault: boo
 export async function pickAndCopySoundFile(
   parent: BrowserWindow | null
 ): Promise<{ success: true; path: string; fileName: string } | { success: false; error: string }> {
+  const config = loadConfig()
+  const defaultPath = resolveDialogDefaultPath(
+    config?.last_file_dialog_directory,
+    app.getPath('documents')
+  )
+  const dialogOptions = {
+    title: 'Choose task completion sound',
+    properties: ['openFile'] as Array<'openFile'>,
+    defaultPath,
+    filters: [
+      { name: 'Audio', extensions: ['mp3', 'wav', 'ogg', 'm4a', 'aac', 'flac'] },
+    ],
+  }
   const dialogResult = parent
-    ? await dialog.showOpenDialog(parent, {
-        title: 'Choose task completion sound',
-        properties: ['openFile'],
-        filters: [
-          { name: 'Audio', extensions: ['mp3', 'wav', 'ogg', 'm4a', 'aac', 'flac'] },
-        ],
-      })
-    : await dialog.showOpenDialog({
-        title: 'Choose task completion sound',
-        properties: ['openFile'],
-        filters: [
-          { name: 'Audio', extensions: ['mp3', 'wav', 'ogg', 'm4a', 'aac', 'flac'] },
-        ],
-      })
+    ? await dialog.showOpenDialog(parent, dialogOptions)
+    : await dialog.showOpenDialog(dialogOptions)
 
   if (dialogResult.canceled || dialogResult.filePaths.length === 0) {
     return { success: false, error: 'cancelled' }
@@ -82,10 +84,11 @@ export async function pickAndCopySoundFile(
 
     fs.copyFileSync(sourcePath, destPath)
 
-    const config = loadConfig()
-    if (config) {
-      config.task_completion_sound_path = destPath
-      saveConfig(config)
+    const latest = loadConfig()
+    if (latest) {
+      latest.task_completion_sound_path = destPath
+      latest.last_file_dialog_directory = directoryFromSelectedFile(sourcePath)
+      saveConfig(latest)
     }
 
     return { success: true, path: destPath, fileName }

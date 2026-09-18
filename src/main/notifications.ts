@@ -18,6 +18,17 @@ const routineReminderTimers = new Map<string, ReturnType<typeof setTimeout>>()
 // Reference to main window (set during init)
 let mainWindowRef: BrowserWindow | null = null
 
+/**
+ * Attach failure logging for desktop notifications. On macOS, Electron 42+
+ * uses UNNotification which requires a code-signed app — unsigned/dev builds
+ * emit `failed` instead of showing the notification.
+ */
+function attachNotificationDiagnostics(notification: Notification, context: string): void {
+  notification.on('failed', (_event, error) => {
+    console.warn(`[Notifications] ${context} failed:`, error)
+  })
+}
+
 // --- Public API ---
 
 export function initNotifications(mainWindow: BrowserWindow | null): void {
@@ -154,6 +165,7 @@ export function sendTestNotification(): void {
     timeoutType: config?.notifications_persistent ? 'never' : 'default',
     icon: getIcon(),
   })
+  attachNotificationDiagnostics(notification, 'test notification')
   notification.show()
 }
 
@@ -231,6 +243,7 @@ function fireRoutineReminder(
     timeoutType: (config.notifications_task_reminder_persistent ?? config.notifications_persistent) ? 'never' : 'default',
     icon: getIcon(),
   })
+  attachNotificationDiagnostics(notification, `routine reminder (${definition.id})`)
   notification.on('click', () => {
     showMainWindow()
     mainWindowRef?.webContents.send('navigate', '/routines')
@@ -309,6 +322,7 @@ function fireTaskReminder(taskId: number, title: string, configSnapshot: AppConf
     timeoutType: (config.notifications_task_reminder_persistent ?? config.notifications_persistent) ? 'never' : 'default',
     icon: getIcon(),
   })
+  attachNotificationDiagnostics(notification, `task reminder (${taskId})`)
 
   notification.on('click', () => {
     showMainWindow()
@@ -538,6 +552,7 @@ function showTaskNotification(task: TaskInfo, config: AppConfig): void {
     timeoutType: config.notifications_persistent ? 'never' : 'default',
     icon: getIcon(),
   })
+  attachNotificationDiagnostics(notification, `task notification (${task.id ?? 'unknown'})`)
 
   notification.on('click', () => {
     showMainWindow()
@@ -567,6 +582,7 @@ function showSummaryNotification(tasks: NotificationTasks, config: AppConfig): v
     timeoutType: config.notifications_persistent ? 'never' : 'default',
     icon: getIcon(),
   })
+  attachNotificationDiagnostics(notification, 'summary notification')
 
   notification.on('click', () => {
     showMainWindow()

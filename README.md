@@ -98,7 +98,7 @@ Grab the latest installer from [GitHub Releases](https://github.com/rendyhd/Vicu
 
 ### macOS — install
 
-Vicu ships as a signed, notarized `.dmg` for **Apple Silicon** Macs. Open the `.dmg`, drag **Vicu** into **Applications**, and launch it. Because the app is signed with an Apple Developer ID and notarized by Apple, it opens normally — no right-click → **Open** or `xattr` step needed. macOS may show a one-time "downloaded from the internet — are you sure you want to open it?" prompt on first launch; that's expected.
+Vicu ships as a signed, notarized `.dmg` for **Apple Silicon** Macs running **macOS 13 (Ventura) or later**. Open the `.dmg`, drag **Vicu** into **Applications**, and launch it. Because the app is signed with an Apple Developer ID and notarized by Apple, it opens normally — no right-click → **Open** or `xattr` step needed. macOS may show a one-time "downloaded from the internet — are you sure you want to open it?" prompt on first launch; that's expected.
 
 ### Linux — AppImage notes
 
@@ -111,7 +111,7 @@ chmod +x Vicu-*.AppImage
 
 A few platform caveats:
 
-- **Global hotkeys on Wayland**: Electron cannot register global shortcuts on Wayland without portal support. If Vicu shows a warning in Settings that it couldn't register the Quick Entry / Quick View hotkey, bind the keys via your desktop environment's keyboard settings instead, or trigger them from the tray icon. On X11 sessions, the hotkeys work as on Windows/macOS.
+- **Global hotkeys on Wayland**: Electron binds shortcuts through the GlobalShortcuts portal. Accept the consent dialog if your desktop environment shows one (GNOME). If registration still fails, Settings → Quick Entry shows a warning with copyable commands — bind those via your DE's keyboard settings, or trigger Quick Entry / Quick View from the tray. On X11 sessions, hotkeys work as on Windows/macOS.
 - **System tray**: works out of the box on KDE, XFCE, Cinnamon, and most Wayland compositors. On GNOME you'll need the **AppIndicator and KStatusNotifierItem Support** extension.
 - **Browser link mode**: supported via the bundled Chrome/Firefox extension + native messaging. Enable it in Settings and click "Register browser hosts" — the manifests are written to `~/.config/<browser>/NativeMessagingHosts/` and `~/.mozilla/native-messaging-hosts/`. The Windows/macOS URL-from-window-title fallback is not available on Linux.
 - **Obsidian integration**: Windows and macOS only. On Linux the setting is visible but no foreground-app detection runs.

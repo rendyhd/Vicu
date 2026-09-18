@@ -31,7 +31,12 @@ export async function fetchCurrentUser(
 
     if (!response.ok) return null
 
-    const data = await response.json()
+    const data = await response.json() as {
+      id: number
+      username: string
+      email?: string
+      name?: string
+    }
     return {
       id: data.id,
       username: data.username,

@@ -18,12 +18,16 @@ import { storeAPIToken, getAPIToken, isEncryptionAvailable, API_TOKEN_NO_EXPIRY 
 import { clearTaskBadge, reapplyTaskBadge } from './badge'
 import { replayPendingActions } from './sync'
 import { syncCustomLists } from './custom-list-service'
+import { buildLoginItemSettings } from './login-item-settings'
+import { buildShortcutStatus } from './shortcut-status'
 
 let mainWindow: BrowserWindow | null = null
 let quickEntryWindow: BrowserWindow | null = null
 let quickViewWindow: BrowserWindow | null = null
 let startupComplete = false
 let lastCustomListFocusSync = 0
+/** Tracks intentional app quit (tray Quit / before-quit). */
+let appIsQuitting = false
 
 // Register shared state so ipc-handlers can access these without a circular import.
 // The actual function bodies are defined below; the closures capture the module-level
@@ -289,14 +293,13 @@ function setViewerHeight(height: number): void {
 // --- Shortcut registration ---
 // Latest global-shortcut registration state. Surfaced to the renderer via the
 // `get-global-shortcut-status` IPC so Settings can show a warning banner when
-// registration fails (most common on Wayland, where Electron 33 can't talk to
-// the XDG portal).
+// registration fails.
 //
-// `waylandLimited` is a Linux-specific caveat: on Wayland, Electron's
-// globalShortcut.register() happily returns true, but the key only fires when
-// Vicu itself is focused because Wayland's security model doesn't forward keys
-// to unfocused clients. We detect the session type and surface it so Settings
-// can show a proactive warning even when registration "succeeded".
+// On Wayland, Electron 44+ binds shortcuts through the GlobalShortcuts portal
+// (requires a valid reverse-DNS desktopName matching the installed .desktop
+// file). Registration can succeed globally after the user consents. We only
+// flag `waylandLimited` when an enabled shortcut actually failed to register,
+// so Settings can offer the DE keyboard-shortcut fallback.
 const isWaylandSession = isLinux && (
   process.env.XDG_SESSION_TYPE === 'wayland' || !!process.env.WAYLAND_DISPLAY
 )
@@ -304,32 +307,42 @@ const isWaylandSession = isLinux && (
 let lastShortcutStatus: { entry: boolean; viewer: boolean; waylandLimited: boolean } = {
   entry: false,
   viewer: false,
-  waylandLimited: isWaylandSession,
+  waylandLimited: false,
 }
 
 function registerQuickEntryShortcuts(config: AppConfig): { entry: boolean; viewer: boolean; waylandLimited: boolean } {
-  const result = { entry: false, viewer: false, waylandLimited: isWaylandSession }
+  let entryRegistered = false
+  let viewerRegistered = false
+  const entryEnabled = !!config.quick_entry_enabled
+  const viewerEnabled = config.quick_view_enabled !== false
 
-  if (config.quick_entry_enabled) {
+  if (entryEnabled) {
     const entryHotkey = config.quick_entry_hotkey || DEFAULT_QUICK_ENTRY_HOTKEY
     try {
-      result.entry = globalShortcut.register(entryHotkey, toggleQuickEntry)
-      if (!result.entry) console.error(`Failed to register Quick Entry shortcut: ${entryHotkey}`)
+      entryRegistered = globalShortcut.register(entryHotkey, toggleQuickEntry)
+      if (!entryRegistered) console.error(`Failed to register Quick Entry shortcut: ${entryHotkey}`)
     } catch (err) {
       console.error(`Error registering entry shortcut "${entryHotkey}":`, err)
     }
   }
 
-  if (config.quick_view_enabled !== false) {
+  if (viewerEnabled) {
     const viewerHotkey = config.quick_view_hotkey || DEFAULT_QUICK_VIEW_HOTKEY
     try {
-      result.viewer = globalShortcut.register(viewerHotkey, toggleQuickView)
-      if (!result.viewer) console.error(`Failed to register Quick View shortcut: ${viewerHotkey}`)
+      viewerRegistered = globalShortcut.register(viewerHotkey, toggleQuickView)
+      if (!viewerRegistered) console.error(`Failed to register Quick View shortcut: ${viewerHotkey}`)
     } catch (err) {
       console.error(`Error registering viewer shortcut "${viewerHotkey}":`, err)
     }
   }
 
+  const result = buildShortcutStatus({
+    entryEnabled,
+    viewerEnabled,
+    entryRegistered,
+    viewerRegistered,
+    isWaylandSession,
+  })
   lastShortcutStatus = result
   return result
 }
@@ -388,7 +401,7 @@ function createAndWireMainWindow(config: AppConfig | null): BrowserWindow {
   // hide instead of closing whenever that leaves the user a way back —
   // always on macOS (dock), elsewhere when the tray is active.
   win.on('close', (e) => {
-    if (app.isQuitting) return
+    if (appIsQuitting) return
     if (isMac || hasTray()) {
       e.preventDefault()
       win.hide()
@@ -414,7 +427,7 @@ function setupTray(): void {
     onShowQuickEntry: () => showQuickEntry(),
     onShowQuickView: () => showQuickView(),
     onQuit: () => {
-      app.isQuitting = true
+      appIsQuitting = true
       app.quit()
     },
   })
@@ -425,7 +438,7 @@ function initQuickEntryWindows(config: AppConfig): void {
   if (config.quick_entry_enabled && !quickEntryWindow) {
     quickEntryWindow = createQuickEntryWindow(config)
     quickEntryWindow.on('close', (e) => {
-      if (!app.isQuitting) {
+      if (!appIsQuitting) {
         e.preventDefault()
         hideQuickEntry()
       }
@@ -453,7 +466,7 @@ function initQuickEntryWindows(config: AppConfig): void {
   if (config.quick_view_enabled !== false && !quickViewWindow) {
     quickViewWindow = createQuickViewWindow(config)
     quickViewWindow.on('close', (e) => {
-      if (!app.isQuitting) {
+      if (!appIsQuitting) {
         e.preventDefault()
         hideQuickView()
       }
@@ -493,7 +506,7 @@ function initQuickEntryWindows(config: AppConfig): void {
 function applyQuickEntrySettings(): { entry: boolean; viewer: boolean; waylandLimited: boolean } {
   const config = loadConfig()
   if (!config) {
-    const empty = { entry: false, viewer: false, waylandLimited: isWaylandSession }
+    const empty = { entry: false, viewer: false, waylandLimited: false }
     lastShortcutStatus = empty
     return empty
   }
@@ -518,10 +531,10 @@ function applyQuickEntrySettings(): { entry: boolean; viewer: boolean; waylandLi
       quickViewWindow = null
     }
 
-    app.setLoginItemSettings({
+    app.setLoginItemSettings(buildLoginItemSettings({
       openAtLogin: config.launch_on_startup === true,
-      ...(isMac ? { openAsHidden: true, name: 'Vicu' } : {}),
-    })
+      isMac,
+    }))
     return result
   } else {
     // Clean up all windows and tray
@@ -540,20 +553,13 @@ function applyQuickEntrySettings(): { entry: boolean; viewer: boolean; waylandLi
     }
   }
 
-  app.setLoginItemSettings({
+  app.setLoginItemSettings(buildLoginItemSettings({
     openAtLogin: config.launch_on_startup === true,
-    ...(isMac ? { openAsHidden: true, name: 'Vicu' } : {}),
-  })
-  const empty = { entry: false, viewer: false, waylandLimited: isWaylandSession }
+    isMac,
+  }))
+  const empty = { entry: false, viewer: false, waylandLimited: false }
   lastShortcutStatus = empty
   return empty
-}
-
-// Augment the app type
-declare module 'electron' {
-  interface App {
-    isQuitting?: boolean
-  }
 }
 
 // Pin the app name so `app.getPath('userData')` resolves to ~/.config/vicu on
@@ -735,10 +741,10 @@ if (!gotLock) {
       globalShortcut.unregisterAll() // Clear stale registrations from crashes
       registerQuickEntryShortcuts(config)
 
-      app.setLoginItemSettings({
-      openAtLogin: config.launch_on_startup === true,
-      ...(isMac ? { openAsHidden: true, name: 'Vicu' } : {}),
-    })
+      app.setLoginItemSettings(buildLoginItemSettings({
+        openAtLogin: config.launch_on_startup === true,
+        isMac,
+      }))
     }
 
     // If the app was launched with --quick-entry/--quick-view (e.g. a DE
@@ -775,7 +781,7 @@ if (!gotLock) {
   })
 
   app.on('before-quit', () => {
-    app.isQuitting = true
+    appIsQuitting = true
   })
 
   app.on('will-quit', () => {

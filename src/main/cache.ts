@@ -74,11 +74,11 @@ function generateId(): string {
 
 export function addPendingAction(action: Omit<PendingAction, 'id' | 'createdAt'>): string {
   const cache = loadCache()
-  const full: PendingAction = {
+  const full = {
     ...action,
     id: generateId(),
     createdAt: new Date().toISOString(),
-  }
+  } as PendingAction
   cache.pendingActions.push(full)
   saveCache(cache)
   return full.id

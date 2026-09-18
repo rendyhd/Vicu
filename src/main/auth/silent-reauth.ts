@@ -144,7 +144,7 @@ export async function silentReauth(vikunjaUrl: string): Promise<string> {
       )
     }
 
-    const tokenData: { token: string } = await tokenResponse.json()
+    const tokenData = await tokenResponse.json() as { token: string }
     const jwt = tokenData.token
     if (!jwt) {
       throw new Error('Token exchange response missing "token" field')

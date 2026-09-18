@@ -71,7 +71,7 @@ export async function loginWithPassword(
       return { success: false, error: message }
     }
 
-    const data: { token?: string } = await response.json()
+    const data = await response.json() as { token?: string }
     const jwt = data.token
     if (!jwt) {
       return { success: false, error: 'Login response missing token' }

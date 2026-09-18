@@ -29,6 +29,7 @@ import {
   downloadTaskAttachment,
 } from './api-client'
 import { loadConfig, saveConfig, type AppConfig } from './config'
+import { directoryFromSelectedFile, resolveDialogDefaultPath } from './dialog-path'
 import {
   deleteCustomList,
   getCustomLists,
@@ -472,7 +473,7 @@ export function registerIpcHandlers(): void {
       }
     }
 
-    const filterParams = buildViewerFilterParams(effectiveFilter)
+    const filterParams = buildViewerFilterParams(effectiveFilter) as unknown as Record<string, unknown>
 
     // Position sort needs special handling via project views
     if (effectiveFilter.sort_by === 'position') {
@@ -836,11 +837,21 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle('pick-and-upload-attachment', async (_event, taskId: number) => {
     const win = getMainWindow()
+    const config = loadConfig()
     const dialogResult = await dialog.showOpenDialog(win!, {
       properties: ['openFile', 'multiSelections'],
+      defaultPath: resolveDialogDefaultPath(
+        config?.last_file_dialog_directory,
+        app.getPath('documents')
+      ),
     })
     if (dialogResult.canceled || dialogResult.filePaths.length === 0) {
       return { success: true, data: { count: 0 } }
+    }
+
+    if (config) {
+      config.last_file_dialog_directory = directoryFromSelectedFile(dialogResult.filePaths[0])
+      saveConfig(config)
     }
 
     let count = 0

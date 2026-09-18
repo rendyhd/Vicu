@@ -48,10 +48,24 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
+      - name: Cache Electron
+        uses: actions/cache@v4
+        with:
+          path: ~/AppData/Local/electron/Cache
+          key: electron-x64-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            electron-x64-
+
       - run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
 
       - name: Build and publish
         run: npm run dist:publish
@@ -66,7 +80,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       # Import the Developer ID cert into a temporary keychain when the secret
@@ -93,6 +107,12 @@ jobs:
           security list-keychain -d user -s $KEYCHAIN_PATH
 
       - run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
 
       # Sign only if the cert secret is present (CSC_IDENTITY_AUTO_DISCOVERY
       # true), otherwise produce an unsigned build instead of failing. The
@@ -139,10 +159,16 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
 
       # electron-builder.yml lists both arches under linux.target; we override
       # via the positional `AppImage:<arch>` target so each matrix runner only

@@ -110,6 +110,8 @@ export interface AppConfig {
   // Task completion sound
   task_completion_sound_enabled?: boolean
   task_completion_sound_path?: string | null
+  // Last directory used by file open dialogs (attachments, sound picker)
+  last_file_dialog_directory?: string | null
   // Cached username for re-login screen
   last_username?: string
   // Task context menu
@@ -287,6 +289,8 @@ function normalizeConfig(raw: Record<string, unknown>): AppConfig {
     task_completion_sound_enabled: raw.task_completion_sound_enabled !== false,
     task_completion_sound_path: typeof raw.task_completion_sound_path === 'string'
       ? raw.task_completion_sound_path : null,
+    last_file_dialog_directory: typeof raw.last_file_dialog_directory === 'string'
+      ? raw.last_file_dialog_directory : null,
     last_username: typeof raw.last_username === 'string' ? raw.last_username : undefined,
     urgency_mode: raw.urgency_mode === 'important' ? 'important' : 'today',
     last_used_project_id: typeof raw.last_used_project_id === 'number' ? raw.last_used_project_id : undefined,

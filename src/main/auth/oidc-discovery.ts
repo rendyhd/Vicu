@@ -47,7 +47,7 @@ export async function discoverProviders(vikunjaUrl: string): Promise<OIDCProvide
 
     if (!response.ok) return []
 
-    const info: InfoResponse = await response.json()
+    const info = await response.json() as InfoResponse
 
     const oidc = info?.auth?.openid_connect
     if (!oidc?.enabled || !Array.isArray(oidc.providers)) return []
@@ -81,7 +81,7 @@ export async function discoverAuthMethods(vikunjaUrl: string): Promise<ServerAut
 
     if (!response.ok) return fallback
 
-    const info: InfoResponse = await response.json()
+    const info = await response.json() as InfoResponse
 
     const oidc = info?.auth?.openid_connect
     const oidcEnabled = oidc?.enabled === true && Array.isArray(oidc.providers) && oidc.providers.length > 0

@@ -14,7 +14,7 @@ interface QuickEntrySettingsProps {
 
 
 const HOTKEY_FAILURE_COPY = window.api.platform === 'linux'
-  ? 'Failed to register. On Wayland this usually means the compositor blocked the shortcut — see the Wayland notice above for a workaround.'
+  ? 'Failed to register. On Wayland, Electron binds shortcuts through the desktop portal — accept the consent dialog if prompted, or use the workaround below.'
   : 'Failed to register — hotkey may be in use by another application'
 
 export function QuickEntrySettings({ config, projects, onChange, hotkeyWarnings }: QuickEntrySettingsProps) {
@@ -90,10 +90,10 @@ export function QuickEntrySettings({ config, projects, onChange, hotkeyWarnings 
         {hotkeyWarnings?.waylandLimited && (entryEnabled || viewEnabled) && (
           <div className="rounded-md border border-accent-orange/40 bg-accent-orange/10 px-3 py-3 text-xs text-[var(--text-primary)]">
             <p className="mb-2 font-semibold text-accent-orange">
-              Wayland: Vicu hotkeys only fire when Vicu is focused
+              Wayland: global hotkey registration failed
             </p>
             <p className="mb-2 text-[var(--text-secondary)]">
-              Wayland doesn't let applications grab global keyboard shortcuts. To get true global capture, bind a shortcut in your desktop environment's keyboard settings that runs Vicu with a command-line flag:
+              On Wayland, Vicu uses the GlobalShortcuts portal. If a consent dialog appeared, accept it and try again. If registration still fails, bind a shortcut in your desktop environment that runs Vicu with a command-line flag:
             </p>
             <ol className="mb-3 list-decimal space-y-1 pl-5 text-[var(--text-secondary)]">
               <li>Open <strong className="text-[var(--text-primary)]">Settings → Keyboard → Custom Shortcuts</strong> (GNOME) or <strong className="text-[var(--text-primary)]">System Settings → Shortcuts → Custom Shortcuts</strong> (KDE).</li>

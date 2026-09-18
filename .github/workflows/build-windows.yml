@@ -1,0 +1,56 @@
+# Windows CI Build
+#
+# Builds and packages Vicu for Windows on every push to main, PRs targeting main,
+# and manual triggers. Produces an NSIS x64 installer artifact without publishing
+# to GitHub Releases.
+
+name: Build Windows
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Cache Electron
+        uses: actions/cache@v4
+        with:
+          path: ~/AppData/Local/electron/Cache
+          key: electron-x64-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            electron-x64-
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
+
+      - name: Build app
+        run: npm run build
+
+      - name: Package Windows (x64)
+        timeout-minutes: 30
+        run: npx electron-builder --win nsis:x64 --publish never
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: vicu-windows-x64-nsis
+          path: dist/*.exe
+          if-no-files-found: warn

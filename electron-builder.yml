@@ -64,6 +64,7 @@ linux:
   synopsis: Task management app powered by Vikunja
   description: A personal task manager for your desktop, powered by Vikunja. Frictionless capture, keyboard-driven review, and deep integration with your browser.
   maintainer: rendyhd
+  syncDesktopName: true
   target:
     - target: AppImage
       arch:
@@ -71,7 +72,7 @@ linux:
         - arm64
   desktop:
     entry:
-      StartupWMClass: Vicu
+      StartupWMClass: com.rendyhd.vicu
       Comment: Task management app powered by Vikunja
       Keywords: task;todo;productivity;vikunja;
 
