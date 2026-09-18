@@ -23,6 +23,8 @@ updates continue to preserve the existing description.
 - Verify `javascript:`, `data:`, event attributes, scripts, styles, iframes,
   forms, active SVG, and nested unsafe markup are not rendered or re-emitted.
 - Verify image tokens and note/page-link envelopes survive edits unchanged.
+- Verify desktop notes: link toolbar opens an in-app dialog (add/edit/remove);
+  plain-click opens via `openDeepLink` (http/https/mailto).
 - Verify a Quick View title edit cannot flatten a rich description.
 - Verify a concurrent desktop/Android description edit presents the Android
   “Keep mine / Use server” decision before save.
