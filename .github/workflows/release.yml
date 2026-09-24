@@ -18,6 +18,8 @@ jobs:
   create-release:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+
       - name: Ensure draft release exists
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -33,12 +35,18 @@ jobs:
           else
             PRERELEASE_FLAG=
           fi
+          NOTES_FILE="docs/releases/${TAG}.md"
+          if [[ -f "$NOTES_FILE" ]]; then
+            NOTES_ARGS=(--notes-file "$NOTES_FILE")
+          else
+            NOTES_ARGS=(--generate-notes)
+          fi
           gh release create "$TAG" \
             --repo "$REPO" \
             --draft \
             $PRERELEASE_FLAG \
             --title "$TAG" \
-            --notes-from-tag
+            "${NOTES_ARGS[@]}"
 
   build-windows:
     needs: create-release
