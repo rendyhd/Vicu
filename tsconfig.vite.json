@@ -1,0 +1,7 @@
+{
+  "extends": "./tsconfig.node.json",
+  "compilerOptions": {
+    "rootDir": "."
+  },
+  "include": ["electron.vite.config.ts"]
+}
