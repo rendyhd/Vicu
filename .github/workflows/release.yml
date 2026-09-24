@@ -13,8 +13,8 @@ jobs:
   # build-linux all see an existing release when they call
   # `electron-builder --publish always`. Without this, each runner races
   # to POST /repos/.../releases and whoever loses gets `422 already_exists`
-  # and fails the job. Pre-release flag is set from the tag: vX.Y.Z-* is
-  # treated as a pre-release, plain vX.Y.Z as a stable release.
+  # and fails the job. Suffix tags are pre-releases; v1.8.1 is also a
+  # pre-release while retaining the requested plain version number.
   create-release:
     runs-on: ubuntu-latest
     steps:
@@ -28,7 +28,7 @@ jobs:
             echo "Release $TAG already exists, skipping create."
             exit 0
           fi
-          if [[ "$TAG" == *-* ]]; then
+          if [[ "$TAG" == *-* || "$TAG" == "v1.8.1" ]]; then
             PRERELEASE_FLAG=--prerelease
           else
             PRERELEASE_FLAG=
@@ -38,7 +38,7 @@ jobs:
             --draft \
             $PRERELEASE_FLAG \
             --title "$TAG" \
-            --notes ""
+            --notes-from-tag
 
   build-windows:
     needs: create-release
@@ -195,7 +195,7 @@ jobs:
   # release as the draft that create-release made, so nothing publishes it on its
   # own. This flips it to published only after all builds succeed — a failed
   # build leaves the release as a draft instead of shipping a partial release.
-  # Stable tags (vX.Y.Z) become the "Latest" release; pre-release tags (vX.Y.Z-*)
+  # Stable tags become the "Latest" release; suffix tags and v1.8.1
   # publish with the pre-release flag.
   publish-release:
     needs: [build-windows, build-macos, build-linux]
@@ -207,7 +207,7 @@ jobs:
           TAG: ${{ github.ref_name }}
           REPO: ${{ github.repository }}
         run: |
-          if [[ "$TAG" == *-* ]]; then
+          if [[ "$TAG" == *-* || "$TAG" == "v1.8.1" ]]; then
             gh release edit "$TAG" --repo "$REPO" --draft=false --prerelease
           else
             gh release edit "$TAG" --repo "$REPO" --draft=false --latest
