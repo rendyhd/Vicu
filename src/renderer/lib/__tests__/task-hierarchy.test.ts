@@ -9,6 +9,7 @@ import {
   unfinishedDescendants,
 } from '../task-hierarchy'
 import { resolveSelectedTasks } from '../task-selection'
+import { updateTaskDetailDone } from '../task-detail-cache'
 
 function task(id: number, done = false, children: Task[] = []): Task {
   return {
@@ -67,5 +68,20 @@ describe('task hierarchy', () => {
     queryClient.setQueryData(['tasks', 'today'], [task(1, false, [task(2)])])
 
     expect(resolveSelectedTasks(queryClient, new Set([2])).map((item) => item.id)).toEqual([2])
+  })
+
+  it('updates fetched subtask caches and preserves their rollback snapshots', () => {
+    const queryClient = new QueryClient()
+    queryClient.setQueryData(['task-detail', 1], [task(2), task(3)])
+    queryClient.setQueryData(['task-detail', 4], [task(5, false, [task(2)])])
+
+    const previous = updateTaskDetailDone(queryClient, new Map([[2, true]]))
+
+    expect(queryClient.getQueryData<Task[]>(['task-detail', 1])?.map((item) => item.done)).toEqual([true, false])
+    expect(queryClient.getQueryData<Task[]>(['task-detail', 4])?.[0].related_tasks?.subtask?.[0].done).toBe(true)
+
+    for (const [key, data] of previous) queryClient.setQueryData(key, data)
+    expect(queryClient.getQueryData<Task[]>(['task-detail', 1])?.[0].done).toBe(false)
+    expect(queryClient.getQueryData<Task[]>(['task-detail', 4])?.[0].related_tasks?.subtask?.[0].done).toBe(false)
   })
 })

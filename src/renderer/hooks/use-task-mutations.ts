@@ -10,6 +10,7 @@ import {
   taskDescendants,
   unfinishedDescendants,
 } from '@/lib/task-hierarchy'
+import { updateTaskDetailDone } from '@/lib/task-detail-cache'
 import type {
   Task,
   TaskAttachment,
@@ -447,16 +448,17 @@ export function useCompleteTask() {
       ])
       // Track completed task so it stays visible (with strikethrough) until navigation
       addCompleted(mapTaskDoneByIds(task, doneById), pathname, autoCompleted, suppressTopLevelUndo)
-      playCompletionSound()
 
       await qc.cancelQueries({ queryKey: ['tasks'] })
       await qc.cancelQueries({ queryKey: ['view-tasks'] })
       await qc.cancelQueries({ queryKey: ['section-tasks'] })
+      await qc.cancelQueries({ queryKey: ['task-detail'] })
       const previousTaskQueries = qc.getQueriesData<Task[]>({ queryKey: ['tasks'] })
       const previousViewQueries = qc.getQueriesData<Task[]>({ queryKey: ['view-tasks'] })
       const previousSectionQueries = qc.getQueriesData<SectionTaskCacheEntry[]>({
         queryKey: ['section-tasks'],
       })
+      const previousTaskDetailQueries = updateTaskDetailDone(qc, doneById)
 
       qc.setQueriesData<Task[]>({ queryKey: ['tasks'] }, (old) =>
         old?.map((item) => mapTaskDoneByIds(item, doneById))
@@ -471,7 +473,10 @@ export function useCompleteTask() {
         }))
       )
 
-      return { previousTaskQueries, previousViewQueries, previousSectionQueries }
+      return { previousTaskQueries, previousViewQueries, previousSectionQueries, previousTaskDetailQueries }
+    },
+    onSuccess: () => {
+      playCompletionSound()
     },
     onError: (_err, input, context) => {
       const task = 'task' in input ? input.task : input
@@ -491,10 +496,18 @@ export function useCompleteTask() {
           qc.setQueryData(key, data)
         }
       }
+      if (context?.previousTaskDetailQueries) {
+        for (const [key, data] of context.previousTaskDetailQueries) {
+          qc.setQueryData(key, data)
+        }
+      }
     },
-    // Skip invalidation — the optimistic update keeps the task at its original
-    // position with strikethrough. The store provides a fallback if another
-    // mutation triggers a refetch. Full sync happens on navigation.
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: ['task-detail'] })
+    },
+    // Skip list invalidation — the optimistic update keeps the task at its
+    // original position with strikethrough. Refresh task-detail separately so
+    // the expanded subtask list stays in sync with the server.
   })
 }
 
@@ -547,11 +560,13 @@ export function useUncompleteTask() {
       await qc.cancelQueries({ queryKey: ['tasks'] })
       await qc.cancelQueries({ queryKey: ['view-tasks'] })
       await qc.cancelQueries({ queryKey: ['section-tasks'] })
+      await qc.cancelQueries({ queryKey: ['task-detail'] })
       const previousTaskQueries = qc.getQueriesData<Task[]>({ queryKey: ['tasks'] })
       const previousViewQueries = qc.getQueriesData<Task[]>({ queryKey: ['view-tasks'] })
       const previousSectionQueries = qc.getQueriesData<SectionTaskCacheEntry[]>({
         queryKey: ['section-tasks'],
       })
+      const previousTaskDetailQueries = updateTaskDetailDone(qc, doneById)
 
       qc.setQueriesData<Task[]>({ queryKey: ['tasks'] }, (old) =>
         old?.map((item) => mapTaskDoneByIds(item, doneById))
@@ -566,7 +581,7 @@ export function useUncompleteTask() {
         }))
       )
 
-      return { previousTaskQueries, previousViewQueries, previousSectionQueries, wasInStore }
+      return { previousTaskQueries, previousViewQueries, previousSectionQueries, previousTaskDetailQueries, wasInStore }
     },
     onError: (_err, task, context) => {
       if (context?.wasInStore) {
@@ -589,10 +604,17 @@ export function useUncompleteTask() {
           qc.setQueryData(key, data)
         }
       }
+      if (context?.previousTaskDetailQueries) {
+        for (const [key, data] of context.previousTaskDetailQueries) {
+          qc.setQueryData(key, data)
+        }
+      }
     },
-    // Skip invalidation — the optimistic update keeps the task at its original
-    // position. The store provides a fallback if another mutation triggers a
-    // refetch. Full sync happens on navigation.
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: ['task-detail'] })
+    },
+    // Skip list invalidation — the optimistic update keeps the task at its
+    // original position. Refresh task-detail separately for expanded subtasks.
   })
 }
 

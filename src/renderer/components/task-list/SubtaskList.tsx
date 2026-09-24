@@ -76,6 +76,11 @@ export function SubtaskList({ parentTask, showInput = false }: SubtaskListProps)
           ))}
         </div>
       )}
+      {completeTask.isError && (
+        <div role="alert" className="mb-1 text-2xs text-red-500">
+          Could not complete subtask: {completeTask.error.message}
+        </div>
+      )}
 
       {showInput && (
         <div className="flex items-center gap-2">
