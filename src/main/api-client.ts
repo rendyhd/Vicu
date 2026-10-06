@@ -12,7 +12,7 @@ import {
   MAX_PAGE_SIZE,
   clampPageSize,
   type PaginatedResponse,
-  withoutNestedSubtasks,
+  finishTaskCollection,
 } from './api-v2'
 import type { ApiError, ApiResult } from './api-result'
 import { collectAllPages } from './paginate'
@@ -333,7 +333,7 @@ export async function fetchTasks(params: Record<string, unknown>): Promise<ApiRe
     : requestAllPagesWithRetry<unknown>(fullUrl, c.token)
   const tasks = await result
   if (!tasks.success) return tasks
-  return { success: true, data: withoutNestedSubtasks(tasks.data) }
+  return { success: true, data: finishTaskCollection(tasks.data, params) }
 }
 
 export async function createTask(
@@ -564,7 +564,7 @@ export async function fetchViewTasks(
     : requestAllPagesWithRetry<unknown>(fullUrl, c.token)
   const tasks = await result
   if (!tasks.success) return tasks
-  return { success: true, data: withoutNestedSubtasks(tasks.data) }
+  return { success: true, data: finishTaskCollection(tasks.data, params) }
 }
 
 export async function updateTaskPosition(

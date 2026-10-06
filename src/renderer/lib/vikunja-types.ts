@@ -129,6 +129,11 @@ export interface TaskQueryParams {
   order_by?: string
   filter_include_nulls?: boolean
   filter_timezone?: string
+  /**
+   * Vicu option, never sent to the server: keep nested subtasks in the result so the view can
+   * filter first and hide them afterwards (Tag view, custom lists).
+   */
+  keep_nested_subtasks?: boolean
 }
 
 export type ApiResult<T> =
@@ -147,6 +152,8 @@ export interface CustomListFilter {
   label_ids?: number[]
   include_done?: boolean
   include_today_all_projects?: boolean
+  /** Whether the today / this week / this month windows also include overdue tasks. Absent means true. */
+  include_overdue?: boolean
 }
 
 export interface CustomList {

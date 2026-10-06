@@ -1,4 +1,5 @@
 import { sanitizeProjectPatch, sanitizeTaskPatch } from '../shared/merge-patches'
+import { withoutNestedSubtasks } from '../shared/nested-subtasks'
 
 export interface PaginatedResponse<T> {
   items: T[] | null
@@ -48,33 +49,18 @@ export function createTaskCollectionSearchParams(
   return qs
 }
 
-function taskId(value: unknown): number | null {
-  if (!value || typeof value !== 'object') return null
-  const id = (value as { id?: unknown }).id
-  return typeof id === 'number' ? id : null
-}
+export { withoutNestedSubtasks } from '../shared/nested-subtasks'
 
 /**
- * Remove a task from the top-level list when one of its parents is present,
- * or when the embedded parent is completed. Active matching children remain
- * visible for searches/filters which omit an active parent.
+ * Vicu-only query option (never sent to the server): keep nested subtasks in the result so the
+ * caller can filter first and hide them afterwards (Tag view, custom lists; cross-app
+ * semantics v1 section 3.2).
  */
-export function withoutNestedSubtasks<T>(tasks: T[]): T[] {
-  const visibleIds = new Set(tasks.map(taskId).filter((id): id is number => id !== null))
+export const KEEP_NESTED_SUBTASKS_PARAM = 'keep_nested_subtasks'
 
-  return tasks.filter((task) => {
-    if (!task || typeof task !== 'object') return true
-    const related = (task as { related_tasks?: unknown }).related_tasks
-    if (!related || typeof related !== 'object') return true
-    const parents = (related as { parenttask?: unknown }).parenttask
-    if (!Array.isArray(parents)) return true
-    return !parents.some((parent) => {
-      const parentId = taskId(parent)
-      const parentDone = !!parent && typeof parent === 'object'
-        && (parent as { done?: unknown }).done === true
-      return parentDone || (parentId !== null && visibleIds.has(parentId))
-    })
-  })
+/** The final step of every task fetch: hide nested subtasks unless the caller asked to keep them. */
+export function finishTaskCollection<T>(tasks: T[], params: Record<string, unknown>): T[] {
+  return params[KEEP_NESTED_SUBTASKS_PARAM] === true ? tasks : withoutNestedSubtasks(tasks)
 }
 
 export type AttachmentPreviewSize = 'sm' | 'md' | 'lg' | 'xl'

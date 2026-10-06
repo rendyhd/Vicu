@@ -5,6 +5,7 @@ import {
   createProjectPatch,
   createTaskCollectionSearchParams,
   createTaskPatch,
+  finishTaskCollection,
   withoutNestedSubtasks,
 } from '../api-v2'
 
@@ -52,6 +53,25 @@ describe('task hierarchy', () => {
     }
 
     expect(withoutNestedSubtasks([child])).toEqual([])
+  })
+})
+
+describe('finishTaskCollection', () => {
+  const parent = { id: 1, title: 'Parent', related_tasks: { subtask: [{ id: 2 }] } }
+  const child = { id: 2, title: 'Child', related_tasks: { parenttask: [{ id: 1 }] } }
+
+  it('hides nested subtasks by default', () => {
+    expect(finishTaskCollection([parent, child], {})).toEqual([parent])
+    expect(finishTaskCollection([parent, child], { filter: 'done = false' })).toEqual([parent])
+  })
+
+  it('keeps every task when the caller will filter first (Tag view, custom lists)', () => {
+    expect(finishTaskCollection([parent, child], { keep_nested_subtasks: true })).toEqual([parent, child])
+  })
+
+  it('does not send the option to the server', () => {
+    const query = createTaskCollectionSearchParams({ filter: 'done = false', keep_nested_subtasks: true })
+    expect([...query.keys()].sort()).toEqual(['expand', 'filter'])
   })
 })
 

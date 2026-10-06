@@ -66,11 +66,14 @@ export function useFilters({
           order_by: 'desc',
         }
 
+      // The Tag view filters by label before hiding nested subtasks, so it needs the
+      // un-nested set (a labeled subtask is shown even when its parent lacks the label).
       case 'tag':
         return {
           filter: 'done = false',
           sort_by: 'updated',
           order_by: 'desc',
+          keep_nested_subtasks: true,
         }
 
       default:
