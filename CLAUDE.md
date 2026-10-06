@@ -120,6 +120,12 @@ Three separate files in `userData`, all held in memory and written by `JsonFileS
 
 An older combined `offline-cache.json` is split once at startup (`offline/legacy-migration.ts`), keeping the original as `offline-cache.json.bak`.
 
+Main window use of the queue (renderer): mutation helpers in `hooks/use-task-mutations.ts` call `lib/offline-mutations.ts`, which asks `isQueueableFailure` (`src/shared/error-classify.ts`) whether a failure should be queued. A queued change keeps its optimistic cache and a pending create lives in the cache under its temp id (`lib/pending-cache.ts`); `hooks/use-offline-queue.ts` feeds `stores/offline-store.ts` (counts, task ids for the row icon) and `lib/replay-handler.ts` remaps temp ids and refetches when a replay drains the queue. Task refetches are deferred while changes are queued (`lib/task-refresh.ts`). Non-queueable failures roll back and show a toast (`MutationCache.onError` in `lib/query-client.ts`; a mutation opts out with `meta: { silent: true }`). The sidebar `SyncStatusButton` opens `SyncPanel` (retry / discard of failed changes, sign-in on an auth problem). Queue entries carry the server URL and user id they were made for (`offline/owner.ts`); actions for another account are never replayed and stay in the failed log as `other-account`. The query cache of task lists, projects and labels is saved to IndexedDB (`lib/query-persistence.ts`) so the app starts with its last lists offline. Freshness: `lib/freshness.ts` refetches on window focus (30 s throttle), every 5 minutes while visible, on resume, and rolls date-dependent views over at midnight through `stores/day-store.ts`.
+
+### Task reminders
+
+`src/main/task-reminders.ts` (no Electron imports, fake-timer tests) schedules one timer per task reminder; `src/main/notifications.ts` wires it to the API client, config and notification windows. A refresh fetches only open tasks with a reminder in a window around now (server filter), at start-up, every 15 minutes, on window focus and resume, and after a task is completed, uncompleted or deleted. Timers beyond about 24.8 days are left to a later refresh, the task is re-read when a timer fires, and the master `notifications_enabled` switch is checked at refresh and at fire time.
+
 ### Config
 
 `AppConfig` in `src/main/config.ts` — persisted as JSON in Electron's `userData` directory. Includes Vikunja connection settings, theme, window bounds, sidebar width, custom lists, quick entry settings, and viewer filter config.
