@@ -14,8 +14,8 @@ describe('classifyReplayFailure (D-SYNC-1)', () => {
       expect(classifyReplayFailure(http(status), 'update')).toEqual({ kind: 'drop', reason })
     })
 
-    it('404 on an update, a label change or an upload means the task is gone', () => {
-      for (const type of ['update', 'add-label', 'remove-label', 'upload-attachment'] as const) {
+    it('404 on an update, an added label or an upload means the task is gone', () => {
+      for (const type of ['update', 'add-label', 'upload-attachment'] as const) {
         expect(classifyReplayFailure(http(404), type)).toEqual({ kind: 'drop', reason: 'task-gone' })
       }
     })
@@ -33,6 +33,10 @@ describe('classifyReplayFailure (D-SYNC-1)', () => {
   describe('already in effect counts as done', () => {
     it('404 on a delete: the task is already gone', () => {
       expect(classifyReplayFailure(http(404), 'delete')).toEqual({ kind: 'done' })
+    })
+
+    it('404 on removing a label: it is already off the task', () => {
+      expect(classifyReplayFailure(http(404), 'remove-label')).toEqual({ kind: 'done' })
     })
 
     it('409 on adding a label that is already on the task', () => {

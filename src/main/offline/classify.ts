@@ -33,7 +33,8 @@ export function classifyReplayFailure(failure: FailureLike, actionType: OfflineA
     if (status >= 500) return { kind: 'stop', why: 'server' }
 
     if (status === 404) {
-      if (actionType === 'delete') return { kind: 'done' }
+      // Deleting or detaching something that is already gone has the effect the user wanted.
+      if (actionType === 'delete' || actionType === 'remove-label') return { kind: 'done' }
       return { kind: 'drop', reason: actionType === 'create' ? 'not-found' : 'task-gone' }
     }
     if (status === 409) {
