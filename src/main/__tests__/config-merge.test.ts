@@ -6,6 +6,7 @@ vi.mock('electron', () => ({
 }))
 
 import {
+  applyConfigPatch,
   applyConnectionFields,
   isConnectionFields,
   normalizeConfig,
@@ -247,5 +248,136 @@ describe('isConnectionFields', () => {
     expect(isConnectionFields({ vikunja_url: 5, api_token: '', auth_method: 'oidc' })).toBe(false)
     expect(isConnectionFields({ vikunja_url: 'u', api_token: '', auth_method: 'oidc', inbox_project_id: 'x' })).toBe(false)
     expect(isConnectionFields({ vikunja_url: 'u', api_token: '', auth_method: 'oidc', inbox_project_id: NaN })).toBe(false)
+  })
+})
+
+describe('applyConfigPatch (D-CFG-2)', () => {
+  it('changes only the patched keys', () => {
+    const before = userConfig()
+    const result = applyConfigPatch(before, { notifications_sound: true, theme: 'light' })
+
+    expect(result.notifications_sound).toBe(true)
+    expect(result.theme).toBe('light')
+    expect({ ...result, notifications_sound: false, theme: 'dark' }).toEqual(before)
+  })
+
+  it('never reverts fields main changed after the renderer loaded its snapshot', () => {
+    const snapshotTakenByRenderer = userConfig()
+    // Main moves on: the user resized the window, moved a popup, picked a file, dismissed an update...
+    const current = userConfig({
+      window_bounds: { x: 50, y: 60, width: 900, height: 700 },
+      sidebar_width: 280,
+      quick_entry_position: { x: 100, y: 200 },
+      quick_view_position: { x: 300, y: 400 },
+      last_file_dialog_directory: 'D:\Other',
+      update_check_dismissed_version: '10.0.0',
+      last_used_project_id: 77,
+      last_used_label_id: 88,
+    })
+
+    // The renderer only reports what the user edited.
+    const patch = { launch_on_startup: false, quick_view_hotkey: 'Ctrl+Alt+V' }
+    const result = applyConfigPatch(current, patch)
+
+    expect(result.launch_on_startup).toBe(false)
+    expect(result.quick_view_hotkey).toBe('Ctrl+Alt+V')
+    expect(result.window_bounds).toEqual({ x: 50, y: 60, width: 900, height: 700 })
+    expect(result.sidebar_width).toBe(280)
+    expect(result.quick_entry_position).toEqual({ x: 100, y: 200 })
+    expect(result.quick_view_position).toEqual({ x: 300, y: 400 })
+    expect(result.last_file_dialog_directory).toBe('D:\Other')
+    expect(result.update_check_dismissed_version).toBe('10.0.0')
+    expect(result.last_used_project_id).toBe(77)
+    expect(result.last_used_label_id).toBe(88)
+    // ...which a whole-snapshot save would have reverted:
+    expect(snapshotTakenByRenderer.window_bounds).not.toEqual(result.window_bounds)
+  })
+
+  it('ignores custom_lists and custom_lists_sync, which main owns', () => {
+    const before = userConfig()
+    const result = applyConfigPatch(before, {
+      custom_lists: [],
+      custom_lists_sync: undefined,
+      theme: 'light',
+    })
+
+    expect(result.custom_lists).toEqual(before.custom_lists)
+    expect(result.custom_lists_sync).toEqual(before.custom_lists_sync)
+    expect(result.theme).toBe('light')
+  })
+
+  it('ignores keys that are not config fields', () => {
+    const before = userConfig()
+    const result = applyConfigPatch(before, JSON.parse('{"__proto__": {"polluted": true}, "constructor": 1, "evil": "x", "theme": "light"}'))
+
+    expect(result).not.toHaveProperty('evil')
+    expect(result).not.toHaveProperty('constructor', 1)
+    expect(({} as Record<string, unknown>).polluted).toBeUndefined()
+    expect(result.theme).toBe('light')
+  })
+
+  it('resets a key to its default when the patch value is undefined', () => {
+    const result = applyConfigPatch(userConfig(), { update_check_dismissed_version: undefined, notifications_sound: undefined })
+
+    expect(result.update_check_dismissed_version).toBeUndefined()
+    expect(result.notifications_sound).toBe(true)
+  })
+
+  it('replaces nested settings objects as a whole', () => {
+    const result = applyConfigPatch(userConfig(), {
+      review: { enabled: true, default_cadence_days: 7, exclude_inbox: true },
+      viewer_filter: { project_ids: [1, 2], sort_by: 'title', order_by: 'asc', due_date_filter: 'all' },
+    })
+
+    expect(result.review).toEqual({ enabled: true, default_cadence_days: 7, exclude_inbox: true })
+    expect(result.viewer_filter).toMatchObject({ project_ids: [1, 2], sort_by: 'title' })
+  })
+
+  it('normalizes values (invalid types fall back to defaults)', () => {
+    const result = applyConfigPatch(userConfig(), {
+      theme: 'neon',
+      sidebar_width: 'wide',
+      review: { default_cadence_days: 9999 },
+    })
+
+    expect(result.theme).toBe('system')
+    expect(result.sidebar_width).toBeUndefined()
+    expect(result.review?.default_cadence_days).toBe(365)
+  })
+
+  it('pointing at another server drops the previous account data', () => {
+    const before = userConfig()
+    const result = applyConfigPatch(before, {
+      vikunja_url: 'https://other.example.org/',
+      api_token: 'tk',
+      auth_method: 'api_token',
+    })
+
+    expect(result.vikunja_url).toBe('https://other.example.org')
+    expect(result.custom_lists).toBeUndefined()
+    expect(result.custom_lists_sync).toBeUndefined()
+    expect(result.quick_entry_default_project_id).toBeUndefined()
+    expect(result.theme).toBe('dark')
+  })
+
+  it('keeping the same server (even with a trailing slash) keeps the account data', () => {
+    const before = userConfig()
+    const result = applyConfigPatch(before, { vikunja_url: 'https://tasks.example.com/', api_token: 'tk', auth_method: 'api_token' })
+
+    expect(result.custom_lists).toEqual(before.custom_lists)
+    expect(result.quick_entry_default_project_id).toBe(9)
+  })
+
+  it('does not mutate the config it was given', () => {
+    const before = userConfig()
+    const snapshot = structuredClone(before)
+    applyConfigPatch(before, { theme: 'light', review: { enabled: true, default_cadence_days: 3, exclude_inbox: true } })
+
+    expect(before).toEqual(snapshot)
+  })
+
+  it('accepts an empty patch', () => {
+    const before = userConfig()
+    expect(applyConfigPatch(before, {})).toEqual(before)
   })
 })

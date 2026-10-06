@@ -364,6 +364,12 @@ const ACCOUNT_SPECIFIC_KEYS = [
   'last_username',
 ] as const satisfies readonly (keyof AppConfig)[]
 
+/** Owned by the custom list service (its own IPCs and sync); never taken from a renderer patch. */
+const MAIN_OWNED_KEYS: ReadonlySet<string> = new Set(['custom_lists', 'custom_lists_sync'])
+
+/** Every key of AppConfig, derived from the normalizer so the two cannot drift apart. */
+const CONFIG_KEYS: ReadonlySet<string> = new Set(Object.keys(normalizeConfig({})))
+
 function trimUrl(url: unknown): string {
   return typeof url === 'string' ? url.replace(/\/+$/, '') : ''
 }
@@ -389,6 +395,23 @@ export function applyConnectionFields(existing: AppConfig | null, conn: Connecti
     inbox_project_id: conn.inbox_project_id ?? (sameServer ? existing.inbox_project_id : 0),
   }
   if (!sameServer) resetAccountData(merged)
+  return normalizeConfig(merged)
+}
+
+/**
+ * Merge a partial change from the renderer into the current config. Only known
+ * keys are taken, and never the custom list slice. A key whose value is
+ * undefined is reset to its default. Values are replaced at the top level (a
+ * patched `review` or `viewer_filter` object replaces the old one). Pointing
+ * `vikunja_url` at another server drops the previous account's data.
+ */
+export function applyConfigPatch(current: AppConfig, patch: Record<string, unknown>): AppConfig {
+  const merged: Record<string, unknown> = { ...current }
+  for (const key of Object.keys(patch)) {
+    if (!CONFIG_KEYS.has(key) || MAIN_OWNED_KEYS.has(key)) continue
+    merged[key] = patch[key]
+  }
+  if (trimUrl(merged.vikunja_url) !== trimUrl(current.vikunja_url)) resetAccountData(merged)
   return normalizeConfig(merged)
 }
 

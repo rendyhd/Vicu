@@ -592,9 +592,7 @@ export function AppShell() {
         document.body.style.cursor = ''
         document.body.style.userSelect = ''
         setSidebarWidth(latestWidth)
-        void api.getConfig().then((cfg) => {
-          if (cfg) return api.saveConfig({ ...cfg, sidebar_width: latestWidth })
-        })
+        void api.saveConfigPatch({ sidebar_width: latestWidth })
       }
 
       document.body.style.cursor = 'col-resize'

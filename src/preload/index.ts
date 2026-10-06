@@ -57,6 +57,8 @@ const api = {
     ipcRenderer.invoke('get-config'),
   saveConfig: (config: Record<string, unknown>) =>
     ipcRenderer.invoke('save-config', config),
+  saveConfigPatch: (patch: Record<string, unknown>) =>
+    ipcRenderer.invoke('save-config-patch', patch),
   saveConnectionConfig: (connection: Record<string, unknown>) =>
     ipcRenderer.invoke('save-connection-config', connection),
   getCustomLists: () => ipcRenderer.invoke('custom-lists:get'),

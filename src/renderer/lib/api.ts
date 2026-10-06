@@ -100,6 +100,9 @@ export const api = {
   saveConfig: (config: AppConfig) =>
     window.api.saveConfig(config) as Promise<void>,
 
+  saveConfigPatch: (patch: Partial<AppConfig>) =>
+    window.api.saveConfigPatch(patch) as Promise<void>,
+
   saveConnectionConfig: (connection: ConnectionConfig) =>
     window.api.saveConnectionConfig(connection) as Promise<void>,
 

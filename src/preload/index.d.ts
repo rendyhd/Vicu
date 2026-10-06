@@ -69,6 +69,7 @@ export interface ElectronAPI {
   // Config
   getConfig(): Promise<AppConfig | null>
   saveConfig(config: AppConfig): Promise<void>
+  saveConfigPatch(patch: Partial<AppConfig>): Promise<void>
   saveConnectionConfig(connection: ConnectionConfig): Promise<void>
   getCustomLists(): Promise<CustomList[]>
   upsertCustomList(list: CustomList): Promise<CustomList[]>

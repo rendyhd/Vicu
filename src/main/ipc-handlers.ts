@@ -33,6 +33,7 @@ import {
   downloadTaskAttachment,
 } from './api-client'
 import {
+  applyConfigPatch,
   applyConnectionFields,
   isConnectionFields,
   loadConfig,
@@ -137,9 +138,22 @@ function withoutCompletionMetadata(task: Record<string, unknown>): Record<string
   return clean
 }
 
+// Config keys that only record UI state. Changing just these needs no badge refresh,
+// Quick View refresh or custom list sync.
+const QUIET_PATCH_KEYS: ReadonlySet<string> = new Set([
+  'sidebar_width',
+  'window_bounds',
+  'last_used_project_id',
+  'last_used_label_id',
+  'last_file_dialog_directory',
+  'update_check_dismissed_version',
+  'quick_entry_position',
+  'quick_view_position',
+])
+
 // Shared tail of every renderer-driven config write: keep the API token out of
-// config.json, save, then tell the rest of the app about the change.
-function persistConfig(config: AppConfig): void {
+// config.json, save, then (unless `announce` is false) tell the rest of the app.
+function persistConfig(config: AppConfig, announce = true): void {
   // Encrypt API token into token-store if available
   if (config.auth_method === 'api_token' && config.api_token && isEncryptionAvailable()) {
     storeAPIToken(config.api_token, API_TOKEN_NO_EXPIRY)
@@ -150,6 +164,7 @@ function persistConfig(config: AppConfig): void {
   if (config.theme) {
     nativeTheme.themeSource = config.theme === 'system' ? 'system' : config.theme
   }
+  if (!announce) return
   // If the task badge was just turned off, clear it right away so the
   // dock/taskbar icon updates without waiting for the renderer to push.
   if (config.show_today_overdue_badge !== true) {
@@ -285,6 +300,17 @@ export function registerIpcHandlers(): void {
       config.custom_lists_sync = undefined
     }
     persistConfig(config)
+  })
+
+  // Preference changes: only the keys in the patch change, merged into the config as it
+  // is now, so fields main changes on its own (window bounds, popup positions, last
+  // dialog directory...) are never reverted by a stale renderer snapshot.
+  handleTrusted('save-config-patch', (_event, patch: unknown) => {
+    if (!patch || typeof patch !== 'object' || Array.isArray(patch)) throw new Error('Invalid config patch')
+    const latest = loadConfig()
+    if (!latest) return
+    const keys = Object.keys(patch)
+    persistConfig(applyConfigPatch(latest, patch as Record<string, unknown>), !keys.every((k) => QUIET_PATCH_KEYS.has(k)))
   })
 
   // Setup, OIDC/password login and disconnect: only the connection fields change, every

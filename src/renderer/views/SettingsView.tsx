@@ -41,12 +41,15 @@ export function SettingsView() {
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle')
   const [hotkeyWarnings, setHotkeyWarnings] = useState<{ entry: boolean; viewer: boolean; waylandLimited: boolean } | undefined>(undefined)
 
-  // Keep full config for preserving fields during save
+  // Config as loaded, plus the edits made here. Used to render the controls only.
   const [fullConfig, setFullConfig] = useState<AppConfig | null>(null)
+  const configLoadedRef = useRef(false)
 
-  // Auto-save with debounce
+  // Auto-save with debounce. Only the keys edited since the last save are sent: main
+  // merges them into the current config, so fields it changes on its own (window
+  // bounds, sidebar width, popup positions...) are never reverted by this snapshot.
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const pendingConfigRef = useRef<AppConfig | null>(null)
+  const pendingPatchRef = useRef<Partial<AppConfig>>({})
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -67,6 +70,7 @@ export function SettingsView() {
   useEffect(() => {
     api.getConfig().then((config) => {
       if (config) {
+        configLoadedRef.current = true
         setFullConfig(config)
         setUrl(config.vikunja_url || '')
         setToken(config.api_token || '')
@@ -117,32 +121,37 @@ export function SettingsView() {
     }
   }
 
-  const flushSave = useCallback(async (config: AppConfig) => {
+  const flushSave = useCallback(async () => {
+    const patch = pendingPatchRef.current
+    pendingPatchRef.current = {}
+    if (Object.keys(patch).length === 0) return
     setSaveStatus('saving')
-    await api.saveConfig(config)
-    const result = await api.applyQuickEntrySettings()
-    await api.rescheduleNotifications()
-    queryClient.invalidateQueries({ queryKey: APP_CONFIG_QUERY_KEY })
-    setHotkeyWarnings(result)
-    setSaveStatus('saved')
-    setTimeout(() => setSaveStatus('idle'), 2000)
+    try {
+      await api.saveConfigPatch(patch)
+      const result = await api.applyQuickEntrySettings()
+      await api.rescheduleNotifications()
+      queryClient.invalidateQueries({ queryKey: APP_CONFIG_QUERY_KEY })
+      setHotkeyWarnings(result)
+      setSaveStatus('saved')
+      setTimeout(() => setSaveStatus('idle'), 2000)
+    } catch (err) {
+      console.error('Failed to save settings', err)
+      setSaveStatus('idle')
+    }
   }, [queryClient])
 
-  const scheduleSave = useCallback((config: AppConfig) => {
-    pendingConfigRef.current = config
+  const scheduleSave = useCallback(() => {
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
     saveTimerRef.current = setTimeout(() => {
-      if (pendingConfigRef.current) flushSave(pendingConfigRef.current)
+      void flushSave()
     }, 500)
   }, [flushSave])
 
   const handleQuickEntryChange = useCallback((partial: Partial<AppConfig>) => {
-    setFullConfig((prev) => {
-      if (!prev) return null
-      const next = { ...prev, ...partial }
-      scheduleSave(next)
-      return next
-    })
+    if (!configLoadedRef.current) return
+    setFullConfig((prev) => (prev ? { ...prev, ...partial } : prev))
+    pendingPatchRef.current = { ...pendingPatchRef.current, ...partial }
+    scheduleSave()
   }, [scheduleSave])
 
   const handleLogout = async () => {

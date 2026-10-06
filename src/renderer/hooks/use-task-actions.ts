@@ -163,9 +163,7 @@ export function useTaskActions(tasks: Task[]) {
 
   const recordLastProject = useCallback(
     async (projectId: number) => {
-      const cfg = await api.getConfig()
-      if (!cfg) return
-      await api.saveConfig({ ...cfg, last_used_project_id: projectId })
+      await api.saveConfigPatch({ last_used_project_id: projectId })
       qc.invalidateQueries({ queryKey: APP_CONFIG_QUERY_KEY })
     },
     [qc]
@@ -173,9 +171,7 @@ export function useTaskActions(tasks: Task[]) {
 
   const recordLastLabel = useCallback(
     async (label: Label) => {
-      const cfg = await api.getConfig()
-      if (!cfg) return
-      await api.saveConfig({ ...cfg, last_used_label_id: label.id })
+      await api.saveConfigPatch({ last_used_label_id: label.id })
       qc.invalidateQueries({ queryKey: APP_CONFIG_QUERY_KEY })
     },
     [qc]
