@@ -34,9 +34,9 @@ export function useFilters({
         }
 
       // Today and Upcoming fetch all open tasks with a due date;
-      // the views filter client-side (isToday/isOverdue in TodayView,
-      // exclude today/overdue in UpcomingView) to avoid Vikunja's
-      // unreliable server-side date comparison across timezones.
+      // the views classify client-side on the local date (isOverdue/isDueToday in
+      // TodayView, isUpcoming in UpcomingView; see src/shared/due-dates.ts) to avoid
+      // Vikunja's unreliable server-side date comparison across timezones.
       case 'today':
       case 'upcoming':
         return {
