@@ -1,5 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron'
 
+// Page callbacks only ever receive the payload. The IpcRendererEvent carries
+// `sender` (the ipcRenderer itself), which must not cross the context bridge.
 contextBridge.exposeInMainWorld('quickViewApi', {
   platform: process.platform as 'darwin' | 'win32' | 'linux',
   fetchTasks: () => ipcRenderer.invoke('qv:fetch-tasks'),
@@ -20,19 +22,19 @@ contextBridge.exposeInMainWorld('quickViewApi', {
   getPendingCount: () => ipcRenderer.invoke('qv:get-pending-count'),
   getConfig: () => ipcRenderer.invoke('qv:get-config'),
   onShowWindow: (callback: () => void) => {
-    ipcRenderer.on('viewer-shown', callback)
+    ipcRenderer.on('viewer-shown', () => callback())
   },
   onHideWindow: (callback: () => void) => {
-    ipcRenderer.on('viewer-hidden', callback)
+    ipcRenderer.on('viewer-hidden', () => callback())
   },
   onSyncCompleted: (callback: () => void) => {
-    ipcRenderer.on('sync-completed', callback)
+    ipcRenderer.on('sync-completed', () => callback())
   },
   onConfigChanged: (callback: () => void) => {
-    ipcRenderer.on('viewer-config-changed', callback)
+    ipcRenderer.on('viewer-config-changed', () => callback())
   },
-  onDragHover: (callback: (_event: unknown, hovering: boolean) => void) => {
-    ipcRenderer.on('drag-hover', callback)
+  onDragHover: (callback: (hovering: boolean) => void) => {
+    ipcRenderer.on('drag-hover', (_event, hovering: boolean) => callback(hovering))
   },
   openDeepLink: (url: string) => ipcRenderer.invoke('open-deep-link', url),
 })

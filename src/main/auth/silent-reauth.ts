@@ -3,6 +3,7 @@ import { randomUUID } from 'crypto'
 import { discoverProviders } from './oidc-discovery'
 import { getProviderKey, storeJWT, storeRefreshToken } from './token-store'
 import { extractRefreshToken } from './cookie-utils'
+import { AUTH_WINDOW_PARTITION } from '../web-security-policy'
 
 const SILENT_AUTH_TIMEOUT = 15_000
 const TOKEN_EXCHANGE_TIMEOUT = 15_000
@@ -67,7 +68,7 @@ export async function silentReauth(vikunjaUrl: string): Promise<string> {
     width: 0,
     height: 0,
     webPreferences: {
-      partition: 'persist:oidc-auth',
+      partition: AUTH_WINDOW_PARTITION,
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: true,

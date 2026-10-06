@@ -1,5 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron'
 
+// Page callbacks only ever receive the payload. The IpcRendererEvent carries
+// `sender` (the ipcRenderer itself), which must not cross the context bridge.
 contextBridge.exposeInMainWorld('quickEntryApi', {
   platform: process.platform as 'darwin' | 'win32' | 'linux',
   saveTask: (title: string, description: string | null, dueDate: string | null, projectId: number | null, priority?: number, repeatAfter?: number, repeatMode?: number) =>
@@ -19,16 +21,16 @@ contextBridge.exposeInMainWorld('quickEntryApi', {
   addLabelToTask: (taskId: number, labelId: number) => ipcRenderer.invoke('add-label-to-task', taskId, labelId),
   createLabel: (label: { title: string; hex_color?: string }) => ipcRenderer.invoke('create-label', label),
   onShowWindow: (callback: () => void) => {
-    ipcRenderer.on('window-shown', callback)
+    ipcRenderer.on('window-shown', () => callback())
   },
   onHideWindow: (callback: () => void) => {
-    ipcRenderer.on('window-hidden', callback)
+    ipcRenderer.on('window-hidden', () => callback())
   },
   onSyncCompleted: (callback: () => void) => {
-    ipcRenderer.on('sync-completed', callback)
+    ipcRenderer.on('sync-completed', () => callback())
   },
-  onDragHover: (callback: (_event: unknown, hovering: boolean) => void) => {
-    ipcRenderer.on('drag-hover', callback)
+  onDragHover: (callback: (hovering: boolean) => void) => {
+    ipcRenderer.on('drag-hover', (_event, hovering: boolean) => callback(hovering))
   },
   onObsidianContext: (callback: (context: {
     deepLink: string; noteName: string; vaultName: string; isUidBased: boolean; mode: 'ask' | 'always'

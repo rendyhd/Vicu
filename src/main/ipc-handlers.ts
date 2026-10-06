@@ -1,4 +1,8 @@
-import { ipcMain, shell, dialog, app, nativeTheme } from 'electron'
+import { shell, dialog, app, nativeTheme } from 'electron'
+import { handleTrusted } from './secure-ipc'
+import { isExternalAllowed } from './web-security-policy'
+import { isRiskyAttachment, sanitizeAttachmentFileName } from './attachment-safety'
+import { ensureAttachmentTempDir } from './attachment-temp'
 import * as fs from 'fs'
 import * as path from 'path'
 import {
@@ -126,17 +130,17 @@ function withoutCompletionMetadata(task: Record<string, unknown>): Record<string
 
 export function registerIpcHandlers(): void {
   // Tasks
-  ipcMain.handle('fetch-tasks', (_event, params: Record<string, unknown>) => {
+  handleTrusted('fetch-tasks', (_event, params: Record<string, unknown>) => {
     return fetchTasks(params)
   })
 
-  ipcMain.handle('create-task', async (_event, projectId: number, task: Record<string, unknown>) => {
+  handleTrusted('create-task', async (_event, projectId: number, task: Record<string, unknown>) => {
     const result = await createTask(projectId, task)
     if (result.success) notifyViewerSync()
     return result
   })
 
-  ipcMain.handle('update-task', async (event, id: number, task: Record<string, unknown>) => {
+  handleTrusted('update-task', async (event, id: number, task: Record<string, unknown>) => {
     const result = await updateTask(id, task)
     if (result.success) {
       notifyViewerSync()
@@ -145,88 +149,88 @@ export function registerIpcHandlers(): void {
     return result
   })
 
-  ipcMain.handle('delete-task', async (_event, id: number) => {
+  handleTrusted('delete-task', async (_event, id: number) => {
     const result = await deleteTask(id)
     if (result.success) notifyViewerSync()
     return result
   })
 
-  ipcMain.handle('fetch-task-by-id', (_event, id: number) => {
+  handleTrusted('fetch-task-by-id', (_event, id: number) => {
     return fetchTaskById(id)
   })
 
   // Print
-  ipcMain.handle('print-html', (_event, html: string) => printHtml(html))
+  handleTrusted('print-html', (_event, html: string) => printHtml(html))
 
-  ipcMain.handle('create-task-relation', (_event, taskId: number, otherTaskId: number, relationKind: string) => {
+  handleTrusted('create-task-relation', (_event, taskId: number, otherTaskId: number, relationKind: string) => {
     return createTaskRelation(taskId, otherTaskId, relationKind)
   })
 
-  ipcMain.handle('delete-task-relation', (_event, taskId: number, relationKind: string, otherTaskId: number) => {
+  handleTrusted('delete-task-relation', (_event, taskId: number, relationKind: string, otherTaskId: number) => {
     return deleteTaskRelation(taskId, relationKind, otherTaskId)
   })
 
   // Projects
-  ipcMain.handle('fetch-projects', (_event, includeArchived = false) => {
+  handleTrusted('fetch-projects', (_event, includeArchived = false) => {
     return fetchProjects(includeArchived)
   })
 
-  ipcMain.handle('create-project', (_event, project: Record<string, unknown>) => {
+  handleTrusted('create-project', (_event, project: Record<string, unknown>) => {
     return createProject(project)
   })
 
-  ipcMain.handle('update-project', (_event, id: number, project: Record<string, unknown>) => {
+  handleTrusted('update-project', (_event, id: number, project: Record<string, unknown>) => {
     return updateProject(id, project)
   })
 
-  ipcMain.handle('delete-project', (_event, id: number) => {
+  handleTrusted('delete-project', (_event, id: number) => {
     return deleteProject(id)
   })
 
   // Labels
-  ipcMain.handle('fetch-labels', () => {
+  handleTrusted('fetch-labels', () => {
     return fetchLabels()
   })
 
-  ipcMain.handle('add-label-to-task', (_event, taskId: number, labelId: number) => {
+  handleTrusted('add-label-to-task', (_event, taskId: number, labelId: number) => {
     return addLabelToTask(taskId, labelId)
   })
 
-  ipcMain.handle('remove-label-from-task', (_event, taskId: number, labelId: number) => {
+  handleTrusted('remove-label-from-task', (_event, taskId: number, labelId: number) => {
     return removeLabelFromTask(taskId, labelId)
   })
 
-  ipcMain.handle('create-label', (_event, label: Record<string, unknown>) => {
+  handleTrusted('create-label', (_event, label: Record<string, unknown>) => {
     return createLabel(label)
   })
 
-  ipcMain.handle('update-label', (_event, id: number, label: Record<string, unknown>) => {
+  handleTrusted('update-label', (_event, id: number, label: Record<string, unknown>) => {
     return updateLabel(id, label)
   })
 
-  ipcMain.handle('delete-label', (_event, id: number) => {
+  handleTrusted('delete-label', (_event, id: number) => {
     return deleteLabel(id)
   })
 
   // Project Views
-  ipcMain.handle('fetch-project-views', (_event, projectId: number) => {
+  handleTrusted('fetch-project-views', (_event, projectId: number) => {
     return fetchProjectViews(projectId)
   })
 
-  ipcMain.handle('fetch-view-tasks', (_event, projectId: number, viewId: number, params: Record<string, unknown>) => {
+  handleTrusted('fetch-view-tasks', (_event, projectId: number, viewId: number, params: Record<string, unknown>) => {
     return fetchViewTasks(projectId, viewId, params)
   })
 
-  ipcMain.handle('update-task-position', (_event, taskId: number, viewId: number, position: number) => {
+  handleTrusted('update-task-position', (_event, taskId: number, viewId: number, position: number) => {
     return updateTaskPosition(taskId, viewId, position)
   })
 
   // Config
-  ipcMain.handle('get-config', () => {
+  handleTrusted('get-config', () => {
     return loadConfig()
   })
 
-  ipcMain.handle('save-config', (_event, config: AppConfig) => {
+  handleTrusted('save-config', (_event, config: AppConfig) => {
     const latest = loadConfig()
     const accountChanged = !!latest && latest.vikunja_url.replace(/\/+$/, '') !== config.vikunja_url.replace(/\/+$/, '')
     // Renderer settings forms save a full config snapshot and may have been open while a
@@ -262,14 +266,14 @@ export function registerIpcHandlers(): void {
     if (config.custom_lists?.length || config.custom_lists_sync?.dirty) void syncCustomLists()
   })
 
-  ipcMain.handle('custom-lists:get', () => getCustomLists())
-  ipcMain.handle('custom-lists:upsert', (_event, list: CustomListWire) => upsertCustomList(list))
-  ipcMain.handle('custom-lists:delete', (_event, id: string) => deleteCustomList(id))
-  ipcMain.handle('custom-lists:reorder', (_event, ids: string[]) => reorderCustomLists(ids))
-  ipcMain.handle('custom-lists:sync', () => syncCustomLists())
-  ipcMain.handle('custom-lists:status', () => getCustomListSyncStatus())
+  handleTrusted('custom-lists:get', () => getCustomLists())
+  handleTrusted('custom-lists:upsert', (_event, list: CustomListWire) => upsertCustomList(list))
+  handleTrusted('custom-lists:delete', (_event, id: string) => deleteCustomList(id))
+  handleTrusted('custom-lists:reorder', (_event, ids: string[]) => reorderCustomLists(ids))
+  handleTrusted('custom-lists:sync', () => syncCustomLists())
+  handleTrusted('custom-lists:status', () => getCustomListSyncStatus())
 
-  ipcMain.handle('set-task-badge', (_event, count: number, dataUrl: string | null) => {
+  handleTrusted('set-task-badge', (_event, count: number, dataUrl: string | null) => {
     const cfg = loadConfig()
     if (cfg?.show_today_overdue_badge === true) {
       setTaskBadge(typeof count === 'number' ? count : 0, dataUrl ?? null)
@@ -279,16 +283,16 @@ export function registerIpcHandlers(): void {
   })
 
   // Connection test
-  ipcMain.handle('test-connection', (_event, url: string, token: string) => {
+  handleTrusted('test-connection', (_event, url: string, token: string) => {
     return testConnection(url, token)
   })
 
   // Auth
-  ipcMain.handle('auth:discover-oidc', (_event, url: string) => {
+  handleTrusted('auth:discover-oidc', (_event, url: string) => {
     return discoverProviders(url)
   })
 
-  ipcMain.handle('auth:login-oidc', async (_event, url: string, providerKey: string, totpPasscode?: string) => {
+  handleTrusted('auth:login-oidc', async (_event, url: string, providerKey: string, totpPasscode?: string) => {
     try {
       await authManager.login(url, providerKey, totpPasscode)
       return { success: true }
@@ -301,15 +305,15 @@ export function registerIpcHandlers(): void {
     }
   })
 
-  ipcMain.handle('auth:discover-methods', (_event, url: string) => {
+  handleTrusted('auth:discover-methods', (_event, url: string) => {
     return discoverAuthMethods(url)
   })
 
-  ipcMain.handle('auth:login-password', async (_event, url: string, username: string, password: string, totpPasscode?: string) => {
+  handleTrusted('auth:login-password', async (_event, url: string, username: string, password: string, totpPasscode?: string) => {
     return authManager.loginPassword(url, username, password, totpPasscode)
   })
 
-  ipcMain.handle('auth:get-user', async () => {
+  handleTrusted('auth:get-user', async () => {
     const config = loadConfig()
     if (!config?.vikunja_url) return null
     const token = config.auth_method === 'api_token'
@@ -319,7 +323,7 @@ export function registerIpcHandlers(): void {
     return fetchCurrentUser(config.vikunja_url, token)
   })
 
-  ipcMain.handle('auth:check', async () => {
+  handleTrusted('auth:check', async () => {
     const config = loadConfig()
     if (!config || !config.vikunja_url) {
       return { status: 'unconfigured' as const }
@@ -350,12 +354,12 @@ export function registerIpcHandlers(): void {
     }
   })
 
-  ipcMain.handle('auth:logout', async () => {
+  handleTrusted('auth:logout', async () => {
     await authManager.logout()
   })
 
   // --- Quick Entry IPC ---
-  ipcMain.handle('qe:save-task', async (_event, title: string, description: string | null, dueDate: string | null, projectId: number | null, priority?: number, repeatAfter?: number, repeatMode?: number) => {
+  handleTrusted('qe:save-task', async (_event, title: string, description: string | null, dueDate: string | null, projectId: number | null, priority?: number, repeatAfter?: number, repeatMode?: number) => {
     const config = loadConfig()
     if (!config) return { success: false, error: 'Configuration not loaded' }
 
@@ -398,11 +402,11 @@ export function registerIpcHandlers(): void {
     return result
   })
 
-  ipcMain.handle('qe:close-window', () => {
+  handleTrusted('qe:close-window', () => {
     hideQuickEntry()
   })
 
-  ipcMain.handle('qe:get-config', () => {
+  handleTrusted('qe:get-config', () => {
     const config = loadConfig()
     if (!config) return null
     return {
@@ -418,12 +422,12 @@ export function registerIpcHandlers(): void {
     }
   })
 
-  ipcMain.handle('qe:get-pending-count', () => {
+  handleTrusted('qe:get-pending-count', () => {
     return getPendingCount()
   })
 
   // --- Quick View IPC ---
-  ipcMain.handle('qv:fetch-tasks', async () => {
+  handleTrusted('qv:fetch-tasks', async () => {
     const config = loadConfig()
     if (!config) return { success: false, error: 'Configuration not loaded' }
 
@@ -522,7 +526,7 @@ export function registerIpcHandlers(): void {
     return result
   })
 
-  ipcMain.handle('qv:mark-task-done', async (_event, taskId: number, taskData: Record<string, unknown>) => {
+  handleTrusted('qv:mark-task-done', async (_event, taskId: number, taskData: Record<string, unknown>) => {
     const config = loadConfig()
     if (config?.standalone_mode) {
       const task = markStandaloneTaskDone(String(taskId))
@@ -567,7 +571,7 @@ export function registerIpcHandlers(): void {
     return result.success ? result : { success: true, cached: true }
   })
 
-  ipcMain.handle('qv:mark-task-undone', async (_event, taskId: number, taskData: Record<string, unknown>) => {
+  handleTrusted('qv:mark-task-undone', async (_event, taskId: number, taskData: Record<string, unknown>) => {
     const config = loadConfig()
     if (config?.standalone_mode) {
       const task = markStandaloneTaskUndone(String(taskId))
@@ -611,7 +615,7 @@ export function registerIpcHandlers(): void {
     }
   })
 
-  ipcMain.handle('qv:schedule-task-today', async (_event, taskId: number, taskData: Record<string, unknown>) => {
+  handleTrusted('qv:schedule-task-today', async (_event, taskId: number, taskData: Record<string, unknown>) => {
     const now = new Date()
     const dueDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59).toISOString()
 
@@ -634,7 +638,7 @@ export function registerIpcHandlers(): void {
     return result
   })
 
-  ipcMain.handle('qv:remove-due-date', async (_event, taskId: number, taskData: Record<string, unknown>) => {
+  handleTrusted('qv:remove-due-date', async (_event, taskId: number, taskData: Record<string, unknown>) => {
     const nullDate = '0001-01-01T00:00:00Z'
 
     const config = loadConfig()
@@ -656,7 +660,7 @@ export function registerIpcHandlers(): void {
     return result
   })
 
-  ipcMain.handle('qv:update-task', async (_event, taskId: number, taskData: Record<string, unknown>) => {
+  handleTrusted('qv:update-task', async (_event, taskId: number, taskData: Record<string, unknown>) => {
     const config = loadConfig()
     if (config?.standalone_mode) {
       const task = updateStandaloneTask(String(taskId), taskData)
@@ -676,7 +680,7 @@ export function registerIpcHandlers(): void {
     return result
   })
 
-  ipcMain.handle('qv:open-task-in-browser', (_event, taskId: number) => {
+  handleTrusted('qv:open-task-in-browser', (_event, taskId: number) => {
     const config = loadConfig()
     if (!config || config.standalone_mode) return
     const url = `${config.vikunja_url}/tasks/${taskId}`
@@ -685,7 +689,7 @@ export function registerIpcHandlers(): void {
     }
   })
 
-  ipcMain.handle('qv:open-task-in-app', (_event, taskId: number) => {
+  handleTrusted('qv:open-task-in-app', (_event, taskId: number) => {
     const win = getMainWindow()
     if (!win || win.isDestroyed()) return
     if (win.isMinimized()) win.restore()
@@ -695,23 +699,23 @@ export function registerIpcHandlers(): void {
     hideQuickView()
   })
 
-  ipcMain.handle('qv:close-window', () => {
+  handleTrusted('qv:close-window', () => {
     hideQuickView()
   })
 
-  ipcMain.handle('qe:set-height', (_event, height: number) => {
+  handleTrusted('qe:set-height', (_event, height: number) => {
     setQuickEntryHeight(height)
   })
 
-  ipcMain.handle('qv:set-height', (_event, height: number) => {
+  handleTrusted('qv:set-height', (_event, height: number) => {
     setViewerHeight(height)
   })
 
-  ipcMain.handle('qv:get-pending-count', () => {
+  handleTrusted('qv:get-pending-count', () => {
     return getPendingCount()
   })
 
-  ipcMain.handle('qv:get-config', () => {
+  handleTrusted('qv:get-config', () => {
     const config = loadConfig()
     if (!config) return null
     return {
@@ -720,24 +724,24 @@ export function registerIpcHandlers(): void {
   })
 
   // --- Notifications IPC ---
-  ipcMain.handle('notifications:test', () => {
+  handleTrusted('notifications:test', () => {
     sendTestNotification()
   })
 
-  ipcMain.handle('notifications:reschedule', () => {
+  handleTrusted('notifications:reschedule', () => {
     rescheduleNotifications()
   })
 
-  ipcMain.handle('notifications:refresh-task-reminders', () => {
+  handleTrusted('notifications:refresh-task-reminders', () => {
     refreshTaskReminders()
   })
 
-  ipcMain.handle('notifications:refresh-routine-reminders', () => {
+  handleTrusted('notifications:refresh-routine-reminders', () => {
     refreshRoutineReminders()
   })
 
   // --- Apply Quick Entry Settings (called from renderer settings page) ---
-  ipcMain.handle('apply-quick-entry-settings', () => {
+  handleTrusted('apply-quick-entry-settings', () => {
     return applyQuickEntrySettings()
   })
 
@@ -746,7 +750,7 @@ export function registerIpcHandlers(): void {
   // globalShortcut.register() calls. The Settings view uses this to surface a
   // warning banner on platforms where registration can silently fail (notably
   // Wayland).
-  ipcMain.handle('get-global-shortcut-status', () => {
+  handleTrusted('get-global-shortcut-status', () => {
     return getLastShortcutStatus()
   })
 
@@ -756,7 +760,7 @@ export function registerIpcHandlers(): void {
   // Wayland. All paths returned are absolute so the command works regardless
   // of the spawning process's working directory (GNOME/KDE custom-shortcut
   // spawners run with cwd = $HOME or /, not the project root).
-  ipcMain.handle('get-hotkey-launcher-command', () => {
+  handleTrusted('get-hotkey-launcher-command', () => {
     const quote = (s: string) => (/[\s"']/.test(s) ? `"${s.replace(/"/g, '\\"')}"` : s)
 
     let base: string
@@ -785,24 +789,24 @@ export function registerIpcHandlers(): void {
   })
 
   // --- Standalone mode IPC ---
-  ipcMain.handle('qe:get-standalone-task-count', () => {
+  handleTrusted('qe:get-standalone-task-count', () => {
     return getAllStandaloneTasks().length
   })
 
   // --- Attachments IPC ---
-  ipcMain.handle('fetch-task-attachments', (_event, taskId: number) => {
+  handleTrusted('fetch-task-attachments', (_event, taskId: number) => {
     return fetchTaskAttachments(taskId)
   })
 
-  ipcMain.handle('upload-task-attachment', (_event, taskId: number, fileData: Uint8Array, fileName: string, mimeType: string) => {
+  handleTrusted('upload-task-attachment', (_event, taskId: number, fileData: Uint8Array, fileName: string, mimeType: string) => {
     return uploadTaskAttachment(taskId, Buffer.from(fileData), fileName, mimeType)
   })
 
-  ipcMain.handle('delete-task-attachment', (_event, taskId: number, attachmentId: number) => {
+  handleTrusted('delete-task-attachment', (_event, taskId: number, attachmentId: number) => {
     return deleteTaskAttachment(taskId, attachmentId)
   })
 
-  ipcMain.handle('fetch-task-attachment-bytes', async (_event, taskId: number, attachmentId: number) => {
+  handleTrusted('fetch-task-attachment-bytes', async (_event, taskId: number, attachmentId: number) => {
     // Inline task-note images only need a bounded preview. Fetching full-size
     // phone photos here can exhaust the renderer/IPC budget before <img> decodes.
     const result = await downloadTaskAttachment(taskId, attachmentId, 'lg')
@@ -813,29 +817,40 @@ export function registerIpcHandlers(): void {
     return { success: true, data: new Uint8Array(result.data) }
   })
 
-  ipcMain.handle('open-task-attachment', async (_event, taskId: number, attachmentId: number, fileName: string) => {
+  handleTrusted('open-task-attachment', async (_event, taskId: number, attachmentId: number, fileName: string) => {
+    if (!Number.isSafeInteger(taskId) || !Number.isSafeInteger(attachmentId)) {
+      return { success: false, error: 'Invalid attachment' }
+    }
     const result = await downloadTaskAttachment(taskId, attachmentId)
     if (!result.success) return result
 
     try {
-      const tempDir = path.join(app.getPath('temp'), 'vicu-attachments')
-      if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true })
-      const safeName = path.basename(fileName)
+      const tempDir = ensureAttachmentTempDir(app.getPath('temp'))
+      const safeName = sanitizeAttachmentFileName(fileName, `attachment-${attachmentId}`)
       const filePath = path.join(tempDir, `${attachmentId}-${safeName}`)
       // Defense-in-depth: verify resolved path is inside tempDir
       const resolved = path.resolve(filePath)
       if (!resolved.startsWith(path.resolve(tempDir) + path.sep)) {
         return { success: false, error: 'Invalid attachment filename' }
       }
-      fs.writeFileSync(filePath, result.data)
-      await shell.openPath(filePath)
+      fs.writeFileSync(filePath, result.data, { mode: 0o600 })
+
+      // The copy has no Mark-of-the-Web, so executables, scripts, shortcuts and
+      // macro documents are shown in the file manager instead of being run.
+      if (isRiskyAttachment(safeName)) {
+        shell.showItemInFolder(filePath)
+        return { success: true, data: undefined }
+      }
+
+      const openError = await shell.openPath(filePath)
+      if (openError) return { success: false, error: openError }
       return { success: true, data: undefined }
     } catch (err: unknown) {
       return { success: false, error: err instanceof Error ? err.message : 'Failed to open file' }
     }
   })
 
-  ipcMain.handle('pick-and-upload-attachment', async (_event, taskId: number) => {
+  handleTrusted('pick-and-upload-attachment', async (_event, taskId: number) => {
     const win = getMainWindow()
     const config = loadConfig()
     const dialogResult = await dialog.showOpenDialog(win!, {
@@ -871,19 +886,13 @@ export function registerIpcHandlers(): void {
   })
 
   // --- Obsidian IPC ---
-  const ALLOWED_EXTERNAL_PROTOCOLS = new Set(['https:', 'http:', 'obsidian:', 'mailto:'])
-
-  ipcMain.handle('open-deep-link', (_event, url: string) => {
-    if (typeof url !== 'string') return
-    try {
-      const parsed = new URL(url)
-      if (ALLOWED_EXTERNAL_PROTOCOLS.has(parsed.protocol)) {
-        shell.openExternal(url)
-      }
-    } catch { /* invalid URL */ }
+  handleTrusted('open-deep-link', (_event, url: string) => {
+    if (isExternalAllowed(url)) {
+      shell.openExternal(url).catch(() => { /* no handler for the scheme */ })
+    }
   })
 
-  ipcMain.handle('test-obsidian-connection', async () => {
+  handleTrusted('test-obsidian-connection', async () => {
     const config = loadConfig()
     if (!config?.obsidian_api_key) return { success: false, error: 'No API key configured' }
     try {
@@ -897,7 +906,7 @@ export function registerIpcHandlers(): void {
     }
   })
 
-  ipcMain.handle('qe:upload-standalone-tasks', async (_event, projectId: number) => {
+  handleTrusted('qe:upload-standalone-tasks', async (_event, projectId: number) => {
     const tasks = getAllStandaloneTasks()
     if (tasks.length === 0) return { success: true, uploaded: 0 }
 
@@ -931,9 +940,9 @@ export function registerIpcHandlers(): void {
   })
 
   // --- Browser Link IPC ---
-  ipcMain.handle('check-browser-host-registration', () => isRegistered())
+  handleTrusted('check-browser-host-registration', () => isRegistered())
 
-  ipcMain.handle('register-browser-hosts', () => {
+  handleTrusted('register-browser-hosts', () => {
     const config = loadConfig()
     registerHosts({
       chromeExtensionId: config?.browser_extension_id || '',
@@ -942,7 +951,7 @@ export function registerIpcHandlers(): void {
     return isRegistered()
   })
 
-  ipcMain.handle('get-browser-extension-path', () => {
+  handleTrusted('get-browser-extension-path', () => {
     const base = app.isPackaged
       ? path.join(process.resourcesPath, 'extensions', 'browser')
       : path.join(app.getAppPath(), 'extensions', 'browser')
@@ -950,15 +959,15 @@ export function registerIpcHandlers(): void {
   })
 
   // --- Update Checker IPC ---
-  ipcMain.handle('update:check', () => {
+  handleTrusted('update:check', () => {
     return checkForUpdates(true)
   })
 
-  ipcMain.handle('update:get-status', () => {
+  handleTrusted('update:get-status', () => {
     return getCachedUpdateStatus()
   })
 
-  ipcMain.handle('update:dismiss', (_event, version: string) => {
+  handleTrusted('update:dismiss', (_event, version: string) => {
     const config = loadConfig()
     if (config) {
       config.update_check_dismissed_version = version
@@ -966,7 +975,7 @@ export function registerIpcHandlers(): void {
     }
   })
 
-  ipcMain.handle('open-browser-extension-folder', () => {
+  handleTrusted('open-browser-extension-folder', () => {
     const base = app.isPackaged
       ? path.join(process.resourcesPath, 'extensions', 'browser')
       : path.join(app.getAppPath(), 'extensions', 'browser')
@@ -976,20 +985,20 @@ export function registerIpcHandlers(): void {
   })
 
   // --- Task completion sound IPC ---
-  ipcMain.handle('sound:pick', async () => {
+  handleTrusted('sound:pick', async () => {
     const win = getMainWindow()
     return pickAndCopySoundFile(win ?? null)
   })
 
-  ipcMain.handle('sound:reset', () => {
+  handleTrusted('sound:reset', () => {
     resetSoundToDefault()
   })
 
-  ipcMain.handle('sound:read', () => {
+  handleTrusted('sound:read', () => {
     return readSoundBytes()
   })
 
-  ipcMain.handle('sound:get-info', () => {
+  handleTrusted('sound:get-info', () => {
     return getSoundInfo()
   })
 }

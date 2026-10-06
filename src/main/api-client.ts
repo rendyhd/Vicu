@@ -11,6 +11,7 @@ import {
   type PaginatedResponse,
   withoutNestedSubtasks,
 } from './api-v2'
+import { MAX_BINARY_DOWNLOAD_BYTES, describeDownloadLimit, parseContentLength } from './attachment-safety'
 
 /**
  * Send 'auth-required' IPC event to all renderer windows.
@@ -705,15 +706,41 @@ function requestBinary(
 
       const chunks: Buffer[] = []
       let statusCode = 0
+      let receivedBytes = 0
+      let tooLarge = false
+
+      const rejectTooLarge = (): void => {
+        if (tooLarge) return
+        tooLarge = true
+        chunks.length = 0
+        clearTimeout(timeout)
+        try { req?.abort() } catch { /* ignore */ }
+        resolve({ success: false, error: describeDownloadLimit(MAX_BINARY_DOWNLOAD_BYTES) })
+      }
 
       req.on('response', (response) => {
         statusCode = response.statusCode
 
+        // Refuse oversized downloads up front when the server declares a length,
+        // and again while streaming in case it did not (D-IPC-2).
+        const declaredLength = parseContentLength(response.headers['content-length'])
+        if (declaredLength !== null && declaredLength > MAX_BINARY_DOWNLOAD_BYTES) {
+          rejectTooLarge()
+          return
+        }
+
         response.on('data', (chunk) => {
+          if (tooLarge) return
+          receivedBytes += chunk.length
+          if (receivedBytes > MAX_BINARY_DOWNLOAD_BYTES) {
+            rejectTooLarge()
+            return
+          }
           chunks.push(Buffer.from(chunk))
         })
 
         response.on('end', () => {
+          if (tooLarge) return
           clearTimeout(timeout)
           if (statusCode >= 200 && statusCode < 300) {
             resolve({ success: true, data: Buffer.concat(chunks) })

@@ -3,9 +3,28 @@ import { getMainWindow } from '../quick-entry-state'
 import { randomUUID } from 'crypto'
 import { hostname } from 'node:os'
 import { discoverProviders, type OIDCProvider } from './oidc-discovery'
-import { storeJWT, storeAPIToken, storeProviderKey, storeRefreshToken } from './token-store'
+import {
+  API_TOKEN_NO_EXPIRY,
+  getAPITokenExpiry,
+  getAPITokenMeta,
+  hasAPIToken,
+  setAPITokenMeta,
+  storeJWT,
+  storeAPIToken,
+  storeProviderKey,
+  storeRefreshToken,
+  type BackupTokenMeta,
+} from './token-store'
 import { extractRefreshToken } from './cookie-utils'
 import { isTotpChallenge, parseVikunjaProblem } from './totp'
+import { AUTH_WINDOW_PARTITION } from '../web-security-policy'
+import { getInstallId } from './install-id'
+import {
+  buildBackupTokenTitle,
+  findLegacyOwnToken,
+  selectSiblingTokenIds,
+  type ListedToken,
+} from './backup-token'
 
 const TOKEN_EXCHANGE_TIMEOUT = 15_000
 const LOGIN_TIMEOUT = 5 * 60 * 1000 // 5 minutes
@@ -91,7 +110,7 @@ export async function loginWithOIDC(
     parent: mainWin ?? undefined,
     title: 'Sign in',
     webPreferences: {
-      partition: 'persist:oidc-auth',
+      partition: AUTH_WINDOW_PARTITION,
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: true,
@@ -278,6 +297,7 @@ export async function createBackupAPIToken(
     }
 
     const deviceName = hostname() || 'Unknown device'
+    const installId = getInstallId()
 
     const response = await net.fetch(`${baseUrl}/api/v2/tokens`, {
       method: 'POST',
@@ -286,7 +306,7 @@ export async function createBackupAPIToken(
         Authorization: `Bearer ${jwt}`,
       },
       body: JSON.stringify({
-        title: `Vicu — ${deviceName}`,
+        title: buildBackupTokenTitle(deviceName, installId),
         expires_at: expirationDate.toISOString(),
         permissions,
       }),
@@ -302,13 +322,29 @@ export async function createBackupAPIToken(
       throw new Error('API token creation response missing "token" field')
     }
     const expiresAtUnix = Math.floor(expirationDate.getTime() / 1000)
-    storeAPIToken(data.token, expiresAtUnix)
 
-    // Best-effort: delete other tokens on the server that match our exact title.
+    // Remember what the new token replaces before it overwrites the stored one.
+    const previousMeta = getAPITokenMeta()
+    const previousExpiry = getAPITokenExpiry()
+
+    // Keep the server-side id with the token so logout can revoke it.
+    storeAPIToken(
+      data.token,
+      expiresAtUnix,
+      typeof data.id === 'number' ? { id: data.id, baseUrl } : undefined
+    )
+
+    // Best-effort: delete this install's older tokens on the server.
     // Fire-and-forget — local + server-side new token are already in place, so
     // a failure here can never leave the user without a backup token.
-    if (data.id != null) {
-      cleanupOldTokens(baseUrl, jwt, data.id, deviceName).catch((err) => {
+    if (typeof data.id === 'number') {
+      cleanupOldTokens(baseUrl, jwt, {
+        keepId: data.id,
+        deviceName,
+        installId,
+        previousMeta,
+        previousExpiry,
+      }).catch((err) => {
         console.warn(
           '[Auth] Old token cleanup failed (non-fatal):',
           err instanceof Error ? err.message : err
@@ -326,24 +362,19 @@ export async function createBackupAPIToken(
   }
 }
 
-interface ListedToken {
-  id: number
-  title: string
-}
-
 interface PaginatedTokens {
   items: ListedToken[] | null
   total_pages: number
 }
 
-async function listAPITokens(baseUrl: string, jwt: string): Promise<ListedToken[]> {
+async function listAPITokens(baseUrl: string, bearer: string): Promise<ListedToken[]> {
   const all: ListedToken[] = []
   const PER_PAGE = 100
   const MAX_PAGES = 10
   for (let page = 1; page <= MAX_PAGES; page++) {
     const resp = await net.fetch(
       `${baseUrl}/api/v2/tokens?page=${page}&per_page=${PER_PAGE}`,
-      { headers: { Authorization: `Bearer ${jwt}` } },
+      { headers: { Authorization: `Bearer ${bearer}` } },
     )
     if (!resp.ok) {
       throw new Error(`List tokens failed (${resp.status})`)
@@ -357,34 +388,119 @@ async function listAPITokens(baseUrl: string, jwt: string): Promise<ListedToken[
   return all
 }
 
-async function cleanupOldTokens(
-  baseUrl: string,
-  jwt: string,
-  keepId: number,
-  deviceName: string,
-): Promise<void> {
-  if (!deviceName) return
-  const targetTitle = `Vicu — ${deviceName}`
+const TOKEN_DELETE_TIMEOUT = 8_000
+
+/** DELETE /tokens/{id}. A token that is already gone (404) counts as deleted. */
+async function deleteAPIToken(baseUrl: string, bearer: string, id: number): Promise<boolean> {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), TOKEN_DELETE_TIMEOUT)
+  try {
+    const resp = await net.fetch(`${baseUrl}/api/v2/tokens/${id}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${bearer}` },
+      signal: controller.signal,
+    })
+    if (resp.ok || resp.status === 404) return true
+    console.warn(`[Auth] Delete token ${id} failed (${resp.status})`)
+    return false
+  } catch (err) {
+    console.warn(`[Auth] Delete token ${id} threw:`, err instanceof Error ? err.message : err)
+    return false
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+interface CleanupContext {
+  keepId: number
+  deviceName: string
+  installId: string
+  /** The backup token this install held before the new one was stored. */
+  previousMeta: BackupTokenMeta | null
+  previousExpiry: number | null
+}
+
+/**
+ * Delete the backup tokens a newly created token replaces. Only tokens that
+ * provably belong to this install are touched:
+ * - tokens whose title carries this install's id,
+ * - the token id stored for the previous backup token (same server only),
+ * - for installs upgraded from a version without ids: the one token with the old
+ *   `Vicu — <host name>` title whose expiry matches the locally stored expiry
+ *   (see findLegacyOwnToken). Other legacy tokens with the same title may belong
+ *   to a different machine with the same host name, so they are left alone.
+ */
+async function cleanupOldTokens(baseUrl: string, jwt: string, ctx: CleanupContext): Promise<void> {
   const tokens = await listAPITokens(baseUrl, jwt)
-  const toDelete = tokens.filter((t) => t.id !== keepId && t.title === targetTitle)
-  if (toDelete.length === 0) return
-  console.log(
-    `[Auth] Cleaning up ${toDelete.length} stale "${targetTitle}" token(s)`,
-  )
-  for (const t of toDelete) {
-    try {
-      const resp = await net.fetch(`${baseUrl}/api/v2/tokens/${t.id}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${jwt}` },
-      })
-      if (!resp.ok && resp.status !== 404) {
-        console.warn(`[Auth] Delete token ${t.id} failed (${resp.status})`)
-      }
-    } catch (err) {
-      console.warn(
-        `[Auth] Delete token ${t.id} threw:`,
-        err instanceof Error ? err.message : err,
-      )
-    }
+  const ids = new Set(selectSiblingTokenIds(tokens, ctx.installId, ctx.keepId))
+
+  if (ctx.previousMeta && ctx.previousMeta.baseUrl === baseUrl) {
+    ids.add(ctx.previousMeta.id)
+  } else if (!ctx.previousMeta) {
+    const legacy = findLegacyOwnToken(tokens, ctx.deviceName, ctx.previousExpiry)
+    if (legacy) ids.add(legacy.id)
+  }
+  ids.delete(ctx.keepId)
+  if (ids.size === 0) return
+
+  console.log(`[Auth] Cleaning up ${ids.size} stale backup token(s)`)
+  for (const id of ids) {
+    await deleteAPIToken(baseUrl, jwt, id)
+  }
+}
+
+// Looking up the id of a pre-upgrade token costs a request, so try once per run.
+let legacyLookupDone = false
+
+/**
+ * The server-side id of the stored backup token, or null when Vicu did not
+ * create it (user-provided API token, JWT kept as fallback) or it cannot be
+ * identified. Installs upgraded from a version that did not record ids resolve
+ * it by lookup (findLegacyOwnToken) and remember the result.
+ */
+async function resolveBackupTokenId(baseUrl: string, bearer: string, force = false): Promise<number | null> {
+  const meta = getAPITokenMeta()
+  if (meta) return meta.baseUrl === baseUrl ? meta.id : null
+
+  const expiry = getAPITokenExpiry()
+  if (!hasAPIToken() || expiry == null || expiry === API_TOKEN_NO_EXPIRY) return null
+  if (legacyLookupDone && !force) return null
+  legacyLookupDone = true
+
+  try {
+    const tokens = await listAPITokens(baseUrl, bearer)
+    const legacy = findLegacyOwnToken(tokens, hostname() || 'Unknown device', expiry)
+    if (!legacy) return null
+    setAPITokenMeta({ id: legacy.id, baseUrl })
+    return legacy.id
+  } catch (err) {
+    console.warn('[Auth] Could not look up backup token id:', err instanceof Error ? err.message : err)
+    return null
+  }
+}
+
+/**
+ * Record the id of a backup token created by an older version, so a later logout
+ * can revoke it. Safe to call on every refresh; it does network work at most once
+ * per run and only when no id is stored yet.
+ */
+export async function adoptLegacyBackupTokenId(baseUrl: string, jwt: string): Promise<void> {
+  await resolveBackupTokenId(baseUrl, jwt)
+}
+
+/**
+ * Best-effort revocation of the backup API token on logout. Never throws: a
+ * failure (offline, expired session) only leaves the token to expire on its own.
+ * `bearer` must be a credential the server still accepts (a valid JWT, or the
+ * API token itself).
+ */
+export async function revokeStoredBackupAPIToken(baseUrl: string, bearer: string): Promise<boolean> {
+  try {
+    const id = await resolveBackupTokenId(baseUrl, bearer, true)
+    if (id == null) return false
+    return await deleteAPIToken(baseUrl, bearer, id)
+  } catch (err) {
+    console.warn('[Auth] Backup token revocation failed:', err instanceof Error ? err.message : err)
+    return false
   }
 }

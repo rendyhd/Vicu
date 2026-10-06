@@ -17,7 +17,7 @@ declare global {
       onShowWindow(callback: () => void): void
       onHideWindow(callback: () => void): void
       onSyncCompleted(callback: () => void): void
-      onDragHover(callback: (_event: unknown, hovering: boolean) => void): void
+      onDragHover(callback: (hovering: boolean) => void): void
       onObsidianContext(callback: (context: {
         deepLink: string; noteName: string; vaultName: string; isUidBased: boolean; mode: 'ask' | 'always'
       } | null) => void): void
@@ -698,7 +698,7 @@ window.quickEntryApi.onSyncCompleted(async () => {
   await updatePendingIndicator()
 })
 
-window.quickEntryApi.onDragHover((_: unknown, hovering: boolean) => {
+window.quickEntryApi.onDragHover((hovering: boolean) => {
   if (dragHandle) dragHandle.classList.toggle('hover', hovering)
 })
 

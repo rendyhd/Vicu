@@ -1,4 +1,4 @@
-import { app, BrowserWindow, globalShortcut, ipcMain, nativeTheme, powerMonitor, screen } from 'electron'
+import { app, BrowserWindow, globalShortcut, nativeTheme, powerMonitor, screen } from 'electron'
 import { createMainWindow, createQuickEntryWindow, createQuickViewWindow } from './window-manager'
 import { registerIpcHandlers } from './ipc-handlers'
 import { loadConfig, saveConfig, type AppConfig, DEFAULT_QUICK_ENTRY_HOTKEY, DEFAULT_QUICK_VIEW_HOTKEY } from './config'
@@ -20,6 +20,9 @@ import { replayPendingActions } from './sync'
 import { syncCustomLists } from './custom-list-service'
 import { buildLoginItemSettings } from './login-item-settings'
 import { buildShortcutStatus } from './shortcut-status'
+import { handleTrusted } from './secure-ipc'
+import { cleanAttachmentTempDir } from './attachment-temp'
+import { registerWebSecurity } from './web-security'
 
 let mainWindow: BrowserWindow | null = null
 let quickEntryWindow: BrowserWindow | null = null
@@ -569,6 +572,10 @@ function applyQuickEntrySettings(): { entry: boolean; viewer: boolean; waylandLi
 // and diverges from the bundled vicu-bridge.js that hardcodes "vicu").
 app.setName('vicu')
 
+// Navigation, window-open and webview guards for every WebContents (D-SEC-1).
+// Registered before the first window is created.
+registerWebSecurity()
+
 // Linux: force Chromium's "basic" password-store backend. The default is
 // "detect", which tries libsecret (gnome-keyring / KWallet) and falls back
 // to the basic backend if nothing is found. The detection path, however,
@@ -638,6 +645,9 @@ if (!gotLock) {
   app.setAppUserModelId('com.vicu.app')
 
   app.whenReady().then(async () => {
+    // Attachments opened in a previous session (D-IPC-2). Only the primary
+    // instance gets here, so nothing else is using the folder.
+    cleanAttachmentTempDir(app.getPath('temp'))
     setupApplicationMenu(() => mainWindow)
     registerIpcHandlers()
     if (isWindows) prewarmForegroundCheck()
@@ -680,13 +690,13 @@ if (!gotLock) {
     nativeTheme.themeSource = themeValue === 'system' ? 'system' : themeValue
 
     // Window control IPC handlers
-    ipcMain.handle('window-minimize', () => mainWindow?.minimize())
-    ipcMain.handle('window-maximize', () => {
+    handleTrusted('window-minimize', () => mainWindow?.minimize())
+    handleTrusted('window-maximize', () => {
       if (mainWindow?.isMaximized()) mainWindow.unmaximize()
       else mainWindow?.maximize()
     })
-    ipcMain.handle('window-close', () => mainWindow?.close())
-    ipcMain.handle('window-is-maximized', () => mainWindow?.isMaximized() ?? false)
+    handleTrusted('window-close', () => mainWindow?.close())
+    handleTrusted('window-is-maximized', () => mainWindow?.isMaximized() ?? false)
 
     // Initialize notification scheduler
     initNotifications(mainWindow)
@@ -785,6 +795,7 @@ if (!gotLock) {
   })
 
   app.on('will-quit', () => {
+    cleanAttachmentTempDir(app.getPath('temp'))
     stopNotifications()
     shutdownUrlReader()
     destroyDummyWindow()

@@ -13,7 +13,12 @@ import {
   extractJWTExp,
   storeAPIToken,
 } from './token-store'
-import { loginWithOIDC, createBackupAPIToken } from './oidc-login'
+import {
+  adoptLegacyBackupTokenId,
+  createBackupAPIToken,
+  loginWithOIDC,
+  revokeStoredBackupAPIToken,
+} from './oidc-login'
 import { silentReauth } from './silent-reauth'
 import { loginWithPassword, type PasswordLoginResult } from './password-login'
 import { renewJWT, JWTRenewalError, type JWTRenewalErrorKind } from './jwt-renewal'
@@ -23,6 +28,9 @@ const REFRESH_BUFFER_SECONDS = 120
 
 // Max time to wait for network-based token recovery at startup
 const STARTUP_RECOVERY_TIMEOUT = 15_000
+
+// Max time logout waits for the server to revoke the backup API token
+const BACKUP_TOKEN_REVOKE_TIMEOUT = 10_000
 
 // Backoff settings for repeated refresh failures.
 // Transient errors (network, 5xx) use exponential backoff. Rate-limit responses
@@ -174,12 +182,19 @@ class AuthManager {
 
   /**
    * Clear all stored tokens and stop refresh timer.
-   * Also destroys the server-side session (Vikunja 2.0+; best-effort).
+   * Also revokes the backup API token and destroys the server-side session
+   * (Vikunja 2.0+; both best-effort).
    */
   async logout(): Promise<void> {
     this._cancelRefreshTimer()
     this._refreshInProgress = null
     this._resetBackoff()
+
+    // Best-effort revocation of the 365-day backup API token this app created.
+    // Must run before the server-side logout below, which ends the session the
+    // request is authenticated with. A failure (offline, expired session) only
+    // leaves the token to expire on its own; it never blocks logout.
+    await this._revokeBackupAPIToken()
 
     // Best-effort server-side logout (Vikunja 2.0+)
     // On pre-2.0 servers this returns 404 — caught and ignored.
@@ -198,6 +213,33 @@ class AuthManager {
     }
 
     clear()
+  }
+
+  private async _revokeBackupAPIToken(): Promise<void> {
+    try {
+      const config = loadConfig()
+      // Only OIDC/password logins create a backup token. A user-provided API
+      // token (auth_method 'api_token') is never touched.
+      if (!config?.vikunja_url) return
+      if (config.auth_method !== 'oidc' && config.auth_method !== 'password') return
+
+      const jwt = !isJWTExpired() ? getJWT() : null
+      const bearer = jwt ?? getAPIToken()
+      if (!bearer) return
+
+      const baseUrl = config.vikunja_url.replace(/\/+$/, '')
+      let timer: ReturnType<typeof setTimeout> | undefined
+      const timeout = new Promise<boolean>((resolve) => {
+        timer = setTimeout(() => resolve(false), BACKUP_TOKEN_REVOKE_TIMEOUT)
+      })
+      try {
+        await Promise.race([revokeStoredBackupAPIToken(baseUrl, bearer), timeout])
+      } finally {
+        clearTimeout(timer)
+      }
+    } catch {
+      // Swallow: local cleanup is what matters
+    }
   }
 
   /**
@@ -475,8 +517,8 @@ class AuthManager {
 
   /**
    * Ensure a backup API token exists and is not expiring soon.
-   * Creates one if missing, renews if within 30 days of expiry.
-   * Runs async — does not block the caller.
+   * Creates one if missing, renews when it expires within 30 days or its expiry
+   * is unknown. Runs async — does not block the caller.
    */
   private async _ensureBackupAPIToken(jwt: string): Promise<void> {
     const config = loadConfig()
@@ -486,11 +528,14 @@ class AuthManager {
 
     if (hasAPIToken()) {
       const expiry = getAPITokenExpiry()
-      // If expiry is unknown or more than 30 days away, skip
+      // Skip only when the expiry is known and more than 30 days away.
       if (expiry != null && expiry - Date.now() / 1000 > THIRTY_DAYS) {
+        // Tokens created before ids were recorded: find and remember the id so
+        // logout can revoke them (does network work at most once per run).
+        adoptLegacyBackupTokenId(config.vikunja_url.replace(/\/+$/, ''), jwt).catch(() => {})
         return
       }
-      // Within 30 days of expiry (or expiry unknown) — renew
+      // Within 30 days of expiry, or expiry unknown — renew
       console.log('[Auth] Backup API token expiring soon, renewing')
     } else {
       console.log('[Auth] No backup API token found, creating one')

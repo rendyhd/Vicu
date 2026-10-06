@@ -17,7 +17,7 @@ declare global {
       onHideWindow(callback: () => void): void
       onSyncCompleted(callback: () => void): void
       onConfigChanged(callback: () => void): void
-      onDragHover(callback: (_event: unknown, hovering: boolean) => void): void
+      onDragHover(callback: (hovering: boolean) => void): void
       openDeepLink(url: string): Promise<void>
     }
   }
@@ -679,7 +679,7 @@ window.quickViewApi.onConfigChanged(() => {
   lastFetchTime = 0
 })
 
-window.quickViewApi.onDragHover((_: unknown, hovering: boolean) => {
+window.quickViewApi.onDragHover((hovering: boolean) => {
   if (dragHandle) dragHandle.classList.toggle('hover', hovering)
 })
 

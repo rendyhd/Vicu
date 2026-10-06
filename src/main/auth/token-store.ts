@@ -19,6 +19,10 @@ interface AuthStore {
   jwt_exp?: number
   api_token?: string
   api_token_exp?: number
+  /** Server-side id of the backup API token Vicu created (absent for user-provided tokens). */
+  api_token_id?: number
+  /** Server the backup token was created on, so its id is never used against another server. */
+  api_token_url?: string
   provider_key?: string
   refresh_token?: string
 }
@@ -120,10 +124,48 @@ export function isJWTExpired(bufferSeconds = 0): boolean {
   return Date.now() / 1000 + bufferSeconds >= store.jwt_exp
 }
 
-export function storeAPIToken(token: string, expiresAt: number): void {
+export interface BackupTokenMeta {
+  id: number
+  baseUrl: string
+}
+
+function normalizeBaseUrl(url: string): string {
+  return url.replace(/\/+$/, '')
+}
+
+/**
+ * Store the API token. Pass `meta` only for the backup token Vicu itself created
+ * on the server: the id is what lets logout revoke it. A token without `meta`
+ * (user-provided, or a long-lived JWT kept as fallback) clears any stored id, so
+ * logout never tries to delete something Vicu did not create.
+ */
+export function storeAPIToken(token: string, expiresAt: number, meta?: BackupTokenMeta): void {
   const store = readStore()
   store.api_token = encrypt(token)
   store.api_token_exp = expiresAt
+  if (meta) {
+    store.api_token_id = meta.id
+    store.api_token_url = normalizeBaseUrl(meta.baseUrl)
+  } else {
+    delete store.api_token_id
+    delete store.api_token_url
+  }
+  writeStore(store)
+}
+
+/** The server-side id of the stored backup token, when Vicu created it. */
+export function getAPITokenMeta(): BackupTokenMeta | null {
+  const store = readStore()
+  if (typeof store.api_token_id !== 'number' || typeof store.api_token_url !== 'string') return null
+  return { id: store.api_token_id, baseUrl: store.api_token_url }
+}
+
+/** Record the id of an already-stored backup token (found by lookup after an upgrade). */
+export function setAPITokenMeta(meta: BackupTokenMeta): void {
+  const store = readStore()
+  if (!store.api_token) return
+  store.api_token_id = meta.id
+  store.api_token_url = normalizeBaseUrl(meta.baseUrl)
   writeStore(store)
 }
 

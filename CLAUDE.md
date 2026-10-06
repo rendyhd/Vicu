@@ -59,6 +59,13 @@ All API calls go through IPC: renderer calls `window.api.someMethod()` → prelo
 
 API responses use a discriminated union: `{ success: true, data: T } | { success: false, error: string }`.
 
+### Web security
+
+- `src/main/web-security.ts` (registered in `index.ts` before any window exists) guards every WebContents: `will-navigate`/`will-redirect` only allow the app's own pages (dev server origin, or files under `out/renderer`), http/https/mailto/obsidian links open in the system handler, `setWindowOpenHandler` denies all new windows, `<webview>` is denied. The OIDC sign-in windows (`AUTH_WINDOW_PARTITION`) are exempt because they follow the identity provider. URL decisions are pure functions in `web-security-policy.ts`.
+- Register IPC handlers with `handleTrusted()` from `src/main/secure-ipc.ts`, never `ipcMain.handle` directly (a test enforces this). It rejects calls whose sender frame is not a top-level app page (main window, Quick Entry, Quick View).
+- Preload callbacks (`ipcRenderer.on`) must pass only the payload to page code, never the `IpcRendererEvent`.
+- Attachments opened from the server go to `<temp>/vicu-attachments` (cleaned at startup and quit). Executable, script, shortcut and macro extensions are revealed with `shell.showItemInFolder` instead of opened (`attachment-safety.ts`). Binary downloads are capped at 100 MB.
+
 ### Vikunja API
 
 Vicu uses Vikunja API v2. List responses are unwrapped from their pagination
@@ -101,6 +108,8 @@ zero unrelated values.
 Two auth methods supported:
 - **API Token**: stored in config, sent as `Bearer` token
 - **OIDC**: full OAuth2 flow in `src/main/auth/` (discovery, login, token store, silent reauth)
+
+OIDC and password logins also create a 365-day full-access backup API token titled `Vicu — <host> [<install id>]` (`backup-token.ts`; the random per-install id lives in `userData/install-id`). Its server id is stored in `auth.json` and logout revokes it best-effort (`DELETE /tokens/{id}`). Stale-token cleanup only deletes tokens carrying this install's id, the previously stored id, or the old-format token whose title and expiry match the locally stored one.
 
 ### Offline support
 
