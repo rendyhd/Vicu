@@ -10,6 +10,7 @@ import {
   writeFileSync,
   fsyncSync,
 } from 'fs'
+import { promises as fsp } from 'fs'
 import { basename, dirname } from 'path'
 
 // Crash-safe persistence for the small JSON files in userData (config.json,
@@ -77,6 +78,89 @@ function keepBackup(path: string): void {
     if (!existsSync(path)) return
     if (!isParseableJson(readFileSync(path, 'utf-8'))) return
     copyFileSync(path, backupPathFor(path))
+  } catch (err) {
+    // A backup problem must never block saving the new data.
+    console.warn(`[Files] Could not back up ${basename(path)}:`, errorMessage(err))
+  }
+}
+
+/**
+ * Run `fn`, retrying while `isTransient` says the error is worth another try.
+ * Used for the final rename: on Windows an antivirus scanner or the search
+ * indexer can hold the target for a few milliseconds and fail the rename with
+ * EPERM/EBUSY/EACCES even though nothing is wrong.
+ */
+export async function retryTransient<T>(
+  fn: () => Promise<T>,
+  options: { attempts: number; delayMs: number; isTransient: (err: unknown) => boolean }
+): Promise<T> {
+  let lastError: unknown
+  for (let attempt = 1; attempt <= options.attempts; attempt++) {
+    try {
+      return await fn()
+    } catch (err) {
+      lastError = err
+      if (attempt === options.attempts || !options.isTransient(err)) throw err
+      await new Promise((resolve) => setTimeout(resolve, options.delayMs * attempt))
+    }
+  }
+  throw lastError
+}
+
+function isTransientRenameError(err: unknown): boolean {
+  const code = (err as NodeJS.ErrnoException | undefined)?.code
+  return code === 'EPERM' || code === 'EBUSY' || code === 'EACCES'
+}
+
+/**
+ * Async twin of `writeFileAtomic` for hot paths: the event loop keeps running
+ * while the data is written and fsynced. Same guarantees (temp file + rename, an
+ * optional parse-checked `.bak`). Callers that can overlap must serialize their
+ * writes themselves because both writers share one `<path>.tmp`; the offline
+ * stores do that through `JsonFileStore`.
+ */
+export async function writeFileAtomicAsync(
+  path: string,
+  data: string,
+  options: { backup?: boolean; mode?: number } = {}
+): Promise<void> {
+  await fsp.mkdir(dirname(path), { recursive: true })
+  const tmp = tmpPathFor(path)
+  try {
+    const handle = await fsp.open(tmp, 'w', options.mode)
+    try {
+      await handle.writeFile(data, 'utf-8')
+      await handle.sync()
+    } finally {
+      await handle.close()
+    }
+    if (options.backup) await keepBackupAsync(path)
+    await retryTransient(() => fsp.rename(tmp, path), {
+      attempts: 5,
+      delayMs: 20,
+      isTransient: isTransientRenameError,
+    })
+  } catch (err) {
+    try {
+      await fsp.unlink(tmp)
+    } catch {
+      // Nothing left to clean up.
+    }
+    throw err
+  }
+}
+
+async function keepBackupAsync(path: string): Promise<void> {
+  try {
+    let previous: string
+    try {
+      previous = await fsp.readFile(path, 'utf-8')
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code === 'ENOENT') return
+      throw err
+    }
+    if (!isParseableJson(previous)) return
+    await fsp.copyFile(path, backupPathFor(path))
   } catch (err) {
     // A backup problem must never block saving the new data.
     console.warn(`[Files] Could not back up ${basename(path)}:`, errorMessage(err))
