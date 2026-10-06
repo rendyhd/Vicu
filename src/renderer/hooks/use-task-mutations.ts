@@ -11,14 +11,14 @@ import {
   unfinishedDescendants,
 } from '@/lib/task-hierarchy'
 import { updateTaskDetailDone } from '@/lib/task-detail-cache'
-import { taskPatch } from '@/lib/merge-patches'
+import { projectPatch, taskPatch } from '@/lib/merge-patches'
 import type {
   Task,
+  Project,
   TaskAttachment,
   ProjectView,
   CreateTaskPayload,
   CreateProjectPayload,
-  UpdateProjectPayload,
   CreateLabelPayload,
   UpdateLabelPayload,
 } from '@/lib/vikunja-types'
@@ -672,46 +672,57 @@ export function useCreateProject() {
   })
 }
 
+export interface UpdateProjectVariables {
+  id: number
+  /**
+   * The fields that changed, e.g. `{ title: 'New name' }`. Only changed writable
+   * fields are sent (D-PROJ-1): a stale cached description must never overwrite a
+   * concurrent edit, and keys outside the PATCH schema (a tree node's `children`)
+   * are rejected by the server with a 422.
+   */
+  changes: Partial<Project>
+  /** The cached project the changes were made against; the request is diffed against it. */
+  original?: Project
+}
+
+/** Send a project edit as a minimal merge patch; skip the request when nothing differs. */
+export async function updateProjectRequest({
+  id,
+  changes,
+  original,
+}: UpdateProjectVariables): Promise<Project | null> {
+  const patch = projectPatch(original ?? null, changes)
+  if (Object.keys(patch).length === 0) return original ?? null
+  const result = await api.updateProject(id, patch)
+  if (!result.success) throw new Error(result.error)
+  return result.data
+}
+
 export function useUpdateProject() {
   const qc = useQueryClient()
 
   return useMutation({
-    mutationFn: async ({ id, project }: { id: number; project: UpdateProjectPayload }) => {
-      const result = await api.updateProject(id, project)
-      if (!result.success) throw new Error(result.error)
-      return result.data
-    },
+    mutationFn: (variables: UpdateProjectVariables) => updateProjectRequest(variables),
     onSettled: () => {
       qc.invalidateQueries({ queryKey: ['projects'] })
     },
   })
 }
 
-/** Archive/restore preserves every mutable project field and updates the all-project cache. */
+/** Archive/restore sends only `is_archived` and updates the all-project cache. */
 export function useSetProjectArchived() {
   const qc = useQueryClient()
   const navigate = useNavigate()
   const matches = useMatches()
 
   return useMutation({
-    mutationFn: async ({ project, archived }: { project: import('@/lib/vikunja-types').Project; archived: boolean }) => {
-      const payload: UpdateProjectPayload = {
-        title: project.title,
-        description: project.description,
-        hex_color: project.hex_color,
-        is_archived: archived,
-        position: project.position,
-        parent_project_id: project.parent_project_id,
-      }
-      const result = await api.updateProject(project.id, payload)
-      if (!result.success) throw new Error(result.error)
-      return result.data
-    },
+    mutationFn: ({ project, archived }: { project: Project; archived: boolean }) =>
+      updateProjectRequest({ id: project.id, changes: { is_archived: archived }, original: project }),
     onMutate: async ({ project, archived }) => {
       await qc.cancelQueries({ queryKey: ['projects'] })
-      const previous = qc.getQueryData<import('@/lib/vikunja-types').Project[]>(['projects'])
+      const previous = qc.getQueryData<Project[]>(['projects'])
       if (previous) {
-        qc.setQueryData<import('@/lib/vikunja-types').Project[]>(
+        qc.setQueryData<Project[]>(
           ['projects'],
           previous.map((item) => item.id === project.id ? { ...item, is_archived: archived } : item),
         )
@@ -740,19 +751,17 @@ export function useReorderProject() {
   const qc = useQueryClient()
 
   return useMutation({
-    mutationFn: async ({ id, project }: { id: number; project: UpdateProjectPayload }) => {
-      const result = await api.updateProject(id, project)
-      if (!result.success) throw new Error(result.error)
-      return result.data
-    },
-    onMutate: ({ id, project }) => {
+    // A reorder only ever changes the position.
+    mutationFn: ({ id, position }: { id: number; position: number }) =>
+      updateProjectRequest({ id, changes: { position } }),
+    onMutate: ({ id, position }) => {
       qc.cancelQueries({ queryKey: ['projects'] }) // fire-and-forget
-      const previous = qc.getQueryData<import('@/lib/vikunja-types').Project[]>(['projects'])
+      const previous = qc.getQueryData<Project[]>(['projects'])
 
-      if (previous && project.position !== undefined) {
-        qc.setQueryData<import('@/lib/vikunja-types').Project[]>(
+      if (previous) {
+        qc.setQueryData<Project[]>(
           ['projects'],
-          previous.map((p) => (p.id === id ? { ...p, position: project.position! } : p))
+          previous.map((p) => (p.id === id ? { ...p, position } : p))
         )
       }
 

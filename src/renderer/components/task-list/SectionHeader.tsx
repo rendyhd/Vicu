@@ -86,14 +86,8 @@ export function SectionHeader({ project, siblings, onAddTask }: SectionHeaderPro
     if (trimmed && trimmed !== project.title) {
       updateProject.mutate({
         id: project.id,
-        project: {
-          title: trimmed,
-          description: project.description,
-          hex_color: project.hex_color,
-          is_archived: project.is_archived,
-          position: project.position,
-          parent_project_id: project.parent_project_id,
-        },
+        changes: { title: trimmed },
+        original: project,
       })
     }
     setIsRenaming(false)

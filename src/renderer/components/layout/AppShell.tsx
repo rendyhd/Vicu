@@ -445,17 +445,7 @@ export function AppShell() {
             const above = without[newIndex - 1]?.position ?? 0
             const below = without[newIndex]?.position ?? (above + 2 ** 16)
             const newPosition = (above + below) / 2
-            reorderProject.mutate({
-              id: dragItem.project.id,
-              project: {
-                title: dragItem.project.title,
-                description: dragItem.project.description,
-                hex_color: dragItem.project.hex_color,
-                is_archived: dragItem.project.is_archived,
-                position: newPosition,
-                parent_project_id: dragItem.project.parent_project_id,
-              },
-            })
+            reorderProject.mutate({ id: dragItem.project.id, position: newPosition })
           }
         }
       } else if (dragItem.type === 'project') {
@@ -468,17 +458,7 @@ export function AppShell() {
             const newIndex = siblings.findIndex((s) => s.id === overNode.id)
             if (oldIndex !== -1 && newIndex !== -1) {
               const newPosition = calculateProjectPosition(siblings, oldIndex, newIndex)
-              // Keep known project fields in the optimistic reorder payload.
-              reorderProject.mutate({
-                id: node.id,
-                project: {
-                  title: node.title,
-                  description: node.description,
-                  hex_color: node.hex_color,
-                  is_archived: node.is_archived,
-                  position: newPosition,
-                },
-              })
+              reorderProject.mutate({ id: node.id, position: newPosition })
             }
           }
         }

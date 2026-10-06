@@ -2,10 +2,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   completeTaskRequest,
   uncompleteTaskRequest,
+  updateProjectRequest,
   updateTaskRequest,
 } from '../use-task-mutations'
+import { PROJECT_WRITABLE_FIELDS } from '@/lib/merge-patches'
 import { NULL_DATE } from '@/lib/constants'
-import type { Task } from '@/lib/vikunja-types'
+import type { Project, Task } from '@/lib/vikunja-types'
 
 function task(id: number, overrides: Partial<Task> = {}): Task {
   return {
@@ -35,12 +37,29 @@ function task(id: number, overrides: Partial<Task> = {}): Task {
   }
 }
 
+function project(id: number, overrides: Partial<Project> = {}): Project {
+  return {
+    id,
+    title: `Project ${id}`,
+    description: 'About the project',
+    parent_project_id: 4,
+    is_archived: false,
+    hex_color: '3498db',
+    position: 1024,
+    created: '2026-10-01T00:00:00Z',
+    updated: '2026-10-01T00:00:00Z',
+    ...overrides,
+  }
+}
+
 const ok = (data: unknown = {}) => ({ success: true as const, data })
 let updateTask: ReturnType<typeof vi.fn>
+let updateProject: ReturnType<typeof vi.fn>
 
 beforeEach(() => {
   updateTask = vi.fn(async () => ok())
-  vi.stubGlobal('window', { api: { updateTask } })
+  updateProject = vi.fn(async () => ok())
+  vi.stubGlobal('window', { api: { updateTask, updateProject } })
 })
 
 afterEach(() => {
@@ -175,5 +194,76 @@ describe('uncompleteTaskRequest', () => {
       [10, { done: false }],
       [11, { done: true }],
     ])
+  })
+})
+
+describe('updateProjectRequest', () => {
+  it('rename sends only the title', async () => {
+    const original = project(5)
+
+    await updateProjectRequest({ id: 5, changes: { title: 'Renamed' }, original })
+
+    expect(updateProject).toHaveBeenCalledWith(5, { title: 'Renamed' })
+  })
+
+  it('settings send only changed fields and parent_project_id only when it changes', async () => {
+    const original = project(5)
+
+    await updateProjectRequest({
+      id: 5,
+      changes: { title: 'Renamed', hex_color: '#3498db', parent_project_id: 4 },
+      original,
+    })
+    expect(updateProject).toHaveBeenLastCalledWith(5, { title: 'Renamed' })
+
+    await updateProjectRequest({
+      id: 5,
+      changes: { title: 'Renamed', hex_color: '#3498db', parent_project_id: 9 },
+      original,
+    })
+    expect(updateProject).toHaveBeenLastCalledWith(5, { title: 'Renamed', parent_project_id: 9 })
+  })
+
+  it('reorder and archive send a single field', async () => {
+    await updateProjectRequest({ id: 5, changes: { position: 512 } })
+    expect(updateProject).toHaveBeenLastCalledWith(5, { position: 512 })
+
+    await updateProjectRequest({ id: 5, changes: { is_archived: true }, original: project(5) })
+    expect(updateProject).toHaveBeenLastCalledWith(5, { is_archived: true })
+  })
+
+  it('never sends children or any key outside the PATCH schema, even for a tree node', async () => {
+    const treeNode = {
+      ...project(5),
+      children: [{ ...project(6), children: [] }],
+      views: [{ id: 1 }],
+      owner: { id: 1 },
+    } as unknown as Project
+
+    await updateProjectRequest({
+      id: 5,
+      changes: { ...treeNode, description: 'Reviewed' },
+      original: treeNode,
+    })
+
+    const sent = updateProject.mock.calls[0][1] as Record<string, unknown>
+    expect(sent).toEqual({ description: 'Reviewed' })
+    for (const key of Object.keys(sent)) expect(PROJECT_WRITABLE_FIELDS as readonly string[]).toContain(key)
+    expect('children' in sent).toBe(false)
+  })
+
+  it('skips the request when nothing differs', async () => {
+    const original = project(5)
+
+    const result = await updateProjectRequest({ id: 5, changes: { title: original.title }, original })
+
+    expect(updateProject).not.toHaveBeenCalled()
+    expect(result).toBe(original)
+  })
+
+  it('throws the server error', async () => {
+    updateProject.mockResolvedValueOnce({ success: false, error: 'validation failed' })
+
+    await expect(updateProjectRequest({ id: 5, changes: { title: 'x' } })).rejects.toThrow('validation failed')
   })
 })

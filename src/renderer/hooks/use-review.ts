@@ -11,7 +11,8 @@ import {
   type ReviewStatus,
   type ReviewMetadata,
 } from '@/lib/review-metadata'
-import type { Project, AppConfig, UpdateProjectPayload } from '@/lib/vikunja-types'
+import { useReviewNoticeStore } from '@/stores/review-notice-store'
+import type { Project, AppConfig } from '@/lib/vikunja-types'
 
 export interface ProjectWithStatus {
   project: Project
@@ -149,58 +150,102 @@ export function flattenReviewTree(nodes: ReviewTreeNode[]): ReviewTreeNode[] {
   return out
 }
 
-function applyMetaUpdate(project: Project, mutator: (m: ReviewMetadata) => ReviewMetadata): Project {
-  const currentMeta = parseReviewFooter(project.description)
-  const nextMeta = mutator(currentMeta)
-  const newDescription = upsertFooter(project.description, nextMeta)
-  if (newDescription === project.description) return project
-  return { ...project, description: newDescription }
+/**
+ * Review state lives in a footer of the project description, so every review
+ * action rewrites the description and nothing else. Each helper returns the new
+ * description, or null when the action would not change it.
+ */
+function nextDescription(
+  project: Pick<Project, 'description'>,
+  mutator: (m: ReviewMetadata) => ReviewMetadata,
+): string | null {
+  const next = upsertFooter(project.description, mutator(parseReviewFooter(project.description)))
+  return next === project.description ? null : next
 }
 
-// Project is a structural superset of UpdateProjectPayload. The API client
-// sends these fields as a v2 merge patch.
-function projectToPayload(p: Project): UpdateProjectPayload {
-  return p as unknown as UpdateProjectPayload
+export function reviewedDescription(project: Pick<Project, 'description'>, today = todayLocalIsoDate()): string | null {
+  return nextDescription(project, (m) => ({ ...m, state: 'reviewed', lastReviewedAt: today }))
+}
+
+export function cadenceDescription(project: Pick<Project, 'description'>, cadenceDays: number | null): string | null {
+  return nextDescription(project, (m) => ({
+    ...m,
+    cadenceDaysOverride: cadenceDays && cadenceDays > 0 ? cadenceDays : null,
+  }))
+}
+
+export function excludeDescription(project: Pick<Project, 'description'>, excluded: boolean): string | null {
+  return nextDescription(project, (m) => {
+    if (excluded) return { state: 'excluded', lastReviewedAt: null, cadenceDaysOverride: null }
+    return { ...m, state: 'never', lastReviewedAt: null }
+  })
+}
+
+export interface ReviewMutateOptions {
+  onSuccess?: () => void
+  onError?: (error: Error) => void
+}
+
+/**
+ * Save a new description for a review action. The request carries `{ description }`
+ * only: the project passed in may be a tree node (it has `children`, which the server
+ * rejects with a 422) or a stale copy of fields this action never touches.
+ * Failures are shown to the user instead of vanishing.
+ */
+function useSaveReviewDescription(failureLabel: string) {
+  const update = useUpdateProject()
+  const save = (
+    project: Project,
+    description: string | null,
+    options?: ReviewMutateOptions,
+    // Undo restores a description that differs from the cached one on purpose, so
+    // it is sent without diffing against the cache.
+    diffAgainstCache = true,
+  ) => {
+    if (description === null) {
+      // Nothing to write: the project already has this review state.
+      options?.onSuccess?.()
+      return
+    }
+    update.mutate(
+      { id: project.id, changes: { description }, original: diffAgainstCache ? project : undefined },
+      {
+        onSuccess: () => options?.onSuccess?.(),
+        onError: (error) => {
+          useReviewNoticeStore.getState().showError(`${failureLabel}: ${error.message}`)
+          options?.onError?.(error)
+        },
+      },
+    )
+  }
+  return { update, save }
 }
 
 export function useMarkReviewed() {
-  const update = useUpdateProject()
-  const mutate = (vars: { project: Project }) => {
-    const next = applyMetaUpdate(vars.project, (m) => ({
-      ...m,
-      state: 'reviewed',
-      lastReviewedAt: todayLocalIsoDate(),
-    }))
-    if (next === vars.project) return
-    update.mutate({ id: vars.project.id, project: projectToPayload(next) })
-  }
+  const { update, save } = useSaveReviewDescription('Could not mark the project as reviewed')
+  const mutate = (vars: { project: Project }, options?: ReviewMutateOptions) =>
+    save(vars.project, reviewedDescription(vars.project), options)
   return { ...update, mutate }
 }
 
 export function useSetReviewCadence() {
-  const update = useUpdateProject()
-  const mutate = (vars: { project: Project; cadenceDays: number | null }) => {
-    const next = applyMetaUpdate(vars.project, (m) => ({
-      ...m,
-      cadenceDaysOverride: vars.cadenceDays && vars.cadenceDays > 0 ? vars.cadenceDays : null,
-    }))
-    if (next === vars.project) return
-    update.mutate({ id: vars.project.id, project: projectToPayload(next) })
-  }
+  const { update, save } = useSaveReviewDescription('Could not save the review cadence')
+  const mutate = (vars: { project: Project; cadenceDays: number | null }, options?: ReviewMutateOptions) =>
+    save(vars.project, cadenceDescription(vars.project, vars.cadenceDays), options)
   return { ...update, mutate }
 }
 
 export function useExcludeFromReview() {
-  const update = useUpdateProject()
-  const mutate = (vars: { project: Project; excluded: boolean }) => {
-    const next = applyMetaUpdate(vars.project, (m) => {
-      if (vars.excluded) {
-        return { state: 'excluded', lastReviewedAt: null, cadenceDaysOverride: null }
-      }
-      return { ...m, state: 'never', lastReviewedAt: null }
-    })
-    if (next === vars.project) return
-    update.mutate({ id: vars.project.id, project: projectToPayload(next) })
-  }
+  const { update, save } = useSaveReviewDescription('Could not update the review settings')
+  const mutate = (vars: { project: Project; excluded: boolean }, options?: ReviewMutateOptions) =>
+    save(vars.project, excludeDescription(vars.project, vars.excluded), options)
+  return { ...update, mutate }
+}
+
+/** Put a project's previous description back (undo). Sends `{ description }` only. */
+export function useRestoreReviewDescription() {
+  const { update, save } = useSaveReviewDescription('Could not undo the review')
+  const mutate = (vars: { project: Project }, options?: ReviewMutateOptions) =>
+    save(vars.project, vars.project.description, options, false)
   return { ...update, mutate }
 }

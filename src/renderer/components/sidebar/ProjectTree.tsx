@@ -42,14 +42,8 @@ function ProjectDialog({
       updateProject.mutate(
         {
           id: project.id,
-          project: {
-            title: trimmed,
-            description: project.description,
-            hex_color: hexColor,
-            is_archived: project.is_archived,
-            position: project.position,
-            parent_project_id: project.parent_project_id,
-          },
+          changes: { title: trimmed, hex_color: hexColor },
+          original: project,
         },
         { onSuccess: onClose }
       )
