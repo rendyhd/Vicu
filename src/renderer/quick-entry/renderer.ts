@@ -624,7 +624,6 @@ async function saveTask(): Promise<void> {
               ? `${description}\n${tokens.join('\n')}`
               : tokens.join('\n')
             await window.quickEntryApi.updateTask(taskId, {
-              ...createdTask,
               description: patchedDescription,
             })
           }

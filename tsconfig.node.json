@@ -15,6 +15,7 @@
   },
   "include": [
     "src/main/**/*",
-    "src/preload/**/*"
+    "src/preload/**/*",
+    "src/shared/**/*"
   ]
 }

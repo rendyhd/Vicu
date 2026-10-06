@@ -18,11 +18,11 @@ import { taskDescendants, unfinishedDescendants } from '@/lib/task-hierarchy'
 
 /**
  * Actions for the right-click context menu, applied to one OR many tasks.
- * Full task data is kept in mutation inputs so optimistic cross-project moves
- * can populate the destination cache immediately; the main-process API client
- * filters it into a writable v2 merge patch. Bulk operations loop per task,
- * letting each mutation reconcile its caches. The `record*` helpers persist the
- * most recent project/label for one-click reuse.
+ * Each mutation carries only the changed fields plus the cached task it was
+ * made against; `useUpdateTask` diffs them into a minimal v2 merge patch and
+ * uses the cached task to populate the destination cache optimistically.
+ * Bulk operations loop per task, letting each mutation reconcile its caches.
+ * The `record*` helpers persist the most recent project/label for one-click reuse.
  */
 export function useTaskActions(tasks: Task[]) {
   const qc = useQueryClient()
@@ -35,7 +35,7 @@ export function useTaskActions(tasks: Task[]) {
   const patch = useCallback(
     (changes: Partial<Task>) => {
       tasks.forEach((t) => {
-        updateTask.mutate({ id: t.id, task: { ...t, ...changes } })
+        updateTask.mutate({ id: t.id, changes, original: t })
       })
     },
     [tasks, updateTask]
@@ -71,7 +71,7 @@ export function useTaskActions(tasks: Task[]) {
     (projectId: number) => {
       tasks.forEach((t) => {
         if (t.project_id === projectId) return
-        updateTask.mutate({ id: t.id, task: { ...t, project_id: projectId } })
+        updateTask.mutate({ id: t.id, changes: { project_id: projectId }, original: t })
       })
       // Moved tasks leave the current view — drop the now-orphaned selection
       // (parity with drag-to-project).

@@ -1,3 +1,5 @@
+import type { ProjectPatch, TaskPatch } from './merge-patches'
+
 export interface TaskReminder {
   reminder: string          // absolute ISO timestamp
   relative_period?: number  // seconds relative to relative_to date
@@ -89,7 +91,11 @@ export interface CreateTaskPayload {
   repeat_mode?: number
 }
 
-export interface UpdateTaskPayload extends Partial<Task> {}
+/**
+ * Wire format of `PATCH /tasks/{id}`: only the writable fields that changed
+ * (build it with `taskPatch`). Never a whole cached task.
+ */
+export type UpdateTaskPayload = TaskPatch
 
 export interface CreateProjectPayload {
   title: string
@@ -98,14 +104,11 @@ export interface CreateProjectPayload {
   hex_color?: string
 }
 
-export interface UpdateProjectPayload {
-  title?: string
-  description?: string
-  hex_color?: string
-  is_archived?: boolean
-  position?: number
-  parent_project_id?: number
-}
+/**
+ * Wire format of `PATCH /projects/{id}`: only the writable fields that changed
+ * (build it with `projectPatch`). Never a project tree node.
+ */
+export type UpdateProjectPayload = ProjectPatch
 
 export interface CreateLabelPayload {
   title: string

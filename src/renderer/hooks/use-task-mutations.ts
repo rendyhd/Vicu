@@ -11,12 +11,12 @@ import {
   unfinishedDescendants,
 } from '@/lib/task-hierarchy'
 import { updateTaskDetailDone } from '@/lib/task-detail-cache'
+import { taskPatch } from '@/lib/merge-patches'
 import type {
   Task,
   TaskAttachment,
   ProjectView,
   CreateTaskPayload,
-  UpdateTaskPayload,
   CreateProjectPayload,
   UpdateProjectPayload,
   CreateLabelPayload,
@@ -138,31 +138,52 @@ export function useCreateTask() {
   })
 }
 
+export interface UpdateTaskVariables {
+  id: number
+  /**
+   * The fields the user changed, e.g. `{ priority: 2 }`. Never spread a whole
+   * task in here: only changed writable fields are sent (D-REN-2), so a stale
+   * cache cannot revert what another client changed.
+   */
+  changes: Partial<Task>
+  /**
+   * The cached task the changes were made against. The request is diffed against
+   * it (`taskPatch`), and cross-project moves use it to place the task in the
+   * destination cache optimistically.
+   */
+  original?: Task
+  // Caller signals that a reorderTask call follows and will own
+  // view-tasks/section-tasks invalidation. Don't read it here; it's
+  // consumed in onSettled.
+  deferInvalidation?: boolean
+}
+
+/** Send an edit as a minimal merge patch; skip the request when nothing differs. */
+export async function updateTaskRequest({
+  id,
+  changes,
+  original,
+}: Pick<UpdateTaskVariables, 'id' | 'changes' | 'original'>): Promise<Task | null> {
+  // Position is per-view in Vikunja and only honored by /tasks/{id}/position
+  // (see useReorderTask). Strip it from the regular update body so it
+  // can't be written to an unintended view; we still keep it on `changes`
+  // for the optimistic-update path so the UI lands at the right slot.
+  const { position: _position, ...writable } = changes
+  const patch = taskPatch(original ?? null, writable)
+  // Nothing differs from what the server already has (e.g. setting today's
+  // date on a task that is already due today): skip the request.
+  if (Object.keys(patch).length === 0) return original ?? null
+  const result = await api.updateTask(id, patch)
+  if (!result.success) throw new Error(result.error)
+  return result.data
+}
+
 export function useUpdateTask() {
   const qc = useQueryClient()
 
   return useMutation({
-    mutationFn: async ({
-      id,
-      task,
-    }: {
-      id: number
-      task: UpdateTaskPayload
-      // Caller signals that a reorderTask call follows and will own
-      // view-tasks/section-tasks invalidation. Don't read it here; it's
-      // consumed in onSettled.
-      deferInvalidation?: boolean
-    }) => {
-      // Position is per-view in Vikunja and only honored by /tasks/{id}/position
-      // (see useReorderTask). Strip it from the regular update body so it
-      // can't be written to an unintended view; we still keep it on `task`
-      // for the optimistic-update path so the UI lands at the right slot.
-      const { position: _position, ...apiTask } = task
-      const result = await api.updateTask(id, apiTask)
-      if (!result.success) throw new Error(result.error)
-      return result.data
-    },
-    onMutate: async ({ id, task }) => {
+    mutationFn: (variables: UpdateTaskVariables) => updateTaskRequest(variables),
+    onMutate: async ({ id, changes, original }) => {
       await qc.cancelQueries({ queryKey: ['tasks'] })
       await qc.cancelQueries({ queryKey: ['view-tasks'] })
       await qc.cancelQueries({ queryKey: ['section-tasks'] })
@@ -173,7 +194,7 @@ export function useUpdateTask() {
       })
 
       qc.setQueriesData<Task[]>({ queryKey: ['tasks'] }, (old) =>
-        old?.map((t) => (t.id === id ? { ...t, ...task } : t))
+        old?.map((t) => (t.id === id ? { ...t, ...changes } : t))
       )
       // view-tasks is keyed ['view-tasks', projectId, viewId]. When the task's
       // project_id changes (drag-drop cross-section / sidebar / header drops),
@@ -183,8 +204,10 @@ export function useUpdateTask() {
       // looks at where it was. Iterate keys so we can compare each cache's
       // projectId against the new project_id and either remove from
       // mismatched views or add to a matched one.
-      const newProjectId = (task as Partial<Task>).project_id
-      const taskHasFullSpread = (task as Partial<Task>).title !== undefined
+      const newProjectId = changes.project_id
+      // A task added to a destination cache needs every field, not just the changes.
+      const fullTask: Partial<Task> = original ? { ...original, ...changes } : changes
+      const taskHasFullSpread = fullTask.title !== undefined
       const allViewTasks = qc.getQueriesData<Task[]>({ queryKey: ['view-tasks'] })
       for (const [key, oldData] of allViewTasks) {
         if (!oldData) continue
@@ -199,7 +222,7 @@ export function useUpdateTask() {
           ) {
             next = oldData.filter((t) => t.id !== id)
           } else {
-            next = oldData.map((t) => (t.id === id ? { ...t, ...task } : t))
+            next = oldData.map((t) => (t.id === id ? { ...t, ...changes } : t))
           }
         } else if (
           taskHasFullSpread &&
@@ -207,13 +230,13 @@ export function useUpdateTask() {
           queryProjectId !== undefined &&
           newProjectId === queryProjectId
         ) {
-          next = sortProjectTasks([...oldData, { ...task, id } as Task])
+          next = sortProjectTasks([...oldData, { ...fullTask, id } as Task])
         }
         if (next !== oldData) qc.setQueryData(key, next)
       }
       qc.setQueriesData<SectionTaskCacheEntry[]>(
         { queryKey: ['section-tasks'] },
-        (old) => updateSectionTaskCache(old, id, task)
+        (old) => updateSectionTaskCache(old, id, changes, original)
       )
 
       return { previousTaskQueries, previousViewQueries, previousSectionQueries }
@@ -246,7 +269,7 @@ export function useUpdateTask() {
         qc.invalidateQueries({ queryKey: ['section-tasks'] })
       }
       // Only refresh reminder timers when reminder-relevant fields changed
-      const t = variables.task
+      const t = variables.changes
       if ('reminders' in t || 'due_date' in t) {
         api.refreshTaskReminders()
       }
@@ -408,6 +431,52 @@ export function useReorderTask() {
   })
 }
 
+/**
+ * Complete a task and its unfinished subtasks. Every request is just `{ done }`:
+ * the embedded `related_tasks` copies are only used for their ids, never as patch
+ * sources, so partial objects cannot clear fields.
+ */
+export async function completeTaskRequest(task: Task): Promise<Task> {
+  const autoCompleted = unfinishedDescendants(task)
+  const completed: Task[] = []
+  try {
+    // Children first prevents the server from ever exposing them as standalone
+    // work while the parent completion is in flight.
+    for (const child of [...autoCompleted].reverse()) {
+      const result = await api.updateTask(child.id, { done: true })
+      if (!result.success) throw new Error(result.error)
+      completed.push(child)
+    }
+    const result = await api.updateTask(task.id, { done: true })
+    if (!result.success) throw new Error(result.error)
+    return result.data
+  } catch (error) {
+    await Promise.allSettled(
+      completed.map((child) => api.updateTask(child.id, { done: false })),
+    )
+    throw error
+  }
+}
+
+export async function uncompleteTaskRequest(task: Task, autoCompleted: readonly Task[]): Promise<Task> {
+  const restored: Task[] = []
+  try {
+    for (const child of [...autoCompleted].reverse()) {
+      const result = await api.updateTask(child.id, { done: false })
+      if (!result.success) throw new Error(result.error)
+      restored.push(child)
+    }
+    const result = await api.updateTask(task.id, { done: false })
+    if (!result.success) throw new Error(result.error)
+    return result.data
+  } catch (error) {
+    await Promise.allSettled(
+      restored.map((child) => api.updateTask(child.id, { done: true })),
+    )
+    throw error
+  }
+}
+
 export function useCompleteTask() {
   const qc = useQueryClient()
   const matches = useMatches()
@@ -418,25 +487,7 @@ export function useCompleteTask() {
   return useMutation({
     mutationFn: async (input: Task | { task: Task; suppressTopLevelUndo?: boolean }) => {
       const task = 'task' in input ? input.task : input
-      const autoCompleted = unfinishedDescendants(task)
-      const completed: Task[] = []
-      try {
-        // Children first prevents the server from ever exposing them as standalone
-        // work while the parent completion is in flight.
-        for (const child of [...autoCompleted].reverse()) {
-          const result = await api.updateTask(child.id, { ...child, done: true })
-          if (!result.success) throw new Error(result.error)
-          completed.push(child)
-        }
-        const result = await api.updateTask(task.id, { ...task, done: true })
-        if (!result.success) throw new Error(result.error)
-        return result.data
-      } catch (error) {
-        await Promise.allSettled(
-          completed.map((child) => api.updateTask(child.id, { ...child, done: false })),
-        )
-        throw error
-      }
+      return completeTaskRequest(task)
     },
     onMutate: async (input) => {
       const task = 'task' in input ? input.task : input
@@ -523,22 +574,7 @@ export function useUncompleteTask() {
     mutationFn: async (task: Task) => {
       const autoCompleted = useCompletedTasksStore.getState().tasks
         .get(task.id)?.autoCompletedSubtasks ?? []
-      const restored: Task[] = []
-      try {
-        for (const child of [...autoCompleted].reverse()) {
-          const result = await api.updateTask(child.id, { ...child, done: false })
-          if (!result.success) throw new Error(result.error)
-          restored.push(child)
-        }
-        const result = await api.updateTask(task.id, { ...task, done: false })
-        if (!result.success) throw new Error(result.error)
-        return result.data
-      } catch (error) {
-        await Promise.allSettled(
-          restored.map((child) => api.updateTask(child.id, { ...child, done: true })),
-        )
-        throw error
-      }
+      return uncompleteTaskRequest(task, autoCompleted)
     },
     onMutate: async (task) => {
       // If task was recently completed (in store), update to done:false.

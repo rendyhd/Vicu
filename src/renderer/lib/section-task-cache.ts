@@ -1,5 +1,5 @@
 import { sortProjectTasks } from '@/lib/task-sort'
-import type { Task, UpdateTaskPayload } from '@/lib/vikunja-types'
+import type { Task } from '@/lib/vikunja-types'
 
 /**
  * Raw data stored under the `section-tasks` query key.
@@ -18,19 +18,24 @@ export interface SectionTaskCacheEntry {
  * Apply a task update to every cached descendant-project entry.
  *
  * Parent-project tasks are not present in this cache. Cross-project moves may
- * remove a task from one descendant entry and add it to another.
+ * remove a task from one descendant entry and add it to another. `changes` is a
+ * partial update; `original` supplies the rest of the task when a move adds it
+ * to an entry that did not hold it yet.
  */
 export function updateSectionTaskCache(
   entries: SectionTaskCacheEntry[] | undefined,
   id: number,
-  task: UpdateTaskPayload
+  changes: Partial<Task>,
+  original?: Task
 ): SectionTaskCacheEntry[] | undefined {
   if (!entries) return entries
 
   const current = entries.flatMap((entry) => entry.tasks).find((candidate) => candidate.id === id)
   const merged: Task | null = current
-    ? ({ ...current, ...task } as Task)
-    : (task.title !== undefined ? ({ ...task, id } as Task) : null)
+    ? ({ ...current, ...changes } as Task)
+    : original
+      ? ({ ...original, ...changes } as Task)
+      : (changes.title !== undefined ? ({ ...changes, id } as Task) : null)
 
   if (!merged || merged.project_id === undefined) return entries
 

@@ -287,7 +287,7 @@ export function AppShell() {
           const projectId = overData.projectId as number
           dragTasks.forEach((t) => {
             if (projectId !== t.project_id) {
-              updateTask.mutate({ id: t.id, task: { ...t, project_id: projectId } })
+              updateTask.mutate({ id: t.id, changes: { project_id: projectId }, original: t })
             }
           })
           clearIfMulti()
@@ -303,7 +303,7 @@ export function AppShell() {
           const sectionProject = overData.project as Project
           dragTasks.forEach((t) => {
             if (sectionProject.id !== t.project_id) {
-              updateTask.mutate({ id: t.id, task: { ...t, project_id: sectionProject.id } })
+              updateTask.mutate({ id: t.id, changes: { project_id: sectionProject.id }, original: t })
             }
           })
           clearIfMulti()
@@ -312,7 +312,7 @@ export function AppShell() {
           const projectId = overData.projectId as number
           dragTasks.forEach((t) => {
             if (projectId !== t.project_id) {
-              updateTask.mutate({ id: t.id, task: { ...t, project_id: projectId } })
+              updateTask.mutate({ id: t.id, changes: { project_id: projectId }, original: t })
             }
           })
           clearIfMulti()
@@ -338,7 +338,8 @@ export function AppShell() {
               updateTask.mutate(
                 {
                   id: task.id,
-                  task: { ...task, project_id: sectionProjectId, position: newPosition },
+                  changes: { project_id: sectionProjectId, position: newPosition },
+                  original: task,
                   deferInvalidation: true,
                 },
                 {
@@ -421,7 +422,8 @@ export function AppShell() {
             updateTask.mutate(
               {
                 id: task.id,
-                task: { ...task, project_id: destProjectId, position: insertPosition },
+                changes: { project_id: destProjectId, position: insertPosition },
+                original: task,
                 deferInvalidation: true,
               },
               {

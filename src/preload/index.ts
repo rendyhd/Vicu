@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
+import type { ProjectPatch, TaskPatch } from '../shared/merge-patches'
 
 const api = {
   platform: process.platform as 'darwin' | 'win32' | 'linux',
@@ -8,8 +9,8 @@ const api = {
     ipcRenderer.invoke('fetch-tasks', params),
   createTask: (projectId: number, task: Record<string, unknown>) =>
     ipcRenderer.invoke('create-task', projectId, task),
-  updateTask: (id: number, task: Record<string, unknown>) =>
-    ipcRenderer.invoke('update-task', id, task),
+  updateTask: (id: number, patch: TaskPatch) =>
+    ipcRenderer.invoke('update-task', id, patch),
   deleteTask: (id: number) =>
     ipcRenderer.invoke('delete-task', id),
   fetchTaskById: (id: number) =>
@@ -24,8 +25,8 @@ const api = {
     ipcRenderer.invoke('fetch-projects', includeArchived),
   createProject: (project: Record<string, unknown>) =>
     ipcRenderer.invoke('create-project', project),
-  updateProject: (id: number, project: Record<string, unknown>) =>
-    ipcRenderer.invoke('update-project', id, project),
+  updateProject: (id: number, patch: ProjectPatch) =>
+    ipcRenderer.invoke('update-project', id, patch),
   deleteProject: (id: number) =>
     ipcRenderer.invoke('delete-project', id),
 

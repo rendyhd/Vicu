@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useMemo } from 'react'
 import { api } from '@/lib/api'
+import { taskPatch } from '@/lib/merge-patches'
 import type { Task } from '@/lib/vikunja-types'
 import {
   NULL_DATE,
@@ -36,16 +37,17 @@ async function writeCarrier(carrier: RoutineCarrier<Task>, localPayload: Routine
   const fresh = freshResult.data
   const parsed = parseRoutineEnvelope(fresh.description)
   const payload = parsed.payload ? mergeRoutinePayload(localPayload, parsed.payload) : localPayload
-  const result = await api.updateTask(fresh.id, {
+  // Carriers are always completed, undated, non-repeating and reminder-free; only
+  // what differs from the fresh server copy is sent.
+  const result = await api.updateTask(fresh.id, taskPatch(fresh, {
     title: payload.definition.name,
     description: upsertRoutineEnvelope(parsed.body, payload),
     done: true,
-    done_at: fresh.done_at || new Date().toISOString(),
     due_date: NULL_DATE,
     repeat_after: 0,
     repeat_mode: 0,
     reminders: [],
-  })
+  }))
   if (!result.success) throw new Error(result.error)
   return { task: result.data, payload }
 }
@@ -90,14 +92,13 @@ export function useRoutines() {
         description: upsertRoutineEnvelope('', payload),
       })
       if (!created.success) throw new Error(created.error)
-      const completed = await api.updateTask(created.data.id, {
+      const completed = await api.updateTask(created.data.id, taskPatch(created.data, {
         done: true,
-        done_at: now,
         due_date: NULL_DATE,
         repeat_after: 0,
         repeat_mode: 0,
         reminders: [],
-      })
+      }))
       if (!completed.success) throw new Error(completed.error)
       return { task: completed.data, payload }
     },

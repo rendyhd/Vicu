@@ -1,3 +1,5 @@
+import { sanitizeProjectPatch, sanitizeTaskPatch } from '../shared/merge-patches'
+
 export interface PaginatedResponse<T> {
   items: T[] | null
   total: number
@@ -92,31 +94,19 @@ export function buildTaskAttachmentDownloadUrl(
   return url.toString()
 }
 
-const WRITABLE_TASK_FIELDS = new Set([
-  'bucket_id',
-  'cover_image_attachment_id',
-  'description',
-  'done',
-  'due_date',
-  'end_date',
-  'hex_color',
-  'is_favorite',
-  'percent_done',
-  'priority',
-  'project_id',
-  'reminders',
-  'repeat_after',
-  'repeat_mode',
-  'start_date',
-  'title',
-])
-
 /**
  * Turn task state or a partial update into a v2-safe merge patch.
- * Undefined and server-owned response fields are never written back.
+ * Undefined and server-owned response fields are never written back, empty
+ * dates become `null`, and reminders never carry a blank `reminder`.
  */
 export function createTaskPatch(task: Record<string, unknown>): Record<string, unknown> {
-  return Object.fromEntries(
-    Object.entries(task).filter(([key, value]) => WRITABLE_TASK_FIELDS.has(key) && value !== undefined)
-  )
+  return { ...sanitizeTaskPatch(task) }
+}
+
+/**
+ * Reduce a project update to the writable PATCH schema. Keys outside it, such
+ * as a tree node's `children`, are rejected by the server with a 422.
+ */
+export function createProjectPatch(project: Record<string, unknown>): Record<string, unknown> {
+  return { ...sanitizeProjectPatch(project) }
 }

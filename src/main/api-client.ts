@@ -6,6 +6,7 @@ import {
   buildTaskAttachmentDownloadUrl,
   buildProjectCollectionUrl,
   createTaskCollectionSearchParams,
+  createProjectPatch,
   createTaskPatch,
   type AttachmentPreviewSize,
   MAX_PAGE_SIZE,
@@ -405,7 +406,7 @@ export async function updateProject(
     'PATCH',
     `${c.url}${API_BASE_PATH}/projects/${id}`,
     c.token,
-    project,
+    createProjectPatch(project),
     JSON_MERGE_PATCH
   )
 }

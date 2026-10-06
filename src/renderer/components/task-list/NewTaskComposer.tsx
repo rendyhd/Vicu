@@ -209,7 +209,7 @@ export function NewTaskComposer({
       const patched = replacePendingTokens(currentDescription, mapping)
       if (patched !== currentDescription) {
         try {
-          await updateTask.mutateAsync({ id: taskId, task: { description: patched } })
+          await updateTask.mutateAsync({ id: taskId, changes: { description: patched } })
           currentDescription = patched
         } catch {
           // The files already exist remotely, so retain only the description patch for
@@ -231,7 +231,7 @@ export function NewTaskComposer({
     let descriptionPatch = partialFailure.descriptionPatch
     if (descriptionPatch) {
       try {
-        await updateTask.mutateAsync({ id: partialFailure.taskId, task: { description: descriptionPatch } })
+        await updateTask.mutateAsync({ id: partialFailure.taskId, changes: { description: descriptionPatch } })
         currentDescription = descriptionPatch
         descriptionPatch = undefined
       } catch {

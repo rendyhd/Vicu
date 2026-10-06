@@ -6,7 +6,7 @@ declare global {
       markTaskUndone(taskId: number, taskData: Record<string, unknown>): Promise<ActionResult>
       scheduleTaskToday(taskId: number, taskData: Record<string, unknown>): Promise<ActionResult>
       removeDueDate(taskId: number, taskData: Record<string, unknown>): Promise<ActionResult>
-      updateTask(taskId: number, taskData: Record<string, unknown>): Promise<ActionResult>
+      updateTask(taskId: number, patch: TaskPatch): Promise<ActionResult>
       openTaskInBrowser(taskId: number): Promise<void>
       openTaskInApp(taskId: number): Promise<void>
       closeWindow(): Promise<void>
@@ -58,6 +58,7 @@ interface QuickViewConfig {
 
 import { extractTaskLink, stripNoteLink, stripPageLink, extractNoteLinkHtml, extractPageLinkHtml } from '@/lib/note-link'
 import { sanitizeTaskHtml } from '@/lib/sanitize-html'
+import { taskPatch, type TaskPatch } from '@/lib/merge-patches'
 import { hasRichDescriptionBody } from '@/lib/description-html'
 
 function escapeHtml(s: string): string {
@@ -552,9 +553,11 @@ async function saveEdit(item: HTMLElement, newTitle: string, newDescription: str
     const wrapped = trimmedDesc ? `<p>${escapeHtml(trimmedDesc).replace(/\n/g, '<br>')}</p>` : ''
     finalDescription = wrapped + linkHtml
   }
-  const updatedData = { ...taskData, title: trimmedTitle, description: finalDescription }
-
-  const result = await window.quickViewApi.updateTask(Number(taskId), updatedData)
+  // Send only what changed so a stale cached row cannot revert other edits (D-REN-2).
+  const patch = taskPatch(taskData, { title: trimmedTitle, description: finalDescription })
+  const result: ActionResult = Object.keys(patch).length === 0
+    ? { success: true }
+    : await window.quickViewApi.updateTask(Number(taskId), patch)
 
   if (result.success) {
     lastFetchResult = null

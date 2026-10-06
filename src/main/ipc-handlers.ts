@@ -140,8 +140,10 @@ export function registerIpcHandlers(): void {
     return result
   })
 
-  handleTrusted('update-task', async (event, id: number, task: Record<string, unknown>) => {
-    const result = await updateTask(id, task)
+  // `patch` holds only the writable fields that changed (see src/shared/merge-patches.ts);
+  // the API client reduces it to the PATCH schema once more before sending.
+  handleTrusted('update-task', async (event, id: number, patch: Record<string, unknown>) => {
+    const result = await updateTask(id, patch)
     if (result.success) {
       notifyViewerSync()
       notifyMainWindow(event.sender.id)
@@ -539,7 +541,7 @@ export function registerIpcHandlers(): void {
 
     for (const child of [...autoCompleted].reverse()) {
       const childId = child.id as number
-      const result = await updateTask(childId, { ...child, done: true })
+      const result = await updateTask(childId, { done: true })
       if (result.success) {
         changed.push({ task: child, queued: false })
       } else if (isRetriableError(result.error)) {
@@ -549,18 +551,18 @@ export function registerIpcHandlers(): void {
         for (const entry of changed.reverse()) {
           const id = entry.task.id as number
           if (entry.queued) removePendingActionByTaskId(id, 'complete')
-          else await updateTask(id, { ...entry.task, done: false })
+          else await updateTask(id, { done: false })
         }
         return result
       }
     }
 
-    const result = await updateTask(taskId, { ...cleanTask, done: true })
+    const result = await updateTask(taskId, { done: true })
     if (!result.success && !isRetriableError(result.error)) {
       for (const entry of changed.reverse()) {
         const id = entry.task.id as number
         if (entry.queued) removePendingActionByTaskId(id, 'complete')
-        else await updateTask(id, { ...entry.task, done: false })
+        else await updateTask(id, { done: false })
       }
       return result
     }
@@ -590,7 +592,7 @@ export function registerIpcHandlers(): void {
         cancelledPending = true
         return { success: true } as const
       }
-      const result = await updateTask(id, { ...task, done: false })
+      const result = await updateTask(id, { done: false })
       if (!result.success && isRetriableError(result.error)) {
         addPendingAction({ type: 'uncomplete', taskId: id, taskData: task })
         usedCache = true
@@ -625,7 +627,7 @@ export function registerIpcHandlers(): void {
       return task ? { success: true, task } : { success: false, error: 'Task not found' }
     }
 
-    const result = await updateTask(taskId, { ...taskData, due_date: dueDate })
+    const result = await updateTask(taskId, { due_date: dueDate })
     if (result.success) {
       notifyMainWindow()
       return result
@@ -647,7 +649,7 @@ export function registerIpcHandlers(): void {
       return task ? { success: true, task } : { success: false, error: 'Task not found' }
     }
 
-    const result = await updateTask(taskId, { ...taskData, due_date: nullDate })
+    const result = await updateTask(taskId, { due_date: nullDate })
     if (result.success) {
       notifyMainWindow()
       return result

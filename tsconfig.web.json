@@ -7,7 +7,7 @@
     "esModuleInterop": true,
     "jsx": "react-jsx",
     "outDir": "./out",
-    "rootDir": "./src/renderer",
+    "rootDir": "./src",
     "strict": true,
     "skipLibCheck": true,
     "target": "ES2022",

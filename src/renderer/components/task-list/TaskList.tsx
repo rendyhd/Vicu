@@ -346,7 +346,7 @@ export function TaskList({
         if (task) {
           const today = new Date()
           today.setHours(0, 0, 0, 0)
-          updateTask.mutate({ id: task.id, task: { ...task, due_date: today.toISOString() } })
+          updateTask.mutate({ id: task.id, changes: { due_date: today.toISOString() }, original: task })
         }
         return
       }

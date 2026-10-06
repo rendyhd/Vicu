@@ -369,7 +369,7 @@ function TaskRowInner({ task, sortable = false, nestedDepth = 0, parentProjectId
       descBaselineRef.current = editDescription
     }
     if (Object.keys(changes).length > 0) {
-      updateTask.mutate({ id: task.id, task: { ...task, ...changes } })
+      updateTask.mutate({ id: task.id, changes, original: task })
     }
   }, [editDescription, noteLinkHtml, task, updateTask])
 
@@ -381,28 +381,28 @@ function TaskRowInner({ task, sortable = false, nestedDepth = 0, parentProjectId
 
   const handleDateChange = useCallback(
     (isoDate: string) => {
-      updateTask.mutate({ id: task.id, task: { ...task, due_date: isoDate } })
+      updateTask.mutate({ id: task.id, changes: { due_date: isoDate }, original: task })
     },
     [task, updateTask]
   )
 
   const handleReminderChange = useCallback(
     (reminders: TaskReminder[]) => {
-      updateTask.mutate({ id: task.id, task: { ...task, reminders } })
+      updateTask.mutate({ id: task.id, changes: { reminders }, original: task })
     },
     [task, updateTask]
   )
 
   const handleRecurrenceChange = useCallback(
     (repeat_after: number, repeat_mode: number) => {
-      updateTask.mutate({ id: task.id, task: { ...task, repeat_after, repeat_mode } })
+      updateTask.mutate({ id: task.id, changes: { repeat_after, repeat_mode }, original: task })
     },
     [task, updateTask]
   )
 
   const handlePriorityChange = useCallback(
     (priority: number) => {
-      updateTask.mutate({ id: task.id, task: { ...task, priority } })
+      updateTask.mutate({ id: task.id, changes: { priority }, original: task })
     },
     [task, updateTask]
   )
@@ -410,7 +410,7 @@ function TaskRowInner({ task, sortable = false, nestedDepth = 0, parentProjectId
   const setDateToToday = useCallback(() => {
     const today = new Date()
     today.setHours(0, 0, 0, 0)
-    updateTask.mutate({ id: task.id, task: { ...task, due_date: today.toISOString() } })
+    updateTask.mutate({ id: task.id, changes: { due_date: today.toISOString() }, original: task })
   }, [task, updateTask])
 
   const togglePopover = (popover: PopoverType) => {
@@ -907,7 +907,7 @@ function TaskRowInner({ task, sortable = false, nestedDepth = 0, parentProjectId
             {activePopover === 'project' && (
               <ProjectPickerPopover
                 currentProjectId={task.project_id}
-                onSelect={(pid) => updateTask.mutate({ id: task.id, task: { ...task, project_id: pid } })}
+                onSelect={(pid) => updateTask.mutate({ id: task.id, changes: { project_id: pid }, original: task })}
                 onClose={() => setActivePopover(null)}
               />
             )}

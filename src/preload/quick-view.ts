@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
+import type { TaskPatch } from '../shared/merge-patches'
 
 // Page callbacks only ever receive the payload. The IpcRendererEvent carries
 // `sender` (the ipcRenderer itself), which must not cross the context bridge.
@@ -13,8 +14,8 @@ contextBridge.exposeInMainWorld('quickViewApi', {
     ipcRenderer.invoke('qv:schedule-task-today', taskId, taskData),
   removeDueDate: (taskId: number, taskData: Record<string, unknown>) =>
     ipcRenderer.invoke('qv:remove-due-date', taskId, taskData),
-  updateTask: (taskId: number, taskData: Record<string, unknown>) =>
-    ipcRenderer.invoke('qv:update-task', taskId, taskData),
+  updateTask: (taskId: number, patch: TaskPatch) =>
+    ipcRenderer.invoke('qv:update-task', taskId, patch),
   openTaskInBrowser: (taskId: number) => ipcRenderer.invoke('qv:open-task-in-browser', taskId),
   openTaskInApp: (taskId: number) => ipcRenderer.invoke('qv:open-task-in-app', taskId),
   closeWindow: () => ipcRenderer.invoke('qv:close-window'),
