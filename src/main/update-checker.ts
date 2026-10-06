@@ -1,5 +1,6 @@
 import { app } from 'electron'
 import { net } from 'electron'
+import { decodeUtf8Chunks } from './response-body'
 
 export interface UpdateStatus {
   available: boolean
@@ -47,15 +48,16 @@ function fetchLatestRelease(): Promise<UpdateStatus> {
       req.setHeader('Accept', 'application/vnd.github.v3+json')
       req.setHeader('User-Agent', `Vicu/${currentVersion}`)
 
-      let body = ''
+      const bodyChunks: Buffer[] = []
 
       req.on('response', (response) => {
         response.on('data', (chunk) => {
-          body += chunk.toString()
+          bodyChunks.push(Buffer.from(chunk))
         })
 
         response.on('end', () => {
           clearTimeout(timeout)
+          const body = decodeUtf8Chunks(bodyChunks)
 
           if (response.statusCode !== 200) {
             resolve(fallback)

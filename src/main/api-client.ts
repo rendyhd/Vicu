@@ -11,6 +11,7 @@ import {
   type PaginatedResponse,
   withoutNestedSubtasks,
 } from './api-v2'
+import { decodeUtf8Chunks } from './response-body'
 import { MAX_BINARY_DOWNLOAD_BYTES, describeDownloadLimit, parseContentLength } from './attachment-safety'
 
 /**
@@ -137,18 +138,19 @@ function request<T>(
       req.setHeader('Authorization', `Bearer ${token}`)
       req.setHeader('Content-Type', contentType)
 
-      let responseBody = ''
+      const bodyChunks: Buffer[] = []
       let statusCode = 0
 
       req.on('response', (response) => {
         statusCode = response.statusCode
 
         response.on('data', (chunk) => {
-          responseBody += chunk.toString()
+          bodyChunks.push(Buffer.from(chunk))
         })
 
         response.on('end', () => {
           clearTimeout(timeout)
+          const responseBody = decodeUtf8Chunks(bodyChunks)
 
           if (statusCode >= 200 && statusCode < 300) {
             try {
@@ -632,18 +634,19 @@ function requestMultipart<T>(
       // Electron's net.request rejects it with ERR_INVALID_ARGUMENT.
       // Chromium calculates it automatically from the body.
 
-      let responseBody = ''
+      const bodyChunks: Buffer[] = []
       let statusCode = 0
 
       req.on('response', (response) => {
         statusCode = response.statusCode
 
         response.on('data', (chunk) => {
-          responseBody += chunk.toString()
+          bodyChunks.push(Buffer.from(chunk))
         })
 
         response.on('end', () => {
           clearTimeout(timeout)
+          const responseBody = decodeUtf8Chunks(bodyChunks)
           if (statusCode >= 200 && statusCode < 300) {
             try {
               const data = JSON.parse(responseBody) as T
@@ -745,7 +748,7 @@ function requestBinary(
           if (statusCode >= 200 && statusCode < 300) {
             resolve({ success: true, data: Buffer.concat(chunks) })
           } else {
-            const body = Buffer.concat(chunks).toString()
+            const body = decodeUtf8Chunks(chunks)
             let errorCode: number | undefined
             try {
               const parsed = JSON.parse(body)
