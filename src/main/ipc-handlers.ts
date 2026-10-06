@@ -89,15 +89,17 @@ import {
 
 import { printHtml } from './print'
 import { uploadStandaloneTasks } from './standalone-upload'
+import { getOfflineQueue } from './offline/service'
 import {
-  addPendingAction,
-  removePendingAction,
-  removePendingActionByTaskId,
-  getPendingCount,
+  createFromQuickEntry,
+  quickViewComplete,
+  quickViewPatch,
+  quickViewReopen,
+  type QuickActionDeps,
+} from './offline/quick-actions'
+import {
   setCachedTasks,
   getCachedTasks,
-  isRetriableError,
-  isConnectionError,
   isAuthError,
   addStandaloneTask,
   getStandaloneTasks,
@@ -111,36 +113,13 @@ import {
   removeStandaloneTask,
 } from './cache'
 
-const AUTO_COMPLETED_SUBTASKS_KEY = '__vicu_auto_completed_subtasks'
-
-function taskDescendants(task: Record<string, unknown>): Record<string, unknown>[] {
-  const result: Record<string, unknown>[] = []
-  const rootId = typeof task.id === 'number' ? task.id : null
-  const visited = new Set<number>(rootId === null ? [] : [rootId])
-
-  const visit = (parent: Record<string, unknown>) => {
-    const related = parent.related_tasks
-    if (!related || typeof related !== 'object') return
-    const children = (related as { subtask?: unknown }).subtask
-    if (!Array.isArray(children)) return
-    for (const value of children) {
-      if (!value || typeof value !== 'object') continue
-      const child = value as Record<string, unknown>
-      if (typeof child.id !== 'number' || visited.has(child.id)) continue
-      visited.add(child.id)
-      result.push(child)
-      visit(child)
-    }
+/** What the Quick Entry / Quick View handlers need: the queue, the API client and a way to refresh the main window. */
+function quickActionDeps(): QuickActionDeps {
+  return {
+    queue: getOfflineQueue(),
+    api: { createTask, updateTask },
+    notifyMainWindow: () => notifyMainWindow(),
   }
-
-  visit(task)
-  return result
-}
-
-function withoutCompletionMetadata(task: Record<string, unknown>): Record<string, unknown> {
-  const clean = { ...task }
-  delete clean[AUTO_COMPLETED_SUBTASKS_KEY]
-  return clean
 }
 
 // Config keys that only record UI state. Changing just these needs no badge refresh,
@@ -422,7 +401,7 @@ export function registerIpcHandlers(): void {
   })
 
   // --- Quick Entry IPC ---
-  handleTrusted('qe:save-task', async (_event, title: string, description: string | null, dueDate: string | null, projectId: number | null, priority?: number, repeatAfter?: number, repeatMode?: number) => {
+  handleTrusted('qe:save-task', async (_event, title: string, description: string | null, dueDate: string | null, projectId: number | null, priority?: number, repeatAfter?: number, repeatMode?: number, extras?: { labels?: unknown; images?: unknown }) => {
     const config = loadConfig()
     if (!config) return { success: false, error: 'Configuration not loaded' }
 
@@ -441,27 +420,10 @@ export function registerIpcHandlers(): void {
     if (repeatAfter !== undefined) taskPayload.repeat_after = repeatAfter
     if (repeatMode !== undefined) taskPayload.repeat_mode = repeatMode
 
-    const result = await createTask(targetProjectId, taskPayload)
-
-    if (result.success) {
-      notifyViewerSync()
-      notifyMainWindow()
-      return result
-    }
-
-    // Queue for later sync only when the request never reached the server —
-    // a timeout/reset may have been applied server-side and would duplicate.
-    if (isConnectionError(result.error)) {
-      addPendingAction({
-        type: 'create',
-        title,
-        description: description || null,
-        dueDate: dueDate || null,
-        projectId: targetProjectId,
-      })
-      return { success: true, cached: true }
-    }
-
+    // The create is queued with everything the user set when the server cannot be reached; see
+    // createFromQuickEntry for what may be queued and why.
+    const result = await createFromQuickEntry(quickActionDeps(), targetProjectId, taskPayload, extras)
+    if (result.success && !('cached' in result)) notifyViewerSync()
     return result
   })
 
@@ -486,7 +448,7 @@ export function registerIpcHandlers(): void {
   })
 
   handleTrusted('qe:get-pending-count', () => {
-    return getPendingCount()
+    return getOfflineQueue().counts().pending
   })
 
   // --- Quick View IPC ---
@@ -561,158 +523,52 @@ export function registerIpcHandlers(): void {
     return cachedFallback(result.error, getCachedTasks()) ?? result
   })
 
-  handleTrusted('qv:mark-task-done', async (_event, taskId: number, taskData: Record<string, unknown>) => {
+  handleTrusted('qv:mark-task-done', async (_event, rawTaskId: number | string, taskData: Record<string, unknown>) => {
     const config = loadConfig()
     if (config?.standalone_mode) {
-      const task = markStandaloneTaskDone(String(taskId))
+      const task = markStandaloneTaskDone(String(rawTaskId))
       return task ? { success: true, task } : { success: false, error: 'Task not found' }
     }
-
-    const cleanTask = withoutCompletionMetadata(taskData)
-    const autoCompleted = taskDescendants(cleanTask).filter((task) => task.done !== true)
-    const changed: Array<{ task: Record<string, unknown>; queued: boolean }> = []
-
-    for (const child of [...autoCompleted].reverse()) {
-      const childId = child.id as number
-      const result = await updateTask(childId, { done: true })
-      if (result.success) {
-        changed.push({ task: child, queued: false })
-      } else if (isRetriableError(result.error)) {
-        addPendingAction({ type: 'complete', taskId: childId, taskData: child })
-        changed.push({ task: child, queued: true })
-      } else {
-        for (const entry of changed.reverse()) {
-          const id = entry.task.id as number
-          if (entry.queued) removePendingActionByTaskId(id, 'complete')
-          else await updateTask(id, { done: false })
-        }
-        return result
-      }
-    }
-
-    const result = await updateTask(taskId, { done: true })
-    if (!result.success && !isRetriableError(result.error)) {
-      for (const entry of changed.reverse()) {
-        const id = entry.task.id as number
-        if (entry.queued) removePendingActionByTaskId(id, 'complete')
-        else await updateTask(id, { done: false })
-      }
-      return result
-    }
-    if (!result.success) {
-      addPendingAction({ type: 'complete', taskId, taskData: cleanTask })
-    }
-    notifyMainWindow()
-    return result.success ? result : { success: true, cached: true }
+    return quickViewComplete(quickActionDeps(), rawTaskId, taskData)
   })
 
-  handleTrusted('qv:mark-task-undone', async (_event, taskId: number, taskData: Record<string, unknown>) => {
+  handleTrusted('qv:mark-task-undone', async (_event, rawTaskId: number | string, taskData: Record<string, unknown>) => {
     const config = loadConfig()
     if (config?.standalone_mode) {
-      const task = markStandaloneTaskUndone(String(taskId))
+      const task = markStandaloneTaskUndone(String(rawTaskId))
       return task ? { success: true, task } : { success: false, error: 'Task not found' }
     }
-
-    const autoCompleted = Array.isArray(taskData[AUTO_COMPLETED_SUBTASKS_KEY])
-      ? (taskData[AUTO_COMPLETED_SUBTASKS_KEY] as Record<string, unknown>[])
-      : []
-    const cleanTask = withoutCompletionMetadata(taskData)
-    let usedCache = false
-    let cancelledPending = false
-
-    const restore = async (id: number, task: Record<string, unknown>) => {
-      if (removePendingActionByTaskId(id, 'complete')) {
-        cancelledPending = true
-        return { success: true } as const
-      }
-      const result = await updateTask(id, { done: false })
-      if (!result.success && isRetriableError(result.error)) {
-        addPendingAction({ type: 'uncomplete', taskId: id, taskData: task })
-        usedCache = true
-        return { success: true } as const
-      }
-      return result
-    }
-
-    const rootResult = await restore(taskId, cleanTask)
-    if (!rootResult.success) return rootResult
-    for (const child of [...autoCompleted].reverse()) {
-      if (typeof child.id !== 'number') continue
-      const childResult = await restore(child.id, child)
-      if (!childResult.success) return childResult
-    }
-
-    notifyMainWindow()
-    return {
-      success: true,
-      cached: usedCache || undefined,
-      cancelledPending: cancelledPending || undefined,
-    }
+    return quickViewReopen(quickActionDeps(), rawTaskId, taskData)
   })
 
-  handleTrusted('qv:schedule-task-today', async (_event, taskId: number, taskData: Record<string, unknown>) => {
+  handleTrusted('qv:schedule-task-today', async (_event, rawTaskId: number | string, taskData: Record<string, unknown>) => {
     // Same date-only rule as every other "today" setter: local 23:59:59 (D-IPC-3).
     const dueDate = dueToday()
 
     const config = loadConfig()
     if (config?.standalone_mode) {
-      const task = scheduleStandaloneTaskToday(String(taskId))
+      const task = scheduleStandaloneTaskToday(String(rawTaskId))
       return task ? { success: true, task } : { success: false, error: 'Task not found' }
     }
-
-    const result = await updateTask(taskId, { due_date: dueDate })
-    if (result.success) {
-      notifyMainWindow()
-      return result
-    }
-
-    if (isRetriableError(result.error)) {
-      addPendingAction({ type: 'schedule-today', taskId, taskData, dueDate })
-      return { success: true, cached: true }
-    }
-    return result
+    return quickViewPatch(quickActionDeps(), rawTaskId, { due_date: dueDate }, taskData)
   })
 
-  handleTrusted('qv:remove-due-date', async (_event, taskId: number, taskData: Record<string, unknown>) => {
-    const nullDate = '0001-01-01T00:00:00Z'
-
+  handleTrusted('qv:remove-due-date', async (_event, rawTaskId: number | string, taskData: Record<string, unknown>) => {
     const config = loadConfig()
     if (config?.standalone_mode) {
-      const task = removeStandaloneTaskDueDate(String(taskId))
+      const task = removeStandaloneTaskDueDate(String(rawTaskId))
       return task ? { success: true, task } : { success: false, error: 'Task not found' }
     }
-
-    const result = await updateTask(taskId, { due_date: nullDate })
-    if (result.success) {
-      notifyMainWindow()
-      return result
-    }
-
-    if (isRetriableError(result.error)) {
-      addPendingAction({ type: 'remove-due-date', taskId, taskData, dueDate: nullDate })
-      return { success: true, cached: true }
-    }
-    return result
+    return quickViewPatch(quickActionDeps(), rawTaskId, { due_date: null }, taskData)
   })
 
-  handleTrusted('qv:update-task', async (_event, taskId: number, taskData: Record<string, unknown>) => {
+  handleTrusted('qv:update-task', async (_event, rawTaskId: number | string, patch: Record<string, unknown>) => {
     const config = loadConfig()
     if (config?.standalone_mode) {
-      const task = updateStandaloneTask(String(taskId), taskData)
+      const task = updateStandaloneTask(String(rawTaskId), patch)
       return task ? { success: true, task } : { success: false, error: 'Task not found' }
     }
-
-    const result = await updateTask(taskId, taskData)
-    if (result.success) {
-      notifyMainWindow()
-      return result
-    }
-
-    if (isRetriableError(result.error)) {
-      addPendingAction({ type: 'update-task', taskId, taskData })
-      return { success: true, cached: true }
-    }
-    return result
+    return quickViewPatch(quickActionDeps(), rawTaskId, patch)
   })
 
   handleTrusted('qv:open-task-in-browser', (_event, taskId: number) => {
@@ -747,7 +603,7 @@ export function registerIpcHandlers(): void {
   })
 
   handleTrusted('qv:get-pending-count', () => {
-    return getPendingCount()
+    return getOfflineQueue().counts().pending
   })
 
   handleTrusted('qv:get-config', () => {

@@ -1,11 +1,18 @@
 import { contextBridge, ipcRenderer } from 'electron'
+import type { OfflineImageInput, OfflineLabelRef } from '../shared/offline-queue-types'
+
+/** What the offline queue keeps alongside a create that could not reach the server (D-QE-1). */
+interface QueuedCreateExtras {
+  labels?: OfflineLabelRef[]
+  images?: OfflineImageInput[]
+}
 
 // Page callbacks only ever receive the payload. The IpcRendererEvent carries
 // `sender` (the ipcRenderer itself), which must not cross the context bridge.
 contextBridge.exposeInMainWorld('quickEntryApi', {
   platform: process.platform as 'darwin' | 'win32' | 'linux',
-  saveTask: (title: string, description: string | null, dueDate: string | null, projectId: number | null, priority?: number, repeatAfter?: number, repeatMode?: number) =>
-    ipcRenderer.invoke('qe:save-task', title, description, dueDate, projectId, priority, repeatAfter, repeatMode),
+  saveTask: (title: string, description: string | null, dueDate: string | null, projectId: number | null, priority?: number, repeatAfter?: number, repeatMode?: number, extras?: QueuedCreateExtras) =>
+    ipcRenderer.invoke('qe:save-task', title, description, dueDate, projectId, priority, repeatAfter, repeatMode, extras),
   uploadAttachment: (taskId: number, fileData: Uint8Array, fileName: string, mimeType: string) =>
     ipcRenderer.invoke('upload-task-attachment', taskId, fileData, fileName, mimeType),
   fetchTaskAttachments: (taskId: number) =>

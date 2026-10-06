@@ -33,7 +33,7 @@ describe('standalone task store', () => {
 
     const reloaded = await loadCache()
     expect(reloaded.getAllStandaloneTasks().map((t) => t.id)).toEqual([a.id, c.id])
-    expect(existsSync(join(state.dir, 'offline-cache.json.tmp'))).toBe(false)
+    expect(existsSync(join(state.dir, 'standalone-tasks.json.tmp'))).toBe(false)
   })
 
   it('ignores an unknown id', async () => {
@@ -51,7 +51,7 @@ describe('standalone task store', () => {
     const open = cache.addStandaloneTask('Open', null, null)
     cache.markStandaloneTaskDone(done.id)
     const stored = () =>
-      JSON.parse(readFileSync(join(state.dir, 'offline-cache.json'), 'utf-8')).standaloneTasks.map(
+      JSON.parse(readFileSync(join(state.dir, 'standalone-tasks.json'), 'utf-8')).standaloneTasks.map(
         (t: { id: string }) => t.id
       )
 

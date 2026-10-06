@@ -1,59 +1,66 @@
 import { loadConfig } from './config'
-import { createTask, updateTask } from './api-client'
-import { getPendingActions, removePendingAction, isRetriableError } from './cache'
-import { actionToRequest } from './sync-logic'
-import { getMainWindow, getQuickViewWindow } from './quick-entry-state'
+import {
+  addLabelToTask,
+  createLabel,
+  createTask,
+  deleteTask,
+  fetchLabels,
+  fetchTaskAttachments,
+  fetchTaskById,
+  removeLabelFromTask,
+  updateTask,
+  uploadTaskAttachment,
+} from './api-client'
+import { OFFLINE_EVENTS, getOfflineQueue, sendToAppWindows } from './offline/service'
+import { createReplayRunner, replayQueue, type ReplayApi } from './offline/replay'
+import { getMainWindow, getQuickEntryWindow, getQuickViewWindow } from './quick-entry-state'
+import type { OfflineReplayEvent } from '../shared/offline-queue-types'
 
-let replaying = false
-
-/**
- * Replay queued offline actions FIFO. Stops at the first retriable
- * (still-offline) failure to preserve ordering; drops actions that fail
- * permanently (404 task deleted, validation error) so the queue can't jam.
- * Safe to call from multiple triggers — concurrent calls no-op.
- */
-export async function replayPendingActions(): Promise<void> {
-  if (replaying) return
-  const config = loadConfig()
-  if (!config || config.standalone_mode || !config.vikunja_url) return
-
-  replaying = true
-  let applied = 0
-  try {
-    for (const action of getPendingActions()) {
-      const req = actionToRequest(action)
-      if (req.kind === 'skip') {
-        removePendingAction(action.id)
-        continue
-      }
-      const result = req.kind === 'create'
-        ? await createTask(req.projectId, req.payload)
-        : await updateTask(req.taskId, req.payload)
-
-      if (result.success) {
-        removePendingAction(action.id)
-        applied++
-      } else if (isRetriableError(result.error)) {
-        break // still offline — keep the action and stop, order preserved
-      } else {
-        console.warn(`[sync] dropping pending action ${action.id} (${action.type}): ${result.error}`)
-        removePendingAction(action.id)
-      }
-    }
-  } finally {
-    replaying = false
-  }
-
-  if (applied > 0) notifyWindowsAfterReplay()
+const api: ReplayApi = {
+  createTask,
+  updateTask,
+  deleteTask,
+  addLabelToTask,
+  removeLabelFromTask,
+  fetchLabels,
+  createLabel,
+  uploadTaskAttachment,
+  fetchTaskAttachments,
+  fetchTaskById,
 }
 
-function notifyWindowsAfterReplay(): void {
+const runReplay = createReplayRunner(async () => {
+  const event = await replayQueue(getOfflineQueue(), api)
+  announce(event)
+  return event
+})
+
+/**
+ * Replay the offline queue (see src/main/offline/replay.ts for the rules). Safe to call from every
+ * trigger: calls made while a replay is running join it, so nothing is sent twice. Resolves to
+ * null when there is nothing to do (standalone mode, not configured, empty queue).
+ */
+export async function replayPendingActions(): Promise<OfflineReplayEvent | null> {
+  const config = loadConfig()
+  if (!config || config.standalone_mode || !config.vikunja_url) return null
+  if (getOfflineQueue().counts().pending === 0) return null
+  return runReplay()
+}
+
+function announce(event: OfflineReplayEvent): void {
+  sendToAppWindows(OFFLINE_EVENTS.replayed, event)
+  if (event.stopped === 'auth') sendToAppWindows(OFFLINE_EVENTS.authProblem, { error: event.error ?? 'Sign in again to sync your changes' })
+
+  if (event.applied === 0 && event.failed === 0) return
   try {
     const win = getMainWindow()
-    if (win && !win.isDestroyed()) win.webContents.send('tasks-changed')
+    if (win && !win.isDestroyed() && event.applied > 0) win.webContents.send('tasks-changed')
   } catch { /* ignore */ }
-  try {
-    const viewer = getQuickViewWindow()
-    if (viewer && !viewer.isDestroyed()) viewer.webContents.send('sync-completed')
-  } catch { /* ignore */ }
+  // Quick Entry shows the pending count, Quick View refetches its list.
+  for (const get of [getQuickViewWindow, getQuickEntryWindow]) {
+    try {
+      const win = get()
+      if (win && !win.isDestroyed()) win.webContents.send('sync-completed')
+    } catch { /* ignore */ }
+  }
 }

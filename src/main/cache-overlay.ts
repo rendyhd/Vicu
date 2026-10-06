@@ -1,48 +1,81 @@
-import type { PendingAction } from './cache'
+import { NULL_DATE } from '../shared/merge-patches'
+import { pendingIdFor, type QueuedAction } from './offline/types'
 
-const NULL_DATE = '0001-01-01T00:00:00Z'
+type Row = Record<string, unknown>
+
+/** A queued patch as a cached row sees it: a cleared date is the Go zero time there, not null. */
+function rowFields(patch: Record<string, unknown>): Row {
+  const fields: Row = {}
+  for (const [key, value] of Object.entries(patch)) {
+    if (key === 'done') continue // handled as "hide the row"
+    fields[key] = value === null && key.endsWith('_date') ? NULL_DATE : value
+  }
+  return fields
+}
 
 /**
- * Project queued offline actions onto a cached task snapshot so the offline
- * Quick View reflects what the user already did: completes hide rows, date
- * actions and updates rewrite rows, creates append placeholder rows.
+ * Project the pending offline queue onto a cached task list so the offline Quick View reflects what
+ * the user already did: completed or deleted rows disappear, edits and date changes rewrite rows,
+ * and tasks created offline show up as placeholder rows with a `pending_<actionId>` id (which the
+ * Quick View can complete and edit again, folding the change into the queued create).
  */
-export function overlayPendingActions(
-  cachedTasks: unknown[],
-  actions: PendingAction[]
-): unknown[] {
-  const completedIds = new Set(
-    actions.filter((a) => a.type === 'complete').map((a) => String(a.taskId))
-  )
+export function overlayPendingActions(cachedTasks: unknown[], actions: readonly QueuedAction[]): unknown[] {
+  const rows = new Map<number, Row>()
+  const hidden = new Set<number>()
 
-  let tasks = cachedTasks.filter((t) => !completedIds.has(String((t as { id?: unknown }).id)))
-
-  for (const action of actions) {
-    if (action.taskId === undefined) continue
-    const idx = tasks.findIndex((t) => String((t as { id?: unknown }).id) === String(action.taskId))
-    if (idx === -1) continue
-    const row = tasks[idx] as Record<string, unknown>
-    if (action.type === 'schedule-today' || action.type === 'remove-due-date') {
-      tasks = tasks.slice()
-      tasks[idx] = { ...row, due_date: action.dueDate ?? NULL_DATE }
-    } else if (action.type === 'update-task' && action.taskData) {
-      tasks = tasks.slice()
-      tasks[idx] = { ...row, ...action.taskData }
-    }
+  for (const task of cachedTasks) {
+    const id = (task as { id?: unknown }).id
+    if (typeof id === 'number') rows.set(id, task as Row)
   }
 
-  const creates = actions
-    .filter((a) => a.type === 'create')
-    .map((a) => ({
-      id: `pending_${a.id}`,
-      title: a.title,
-      description: a.description || '',
-      due_date: a.dueDate || NULL_DATE,
-      priority: 0,
+  const placeholders = new Map<number, Row>()
+  for (const action of actions) {
+    if (action.type !== 'create') continue
+    const fields = action.fields
+    placeholders.set(action.tempId, {
+      id: pendingIdFor(action.id),
+      title: fields.title,
+      description: typeof fields.description === 'string' ? fields.description : '',
+      due_date: typeof fields.due_date === 'string' ? fields.due_date : NULL_DATE,
+      priority: typeof fields.priority === 'number' ? fields.priority : 0,
+      repeat_after: typeof fields.repeat_after === 'number' ? fields.repeat_after : 0,
+      repeat_mode: typeof fields.repeat_mode === 'number' ? fields.repeat_mode : 0,
+      project_id: action.projectId,
       done: false,
-      created: a.createdAt,
-      updated: a.createdAt,
-    }))
+      created: action.createdAt,
+      updated: action.createdAt,
+      pending: true,
+    })
+    if (action.done) hidden.add(action.tempId)
+  }
 
-  return [...tasks, ...creates]
+  for (const action of actions) {
+    if (action.type === 'create') continue
+    if (action.type === 'delete') {
+      hidden.add(action.taskId)
+      continue
+    }
+    if (action.type !== 'update') continue
+
+    if (action.patch.done === true) hidden.add(action.taskId)
+    else if (action.patch.done === false) hidden.delete(action.taskId)
+
+    const target = placeholders.get(action.taskId) ?? rows.get(action.taskId)
+    if (!target) continue
+    const next = { ...target, ...rowFields(action.patch) }
+    if (placeholders.has(action.taskId)) placeholders.set(action.taskId, next)
+    else rows.set(action.taskId, next)
+  }
+
+  const result: unknown[] = []
+  for (const task of cachedTasks) {
+    const id = (task as { id?: unknown }).id
+    if (typeof id === 'number') {
+      if (!hidden.has(id)) result.push(rows.get(id))
+    } else {
+      result.push(task)
+    }
+  }
+  for (const [tempId, row] of placeholders) if (!hidden.has(tempId)) result.push(row)
+  return result
 }

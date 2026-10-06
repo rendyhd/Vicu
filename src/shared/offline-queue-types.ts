@@ -109,6 +109,13 @@ export interface OfflineQueueCounts {
   failed: number
 }
 
+/** Sent as `offline-queue:changed` after every change to the queue. */
+export interface OfflineQueueChange {
+  counts: OfflineQueueCounts
+  replaying: boolean
+  authProblem: { error: string; since: string } | null
+}
+
 export interface OfflineReplayEvent {
   /** Actions the server accepted (or that were already in effect). */
   applied: number

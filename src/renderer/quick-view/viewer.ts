@@ -2,11 +2,12 @@ declare global {
   interface Window {
     quickViewApi: {
       fetchTasks(): Promise<FetchResult>
-      markTaskDone(taskId: number, taskData: Record<string, unknown>): Promise<ActionResult>
-      markTaskUndone(taskId: number, taskData: Record<string, unknown>): Promise<ActionResult>
-      scheduleTaskToday(taskId: number, taskData: Record<string, unknown>): Promise<ActionResult>
-      removeDueDate(taskId: number, taskData: Record<string, unknown>): Promise<ActionResult>
-      updateTask(taskId: number, patch: TaskPatch): Promise<ActionResult>
+      // A row id is a number, a `local_x` string (standalone) or `pending_x` (queued offline).
+      markTaskDone(taskId: number | string, taskData: Record<string, unknown>): Promise<ActionResult>
+      markTaskUndone(taskId: number | string, taskData: Record<string, unknown>): Promise<ActionResult>
+      scheduleTaskToday(taskId: number | string, taskData: Record<string, unknown>): Promise<ActionResult>
+      removeDueDate(taskId: number | string, taskData: Record<string, unknown>): Promise<ActionResult>
+      updateTask(taskId: number | string, patch: TaskPatch): Promise<ActionResult>
       openTaskInBrowser(taskId: number): Promise<void>
       openTaskInApp(taskId: number): Promise<void>
       closeWindow(): Promise<void>
@@ -252,7 +253,8 @@ function buildTaskItemDOM(task: TaskData): HTMLElement {
   if (!isStandaloneMode) {
     title.addEventListener('click', (e) => {
       e.stopPropagation()
-      window.quickViewApi.openTaskInBrowser(Number(task.id))
+      // A task that only exists in the offline queue has no page on the server yet.
+      if (typeof task.id === 'number') window.quickViewApi.openTaskInBrowser(task.id)
     })
   }
   titleRow.appendChild(title)
@@ -372,7 +374,7 @@ async function completeTask(taskId: number | string, itemElement: HTMLElement, c
   if (checkbox) checkbox.disabled = true
   itemElement.classList.add('completing')
 
-  const result = await window.quickViewApi.markTaskDone(Number(taskId), originalTask)
+  const result = await window.quickViewApi.markTaskDone(taskId, originalTask)
 
   if (result.success) {
     lastFetchResult = null
@@ -393,7 +395,7 @@ async function completeTask(taskId: number | string, itemElement: HTMLElement, c
 
 async function undoComplete(taskId: number | string, itemElement: HTMLElement): Promise<void> {
   const storedTask = completedTasks.get(String(taskId))
-  const result = await window.quickViewApi.markTaskUndone(Number(taskId), storedTask || {})
+  const result = await window.quickViewApi.markTaskUndone(taskId, storedTask || {})
 
   if (result.success) {
     lastFetchResult = null
@@ -420,7 +422,7 @@ async function toggleDueDate(): Promise<void> {
   const hasDueDate = taskData.due_date && taskData.due_date !== '0001-01-01T00:00:00Z'
 
   if (hasDueDate) {
-    const result = await window.quickViewApi.removeDueDate(Number(taskId), taskData)
+    const result = await window.quickViewApi.removeDueDate(taskId, taskData)
     if (result.success) {
       lastFetchResult = null
       taskData.due_date = '0001-01-01T00:00:00Z'
@@ -431,7 +433,7 @@ async function toggleDueDate(): Promise<void> {
       showError(result.error || 'Failed to remove due date')
     }
   } else {
-    const result = await window.quickViewApi.scheduleTaskToday(Number(taskId), taskData)
+    const result = await window.quickViewApi.scheduleTaskToday(taskId, taskData)
     if (result.success) {
       lastFetchResult = null
       taskData.due_date = dueToday()
@@ -470,8 +472,10 @@ function enterEditMode(focusDescription = false): void {
   const taskData: TaskData = JSON.parse(item.dataset.task || '{}')
   const descriptionBody = stripPageLink(stripNoteLink(taskData.description || ''))
   const hasRichDescription = hasRichDescriptionBody(descriptionBody)
-  if (focusDescription && hasRichDescription) {
-    void window.quickViewApi.openTaskInApp(Number(taskData.id))
+  // A task that only exists in the offline queue cannot be opened in the app yet.
+  const canOpenInApp = typeof taskData.id === 'number'
+  if (focusDescription && hasRichDescription && canOpenInApp) {
+    void window.quickViewApi.openTaskInApp(taskData.id as number)
     return
   }
   editingItem = item
@@ -519,9 +523,9 @@ function enterEditMode(focusDescription = false): void {
 
   descTextarea.addEventListener('keydown', (e) => {
     e.stopPropagation()
-    if (hasRichDescription && e.key === 'Enter') {
+    if (hasRichDescription && canOpenInApp && e.key === 'Enter') {
       e.preventDefault()
-      void window.quickViewApi.openTaskInApp(Number(taskData.id))
+      void window.quickViewApi.openTaskInApp(taskData.id as number)
       return
     }
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); saveEdit(item, titleInput.value, descTextarea.value) }
@@ -531,9 +535,9 @@ function enterEditMode(focusDescription = false): void {
 
   titleInput.addEventListener('keypress', (e) => e.stopPropagation())
   descTextarea.addEventListener('keypress', (e) => e.stopPropagation())
-  if (hasRichDescription) {
+  if (hasRichDescription && canOpenInApp) {
     descTextarea.addEventListener('click', () => {
-      void window.quickViewApi.openTaskInApp(Number(taskData.id))
+      void window.quickViewApi.openTaskInApp(taskData.id as number)
     })
   }
 
@@ -566,7 +570,7 @@ async function saveEdit(item: HTMLElement, newTitle: string, newDescription: str
   const patch = taskPatch(taskData, { title: trimmedTitle, description: finalDescription })
   const result: ActionResult = Object.keys(patch).length === 0
     ? { success: true }
-    : await window.quickViewApi.updateTask(Number(taskId), patch)
+    : await window.quickViewApi.updateTask(taskId, patch)
 
   if (result.success) {
     lastFetchResult = null

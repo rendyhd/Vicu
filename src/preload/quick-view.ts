@@ -6,15 +6,15 @@ import type { TaskPatch } from '../shared/merge-patches'
 contextBridge.exposeInMainWorld('quickViewApi', {
   platform: process.platform as 'darwin' | 'win32' | 'linux',
   fetchTasks: () => ipcRenderer.invoke('qv:fetch-tasks'),
-  markTaskDone: (taskId: number, taskData: Record<string, unknown>) =>
+  markTaskDone: (taskId: number | string, taskData: Record<string, unknown>) =>
     ipcRenderer.invoke('qv:mark-task-done', taskId, taskData),
-  markTaskUndone: (taskId: number, taskData: Record<string, unknown>) =>
+  markTaskUndone: (taskId: number | string, taskData: Record<string, unknown>) =>
     ipcRenderer.invoke('qv:mark-task-undone', taskId, taskData),
-  scheduleTaskToday: (taskId: number, taskData: Record<string, unknown>) =>
+  scheduleTaskToday: (taskId: number | string, taskData: Record<string, unknown>) =>
     ipcRenderer.invoke('qv:schedule-task-today', taskId, taskData),
-  removeDueDate: (taskId: number, taskData: Record<string, unknown>) =>
+  removeDueDate: (taskId: number | string, taskData: Record<string, unknown>) =>
     ipcRenderer.invoke('qv:remove-due-date', taskId, taskData),
-  updateTask: (taskId: number, patch: TaskPatch) =>
+  updateTask: (taskId: number | string, patch: TaskPatch) =>
     ipcRenderer.invoke('qv:update-task', taskId, patch),
   openTaskInBrowser: (taskId: number) => ipcRenderer.invoke('qv:open-task-in-browser', taskId),
   openTaskInApp: (taskId: number) => ipcRenderer.invoke('qv:open-task-in-app', taskId),

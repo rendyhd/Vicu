@@ -17,6 +17,8 @@ import { setupApplicationMenu } from './app-menu'
 import { storeAPIToken, getAPIToken, isEncryptionAvailable, API_TOKEN_NO_EXPIRY } from './auth/token-store'
 import { clearTaskBadge, reapplyTaskBadge } from './badge'
 import { replayPendingActions } from './sync'
+import { flushOfflineQueue, offlineQueueHasUnsavedChanges } from './offline/service'
+import { flushTaskCache, taskCacheHasUnsavedChanges } from './cache'
 import { syncCustomLists } from './custom-list-service'
 import { buildLoginItemSettings } from './login-item-settings'
 import { buildShortcutStatus } from './shortcut-status'
@@ -796,8 +798,17 @@ if (!gotLock) {
     }
   })
 
-  app.on('before-quit', () => {
+  // The offline queue and task cache are written asynchronously. If a write is still in flight or
+  // queued when the user quits, hold the quit until it is on disk, then quit again.
+  let offlineStoresFlushed = false
+  app.on('before-quit', (event) => {
     appIsQuitting = true
+    if (offlineStoresFlushed || !(offlineQueueHasUnsavedChanges() || taskCacheHasUnsavedChanges())) return
+    event.preventDefault()
+    void Promise.all([flushOfflineQueue(), flushTaskCache()]).finally(() => {
+      offlineStoresFlushed = true
+      app.quit()
+    })
   })
 
   app.on('will-quit', () => {

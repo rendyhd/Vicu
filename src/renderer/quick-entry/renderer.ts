@@ -2,7 +2,17 @@ declare global {
   interface Window {
     quickEntryApi: {
       platform: 'darwin' | 'win32' | 'linux'
-      saveTask(title: string, description: string | null, dueDate: string | null, projectId: number | null, priority?: number, repeatAfter?: number, repeatMode?: number): Promise<{ success: boolean; cached?: boolean; error?: string; data?: { id: number } }>
+      saveTask(
+        title: string,
+        description: string | null,
+        dueDate: string | null,
+        projectId: number | null,
+        priority?: number,
+        repeatAfter?: number,
+        repeatMode?: number,
+        // Kept with the create when it has to be queued offline; unused when the server answers.
+        extras?: { labels?: Array<{ id?: number; title?: string }>; images?: Array<{ name: string; mime: string; bytes: Uint8Array }> },
+      ): Promise<{ success: boolean; cached?: boolean; error?: string; data?: { id: number } }>
       uploadAttachment(taskId: number, fileData: Uint8Array, fileName: string, mimeType: string): Promise<{ success: boolean; error?: string }>
       fetchTaskAttachments(taskId: number): Promise<{ success: boolean; data?: Array<{ id: number }>; error?: string }>
       updateTask(taskId: number, task: Record<string, unknown>): Promise<{ success: boolean; error?: string; data?: unknown }>
@@ -576,7 +586,14 @@ async function saveTask(): Promise<void> {
   descriptionInput.disabled = true
   clearError()
 
-  const result = await window.quickEntryApi.saveTask(title, description || null, dueDate, projectId, priority, repeatAfter, repeatMode)
+  // Labels and pasted images ride along: if the create has to be queued offline the queue keeps
+  // them and replays them after the task exists. Online, they are applied below as before.
+  const labelRefs = parsedLabels.map((name) => {
+    const match = cachedLabels.find((l) => l.title.toLowerCase() === name.toLowerCase())
+    return match ? { id: match.id, title: match.title } : { title: name }
+  })
+  const imageInputs = pendingImages.map((img) => ({ name: img.name, mime: img.mime, bytes: img.bytes }))
+  const result = await window.quickEntryApi.saveTask(title, description || null, dueDate, projectId, priority, repeatAfter, repeatMode, { labels: labelRefs, images: imageInputs })
 
   if (result.success) {
     const createdTask = result.data as (Record<string, unknown> & { id?: number }) | undefined
@@ -606,7 +623,8 @@ async function saveTask(): Promise<void> {
     }
 
     // Upload staged images and patch description with [[image:N]] tokens.
-    // If we couldn't get a task ID (offline cache), images are dropped silently.
+    // A create that was queued offline has no task id here: its labels and images were queued with
+    // it and are applied when it syncs.
     if (pendingImages.length > 0 && taskId && createdTask) {
       let uploaded = 0
       for (const img of pendingImages) {
