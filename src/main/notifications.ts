@@ -4,6 +4,8 @@ import { loadConfig, type AppConfig } from './config'
 import { fetchTasks } from './api-client'
 import { getAllStandaloneTasks } from './cache'
 import { notificationCategory, notificationFilters, overdueDays } from './notification-windows'
+import { addLocalDays, startOfLocalDay, toLocalDate } from '../shared/due-dates'
+import { parseRoutineEnvelope, routineOccurrenceKey, scheduledDateOn, type RoutinePayload } from '../shared/routines'
 
 const NULL_DATE = '0001-01-01T00:00:00Z'
 
@@ -59,32 +61,6 @@ export function stopNotifications(): void {
   clearRoutineReminderTimers()
 }
 
-interface RoutineNotificationPayload {
-  definition: {
-    id: string
-    name: string
-    kind: 'HEALTH' | 'CHORE'
-    amount: string
-    unit: string
-    archived: boolean
-    activeFrom: string
-    schedule:
-      | { type: 'calendar'; weekdays: number[]; weekInterval: number; anchorDate: string }
-      | { type: 'after_completion'; intervalDays: number; firstDueDate: string }
-    slots: Array<{
-      id: string
-      label: string
-      reminderMinutes: number
-      reminderEnabled: boolean
-      followUpMinutes: number
-    }>
-  }
-  occurrences: Record<string, {
-    scheduledDate: string
-    status: 'PENDING' | 'COMPLETED' | 'SKIPPED' | 'NOT_LOGGED'
-  }>
-}
-
 /** Schedule the next three weeks of routine alarms stored in hidden carrier tasks. */
 export async function refreshRoutineReminders(): Promise<void> {
   clearRoutineReminderTimers()
@@ -94,18 +70,21 @@ export async function refreshRoutineReminders(): Promise<void> {
   const result = await fetchTasks({ per_page: 200, filter: 'done = true' })
   if (!result.success || !Array.isArray(result.data)) return
   const now = Date.now()
-  const today = localDateString(new Date())
+  const today = toLocalDate(new Date())
 
   for (const task of result.data as Array<Record<string, unknown>>) {
-    const payload = parseRoutinePayload(task.description)
+    // Archive parts and malformed carriers have no payload and are skipped here.
+    const payload = parseRoutineEnvelope(typeof task.description === 'string' ? task.description : '').payload
     if (!payload || payload.definition.archived) continue
     for (let offset = 0; offset <= 21; offset += 1) {
       const candidate = addLocalDays(today, offset)
-      const scheduledDate = scheduledRoutineDate(payload, candidate)
-      if (!scheduledDate || scheduledDate < payload.definition.activeFrom) continue
+      // The same scheduling rules as the Today view (src/shared/routines.ts); reminders only
+      // fire on the due date itself, never for an overdue chore carried over to today.
+      const scheduledDate = scheduledDateOn(payload, candidate)
+      if (!scheduledDate) continue
       for (const slot of payload.definition.slots) {
         if (!slot.reminderEnabled) continue
-        const key = `${payload.definition.id}:${scheduledDate}:${slot.id}`
+        const key = routineOccurrenceKey(payload.definition.id, scheduledDate, slot.id)
         const status = payload.occurrences[key]?.status ?? 'PENDING'
         if (status !== 'PENDING') continue
         const base = localDateAtMinutes(candidate, slot.reminderMinutes).getTime()
@@ -213,7 +192,7 @@ function scheduleRoutineTimer(
   key: string,
   triggerAt: number,
   now: number,
-  payload: RoutineNotificationPayload,
+  payload: RoutinePayload,
   slotLabel: string,
   followUp: boolean,
   config: AppConfig,
@@ -228,7 +207,7 @@ function scheduleRoutineTimer(
 }
 
 function fireRoutineReminder(
-  payload: RoutineNotificationPayload,
+  payload: RoutinePayload,
   slotLabel: string,
   followUp: boolean,
   configSnapshot: AppConfig,
@@ -252,63 +231,8 @@ function fireRoutineReminder(
   notification.show()
 }
 
-function parseRoutinePayload(description: unknown): RoutineNotificationPayload | null {
-  if (typeof description !== 'string') return null
-  const marker = description.match(/<!--\s*vicu-routine:v1:([A-Za-z0-9_-]+={0,2})\s*-->/)
-  if (!marker) return null
-  try {
-    const payload = JSON.parse(Buffer.from(marker[1], 'base64url').toString('utf8')) as RoutineNotificationPayload
-    if (!payload?.definition?.id || !Array.isArray(payload.definition.slots)) return null
-    return payload
-  } catch {
-    return null
-  }
-}
-
-function localDateString(date: Date): string {
-  return `${date.getFullYear()}-${`${date.getMonth() + 1}`.padStart(2, '0')}-${`${date.getDate()}`.padStart(2, '0')}`
-}
-
-function parseLocalDate(value: string): Date {
-  const [year, month, day] = value.split('-').map(Number)
-  return new Date(year, month - 1, day, 12)
-}
-
-function addLocalDays(value: string, days: number): string {
-  const date = parseLocalDate(value)
-  date.setDate(date.getDate() + days)
-  return localDateString(date)
-}
-
-function isoWeekday(value: string): number {
-  return parseLocalDate(value).getDay() || 7
-}
-
-function isoWeekStart(value: string): Date {
-  const date = parseLocalDate(value)
-  date.setDate(date.getDate() + 1 - (date.getDay() || 7))
-  return date
-}
-
-function scheduledRoutineDate(payload: RoutineNotificationPayload, candidate: string): string | null {
-  const { schedule } = payload.definition
-  if (schedule.type === 'calendar') {
-    if (candidate < schedule.anchorDate) return null
-    if (schedule.weekdays.length > 0 && !schedule.weekdays.includes(isoWeekday(candidate))) return null
-    const weeks = Math.round((isoWeekStart(candidate).getTime() - isoWeekStart(schedule.anchorDate).getTime()) / (7 * 86_400_000))
-    return weeks % Math.max(1, schedule.weekInterval) === 0 ? candidate : null
-  }
-  const latest = Object.values(payload.occurrences)
-    .filter((record) => record.status === 'COMPLETED')
-    .map((record) => record.scheduledDate)
-    .sort()
-    .at(-1)
-  const due = latest ? addLocalDays(latest, Math.max(1, schedule.intervalDays)) : schedule.firstDueDate
-  return candidate === due ? due : null
-}
-
 function localDateAtMinutes(value: string, minutes: number): Date {
-  const date = parseLocalDate(value)
+  const date = startOfLocalDay(value)
   date.setHours(Math.max(0, Math.min(23, Math.floor(minutes / 60))), Math.max(0, Math.min(59, minutes % 60)), 0, 0)
   return date
 }

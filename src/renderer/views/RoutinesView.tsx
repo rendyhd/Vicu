@@ -285,7 +285,7 @@ export function RoutinesView() {
   const active = useMemo(() => routines.active, [routines.active])
 
   const exportCsv = () => {
-    const blob = new Blob([csvForRoutines(routines.carriers)], { type: 'text/csv;charset=utf-8' })
+    const blob = new Blob([csvForRoutines(routines.carriers.map(({ payload }) => ({ name: payload.definition.name, occurrences: Object.values(payload.occurrences) })))], { type: 'text/csv;charset=utf-8' })
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
