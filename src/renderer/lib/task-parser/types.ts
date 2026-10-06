@@ -41,6 +41,11 @@ export interface ParserConfig {
   syntaxMode: SyntaxMode
   suppressTypes?: TokenType[]
   bangToday?: boolean
+  /**
+   * BCP 47 locale deciding the order of slash dates ("5/11": month/day in en-US, day/month in
+   * en-GB). Defaults to the system locale (`navigator.language`).
+   */
+  locale?: string
 }
 
 const SYNTAX_PREFIXES: Record<SyntaxMode, SyntaxPrefixes> = {

@@ -4,6 +4,7 @@ import { extractLabels } from './extract-labels'
 import { extractProject } from './extract-projects'
 import { extractPriority } from './extract-priority'
 import { extractRecurrence } from './extract-recurrence'
+import type { WeekdayAnchor } from './extract-recurrence'
 import { extractDate, extractBangToday } from './extract-dates'
 
 export type { ParseResult, ParserConfig, ParsedToken, ParsedRecurrence, SyntaxMode, TokenType, SyntaxPrefixes } from './types'
@@ -13,19 +14,23 @@ export { getParserConfig } from './config-bridge'
 export { extractBangToday } from './extract-dates'
 
 /**
- * Parse free-form task input into structured fields.
+ * Parse free-form task input into structured fields. Implements shared-parser-spec.md and
+ * section 5 of docs/cross-app-semantics-v1.md; test-fixtures/nlp-corpus-v1.json is the test.
  *
  * Extraction order: Labels → Projects → Priority → Recurrence → Dates → Title
  *
- * The trailing `!` → today shortcut is controlled by `config.bangToday`.
- * When the parser is disabled, the caller should handle it via `extractBangToday()` directly.
+ * The `!` → today shortcut (standalone, leading or trailing `!`) is controlled by
+ * `config.bangToday` and has one rule, `extractBangToday`: `parse()` applies it whether the
+ * parser is enabled or not, so callers never look for `!` themselves.
  *
  * @param rawInput - The raw user input string
- * @param config - Parser configuration (enabled, syntax mode, suppress types)
+ * @param config - Parser configuration (enabled, syntax mode, suppress types, locale)
+ * @param reference - "Now" for relative dates; the current time unless a test passes one
  */
 export function parse(
   rawInput: string,
   config: ParserConfig = DEFAULT_PARSER_CONFIG,
+  reference: Date = new Date(),
 ): ParseResult {
   const result: ParseResult = {
     title: rawInput,
@@ -41,6 +46,14 @@ export function parse(
   if (!rawInput.trim()) return result
 
   if (!config.enabled) {
+    // Everything stays in the title; only the `!` shortcut still works.
+    if (config.bangToday) {
+      const bang = extractBangToday(rawInput, reference)
+      if (bang.dueDate) {
+        result.title = bang.title
+        result.dueDate = bang.dueDate
+      }
+    }
     return result
   }
 
@@ -70,26 +83,54 @@ export function parse(
   }
 
   // 4. Recurrence
+  let weekday: WeekdayAnchor | undefined
+  let recurrenceToken: ParsedToken | undefined
   if (!suppress.has('recurrence')) {
-    const { recurrence, tokens } = extractRecurrence(rawInput, consumed)
-    result.recurrence = recurrence
-    result.tokens.push(...tokens)
+    const extracted = extractRecurrence(rawInput, consumed)
+    result.recurrence = extracted.recurrence
+    result.tokens.push(...extracted.tokens)
+    weekday = extracted.weekday
+    recurrenceToken = extracted.tokens[0]
   }
 
   // 5. Dates
+  const dateOptions = { reference, locale: config.locale }
   if (!suppress.has('date')) {
-    const { dueDate, hasTime, tokens } = extractDate(rawInput, consumed)
-    result.dueDate = dueDate
-    result.dueHasTime = hasTime
-    result.tokens.push(...tokens)
+    let found: ReturnType<typeof extractDate> | null = null
+    if (weekday) {
+      // "every monday": the weekday is the due date unless the input has another date. A time
+      // on its own ("every monday 10am") is not another date; it goes with the weekday.
+      const trial = [...consumed, weekday]
+      const other = extractDate(rawInput, trial, { ...dateOptions, skipTimeOnly: true })
+      if (other.dueDate) {
+        consumed.length = 0
+        consumed.push(...trial)
+        found = other
+        if (recurrenceToken) {
+          recurrenceToken.end = weekday.end
+          recurrenceToken.raw = rawInput.slice(recurrenceToken.start, weekday.end)
+        }
+      }
+    }
+    if (!found) found = extractDate(rawInput, consumed, { ...dateOptions, prefer: weekday })
+    result.dueDate = found.dueDate
+    result.dueHasTime = found.hasTime
+    result.tokens.push(...found.tokens)
+  } else if (weekday) {
+    // The date was dismissed: "every monday" is only the recurrence.
+    consumed.push(weekday)
+    if (recurrenceToken) {
+      recurrenceToken.end = weekday.end
+      recurrenceToken.raw = rawInput.slice(recurrenceToken.start, weekday.end)
+    }
   }
 
   // 6. Build title from non-consumed regions
   result.title = buildTitle(rawInput, consumed)
 
-  // 7. Leading/trailing ! → today (only when enabled and no date was found by chrono)
+  // 7. Standalone/leading/trailing ! → today (only when no date was found by chrono)
   if (config.bangToday && !result.dueDate) {
-    const bang = extractBangToday(result.title)
+    const bang = extractBangToday(result.title, reference)
     if (bang.dueDate) {
       result.title = bang.title
       result.dueDate = bang.dueDate
