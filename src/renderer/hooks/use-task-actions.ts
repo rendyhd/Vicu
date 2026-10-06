@@ -11,7 +11,7 @@ import {
 import { useSelectionStore } from '@/stores/selection-store'
 import { confirmDelete } from '@/lib/confirm-bridge'
 import { copySelectedTitles, isTaskNestedInCurrentList } from '@/lib/task-selection'
-import { tomorrowAtMidnightISO, nextMondayAtMidnightISO } from '@/lib/date-utils'
+import { dueNextWeek, dueToday, dueTomorrow } from '@/lib/due-dates'
 import { NULL_DATE } from '@/lib/constants'
 import type { Task, Label } from '@/lib/vikunja-types'
 import { taskDescendants, unfinishedDescendants } from '@/lib/task-hierarchy'
@@ -41,23 +41,19 @@ export function useTaskActions(tasks: Task[]) {
     [tasks, updateTask]
   )
 
-  const setDueToday = useCallback(() => {
-    const d = new Date()
-    d.setHours(0, 0, 0, 0)
-    patch({ due_date: d.toISOString() })
-  }, [patch])
+  const setDueToday = useCallback(() => patch({ due_date: dueToday() }), [patch])
 
   const setUrgentPriority = useCallback(() => patch({ priority: 4 }), [patch])
 
   const setDueDateIso = useCallback((iso: string) => patch({ due_date: iso }), [patch])
 
   const postponeTomorrow = useCallback(
-    () => patch({ due_date: tomorrowAtMidnightISO() }),
+    () => patch({ due_date: dueTomorrow() }),
     [patch]
   )
 
   const postponeNextMonday = useCallback(
-    () => patch({ due_date: nextMondayAtMidnightISO() }),
+    () => patch({ due_date: dueNextWeek() }),
     [patch]
   )
 

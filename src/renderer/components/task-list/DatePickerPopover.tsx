@@ -4,8 +4,9 @@ import {
   datePickerPresets,
   isNullDate,
   localDateInputValue,
-  localDateStringToISO,
 } from '@/lib/date-utils'
+import { dateOnlyDue } from '@/lib/due-dates'
+import { NULL_DATE } from '@/lib/constants'
 import { detectRecurrencePreset, formatRecurrenceLabel } from '@/lib/recurrence'
 import { RecurrencePickerPopover } from './RecurrencePickerPopover'
 import { usePopoverAlignment } from './use-popover-alignment'
@@ -44,8 +45,9 @@ export function DatePickerPopover({
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [onClose])
 
+  // A picked day is date-only: local 23:59:59 of that calendar day, never built from UTC.
   const applyDate = (dateStr: string) => {
-    onDateChange(localDateStringToISO(dateStr))
+    onDateChange(dateStr ? dateOnlyDue(dateStr) : NULL_DATE)
     onClose()
   }
 

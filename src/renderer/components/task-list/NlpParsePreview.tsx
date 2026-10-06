@@ -1,4 +1,5 @@
 import type { ParseResult, ParsedToken } from '@/lib/task-parser'
+import { formatClockTime } from '@/lib/date-utils'
 
 function formatDateLabel(date: Date): string {
   const now = new Date()
@@ -49,9 +50,10 @@ export function NlpParsePreview({ result }: NlpParsePreviewProps) {
   const chips: Array<{ key: string; label: string; className: string }> = []
 
   if (result.dueDate) {
+    const day = formatDateLabel(result.dueDate)
     chips.push({
       key: 'date',
-      label: formatDateLabel(result.dueDate),
+      label: result.dueHasTime ? `${day} ${formatClockTime(result.dueDate)}` : day,
       className: chipStyles.date,
     })
   }

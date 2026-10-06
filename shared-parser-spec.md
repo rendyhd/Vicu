@@ -75,7 +75,8 @@ The `!word` forms (`!low`, `!high`, etc.) work in BOTH modes. Only the short num
 ```typescript
 interface ParseResult {
   title: string              // Cleaned task title (all tokens removed)
-  dueDate: Date | null       // Extracted due date/time
+  dueDate: Date | null       // Extracted due date; its time of day only counts when dueHasTime is true
+  dueHasTime: boolean        // The text named a time ("3pm", "14:30", "in 2 hours"): chrono start.isCertain('hour')
   priority: 1 | 2 | 3 | 4 | null  // Vikunja priority (1=low, 2=medium, 3=high, 4=urgent)
   labels: string[]           // Label names (prefix stripped)
   project: string | null     // Project name (prefix stripped)
@@ -214,6 +215,14 @@ This order matters because:
 - With time: `tomorrow at 3pm`, `next friday 14:00`, `jan 15 9:30am`
 - Relative: `in 2 hours`, `in 30 minutes`
 - Special shortcut: `!` alone means "today" — both modes, even when parser is disabled
+
+### Stored due time (docs/cross-app-semantics-v1.md, section 1)
+
+- A date without a time of day ("tomorrow", "jan 15", "in 3 days", the `!` shortcut) is stored as that
+  local date at **23:59:59** (date-only), never midnight.
+- A date with a time ("tomorrow at 3pm", "next friday 14:00", "in 2 hours") keeps the parsed time. Desktop
+  decides with `dueHasTime`; the caller builds the stored value with `parsedDue(dueDate, dueHasTime)`
+  (`src/shared/due-dates.ts`), which never mutates the parse result.
 
 ---
 

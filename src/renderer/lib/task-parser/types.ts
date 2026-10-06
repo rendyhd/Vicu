@@ -18,6 +18,12 @@ export interface ParsedRecurrence {
 export interface ParseResult {
   title: string
   dueDate: Date | null
+  /**
+   * True when the parsed text named a time of day ("3pm", "14:30", "in 2 hours"), i.e. chrono's
+   * `start.isCertain('hour')`. The time of `dueDate` is only meaningful when this is true;
+   * otherwise the due date is date-only (build it with `parsedDue`).
+   */
+  dueHasTime: boolean
   priority: number | null
   labels: string[]
   project: string | null

@@ -30,6 +30,7 @@ export function parse(
   const result: ParseResult = {
     title: rawInput,
     dueDate: null,
+    dueHasTime: false,
     priority: null,
     labels: [],
     project: null,
@@ -77,8 +78,9 @@ export function parse(
 
   // 5. Dates
   if (!suppress.has('date')) {
-    const { dueDate, tokens } = extractDate(rawInput, consumed)
+    const { dueDate, hasTime, tokens } = extractDate(rawInput, consumed)
     result.dueDate = dueDate
+    result.dueHasTime = hasTime
     result.tokens.push(...tokens)
   }
 
@@ -91,6 +93,7 @@ export function parse(
     if (bang.dueDate) {
       result.title = bang.title
       result.dueDate = bang.dueDate
+      result.dueHasTime = false
     }
   }
 

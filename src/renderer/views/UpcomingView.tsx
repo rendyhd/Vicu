@@ -3,7 +3,7 @@ import { useTasks } from '@/hooks/use-tasks'
 import { useProjects } from '@/hooks/use-projects'
 import { useFilters } from '@/hooks/use-filters'
 import { usePrintable } from '@/stores/print-store'
-import { isNullDate, isToday, isOverdue } from '@/lib/date-utils'
+import { diffLocalDays, isUpcoming, localDateOf, toLocalDate } from '@/lib/due-dates'
 import { TaskList } from '@/components/task-list/TaskList'
 import { TaskRow } from '@/components/task-list/TaskRow'
 import { api } from '@/lib/api'
@@ -11,10 +11,7 @@ import type { Task } from '@/lib/vikunja-types'
 
 function formatDateHeader(dateStr: string): string {
   const d = new Date(dateStr)
-  const now = new Date()
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-  const target = new Date(d.getFullYear(), d.getMonth(), d.getDate())
-  const diffDays = Math.round((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+  const diffDays = diffLocalDays(toLocalDate(new Date()), toLocalDate(d))
 
   if (diffDays === 0) return 'Today'
   if (diffDays === 1) return 'Tomorrow'
@@ -25,8 +22,7 @@ function formatDateHeader(dateStr: string): string {
 }
 
 function getDateKey(date: string): string {
-  const d = new Date(date)
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  return localDateOf(date)
 }
 
 function groupByProject(tasks: Task[], projectsFlat?: { id: number; title: string }[]) {
@@ -69,11 +65,11 @@ export function UpcomingView() {
   const groups = useMemo(() => {
     const grouped = new Map<string, DateGroup>()
     const activeIds = new Set(projects?.flat.map((project) => project.id) ?? [])
+    const now = new Date()
     for (const task of tasks) {
       if (!activeIds.has(task.project_id)) continue
-      if (isNullDate(task.due_date)) continue
-      // Client-side filter: exclude today and overdue tasks
-      if (isToday(task.due_date) || isOverdue(task.due_date)) continue
+      // Client-side filter: local due date tomorrow or later (no due date, today and overdue are out)
+      if (!isUpcoming(task.due_date, now)) continue
       const key = getDateKey(task.due_date)
       if (!grouped.has(key)) {
         grouped.set(key, {

@@ -8,6 +8,7 @@ import { useCreateTask, useCompleteTask, useUpdateTask, useDeleteTask } from '@/
 import { useSelectionStore } from '@/stores/selection-store'
 import { orderedTaskIds, resolveSelectedTasks, copySelectedTitles, isTaskNestedInCurrentList } from '@/lib/task-selection'
 import { confirmDelete } from '@/lib/confirm-bridge'
+import { dueToday } from '@/lib/due-dates'
 import type { Task } from '@/lib/vikunja-types'
 import { TaskRow } from './TaskRow'
 import { AddTaskButton } from './AddTaskButton'
@@ -344,9 +345,7 @@ export function TaskList({
         if (!targetId) return
         const task = tasks.find((t) => t.id === targetId)
         if (task) {
-          const today = new Date()
-          today.setHours(0, 0, 0, 0)
-          updateTask.mutate({ id: task.id, changes: { due_date: today.toISOString() }, original: task })
+          updateTask.mutate({ id: task.id, changes: { due_date: dueToday() }, original: task })
         }
         return
       }

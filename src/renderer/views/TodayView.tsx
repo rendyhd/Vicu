@@ -3,7 +3,7 @@ import { useTasks } from '@/hooks/use-tasks'
 import { useProjects } from '@/hooks/use-projects'
 import { useFilters } from '@/hooks/use-filters'
 import { usePrintable } from '@/stores/print-store'
-import { isOverdue, isToday } from '@/lib/date-utils'
+import { isDueToday, isOverdue } from '@/lib/due-dates'
 import { TaskList } from '@/components/task-list/TaskList'
 import { TaskRow } from '@/components/task-list/TaskRow'
 import { api } from '@/lib/api'
@@ -48,11 +48,13 @@ export function TodayView() {
     const overdue: typeof tasks = []
     const today: typeof tasks = []
     const activeIds = new Set(projects?.flat.map((project) => project.id) ?? [])
+    // Local calendar date: overdue is before today, Today is today whatever the time of day.
+    const now = new Date()
     for (const t of tasks) {
       if (!activeIds.has(t.project_id)) continue
-      if (isOverdue(t.due_date)) {
+      if (isOverdue(t.due_date, now)) {
         overdue.push(t)
-      } else if (isToday(t.due_date)) {
+      } else if (isDueToday(t.due_date, now)) {
         today.push(t)
       }
     }

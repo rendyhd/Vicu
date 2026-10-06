@@ -41,6 +41,8 @@ interface QuickEntryConfig {
 }
 
 import { parse, getParserConfig, recurrenceToVikunja } from '../lib/task-parser'
+import { dueToday, parsedDue } from '../lib/due-dates'
+import { formatClockTime } from '../lib/date-utils'
 import type { ParseResult, ParserConfig, ParsedToken, TokenType } from '../lib/task-parser'
 import { getClipboardImages, fileToUint8Array } from '../lib/clipboard-images'
 import { imageToken } from '../lib/image-tokens'
@@ -393,7 +395,8 @@ function renderParsePreview(result: ParseResult): void {
   const chips: string[] = []
 
   if (result.dueDate) {
-    const label = formatDateLabel(result.dueDate)
+    const day = formatDateLabel(result.dueDate)
+    const label = result.dueHasTime ? `${day} ${formatClockTime(result.dueDate)}` : day
     chips.push(`<span class="parse-chip parse-chip-date">${escapeHtml(label)}<button class="parse-chip-dismiss" data-type="date">&times;</button></span>`)
   }
   if (result.priority !== null && result.priority > 0) {
@@ -532,9 +535,9 @@ async function saveTask(): Promise<void> {
     if (!title) return
 
     if (lastParseResult.dueDate) {
-      const d = lastParseResult.dueDate
-      d.setHours(23, 59, 59, 0)
-      dueDate = d.toISOString()
+      // A parsed time ("tomorrow at 3pm") is kept; a bare date is date-only. The parse result
+      // is only read, never changed: the preview chips keep rendering from it.
+      dueDate = parsedDue(lastParseResult.dueDate, lastParseResult.dueHasTime)
     }
 
     if (lastParseResult.priority !== null && lastParseResult.priority > 0) {
@@ -560,9 +563,7 @@ async function saveTask(): Promise<void> {
     if (exclamationTodayEnabled && title.includes('!')) {
       title = title.replace(/!/g, '').trim()
       if (!title) return
-      const today = new Date()
-      today.setHours(23, 59, 59, 0)
-      dueDate = today.toISOString()
+      dueDate = dueToday()
     }
   }
 

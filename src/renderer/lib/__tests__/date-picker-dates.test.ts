@@ -1,11 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import {
-  datePickerPresets,
-  localDateInputValue,
-  localDateStringToISO,
-  nextMondayAtMidnightISO,
-  toLocalDateString,
-} from '../date-utils'
+import { datePickerPresets, localDateInputValue } from '../date-utils'
+import { dateOnlyDue, dueNextWeek, localDateOf, toLocalDate } from '../due-dates'
 
 const originalTz = process.env.TZ
 
@@ -27,20 +22,20 @@ describe('time zone setup', () => {
   })
 })
 
-describe('toLocalDateString', () => {
+describe('toLocalDate', () => {
   it('uses the local calendar day, not the UTC day', () => {
     // 20:30 local in UTC-4 is already tomorrow in UTC.
     inTimeZone('America/New_York', () => {
-      expect(toLocalDateString(new Date(2026, 9, 6, 20, 30))).toBe('2026-10-06')
+      expect(toLocalDate(new Date(2026, 9, 6, 20, 30))).toBe('2026-10-06')
     })
     // 00:30 local in UTC+2 is still yesterday in UTC.
     inTimeZone('Europe/Berlin', () => {
-      expect(toLocalDateString(new Date(2026, 9, 6, 0, 30))).toBe('2026-10-06')
+      expect(toLocalDate(new Date(2026, 9, 6, 0, 30))).toBe('2026-10-06')
     })
   })
 
   it('zero-pads month and day', () => {
-    expect(toLocalDateString(new Date(2026, 0, 5, 12))).toBe('2026-01-05')
+    expect(toLocalDate(new Date(2026, 0, 5, 12))).toBe('2026-01-05')
   })
 })
 
@@ -76,12 +71,11 @@ describe('datePickerPresets', () => {
     })
   })
 
-  it('Next Week agrees with nextMondayAtMidnightISO for every weekday', () => {
+  it('Next Week agrees with the Next week setter for every weekday', () => {
     inTimeZone('America/New_York', () => {
       for (let day = 4; day <= 10; day++) {
         const now = new Date(2026, 9, day, 21, 0)
-        const expected = toLocalDateString(new Date(nextMondayAtMidnightISO(now)))
-        expect(datePickerPresets(now).nextWeek).toBe(expected)
+        expect(datePickerPresets(now).nextWeek).toBe(localDateOf(dueNextWeek(now)))
       }
     })
   })
@@ -114,26 +108,21 @@ describe('localDateInputValue', () => {
   })
 
   it('round-trips with the picker output', () => {
-    inTimeZone('America/New_York', () => {
-      expect(localDateInputValue(localDateStringToISO('2026-10-06'))).toBe('2026-10-06')
-    })
-    inTimeZone('Europe/Berlin', () => {
-      expect(localDateInputValue(localDateStringToISO('2026-10-06'))).toBe('2026-10-06')
-    })
+    for (const tz of ['America/New_York', 'Europe/Berlin', 'Pacific/Auckland']) {
+      inTimeZone(tz, () => {
+        expect(localDateInputValue(dateOnlyDue('2026-10-06'))).toBe('2026-10-06')
+      })
+    }
   })
 })
 
-describe('localDateStringToISO', () => {
-  it('stores local midnight of the picked day (time of day is unchanged until semantics v1)', () => {
+describe('the date a picked day is stored as', () => {
+  it('is local 23:59:59 of the picked day, not local midnight', () => {
     inTimeZone('America/New_York', () => {
-      expect(localDateStringToISO('2026-10-06')).toBe('2026-10-06T04:00:00.000Z')
+      expect(dateOnlyDue('2026-10-06')).toBe('2026-10-07T03:59:59.000Z')
     })
     inTimeZone('Europe/Berlin', () => {
-      expect(localDateStringToISO('2026-10-06')).toBe('2026-10-05T22:00:00.000Z')
+      expect(dateOnlyDue('2026-10-06')).toBe('2026-10-06T21:59:59.000Z')
     })
-  })
-
-  it('returns the Vikunja null date for an empty string', () => {
-    expect(localDateStringToISO('')).toBe('0001-01-01T00:00:00Z')
   })
 })

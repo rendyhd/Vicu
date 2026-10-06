@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { parse, extractBangToday } from '../index'
 import { recurrenceToVikunja } from '../recurrence-map'
+import { dateOnlyDue, parsedDue } from '../../due-dates'
 import type { ParserConfig } from '../types'
 
 const todoist: ParserConfig = { enabled: true, syntaxMode: 'todoist' }
@@ -395,5 +396,54 @@ describe('recurrenceToVikunja', () => {
       repeat_after: 2 * 604800,
       repeat_mode: 0,
     })
+  })
+})
+
+// ─── Explicit times (cross-app semantics v1, section 1.1) ───
+
+describe('explicit times', () => {
+  it('flags a date with a time of day', () => {
+    expect(parse('buy groceries tomorrow 3pm', todoist).dueHasTime).toBe(true)
+    expect(parse('call mom at 14:30', todoist).dueHasTime).toBe(true)
+    expect(parse('stand-up in 2 hours', todoist).dueHasTime).toBe(true)
+  })
+
+  it('does not flag a date-only phrase', () => {
+    expect(parse('buy groceries tomorrow', todoist).dueHasTime).toBe(false)
+    expect(parse('renew passport jan 15', todoist).dueHasTime).toBe(false)
+    expect(parse('plan trip in 3 days', todoist).dueHasTime).toBe(false)
+  })
+
+  it('is false when no date was found', () => {
+    expect(parse('buy groceries', todoist).dueHasTime).toBe(false)
+    expect(parse('buy groceries tomorrow', disabled).dueHasTime).toBe(false)
+  })
+
+  it('treats the bang shortcut as date-only', () => {
+    const r = parse('call dentist !', { ...todoist, bangToday: true })
+    expect(r.dueDate).toBeInstanceOf(Date)
+    expect(r.dueHasTime).toBe(false)
+  })
+
+  it('stores a parsed time as typed and a bare date at 23:59:59', () => {
+    const timed = parse('buy groceries tomorrow 3pm', todoist)
+    const tomorrow = new Date()
+    tomorrow.setDate(tomorrow.getDate() + 1)
+    const due = new Date(parsedDue(timed.dueDate!, timed.dueHasTime))
+    expect(due.getDate()).toBe(tomorrow.getDate())
+    expect([due.getHours(), due.getMinutes(), due.getSeconds()]).toEqual([15, 0, 0])
+
+    const bare = parse('buy groceries tomorrow', todoist)
+    const bareDue = new Date(parsedDue(bare.dueDate!, bare.dueHasTime))
+    expect(bareDue.getDate()).toBe(tomorrow.getDate())
+    expect([bareDue.getHours(), bareDue.getMinutes(), bareDue.getSeconds()]).toEqual([23, 59, 59])
+  })
+
+  it('does not change the parse result when building the due date', () => {
+    const r = parse('buy groceries tomorrow', todoist)
+    const before = r.dueDate!.getTime()
+    parsedDue(r.dueDate!, r.dueHasTime)
+    expect(r.dueDate!.getTime()).toBe(before)
+    expect(parsedDue(r.dueDate!, false)).toBe(dateOnlyDue(`${r.dueDate!.getFullYear()}-${String(r.dueDate!.getMonth() + 1).padStart(2, '0')}-${String(r.dueDate!.getDate()).padStart(2, '0')}`))
   })
 })

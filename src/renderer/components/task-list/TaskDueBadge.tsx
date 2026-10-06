@@ -1,5 +1,6 @@
 import { cn } from '@/lib/cn'
-import { isNullDate, isOverdue, isToday, formatRelativeDate } from '@/lib/date-utils'
+import { isNullDate, formatDueDate } from '@/lib/date-utils'
+import { isDueToday, isOverdue } from '@/lib/due-dates'
 
 interface TaskDueBadgeProps {
   dueDate: string
@@ -9,9 +10,10 @@ interface TaskDueBadgeProps {
 export function TaskDueBadge({ dueDate, className }: TaskDueBadgeProps) {
   if (isNullDate(dueDate)) return null
 
-  const label = formatRelativeDate(dueDate)
+  // Date, plus the time of day when the due date has an explicit time.
+  const label = formatDueDate(dueDate)
   const overdue = isOverdue(dueDate)
-  const today = isToday(dueDate)
+  const today = isDueToday(dueDate)
 
   return (
     <span

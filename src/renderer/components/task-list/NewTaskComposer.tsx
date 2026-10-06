@@ -16,6 +16,7 @@ import { api } from '@/lib/api'
 import { NULL_DATE } from '@/lib/constants'
 import { replacePendingTokens } from '@/lib/image-tokens'
 import { recurrenceToVikunja } from '@/lib/task-parser'
+import { dateOnlyDue, dueToday, parsedDue, toLocalDate } from '@/lib/due-dates'
 import { useTaskParser } from '@/hooks/use-task-parser'
 import { useLabels } from '@/hooks/use-labels'
 import { useProjects } from '@/hooks/use-projects'
@@ -64,10 +65,9 @@ export interface NewTaskComposerProps {
   className?: string
 }
 
-function endOfDayIso(date: Date): string {
-  const value = new Date(date.getTime())
-  value.setHours(23, 59, 59, 0)
-  return value.toISOString()
+/** The date-only due date (local 23:59:59) for the local calendar day of `date`. */
+function dateOnlyIso(date: Date): string {
+  return dateOnlyDue(toLocalDate(date))
 }
 
 function shortDate(value: string): string {
@@ -138,7 +138,7 @@ export function NewTaskComposer({
   const labelItems = useMemo(() => labels.map((label) => ({ id: label.id, title: label.title })), [labels])
   const effectiveDueDate = dateTouched
     ? (explicitDueDate ?? NULL_DATE)
-    : (!defaultDateDismissed && defaultDueDate ? endOfDayIso(defaultDueDate) : NULL_DATE)
+    : (!defaultDateDismissed && defaultDueDate ? dateOnlyIso(defaultDueDate) : NULL_DATE)
   const selectedProjectTitle = projects?.flat.find((project) => project.id === selectedProjectId)?.title ?? 'Project'
   const priorityLabel = priority === null ? 'Priority' : PRIORITY_OPTIONS.find((option) => option.value === priority)?.label ?? 'Priority'
 
@@ -154,7 +154,7 @@ export function NewTaskComposer({
 
   const contextChips = useMemo<ChipData[]>(() => {
     if (!defaultDueDate || defaultDateDismissed || dateTouched || parser.parseResult?.dueDate) return []
-    return [{ type: 'date', label: shortDate(endOfDayIso(defaultDueDate)), key: 'context-date' }]
+    return [{ type: 'date', label: shortDate(dateOnlyIso(defaultDueDate)), key: 'context-date' }]
   }, [defaultDueDate, defaultDateDismissed, dateTouched, parser.parseResult?.dueDate])
 
   const closeAndReset = () => {
@@ -286,9 +286,10 @@ export function NewTaskComposer({
       const payload: CreateTaskPayload = { title }
       const draftDescription = description.trim()
       if (draftDescription) payload.description = draftDescription
-      const parsedDate = parsed?.dueDate ? endOfDayIso(parsed.dueDate) : undefined
-      const legacyBangDate = !parser.enabled && parser.parserConfig.bangToday && rawTitle.includes('!') ? endOfDayIso(new Date()) : undefined
-      const dueDate = dateTouched ? explicitDueDate : (parsedDate ?? legacyBangDate ?? (!defaultDateDismissed && defaultDueDate ? endOfDayIso(defaultDueDate) : undefined))
+      // A parsed time ("tomorrow at 3pm") is kept; a bare date is date-only.
+      const parsedDate = parsed?.dueDate ? parsedDue(parsed.dueDate, parsed.dueHasTime) : undefined
+      const legacyBangDate = !parser.enabled && parser.parserConfig.bangToday && rawTitle.includes('!') ? dueToday() : undefined
+      const dueDate = dateTouched ? explicitDueDate : (parsedDate ?? legacyBangDate ?? (!defaultDateDismissed && defaultDueDate ? dateOnlyIso(defaultDueDate) : undefined))
       if (dueDate && dueDate !== NULL_DATE) payload.due_date = dueDate
       const selectedPriority = priority !== null ? priority : parsed?.priority
       if (selectedPriority && selectedPriority > 0) payload.priority = selectedPriority

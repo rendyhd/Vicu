@@ -59,6 +59,7 @@ interface QuickViewConfig {
 import { extractTaskLink, stripNoteLink, stripPageLink, extractNoteLinkHtml, extractPageLinkHtml } from '@/lib/note-link'
 import { sanitizeTaskHtml } from '@/lib/sanitize-html'
 import { taskPatch, type TaskPatch } from '@/lib/merge-patches'
+import { diffLocalDays, dueToday, isDateOnly, isNoDueDate, toLocalDate } from '@/lib/due-dates'
 import { hasRichDescriptionBody } from '@/lib/description-html'
 
 function escapeHtml(s: string): string {
@@ -173,31 +174,29 @@ function updateSelection(newIndex: number): void {
   items[selectedIndex].scrollIntoView({ block: 'nearest' })
 }
 
+// Buckets follow the local calendar date (cross-app semantics v1): a task due at 08:00 today
+// is still "Today" at 10:00 and becomes overdue tomorrow. Date-only values show no time.
 function formatDueDate(dueDateStr: string | null | undefined): { label: string; cssClass: string } | null {
-  if (!dueDateStr || dueDateStr === '0001-01-01T00:00:00Z') return null
+  if (isNoDueDate(dueDateStr)) return null
 
-  const due = new Date(dueDateStr)
+  const due = new Date(dueDateStr as string)
   const now = new Date()
-  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-  const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999)
-  const tomorrowEnd = new Date(todayEnd.getTime() + 86400000)
+  const diffDays = diffLocalDays(toLocalDate(now), toLocalDate(due))
 
   let label: string
   let cssClass: string
 
-  if (due < todayStart) {
-    const diffDays = Math.ceil((todayStart.getTime() - due.getTime()) / 86400000)
-    label = diffDays === 1 ? 'Yesterday' : `${diffDays} days overdue`
+  if (diffDays < 0) {
+    label = diffDays === -1 ? 'Yesterday' : `${-diffDays} days overdue`
     cssClass = 'overdue'
-  } else if (due <= todayEnd) {
+  } else if (diffDays === 0) {
     label = 'Today'
     cssClass = 'today'
-  } else if (due <= tomorrowEnd) {
+  } else if (diffDays === 1) {
     label = 'Tomorrow'
     cssClass = 'upcoming'
   } else {
-    const diffDays = Math.ceil((due.getTime() - todayStart.getTime()) / 86400000)
-    if (diffDays <= 7) {
+    if (diffDays <= 6) {
       const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
       label = days[due.getDay()]
     } else {
@@ -206,6 +205,10 @@ function formatDueDate(dueDateStr: string | null | undefined): { label: string; 
       if (due.getFullYear() !== now.getFullYear()) label += `, ${due.getFullYear()}`
     }
     cssClass = 'upcoming'
+  }
+
+  if (diffDays >= -1 && !isDateOnly(dueDateStr as string)) {
+    label += ` ${due.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}`
   }
 
   return { label, cssClass }
@@ -424,8 +427,7 @@ async function toggleDueDate(): Promise<void> {
     const result = await window.quickViewApi.scheduleTaskToday(Number(taskId), taskData)
     if (result.success) {
       lastFetchResult = null
-      const now = new Date()
-      taskData.due_date = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59).toISOString()
+      taskData.due_date = dueToday()
       item.dataset.task = JSON.stringify(taskData)
       const content = item.querySelector('.task-content')
       let dueEl = item.querySelector('.task-due')

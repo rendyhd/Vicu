@@ -12,6 +12,7 @@ import { useUpdateTask, useCompleteTask, useDeleteTask, useUploadAttachmentFromD
 import { useConfirmDelete } from '@/hooks/use-confirm-delete'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { isNullDate } from '@/lib/date-utils'
+import { dueToday, parsedDue } from '@/lib/due-dates'
 import { normalizeHex } from '@/lib/constants'
 import type { Task, TaskReminder } from '@/lib/vikunja-types'
 import { TaskCheckbox } from './TaskCheckbox'
@@ -180,9 +181,8 @@ const TaskTitleEditor = forwardRef<TaskTitleEditorHandle, TaskTitleEditorProps>(
 
         if (nextTitle) {
           if (parsed.dueDate) {
-            const dueDate = new Date(parsed.dueDate.getTime())
-            dueDate.setHours(23, 59, 59, 0)
-            changes.due_date = dueDate.toISOString()
+            // A parsed time ("tomorrow at 3pm") is kept; a bare date is date-only.
+            changes.due_date = parsedDue(parsed.dueDate, parsed.dueHasTime)
           }
           if (parsed.priority !== null && parsed.priority > 0) {
             changes.priority = parsed.priority
@@ -205,9 +205,7 @@ const TaskTitleEditor = forwardRef<TaskTitleEditorHandle, TaskTitleEditorProps>(
         const bang = extractBangToday(nextTitle)
         if (bang.dueDate) {
           nextTitle = bang.title.trim()
-          const dueDate = new Date(bang.dueDate.getTime())
-          dueDate.setHours(23, 59, 59, 0)
-          changes.due_date = dueDate.toISOString()
+          changes.due_date = dueToday()
         }
       }
 
@@ -408,9 +406,7 @@ function TaskRowInner({ task, sortable = false, nestedDepth = 0, parentProjectId
   )
 
   const setDateToToday = useCallback(() => {
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    updateTask.mutate({ id: task.id, changes: { due_date: today.toISOString() }, original: task })
+    updateTask.mutate({ id: task.id, changes: { due_date: dueToday() }, original: task })
   }, [task, updateTask])
 
   const togglePopover = (popover: PopoverType) => {
