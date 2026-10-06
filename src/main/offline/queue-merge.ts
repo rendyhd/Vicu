@@ -255,7 +255,15 @@ export function cancelPatchKeys(
   return { actions: next, removed, cancelled: cancelled && !sentKeyInFlight }
 }
 
-/** Point every action that follows a create at the task's real id. Untouched actions are reused. */
-export function remapTempId(actions: QueuedAction[], tempId: number, realId: number): QueuedAction[] {
-  return actions.map((a) => (hasTaskId(a) && a.taskId === tempId ? ({ ...a, taskId: realId } as QueuedAction) : a))
+/**
+ * Point every action that follows a create at the task's real id. Untouched actions are reused.
+ * `title`, the created task's final title, names the task in summaries once its temp id is gone.
+ */
+export function remapTempId(actions: QueuedAction[], tempId: number, realId: number, title?: string): QueuedAction[] {
+  return actions.map((a) => {
+    if (!hasTaskId(a) || a.taskId !== tempId) return a
+    const remapped = { ...a, taskId: realId } as QueuedAction
+    if (title && !remapped.title) remapped.title = title
+    return remapped
+  })
 }

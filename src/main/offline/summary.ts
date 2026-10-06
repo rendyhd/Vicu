@@ -4,12 +4,23 @@ function quoted(title: string | undefined): string {
   return title ? `"${title}"` : ''
 }
 
+/** Temp id -> title of the pending create, so a change to a task that does not exist yet can still be named. */
+export function pendingCreateTitles(actions: readonly QueuedAction[]): Map<number, string> {
+  const titles = new Map<number, string>()
+  for (const a of actions) {
+    if (a.type === 'create' && typeof a.fields.title === 'string') titles.set(a.tempId, a.fields.title)
+  }
+  return titles
+}
+
 /** What to call the task an action belongs to: its title, else the title of its pending create, else its id. */
-function taskLabel(action: QueuedAction, all: readonly QueuedAction[]): string {
+function taskLabel(action: QueuedAction, titles: ReadonlyMap<number, string>): string {
+  if (action.type === 'create') {
+    return quoted(typeof action.fields.title === 'string' ? action.fields.title : action.title) || 'a new task'
+  }
   if (action.title) return quoted(action.title)
-  if (action.type === 'create') return quoted(typeof action.fields.title === 'string' ? action.fields.title : undefined) || 'a new task'
-  const create = all.find((a) => a.type === 'create' && a.tempId === action.taskId)
-  if (create && create.type === 'create' && typeof create.fields.title === 'string') return quoted(create.fields.title)
+  const pendingTitle = titles.get(action.taskId)
+  if (pendingTitle) return quoted(pendingTitle)
   return action.taskId > 0 ? `task #${action.taskId}` : 'a new task'
 }
 
@@ -29,12 +40,9 @@ const FIELD_NAMES: Record<string, string> = {
   is_favorite: 'favorite',
 }
 
-/**
- * One line for the pending / failed lists. `all` is the whole queue, so a change to a task that
- * only exists as a pending create can still be named.
- */
-export function describeAction(action: QueuedAction, all: readonly QueuedAction[] = []): string {
-  const name = taskLabel(action, all)
+/** One line for the pending / failed lists. `titles` comes from `pendingCreateTitles`. */
+export function describeAction(action: QueuedAction, titles: ReadonlyMap<number, string> = new Map()): string {
+  const name = taskLabel(action, titles)
   switch (action.type) {
     case 'create':
       return `Create ${name}${action.done ? ' (completed)' : ''}`

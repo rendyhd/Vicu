@@ -48,11 +48,11 @@ export function getOfflineQueue(): OfflineQueue {
   if (status === 'corrupt') console.warn('[offline-queue] the queue file was damaged and could not be restored; pending changes were lost')
 
   created.onChange(() => {
-    const snapshot = created.snapshot()
+    // Cheap on purpose: this runs after every change, including each step of a long replay.
     const change: OfflineQueueChange = {
       counts: created.counts(),
-      replaying: snapshot.replaying,
-      authProblem: snapshot.authProblem,
+      replaying: created.isReplaying(),
+      authProblem: created.getAuthProblem(),
     }
     sendToAppWindows(OFFLINE_EVENTS.changed, change)
   })

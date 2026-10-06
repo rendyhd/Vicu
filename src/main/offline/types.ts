@@ -27,6 +27,11 @@ export interface CreateAction extends ActionBase {
   fields: Record<string, unknown>
   /** Completed before it reached the server (a create has no `done` field, so a follow-up update sets it). */
   done?: boolean
+  /**
+   * A replay sent this create and got a timeout, a reset or a 500: the server may have created the
+   * task anyway. The next attempt looks for it before posting again, so a retry cannot duplicate it.
+   */
+  maybeSent?: boolean
 }
 
 export interface UpdateAction extends ActionBase {
@@ -111,10 +116,6 @@ export const PENDING_ID_PREFIX = 'pending_'
 
 export function pendingIdFor(createActionId: string): string {
   return `${PENDING_ID_PREFIX}${createActionId}`
-}
-
-export function isTempId(id: number): boolean {
-  return Number.isInteger(id) && id < 0
 }
 
 /** The actions that carry a `taskId`, that is, everything except a create. */

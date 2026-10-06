@@ -55,6 +55,7 @@ function fakeApi(script: Script = {}) {
       }),
     fetchTaskAttachments: (taskId) => record('fetchTaskAttachments', [taskId], () => ok(attachments.slice())),
     fetchTaskById: (taskId) => record('fetchTaskById', [taskId], () => ok({ id: taskId, description: descriptions.get(taskId) ?? '' })),
+    findRecentCreate: (projectId, fields, since) => record('findRecentCreate', [projectId, fields.title, since], () => ok(null)),
   }
   return { api, calls, ops: () => calls.map((c) => c.op), descriptions }
 }
@@ -288,6 +289,68 @@ describe('replayQueue', () => {
       const { api, calls } = fakeApi()
       await replayQueue(queue, api)
       expect(calls).toHaveLength(0)
+    })
+  })
+
+  describe('a create whose earlier attempt may have been applied', () => {
+    it('is not sent blindly: it looks for the task first, and adopts it instead of creating a duplicate', async () => {
+      const { tempId } = await queue.enqueueCreate({ projectId: 7, fields: { title: 'Pack' }, labels: [{ id: 3 }] })
+      let calls = 0
+      const harness = fakeApi({
+        createTask: () => (++calls === 1 ? err('Request timed out (10s)') : ok({ id: 1000 })),
+        // the first attempt did reach the server and created task 777
+        findRecentCreate: () => ok({ id: 777 }),
+      })
+
+      const first = await replayQueue(queue, harness.api)
+      expect(first.stopped).toBe('network')
+      expect(queue.getPending()[0]).toMatchObject({ type: 'create', maybeSent: true })
+
+      const second = await replayQueue(queue, harness.api)
+
+      expect(harness.ops()).toEqual(['createTask', 'findRecentCreate', 'addLabelToTask'])
+      expect(harness.calls[2].args).toEqual([777, 3]) // the label follows the task that already exists
+      expect(second).toMatchObject({ applied: 2, stopped: null, idMap: { [String(tempId)]: 777 } })
+    })
+
+    it('creates it when the lookup finds nothing', async () => {
+      await queue.enqueueCreate({ projectId: 7, fields: { title: 'Pack' } })
+      let calls = 0
+      const harness = fakeApi({ createTask: () => (++calls === 1 ? err('socket hang up') : ok({ id: 1000 })) })
+
+      await replayQueue(queue, harness.api)
+      const second = await replayQueue(queue, harness.api)
+
+      expect(harness.ops()).toEqual(['createTask', 'findRecentCreate', 'createTask'])
+      expect(second.idMap).toEqual({ '-1': 1000 })
+    })
+
+    it('looks only for tasks created since the create was queued, in its project, with its title', async () => {
+      await queue.enqueueCreate({ projectId: 7, fields: { title: 'Pack' } })
+      const queuedAt = queue.getPending()[0].createdAt
+      const harness = fakeApi({ createTask: () => err('Request timed out (10s)') })
+      await replayQueue(queue, harness.api)
+      await replayQueue(queue, harness.api)
+      expect(harness.calls.find((c) => c.op === 'findRecentCreate')?.args).toEqual([7, 'Pack', queuedAt])
+    })
+
+    it('stays queued when the lookup itself fails', async () => {
+      await queue.enqueueCreate({ projectId: 7, fields: { title: 'Pack' } })
+      const harness = fakeApi({ createTask: () => err('Request timed out (10s)'), findRecentCreate: () => err('net::ERR_INTERNET_DISCONNECTED') })
+      await replayQueue(queue, harness.api)
+      const second = await replayQueue(queue, harness.api)
+      expect(second.stopped).toBe('network')
+      expect(harness.ops()).toEqual(['createTask', 'findRecentCreate'])
+      expect(queue.counts().pending).toBe(1)
+    })
+
+    it('a failure that provably never reached the server does not trigger the lookup', async () => {
+      await queue.enqueueCreate({ projectId: 7, fields: { title: 'Pack' } })
+      let calls = 0
+      const harness = fakeApi({ createTask: () => (++calls === 1 ? err('net::ERR_CONNECTION_REFUSED') : ok({ id: 1000 })) })
+      await replayQueue(queue, harness.api)
+      await replayQueue(queue, harness.api)
+      expect(harness.ops()).toEqual(['createTask', 'createTask'])
     })
   })
 

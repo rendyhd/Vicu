@@ -91,6 +91,7 @@ import { printHtml } from './print'
 import { uploadStandaloneTasks } from './standalone-upload'
 import { getOfflineQueue } from './offline/service'
 import { registerOfflineQueueIpc } from './offline/ipc'
+import { replayPendingActions } from './sync'
 import {
   createFromQuickEntry,
   quickViewComplete,
@@ -340,6 +341,8 @@ export function registerIpcHandlers(): void {
   handleTrusted('auth:login-oidc', async (_event, url: string, providerKey: string, totpPasscode?: string) => {
     try {
       await authManager.login(url, providerKey, totpPasscode)
+      // Signing in again is what a replay that paused on an expired session was waiting for.
+      void replayPendingActions()
       return { success: true }
     } catch (err: unknown) {
       return {
@@ -355,7 +358,9 @@ export function registerIpcHandlers(): void {
   })
 
   handleTrusted('auth:login-password', async (_event, url: string, username: string, password: string, totpPasscode?: string) => {
-    return authManager.loginPassword(url, username, password, totpPasscode)
+    const result = await authManager.loginPassword(url, username, password, totpPasscode)
+    if (result.success) void replayPendingActions()
+    return result
   })
 
   handleTrusted('auth:get-user', async () => {

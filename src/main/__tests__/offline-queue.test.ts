@@ -568,6 +568,16 @@ describe('OfflineQueue', () => {
       expect(snap.authProblem).toBeNull()
     })
 
+    it('names follow-ups after their create, also after a rename and once the task has a real id', async () => {
+      const q = make()
+      const { pendingId, actionId } = await q.enqueueCreate({ projectId: 7, fields: { title: 'Pack' }, labels: [{ title: 'Travel' }] })
+      await q.enqueueUpdate(pendingId, { title: 'Pack bags' })
+      expect(q.snapshot().pending.map((p) => p.summary)).toEqual(['Create "Pack bags"', 'Add label "Travel" to "Pack bags"'])
+
+      await q.completeAction(actionId, { realId: 77 })
+      expect(q.snapshot().pending.map((p) => p.summary)).toEqual(['Add label "Travel" to "Pack bags"'])
+    })
+
     it('tracks an auth problem until it is cleared', () => {
       const q = make()
       q.setAuthProblem('Session expired. Please sign in again.')

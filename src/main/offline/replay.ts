@@ -5,6 +5,7 @@ import type {
   OfflineReplayStop,
 } from '../../shared/offline-queue-types'
 import type { ApiResult } from '../api-result'
+import { isQueueableFailure } from '../../shared/error-classify'
 import { classifyReplayFailure } from './classify'
 import { createFields, type OfflineQueue } from './queue'
 import { hasTaskId, type QueuedAction } from './types'
@@ -21,6 +22,11 @@ export interface ReplayApi {
   uploadTaskAttachment(taskId: number, bytes: Buffer, name: string, mime: string): Promise<ApiResult<unknown>>
   fetchTaskAttachments(taskId: number): Promise<ApiResult<unknown[]>>
   fetchTaskById(taskId: number): Promise<ApiResult<unknown>>
+  /**
+   * The task a create that may have been applied would have produced: same project and title,
+   * created since `since`. Null when there is none.
+   */
+  findRecentCreate(projectId: number, fields: Record<string, unknown>, since: string): Promise<ApiResult<{ id: number } | null>>
 }
 
 /** Replays that stop on the same action with an error that is neither network nor auth, before it is moved to the failed log. */
@@ -89,6 +95,11 @@ export async function replayQueue(queue: OfflineQueue, api: ReplayApi): Promise<
             await queue.failAction(action.id, { ...step.failure, reason: decision.reason })
           } else {
             if (decision.why === 'auth') queue.setAuthProblem(step.failure.error)
+            // A create that timed out or hit a 500 may exist on the server already: remember that,
+            // so the retry checks before it posts again.
+            if (action.type === 'create' && decision.why !== 'auth' && !isQueueableFailure(step.failure, 'create')) {
+              await queue.patchAction(action.id, { maybeSent: true })
+            }
             if (decision.why === 'unknown') {
               // Something the server said that we have no rule for. Keep the action for a few
               // replays, then surface it instead of blocking the queue for ever.
@@ -137,6 +148,11 @@ async function sendAction(queue: OfflineQueue, api: ReplayApi, action: QueuedAct
       payload = createFields(action.fields)
     } catch (err) {
       return { kind: 'broken', reason: 'rejected', error: err instanceof Error ? err.message : 'The task is not valid' }
+    }
+    if (action.maybeSent) {
+      const existing = await api.findRecentCreate(action.projectId, payload, action.createdAt)
+      if (!existing.success) return fail(existing)
+      if (existing.data) return { kind: 'ok', realId: existing.data.id }
     }
     const result = await api.createTask(action.projectId, payload)
     if (!result.success) return fail(result)

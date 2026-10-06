@@ -37,6 +37,7 @@ export function normalizeAction(raw: unknown): QueuedAction | null {
         projectId: raw.projectId,
         fields: raw.fields,
         ...(raw.done === true ? { done: true } : {}),
+        ...(raw.maybeSent === true ? { maybeSent: true } : {}),
       }
     case 'update':
       if (!isInt(raw.taskId) || !isRecord(raw.patch)) return null

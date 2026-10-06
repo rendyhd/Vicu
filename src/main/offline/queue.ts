@@ -23,7 +23,7 @@ import {
   type MergeOutcome,
 } from './queue-merge'
 import { parseQueueData } from './queue-parse'
-import { describeAction } from './summary'
+import { describeAction, pendingCreateTitles } from './summary'
 import {
   MAX_RESOLVED_IDS,
   emptyQueueData,
@@ -139,18 +139,26 @@ export class OfflineQueue {
     return this.data.failed
   }
 
+  isReplaying(): boolean {
+    return this.replaying
+  }
+
+  getAuthProblem(): { error: string; since: string } | null {
+    return this.authProblem
+  }
+
   counts(): OfflineQueueCounts {
     return { pending: this.data.actions.length, failed: this.data.failed.length }
   }
 
   snapshot(): OfflineQueueSnapshot {
-    const all = this.data.actions
+    const titles = pendingCreateTitles(this.data.actions)
     return {
-      pending: all.map((a): OfflineQueueItemView => {
+      pending: this.data.actions.map((a): OfflineQueueItemView => {
         const view: OfflineQueueItemView = {
           id: a.id,
           type: a.type,
-          summary: describeAction(a, all),
+          summary: describeAction(a, titles),
           createdAt: a.createdAt,
           attempts: a.attempts,
         }
@@ -170,7 +178,7 @@ export class OfflineQueue {
       failed: this.data.failed.map((f) => ({
         id: f.id,
         type: f.action.type,
-        summary: describeAction(f.action, all),
+        summary: describeAction(f.action, titles),
         error: f.error,
         statusCode: f.statusCode,
         reason: f.reason,
@@ -311,10 +319,10 @@ export class OfflineQueue {
 
     const tempId = this.data.lastTempId - 1
     this.data.lastTempId = tempId
-    const meta: Meta = { title: fields.title as string }
-
     const create: CreateAction = {
-      ...this.stamp(meta),
+      // The follow-ups below carry no title of their own: summaries name them after the create, so a
+      // rename that folds into the create is reflected there too.
+      ...this.stamp({ title: fields.title as string }),
       type: 'create',
       tempId,
       projectId: input.projectId,
@@ -329,7 +337,7 @@ export class OfflineQueue {
       if ((label.id === undefined && !label.title?.trim()) || seen.has(key)) continue
       seen.add(key)
       added.push({
-        ...this.stamp(meta),
+        ...this.stamp(),
         type: 'add-label',
         taskId: tempId,
         labelId: label.id,
@@ -338,7 +346,7 @@ export class OfflineQueue {
     }
     for (const s of stored) {
       added.push({
-        ...this.stamp(meta),
+        ...this.stamp(),
         type: 'upload-attachment',
         taskId: tempId,
         file: s.file,
@@ -458,7 +466,7 @@ export class OfflineQueue {
     let actions = [...this.data.actions.slice(0, index), ...this.data.actions.slice(index + 1)]
 
     if (action.type === 'create' && result.realId !== undefined) {
-      actions = remapTempId(actions, action.tempId, result.realId)
+      actions = remapTempId(actions, action.tempId, result.realId, typeof action.fields.title === 'string' ? action.fields.title : undefined)
       this.data.resolved[String(action.tempId)] = result.realId
       this.data.resolved[pendingIdFor(action.id)] = result.realId
       this.trimResolved()
@@ -528,7 +536,7 @@ export class OfflineQueue {
   }
 
   /** Persist progress inside an action (a resolved label id, "already uploaded"). */
-  async patchAction(id: string, changes: { labelId?: number; uploaded?: boolean }): Promise<void> {
+  async patchAction(id: string, changes: { labelId?: number; uploaded?: boolean; maybeSent?: boolean }): Promise<void> {
     const index = this.data.actions.findIndex((a) => a.id === id)
     if (index === -1) return
     this.data.actions = this.data.actions.map((a, i) => (i === index ? ({ ...a, ...changes } as QueuedAction) : a))

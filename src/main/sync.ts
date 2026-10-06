@@ -1,5 +1,6 @@
 import { loadConfig } from './config'
 import {
+  fetchTasks,
   addLabelToTask,
   createLabel,
   createTask,
@@ -12,7 +13,9 @@ import {
   uploadTaskAttachment,
 } from './api-client'
 import { OFFLINE_EVENTS, getOfflineQueue, sendToAppWindows } from './offline/service'
+import { matchesQueuedCreate } from './offline/duplicate-match'
 import { createReplayRunner, replayQueue, type ReplayApi } from './offline/replay'
+import { KEEP_NESTED_SUBTASKS_PARAM } from './api-v2'
 import { getMainWindow, getQuickEntryWindow, getQuickViewWindow } from './quick-entry-state'
 import type { OfflineReplayEvent } from '../shared/offline-queue-types'
 
@@ -27,6 +30,12 @@ const api: ReplayApi = {
   uploadTaskAttachment,
   fetchTaskAttachments,
   fetchTaskById,
+  async findRecentCreate(projectId, fields, since) {
+    const title = typeof fields.title === 'string' ? fields.title : ''
+    const found = await fetchTasks({ q: title, filter: `project_id = ${projectId}`, [KEEP_NESTED_SUBTASKS_PARAM]: true })
+    if (!found.success) return found
+    return { success: true, data: found.data.find((t) => matchesQueuedCreate(t, projectId, fields, since)) as { id: number } | undefined ?? null }
+  },
 }
 
 const runReplay = createReplayRunner(async () => {
