@@ -3,6 +3,7 @@ import { join } from 'path'
 import { loadConfig, type AppConfig } from './config'
 import { fetchTasks } from './api-client'
 import { getAllStandaloneTasks } from './cache'
+import { notificationCategory, notificationFilters, overdueDays } from './notification-windows'
 
 const NULL_DATE = '0001-01-01T00:00:00Z'
 
@@ -428,18 +429,13 @@ async function getNotificationTasks(config: AppConfig): Promise<NotificationTask
     return getStandaloneNotificationTasks(config)
   }
 
-  const now = new Date()
-  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-  const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59)
-  const tomorrowStart = new Date(todayStart)
-  tomorrowStart.setDate(tomorrowStart.getDate() + 1)
-  const tomorrowEnd = new Date(todayEnd)
-  tomorrowEnd.setDate(tomorrowEnd.getDate() + 1)
+  // Local-day boundaries, exclusive upper bounds (cross-app semantics v1, section 2).
+  const filters = notificationFilters(new Date())
 
   // Fetch overdue tasks
   if (config.notifications_overdue_enabled) {
     const overdue = await fetchTasks({
-      filter: `done = false && due_date < "${todayStart.toISOString()}" && due_date != "${NULL_DATE}"`,
+      filter: filters.overdue,
       sort_by: 'due_date',
       order_by: 'asc',
       per_page: 50,
@@ -459,7 +455,7 @@ async function getNotificationTasks(config: AppConfig): Promise<NotificationTask
   // Fetch tasks due today
   if (config.notifications_due_today_enabled) {
     const dueToday = await fetchTasks({
-      filter: `done = false && due_date >= "${todayStart.toISOString()}" && due_date <= "${todayEnd.toISOString()}"`,
+      filter: filters.dueToday,
       sort_by: 'due_date',
       order_by: 'asc',
       per_page: 50,
@@ -479,7 +475,7 @@ async function getNotificationTasks(config: AppConfig): Promise<NotificationTask
   // Fetch upcoming tasks (tomorrow)
   if (config.notifications_upcoming_enabled) {
     const upcoming = await fetchTasks({
-      filter: `done = false && due_date >= "${tomorrowStart.toISOString()}" && due_date <= "${tomorrowEnd.toISOString()}"`,
+      filter: filters.upcoming,
       sort_by: 'due_date',
       order_by: 'asc',
       per_page: 50,
@@ -504,32 +500,26 @@ function getStandaloneNotificationTasks(config: AppConfig): NotificationTasks {
   const tasks = getAllStandaloneTasks()
 
   const now = new Date()
-  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-  const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59)
-  const tomorrowStart = new Date(todayStart)
-  tomorrowStart.setDate(tomorrowStart.getDate() + 1)
-  const tomorrowEnd = new Date(todayEnd)
-  tomorrowEnd.setDate(tomorrowEnd.getDate() + 1)
 
   for (const task of tasks) {
     if (task.due_date === NULL_DATE || !task.due_date) continue
-    const dueTime = new Date(task.due_date).getTime()
+    const category = notificationCategory(task.due_date, now)
 
-    if (config.notifications_overdue_enabled && dueTime < todayStart.getTime()) {
+    if (config.notifications_overdue_enabled && category === 'overdue') {
       result.overdue.push({
         id: task.id,
         title: task.title,
         due_date: task.due_date,
         category: 'overdue',
       })
-    } else if (config.notifications_due_today_enabled && dueTime >= todayStart.getTime() && dueTime <= todayEnd.getTime()) {
+    } else if (config.notifications_due_today_enabled && category === 'due_today') {
       result.dueToday.push({
         id: task.id,
         title: task.title,
         due_date: task.due_date,
         category: 'due_today',
       })
-    } else if (config.notifications_upcoming_enabled && dueTime >= tomorrowStart.getTime() && dueTime <= tomorrowEnd.getTime()) {
+    } else if (config.notifications_upcoming_enabled && category === 'upcoming') {
       result.upcoming.push({
         id: task.id,
         title: task.title,
@@ -597,11 +587,8 @@ function formatDueDate(dueDateStr: string, category: 'overdue' | 'due_today' | '
   if (category === 'due_today') return 'Due today'
   if (category === 'upcoming') return 'Due tomorrow'
 
-  // Overdue — calculate how many days
-  const dueDate = new Date(dueDateStr)
-  const now = new Date()
-  const diffMs = now.getTime() - dueDate.getTime()
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+  // Overdue: whole calendar days since the due date's local day
+  const diffDays = overdueDays(dueDateStr)
 
   if (diffDays <= 0) return 'Due today'
   if (diffDays === 1) return 'Overdue by 1 day'

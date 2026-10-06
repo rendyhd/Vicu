@@ -4,6 +4,7 @@ import { app } from 'electron'
 import { randomBytes } from 'crypto'
 import { writeFileAtomic } from './atomic-file'
 import { overlayPendingActions } from './cache-overlay'
+import { dueToday } from '../shared/due-dates'
 
 const CACHE_FILENAME = 'offline-cache.json'
 
@@ -205,8 +206,7 @@ export function scheduleStandaloneTaskToday(taskId: string): StandaloneTask | nu
   const cache = loadCache()
   const task = cache.standaloneTasks.find((t) => t.id === taskId)
   if (!task) return null
-  const now = new Date()
-  task.due_date = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59).toISOString()
+  task.due_date = dueToday()
   task.updated = new Date().toISOString()
   saveCache(cache)
   return task

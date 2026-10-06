@@ -64,3 +64,25 @@ describe('standalone task store', () => {
     expect(stored()).toEqual([])
   })
 })
+
+describe('standalone "schedule today"', () => {
+  beforeEach(() => {
+    state.dir = mkdtempSync(join(tmpdir(), 'vicu-standalone-'))
+  })
+
+  afterEach(() => {
+    rmSync(state.dir, { recursive: true, force: true })
+  })
+
+  it('stores today as a date-only due date: local 23:59:59 (D-IPC-3, D-REN-4)', async () => {
+    const cache = await loadCache()
+    const task = cache.addStandaloneTask('A', null, null)
+
+    const scheduled = cache.scheduleStandaloneTaskToday(task.id)
+
+    const due = new Date(scheduled!.due_date)
+    const now = new Date()
+    expect([due.getFullYear(), due.getMonth(), due.getDate()]).toEqual([now.getFullYear(), now.getMonth(), now.getDate()])
+    expect([due.getHours(), due.getMinutes(), due.getSeconds(), due.getMilliseconds()]).toEqual([23, 59, 59, 0])
+  })
+})

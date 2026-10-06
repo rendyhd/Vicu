@@ -57,6 +57,7 @@ import { fetchCurrentUser } from './auth/user-info'
 import { authManager } from './auth/auth-manager'
 import { OidcTotpRequiredError } from './auth/oidc-login'
 import { buildViewerFilterParams } from './quick-entry/filter-builder'
+import { dueToday } from '../shared/due-dates'
 import { fetchPositionSortedTasks } from './quick-entry/position-sort'
 import { cachedFallback } from './quick-entry/fetch-fallback'
 import { applyCustomListTaskFilter, type CustomListClientFilter } from './quick-entry/custom-list-filter'
@@ -655,8 +656,8 @@ export function registerIpcHandlers(): void {
   })
 
   handleTrusted('qv:schedule-task-today', async (_event, taskId: number, taskData: Record<string, unknown>) => {
-    const now = new Date()
-    const dueDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59).toISOString()
+    // Same date-only rule as every other "today" setter: local 23:59:59 (D-IPC-3).
+    const dueDate = dueToday()
 
     const config = loadConfig()
     if (config?.standalone_mode) {

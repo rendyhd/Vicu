@@ -1,5 +1,6 @@
 import type { ViewerFilter } from '../config'
 import { MAX_PAGE_SIZE } from '../api-v2'
+import { startOfLocalDayIso } from '../../shared/due-dates'
 
 // Vikunja caps per_page at 1000 (anything above is a 422). No `page` is set on purpose:
 // the API client then reads every page until total_pages, so lists beyond 1000 tasks
@@ -12,26 +13,26 @@ interface FilterParams {
   filter_include_nulls?: string
 }
 
-export function buildViewerFilterParams(viewerFilter: ViewerFilter): FilterParams {
-  const now = new Date()
-  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-  const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59)
+export function buildViewerFilterParams(viewerFilter: ViewerFilter, now: Date = new Date()): FilterParams {
+  // Local-day boundaries as UTC instants. "Today" is everything before the start of local
+  // tomorrow (cross-app semantics v1, section 2); the client applies the exact rule on top.
+  const todayStartIso = startOfLocalDayIso(0, now)
+  const tomorrowStartIso = startOfLocalDayIso(1, now)
 
   // Built-in view types bypass the normal filter logic
   if (viewerFilter.view_type) {
-    const eot = todayEnd.toISOString()
     const nullDate = '0001-01-01T00:00:00Z'
     switch (viewerFilter.view_type) {
       case 'today':
         return {
-          filter: `done = false && due_date <= '${eot}' && due_date != '${nullDate}'`,
+          filter: `done = false && due_date < '${tomorrowStartIso}' && due_date != '${nullDate}'`,
           sort_by: 'due_date',
           order_by: 'asc',
           per_page: MAX_PAGE_SIZE,
         }
       case 'upcoming':
         return {
-          filter: `done = false && due_date > '${eot}' && due_date != '${nullDate}'`,
+          filter: `done = false && due_date >= '${tomorrowStartIso}' && due_date != '${nullDate}'`,
           sort_by: 'due_date',
           order_by: 'asc',
           per_page: MAX_PAGE_SIZE,
@@ -65,13 +66,13 @@ export function buildViewerFilterParams(viewerFilter: ViewerFilter): FilterParam
   if (viewerFilter.due_date_filter && viewerFilter.due_date_filter !== 'all') {
     switch (viewerFilter.due_date_filter) {
       case 'overdue':
-        dueDateClause = `due_date < '${todayStart.toISOString()}' && due_date != '0001-01-01T00:00:00Z'`
+        dueDateClause = `due_date < '${todayStartIso}' && due_date != '0001-01-01T00:00:00Z'`
         break
       case 'today':
-        dueDateClause = `due_date <= '${todayEnd.toISOString()}' && due_date != '0001-01-01T00:00:00Z'`
+        dueDateClause = `due_date < '${tomorrowStartIso}' && due_date != '0001-01-01T00:00:00Z'`
         break
       case 'this_week': {
-        const weekEnd = new Date(todayStart)
+        const weekEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate())
         weekEnd.setDate(weekEnd.getDate() + (7 - weekEnd.getDay()))
         weekEnd.setHours(23, 59, 59)
         dueDateClause = `due_date <= '${weekEnd.toISOString()}' && due_date != '0001-01-01T00:00:00Z'`
@@ -92,7 +93,7 @@ export function buildViewerFilterParams(viewerFilter: ViewerFilter): FilterParam
   }
 
   // Build "due today" clause for union mode
-  const dueTodayClause = `due_date >= '${todayStart.toISOString()}' && due_date <= '${todayEnd.toISOString()}' && due_date != '0001-01-01T00:00:00Z'`
+  const dueTodayClause = `due_date >= '${todayStartIso}' && due_date < '${tomorrowStartIso}' && due_date != '0001-01-01T00:00:00Z'`
 
   let filterString = 'done = false'
   let isUnionMode = false
