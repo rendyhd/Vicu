@@ -231,6 +231,13 @@ function buildTaskItemDOM(task: TaskData): HTMLElement {
   checkbox.className = 'task-checkbox'
   checkbox.title = 'Mark as done'
   checkbox.addEventListener('change', () => completeTask(task.id, item, checkbox))
+  // A list that includes completed tasks shows them checked; they cannot be completed again.
+  if (task.done) {
+    item.classList.add('task-done')
+    checkbox.checked = true
+    checkbox.disabled = true
+    checkbox.title = 'Completed'
+  }
   item.appendChild(checkbox)
 
   const content = document.createElement('div')
@@ -602,7 +609,7 @@ async function handleEnterOnSelected(): Promise<void> {
   const taskId = item.dataset.taskId!
   if (item.classList.contains('completed-undo')) {
     await undoComplete(taskId, item)
-  } else {
+  } else if (!item.classList.contains('task-done')) {
     await completeTask(taskId, item, item.querySelector('.task-checkbox') as HTMLInputElement | null)
   }
 }

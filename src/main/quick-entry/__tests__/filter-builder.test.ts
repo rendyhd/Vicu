@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { buildViewerFilterParams } from '../filter-builder'
+import { resolveViewerFilter } from '../viewer-filter'
 import type { ViewerFilter } from '../../config'
 
 const originalTz = process.env.TZ
@@ -70,14 +71,35 @@ describe('the "today" window of a custom list', () => {
     })
   })
 
-  it('"today from all projects" covers exactly the local day', () => {
+  it('"today from all projects" of a plain filter covers exactly the local day', () => {
     inTimeZone('America/New_York', () => {
-      const params = buildViewerFilterParams(
+      const { filter } = resolveViewerFilter(
         { ...base, due_date_filter: 'all', project_ids: [10], include_today_all_projects: true },
-        eveningInNewYork(),
+        [],
       )
-      expect(params.filter).toContain("due_date >= '2026-10-06T04:00:00.000Z' && due_date < '2026-10-07T04:00:00.000Z'")
+      const params = buildViewerFilterParams(filter, eveningInNewYork())
+      expect(params.filter).toBe(
+        "done = false && (project_id = 10 || (due_date >= '2026-10-06T04:00:00.000Z' && due_date < '2026-10-07T04:00:00.000Z'))",
+      )
     })
+  })
+
+  it('"today from all projects" of a list also brings overdue tasks unless the list turns that off', () => {
+    inTimeZone('America/New_York', () => {
+      const union = { ...base, due_date_filter: 'all', project_ids: [10], include_today_all_projects: true }
+      expect(buildViewerFilterParams(union, eveningInNewYork()).filter).toBe(
+        "done = false && (project_id = 10 || (due_date < '2026-10-07T04:00:00.000Z' && due_date != '0001-01-01T00:00:00Z'))",
+      )
+      expect(buildViewerFilterParams({ ...union, include_overdue: false }, eveningInNewYork()).filter).toContain(
+        "due_date >= '2026-10-06T04:00:00.000Z' && due_date < '2026-10-07T04:00:00.000Z'",
+      )
+    })
+  })
+
+  it('does not sort nulls in when the union brings in tasks from other projects', () => {
+    const union = { ...base, project_ids: [10], include_today_all_projects: true }
+    expect(buildViewerFilterParams(union).filter_include_nulls).toBeUndefined()
+    expect(buildViewerFilterParams({ ...base, project_ids: [10] }).filter_include_nulls).toBe('true')
   })
 
   it('the overdue window still ends at the start of today', () => {

@@ -59,9 +59,10 @@ import { authManager } from './auth/auth-manager'
 import { OidcTotpRequiredError } from './auth/oidc-login'
 import { buildViewerFilterParams } from './quick-entry/filter-builder'
 import { dueToday } from '../shared/due-dates'
+import { KEEP_NESTED_SUBTASKS_PARAM } from './api-v2'
 import { fetchPositionSortedTasks } from './quick-entry/position-sort'
 import { cachedFallback } from './quick-entry/fetch-fallback'
-import { applyCustomListTaskFilter, type CustomListClientFilter } from './quick-entry/custom-list-filter'
+import { resolveViewerFilter, selectQuickViewTasks } from './quick-entry/viewer-filter'
 import {
   hideQuickEntry,
   hideQuickView,
@@ -508,45 +509,27 @@ export function registerIpcHandlers(): void {
     const activeProjectIds = activeProjectsResult.success
       ? new Set((activeProjectsResult.data as Array<{ id?: number }>).map(project => project.id).filter((id): id is number => typeof id === 'number'))
       : null
-    const keepActiveProjectTasks = (tasks: unknown[]): unknown[] => {
-      if (!activeProjectIds) return tasks
-      return tasks.filter(task => {
-        const projectId = (task as { project_id?: unknown })?.project_id
-        return typeof projectId === 'number' && activeProjectIds.has(projectId)
-      })
-    }
 
-    // Resolve custom list filter if set
-    let effectiveFilter = config.viewer_filter
-    let clientFilter: CustomListClientFilter | null = null
-    if (config.viewer_filter.custom_list_id) {
-      const list = config.custom_lists?.find(l => l.id === config.viewer_filter!.custom_list_id)
-      if (list) {
-        const isExclude = list.filter.project_filter_mode === 'exclude'
-        effectiveFilter = {
-          project_ids: isExclude ? [] : list.filter.project_ids,
-          sort_by: list.filter.sort_by,
-          order_by: list.filter.order_by,
-          due_date_filter: list.filter.due_date_filter,
-          include_today_all_projects: list.filter.include_today_all_projects,
-        }
-        clientFilter = {
-          project_ids: list.filter.project_ids,
-          project_filter_mode: list.filter.project_filter_mode,
-          priority_filter: list.filter.priority_filter,
-          label_ids: list.filter.label_ids,
-        }
-      }
-    }
-
-    const filterParams = buildViewerFilterParams(effectiveFilter) as unknown as Record<string, unknown>
+    // A viewer that points at a custom list takes that list's conditions. The server query is a
+    // superset; the exact rule is applied below with the same evaluator as the main window.
+    const resolved = resolveViewerFilter(config.viewer_filter, config.custom_lists)
+    const { filter: effectiveFilter, fromCustomList } = resolved
+    const now = new Date()
+    const filterParams = {
+      ...buildViewerFilterParams(effectiveFilter, now),
+      // A custom list filters before hiding nested subtasks, so a matching subtask whose
+      // parent does not match is still shown (cross-app semantics v1, section 3.2).
+      ...(fromCustomList ? { [KEEP_NESTED_SUBTASKS_PARAM]: true } : {}),
+    } as unknown as Record<string, unknown>
 
     // Position sort needs special handling via project views
     let result: Awaited<ReturnType<typeof fetchTasks>>
     if (effectiveFilter.sort_by === 'position') {
+      // Only an include list names the projects to read; an exclude list is not a project list.
+      const listedProjectIds = effectiveFilter.project_filter_mode === 'exclude' ? [] : effectiveFilter.project_ids
       const projectIds = activeProjectIds
-        ? effectiveFilter.project_ids.filter(projectId => activeProjectIds.has(projectId))
-        : effectiveFilter.project_ids
+        ? listedProjectIds.filter(projectId => activeProjectIds.has(projectId))
+        : listedProjectIds
       if (!projectIds || projectIds.length === 0) {
         return { success: false, error: 'Position sort requires specific projects' }
       }
@@ -559,9 +542,16 @@ export function registerIpcHandlers(): void {
     }
 
     if (result.success) {
-      const tasks = keepActiveProjectTasks((clientFilter
-        ? applyCustomListTaskFilter((result.data ?? []) as Array<{ project_id?: number; priority?: number; labels?: Array<{ id: number }> }>, clientFilter)
-        : result.data).filter((task) => !hasVicuMetadataMarker((task as { description?: string }).description)))
+      const tasks = selectQuickViewTasks(
+        (result.data ?? []) as Array<{ project_id: number; done?: boolean; due_date?: string | null; priority?: number; labels?: Array<{ id: number }> | null; description?: string }>,
+        resolved,
+        {
+          now,
+          inboxProjectId: config.inbox_project_id,
+          keep: (task) => !hasVicuMetadataMarker(task.description)
+            && (!activeProjectIds || activeProjectIds.has(task.project_id)),
+        },
+      )
       setCachedTasks(tasks ?? [])
       return { success: true, tasks }
     }

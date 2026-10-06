@@ -1,22 +1,26 @@
 import type { ViewerFilter } from '../config'
 import { MAX_PAGE_SIZE } from '../api-v2'
+import { buildCustomListServerFilter } from '../../shared/custom-list-filter'
 import { startOfLocalDayIso } from '../../shared/due-dates'
 
 // Vikunja caps per_page at 1000 (anything above is a 422). No `page` is set on purpose:
 // the API client then reads every page until total_pages, so lists beyond 1000 tasks
 // are complete instead of silently cut off.
 interface FilterParams {
-  filter: string
+  filter?: string
   sort_by: string
   order_by: string
   per_page: number
   filter_include_nulls?: string
 }
 
+/**
+ * The server query for the Quick View. The filter is a superset built from local-day boundaries
+ * (cross-app semantics v1, sections 2 and 3); `selectViewerTasks` applies the exact rule to
+ * what comes back.
+ */
 export function buildViewerFilterParams(viewerFilter: ViewerFilter, now: Date = new Date()): FilterParams {
-  // Local-day boundaries as UTC instants. "Today" is everything before the start of local
-  // tomorrow (cross-app semantics v1, section 2); the client applies the exact rule on top.
-  const todayStartIso = startOfLocalDayIso(0, now)
+  // "Today" is everything before the start of local tomorrow.
   const tomorrowStartIso = startOfLocalDayIso(1, now)
 
   // Built-in view types bypass the normal filter logic
@@ -47,87 +51,14 @@ export function buildViewerFilterParams(viewerFilter: ViewerFilter, now: Date = 
     }
   }
 
-  const hasProjects = viewerFilter.project_ids && viewerFilter.project_ids.length > 0
-  const includeTodayAllProjects = viewerFilter.include_today_all_projects === true
-
-  // Build project filter clause
-  let projectClause: string | null = null
-  if (hasProjects) {
-    if (viewerFilter.project_ids.length === 1) {
-      projectClause = `project_id = ${viewerFilter.project_ids[0]}`
-    } else {
-      const projectConditions = viewerFilter.project_ids.map(id => `project_id = ${id}`).join(' || ')
-      projectClause = `(${projectConditions})`
-    }
-  }
-
-  // Build due date filter clause
-  let dueDateClause: string | null = null
-  if (viewerFilter.due_date_filter && viewerFilter.due_date_filter !== 'all') {
-    switch (viewerFilter.due_date_filter) {
-      case 'overdue':
-        dueDateClause = `due_date < '${todayStartIso}' && due_date != '0001-01-01T00:00:00Z'`
-        break
-      case 'today':
-        dueDateClause = `due_date < '${tomorrowStartIso}' && due_date != '0001-01-01T00:00:00Z'`
-        break
-      case 'this_week': {
-        const weekEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-        weekEnd.setDate(weekEnd.getDate() + (7 - weekEnd.getDay()))
-        weekEnd.setHours(23, 59, 59)
-        dueDateClause = `due_date <= '${weekEnd.toISOString()}' && due_date != '0001-01-01T00:00:00Z'`
-        break
-      }
-      case 'this_month': {
-        const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59)
-        dueDateClause = `due_date <= '${monthEnd.toISOString()}' && due_date != '0001-01-01T00:00:00Z'`
-        break
-      }
-      case 'has_due_date':
-        dueDateClause = `due_date != '0001-01-01T00:00:00Z'`
-        break
-      case 'no_due_date':
-        dueDateClause = `due_date = '0001-01-01T00:00:00Z'`
-        break
-    }
-  }
-
-  // Build "due today" clause for union mode
-  const dueTodayClause = `due_date >= '${todayStartIso}' && due_date < '${tomorrowStartIso}' && due_date != '0001-01-01T00:00:00Z'`
-
-  let filterString = 'done = false'
-  let isUnionMode = false
-
-  if (includeTodayAllProjects && hasProjects) {
-    isUnionMode = true
-    const normalFilterParts: string[] = []
-    if (projectClause) normalFilterParts.push(projectClause)
-    if (dueDateClause) normalFilterParts.push(dueDateClause)
-
-    const nullDueDateFromProject = projectClause
-      ? `(${projectClause} && due_date = '0001-01-01T00:00:00Z')`
-      : null
-
-    if (normalFilterParts.length > 0) {
-      const normalFilter = normalFilterParts.join(' && ')
-      if (nullDueDateFromProject && !dueDateClause) {
-        filterString += ` && ((${normalFilter}) || ${nullDueDateFromProject} || (${dueTodayClause}))`
-      } else {
-        filterString += ` && ((${normalFilter}) || (${dueTodayClause}))`
-      }
-    } else {
-      filterString += ` && (${dueTodayClause})`
-    }
-  } else {
-    if (projectClause) filterString += ` && ${projectClause}`
-    if (dueDateClause) filterString += ` && ${dueDateClause}`
-  }
+  const hasProjects = !!viewerFilter.project_ids && viewerFilter.project_ids.length > 0
+  const isUnionMode = viewerFilter.include_today_all_projects === true && hasProjects
 
   const sortBy = viewerFilter.sort_by || 'due_date'
   const orderBy = viewerFilter.order_by || 'asc'
 
   const params: FilterParams = {
-    filter: filterString,
+    filter: buildCustomListServerFilter(viewerFilter, now),
     sort_by: sortBy,
     order_by: orderBy,
     per_page: MAX_PAGE_SIZE,

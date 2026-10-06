@@ -12,6 +12,13 @@ export interface ViewerFilter {
   include_today_all_projects?: boolean
   custom_list_id?: string
   view_type?: 'today' | 'upcoming' | 'anytime'
+  // The conditions of a custom list. The Quick View settings never write these; they are filled
+  // in memory when the viewer points at a custom list (see quick-entry/viewer-filter.ts).
+  project_filter_mode?: 'include' | 'exclude'
+  include_done?: boolean
+  include_overdue?: boolean
+  priority_filter?: number[]
+  label_ids?: number[]
 }
 
 export interface SecondaryProject {

@@ -238,7 +238,8 @@ html, body {
   color: #1a1a1a;
 }
 
-.task-item.completing .task-title {
+.task-item.completing .task-title,
+.task-item.task-done .task-title {
   text-decoration: line-through;
   opacity: 0.5;
 }
