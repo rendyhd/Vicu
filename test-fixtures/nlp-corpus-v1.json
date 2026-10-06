@@ -9,12 +9,16 @@
     { "input": "p3 talk about p2p networking", "title": "talk about p2p networking", "priority": 2 },
     { "input": "Fix login p1", "title": "Fix login", "priority": 4 },
     { "input": "Fix bug !high", "title": "Fix bug", "priority": 3 },
+    { "input": "Fix bug !med", "title": "Fix bug", "priority": 2 },
+    { "input": "Outage !critical", "title": "Outage", "priority": 4 },
+    { "input": "!low Tidy desk", "title": "Tidy desk", "priority": 1 },
     { "input": "Book flight #\"Travel plans\" @\"long term\"", "title": "Book flight", "labels": ["long term"], "project": "Travel plans" },
 
     { "input": "call dentist !", "title": "call dentist", "due": "2026-10-06T23:59:59" },
     { "input": "call dentist!", "title": "call dentist", "due": "2026-10-06T23:59:59" },
     { "input": "! call dentist", "title": "call dentist", "due": "2026-10-06T23:59:59" },
     { "input": "Hello! world", "title": "Hello! world" },
+    { "input": "Call mom tomorrow!", "title": "Call mom", "due": "2026-10-07T23:59:59" },
 
     { "input": "Call mom tomorrow", "title": "Call mom", "due": "2026-10-07T23:59:59" },
     { "input": "Call mom today", "title": "Call mom", "due": "2026-10-06T23:59:59" },

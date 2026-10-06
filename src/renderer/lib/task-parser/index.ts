@@ -128,13 +128,16 @@ export function parse(
   // 6. Build title from non-consumed regions
   result.title = buildTitle(rawInput, consumed)
 
-  // 7. Standalone/leading/trailing ! → today (only when no date was found by chrono)
-  if (config.bangToday && !result.dueDate) {
+  // 7. Standalone/leading/trailing ! → today. An explicit date wins, but the
+  //    "!" marker is still removed from the title ("Call mom tomorrow!").
+  if (config.bangToday) {
     const bang = extractBangToday(result.title, reference)
     if (bang.dueDate) {
       result.title = bang.title
-      result.dueDate = bang.dueDate
-      result.dueHasTime = false
+      if (!result.dueDate) {
+        result.dueDate = bang.dueDate
+        result.dueHasTime = false
+      }
     }
   }
 

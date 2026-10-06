@@ -213,7 +213,7 @@ export function extractBangToday(
   if (leadingMatch) {
     // Check that the text after `!` doesn't start with a priority token
     const rest = leadingMatch[1]
-    if (!/^[1-4](?:\s|$)/.test(rest) && !/^(?:urgent|high|medium|low)(?:\s|$)/i.test(rest)) {
+    if (!/^[1-4](?:\s|$)/.test(rest) && !/^(?:urgent|critical|high|medium|med|low)(?:\s|$)/i.test(rest)) {
       return { title: rest.trim(), dueDate: today }
     }
   }

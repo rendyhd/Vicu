@@ -62,7 +62,7 @@ export function runNlpCorpusSuite(options: { zone: string; expectedOffsetMinutes
   describe(`nlp corpus v1 in ${options.zone}`, () => {
     it('is running in the requested time zone', () => {
       expect(corpus.contractVersion).toBe(1)
-      expect(corpus.cases.length).toBe(70)
+      expect(corpus.cases.length).toBe(74)
       if (options.expectedOffsetMinutesInOctober !== undefined) {
         expect(new Date(2026, 9, 6).getTimezoneOffset()).toBe(options.expectedOffsetMinutesInOctober)
       }
