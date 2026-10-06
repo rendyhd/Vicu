@@ -262,6 +262,8 @@ export const api = {
     window.api.onTasksChanged?.(cb) ?? (() => {}),
   onNavigate: (cb: (path: string) => void) =>
     window.api.onNavigate?.(cb) ?? (() => {}),
+  onAppResumed: (cb: () => void) =>
+    window.api.onAppResumed?.(cb) ?? (() => {}),
   printHtml: (html: string) =>
     window.api.printHtml(html) as Promise<{ success: true } | { success: false; error: string }>,
   onPrintView: (cb: () => void) =>

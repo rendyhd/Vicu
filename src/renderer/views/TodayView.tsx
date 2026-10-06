@@ -3,6 +3,7 @@ import { useTasks } from '@/hooks/use-tasks'
 import { useProjects } from '@/hooks/use-projects'
 import { useFilters } from '@/hooks/use-filters'
 import { usePrintable } from '@/stores/print-store'
+import { useDayKey } from '@/stores/day-store'
 import { isDueToday, isOverdue } from '@/lib/due-dates'
 import { TaskList } from '@/components/task-list/TaskList'
 import { TaskRow } from '@/components/task-list/TaskRow'
@@ -32,9 +33,10 @@ export function TodayView() {
   const { data: tasks = [], isLoading } = useTasks(params)
   const { data: projects } = useProjects()
   const [inboxProjectId, setInboxProjectId] = useState<number | undefined>()
-  // Captured per mount (views remount on navigation) — never per app launch,
-  // which made tasks created after midnight land on yesterday.
-  const [today] = useState(() => new Date())
+  // The local day: re-read when it rolls over at midnight (or after sleep), so a task added to Today
+  // after midnight is dated today, not yesterday, and the overdue / due-today split follows.
+  const dayKey = useDayKey()
+  const today = useMemo(() => new Date(), [dayKey])
 
   useEffect(() => {
     api.getConfig().then((config) => {
@@ -59,7 +61,7 @@ export function TodayView() {
       }
     }
     return { overdueTasks: overdue, todayTasks: today }
-  }, [tasks, projects?.flat])
+  }, [tasks, projects?.flat, dayKey])
 
   const overdueGroups = useMemo(
     () => groupByProject(overdueTasks, projects?.flat),

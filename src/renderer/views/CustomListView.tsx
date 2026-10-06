@@ -5,6 +5,7 @@ import { useProjects } from '@/hooks/use-projects'
 import { useCustomList } from '@/hooks/use-custom-lists'
 import { useAppConfig } from '@/hooks/use-app-config'
 import { usePrintable } from '@/stores/print-store'
+import { useDayKey } from '@/stores/day-store'
 import { TaskList } from '@/components/task-list/TaskList'
 import { buildCustomListServerFilter, matchesCustomList } from '@/lib/custom-list-filter'
 import { toLocalDate } from '@/lib/due-dates'
@@ -36,11 +37,15 @@ export function CustomListView() {
   const { data: projects } = useProjects()
   const { data: config } = useAppConfig()
   const [creationNotice, setCreationNotice] = useState<string | null>(null)
+  // The server filter holds local-day boundaries for date windows. They are computed when the
+  // params are built, so the day is a dependency: after midnight the filter (and with it the query
+  // key) changes instead of reusing yesterday's window.
+  const dayKey = useDayKey()
 
   const queryParams = useMemo(() => {
     if (!customList) return { filter: 'done = false', keep_nested_subtasks: true }
     return buildQueryParams(customList)
-  }, [customList])
+  }, [customList, dayKey])
 
   const { data: tasks = [], isLoading } = useTasks(queryParams, !!customList)
 
@@ -56,7 +61,7 @@ export function CustomListView() {
     const matching = tasks.filter((task) => taskMatchesCustomList(task, customList, activeIds))
     // A matching subtask is shown even when its parent does not match (cross-app semantics v1, 3.2).
     return withoutNestedSubtasks(matching, { hideChildrenOfCompletedParents: false })
-  }, [tasks, customList, projects?.flat])
+  }, [tasks, customList, projects?.flat, dayKey])
 
   usePrintable(
     useMemo(

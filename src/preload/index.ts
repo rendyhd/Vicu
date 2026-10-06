@@ -151,6 +151,13 @@ const api = {
   getHotkeyLauncherCommand: () =>
     ipcRenderer.invoke('get-hotkey-launcher-command') as Promise<{ quickEntry: string; quickView: string; kind: 'appimage' | 'packaged' | 'dev' }>,
 
+  // The computer woke from sleep: timers and the clock may have jumped while it was asleep.
+  onAppResumed: (callback: () => void) => {
+    const handler = () => callback()
+    ipcRenderer.on('app-resumed', handler)
+    return () => { ipcRenderer.removeListener('app-resumed', handler) }
+  },
+
   // Offline queue: changes that could not reach the server wait here, in the main process, and are
   // replayed in order. Every call answers `{ success, data | error }`.
   offlineQueue: {

@@ -41,6 +41,7 @@ import { UpdateBanner } from '@/components/UpdateBanner'
 import { ToastHost } from '@/components/shared/ToastHost'
 import { useAppConfig } from '@/hooks/use-app-config'
 import { useOfflineQueueSync } from '@/hooks/use-offline-queue'
+import { useFreshness } from '@/hooks/use-freshness'
 import { useUIStore } from '@/stores/ui-store'
 import { refreshTasks } from '@/lib/task-refresh'
 import { reloadCompletionSound, setCompletionSoundEnabled } from '@/lib/completion-sound'
@@ -179,6 +180,8 @@ export function AppShell() {
 
   // The main-process offline queue: pending / failed counts, replay results, temp-id remapping.
   useOfflineQueueSync()
+  // Task lists refetch on focus and on a timer, and the date-dependent views roll over at midnight.
+  useFreshness()
 
   // Clear recently-completed-tasks store on route change so completed tasks
   // don't bleed into the next view.
@@ -200,7 +203,8 @@ export function AppShell() {
 
   // TanStack Query's browser focus manager only observes page visibility. An Electron
   // window can lose and regain focus without becoming hidden, so explicitly refresh
-  // projects to pick up archives/restores made in Vikunja or another Vicu client.
+  // projects to pick up archives/restores made in Vikunja or another Vicu client. (Task lists
+  // are refreshed by useFreshness, throttled.)
   useEffect(() => {
     const refreshProjects = () => {
       queryClient.invalidateQueries({ queryKey: ['projects'] })

@@ -711,6 +711,8 @@ if (!gotLock) {
     // Initialize notification scheduler
     initNotifications(mainWindow)
     powerMonitor.on('resume', () => {
+      // The main window's timers (midnight, polling) may have been paused by sleep.
+      if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('app-resumed')
       rescheduleNotifications()
       authManager.onSystemResume()
       void replayPendingActions()

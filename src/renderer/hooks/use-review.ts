@@ -5,6 +5,7 @@ import { isRetriableError } from '@/lib/error-classify'
 import { useProjects } from './use-projects'
 import type { ProjectTreeNode } from './use-projects'
 import { useAppConfig } from './use-app-config'
+import { useDayKey } from '@/stores/day-store'
 import { updateProjectRequest } from './use-task-mutations'
 import {
   parseReviewFooter,
@@ -52,9 +53,11 @@ function selectProjects(
 export function useProjectsNeedingReview() {
   const { data: projectsData, isLoading: projectsLoading } = useProjects()
   const { data: cfg, isLoading: cfgLoading } = useAppConfig()
+  // Review due dates are measured against today, so the day is a dependency.
+  const dayKey = useDayKey()
   const data = useMemo(
     () => selectProjects(projectsData?.flat, cfg, (s) => s.isOverdue),
-    [projectsData, cfg],
+    [projectsData, cfg, dayKey],
   )
   return { data, isLoading: projectsLoading || cfgLoading }
 }
@@ -62,9 +65,10 @@ export function useProjectsNeedingReview() {
 export function useTrackedProjects() {
   const { data: projectsData, isLoading: projectsLoading } = useProjects()
   const { data: cfg, isLoading: cfgLoading } = useAppConfig()
+  const dayKey = useDayKey()
   const data = useMemo(
     () => selectProjects(projectsData?.flat, cfg, () => true),
-    [projectsData, cfg],
+    [projectsData, cfg, dayKey],
   )
   return { data, isLoading: projectsLoading || cfgLoading }
 }
@@ -126,6 +130,7 @@ function pruneToDue(nodes: ReviewTreeNode[], keepVisible: ReadonlySet<number>): 
 export function useReviewTree(filter: 'due' | 'all', keepVisible: ReadonlySet<number> = EMPTY_KEEP) {
   const { data: projectsData, isLoading: projectsLoading } = useProjects()
   const { data: cfg, isLoading: cfgLoading } = useAppConfig()
+  const dayKey = useDayKey()
   const data = useMemo<ReviewTreeNode[]>(() => {
     if (!projectsData?.tree || !cfg?.review?.enabled) return []
     const now = new Date()
@@ -137,7 +142,7 @@ export function useReviewTree(filter: 'due' | 'all', keepVisible: ReadonlySet<nu
       now,
     )
     return filter === 'all' ? tracked : pruneToDue(tracked, keepVisible)
-  }, [projectsData, cfg, filter, keepVisible])
+  }, [projectsData, cfg, filter, keepVisible, dayKey])
   return { data, isLoading: projectsLoading || cfgLoading }
 }
 

@@ -3,6 +3,7 @@ import { useTasks } from '@/hooks/use-tasks'
 import { useProjects } from '@/hooks/use-projects'
 import { useFilters } from '@/hooks/use-filters'
 import { usePrintable } from '@/stores/print-store'
+import { useDayKey } from '@/stores/day-store'
 import { diffLocalDays, isUpcoming, localDateOf, toLocalDate } from '@/lib/due-dates'
 import { TaskList } from '@/components/task-list/TaskList'
 import { TaskRow } from '@/components/task-list/TaskRow'
@@ -50,6 +51,8 @@ interface DateGroup {
 
 export function UpcomingView() {
   const params = useFilters({ view: 'upcoming' })
+  // Recomputes the groups when the local day rolls over (Today / Tomorrow / weekday headings).
+  const dayKey = useDayKey()
   const { data: tasks = [], isLoading } = useTasks(params)
   const { data: projects } = useProjects()
   const [inboxProjectId, setInboxProjectId] = useState<number | undefined>()
@@ -81,7 +84,7 @@ export function UpcomingView() {
       grouped.get(key)!.tasks.push(task)
     }
     return Array.from(grouped.values()).sort((a, b) => a.key.localeCompare(b.key))
-  }, [tasks, projects?.flat])
+  }, [tasks, projects?.flat, dayKey])
 
   usePrintable(
     useMemo(
