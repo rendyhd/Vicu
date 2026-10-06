@@ -6,6 +6,16 @@ export interface PaginatedResponse<T> {
   total_pages: number
 }
 
+/** Largest `per_page` Vikunja 2.4 accepts; anything above it is a 422. */
+export const MAX_PAGE_SIZE = 1000
+
+/** Turn a caller supplied `per_page` into a value the server accepts, or null. */
+export function clampPageSize(value: unknown): number | null {
+  const n = Math.floor(Number(value))
+  if (!Number.isFinite(n) || n < 1) return null
+  return Math.min(n, MAX_PAGE_SIZE)
+}
+
 export function buildProjectCollectionUrl(baseUrl: string, includeArchived = false): string {
   const url = new URL(`${baseUrl.replace(/\/+$/, '')}/api/v2/projects`)
   if (includeArchived) url.searchParams.set('is_archived', 'true')
@@ -26,7 +36,8 @@ export function createTaskCollectionSearchParams(
   if (params.filter) qs.set('filter', String(params.filter))
   if (params.sort_by) qs.set('sort_by', String(params.sort_by))
   if (params.order_by) qs.set('order_by', String(params.order_by))
-  if (params.per_page) qs.set('per_page', String(params.per_page))
+  const perPage = clampPageSize(params.per_page)
+  if (perPage !== null) qs.set('per_page', String(perPage))
   if (params.page) qs.set('page', String(params.page))
   if (params.filter_include_nulls) {
     qs.set('filter_include_nulls', String(params.filter_include_nulls))

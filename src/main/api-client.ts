@@ -8,9 +8,13 @@ import {
   createTaskCollectionSearchParams,
   createTaskPatch,
   type AttachmentPreviewSize,
+  MAX_PAGE_SIZE,
+  clampPageSize,
   type PaginatedResponse,
   withoutNestedSubtasks,
 } from './api-v2'
+import type { ApiError, ApiResult } from './api-result'
+import { collectAllPages } from './paginate'
 import { decodeUtf8Chunks } from './response-body'
 import { MAX_BINARY_DOWNLOAD_BYTES, describeDownloadLimit, parseContentLength } from './attachment-safety'
 
@@ -31,20 +35,6 @@ const REQUEST_TIMEOUT = 10_000
 const UPLOAD_TIMEOUT = 60_000
 const API_BASE_PATH = '/api/v2'
 const JSON_MERGE_PATCH = 'application/merge-patch+json'
-
-interface ApiSuccess<T> {
-  success: true
-  data: T
-}
-
-interface ApiError {
-  success: false
-  error: string
-  statusCode?: number
-  errorCode?: number
-}
-
-type ApiResult<T> = ApiSuccess<T> | ApiError
 
 // Friendly error overrides for known unhelpful server messages
 const FRIENDLY_ERROR_OVERRIDES: { pattern: RegExp; message: string }[] = [
@@ -233,24 +223,26 @@ async function requestPaginatedWithRetry<T>(
   return { success: true, data: result.data.items ?? [] }
 }
 
+/**
+ * Fetch every page of a collection. The caller's `per_page` (if any) is only the
+ * batch size; the default is the server maximum so large lists need few requests.
+ * The real stop conditions live in `collectAllPages`.
+ */
 async function requestAllPagesWithRetry<T>(
   url: string,
-  token: string,
-  maxPages = 100
+  token: string
 ): Promise<ApiResult<T[]>> {
-  const all: T[] = []
   const pageUrl = new URL(url)
+  const pageSize = clampPageSize(pageUrl.searchParams.get('per_page')) ?? MAX_PAGE_SIZE
+  pageUrl.searchParams.set('per_page', String(pageSize))
 
-  for (let page = 1; page <= maxPages; page++) {
-    pageUrl.searchParams.set('page', String(page))
-    const result = await requestWithRetry<PaginatedResponse<T>>('GET', pageUrl.toString(), token)
-    if (!result.success) return result
-
-    all.push(...(result.data.items ?? []))
-    if (page >= result.data.total_pages) break
-  }
-
-  return { success: true, data: all }
+  return collectAllPages<T>(
+    (page) => {
+      pageUrl.searchParams.set('page', String(page))
+      return requestWithRetry<PaginatedResponse<T>>('GET', pageUrl.toString(), token)
+    },
+    { pageSize }
+  )
 }
 
 async function requestMultipartWithRetry<T>(

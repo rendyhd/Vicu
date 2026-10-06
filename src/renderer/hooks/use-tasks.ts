@@ -4,8 +4,6 @@ import { useMatches } from '@tanstack/react-router'
 import { api } from '@/lib/api'
 import { useCompletedTasksStore } from '@/stores/completed-tasks-store'
 import type { TaskQueryParams } from '@/lib/vikunja-types'
-import { DEFAULT_PAGE_SIZE } from '@/lib/constants'
-import { fetchAllPages } from '@/lib/fetch-all-pages'
 import { hasVicuMetadataMarker } from '@/lib/metadata-tasks'
 
 export function useTasks(params: TaskQueryParams, enabled = true) {
@@ -16,14 +14,12 @@ export function useTasks(params: TaskQueryParams, enabled = true) {
   const query = useQuery({
     queryKey: ['tasks', params],
     queryFn: async () => {
-      return fetchAllPages(
-        async (page) => {
-          const result = await api.fetchTasks({ per_page: DEFAULT_PAGE_SIZE, ...params, page })
-          if (!result.success) throw new Error(result.error)
-          return result.data ?? []
-        },
-        { pageSize: DEFAULT_PAGE_SIZE }
-      )
+      // Without `page` the main process walks every page (honoring total_pages) and
+      // removes nested subtasks once on the complete set. Paginating here would stop
+      // early whenever a page shrank after subtask filtering (D-REN-1).
+      const result = await api.fetchTasks(params)
+      if (!result.success) throw new Error(result.error)
+      return result.data ?? []
     },
     enabled,
   })

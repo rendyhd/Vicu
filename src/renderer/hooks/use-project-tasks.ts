@@ -3,7 +3,6 @@ import { useQuery } from '@tanstack/react-query'
 import { useMatches } from '@tanstack/react-router'
 import { api } from '@/lib/api'
 import { useCompletedTasksStore } from '@/stores/completed-tasks-store'
-import { DEFAULT_PAGE_SIZE } from '@/lib/constants'
 import { sortProjectTasks } from '@/lib/task-sort'
 import { mergeProjectUndoWindow } from '@/lib/undo-window'
 
@@ -29,7 +28,6 @@ export function useProjectTasks(projectId: number | undefined) {
     queryFn: async () => {
       const result = await api.fetchViewTasks(projectId!, viewQuery.data!.id, {
         filter: 'done = false',
-        per_page: DEFAULT_PAGE_SIZE,
       })
       if (!result.success) throw new Error(result.error)
       return result.data
