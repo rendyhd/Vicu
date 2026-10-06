@@ -38,3 +38,34 @@ export function isAuthError(error: string): boolean {
     error.includes('Session expired')
   )
 }
+
+/** What a failed API call looks like to the classifiers: the message and, when the server answered, the status. */
+export interface FailureLike {
+  error: string
+  statusCode?: number
+}
+
+/**
+ * Whether a failed change should go into the offline queue instead of being reported as an error
+ * (D-SYNC-6). Only failures that say nothing about the change itself qualify: the network is down,
+ * the server is down or overloaded. A 4xx means the server looked at the change and said no, and
+ * an auth failure needs the user, so neither is queued.
+ *
+ * A create is stricter because it is not idempotent: it is queued only when the request provably
+ * never created anything. A timeout or a 500 may have been applied, and replaying it would add a
+ * duplicate. Gateway errors (502/503/504) mean the proxy answered but Vikunja never saw the
+ * request, and 429 means the server refused it, so those are safe.
+ */
+export function isQueueableFailure(failure: FailureLike, kind: 'change' | 'create'): boolean {
+  const status = failure.statusCode
+  if (status === 401 || status === 403) return false
+  if (isAuthError(failure.error)) return false
+
+  if (kind === 'create') {
+    if (status === 502 || status === 503 || status === 504 || status === 429) return true
+    return status === undefined && isConnectionError(failure.error)
+  }
+
+  if (status !== undefined) return status >= 500 || status === 429 || status === 408
+  return isRetriableError(failure.error)
+}
