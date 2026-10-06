@@ -3,6 +3,7 @@ import * as crypto from 'node:crypto'
 import { execFile } from 'child_process'
 import { loadConfig } from './config'
 import { isWindows, isMac } from './platform'
+import { decodeUtf8Chunks } from './response-body'
 
 const OBSIDIAN_TIMEOUT = 300
 
@@ -50,9 +51,10 @@ function obsidianRequest<T>(
       }
 
       const req = https.request(options, (res) => {
-        let data = ''
-        res.on('data', (chunk) => { data += chunk.toString() })
+        const chunks: Buffer[] = []
+        res.on('data', (chunk: Buffer) => { chunks.push(chunk) })
         res.on('end', () => {
+          const data = decodeUtf8Chunks(chunks)
           clearTimeout(timeout)
           if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
             try {
@@ -117,9 +119,10 @@ export function testObsidianConnection(apiKey: string, port = 27124): Promise<{ 
       }
 
       const req = https.request(options, (res) => {
-        let data = ''
-        res.on('data', (chunk) => { data += chunk.toString() })
+        const chunks: Buffer[] = []
+        res.on('data', (chunk: Buffer) => { chunks.push(chunk) })
         res.on('end', () => {
+          const data = decodeUtf8Chunks(chunks)
           clearTimeout(timeout)
           if (res.statusCode === 401) {
             resolve({ reachable: false })
