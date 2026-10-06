@@ -1,4 +1,5 @@
 import { useRef, useState, useCallback, useEffect } from 'react'
+import { extractBangToday } from '@/lib/task-parser'
 import type { ParseResult, ParserConfig, TokenType, SyntaxPrefixes } from '@/lib/task-parser'
 import { NlpInputHighlight } from '@/components/task-list/NlpParsePreview'
 import { TokenChip, buildChips } from './TokenChip'
@@ -234,8 +235,8 @@ export function TaskInputParser({
         )}
       </div>
 
-      {/* Legacy bang-today hint */}
-      {showBangTodayHint && value.includes('!') && (
+      {/* Bang-today hint (parser off): same rule as the save path, a `!` inside the text is not a date */}
+      {showBangTodayHint && extractBangToday(value).dueDate && (
         <span className="absolute right-0 top-1/2 -translate-y-1/2 shrink-0 text-[11px] font-medium text-accent-blue">
           Today
         </span>

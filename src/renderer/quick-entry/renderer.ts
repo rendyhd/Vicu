@@ -40,7 +40,7 @@ interface QuickEntryConfig {
   nlp_syntax_mode: 'todoist' | 'vikunja'
 }
 
-import { parse, getParserConfig, recurrenceToVikunja } from '../lib/task-parser'
+import { parse, getParserConfig, recurrenceToVikunja, extractBangToday } from '../lib/task-parser'
 import { dueToday, parsedDue } from '../lib/due-dates'
 import { formatClockTime } from '../lib/date-utils'
 import type { ParseResult, ParserConfig, ParsedToken, TokenType } from '../lib/task-parser'
@@ -201,7 +201,8 @@ function updateTodayHints(): void {
     return
   }
 
-  const hasExclamation = exclamationTodayEnabled && input.value.includes('!')
+  // Same rule as the save path: a `!` inside the text is not a date.
+  const hasExclamation = exclamationTodayEnabled && !!extractBangToday(input.value).dueDate
 
   if (hasExclamation && !isDescriptionExpanded()) {
     todayHintInline.classList.remove('hidden')
@@ -559,11 +560,15 @@ async function saveTask(): Promise<void> {
 
     parsedLabels = lastParseResult.labels
   } else {
-    // Legacy ! → today behavior
-    if (exclamationTodayEnabled && title.includes('!')) {
-      title = title.replace(/!/g, '').trim()
-      if (!title) return
-      dueDate = dueToday()
+    // Parser off: only the `!` → today shortcut applies, with the same rule as the other entry
+    // points (standalone, leading or trailing `!`; a `!` inside the text is not a date).
+    if (exclamationTodayEnabled) {
+      const bang = extractBangToday(title)
+      if (bang.dueDate) {
+        title = bang.title.trim()
+        if (!title) return
+        dueDate = dueToday()
+      }
     }
   }
 

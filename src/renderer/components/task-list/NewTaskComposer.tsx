@@ -15,8 +15,8 @@ import { cn } from '@/lib/cn'
 import { api } from '@/lib/api'
 import { NULL_DATE } from '@/lib/constants'
 import { replacePendingTokens } from '@/lib/image-tokens'
-import { recurrenceToVikunja } from '@/lib/task-parser'
-import { dateOnlyDue, dueToday, parsedDue, toLocalDate } from '@/lib/due-dates'
+import { parse, recurrenceToVikunja } from '@/lib/task-parser'
+import { dateOnlyDue, parsedDue, toLocalDate } from '@/lib/due-dates'
 import { useTaskParser } from '@/hooks/use-task-parser'
 import { useLabels } from '@/hooks/use-labels'
 import { useProjects } from '@/hooks/use-projects'
@@ -275,8 +275,10 @@ export function NewTaskComposer({
     setError(null)
     let createdTask: Task | null = null
     try {
-      const parsed = parser.parserConfig.enabled ? parser.parseResult : null
-      const title = parsed?.title.trim() || rawTitle.replace(!parser.enabled && parser.parserConfig.bangToday ? /!/g : /$^/, '').trim()
+      // With the parser off nothing is extracted except the `!` today shortcut, which has one rule
+      // (extractBangToday, applied by parse()) in every entry point.
+      const parsed = parser.parserConfig.enabled ? parser.parseResult : parse(rawTitle, parser.parserConfig)
+      const title = parsed?.title.trim() || (parser.enabled ? rawTitle : '')
       if (!title) throw new Error('Enter a task title')
 
       let targetProjectId = selectedProjectId
@@ -288,8 +290,7 @@ export function NewTaskComposer({
       if (draftDescription) payload.description = draftDescription
       // A parsed time ("tomorrow at 3pm") is kept; a bare date is date-only.
       const parsedDate = parsed?.dueDate ? parsedDue(parsed.dueDate, parsed.dueHasTime) : undefined
-      const legacyBangDate = !parser.enabled && parser.parserConfig.bangToday && rawTitle.includes('!') ? dueToday() : undefined
-      const dueDate = dateTouched ? explicitDueDate : (parsedDate ?? legacyBangDate ?? (!defaultDateDismissed && defaultDueDate ? dateOnlyIso(defaultDueDate) : undefined))
+      const dueDate = dateTouched ? explicitDueDate : (parsedDate ?? (!defaultDateDismissed && defaultDueDate ? dateOnlyIso(defaultDueDate) : undefined))
       if (dueDate && dueDate !== NULL_DATE) payload.due_date = dueDate
       const selectedPriority = priority !== null ? priority : parsed?.priority
       if (selectedPriority && selectedPriority > 0) payload.priority = selectedPriority
