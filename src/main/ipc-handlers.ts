@@ -85,6 +85,7 @@ import {
 } from './sound'
 
 import { printHtml } from './print'
+import { uploadStandaloneTasks } from './standalone-upload'
 import {
   addPendingAction,
   removePendingAction,
@@ -104,6 +105,7 @@ import {
   removeStandaloneTaskDueDate,
   updateStandaloneTask,
   clearStandaloneTasks,
+  removeStandaloneTask,
 } from './cache'
 
 const AUTO_COMPLETED_SUBTASKS_KEY = '__vicu_auto_completed_subtasks'
@@ -947,26 +949,16 @@ export function registerIpcHandlers(): void {
     const tasks = getAllStandaloneTasks()
     if (tasks.length === 0) return { success: true, uploaded: 0 }
 
-    let uploaded = 0
-    const errors: string[] = []
+    // Each task leaves the local store as soon as its upload succeeded, so a retry after
+    // a partial failure only sends the ones that did not go through (D-IPC-1).
+    const { uploaded, errors } = await uploadStandaloneTasks(tasks, {
+      upload: (payload) => createTask(projectId, payload),
+      remove: removeStandaloneTask,
+      isAuthError,
+    })
 
-    for (const task of tasks) {
-      const taskPayload: Record<string, unknown> = { title: task.title }
-      if (task.description) taskPayload.description = task.description
-      if (task.due_date && task.due_date !== '0001-01-01T00:00:00Z') {
-        taskPayload.due_date = task.due_date
-      }
-
-      const result = await createTask(projectId, taskPayload)
-      if (result.success) {
-        uploaded++
-      } else {
-        errors.push(`"${task.title}": ${result.error}`)
-        if (result.error && isAuthError(result.error)) break
-      }
-    }
-
-    if (uploaded > 0 && uploaded === tasks.length) {
+    if (errors.length === 0 && uploaded === tasks.length) {
+      // Sweep what is left: completed tasks, which are never uploaded.
       clearStandaloneTasks()
     }
 

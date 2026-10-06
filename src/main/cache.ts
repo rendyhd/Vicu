@@ -236,6 +236,15 @@ export function updateStandaloneTask(taskId: string, updates: Record<string, unk
   return task
 }
 
+/** Remove one task, for example right after it was uploaded to the server. */
+export function removeStandaloneTask(taskId: string): void {
+  const cache = loadCache()
+  const remaining = cache.standaloneTasks.filter((t) => t.id !== taskId)
+  if (remaining.length === cache.standaloneTasks.length) return
+  cache.standaloneTasks = remaining
+  saveCache(cache)
+}
+
 export function clearStandaloneTasks(): void {
   const cache = loadCache()
   cache.standaloneTasks = []
