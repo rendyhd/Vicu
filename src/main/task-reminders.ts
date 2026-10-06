@@ -15,6 +15,8 @@
  * - Everything respects the master notification toggle, at refresh time and at fire time.
  */
 
+import { KEEP_NESTED_SUBTASKS_PARAM, MAX_PAGE_SIZE } from './api-v2'
+
 export const REFRESH_INTERVAL_MS = 15 * 60_000
 /** Window focus refreshes at most this often. */
 export const FOCUS_REFRESH_MIN_MS = 2 * 60_000
@@ -138,6 +140,10 @@ export function createTaskReminderScheduler(deps: TaskReminderDeps): TaskReminde
     const to = deps.now() + REMINDER_WINDOW_MS
     const result = await deps.fetchTasks({
       filter: `done = false && reminders > '${new Date(from).toISOString()}' && reminders < '${new Date(to).toISOString()}'`,
+      // A subtask's own reminder must not be hidden because its parent is in the result too, and a
+      // full page keeps the common case at one request.
+      [KEEP_NESTED_SUBTASKS_PARAM]: true,
+      per_page: MAX_PAGE_SIZE,
     })
     // A newer refresh (or stop) started while this one was waiting: it owns the timers now.
     if (mine !== generation) return

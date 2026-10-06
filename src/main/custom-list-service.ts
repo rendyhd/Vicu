@@ -1,6 +1,7 @@
 import { BrowserWindow } from 'electron'
 import { randomUUID } from 'crypto'
-import { createTask, fetchTaskById, fetchTasks, updateTask } from './api-client'
+import { createTask, fetchTaskById, updateTask } from './api-client'
+import { loadCustomListCarriers, rememberCreatedTask } from './carrier-service'
 import { loadConfig, saveConfig, type AppConfig } from './config'
 import {
   CUSTOM_LIST_CARRIER_TITLE,
@@ -158,13 +159,14 @@ function documentsEqual(left: CustomListSyncDocumentV1, right: CustomListSyncDoc
 }
 
 async function fetchCarriers(): Promise<{ valid: Array<{ task: CarrierTask; document: CustomListSyncDocumentV1 }>; malformed: number; futureVersion?: number }> {
-  const result = await fetchTasks({ filter: 'done = true', sort_by: 'updated', order_by: 'desc', per_page: 200 })
+  // The carriers this app has seen are fetched by id; new ones are found with a marker search
+  // (see carrier-discovery.ts). The done tasks are no longer listed on every sync.
+  const result = await loadCustomListCarriers()
   if (!result.success) throw new Error(result.error)
   const valid: Array<{ task: CarrierTask; document: CustomListSyncDocumentV1 }> = []
   let malformed = 0
   let futureVersion: number | undefined
-  for (const raw of result.data) {
-    const task = raw as CarrierTask
+  for (const task of result.data) {
     if (task.title !== CUSTOM_LIST_CARRIER_TITLE && !hasCustomListMarker(task.description)) continue
     const parsed = parseCustomListEnvelope(task.description)
     if (parsed.document) valid.push({ task, document: parsed.document })
@@ -187,7 +189,11 @@ async function writeCarrier(taskId: number, document: CustomListSyncDocumentV1):
   if (!result.success) throw new Error(result.error)
 }
 
-async function createCarrier(projectId: number, document: CustomListSyncDocumentV1): Promise<number> {
+/**
+ * Creates the carrier already completed, in one request. Only a server that ignored `done` on
+ * create (it would leave an open, visible carrier) gets a second one to finish it.
+ */
+async function createCarrier(projectId: number, document: CustomListSyncDocumentV1): Promise<{ id: number; description?: string }> {
   const created = await createTask(projectId, {
     title: CUSTOM_LIST_CARRIER_TITLE,
     description: encodeCustomListEnvelope(document),
@@ -199,8 +205,13 @@ async function createCarrier(projectId: number, document: CustomListSyncDocument
   })
   if (!created.success) throw new Error(created.error)
   const task = created.data as CarrierTask
-  await writeCarrier(task.id, document)
-  return task.id
+  rememberCreatedTask(task)
+  if (task.done !== true) {
+    await writeCarrier(task.id, document)
+    return { id: task.id }
+  }
+  // The create response is the stored task: it is the read-back, no extra request needed.
+  return { id: task.id, description: task.description }
 }
 
 function looksOffline(message: string): boolean {
@@ -242,19 +253,28 @@ async function runSync(): Promise<CustomListSyncStatus> {
       ? !documentsEqual(canonicalDocument, merged)
       : Object.keys(merged.lists).length > 0 || hadPendingLocalChanges
 
+    // What the carrier holds right now. Without a write that is what was just read; after a write
+    // it is read back, so a server that altered the description is noticed.
+    let verifiedDocument: CustomListSyncDocumentV1 | undefined = canonicalDocument
     if (needsWrite) {
+      verifiedDocument = undefined
       if (carrierId) await writeCarrier(carrierId, merged)
       else {
         if (!config.inbox_project_id) throw new Error('Choose an Inbox project before syncing custom lists')
-        carrierId = await createCarrier(config.inbox_project_id, merged)
+        const created = await createCarrier(config.inbox_project_id, merged)
+        carrierId = created.id
+        if (created.description !== undefined) verifiedDocument = parseCustomListEnvelope(created.description).document
       }
     }
 
     if (carrierId) {
-      const verified = await fetchTaskById(carrierId)
-      if (!verified.success) throw new Error(verified.error)
-      const parsed = parseCustomListEnvelope((verified.data as CarrierTask).description)
-      if (!parsed.document) throw new Error(parsed.error || 'Cannot verify custom-list carrier')
+      if (!verifiedDocument) {
+        const verified = await fetchTaskById(carrierId)
+        if (!verified.success) throw new Error(verified.error)
+        const parsed = parseCustomListEnvelope((verified.data as CarrierTask).description)
+        if (!parsed.document) throw new Error(parsed.error || 'Cannot verify custom-list carrier')
+        verifiedDocument = parsed.document
+      }
       const latest = loadConfig() ?? config
       if (latest.vikunja_url.replace(/\/+$/, '') !== syncUrl) {
         return setStatus({ state: 'pending', message: 'Account changed during custom-list sync' })
@@ -263,10 +283,10 @@ async function runSync(): Promise<CustomListSyncStatus> {
       // carrier does not contain them yet, keep the merged local document dirty.
       const latestLocalDocument = ensureSyncState(latest).document
       const converged = mergeCustomListDocuments(
-        mergeCustomListDocuments(merged, parsed.document),
+        mergeCustomListDocuments(merged, verifiedDocument),
         latestLocalDocument,
       )
-      if (!documentsEqual(converged, parsed.document)) {
+      if (!documentsEqual(converged, verifiedDocument)) {
         persist(latest, converged, true)
         broadcastLists(latest)
         return setStatus({ state: 'pending', message: 'Custom lists changed during sync; retrying' })

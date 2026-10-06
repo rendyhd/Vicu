@@ -58,6 +58,7 @@ import { fetchCurrentUser } from './auth/user-info'
 import { authManager } from './auth/auth-manager'
 import { OidcTotpRequiredError } from './auth/oidc-login'
 import { buildViewerFilterParams } from './quick-entry/filter-builder'
+import { forgetDeletedTask, loadRoutineCarriers, rememberCreatedTask } from './carrier-service'
 import { dueToday } from '../shared/due-dates'
 import { KEEP_NESTED_SUBTASKS_PARAM } from './api-v2'
 import { fetchPositionSortedTasks } from './quick-entry/position-sort'
@@ -174,9 +175,18 @@ export function registerIpcHandlers(): void {
     return fetchTasks(params)
   })
 
+  // The routine carriers (hidden done tasks): fetched by their remembered ids, new ones found with
+  // a marker search, never by listing every done task (D-NOTIF-3, D-RT-2).
+  handleTrusted('fetch-routine-carriers', () => {
+    return loadRoutineCarriers()
+  })
+
   handleTrusted('create-task', async (_event, projectId: number, task: Record<string, unknown>) => {
     const result = await createTask(projectId, task)
-    if (result.success) notifyViewerSync()
+    if (result.success) {
+      notifyViewerSync()
+      rememberCreatedTask(result.data)
+    }
     return result
   })
 
@@ -193,7 +203,10 @@ export function registerIpcHandlers(): void {
 
   handleTrusted('delete-task', async (_event, id: number) => {
     const result = await deleteTask(id)
-    if (result.success) notifyViewerSync()
+    if (result.success) {
+      notifyViewerSync()
+      forgetDeletedTask(id)
+    }
     return result
   })
 

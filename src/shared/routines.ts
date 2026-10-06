@@ -23,6 +23,11 @@ import { addLocalDays, diffLocalDays, isoWeekday, startOfWeek, toLocalDate } fro
 export const ROUTINE_ARCHIVE_TITLE = 'Vicu routine archive'
 /** Search text that finds archive parts server side (the marker name inside the HTML comment). */
 export const ROUTINE_ARCHIVE_SEARCH = 'vicu-routine:archive'
+/**
+ * Search text that finds main carriers server side without the archive parts: `vicu-routine:v1:...`
+ * matches, `vicu-routine:archive:v1:...` does not.
+ */
+export const ROUTINE_CARRIER_SEARCH = 'vicu-routine:v'
 /** A main carrier or archive part is written at or below this many bytes of JSON (384 KiB). */
 export const ROUTINE_BUDGET_BYTES = 384 * 1024
 /** Anything above this is rejected (512 KiB), so older clients can still read what we write. */

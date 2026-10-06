@@ -51,6 +51,8 @@ export interface ElectronAPI {
 
   // Tasks
   fetchTasks(params: TaskQueryParams): Promise<ApiResult<Task[]>>
+  /** The routine carrier tasks (hidden done tasks), found without listing every done task. */
+  fetchRoutineCarriers(): Promise<ApiResult<Task[]>>
   createTask(projectId: number, task: CreateTaskPayload): Promise<ApiResult<Task>>
   updateTask(id: number, task: UpdateTaskPayload): Promise<ApiResult<Task>>
   deleteTask(id: number): Promise<ApiResult<void>>

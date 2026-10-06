@@ -1,5 +1,7 @@
 export const CUSTOM_LIST_CARRIER_TITLE = 'Vicu custom lists (sync metadata — do not delete)'
 export const CUSTOM_LIST_MARKER_PREFIX = '<!-- vicu-custom-lists:'
+/** Search text that finds the carrier server side (the marker name inside the HTML comment). */
+export const CUSTOM_LIST_CARRIER_SEARCH = 'vicu-custom-lists'
 export const CUSTOM_LIST_SYNC_VERSION = 1
 export const CUSTOM_LIST_SYNC_MAX_BYTES = 512 * 1024
 

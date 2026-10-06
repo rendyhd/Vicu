@@ -49,6 +49,9 @@ export const api = {
   fetchTasks: (params: TaskQueryParams) =>
     window.api.fetchTasks(params) as Promise<ApiResult<Task[]>>,
 
+  fetchRoutineCarriers: () =>
+    window.api.fetchRoutineCarriers() as Promise<ApiResult<Task[]>>,
+
   createTask: (projectId: number, task: CreateTaskPayload) =>
     window.api.createTask(projectId, task) as Promise<ApiResult<Task>>,
 

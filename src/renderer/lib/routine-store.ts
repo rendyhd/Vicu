@@ -62,6 +62,9 @@ export interface RoutineWriteResult {
   archiveError?: string
 }
 
+/** The server maximum: a full listing takes as few requests as possible. */
+const PAGE_SIZE = 1000
+
 function unwrap<T>(result: ApiResult<T>): T {
   if (!result.success) throw new Error(result.error)
   return result.data
@@ -93,7 +96,7 @@ export async function createRoutineCarrier(
 
 async function fetchParts(api: RoutineStoreApi, fullScan: boolean): Promise<ArchivePartRef[]> {
   const tasks = unwrap(await api.fetchTasks(
-    fullScan ? { filter: 'done = true', per_page: 200 } : { filter: 'done = true', q: ROUTINE_ARCHIVE_SEARCH, per_page: 200 },
+    fullScan ? { filter: 'done = true', per_page: PAGE_SIZE } : { filter: 'done = true', q: ROUTINE_ARCHIVE_SEARCH, per_page: PAGE_SIZE },
   ))
   return tasks.flatMap((task) => {
     const parsed = parseRoutineArchiveEnvelope(task.description)

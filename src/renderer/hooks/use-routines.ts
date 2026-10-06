@@ -29,7 +29,9 @@ import {
 export interface RoutineDraft extends Omit<RoutineDefinition, 'id' | 'activeFrom' | 'archived' | 'createdAt' | 'updatedAt' | 'updatedBy'> {}
 
 async function fetchCarriers(): Promise<RoutineCarrier<Task>[]> {
-  const result = await api.fetchTasks({ filter: 'done = true', sort_by: 'updated', order_by: 'desc', per_page: 200 })
+  // The main process fetches the remembered carriers by id and finds new ones with a marker search;
+  // the done tasks, and the archive parts among them, are not downloaded for the day views.
+  const result = await api.fetchRoutineCarriers()
   if (!result.success) throw new Error(result.error)
   return result.data.flatMap((task) => {
     const parsed = parseRoutineEnvelope(task.description)

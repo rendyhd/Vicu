@@ -12,6 +12,8 @@ const api = {
   // Tasks
   fetchTasks: (params: Record<string, unknown>) =>
     ipcRenderer.invoke('fetch-tasks', params),
+  fetchRoutineCarriers: () =>
+    ipcRenderer.invoke('fetch-routine-carriers'),
   createTask: (projectId: number, task: Record<string, unknown>) =>
     ipcRenderer.invoke('create-task', projectId, task),
   updateTask: (id: number, patch: TaskPatch) =>

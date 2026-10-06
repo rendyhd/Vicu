@@ -75,6 +75,14 @@ describe('task reminder scheduling (D-NOTIF-1, D-NOTIF-2, D-NOTIF-4)', () => {
       expect(REMINDER_WINDOW_MS).toBe(25 * DAY)
     })
 
+    it('keeps nested subtasks in the result and asks for full pages (D-NOTIF-4)', async () => {
+      await scheduler.refresh()
+
+      // Without this the main process drops a subtask whose parent is in the same result, and the
+      // subtask's own reminder would never fire.
+      expect(fetchTasks.mock.calls[0][0]).toMatchObject({ keep_nested_subtasks: true, per_page: 1000 })
+    })
+
     it('does nothing in standalone mode', async () => {
       standalone = true
       await scheduler.refresh()

@@ -1,7 +1,9 @@
 import { app, Notification, nativeImage, BrowserWindow } from 'electron'
 import { join } from 'path'
 import { loadConfig, type AppConfig } from './config'
+import { MAX_PAGE_SIZE } from './api-v2'
 import { fetchTaskById, fetchTasks } from './api-client'
+import { loadRoutineCarriers } from './carrier-service'
 import { getAllStandaloneTasks } from './cache'
 import { getOfflineQueue } from './offline/service'
 import { createTaskReminderScheduler } from './task-reminders'
@@ -90,12 +92,13 @@ export async function refreshRoutineReminders(): Promise<void> {
   const config = loadConfig()
   if (!config?.notifications_enabled || config.standalone_mode) return
 
-  const result = await fetchTasks({ per_page: 200, filter: 'done = true' })
-  if (!result.success || !Array.isArray(result.data)) return
+  // Carriers are fetched by their remembered ids; the done tasks are not listed (D-NOTIF-3).
+  const result = await loadRoutineCarriers()
+  if (!result.success) return
   const now = Date.now()
   const today = toLocalDate(new Date())
 
-  for (const task of result.data as Array<Record<string, unknown>>) {
+  for (const task of result.data as unknown as Array<Record<string, unknown>>) {
     // Archive parts and malformed carriers have no payload and are skipped here.
     const payload = parseRoutineEnvelope(typeof task.description === 'string' ? task.description : '').payload
     if (!payload || payload.definition.archived) continue
@@ -354,7 +357,7 @@ async function getNotificationTasks(config: AppConfig): Promise<NotificationTask
       filter: filters.overdue,
       sort_by: 'due_date',
       order_by: 'asc',
-      per_page: 50,
+      per_page: MAX_PAGE_SIZE,
     })
     if (overdue.success && Array.isArray(overdue.data)) {
       result.overdue = (overdue.data as Array<Record<string, unknown>>)
@@ -374,7 +377,7 @@ async function getNotificationTasks(config: AppConfig): Promise<NotificationTask
       filter: filters.dueToday,
       sort_by: 'due_date',
       order_by: 'asc',
-      per_page: 50,
+      per_page: MAX_PAGE_SIZE,
     })
     if (dueToday.success && Array.isArray(dueToday.data)) {
       result.dueToday = (dueToday.data as Array<Record<string, unknown>>)
@@ -394,7 +397,7 @@ async function getNotificationTasks(config: AppConfig): Promise<NotificationTask
       filter: filters.upcoming,
       sort_by: 'due_date',
       order_by: 'asc',
-      per_page: 50,
+      per_page: MAX_PAGE_SIZE,
     })
     if (upcoming.success && Array.isArray(upcoming.data)) {
       result.upcoming = (upcoming.data as Array<Record<string, unknown>>)
