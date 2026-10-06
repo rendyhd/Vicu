@@ -16,7 +16,9 @@ import {
   nextWeekStart,
   postponeDays,
 } from '../due-dates'
+import { buildCustomListServerFilter, filterCustomList, type CustomListFilterInput } from '../custom-list-filter'
 import { computeStatus, type ReviewMetadata } from '../../renderer/lib/review-metadata'
+import { evaluateServerFilter } from './server-filter-eval'
 
 /**
  * Runs every vector of test-fixtures/cross-app-semantics-v1.json that the desktop app owns
@@ -42,8 +44,17 @@ interface SetterVector {
 interface WeekVector { today: string; thisWeekEnd: string; thisMonthEnd: string; nextWeekStart: string }
 interface FixtureTask {
   id: number
+  projectId: number
   due: string | null
   done: boolean
+  priority: number
+  labelIds: number[]
+}
+interface CustomListVector {
+  name: string
+  today: string
+  filter: CustomListFilterInput
+  expect: number[]
 }
 interface SmartListVector { today: string; todayOverdue: number[]; todayToday: number[]; upcoming: number[] }
 interface ReviewVector {
@@ -59,6 +70,7 @@ interface Fixture {
   weeks: WeekVector[]
   tasks: FixtureTask[]
   smartLists: SmartListVector[]
+  customLists: CustomListVector[]
   review: ReviewVector[]
 }
 
@@ -162,6 +174,38 @@ export function runCrossAppSemanticsSuite(options: { zone: string; expectedOffse
           it(`Upcoming list for ${vector.today} at ${clock}`, () => {
             const upcoming = open().filter((task) => isUpcoming(dueIso(task), now())).map((task) => task.id)
             expect(upcoming).toEqual(vector.upcoming)
+          })
+        }
+      }
+    })
+
+    describe('customLists', () => {
+      // The Vikunja shape of a fixture task, as the evaluator and the server filter see it.
+      const asTask = (task: FixtureTask) => ({
+        id: task.id,
+        project_id: task.projectId,
+        done: task.done,
+        due_date: task.due === null ? '0001-01-01T00:00:00Z' : local(task.due).toISOString(),
+        priority: task.priority,
+        labels: task.labelIds.map((id) => ({ id })),
+      })
+
+      for (const vector of fixture.customLists) {
+        // The result must not depend on the time of day "now" is read at, or on whether
+        // the caller passes the local date or an instant.
+        for (const clock of ['00:00:30', '10:00:00', '23:59:30']) {
+          it(`${vector.name} at ${clock}`, () => {
+            const now = local(`${vector.today}T${clock}`)
+            const tasks = fixture.tasks.map(asTask)
+
+            expect(filterCustomList(tasks, vector.filter, now).map((task) => task.id)).toEqual(vector.expect)
+            expect(filterCustomList(tasks, vector.filter, vector.today).map((task) => task.id)).toEqual(vector.expect)
+
+            // The server filter is a superset: it never drops a task the list accepts.
+            const serverFilter = buildCustomListServerFilter(vector.filter, now)
+            for (const task of filterCustomList(tasks, vector.filter, now)) {
+              expect(evaluateServerFilter(serverFilter, task), `task ${task.id} vs ${serverFilter}`).toBe(true)
+            }
           })
         }
       }
