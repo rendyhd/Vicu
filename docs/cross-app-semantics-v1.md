@@ -215,6 +215,11 @@ archive and changes the merge.
   the effective cutoff move to the archive first; only after the archive write succeeds does the
   main carrier drop them and set `prunedBefore` to the effective cutoff (a local `YYYY-MM-DD`).
   An empty `prunedBefore` means nothing was pruned yet.
+- The effective cutoff never passes today. For an `after_completion` routine it also never
+  passes the `scheduledDate` of the latest completion (section 6.5), or `firstDueDate` before
+  any completion, so the record the schedule counts from always stays in the main carrier
+  (a chore left undone for more than 400 days would otherwise never advance).
+- `prunedBefore` only moves when at least one occurrence was archived.
 
 ### 6.3 Merge
 

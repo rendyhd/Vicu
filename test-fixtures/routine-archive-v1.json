@@ -1,6 +1,6 @@
 {
   "contractVersion": 1,
-  "about": "Routine merge, pruning, archive and after-completion vectors for docs/cross-app-semantics-v1.md section 6. Occurrences are written compactly; expand each to a full record with key '<routineId>:<date>:<slotId>', routineId 'r1', slotId 's1', scheduledDate = date, scheduledMinutes 480, timeZoneId 'UTC' unless given, loggedAt '' unless given, note ''. Keep this file identical in vicu and vicu-android.",
+  "about": "Routine merge, pruning, archive and after-completion vectors for docs/cross-app-semantics-v1.md section 6. Occurrences are written compactly; expand each to a full record with key '<routineId>:<date>:<slotId>', routineId 'r1', slotId 's1', scheduledDate = date, scheduledMinutes 480, timeZoneId 'UTC' unless given, loggedAt '' unless given, note ''. A prune vector may override the definition schedule with \"schedule\" (then kind is CHORE). Keep this file identical in vicu and vicu-android.",
   "baseDefinition": {
     "id": "r1",
     "name": "Vitamin D",
@@ -93,6 +93,28 @@
         { "date": "2025-10-01", "status": "COMPLETED", "modifiedAt": "2025-10-01T08:00:00.000Z", "modifiedBy": "a" }
       ],
       "expect": { "prunedBefore": "2025-10-01", "kept": ["2025-10-01"], "archived": ["2025-09-20"] }
+    },
+    {
+      "name": "after_completion keeps the latest completion",
+      "today": "2026-10-06",
+      "prunedBefore": "",
+      "schedule": { "type": "after_completion", "intervalDays": 7, "firstDueDate": "2024-01-01" },
+      "occurrences": [
+        { "date": "2024-01-01", "status": "COMPLETED", "loggedAt": "2024-01-01T08:00:00.000Z", "modifiedAt": "2024-01-01T08:00:00.000Z", "modifiedBy": "a" },
+        { "date": "2024-06-01", "status": "COMPLETED", "loggedAt": "2024-06-01T08:00:00.000Z", "modifiedAt": "2024-06-01T08:00:00.000Z", "modifiedBy": "a" }
+      ],
+      "expect": { "prunedBefore": "2024-06-01", "kept": ["2024-06-01"], "archived": ["2024-01-01"] }
+    },
+    {
+      "name": "after_completion before the first completion keeps firstDueDate",
+      "today": "2026-10-06",
+      "prunedBefore": "",
+      "schedule": { "type": "after_completion", "intervalDays": 7, "firstDueDate": "2024-03-01" },
+      "occurrences": [
+        { "date": "2024-02-01", "status": "SKIPPED", "modifiedAt": "2024-02-01T08:00:00.000Z", "modifiedBy": "a" },
+        { "date": "2024-03-01", "status": "SKIPPED", "modifiedAt": "2024-03-01T08:00:00.000Z", "modifiedBy": "a" }
+      ],
+      "expect": { "prunedBefore": "2024-03-01", "kept": ["2024-03-01"], "archived": ["2024-02-01"] }
     },
     {
       "name": "nothing to prune",

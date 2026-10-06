@@ -39,6 +39,7 @@ interface Fixture {
     name: string
     today: string
     prunedBefore: string
+    schedule?: RoutineDefinition['schedule']
     occurrences: CompactOccurrence[]
     expect: { prunedBefore: string; kept: string[]; archived: string[] }
   }>
@@ -142,7 +143,13 @@ export function runRoutineArchiveSuite(options: { zone: string; expectedOffsetMi
     describe('prune', () => {
       for (const vector of fixture.prune) {
         it(vector.name, () => {
-          const outcome = pruneRoutinePayload(payload({ prunedBefore: vector.prunedBefore, occurrences: vector.occurrences }), vector.today)
+          const definition: RoutineDefinition = vector.schedule
+            ? { ...fixture.baseDefinition, kind: 'CHORE', healthSubtype: null, schedule: vector.schedule }
+            : fixture.baseDefinition
+          const outcome = pruneRoutinePayload(
+            payload({ prunedBefore: vector.prunedBefore, occurrences: vector.occurrences }, definition),
+            vector.today,
+          )
           expect(outcome.payload.prunedBefore).toBe(vector.expect.prunedBefore)
           expect(Object.values(outcome.payload.occurrences).map((record) => record.scheduledDate).sort()).toEqual(vector.expect.kept)
           expect(outcome.archived.map((record) => record.scheduledDate).sort()).toEqual(vector.expect.archived)
