@@ -23,6 +23,8 @@ const api = {
   // Projects
   fetchProjects: (includeArchived = false) =>
     ipcRenderer.invoke('fetch-projects', includeArchived),
+  fetchProject: (id: number) =>
+    ipcRenderer.invoke('fetch-project', id),
   createProject: (project: Record<string, unknown>) =>
     ipcRenderer.invoke('create-project', project),
   updateProject: (id: number, patch: ProjectPatch) =>

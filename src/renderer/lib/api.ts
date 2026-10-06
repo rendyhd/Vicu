@@ -67,6 +67,9 @@ export const api = {
   fetchProjects: (includeArchived = false) =>
     window.api.fetchProjects(includeArchived) as Promise<ApiResult<Project[]>>,
 
+  fetchProject: (id: number) =>
+    window.api.fetchProject(id) as Promise<ApiResult<Project>>,
+
   createProject: (project: CreateProjectPayload) =>
     window.api.createProject(project) as Promise<ApiResult<Project>>,
 

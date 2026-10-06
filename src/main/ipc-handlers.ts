@@ -14,6 +14,7 @@ import {
   createTaskRelation,
   deleteTaskRelation,
   fetchProjects,
+  fetchProjectById,
   createProject,
   updateProject,
   deleteProject,
@@ -229,6 +230,10 @@ export function registerIpcHandlers(): void {
   // Projects
   handleTrusted('fetch-projects', (_event, includeArchived = false) => {
     return fetchProjects(includeArchived)
+  })
+
+  handleTrusted('fetch-project', (_event, id: number) => {
+    return fetchProjectById(id)
   })
 
   handleTrusted('create-project', (_event, project: Record<string, unknown>) => {

@@ -388,6 +388,14 @@ export async function fetchProjects(includeArchived = false): Promise<ApiResult<
   )
 }
 
+/** One project as the server has it right now (GET /projects/{id}); bypasses every cache. */
+export async function fetchProjectById(id: number): Promise<ApiResult<unknown>> {
+  const c = await getConfigOrFail()
+  if ('success' in c) return c
+
+  return requestWithRetry<unknown>('GET', `${c.url}${API_BASE_PATH}/projects/${id}`, c.token)
+}
+
 export async function createProject(project: Record<string, unknown>): Promise<ApiResult<unknown>> {
   const c = await getConfigOrFail()
   if ('success' in c) return c

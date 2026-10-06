@@ -101,6 +101,21 @@ export function upsertFooter(description: string | null | undefined, meta: Revie
   return `${body}\n\n${footer}`
 }
 
+/** Whether a description ends in a review footer at all (a missing footer reads as "never"). */
+export function hasReviewFooter(description: string | null | undefined): boolean {
+  return !!description && MARKER_REGEX.test(description)
+}
+
+/**
+ * Put the review footer of `previousDescription` onto `description`: the current text stays,
+ * only the footer goes back to what it was (no footer at all when there was none). Used by undo
+ * so it never rolls back a description edit made in the meantime.
+ */
+export function restoreFooter(description: string | null | undefined, previousDescription: string | null | undefined): string {
+  if (!hasReviewFooter(previousDescription)) return stripFooter(description)
+  return upsertFooter(description, parseReviewFooter(previousDescription))
+}
+
 /**
  * Review status on local calendar dates (docs/cross-app-semantics-v1.md section 4):
  * `next = last + cadence`, `daysSince = today - last`, `daysUntil = next - today`, overdue when

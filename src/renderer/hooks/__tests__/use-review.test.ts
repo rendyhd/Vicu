@@ -2,7 +2,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   cadenceDescription,
   excludeDescription,
+  excludeFromReviewRequest,
+  markReviewedRequest,
+  restoreReviewRequest,
   reviewedDescription,
+  setReviewCadenceRequest,
 } from '../use-review'
 import { updateProjectRequest } from '../use-task-mutations'
 import { PROJECT_WRITABLE_FIELDS } from '@/lib/merge-patches'
@@ -41,10 +45,12 @@ function treeNode(overrides: Partial<Project> = {}): ProjectTreeNode {
 }
 
 let updateProject: ReturnType<typeof vi.fn>
+let fetchProject: ReturnType<typeof vi.fn>
 
 beforeEach(() => {
   updateProject = vi.fn(async () => ({ success: true as const, data: {} }))
-  vi.stubGlobal('window', { api: { updateProject } })
+  fetchProject = vi.fn()
+  vi.stubGlobal('window', { api: { updateProject, fetchProject } })
 })
 
 afterEach(() => {
@@ -123,5 +129,106 @@ describe('review project payloads', () => {
     await updateProjectRequest({ id: before.id, changes: { description: before.description } })
 
     expect(updateProject).toHaveBeenCalledWith(5, { description: 'Notes written by Android' })
+  })
+})
+
+// X-7 / D-REV-2: the footer is written onto the description as the server has it right now,
+// so a stale cache can never overwrite a description edited on another device.
+describe('review saves use the current server description', () => {
+  const FOOTER = (date: string) => `---\n**Vicu review**: ${date}`
+
+  function serverHas(description: string): void {
+    fetchProject.mockResolvedValue({ success: true as const, data: { id: 5, description } })
+  }
+
+  const sentPayload = () => updateProject.mock.calls.at(-1)?.[1] as { description: string }
+  const sentDescription = () => sentPayload().description
+
+  it('mark reviewed keeps a description edited elsewhere since the cache was filled', async () => {
+    const cached = treeNode({ description: 'Old notes' })
+    serverHas('Old notes\n\nEdited on Android')
+
+    await markReviewedRequest(cached, '2026-10-06')
+
+    expect(fetchProject).toHaveBeenCalledWith(5)
+    expect(sentDescription()).toBe(`Old notes\n\nEdited on Android\n\n${FOOTER('2026-10-06')}`)
+    expect(Object.keys(sentPayload())).toEqual(['description'])
+  })
+
+  it('replaces the footer of the server description, not the cached one', async () => {
+    const cached = treeNode({ description: `Notes\n\n${FOOTER('2026-09-01')}` })
+    serverHas(`Notes (edited)\n\n${FOOTER('2026-09-20')} · every 7 days`)
+
+    await markReviewedRequest(cached, '2026-10-06')
+
+    expect(sentDescription()).toBe(`Notes (edited)\n\n${FOOTER('2026-10-06')} · every 7 days`)
+  })
+
+  it('does not write when the server already has the asked-for review state', async () => {
+    serverHas(`Notes\n\n${FOOTER('2026-10-06')}`)
+
+    await markReviewedRequest(treeNode({ description: 'Stale cache' }), '2026-10-06')
+
+    expect(updateProject).not.toHaveBeenCalled()
+  })
+
+  it('set cadence and exclude also start from the server description', async () => {
+    serverHas('Server notes')
+    await setReviewCadenceRequest(treeNode({ description: 'Cached notes' }), 30)
+    expect(sentDescription()).toContain('Server notes')
+    expect(sentDescription()).not.toContain('Cached notes')
+    expect(parseReviewFooter(sentDescription()).cadenceDaysOverride).toBe(30)
+
+    await excludeFromReviewRequest(treeNode({ description: 'Cached notes' }), true)
+    expect(sentDescription()).toContain('Server notes')
+    expect(parseReviewFooter(sentDescription()).state).toBe('excluded')
+  })
+
+  it('undo puts the previous review footer back onto the current description', async () => {
+    const before = treeNode({ description: `Notes\n\n${FOOTER('2026-09-01')}` })
+    serverHas(`Notes, edited after review\n\n${FOOTER('2026-10-06')}`)
+
+    await restoreReviewRequest(before)
+
+    expect(sentDescription()).toBe(`Notes, edited after review\n\n${FOOTER('2026-09-01')}`)
+  })
+
+  it('undo removes the footer when the project had none before', async () => {
+    const before = treeNode({ description: 'Notes' })
+    serverHas(`Notes, edited\n\n${FOOTER('2026-10-06')}`)
+
+    await restoreReviewRequest(before)
+
+    expect(sentDescription()).toBe('Notes, edited')
+  })
+
+  it('falls back to the cached description only when the fetch failed on the network', async () => {
+    fetchProject.mockResolvedValue({ success: false as const, error: 'Network error: net::ERR_INTERNET_DISCONNECTED' })
+
+    await markReviewedRequest(treeNode({ description: 'Cached notes' }), '2026-10-06')
+
+    expect(sentDescription()).toBe(`Cached notes\n\n${FOOTER('2026-10-06')}`)
+  })
+
+  it('also falls back on a timeout', async () => {
+    fetchProject.mockResolvedValue({ success: false as const, error: 'Request timed out (10s)' })
+
+    await markReviewedRequest(treeNode({ description: 'Cached notes' }), '2026-10-06')
+
+    expect(sentDescription()).toBe(`Cached notes\n\n${FOOTER('2026-10-06')}`)
+  })
+
+  it('does not write over a project it could not read for any other reason', async () => {
+    fetchProject.mockResolvedValue({ success: false as const, error: 'Project not found' })
+
+    await expect(markReviewedRequest(treeNode(), '2026-10-06')).rejects.toThrow('Project not found')
+    expect(updateProject).not.toHaveBeenCalled()
+  })
+
+  it('a failed PATCH is reported to the caller', async () => {
+    serverHas('Notes')
+    updateProject.mockResolvedValue({ success: false as const, error: 'Server error' })
+
+    await expect(markReviewedRequest(treeNode(), '2026-10-06')).rejects.toThrow('Server error')
   })
 })

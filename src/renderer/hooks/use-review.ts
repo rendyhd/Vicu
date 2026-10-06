@@ -1,11 +1,15 @@
 import { useMemo } from 'react'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { api } from '@/lib/api'
+import { isRetriableError } from '@/lib/error-classify'
 import { useProjects } from './use-projects'
 import type { ProjectTreeNode } from './use-projects'
 import { useAppConfig } from './use-app-config'
-import { useUpdateProject } from './use-task-mutations'
+import { updateProjectRequest } from './use-task-mutations'
 import {
   parseReviewFooter,
   computeStatus,
+  restoreFooter,
   upsertFooter,
   todayLocalIsoDate,
   type ReviewStatus,
@@ -187,65 +191,108 @@ export interface ReviewMutateOptions {
 }
 
 /**
- * Save a new description for a review action. The request carries `{ description }`
- * only: the project passed in may be a tree node (it has `children`, which the server
- * rejects with a 422) or a stale copy of fields this action never touches.
- * Failures are shown to the user instead of vanishing.
+ * The description of a project as the server has it right now. A review save must apply its
+ * footer change to this and not to the cached copy, or a description edited on another device
+ * since the cache was filled would be overwritten (D-REV-2 / X-7 follow-up).
+ *
+ * Only a network failure (offline, DNS, timeout) falls back to the cached description: the PATCH
+ * then fails or is the best the user can do. Any other failure (project deleted, no permission)
+ * is an error and nothing is written.
  */
-function useSaveReviewDescription(failureLabel: string) {
-  const update = useUpdateProject()
-  const save = (
-    project: Project,
-    description: string | null,
-    options?: ReviewMutateOptions,
-    // Undo restores a description that differs from the cached one on purpose, so
-    // it is sent without diffing against the cache.
-    diffAgainstCache = true,
-  ) => {
-    if (description === null) {
-      // Nothing to write: the project already has this review state.
-      options?.onSuccess?.()
-      return
-    }
-    update.mutate(
-      { id: project.id, changes: { description }, original: diffAgainstCache ? project : undefined },
-      {
-        onSuccess: () => options?.onSuccess?.(),
-        onError: (error) => {
-          useReviewNoticeStore.getState().showError(`${failureLabel}: ${error.message}`)
-          options?.onError?.(error)
-        },
-      },
-    )
+async function currentDescription(project: Pick<Project, 'id' | 'description'>): Promise<string> {
+  const result = await api.fetchProject(project.id)
+  if (result.success) return result.data.description ?? ''
+  if (isRetriableError(result.error)) {
+    console.warn('[review] could not reload the project description, using the cached one:', result.error)
+    return project.description ?? ''
   }
-  return { update, save }
+  throw new Error(result.error)
+}
+
+/**
+ * Save a review change. The request carries `{ description }` only: the project passed in may be
+ * a tree node (it has `children`, which the server rejects with a 422) or a stale copy of fields
+ * this action never touches. `compute` receives the current server description and returns the
+ * new one, or null when nothing needs to change; nothing is written in that case.
+ */
+export async function saveReviewDescription(
+  project: Project,
+  compute: (current: Pick<Project, 'description'>) => string | null,
+): Promise<Project | null> {
+  const current = await currentDescription(project)
+  const next = compute({ description: current })
+  if (next === null || next === current) return null
+  return updateProjectRequest({
+    id: project.id,
+    changes: { description: next },
+    original: { ...project, description: current },
+  })
+}
+
+export const markReviewedRequest = (project: Project, today = todayLocalIsoDate()) =>
+  saveReviewDescription(project, (current) => reviewedDescription(current, today))
+
+export const setReviewCadenceRequest = (project: Project, cadenceDays: number | null) =>
+  saveReviewDescription(project, (current) => cadenceDescription(current, cadenceDays))
+
+export const excludeFromReviewRequest = (project: Project, excluded: boolean) =>
+  saveReviewDescription(project, (current) => excludeDescription(current, excluded))
+
+/**
+ * Undo: put the review footer `previous` had back onto the current description. Only the footer
+ * is restored, so a description edit made since then survives the undo.
+ */
+export const restoreReviewRequest = (previous: Project) =>
+  saveReviewDescription(previous, (current) => restoreFooter(current.description, previous.description))
+
+/** Review mutations: shared error reporting, and a refresh of the project list when settled. */
+function useReviewMutation<V extends { project: Project }>(
+  failureLabel: string,
+  request: (vars: V) => Promise<Project | null>,
+) {
+  const qc = useQueryClient()
+  const update = useMutation({
+    mutationFn: request,
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: ['projects'] })
+    },
+  })
+  const mutate = (vars: V, options?: ReviewMutateOptions) =>
+    update.mutate(vars, {
+      onSuccess: () => options?.onSuccess?.(),
+      onError: (error) => {
+        useReviewNoticeStore.getState().showError(`${failureLabel}: ${error.message}`)
+        options?.onError?.(error)
+      },
+    })
+  return { ...update, mutate }
 }
 
 export function useMarkReviewed() {
-  const { update, save } = useSaveReviewDescription('Could not mark the project as reviewed')
-  const mutate = (vars: { project: Project }, options?: ReviewMutateOptions) =>
-    save(vars.project, reviewedDescription(vars.project), options)
-  return { ...update, mutate }
+  return useReviewMutation(
+    'Could not mark the project as reviewed',
+    (vars: { project: Project }) => markReviewedRequest(vars.project),
+  )
 }
 
 export function useSetReviewCadence() {
-  const { update, save } = useSaveReviewDescription('Could not save the review cadence')
-  const mutate = (vars: { project: Project; cadenceDays: number | null }, options?: ReviewMutateOptions) =>
-    save(vars.project, cadenceDescription(vars.project, vars.cadenceDays), options)
-  return { ...update, mutate }
+  return useReviewMutation(
+    'Could not save the review cadence',
+    (vars: { project: Project; cadenceDays: number | null }) => setReviewCadenceRequest(vars.project, vars.cadenceDays),
+  )
 }
 
 export function useExcludeFromReview() {
-  const { update, save } = useSaveReviewDescription('Could not update the review settings')
-  const mutate = (vars: { project: Project; excluded: boolean }, options?: ReviewMutateOptions) =>
-    save(vars.project, excludeDescription(vars.project, vars.excluded), options)
-  return { ...update, mutate }
+  return useReviewMutation(
+    'Could not update the review settings',
+    (vars: { project: Project; excluded: boolean }) => excludeFromReviewRequest(vars.project, vars.excluded),
+  )
 }
 
-/** Put a project's previous description back (undo). Sends `{ description }` only. */
+/** Put a project's previous review footer back (undo). Sends `{ description }` only. */
 export function useRestoreReviewDescription() {
-  const { update, save } = useSaveReviewDescription('Could not undo the review')
-  const mutate = (vars: { project: Project }, options?: ReviewMutateOptions) =>
-    save(vars.project, vars.project.description, options, false)
-  return { ...update, mutate }
+  return useReviewMutation(
+    'Could not undo the review',
+    (vars: { project: Project }) => restoreReviewRequest(vars.project),
+  )
 }

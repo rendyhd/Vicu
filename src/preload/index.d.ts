@@ -54,6 +54,7 @@ export interface ElectronAPI {
 
   // Projects
   fetchProjects(includeArchived?: boolean): Promise<ApiResult<Project[]>>
+  fetchProject(id: number): Promise<ApiResult<Project>>
   createProject(project: CreateProjectPayload): Promise<ApiResult<Project>>
   updateProject(id: number, project: UpdateProjectPayload): Promise<ApiResult<Project>>
   deleteProject(id: number): Promise<ApiResult<void>>
