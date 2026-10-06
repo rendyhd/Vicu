@@ -5,6 +5,9 @@
 //   <description>\n\n---\n**Vicu review**: <date|never|excluded>[ · every N days]
 //
 // See docs/superpowers/specs/2026-05-24-project-review-design.md §3.
+// Status math follows docs/cross-app-semantics-v1.md section 4: local calendar dates only.
+
+import { addLocalDays, diffLocalDays, toLocalDate } from './due-dates'
 
 export const REVIEW_MARKER_PREFIX = '**Vicu review**:'
 export const REVIEW_MARKER_SEPARATOR = '---'
@@ -21,7 +24,8 @@ export interface ReviewMetadata {
 export interface ReviewStatus {
   metadata: ReviewMetadata
   effectiveCadenceDays: number
-  nextReviewAt: Date | null
+  /** Local `YYYY-MM-DD` of the next review (last reviewed + cadence), null for never/excluded. */
+  nextReviewAt: string | null
   isOverdue: boolean
   daysSinceReviewed: number | null
   daysUntilDue: number | null
@@ -97,13 +101,18 @@ export function upsertFooter(description: string | null | undefined, meta: Revie
   return `${body}\n\n${footer}`
 }
 
+/**
+ * Review status on local calendar dates (docs/cross-app-semantics-v1.md section 4):
+ * `next = last + cadence`, `daysSince = today - last`, `daysUntil = next - today`, overdue when
+ * `daysUntil < 0`. `today` is the local date of `now`, so the answer never flips at UTC midnight
+ * and always matches Android.
+ */
 export function computeStatus(
   meta: ReviewMetadata,
   globalDefaultCadenceDays: number,
-  today: Date = new Date()
+  now: Date = new Date()
 ): ReviewStatus {
   const effectiveCadenceDays = meta.cadenceDaysOverride ?? globalDefaultCadenceDays
-  const todayUtc = utcMidnight(today)
 
   if (meta.state === 'excluded') {
     return {
@@ -127,40 +136,22 @@ export function computeStatus(
     }
   }
 
-  const last = parseIsoDateUtc(meta.lastReviewedAt)
-  const next = new Date(last)
-  next.setUTCDate(next.getUTCDate() + effectiveCadenceDays)
-  const daysSince = daysBetween(todayUtc, last)
-  const daysUntil = daysBetween(next, todayUtc)
+  const today = toLocalDate(now)
+  const last = meta.lastReviewedAt
+  const next = addLocalDays(last, effectiveCadenceDays)
+  const daysUntil = diffLocalDays(today, next)
   return {
     metadata: meta,
     effectiveCadenceDays,
     nextReviewAt: next,
     isOverdue: daysUntil < 0,
-    daysSinceReviewed: daysSince,
+    daysSinceReviewed: diffLocalDays(last, today),
     daysUntilDue: daysUntil,
   }
 }
 
-function utcMidnight(d: Date): Date {
-  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()))
-}
-
-function parseIsoDateUtc(s: string): Date {
-  const [y, m, d] = s.split('-').map((x) => parseInt(x, 10))
-  return new Date(Date.UTC(y, m - 1, d))
-}
-
-function daysBetween(a: Date, b: Date): number {
-  const MS_PER_DAY = 86_400_000
-  return Math.round((a.getTime() - b.getTime()) / MS_PER_DAY)
-}
-
 export function todayLocalIsoDate(now: Date = new Date()): string {
-  const y = now.getFullYear()
-  const m = String(now.getMonth() + 1).padStart(2, '0')
-  const d = String(now.getDate()).padStart(2, '0')
-  return `${y}-${m}-${d}`
+  return toLocalDate(now)
 }
 
 export function formatLastReviewedLabel(status: ReviewStatus): string {
