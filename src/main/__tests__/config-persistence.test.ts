@@ -67,6 +67,30 @@ describe('config.json persistence (D-CFG-1)', () => {
     expect(existsSync(configPath() + '.tmp')).toBe(false)
   })
 
+  it('keeps fields a newer app added to custom lists through a load and save', async () => {
+    const lists = [{
+      id: 'a',
+      name: 'Focus',
+      color: '#ff8800',
+      filter: {
+        project_ids: [3],
+        sort_by: 'due_date',
+        order_by: 'asc',
+        due_date_filter: 'this_week',
+        include_overdue: false,
+        due_in_days: 3,
+      },
+    }]
+    writeFileSync(configPath(), JSON.stringify({ ...baseConfig(), custom_lists: lists }), 'utf-8')
+
+    const config = await launch()
+    const loaded = config.loadConfig()!
+    expect(loaded.custom_lists).toEqual(lists)
+    config.saveConfig(loaded)
+
+    expect(JSON.parse(readFileSync(configPath(), 'utf-8')).custom_lists).toEqual(lists)
+  })
+
   it('keeps the previous config as config.json.bak', async () => {
     const config = await launch()
     config.saveConfig(baseConfig({ sidebar_width: 100 }))

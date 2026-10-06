@@ -2,7 +2,7 @@ import { app } from 'electron'
 import { join } from 'path'
 import { isMac } from './platform'
 import { readFileWithBackup, writeFileAtomic } from './atomic-file'
-import type { CustomListSyncDocumentV1 } from './custom-list-protocol'
+import type { AppCustomList, CustomListSyncDocumentV1 } from './custom-list-protocol'
 
 export interface ViewerFilter {
   project_ids: number[]
@@ -33,23 +33,7 @@ export interface AppConfig {
   theme: 'light' | 'dark' | 'system'
   window_bounds?: { x: number; y: number; width: number; height: number }
   sidebar_width?: number
-  custom_lists?: Array<{
-    id: string
-    name: string
-    icon?: string
-    filter: {
-      project_ids: number[]
-      project_filter_mode?: 'include' | 'exclude'
-      add_to_project_id?: number
-      sort_by: string
-      order_by: string
-      due_date_filter: string
-      priority_filter?: number[]
-      label_ids?: number[]
-      include_done?: boolean
-      include_today_all_projects?: boolean
-    }
-  }>
+  custom_lists?: AppCustomList[]
   custom_lists_sync?: {
     device_id: string
     document: CustomListSyncDocumentV1

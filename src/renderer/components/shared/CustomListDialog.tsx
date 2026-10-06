@@ -3,6 +3,7 @@ import { X } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { useProjects } from '@/hooks/use-projects'
 import { useLabels } from '@/hooks/use-labels'
+import { windowHonorsIncludeOverdue } from '@/lib/custom-list-filter'
 import type { CustomList, CustomListFilter } from '@/lib/vikunja-types'
 
 interface CustomListDialogProps {
@@ -204,6 +205,17 @@ export function CustomListDialog({ open, list, onSave, onClose }: CustomListDial
                 <option key={o.value} value={o.value}>{o.label}</option>
               ))}
             </select>
+            {windowHonorsIncludeOverdue(filter.due_date_filter) && (
+              <label className="mt-2 flex cursor-pointer items-center gap-2 text-xs text-[var(--text-primary)]">
+                <input
+                  type="checkbox"
+                  checked={filter.include_overdue !== false}
+                  onChange={(e) => setFilter((f) => ({ ...f, include_overdue: e.target.checked ? undefined : false }))}
+                  className="accent-accent-blue"
+                />
+                Include overdue tasks
+              </label>
+            )}
           </div>
 
           {/* Projects */}

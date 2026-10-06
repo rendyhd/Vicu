@@ -5,6 +5,7 @@ import { loadConfig, saveConfig, type AppConfig } from './config'
 import {
   CUSTOM_LIST_CARRIER_TITLE,
   activeLists,
+  appListToWire,
   documentFromLists,
   encodeCustomListEnvelope,
   hasCustomListMarker,
@@ -14,6 +15,8 @@ import {
   normalizeWireList,
   parseCustomListEnvelope,
   validateCustomListDocument,
+  wireToAppList,
+  type AppCustomList,
   type CustomListSyncDocumentV1,
   type CustomListWire,
 } from './custom-list-protocol'
@@ -38,46 +41,6 @@ interface CarrierTask {
 
 let syncStatus: CustomListSyncStatus = { state: 'idle' }
 let inFlightSync: Promise<CustomListSyncStatus> | null = null
-
-function appListToWire(list: NonNullable<AppConfig['custom_lists']>[number]): CustomListWire {
-  return normalizeWireList({
-    id: list.id,
-    name: list.name,
-    icon: list.icon ?? '',
-    filter: {
-      project_ids: list.filter.project_ids ?? [],
-      project_filter_mode: list.filter.project_filter_mode ?? 'include',
-      add_to_project_id: list.filter.add_to_project_id ?? 0,
-      sort_by: list.filter.sort_by || 'due_date',
-      order_by: list.filter.order_by || 'asc',
-      due_date_filter: list.filter.due_date_filter || 'all',
-      priority_filter: list.filter.priority_filter ?? [],
-      label_ids: list.filter.label_ids ?? [],
-      include_done: list.filter.include_done === true,
-      include_today_all_projects: list.filter.include_today_all_projects === true,
-    },
-  })
-}
-
-function wireToAppList(list: CustomListWire): NonNullable<AppConfig['custom_lists']>[number] {
-  return {
-    id: list.id,
-    name: list.name,
-    ...(list.icon ? { icon: list.icon } : {}),
-    filter: {
-      project_ids: list.filter.project_ids,
-      project_filter_mode: list.filter.project_filter_mode,
-      add_to_project_id: list.filter.add_to_project_id,
-      sort_by: list.filter.sort_by,
-      order_by: list.filter.order_by,
-      due_date_filter: list.filter.due_date_filter,
-      ...(list.filter.priority_filter.length ? { priority_filter: list.filter.priority_filter } : {}),
-      ...(list.filter.label_ids.length ? { label_ids: list.filter.label_ids } : {}),
-      include_done: list.filter.include_done,
-      include_today_all_projects: list.filter.include_today_all_projects,
-    },
-  }
-}
 
 function ensureSyncState(config: AppConfig): NonNullable<AppConfig['custom_lists_sync']> {
   const current = config.custom_lists_sync
@@ -130,7 +93,7 @@ export function getCustomListSyncStatus(): CustomListSyncStatus {
   return syncStatus
 }
 
-export function getCustomLists(): NonNullable<AppConfig['custom_lists']> {
+export function getCustomLists(): AppCustomList[] {
   const config = loadConfig()
   if (!config) return []
   const hadState = !!config.custom_lists_sync
@@ -140,7 +103,7 @@ export function getCustomLists(): NonNullable<AppConfig['custom_lists']> {
   return config.custom_lists
 }
 
-function saveLocalMutation(config: AppConfig, document: CustomListSyncDocumentV1): NonNullable<AppConfig['custom_lists']> {
+function saveLocalMutation(config: AppConfig, document: CustomListSyncDocumentV1): AppCustomList[] {
   persist(config, document, true)
   setStatus(config.standalone_mode ? { state: 'local_only' } : { state: 'pending' })
   broadcastLists(config)
@@ -148,7 +111,7 @@ function saveLocalMutation(config: AppConfig, document: CustomListSyncDocumentV1
   return config.custom_lists ?? []
 }
 
-export function upsertCustomList(value: CustomListWire): NonNullable<AppConfig['custom_lists']> {
+export function upsertCustomList(value: CustomListWire): AppCustomList[] {
   const config = loadConfig()
   if (!config) throw new Error('Configuration not loaded')
   const state = ensureSyncState(config)
@@ -165,7 +128,7 @@ export function upsertCustomList(value: CustomListWire): NonNullable<AppConfig['
   return saveLocalMutation(config, document)
 }
 
-export function deleteCustomList(id: string): NonNullable<AppConfig['custom_lists']> {
+export function deleteCustomList(id: string): AppCustomList[] {
   const config = loadConfig()
   if (!config) throw new Error('Configuration not loaded')
   const state = ensureSyncState(config)
@@ -178,7 +141,7 @@ export function deleteCustomList(id: string): NonNullable<AppConfig['custom_list
   return saveLocalMutation(config, document)
 }
 
-export function reorderCustomLists(ids: string[]): NonNullable<AppConfig['custom_lists']> {
+export function reorderCustomLists(ids: string[]): AppCustomList[] {
   const config = loadConfig()
   if (!config) throw new Error('Configuration not loaded')
   const state = ensureSyncState(config)

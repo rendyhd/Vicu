@@ -6,6 +6,10 @@ export const CUSTOM_LIST_SYNC_MAX_BYTES = 512 * 1024
 const MARKER_RE = /<!--\s*vicu-custom-lists:v(\d+):([A-Za-z0-9_-]+={0,2})\s*-->/
 const ANY_MARKER_RE = /<!--\s*vicu-custom-lists:[\s\S]*?-->/
 
+/**
+ * The filter of a synced list. Fields this version does not know (added by a newer app) are kept
+ * as they are (cross-app semantics v1, section 3), hence the index signature.
+ */
 export interface CustomListWireFilter {
   project_ids: number[]
   project_filter_mode: 'include' | 'exclude'
@@ -17,6 +21,9 @@ export interface CustomListWireFilter {
   label_ids: number[]
   include_done: boolean
   include_today_all_projects: boolean
+  /** Whether date windows also include overdue tasks. Absent means true. */
+  include_overdue?: boolean
+  [unknownField: string]: unknown
 }
 
 export interface CustomListWire {
@@ -24,6 +31,31 @@ export interface CustomListWire {
   name: string
   icon: string
   filter: CustomListWireFilter
+  [unknownField: string]: unknown
+}
+
+/** A list as the app keeps it in its config and shows it in the renderer. */
+export interface AppCustomListFilter {
+  project_ids: number[]
+  project_filter_mode?: 'include' | 'exclude'
+  add_to_project_id?: number
+  sort_by: string
+  order_by: string
+  due_date_filter: string
+  priority_filter?: number[]
+  label_ids?: number[]
+  include_done?: boolean
+  include_today_all_projects?: boolean
+  include_overdue?: boolean
+  [unknownField: string]: unknown
+}
+
+export interface AppCustomList {
+  id: string
+  name: string
+  icon?: string
+  filter: AppCustomListFilter
+  [unknownField: string]: unknown
 }
 
 export interface CustomListRevision {
@@ -101,6 +133,39 @@ export function emptyCustomListDocument(deviceId: string, now = Date.now()): Cus
   }
 }
 
+const KNOWN_LIST_KEYS: ReadonlySet<string> = new Set(['id', 'name', 'icon', 'filter'])
+const KNOWN_FILTER_KEYS: ReadonlySet<string> = new Set([
+  'project_ids',
+  'project_filter_mode',
+  'add_to_project_id',
+  'sort_by',
+  'order_by',
+  'due_date_filter',
+  'priority_filter',
+  'label_ids',
+  'include_done',
+  'include_today_all_projects',
+  'include_overdue',
+])
+
+/**
+ * The fields of `source` that are not in `known`, with keys in sorted order so two devices
+ * that saw the same fields in a different order still produce the same JSON.
+ */
+function unknownFields(source: object, known: ReadonlySet<string>): Record<string, unknown> {
+  const record = source as Record<string, unknown>
+  const extra: Record<string, unknown> = {}
+  for (const key of Object.keys(record).sort()) {
+    if (!known.has(key) && key !== '__proto__' && record[key] !== undefined) extra[key] = record[key]
+  }
+  return extra
+}
+
+/**
+ * The canonical form of a synced list: known fields are validated and defaulted, and unknown
+ * fields (list value and filter) are carried over untouched so a field added by another app
+ * survives a round trip through this one. `include_overdue` is only written when it was set.
+ */
 export function normalizeWireList(value: CustomListWire): CustomListWire {
   return {
     id: value.id,
@@ -117,8 +182,34 @@ export function normalizeWireList(value: CustomListWire): CustomListWire {
       label_ids: [...new Set(value.filter.label_ids ?? [])],
       include_done: value.filter.include_done === true,
       include_today_all_projects: value.filter.include_today_all_projects === true,
+      ...(typeof value.filter.include_overdue === 'boolean' ? { include_overdue: value.filter.include_overdue } : {}),
+      ...unknownFields(value.filter, KNOWN_FILTER_KEYS),
     },
+    ...unknownFields(value, KNOWN_LIST_KEYS),
   }
+}
+
+/** A list from the app's config as a synced value. Unknown fields pass through. */
+export function appListToWire(list: AppCustomList): CustomListWire {
+  return normalizeWireList({ ...list, icon: list.icon ?? '', filter: { ...list.filter } } as CustomListWire)
+}
+
+/**
+ * A synced value as the list the app keeps in its config: empty priority and label conditions
+ * are left out. Unknown fields pass through.
+ */
+export function wireToAppList(list: CustomListWire): AppCustomList {
+  const { icon, filter, ...rest } = list
+  const { priority_filter: priorities, label_ids: labelIds, ...filterRest } = filter
+  return {
+    ...rest,
+    ...(icon ? { icon } : {}),
+    filter: {
+      ...filterRest,
+      ...(priorities.length ? { priority_filter: priorities } : {}),
+      ...(labelIds.length ? { label_ids: labelIds } : {}),
+    },
+  } as AppCustomList
 }
 
 export function documentFromLists(
