@@ -93,11 +93,46 @@ export function tomorrowAtMidnightISO(): string {
   return d.toISOString()
 }
 
-export function nextMondayAtMidnightISO(): string {
-  const d = new Date()
+export function nextMondayAtMidnightISO(now: Date = new Date()): string {
+  const d = new Date(now)
   // Sun(0)→+1, Mon(1)→+7, Wed(3)→+5; always the strictly-future Monday
   const offset = (1 - d.getDay() + 7) % 7 || 7
   d.setDate(d.getDate() + offset)
   d.setHours(0, 0, 0, 0)
   return d.toISOString()
+}
+
+/** YYYY-MM-DD of the local calendar day (never the UTC day, which differs near midnight). */
+export function toLocalDateString(d: Date): string {
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${d.getFullYear()}-${month}-${day}`
+}
+
+/** Value for a date input: the local calendar day of a stored instant, or '' when unset. */
+export function localDateInputValue(date: string): string {
+  if (isNullDate(date)) return ''
+  const d = new Date(date)
+  return Number.isNaN(d.getTime()) ? '' : toLocalDateString(d)
+}
+
+/** Local-midnight instant for a picked YYYY-MM-DD, or the Vikunja null date for ''. */
+export function localDateStringToISO(dateStr: string): string {
+  if (!dateStr) return NULL_DATE
+  return new Date(dateStr + 'T00:00:00').toISOString()
+}
+
+/** The quick-pick dates of the date picker as local YYYY-MM-DD strings. */
+export function datePickerPresets(now: Date = new Date()): {
+  today: string
+  tomorrow: string
+  nextWeek: string
+} {
+  const tomorrow = new Date(now)
+  tomorrow.setDate(now.getDate() + 1)
+  return {
+    today: toLocalDateString(now),
+    tomorrow: toLocalDateString(tomorrow),
+    nextWeek: toLocalDateString(new Date(nextMondayAtMidnightISO(now))),
+  }
 }

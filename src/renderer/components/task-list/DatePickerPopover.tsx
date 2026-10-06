@@ -1,6 +1,11 @@
 import { useState, useRef, useEffect } from 'react'
 import { X, Repeat } from 'lucide-react'
-import { isNullDate } from '@/lib/date-utils'
+import {
+  datePickerPresets,
+  isNullDate,
+  localDateInputValue,
+  localDateStringToISO,
+} from '@/lib/date-utils'
 import { detectRecurrencePreset, formatRecurrenceLabel } from '@/lib/recurrence'
 import { RecurrencePickerPopover } from './RecurrencePickerPopover'
 import { usePopoverAlignment } from './use-popover-alignment'
@@ -24,9 +29,7 @@ export function DatePickerPopover({
 }: DatePickerPopoverProps) {
   const ref = useRef<HTMLDivElement>(null)
   const align = usePopoverAlignment(ref)
-  const [dateValue, setDateValue] = useState(
-    isNullDate(currentDate) ? '' : currentDate.slice(0, 10)
-  )
+  const [dateValue, setDateValue] = useState(localDateInputValue(currentDate))
   const [showRecurrence, setShowRecurrence] = useState(false)
 
   const hasRecurrence = detectRecurrencePreset(repeatAfter, repeatMode) !== 'none'
@@ -42,21 +45,11 @@ export function DatePickerPopover({
   }, [onClose])
 
   const applyDate = (dateStr: string) => {
-    if (!dateStr) {
-      onDateChange('0001-01-01T00:00:00Z')
-    } else {
-      onDateChange(new Date(dateStr + 'T00:00:00').toISOString())
-    }
+    onDateChange(localDateStringToISO(dateStr))
     onClose()
   }
 
-  const today = new Date()
-  const tomorrow = new Date(today)
-  tomorrow.setDate(today.getDate() + 1)
-  const nextWeek = new Date(today)
-  nextWeek.setDate(today.getDate() + (7 - today.getDay() + 1))
-
-  const fmt = (d: Date) => d.toISOString().slice(0, 10)
+  const presets = datePickerPresets()
 
   return (
     <div
@@ -66,21 +59,21 @@ export function DatePickerPopover({
       <div className="mb-2 flex flex-col gap-1">
         <button
           type="button"
-          onClick={() => applyDate(fmt(today))}
+          onClick={() => applyDate(presets.today)}
           className="rounded px-2 py-1.5 text-left text-xs text-[var(--text-primary)] hover:bg-[var(--bg-hover)]"
         >
           Today
         </button>
         <button
           type="button"
-          onClick={() => applyDate(fmt(tomorrow))}
+          onClick={() => applyDate(presets.tomorrow)}
           className="rounded px-2 py-1.5 text-left text-xs text-[var(--text-primary)] hover:bg-[var(--bg-hover)]"
         >
           Tomorrow
         </button>
         <button
           type="button"
-          onClick={() => applyDate(fmt(nextWeek))}
+          onClick={() => applyDate(presets.nextWeek)}
           className="rounded px-2 py-1.5 text-left text-xs text-[var(--text-primary)] hover:bg-[var(--bg-hover)]"
         >
           Next Week
