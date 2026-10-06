@@ -121,7 +121,7 @@ function isTransientRenameError(err: unknown): boolean {
  */
 export async function writeFileAtomicAsync(
   path: string,
-  data: string,
+  data: string | Uint8Array,
   options: { backup?: boolean; mode?: number } = {}
 ): Promise<void> {
   await fsp.mkdir(dirname(path), { recursive: true })
@@ -129,7 +129,7 @@ export async function writeFileAtomicAsync(
   try {
     const handle = await fsp.open(tmp, 'w', options.mode)
     try {
-      await handle.writeFile(data, 'utf-8')
+      await handle.writeFile(data, typeof data === 'string' ? 'utf-8' : undefined)
       await handle.sync()
     } finally {
       await handle.close()
