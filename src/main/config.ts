@@ -206,7 +206,7 @@ function normalizeReview(raw: unknown): ReviewConfig {
   }
 }
 
-function normalizeConfig(raw: Record<string, unknown>): AppConfig {
+export function normalizeConfig(raw: Record<string, unknown>): AppConfig {
   return {
     vikunja_url: typeof raw.vikunja_url === 'string'
       ? raw.vikunja_url.replace(/\/+$/, '')
@@ -331,4 +331,75 @@ export function saveConfig(config: AppConfig): void {
   cachedConfig = structuredClone(config)
   // Temp file + rename, keeping config.json.bak (see atomic-file.ts)
   writeFileAtomic(getConfigPath(), JSON.stringify(config, null, 2), { backup: true })
+}
+
+// --- Merging renderer changes into the current config -----------------------
+//
+// The renderer must never replace the whole config: it only holds a snapshot, and
+// main keeps changing fields of its own (window bounds, sidebar width, popup
+// positions, last dialog directory, dismissed update version, custom lists...).
+// These helpers merge a narrow change into the config as it is *now*.
+
+export type AuthMethod = NonNullable<AppConfig['auth_method']>
+
+/** The fields a setup, login or disconnect flow is allowed to change. */
+export interface ConnectionFields {
+  vikunja_url: string
+  api_token: string
+  auth_method: AuthMethod
+  /** Omit to keep the current inbox on the same server (0 on a different one). */
+  inbox_project_id?: number
+}
+
+/** Data that belongs to one server/account: IDs and state that mean nothing elsewhere. */
+const ACCOUNT_SPECIFIC_KEYS = [
+  'custom_lists',
+  'custom_lists_sync',
+  'quick_entry_default_project_id',
+  'secondary_projects',
+  'viewer_filter',
+  'standalone_mode',
+  'last_used_project_id',
+  'last_used_label_id',
+  'last_username',
+] as const satisfies readonly (keyof AppConfig)[]
+
+function trimUrl(url: unknown): string {
+  return typeof url === 'string' ? url.replace(/\/+$/, '') : ''
+}
+
+function resetAccountData(config: Record<string, unknown>): void {
+  for (const key of ACCOUNT_SPECIFIC_KEYS) config[key] = undefined
+}
+
+/**
+ * Apply a connection change (setup, OIDC/password login, disconnect) to the
+ * existing config. Only the connection fields change. Switching to another server
+ * also drops the previous account's data; every preference (theme, hotkeys,
+ * notifications, quick entry, sounds...) is kept.
+ */
+export function applyConnectionFields(existing: AppConfig | null, conn: ConnectionFields): AppConfig {
+  const url = trimUrl(conn.vikunja_url)
+  const sameServer = existing !== null && trimUrl(existing.vikunja_url) === url
+  const merged: Record<string, unknown> = {
+    ...(existing ?? {}),
+    vikunja_url: url,
+    api_token: conn.api_token,
+    auth_method: conn.auth_method,
+    inbox_project_id: conn.inbox_project_id ?? (sameServer ? existing.inbox_project_id : 0),
+  }
+  if (!sameServer) resetAccountData(merged)
+  return normalizeConfig(merged)
+}
+
+/** Shape check for connection fields arriving over IPC. */
+export function isConnectionFields(v: unknown): v is ConnectionFields {
+  if (!v || typeof v !== 'object') return false
+  const c = v as Record<string, unknown>
+  return (
+    typeof c.vikunja_url === 'string' &&
+    typeof c.api_token === 'string' &&
+    (c.auth_method === 'api_token' || c.auth_method === 'oidc' || c.auth_method === 'password') &&
+    (c.inbox_project_id === undefined || (typeof c.inbox_project_id === 'number' && Number.isFinite(c.inbox_project_id)))
+  )
 }

@@ -32,7 +32,14 @@ import {
   deleteTaskAttachment,
   downloadTaskAttachment,
 } from './api-client'
-import { loadConfig, saveConfig, type AppConfig } from './config'
+import {
+  applyConnectionFields,
+  isConnectionFields,
+  loadConfig,
+  normalizeConfig,
+  saveConfig,
+  type AppConfig,
+} from './config'
 import { directoryFromSelectedFile, resolveDialogDefaultPath } from './dialog-path'
 import {
   deleteCustomList,
@@ -128,6 +135,33 @@ function withoutCompletionMetadata(task: Record<string, unknown>): Record<string
   const clean = { ...task }
   delete clean[AUTO_COMPLETED_SUBTASKS_KEY]
   return clean
+}
+
+// Shared tail of every renderer-driven config write: keep the API token out of
+// config.json, save, then tell the rest of the app about the change.
+function persistConfig(config: AppConfig): void {
+  // Encrypt API token into token-store if available
+  if (config.auth_method === 'api_token' && config.api_token && isEncryptionAvailable()) {
+    storeAPIToken(config.api_token, API_TOKEN_NO_EXPIRY)
+    config.api_token = ''
+  }
+  saveConfig(config)
+  // Sync native theme when config changes
+  if (config.theme) {
+    nativeTheme.themeSource = config.theme === 'system' ? 'system' : config.theme
+  }
+  // If the task badge was just turned off, clear it right away so the
+  // dock/taskbar icon updates without waiting for the renderer to push.
+  if (config.show_today_overdue_badge !== true) {
+    clearTaskBadge()
+  }
+  // Tell the Quick View renderer to drop its 30s task cache so the next
+  // show reflects the updated viewer_filter instead of stale data.
+  const viewerWindow = getQuickViewWindow()
+  if (viewerWindow && !viewerWindow.isDestroyed()) {
+    viewerWindow.webContents.send('viewer-config-changed')
+  }
+  if (config.custom_lists?.length || config.custom_lists_sync?.dirty) void syncCustomLists()
 }
 
 export function registerIpcHandlers(): void {
@@ -234,7 +268,11 @@ export function registerIpcHandlers(): void {
     return loadConfig()
   })
 
-  handleTrusted('save-config', (_event, config: AppConfig) => {
+  // Full-snapshot save. The renderer's copy can be stale (main changes window bounds,
+  // sidebar width, popup positions... on its own), so prefer save-config-patch for
+  // preference changes and save-connection-config for setup/login/disconnect.
+  handleTrusted('save-config', (_event, snapshot: AppConfig) => {
+    const config = normalizeConfig(snapshot as unknown as Record<string, unknown>)
     const latest = loadConfig()
     const accountChanged = !!latest && latest.vikunja_url.replace(/\/+$/, '') !== config.vikunja_url.replace(/\/+$/, '')
     // Renderer settings forms save a full config snapshot and may have been open while a
@@ -246,28 +284,14 @@ export function registerIpcHandlers(): void {
     } else if (accountChanged) {
       config.custom_lists_sync = undefined
     }
-    // Encrypt API token into token-store if available
-    if (config.auth_method === 'api_token' && config.api_token && isEncryptionAvailable()) {
-      storeAPIToken(config.api_token, API_TOKEN_NO_EXPIRY)
-      config.api_token = ''
-    }
-    saveConfig(config)
-    // Sync native theme when config changes
-    if (config.theme) {
-      nativeTheme.themeSource = config.theme === 'system' ? 'system' : config.theme
-    }
-    // If the task badge was just turned off, clear it right away so the
-    // dock/taskbar icon updates without waiting for the renderer to push.
-    if (config.show_today_overdue_badge !== true) {
-      clearTaskBadge()
-    }
-    // Tell the Quick View renderer to drop its 30s task cache so the next
-    // show reflects the updated viewer_filter instead of stale data.
-    const viewerWindow = getQuickViewWindow()
-    if (viewerWindow && !viewerWindow.isDestroyed()) {
-      viewerWindow.webContents.send('viewer-config-changed')
-    }
-    if (config.custom_lists?.length || config.custom_lists_sync?.dirty) void syncCustomLists()
+    persistConfig(config)
+  })
+
+  // Setup, OIDC/password login and disconnect: only the connection fields change, every
+  // preference is kept (see applyConnectionFields).
+  handleTrusted('save-connection-config', (_event, connection: unknown) => {
+    if (!isConnectionFields(connection)) throw new Error('Invalid connection settings')
+    persistConfig(applyConnectionFields(loadConfig(), connection))
   })
 
   handleTrusted('custom-lists:get', () => getCustomLists())

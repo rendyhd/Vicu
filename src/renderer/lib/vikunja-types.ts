@@ -254,6 +254,18 @@ export interface AppConfig {
   review?: ReviewConfig
 }
 
+/**
+ * What a setup, login or disconnect flow may change. Everything else in the config
+ * (preferences, hotkeys, window state...) is kept by the main process.
+ */
+export interface ConnectionConfig {
+  vikunja_url: string
+  api_token: string
+  auth_method: 'api_token' | 'oidc' | 'password'
+  /** Omit to keep the current inbox on the same server (0 on a different one). */
+  inbox_project_id?: number
+}
+
 export interface OIDCProvider {
   name: string
   key: string

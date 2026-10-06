@@ -13,6 +13,7 @@ import type {
   TaskQueryParams,
   ApiResult,
   AppConfig,
+  ConnectionConfig,
   OIDCProvider,
   ServerAuthInfo,
   PasswordLoginResult,
@@ -98,6 +99,9 @@ export const api = {
 
   saveConfig: (config: AppConfig) =>
     window.api.saveConfig(config) as Promise<void>,
+
+  saveConnectionConfig: (connection: ConnectionConfig) =>
+    window.api.saveConnectionConfig(connection) as Promise<void>,
 
   getCustomLists: () => window.api.getCustomLists(),
   upsertCustomList: (list: import('./vikunja-types').CustomList) => window.api.upsertCustomList(list),

@@ -57,6 +57,8 @@ const api = {
     ipcRenderer.invoke('get-config'),
   saveConfig: (config: Record<string, unknown>) =>
     ipcRenderer.invoke('save-config', config),
+  saveConnectionConfig: (connection: Record<string, unknown>) =>
+    ipcRenderer.invoke('save-connection-config', connection),
   getCustomLists: () => ipcRenderer.invoke('custom-lists:get'),
   upsertCustomList: (list: Record<string, unknown>) => ipcRenderer.invoke('custom-lists:upsert', list),
   deleteCustomList: (id: string) => ipcRenderer.invoke('custom-lists:delete', id),

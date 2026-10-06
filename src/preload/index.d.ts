@@ -13,6 +13,7 @@ import type {
   TaskQueryParams,
   ApiResult,
   AppConfig,
+  ConnectionConfig,
   OIDCProvider,
   ServerAuthInfo,
   PasswordLoginResult,
@@ -68,6 +69,7 @@ export interface ElectronAPI {
   // Config
   getConfig(): Promise<AppConfig | null>
   saveConfig(config: AppConfig): Promise<void>
+  saveConnectionConfig(connection: ConnectionConfig): Promise<void>
   getCustomLists(): Promise<CustomList[]>
   upsertCustomList(list: CustomList): Promise<CustomList[]>
   deleteCustomList(id: string): Promise<CustomList[]>
