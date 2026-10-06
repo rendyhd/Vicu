@@ -247,7 +247,7 @@ function RoutineEditor({
 }
 
 function HistoryDialog({ carrier, onClose }: { carrier: RoutineCarrier<Task>; onClose: () => void }) {
-  const records = useRoutineHistory(carrier)
+  const { records, loadingArchive, archiveError } = useRoutineHistory(carrier)
   const logged = records.filter((record) => record.status !== 'PENDING')
   const completed = logged.filter((record) => record.status === 'COMPLETED').length
   const adherence = logged.length ? Math.round((completed / logged.length) * 100) : 0
@@ -259,6 +259,8 @@ function HistoryDialog({ carrier, onClose }: { carrier: RoutineCarrier<Task>; on
           <div className="rounded-lg bg-[var(--bg-secondary)] p-4"><div className="text-2xl font-semibold text-[var(--text-primary)]">{completed}</div><div className="text-xs text-[var(--text-secondary)]">Completions</div></div>
         </div>
         <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-secondary)]">History</h3>
+        {loadingArchive && <p className="mb-2 text-xs text-[var(--text-secondary)]">Loading earlier history...</p>}
+        {archiveError && <p className="mb-2 text-xs text-accent-red">Could not load earlier history: {archiveError}</p>}
         {records.length === 0 ? <p className="py-8 text-center text-sm text-[var(--text-secondary)]">No check-ins yet.</p> : (
           <div className="divide-y divide-[var(--border-color)]">
             {records.slice(0, 100).map((record) => (
@@ -284,14 +286,23 @@ export function RoutinesView() {
   const [showArchived, setShowArchived] = useState(false)
   const active = useMemo(() => routines.active, [routines.active])
 
-  const exportCsv = () => {
-    const blob = new Blob([csvForRoutines(routines.carriers.map(({ payload }) => ({ name: payload.definition.name, occurrences: Object.values(payload.occurrences) })))], { type: 'text/csv;charset=utf-8' })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `vicu-routines-${localDateString()}.csv`
-    link.click()
-    URL.revokeObjectURL(url)
+  const [exportError, setExportError] = useState<string | null>(null)
+
+  const exportCsv = async () => {
+    setExportError(null)
+    try {
+      // The archive is read on demand: the export includes history older than the rolling window.
+      const entries = await routines.loadCsvEntries()
+      const blob = new Blob([csvForRoutines(entries)], { type: 'text/csv;charset=utf-8' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `vicu-routines-${localDateString()}.csv`
+      link.click()
+      URL.revokeObjectURL(url)
+    } catch (error) {
+      setExportError(error instanceof Error ? error.message : 'Could not export routines')
+    }
   }
 
   return (
@@ -337,6 +348,8 @@ export function RoutinesView() {
             </section>
           )}
 
+          {routines.archiveWarning && <div className="mx-6 mt-5 rounded-lg border border-accent-orange/30 bg-accent-orange/10 px-4 py-3 text-xs text-accent-orange">Older history could not be archived yet and stays in the routine for now: {routines.archiveWarning}</div>}
+          {exportError && <div className="mx-6 mt-5 rounded-lg border border-accent-red/30 bg-accent-red/10 px-4 py-3 text-xs text-accent-red">{exportError}</div>}
           {routines.error && <div className="mx-6 mt-5 rounded-lg border border-accent-red/30 bg-accent-red/10 px-4 py-3 text-xs text-accent-red">{routines.error instanceof Error ? routines.error.message : 'Could not update routines'}</div>}
         </div>
       </div>

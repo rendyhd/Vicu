@@ -78,6 +78,8 @@ describe('custom-list carrier protocol', () => {
   it('recognizes all Vicu metadata carriers', () => {
     expect(hasVicuMetadataMarker('<!-- vicu-custom-lists:v1:e30 -->')).toBe(true)
     expect(hasVicuMetadataMarker('<!-- vicu-routine:v1:e30 -->')).toBe(true)
+    // Routine archive parts are hidden like every other metadata task (Quick View, search, counts).
+    expect(hasVicuMetadataMarker('<!-- vicu-routine:archive:v1:e30 -->')).toBe(true)
     expect(hasVicuMetadataMarker('ordinary notes')).toBe(false)
   })
 

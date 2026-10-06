@@ -82,6 +82,8 @@ export interface ProjectView {
 export interface CreateTaskPayload {
   title: string
   description?: string
+  /** Create the task already completed (routine carriers and archive parts, one call). */
+  done?: boolean
   due_date?: string
   start_date?: string
   priority?: number

@@ -1,21 +1,27 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useSyncExternalStore } from 'react'
 import { api } from '@/lib/api'
-import { taskPatch } from '@/lib/merge-patches'
+import {
+  createRoutineCarrier,
+  deleteRoutine,
+  loadRoutineCsvEntries,
+  loadRoutineArchive,
+  writeRoutineCarrier,
+} from '@/lib/routine-store'
 import type { Task } from '@/lib/vikunja-types'
 import {
-  NULL_DATE,
   deviceId,
   localDateString,
-  mergeRoutinePayload,
   newId,
   parseRoutineEnvelope,
+  readRoutineHistory,
   routineDay,
   statusRecord,
-  upsertRoutineEnvelope,
   type OccurrenceStatus,
   type RoutineCarrier,
+  type RoutineCsvEntry,
   type RoutineDefinition,
+  type RoutineOccurrenceRecord,
   type RoutinePayload,
   type RoutineSlot,
 } from '@/lib/routines'
@@ -31,25 +37,35 @@ async function fetchCarriers(): Promise<RoutineCarrier<Task>[]> {
   }).sort((left, right) => left.payload.definition.createdAt.localeCompare(right.payload.definition.createdAt))
 }
 
-async function writeCarrier(carrier: RoutineCarrier<Task>, localPayload: RoutinePayload): Promise<RoutineCarrier<Task>> {
-  const freshResult = await api.fetchTaskById(carrier.task.id)
-  if (!freshResult.success) throw new Error(freshResult.error)
-  const fresh = freshResult.data
-  const parsed = parseRoutineEnvelope(fresh.description)
-  const payload = parsed.payload ? mergeRoutinePayload(localPayload, parsed.payload) : localPayload
-  // Carriers are always completed, undated, non-repeating and reminder-free; only
-  // what differs from the fresh server copy is sent.
-  const result = await api.updateTask(fresh.id, taskPatch(fresh, {
-    title: payload.definition.name,
-    description: upsertRoutineEnvelope(parsed.body, payload),
-    done: true,
-    due_date: NULL_DATE,
-    repeat_after: 0,
-    repeat_mode: 0,
-    reminders: [],
-  }))
-  if (!result.success) throw new Error(result.error)
-  return { task: result.data, payload }
+// The latest archive problem that did not stop a write (pruning skipped); shown by the Routines view.
+let archiveWarning: string | null = null
+const archiveWarningListeners = new Set<() => void>()
+
+function setArchiveWarning(message: string | null): void {
+  archiveWarning = message
+  archiveWarningListeners.forEach((listener) => listener())
+}
+
+function useArchiveWarning(): string | null {
+  return useSyncExternalStore(
+    (listener) => {
+      archiveWarningListeners.add(listener)
+      return () => { archiveWarningListeners.delete(listener) }
+    },
+    () => archiveWarning,
+  )
+}
+
+function writeCarrier(
+  carrier: RoutineCarrier<Task>,
+  localPayload: RoutinePayload,
+  changed: RoutineOccurrenceRecord[] = [],
+): Promise<RoutineCarrier<Task>> {
+  return writeRoutineCarrier(api, carrier, localPayload, { changed, onArchiveError: setArchiveWarning })
+    .then(({ task, payload, archiveError }) => {
+      if (!archiveError) setArchiveWarning(null)
+      return { task, payload }
+    })
 }
 
 export function useRoutines() {
@@ -62,6 +78,7 @@ export function useRoutines() {
 
   const settle = async () => {
     await queryClient.invalidateQueries({ queryKey: ['routines'] })
+    await queryClient.invalidateQueries({ queryKey: ['routine-archive'] })
     await queryClient.invalidateQueries({ queryKey: ['tasks'] })
     await api.refreshRoutineReminders()
   }
@@ -87,20 +104,8 @@ export function useRoutines() {
         updatedBy: deviceId(),
       }
       const payload: RoutinePayload = { version: 1, definition, occurrences: {}, prunedBefore: '' }
-      const created = await api.createTask(config.inbox_project_id, {
-        title: definition.name,
-        description: upsertRoutineEnvelope('', payload),
-      })
-      if (!created.success) throw new Error(created.error)
-      const completed = await api.updateTask(created.data.id, taskPatch(created.data, {
-        done: true,
-        due_date: NULL_DATE,
-        repeat_after: 0,
-        repeat_mode: 0,
-        reminders: [],
-      }))
-      if (!completed.success) throw new Error(completed.error)
-      return { task: completed.data, payload }
+      // One request, already done: no window where an open carrier shows up in task lists.
+      return createRoutineCarrier(api, config.inbox_project_id, payload)
     },
     onSettled: settle,
   })
@@ -145,7 +150,7 @@ export function useRoutines() {
       return writeCarrier(carrier, {
         ...carrier.payload,
         occurrences: { ...carrier.payload.occurrences, [record.key]: record },
-      })
+      }, [record])
     },
     onSettled: settle,
   })
@@ -167,10 +172,7 @@ export function useRoutines() {
   })
 
   const deleteMutation = useMutation({
-    mutationFn: async (carrier: RoutineCarrier<Task>) => {
-      const result = await api.deleteTask(carrier.task.id)
-      if (!result.success) throw new Error(result.error)
-    },
+    mutationFn: (carrier: RoutineCarrier<Task>) => deleteRoutine(api, carrier),
     onSettled: settle,
   })
 
@@ -186,13 +188,35 @@ export function useRoutines() {
     setStatus: statusMutation,
     archiveRoutine: archiveMutation,
     deleteRoutine: deleteMutation,
+    archiveWarning: useArchiveWarning(),
+    loadCsvEntries: (): Promise<RoutineCsvEntry[]> => loadRoutineCsvEntries(api, carriers),
     isMutating: createMutation.isPending || updateMutation.isPending || statusMutation.isPending || archiveMutation.isPending || deleteMutation.isPending,
     error: query.error || createMutation.error || updateMutation.error || statusMutation.error || archiveMutation.error || deleteMutation.error,
   }
 }
 
+/**
+ * A routine's history, newest first: the carrier's occurrences at once, with the archive parts
+ * merged in once they have loaded. The archive is only fetched here (the History view), never
+ * for the Today and Routines day views.
+ */
 export function useRoutineHistory(carrier?: RoutineCarrier<Task>) {
-  return useMemo(() => carrier ? Object.values(carrier.payload.occurrences).sort((left, right) =>
-    right.scheduledDate.localeCompare(left.scheduledDate) || right.scheduledMinutes - left.scheduledMinutes
-  ) : [], [carrier])
+  const needsArchive = !!carrier && carrier.payload.prunedBefore !== ''
+  const archive = useQuery({
+    queryKey: ['routine-archive', carrier?.payload.definition.id, carrier?.task.id, carrier?.payload.prunedBefore],
+    queryFn: () => loadRoutineArchive(api, carrier!),
+    enabled: needsArchive,
+    staleTime: 30_000,
+  })
+  const records = useMemo(() => {
+    if (!carrier) return []
+    const history = readRoutineHistory(carrier.payload.definition.id, carrier.payload.occurrences, archive.data ?? [])
+    return Object.values(history).sort((left, right) =>
+      right.scheduledDate.localeCompare(left.scheduledDate) || right.scheduledMinutes - left.scheduledMinutes)
+  }, [carrier, archive.data])
+  return {
+    records,
+    loadingArchive: needsArchive && archive.isPending,
+    archiveError: archive.error instanceof Error ? archive.error.message : null,
+  }
 }
