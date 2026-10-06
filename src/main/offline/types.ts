@@ -29,9 +29,10 @@ export interface CreateAction extends ActionBase {
   done?: boolean
   /**
    * A replay sent this create and got a timeout, a reset or a 500: the server may have created the
-   * task anyway. The next attempt looks for it before posting again, so a retry cannot duplicate it.
+   * task anyway. This is what that attempt sent. The next attempt looks for a task like it before
+   * posting again, so a retry cannot duplicate it, and applies whatever was edited since.
    */
-  maybeSent?: boolean
+  maybeSent?: { projectId: number; fields: Record<string, unknown> }
 }
 
 export interface UpdateAction extends ActionBase {

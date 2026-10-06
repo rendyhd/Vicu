@@ -53,7 +53,13 @@ export async function replayPendingActions(): Promise<OfflineReplayEvent | null>
   const config = loadConfig()
   if (!config || config.standalone_mode || !config.vikunja_url) return null
   if (getOfflineQueue().counts().pending === 0) return null
-  return runReplay()
+  try {
+    return await runReplay()
+  } catch (err) {
+    // Callers fire this and forget it; a failure here must not become an unhandled rejection.
+    console.warn('[sync] replay failed:', err instanceof Error ? err.message : err)
+    return null
+  }
 }
 
 function announce(event: OfflineReplayEvent): void {

@@ -222,6 +222,20 @@ describe('replayQueue', () => {
       expect(queue.counts()).toEqual({ pending: 0, failed: 0 })
     })
 
+    it('an exception from the API layer is a failure of that request, not a crashed replay', async () => {
+      const a = await queue.enqueueUpdate(1, { title: 'a' })
+      const { api } = fakeApi({
+        updateTask: () => {
+          throw new Error('boom')
+        },
+      })
+
+      const result = await replayQueue(queue, api)
+
+      expect(result).toMatchObject({ stopped: 'unknown', error: 'boom' })
+      expect(queue.getPending()[0]).toMatchObject({ id: a.actionId, attempts: 1 })
+    })
+
     it('an error nobody has a rule for stops the replay, is counted, and surfaces after several replays', async () => {
       const a = await queue.enqueueUpdate(1, { title: 'a' })
       await queue.enqueueUpdate(2, { title: 'b' })
@@ -304,13 +318,32 @@ describe('replayQueue', () => {
 
       const first = await replayQueue(queue, harness.api)
       expect(first.stopped).toBe('network')
-      expect(queue.getPending()[0]).toMatchObject({ type: 'create', maybeSent: true })
+      expect(queue.getPending()[0]).toMatchObject({ type: 'create', maybeSent: { projectId: 7, fields: { title: 'Pack' } } })
 
       const second = await replayQueue(queue, harness.api)
 
       expect(harness.ops()).toEqual(['createTask', 'findRecentCreate', 'addLabelToTask'])
       expect(harness.calls[2].args).toEqual([777, 3]) // the label follows the task that already exists
       expect(second).toMatchObject({ applied: 2, stopped: null, idMap: { [String(tempId)]: 777 } })
+    })
+
+    it('looks for what the unconfirmed attempt sent, then applies the edits made since to the task it adopts', async () => {
+      const { pendingId } = await queue.enqueueCreate({ projectId: 7, fields: { title: 'Pack', priority: 1, due_date: '2026-10-08T14:30:00.000Z' } })
+      let calls = 0
+      const harness = fakeApi({
+        createTask: () => (++calls === 1 ? err('Request timed out (10s)') : ok({ id: 1000 })),
+        findRecentCreate: () => ok({ id: 777 }),
+      })
+      await replayQueue(queue, harness.api)
+
+      // While offline again the user renames the pending task, raises its priority and clears its date.
+      await queue.enqueueUpdate(pendingId, { title: 'Pack bags', priority: 2, due_date: null })
+      const second = await replayQueue(queue, harness.api)
+
+      expect(harness.calls.find((c) => c.op === 'findRecentCreate')?.args[1]).toBe('Pack') // the title that was sent
+      expect(harness.calls.filter((c) => c.op === 'createTask')).toHaveLength(1)
+      expect(harness.calls[harness.calls.length - 1]).toEqual({ op: 'updateTask', args: [777, { title: 'Pack bags', priority: 2, due_date: null }] })
+      expect(second).toMatchObject({ stopped: null, idMap: { '-1': 777 } })
     })
 
     it('creates it when the lookup finds nothing', async () => {

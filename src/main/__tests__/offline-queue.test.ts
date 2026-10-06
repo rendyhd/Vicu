@@ -98,6 +98,20 @@ describe('OfflineQueue', () => {
       expect(reloaded.loadStatus).toBe('ok')
     })
 
+    it('counts a task created offline as one change, whatever rides along with it', async () => {
+      const q = make()
+      await q.enqueueCreate({
+        projectId: 7,
+        fields: { title: 'x' },
+        labels: [{ id: 1 }, { title: 'two' }],
+        images: [{ name: 'a.png', mime: 'image/png', bytes: pngBytes() }],
+      })
+      expect(q.getPending()).toHaveLength(4)
+      expect(q.counts().pending).toBe(1)
+      await q.enqueueComplete(5, true)
+      expect(q.counts().pending).toBe(2)
+    })
+
     it('counts come from memory, not from re-parsing the file', async () => {
       const q = make()
       await q.enqueueUpdate(5, { done: true })
@@ -289,6 +303,16 @@ describe('OfflineQueue', () => {
       await expect(
         q.enqueueCreate({ projectId: 7, fields: { title: 'x' }, images: [{ name: 'huge.png', mime: 'image/png', bytes: new Uint8Array(MAX_QUEUED_IMAGE_BYTES + 1) }] })
       ).rejects.toThrow(/too large/i)
+      expect(q.counts().pending).toBe(0)
+      expect(existsSync(attachmentsDir) ? readdirSync(attachmentsDir) : []).toEqual([])
+    })
+
+    it('refuses images that are too large together, leaving nothing behind', async () => {
+      const q = make()
+      const big = () => ({ name: 'big.png', mime: 'image/png', bytes: new Uint8Array(MAX_QUEUED_IMAGE_BYTES) })
+      await expect(
+        q.enqueueCreate({ projectId: 7, fields: { title: 'x' }, images: [big(), big(), big(), big(), { name: 'one more.png', mime: 'image/png', bytes: new Uint8Array(1) }] })
+      ).rejects.toThrow(/together/i)
       expect(q.counts().pending).toBe(0)
       expect(existsSync(attachmentsDir) ? readdirSync(attachmentsDir) : []).toEqual([])
     })

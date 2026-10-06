@@ -46,6 +46,8 @@ export const MAX_FAILED_ENTRIES = 100
 /** Pasted images are stored on disk until they can be uploaded; keep an offline paste bounded. */
 export const MAX_QUEUED_IMAGE_BYTES = 25 * 1024 * 1024
 export const MAX_QUEUED_IMAGES = 20
+/** All images of one create together. */
+export const MAX_QUEUED_IMAGE_TOTAL_BYTES = 100 * 1024 * 1024
 
 export interface OfflineQueueOptions {
   queuePath: string
@@ -147,8 +149,19 @@ export class OfflineQueue {
     return this.authProblem
   }
 
+  /**
+   * How many changes are waiting, as the user counts them: a task created offline is one change
+   * however many labels and images ride along with it. From memory, never from the file.
+   */
   counts(): OfflineQueueCounts {
-    return { pending: this.data.actions.length, failed: this.data.failed.length }
+    const pendingCreates = new Set<number>()
+    for (const a of this.data.actions) if (a.type === 'create') pendingCreates.add(a.tempId)
+    let pending = 0
+    for (const a of this.data.actions) {
+      const isCreateFollowUp = (a.type === 'add-label' || a.type === 'upload-attachment') && pendingCreates.has(a.taskId)
+      if (!isCreateFollowUp) pending++
+    }
+    return { pending, failed: this.data.failed.length }
   }
 
   snapshot(): OfflineQueueSnapshot {
@@ -302,6 +315,9 @@ export class OfflineQueue {
         throw new Error(`"${image.name}" is too large to save offline (limit ${MAX_QUEUED_IMAGE_BYTES / 1024 / 1024} MB)`)
       }
     }
+    if (images.reduce((sum, image) => sum + image.bytes.byteLength, 0) > MAX_QUEUED_IMAGE_TOTAL_BYTES) {
+      throw new Error(`The images are too large to save offline together (limit ${MAX_QUEUED_IMAGE_TOTAL_BYTES / 1024 / 1024} MB)`)
+    }
 
     const stored: Array<{ file: string; name: string; mime: string }> = []
     try {
@@ -370,7 +386,7 @@ export class OfflineQueue {
     const taskId = this.resolveTaskRef(ref)
     if (taskId === null) return false
     const outcome = cancelPatchKeys(this.data.actions, taskId, keys, this.inFlightId)
-    if (outcome.actions === this.data.actions || (!outcome.cancelled && outcome.removed.length === 0)) return false
+    if (!outcome.cancelled && outcome.removed.length === 0) return false
     this.data.actions = outcome.actions
     await this.commit(outcome.removed)
     return outcome.cancelled
@@ -459,7 +475,7 @@ export class OfflineQueue {
   }
 
   /** The server accepted the action (or it was already in effect). */
-  async completeAction(id: string, result: { realId?: number } = {}): Promise<void> {
+  async completeAction(id: string, result: { realId?: number; adopted?: boolean } = {}): Promise<void> {
     const index = this.data.actions.findIndex((a) => a.id === id)
     if (index === -1) return
     const action = this.data.actions[index]
@@ -470,15 +486,19 @@ export class OfflineQueue {
       this.data.resolved[String(action.tempId)] = result.realId
       this.data.resolved[pendingIdFor(action.id)] = result.realId
       this.trimResolved()
-      if (action.done) {
-        // A create has no `done` field: complete the new task with an update that runs next.
-        const done: UpdateAction = {
+      // What still has to be applied to the new task, in one update that runs next: a create has no
+      // `done` field, and a task adopted from an earlier unconfirmed attempt may predate edits that
+      // were folded into the create afterwards.
+      const patch: Record<string, unknown> = result.adopted ? editsSinceSent(action) : {}
+      if (action.done) patch.done = true
+      if (Object.keys(patch).length > 0) {
+        const followUp: UpdateAction = {
           ...this.stamp({ title: action.title }),
           type: 'update',
           taskId: result.realId,
-          patch: { done: true },
+          patch,
         }
-        actions.splice(index, 0, done)
+        actions.splice(index, 0, followUp)
       }
       this.data.failed = this.data.failed.map((f) =>
         hasTaskId(f.action) && f.action.taskId === action.tempId ? { ...f, action: { ...f.action, taskId: result.realId! } as QueuedAction } : f
@@ -536,7 +556,7 @@ export class OfflineQueue {
   }
 
   /** Persist progress inside an action (a resolved label id, "already uploaded"). */
-  async patchAction(id: string, changes: { labelId?: number; uploaded?: boolean; maybeSent?: boolean }): Promise<void> {
+  async patchAction(id: string, changes: { labelId?: number; uploaded?: boolean; maybeSent?: CreateAction['maybeSent'] }): Promise<void> {
     const index = this.data.actions.findIndex((a) => a.id === id)
     if (index === -1) return
     this.data.actions = this.data.actions.map((a, i) => (i === index ? ({ ...a, ...changes } as QueuedAction) : a))
@@ -605,6 +625,18 @@ export class OfflineQueue {
       )
     )
   }
+}
+
+/** The fields that differ between what an earlier attempt sent and what the create holds now, as a merge patch. */
+function editsSinceSent(create: CreateAction): Record<string, unknown> {
+  const sent = create.maybeSent
+  if (!sent) return {}
+  const patch: Record<string, unknown> = {}
+  for (const key of new Set([...Object.keys(sent.fields), ...Object.keys(create.fields)])) {
+    if (JSON.stringify(sent.fields[key]) !== JSON.stringify(create.fields[key])) patch[key] = create.fields[key] ?? null
+  }
+  if (sent.projectId !== create.projectId) patch.project_id = create.projectId
+  return patch
 }
 
 /** Reduce create input to the writable fields that can be sent in a POST: no done, no project, no nulls. */

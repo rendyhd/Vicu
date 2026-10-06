@@ -36,7 +36,7 @@ export const MAX_UNKNOWN_ATTEMPTS = 5
 const imageToken = (attachmentId: number): string => `[[image:${attachmentId}]]`
 
 type Step =
-  | { kind: 'ok'; realId?: number }
+  | { kind: 'ok'; realId?: number; /** An earlier, unconfirmed attempt had already created the task. */ adopted?: boolean }
   | { kind: 'failure'; failure: FailureLike }
   /** Removed from the queue while the replay was preparing its request: nothing was sent. */
   | { kind: 'cancelled' }
@@ -74,10 +74,10 @@ export async function replayQueue(queue: OfflineQueue, api: ReplayApi): Promise<
       if (!queue.beginSend(action.id)) continue
 
       try {
-        const step = await sendAction(queue, api, action)
+        const step = await sendActionSafely(queue, api, action)
 
         if (step.kind === 'ok') {
-          await queue.completeAction(action.id, { realId: step.realId })
+          await queue.completeAction(action.id, { realId: step.realId, adopted: step.adopted })
           if (action.type === 'create' && step.realId !== undefined) idMap[String(action.tempId)] = step.realId
           applied++
           queue.setAuthProblem(null)
@@ -98,7 +98,7 @@ export async function replayQueue(queue: OfflineQueue, api: ReplayApi): Promise<
             // A create that timed out or hit a 500 may exist on the server already: remember that,
             // so the retry checks before it posts again.
             if (action.type === 'create' && decision.why !== 'auth' && !isQueueableFailure(step.failure, 'create')) {
-              await queue.patchAction(action.id, { maybeSent: true })
+              await queue.patchAction(action.id, { maybeSent: { projectId: action.projectId, fields: action.fields } })
             }
             if (decision.why === 'unknown') {
               // Something the server said that we have no rule for. Keep the action for a few
@@ -114,6 +114,12 @@ export async function replayQueue(queue: OfflineQueue, api: ReplayApi): Promise<
             break
           }
         }
+      } catch (err) {
+        // The queue could not be updated (a disk write failed). Stop rather than send more requests
+        // whose results cannot be recorded; the next replay picks up from the saved state.
+        stopped = 'unknown'
+        stopError = err instanceof Error ? err.message : String(err)
+        break
       } finally {
         queue.endSend()
       }
@@ -141,6 +147,15 @@ function targetTask(queue: OfflineQueue, action: Exclude<QueuedAction, { type: '
   return real !== null && real > 0 ? real : null
 }
 
+/** `sendAction`, with an exception from the API layer treated as a failure of the request instead of aborting the replay. */
+async function sendActionSafely(queue: OfflineQueue, api: ReplayApi, action: QueuedAction): Promise<Step> {
+  try {
+    return await sendAction(queue, api, action)
+  } catch (err) {
+    return fail({ error: err instanceof Error ? err.message : String(err) })
+  }
+}
+
 async function sendAction(queue: OfflineQueue, api: ReplayApi, action: QueuedAction): Promise<Step> {
   if (action.type === 'create') {
     let payload: Record<string, unknown>
@@ -150,9 +165,10 @@ async function sendAction(queue: OfflineQueue, api: ReplayApi, action: QueuedAct
       return { kind: 'broken', reason: 'rejected', error: err instanceof Error ? err.message : 'The task is not valid' }
     }
     if (action.maybeSent) {
-      const existing = await api.findRecentCreate(action.projectId, payload, action.createdAt)
+      // Look for what the unconfirmed attempt sent, which may differ from what the create holds now.
+      const existing = await api.findRecentCreate(action.maybeSent.projectId, action.maybeSent.fields, action.createdAt)
       if (!existing.success) return fail(existing)
-      if (existing.data) return { kind: 'ok', realId: existing.data.id }
+      if (existing.data) return { kind: 'ok', realId: existing.data.id, adopted: true }
     }
     const result = await api.createTask(action.projectId, payload)
     if (!result.success) return fail(result)
