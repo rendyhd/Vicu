@@ -22,7 +22,7 @@ import { evaluateServerFilter } from './server-filter-eval'
 
 /**
  * Runs every vector of test-fixtures/cross-app-semantics-v1.json that the desktop app owns
- * (due dates, weeks, smart lists, review) against the real helpers.
+ * (due dates, weeks, smart lists, custom lists, review) against the real helpers.
  *
  * The fixture writes times as local wall-clock times without an offset, so every test below
  * converts them with `new Date(y, m - 1, d, h, mi, s)` in the process time zone. The zone

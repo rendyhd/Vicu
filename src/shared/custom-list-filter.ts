@@ -28,21 +28,15 @@ import {
 /** Vikunja's null date. Duplicated here on purpose, like in due-dates.ts. */
 const NULL_DUE_DATE = '0001-01-01T00:00:00Z'
 
-export type DueDateWindow =
-  | 'all'
-  | 'overdue'
-  | 'today'
-  | 'this_week'
-  | 'this_month'
-  | 'has_due_date'
-  | 'no_due_date'
-
 /** The windows `include_overdue` applies to. */
 const WINDOWS_WITH_OVERDUE: ReadonlySet<string> = new Set(['today', 'this_week', 'this_month'])
 
 /** The conditions of a custom list, in the shape both the synced list and Quick View use. */
 export interface CustomListFilterInput {
-  /** One of `DueDateWindow`; anything else (a value from a newer app) means no date condition. */
+  /**
+   * all, overdue, today, this_week, this_month, has_due_date or no_due_date. Anything else (a
+   * value from a newer app) means no date condition.
+   */
   due_date_filter?: string
   /** Absent means true. */
   include_overdue?: boolean

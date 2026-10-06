@@ -16,7 +16,8 @@ export function useTasks(params: TaskQueryParams, enabled = true) {
     queryFn: async () => {
       // Without `page` the main process walks every page (honoring total_pages) and
       // removes nested subtasks once on the complete set. Paginating here would stop
-      // early whenever a page shrank after subtask filtering (D-REN-1).
+      // early whenever a page shrank after subtask filtering (D-REN-1). Views that filter
+      // first (Tag view, custom lists) pass `keep_nested_subtasks` to get the un-nested set.
       const result = await api.fetchTasks(params)
       if (!result.success) throw new Error(result.error)
       return result.data ?? []
