@@ -1,11 +1,14 @@
 import type { ViewerFilter } from '../config'
+import { MAX_PAGE_SIZE } from '../api-v2'
 
+// Vikunja caps per_page at 1000 (anything above is a 422). No `page` is set on purpose:
+// the API client then reads every page until total_pages, so lists beyond 1000 tasks
+// are complete instead of silently cut off.
 interface FilterParams {
   filter: string
   sort_by: string
   order_by: string
   per_page: number
-  page: number
   filter_include_nulls?: string
 }
 
@@ -24,24 +27,21 @@ export function buildViewerFilterParams(viewerFilter: ViewerFilter): FilterParam
           filter: `done = false && due_date <= '${eot}' && due_date != '${nullDate}'`,
           sort_by: 'due_date',
           order_by: 'asc',
-          per_page: 10000,
-          page: 1,
+          per_page: MAX_PAGE_SIZE,
         }
       case 'upcoming':
         return {
           filter: `done = false && due_date > '${eot}' && due_date != '${nullDate}'`,
           sort_by: 'due_date',
           order_by: 'asc',
-          per_page: 10000,
-          page: 1,
+          per_page: MAX_PAGE_SIZE,
         }
       case 'anytime':
         return {
           filter: 'done = false',
           sort_by: 'updated',
           order_by: 'desc',
-          per_page: 10000,
-          page: 1,
+          per_page: MAX_PAGE_SIZE,
         }
     }
   }
@@ -129,8 +129,7 @@ export function buildViewerFilterParams(viewerFilter: ViewerFilter): FilterParam
     filter: filterString,
     sort_by: sortBy,
     order_by: orderBy,
-    per_page: 10000,
-    page: 1,
+    per_page: MAX_PAGE_SIZE,
   }
 
   // Include nulls at end when sorting by due_date (but not in union mode)

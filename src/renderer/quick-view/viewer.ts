@@ -619,7 +619,9 @@ async function loadTasks(forceRefresh = false): Promise<void> {
   hideStatusBar()
 
   const result = await window.quickViewApi.fetchTasks()
-  if (result.success) {
+  // A cached list served because the refresh failed is not remembered as fresh, so
+  // the next show tries the server again.
+  if (result.success && !result.error) {
     lastFetchResult = result
     lastFetchTime = Date.now()
   }
@@ -629,7 +631,12 @@ async function loadTasks(forceRefresh = false): Promise<void> {
 async function applyFetchResult(result: FetchResult): Promise<void> {
   if (result.success) {
     renderTasks(result.tasks || [])
-    if (result.cached) {
+    if (result.cached && result.error) {
+      // The refresh failed for a reason other than being offline: show the cached list
+      // but say why it may be out of date.
+      showStatusBar(`Could not refresh (cached ${formatRelativeTime(result.cachedAt)})`, 'offline')
+      showError(result.error)
+    } else if (result.cached) {
       showStatusBar(`Offline \u2014 cached ${formatRelativeTime(result.cachedAt)}`, 'offline')
     } else if (result.standalone) {
       showStatusBar('Standalone mode', 'standalone')

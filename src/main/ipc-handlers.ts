@@ -49,6 +49,8 @@ import { fetchCurrentUser } from './auth/user-info'
 import { authManager } from './auth/auth-manager'
 import { OidcTotpRequiredError } from './auth/oidc-login'
 import { buildViewerFilterParams } from './quick-entry/filter-builder'
+import { fetchPositionSortedTasks } from './quick-entry/position-sort'
+import { cachedFallback } from './quick-entry/fetch-fallback'
 import { applyCustomListTaskFilter, type CustomListClientFilter } from './quick-entry/custom-list-filter'
 import {
   hideQuickEntry,
@@ -482,6 +484,7 @@ export function registerIpcHandlers(): void {
     const filterParams = buildViewerFilterParams(effectiveFilter) as unknown as Record<string, unknown>
 
     // Position sort needs special handling via project views
+    let result: Awaited<ReturnType<typeof fetchTasks>>
     if (effectiveFilter.sort_by === 'position') {
       const projectIds = activeProjectIds
         ? effectiveFilter.project_ids.filter(projectId => activeProjectIds.has(projectId))
@@ -489,26 +492,14 @@ export function registerIpcHandlers(): void {
       if (!projectIds || projectIds.length === 0) {
         return { success: false, error: 'Position sort requires specific projects' }
       }
-      const allTasks: unknown[] = []
-      for (const pid of projectIds) {
-        const viewsResult = await fetchProjectViews(pid)
-        if (!viewsResult.success || !Array.isArray(viewsResult.data)) continue
-        const views = viewsResult.data as Array<{ id: number; view_kind: string }>
-        const listView = views.find(v => v.view_kind === 'list') || views[0]
-        if (!listView) continue
-        const viewResult = await fetchViewTasks(pid, listView.id, filterParams)
-        if (viewResult.success && Array.isArray(viewResult.data)) {
-          allTasks.push(...viewResult.data)
-        }
-      }
-      const filteredAll = keepActiveProjectTasks((clientFilter
-        ? applyCustomListTaskFilter(allTasks as Array<{ project_id?: number; priority?: number; labels?: Array<{ id: number }> }>, clientFilter)
-        : allTasks).filter((task) => !hasVicuMetadataMarker((task as { description?: string }).description)))
-      setCachedTasks(filteredAll)
-      return { success: true, tasks: filteredAll }
+      result = await fetchPositionSortedTasks(projectIds, filterParams, {
+        fetchViews: fetchProjectViews,
+        fetchViewTasks,
+      })
+    } else {
+      result = await fetchTasks(filterParams)
     }
 
-    const result = await fetchTasks(filterParams)
     if (result.success) {
       const tasks = keepActiveProjectTasks((clientFilter
         ? applyCustomListTaskFilter((result.data ?? []) as Array<{ project_id?: number; priority?: number; labels?: Array<{ id: number }> }>, clientFilter)
@@ -517,15 +508,9 @@ export function registerIpcHandlers(): void {
       return { success: true, tasks }
     }
 
-    // API failed — serve cached tasks if available
-    if (isRetriableError(result.error)) {
-      const cached = getCachedTasks()
-      if (cached.tasks) {
-        return { success: true, tasks: cached.tasks, cached: true, cachedAt: cached.timestamp }
-      }
-    }
-
-    return result
+    // API failed — serve the cached list when there is one; a non-retriable failure
+    // is passed along so the popup shows the error as well.
+    return cachedFallback(result.error, getCachedTasks()) ?? result
   })
 
   handleTrusted('qv:mark-task-done', async (_event, taskId: number, taskData: Record<string, unknown>) => {
