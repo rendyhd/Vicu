@@ -572,6 +572,12 @@ function applyQuickEntrySettings(): { entry: boolean; viewer: boolean; waylandLi
 // and diverges from the bundled vicu-bridge.js that hardcodes "vicu").
 app.setName('vicu')
 
+// Test and development runs can use a throwaway profile, so they never read,
+// write or lock against the real one. Must run before the single-instance lock.
+if (process.env.VICU_USER_DATA_DIR) {
+  app.setPath('userData', process.env.VICU_USER_DATA_DIR)
+}
+
 // Navigation, window-open and webview guards for every WebContents (D-SEC-1).
 // Registered before the first window is created.
 registerWebSecurity()
