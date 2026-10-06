@@ -256,6 +256,8 @@ function useReviewMutation<V extends { project: Project }>(
     onSettled: () => {
       qc.invalidateQueries({ queryKey: ['projects'] })
     },
+    // The review screen shows its own error notice (below); no global toast on top of it.
+    meta: { silent: true },
   })
   const mutate = (vars: V, options?: ReviewMutateOptions) =>
     update.mutate(vars, {

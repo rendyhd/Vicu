@@ -21,6 +21,7 @@ import type {
   AuthCheckResult,
 } from './vikunja-types'
 import type { TaskPatch } from './merge-patches'
+import { announceAccountChanged } from './account-events'
 import type {
   OfflineCreateInput,
   OfflineCreateResult,
@@ -117,8 +118,11 @@ export const api = {
   saveConfigPatch: (patch: Partial<AppConfig>) =>
     window.api.saveConfigPatch(patch) as Promise<void>,
 
-  saveConnectionConfig: (connection: ConnectionConfig) =>
-    window.api.saveConnectionConfig(connection) as Promise<void>,
+  saveConnectionConfig: async (connection: ConnectionConfig) => {
+    await window.api.saveConnectionConfig(connection)
+    // A login or a disconnect: lists cached for the previous account must not carry over.
+    announceAccountChanged()
+  },
 
   getCustomLists: () => window.api.getCustomLists(),
   upsertCustomList: (list: import('./vikunja-types').CustomList) => window.api.upsertCustomList(list),

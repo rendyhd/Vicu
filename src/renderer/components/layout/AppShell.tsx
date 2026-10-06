@@ -38,7 +38,11 @@ import { ProjectDragOverlay } from '@/components/sidebar/ProjectDragOverlay'
 import { CustomListDragOverlay } from '@/components/sidebar/CustomListDragOverlay'
 import { SectionDragOverlay } from '@/components/task-list/SectionDragOverlay'
 import { UpdateBanner } from '@/components/UpdateBanner'
+import { ToastHost } from '@/components/shared/ToastHost'
 import { useAppConfig } from '@/hooks/use-app-config'
+import { useOfflineQueueSync } from '@/hooks/use-offline-queue'
+import { useUIStore } from '@/stores/ui-store'
+import { refreshTasks } from '@/lib/task-refresh'
 import { reloadCompletionSound, setCompletionSoundEnabled } from '@/lib/completion-sound'
 import { useTodayOverdueCount } from '@/hooks/use-today-overdue-count'
 import { renderBadgeDataUrl } from '@/lib/render-badge-icon'
@@ -173,6 +177,9 @@ export function AppShell() {
   const themeRef = useRef<ThemeOption>('system')
   const navigate = useNavigate()
 
+  // The main-process offline queue: pending / failed counts, replay results, temp-id remapping.
+  useOfflineQueueSync()
+
   // Clear recently-completed-tasks store on route change so completed tasks
   // don't bleed into the next view.
   const routeMatches = useMatches()
@@ -184,10 +191,9 @@ export function AppShell() {
       // Drop any multi-selection so its ids can't act on a different view's tasks.
       useSelectionStore.getState().clearSelection()
       // Flush stale optimistic data (complete/uncomplete skip invalidation
-      // to keep tasks in-place, so we sync on navigation instead).
-      queryClient.invalidateQueries({ queryKey: ['tasks'] })
-      queryClient.invalidateQueries({ queryKey: ['view-tasks'] })
-      queryClient.invalidateQueries({ queryKey: ['section-tasks'] })
+      // to keep tasks in-place, so we sync on navigation instead). Nothing is refetched while
+      // offline changes are still queued: that would erase their optimistic state.
+      refreshTasks(queryClient, [['tasks'], ['view-tasks'], ['section-tasks']])
       prevRouteRef.current = routePath
     }
   }, [routePath, queryClient])
@@ -513,12 +519,11 @@ export function AppShell() {
     return () => mq.removeEventListener('change', handler)
   }, [])
 
-  // Invalidate query cache when Quick Entry/View mutates tasks
+  // Invalidate query cache when Quick Entry/View mutates tasks, or a replay applied queued changes.
+  // Every task-derived key goes, section tasks included (D-FRESH-1).
   useEffect(() => {
     const cleanup = api.onTasksChanged(() => {
-      queryClient.invalidateQueries({ queryKey: ['tasks'] })
-      queryClient.invalidateQueries({ queryKey: ['view-tasks'] })
-      queryClient.invalidateQueries({ queryKey: ['task-detail'] })
+      refreshTasks(queryClient)
     })
     return cleanup
   }, [queryClient])
@@ -551,6 +556,28 @@ export function AppShell() {
       }
     })
   }, [])
+
+  // "Sign in" in the sync panel: the queue stopped on an auth problem the local token state does not
+  // show (the server rejected a token that looks valid), so show the sign-in screen regardless.
+  const reauthRequestId = useUIStore((s) => s.reauthRequestId)
+  useEffect(() => {
+    if (reauthRequestId === 0) return
+    void api.getConfig().then((config) => {
+      if (!config?.vikunja_url) {
+        setAppState('setup')
+      } else if (config.auth_method === 'oidc' || config.auth_method === 'password') {
+        setReauthInfo({
+          authMethod: config.auth_method,
+          vikunjaUrl: config.vikunja_url,
+          lastUsername: config.last_username,
+        })
+        setAppState('reauth')
+      } else {
+        // An API token that the server refuses has to be replaced on the setup screen.
+        setAppState('setup')
+      }
+    })
+  }, [reauthRequestId])
 
   // Listen for auth-required events (runtime token expiry)
   useEffect(() => {
@@ -674,6 +701,7 @@ export function AppShell() {
         <BadgeSync />
         <CompletionSoundSync />
         <GlobalConfirm />
+        <ToastHost />
       </div>
 
       <DragOverlay

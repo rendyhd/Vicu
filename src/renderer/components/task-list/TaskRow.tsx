@@ -29,6 +29,7 @@ import { PriorityPickerPopover } from './PriorityPickerPopover'
 import { TaskContextMenu } from './TaskContextMenu'
 import { InfoPopover } from './InfoPopover'
 import { TaskLinkIcon } from '@/components/TaskLinkIcon'
+import { TaskSyncIcon } from '@/components/task-list/TaskSyncIcon'
 import { stripNoteLink, stripPageLink, extractNoteLinkHtml, extractPageLinkHtml, hasNotesContent } from '@/lib/note-link'
 import { formatRecurrenceLabel } from '@/lib/recurrence'
 import { RichTextEditor } from '@/components/rich-text/RichTextEditor'
@@ -591,6 +592,7 @@ function TaskRowInner({ task, sortable = false, nestedDepth = 0, parentProjectId
           )}
         </div>
 
+        <TaskSyncIcon taskId={task.id} />
         <TaskLinkIcon description={task.description} />
 
         <div className="flex items-center gap-2">
@@ -690,6 +692,7 @@ function TaskRowInner({ task, sortable = false, nestedDepth = 0, parentProjectId
           onSubmit={() => descEditorRef.current?.commands.focus('end')}
           onCancel={collapseAll}
         />
+        <TaskSyncIcon taskId={task.id} />
         <TaskLinkIcon description={task.description} />
         {(task.attachments?.length ?? 0) > 0 && (
           <button

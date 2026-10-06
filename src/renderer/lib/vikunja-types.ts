@@ -200,6 +200,8 @@ export interface AppConfig {
   api_token: string
   inbox_project_id: number
   auth_method?: 'api_token' | 'oidc' | 'password'
+  /** The username of the last password login; shown on the sign-in screen. */
+  last_username?: string
   theme: 'light' | 'dark' | 'system'
   window_bounds?: { x: number; y: number; width: number; height: number }
   sidebar_width?: number

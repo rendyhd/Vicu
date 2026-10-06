@@ -7,6 +7,7 @@ import {
 } from '../use-task-mutations'
 import { PROJECT_WRITABLE_FIELDS } from '@/lib/merge-patches'
 import { NULL_DATE } from '@/lib/constants'
+import { useOfflineStore } from '@/stores/offline-store'
 import type { Project, Task } from '@/lib/vikunja-types'
 
 function task(id: number, overrides: Partial<Task> = {}): Task {
@@ -265,5 +266,104 @@ describe('updateProjectRequest', () => {
     updateProject.mockResolvedValueOnce({ success: false, error: 'validation failed' })
 
     await expect(updateProjectRequest({ id: 5, changes: { title: 'x' } })).rejects.toThrow('validation failed')
+  })
+})
+
+describe('main-window changes that go into the offline queue (D-SYNC-6, decision 4)', () => {
+  const network = { success: false as const, error: 'net::ERR_INTERNET_DISCONNECTED' }
+  const queuedOk = { success: true as const, data: { actionId: 'a', taskId: 1, folded: false } }
+  let enqueueUpdate: ReturnType<typeof vi.fn>
+  let cancelChange: ReturnType<typeof vi.fn>
+
+  beforeEach(() => {
+    enqueueUpdate = vi.fn(async () => queuedOk)
+    cancelChange = vi.fn(async () => ({ success: true as const, data: true }))
+    vi.stubGlobal('window', { api: { updateTask, updateProject, offlineQueue: { enqueueUpdate, cancelChange } } })
+    useOfflineStore.setState({ counts: { pending: 0, failed: 0 } })
+  })
+
+  it('an edit that cannot reach the server is queued as the same minimal patch and resolves with the optimistic task', async () => {
+    updateTask.mockResolvedValueOnce(network)
+    const original = task(1)
+
+    const result = await updateTaskRequest({ id: 1, changes: { priority: 3 }, original })
+
+    expect(enqueueUpdate).toHaveBeenCalledWith(1, { priority: 3 }, { title: 'Task 1' })
+    expect(result).toMatchObject({ id: 1, priority: 3, title: 'Task 1' })
+  })
+
+  it('an edit the server refuses is not queued: the error reaches the caller so the cache rolls back', async () => {
+    updateTask.mockResolvedValueOnce({ success: false, error: 'Invalid priority', statusCode: 422 })
+
+    await expect(updateTaskRequest({ id: 1, changes: { priority: 9 }, original: task(1) })).rejects.toThrow('Invalid priority')
+    expect(enqueueUpdate).not.toHaveBeenCalled()
+  })
+
+  it('an edit to a task that only exists as a pending create never goes to the server', async () => {
+    const pending = task(-3, { title: 'Offline task' })
+
+    await updateTaskRequest({ id: -3, changes: { title: 'Renamed' }, original: pending })
+
+    expect(updateTask).not.toHaveBeenCalled()
+    expect(enqueueUpdate).toHaveBeenCalledWith(-3, { title: 'Renamed' }, { title: 'Offline task' })
+  })
+
+  it('completing offline queues every step, children first, and does not fail', async () => {
+    updateTask.mockResolvedValue(network)
+    const child1 = { id: 11, title: 'Child 1', done: false } as unknown as Task
+    const child2 = { id: 12, title: 'Child 2', done: false } as unknown as Task
+    const parent = task(10, { related_tasks: { subtask: [child1, child2] } })
+
+    const result = await completeTaskRequest(parent)
+
+    expect(enqueueUpdate.mock.calls.map((call) => [call[0], call[1]])).toEqual([
+      [12, { done: true }],
+      [11, { done: true }],
+      [10, { done: true }],
+    ])
+    expect(result.done).toBe(true)
+  })
+
+  it('takes a queued child completion back out of the queue when the parent is refused', async () => {
+    const child = { id: 11, title: 'Child', done: false } as unknown as Task
+    const parent = task(10, { related_tasks: { subtask: [child] } })
+    updateTask.mockResolvedValueOnce(network).mockResolvedValueOnce({ success: false, error: 'nope', statusCode: 403 })
+
+    await expect(completeTaskRequest(parent)).rejects.toThrow('nope')
+
+    expect(enqueueUpdate).toHaveBeenCalledWith(11, { done: true }, { title: 'Child' })
+    expect(cancelChange).toHaveBeenCalledWith(11, ['done'])
+    // The cancel worked, so no request undoes it.
+    expect(updateTask.mock.calls).toEqual([
+      [11, { done: true }],
+      [10, { done: true }],
+    ])
+  })
+
+  it('undoing a completion that is still queued cancels it instead of sending a reopen', async () => {
+    useOfflineStore.setState({ counts: { pending: 1, failed: 0 } })
+
+    await uncompleteTaskRequest(task(10, { done: true }), [])
+
+    expect(cancelChange).toHaveBeenCalledWith(10, ['done'])
+    expect(updateTask).not.toHaveBeenCalled()
+    expect(enqueueUpdate).not.toHaveBeenCalled()
+  })
+
+  it('undoing queues the reopen when the completion had already been sent', async () => {
+    useOfflineStore.setState({ counts: { pending: 1, failed: 0 } })
+    cancelChange.mockResolvedValueOnce({ success: true, data: false })
+    updateTask.mockResolvedValueOnce(network)
+
+    await uncompleteTaskRequest(task(10, { done: true }), [])
+
+    expect(enqueueUpdate).toHaveBeenCalledWith(10, { done: false }, { title: 'Task 10' })
+  })
+
+  it('does not ask the queue about a completion when nothing is pending', async () => {
+    await uncompleteTaskRequest(task(10, { done: true }), [])
+
+    expect(cancelChange).not.toHaveBeenCalled()
+    expect(updateTask).toHaveBeenCalledWith(10, { done: false })
   })
 })

@@ -21,6 +21,8 @@ interface CompletedTasksState {
   update: (taskId: number, partial: Partial<Task>) => void
   remove: (taskId: number) => void
   clear: () => void
+  /** A task created offline got its real id. */
+  remapTaskIds: (idMap: ReadonlyMap<number, number>) => void
 }
 
 export const useCompletedTasksStore = create<CompletedTasksState>((set) => ({
@@ -47,4 +49,14 @@ export const useCompletedTasksStore = create<CompletedTasksState>((set) => ({
       return { tasks: next }
     }),
   clear: () => set({ tasks: new Map() }),
+  remapTaskIds: (idMap) =>
+    set((state) => {
+      if (![...state.tasks.keys()].some((id) => idMap.has(id))) return state
+      const next = new Map<number, CompletedTaskEntry>()
+      for (const [id, entry] of state.tasks) {
+        const realId = idMap.get(id)
+        next.set(realId ?? id, realId === undefined ? entry : { ...entry, task: { ...entry.task, id: realId } })
+      }
+      return { tasks: next }
+    }),
 }))

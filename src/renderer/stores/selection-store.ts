@@ -16,6 +16,8 @@ interface SelectionState {
   setSelectedRange: (ids: number[]) => void
   clearSelection: () => void
   setSelectionAnchor: (id: number | null) => void
+  /** A task created offline got its real id: keep it expanded / focused / selected. */
+  remapTaskIds: (idMap: ReadonlyMap<number, number>) => void
 }
 
 export const useSelectionStore = create<SelectionState>((set) => ({
@@ -51,4 +53,19 @@ export const useSelectionStore = create<SelectionState>((set) => ({
   clearSelection: () => set({ selectedTaskIds: new Set(), selectionAnchorId: null }),
 
   setSelectionAnchor: (id) => set({ selectionAnchorId: id }),
+
+  remapTaskIds: (idMap) =>
+    set((state) => {
+      const map = (id: number | null) => (id === null ? null : (idMap.get(id) ?? id))
+      const touched =
+        [state.expandedTaskId, state.focusedTaskId, state.selectionAnchorId].some((id) => id !== null && idMap.has(id)) ||
+        [...state.selectedTaskIds].some((id) => idMap.has(id))
+      if (!touched) return state
+      return {
+        expandedTaskId: map(state.expandedTaskId),
+        focusedTaskId: map(state.focusedTaskId),
+        selectionAnchorId: map(state.selectionAnchorId),
+        selectedTaskIds: new Set([...state.selectedTaskIds].map((id) => idMap.get(id) ?? id)),
+      }
+    }),
 }))

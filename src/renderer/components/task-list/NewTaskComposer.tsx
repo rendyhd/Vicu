@@ -17,6 +17,8 @@ import { NULL_DATE } from '@/lib/constants'
 import { replacePendingTokens } from '@/lib/image-tokens'
 import { parse, recurrenceToVikunja } from '@/lib/task-parser'
 import { dateOnlyDue, parsedDue, toLocalDate } from '@/lib/due-dates'
+import { buildCreateExtras } from '@/lib/composer-queue'
+import { isTempTaskId } from '@/lib/pending-cache'
 import { useTaskParser } from '@/hooks/use-task-parser'
 import { useLabels } from '@/hooks/use-labels'
 import { useProjects } from '@/hooks/use-projects'
@@ -108,11 +110,12 @@ export function NewTaskComposer({
   const parser = useTaskParser()
   const { data: labels = [] } = useLabels()
   const { data: projects } = useProjects()
-  const createTask = useCreateTask()
-  const addLabel = useAddLabel()
-  const createLabel = useCreateLabel()
-  const uploadAttachment = useUploadAttachmentFromPaste()
-  const updateTask = useUpdateTask()
+  // The composer reports failures inline (and keeps what the user typed), so no global toast.
+  const createTask = useCreateTask({ silent: true })
+  const addLabel = useAddLabel({ silent: true })
+  const createLabel = useCreateLabel({ silent: true })
+  const uploadAttachment = useUploadAttachmentFromPaste({ silent: true })
+  const updateTask = useUpdateTask({ silent: true })
   const [description, setDescription] = useState('')
   const [showNotes, setShowNotes] = useState(false)
   const [openPicker, setOpenPicker] = useState<OpenPicker>(null)
@@ -302,10 +305,24 @@ export function NewTaskComposer({
         Object.assign(payload, recurrenceToVikunja(parsed.recurrence))
       }
 
-      const task = await createTask.mutateAsync({ projectId: targetProjectId, task: payload })
-      createdTask = task
       const labelNames = [...new Set(parsed?.labels ?? [])]
       const explicitLabels = labels.filter((label) => selectedLabelIds.includes(label.id))
+      // If the server cannot be reached the create is queued with its labels and attachments, and
+      // the task shows up at once under a temporary id.
+      const extras = buildCreateExtras({
+        explicitLabels,
+        parsedLabelNames: labelNames,
+        knownLabels: labels,
+        attachments,
+        description: draftDescription,
+      })
+      const task = await createTask.mutateAsync({ projectId: targetProjectId, task: payload, extras })
+      if (isTempTaskId(task.id)) {
+        closeAndReset()
+        onCreated?.(task)
+        return
+      }
+      createdTask = task
       const failedLabels: PartialFailure['labels'] = []
       for (const label of explicitLabels) {
         try { await addLabel.mutateAsync({ taskId: task.id, labelId: label.id }) }
