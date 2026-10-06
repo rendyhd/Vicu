@@ -1,4 +1,5 @@
 import type { OfflineFailureReason } from '../../shared/offline-queue-types'
+import type { OfflineOwner } from './owner'
 
 /**
  * The queue stores intent as merge patches, never full task snapshots (D-SYNC-2): replaying a
@@ -16,6 +17,11 @@ interface ActionBase {
   attempts: number
   /** Task title for the summary line; display only. */
   title?: string
+  /**
+   * The server (and user, when known) the action was created for. The replay refuses to send an
+   * action to a different account; missing on actions an older build queued until they are adopted.
+   */
+  owner?: OfflineOwner
 }
 
 export interface CreateAction extends ActionBase {

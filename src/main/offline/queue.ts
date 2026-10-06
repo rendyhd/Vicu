@@ -7,12 +7,14 @@ import type {
   OfflineCreateResult,
   OfflineEnqueueResult,
   OfflineFailureReason,
+  OfflineImageInput,
   OfflineLabelRef,
   OfflineQueueCounts,
   OfflineQueueItemView,
   OfflineQueueSnapshot,
 } from '../../shared/offline-queue-types'
 import { OfflineAttachmentFiles } from './attachments'
+import { isSameOwner, type OfflineOwner } from './owner'
 import {
   cancelPatchKeys,
   mergeAddLabel,
@@ -54,6 +56,11 @@ export interface OfflineQueueOptions {
   attachmentsDir: string
   now?: () => Date
   newId?: () => string
+  /**
+   * The account the app is signed in to right now, or null when none is configured. Every new
+   * action is stamped with it, and `failForeign` uses it to find actions that belong to another.
+   */
+  getOwner?: () => OfflineOwner | null
 }
 
 export interface FailureInfo {
@@ -86,6 +93,7 @@ export class OfflineQueue {
   private readonly store: JsonFileStore<QueueData>
   private readonly now: () => Date
   private readonly newId: () => string
+  private readonly getOwner: () => OfflineOwner | null
   private readonly listeners = new Set<() => void>()
   private inFlightId: string | null = null
   private replaying = false
@@ -94,6 +102,7 @@ export class OfflineQueue {
   constructor(options: OfflineQueueOptions) {
     this.now = options.now ?? (() => new Date())
     this.newId = options.newId ?? (() => randomBytes(8).toString('hex'))
+    this.getOwner = options.getOwner ?? (() => null)
     this.files = new OfflineAttachmentFiles(options.attachmentsDir)
     this.store = new JsonFileStore<QueueData>({
       path: options.queuePath,
@@ -197,6 +206,7 @@ export class OfflineQueue {
         reason: f.reason,
         failedAt: f.failedAt,
         groupId: f.groupId,
+        taskId: hasTaskId(f.action) ? f.action.taskId : f.action.tempId,
       })),
       replaying: this.replaying,
       authProblem: this.authProblem,
@@ -236,8 +246,14 @@ export class OfflineQueue {
   // --- Enqueue -----------------------------------------------------------------------------
 
   /** The fields every action carries. */
-  private stamp(meta: Meta = {}): { id: string; createdAt: string; attempts: 0; title?: string } {
-    const base = { id: this.newId(), createdAt: this.now().toISOString(), attempts: 0 as const }
+  private stamp(meta: Meta = {}): { id: string; createdAt: string; attempts: 0; title?: string; owner?: OfflineOwner } {
+    const owner = this.getOwner()
+    const base = {
+      id: this.newId(),
+      createdAt: this.now().toISOString(),
+      attempts: 0 as const,
+      ...(owner ? { owner: { ...owner } } : {}),
+    }
     return meta.title ? { ...base, title: meta.title } : base
   }
 
@@ -319,13 +335,14 @@ export class OfflineQueue {
       throw new Error(`The images are too large to save offline together (limit ${MAX_QUEUED_IMAGE_TOTAL_BYTES / 1024 / 1024} MB)`)
     }
 
-    const stored: Array<{ file: string; name: string; mime: string }> = []
+    const stored: Array<{ file: string; name: string; mime: string; inline: boolean }> = []
     try {
       for (const image of images) {
         stored.push({
           file: await this.files.save(image.bytes),
           name: sanitizeAttachmentFileName(image.name, 'image'),
           mime: IMAGE_MIME.test(image.mime) ? image.mime : 'application/octet-stream',
+          inline: image.inline !== false,
         })
       }
     } catch (err) {
@@ -368,13 +385,42 @@ export class OfflineQueue {
         file: s.file,
         name: s.name,
         mime: s.mime,
-        addImageToken: true,
+        ...(s.inline ? { addImageToken: true } : {}),
       })
     }
 
     this.data.actions = [...this.data.actions, ...added]
     await this.commit()
     return { actionId: create.id, tempId, pendingId: pendingIdFor(create.id) }
+  }
+
+  /**
+   * Queue the upload of one file or pasted image to a task that already exists (or is itself still
+   * queued): the follow-up of a create whose upload call could not reach the server. The bytes are
+   * written to disk first.
+   */
+  async enqueueUpload(
+    ref: number | string,
+    image: OfflineImageInput,
+    options: { addImageToken?: boolean; title?: string } = {}
+  ): Promise<OfflineEnqueueResult> {
+    const taskId = this.requireTask(ref)
+    if (image.bytes.byteLength > MAX_QUEUED_IMAGE_BYTES) {
+      throw new Error(`"${image.name}" is too large to save offline (limit ${MAX_QUEUED_IMAGE_BYTES / 1024 / 1024} MB)`)
+    }
+    const file = await this.files.save(image.bytes)
+    const action: UploadAttachmentAction = {
+      ...this.stamp(options.title ? { title: options.title } : {}),
+      type: 'upload-attachment',
+      taskId,
+      file,
+      name: sanitizeAttachmentFileName(image.name, 'image'),
+      mime: IMAGE_MIME.test(image.mime) ? image.mime : 'application/octet-stream',
+      ...(options.addImageToken ? { addImageToken: true } : {}),
+    }
+    this.data.actions = [...this.data.actions, action]
+    await this.commit()
+    return { actionId: action.id, taskId, folded: false }
   }
 
   /**
@@ -442,6 +488,73 @@ export class OfflineQueue {
     const groups = new Set<string>()
     for (const f of this.data.failed) if (wanted.has(f.id) && f.groupId) groups.add(f.groupId)
     return this.data.failed.filter((f) => wanted.has(f.id) || (f.groupId !== undefined && groups.has(f.groupId)))
+  }
+
+  // --- Account guard -------------------------------------------------------------------------
+
+  /**
+   * Record `owner` on pending and failed actions an older build queued without one, so a later
+   * server switch can tell them apart. Returns how many were stamped. Not persisted by itself: the
+   * next change to the queue saves it.
+   */
+  stampUnowned(owner: OfflineOwner): number {
+    let stamped = 0
+    const adopt = <T extends QueuedAction>(action: T): T => {
+      if (action.owner) return action
+      stamped++
+      return { ...action, owner: { ...owner } }
+    }
+    this.data.actions = this.data.actions.map(adopt)
+    this.data.failed = this.data.failed.map((f) => ({ ...f, action: adopt(f.action) }))
+    if (stamped > 0) void this.store.save().catch(() => {})
+    return stamped
+  }
+
+  /** Whether the action was queued for an account other than the one signed in now. */
+  isForeign(action: QueuedAction, current: OfflineOwner | null = this.getOwner()): boolean {
+    return !!current && !!action.owner && !isSameOwner(action.owner, current)
+  }
+
+  /**
+   * Move every pending action that belongs to another server or user to the failed log as
+   * `other-account` (so the user can discard them), together with the actions that depend on a
+   * foreign create. Nothing is sent. Returns how many actions moved.
+   */
+  async failForeign(): Promise<number> {
+    const current = this.getOwner()
+    if (!current) return 0
+    // The action being sent right now is already on the wire; leave it to finish.
+    const foreign = this.data.actions.filter((a) => a.id !== this.inFlightId && this.isForeign(a, current))
+    if (foreign.length === 0) return 0
+
+    const failedAt = this.now().toISOString()
+    const doomed = new Set(foreign.map((a) => a.id))
+    const entries: FailedAction[] = []
+    for (const action of this.data.actions) {
+      if (!doomed.has(action.id)) continue
+      const server = action.owner?.server ?? 'another server'
+      entries.push({
+        id: action.id,
+        action,
+        error: `Queued while signed in to ${server}. It was not sent to the current account; discard it, or sign back in to that account and retry.`,
+        reason: 'other-account',
+        failedAt,
+      })
+    }
+    // What depends on a foreign create can never run either.
+    for (const action of this.data.actions) {
+      if (doomed.has(action.id) || !hasTaskId(action)) continue
+      if (foreign.some((f) => f.type === 'create' && f.tempId === action.taskId)) {
+        doomed.add(action.id)
+        entries.push({ id: action.id, action, error: 'Queued with a task that belongs to another account', reason: 'other-account', failedAt })
+      }
+    }
+
+    this.data.actions = this.data.actions.filter((a) => !doomed.has(a.id))
+    this.data.failed = [...this.data.failed, ...entries]
+    const pruned = this.pruneFailed()
+    await this.commit(pruned)
+    return entries.length
   }
 
   // --- Replay support ----------------------------------------------------------------------

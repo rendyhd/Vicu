@@ -13,17 +13,24 @@ declare global {
         // Kept with the create when it has to be queued offline; unused when the server answers.
         extras?: { labels?: Array<{ id?: number; title?: string }>; images?: Array<{ name: string; mime: string; bytes: Uint8Array }> },
       ): Promise<{ success: boolean; cached?: boolean; error?: string; data?: { id: number } }>
-      uploadAttachment(taskId: number, fileData: Uint8Array, fileName: string, mimeType: string): Promise<{ success: boolean; error?: string }>
-      fetchTaskAttachments(taskId: number): Promise<{ success: boolean; data?: Array<{ id: number }>; error?: string }>
-      updateTask(taskId: number, task: Record<string, unknown>): Promise<{ success: boolean; error?: string; data?: unknown }>
+      uploadAttachment(taskId: number, fileData: Uint8Array, fileName: string, mimeType: string): Promise<{ success: boolean; error?: string; statusCode?: number }>
+      fetchTaskAttachments(taskId: number): Promise<{ success: boolean; data?: Array<{ id: number }>; error?: string; statusCode?: number }>
+      updateTask(taskId: number, task: Record<string, unknown>): Promise<{ success: boolean; error?: string; statusCode?: number; data?: unknown }>
       closeWindow(): Promise<void>
       setHeight(height: number): Promise<void>
       getConfig(): Promise<QuickEntryConfig | null>
       getPendingCount(): Promise<number>
+      getQueueCounts(): Promise<{ pending: number; failed: number }>
+      // Queue what failed after an online create (labels by id or title, images with their bytes).
+      queueFollowUps(
+        taskId: number,
+        extras: { labels: Array<{ id?: number; title?: string }>; images: Array<{ name: string; mime: string; bytes: Uint8Array }> },
+        title?: string,
+      ): Promise<{ success: boolean; error?: string }>
       fetchLabels(): Promise<{ success: boolean; data?: Array<{ id: number; title: string }> }>
       fetchProjects(): Promise<{ success: boolean; data?: Array<{ id: number; title: string }> }>
-      addLabelToTask(taskId: number, labelId: number): Promise<{ success: boolean }>
-      createLabel(label: { title: string; hex_color?: string }): Promise<{ success: boolean; data?: { id: number; title: string } }>
+      addLabelToTask(taskId: number, labelId: number): Promise<{ success: boolean; error?: string; statusCode?: number }>
+      createLabel(label: { title: string; hex_color?: string }): Promise<{ success: boolean; error?: string; statusCode?: number; data?: { id: number; title: string } }>
       onShowWindow(callback: () => void): void
       onHideWindow(callback: () => void): void
       onSyncCompleted(callback: () => void): void
@@ -55,9 +62,9 @@ import { dueToday, parsedDue } from '../lib/due-dates'
 import { formatClockTime } from '../lib/date-utils'
 import type { ParseResult, ParserConfig, ParsedToken, TokenType } from '../lib/task-parser'
 import { getClipboardImages, fileToUint8Array } from '../lib/clipboard-images'
-import { imageToken } from '../lib/image-tokens'
 import { AutocompleteDropdown } from './autocomplete'
 import { cache } from './vikunja-cache'
+import { applyQuickEntryFollowUps } from '../lib/quick-entry-follow-ups'
 
 const input = document.getElementById('task-input') as HTMLInputElement
 const descriptionHint = document.getElementById('description-hint')!
@@ -148,8 +155,8 @@ function showError(msg: string): void {
   }, 3000)
 }
 
-function showOfflineMessage(): void {
-  errorMessage.textContent = 'Saved offline \u2014 will sync when connected'
+function showOfflineMessage(message = 'Saved offline \u2014 will sync when connected'): void {
+  errorMessage.textContent = message
   errorMessage.hidden = false
   errorMessage.classList.add('offline')
   void errorMessage.offsetHeight
@@ -227,9 +234,13 @@ function updateTodayHints(): void {
 }
 
 async function updatePendingIndicator(): Promise<void> {
-  const count = await window.quickEntryApi.getPendingCount()
-  if (count > 0) {
-    pendingCountEl.textContent = String(count)
+  const { pending, failed } = await window.quickEntryApi.getQueueCounts()
+  if (pending > 0 || failed > 0) {
+    const parts: string[] = []
+    if (pending > 0) parts.push(`${pending} change(s) pending sync`)
+    if (failed > 0) parts.push(`${failed} failed \u2014 open Vicu to review`)
+    pendingCountEl.textContent = parts.join(' \u00b7 ')
+    pendingIndicator.classList.toggle('has-failed', failed > 0)
     pendingIndicator.classList.remove('hidden')
   } else {
     pendingIndicator.classList.add('hidden')
@@ -599,66 +610,21 @@ async function saveTask(): Promise<void> {
     const createdTask = result.data as (Record<string, unknown> & { id?: number }) | undefined
     const taskId = createdTask?.id
 
-    // Attach labels post-creation
-    if (parsedLabels.length > 0 && taskId) {
-      for (const labelName of parsedLabels) {
-        const match = cachedLabels.find((l) => l.title.toLowerCase() === labelName.toLowerCase())
-        if (match) {
-          try {
-            await window.quickEntryApi.addLabelToTask(taskId, match.id)
-          } catch {
-            // Skip silently
-          }
-        } else {
-          try {
-            const created = await window.quickEntryApi.createLabel({ title: labelName })
-            if (created.success && created.data?.id) {
-              await window.quickEntryApi.addLabelToTask(taskId, created.data.id)
-            }
-          } catch {
-            // Skip silently — label creation failed (e.g. offline)
-          }
-        }
-      }
+    // Labels and images go on after the create. A step the network drops is queued, not lost.
+    let queuedFollowUps = false
+    if (taskId && (labelRefs.length > 0 || imageInputs.length > 0)) {
+      const outcome = await applyQuickEntryFollowUps(window.quickEntryApi, {
+        taskId,
+        title,
+        description: description ?? '',
+        labels: labelRefs,
+        images: imageInputs,
+      })
+      queuedFollowUps = outcome.queuedLabels + outcome.queuedImages > 0 && !outcome.queueError
     }
 
-    // Upload staged images and patch description with [[image:N]] tokens.
-    // A create that was queued offline has no task id here: its labels and images were queued with
-    // it and are applied when it syncs.
-    if (pendingImages.length > 0 && taskId && createdTask) {
-      let uploaded = 0
-      for (const img of pendingImages) {
-        try {
-          const upload = await window.quickEntryApi.uploadAttachment(taskId, img.bytes, img.name, img.mime)
-          if (upload.success) uploaded++
-        } catch {
-          // Skip silently
-        }
-      }
-      // Vikunja's upload endpoint doesn't reliably return the new attachment id,
-      // so refetch the task's attachments. The task is brand new, so every
-      // attachment here is one we just added — sort ascending = upload order.
-      if (uploaded > 0) {
-        try {
-          const after = await window.quickEntryApi.fetchTaskAttachments(taskId)
-          if (after.success && after.data && after.data.length > 0) {
-            const ids = after.data.map((a) => a.id).sort((a, b) => a - b)
-            const tokens = ids.map((id) => imageToken(id))
-            const patchedDescription = description
-              ? `${description}\n${tokens.join('\n')}`
-              : tokens.join('\n')
-            await window.quickEntryApi.updateTask(taskId, {
-              description: patchedDescription,
-            })
-          }
-        } catch {
-          // Best effort — task already exists with images attached.
-        }
-      }
-    }
-
-    if (result.cached) {
-      showOfflineMessage()
+    if (result.cached || queuedFollowUps) {
+      showOfflineMessage(queuedFollowUps && !result.cached ? 'Task saved \u2014 labels and images will sync when connected' : undefined)
     } else {
       window.quickEntryApi.closeWindow()
     }

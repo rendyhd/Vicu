@@ -23,6 +23,9 @@ contextBridge.exposeInMainWorld('quickEntryApi', {
   setHeight: (height: number) => ipcRenderer.invoke('qe:set-height', height),
   getConfig: () => ipcRenderer.invoke('qe:get-config'),
   getPendingCount: () => ipcRenderer.invoke('qe:get-pending-count'),
+  getQueueCounts: () => ipcRenderer.invoke('qe:get-queue-counts'),
+  queueFollowUps: (taskId: number, extras: QueuedCreateExtras, title?: string) =>
+    ipcRenderer.invoke('qe:queue-follow-ups', taskId, extras, title),
   fetchLabels: () => ipcRenderer.invoke('fetch-labels'),
   fetchProjects: () => ipcRenderer.invoke('fetch-projects', false),
   addLabelToTask: (taskId: number, labelId: number) => ipcRenderer.invoke('add-label-to-task', taskId, labelId),

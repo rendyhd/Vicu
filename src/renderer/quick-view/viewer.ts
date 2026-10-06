@@ -13,6 +13,7 @@ declare global {
       closeWindow(): Promise<void>
       setHeight(height: number): Promise<void>
       getPendingCount(): Promise<number>
+      getQueueCounts(): Promise<{ pending: number; failed: number }>
       getConfig(): Promise<QuickViewConfig | null>
       onShowWindow(callback: () => void): void
       onHideWindow(callback: () => void): void
@@ -654,8 +655,13 @@ async function applyFetchResult(result: FetchResult): Promise<void> {
     } else if (result.standalone) {
       showStatusBar('Standalone mode', 'standalone')
     } else {
-      const pendingCount = await window.quickViewApi.getPendingCount()
-      if (pendingCount > 0) showStatusBar(`${pendingCount} action(s) pending sync`, 'pending')
+      const { pending, failed } = await window.quickViewApi.getQueueCounts()
+      if (failed > 0) {
+        const waiting = pending > 0 ? `${pending} action(s) pending sync, ` : ''
+        showStatusBar(`${waiting}${failed} failed \u2014 open Vicu to review`, 'failed')
+      } else if (pending > 0) {
+        showStatusBar(`${pending} action(s) pending sync`, 'pending')
+      }
     }
   } else {
     taskList.innerHTML = ''

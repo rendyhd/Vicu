@@ -68,9 +68,16 @@ export async function replayQueue(queue: OfflineQueue, api: ReplayApi): Promise<
 
   queue.setReplaying(true)
   try {
+    // Changes queued for another server or user never go out; they wait in the failed log to be
+    // discarded. Checked up front and again per action, because the account can change mid-run.
+    await queue.failForeign()
     for (let guard = 0; guard < 100_000; guard++) {
       const action = queue.nextAction()
       if (!action) break
+      if (queue.isForeign(action)) {
+        await queue.failForeign()
+        continue
+      }
       if (!queue.beginSend(action.id)) continue
 
       try {

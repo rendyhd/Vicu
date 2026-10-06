@@ -1,4 +1,5 @@
 import type { OfflineFailureReason } from '../../shared/offline-queue-types'
+import { parseOwner } from './owner'
 import { emptyQueueData, type FailedAction, type QueueData, type QueuedAction } from './types'
 
 const FAILURE_REASONS: ReadonlySet<string> = new Set<OfflineFailureReason>([
@@ -8,6 +9,7 @@ const FAILURE_REASONS: ReadonlySet<string> = new Set<OfflineFailureReason>([
   'not-found',
   'dependency-failed',
   'gave-up',
+  'other-account',
 ])
 
 const isRecord = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v)
@@ -25,6 +27,7 @@ export function normalizeAction(raw: unknown): QueuedAction | null {
     createdAt: typeof raw.createdAt === 'string' ? raw.createdAt : new Date(0).toISOString(),
     attempts: isInt(raw.attempts) && raw.attempts >= 0 ? raw.attempts : 0,
     ...(typeof raw.title === 'string' && raw.title ? { title: raw.title } : {}),
+    ...(parseOwner(raw.owner) ? { owner: parseOwner(raw.owner) } : {}),
   }
 
   switch (raw.type) {

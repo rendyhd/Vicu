@@ -21,6 +21,7 @@ contextBridge.exposeInMainWorld('quickViewApi', {
   closeWindow: () => ipcRenderer.invoke('qv:close-window'),
   setHeight: (height: number) => ipcRenderer.invoke('qv:set-height', height),
   getPendingCount: () => ipcRenderer.invoke('qv:get-pending-count'),
+  getQueueCounts: () => ipcRenderer.invoke('qv:get-queue-counts'),
   getConfig: () => ipcRenderer.invoke('qv:get-config'),
   onShowWindow: (callback: () => void) => {
     ipcRenderer.on('viewer-shown', () => callback())

@@ -29,6 +29,7 @@ export type OfflineFailureReason =
   | 'not-found' // 404 on something else (a project, a label)
   | 'dependency-failed' // the task this action belongs to was never created
   | 'gave-up' // unknown errors on several replays in a row
+  | 'other-account' // queued for a different server or user than the one signed in now
 
 /** Why a replay stopped before the queue was empty. `null` means it finished. */
 export type OfflineReplayStop = 'auth' | 'network' | 'server' | 'rate-limit' | 'config' | 'unknown'
@@ -47,6 +48,11 @@ export interface OfflineImageInput {
   name: string
   mime: string
   bytes: Uint8Array
+  /**
+   * A pasted image whose `[[image:N]]` token is added to the description once uploaded (the
+   * default). False for a plain file attachment, which only gets uploaded.
+   */
+  inline?: boolean
 }
 
 export interface OfflineCreateInput {
@@ -92,6 +98,8 @@ export interface OfflineFailedItemView {
   failedAt: string
   /** Entries that failed together (a create and the changes that depended on it) share this. */
   groupId?: string
+  /** The task the action changed (a negative temp id for a create), so a row can show it failed. */
+  taskId?: number
 }
 
 export interface OfflineQueueSnapshot {

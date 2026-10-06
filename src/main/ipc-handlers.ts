@@ -89,11 +89,12 @@ import {
 
 import { printHtml } from './print'
 import { uploadStandaloneTasks } from './standalone-upload'
-import { getOfflineQueue } from './offline/service'
+import { getOfflineQueue, rememberKnownUser } from './offline/service'
 import { registerOfflineQueueIpc } from './offline/ipc'
-import { replayPendingActions } from './sync'
+import { accountChanged, replayPendingActions } from './sync'
 import {
   createFromQuickEntry,
+  queueQuickEntryFollowUps,
   quickViewComplete,
   quickViewPatch,
   quickViewReopen,
@@ -310,6 +311,9 @@ export function registerIpcHandlers(): void {
   handleTrusted('save-connection-config', (_event, connection: unknown) => {
     if (!isConnectionFields(connection)) throw new Error('Invalid connection settings')
     persistConfig(applyConnectionFields(loadConfig(), connection))
+    // A different server or user: changes queued for the previous account must not follow.
+    accountChanged()
+    void replayPendingActions()
   })
 
   handleTrusted('custom-lists:get', () => getCustomLists())
@@ -341,6 +345,7 @@ export function registerIpcHandlers(): void {
   handleTrusted('auth:login-oidc', async (_event, url: string, providerKey: string, totpPasscode?: string) => {
     try {
       await authManager.login(url, providerKey, totpPasscode)
+      accountChanged()
       // Signing in again is what a replay that paused on an expired session was waiting for.
       void replayPendingActions()
       return { success: true }
@@ -359,7 +364,10 @@ export function registerIpcHandlers(): void {
 
   handleTrusted('auth:login-password', async (_event, url: string, username: string, password: string, totpPasscode?: string) => {
     const result = await authManager.loginPassword(url, username, password, totpPasscode)
-    if (result.success) void replayPendingActions()
+    if (result.success) {
+      accountChanged()
+      void replayPendingActions()
+    }
     return result
   })
 
@@ -370,7 +378,9 @@ export function registerIpcHandlers(): void {
       ? (getAPIToken() || config.api_token)
       : authManager.getTokenSync()
     if (!token) return null
-    return fetchCurrentUser(config.vikunja_url, token)
+    const user = await fetchCurrentUser(config.vikunja_url, token)
+    if (user) rememberKnownUser(config.vikunja_url, user.id)
+    return user
   })
 
   handleTrusted('auth:check', async () => {
@@ -406,6 +416,7 @@ export function registerIpcHandlers(): void {
 
   handleTrusted('auth:logout', async () => {
     await authManager.logout()
+    accountChanged()
   })
 
   // --- Quick Entry IPC ---
@@ -457,6 +468,22 @@ export function registerIpcHandlers(): void {
 
   handleTrusted('qe:get-pending-count', () => {
     return getOfflineQueue().counts().pending
+  })
+
+  // Pending and failed changes, for the indicator under the input.
+  handleTrusted('qe:get-queue-counts', () => getOfflineQueue().counts())
+
+  // The create reached the server but a label or upload call after it hit a network or server
+  // problem: the window sends what failed and it is queued for replay.
+  handleTrusted('qe:queue-follow-ups', async (_event, taskId: unknown, extras: unknown, title?: unknown) => {
+    const result = await queueQuickEntryFollowUps(
+      getOfflineQueue(),
+      typeof taskId === 'number' ? taskId : 0,
+      extras && typeof extras === 'object' ? (extras as { labels?: unknown; images?: unknown }) : {},
+      typeof title === 'string' ? title : undefined,
+    )
+    if (result.success && result.labels + result.images > 0) void replayPendingActions()
+    return result
   })
 
   // --- Quick View IPC ---
@@ -613,6 +640,8 @@ export function registerIpcHandlers(): void {
   handleTrusted('qv:get-pending-count', () => {
     return getOfflineQueue().counts().pending
   })
+
+  handleTrusted('qv:get-queue-counts', () => getOfflineQueue().counts())
 
   handleTrusted('qv:get-config', () => {
     const config = loadConfig()

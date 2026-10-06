@@ -321,6 +321,9 @@ body {
   color: #b7791f;
   font-style: italic;
 }
+.pending-indicator.has-failed {
+  color: #c53030;
+}
 
 /* Obsidian hint */
 .obsidian-hint {
@@ -519,6 +522,10 @@ body {
 
   .pending-indicator {
     color: #ecc94b;
+  }
+
+  .pending-indicator.has-failed {
+    color: #fc8181;
   }
 
   .obsidian-hint { color: #a78bfa; }

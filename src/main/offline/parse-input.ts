@@ -23,12 +23,13 @@ export function parseQueuedImages(raw: unknown): OfflineImageInput[] {
   const images: OfflineImageInput[] = []
   for (const item of raw) {
     if (!item || typeof item !== 'object') continue
-    const { name, mime, bytes } = item as { name?: unknown; mime?: unknown; bytes?: unknown }
+    const { name, mime, bytes, inline } = item as { name?: unknown; mime?: unknown; bytes?: unknown; inline?: unknown }
     if (!(bytes instanceof Uint8Array) || bytes.byteLength === 0) continue
     images.push({
       name: typeof name === 'string' && name ? name : 'image',
       mime: typeof mime === 'string' ? mime : 'application/octet-stream',
       bytes,
+      ...(inline === false ? { inline: false } : {}),
     })
   }
   return images

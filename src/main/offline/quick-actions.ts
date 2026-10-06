@@ -62,6 +62,45 @@ export async function createFromQuickEntry(
   }
 }
 
+/** What `queueQuickEntryFollowUps` queued, or why it could not. */
+export type FollowUpResult = { success: true; labels: number; images: number } | { success: false; error: string }
+
+/**
+ * Queue the label and image follow-ups of a Quick Entry create that did reach the server but whose
+ * label or upload call then could not (the network dropped in between). The window sends only what
+ * failed with a queueable error, so nothing is queued twice. Labels may be named by title; the
+ * replay looks them up or creates them.
+ */
+export async function queueQuickEntryFollowUps(
+  queue: OfflineQueue,
+  taskId: number,
+  extras: { labels?: unknown; images?: unknown },
+  title?: string
+): Promise<FollowUpResult> {
+  if (!Number.isInteger(taskId) || taskId <= 0) return { success: false, error: 'Invalid task' }
+  const meta = title ? { title } : {}
+  let labels = 0
+  let images = 0
+  const seen = new Set<string>()
+  try {
+    for (const label of parseQueuedLabels(extras.labels)) {
+      const key = label.id !== undefined ? `id:${label.id}` : `title:${(label.title ?? '').toLowerCase()}`
+      if (seen.has(key)) continue
+      seen.add(key)
+      await queue.enqueueAddLabel(taskId, label, meta)
+      labels++
+    }
+    for (const image of parseQueuedImages(extras.images)) {
+      // Pasted images get their `[[image:N]]` token appended on replay, as the online path does.
+      await queue.enqueueUpload(taskId, image, { addImageToken: image.inline !== false, ...meta })
+      images++
+    }
+  } catch (err) {
+    return { success: false, error: `Could not save offline: ${err instanceof Error ? err.message : String(err)}` }
+  }
+  return { success: true, labels, images }
+}
+
 // --- Quick View --------------------------------------------------------------------------
 
 // A Quick View row is a task on the server, or (offline) a `pending_<id>` placeholder for a task
