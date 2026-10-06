@@ -1,5 +1,10 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type { ProjectPatch, TaskPatch } from '../shared/merge-patches'
+import type {
+  OfflineCreateInput,
+  OfflineLabelRef,
+  OfflineReplayEvent,
+} from '../shared/offline-queue-types'
 
 const api = {
   platform: process.platform as 'darwin' | 'win32' | 'linux',
@@ -145,6 +150,45 @@ const api = {
     ipcRenderer.invoke('get-global-shortcut-status') as Promise<{ entry: boolean; viewer: boolean; waylandLimited: boolean }>,
   getHotkeyLauncherCommand: () =>
     ipcRenderer.invoke('get-hotkey-launcher-command') as Promise<{ quickEntry: string; quickView: string; kind: 'appimage' | 'packaged' | 'dev' }>,
+
+  // Offline queue: changes that could not reach the server wait here, in the main process, and are
+  // replayed in order. Every call answers `{ success, data | error }`.
+  offlineQueue: {
+    snapshot: () => ipcRenderer.invoke('offline-queue:snapshot'),
+    enqueueUpdate: (taskRef: number | string, patch: TaskPatch, meta?: { title?: string }) =>
+      ipcRenderer.invoke('offline-queue:enqueue-update', taskRef, patch, meta),
+    enqueueComplete: (taskRef: number | string, done: boolean, meta?: { title?: string }) =>
+      ipcRenderer.invoke('offline-queue:enqueue-complete', taskRef, done, meta),
+    enqueueDelete: (taskRef: number | string, meta?: { title?: string }) =>
+      ipcRenderer.invoke('offline-queue:enqueue-delete', taskRef, meta),
+    enqueueCreate: (input: OfflineCreateInput) =>
+      ipcRenderer.invoke('offline-queue:enqueue-create', input),
+    enqueueAddLabel: (taskRef: number | string, label: OfflineLabelRef, meta?: { title?: string }) =>
+      ipcRenderer.invoke('offline-queue:enqueue-add-label', taskRef, label, meta),
+    enqueueRemoveLabel: (taskRef: number | string, labelId: number, meta?: { title?: string }) =>
+      ipcRenderer.invoke('offline-queue:enqueue-remove-label', taskRef, labelId, meta),
+    cancelChange: (taskRef: number | string, keys: string[]) =>
+      ipcRenderer.invoke('offline-queue:cancel-change', taskRef, keys),
+    retryFailed: (ids?: string[]) => ipcRenderer.invoke('offline-queue:retry-failed', ids),
+    discardFailed: (ids?: string[]) => ipcRenderer.invoke('offline-queue:discard-failed', ids),
+    discardPending: (ids: string[]) => ipcRenderer.invoke('offline-queue:discard-pending', ids),
+    replayNow: () => ipcRenderer.invoke('offline-queue:replay-now'),
+    onChanged: (cb: (change: unknown) => void) => {
+      const handler = (_: unknown, change: unknown) => cb(change)
+      ipcRenderer.on('offline-queue:changed', handler)
+      return () => { ipcRenderer.removeListener('offline-queue:changed', handler) }
+    },
+    onReplayed: (cb: (event: OfflineReplayEvent) => void) => {
+      const handler = (_: unknown, event: OfflineReplayEvent) => cb(event)
+      ipcRenderer.on('offline-queue:replayed', handler)
+      return () => { ipcRenderer.removeListener('offline-queue:replayed', handler) }
+    },
+    onAuthProblem: (cb: (problem: { error: string }) => void) => {
+      const handler = (_: unknown, problem: { error: string }) => cb(problem)
+      ipcRenderer.on('offline-queue:auth-problem', handler)
+      return () => { ipcRenderer.removeListener('offline-queue:auth-problem', handler) }
+    },
+  },
 
   // Standalone mode
   getStandaloneTaskCount: () =>

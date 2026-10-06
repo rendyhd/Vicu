@@ -22,6 +22,17 @@ import type {
   CustomList,
   CustomListSyncStatus,
 } from '../renderer/lib/vikunja-types'
+import type { TaskPatch } from '../shared/merge-patches'
+import type {
+  OfflineCreateInput,
+  OfflineCreateResult,
+  OfflineEnqueueResult,
+  OfflineLabelRef,
+  OfflineQueueChange,
+  OfflineQueueResult,
+  OfflineQueueSnapshot,
+  OfflineReplayEvent,
+} from '../shared/offline-queue-types'
 
 type OidcLoginResult =
   | { success: true }
@@ -110,6 +121,29 @@ export interface ElectronAPI {
   applyQuickEntrySettings(): Promise<{ entry: boolean; viewer: boolean; waylandLimited: boolean }>
   getGlobalShortcutStatus(): Promise<{ entry: boolean; viewer: boolean; waylandLimited: boolean }>
   getHotkeyLauncherCommand(): Promise<{ quickEntry: string; quickView: string; kind: 'appimage' | 'packaged' | 'dev' }>
+
+  // Offline queue (main process): changes that could not reach the server, replayed in order
+  offlineQueue: {
+    snapshot(): Promise<OfflineQueueResult<OfflineQueueSnapshot>>
+    /** `taskRef` is a real id, a negative temp id, or `pending_<actionId>`; `patch` is a merge patch. */
+    enqueueUpdate(taskRef: number | string, patch: TaskPatch, meta?: { title?: string }): Promise<OfflineQueueResult<OfflineEnqueueResult>>
+    enqueueComplete(taskRef: number | string, done: boolean, meta?: { title?: string }): Promise<OfflineQueueResult<OfflineEnqueueResult>>
+    enqueueDelete(taskRef: number | string, meta?: { title?: string }): Promise<OfflineQueueResult<OfflineEnqueueResult>>
+    enqueueCreate(input: OfflineCreateInput): Promise<OfflineQueueResult<OfflineCreateResult>>
+    enqueueAddLabel(taskRef: number | string, label: OfflineLabelRef, meta?: { title?: string }): Promise<OfflineQueueResult<OfflineEnqueueResult>>
+    enqueueRemoveLabel(taskRef: number | string, labelId: number, meta?: { title?: string }): Promise<OfflineQueueResult<OfflineEnqueueResult>>
+    /** Take a queued change back out (undo). `data` is false when nothing could be cancelled. */
+    cancelChange(taskRef: number | string, keys: string[]): Promise<OfflineQueueResult<boolean>>
+    /** Retry all failed actions, or the given ones (their group comes with them). */
+    retryFailed(ids?: string[]): Promise<OfflineQueueResult<number>>
+    discardFailed(ids?: string[]): Promise<OfflineQueueResult<number>>
+    discardPending(ids: string[]): Promise<OfflineQueueResult<number>>
+    /** Replay now. `data` is null when there was nothing to do (empty queue, standalone mode). */
+    replayNow(): Promise<OfflineQueueResult<OfflineReplayEvent | null>>
+    onChanged(cb: (change: OfflineQueueChange) => void): () => void
+    onReplayed(cb: (event: OfflineReplayEvent) => void): () => void
+    onAuthProblem(cb: (problem: { error: string }) => void): () => void
+  }
 
   // Standalone mode
   getStandaloneTaskCount(): Promise<number>

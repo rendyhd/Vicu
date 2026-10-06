@@ -90,6 +90,7 @@ import {
 import { printHtml } from './print'
 import { uploadStandaloneTasks } from './standalone-upload'
 import { getOfflineQueue } from './offline/service'
+import { registerOfflineQueueIpc } from './offline/ipc'
 import {
   createFromQuickEntry,
   quickViewComplete,
@@ -164,6 +165,8 @@ function persistConfig(config: AppConfig, announce = true): void {
 }
 
 export function registerIpcHandlers(): void {
+  registerOfflineQueueIpc()
+
   // Tasks
   handleTrusted('fetch-tasks', (_event, params: Record<string, unknown>) => {
     return fetchTasks(params)

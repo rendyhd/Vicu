@@ -20,6 +20,17 @@ import type {
   VikunjaUser,
   AuthCheckResult,
 } from './vikunja-types'
+import type { TaskPatch } from './merge-patches'
+import type {
+  OfflineCreateInput,
+  OfflineCreateResult,
+  OfflineEnqueueResult,
+  OfflineLabelRef,
+  OfflineQueueChange,
+  OfflineQueueResult,
+  OfflineQueueSnapshot,
+  OfflineReplayEvent,
+} from '../../shared/offline-queue-types'
 
 export type {
   OIDCProvider,
@@ -205,6 +216,36 @@ export const api = {
     window.api.openTaskAttachment(taskId, attachmentId, fileName) as Promise<ApiResult<void>>,
   pickAndUploadAttachment: (taskId: number) =>
     window.api.pickAndUploadAttachment(taskId) as Promise<ApiResult<{ count: number }>>,
+
+  // Offline queue (main process). Changes that fail for network or server reasons are queued here
+  // and replayed in order; see src/main/offline/ and src/shared/offline-queue-types.ts.
+  offlineQueue: {
+    snapshot: () => window.api.offlineQueue.snapshot() as Promise<OfflineQueueResult<OfflineQueueSnapshot>>,
+    enqueueUpdate: (taskRef: number | string, patch: TaskPatch, meta?: { title?: string }) =>
+      window.api.offlineQueue.enqueueUpdate(taskRef, patch, meta) as Promise<OfflineQueueResult<OfflineEnqueueResult>>,
+    enqueueComplete: (taskRef: number | string, done: boolean, meta?: { title?: string }) =>
+      window.api.offlineQueue.enqueueComplete(taskRef, done, meta) as Promise<OfflineQueueResult<OfflineEnqueueResult>>,
+    enqueueDelete: (taskRef: number | string, meta?: { title?: string }) =>
+      window.api.offlineQueue.enqueueDelete(taskRef, meta) as Promise<OfflineQueueResult<OfflineEnqueueResult>>,
+    enqueueCreate: (input: OfflineCreateInput) =>
+      window.api.offlineQueue.enqueueCreate(input) as Promise<OfflineQueueResult<OfflineCreateResult>>,
+    enqueueAddLabel: (taskRef: number | string, label: OfflineLabelRef, meta?: { title?: string }) =>
+      window.api.offlineQueue.enqueueAddLabel(taskRef, label, meta) as Promise<OfflineQueueResult<OfflineEnqueueResult>>,
+    enqueueRemoveLabel: (taskRef: number | string, labelId: number, meta?: { title?: string }) =>
+      window.api.offlineQueue.enqueueRemoveLabel(taskRef, labelId, meta) as Promise<OfflineQueueResult<OfflineEnqueueResult>>,
+    cancelChange: (taskRef: number | string, keys: string[]) =>
+      window.api.offlineQueue.cancelChange(taskRef, keys) as Promise<OfflineQueueResult<boolean>>,
+    retryFailed: (ids?: string[]) => window.api.offlineQueue.retryFailed(ids) as Promise<OfflineQueueResult<number>>,
+    discardFailed: (ids?: string[]) => window.api.offlineQueue.discardFailed(ids) as Promise<OfflineQueueResult<number>>,
+    discardPending: (ids: string[]) => window.api.offlineQueue.discardPending(ids) as Promise<OfflineQueueResult<number>>,
+    replayNow: () => window.api.offlineQueue.replayNow() as Promise<OfflineQueueResult<OfflineReplayEvent | null>>,
+    onChanged: (cb: (change: OfflineQueueChange) => void) =>
+      window.api.offlineQueue?.onChanged(cb) ?? (() => {}),
+    onReplayed: (cb: (event: OfflineReplayEvent) => void) =>
+      window.api.offlineQueue?.onReplayed(cb) ?? (() => {}),
+    onAuthProblem: (cb: (problem: { error: string }) => void) =>
+      window.api.offlineQueue?.onAuthProblem(cb) ?? (() => {}),
+  },
 
   // Window controls
   windowMinimize: () => window.api.windowMinimize(),
