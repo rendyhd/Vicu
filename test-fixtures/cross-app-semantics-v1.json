@@ -78,6 +78,7 @@
     { "name": "this_week in project 10 plus today from all projects", "today": "2026-10-06", "filter": { "due_date_filter": "this_week", "project_ids": [10], "include_today_all_projects": true }, "expect": [1, 2, 3, 4, 6, 12, 13] },
     { "name": "this_week in project 10 plus today, no overdue", "today": "2026-10-06", "filter": { "due_date_filter": "this_week", "project_ids": [10], "include_today_all_projects": true, "include_overdue": false }, "expect": [2, 3, 4, 6, 13] },
     { "name": "exclude project 10", "today": "2026-10-06", "filter": { "due_date_filter": "all", "project_ids": [10], "project_filter_mode": "exclude" }, "expect": [3, 5, 8, 12, 13] },
+    { "name": "exclude project 10 plus today from all projects", "today": "2026-10-06", "filter": { "due_date_filter": "all", "project_ids": [10], "project_filter_mode": "exclude", "include_today_all_projects": true }, "expect": [1, 2, 3, 5, 8, 12, 13] },
     { "name": "priority 3 and 4", "today": "2026-10-06", "filter": { "due_date_filter": "all", "priority_filter": [3, 4] }, "expect": [12, 13] },
     { "name": "label 7 due today", "today": "2026-10-06", "filter": { "due_date_filter": "today", "label_ids": [7] }, "expect": [12, 13] },
     { "name": "this_week on a Sunday with overdue", "today": "2026-10-11", "filter": { "due_date_filter": "this_week" }, "expect": [1, 2, 3, 4, 5, 6, 12, 13] },

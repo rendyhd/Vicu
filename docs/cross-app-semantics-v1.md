@@ -111,8 +111,9 @@ with a local due date before T are included too. `overdue`, `has_due_date`, `no_
 - `project_ids` with `project_filter_mode` `include` (default) keeps tasks in those projects;
   `exclude` removes them.
 - `include_today_all_projects` (only with a non-empty `project_ids`): a task passes the project
-  condition if it is in the selected projects **or** it falls in the `today` window (which
-  honors `include_overdue`). The date window still applies to every task.
+  condition if it passes the include/exclude rule above **or** it falls in the `today` window
+  (which honors `include_overdue`). This works the same in include and exclude mode. The date
+  window still applies to every task.
 - `priority_filter` keeps tasks whose priority is in the list.
 - `label_ids` keeps tasks with at least one of the labels.
 - Evaluate all conditions on the full task set **before** hiding nested subtasks. A subtask
