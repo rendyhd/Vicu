@@ -1,8 +1,10 @@
 import { app, Notification, nativeImage, BrowserWindow } from 'electron'
 import { join } from 'path'
 import { loadConfig, type AppConfig } from './config'
-import { fetchTasks } from './api-client'
+import { fetchTaskById, fetchTasks } from './api-client'
 import { getAllStandaloneTasks } from './cache'
+import { getOfflineQueue } from './offline/service'
+import { createTaskReminderScheduler } from './task-reminders'
 import { notificationCategory, notificationFilters, overdueDays } from './notification-windows'
 import { addLocalDays, startOfLocalDay, toLocalDate } from '../shared/due-dates'
 import { parseRoutineEnvelope, routineOccurrenceKey, scheduledDateOn, type RoutinePayload } from '../shared/routines'
@@ -14,12 +16,33 @@ let dailyTimerId: ReturnType<typeof setTimeout> | null = null
 let secondaryTimerId: ReturnType<typeof setTimeout> | null = null
 let routineRefreshTimerId: ReturnType<typeof setTimeout> | null = null
 
-// Per-task reminder timers (key: "taskId-timestamp")
-const reminderTimers = new Map<string, ReturnType<typeof setTimeout>>()
 const routineReminderTimers = new Map<string, ReturnType<typeof setTimeout>>()
 
 // Reference to main window (set during init)
 let mainWindowRef: BrowserWindow | null = null
+
+/** The user completed or deleted the task here and the offline queue has not told the server yet. */
+function isClosedLocally(taskId: number): boolean {
+  try {
+    return getOfflineQueue().getPending().some((action) =>
+      (action.type === 'delete' && action.taskId === taskId) ||
+      (action.type === 'update' && action.taskId === taskId && action.patch.done === true)
+    )
+  } catch {
+    return false
+  }
+}
+
+// Task reminders: one refresh from the server every 15 minutes (and on focus, resume and after a
+// task changes), one timer per reminder, a re-check when each fires. See ./task-reminders.ts.
+const taskReminders = createTaskReminderScheduler({
+  loadConfig,
+  fetchTasks,
+  fetchTaskById,
+  isClosedLocally,
+  show: (taskId, title, config) => fireTaskReminder(taskId, title, config as AppConfig),
+  now: () => Date.now(),
+})
 
 /**
  * Attach failure logging for desktop notifications. On macOS, Electron 42+
@@ -37,7 +60,7 @@ function attachNotificationDiagnostics(notification: Notification, context: stri
 export function initNotifications(mainWindow: BrowserWindow | null): void {
   mainWindowRef = mainWindow
   scheduleAll()
-  refreshTaskReminders()
+  taskReminders.start()
   refreshRoutineReminders()
   scheduleRoutineRefresh()
 }
@@ -50,14 +73,14 @@ export function setNotificationsMainWindow(mainWindow: BrowserWindow | null): vo
 export function rescheduleNotifications(): void {
   clearTimers()
   scheduleAll()
-  refreshTaskReminders()
+  void refreshTaskReminders()
   refreshRoutineReminders()
   scheduleRoutineRefresh()
 }
 
 export function stopNotifications(): void {
   clearTimers()
-  clearReminderTimers()
+  taskReminders.stop()
   clearRoutineReminderTimers()
 }
 
@@ -97,43 +120,17 @@ export async function refreshRoutineReminders(): Promise<void> {
   }
 }
 
-export async function refreshTaskReminders(): Promise<void> {
-  clearReminderTimers()
+/**
+ * Re-read the upcoming reminders from the server and re-arm the timers. Call it after anything that
+ * can change them: a completed, reopened or deleted task, edited reminders or due date.
+ */
+export function refreshTaskReminders(): Promise<void> {
+  return taskReminders.refresh()
+}
 
-  const config = loadConfig()
-  if (!config || config.standalone_mode) return
-
-  const result = await fetchTasks({ per_page: 200, filter: 'done = false' })
-  if (!result.success || !Array.isArray(result.data)) return
-
-  const tasks = result.data as Array<Record<string, unknown>>
-  const now = Date.now()
-
-  for (const task of tasks) {
-    const reminders = task.reminders as Array<{ reminder: string }> | null | undefined
-    if (!reminders || !Array.isArray(reminders)) continue
-
-    const taskId = task.id as number
-    const taskTitle = task.title as string
-
-    for (const r of reminders) {
-      if (!r.reminder) continue
-      const reminderTime = new Date(r.reminder).getTime()
-      if (isNaN(reminderTime) || reminderTime <= now) continue
-
-      const key = `${taskId}-${r.reminder}`
-      const delay = reminderTime - now
-      // setTimeout uses a 32-bit signed int internally; delays > 2^31-1 ms (~24.85 days)
-      // overflow and fire immediately. Skip far-future reminders — they'll be picked up
-      // on a future refresh once they're within range.
-      if (delay > 2_147_483_647) continue
-      const timerId = setTimeout(() => {
-        fireTaskReminder(taskId, taskTitle, config)
-        reminderTimers.delete(key)
-      }, delay)
-      reminderTimers.set(key, timerId)
-    }
-  }
+/** Window focus: refresh unless a refresh ran a moment ago. */
+export function refreshTaskRemindersOnFocus(): void {
+  taskReminders.refreshOnFocus()
 }
 
 export function sendTestNotification(): void {
@@ -174,13 +171,6 @@ function scheduleRoutineRefresh(): void {
     void refreshRoutineReminders()
     scheduleRoutineRefresh()
   }, next.getTime() - now.getTime())
-}
-
-function clearReminderTimers(): void {
-  for (const timerId of reminderTimers.values()) {
-    clearTimeout(timerId)
-  }
-  reminderTimers.clear()
 }
 
 function clearRoutineReminderTimers(): void {
@@ -239,6 +229,8 @@ function localDateAtMinutes(value: string, minutes: number): Date {
 
 function fireTaskReminder(taskId: number, title: string, configSnapshot: AppConfig): void {
   const config = loadConfig() || configSnapshot
+  // The master toggle covers task reminders too (D-NOTIF-1).
+  if (!config.notifications_enabled) return
 
   const notification = new Notification({
     title: `Reminder: ${title}`,

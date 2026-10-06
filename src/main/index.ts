@@ -6,7 +6,7 @@ import { authManager } from './auth/auth-manager'
 import { createTray, destroyTray, hasTray } from './tray'
 import { returnFocusToPreviousWindow, destroyDummyWindow } from './focus'
 import { registerQuickEntryState } from './quick-entry-state'
-import { initNotifications, rescheduleNotifications, stopNotifications, setNotificationsMainWindow } from './notifications'
+import { initNotifications, refreshTaskRemindersOnFocus, rescheduleNotifications, stopNotifications, setNotificationsMainWindow } from './notifications'
 import { getObsidianContext, getForegroundProcessName, getForegroundWindowHandle, prewarmForegroundCheck, type ObsidianNoteContext } from './obsidian-client'
 import { getBrowserContext, type BrowserContext } from './browser-client'
 import { getBrowserUrlFromWindow, prewarmUrlReader, shutdownUrlReader, BROWSER_PROCESSES } from './window-url-reader'
@@ -397,6 +397,8 @@ function createAndWireMainWindow(config: AppConfig | null): BrowserWindow {
     reapplyTaskBadge()
   })
   win.on('focus', () => {
+    // Reminders set on another device are picked up here (throttled inside).
+    refreshTaskRemindersOnFocus()
     if (Date.now() - lastCustomListFocusSync < 30_000) return
     lastCustomListFocusSync = Date.now()
     void syncCustomLists()
