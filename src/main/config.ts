@@ -1,7 +1,7 @@
 import { app } from 'electron'
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs'
-import { join, dirname } from 'path'
+import { join } from 'path'
 import { isMac } from './platform'
+import { readFileWithBackup, writeFileAtomic } from './atomic-file'
 import type { CustomListSyncDocumentV1 } from './custom-list-protocol'
 
 export interface ViewerFilter {
@@ -157,37 +157,42 @@ export function loadConfig(): AppConfig | null {
   return cachedConfig ? structuredClone(cachedConfig) : null
 }
 
+function parseConfigFile(raw: string): AppConfig {
+  const parsed: unknown = JSON.parse(raw)
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new Error('config.json does not contain an object')
+  }
+  return normalizeConfig(parsed as Record<string, unknown>)
+}
+
 function readConfigFromDisk(): AppConfig | null {
-  const configPath = getConfigPath()
+  // Falls back to config.json.bak (and logs it) when the file does not parse.
+  const loaded = readFileWithBackup(getConfigPath(), parseConfigFile)
+  if (!loaded) return null
+  const config = loaded.value
 
-  if (!existsSync(configPath)) {
-    return null
-  }
-
-  try {
-    const raw = readFileSync(configPath, 'utf-8')
-    const parsed = JSON.parse(raw)
-    const config = normalizeConfig(parsed)
-
-    // One-time migration: replace Windows hotkey defaults that never worked on macOS
-    if (isMac && !config.hotkeys_migrated_macos) {
-      let changed = false
-      if (config.quick_entry_hotkey === 'Alt+Shift+V') {
-        config.quick_entry_hotkey = DEFAULT_QUICK_ENTRY_HOTKEY
-        changed = true
-      }
-      if (config.quick_view_hotkey === 'Alt+Shift+B') {
-        config.quick_view_hotkey = DEFAULT_QUICK_VIEW_HOTKEY
-        changed = true
-      }
-      config.hotkeys_migrated_macos = true
-      if (changed) saveConfig(config)
+  // One-time migration: replace Windows hotkey defaults that never worked on macOS
+  if (isMac && !config.hotkeys_migrated_macos) {
+    let changed = false
+    if (config.quick_entry_hotkey === 'Alt+Shift+V') {
+      config.quick_entry_hotkey = DEFAULT_QUICK_ENTRY_HOTKEY
+      changed = true
     }
-
-    return config
-  } catch {
-    return null
+    if (config.quick_view_hotkey === 'Alt+Shift+B') {
+      config.quick_view_hotkey = DEFAULT_QUICK_VIEW_HOTKEY
+      changed = true
+    }
+    config.hotkeys_migrated_macos = true
+    if (changed) {
+      try {
+        saveConfig(config)
+      } catch (err) {
+        console.warn('[Config] Could not save the hotkey migration:', err instanceof Error ? err.message : err)
+      }
+    }
   }
+
+  return config
 }
 
 function normalizeReview(raw: unknown): ReviewConfig {
@@ -324,10 +329,6 @@ function isWindowBounds(v: unknown): v is { x: number; y: number; width: number;
 
 export function saveConfig(config: AppConfig): void {
   cachedConfig = structuredClone(config)
-  const configPath = getConfigPath()
-  const dir = dirname(configPath)
-  if (!existsSync(dir)) {
-    mkdirSync(dir, { recursive: true })
-  }
-  writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf-8')
+  // Temp file + rename, keeping config.json.bak (see atomic-file.ts)
+  writeFileAtomic(getConfigPath(), JSON.stringify(config, null, 2), { backup: true })
 }

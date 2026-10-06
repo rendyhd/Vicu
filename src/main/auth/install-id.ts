@@ -1,6 +1,7 @@
 import { app } from 'electron'
-import { mkdirSync, readFileSync, writeFileSync } from 'fs'
-import { dirname, join } from 'path'
+import { readFileSync } from 'fs'
+import { join } from 'path'
+import { writeFileAtomic } from '../atomic-file'
 import { generateInstallId, isValidInstallId } from './backup-token'
 
 // A random id that identifies this Vicu install, used as the suffix of the
@@ -33,8 +34,7 @@ export function getInstallId(): string {
 
   const id = generateInstallId()
   try {
-    mkdirSync(dirname(path), { recursive: true })
-    writeFileSync(path, `${id}\n`, 'utf-8')
+    writeFileAtomic(path, `${id}\n`)
   } catch (err) {
     // Still usable for this run; a new id is generated next time.
     console.warn('[Auth] Could not persist install id:', err instanceof Error ? err.message : err)

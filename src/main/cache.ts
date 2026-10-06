@@ -1,7 +1,8 @@
-import { readFileSync, writeFileSync, existsSync, mkdirSync, renameSync } from 'fs'
-import { join, dirname } from 'path'
+import { readFileSync } from 'fs'
+import { join } from 'path'
 import { app } from 'electron'
 import { randomBytes } from 'crypto'
+import { writeFileAtomic } from './atomic-file'
 import { overlayPendingActions } from './cache-overlay'
 
 const CACHE_FILENAME = 'offline-cache.json'
@@ -57,13 +58,8 @@ function loadCache(): CacheData {
 }
 
 function saveCache(cache: CacheData): void {
-  const cachePath = getCachePath()
-  const dir = dirname(cachePath)
-  if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
   // Write atomically: temp file then rename
-  const tmpPath = cachePath + '.tmp'
-  writeFileSync(tmpPath, JSON.stringify(cache, null, 2), 'utf-8')
-  renameSync(tmpPath, cachePath)
+  writeFileAtomic(getCachePath(), JSON.stringify(cache, null, 2))
 }
 
 function generateId(): string {

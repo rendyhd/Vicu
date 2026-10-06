@@ -11,8 +11,8 @@ export const API_TOKEN_NO_EXPIRY = 4102444800 // 2100-01-01T00:00:00Z
 export function isEncryptionAvailable(): boolean {
   return true
 }
-import { readFileSync, writeFileSync, existsSync, unlinkSync, mkdirSync } from 'fs'
-import { join, dirname } from 'path'
+import { join } from 'path'
+import { readFileWithBackup, removeFileAndBackup, writeFileAtomic } from '../atomic-file'
 
 interface AuthStore {
   jwt?: string
@@ -33,26 +33,22 @@ function getAuthPath(): string {
   return join(app.getPath('userData'), AUTH_FILENAME)
 }
 
+function parseAuthStore(raw: string): AuthStore {
+  const parsed: unknown = JSON.parse(raw)
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new Error('auth.json does not contain an object')
+  }
+  return parsed as AuthStore
+}
+
 function readStore(): AuthStore {
-  const authPath = getAuthPath()
-  if (!existsSync(authPath)) {
-    return {}
-  }
-  try {
-    const raw = readFileSync(authPath, 'utf-8')
-    return JSON.parse(raw)
-  } catch {
-    return {}
-  }
+  // Falls back to auth.json.bak (and logs it) when the file does not parse, so a
+  // torn write does not log the user out.
+  return readFileWithBackup(getAuthPath(), parseAuthStore)?.value ?? {}
 }
 
 function writeStore(data: AuthStore): void {
-  const authPath = getAuthPath()
-  const dir = dirname(authPath)
-  if (!existsSync(dir)) {
-    mkdirSync(dir, { recursive: true })
-  }
-  writeFileSync(authPath, JSON.stringify(data, null, 2), 'utf-8')
+  writeFileAtomic(getAuthPath(), JSON.stringify(data, null, 2), { backup: true, mode: 0o600 })
 }
 
 // Tokens stored while safeStorage is unavailable get a "plain:" prefix so the
@@ -232,8 +228,6 @@ export function getBestToken(): string | null {
 }
 
 export function clear(): void {
-  const authPath = getAuthPath()
-  if (existsSync(authPath)) {
-    unlinkSync(authPath)
-  }
+  // The backup copy must go too, or it would restore the session after logout.
+  removeFileAndBackup(getAuthPath())
 }
