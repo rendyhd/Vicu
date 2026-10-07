@@ -255,6 +255,12 @@ const api = {
     ipcRenderer.on('navigate', handler)
     return () => { ipcRenderer.removeListener('navigate', handler) }
   },
+  // File > New Task (Ctrl+N). The menu accelerator takes the key before the page sees it.
+  onNewTask: (cb: () => void) => {
+    const handler = () => cb()
+    ipcRenderer.on('new-task', handler)
+    return () => { ipcRenderer.removeListener('new-task', handler) }
+  },
   // Main asks the window to show one task (a clicked reminder, Quick View's "open in app").
   onNavigateToTask: (cb: (taskId: number) => void) => {
     const handler = (_: unknown, taskId: number) => cb(taskId)

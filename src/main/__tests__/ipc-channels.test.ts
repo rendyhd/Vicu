@@ -52,10 +52,7 @@ const listened = channels(
 )
 
 /** Channels main sends that no window listens to yet. Each one is a bug to fix, not a pattern to copy. */
-const KNOWN_UNHEARD = new Set([
-  // File > New Task (Ctrl+N) sends it; no renderer reacts to it.
-  'new-task',
-])
+const KNOWN_UNHEARD = new Set<string>([])
 
 describe('IPC channels', () => {
   it('finds the channels at all', () => {

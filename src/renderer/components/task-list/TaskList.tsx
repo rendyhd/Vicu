@@ -9,6 +9,7 @@ import { usePasteTasks } from '@/hooks/use-paste-tasks'
 import { useSelectionStore } from '@/stores/selection-store'
 import { orderedTaskIds, resolveSelectedTasks, copySelectedTitles, isTaskNestedInCurrentList } from '@/lib/task-selection'
 import { confirmDelete } from '@/lib/confirm-bridge'
+import { api } from '@/lib/api'
 import { dueToday } from '@/lib/due-dates'
 import type { Task } from '@/lib/vikunja-types'
 import { TaskRow } from './TaskRow'
@@ -379,6 +380,16 @@ export function TaskList({
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [handleKeyDown])
+
+  // File > New Task (Ctrl+N) arrives from the app menu, which takes the key first.
+  useEffect(() => {
+    return api.onNewTask(() => {
+      if (showNewTask && projectId) {
+        setAddPosition('top')
+        setIsAdding(true)
+      }
+    })
+  }, [showNewTask, projectId])
 
   // Scroll focused task into view
   useEffect(() => {
