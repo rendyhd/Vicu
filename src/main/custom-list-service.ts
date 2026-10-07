@@ -238,8 +238,8 @@ async function createCarrier(projectId: number, document: CustomListSyncDocument
  * Deletes carriers that were created next to the one this app keeps (two devices that first
  * synced at the same time each made one). `kept` is what the kept carrier holds after a
  * successful write and read-back. An extra is read again right before it goes and is only deleted
- * when the kept carrier already holds everything in it, so a list another device just wrote
- * there is merged first, on the next sync. Carriers that cannot be read are never touched.
+ * when the kept carrier already holds everything in it (old tombstones aside), so a list another
+ * device just wrote there is merged first, on the next sync. Carriers that cannot be read are never touched.
  */
 async function removeDuplicateCarriers(
   extras: Array<{ task: CarrierTask; document: CustomListSyncDocumentV1 }>,
@@ -254,7 +254,8 @@ async function removeDuplicateCarriers(
       }
       const parsed = parseCustomListEnvelope((fresh.data as CarrierTask).description)
       if (!parsed.document) continue
-      if (!documentsEqual(mergeCustomListDocuments(kept, parsed.document), kept)) continue
+      // Tombstones older than 90 days are not kept in the kept carrier, so they do not count.
+      if (!documentsEqual(pruneTombstones(mergeCustomListDocuments(kept, parsed.document)), kept)) continue
       const removed = await deleteTask(extra.task.id)
       if (removed.success) forgetDeletedTask(extra.task.id)
       else console.warn(`[CustomLists] Could not delete the duplicate carrier ${extra.task.id}: ${removed.error}`)

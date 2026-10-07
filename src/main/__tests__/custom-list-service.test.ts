@@ -316,6 +316,23 @@ describe('custom-list service', () => {
       expect(state.deleted).toEqual([100])
     })
 
+    // The kept carrier has no 90 day old tombstones (they are dropped when it is written), so a
+    // duplicate that still lists one holds nothing the kept carrier lacks.
+    it('deletes a duplicate whose only difference is a tombstone older than 90 days', async () => {
+      writeConfig({ custom_lists: [] })
+      putCarrier(7, documentFromLists([list('x')], 'android', Date.now() - 10 * DAY))
+      const extra = documentFromLists([list('y')], 'other', Date.now() - 5 * DAY)
+      extra.lists.gone = { value: null, revision: { wall_time_ms: Date.now() - 120 * DAY, counter: 0, device_id: 'other' } }
+      putCarrier(100, extra)
+      const service = await loadService()
+
+      expect((await service.syncCustomLists()).state).toBe('idle')
+
+      expect(state.deleted).toEqual([100])
+      expect(idsOf(documentOf(7)).sort()).toEqual(['x', 'y'])
+      expect(Object.keys(documentOf(7).lists).sort()).toEqual(['x', 'y'])
+    })
+
     it('still reports idle when a duplicate cannot be deleted right now', async () => {
       writeConfig({ custom_lists: [] })
       putCarrier(7, documentFromLists([list('x')], 'android', Date.now() - 10 * DAY))
