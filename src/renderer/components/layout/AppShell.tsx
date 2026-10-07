@@ -41,6 +41,8 @@ import { SectionDragOverlay } from '@/components/task-list/SectionDragOverlay'
 import { UpdateBanner } from '@/components/UpdateBanner'
 import { ToastHost } from '@/components/shared/ToastHost'
 import { useAppConfig } from '@/hooks/use-app-config'
+import { openTaskInApp } from '@/lib/open-task'
+import { toast } from '@/stores/toast-store'
 import { useOfflineQueueSync } from '@/hooks/use-offline-queue'
 import { useFreshness } from '@/hooks/use-freshness'
 import { useUIStore } from '@/stores/ui-store'
@@ -493,6 +495,21 @@ export function AppShell() {
   useEffect(() => {
     return api.onNavigate((path) => {
       navigate({ to: path })
+    })
+  }, [navigate])
+
+  // A clicked task reminder or Quick View's "open in app": show that task in this window.
+  useEffect(() => {
+    return api.onNavigateToTask((taskId) => {
+      void openTaskInApp(
+        {
+          fetchTask: (id) => api.fetchTaskById(id),
+          inboxProjectId: async () => (await api.getConfig())?.inbox_project_id ?? 0,
+          navigate: (route) => navigate(route),
+          notify: (message) => toast.error(message),
+        },
+        taskId,
+      )
     })
   }, [navigate])
 

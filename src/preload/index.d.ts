@@ -188,6 +188,7 @@ export interface ElectronAPI {
   onWindowMaximizedChange(cb: (maximized: boolean) => void): () => void
   onTasksChanged(cb: () => void): () => void
   onNavigate(cb: (path: string) => void): () => void
+  onNavigateToTask(cb: (taskId: number) => void): () => void
   onAppResumed(cb: () => void): () => void
   // Print
   printHtml(html: string): Promise<{ success: true } | { success: false; error: string }>

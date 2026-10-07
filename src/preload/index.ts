@@ -255,6 +255,12 @@ const api = {
     ipcRenderer.on('navigate', handler)
     return () => { ipcRenderer.removeListener('navigate', handler) }
   },
+  // Main asks the window to show one task (a clicked reminder, Quick View's "open in app").
+  onNavigateToTask: (cb: (taskId: number) => void) => {
+    const handler = (_: unknown, taskId: number) => cb(taskId)
+    ipcRenderer.on('navigate-to-task', handler)
+    return () => { ipcRenderer.removeListener('navigate-to-task', handler) }
+  },
   // Print
   printHtml: (html: string) =>
     ipcRenderer.invoke('print-html', html),

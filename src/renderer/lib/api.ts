@@ -291,6 +291,9 @@ export const api = {
     window.api.onTasksChanged?.(cb) ?? (() => {}),
   onNavigate: (cb: (path: string) => void) =>
     window.api.onNavigate?.(cb) ?? (() => {}),
+
+  onNavigateToTask: (cb: (taskId: number) => void) =>
+    window.api.onNavigateToTask?.(cb) ?? (() => {}),
   onAppResumed: (cb: () => void) =>
     window.api.onAppResumed?.(cb) ?? (() => {}),
   printHtml: (html: string) =>

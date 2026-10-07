@@ -299,6 +299,8 @@ function TaskRowInner({ task, nestedDepth = 0, parentProjectId, drag }: Omit<Tas
   const isExpanded = useSelectionStore((s) => s.expandedTaskId === task.id)
   const isFocused = useSelectionStore((s) => s.focusedTaskId === task.id)
   const isSelected = useSelectionStore((s) => s.selectedTaskIds.has(task.id))
+  // Main asked for this task to be shown (a clicked reminder): expand once the row is on screen.
+  const isOpenRequested = useSelectionStore((s) => s.pendingOpenTaskId === task.id)
   const toggleExpandedTask = useSelectionStore((s) => s.toggleExpandedTask)
   const setFocusedTask = useSelectionStore((s) => s.setFocusedTask)
   const setExpandedTask = useSelectionStore((s) => s.setExpandedTask)
@@ -328,6 +330,9 @@ function TaskRowInner({ task, nestedDepth = 0, parentProjectId, drag }: Omit<Tas
   const [subtasksExpanded, setSubtasksExpanded] = useState(false)
   const [structuralDeleteOpen, setStructuralDeleteOpen] = useState(false)
   const [activePopover, setActivePopover] = useState<PopoverType>(null)
+  useEffect(() => {
+    if (isOpenRequested) useSelectionStore.getState().openRequestedTask(task.id)
+  }, [isOpenRequested, task.id])
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null)
   const titleEditorRef = useRef<TaskTitleEditorHandle>(null)
   const descEditorRef = useRef<Editor | null>(null)

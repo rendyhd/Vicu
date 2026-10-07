@@ -38,6 +38,25 @@ const handled = channels(
   /handleTrusted\(\s*['"]([^'"]+)['"]/g,
 )
 
+// What main sends to a window must have a listener in a preload script, or the message is dropped
+// without a trace (navigate-to-task was sent by reminders and Quick View for a long time and
+// nothing received it, F5).
+const mainFiles = sourceFiles(join(srcDir, 'main'), (name) => name.endsWith('.ts'))
+const sent = channels(mainFiles, /\.send\(\s*['"]([^'"]+)['"]/g)
+for (const channel of channels(mainFiles, /sendToAppWindows\(\s*['"]([^'"]+)['"]/g)) sent.add(channel)
+// The offline queue's events are named once, in an object.
+for (const channel of channels([join(srcDir, 'main', 'offline', 'service.ts')], /(?:changed|replayed|authProblem):\s*['"]([^'"]+)['"]/g)) sent.add(channel)
+const listened = channels(
+  sourceFiles(join(srcDir, 'preload'), (name) => name.endsWith('.ts') && !name.endsWith('.d.ts')),
+  /ipcRenderer\.on(?:ce)?\(\s*['"]([^'"]+)['"]/g,
+)
+
+/** Channels main sends that no window listens to yet. Each one is a bug to fix, not a pattern to copy. */
+const KNOWN_UNHEARD = new Set([
+  // File > New Task (Ctrl+N) sends it; no renderer reacts to it.
+  'new-task',
+])
+
 describe('IPC channels', () => {
   it('finds the channels at all', () => {
     expect(invoked.size).toBeGreaterThan(50)
@@ -50,6 +69,20 @@ describe('IPC channels', () => {
 
   it('has a caller for every handler', () => {
     expect([...handled].filter((channel) => !invoked.has(channel)).sort()).toEqual([])
+  })
+
+  it('finds the channels main sends', () => {
+    expect(sent.size).toBeGreaterThan(15)
+    expect(sent.has('navigate-to-task')).toBe(true)
+    expect(listened.has('navigate')).toBe(true)
+  })
+
+  it('has a listener in a preload script for every channel main sends to a window', () => {
+    expect([...sent].filter((channel) => !listened.has(channel) && !KNOWN_UNHEARD.has(channel)).sort()).toEqual([])
+  })
+
+  it('lists only channels that really are unheard', () => {
+    expect([...KNOWN_UNHEARD].filter((channel) => listened.has(channel) || !sent.has(channel))).toEqual([])
   })
 
   // A renderer that saves its whole config snapshot can overwrite what main changed in the

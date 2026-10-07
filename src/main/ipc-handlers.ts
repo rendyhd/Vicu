@@ -674,6 +674,8 @@ export function registerIpcHandlers(): void {
   })
 
   handleTrusted('qv:open-task-in-app', (_event, taskId: number) => {
+    // Only a task that exists on the server has a row to open (a queued one has a temp id).
+    if (!Number.isInteger(taskId) || taskId <= 0) return
     const win = getMainWindow()
     if (!win || win.isDestroyed()) return
     if (win.isMinimized()) win.restore()
