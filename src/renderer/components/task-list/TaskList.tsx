@@ -4,7 +4,8 @@ import { SortableContext } from '@dnd-kit/sortable'
 import { useQueryClient } from '@tanstack/react-query'
 import { cn } from '@/lib/cn'
 import { verticalListSortingStrategyForeignSafe } from '@/lib/sortable-strategy'
-import { useCreateTask, useCompleteTask, useUpdateTask, useDeleteTask } from '@/hooks/use-task-mutations'
+import { useCompleteTask, useUpdateTask, useDeleteTask } from '@/hooks/use-task-mutations'
+import { usePasteTasks } from '@/hooks/use-paste-tasks'
 import { useSelectionStore } from '@/stores/selection-store'
 import { orderedTaskIds, resolveSelectedTasks, copySelectedTitles, isTaskNestedInCurrentList } from '@/lib/task-selection'
 import { confirmDelete } from '@/lib/confirm-bridge'
@@ -58,7 +59,7 @@ export function TaskList({
   const creationRef = useRef<HTMLDivElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
   const pendingTaskClickRef = useRef<number | null>(null)
-  const createTask = useCreateTask()
+  const pasteTasks = usePasteTasks({ projectId, defaultDueDate })
   const completeTask = useCompleteTask()
   const updateTask = useUpdateTask()
   const deleteTask = useDeleteTask()
@@ -250,16 +251,11 @@ export function TaskList({
         return
       }
 
-      // Ctrl+V / ⌘V: New task from clipboard
+      // Ctrl+V / ⌘V: new tasks from the clipboard, one per line, each parsed like typed input.
+      // Several lines are confirmed first (see usePasteTasks).
       if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
         e.preventDefault()
-        if (!projectId) return
-        navigator.clipboard.readText().then((text) => {
-          const trimmed = text.trim()
-          if (trimmed) {
-            createTask.mutate({ projectId, task: { title: trimmed } })
-          }
-        })
+        void pasteTasks()
         return
       }
 
@@ -364,7 +360,7 @@ export function TaskList({
       focusedTaskId,
       projectId,
       showNewTask,
-      createTask,
+      pasteTasks,
       completeTask,
       updateTask,
       deleteTask,

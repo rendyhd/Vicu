@@ -62,20 +62,20 @@ import { extractTaskLink, stripNoteLink, stripPageLink, extractNoteLinkHtml, ext
 import { sanitizeTaskHtml } from '@/lib/sanitize-html'
 import { taskPatch, type TaskPatch } from '@/lib/merge-patches'
 import { diffLocalDays, dueToday, isDateOnly, isNoDueDate, toLocalDate } from '@/lib/due-dates'
-import { hasRichDescriptionBody, resolveOpenableDescriptionHref } from '@/lib/description-html'
+import {
+  hasRichDescriptionBody,
+  plainTextFromDescriptionLines,
+  plainTextToDescriptionHtml,
+  resolveOpenableDescriptionHref,
+  withLineBreaksAsNewlines,
+} from '@/lib/description-html'
 
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-}
-
+// The notes as the text box shows them: one line per paragraph (and per <br>), where textContent
+// alone would run the paragraphs together.
 function plainTextFromHtml(html: string): string {
   const tmp = document.createElement('div')
-  tmp.innerHTML = sanitizeTaskHtml(html)
-  return tmp.textContent ?? ''
+  tmp.innerHTML = sanitizeTaskHtml(withLineBreaksAsNewlines(html))
+  return plainTextFromDescriptionLines(tmp.textContent ?? '')
 }
 
 const container = document.getElementById('container')!
@@ -571,10 +571,13 @@ async function saveEdit(item: HTMLElement, newTitle: string, newDescription: str
   const preserveRichDescription = item.querySelector<HTMLElement>('.task-edit-wrapper')?.dataset.preserveRichDescription === 'true'
   let finalDescription = taskData.description || ''
   if (!preserveRichDescription) {
-    const trimmedDesc = newDescription.trim()
-    const linkHtml = extractNoteLinkHtml(taskData.description) + extractPageLinkHtml(taskData.description)
-    const wrapped = trimmedDesc ? `<p>${escapeHtml(trimmedDesc).replace(/\n/g, '<br>')}</p>` : ''
-    finalDescription = wrapped + linkHtml
+    // Notes that were not edited keep their stored HTML exactly; edited text is written the way
+    // every plain-text box writes it (escaped, one <p> per line).
+    const original = plainTextFromHtml(stripPageLink(stripNoteLink(taskData.description || '')))
+    if (plainTextFromDescriptionLines(newDescription) !== original) {
+      const linkHtml = extractNoteLinkHtml(taskData.description) + extractPageLinkHtml(taskData.description)
+      finalDescription = plainTextToDescriptionHtml(newDescription) + linkHtml
+    }
   }
   // Send only what changed so a stale cached row cannot revert other edits (D-REN-2).
   const patch = taskPatch(taskData, { title: trimmedTitle, description: finalDescription })

@@ -67,6 +67,7 @@ import { getClipboardImages, fileToUint8Array } from '../lib/clipboard-images'
 import { AutocompleteDropdown } from './autocomplete'
 import { cache } from './vikunja-cache'
 import { applyQuickEntryFollowUps } from '../lib/quick-entry-follow-ups'
+import { escapeHtml, plainTextToDescriptionHtml } from '../lib/description-html'
 
 const input = document.getElementById('task-input') as HTMLInputElement
 const descriptionHint = document.getElementById('description-hint')!
@@ -336,10 +337,6 @@ function updateBrowserUI(): void {
   }
 }
 
-function escapeHtml(str: string): string {
-  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
-}
-
 function buildNoteLinkHtml(deepLink: string, noteName: string): string {
   const safeLink = escapeHtml(deepLink)
   const safeName = escapeHtml(noteName)
@@ -533,7 +530,9 @@ async function saveTask(): Promise<void> {
   const raw = input.value.trim()
   if (!raw) return
 
-  let description: string | null = descriptionInput.value.trim() || null
+  // The notes are plain text: escaped, one <p> per line, the same with or without a link below
+  // (description format contract). Empty notes stay null.
+  let description: string | null = plainTextToDescriptionHtml(descriptionInput.value) || null
 
   // Inject Obsidian note link into description. Only now, with the note linked and the task being
   // saved, does main add the uid to the note (D-OBS-1); if that fails the shown link is used.
@@ -548,13 +547,13 @@ async function saveTask(): Promise<void> {
       resolvingObsidianLink = false
     }
     const linkHtml = buildNoteLinkHtml(link.deepLink, link.noteName)
-    description = description ? `<p>${escapeHtml(description)}</p>${linkHtml}` : linkHtml
+    description = description ? `${description}${linkHtml}` : linkHtml
   }
 
   // Inject browser page link into description
   if (!obsidianLinked && browserLinked && browserContext) {
     const linkHtml = buildPageLinkHtml(browserContext.url, browserContext.title)
-    description = description ? `<p>${escapeHtml(description)}</p>${linkHtml}` : linkHtml
+    description = description ? `${description}${linkHtml}` : linkHtml
   }
 
   let title = raw
