@@ -139,6 +139,146 @@ describe('weekend and weekday', () => {
   })
 })
 
+// [input, title, stored due] for a reference of Tue 2026-10-06 20:15:30; null is no due date.
+function expectParses(cases: Array<[string, string, number[] | null]>, config: ParserConfig = bang): void {
+  for (const [input, title, due] of cases) {
+    const r = parse(input, config, evening)
+    expect(r.title, input).toBe(title)
+    expect(ymd(stored(r)), input).toEqual(due)
+  }
+}
+
+describe('a label, project or priority inside a date phrase', () => {
+  it('splits the phrase, and the first part is the date', () => {
+    expectParses([
+      ['Call tomorrow @home 3pm', 'Call 3pm', [2026, 10, 7, 23, 59, 59]],
+      ['Call tomorrow p1 3pm', 'Call 3pm', [2026, 10, 7, 23, 59, 59]],
+      ['Dentist tomorrow #Health at 3pm', 'Dentist at 3pm', [2026, 10, 7, 23, 59, 59]],
+      // 15:00 has passed in the evening, so the time alone is tomorrow.
+      ['Call 3pm @home tomorrow', 'Call tomorrow', [2026, 10, 7, 15, 0, 0]],
+      ['Call tomorrow @home', 'Call', [2026, 10, 7, 23, 59, 59]],
+    ])
+    expectParses([['Call tomorrow *home 3pm', 'Call 3pm', [2026, 10, 7, 23, 59, 59]]], { ...bang, syntaxMode: 'vikunja' })
+    expect(parse('Call tomorrow @home 3pm', bang, evening).labels).toEqual(['home'])
+  })
+
+  it('keeps a connector on its own side', () => {
+    expectParses([
+      ['Pay rent by @money friday', 'Pay rent by', [2026, 10, 9, 23, 59, 59]],
+      ['Meet on @home friday', 'Meet on', [2026, 10, 9, 23, 59, 59]],
+      ['Report due @work tomorrow', 'Report due', [2026, 10, 7, 23, 59, 59]],
+    ])
+  })
+
+  it('keeps a weekday apart from the date after it', () => {
+    expectParses([['Call Ana about Saturday @call tomorrow', 'Call Ana about tomorrow', [2026, 10, 10, 23, 59, 59]]])
+  })
+})
+
+describe('ranges', () => {
+  it('use their first date and leave the rest in the title', () => {
+    expectParses([
+      ['Trip friday to sunday', 'Trip to sunday', [2026, 10, 9, 23, 59, 59]],
+      ['Trip tomorrow to friday', 'Trip to friday', [2026, 10, 7, 23, 59, 59]],
+      ['Out monday through friday', 'Out through friday', [2026, 10, 12, 23, 59, 59]],
+      ['Trip friday till sunday', 'Trip till sunday', [2026, 10, 9, 23, 59, 59]],
+      ['Trip oct 10 - oct 12', 'Trip - oct 12', [2026, 10, 10, 23, 59, 59]],
+      ['Trip oct 10 – oct 12', 'Trip – oct 12', [2026, 10, 10, 23, 59, 59]],
+      ['Conference oct 10 until oct 12', 'Conference until oct 12', [2026, 10, 10, 23, 59, 59]],
+      ['Meeting tomorrow 3pm to 5pm', 'Meeting to 5pm', [2026, 10, 7, 15, 0, 0]],
+      ['Meeting tomorrow 3pm until 5pm', 'Meeting until 5pm', [2026, 10, 7, 15, 0, 0]],
+    ])
+  })
+
+  it('are not a date when written as one word', () => {
+    expectParses([
+      ['Meeting tomorrow 3-5pm', 'Meeting 3-5pm', [2026, 10, 7, 23, 59, 59]],
+      // chrono's other reading inside the range, 3 May, does not count either.
+      ['Meeting 3-5 pm', 'Meeting 3-5 pm', null],
+      ['Ship friday-sunday', 'Ship friday-sunday', null],
+    ])
+  })
+
+  it('keep "to" as a word of the title', () => {
+    expectParses([
+      ['Remember to call tomorrow', 'Remember to call', [2026, 10, 7, 23, 59, 59]],
+      ['Walk to friday market', 'Walk to market', [2026, 10, 9, 23, 59, 59]],
+    ])
+  })
+})
+
+describe('whole words', () => {
+  it('a date inside another word is not a date', () => {
+    for (const input of [
+      "Prep tomorrow's slides",
+      'Fix Friday’s build',
+      'Tomorrow: call Ana',
+      'Call Ana (tomorrow)',
+      'Call Ana [tomorrow]',
+      'Ship it tomorrow-ish',
+      'Plan Friday/Saturday',
+      'Book "friday" table',
+      'Meet,friday',
+      'Plan on(friday)',
+    ]) {
+      const r = parse(input, bang, evening)
+      expect(r.dueDate, input).toBeNull()
+      expect(r.title, input).toBe(input)
+    }
+  })
+
+  it('a date may be followed by punctuation', () => {
+    expectParses([
+      ["Send Monday's report tomorrow", "Send Monday's report", [2026, 10, 7, 23, 59, 59]],
+      ['Pay by friday, then relax', 'Pay , then relax', [2026, 10, 9, 23, 59, 59]],
+      ['Meet on friday)', 'Meet )', [2026, 10, 9, 23, 59, 59]],
+    ])
+  })
+
+  it('a bracket before a connector keeps the connector in the title', () => {
+    expectParses([
+      ['Meet (on friday)', 'Meet (on )', [2026, 10, 9, 23, 59, 59]],
+      ['Report (due friday)', 'Report (due )', [2026, 10, 9, 23, 59, 59]],
+      ['Call (at 9pm)', 'Call (at )', [2026, 10, 6, 21, 0, 0]],
+    ])
+  })
+})
+
+describe('phrases about the past', () => {
+  it('are not dates', () => {
+    for (const input of [
+      'Review notes from last friday',
+      'Review notes from past friday',
+      'Friday last week recap',
+      'Finish by last friday',
+      'Notes from yesterday',
+      'Sleep last night',
+      'Follow up on last week',
+      'Invoice from last month',
+      'Review the last 2 days',
+      'Sent 2 days ago',
+      'Call a few days ago',
+      'Read it half an hour ago',
+    ]) {
+      const r = parse(input, bang, evening)
+      expect(r.dueDate, input).toBeNull()
+      expect(r.title, input).toBe(input)
+    }
+  })
+
+  it('leave the dates around them', () => {
+    expectParses([
+      ['Read 2 days before friday', 'Read 2 days before', [2026, 10, 9, 23, 59, 59]],
+      ['Last day of school friday', 'Last day of school', [2026, 10, 9, 23, 59, 59]],
+      ['Same as before tomorrow', 'Same as before', [2026, 10, 7, 23, 59, 59]],
+      ['Call them earlier tomorrow', 'Call them earlier', [2026, 10, 7, 23, 59, 59]],
+      ['Plan friday last weekend', 'Plan last weekend', [2026, 10, 9, 23, 59, 59]],
+      // A time after it is a time of its own (15:00 has passed in the evening).
+      ['Call last sat 3pm', 'Call last sat', [2026, 10, 7, 15, 0, 0]],
+    ])
+  })
+})
+
 describe('slash dates', () => {
   it('follow the locale order', () => {
     expect(ymd(stored(parse('Report 5/11', { ...bang, locale: 'en-US' }, evening)))).toEqual([2027, 5, 11, 23, 59, 59])

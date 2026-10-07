@@ -49,6 +49,17 @@
     { "input": "Meet friday next week", "title": "Meet", "due": "2026-10-16T23:59:59" },
     { "input": "Plan the weekend", "title": "Plan the weekend" },
 
+    { "input": "Call tomorrow @home 3pm", "title": "Call 3pm", "due": "2026-10-07T23:59:59", "labels": ["home"] },
+    { "input": "Dentist tomorrow #Health at 3pm", "title": "Dentist at 3pm", "due": "2026-10-07T23:59:59", "project": "Health" },
+    { "input": "Pay rent by @money friday", "title": "Pay rent by", "due": "2026-10-09T23:59:59", "labels": ["money"] },
+    { "input": "Trip friday to sunday", "title": "Trip to sunday", "due": "2026-10-09T23:59:59" },
+    { "input": "Meeting tomorrow 3pm to 5pm", "title": "Meeting to 5pm", "due": "2026-10-07T15:00:00" },
+    { "input": "Meeting tomorrow 3-5pm", "title": "Meeting 3-5pm", "due": "2026-10-07T23:59:59" },
+    { "input": "Send Monday's report tomorrow", "title": "Send Monday's report", "due": "2026-10-07T23:59:59" },
+    { "input": "Call Ana (tomorrow)", "title": "Call Ana (tomorrow)" },
+    { "input": "Review notes from last friday", "title": "Review notes from last friday" },
+    { "input": "Notes from yesterday", "title": "Notes from yesterday" },
+
     { "input": "Meeting today at 14:00", "title": "Meeting", "due": "2026-10-06T14:00:00" },
     { "input": "Dentist tomorrow 3:30pm", "title": "Dentist", "due": "2026-10-07T15:30:00" },
     { "input": "Call tomorrow at 9am", "title": "Call", "due": "2026-10-07T09:00:00" },

@@ -2,7 +2,7 @@
 
 This document defines the exact parser behavior that BOTH Vicu (desktop) and Vicu Android must implement identically. Both apps must produce the same `ParseResult` for the same input string and the same `ParserConfig`.
 
-The date and recurrence rules are the contract in `docs/cross-app-semantics-v1.md` section 5, and the test is the shared corpus `test-fixtures/nlp-corpus-v1.json` (81 cases, reference time Tue 2026-10-06 10:00 local; both apps run the same file). If this document and the corpus disagree, the corpus wins. The desktop implementation is `src/renderer/lib/task-parser/`: there is one parser (the main window, the task title editor and Quick Entry all call it), and the date work is done by chrono-node plus the rules below.
+The date and recurrence rules are the contract in `docs/cross-app-semantics-v1.md` section 5, and the test is the shared corpus `test-fixtures/nlp-corpus-v1.json` (91 cases, reference time Tue 2026-10-06 10:00 local; both apps run the same file). If this document and the corpus disagree, the corpus wins. The desktop implementation is `src/renderer/lib/task-parser/`: there is one parser (the main window, the task title editor and Quick Entry all call it), and the date work is done by chrono-node plus the rules below.
 
 ---
 
@@ -216,7 +216,7 @@ This order matters because:
 
 ## Dates — identical in both modes
 
-Contract: `docs/cross-app-semantics-v1.md` section 5.1; corpus: `test-fixtures/nlp-corpus-v1.json`. Dates are parsed with chrono-node (`forwardDate: true`) plus the rules below. Text already taken by labels, projects, priority and recurrence is invisible to the date parser.
+Contract: `docs/cross-app-semantics-v1.md` section 5.1; corpus: `test-fixtures/nlp-corpus-v1.json`. Dates are parsed with chrono-node (`forwardDate: true`) plus the rules below. Text already taken by labels, projects, priority and recurrence is invisible to the date parser, and it splits a date phrase (see More than one date).
 
 - Natural language: `today`, `tomorrow`, weekday names, `this <weekday>`, `next <weekday>`, `<weekday> this week`, `<weekday> next week`, `next week`, `next month`, `in 3 days`, `in 2 weeks`
 - Specific dates: `jan 15`, `15 jan`, `march 3rd`, `10/15`, `2026-10-15`
@@ -233,14 +233,21 @@ Contract: `docs/cross-app-semantics-v1.md` section 5.1; corpus: `test-fixtures/n
 - **Three-letter abbreviations** (`mon`, `tue`, `tues`, `wed`, `thu`, `thur`, `thurs`, `fri`, `sat`, `sun`) only count as dates when the previous word is `on`, `next`, `this`, `by` or `due`, or when a time follows (`mon 9am`, `wed at 3pm`, `fri 14:00`). Otherwise they are plain words: "Buy sun cream", "Notes we sat on" and "Plan wed anniversary" have no date. Full weekday names always count.
 - `weekend` and `weekday` are words, not dates: "Plan the weekend" has no date. (chrono reads them as Saturday and the next working day; desktop blanks them before chrono runs.)
 
+### Words that are not dates
+
+- **A date phrase is made of whole words**: it starts at the start of the text or after a space, and ends at a space, the end of the text, or one of `. , ! ? ; )`. "Send Monday's report tomorrow" is due tomorrow; "Call Ana (tomorrow)", "Plan Friday/Saturday", "Ship it tomorrow-ish", `Book "friday" table` and "Tomorrow: call Ana" have no date. chrono reads all of them, so desktop drops the chrono results that are not whole words (`isWholeWords` in `extract-dates.ts`).
+- **Phrases about the past are not dates** and stay in the title: `yesterday`, `last night`, `last <weekday>`, `past <weekday>`, `<weekday> last week`, `last week|month|year` and `N days ago` ("Review notes from last friday", "Notes from yesterday" and "Sent 2 days ago" have no date). Desktop blanks the past forms chrono reads before chrono runs (`PAST_PHRASE_RE`); Android only needs the weekday ones, as it has no pattern for the others.
+
 ### More than one date
 
-- **A weekday directly followed by another date** (only spaces or a comma between them) is part of the title, and the other date is the due date: "Call Ana about Saturday tomorrow at 3pm" is due tomorrow at 15:00 with the title "Call Ana about Saturday"; "Party Saturday oct 17" is due on 2026-10-17 with the title "Party Saturday". A time is not another date ("Call wed 3pm" is Wednesday at 15:00); `in 2 hours` is. A word between them, connectors included, keeps them apart ("Meeting about Friday on Monday" is due on Friday). chrono would merge the weekday into the date after it (its `MergeWeekdayComponentRefiner`), so desktop drops such a weekday in a refiner that runs before chrono's own (`weekdayBeforeAnotherDate` in `extract-dates.ts`).
+- **A weekday directly followed by another date** (only spaces or a comma between them) is part of the title, and the other date is the due date: "Call Ana about Saturday tomorrow at 3pm" is due tomorrow at 15:00 with the title "Call Ana about Saturday"; "Party Saturday oct 17" is due on 2026-10-17 with the title "Party Saturday". A time is not another date ("Call wed 3pm" is Wednesday at 15:00); `in 2 hours` is. A word between them, connectors included, keeps them apart ("Meeting about Friday on Monday" is due on Friday). chrono would merge the weekday into the date after it (its `MergeWeekdayComponentRefiner`), so desktop drops such a weekday in a refiner that runs before chrono's own (`isWeekdayBeforeAnotherDate` in `extract-dates.ts`).
+- **A label, project or priority splits a date phrase** in two, and the first part is the due date: "Call tomorrow @home 3pm" is due tomorrow (date-only) with the title "Call 3pm", and "Dentist tomorrow #Health at 3pm" is due tomorrow with the title "Dentist at 3pm". A connector does not reach across one either: "Pay rent by @money friday" is due on Friday with the title "Pay rent by". Desktop shows chrono a mark in place of the taken text, so chrono cannot read across it.
+- **There are no ranges.** `to`, `until`, `through`, `till` or a dash (`-`, `–`, `~`) between two dates or times leaves two phrases, and the first is the due date: "Trip friday to sunday" is due on Friday with the title "Trip to sunday"; "Meeting tomorrow 3pm to 5pm" is due tomorrow at 15:00 with the title "Meeting to 5pm". A range written as one word is not a date: "Meeting tomorrow 3-5pm" is due tomorrow (date-only) with the title "Meeting 3-5pm". Desktop shows chrono a mark in place of a range word between spaces, and drops the ranges chrono finds inside one match ("3-5pm", "oct 10-12").
 - **Otherwise the first date phrase is the due date** and the others stay in the title: "Book Friday dinner tomorrow" is due on Friday with the title "Book dinner tomorrow".
 
 ### Connectors
 
-The words `on`, `by` and `due` directly before a date phrase, and `at` directly before a time, are removed together with the date: "Submit report by friday" gives the title "Submit report", "Taxes due tomorrow" gives "Taxes", "Call at 9am" gives "Call". A connector with no date after it stays in the title.
+The words `on`, `by` and `due` directly before a date phrase, and `at` directly before a time, are removed together with the date: "Submit report by friday" gives the title "Submit report", "Taxes due tomorrow" gives "Taxes", "Call at 9am" gives "Call". A connector with no date after it stays in the title. `from` is not a connector: chrono takes it with a time ("from 3pm"), and desktop leaves it in the title.
 
 ### Times
 
@@ -353,6 +360,18 @@ interface VikunjaTaskPayload {
 "Plan the weekend"
 → { title: "Plan the weekend", dueDate: null }
 // "weekend" is not a date
+
+"Call tomorrow @home 3pm"
+→ { title: "Call 3pm", dueDate: <tomorrow, date-only>, labels: ["home"] }
+// the label splits the phrase, and the first part is the date
+
+"Trip friday to sunday"
+→ { title: "Trip to sunday", dueDate: <friday, date-only> }
+// no ranges: the first date is the due date
+
+"Review notes from last friday"
+→ { title: "Review notes from last friday", dueDate: null }
+// a phrase about the past is not a date
 
 "Water plants daily"
 → { title: "Water plants", recurrence: { interval: 1, unit: 'day' } }

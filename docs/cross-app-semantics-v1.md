@@ -157,6 +157,13 @@ the date and recurrence rules.
   `in N days|weeks`, `in N hours|minutes` (exact time), month-name dates (`jan 15`, `15 jan`,
   `march 3rd`), ISO dates (`2026-10-15`) and slash dates (`10/15`, `15/10`). `weekend` and
   `weekday` are words, not dates: "Plan the weekend" has no due date.
+- A date phrase is made of whole words: it starts at the start of the text or after a space,
+  and ends at a space, the end of the text, or one of `. , ! ? ; )`. "Send Monday's report
+  tomorrow" is due tomorrow, and "Call Ana (tomorrow)", "Plan Friday/Saturday" and "Ship it
+  tomorrow-ish" have no due date.
+- Phrases about the past are not dates and stay in the title: `yesterday`, `last night`,
+  `last <weekday>`, `past <weekday>`, `<weekday> last week`, `last week|month|year` and
+  `N days|weeks|... ago`. "Review notes from last friday" has no due date.
 - Times: `3pm`, `3:30pm`, `14:00`, optionally after `at`, before or after a date phrase. A time
   without a date means today if that time is still ahead, otherwise tomorrow.
 - Weekdays:
@@ -184,6 +191,15 @@ the date and recurrence rules.
 - When a text has more than one date phrase (apart from the weekday rule above), the first is
   the due date and the others stay in the title: "Book Friday dinner tomorrow" is due on
   Friday with the title "Book dinner tomorrow".
+- A label, project or priority is never part of a date phrase. One inside a phrase splits it
+  in two, and the first part is the due date: "Call tomorrow @home 3pm" is due tomorrow
+  (date-only) with the title "Call 3pm". A connector word does not reach across one either:
+  "Pay rent by @money friday" is due on Friday with the title "Pay rent by".
+- There are no date ranges. `to`, `until`, `through`, `till` or a dash between two dates or
+  times leaves two phrases, and the first is the due date: "Trip friday to sunday" is due on
+  Friday with the title "Trip to sunday", and "Meeting tomorrow 3pm to 5pm" is due tomorrow
+  at 15:00 with the title "Meeting to 5pm". A range written as one word ("3-5pm") is not a
+  date phrase.
 - `now` is never a date.
 - The `!` today shortcut has one rule in every entry point: a standalone `!`, a leading `!`
   (not followed by a priority token such as `!1` or `!high`) or a trailing `!` means today
