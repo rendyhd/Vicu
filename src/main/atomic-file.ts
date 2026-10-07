@@ -26,9 +26,18 @@ function tmpPathFor(path: string): string {
   return `${path}.tmp`
 }
 
+/**
+ * Drop a leading UTF-8 byte order mark. Notepad, PowerShell 5's Out-File and other Windows tools
+ * save one, `readFileSync(..., 'utf-8')` keeps it as U+FEFF, and `JSON.parse` rejects it, which made
+ * a hand-edited file look corrupt (the backup was loaded and the next save replaced the file).
+ */
+export function stripBom(raw: string): string {
+  return raw.charCodeAt(0) === 0xfeff ? raw.slice(1) : raw
+}
+
 function isParseableJson(raw: string): boolean {
   try {
-    JSON.parse(raw)
+    JSON.parse(stripBom(raw))
     return true
   } catch {
     return false
@@ -265,7 +274,7 @@ export function readFileWithBackup<T>(
   try {
     const raw = readFileSync(path, 'utf-8')
     try {
-      return { value: parse(raw), recovered: false }
+      return { value: parse(stripBom(raw)), recovered: false }
     } catch (err) {
       primaryError = err
     }
@@ -277,7 +286,7 @@ export function readFileWithBackup<T>(
   const backup = backupPathFor(path)
   if (existsSync(backup)) {
     try {
-      const value = parse(readFileSync(backup, 'utf-8'))
+      const value = parse(stripBom(readFileSync(backup, 'utf-8')))
       console.warn(`[Files] ${name} is unreadable (${errorMessage(primaryError)}); using ${basename(backup)}`)
       if (!readFailed) {
         try {

@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from 'fs'
 import { join } from 'path'
-import { writeFileAtomic } from '../atomic-file'
+import { stripBom, writeFileAtomic } from '../atomic-file'
 import { sanitizeTaskPatch } from '../../shared/merge-patches'
 import { mergeUpdate } from './queue-merge'
 import { emptyQueueData, type QueuedAction, type UpdateAction } from './types'
@@ -100,7 +100,7 @@ export function convertLegacyActions(legacy: unknown[]): { actions: QueuedAction
 }
 
 function readJson(path: string): unknown {
-  return JSON.parse(readFileSync(path, 'utf-8'))
+  return JSON.parse(stripBom(readFileSync(path, 'utf-8')))
 }
 
 /**

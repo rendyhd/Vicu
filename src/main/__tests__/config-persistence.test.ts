@@ -170,6 +170,19 @@ describe('config.json persistence (D-CFG-1)', () => {
     expect(config.loadConfig()?.sidebar_width).toBe(400)
   })
 
+  it('loads a config.json saved with a UTF-8 byte order mark and keeps it on the next save (F9)', async () => {
+    writeFileSync(configPath(), '﻿' + JSON.stringify(baseConfig({ sidebar_width: 411 })), 'utf-8')
+
+    const config = await launch()
+    expect(config.loadConfig()).toMatchObject({ vikunja_url: 'https://tasks.example.com', sidebar_width: 411 })
+    expect(warn).not.toHaveBeenCalled()
+
+    config.saveConfig({ ...config.loadConfig()!, sidebar_width: 412 })
+    // The edited file is backed up as the good file it is, then replaced by a normal one.
+    expect(readFileSync(backupPath(), 'utf-8')).toContain('"sidebar_width":411')
+    expect((await launch()).loadConfig()?.sidebar_width).toBe(412)
+  })
+
   it('a leftover partial temp file does not affect loading or the next save', async () => {
     const config = await launch()
     config.saveConfig(baseConfig({ sidebar_width: 100 }))

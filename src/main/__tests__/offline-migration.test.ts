@@ -138,6 +138,12 @@ describe('migrateLegacyCache (one-time split of offline-cache.json)', () => {
     expect((queue.getPending()[0] as { patch: object }).patch).toEqual({ title: 'New', done: true })
   })
 
+  it('splits a legacy cache file that was saved with a UTF-8 byte order mark (F9)', () => {
+    writeFileSync(cachePath(), '﻿' + JSON.stringify(legacy))
+
+    expect(migrateLegacyCache(dir)).toMatchObject({ migrated: true, actions: 6, standaloneTasks: 1 })
+  })
+
   it('temp ids continue counting down after migrated creates', async () => {
     writeFileSync(cachePath(), JSON.stringify(legacy))
     migrateLegacyCache(dir)

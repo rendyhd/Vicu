@@ -49,6 +49,14 @@ describe('auth.json persistence (D-CFG-1)', () => {
   const authPath = () => join(state.dir, 'auth.json')
   const backupPath = () => join(state.dir, 'auth.json.bak')
 
+  it('keeps the session when auth.json was saved with a UTF-8 byte order mark (F9)', async () => {
+    writeFileSync(authPath(), '﻿' + JSON.stringify({ api_token: 'plain:tk_bom', api_token_exp: 1_900_000_000 }), 'utf-8')
+
+    const store = await loadStore()
+    expect(store.getAPIToken()).toBe('tk_bom')
+    expect(warn).not.toHaveBeenCalled()
+  })
+
   it('keeps the session when auth.json is torn: the backup is used and logged', async () => {
     const store = await loadStore()
     store.storeAPIToken('tk_one', 1_900_000_000)

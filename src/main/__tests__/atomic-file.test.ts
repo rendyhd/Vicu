@@ -22,6 +22,7 @@ import {
   backupPathFor,
   readFileWithBackup,
   removeFileAndBackup,
+  stripBom,
   writeFileAtomic,
 } from '../atomic-file'
 
@@ -100,6 +101,49 @@ describe('atomic file helper', () => {
     writeFileAtomic(file, '{"v":3}')
     expect(readFileWithBackup(file, parseJson)).toEqual({ value: { v: 3 }, recovered: false })
     expect(existsSync(file + '.tmp')).toBe(false)
+  })
+
+  // F9: editors and tools on Windows (Notepad, PowerShell 5's Out-File) save UTF-8 with a byte order
+  // mark. JSON.parse rejects it, so the file used to be treated as corrupt: the backup was loaded and
+  // the next save overwrote the user's file.
+  describe('a file saved with a UTF-8 byte order mark (F9)', () => {
+    const BOM = '﻿'
+
+    it('stripBom removes one leading mark and nothing else', () => {
+      expect(stripBom(BOM + '{"v":1}')).toBe('{"v":1}')
+      expect(stripBom('{"v":1}')).toBe('{"v":1}')
+      expect(stripBom('')).toBe('')
+      expect(stripBom(BOM + BOM + 'x')).toBe(BOM + 'x')
+    })
+
+    it('reads the file as it is: not corrupt, not recovered, nothing logged', () => {
+      writeFileSync(file, BOM + '{"v":7}', 'utf-8')
+
+      expect(readFileWithBackup(file, parseJson)).toEqual({ value: { v: 7 }, recovered: false })
+      expect(warn).not.toHaveBeenCalled()
+      expect(existsSync(backupPathFor(file))).toBe(false)
+    })
+
+    it('reads a backup that has one too', () => {
+      writeFileSync(file, '{"v":3', 'utf-8') // torn
+      writeFileSync(backupPathFor(file), BOM + '{"v":2}', 'utf-8')
+
+      expect(readFileWithBackup(file, parseJson)).toEqual({ value: { v: 2 }, recovered: true })
+    })
+
+    it('counts as a good file when the next save backs it up, so the user data is kept', () => {
+      writeFileSync(file, BOM + '{"v":7}', 'utf-8')
+
+      writeFileAtomic(file, '{"v":8}', { backup: true })
+
+      expect(readFileSync(backupPathFor(file), 'utf-8')).toBe(BOM + '{"v":7}')
+      expect(readFileSync(file, 'utf-8')).toBe('{"v":8}')
+    })
+
+    it('is still corrupt when the JSON itself is broken', () => {
+      writeFileSync(file, BOM + '{"v":', 'utf-8')
+      expect(readFileWithBackup(file, parseJson)).toBeNull()
+    })
   })
 
   it('returns null for a file that was never written', () => {
