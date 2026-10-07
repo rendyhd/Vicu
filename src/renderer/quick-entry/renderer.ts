@@ -12,7 +12,7 @@ declare global {
         repeatMode?: number,
         // Kept with the create when it has to be queued offline; unused when the server answers.
         extras?: { labels?: Array<{ id?: number; title?: string }>; images?: Array<{ name: string; mime: string; bytes: Uint8Array }> },
-      ): Promise<{ success: boolean; cached?: boolean; error?: string; data?: { id: number } }>
+      ): Promise<{ success: boolean; cached?: boolean; error?: string; mayExist?: boolean; data?: { id: number } }>
       uploadAttachment(taskId: number, fileData: Uint8Array, fileName: string, mimeType: string): Promise<{ success: boolean; error?: string; statusCode?: number }>
       fetchTaskAttachments(taskId: number): Promise<{ success: boolean; data?: Array<{ id: number }>; error?: string; statusCode?: number }>
       updateTask(taskId: number, task: Record<string, unknown>): Promise<{ success: boolean; error?: string; statusCode?: number; data?: unknown }>
@@ -146,7 +146,7 @@ document.querySelectorAll('.obsidian-hint-key, .browser-hint-key').forEach((el) 
   el.textContent = linkKeyLabel
 })
 
-function showError(msg: string): void {
+function showError(msg: string, visibleMs = 3000): void {
   errorMessage.textContent = msg
   errorMessage.hidden = false
   void errorMessage.offsetHeight
@@ -156,7 +156,7 @@ function showError(msg: string): void {
   errorTimeout = setTimeout(() => {
     errorMessage.classList.remove('show')
     setTimeout(() => { errorMessage.hidden = true }, 200)
-  }, 3000)
+  }, visibleMs)
 }
 
 function showOfflineMessage(message = 'Saved offline \u2014 will sync when connected'): void {
@@ -641,7 +641,8 @@ async function saveTask(): Promise<void> {
       window.quickEntryApi.closeWindow()
     }
   } else {
-    showError(result.error || 'Failed to save task')
+    // "The task may already exist" is a sentence to read, not a flash: it stays up longer.
+    showError(result.error || 'Failed to save task', result.mayExist ? 10_000 : 3000)
     input.disabled = false
     descriptionInput.disabled = false
     input.focus()

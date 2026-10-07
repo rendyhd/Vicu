@@ -17,6 +17,17 @@ describe('describeMutationError', () => {
     })
   })
 
+  it('shows a create that may already exist as it is worded, not as "try again" (F7)', () => {
+    const warning = "The server didn't answer in time. The task may already have been created; check before retrying."
+    expect(describeMutationError(new ApiError(warning, undefined, true))).toEqual({ kind: 'unknown', message: warning })
+    // Even with a 500 behind it: "try again in a moment" would add the task a second time.
+    const serverWarning = 'The server reported an error. The task may already have been created; check before retrying.'
+    expect(describeMutationError(apiError({ error: serverWarning, statusCode: 500, mayExist: true }))).toEqual({
+      kind: 'unknown',
+      message: serverWarning,
+    })
+  })
+
   it('tells the user to sign in again for an auth failure, by status or by message', () => {
     expect(describeMutationError(new ApiError('Unauthorized', 401)).kind).toBe('auth')
     expect(describeMutationError(new Error('Session expired. Please log in again.')).kind).toBe('auth')

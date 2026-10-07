@@ -111,6 +111,30 @@ describe('Quick Entry and Quick View with the offline queue', () => {
       expect(queue.counts().pending).toBe(0)
     })
 
+    // F7: after a silent connection loss the create times out; the user is warned that the task may
+    // exist, so they look before typing it again.
+    it('tells the user a timed out create may already exist', async () => {
+      createTask.mockResolvedValue(err('Request timed out (10s)'))
+      const result = await createFromQuickEntry(deps(), 7, payload)
+      expect(result).toEqual({
+        success: false,
+        error: "The server didn't answer in time. The task may already have been created; check before retrying.",
+        mayExist: true,
+      })
+    })
+
+    it('also warns after a lost connection or a 500, and keeps the status code', async () => {
+      createTask.mockResolvedValue(err('socket hang up'))
+      expect(await createFromQuickEntry(deps(), 7, payload)).toMatchObject({ success: false, mayExist: true, error: expect.stringContaining('may already have been created') })
+      createTask.mockResolvedValue(err('Server error — Vikunja may be experiencing issues.', 500))
+      expect(await createFromQuickEntry(deps(), 7, payload)).toMatchObject({ success: false, mayExist: true, statusCode: 500 })
+    })
+
+    it('does not add the warning to an error that is not about a possible create', async () => {
+      createTask.mockResolvedValue(err('validation failed', 422))
+      expect(await createFromQuickEntry(deps(), 7, payload)).toEqual(err('validation failed', 422))
+    })
+
     it.each([
       [err('validation failed', 422)],
       [err('API token is invalid or expired.', 401)],

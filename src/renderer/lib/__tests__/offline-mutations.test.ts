@@ -207,10 +207,31 @@ describe('mutation helpers with the offline queue (D-SYNC-6, decision 4)', () =>
 
     it('does not queue a create that may have been applied (a timeout or a 500): replaying could duplicate it', async () => {
       createTask.mockResolvedValueOnce(fail('Request timed out'))
-      await expect(createTaskOrQueue(7, { title: 'x' })).rejects.toThrow('Request timed out')
+      await expect(createTaskOrQueue(7, { title: 'x' })).rejects.toThrow('may already have been created')
       createTask.mockResolvedValueOnce(fail('Internal Server Error', 500))
       await expect(createTaskOrQueue(7, { title: 'x' })).rejects.toBeInstanceOf(ApiError)
       expect(queue.enqueueCreate).not.toHaveBeenCalled()
+    })
+
+    it('tells the user a timed out create may already exist (F7)', async () => {
+      createTask.mockResolvedValueOnce(fail('Request timed out (10s)'))
+      await expect(createTaskOrQueue(7, { title: 'x' })).rejects.toThrow(
+        "The server didn't answer in time. The task may already have been created; check before retrying.",
+      )
+    })
+
+    it('keeps the status of a 500 on the warning and marks it as one that must be shown as worded', async () => {
+      createTask.mockResolvedValueOnce(fail('Internal Server Error', 500))
+      await expect(createTaskOrQueue(7, { title: 'x' })).rejects.toMatchObject({
+        statusCode: 500,
+        mayExist: true,
+        message: expect.stringContaining('may already have been created'),
+      })
+    })
+
+    it('does not mark a refusal as a possible create', async () => {
+      createTask.mockResolvedValueOnce(fail('title too long', 422))
+      await expect(createTaskOrQueue(7, { title: 'x' })).rejects.toMatchObject({ statusCode: 422, mayExist: false, message: 'title too long' })
     })
 
     it('queues a create after a gateway error', async () => {

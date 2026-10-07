@@ -6,16 +6,19 @@ import { isAuthError, isRetriableError } from './error-classify'
  */
 export class ApiError extends Error {
   readonly statusCode?: number
+  /** A create that failed in a way that may still have created the task: the message says so and must be shown as it is. */
+  readonly mayExist: boolean
 
-  constructor(message: string, statusCode?: number) {
+  constructor(message: string, statusCode?: number, mayExist = false) {
     super(message)
     this.name = 'ApiError'
     this.statusCode = statusCode
+    this.mayExist = mayExist
   }
 }
 
-export function apiError(result: { error: string; statusCode?: number }): ApiError {
-  return new ApiError(result.error, result.statusCode)
+export function apiError(result: { error: string; statusCode?: number; mayExist?: boolean }): ApiError {
+  return new ApiError(result.error, result.statusCode, result.mayExist === true)
 }
 
 export type FailureKind = 'offline' | 'auth' | 'forbidden' | 'not-found' | 'rate-limit' | 'server' | 'rejected' | 'unknown'
@@ -43,6 +46,9 @@ export function describeMutationError(error: unknown): MutationFailure {
   const raw = error instanceof Error ? error.message : typeof error === 'string' ? error : ''
   const status = error instanceof ApiError ? error.statusCode : undefined
   const text = cleanMessage(raw)
+
+  // "The task may already have been created; check before retrying": not softened into "try again".
+  if (error instanceof ApiError && error.mayExist && text) return { kind: 'unknown', message: text }
 
   if (status === 401 || isAuthError(raw)) {
     return { kind: 'auth', message: 'Your session has expired. Sign in again to keep syncing.' }

@@ -1,5 +1,5 @@
 import { api } from './api'
-import { isQueueableFailure } from './error-classify'
+import { isQueueableFailure, maybeCreatedMessage } from './error-classify'
 import { ApiError, apiError } from './mutation-errors'
 import { isTempTaskId, pendingTaskFromCreate } from './pending-cache'
 import type { TaskPatch } from './merge-patches'
@@ -127,7 +127,11 @@ export async function createTaskOrQueue(
 ): Promise<CreateOutcome> {
   const result = await api.createTask(projectId, task)
   if (result.success) return { queued: false, task: result.data }
-  if (!isQueueableFailure(result, 'create')) throw apiError(result)
+  if (!isQueueableFailure(result, 'create')) {
+    // A timeout or a 500 may have created the task; say so, so "try again" does not add it twice.
+    const warning = maybeCreatedMessage(result)
+    throw apiError(warning ? { ...result, error: warning, mayExist: true } : result)
+  }
 
   const { done, labels: _labels, ...rest } = task
   const fields: Record<string, unknown> = { ...rest }

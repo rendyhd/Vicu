@@ -69,3 +69,25 @@ export function isQueueableFailure(failure: FailureLike, kind: 'change' | 'creat
   if (status !== undefined) return status >= 500 || status === 429 || status === 408
   return isRetriableError(failure.error)
 }
+
+/** Said when a create timed out: the request may have reached the server and been applied. */
+export const CREATE_MAY_EXIST_TIMEOUT_MESSAGE =
+  "The server didn't answer in time. The task may already have been created; check before retrying."
+
+/**
+ * What to tell the user when a create failed in a way that may still have created the task: the
+ * request timed out, the connection dropped after it was sent, or the server answered with a 500.
+ * Such a create is not queued (replaying it could add a duplicate), so the user has to decide, and
+ * "try again" would add the task a second time if it exists. Null when the request provably created
+ * nothing (it is queued instead) or the server refused it (a 4xx, an auth problem).
+ */
+export function maybeCreatedMessage(failure: FailureLike): string | null {
+  if (isQueueableFailure(failure, 'create')) return null
+  const status = failure.statusCode
+  if (status !== undefined) {
+    return status >= 500 ? 'The server reported an error. The task may already have been created; check before retrying.' : null
+  }
+  if (/timed out|ETIMEDOUT/i.test(failure.error)) return CREATE_MAY_EXIST_TIMEOUT_MESSAGE
+  if (isRetriableError(failure.error)) return 'The connection was lost. The task may already have been created; check before retrying.'
+  return null
+}

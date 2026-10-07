@@ -1,4 +1,4 @@
-import { isQueueableFailure } from '../../shared/error-classify'
+import { isQueueableFailure, maybeCreatedMessage } from '../../shared/error-classify'
 import type { ApiResult } from '../api-result'
 import type { OfflineQueue } from './queue'
 import { parseQueuedImages, parseQueuedLabels } from './parse-input'
@@ -30,6 +30,8 @@ export const AUTO_COMPLETED_SUBTASKS_KEY = '__vicu_auto_completed_subtasks'
 export type QuickActionResult =
   | ApiResult<unknown>
   | { success: true; cached?: boolean; cancelledPending?: boolean; pendingId?: string }
+  /** A create that failed in a way that may still have created the task (`error` says so). */
+  | { success: false; error: string; statusCode?: number; mayExist: true }
 
 // --- Quick Entry -------------------------------------------------------------------------
 
@@ -50,7 +52,11 @@ export async function createFromQuickEntry(
     deps.notifyMainWindow()
     return result
   }
-  if (!isQueueableFailure(result, 'create')) return result
+  if (!isQueueableFailure(result, 'create')) {
+    // A timeout or a 500 may have created the task; saying so keeps "try again" from adding it twice.
+    const warning = maybeCreatedMessage(result)
+    return warning ? { ...result, error: warning, mayExist: true } : result
+  }
 
   try {
     const queued = await deps.queue.enqueueCreate({
