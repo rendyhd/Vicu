@@ -26,6 +26,7 @@ import { buildShortcutStatus } from './shortcut-status'
 import { handleTrusted } from './secure-ipc'
 import { cleanAttachmentTempDir } from './attachment-temp'
 import { registerWebSecurity } from './web-security'
+import { APP_ID } from './app-id'
 
 let mainWindow: BrowserWindow | null = null
 let quickEntryWindow: BrowserWindow | null = null
@@ -656,7 +657,7 @@ if (!gotLock) {
     callback(false)
   })
 
-  app.setAppUserModelId('com.vicu.app')
+  app.setAppUserModelId(APP_ID)
 
   app.whenReady().then(async () => {
     // Attachments opened in a previous session (D-IPC-2). Only the primary
