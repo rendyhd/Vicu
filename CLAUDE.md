@@ -136,7 +136,7 @@ Main window use of the queue (renderer): mutation helpers in `hooks/use-task-mut
 
 ### Config
 
-`AppConfig` in `src/main/config.ts` — persisted as JSON in Electron's `userData` directory. Includes Vikunja connection settings, theme, window bounds, sidebar width, custom lists, quick entry settings, and viewer filter config.
+`AppConfig` — persisted as JSON in Electron's `userData` directory. Includes Vikunja connection settings, theme, window bounds, sidebar width, custom lists, quick entry settings, and viewer filter config. The types (`AppConfig`, `ViewerFilter`, `ReviewConfig`, the custom-list shapes) have one definition, `src/shared/config-types.ts`, used by main and renderer; `src/main/config.ts` holds the defaults, normalizer and persistence. Quick Entry and Quick View are off until turned on (`isQuickEntryEnabled` / `isQuickViewEnabled`). Custom lists are ordered by `src/shared/custom-list-sort.ts` (same rules as Android: tasks without the date last in both directions, stable ties; `position` is never sent to the server as a sort).
 
 ### Platform Notes
 
