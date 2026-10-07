@@ -24,7 +24,7 @@ If you work in Obsidian, Vicu bridges your notes and your tasks: link the active
 
 **Quick Entry** is Vicu's defining feature. Press `Alt+Shift+V` from any app and a floating popup appears. Type your task, set a date, pick a project, hit Enter — it's captured and the popup is gone. You stay in flow.
 
-Just end the title with `!` to set it due today. Hold a modifier key and press arrow keys to cycle through projects without opening a dropdown.
+Just add a `!` to the title (at the start or the end) to set it due today. Hold a modifier key and press arrow keys to cycle through projects without opening a dropdown.
 
 Quick Entry was originally a standalone companion app ([vikunja-quick-entry](https://github.com/rendyhd/vikunja-quick-entry)) that has been integrated directly into Vicu.
 
@@ -40,7 +40,7 @@ Three modes: **ask** (Ctrl+L to opt-in per task), **always** (auto-link), and **
 
 ## Browser integration
 
-Vicu can link tasks to your active browser tab. A bundled Manifest V3 extension (Chrome and Firefox) sends the tab title and URL to Quick Entry via native messaging. When the extension isn't installed, Vicu falls back to Windows UI Automation to read the URL bar from Chrome, Firefox, Edge, and Brave.
+Vicu can link tasks to your active browser tab. A bundled Manifest V3 extension (Chrome and Firefox) sends the tab title and URL to Quick Entry via native messaging; the bridge runs on Vicu's own runtime, so Node.js does not need to be installed. When the extension isn't installed, Vicu falls back to Windows UI Automation to read the URL bar from Chrome, Firefox, Edge, and Brave.
 
 Same three modes as Obsidian: **ask** (`Ctrl+L`), **always**, and **off**.
 
@@ -54,12 +54,12 @@ Type tasks the way you think. Vicu parses freeform text into structured fields a
 
 | Token | Example | Effect |
 |-------|---------|--------|
-| Dates | `tomorrow`, `next Monday`, `Dec 25`, `in 3 days` | Sets due date |
-| `!` | `Buy milk !` | Due today |
-| Priority | `p1`–`p4`, `!urgent`, `!high`, `!medium`, `!low` | Sets priority |
+| Dates | `tomorrow`, `next Monday`, `Dec 25`, `in 3 days`, `friday 3pm` | Sets due date (without a time it is due at the end of that day) |
+| `!` | `Buy milk !` or `! Buy milk` | Due today |
+| Priority | `p1`–`p4`, `!urgent` (or `!critical`), `!high`, `!medium` (or `!med`), `!low` | Sets priority |
 | Labels | `@shopping`, `@"grocery list"` | Applies labels |
 | Projects | `#work`, `#"side project"` | Assigns to project |
-| Recurrence | `every 3 days`, `weekly`, `monthly` | Sets repeat interval |
+| Recurrence | `every 3 days`, `every Monday`, `weekly`, `monthly` | Sets repeat interval |
 
 Everything that isn't a recognized token becomes the task title. Tokens can appear anywhere in the input and are shown as dismissible chips below the text field.
 
@@ -68,7 +68,7 @@ Two syntax modes are available in Settings: **Todoist** (default — `@` for lab
 ## Features
 
 - **Smart lists** — Inbox, Today, Upcoming, Anytime, Logbook
-- **Custom lists** — User-defined filtered views by project, due date, priority, labels, and sort order
+- **Custom lists** — User-defined filtered views by project, due date window (overdue, today, this week, this month, with or without a date; today, this week, and this month have an **Include overdue tasks** option), priority, labels, and sort order; they are stored on your Vikunja server, so Vicu Android shows the same lists
 - **Subtasks** — Parent-child task relationships
 - **Tags and labels** — With custom colors, drag a task to a sidebar label to apply it
 - **Recurring tasks** — Daily, weekly, monthly, or custom intervals
@@ -76,8 +76,9 @@ Two syntax modes are available in Settings: **Todoist** (default — `@` for lab
 - **Reminders** — Per-task reminders (absolute or relative to due/start/end date), configurable daily and secondary reminders, overdue and upcoming notifications
 - **Drag-and-drop** — Reorder tasks, projects, and custom lists; drag tasks to labels
 - **Dark / light / system themes**
-- **Offline caching** — Caches last fetch, queues failed actions for automatic retry
-- **System tray** — Launch on startup, quick access to all windows
+- **Same data on desktop and Android** — due dates, custom lists, review status, routines, and quick-add parsing follow one shared specification ([`docs/cross-app-semantics-v1.md`](docs/cross-app-semantics-v1.md)), so the same task means the same thing on both
+- **Offline editing** — When the server is unreachable you can keep working: changes made in the main window, Quick Entry, and Quick View are queued and sent automatically when it is back, and the last task lists stay available. A sync panel in the sidebar shows pending and failed changes, with retry and discard
+- **System tray** — Launch on startup (Windows, macOS, and Linux), optionally **Start hidden** so the main window stays closed at login, quick access to all windows
 - **Authentication** — API token, username/password with TOTP two-factor and JWT auto-renewal, or OpenID Connect (OIDC/SSO) with provider discovery and silent re-auth
 
 ## Vicu vs the official Vikunja app
