@@ -35,6 +35,8 @@ import {
   downloadTaskAttachment,
 } from './api-client'
 import { loadFileForUpload } from './upload-file'
+import { getLaunchOnStartupSupport } from './launch-on-startup'
+import { startupEnv } from './startup-env'
 import {
   applyConfigPatch,
   applyConnectionFields,
@@ -707,6 +709,10 @@ export function registerIpcHandlers(): void {
   // How the sign-in secrets are protected on this machine ('encrypted', 'obfuscated' or
   // 'plaintext'), so Settings can warn instead of implying they are always encrypted (D-AUTH-4).
   handleTrusted('get-secret-storage-status', () => getSecretStorageStatus())
+
+  // Whether "Launch on startup" can be offered: always on Windows and macOS, on Linux only when the
+  // executable (the AppImage file or the installed binary) is known (D-LNX-1).
+  handleTrusted('get-launch-on-startup-support', () => getLaunchOnStartupSupport(startupEnv()))
 
   // --- Hotkey launcher command (Linux/Wayland escape hatch) ---
   // Returns the exact shell command a user should bind in their desktop

@@ -16,7 +16,7 @@ function boundsAreVisible(bounds: NonNullable<AppConfig['window_bounds']>): bool
   })
 }
 
-export function createMainWindow(config: AppConfig | null): BrowserWindow {
+export function createMainWindow(config: AppConfig | null, options: { startHidden?: boolean } = {}): BrowserWindow {
   const saved = config?.window_bounds
   const bounds = saved && boundsAreVisible(saved) ? saved : undefined
 
@@ -80,17 +80,25 @@ export function createMainWindow(config: AppConfig | null): BrowserWindow {
   // On Linux (Wayland/mutter in particular) frameless xdg_toplevels without
   // server-side decorations get auto-maximized by the compositor when first
   // mapped. Explicitly unmaximize and force the bounds we asked for.
+  const fixLinuxBounds = (): void => {
+    if (!isLinux) return
+    if (win.isMaximized()) win.unmaximize()
+    win.setBounds({
+      x: fallbackX,
+      y: fallbackY,
+      width: defaultWidth,
+      height: defaultHeight,
+    })
+  }
   win.once('ready-to-show', () => {
-    win.show()
-    if (isLinux) {
-      if (win.isMaximized()) win.unmaximize()
-      win.setBounds({
-        x: fallbackX,
-        y: fallbackY,
-        width: defaultWidth,
-        height: defaultHeight,
-      })
+    if (options.startHidden) {
+      // Launched at login into the tray: stay hidden. The first show comes later (tray, dock or a
+      // second launch) and gets the same Linux bounds fix then.
+      win.once('show', fixLinuxBounds)
+      return
     }
+    win.show()
+    fixLinuxBounds()
   })
 
   // Load renderer

@@ -61,6 +61,8 @@ export interface AppConfig {
   quick_view_position?: { x: number; y: number }
   viewer_filter?: ViewerFilter
   launch_on_startup?: boolean
+  /** Start in the tray, without showing the main window, when launched at login. */
+  start_hidden?: boolean
   standalone_mode?: boolean
   show_today_overdue_badge?: boolean
   // Obsidian
@@ -240,6 +242,7 @@ export function normalizeConfig(raw: Record<string, unknown>): AppConfig {
       include_today_all_projects: false,
     },
     launch_on_startup: raw.launch_on_startup === true,
+    start_hidden: raw.start_hidden === true,
     standalone_mode: raw.standalone_mode === true,
     show_today_overdue_badge: raw.show_today_overdue_badge === true,
     // Obsidian

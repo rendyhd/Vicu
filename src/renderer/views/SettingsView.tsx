@@ -40,6 +40,8 @@ export function SettingsView() {
   const [testStatus, setTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle')
   const [testError, setTestError] = useState('')
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle')
+  // Linux can only autostart when the app knows its own executable (not in a development run).
+  const [launchOnStartupSupported, setLaunchOnStartupSupported] = useState(true)
   const [hotkeyWarnings, setHotkeyWarnings] = useState<{ entry: boolean; viewer: boolean; waylandLimited: boolean } | undefined>(undefined)
 
   // Config as loaded, plus the edits made here. Used to render the controls only.
@@ -89,6 +91,7 @@ export function SettingsView() {
     // Pull current global-shortcut registration state so the banner shows on
     // cold start, not only after the user edits a hotkey.
     api.getGlobalShortcutStatus().then(setHotkeyWarnings).catch(() => {})
+    api.getLaunchOnStartupSupport().then((result) => setLaunchOnStartupSupported(result.supported)).catch(() => {})
   }, [])
 
   useEffect(() => {
@@ -317,18 +320,37 @@ export function SettingsView() {
           <h2 className="mb-4 text-sm font-semibold text-[var(--text-primary)]">Preferences</h2>
 
           <div className="space-y-3">
-            <label className="flex cursor-pointer items-center gap-2">
-              <input
-                type="checkbox"
-                checked={fullConfig?.launch_on_startup ?? false}
-                onChange={(e) => handleQuickEntryChange({ launch_on_startup: e.target.checked })}
-                className="h-4 w-4 rounded border-[var(--border-color)] accent-accent-blue"
-              />
-              <span className="text-sm text-[var(--text-primary)]">
-                Launch on startup
-              </span>
-              <span className="text-xs text-[var(--text-secondary)]">(advised for Quick Entry / View)</span>
-            </label>
+            {launchOnStartupSupported && (
+              <>
+                <label className="flex cursor-pointer items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={fullConfig?.launch_on_startup ?? false}
+                    onChange={(e) => handleQuickEntryChange({ launch_on_startup: e.target.checked })}
+                    className="h-4 w-4 rounded border-[var(--border-color)] accent-accent-blue"
+                  />
+                  <span className="text-sm text-[var(--text-primary)]">
+                    Launch on startup
+                  </span>
+                  <span className="text-xs text-[var(--text-secondary)]">(advised for Quick Entry / View)</span>
+                </label>
+
+                {fullConfig?.launch_on_startup === true && (
+                  <label className="ml-6 flex cursor-pointer items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={fullConfig?.start_hidden ?? false}
+                      onChange={(e) => handleQuickEntryChange({ start_hidden: e.target.checked })}
+                      className="h-4 w-4 rounded border-[var(--border-color)] accent-accent-blue"
+                    />
+                    <span className="text-sm text-[var(--text-primary)]">
+                      Start hidden
+                    </span>
+                    <span className="text-xs text-[var(--text-secondary)]">(no window at login; needs the tray icon from Quick Entry / View)</span>
+                  </label>
+                )}
+              </>
+            )}
 
             <label className="flex cursor-pointer items-center gap-2">
               <input

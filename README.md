@@ -115,6 +115,7 @@ A few platform caveats:
 - **System tray**: works out of the box on KDE, XFCE, Cinnamon, and most Wayland compositors. On GNOME you'll need the **AppIndicator and KStatusNotifierItem Support** extension.
 - **Browser link mode**: supported via the bundled Chrome/Firefox extension + native messaging. Enable it in Settings and click "Register browser hosts" — the manifests are written to `~/.config/<browser>/NativeMessagingHosts/` and `~/.mozilla/native-messaging-hosts/`. The bridge runs on Vicu's own bundled runtime, so Node.js does not need to be installed. The Windows/macOS URL-from-window-title fallback is not available on Linux.
 - **Obsidian integration**: Windows and macOS only. On Linux the setting is visible but no foreground-app detection runs.
+- **Launch on startup**: on Linux Vicu writes an XDG autostart entry (`~/.config/autostart/com.rendyhd.vicu.desktop`) that runs the AppImage file. The option is hidden when the app cannot tell its own path (for example in a development run). **Start hidden** (all platforms, shown once Launch on startup is on) opens Vicu in the tray without the main window.
 
 ### Setup
 

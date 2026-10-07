@@ -225,6 +225,7 @@ export interface AppConfig {
   quick_view_position?: { x: number; y: number }
   viewer_filter?: ViewerFilter
   launch_on_startup?: boolean
+  start_hidden?: boolean
   standalone_mode?: boolean
   show_today_overdue_badge?: boolean
   // Obsidian

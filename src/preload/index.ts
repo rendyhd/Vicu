@@ -152,6 +152,8 @@ const api = {
     ipcRenderer.invoke('get-global-shortcut-status') as Promise<{ entry: boolean; viewer: boolean; waylandLimited: boolean }>,
   getSecretStorageStatus: () =>
     ipcRenderer.invoke('get-secret-storage-status') as Promise<'encrypted' | 'obfuscated' | 'plaintext'>,
+  getLaunchOnStartupSupport: () =>
+    ipcRenderer.invoke('get-launch-on-startup-support') as Promise<{ supported: boolean }>,
   getHotkeyLauncherCommand: () =>
     ipcRenderer.invoke('get-hotkey-launcher-command') as Promise<{ quickEntry: string; quickView: string; kind: 'appimage' | 'packaged' | 'dev' }>,
 

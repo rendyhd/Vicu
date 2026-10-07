@@ -381,3 +381,18 @@ describe('applyConfigPatch (D-CFG-2)', () => {
     expect(applyConfigPatch(before, {})).toEqual(before)
   })
 })
+
+describe('start_hidden (D-LNX-1)', () => {
+  it('is off unless the config says true', () => {
+    expect(normalizeConfig({}).start_hidden).toBe(false)
+    expect(normalizeConfig({ start_hidden: 'yes' }).start_hidden).toBe(false)
+    expect(normalizeConfig({ start_hidden: true }).start_hidden).toBe(true)
+  })
+
+  it('is changed by a patch without touching launch_on_startup', () => {
+    const before = userConfig({ launch_on_startup: true })
+    const after = applyConfigPatch(before, { start_hidden: true })
+    expect(after.start_hidden).toBe(true)
+    expect(after.launch_on_startup).toBe(true)
+  })
+})

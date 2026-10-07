@@ -21,7 +21,9 @@ import { replayPendingActions } from './sync'
 import { flushOfflineQueue, offlineQueueHasUnsavedChanges } from './offline/service'
 import { flushTaskCache, taskCacheHasUnsavedChanges } from './cache'
 import { syncCustomLists } from './custom-list-service'
-import { buildLoginItemSettings } from './login-item-settings'
+import { parseHiddenArg, shouldStartHidden } from './login-item-settings'
+import { applyLaunchOnStartup } from './launch-on-startup'
+import { startupEnv } from './startup-env'
 import { buildShortcutStatus } from './shortcut-status'
 import { handleTrusted } from './secure-ipc'
 import { cleanAttachmentTempDir } from './attachment-temp'
@@ -364,8 +366,8 @@ function registerQuickEntryShortcuts(config: AppConfig): { entry: boolean; viewe
 // --- Main window creation + wiring ---
 // Everything window-instance-specific lives here so the window can be
 // recreated on demand (tray "Show Vicu" / second-instance after a close).
-function createAndWireMainWindow(config: AppConfig | null): BrowserWindow {
-  const win = createMainWindow(config)
+function createAndWireMainWindow(config: AppConfig | null, options: { startHidden?: boolean } = {}): BrowserWindow {
+  const win = createMainWindow(config, options)
 
   win.on('maximize', () => win.webContents.send('window-maximized-change', true))
   win.on('unmaximize', () => win.webContents.send('window-maximized-change', false))
@@ -518,6 +520,21 @@ function initQuickEntryWindows(config: AppConfig): void {
   }
 }
 
+// "Launch on startup" and "Start hidden": the login item on Windows and macOS, an XDG autostart
+// entry on Linux (see launch-on-startup.ts). A failure here must never break startup or saving.
+function applyStartupSettings(config: AppConfig): void {
+  // A throwaway profile (VICU_USER_DATA_DIR) is for tests: it must not change the real login items.
+  if (process.env.VICU_USER_DATA_DIR) return
+  try {
+    applyLaunchOnStartup(
+      { launchOnStartup: config.launch_on_startup === true, startHidden: config.start_hidden === true },
+      startupEnv(),
+    )
+  } catch (err) {
+    console.error('Could not apply the launch-on-startup setting:', err)
+  }
+}
+
 // Apply quick entry settings (called from IPC when settings change)
 function applyQuickEntrySettings(): { entry: boolean; viewer: boolean; waylandLimited: boolean } {
   const config = loadConfig()
@@ -547,10 +564,7 @@ function applyQuickEntrySettings(): { entry: boolean; viewer: boolean; waylandLi
       quickViewWindow = null
     }
 
-    app.setLoginItemSettings(buildLoginItemSettings({
-      openAtLogin: config.launch_on_startup === true,
-      isMac,
-    }))
+    applyStartupSettings(config)
     return result
   } else {
     // Clean up all windows and tray
@@ -569,10 +583,7 @@ function applyQuickEntrySettings(): { entry: boolean; viewer: boolean; waylandLi
     }
   }
 
-  app.setLoginItemSettings(buildLoginItemSettings({
-    openAtLogin: config.launch_on_startup === true,
-    isMac,
-  }))
+  applyStartupSettings(config)
   const empty = { entry: false, viewer: false, waylandLimited: false }
   lastShortcutStatus = empty
   return empty
@@ -638,6 +649,8 @@ if (!gotLock) {
       showQuickView()
       return
     }
+    // A launch at login (--hidden) that finds Vicu already running must not raise the window.
+    if (parseHiddenArg(argv)) return
     if (!mainWindow || mainWindow.isDestroyed()) {
       mainWindow = createAndWireMainWindow(loadConfig())
     }
@@ -702,7 +715,18 @@ if (!gotLock) {
     }
 
     const config = loadConfig()
-    mainWindow = createAndWireMainWindow(config)
+    // Start in the tray when launched at login with "Start hidden" (or with --hidden), but only
+    // when there is a way back: the tray icon exists when Quick Entry or Quick View is on, and
+    // macOS always has the dock.
+    const trayWillExist = !!config && (config.quick_entry_enabled === true || config.quick_view_enabled !== false)
+    const startHidden = !!config && shouldStartHidden({
+      hiddenArg: parseHiddenArg(process.argv),
+      openedAtLogin: isMac && app.getLoginItemSettings().wasOpenedAtLogin,
+      startHiddenSetting: config.start_hidden === true,
+      isMac,
+      canComeBack: isMac || trayWillExist,
+    })
+    mainWindow = createAndWireMainWindow(config, { startHidden })
     startupComplete = true
 
     // Sync Electron's native theme with the user's config setting
@@ -772,12 +796,10 @@ if (!gotLock) {
       initQuickEntryWindows(config)
       globalShortcut.unregisterAll() // Clear stale registrations from crashes
       registerQuickEntryShortcuts(config)
-
-      app.setLoginItemSettings(buildLoginItemSettings({
-        openAtLogin: config.launch_on_startup === true,
-        isMac,
-      }))
     }
+    // Once per start, whatever Quick Entry/View are set to: re-asserts the login item (path, the
+    // --hidden argument) or autostart entry, and drops the old-id Windows entry.
+    if (config) applyStartupSettings(config)
 
     // If the app was launched with --quick-entry/--quick-view (e.g. a DE
     // keyboard shortcut on Wayland starting a cold instance), open the
