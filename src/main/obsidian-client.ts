@@ -3,15 +3,16 @@ import * as crypto from 'node:crypto'
 import { execFile } from 'child_process'
 import { loadConfig } from './config'
 import { isWindows, isMac } from './platform'
+import { decodeUtf8Chunks } from './response-body'
+import {
+  describeActiveNote,
+  resolveLinkForSave,
+  type ObsidianNoteContext,
+} from './obsidian-link'
+
+export type { ObsidianNoteContext } from './obsidian-link'
 
 const OBSIDIAN_TIMEOUT = 300
-
-export interface ObsidianNoteContext {
-  deepLink: string
-  noteName: string
-  vaultName: string
-  isUidBased: boolean
-}
 
 interface ActiveNoteResponse {
   path: string
@@ -50,9 +51,10 @@ function obsidianRequest<T>(
       }
 
       const req = https.request(options, (res) => {
-        let data = ''
-        res.on('data', (chunk) => { data += chunk.toString() })
+        const chunks: Buffer[] = []
+        res.on('data', (chunk: Buffer) => { chunks.push(chunk) })
         res.on('end', () => {
+          const data = decodeUtf8Chunks(chunks)
           clearTimeout(timeout)
           if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
             try {
@@ -117,9 +119,10 @@ export function testObsidianConnection(apiKey: string, port = 27124): Promise<{ 
       }
 
       const req = https.request(options, (res) => {
-        let data = ''
-        res.on('data', (chunk) => { data += chunk.toString() })
+        const chunks: Buffer[] = []
+        res.on('data', (chunk: Buffer) => { chunks.push(chunk) })
         res.on('end', () => {
+          const data = decodeUtf8Chunks(chunks)
           clearTimeout(timeout)
           if (res.statusCode === 401) {
             resolve({ reachable: false })
@@ -292,45 +295,52 @@ export async function isObsidianForeground(): Promise<boolean> {
   return false
 }
 
+/**
+ * The active note as Quick Entry should show it. Read-only: it never writes to the note. The uid
+ * is added only when a task is saved with the link (resolveShownObsidianLink), so a note the user
+ * does not link is never modified (D-OBS-1).
+ */
 export async function getObsidianContext(): Promise<ObsidianNoteContext | null> {
   const config = loadConfig()
   if (!config) return null
   if (config.obsidian_mode === 'off') return null
   if (!config.obsidian_api_key) return null
 
-  const port = config.obsidian_port || 27124
-  const note = await getActiveNote(config.obsidian_api_key, port)
+  const note = await getActiveNote(config.obsidian_api_key, config.obsidian_port || 27124)
   if (!note) return null
 
-  const vaultName = config.obsidian_vault_name || ''
-  const notePath = note.path || ''
-  const noteName = notePath.replace(/\.md$/i, '').split('/').pop() || 'Untitled'
+  return describeActiveNote(note, config.obsidian_vault_name || '')
+}
 
-  let uid = (note.frontmatter?.uid as string) || ''
-  let isUidBased = false
+// The context Quick Entry is showing right now. The window never sends paths or uids back: when a
+// linked task is saved it asks for the final link and main works from this.
+let shownContext: ObsidianNoteContext | null = null
 
-  if (uid) {
-    isUidBased = true
-  } else {
-    // Try to inject a UID
-    uid = crypto.randomUUID()
-    const injected = await injectUID(config.obsidian_api_key, uid, port)
-    if (injected) {
-      isUidBased = true
-    } else {
-      // Fall back to path-based URI
-      uid = ''
-      isUidBased = false
-    }
+export function rememberShownObsidianContext(context: ObsidianNoteContext | null): void {
+  shownContext = context
+}
+
+/**
+ * Called when a task is saved with the Obsidian note linked: writes the uid into the note (when it
+ * has none and is still the active one) and returns the link to store. Falls back to the link that
+ * was shown when the note cannot be updated.
+ */
+export async function resolveShownObsidianLink(): Promise<ObsidianNoteContext | null> {
+  const context = shownContext
+  if (!context) return null
+  const config = loadConfig()
+  if (!config?.obsidian_api_key || config.obsidian_mode === 'off') return context
+  const apiKey = config.obsidian_api_key
+  const port = config.obsidian_port || 27124
+  try {
+    const resolved = await resolveLinkForSave(context, {
+      getActiveNote: () => getActiveNote(apiKey, port),
+      injectUid: (uid) => injectUID(apiKey, uid, port),
+      newUid: () => crypto.randomUUID(),
+    })
+    if (shownContext === context) shownContext = resolved
+    return resolved
+  } catch {
+    return context
   }
-
-  let deepLink: string
-  if (isUidBased) {
-    deepLink = `obsidian://advanced-uri?vault=${encodeURIComponent(vaultName)}&uid=${encodeURIComponent(uid)}`
-  } else {
-    const pathWithoutMd = notePath.replace(/\.md$/i, '')
-    deepLink = `obsidian://open?vault=${encodeURIComponent(vaultName)}&file=${encodeURIComponent(pathWithoutMd)}`
-  }
-
-  return { deepLink, noteName, vaultName, isUidBased }
 }

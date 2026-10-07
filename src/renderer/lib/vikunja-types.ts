@@ -1,3 +1,6 @@
+import type { DueWindow } from './due-dates'
+import type { ProjectPatch, TaskPatch } from './merge-patches'
+
 export interface TaskReminder {
   reminder: string          // absolute ISO timestamp
   relative_period?: number  // seconds relative to relative_to date
@@ -80,6 +83,8 @@ export interface ProjectView {
 export interface CreateTaskPayload {
   title: string
   description?: string
+  /** Create the task already completed (routine carriers and archive parts, one call). */
+  done?: boolean
   due_date?: string
   start_date?: string
   priority?: number
@@ -89,7 +94,11 @@ export interface CreateTaskPayload {
   repeat_mode?: number
 }
 
-export interface UpdateTaskPayload extends Partial<Task> {}
+/**
+ * Wire format of `PATCH /tasks/{id}`: only the writable fields that changed
+ * (build it with `taskPatch`). Never a whole cached task.
+ */
+export type UpdateTaskPayload = TaskPatch
 
 export interface CreateProjectPayload {
   title: string
@@ -98,14 +107,11 @@ export interface CreateProjectPayload {
   hex_color?: string
 }
 
-export interface UpdateProjectPayload {
-  title?: string
-  description?: string
-  hex_color?: string
-  is_archived?: boolean
-  position?: number
-  parent_project_id?: number
-}
+/**
+ * Wire format of `PATCH /projects/{id}`: only the writable fields that changed
+ * (build it with `projectPatch`). Never a project tree node.
+ */
+export type UpdateProjectPayload = ProjectPatch
 
 export interface CreateLabelPayload {
   title: string
@@ -126,130 +132,42 @@ export interface TaskQueryParams {
   order_by?: string
   filter_include_nulls?: boolean
   filter_timezone?: string
+  /**
+   * Vicu option, never sent to the server: keep nested subtasks in the result so the view can
+   * filter first and hide them afterwards (Tag view, custom lists).
+   */
+  keep_nested_subtasks?: boolean
+  /**
+   * Vicu option, never sent to the server: add the due-date clause of the Today or Upcoming list,
+   * built in the main process from the local-day boundary at request time.
+   */
+  due_window?: DueWindow
 }
 
 export type ApiResult<T> =
   | { success: true; data: T }
   | { success: false; error: string }
 
-export interface CustomListFilter {
-  project_ids: number[]
-  project_filter_mode?: 'include' | 'exclude'
-  /** 0 resolves to the configured Inbox. */
-  add_to_project_id?: number
-  sort_by: 'due_date' | 'priority' | 'created' | 'updated' | 'title'
-  order_by: 'asc' | 'desc'
-  due_date_filter: 'all' | 'overdue' | 'today' | 'this_week' | 'this_month' | 'has_due_date' | 'no_due_date'
-  priority_filter?: number[]
-  label_ids?: number[]
-  include_done?: boolean
-  include_today_all_projects?: boolean
-}
+// Config shapes are shared with the main process (src/shared/config-types.ts).
+export type {
+  AppConfig,
+  AuthMethod,
+  CustomList,
+  CustomListFilter,
+  CustomListSortField,
+  CustomListSyncStatus,
+  ReviewConfig,
+  SecondaryProject,
+  ViewerFilter,
+} from '../../shared/config-types'
+export { CUSTOM_LIST_SORT_FIELDS, isQuickEntryEnabled, isQuickViewEnabled } from '../../shared/config-types'
+import type { ConnectionFields } from '../../shared/config-types'
 
-export interface CustomList {
-  id: string
-  name: string
-  icon?: string
-  filter: CustomListFilter
-}
-
-export type CustomListSyncStatus =
-  | { state: 'idle'; last_synced_at?: string }
-  | { state: 'syncing' }
-  | { state: 'pending'; message?: string }
-  | { state: 'offline'; message: string }
-  | { state: 'error'; message: string }
-  | { state: 'update_required'; message: string }
-  | { state: 'local_only' }
-
-export interface ViewerFilter {
-  project_ids: number[]
-  sort_by: string
-  order_by: string
-  due_date_filter: string
-  include_today_all_projects?: boolean
-  custom_list_id?: string
-  view_type?: 'today' | 'upcoming' | 'anytime'
-}
-
-export interface SecondaryProject {
-  id: number
-  title: string
-}
-
-export interface ReviewConfig {
-  enabled: boolean
-  default_cadence_days: number
-  exclude_inbox: boolean
-}
-
-export interface AppConfig {
-  vikunja_url: string
-  api_token: string
-  inbox_project_id: number
-  auth_method?: 'api_token' | 'oidc' | 'password'
-  theme: 'light' | 'dark' | 'system'
-  window_bounds?: { x: number; y: number; width: number; height: number }
-  sidebar_width?: number
-  custom_lists?: CustomList[]
-  // Quick Entry / Quick View
-  quick_entry_enabled?: boolean
-  quick_view_enabled?: boolean
-  quick_entry_hotkey?: string
-  quick_view_hotkey?: string
-  quick_entry_default_project_id?: number
-  exclamation_today?: boolean
-  project_cycle_modifier?: 'ctrl' | 'alt' | 'ctrl+alt'
-  secondary_projects?: SecondaryProject[]
-  quick_entry_position?: { x: number; y: number }
-  quick_view_position?: { x: number; y: number }
-  viewer_filter?: ViewerFilter
-  launch_on_startup?: boolean
-  standalone_mode?: boolean
-  show_today_overdue_badge?: boolean
-  // Obsidian
-  obsidian_mode?: 'off' | 'ask' | 'always'
-  obsidian_api_key?: string
-  obsidian_port?: number
-  obsidian_vault_name?: string
-  // Browser
-  browser_link_mode?: 'off' | 'ask' | 'always'
-  browser_extension_id?: string
-  // Notifications
-  notifications_enabled?: boolean
-  notifications_persistent?: boolean
-  notifications_daily_reminder_enabled?: boolean
-  notifications_daily_reminder_time?: string
-  notifications_secondary_reminder_enabled?: boolean
-  notifications_secondary_reminder_time?: string
-  notifications_overdue_enabled?: boolean
-  notifications_due_today_enabled?: boolean
-  notifications_upcoming_enabled?: boolean
-  notifications_sound?: boolean
-  // Task reminder settings
-  notifications_task_reminder_sound?: boolean
-  notifications_task_reminder_persistent?: boolean
-  notifications_default_reminder_offset?: number
-  notifications_default_reminder_relative_to?: 'due_date' | 'start_date' | 'end_date'
-  // NLP task parser
-  nlp_enabled?: boolean
-  nlp_syntax_mode?: 'todoist' | 'vikunja'
-  // Delete confirmation
-  confirm_before_delete?: boolean
-  // Subtask presentation in task lists
-  subtask_display?: 'inside_task' | 'expandable'
-  // Task completion sound
-  task_completion_sound_enabled?: boolean
-  task_completion_sound_path?: string | null
-  // Update checker
-  update_check_dismissed_version?: string
-  // Task context menu
-  urgency_mode?: 'today' | 'important'
-  last_used_project_id?: number
-  last_used_label_id?: number
-  // Project review
-  review?: ReviewConfig
-}
+/**
+ * What a setup, login or disconnect flow may change. Everything else in the config
+ * (preferences, hotkeys, window state...) is kept by the main process.
+ */
+export type ConnectionConfig = ConnectionFields
 
 export interface OIDCProvider {
   name: string

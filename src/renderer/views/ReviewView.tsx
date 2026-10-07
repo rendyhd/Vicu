@@ -5,11 +5,12 @@ import {
   useReviewTree,
   flattenReviewTree,
   useMarkReviewed,
+  useRestoreReviewDescription,
   type ReviewTreeNode,
 } from '@/hooks/use-review'
-import { useUpdateProject } from '@/hooks/use-task-mutations'
 import { useAppConfig } from '@/hooks/use-app-config'
 import { useSelectionStore } from '@/stores/selection-store'
+import { useReviewNoticeStore } from '@/stores/review-notice-store'
 import { ProjectBranch } from '@/components/review/ProjectBranch'
 import type { Project } from '@/lib/vikunja-types'
 
@@ -37,7 +38,9 @@ export function ReviewView() {
   const due = useReviewTree('due', reviewedThisSession)
   const all = useReviewTree('all', reviewedThisSession)
   const markReviewed = useMarkReviewed()
-  const updateProject = useUpdateProject()
+  const restoreDescription = useRestoreReviewDescription()
+  const errorNotice = useReviewNoticeStore((s) => s.error)
+  const clearErrorNotice = useReviewNoticeStore((s) => s.clearError)
   const collapseTasks = useSelectionStore((s) => s.collapseAll)
   const { data: cfg } = useAppConfig()
   const defaultCadence = cfg?.review?.default_cadence_days ?? 14
@@ -76,14 +79,26 @@ export function ReviewView() {
 
   const handleMarkReviewed = (node: ReviewTreeNode) => {
     const prevProject = node.project
-    markReviewed.mutate({ project: prevProject })
+    // The row fades and focus moves on right away; this is rolled back if the save
+    // fails, and the "reviewed" toast only appears once the server accepted it.
     setReviewedThisSession((prev) => new Set(prev).add(prevProject.id))
     setExpandedIds((prev) => {
       const next = new Set(prev)
       next.delete(prevProject.id)
       return next
     })
-    showToast({ projectId: prevProject.id, title: prevProject.title, prevProject })
+    markReviewed.mutate(
+      { project: prevProject },
+      {
+        onSuccess: () => showToast({ projectId: prevProject.id, title: prevProject.title, prevProject }),
+        onError: () =>
+          setReviewedThisSession((prev) => {
+            const next = new Set(prev)
+            next.delete(prevProject.id)
+            return next
+          }),
+      },
+    )
 
     // Advance focus to the next still-due project.
     const list = navList
@@ -96,7 +111,11 @@ export function ReviewView() {
 
   const handleUndo = () => {
     if (!toast) return
-    updateProject.mutate({ id: toast.projectId, project: toast.prevProject })
+    const undone = toast
+    restoreDescription.mutate(
+      { project: undone.prevProject },
+      { onError: () => setReviewedThisSession((prev) => new Set(prev).add(undone.projectId)) },
+    )
     setReviewedThisSession((prev) => {
       const next = new Set(prev)
       next.delete(toast.projectId)
@@ -173,6 +192,13 @@ export function ReviewView() {
   useEffect(() => () => {
     if (toastTimer.current) clearTimeout(toastTimer.current)
   }, [])
+
+  // A failed save stays visible long enough to read, then clears itself.
+  useEffect(() => {
+    if (!errorNotice) return
+    const timer = setTimeout(clearErrorNotice, 10000)
+    return () => clearTimeout(timer)
+  }, [errorNotice, clearErrorNotice])
 
   const allCaughtUp = tab === 'due' && !isLoading && currentTree.length === 0
 
@@ -282,6 +308,38 @@ export function ReviewView() {
             />
           ))}
       </div>
+
+      {/* Error notice: failed saves must not pass silently */}
+      {errorNotice && (
+        <div
+          role="alert"
+          className="absolute left-1/2 -translate-x-1/2"
+          style={{
+            bottom: toast ? 72 : 20,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 12,
+            maxWidth: 'min(560px, calc(100% - 32px))',
+            padding: '8px 12px 8px 14px',
+            borderRadius: 8,
+            background: 'var(--bg-secondary)',
+            border: '1px solid var(--accent-red)',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.18)',
+            fontSize: 13,
+            color: 'var(--text-primary)',
+            zIndex: 31,
+          }}
+        >
+          <span>{errorNotice.message}</span>
+          <button
+            type="button"
+            onClick={clearErrorNotice}
+            style={{ fontSize: 13, fontWeight: 600, color: 'var(--accent-red)', cursor: 'pointer' }}
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
 
       {/* Undo toast */}
       {toast && (

@@ -3,6 +3,7 @@ import {
   evictForeignCompletions,
   mergeProjectUndoWindow,
   mergeSectionUndoWindow,
+  mergeSmartListUndoWindow,
 } from '../undo-window'
 import type { Task } from '../vikunja-types'
 import type { CompletedTaskEntry } from '@/stores/completed-tasks-store'
@@ -133,5 +134,31 @@ describe('mergeProjectUndoWindow', () => {
     expect(
       mergeProjectUndoWindow([parentTask], completed, '/project/2', parentProjectId)
     ).toEqual([parentTask])
+  })
+})
+
+describe('mergeSmartListUndoWindow', () => {
+  it('appends a task toggled on this path that the server no longer returns', () => {
+    const listed = task(1, false)
+    const reopened = task(2, false)
+    const completed = store([{ task: reopened, path: '/logbook' }])
+
+    expect(mergeSmartListUndoWindow([listed], completed, '/logbook')).toEqual([listed, reopened])
+  })
+
+  it('ignores another path, a nested row and a task the server already returned', () => {
+    const list = [task(1, false)]
+    const completed = store([
+      { task: task(2), path: '/today' },
+      { task: task(3), path: '/logbook', suppressTopLevelUndo: true },
+      { task: task(1, true), path: '/logbook' },
+    ])
+
+    expect(mergeSmartListUndoWindow(list, completed, '/logbook')).toBe(list)
+  })
+
+  it('never shows an implementation-detail task', () => {
+    const carrier = { ...task(5), description: '<!-- vicu-routine:v1:e30 -->' } as Task
+    expect(mergeSmartListUndoWindow([], store([{ task: carrier, path: '/logbook' }]), '/logbook')).toEqual([])
   })
 })

@@ -1,4 +1,11 @@
 import { contextBridge, ipcRenderer } from 'electron'
+import type { ProjectPatch, TaskPatch } from '../shared/merge-patches'
+import type {
+  OfflineCreateInput,
+  OfflineLabelRef,
+  OfflineReplayEvent,
+  TaskWriteOptions,
+} from '../shared/offline-queue-types'
 
 const api = {
   platform: process.platform as 'darwin' | 'win32' | 'linux',
@@ -6,12 +13,16 @@ const api = {
   // Tasks
   fetchTasks: (params: Record<string, unknown>) =>
     ipcRenderer.invoke('fetch-tasks', params),
+  fetchRoutineCarriers: () =>
+    ipcRenderer.invoke('fetch-routine-carriers'),
   createTask: (projectId: number, task: Record<string, unknown>) =>
     ipcRenderer.invoke('create-task', projectId, task),
-  updateTask: (id: number, task: Record<string, unknown>) =>
-    ipcRenderer.invoke('update-task', id, task),
-  deleteTask: (id: number) =>
-    ipcRenderer.invoke('delete-task', id),
+  // The task writes go through the main process's write gate; `options.queue` says the caller can
+  // live with the change being queued (see src/main/offline/task-writes.ts).
+  updateTask: (id: number, patch: TaskPatch, options?: TaskWriteOptions) =>
+    ipcRenderer.invoke('update-task', id, patch, options),
+  deleteTask: (id: number, options?: TaskWriteOptions) =>
+    ipcRenderer.invoke('delete-task', id, options),
   fetchTaskById: (id: number) =>
     ipcRenderer.invoke('fetch-task-by-id', id),
   createTaskRelation: (taskId: number, otherTaskId: number, relationKind: string) =>
@@ -22,20 +33,22 @@ const api = {
   // Projects
   fetchProjects: (includeArchived = false) =>
     ipcRenderer.invoke('fetch-projects', includeArchived),
+  fetchProject: (id: number) =>
+    ipcRenderer.invoke('fetch-project', id),
   createProject: (project: Record<string, unknown>) =>
     ipcRenderer.invoke('create-project', project),
-  updateProject: (id: number, project: Record<string, unknown>) =>
-    ipcRenderer.invoke('update-project', id, project),
+  updateProject: (id: number, patch: ProjectPatch) =>
+    ipcRenderer.invoke('update-project', id, patch),
   deleteProject: (id: number) =>
     ipcRenderer.invoke('delete-project', id),
 
   // Labels
   fetchLabels: () =>
     ipcRenderer.invoke('fetch-labels'),
-  addLabelToTask: (taskId: number, labelId: number) =>
-    ipcRenderer.invoke('add-label-to-task', taskId, labelId),
-  removeLabelFromTask: (taskId: number, labelId: number) =>
-    ipcRenderer.invoke('remove-label-from-task', taskId, labelId),
+  addLabelToTask: (taskId: number, labelId: number, options?: TaskWriteOptions) =>
+    ipcRenderer.invoke('add-label-to-task', taskId, labelId, options),
+  removeLabelFromTask: (taskId: number, labelId: number, options?: TaskWriteOptions) =>
+    ipcRenderer.invoke('remove-label-from-task', taskId, labelId, options),
   createLabel: (label: Record<string, unknown>) =>
     ipcRenderer.invoke('create-label', label),
   updateLabel: (id: number, label: Record<string, unknown>) =>
@@ -54,8 +67,10 @@ const api = {
   // Config
   getConfig: () =>
     ipcRenderer.invoke('get-config'),
-  saveConfig: (config: Record<string, unknown>) =>
-    ipcRenderer.invoke('save-config', config),
+  saveConfigPatch: (patch: Record<string, unknown>) =>
+    ipcRenderer.invoke('save-config-patch', patch),
+  saveConnectionConfig: (connection: Record<string, unknown>) =>
+    ipcRenderer.invoke('save-connection-config', connection),
   getCustomLists: () => ipcRenderer.invoke('custom-lists:get'),
   upsertCustomList: (list: Record<string, unknown>) => ipcRenderer.invoke('custom-lists:upsert', list),
   deleteCustomList: (id: string) => ipcRenderer.invoke('custom-lists:delete', id),
@@ -128,7 +143,6 @@ const api = {
   // Browser Link
   checkBrowserHostRegistration: () => ipcRenderer.invoke('check-browser-host-registration'),
   registerBrowserHosts: () => ipcRenderer.invoke('register-browser-hosts'),
-  getBrowserExtensionPath: () => ipcRenderer.invoke('get-browser-extension-path') as Promise<string>,
   openBrowserExtensionFolder: () => ipcRenderer.invoke('open-browser-extension-folder'),
 
   // Quick Entry settings
@@ -136,8 +150,58 @@ const api = {
     ipcRenderer.invoke('apply-quick-entry-settings') as Promise<{ entry: boolean; viewer: boolean; waylandLimited: boolean }>,
   getGlobalShortcutStatus: () =>
     ipcRenderer.invoke('get-global-shortcut-status') as Promise<{ entry: boolean; viewer: boolean; waylandLimited: boolean }>,
+  getSecretStorageStatus: () =>
+    ipcRenderer.invoke('get-secret-storage-status') as Promise<'encrypted' | 'obfuscated' | 'plaintext'>,
+  getLaunchOnStartupSupport: () =>
+    ipcRenderer.invoke('get-launch-on-startup-support') as Promise<{ supported: boolean }>,
   getHotkeyLauncherCommand: () =>
     ipcRenderer.invoke('get-hotkey-launcher-command') as Promise<{ quickEntry: string; quickView: string; kind: 'appimage' | 'packaged' | 'dev' }>,
+
+  // The computer woke from sleep: timers and the clock may have jumped while it was asleep.
+  onAppResumed: (callback: () => void) => {
+    const handler = () => callback()
+    ipcRenderer.on('app-resumed', handler)
+    return () => { ipcRenderer.removeListener('app-resumed', handler) }
+  },
+
+  // Offline queue: changes that could not reach the server wait here, in the main process, and are
+  // replayed in order. Every call answers `{ success, data | error }`.
+  offlineQueue: {
+    snapshot: () => ipcRenderer.invoke('offline-queue:snapshot'),
+    enqueueUpdate: (taskRef: number | string, patch: TaskPatch, meta?: { title?: string }) =>
+      ipcRenderer.invoke('offline-queue:enqueue-update', taskRef, patch, meta),
+    enqueueComplete: (taskRef: number | string, done: boolean, meta?: { title?: string }) =>
+      ipcRenderer.invoke('offline-queue:enqueue-complete', taskRef, done, meta),
+    enqueueDelete: (taskRef: number | string, meta?: { title?: string }) =>
+      ipcRenderer.invoke('offline-queue:enqueue-delete', taskRef, meta),
+    enqueueCreate: (input: OfflineCreateInput) =>
+      ipcRenderer.invoke('offline-queue:enqueue-create', input),
+    enqueueAddLabel: (taskRef: number | string, label: OfflineLabelRef, meta?: { title?: string }) =>
+      ipcRenderer.invoke('offline-queue:enqueue-add-label', taskRef, label, meta),
+    enqueueRemoveLabel: (taskRef: number | string, labelId: number, meta?: { title?: string }) =>
+      ipcRenderer.invoke('offline-queue:enqueue-remove-label', taskRef, labelId, meta),
+    cancelChange: (taskRef: number | string, keys: string[]) =>
+      ipcRenderer.invoke('offline-queue:cancel-change', taskRef, keys),
+    retryFailed: (ids?: string[]) => ipcRenderer.invoke('offline-queue:retry-failed', ids),
+    discardFailed: (ids?: string[]) => ipcRenderer.invoke('offline-queue:discard-failed', ids),
+    discardPending: (ids: string[]) => ipcRenderer.invoke('offline-queue:discard-pending', ids),
+    replayNow: () => ipcRenderer.invoke('offline-queue:replay-now'),
+    onChanged: (cb: (change: unknown) => void) => {
+      const handler = (_: unknown, change: unknown) => cb(change)
+      ipcRenderer.on('offline-queue:changed', handler)
+      return () => { ipcRenderer.removeListener('offline-queue:changed', handler) }
+    },
+    onReplayed: (cb: (event: OfflineReplayEvent) => void) => {
+      const handler = (_: unknown, event: OfflineReplayEvent) => cb(event)
+      ipcRenderer.on('offline-queue:replayed', handler)
+      return () => { ipcRenderer.removeListener('offline-queue:replayed', handler) }
+    },
+    onAuthProblem: (cb: (problem: { error: string }) => void) => {
+      const handler = (_: unknown, problem: { error: string }) => cb(problem)
+      ipcRenderer.on('offline-queue:auth-problem', handler)
+      return () => { ipcRenderer.removeListener('offline-queue:auth-problem', handler) }
+    },
+  },
 
   // Standalone mode
   getStandaloneTaskCount: () =>
@@ -190,6 +254,18 @@ const api = {
     const handler = (_: unknown, path: string) => cb(path)
     ipcRenderer.on('navigate', handler)
     return () => { ipcRenderer.removeListener('navigate', handler) }
+  },
+  // File > New Task (Ctrl+N). The menu accelerator takes the key before the page sees it.
+  onNewTask: (cb: () => void) => {
+    const handler = () => cb()
+    ipcRenderer.on('new-task', handler)
+    return () => { ipcRenderer.removeListener('new-task', handler) }
+  },
+  // Main asks the window to show one task (a clicked reminder, Quick View's "open in app").
+  onNavigateToTask: (cb: (taskId: number) => void) => {
+    const handler = (_: unknown, taskId: number) => cb(taskId)
+    ipcRenderer.on('navigate-to-task', handler)
+    return () => { ipcRenderer.removeListener('navigate-to-task', handler) }
   },
   // Print
   printHtml: (html: string) =>

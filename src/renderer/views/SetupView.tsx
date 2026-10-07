@@ -142,13 +142,12 @@ export function SetupView({ onComplete }: SetupViewProps) {
     setOidcError('')
     setSelectedOidcProvider(provider)
 
-    // Save partial config so the main process knows the URL and auth method
-    await api.saveConfig({
+    // Tell the main process the URL and auth method. Main merges these into the
+    // existing config, so hotkeys, theme and other preferences survive a re-login.
+    await api.saveConnectionConfig({
       vikunja_url: url.replace(/\/+$/, ''),
       api_token: '',
-      inbox_project_id: 0,
       auth_method: 'oidc',
-      theme: 'system',
     })
 
     try {
@@ -187,13 +186,11 @@ export function SetupView({ onComplete }: SetupViewProps) {
     setPasswordLogging(true)
     setPasswordError('')
 
-    // Save partial config so the main process knows the URL and auth method
-    await api.saveConfig({
+    // Tell the main process the URL and auth method (merged into the existing config).
+    await api.saveConnectionConfig({
       vikunja_url: url.replace(/\/+$/, ''),
       api_token: '',
-      inbox_project_id: 0,
       auth_method: 'password',
-      theme: 'system',
     })
 
     try {
@@ -246,27 +243,14 @@ export function SetupView({ onComplete }: SetupViewProps) {
 
   const handleSave = async () => {
     setSaving(true)
-    // Merge connection details into existing config to preserve app preferences.
-    // If the server URL changed, reset account-specific data (project IDs, custom lists, etc.)
-    // since those IDs belong to the previous server/account.
-    const existing = await api.getConfig()
-    const newUrl = url.replace(/\/+$/, '')
-    const sameServer = existing?.vikunja_url === newUrl
-    await api.saveConfig({
-      ...existing,
-      vikunja_url: newUrl,
+    // Main merges the connection details into the existing config, so app preferences
+    // are preserved. If the server URL changed it also resets account-specific data
+    // (project IDs, custom lists, etc.), since those belong to the previous server/account.
+    await api.saveConnectionConfig({
+      vikunja_url: url.replace(/\/+$/, ''),
       api_token: authMethod === 'api_token' ? token : '',
       inbox_project_id: inboxProjectId,
       auth_method: authMethod,
-      theme: existing?.theme ?? 'system',
-      // Reset account-specific data when switching servers
-      ...(!sameServer && {
-        custom_lists: undefined,
-        quick_entry_default_project_id: undefined,
-        secondary_projects: undefined,
-        viewer_filter: undefined,
-        standalone_mode: undefined,
-      }),
     })
     // If the user is coming from standalone mode, push their local tasks to
     // the freshly chosen inbox so nothing is stranded in offline-cache.json.

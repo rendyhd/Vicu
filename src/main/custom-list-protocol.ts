@@ -1,47 +1,30 @@
+// The shapes live with the config types so the renderer sees the same ones (D-CFG-3).
+import type {
+  CustomList,
+  CustomListRevision,
+  CustomListSyncDocumentV1,
+  CustomListSyncRecord,
+  CustomListWire,
+} from '../shared/config-types'
+export type {
+  CustomList,
+  CustomListFilter,
+  CustomListRevision,
+  CustomListSyncDocumentV1,
+  CustomListSyncRecord,
+  CustomListWire,
+  CustomListWireFilter,
+} from '../shared/config-types'
+
 export const CUSTOM_LIST_CARRIER_TITLE = 'Vicu custom lists (sync metadata — do not delete)'
 export const CUSTOM_LIST_MARKER_PREFIX = '<!-- vicu-custom-lists:'
+/** Search text that finds the carrier server side (the marker name inside the HTML comment). */
+export const CUSTOM_LIST_CARRIER_SEARCH = 'vicu-custom-lists'
 export const CUSTOM_LIST_SYNC_VERSION = 1
 export const CUSTOM_LIST_SYNC_MAX_BYTES = 512 * 1024
 
 const MARKER_RE = /<!--\s*vicu-custom-lists:v(\d+):([A-Za-z0-9_-]+={0,2})\s*-->/
 const ANY_MARKER_RE = /<!--\s*vicu-custom-lists:[\s\S]*?-->/
-
-export interface CustomListWireFilter {
-  project_ids: number[]
-  project_filter_mode: 'include' | 'exclude'
-  add_to_project_id: number
-  sort_by: string
-  order_by: string
-  due_date_filter: string
-  priority_filter: number[]
-  label_ids: number[]
-  include_done: boolean
-  include_today_all_projects: boolean
-}
-
-export interface CustomListWire {
-  id: string
-  name: string
-  icon: string
-  filter: CustomListWireFilter
-}
-
-export interface CustomListRevision {
-  wall_time_ms: number
-  counter: number
-  device_id: string
-}
-
-export interface CustomListSyncRecord {
-  value: CustomListWire | null
-  revision: CustomListRevision
-}
-
-export interface CustomListSyncDocumentV1 {
-  version: 1
-  lists: Record<string, CustomListSyncRecord>
-  order: { ids: string[]; revision: CustomListRevision }
-}
 
 export interface ParsedCustomListEnvelope {
   isCarrier: boolean
@@ -93,14 +76,70 @@ export function nextRevision(
   }
 }
 
-export function emptyCustomListDocument(deviceId: string, now = Date.now()): CustomListSyncDocumentV1 {
+/**
+ * A document nobody has written to. Its order carries a zero revision, not "now": an empty order
+ * stamped with the current time beat the real order of another device on a first sync and was
+ * then written back over it.
+ */
+export function emptyCustomListDocument(deviceId: string): CustomListSyncDocumentV1 {
   return {
     version: 1,
     lists: {},
-    order: { ids: [], revision: { wall_time_ms: now, counter: 0, device_id: deviceId } },
+    order: { ids: [], revision: { wall_time_ms: 0, counter: 0, device_id: deviceId } },
   }
 }
 
+/** Deleted lists are remembered as tombstones so the deletion reaches every device; after this long they are dropped. */
+export const TOMBSTONE_MAX_AGE_MS = 90 * 24 * 60 * 60 * 1000
+
+/**
+ * The document without the tombstones (`value: null`) whose revision is older than 90 days. Lists
+ * that exist are never touched. A device that has been offline longer than that and still holds a
+ * deleted list may bring it back; the age is the price of a document that does not grow forever.
+ */
+export function pruneTombstones(document: CustomListSyncDocumentV1, now = Date.now()): CustomListSyncDocumentV1 {
+  const cutoff = now - TOMBSTONE_MAX_AGE_MS
+  const lists: Record<string, CustomListSyncRecord> = {}
+  for (const [id, record] of Object.entries(document.lists)) {
+    if (record.value === null && record.revision.wall_time_ms < cutoff) continue
+    lists[id] = record
+  }
+  return { ...document, lists }
+}
+
+const KNOWN_LIST_KEYS: ReadonlySet<string> = new Set(['id', 'name', 'icon', 'filter'])
+const KNOWN_FILTER_KEYS: ReadonlySet<string> = new Set([
+  'project_ids',
+  'project_filter_mode',
+  'add_to_project_id',
+  'sort_by',
+  'order_by',
+  'due_date_filter',
+  'priority_filter',
+  'label_ids',
+  'include_done',
+  'include_today_all_projects',
+  'include_overdue',
+])
+
+/**
+ * The fields of `source` that are not in `known`, with keys in sorted order so two devices
+ * that saw the same fields in a different order still produce the same JSON.
+ */
+function unknownFields(source: object, known: ReadonlySet<string>): Record<string, unknown> {
+  const record = source as Record<string, unknown>
+  const extra: Record<string, unknown> = {}
+  for (const key of Object.keys(record).sort()) {
+    if (!known.has(key) && key !== '__proto__' && record[key] !== undefined) extra[key] = record[key]
+  }
+  return extra
+}
+
+/**
+ * The canonical form of a synced list: known fields are validated and defaulted, and unknown
+ * fields (list value and filter) are carried over untouched so a field added by another app
+ * survives a round trip through this one. `include_overdue` is only written when it was set.
+ */
 export function normalizeWireList(value: CustomListWire): CustomListWire {
   return {
     id: value.id,
@@ -117,8 +156,34 @@ export function normalizeWireList(value: CustomListWire): CustomListWire {
       label_ids: [...new Set(value.filter.label_ids ?? [])],
       include_done: value.filter.include_done === true,
       include_today_all_projects: value.filter.include_today_all_projects === true,
+      ...(typeof value.filter.include_overdue === 'boolean' ? { include_overdue: value.filter.include_overdue } : {}),
+      ...unknownFields(value.filter, KNOWN_FILTER_KEYS),
     },
+    ...unknownFields(value, KNOWN_LIST_KEYS),
   }
+}
+
+/** A list from the app's config as a synced value. Unknown fields pass through. */
+export function appListToWire(list: CustomList): CustomListWire {
+  return normalizeWireList({ ...list, icon: list.icon ?? '', filter: { ...list.filter } } as CustomListWire)
+}
+
+/**
+ * A synced value as the list the app keeps in its config: empty priority and label conditions
+ * are left out. Unknown fields pass through.
+ */
+export function wireToAppList(list: CustomListWire): CustomList {
+  const { icon, filter, ...rest } = list
+  const { priority_filter: priorities, label_ids: labelIds, ...filterRest } = filter
+  return {
+    ...rest,
+    ...(icon ? { icon } : {}),
+    filter: {
+      ...filterRest,
+      ...(priorities.length ? { priority_filter: priorities } : {}),
+      ...(labelIds.length ? { label_ids: labelIds } : {}),
+    },
+  } as CustomList
 }
 
 export function documentFromLists(
@@ -126,7 +191,9 @@ export function documentFromLists(
   deviceId: string,
   now = Date.now(),
 ): CustomListSyncDocumentV1 {
-  const document = emptyCustomListDocument(deviceId, now)
+  const document = emptyCustomListDocument(deviceId)
+  // Nothing written yet: keep the zero revision so the first sync takes another device's order.
+  if (lists.length === 0) return document
   let counter = 0
   for (const value of lists) {
     const normalized = normalizeWireList(value)

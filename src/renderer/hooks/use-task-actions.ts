@@ -11,18 +11,18 @@ import {
 import { useSelectionStore } from '@/stores/selection-store'
 import { confirmDelete } from '@/lib/confirm-bridge'
 import { copySelectedTitles, isTaskNestedInCurrentList } from '@/lib/task-selection'
-import { tomorrowAtMidnightISO, nextMondayAtMidnightISO } from '@/lib/date-utils'
+import { dueNextWeek, dueToday, dueTomorrow } from '@/lib/due-dates'
 import { NULL_DATE } from '@/lib/constants'
 import type { Task, Label } from '@/lib/vikunja-types'
 import { taskDescendants, unfinishedDescendants } from '@/lib/task-hierarchy'
 
 /**
  * Actions for the right-click context menu, applied to one OR many tasks.
- * Full task data is kept in mutation inputs so optimistic cross-project moves
- * can populate the destination cache immediately; the main-process API client
- * filters it into a writable v2 merge patch. Bulk operations loop per task,
- * letting each mutation reconcile its caches. The `record*` helpers persist the
- * most recent project/label for one-click reuse.
+ * Each mutation carries only the changed fields plus the cached task it was
+ * made against; `useUpdateTask` diffs them into a minimal v2 merge patch and
+ * uses the cached task to populate the destination cache optimistically.
+ * Bulk operations loop per task, letting each mutation reconcile its caches.
+ * The `record*` helpers persist the most recent project/label for one-click reuse.
  */
 export function useTaskActions(tasks: Task[]) {
   const qc = useQueryClient()
@@ -35,29 +35,25 @@ export function useTaskActions(tasks: Task[]) {
   const patch = useCallback(
     (changes: Partial<Task>) => {
       tasks.forEach((t) => {
-        updateTask.mutate({ id: t.id, task: { ...t, ...changes } })
+        updateTask.mutate({ id: t.id, changes, original: t })
       })
     },
     [tasks, updateTask]
   )
 
-  const setDueToday = useCallback(() => {
-    const d = new Date()
-    d.setHours(0, 0, 0, 0)
-    patch({ due_date: d.toISOString() })
-  }, [patch])
+  const setDueToday = useCallback(() => patch({ due_date: dueToday() }), [patch])
 
   const setUrgentPriority = useCallback(() => patch({ priority: 4 }), [patch])
 
   const setDueDateIso = useCallback((iso: string) => patch({ due_date: iso }), [patch])
 
   const postponeTomorrow = useCallback(
-    () => patch({ due_date: tomorrowAtMidnightISO() }),
+    () => patch({ due_date: dueTomorrow() }),
     [patch]
   )
 
   const postponeNextMonday = useCallback(
-    () => patch({ due_date: nextMondayAtMidnightISO() }),
+    () => patch({ due_date: dueNextWeek() }),
     [patch]
   )
 
@@ -71,7 +67,7 @@ export function useTaskActions(tasks: Task[]) {
     (projectId: number) => {
       tasks.forEach((t) => {
         if (t.project_id === projectId) return
-        updateTask.mutate({ id: t.id, task: { ...t, project_id: projectId } })
+        updateTask.mutate({ id: t.id, changes: { project_id: projectId }, original: t })
       })
       // Moved tasks leave the current view — drop the now-orphaned selection
       // (parity with drag-to-project).
@@ -163,9 +159,7 @@ export function useTaskActions(tasks: Task[]) {
 
   const recordLastProject = useCallback(
     async (projectId: number) => {
-      const cfg = await api.getConfig()
-      if (!cfg) return
-      await api.saveConfig({ ...cfg, last_used_project_id: projectId })
+      await api.saveConfigPatch({ last_used_project_id: projectId })
       qc.invalidateQueries({ queryKey: APP_CONFIG_QUERY_KEY })
     },
     [qc]
@@ -173,9 +167,7 @@ export function useTaskActions(tasks: Task[]) {
 
   const recordLastLabel = useCallback(
     async (label: Label) => {
-      const cfg = await api.getConfig()
-      if (!cfg) return
-      await api.saveConfig({ ...cfg, last_used_label_id: label.id })
+      await api.saveConfigPatch({ last_used_label_id: label.id })
       qc.invalidateQueries({ queryKey: APP_CONFIG_QUERY_KEY })
     },
     [qc]

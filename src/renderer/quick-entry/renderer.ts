@@ -2,22 +2,41 @@ declare global {
   interface Window {
     quickEntryApi: {
       platform: 'darwin' | 'win32' | 'linux'
-      saveTask(title: string, description: string | null, dueDate: string | null, projectId: number | null, priority?: number, repeatAfter?: number, repeatMode?: number): Promise<{ success: boolean; cached?: boolean; error?: string; data?: { id: number } }>
-      uploadAttachment(taskId: number, fileData: Uint8Array, fileName: string, mimeType: string): Promise<{ success: boolean; error?: string }>
-      fetchTaskAttachments(taskId: number): Promise<{ success: boolean; data?: Array<{ id: number }>; error?: string }>
-      updateTask(taskId: number, task: Record<string, unknown>): Promise<{ success: boolean; error?: string; data?: unknown }>
+      saveTask(
+        title: string,
+        description: string | null,
+        dueDate: string | null,
+        projectId: number | null,
+        priority?: number,
+        repeatAfter?: number,
+        repeatMode?: number,
+        // Kept with the create when it has to be queued offline; unused when the server answers.
+        extras?: { labels?: Array<{ id?: number; title?: string }>; images?: Array<{ name: string; mime: string; bytes: Uint8Array }> },
+      ): Promise<{ success: boolean; cached?: boolean; error?: string; mayExist?: boolean; data?: { id: number } }>
+      uploadAttachment(taskId: number, fileData: Uint8Array, fileName: string, mimeType: string): Promise<{ success: boolean; error?: string; statusCode?: number }>
+      fetchTaskAttachments(taskId: number): Promise<{ success: boolean; data?: Array<{ id: number }>; error?: string; statusCode?: number }>
+      updateTask(taskId: number, task: Record<string, unknown>): Promise<{ success: boolean; error?: string; statusCode?: number; data?: unknown }>
       closeWindow(): Promise<void>
+      // The note's final link when saving with it linked; the uid is written into the note then.
+      resolveObsidianLink(): Promise<{ deepLink: string; noteName: string; isUidBased: boolean } | null>
       setHeight(height: number): Promise<void>
       getConfig(): Promise<QuickEntryConfig | null>
       getPendingCount(): Promise<number>
+      getQueueCounts(): Promise<{ pending: number; failed: number }>
+      // Queue what failed after an online create (labels by id or title, images with their bytes).
+      queueFollowUps(
+        taskId: number,
+        extras: { labels: Array<{ id?: number; title?: string }>; images: Array<{ name: string; mime: string; bytes: Uint8Array }> },
+        title?: string,
+      ): Promise<{ success: boolean; error?: string }>
       fetchLabels(): Promise<{ success: boolean; data?: Array<{ id: number; title: string }> }>
       fetchProjects(): Promise<{ success: boolean; data?: Array<{ id: number; title: string }> }>
-      addLabelToTask(taskId: number, labelId: number): Promise<{ success: boolean }>
-      createLabel(label: { title: string; hex_color?: string }): Promise<{ success: boolean; data?: { id: number; title: string } }>
+      addLabelToTask(taskId: number, labelId: number): Promise<{ success: boolean; error?: string; statusCode?: number }>
+      createLabel(label: { title: string; hex_color?: string }): Promise<{ success: boolean; error?: string; statusCode?: number; data?: { id: number; title: string } }>
       onShowWindow(callback: () => void): void
       onHideWindow(callback: () => void): void
       onSyncCompleted(callback: () => void): void
-      onDragHover(callback: (_event: unknown, hovering: boolean) => void): void
+      onDragHover(callback: (hovering: boolean) => void): void
       onObsidianContext(callback: (context: {
         deepLink: string; noteName: string; vaultName: string; isUidBased: boolean; mode: 'ask' | 'always'
       } | null) => void): void
@@ -40,12 +59,15 @@ interface QuickEntryConfig {
   nlp_syntax_mode: 'todoist' | 'vikunja'
 }
 
-import { parse, getParserConfig, recurrenceToVikunja } from '../lib/task-parser'
+import { parse, getParserConfig, recurrenceToVikunja, extractBangToday } from '../lib/task-parser'
+import { dueToday, parsedDue } from '../lib/due-dates'
+import { formatClockTime } from '../lib/date-utils'
 import type { ParseResult, ParserConfig, ParsedToken, TokenType } from '../lib/task-parser'
 import { getClipboardImages, fileToUint8Array } from '../lib/clipboard-images'
-import { imageToken } from '../lib/image-tokens'
 import { AutocompleteDropdown } from './autocomplete'
 import { cache } from './vikunja-cache'
+import { applyQuickEntryFollowUps } from '../lib/quick-entry-follow-ups'
+import { escapeHtml, plainTextToDescriptionHtml } from '../lib/description-html'
 
 const input = document.getElementById('task-input') as HTMLInputElement
 const descriptionHint = document.getElementById('description-hint')!
@@ -80,6 +102,7 @@ let currentProjectIndex = 0
 let projectCycleModifier = 'ctrl'
 let obsidianContext: { deepLink: string; noteName: string; isUidBased: boolean } | null = null
 let obsidianLinked = false
+let resolvingObsidianLink = false
 let browserContext: { url: string; title: string; displayTitle: string } | null = null
 let browserLinked = false
 let parserConfig: ParserConfig = { enabled: true, syntaxMode: 'todoist' }
@@ -123,7 +146,7 @@ document.querySelectorAll('.obsidian-hint-key, .browser-hint-key').forEach((el) 
   el.textContent = linkKeyLabel
 })
 
-function showError(msg: string): void {
+function showError(msg: string, visibleMs = 3000): void {
   errorMessage.textContent = msg
   errorMessage.hidden = false
   void errorMessage.offsetHeight
@@ -133,11 +156,11 @@ function showError(msg: string): void {
   errorTimeout = setTimeout(() => {
     errorMessage.classList.remove('show')
     setTimeout(() => { errorMessage.hidden = true }, 200)
-  }, 3000)
+  }, visibleMs)
 }
 
-function showOfflineMessage(): void {
-  errorMessage.textContent = 'Saved offline \u2014 will sync when connected'
+function showOfflineMessage(message = 'Saved offline \u2014 will sync when connected'): void {
+  errorMessage.textContent = message
   errorMessage.hidden = false
   errorMessage.classList.add('offline')
   void errorMessage.offsetHeight
@@ -199,7 +222,8 @@ function updateTodayHints(): void {
     return
   }
 
-  const hasExclamation = exclamationTodayEnabled && input.value.includes('!')
+  // Same rule as the save path: a `!` inside the text is not a date.
+  const hasExclamation = exclamationTodayEnabled && !!extractBangToday(input.value).dueDate
 
   if (hasExclamation && !isDescriptionExpanded()) {
     todayHintInline.classList.remove('hidden')
@@ -214,9 +238,13 @@ function updateTodayHints(): void {
 }
 
 async function updatePendingIndicator(): Promise<void> {
-  const count = await window.quickEntryApi.getPendingCount()
-  if (count > 0) {
-    pendingCountEl.textContent = String(count)
+  const { pending, failed } = await window.quickEntryApi.getQueueCounts()
+  if (pending > 0 || failed > 0) {
+    const parts: string[] = []
+    if (pending > 0) parts.push(`${pending} change(s) pending sync`)
+    if (failed > 0) parts.push(`${failed} failed \u2014 open Vicu to review`)
+    pendingCountEl.textContent = parts.join(' \u00b7 ')
+    pendingIndicator.classList.toggle('has-failed', failed > 0)
     pendingIndicator.classList.remove('hidden')
   } else {
     pendingIndicator.classList.add('hidden')
@@ -309,10 +337,6 @@ function updateBrowserUI(): void {
   }
 }
 
-function escapeHtml(str: string): string {
-  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
-}
-
 function buildNoteLinkHtml(deepLink: string, noteName: string): string {
   const safeLink = escapeHtml(deepLink)
   const safeName = escapeHtml(noteName)
@@ -393,7 +417,8 @@ function renderParsePreview(result: ParseResult): void {
   const chips: string[] = []
 
   if (result.dueDate) {
-    const label = formatDateLabel(result.dueDate)
+    const day = formatDateLabel(result.dueDate)
+    const label = result.dueHasTime ? `${day} ${formatClockTime(result.dueDate)}` : day
     chips.push(`<span class="parse-chip parse-chip-date">${escapeHtml(label)}<button class="parse-chip-dismiss" data-type="date">&times;</button></span>`)
   }
   if (result.priority !== null && result.priority > 0) {
@@ -505,18 +530,30 @@ async function saveTask(): Promise<void> {
   const raw = input.value.trim()
   if (!raw) return
 
-  let description: string | null = descriptionInput.value.trim() || null
+  // The notes are plain text: escaped, one <p> per line, the same with or without a link below
+  // (description format contract). Empty notes stay null.
+  let description: string | null = plainTextToDescriptionHtml(descriptionInput.value) || null
 
-  // Inject Obsidian note link into description
+  // Inject Obsidian note link into description. Only now, with the note linked and the task being
+  // saved, does main add the uid to the note (D-OBS-1); if that fails the shown link is used.
   if (obsidianLinked && obsidianContext) {
-    const linkHtml = buildNoteLinkHtml(obsidianContext.deepLink, obsidianContext.noteName)
-    description = description ? `<p>${escapeHtml(description)}</p>${linkHtml}` : linkHtml
+    if (resolvingObsidianLink) return
+    resolvingObsidianLink = true
+    let link = { deepLink: obsidianContext.deepLink, noteName: obsidianContext.noteName }
+    try {
+      const resolved = await window.quickEntryApi.resolveObsidianLink()
+      if (resolved) link = { deepLink: resolved.deepLink, noteName: resolved.noteName }
+    } catch { /* keep the link that was shown */ } finally {
+      resolvingObsidianLink = false
+    }
+    const linkHtml = buildNoteLinkHtml(link.deepLink, link.noteName)
+    description = description ? `${description}${linkHtml}` : linkHtml
   }
 
   // Inject browser page link into description
   if (!obsidianLinked && browserLinked && browserContext) {
     const linkHtml = buildPageLinkHtml(browserContext.url, browserContext.title)
-    description = description ? `<p>${escapeHtml(description)}</p>${linkHtml}` : linkHtml
+    description = description ? `${description}${linkHtml}` : linkHtml
   }
 
   let title = raw
@@ -532,9 +569,9 @@ async function saveTask(): Promise<void> {
     if (!title) return
 
     if (lastParseResult.dueDate) {
-      const d = lastParseResult.dueDate
-      d.setHours(23, 59, 59, 0)
-      dueDate = d.toISOString()
+      // A parsed time ("tomorrow at 3pm") is kept; a bare date is date-only. The parse result
+      // is only read, never changed: the preview chips keep rendering from it.
+      dueDate = parsedDue(lastParseResult.dueDate, lastParseResult.dueHasTime)
     }
 
     if (lastParseResult.priority !== null && lastParseResult.priority > 0) {
@@ -556,13 +593,15 @@ async function saveTask(): Promise<void> {
 
     parsedLabels = lastParseResult.labels
   } else {
-    // Legacy ! → today behavior
-    if (exclamationTodayEnabled && title.includes('!')) {
-      title = title.replace(/!/g, '').trim()
-      if (!title) return
-      const today = new Date()
-      today.setHours(23, 59, 59, 0)
-      dueDate = today.toISOString()
+    // Parser off: only the `!` → today shortcut applies, with the same rule as the other entry
+    // points (standalone, leading or trailing `!`; a `!` inside the text is not a date).
+    if (exclamationTodayEnabled) {
+      const bang = extractBangToday(title)
+      if (bang.dueDate) {
+        title = bang.title.trim()
+        if (!title) return
+        dueDate = dueToday()
+      }
     }
   }
 
@@ -570,77 +609,40 @@ async function saveTask(): Promise<void> {
   descriptionInput.disabled = true
   clearError()
 
-  const result = await window.quickEntryApi.saveTask(title, description || null, dueDate, projectId, priority, repeatAfter, repeatMode)
+  // Labels and pasted images ride along: if the create has to be queued offline the queue keeps
+  // them and replays them after the task exists. Online, they are applied below as before.
+  const labelRefs = parsedLabels.map((name) => {
+    const match = cachedLabels.find((l) => l.title.toLowerCase() === name.toLowerCase())
+    return match ? { id: match.id, title: match.title } : { title: name }
+  })
+  const imageInputs = pendingImages.map((img) => ({ name: img.name, mime: img.mime, bytes: img.bytes }))
+  const result = await window.quickEntryApi.saveTask(title, description || null, dueDate, projectId, priority, repeatAfter, repeatMode, { labels: labelRefs, images: imageInputs })
 
   if (result.success) {
     const createdTask = result.data as (Record<string, unknown> & { id?: number }) | undefined
     const taskId = createdTask?.id
 
-    // Attach labels post-creation
-    if (parsedLabels.length > 0 && taskId) {
-      for (const labelName of parsedLabels) {
-        const match = cachedLabels.find((l) => l.title.toLowerCase() === labelName.toLowerCase())
-        if (match) {
-          try {
-            await window.quickEntryApi.addLabelToTask(taskId, match.id)
-          } catch {
-            // Skip silently
-          }
-        } else {
-          try {
-            const created = await window.quickEntryApi.createLabel({ title: labelName })
-            if (created.success && created.data?.id) {
-              await window.quickEntryApi.addLabelToTask(taskId, created.data.id)
-            }
-          } catch {
-            // Skip silently — label creation failed (e.g. offline)
-          }
-        }
-      }
+    // Labels and images go on after the create. A step the network drops is queued, not lost.
+    let queuedFollowUps = false
+    if (taskId && (labelRefs.length > 0 || imageInputs.length > 0)) {
+      const outcome = await applyQuickEntryFollowUps(window.quickEntryApi, {
+        taskId,
+        title,
+        description: description ?? '',
+        labels: labelRefs,
+        images: imageInputs,
+      })
+      queuedFollowUps = outcome.queuedLabels + outcome.queuedImages > 0 && !outcome.queueError
     }
 
-    // Upload staged images and patch description with [[image:N]] tokens.
-    // If we couldn't get a task ID (offline cache), images are dropped silently.
-    if (pendingImages.length > 0 && taskId && createdTask) {
-      let uploaded = 0
-      for (const img of pendingImages) {
-        try {
-          const upload = await window.quickEntryApi.uploadAttachment(taskId, img.bytes, img.name, img.mime)
-          if (upload.success) uploaded++
-        } catch {
-          // Skip silently
-        }
-      }
-      // Vikunja's upload endpoint doesn't reliably return the new attachment id,
-      // so refetch the task's attachments. The task is brand new, so every
-      // attachment here is one we just added — sort ascending = upload order.
-      if (uploaded > 0) {
-        try {
-          const after = await window.quickEntryApi.fetchTaskAttachments(taskId)
-          if (after.success && after.data && after.data.length > 0) {
-            const ids = after.data.map((a) => a.id).sort((a, b) => a - b)
-            const tokens = ids.map((id) => imageToken(id))
-            const patchedDescription = description
-              ? `${description}\n${tokens.join('\n')}`
-              : tokens.join('\n')
-            await window.quickEntryApi.updateTask(taskId, {
-              ...createdTask,
-              description: patchedDescription,
-            })
-          }
-        } catch {
-          // Best effort — task already exists with images attached.
-        }
-      }
-    }
-
-    if (result.cached) {
-      showOfflineMessage()
+    if (result.cached || queuedFollowUps) {
+      showOfflineMessage(queuedFollowUps && !result.cached ? 'Task saved \u2014 labels and images will sync when connected' : undefined)
     } else {
       window.quickEntryApi.closeWindow()
     }
   } else {
-    showError(result.error || 'Failed to save task')
+    // "The task may already exist" is a sentence to read, not a flash: it stays up longer.
+    showError(result.error || 'Failed to save task', result.mayExist ? 10_000 : 3000)
     input.disabled = false
     descriptionInput.disabled = false
     input.focus()
@@ -698,7 +700,7 @@ window.quickEntryApi.onSyncCompleted(async () => {
   await updatePendingIndicator()
 })
 
-window.quickEntryApi.onDragHover((_: unknown, hovering: boolean) => {
+window.quickEntryApi.onDragHover((hovering: boolean) => {
   if (dragHandle) dragHandle.classList.toggle('hover', hovering)
 })
 

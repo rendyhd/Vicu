@@ -5,125 +5,31 @@ import { useProjects } from '@/hooks/use-projects'
 import { useCustomList } from '@/hooks/use-custom-lists'
 import { useAppConfig } from '@/hooks/use-app-config'
 import { usePrintable } from '@/stores/print-store'
+import { useDayKey } from '@/stores/day-store'
 import { TaskList } from '@/components/task-list/TaskList'
-import { NULL_DATE } from '@/lib/constants'
+import { buildCustomListServerFilter, matchesCustomList } from '@/lib/custom-list-filter'
+import { serverSortParams, sortCustomListTasks } from '@/lib/custom-list-sort'
+import { toLocalDate } from '@/lib/due-dates'
+import { withoutNestedSubtasks } from '@/lib/nested-subtasks'
 import type { CustomList, Task, TaskQueryParams } from '@/lib/vikunja-types'
 
-function endOfToday(): string {
-  const d = new Date()
-  d.setHours(23, 59, 59, 999)
-  return d.toISOString()
-}
-
-function startOfToday(): string {
-  const d = new Date()
-  d.setHours(0, 0, 0, 0)
-  return d.toISOString()
-}
-
-function endOfWeek(): string {
-  const d = new Date()
-  const day = d.getDay()
-  const diff = day === 0 ? 0 : 7 - day
-  d.setDate(d.getDate() + diff)
-  d.setHours(23, 59, 59, 999)
-  return d.toISOString()
-}
-
-function endOfMonth(): string {
-  const d = new Date()
-  d.setMonth(d.getMonth() + 1, 0)
-  d.setHours(23, 59, 59, 999)
-  return d.toISOString()
-}
-
+/**
+ * The server filter is only a superset built from local-day boundaries; the exact window is
+ * applied by `matchesCustomList`. Nested subtasks stay in the result so the list can filter
+ * first and hide them afterwards.
+ */
 function buildQueryParams(list: CustomList): TaskQueryParams {
   const { filter } = list
-  const parts: string[] = []
-
-  if (!filter.include_done) {
-    parts.push('done = false')
-  }
-
-  if ((filter.project_filter_mode ?? 'include') === 'include' && filter.project_ids.length === 1) {
-    parts.push(`project_id = ${filter.project_ids[0]}`)
-  }
-
-  switch (filter.due_date_filter) {
-    case 'overdue':
-      parts.push(`due_date < '${startOfToday()}'`)
-      parts.push(`due_date != '${NULL_DATE}'`)
-      break
-    case 'today':
-      parts.push(`due_date <= '${endOfToday()}'`)
-      parts.push(`due_date != '${NULL_DATE}'`)
-      break
-    case 'this_week':
-      parts.push(`due_date <= '${endOfWeek()}'`)
-      parts.push(`due_date != '${NULL_DATE}'`)
-      break
-    case 'this_month':
-      parts.push(`due_date <= '${endOfMonth()}'`)
-      parts.push(`due_date != '${NULL_DATE}'`)
-      break
-    case 'has_due_date':
-      parts.push(`due_date != '${NULL_DATE}'`)
-      break
-    case 'no_due_date':
-      parts.push(`due_date = '${NULL_DATE}'`)
-      break
-  }
-
-  // Union mode: include tasks due today from all projects (only for include mode)
-  if (filter.include_today_all_projects && filter.project_ids.length > 0 && (filter.project_filter_mode ?? 'include') === 'include') {
-    const basePart = parts.length > 0 ? parts.join(' && ') : null
-    const dueTodayClause = `due_date >= '${startOfToday()}' && due_date <= '${endOfToday()}' && due_date != '${NULL_DATE}'`
-
-    if (basePart) {
-      return {
-        filter: `done = false && ((${basePart}) || (${dueTodayClause}))`,
-        sort_by: filter.sort_by,
-        order_by: filter.order_by,
-      }
-    }
-  }
-
   return {
-    filter: parts.length > 0 ? parts.join(' && ') : undefined,
-    sort_by: filter.sort_by,
-    order_by: filter.order_by,
+    filter: buildCustomListServerFilter(filter),
+    // The order shown is applied below (sortCustomListTasks); the server only gets a sort it accepts.
+    ...serverSortParams(filter.sort_by, filter.order_by),
+    keep_nested_subtasks: true,
   }
 }
 
 function taskMatchesCustomList(task: Task, list: CustomList, activeProjectIds: Set<number>): boolean {
-  const { filter } = list
-  if (!activeProjectIds.has(task.project_id) || (!filter.include_done && task.done)) return false
-
-  const dueTime = task.due_date && task.due_date !== NULL_DATE ? new Date(task.due_date).getTime() : null
-  const todayStart = new Date(startOfToday()).getTime()
-  const todayEnd = new Date(endOfToday()).getTime()
-  const dueTodayUnion = filter.include_today_all_projects && dueTime !== null && dueTime >= todayStart && dueTime <= todayEnd
-  if (!dueTodayUnion && filter.project_ids.length > 0) {
-    const listed = filter.project_ids.includes(task.project_id)
-    if ((filter.project_filter_mode ?? 'include') === 'exclude' ? listed : !listed) return false
-  }
-
-  const dueLimit = filter.due_date_filter === 'this_week' ? new Date(endOfWeek()).getTime()
-    : filter.due_date_filter === 'this_month' ? new Date(endOfMonth()).getTime()
-      : todayEnd
-  if (!dueTodayUnion) {
-    if (filter.due_date_filter === 'overdue' && (dueTime === null || dueTime >= todayStart)) return false
-    if (filter.due_date_filter === 'today' && (dueTime === null || dueTime > todayEnd)) return false
-    if (['this_week', 'this_month'].includes(filter.due_date_filter) && (dueTime === null || dueTime > dueLimit)) return false
-    if (filter.due_date_filter === 'has_due_date' && dueTime === null) return false
-    if (filter.due_date_filter === 'no_due_date' && dueTime !== null) return false
-  }
-  if (filter.priority_filter?.length && !filter.priority_filter.includes(task.priority)) return false
-  if (filter.label_ids?.length) {
-    const taskLabelIds = new Set((task.labels ?? []).map((label) => label.id))
-    if (!filter.label_ids.some((id) => taskLabelIds.has(id))) return false
-  }
-  return true
+  return activeProjectIds.has(task.project_id) && matchesCustomList(task, list.filter, toLocalDate(new Date()))
 }
 
 export function CustomListView() {
@@ -132,11 +38,15 @@ export function CustomListView() {
   const { data: projects } = useProjects()
   const { data: config } = useAppConfig()
   const [creationNotice, setCreationNotice] = useState<string | null>(null)
+  // The server filter holds local-day boundaries for date windows. They are computed when the
+  // params are built, so the day is a dependency: after midnight the filter (and with it the query
+  // key) changes instead of reusing yesterday's window.
+  const dayKey = useDayKey()
 
   const queryParams = useMemo(() => {
-    if (!customList) return { filter: 'done = false' }
+    if (!customList) return { filter: 'done = false', keep_nested_subtasks: true }
     return buildQueryParams(customList)
-  }, [customList])
+  }, [customList, dayKey])
 
   const { data: tasks = [], isLoading } = useTasks(queryParams, !!customList)
 
@@ -149,8 +59,13 @@ export function CustomListView() {
   const filteredTasks = useMemo(() => {
     if (!customList) return tasks
     const activeIds = new Set(projects?.flat.map((project) => project.id) ?? [])
-    return tasks.filter((task) => taskMatchesCustomList(task, customList, activeIds))
-  }, [tasks, customList, projects?.flat])
+    const matching = tasks.filter((task) => taskMatchesCustomList(task, customList, activeIds))
+    // The list's own sort, the same as on Android: tasks without the date last in both directions,
+    // ties in the order they came in. Subtasks are hidden after sorting, so the order holds.
+    const sorted = sortCustomListTasks(matching, customList.filter.sort_by, customList.filter.order_by)
+    // A matching subtask is shown even when its parent does not match (cross-app semantics v1, 3.2).
+    return withoutNestedSubtasks(sorted, { hideChildrenOfCompletedParents: false })
+  }, [tasks, customList, projects?.flat, dayKey])
 
   usePrintable(
     useMemo(

@@ -1,6 +1,8 @@
 # Shared Parser Module Specification
 
-This document defines the exact parser behavior that BOTH Vicu and vikunja-quick-entry must implement identically. Both apps must produce the same `ParseResult` for the same input string and the same `ParserConfig`.
+This document defines the exact parser behavior that BOTH Vicu (desktop) and Vicu Android must implement identically. Both apps must produce the same `ParseResult` for the same input string and the same `ParserConfig`.
+
+The date and recurrence rules are the contract in `docs/cross-app-semantics-v1.md` section 5, and the test is the shared corpus `test-fixtures/nlp-corpus-v1.json` (91 cases, reference time Tue 2026-10-06 10:00 local; both apps run the same file). If this document and the corpus disagree, the corpus wins. The desktop implementation is `src/renderer/lib/task-parser/`: there is one parser (the main window, the task title editor and Quick Entry all call it), and the date work is done by chrono-node plus the rules below.
 
 ---
 
@@ -13,6 +15,9 @@ type TokenType = 'date' | 'priority' | 'label' | 'project' | 'recurrence'
 interface ParserConfig {
   enabled: boolean        // Master toggle — when false, parse() returns raw input as title, nothing extracted
   syntaxMode: SyntaxMode  // Which prefix convention to use
+  bangToday?: boolean     // The `!` -> today shortcut (setting "exclamation_today", default on)
+  locale?: string         // Slash-date order; defaults to the device/system locale
+  suppressTypes?: TokenType[]  // Token types the user dismissed: that extractor is skipped
 }
 
 const DEFAULT_PARSER_CONFIG: ParserConfig = {
@@ -22,10 +27,10 @@ const DEFAULT_PARSER_CONFIG: ParserConfig = {
 ```
 
 When `enabled` is `false`:
-- `parse()` returns `{ title: rawInput.trim(), dueDate: null, priority: null, labels: [], project: null, recurrence: null, rawInput, tokens: [] }`
+- `parse()` returns the input unchanged as the title with nothing extracted (callers trim it): `{ title: rawInput, dueDate: null, priority: null, labels: [], project: null, recurrence: null, tokens: [] }`
 - No highlighting, no autocomplete, no preview chips
 - The input field behaves as a plain text input (existing behavior before this feature)
-- **Exception**: The `!` → today shortcut STILL works even when the parser is disabled — it predates this feature and is an established convention in both apps
+- **Exception**: The `!` → today shortcut STILL works even when the parser is disabled (when `bangToday` is on) — it predates this feature and is an established convention in both apps. It is the same rule as when the parser is on (see "The `!` today shortcut" under Dates), so `parse()` applies it in both cases.
 
 ---
 
@@ -48,13 +53,13 @@ Vikunja's own web frontend uses `*label`, `+project`, `!4` priority, `@assignee`
 
 ### Priority detail by mode
 
-**Todoist mode:**
+**Todoist mode** (Todoist's numbering: `p1` is the most urgent):
 | Input | Priority Value | Display |
 |-------|---------------|---------|
-| `p1` or `!low` | 1 | Low |
-| `p2` or `!medium` or `!med` | 2 | Medium |
-| `p3` or `!high` | 3 | High |
-| `p4` or `!urgent` or `!critical` | 4 | Urgent |
+| `p4` or `!low` | 1 | Low |
+| `p3` or `!medium` or `!med` | 2 | Medium |
+| `p2` or `!high` | 3 | High |
+| `p1` or `!urgent` or `!critical` | 4 | Urgent |
 
 **Vikunja mode:**
 | Input | Priority Value | Display |
@@ -66,7 +71,7 @@ Vikunja's own web frontend uses `*label`, `+project`, `!4` priority, `@assignee`
 
 The `!word` forms (`!low`, `!high`, etc.) work in BOTH modes. Only the short numeric form differs (`p1` vs `!1`).
 
-**Critical: `!` alone (no letter or digit immediately after it) always means "today" in both modes.** The priority extractor must require a digit (`!1`–`!4`) or a known word (`!low`, `!high`) immediately after the `!`. A lone `!` at end of input or followed by whitespace is always the date shortcut.
+**Critical: a lone `!` (no letter or digit immediately after it) means "today" in both modes** (full rule under Dates). The priority extractor must require a digit (`!1`–`!4`) or a known word (`!low`, `!med`, `!high`, `!urgent`) immediately after the `!`.
 
 ---
 
@@ -75,13 +80,14 @@ The `!word` forms (`!low`, `!high`, etc.) work in BOTH modes. Only the short num
 ```typescript
 interface ParseResult {
   title: string              // Cleaned task title (all tokens removed)
-  dueDate: Date | null       // Extracted due date/time
+  dueDate: Date | null       // Extracted due date; its time of day only counts when dueHasTime is true
+  dueHasTime: boolean        // The text named a time ("3pm", "14:30", "in 2 hours"): chrono start.isCertain('hour')
   priority: 1 | 2 | 3 | 4 | null  // Vikunja priority (1=low, 2=medium, 3=high, 4=urgent)
   labels: string[]           // Label names (prefix stripped)
   project: string | null     // Project name (prefix stripped)
   recurrence: {
     interval: number
-    unit: 'days' | 'weeks' | 'months' | 'years'
+    unit: 'day' | 'week' | 'month' | 'year'   // singular, as in the corpus
   } | null
   rawInput: string           // Original input for debugging
   tokens: ParsedToken[]      // All detected tokens with positions (for highlighting)
@@ -104,13 +110,13 @@ interface ParsedToken {
 export function parse(
   input: string,
   config: ParserConfig = DEFAULT_PARSER_CONFIG,
-  suppressTypes: Set<TokenType> = new Set()
+  reference: Date = new Date()   // "now": relative dates and the `!` shortcut; tests pass the corpus reference
 ): ParseResult
 ```
 
-- When `config.enabled === false`: return immediately with raw title and empty fields. Exception: still handle lone `!` → today.
+- When `config.enabled === false`: return with the input as the title and empty fields. Exception: still apply the `!` shortcut (when `config.bangToday`).
 - When `config.enabled === true`: run extractors using prefix characters from `config.syntaxMode`.
-- When a type is in `suppressTypes`: skip that extractor (its text stays in the title).
+- When a type is in `config.suppressTypes`: skip that extractor (its text stays in the title).
 
 ---
 
@@ -196,45 +202,105 @@ The parser MUST extract tokens in this exact order:
 2. **Projects** (prefix-based: `#` or `+`) — extract and remove
 3. **Priority** (mode-dependent short form + shared word form) — extract and remove
 4. **Recurrence** (`every ...`, `daily`, `weekly`, etc.) — extract and remove
-5. **Dates** (sugar-date on remaining text, plus `!` → today) — extract and remove
-6. **Title** — everything remaining, trimmed and collapsed whitespace
+5. **Dates** (the date rules below on the remaining text) — extract and remove
+6. **`!` today shortcut** — on the title that is left, when no date was found
+7. **Title** — everything remaining, trimmed and collapsed whitespace
 
 This order matters because:
 - Prefix markers are unambiguous — grab them first
 - In Vikunja mode, `!3` (priority) must be extracted BEFORE the date extractor sees `!`
-- Recurrence must be extracted BEFORE dates because "every monday" contains "monday"
-- Dates run last to avoid false positives from removed token text
+- Recurrence must be extracted BEFORE dates because "every monday" contains "monday" (the weekday is then used as the due date, see Recurrence)
+- Dates run after the other tokens so their text can't produce false dates
 
 ---
 
-## Dates (via sugar-date) — identical in both modes
+## Dates — identical in both modes
 
-- Natural language: `today`, `tomorrow`, `next monday`, `in 3 days`, `next week`, `end of month`
-- Specific dates: `jan 15`, `march 3rd`, `12/25`, `2026-03-01`
-- With time: `tomorrow at 3pm`, `next friday 14:00`, `jan 15 9:30am`
-- Relative: `in 2 hours`, `in 30 minutes`
-- Special shortcut: `!` alone means "today" — both modes, even when parser is disabled
+Contract: `docs/cross-app-semantics-v1.md` section 5.1; corpus: `test-fixtures/nlp-corpus-v1.json`. Dates are parsed with chrono-node (`forwardDate: true`) plus the rules below. Text already taken by labels, projects, priority and recurrence is invisible to the date parser, and it splits a date phrase (see More than one date).
+
+- Natural language: `today`, `tomorrow`, weekday names, `this <weekday>`, `next <weekday>`, `<weekday> this week`, `<weekday> next week`, `next week`, `next month`, `in 3 days`, `in 2 weeks`
+- Specific dates: `jan 15`, `15 jan`, `march 3rd`, `10/15`, `2026-10-15`
+- With time: `tomorrow at 3pm`, `next friday 14:00`, `jan 15 9:30am`, `wed 3pm`
+- Relative times: `in 2 hours`, `in 30 minutes` (the exact time)
+- Special shortcut: the `!` today shortcut (below)
+
+### Weekdays
+
+- A bare weekday or `this <weekday>` is the next occurrence on or after today (today included). A date-only phrase is judged against the start of the day, so "tuesday" typed on a Tuesday afternoon is today, not next week.
+- `next <weekday>` is that weekday in the following Monday-start week (Tue 2026-10-06: `next friday` = 2026-10-16; Sun 2026-10-04: `next monday` = 2026-10-05).
+- `<weekday> this week` and `<weekday> next week` are one phrase, the same as `this <weekday>` and `next <weekday>` ("Meet friday next week" is 2026-10-16). chrono reads them that way itself.
+- `next week` is the Monday of the following week (chrono itself says "in 7 days"; do not use that). `next month` is the same day next month.
+- **Three-letter abbreviations** (`mon`, `tue`, `tues`, `wed`, `thu`, `thur`, `thurs`, `fri`, `sat`, `sun`) only count as dates when the previous word is `on`, `next`, `this`, `by` or `due`, or when a time follows (`mon 9am`, `wed at 3pm`, `fri 14:00`). Otherwise they are plain words: "Buy sun cream", "Notes we sat on" and "Plan wed anniversary" have no date. Full weekday names always count.
+- `weekend` and `weekday` are words, not dates: "Plan the weekend" has no date. (chrono reads them as Saturday and the next working day; desktop blanks them before chrono runs.)
+
+### Words that are not dates
+
+- **A date phrase is made of whole words**: it starts at the start of the text or after a space, and ends at a space, the end of the text, or one of `. , ! ? ; )`. "Send Monday's report tomorrow" is due tomorrow; "Call Ana (tomorrow)", "Plan Friday/Saturday", "Ship it tomorrow-ish", `Book "friday" table` and "Tomorrow: call Ana" have no date. chrono reads all of them, so desktop drops the chrono results that are not whole words (`isWholeWords` in `extract-dates.ts`).
+- **Phrases about the past are not dates** and stay in the title: `yesterday`, `last night`, `last <weekday>`, `past <weekday>`, `<weekday> last week`, `last week|month|year` and `N days ago` ("Review notes from last friday", "Notes from yesterday" and "Sent 2 days ago" have no date). Desktop blanks the past forms chrono reads before chrono runs (`PAST_PHRASE_RE`); Android only needs the weekday ones, as it has no pattern for the others.
+
+### More than one date
+
+- **A weekday directly followed by another date** (only spaces or a comma between them) is part of the title, and the other date is the due date: "Call Ana about Saturday tomorrow at 3pm" is due tomorrow at 15:00 with the title "Call Ana about Saturday"; "Party Saturday oct 17" is due on 2026-10-17 with the title "Party Saturday". A time is not another date ("Call wed 3pm" is Wednesday at 15:00); `in 2 hours` is. A word between them, connectors included, keeps them apart ("Meeting about Friday on Monday" is due on Friday). chrono would merge the weekday into the date after it (its `MergeWeekdayComponentRefiner`), so desktop drops such a weekday in a refiner that runs before chrono's own (`isWeekdayBeforeAnotherDate` in `extract-dates.ts`).
+- **A label, project or priority splits a date phrase** in two, and the first part is the due date: "Call tomorrow @home 3pm" is due tomorrow (date-only) with the title "Call 3pm", and "Dentist tomorrow #Health at 3pm" is due tomorrow with the title "Dentist at 3pm". A connector does not reach across one either: "Pay rent by @money friday" is due on Friday with the title "Pay rent by". Desktop shows chrono a mark in place of the taken text, so chrono cannot read across it.
+- **There are no ranges.** `to`, `until`, `through`, `till` or a dash (`-`, `–`, `~`) between two dates or times leaves two phrases, and the first is the due date: "Trip friday to sunday" is due on Friday with the title "Trip to sunday"; "Meeting tomorrow 3pm to 5pm" is due tomorrow at 15:00 with the title "Meeting to 5pm". A range written as one word is not a date: "Meeting tomorrow 3-5pm" is due tomorrow (date-only) with the title "Meeting 3-5pm". Desktop shows chrono a mark in place of a range word between spaces, and drops the ranges chrono finds inside one match ("3-5pm", "oct 10-12").
+- **Otherwise the first date phrase is the due date** and the others stay in the title: "Book Friday dinner tomorrow" is due on Friday with the title "Book dinner tomorrow".
+
+### Connectors
+
+The words `on`, `by` and `due` directly before a date phrase, and `at` directly before a time, are removed together with the date: "Submit report by friday" gives the title "Submit report", "Taxes due tomorrow" gives "Taxes", "Call at 9am" gives "Call". A connector with no date after it stays in the title. `from` is not a connector: chrono takes it with a time ("from 3pm"), and desktop leaves it in the title.
+
+### Times
+
+- A time (`3pm`, `3:30pm`, `14:00`, optionally after `at`) can come before or after a date phrase.
+- A time without a date is today if it is still ahead, otherwise tomorrow.
+- `now` is never a date ("Do it now" keeps its title and has no due date).
+
+### Slash dates
+
+`10/15` follows the device locale's order: month/day for `en-US` (and any locale whose short date puts the month first), day/month for `en-GB` and most others. When the first number cannot be a month (`15/10` in `en-US`) the order flips. ISO dates (`2026-10-15`) are unambiguous. The locale is `ParserConfig.locale`, which defaults to the system locale (`navigator.language` on desktop). Dates without a year that already passed this year roll to next year (`jan 15` in October is next January); a date equal to today stays today.
+
+### The `!` today shortcut
+
+One rule in every entry point (new-task composer, task title editor, Quick Entry), implemented once as `extractBangToday` on desktop and applied by `parse()` whether the parser is enabled or not (only when `bangToday` is on):
+
+- a standalone `!`, a leading `!` ("! call dentist", "!call dentist") or a trailing `!` ("call dentist !", "call dentist!") means today, date-only, and is removed from the title;
+- a leading `!` followed by a priority token (`!1`-`!4`, `!low`, `!medium`, `!high`, `!urgent`) is that priority, not a date;
+- a `!` inside the text ("Hello! world") is not a date and stays;
+- when the parser found another date, the `!` is not used as a date.
+
+### Stored due time (docs/cross-app-semantics-v1.md, section 1)
+
+- A date without a time of day ("tomorrow", "jan 15", "in 3 days", "next week", the `!` shortcut) is stored as that
+  local date at **23:59:59** (date-only), never midnight.
+- A date with a time ("tomorrow at 3pm", "next friday 14:00", "in 2 hours") keeps the parsed time, to the minute. Desktop
+  decides with `dueHasTime` (chrono's `start.isCertain('hour')`); the caller builds the stored value with
+  `parsedDue(dueDate, dueHasTime)` (`src/shared/due-dates.ts`), which never mutates the parse result.
 
 ---
 
 ## Recurrence — identical in both modes
 
+Contract: `docs/cross-app-semantics-v1.md` section 5.2.
+
 | Input | interval | unit |
 |-------|----------|------|
-| `every day` or `daily` | 1 | days |
-| `every week` or `weekly` | 1 | weeks |
-| `every month` or `monthly` | 1 | months |
-| `every year` or `yearly` or `annually` | 1 | years |
-| `every 2 weeks` or `biweekly` | 2 | weeks |
-| `every 3 days` | 3 | days |
+| `every day` or `daily` | 1 | day |
+| `every week` or `weekly` | 1 | week |
+| `every month` or `monthly` | 1 | month |
+| `every year` or `yearly` or `annually` | 1 | year |
+| `every 2 weeks` | 2 | week |
+| `biweekly` or `fortnightly` | 2 | week |
+| `every 3 days` | 3 | day |
 | `every N {unit}` | N | unit |
+| `every <weekday>` (full name) | 1 | week |
 
-`weekly`/`monthly`/`yearly` as standalone only — `weekly standup` should NOT extract recurrence because "weekly" is an adjective modifying "standup".
+- **Shorthand** (`daily`, `weekly`, `monthly`, `yearly`, `annually`, `biweekly`, `fortnightly`) counts when it is the whole remaining input or its **last word**, after labels, projects and priority were removed: "Water plants daily" and "Water plants daily @home" are recurring; "weekly standup" and "Daily review tomorrow" are not (other words follow, so it describes them).
+- **`every <weekday>`** (full name only) is weekly, and the due date is the next occurrence of that weekday (today included) unless the input has another date ("every friday starting oct 20" keeps oct 20). A time after the weekday applies ("every monday 10am" is Monday 10:00); a time on its own is not another date. Desktop leaves the weekday to the date extractor: the recurrence token covers `every` (or `every <weekday>` when another date is used).
 
 ### Recurrence → Vikunja API mapping
 ```typescript
 function recurrenceToSeconds(r: { interval: number; unit: string }): number {
-  const multipliers = { days: 86400, weeks: 604800, months: 2592000, years: 31536000 }
+  const multipliers = { day: 86400, week: 604800, month: 2592000, year: 31536000 }
   return r.interval * multipliers[r.unit]
 }
 // repeat_mode = 0 (repeat after duration)
@@ -248,7 +314,7 @@ function recurrenceToSeconds(r: { interval: number; unit: string }): number {
 // POST /api/v2/projects/{projectID}/tasks
 interface VikunjaTaskPayload {
   title: string                    // ← parseResult.title
-  due_date: string | null          // ← parseResult.dueDate?.toISOString()
+  due_date: string | null          // ← parsedDue(parseResult.dueDate, parseResult.dueHasTime) (date-only = local 23:59:59)
   priority: number                 // ← parseResult.priority ?? 0 (0 = unset)
   repeat_after: number             // ← recurrenceToSeconds(parseResult.recurrence)
   repeat_mode: 0 | 1 | 3          // ← 0 for standard repeat_after
@@ -267,7 +333,7 @@ interface VikunjaTaskPayload {
 → { title: "buy groceries", dueDate: null, priority: null, labels: [], project: null }
 
 "buy groceries tomorrow 3pm #shopping @errands p3"
-→ { title: "buy groceries", dueDate: <tomorrow 15:00>, priority: 3, labels: ["errands"], project: "shopping" }
+→ { title: "buy groceries", dueDate: <tomorrow 15:00>, priority: 2, labels: ["errands"], project: "shopping" }
 
 "review PR #142"
 → { title: "review PR #142", project: null }
@@ -277,10 +343,41 @@ interface VikunjaTaskPayload {
 → { title: "call dentist", dueDate: <today> }
 
 "weekly standup every monday 10am @work"
-→ { title: "weekly standup", dueDate: <next monday 10:00>, labels: ["work"], recurrence: { interval: 1, unit: 'weeks' } }
+→ { title: "weekly standup", dueDate: <next monday 10:00>, labels: ["work"], recurrence: { interval: 1, unit: 'week' } }
+
+"Submit report by fri"
+→ { title: "Submit report", dueDate: <next friday, date-only> }
+// "by" is a connector, so it goes with the date; "fri" counts because "by" precedes it
+
+"Buy sun cream"
+→ { title: "Buy sun cream", dueDate: null }
+// "sun" is an abbreviation with no connector and no time
+
+"Call Ana about Saturday tomorrow at 3pm @call p2 #Personal"
+→ { title: "Call Ana about Saturday", dueDate: <tomorrow 15:00>, priority: 3, labels: ["call"], project: "Personal" }
+// "Saturday" is directly followed by another date, so it stays in the title
+
+"Plan the weekend"
+→ { title: "Plan the weekend", dueDate: null }
+// "weekend" is not a date
+
+"Call tomorrow @home 3pm"
+→ { title: "Call 3pm", dueDate: <tomorrow, date-only>, labels: ["home"] }
+// the label splits the phrase, and the first part is the date
+
+"Trip friday to sunday"
+→ { title: "Trip to sunday", dueDate: <friday, date-only> }
+// no ranges: the first date is the due date
+
+"Review notes from last friday"
+→ { title: "Review notes from last friday", dueDate: null }
+// a phrase about the past is not a date
+
+"Water plants daily"
+→ { title: "Water plants", recurrence: { interval: 1, unit: 'day' } }
 
 "p3 talk about p2p networking"
-→ { title: "talk about p2p networking", priority: 3 }
+→ { title: "talk about p2p networking", priority: 2 }
 // \bp2\b won't match "p2p"
 ```
 
@@ -299,6 +396,9 @@ interface VikunjaTaskPayload {
 
 "task !4 *urgent +inbox"
 → { title: "task", priority: 4, labels: ["urgent"], project: "inbox" }
+
+"Call Ana about the weekend tomorrow at 3pm *call !3"
+→ { title: "Call Ana about the weekend", dueDate: <tomorrow 15:00>, priority: 3, labels: ["call"] }
 
 "call dentist !"
 → { title: "call dentist", dueDate: <today> }

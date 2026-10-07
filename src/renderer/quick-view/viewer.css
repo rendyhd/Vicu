@@ -83,6 +83,11 @@ html, body {
   color: #888;
 }
 
+.status-bar.failed {
+  color: #c53030;
+  background: rgba(197, 48, 48, 0.06);
+}
+
 .status-bar.standalone {
   color: #4a90d9;
   background: rgba(74, 144, 217, 0.06);
@@ -238,7 +243,8 @@ html, body {
   color: #1a1a1a;
 }
 
-.task-item.completing .task-title {
+.task-item.completing .task-title,
+.task-item.task-done .task-title {
   text-decoration: line-through;
   opacity: 0.5;
 }
@@ -600,6 +606,11 @@ html, body {
 
   .status-bar.pending {
     color: #777;
+  }
+
+  .status-bar.failed {
+    color: #fc8181;
+    background: rgba(252, 129, 129, 0.08);
   }
 
   .status-bar.standalone {

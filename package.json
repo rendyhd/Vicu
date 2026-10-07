@@ -1,6 +1,6 @@
 {
   "name": "vicu",
-  "version": "1.8.1",
+  "version": "1.9.0",
   "description": "A task management app powered by Vikunja",
   "main": "./out/main/index.js",
   "desktopName": "com.rendyhd.vicu",
@@ -56,7 +56,7 @@
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.7.0",
     "autoprefixer": "^10.4.0",
-    "electron": "44.4.5",
+    "electron": "44.5.1",
     "electron-builder": "^26.15.3",
     "electron-vite": "^5.0.0",
     "postcss": "^8.4.0",

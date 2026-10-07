@@ -1,0 +1,100 @@
+{
+  "contractVersion": 1,
+  "about": "Shared test vectors for docs/cross-app-semantics-v1.md. Times are local wall-clock times without offset; convert with the system time zone. Keep this file identical in vicu and vicu-android.",
+  "dueDates": {
+    "display": [
+      { "local": "2026-10-06T23:59:59", "dateOnly": true },
+      { "local": "2026-10-06T00:00:00", "dateOnly": true },
+      { "local": "2026-10-06T15:30:00", "dateOnly": false },
+      { "local": "2026-10-06T23:59:00", "dateOnly": false },
+      { "local": "2026-10-06T12:00:00", "dateOnly": false }
+    ],
+    "setters": [
+      { "reference": "2026-10-06T10:00:00", "action": "today", "expect": "2026-10-06T23:59:59" },
+      { "reference": "2026-10-06T10:00:00", "action": "tomorrow", "expect": "2026-10-07T23:59:59" },
+      { "reference": "2026-10-06T10:00:00", "action": "nextWeek", "expect": "2026-10-12T23:59:59" },
+      { "reference": "2026-10-11T10:00:00", "action": "nextWeek", "expect": "2026-10-12T23:59:59" },
+      { "reference": "2026-10-12T10:00:00", "action": "nextWeek", "expect": "2026-10-19T23:59:59" },
+      { "reference": "2026-10-06T23:30:00", "action": "today", "expect": "2026-10-06T23:59:59" },
+      { "reference": "2026-10-06T00:30:00", "action": "today", "expect": "2026-10-06T23:59:59" },
+      { "reference": "2026-10-06T10:00:00", "action": "pickDate", "date": "2026-10-20", "expect": "2026-10-20T23:59:59" },
+      { "reference": "2026-10-06T10:00:00", "action": "bang", "expect": "2026-10-06T23:59:59" },
+      { "reference": "2026-10-06T10:00:00", "action": "postponeDays", "days": 1, "from": "2026-10-06T23:59:59", "expect": "2026-10-07T23:59:59" },
+      { "reference": "2026-10-06T10:00:00", "action": "postponeDays", "days": 1, "from": "2026-10-06T09:30:00", "expect": "2026-10-07T09:30:00" },
+      { "reference": "2026-10-06T10:00:00", "action": "postponeDays", "days": 7, "from": "2026-10-06T00:00:00", "expect": "2026-10-13T23:59:59" }
+    ]
+  },
+  "weeks": [
+    { "today": "2026-10-06", "thisWeekEnd": "2026-10-11", "thisMonthEnd": "2026-10-31", "nextWeekStart": "2026-10-12" },
+    { "today": "2026-10-11", "thisWeekEnd": "2026-10-11", "thisMonthEnd": "2026-10-31", "nextWeekStart": "2026-10-12" },
+    { "today": "2026-10-12", "thisWeekEnd": "2026-10-18", "thisMonthEnd": "2026-10-31", "nextWeekStart": "2026-10-19" },
+    { "today": "2026-10-31", "thisWeekEnd": "2026-11-01", "thisMonthEnd": "2026-10-31", "nextWeekStart": "2026-11-02" },
+    { "today": "2026-12-28", "thisWeekEnd": "2027-01-03", "thisMonthEnd": "2026-12-31", "nextWeekStart": "2027-01-04" }
+  ],
+  "tasks": [
+    { "id": 1, "projectId": 10, "due": "2026-10-01T23:59:59", "done": false, "priority": 0, "labelIds": [] },
+    { "id": 2, "projectId": 10, "due": "2026-10-06T23:59:59", "done": false, "priority": 0, "labelIds": [] },
+    { "id": 3, "projectId": 11, "due": "2026-10-06T08:00:00", "done": false, "priority": 0, "labelIds": [] },
+    { "id": 4, "projectId": 10, "due": "2026-10-07T00:00:00", "done": false, "priority": 0, "labelIds": [] },
+    { "id": 5, "projectId": 11, "due": "2026-10-07T23:59:59", "done": false, "priority": 0, "labelIds": [] },
+    { "id": 6, "projectId": 10, "due": "2026-10-11T23:59:59", "done": false, "priority": 0, "labelIds": [] },
+    { "id": 7, "projectId": 10, "due": "2026-10-12T00:00:00", "done": false, "priority": 0, "labelIds": [] },
+    { "id": 8, "projectId": 11, "due": "2026-10-31T23:59:59", "done": false, "priority": 0, "labelIds": [] },
+    { "id": 9, "projectId": 10, "due": "2026-11-01T00:00:00", "done": false, "priority": 0, "labelIds": [] },
+    { "id": 10, "projectId": 10, "due": null, "done": false, "priority": 0, "labelIds": [] },
+    { "id": 11, "projectId": 10, "due": "2026-10-06T23:59:59", "done": true, "priority": 0, "labelIds": [] },
+    { "id": 12, "projectId": 12, "due": "2026-10-05T23:59:59", "done": false, "priority": 4, "labelIds": [7] },
+    { "id": 13, "projectId": 12, "due": "2026-10-06T12:00:00", "done": false, "priority": 3, "labelIds": [7] }
+  ],
+  "smartLists": [
+    {
+      "today": "2026-10-06",
+      "todayOverdue": [1, 12],
+      "todayToday": [2, 3, 13],
+      "upcoming": [4, 5, 6, 7, 8, 9]
+    },
+    {
+      "today": "2026-10-07",
+      "todayOverdue": [1, 2, 3, 12, 13],
+      "todayToday": [4, 5],
+      "upcoming": [6, 7, 8, 9]
+    }
+  ],
+  "customLists": [
+    { "name": "today, include_overdue absent", "today": "2026-10-06", "filter": { "due_date_filter": "today" }, "expect": [1, 2, 3, 12, 13] },
+    { "name": "today, include_overdue true", "today": "2026-10-06", "filter": { "due_date_filter": "today", "include_overdue": true }, "expect": [1, 2, 3, 12, 13] },
+    { "name": "today, include_overdue false", "today": "2026-10-06", "filter": { "due_date_filter": "today", "include_overdue": false }, "expect": [2, 3, 13] },
+    { "name": "this_week with overdue", "today": "2026-10-06", "filter": { "due_date_filter": "this_week" }, "expect": [1, 2, 3, 4, 5, 6, 12, 13] },
+    { "name": "this_week without overdue", "today": "2026-10-06", "filter": { "due_date_filter": "this_week", "include_overdue": false }, "expect": [2, 3, 4, 5, 6, 13] },
+    { "name": "this_month with overdue", "today": "2026-10-06", "filter": { "due_date_filter": "this_month" }, "expect": [1, 2, 3, 4, 5, 6, 7, 8, 12, 13] },
+    { "name": "this_month without overdue", "today": "2026-10-06", "filter": { "due_date_filter": "this_month", "include_overdue": false }, "expect": [2, 3, 4, 5, 6, 7, 8, 13] },
+    { "name": "overdue ignores the flag", "today": "2026-10-06", "filter": { "due_date_filter": "overdue", "include_overdue": false }, "expect": [1, 12] },
+    { "name": "has_due_date", "today": "2026-10-06", "filter": { "due_date_filter": "has_due_date" }, "expect": [1, 2, 3, 4, 5, 6, 7, 8, 9, 12, 13] },
+    { "name": "no_due_date", "today": "2026-10-06", "filter": { "due_date_filter": "no_due_date" }, "expect": [10] },
+    { "name": "all", "today": "2026-10-06", "filter": { "due_date_filter": "all" }, "expect": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 13] },
+    { "name": "today including done", "today": "2026-10-06", "filter": { "due_date_filter": "today", "include_done": true }, "expect": [1, 2, 3, 11, 12, 13] },
+    { "name": "today in project 10", "today": "2026-10-06", "filter": { "due_date_filter": "today", "project_ids": [10] }, "expect": [1, 2] },
+    { "name": "today in project 10 plus today from all projects", "today": "2026-10-06", "filter": { "due_date_filter": "today", "project_ids": [10], "include_today_all_projects": true }, "expect": [1, 2, 3, 12, 13] },
+    { "name": "this_week in project 10 plus today from all projects", "today": "2026-10-06", "filter": { "due_date_filter": "this_week", "project_ids": [10], "include_today_all_projects": true }, "expect": [1, 2, 3, 4, 6, 12, 13] },
+    { "name": "this_week in project 10 plus today, no overdue", "today": "2026-10-06", "filter": { "due_date_filter": "this_week", "project_ids": [10], "include_today_all_projects": true, "include_overdue": false }, "expect": [2, 3, 4, 6, 13] },
+    { "name": "exclude project 10", "today": "2026-10-06", "filter": { "due_date_filter": "all", "project_ids": [10], "project_filter_mode": "exclude" }, "expect": [3, 5, 8, 12, 13] },
+    { "name": "exclude project 10 plus today from all projects", "today": "2026-10-06", "filter": { "due_date_filter": "all", "project_ids": [10], "project_filter_mode": "exclude", "include_today_all_projects": true }, "expect": [1, 2, 3, 5, 8, 12, 13] },
+    { "name": "priority 3 and 4", "today": "2026-10-06", "filter": { "due_date_filter": "all", "priority_filter": [3, 4] }, "expect": [12, 13] },
+    { "name": "label 7 due today", "today": "2026-10-06", "filter": { "due_date_filter": "today", "label_ids": [7] }, "expect": [12, 13] },
+    { "name": "this_week on a Sunday with overdue", "today": "2026-10-11", "filter": { "due_date_filter": "this_week" }, "expect": [1, 2, 3, 4, 5, 6, 12, 13] },
+    { "name": "this_week on a Sunday without overdue", "today": "2026-10-11", "filter": { "due_date_filter": "this_week", "include_overdue": false }, "expect": [6] },
+    { "name": "this_week on a Monday without overdue", "today": "2026-10-12", "filter": { "due_date_filter": "this_week", "include_overdue": false }, "expect": [7] },
+    { "name": "this_month near month end without overdue", "today": "2026-10-30", "filter": { "due_date_filter": "this_month", "include_overdue": false }, "expect": [8] },
+    { "name": "this_month on the first without overdue", "today": "2026-11-01", "filter": { "due_date_filter": "this_month", "include_overdue": false }, "expect": [9] }
+  ],
+  "review": [
+    { "name": "never reviewed", "today": "2026-10-06", "defaultCadence": 14, "meta": { "state": "never" }, "expect": { "isOverdue": true, "daysSince": null, "daysUntil": null, "next": null } },
+    { "name": "excluded", "today": "2026-10-06", "defaultCadence": 14, "meta": { "state": "excluded", "lastReviewedAt": "2026-01-01" }, "expect": { "isOverdue": false, "daysSince": null, "daysUntil": null, "next": null } },
+    { "name": "reviewed today", "today": "2026-10-06", "defaultCadence": 14, "meta": { "state": "reviewed", "lastReviewedAt": "2026-10-06" }, "expect": { "isOverdue": false, "daysSince": 0, "daysUntil": 14, "next": "2026-10-20" } },
+    { "name": "due today", "today": "2026-10-06", "defaultCadence": 14, "meta": { "state": "reviewed", "lastReviewedAt": "2026-09-22" }, "expect": { "isOverdue": false, "daysSince": 14, "daysUntil": 0, "next": "2026-10-06" } },
+    { "name": "one day overdue", "today": "2026-10-06", "defaultCadence": 14, "meta": { "state": "reviewed", "lastReviewedAt": "2026-09-21" }, "expect": { "isOverdue": true, "daysSince": 15, "daysUntil": -1, "next": "2026-10-05" } },
+    { "name": "cadence override", "today": "2026-10-06", "defaultCadence": 14, "meta": { "state": "reviewed", "lastReviewedAt": "2026-10-01", "cadenceDaysOverride": 7 }, "expect": { "isOverdue": false, "daysSince": 5, "daysUntil": 2, "next": "2026-10-08" } },
+    { "name": "across the EU DST change", "today": "2026-11-03", "defaultCadence": 14, "meta": { "state": "reviewed", "lastReviewedAt": "2026-10-20" }, "expect": { "isOverdue": false, "daysSince": 14, "daysUntil": 0, "next": "2026-11-03" } },
+    { "name": "across the year end", "today": "2027-01-08", "defaultCadence": 14, "meta": { "state": "reviewed", "lastReviewedAt": "2026-12-25" }, "expect": { "isOverdue": false, "daysSince": 14, "daysUntil": 0, "next": "2027-01-08" } }
+  ]
+}

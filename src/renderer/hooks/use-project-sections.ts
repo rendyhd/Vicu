@@ -5,7 +5,6 @@ import { api } from '@/lib/api'
 import { useProjects } from './use-projects'
 import type { ProjectTreeNode } from './use-projects'
 import { useCompletedTasksStore } from '@/stores/completed-tasks-store'
-import { DEFAULT_PAGE_SIZE } from '@/lib/constants'
 import { sortProjectTasks } from '@/lib/task-sort'
 import { mergeSectionUndoWindow } from '@/lib/undo-window'
 import type { SectionTaskCacheEntry } from '@/lib/section-task-cache'
@@ -116,7 +115,6 @@ export function useProjectSections(projectId: number) {
 
           const tasksResult = await api.fetchViewTasks(cp.id, listView.id, {
             filter: 'done = false',
-            per_page: DEFAULT_PAGE_SIZE,
           })
           if (!tasksResult.success) return { id: cp.id, tasks: [] as Task[], viewId: listView.id }
 

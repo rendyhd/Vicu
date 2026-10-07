@@ -1,23 +1,19 @@
-import { readFileSync, writeFileSync, existsSync, mkdirSync, renameSync } from 'fs'
-import { join, dirname } from 'path'
 import { app } from 'electron'
+import { join } from 'path'
 import { randomBytes } from 'crypto'
+import { JsonFileStore } from './json-file-store'
 import { overlayPendingActions } from './cache-overlay'
+import { ensureLegacyMigration, STANDALONE_FILENAME, TASK_CACHE_FILENAME } from './offline/legacy-migration'
+import { getOfflineQueue } from './offline/service'
+import { dueToday } from '../shared/due-dates'
 
-const CACHE_FILENAME = 'offline-cache.json'
-
-export interface PendingAction {
-  id: string
-  type: string
-  createdAt: string
-  title?: string
-  description?: string | null
-  dueDate?: string | null
-  projectId?: number | null
-  taskId?: number
-  taskData?: Record<string, unknown>
-  [key: string]: unknown
-}
+// Two small stores that used to live in one `offline-cache.json` (D-SYNC-5). The pending-action
+// queue now has its own file (src/main/offline/), and:
+//   - the task cache (`offline-cache.json`) is disposable: it only feeds the offline Quick View.
+//     It is held in memory, written asynchronously and never backed up.
+//   - standalone tasks (`standalone-tasks.json`) are the only copy of what the user typed in
+//     standalone mode, so they keep a backup and are written before each call returns. The file
+//     is tiny and written only on a user action.
 
 interface StandaloneTask {
   id: string
@@ -30,103 +26,92 @@ interface StandaloneTask {
   updated: string
 }
 
-interface CacheData {
-  pendingActions: PendingAction[]
+interface TaskCacheData {
   cachedTasks: unknown[] | null
   cachedTasksTimestamp: string | null
+}
+
+interface StandaloneData {
   standaloneTasks: StandaloneTask[]
 }
 
-function getCachePath(): string {
-  return join(app.getPath('userData'), CACHE_FILENAME)
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === 'object' && !Array.isArray(value)
 }
 
-function loadCache(): CacheData {
-  try {
-    const raw = readFileSync(getCachePath(), 'utf-8')
-    const cache = JSON.parse(raw)
-    return {
-      pendingActions: Array.isArray(cache.pendingActions) ? cache.pendingActions : [],
-      cachedTasks: Array.isArray(cache.cachedTasks) ? cache.cachedTasks : null,
-      cachedTasksTimestamp: cache.cachedTasksTimestamp || null,
-      standaloneTasks: Array.isArray(cache.standaloneTasks) ? cache.standaloneTasks : [],
-    }
-  } catch {
-    return { pendingActions: [], cachedTasks: null, cachedTasksTimestamp: null, standaloneTasks: [] }
-  }
+let taskCacheStore: JsonFileStore<TaskCacheData> | null = null
+let standaloneStore: JsonFileStore<StandaloneData> | null = null
+
+function taskCache(): JsonFileStore<TaskCacheData> {
+  if (taskCacheStore) return taskCacheStore
+  const dir = app.getPath('userData')
+  ensureLegacyMigration(dir)
+  const store = new JsonFileStore<TaskCacheData>({
+    path: join(dir, TASK_CACHE_FILENAME),
+    backup: false,
+    label: 'task cache',
+    empty: () => ({ cachedTasks: null, cachedTasksTimestamp: null }),
+    parse: (json) => {
+      if (!isRecord(json)) throw new Error('Not a task cache')
+      return {
+        cachedTasks: Array.isArray(json.cachedTasks) ? json.cachedTasks : null,
+        cachedTasksTimestamp: typeof json.cachedTasksTimestamp === 'string' ? json.cachedTasksTimestamp : null,
+      }
+    },
+  })
+  store.load()
+  taskCacheStore = store
+  return store
 }
 
-function saveCache(cache: CacheData): void {
-  const cachePath = getCachePath()
-  const dir = dirname(cachePath)
-  if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
-  // Write atomically: temp file then rename
-  const tmpPath = cachePath + '.tmp'
-  writeFileSync(tmpPath, JSON.stringify(cache, null, 2), 'utf-8')
-  renameSync(tmpPath, cachePath)
+function standalone(): JsonFileStore<StandaloneData> {
+  if (standaloneStore) return standaloneStore
+  const dir = app.getPath('userData')
+  ensureLegacyMigration(dir)
+  const store = new JsonFileStore<StandaloneData>({
+    path: join(dir, STANDALONE_FILENAME),
+    backup: true,
+    quarantineCorrupt: true,
+    label: 'standalone tasks',
+    empty: () => ({ standaloneTasks: [] }),
+    parse: (json) => {
+      if (!isRecord(json) || !Array.isArray(json.standaloneTasks)) throw new Error('Not a standalone task file')
+      return { standaloneTasks: json.standaloneTasks as StandaloneTask[] }
+    },
+  })
+  store.load()
+  standaloneStore = store
+  return store
 }
 
 function generateId(): string {
   return randomBytes(8).toString('hex')
 }
 
-// --- Pending Actions ---
-
-export function addPendingAction(action: Omit<PendingAction, 'id' | 'createdAt'>): string {
-  const cache = loadCache()
-  const full = {
-    ...action,
-    id: generateId(),
-    createdAt: new Date().toISOString(),
-  } as PendingAction
-  cache.pendingActions.push(full)
-  saveCache(cache)
-  return full.id
-}
-
-export function removePendingAction(actionId: string): void {
-  const cache = loadCache()
-  cache.pendingActions = cache.pendingActions.filter((a) => a.id !== actionId)
-  saveCache(cache)
-}
-
-export function removePendingActionByTaskId(taskId: number, type: string): boolean {
-  const cache = loadCache()
-  const index = cache.pendingActions.findIndex(
-    (a) => String(a.taskId) === String(taskId) && a.type === type,
-  )
-  if (index !== -1) {
-    cache.pendingActions.splice(index, 1)
-    saveCache(cache)
-    return true
-  }
-  return false
-}
-
-export function getPendingActions(): PendingAction[] {
-  return loadCache().pendingActions
-}
-
-export function getPendingCount(): number {
-  return loadCache().pendingActions.length
-}
-
 // --- Task Cache ---
 
 export function setCachedTasks(tasks: unknown[]): void {
-  const cache = loadCache()
-  cache.cachedTasks = tasks
-  cache.cachedTasksTimestamp = new Date().toISOString()
-  saveCache(cache)
+  const store = taskCache()
+  store.state = { cachedTasks: tasks, cachedTasksTimestamp: new Date().toISOString() }
+  store.save().catch((err) => console.warn('[cache] could not save the task cache:', err instanceof Error ? err.message : err))
 }
 
 export function getCachedTasks(): { tasks: unknown[] | null; timestamp: string | null } {
-  const cache = loadCache()
-  if (!cache.cachedTasks) return { tasks: null, timestamp: null }
+  const { cachedTasks, cachedTasksTimestamp } = taskCache().state
+  if (!cachedTasks) return { tasks: null, timestamp: null }
   return {
-    tasks: overlayPendingActions(cache.cachedTasks, cache.pendingActions),
-    timestamp: cache.cachedTasksTimestamp,
+    tasks: overlayPendingActions(cachedTasks, getOfflineQueue().getPending()),
+    timestamp: cachedTasksTimestamp,
   }
+}
+
+/** Write anything not on disk yet. Called before the app quits. */
+export function flushTaskCache(): Promise<void> {
+  return taskCacheStore ? taskCacheStore.flush() : Promise.resolve()
+}
+
+export function taskCacheHasUnsavedChanges(): boolean {
+  return taskCacheStore?.hasUnsavedChanges ?? false
 }
 
 // --- Error Classification ---
@@ -135,30 +120,37 @@ export { isRetriableError, isConnectionError, isAuthError } from './error-classi
 
 // --- Standalone Tasks ---
 
+const NO_DUE = '0001-01-01T00:00:00Z'
+
+function tasks(): StandaloneTask[] {
+  return standalone().state.standaloneTasks
+}
+
+function persistStandalone(): void {
+  standalone().saveSync()
+}
+
 export function addStandaloneTask(title: string, description: string | null, dueDate: string | null): StandaloneTask {
-  const cache = loadCache()
   const task: StandaloneTask = {
     id: 'local_' + generateId(),
     title,
     description: description || '',
-    due_date: dueDate || '0001-01-01T00:00:00Z',
+    due_date: dueDate || NO_DUE,
     priority: 0,
     done: false,
     created: new Date().toISOString(),
     updated: new Date().toISOString(),
   }
-  cache.standaloneTasks.push(task)
-  saveCache(cache)
+  tasks().push(task)
+  persistStandalone()
   return task
 }
 
 export function getStandaloneTasks(sortBy?: string, orderBy?: string): StandaloneTask[] {
-  const cache = loadCache()
   const field = sortBy || 'due_date'
   const asc = (orderBy || 'asc') === 'asc'
-  const NO_DUE = '0001-01-01T00:00:00Z'
 
-  return cache.standaloneTasks
+  return tasks()
     .filter((t) => !t.done)
     .sort((a, b) => {
       if (field === 'due_date') {
@@ -182,53 +174,47 @@ export function getStandaloneTasks(sortBy?: string, orderBy?: string): Standalon
 }
 
 export function getAllStandaloneTasks(): StandaloneTask[] {
-  return loadCache().standaloneTasks.filter((t) => !t.done)
+  return tasks().filter((t) => !t.done)
 }
 
 export function markStandaloneTaskDone(taskId: string): StandaloneTask | null {
-  const cache = loadCache()
-  const task = cache.standaloneTasks.find((t) => t.id === taskId)
+  const task = tasks().find((t) => t.id === taskId)
   if (!task) return null
   task.done = true
   task.updated = new Date().toISOString()
-  saveCache(cache)
+  persistStandalone()
   return task
 }
 
 export function markStandaloneTaskUndone(taskId: string): StandaloneTask | null {
-  const cache = loadCache()
-  const task = cache.standaloneTasks.find((t) => t.id === taskId)
+  const task = tasks().find((t) => t.id === taskId)
   if (!task) return null
   task.done = false
   task.updated = new Date().toISOString()
-  saveCache(cache)
+  persistStandalone()
   return task
 }
 
 export function scheduleStandaloneTaskToday(taskId: string): StandaloneTask | null {
-  const cache = loadCache()
-  const task = cache.standaloneTasks.find((t) => t.id === taskId)
+  const task = tasks().find((t) => t.id === taskId)
   if (!task) return null
-  const now = new Date()
-  task.due_date = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59).toISOString()
+  task.due_date = dueToday()
   task.updated = new Date().toISOString()
-  saveCache(cache)
+  persistStandalone()
   return task
 }
 
 export function removeStandaloneTaskDueDate(taskId: string): StandaloneTask | null {
-  const cache = loadCache()
-  const task = cache.standaloneTasks.find((t) => t.id === taskId)
+  const task = tasks().find((t) => t.id === taskId)
   if (!task) return null
-  task.due_date = '0001-01-01T00:00:00Z'
+  task.due_date = NO_DUE
   task.updated = new Date().toISOString()
-  saveCache(cache)
+  persistStandalone()
   return task
 }
 
 export function updateStandaloneTask(taskId: string, updates: Record<string, unknown>): StandaloneTask | null {
-  const cache = loadCache()
-  const task = cache.standaloneTasks.find((t) => t.id === taskId)
+  const task = tasks().find((t) => t.id === taskId)
   if (!task) return null
   if (updates.title !== undefined) task.title = updates.title as string
   if (updates.description !== undefined) task.description = updates.description as string
@@ -236,12 +222,20 @@ export function updateStandaloneTask(taskId: string, updates: Record<string, unk
   if (typeof updates.priority === 'number') task.priority = updates.priority
   if (typeof updates.done === 'boolean') task.done = updates.done
   task.updated = new Date().toISOString()
-  saveCache(cache)
+  persistStandalone()
   return task
 }
 
+/** Remove one task, for example right after it was uploaded to the server. */
+export function removeStandaloneTask(taskId: string): void {
+  const store = standalone()
+  const remaining = store.state.standaloneTasks.filter((t) => t.id !== taskId)
+  if (remaining.length === store.state.standaloneTasks.length) return
+  store.state.standaloneTasks = remaining
+  persistStandalone()
+}
+
 export function clearStandaloneTasks(): void {
-  const cache = loadCache()
-  cache.standaloneTasks = []
-  saveCache(cache)
+  standalone().state.standaloneTasks = []
+  persistStandalone()
 }

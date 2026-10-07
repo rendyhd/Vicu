@@ -1,17 +1,23 @@
 import { useMemo } from 'react'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { api } from '@/lib/api'
+import { isRetriableError } from '@/lib/error-classify'
 import { useProjects } from './use-projects'
 import type { ProjectTreeNode } from './use-projects'
 import { useAppConfig } from './use-app-config'
-import { useUpdateProject } from './use-task-mutations'
+import { useDayKey } from '@/stores/day-store'
+import { updateProjectRequest } from './use-task-mutations'
 import {
   parseReviewFooter,
   computeStatus,
+  restoreFooter,
   upsertFooter,
   todayLocalIsoDate,
   type ReviewStatus,
   type ReviewMetadata,
 } from '@/lib/review-metadata'
-import type { Project, AppConfig, UpdateProjectPayload } from '@/lib/vikunja-types'
+import { useReviewNoticeStore } from '@/stores/review-notice-store'
+import type { Project, AppConfig } from '@/lib/vikunja-types'
 
 export interface ProjectWithStatus {
   project: Project
@@ -47,9 +53,11 @@ function selectProjects(
 export function useProjectsNeedingReview() {
   const { data: projectsData, isLoading: projectsLoading } = useProjects()
   const { data: cfg, isLoading: cfgLoading } = useAppConfig()
+  // Review due dates are measured against today, so the day is a dependency.
+  const dayKey = useDayKey()
   const data = useMemo(
     () => selectProjects(projectsData?.flat, cfg, (s) => s.isOverdue),
-    [projectsData, cfg],
+    [projectsData, cfg, dayKey],
   )
   return { data, isLoading: projectsLoading || cfgLoading }
 }
@@ -57,9 +65,10 @@ export function useProjectsNeedingReview() {
 export function useTrackedProjects() {
   const { data: projectsData, isLoading: projectsLoading } = useProjects()
   const { data: cfg, isLoading: cfgLoading } = useAppConfig()
+  const dayKey = useDayKey()
   const data = useMemo(
     () => selectProjects(projectsData?.flat, cfg, () => true),
-    [projectsData, cfg],
+    [projectsData, cfg, dayKey],
   )
   return { data, isLoading: projectsLoading || cfgLoading }
 }
@@ -121,6 +130,7 @@ function pruneToDue(nodes: ReviewTreeNode[], keepVisible: ReadonlySet<number>): 
 export function useReviewTree(filter: 'due' | 'all', keepVisible: ReadonlySet<number> = EMPTY_KEEP) {
   const { data: projectsData, isLoading: projectsLoading } = useProjects()
   const { data: cfg, isLoading: cfgLoading } = useAppConfig()
+  const dayKey = useDayKey()
   const data = useMemo<ReviewTreeNode[]>(() => {
     if (!projectsData?.tree || !cfg?.review?.enabled) return []
     const now = new Date()
@@ -132,7 +142,7 @@ export function useReviewTree(filter: 'due' | 'all', keepVisible: ReadonlySet<nu
       now,
     )
     return filter === 'all' ? tracked : pruneToDue(tracked, keepVisible)
-  }, [projectsData, cfg, filter, keepVisible])
+  }, [projectsData, cfg, filter, keepVisible, dayKey])
   return { data, isLoading: projectsLoading || cfgLoading }
 }
 
@@ -149,58 +159,147 @@ export function flattenReviewTree(nodes: ReviewTreeNode[]): ReviewTreeNode[] {
   return out
 }
 
-function applyMetaUpdate(project: Project, mutator: (m: ReviewMetadata) => ReviewMetadata): Project {
-  const currentMeta = parseReviewFooter(project.description)
-  const nextMeta = mutator(currentMeta)
-  const newDescription = upsertFooter(project.description, nextMeta)
-  if (newDescription === project.description) return project
-  return { ...project, description: newDescription }
+/**
+ * Review state lives in a footer of the project description, so every review
+ * action rewrites the description and nothing else. Each helper returns the new
+ * description, or null when the action would not change it.
+ */
+function nextDescription(
+  project: Pick<Project, 'description'>,
+  mutator: (m: ReviewMetadata) => ReviewMetadata,
+): string | null {
+  const next = upsertFooter(project.description, mutator(parseReviewFooter(project.description)))
+  return next === project.description ? null : next
 }
 
-// Project is a structural superset of UpdateProjectPayload. The API client
-// sends these fields as a v2 merge patch.
-function projectToPayload(p: Project): UpdateProjectPayload {
-  return p as unknown as UpdateProjectPayload
+export function reviewedDescription(project: Pick<Project, 'description'>, today = todayLocalIsoDate()): string | null {
+  return nextDescription(project, (m) => ({ ...m, state: 'reviewed', lastReviewedAt: today }))
+}
+
+export function cadenceDescription(project: Pick<Project, 'description'>, cadenceDays: number | null): string | null {
+  return nextDescription(project, (m) => ({
+    ...m,
+    cadenceDaysOverride: cadenceDays && cadenceDays > 0 ? cadenceDays : null,
+  }))
+}
+
+export function excludeDescription(project: Pick<Project, 'description'>, excluded: boolean): string | null {
+  return nextDescription(project, (m) => {
+    if (excluded) return { state: 'excluded', lastReviewedAt: null, cadenceDaysOverride: null }
+    return { ...m, state: 'never', lastReviewedAt: null }
+  })
+}
+
+export interface ReviewMutateOptions {
+  onSuccess?: () => void
+  onError?: (error: Error) => void
+}
+
+/**
+ * The description of a project as the server has it right now. A review save must apply its
+ * footer change to this and not to the cached copy, or a description edited on another device
+ * since the cache was filled would be overwritten (D-REV-2 / X-7 follow-up).
+ *
+ * Only a network failure (offline, DNS, timeout) falls back to the cached description: the PATCH
+ * then fails or is the best the user can do. Any other failure (project deleted, no permission)
+ * is an error and nothing is written.
+ */
+async function currentDescription(project: Pick<Project, 'id' | 'description'>): Promise<string> {
+  const result = await api.fetchProject(project.id)
+  if (result.success) return result.data.description ?? ''
+  if (isRetriableError(result.error)) {
+    console.warn('[review] could not reload the project description, using the cached one:', result.error)
+    return project.description ?? ''
+  }
+  throw new Error(result.error)
+}
+
+/**
+ * Save a review change. The request carries `{ description }` only: the project passed in may be
+ * a tree node (it has `children`, which the server rejects with a 422) or a stale copy of fields
+ * this action never touches. `compute` receives the current server description and returns the
+ * new one, or null when nothing needs to change; nothing is written in that case.
+ */
+export async function saveReviewDescription(
+  project: Project,
+  compute: (current: Pick<Project, 'description'>) => string | null,
+): Promise<Project | null> {
+  const current = await currentDescription(project)
+  const next = compute({ description: current })
+  if (next === null || next === current) return null
+  return updateProjectRequest({
+    id: project.id,
+    changes: { description: next },
+    original: { ...project, description: current },
+  })
+}
+
+export const markReviewedRequest = (project: Project, today = todayLocalIsoDate()) =>
+  saveReviewDescription(project, (current) => reviewedDescription(current, today))
+
+export const setReviewCadenceRequest = (project: Project, cadenceDays: number | null) =>
+  saveReviewDescription(project, (current) => cadenceDescription(current, cadenceDays))
+
+export const excludeFromReviewRequest = (project: Project, excluded: boolean) =>
+  saveReviewDescription(project, (current) => excludeDescription(current, excluded))
+
+/**
+ * Undo: put the review footer `previous` had back onto the current description. Only the footer
+ * is restored, so a description edit made since then survives the undo.
+ */
+export const restoreReviewRequest = (previous: Project) =>
+  saveReviewDescription(previous, (current) => restoreFooter(current.description, previous.description))
+
+/** Review mutations: shared error reporting, and a refresh of the project list when settled. */
+function useReviewMutation<V extends { project: Project }>(
+  failureLabel: string,
+  request: (vars: V) => Promise<Project | null>,
+) {
+  const qc = useQueryClient()
+  const update = useMutation({
+    mutationFn: request,
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: ['projects'] })
+    },
+    // The review screen shows its own error notice (below); no global toast on top of it.
+    meta: { silent: true },
+  })
+  const mutate = (vars: V, options?: ReviewMutateOptions) =>
+    update.mutate(vars, {
+      onSuccess: () => options?.onSuccess?.(),
+      onError: (error) => {
+        useReviewNoticeStore.getState().showError(`${failureLabel}: ${error.message}`)
+        options?.onError?.(error)
+      },
+    })
+  return { ...update, mutate }
 }
 
 export function useMarkReviewed() {
-  const update = useUpdateProject()
-  const mutate = (vars: { project: Project }) => {
-    const next = applyMetaUpdate(vars.project, (m) => ({
-      ...m,
-      state: 'reviewed',
-      lastReviewedAt: todayLocalIsoDate(),
-    }))
-    if (next === vars.project) return
-    update.mutate({ id: vars.project.id, project: projectToPayload(next) })
-  }
-  return { ...update, mutate }
+  return useReviewMutation(
+    'Could not mark the project as reviewed',
+    (vars: { project: Project }) => markReviewedRequest(vars.project),
+  )
 }
 
 export function useSetReviewCadence() {
-  const update = useUpdateProject()
-  const mutate = (vars: { project: Project; cadenceDays: number | null }) => {
-    const next = applyMetaUpdate(vars.project, (m) => ({
-      ...m,
-      cadenceDaysOverride: vars.cadenceDays && vars.cadenceDays > 0 ? vars.cadenceDays : null,
-    }))
-    if (next === vars.project) return
-    update.mutate({ id: vars.project.id, project: projectToPayload(next) })
-  }
-  return { ...update, mutate }
+  return useReviewMutation(
+    'Could not save the review cadence',
+    (vars: { project: Project; cadenceDays: number | null }) => setReviewCadenceRequest(vars.project, vars.cadenceDays),
+  )
 }
 
 export function useExcludeFromReview() {
-  const update = useUpdateProject()
-  const mutate = (vars: { project: Project; excluded: boolean }) => {
-    const next = applyMetaUpdate(vars.project, (m) => {
-      if (vars.excluded) {
-        return { state: 'excluded', lastReviewedAt: null, cadenceDaysOverride: null }
-      }
-      return { ...m, state: 'never', lastReviewedAt: null }
-    })
-    if (next === vars.project) return
-    update.mutate({ id: vars.project.id, project: projectToPayload(next) })
-  }
-  return { ...update, mutate }
+  return useReviewMutation(
+    'Could not update the review settings',
+    (vars: { project: Project; excluded: boolean }) => excludeFromReviewRequest(vars.project, vars.excluded),
+  )
+}
+
+/** Put a project's previous review footer back (undo). Sends `{ description }` only. */
+export function useRestoreReviewDescription() {
+  return useReviewMutation(
+    'Could not undo the review',
+    (vars: { project: Project }) => restoreReviewRequest(vars.project),
+  )
 }

@@ -1,8 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useNavigate, useMatches } from '@tanstack/react-router'
+import { useNavigate, useMatches, useRouter } from '@tanstack/react-router'
 import { api } from '@/lib/api'
 import { useCompletedTasksStore } from '@/stores/completed-tasks-store'
 import { sortProjectTasks } from '@/lib/task-sort'
+import {
+  applyPositionUpdates,
+  sendPositionUpdates,
+  type PositionUpdate,
+  type SiblingPositionUpdate,
+} from '@/lib/reorder-positions'
 import { playCompletionSound } from '@/lib/completion-sound'
 import {
   mapTaskDoneByIds,
@@ -11,14 +17,39 @@ import {
   unfinishedDescendants,
 } from '@/lib/task-hierarchy'
 import { updateTaskDetailDone } from '@/lib/task-detail-cache'
+import { projectPatch, taskPatch } from '@/lib/merge-patches'
+import {
+  addLabelOrQueue,
+  createTaskOrQueue,
+  deleteTaskOrQueue,
+  removeLabelOrQueue,
+  sendTaskPatch,
+  type CreateExtras,
+} from '@/lib/offline-mutations'
+import { ApiError, apiError, type MutationMeta } from '@/lib/mutation-errors'
+import {
+  insertPendingTask,
+  isTempTaskId,
+  mapTaskInCaches,
+  restoreTaskCaches,
+  snapshotTaskCaches,
+} from '@/lib/pending-cache'
+import { refreshTasks } from '@/lib/task-refresh'
+import { ACCOUNT_CHANGED_EVENT } from '@/lib/account-events'
+import { currentPathname } from '@/lib/route-path'
+import {
+  createNewTaskPlacer,
+  placeNewTaskInBackground,
+  readPositionHints,
+} from '@/lib/new-task-position'
+import { useOfflineStore } from '@/stores/offline-store'
 import type {
   Task,
+  Project,
+  Label,
   TaskAttachment,
-  ProjectView,
   CreateTaskPayload,
-  UpdateTaskPayload,
   CreateProjectPayload,
-  UpdateProjectPayload,
   CreateLabelPayload,
   UpdateLabelPayload,
 } from '@/lib/vikunja-types'
@@ -27,54 +58,116 @@ import {
   type SectionTaskCacheEntry,
 } from '@/lib/section-task-cache'
 
-// Place a freshly-created task at the end of its project's list view so
-// position-0 (Vikunja's default for the create endpoint) doesn't make it
-// jump to the top. Best-effort: skips if the view/tasks aren't cached.
-async function placeNewTaskAtEnd(
+// Vikunja puts a new task at the top of the list view. Anchoring it at the end takes one position
+// update per create; the list view id and the last position are remembered per project and the
+// update runs in the background, so a create costs the caller one request (D-REN-7). See
+// src/renderer/lib/new-task-position.ts.
+const newTaskPlacer = createNewTaskPlacer({
+  fetchProjectViews: (projectId) => api.fetchProjectViews(projectId),
+  fetchViewTasks: (projectId, viewId, params) => api.fetchViewTasks(projectId, viewId, params),
+  updateTaskPosition: (taskId, viewId, position) => api.updateTaskPosition(taskId, viewId, position),
+})
+
+// Another account has other projects and views.
+if (typeof window !== 'undefined') {
+  window.addEventListener(ACCOUNT_CHANGED_EVENT, () => newTaskPlacer.invalidate())
+}
+
+/**
+ * Put a new task at the end of its project's list in the background. When it is done (or could not
+ * be), the project's lists refresh so the task shows up where it belongs; `refreshLists` is false
+ * for a caller that refreshes them itself.
+ */
+function placeNewTaskAtEnd(
   qc: ReturnType<typeof useQueryClient>,
   projectId: number,
-  taskId: number
-): Promise<void> {
-  const views = qc.getQueryData<ProjectView[]>(['project-views', projectId])
-  const listView = views?.find((v) => v.view_kind === 'list')
-  if (!listView) return
-  const tasks = qc.getQueryData<Task[]>(['view-tasks', projectId, listView.id]) ?? []
-  const maxPos = tasks.reduce((m, t) => Math.max(m, t.position ?? 0), 0)
-  await api.updateTaskPosition(taskId, listView.id, maxPos + 2 ** 16)
+  taskId: number,
+  refreshLists = true
+): void {
+  placeNewTaskInBackground(newTaskPlacer, projectId, taskId, readPositionHints(qc, projectId), (placed) => {
+    // The cached views were wrong (or unreachable): read them again before the next create.
+    if (!placed) void qc.invalidateQueries({ queryKey: ['project-views', projectId] })
+    if (refreshLists) refreshTasks(qc, [['view-tasks'], ['section-tasks']])
+  })
 }
 
-export function useAddLabel() {
+/**
+ * Options every task mutation hook takes. `silent` is for a caller that shows the failure itself
+ * (the composer's inline error): the global error toast is skipped (D-REN-3).
+ */
+export interface MutationHookOptions {
+  silent?: boolean
+}
+
+const metaFor = (action: string, options?: MutationHookOptions): MutationMeta => ({
+  action,
+  ...(options?.silent ? { silent: true } : {}),
+})
+
+/** A task as the caches hold it (for the title of a queued change). */
+function cachedTask(qc: ReturnType<typeof useQueryClient>, id: number): Task | undefined {
+  const lists = [
+    ...qc.getQueriesData<Task[]>({ queryKey: ['tasks'] }),
+    ...qc.getQueriesData<Task[]>({ queryKey: ['view-tasks'] }),
+  ]
+  for (const [, data] of lists) {
+    const found = data?.find((t) => t.id === id)
+    if (found) return found
+  }
+  for (const [, entries] of qc.getQueriesData<SectionTaskCacheEntry[]>({ queryKey: ['section-tasks'] })) {
+    for (const entry of entries ?? []) {
+      const found = entry.tasks.find((t) => t.id === id)
+      if (found) return found
+    }
+  }
+  return undefined
+}
+
+/** Show or hide a label on a task in every cache, so the change is visible at once and while queued. */
+function setLabelInCaches(qc: ReturnType<typeof useQueryClient>, taskId: number, labelId: number, present: boolean) {
+  const known = qc.getQueryData<Label[]>(['labels'])?.find((l) => l.id === labelId)
+  const label: Label = known ?? { id: labelId, title: '', hex_color: '', created: '', updated: '' }
+  mapTaskInCaches(qc, taskId, (task) => {
+    const others = (task.labels ?? []).filter((l) => l.id !== labelId)
+    return { ...task, labels: present ? [...others, label] : others }
+  })
+}
+
+function useLabelMutation(kind: 'add' | 'remove', options?: MutationHookOptions) {
   const qc = useQueryClient()
 
   return useMutation({
     mutationFn: async ({ taskId, labelId }: { taskId: number; labelId: number }) => {
-      const result = await api.addLabelToTask(taskId, labelId)
-      if (!result.success) throw new Error(result.error)
+      const title = cachedTask(qc, taskId)?.title
+      if (kind === 'add') {
+        const label = qc.getQueryData<Label[]>(['labels'])?.find((l) => l.id === labelId)
+        await addLabelOrQueue(taskId, { id: labelId, title: label?.title || undefined }, title)
+      } else {
+        await removeLabelOrQueue(taskId, labelId, title)
+      }
+    },
+    onMutate: async ({ taskId, labelId }) => {
+      for (const queryKey of ['tasks', 'view-tasks', 'section-tasks', 'task-detail']) await qc.cancelQueries({ queryKey: [queryKey] })
+      const previous = snapshotTaskCaches(qc)
+      setLabelInCaches(qc, taskId, labelId, kind === 'add')
+      return { previous }
+    },
+    onError: (_error, _variables, context) => {
+      if (context?.previous) restoreTaskCaches(qc, context.previous)
     },
     onSettled: () => {
-      qc.invalidateQueries({ queryKey: ['tasks'] })
-      qc.invalidateQueries({ queryKey: ['view-tasks'] })
-      qc.invalidateQueries({ queryKey: ['section-tasks'] })
-      qc.invalidateQueries({ queryKey: ['task-detail'] })
+      refreshTasks(qc)
     },
+    meta: metaFor(kind === 'add' ? 'add the label' : 'remove the label', options),
   })
 }
 
-export function useRemoveLabel() {
-  const qc = useQueryClient()
+export function useAddLabel(options?: MutationHookOptions) {
+  return useLabelMutation('add', options)
+}
 
-  return useMutation({
-    mutationFn: async ({ taskId, labelId }: { taskId: number; labelId: number }) => {
-      const result = await api.removeLabelFromTask(taskId, labelId)
-      if (!result.success) throw new Error(result.error)
-    },
-    onSettled: () => {
-      qc.invalidateQueries({ queryKey: ['tasks'] })
-      qc.invalidateQueries({ queryKey: ['view-tasks'] })
-      qc.invalidateQueries({ queryKey: ['section-tasks'] })
-      qc.invalidateQueries({ queryKey: ['task-detail'] })
-    },
-  })
+export function useRemoveLabel(options?: MutationHookOptions) {
+  return useLabelMutation('remove', options)
 }
 
 export function useCreateSubtask() {
@@ -88,11 +181,16 @@ export function useCreateSubtask() {
       parentTask: Task
       title: string
     }) => {
+      // The relation needs both tasks on the server; the offline queue has no relations yet.
+      if (isTempTaskId(parentTask.id)) {
+        throw new ApiError('This task has not synced yet. Add subtasks once it has been saved.')
+      }
       // Create the child task in the same project
       const createResult = await api.createTask(parentTask.project_id, { title })
-      if (!createResult.success) throw new Error(createResult.error)
+      if (!createResult.success) throw apiError(createResult)
       const childTask = createResult.data as Task
-      await placeNewTaskAtEnd(qc, parentTask.project_id, childTask.id)
+      // In the background; the mutation's own refresh below shows the subtask inside its parent.
+      placeNewTaskAtEnd(qc, parentTask.project_id, childTask.id, false)
 
       // Create the subtask relation (parent → child)
       const relationResult = await api.createTaskRelation(
@@ -100,69 +198,94 @@ export function useCreateSubtask() {
         childTask.id,
         'subtask'
       )
-      if (!relationResult.success) throw new Error(relationResult.error)
+      if (!relationResult.success) throw apiError(relationResult)
 
       return childTask
     },
     onSettled: () => {
-      qc.invalidateQueries({ queryKey: ['tasks'] })
-      qc.invalidateQueries({ queryKey: ['view-tasks'] })
-      qc.invalidateQueries({ queryKey: ['section-tasks'] })
-      qc.invalidateQueries({ queryKey: ['task-detail'] })
+      refreshTasks(qc)
     },
+    meta: metaFor('add the subtask'),
   })
 }
 
-export function useCreateTask() {
+export function useCreateTask(options?: MutationHookOptions) {
   const qc = useQueryClient()
 
   return useMutation({
     mutationFn: async ({
       projectId,
       task,
+      extras,
     }: {
       projectId: number
       task: CreateTaskPayload
+      /** Labels and images the queue keeps with the create if it has to be queued offline. */
+      extras?: CreateExtras
     }) => {
-      const result = await api.createTask(projectId, task)
-      if (!result.success) throw new Error(result.error)
-      const newTask = result.data as Task
-      await placeNewTaskAtEnd(qc, projectId, newTask.id)
-      return newTask
+      const outcome = await createTaskOrQueue(projectId, task, extras)
+      // A queued create has no real id yet; its stand-in carries a temp id. The position update
+      // does not hold the create back; the project's lists refresh once it has landed.
+      if (!outcome.queued) placeNewTaskAtEnd(qc, projectId, outcome.task.id)
+      return outcome.task
     },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['tasks'] })
-      qc.invalidateQueries({ queryKey: ['view-tasks'] })
-      qc.invalidateQueries({ queryKey: ['section-tasks'] })
+    onSuccess: (task) => {
+      if (isTempTaskId(task.id)) insertPendingTask(qc, task)
+      // The project's own lists wait for the position update, so a new task does not show at the
+      // top first and then jump to the end.
+      else refreshTasks(qc, [['tasks'], ['task-detail']])
     },
+    meta: metaFor('create the task', options),
   })
 }
 
-export function useUpdateTask() {
+export interface UpdateTaskVariables {
+  id: number
+  /**
+   * The fields the user changed, e.g. `{ priority: 2 }`. Never spread a whole
+   * task in here: only changed writable fields are sent (D-REN-2), so a stale
+   * cache cannot revert what another client changed.
+   */
+  changes: Partial<Task>
+  /**
+   * The cached task the changes were made against. The request is diffed against
+   * it (`taskPatch`), and cross-project moves use it to place the task in the
+   * destination cache optimistically.
+   */
+  original?: Task
+  // Caller signals that a reorderTask call follows and will own
+  // view-tasks/section-tasks invalidation. Don't read it here; it's
+  // consumed in onSettled.
+  deferInvalidation?: boolean
+}
+
+/** Send an edit as a minimal merge patch; skip the request when nothing differs. */
+export async function updateTaskRequest({
+  id,
+  changes,
+  original,
+}: Pick<UpdateTaskVariables, 'id' | 'changes' | 'original'>): Promise<Task | null> {
+  // Position is per-view in Vikunja and only honored by /tasks/{id}/position
+  // (see useReorderTask). Strip it from the regular update body so it
+  // can't be written to an unintended view; we still keep it on `changes`
+  // for the optimistic-update path so the UI lands at the right slot.
+  const { position: _position, ...writable } = changes
+  const patch = taskPatch(original ?? null, writable)
+  // Nothing differs from what the server already has (e.g. setting today's
+  // date on a task that is already due today): skip the request.
+  if (Object.keys(patch).length === 0) return original ?? null
+  const title = original?.title ?? (typeof changes.title === 'string' ? changes.title : undefined)
+  const outcome = await sendTaskPatch(id, patch, title)
+  // A queued change has no server response; the optimistic cache already holds its result.
+  return outcome.task ?? (original ? { ...original, ...changes } : null)
+}
+
+export function useUpdateTask(options?: MutationHookOptions) {
   const qc = useQueryClient()
 
   return useMutation({
-    mutationFn: async ({
-      id,
-      task,
-    }: {
-      id: number
-      task: UpdateTaskPayload
-      // Caller signals that a reorderTask call follows and will own
-      // view-tasks/section-tasks invalidation. Don't read it here; it's
-      // consumed in onSettled.
-      deferInvalidation?: boolean
-    }) => {
-      // Position is per-view in Vikunja and only honored by /tasks/{id}/position
-      // (see useReorderTask). Strip it from the regular update body so it
-      // can't be written to an unintended view; we still keep it on `task`
-      // for the optimistic-update path so the UI lands at the right slot.
-      const { position: _position, ...apiTask } = task
-      const result = await api.updateTask(id, apiTask)
-      if (!result.success) throw new Error(result.error)
-      return result.data
-    },
-    onMutate: async ({ id, task }) => {
+    mutationFn: (variables: UpdateTaskVariables) => updateTaskRequest(variables),
+    onMutate: async ({ id, changes, original }) => {
       await qc.cancelQueries({ queryKey: ['tasks'] })
       await qc.cancelQueries({ queryKey: ['view-tasks'] })
       await qc.cancelQueries({ queryKey: ['section-tasks'] })
@@ -173,7 +296,7 @@ export function useUpdateTask() {
       })
 
       qc.setQueriesData<Task[]>({ queryKey: ['tasks'] }, (old) =>
-        old?.map((t) => (t.id === id ? { ...t, ...task } : t))
+        old?.map((t) => (t.id === id ? { ...t, ...changes } : t))
       )
       // view-tasks is keyed ['view-tasks', projectId, viewId]. When the task's
       // project_id changes (drag-drop cross-section / sidebar / header drops),
@@ -183,8 +306,10 @@ export function useUpdateTask() {
       // looks at where it was. Iterate keys so we can compare each cache's
       // projectId against the new project_id and either remove from
       // mismatched views or add to a matched one.
-      const newProjectId = (task as Partial<Task>).project_id
-      const taskHasFullSpread = (task as Partial<Task>).title !== undefined
+      const newProjectId = changes.project_id
+      // A task added to a destination cache needs every field, not just the changes.
+      const fullTask: Partial<Task> = original ? { ...original, ...changes } : changes
+      const taskHasFullSpread = fullTask.title !== undefined
       const allViewTasks = qc.getQueriesData<Task[]>({ queryKey: ['view-tasks'] })
       for (const [key, oldData] of allViewTasks) {
         if (!oldData) continue
@@ -199,7 +324,7 @@ export function useUpdateTask() {
           ) {
             next = oldData.filter((t) => t.id !== id)
           } else {
-            next = oldData.map((t) => (t.id === id ? { ...t, ...task } : t))
+            next = oldData.map((t) => (t.id === id ? { ...t, ...changes } : t))
           }
         } else if (
           taskHasFullSpread &&
@@ -207,13 +332,13 @@ export function useUpdateTask() {
           queryProjectId !== undefined &&
           newProjectId === queryProjectId
         ) {
-          next = sortProjectTasks([...oldData, { ...task, id } as Task])
+          next = sortProjectTasks([...oldData, { ...fullTask, id } as Task])
         }
         if (next !== oldData) qc.setQueryData(key, next)
       }
       qc.setQueriesData<SectionTaskCacheEntry[]>(
         { queryKey: ['section-tasks'] },
-        (old) => updateSectionTaskCache(old, id, task)
+        (old) => updateSectionTaskCache(old, id, changes, original)
       )
 
       return { previousTaskQueries, previousViewQueries, previousSectionQueries }
@@ -236,21 +361,19 @@ export function useUpdateTask() {
       }
     },
     onSettled: (_data, _err, variables) => {
-      qc.invalidateQueries({ queryKey: ['tasks'] })
       // When the caller has a reorderTask queued behind us, skip the two
       // view-related invalidations and let reorderTask handle them after its
       // per-view position write completes — otherwise the refetch races the
       // in-flight position update and the task briefly snaps to position 0.
-      if (!variables.deferInvalidation) {
-        qc.invalidateQueries({ queryKey: ['view-tasks'] })
-        qc.invalidateQueries({ queryKey: ['section-tasks'] })
-      }
+      // (Nothing is refetched while the offline queue still holds changes.)
+      refreshTasks(qc, variables.deferInvalidation ? [['tasks']] : undefined)
       // Only refresh reminder timers when reminder-relevant fields changed
-      const t = variables.task
+      const t = variables.changes
       if ('reminders' in t || 'due_date' in t) {
         api.refreshTaskReminders()
       }
     },
+    meta: metaFor('save the change', options),
   })
 }
 
@@ -259,13 +382,15 @@ export function useDeleteTask() {
   const removeCompleted = useCompletedTasksStore((s) => s.remove)
 
   return useMutation({
+    meta: metaFor('delete the task'),
     mutationFn: async ({ task, deleteSubtasks = true }: { task: Task; deleteSubtasks?: boolean }) => {
       const targets = deleteSubtasks
         ? [...taskDescendants(task).reverse(), task]
         : [task]
       for (const target of targets) {
-        const result = await api.deleteTask(target.id)
-        if (!result.success) throw new Error(result.error)
+        // A delete the server cannot take right now is queued; one for a pending create just
+        // removes the create from the queue.
+        await deleteTaskOrQueue(target.id, target.title)
       }
     },
     onMutate: async ({ task, deleteSubtasks = true }) => {
@@ -331,9 +456,9 @@ export function useDeleteTask() {
       }
     },
     onSettled: () => {
-      qc.invalidateQueries({ queryKey: ['tasks'] })
-      qc.invalidateQueries({ queryKey: ['view-tasks'] })
-      qc.invalidateQueries({ queryKey: ['section-tasks'] })
+      refreshTasks(qc, [['tasks'], ['view-tasks'], ['section-tasks']])
+      // A deleted task's reminders must not fire.
+      api.refreshTaskReminders()
     },
   })
 }
@@ -342,20 +467,35 @@ export function useReorderTask() {
   const qc = useQueryClient()
 
   return useMutation({
+    meta: metaFor('move the task'),
     mutationFn: async ({
       taskId,
       viewId,
       position,
+      renumbered = [],
     }: {
       taskId: number
       viewId: number
       position: number
+      /** Other tasks whose positions change too: tasks that shared a position are spread apart (see planMove). */
+      renumbered?: PositionUpdate[]
     }) => {
-      const result = await api.updateTaskPosition(taskId, viewId, position)
-      if (!result.success) throw new Error(result.error)
-      return result.data
+      // Positions are per view and are not queued offline.
+      if (isTempTaskId(taskId) || renumbered.some((update) => isTempTaskId(update.taskId))) {
+        throw new ApiError('This task has not synced yet. Reorder it once it has been saved.')
+      }
+      await sendPositionUpdates(
+        async (update) => {
+          const result = await api.updateTaskPosition(update.taskId, viewId, update.position)
+          if (!result.success) throw apiError(result)
+        },
+        { taskId, position },
+        renumbered,
+      )
+      // A task dragged to the end moves the end of the list; the next new task goes after it.
+      newTaskPlacer.noteViewPosition(viewId, Math.max(position, ...renumbered.map((update) => update.position)))
     },
-    onMutate: ({ taskId, position }) => {
+    onMutate: ({ taskId, position, renumbered = [] }) => {
       qc.cancelQueries({ queryKey: ['view-tasks'] })
       qc.cancelQueries({ queryKey: ['section-tasks'] })
       const previousViewQueries = qc.getQueriesData<Task[]>({ queryKey: ['view-tasks'] })
@@ -365,10 +505,10 @@ export function useReorderTask() {
 
       // Update position AND sort so the array order matches the new visual order immediately.
       // Without sorting, @dnd-kit clears transforms on drop and items snap back to the old array order.
+      const updates = [...renumbered, { taskId, position }]
       const reorderTasks = (old: Task[] | undefined) => {
         if (!old) return old
-        const updated = old.map((t) => (t.id === taskId ? { ...t, position } : t))
-        return sortProjectTasks(updated)
+        return sortProjectTasks(applyPositionUpdates(old, updates))
       }
 
       qc.setQueriesData<Task[]>({ queryKey: ['view-tasks'] }, reorderTasks)
@@ -376,10 +516,7 @@ export function useReorderTask() {
         if (!old) return old
         return old.map((section) => {
           if (!section.tasks.some((t) => t.id === taskId)) return section
-          const updated = section.tasks.map((t) =>
-            t.id === taskId ? { ...t, position } : t
-          )
-          return { ...section, tasks: sortProjectTasks(updated) }
+          return { ...section, tasks: sortProjectTasks(applyPositionUpdates(section.tasks, updates)) }
         })
       })
 
@@ -401,42 +538,87 @@ export function useReorderTask() {
       // Delay invalidation so the refetch doesn't cause a secondary re-render
       // while @dnd-kit is still settling after the drop.
       setTimeout(() => {
-        qc.invalidateQueries({ queryKey: ['view-tasks'] })
-        qc.invalidateQueries({ queryKey: ['section-tasks'] })
+        refreshTasks(qc, [['view-tasks'], ['section-tasks']])
       }, 300)
     },
   })
 }
 
+/** Take a done flag back: a completion still waiting in the queue is cancelled, anything else is reversed with a request. */
+async function reverseDone(entry: { task: Task; queued: boolean }, done: boolean): Promise<void> {
+  if (entry.queued) {
+    const cancelled = await api.offlineQueue.cancelChange(entry.task.id, ['done'])
+    if (cancelled.success && cancelled.data) return
+  }
+  await sendTaskPatch(entry.task.id, { done }, entry.task.title)
+}
+
+/**
+ * Complete a task and its unfinished subtasks. Every request is just `{ done }`:
+ * the embedded `related_tasks` copies are only used for their ids, never as patch
+ * sources, so partial objects cannot clear fields. A step the server cannot take right
+ * now (offline, server trouble) is queued instead and the rest carries on.
+ */
+export async function completeTaskRequest(task: Task): Promise<Task> {
+  const autoCompleted = unfinishedDescendants(task)
+  const completed: Array<{ task: Task; queued: boolean }> = []
+  try {
+    // Children first prevents the server from ever exposing them as standalone
+    // work while the parent completion is in flight.
+    for (const child of [...autoCompleted].reverse()) {
+      const outcome = await sendTaskPatch(child.id, { done: true }, child.title)
+      completed.push({ task: child, queued: outcome.queued })
+    }
+    const outcome = await sendTaskPatch(task.id, { done: true }, task.title)
+    return outcome.task ?? { ...task, done: true }
+  } catch (error) {
+    await Promise.allSettled(completed.map((entry) => reverseDone(entry, false)))
+    throw error
+  }
+}
+
+/**
+ * Reopen a task and the subtasks its completion auto-completed. A completion that is still waiting in
+ * the offline queue is cancelled instead (the server never hears about it); one that is being sent
+ * right now cannot be, so the reopen goes out behind it.
+ */
+export async function uncompleteTaskRequest(task: Task, autoCompleted: readonly Task[]): Promise<Task> {
+  const restored: Array<{ task: Task; queued: boolean }> = []
+  const reopen = async (item: Task): Promise<Task | null> => {
+    if (useOfflineStore.getState().counts.pending > 0) {
+      const cancelled = await api.offlineQueue.cancelChange(item.id, ['done'])
+      if (cancelled.success && cancelled.data) {
+        restored.push({ task: item, queued: false })
+        return null
+      }
+    }
+    const outcome = await sendTaskPatch(item.id, { done: false }, item.title)
+    restored.push({ task: item, queued: outcome.queued })
+    return outcome.task
+  }
+  try {
+    for (const child of [...autoCompleted].reverse()) await reopen(child)
+    const result = await reopen(task)
+    return result ?? { ...task, done: false }
+  } catch (error) {
+    await Promise.allSettled(restored.map((entry) => reverseDone({ task: entry.task, queued: false }, true)))
+    throw error
+  }
+}
+
 export function useCompleteTask() {
   const qc = useQueryClient()
-  const matches = useMatches()
-  const pathname = matches[matches.length - 1]?.pathname ?? ''
+  // The path is read when a task is completed, not by subscribing to the router: every row has this
+  // hook (and its checkbox two more), and a subscription re-rendered all of them on each navigation.
+  const router = useRouter()
   const addCompleted = useCompletedTasksStore((s) => s.add)
   const removeCompleted = useCompletedTasksStore((s) => s.remove)
 
   return useMutation({
+    meta: metaFor('complete the task'),
     mutationFn: async (input: Task | { task: Task; suppressTopLevelUndo?: boolean }) => {
       const task = 'task' in input ? input.task : input
-      const autoCompleted = unfinishedDescendants(task)
-      const completed: Task[] = []
-      try {
-        // Children first prevents the server from ever exposing them as standalone
-        // work while the parent completion is in flight.
-        for (const child of [...autoCompleted].reverse()) {
-          const result = await api.updateTask(child.id, { ...child, done: true })
-          if (!result.success) throw new Error(result.error)
-          completed.push(child)
-        }
-        const result = await api.updateTask(task.id, { ...task, done: true })
-        if (!result.success) throw new Error(result.error)
-        return result.data
-      } catch (error) {
-        await Promise.allSettled(
-          completed.map((child) => api.updateTask(child.id, { ...child, done: false })),
-        )
-        throw error
-      }
+      return completeTaskRequest(task)
     },
     onMutate: async (input) => {
       const task = 'task' in input ? input.task : input
@@ -447,7 +629,7 @@ export function useCompleteTask() {
         ...autoCompleted.map((child) => [child.id, true] as const),
       ])
       // Track completed task so it stays visible (with strikethrough) until navigation
-      addCompleted(mapTaskDoneByIds(task, doneById), pathname, autoCompleted, suppressTopLevelUndo)
+      addCompleted(mapTaskDoneByIds(task, doneById), currentPathname(router), autoCompleted, suppressTopLevelUndo)
 
       await qc.cancelQueries({ queryKey: ['tasks'] })
       await qc.cancelQueries({ queryKey: ['view-tasks'] })
@@ -503,7 +685,9 @@ export function useCompleteTask() {
       }
     },
     onSettled: () => {
-      qc.invalidateQueries({ queryKey: ['task-detail'] })
+      refreshTasks(qc, [['task-detail']])
+      // Completing stops a task's reminders; a recurring task's advance to the next ones.
+      api.refreshTaskReminders()
     },
     // Skip list invalidation — the optimistic update keeps the task at its
     // original position with strikethrough. Refresh task-detail separately so
@@ -513,32 +697,17 @@ export function useCompleteTask() {
 
 export function useUncompleteTask() {
   const qc = useQueryClient()
-  const matches = useMatches()
-  const pathname = matches[matches.length - 1]?.pathname ?? ''
+  const router = useRouter()
   const addToStore = useCompletedTasksStore((s) => s.add)
   const updateCompleted = useCompletedTasksStore((s) => s.update)
   const removeCompleted = useCompletedTasksStore((s) => s.remove)
 
   return useMutation({
+    meta: metaFor('reopen the task'),
     mutationFn: async (task: Task) => {
       const autoCompleted = useCompletedTasksStore.getState().tasks
         .get(task.id)?.autoCompletedSubtasks ?? []
-      const restored: Task[] = []
-      try {
-        for (const child of [...autoCompleted].reverse()) {
-          const result = await api.updateTask(child.id, { ...child, done: false })
-          if (!result.success) throw new Error(result.error)
-          restored.push(child)
-        }
-        const result = await api.updateTask(task.id, { ...task, done: false })
-        if (!result.success) throw new Error(result.error)
-        return result.data
-      } catch (error) {
-        await Promise.allSettled(
-          restored.map((child) => api.updateTask(child.id, { ...child, done: true })),
-        )
-        throw error
-      }
+      return uncompleteTaskRequest(task, autoCompleted)
     },
     onMutate: async (task) => {
       // If task was recently completed (in store), update to done:false.
@@ -554,7 +723,7 @@ export function useUncompleteTask() {
       if (wasInStore) {
         updateCompleted(task.id, { done: false })
       } else {
-        addToStore({ ...task, done: false }, pathname)
+        addToStore({ ...task, done: false }, currentPathname(router))
       }
 
       await qc.cancelQueries({ queryKey: ['tasks'] })
@@ -611,7 +780,8 @@ export function useUncompleteTask() {
       }
     },
     onSettled: () => {
-      qc.invalidateQueries({ queryKey: ['task-detail'] })
+      refreshTasks(qc, [['task-detail']])
+      api.refreshTaskReminders()
     },
     // Skip list invalidation — the optimistic update keeps the task at its
     // original position. Refresh task-detail separately for expanded subtasks.
@@ -624,58 +794,72 @@ export function useCreateProject() {
   const qc = useQueryClient()
 
   return useMutation({
+    meta: metaFor('create the project'),
     mutationFn: async (project: CreateProjectPayload) => {
       const result = await api.createProject(project)
-      if (!result.success) throw new Error(result.error)
+      if (!result.success) throw apiError(result)
       return result.data
     },
     onSettled: () => {
       qc.invalidateQueries({ queryKey: ['projects'] })
-      qc.invalidateQueries({ queryKey: ['section-tasks'] })
+      refreshTasks(qc, [['section-tasks']])
     },
   })
+}
+
+export interface UpdateProjectVariables {
+  id: number
+  /**
+   * The fields that changed, e.g. `{ title: 'New name' }`. Only changed writable
+   * fields are sent (D-PROJ-1): a stale cached description must never overwrite a
+   * concurrent edit, and keys outside the PATCH schema (a tree node's `children`)
+   * are rejected by the server with a 422.
+   */
+  changes: Partial<Project>
+  /** The cached project the changes were made against; the request is diffed against it. */
+  original?: Project
+}
+
+/** Send a project edit as a minimal merge patch; skip the request when nothing differs. */
+export async function updateProjectRequest({
+  id,
+  changes,
+  original,
+}: UpdateProjectVariables): Promise<Project | null> {
+  const patch = projectPatch(original ?? null, changes)
+  if (Object.keys(patch).length === 0) return original ?? null
+  const result = await api.updateProject(id, patch)
+  if (!result.success) throw apiError(result)
+  return result.data
 }
 
 export function useUpdateProject() {
   const qc = useQueryClient()
 
   return useMutation({
-    mutationFn: async ({ id, project }: { id: number; project: UpdateProjectPayload }) => {
-      const result = await api.updateProject(id, project)
-      if (!result.success) throw new Error(result.error)
-      return result.data
-    },
+    meta: metaFor('save the project'),
+    mutationFn: (variables: UpdateProjectVariables) => updateProjectRequest(variables),
     onSettled: () => {
       qc.invalidateQueries({ queryKey: ['projects'] })
     },
   })
 }
 
-/** Archive/restore preserves every mutable project field and updates the all-project cache. */
+/** Archive/restore sends only `is_archived` and updates the all-project cache. */
 export function useSetProjectArchived() {
   const qc = useQueryClient()
   const navigate = useNavigate()
   const matches = useMatches()
 
   return useMutation({
-    mutationFn: async ({ project, archived }: { project: import('@/lib/vikunja-types').Project; archived: boolean }) => {
-      const payload: UpdateProjectPayload = {
-        title: project.title,
-        description: project.description,
-        hex_color: project.hex_color,
-        is_archived: archived,
-        position: project.position,
-        parent_project_id: project.parent_project_id,
-      }
-      const result = await api.updateProject(project.id, payload)
-      if (!result.success) throw new Error(result.error)
-      return result.data
-    },
+    meta: metaFor('change the project'),
+    mutationFn: ({ project, archived }: { project: Project; archived: boolean }) =>
+      updateProjectRequest({ id: project.id, changes: { is_archived: archived }, original: project }),
     onMutate: async ({ project, archived }) => {
       await qc.cancelQueries({ queryKey: ['projects'] })
-      const previous = qc.getQueryData<import('@/lib/vikunja-types').Project[]>(['projects'])
+      const previous = qc.getQueryData<Project[]>(['projects'])
       if (previous) {
-        qc.setQueryData<import('@/lib/vikunja-types').Project[]>(
+        qc.setQueryData<Project[]>(
           ['projects'],
           previous.map((item) => item.id === project.id ? { ...item, is_archived: archived } : item),
         )
@@ -693,9 +877,7 @@ export function useSetProjectArchived() {
     },
     onSettled: () => {
       qc.invalidateQueries({ queryKey: ['projects'] })
-      qc.invalidateQueries({ queryKey: ['tasks'] })
-      qc.invalidateQueries({ queryKey: ['view-tasks'] })
-      qc.invalidateQueries({ queryKey: ['section-tasks'] })
+      refreshTasks(qc, [['tasks'], ['view-tasks'], ['section-tasks']])
     },
   })
 }
@@ -704,19 +886,36 @@ export function useReorderProject() {
   const qc = useQueryClient()
 
   return useMutation({
-    mutationFn: async ({ id, project }: { id: number; project: UpdateProjectPayload }) => {
-      const result = await api.updateProject(id, project)
-      if (!result.success) throw new Error(result.error)
-      return result.data
+    meta: metaFor('move the project'),
+    // A reorder only ever changes positions: the dragged project's and, when its neighbours had
+    // no room between them, the spread-out positions of its siblings (see planSiblingMove).
+    mutationFn: async ({
+      id,
+      position,
+      renumbered = [],
+    }: {
+      id: number
+      position: number
+      renumbered?: SiblingPositionUpdate[]
+    }) => {
+      await sendPositionUpdates<SiblingPositionUpdate>(
+        async (update) => {
+          await updateProjectRequest({ id: update.id, changes: { position: update.position } })
+        },
+        { id, position },
+        renumbered,
+      )
     },
-    onMutate: ({ id, project }) => {
+    onMutate: ({ id, position, renumbered = [] }) => {
       qc.cancelQueries({ queryKey: ['projects'] }) // fire-and-forget
-      const previous = qc.getQueryData<import('@/lib/vikunja-types').Project[]>(['projects'])
+      const previous = qc.getQueryData<Project[]>(['projects'])
 
-      if (previous && project.position !== undefined) {
-        qc.setQueryData<import('@/lib/vikunja-types').Project[]>(
+      if (previous) {
+        const positions = new Map<number, number>(renumbered.map((update) => [update.id, update.position]))
+        positions.set(id, position)
+        qc.setQueryData<Project[]>(
           ['projects'],
-          previous.map((p) => (p.id === id ? { ...p, position: project.position! } : p))
+          previous.map((p) => (positions.has(p.id) ? { ...p, position: positions.get(p.id)! } : p))
         )
       }
 
@@ -739,11 +938,13 @@ export function useDeleteProject() {
   const matches = useMatches()
 
   return useMutation({
+    meta: metaFor('delete the project'),
     mutationFn: async (id: number) => {
       const result = await api.deleteProject(id)
-      if (!result.success) throw new Error(result.error)
+      if (!result.success) throw apiError(result)
     },
     onSuccess: (_data, id) => {
+      newTaskPlacer.invalidate(id)
       const currentPath = matches[matches.length - 1]?.pathname ?? ''
       if (currentPath === `/project/${id}`) {
         navigate({ to: '/inbox' })
@@ -751,26 +952,26 @@ export function useDeleteProject() {
     },
     onSettled: () => {
       qc.invalidateQueries({ queryKey: ['projects'] })
-      qc.invalidateQueries({ queryKey: ['section-tasks'] })
+      refreshTasks(qc, [['section-tasks']])
     },
   })
 }
 
 // --- Labels ---
 
-export function useCreateLabel() {
+export function useCreateLabel(options?: MutationHookOptions) {
   const qc = useQueryClient()
 
   return useMutation({
+    meta: metaFor('create the label', options),
     mutationFn: async (label: CreateLabelPayload) => {
       const result = await api.createLabel(label)
-      if (!result.success) throw new Error(result.error)
+      if (!result.success) throw apiError(result)
       return result.data
     },
     onSettled: () => {
       qc.invalidateQueries({ queryKey: ['labels'] })
-      qc.invalidateQueries({ queryKey: ['tasks'] })
-      qc.invalidateQueries({ queryKey: ['task-detail'] })
+      refreshTasks(qc, [['tasks'], ['task-detail']])
     },
   })
 }
@@ -779,17 +980,15 @@ export function useUpdateLabel() {
   const qc = useQueryClient()
 
   return useMutation({
+    meta: metaFor('save the label'),
     mutationFn: async ({ id, label }: { id: number; label: UpdateLabelPayload }) => {
       const result = await api.updateLabel(id, label)
-      if (!result.success) throw new Error(result.error)
+      if (!result.success) throw apiError(result)
       return result.data
     },
     onSettled: () => {
       qc.invalidateQueries({ queryKey: ['labels'] })
-      qc.invalidateQueries({ queryKey: ['tasks'] })
-      qc.invalidateQueries({ queryKey: ['view-tasks'] })
-      qc.invalidateQueries({ queryKey: ['section-tasks'] })
-      qc.invalidateQueries({ queryKey: ['task-detail'] })
+      refreshTasks(qc)
     },
   })
 }
@@ -800,9 +999,10 @@ export function useDeleteLabel() {
   const matches = useMatches()
 
   return useMutation({
+    meta: metaFor('delete the label'),
     mutationFn: async (id: number) => {
       const result = await api.deleteLabel(id)
-      if (!result.success) throw new Error(result.error)
+      if (!result.success) throw apiError(result)
     },
     onSuccess: (_data, id) => {
       const currentPath = matches[matches.length - 1]?.pathname ?? ''
@@ -812,10 +1012,7 @@ export function useDeleteLabel() {
     },
     onSettled: () => {
       qc.invalidateQueries({ queryKey: ['labels'] })
-      qc.invalidateQueries({ queryKey: ['tasks'] })
-      qc.invalidateQueries({ queryKey: ['view-tasks'] })
-      qc.invalidateQueries({ queryKey: ['section-tasks'] })
-      qc.invalidateQueries({ queryKey: ['task-detail'] })
+      refreshTasks(qc)
     },
   })
 }
@@ -827,7 +1024,7 @@ export function useTaskAttachments(taskId: number, enabled: boolean) {
     queryKey: ['task-attachments', taskId],
     queryFn: async () => {
       const result = await api.fetchTaskAttachments(taskId)
-      if (!result.success) throw new Error(result.error)
+      if (!result.success) throw apiError(result)
       return result.data
     },
     enabled,
@@ -838,15 +1035,15 @@ export function useUploadAttachment() {
   const qc = useQueryClient()
 
   return useMutation({
+    meta: metaFor('upload the attachment'),
     mutationFn: async (taskId: number) => {
       const result = await api.pickAndUploadAttachment(taskId)
-      if (!result.success) throw new Error(result.error)
+      if (!result.success) throw apiError(result)
       return result.data
     },
     onSettled: (_data, _err, taskId) => {
       qc.invalidateQueries({ queryKey: ['task-attachments', taskId] })
-      qc.invalidateQueries({ queryKey: ['tasks'] })
-      qc.invalidateQueries({ queryKey: ['view-tasks'] })
+      refreshTasks(qc, [['tasks'], ['view-tasks']])
     },
   })
 }
@@ -855,6 +1052,7 @@ export function useUploadAttachmentFromDrop() {
   const qc = useQueryClient()
 
   return useMutation({
+    meta: metaFor('upload the attachment'),
     mutationFn: async ({
       taskId,
       fileData,
@@ -867,21 +1065,21 @@ export function useUploadAttachmentFromDrop() {
       mimeType: string
     }) => {
       const result = await api.uploadTaskAttachment(taskId, fileData, fileName, mimeType)
-      if (!result.success) throw new Error(result.error)
+      if (!result.success) throw apiError(result)
       return result.data
     },
     onSettled: (_data, _err, vars) => {
       qc.invalidateQueries({ queryKey: ['task-attachments', vars.taskId] })
-      qc.invalidateQueries({ queryKey: ['tasks'] })
-      qc.invalidateQueries({ queryKey: ['view-tasks'] })
+      refreshTasks(qc, [['tasks'], ['view-tasks']])
     },
   })
 }
 
-export function useUploadAttachmentFromPaste() {
+export function useUploadAttachmentFromPaste(options?: MutationHookOptions) {
   const qc = useQueryClient()
 
   return useMutation({
+    meta: metaFor('upload the image', options),
     mutationFn: async ({
       taskId,
       fileData,
@@ -900,12 +1098,12 @@ export function useUploadAttachmentFromPaste() {
       )
 
       const uploadResult = await api.uploadTaskAttachment(taskId, fileData, fileName, mimeType)
-      if (!uploadResult.success) throw new Error(uploadResult.error)
+      if (!uploadResult.success) throw apiError(uploadResult)
 
       // Refetch and find the new attachment. If multiple new entries appear, prefer
       // the one matching fileName; otherwise take the highest ID.
       const afterResult = await api.fetchTaskAttachments(taskId)
-      if (!afterResult.success) throw new Error(afterResult.error)
+      if (!afterResult.success) throw apiError(afterResult)
 
       const newAttachments = afterResult.data.filter((a) => !beforeIds.has(a.id))
       const byName = newAttachments.find((a) => a.file.name === fileName)
@@ -916,8 +1114,7 @@ export function useUploadAttachmentFromPaste() {
     },
     onSettled: (_data, _err, vars) => {
       qc.invalidateQueries({ queryKey: ['task-attachments', vars.taskId] })
-      qc.invalidateQueries({ queryKey: ['tasks'] })
-      qc.invalidateQueries({ queryKey: ['view-tasks'] })
+      refreshTasks(qc, [['tasks'], ['view-tasks']])
     },
   })
 }
@@ -926,14 +1123,14 @@ export function useDeleteAttachment() {
   const qc = useQueryClient()
 
   return useMutation({
+    meta: metaFor('delete the attachment'),
     mutationFn: async ({ taskId, attachmentId }: { taskId: number; attachmentId: number }) => {
       const result = await api.deleteTaskAttachment(taskId, attachmentId)
-      if (!result.success) throw new Error(result.error)
+      if (!result.success) throw apiError(result)
     },
     onSettled: (_data, _err, vars) => {
       qc.invalidateQueries({ queryKey: ['task-attachments', vars.taskId] })
-      qc.invalidateQueries({ queryKey: ['tasks'] })
-      qc.invalidateQueries({ queryKey: ['view-tasks'] })
+      refreshTasks(qc, [['tasks'], ['view-tasks']])
     },
   })
 }

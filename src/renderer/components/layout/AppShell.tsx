@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Outlet, useMatches, useNavigate } from '@tanstack/react-router'
 import {
@@ -31,73 +31,32 @@ import { Sidebar } from './Sidebar'
 import { ContentArea } from './ContentArea'
 import { WindowControls } from './WindowControls'
 import { SearchBar } from './SearchBar'
-import { SetupView } from '@/views/SetupView'
-import { ReauthView } from '@/views/ReauthView'
+// The sign-in screens are only needed when nobody is signed in: their own chunks.
+const SetupView = lazy(() => import('@/views/SetupView').then((module) => ({ default: module.SetupView })))
+const ReauthView = lazy(() => import('@/views/ReauthView').then((module) => ({ default: module.ReauthView })))
 import { TaskDragOverlay } from '@/components/task-list/TaskDragOverlay'
 import { ProjectDragOverlay } from '@/components/sidebar/ProjectDragOverlay'
 import { CustomListDragOverlay } from '@/components/sidebar/CustomListDragOverlay'
 import { SectionDragOverlay } from '@/components/task-list/SectionDragOverlay'
 import { UpdateBanner } from '@/components/UpdateBanner'
+import { ToastHost } from '@/components/shared/ToastHost'
 import { useAppConfig } from '@/hooks/use-app-config'
+import { openTaskInApp } from '@/lib/open-task'
+import { toast } from '@/stores/toast-store'
+import { useOfflineQueueSync } from '@/hooks/use-offline-queue'
+import { useFreshness } from '@/hooks/use-freshness'
+import { useUIStore } from '@/stores/ui-store'
+import { refreshTasks } from '@/lib/task-refresh'
 import { reloadCompletionSound, setCompletionSoundEnabled } from '@/lib/completion-sound'
 import { useTodayOverdueCount } from '@/hooks/use-today-overdue-count'
 import { renderBadgeDataUrl } from '@/lib/render-badge-icon'
-import { NULL_DATE } from '@/lib/constants'
+import { insertPosition as slotPosition, isUndatedTask, planMove, planSiblingMove } from '@/lib/reorder-positions'
 import { usePrintStore } from '@/stores/print-store'
 import { buildPrintHtml } from '@/lib/print-template'
 import { sanitizeTaskHtml } from '@/lib/sanitize-html'
-import { VICU_LOGO_DATA_URL } from '@/assets/vicu-logo'
 
 const MIN_WIDTH = 180
 const MAX_WIDTH = 360
-
-function isUndatedTask(t: Task): boolean {
-  return !t.due_date || t.due_date === NULL_DATE
-}
-
-// Position is only meaningful for undated tasks — sortProjectTasks puts dated
-// tasks above (sorted by date) regardless of their position. So when computing
-// a gap between visual neighbors, use the nearest undated neighbors' positions;
-// dated tasks' positions are arbitrary and would pull the midpoint outside the
-// intended slot.
-function calculateInsertPosition(tasks: Task[], targetIdx: number): number {
-  let above = 0
-  const startAbove = Math.min(targetIdx - 1, tasks.length - 1)
-  for (let i = startAbove; i >= 0; i--) {
-    const t = tasks[i]
-    if (t && isUndatedTask(t)) {
-      above = t.position ?? 0
-      break
-    }
-  }
-
-  let below = above + 2 ** 16
-  for (let i = targetIdx; i < tasks.length; i++) {
-    const t = tasks[i]
-    if (t && isUndatedTask(t)) {
-      below = t.position ?? above + 2 ** 16
-      break
-    }
-  }
-
-  return (above + below) / 2
-}
-
-function calculatePosition(tasks: Task[], oldIndex: number, newIndex: number): number {
-  const without = tasks.filter((_, i) => i !== oldIndex)
-  return calculateInsertPosition(without, newIndex)
-}
-
-function calculateProjectPosition(
-  siblings: ProjectTreeNode[],
-  oldIndex: number,
-  newIndex: number
-): number {
-  const without = siblings.filter((_, i) => i !== oldIndex)
-  const above = without[newIndex - 1]?.position ?? 0
-  const below = without[newIndex]?.position ?? (above + 2 ** 16)
-  return (above + below) / 2
-}
 
 type AppState = 'loading' | 'setup' | 'ready' | 'reauth'
 
@@ -116,6 +75,7 @@ type DragItem =
 function BadgeSyncEnabled() {
   const count = useTodayOverdueCount()
   useEffect(() => {
+    if (count === null) return
     const dataUrl = renderBadgeDataUrl(count)
     api.setTaskBadge(count, dataUrl)
   }, [count])
@@ -173,6 +133,11 @@ export function AppShell() {
   const themeRef = useRef<ThemeOption>('system')
   const navigate = useNavigate()
 
+  // The main-process offline queue: pending / failed counts, replay results, temp-id remapping.
+  useOfflineQueueSync()
+  // Task lists refetch on focus and on a timer, and the date-dependent views roll over at midnight.
+  useFreshness()
+
   // Clear recently-completed-tasks store on route change so completed tasks
   // don't bleed into the next view.
   const routeMatches = useMatches()
@@ -184,17 +149,17 @@ export function AppShell() {
       // Drop any multi-selection so its ids can't act on a different view's tasks.
       useSelectionStore.getState().clearSelection()
       // Flush stale optimistic data (complete/uncomplete skip invalidation
-      // to keep tasks in-place, so we sync on navigation instead).
-      queryClient.invalidateQueries({ queryKey: ['tasks'] })
-      queryClient.invalidateQueries({ queryKey: ['view-tasks'] })
-      queryClient.invalidateQueries({ queryKey: ['section-tasks'] })
+      // to keep tasks in-place, so we sync on navigation instead). Nothing is refetched while
+      // offline changes are still queued: that would erase their optimistic state.
+      refreshTasks(queryClient, [['tasks'], ['view-tasks'], ['section-tasks']])
       prevRouteRef.current = routePath
     }
   }, [routePath, queryClient])
 
   // TanStack Query's browser focus manager only observes page visibility. An Electron
   // window can lose and regain focus without becoming hidden, so explicitly refresh
-  // projects to pick up archives/restores made in Vikunja or another Vicu client.
+  // projects to pick up archives/restores made in Vikunja or another Vicu client. (Task lists
+  // are refreshed by useFreshness, throttled.)
   useEffect(() => {
     const refreshProjects = () => {
       queryClient.invalidateQueries({ queryKey: ['projects'] })
@@ -287,7 +252,7 @@ export function AppShell() {
           const projectId = overData.projectId as number
           dragTasks.forEach((t) => {
             if (projectId !== t.project_id) {
-              updateTask.mutate({ id: t.id, task: { ...t, project_id: projectId } })
+              updateTask.mutate({ id: t.id, changes: { project_id: projectId }, original: t })
             }
           })
           clearIfMulti()
@@ -303,7 +268,7 @@ export function AppShell() {
           const sectionProject = overData.project as Project
           dragTasks.forEach((t) => {
             if (sectionProject.id !== t.project_id) {
-              updateTask.mutate({ id: t.id, task: { ...t, project_id: sectionProject.id } })
+              updateTask.mutate({ id: t.id, changes: { project_id: sectionProject.id }, original: t })
             }
           })
           clearIfMulti()
@@ -312,7 +277,7 @@ export function AppShell() {
           const projectId = overData.projectId as number
           dragTasks.forEach((t) => {
             if (projectId !== t.project_id) {
-              updateTask.mutate({ id: t.id, task: { ...t, project_id: projectId } })
+              updateTask.mutate({ id: t.id, changes: { project_id: projectId }, original: t })
             }
           })
           clearIfMulti()
@@ -338,7 +303,8 @@ export function AppShell() {
               updateTask.mutate(
                 {
                   id: task.id,
-                  task: { ...task, project_id: sectionProjectId, position: newPosition },
+                  changes: { project_id: sectionProjectId, position: newPosition },
+                  original: task,
                   deferInvalidation: true,
                 },
                 {
@@ -405,8 +371,15 @@ export function AppShell() {
             const oldIndex = sourceTasks.findIndex((t) => t.id === task.id)
             const newIndex = sourceTasks.findIndex((t) => t.id === targetTaskId)
             if (oldIndex !== -1 && newIndex !== -1) {
-              const newPosition = calculatePosition(sourceTasks, oldIndex, newIndex)
-              reorderTask.mutate({ taskId: task.id, viewId: sourceViewId, position: newPosition })
+              // Usually one position. Tasks that share a position (every task moved into a
+              // project starts at 0) cannot be told apart by a midpoint, so planMove then spreads them.
+              const move = planMove(sourceTasks, oldIndex, newIndex)
+              reorderTask.mutate({
+                taskId: task.id,
+                viewId: sourceViewId,
+                position: move.position,
+                renumbered: move.renumbered,
+              })
             }
           } else if (destViewId && destProjectId && destProjectId !== task.project_id) {
             // Cross-section — move task to destination project + position.
@@ -415,13 +388,14 @@ export function AppShell() {
             // render. deferInvalidation tells useUpdateTask to skip refetching
             // view-tasks/section-tasks; the trailing reorderTask owns that.
             const targetIndex = destTasks.findIndex((t) => t.id === targetTaskId)
-            const insertPosition = calculateInsertPosition(destTasks, targetIndex)
+            const insertPosition = slotPosition(destTasks, targetIndex).position
 
             const finalDestViewId = destViewId
             updateTask.mutate(
               {
                 id: task.id,
-                task: { ...task, project_id: destProjectId, position: insertPosition },
+                changes: { project_id: destProjectId, position: insertPosition },
+                original: task,
                 deferInvalidation: true,
               },
               {
@@ -439,21 +413,8 @@ export function AppShell() {
           const overProject = overData.project as Project
           const newIndex = siblings.findIndex((s) => s.id === overProject.id)
           if (oldIndex !== -1 && newIndex !== -1) {
-            const without = siblings.filter((_, i) => i !== oldIndex)
-            const above = without[newIndex - 1]?.position ?? 0
-            const below = without[newIndex]?.position ?? (above + 2 ** 16)
-            const newPosition = (above + below) / 2
-            reorderProject.mutate({
-              id: dragItem.project.id,
-              project: {
-                title: dragItem.project.title,
-                description: dragItem.project.description,
-                hex_color: dragItem.project.hex_color,
-                is_archived: dragItem.project.is_archived,
-                position: newPosition,
-                parent_project_id: dragItem.project.parent_project_id,
-              },
-            })
+            const plan = planSiblingMove(siblings, oldIndex, newIndex)
+            reorderProject.mutate({ id: dragItem.project.id, position: plan.position, renumbered: plan.renumbered })
           }
         }
       } else if (dragItem.type === 'project') {
@@ -465,18 +426,8 @@ export function AppShell() {
             const overNode = overData.node as ProjectTreeNode
             const newIndex = siblings.findIndex((s) => s.id === overNode.id)
             if (oldIndex !== -1 && newIndex !== -1) {
-              const newPosition = calculateProjectPosition(siblings, oldIndex, newIndex)
-              // Keep known project fields in the optimistic reorder payload.
-              reorderProject.mutate({
-                id: node.id,
-                project: {
-                  title: node.title,
-                  description: node.description,
-                  hex_color: node.hex_color,
-                  is_archived: node.is_archived,
-                  position: newPosition,
-                },
-              })
+              const plan = planSiblingMove(siblings, oldIndex, newIndex)
+              reorderProject.mutate({ id: node.id, position: plan.position, renumbered: plan.renumbered })
             }
           }
         }
@@ -531,12 +482,11 @@ export function AppShell() {
     return () => mq.removeEventListener('change', handler)
   }, [])
 
-  // Invalidate query cache when Quick Entry/View mutates tasks
+  // Invalidate query cache when Quick Entry/View mutates tasks, or a replay applied queued changes.
+  // Every task-derived key goes, section tasks included (D-FRESH-1).
   useEffect(() => {
     const cleanup = api.onTasksChanged(() => {
-      queryClient.invalidateQueries({ queryKey: ['tasks'] })
-      queryClient.invalidateQueries({ queryKey: ['view-tasks'] })
-      queryClient.invalidateQueries({ queryKey: ['task-detail'] })
+      refreshTasks(queryClient)
     })
     return cleanup
   }, [queryClient])
@@ -548,6 +498,21 @@ export function AppShell() {
     })
   }, [navigate])
 
+  // A clicked task reminder or Quick View's "open in app": show that task in this window.
+  useEffect(() => {
+    return api.onNavigateToTask((taskId) => {
+      void openTaskInApp(
+        {
+          fetchTask: (id) => api.fetchTaskById(id),
+          inboxProjectId: async () => (await api.getConfig())?.inbox_project_id ?? 0,
+          navigate: (route) => navigate(route),
+          notify: (message) => toast.error(message),
+        },
+        taskId,
+      )
+    })
+  }, [navigate])
+
   // Print the current view when the File menu / Ctrl+P fires. Views register
   // their on-screen tasks via usePrintable; no payload (Settings, Setup)
   // means nothing to print.
@@ -556,6 +521,8 @@ export function AppShell() {
       try {
         const payload = usePrintStore.getState().payload
         if (!payload) return
+        // The logo is a 90 KB data URL used only here: loaded when something is printed.
+        const { VICU_LOGO_DATA_URL } = await import('@/assets/vicu-logo')
         const html = buildPrintHtml(payload, {
           sanitize: sanitizeTaskHtml,
           logoDataUrl: VICU_LOGO_DATA_URL,
@@ -569,6 +536,28 @@ export function AppShell() {
       }
     })
   }, [])
+
+  // "Sign in" in the sync panel: the queue stopped on an auth problem the local token state does not
+  // show (the server rejected a token that looks valid), so show the sign-in screen regardless.
+  const reauthRequestId = useUIStore((s) => s.reauthRequestId)
+  useEffect(() => {
+    if (reauthRequestId === 0) return
+    void api.getConfig().then((config) => {
+      if (!config?.vikunja_url) {
+        setAppState('setup')
+      } else if (config.auth_method === 'oidc' || config.auth_method === 'password') {
+        setReauthInfo({
+          authMethod: config.auth_method,
+          vikunjaUrl: config.vikunja_url,
+          lastUsername: config.last_username,
+        })
+        setAppState('reauth')
+      } else {
+        // An API token that the server refuses has to be replaced on the setup screen.
+        setAppState('setup')
+      }
+    })
+  }, [reauthRequestId])
 
   // Listen for auth-required events (runtime token expiry)
   useEffect(() => {
@@ -610,9 +599,7 @@ export function AppShell() {
         document.body.style.cursor = ''
         document.body.style.userSelect = ''
         setSidebarWidth(latestWidth)
-        void api.getConfig().then((cfg) => {
-          if (cfg) return api.saveConfig({ ...cfg, sidebar_width: latestWidth })
-        })
+        void api.saveConfigPatch({ sidebar_width: latestWidth })
       }
 
       document.body.style.cursor = 'col-resize'
@@ -629,24 +616,30 @@ export function AppShell() {
 
   if (appState === 'reauth' && reauthInfo) {
     return (
-      <ReauthView
-        authMethod={reauthInfo.authMethod}
-        vikunjaUrl={reauthInfo.vikunjaUrl}
-        lastUsername={reauthInfo.lastUsername}
-        onSuccess={() => {
-          setReauthInfo(null)
-          setAppState('ready')
-        }}
-        onSwitchAccount={() => {
-          setReauthInfo(null)
-          setAppState('setup')
-        }}
-      />
+      <Suspense fallback={<div className="flex h-screen w-screen items-center justify-center bg-[var(--bg-primary)]" />}>
+        <ReauthView
+          authMethod={reauthInfo.authMethod}
+          vikunjaUrl={reauthInfo.vikunjaUrl}
+          lastUsername={reauthInfo.lastUsername}
+          onSuccess={() => {
+            setReauthInfo(null)
+            setAppState('ready')
+          }}
+          onSwitchAccount={() => {
+            setReauthInfo(null)
+            setAppState('setup')
+          }}
+        />
+      </Suspense>
     )
   }
 
   if (appState === 'setup') {
-    return <SetupView onComplete={() => setAppState('ready')} />
+    return (
+      <Suspense fallback={<div className="flex h-screen w-screen items-center justify-center bg-[var(--bg-primary)]" />}>
+        <SetupView onComplete={() => setAppState('ready')} />
+      </Suspense>
+    )
   }
 
   return (
@@ -694,6 +687,7 @@ export function AppShell() {
         <BadgeSync />
         <CompletionSoundSync />
         <GlobalConfirm />
+        <ToastHost />
       </div>
 
       <DragOverlay

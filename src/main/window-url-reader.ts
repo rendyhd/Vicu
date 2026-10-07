@@ -3,6 +3,7 @@ import { spawn, execFile, type ChildProcess } from 'child_process'
 import { join } from 'path'
 import type { BrowserContext } from './browser-client'
 import { isMac, isWindows, isLinux } from './platform'
+import { decodeUtf8Chunks } from './response-body'
 
 export const BROWSER_PROCESSES = new Set(
   isMac
@@ -115,11 +116,11 @@ export function getBrowserUrlFromWindow(processName: string, hwnd?: number): Pro
         windowsHide: true
       })
 
-      let stdout = ''
-      child.stdout.on('data', (chunk: Buffer) => { stdout += chunk.toString() })
+      const stdoutChunks: Buffer[] = []
+      child.stdout.on('data', (chunk: Buffer) => { stdoutChunks.push(chunk) })
 
       child.on('close', () => {
-        const line = stdout.trim()
+        const line = decodeUtf8Chunks(stdoutChunks).trim()
         if (!line) { resolve(null); return }
 
         const tabIdx = line.indexOf('\t')

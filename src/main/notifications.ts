@@ -1,8 +1,15 @@
 import { app, Notification, nativeImage, BrowserWindow } from 'electron'
 import { join } from 'path'
 import { loadConfig, type AppConfig } from './config'
-import { fetchTasks } from './api-client'
+import { MAX_PAGE_SIZE } from './api-v2'
+import { fetchTaskById, fetchTasks } from './api-client'
+import { loadRoutineCarriers } from './carrier-service'
 import { getAllStandaloneTasks } from './cache'
+import { getOfflineQueue } from './offline/service'
+import { createTaskReminderScheduler } from './task-reminders'
+import { notificationCategory, notificationFilters, overdueDays } from './notification-windows'
+import { addLocalDays, startOfLocalDay, toLocalDate } from '../shared/due-dates'
+import { parseRoutineEnvelope, routineOccurrenceKey, scheduledDateOn, type RoutinePayload } from '../shared/routines'
 
 const NULL_DATE = '0001-01-01T00:00:00Z'
 
@@ -11,12 +18,33 @@ let dailyTimerId: ReturnType<typeof setTimeout> | null = null
 let secondaryTimerId: ReturnType<typeof setTimeout> | null = null
 let routineRefreshTimerId: ReturnType<typeof setTimeout> | null = null
 
-// Per-task reminder timers (key: "taskId-timestamp")
-const reminderTimers = new Map<string, ReturnType<typeof setTimeout>>()
 const routineReminderTimers = new Map<string, ReturnType<typeof setTimeout>>()
 
 // Reference to main window (set during init)
 let mainWindowRef: BrowserWindow | null = null
+
+/** The user completed or deleted the task here and the offline queue has not told the server yet. */
+function isClosedLocally(taskId: number): boolean {
+  try {
+    return getOfflineQueue().getPending().some((action) =>
+      (action.type === 'delete' && action.taskId === taskId) ||
+      (action.type === 'update' && action.taskId === taskId && action.patch.done === true)
+    )
+  } catch {
+    return false
+  }
+}
+
+// Task reminders: one refresh from the server every 15 minutes (and on focus, resume and after a
+// task changes), one timer per reminder, a re-check when each fires. See ./task-reminders.ts.
+const taskReminders = createTaskReminderScheduler({
+  loadConfig,
+  fetchTasks,
+  fetchTaskById,
+  isClosedLocally,
+  show: (taskId, title, config) => fireTaskReminder(taskId, title, config as AppConfig),
+  now: () => Date.now(),
+})
 
 /**
  * Attach failure logging for desktop notifications. On macOS, Electron 42+
@@ -34,7 +62,7 @@ function attachNotificationDiagnostics(notification: Notification, context: stri
 export function initNotifications(mainWindow: BrowserWindow | null): void {
   mainWindowRef = mainWindow
   scheduleAll()
-  refreshTaskReminders()
+  taskReminders.start()
   refreshRoutineReminders()
   scheduleRoutineRefresh()
 }
@@ -47,41 +75,15 @@ export function setNotificationsMainWindow(mainWindow: BrowserWindow | null): vo
 export function rescheduleNotifications(): void {
   clearTimers()
   scheduleAll()
-  refreshTaskReminders()
+  void refreshTaskReminders()
   refreshRoutineReminders()
   scheduleRoutineRefresh()
 }
 
 export function stopNotifications(): void {
   clearTimers()
-  clearReminderTimers()
+  taskReminders.stop()
   clearRoutineReminderTimers()
-}
-
-interface RoutineNotificationPayload {
-  definition: {
-    id: string
-    name: string
-    kind: 'HEALTH' | 'CHORE'
-    amount: string
-    unit: string
-    archived: boolean
-    activeFrom: string
-    schedule:
-      | { type: 'calendar'; weekdays: number[]; weekInterval: number; anchorDate: string }
-      | { type: 'after_completion'; intervalDays: number; firstDueDate: string }
-    slots: Array<{
-      id: string
-      label: string
-      reminderMinutes: number
-      reminderEnabled: boolean
-      followUpMinutes: number
-    }>
-  }
-  occurrences: Record<string, {
-    scheduledDate: string
-    status: 'PENDING' | 'COMPLETED' | 'SKIPPED' | 'NOT_LOGGED'
-  }>
 }
 
 /** Schedule the next three weeks of routine alarms stored in hidden carrier tasks. */
@@ -90,21 +92,25 @@ export async function refreshRoutineReminders(): Promise<void> {
   const config = loadConfig()
   if (!config?.notifications_enabled || config.standalone_mode) return
 
-  const result = await fetchTasks({ per_page: 200, filter: 'done = true' })
-  if (!result.success || !Array.isArray(result.data)) return
+  // Carriers are fetched by their remembered ids; the done tasks are not listed (D-NOTIF-3).
+  const result = await loadRoutineCarriers()
+  if (!result.success) return
   const now = Date.now()
-  const today = localDateString(new Date())
+  const today = toLocalDate(new Date())
 
-  for (const task of result.data as Array<Record<string, unknown>>) {
-    const payload = parseRoutinePayload(task.description)
+  for (const task of result.data as unknown as Array<Record<string, unknown>>) {
+    // Archive parts and malformed carriers have no payload and are skipped here.
+    const payload = parseRoutineEnvelope(typeof task.description === 'string' ? task.description : '').payload
     if (!payload || payload.definition.archived) continue
     for (let offset = 0; offset <= 21; offset += 1) {
       const candidate = addLocalDays(today, offset)
-      const scheduledDate = scheduledRoutineDate(payload, candidate)
-      if (!scheduledDate || scheduledDate < payload.definition.activeFrom) continue
+      // The same scheduling rules as the Today view (src/shared/routines.ts); reminders only
+      // fire on the due date itself, never for an overdue chore carried over to today.
+      const scheduledDate = scheduledDateOn(payload, candidate)
+      if (!scheduledDate) continue
       for (const slot of payload.definition.slots) {
         if (!slot.reminderEnabled) continue
-        const key = `${payload.definition.id}:${scheduledDate}:${slot.id}`
+        const key = routineOccurrenceKey(payload.definition.id, scheduledDate, slot.id)
         const status = payload.occurrences[key]?.status ?? 'PENDING'
         if (status !== 'PENDING') continue
         const base = localDateAtMinutes(candidate, slot.reminderMinutes).getTime()
@@ -117,43 +123,25 @@ export async function refreshRoutineReminders(): Promise<void> {
   }
 }
 
-export async function refreshTaskReminders(): Promise<void> {
-  clearReminderTimers()
+/**
+ * Re-read the upcoming reminders from the server and re-arm the timers. Call it after anything that
+ * can change them: a completed, reopened or deleted task, edited reminders or due date.
+ */
+export function refreshTaskReminders(): Promise<void> {
+  return taskReminders.refresh()
+}
 
-  const config = loadConfig()
-  if (!config || config.standalone_mode) return
+/**
+ * What a completed, deleted or edited task calls: the refresh runs once the changes stop coming
+ * (about a second later), so completing 20 tasks at once reads the reminder list once, not 20 times.
+ */
+export function refreshTaskRemindersSoon(): void {
+  taskReminders.refreshSoon()
+}
 
-  const result = await fetchTasks({ per_page: 200, filter: 'done = false' })
-  if (!result.success || !Array.isArray(result.data)) return
-
-  const tasks = result.data as Array<Record<string, unknown>>
-  const now = Date.now()
-
-  for (const task of tasks) {
-    const reminders = task.reminders as Array<{ reminder: string }> | null | undefined
-    if (!reminders || !Array.isArray(reminders)) continue
-
-    const taskId = task.id as number
-    const taskTitle = task.title as string
-
-    for (const r of reminders) {
-      if (!r.reminder) continue
-      const reminderTime = new Date(r.reminder).getTime()
-      if (isNaN(reminderTime) || reminderTime <= now) continue
-
-      const key = `${taskId}-${r.reminder}`
-      const delay = reminderTime - now
-      // setTimeout uses a 32-bit signed int internally; delays > 2^31-1 ms (~24.85 days)
-      // overflow and fire immediately. Skip far-future reminders — they'll be picked up
-      // on a future refresh once they're within range.
-      if (delay > 2_147_483_647) continue
-      const timerId = setTimeout(() => {
-        fireTaskReminder(taskId, taskTitle, config)
-        reminderTimers.delete(key)
-      }, delay)
-      reminderTimers.set(key, timerId)
-    }
-  }
+/** Window focus: refresh unless a refresh ran a moment ago. */
+export function refreshTaskRemindersOnFocus(): void {
+  taskReminders.refreshOnFocus()
 }
 
 export function sendTestNotification(): void {
@@ -196,13 +184,6 @@ function scheduleRoutineRefresh(): void {
   }, next.getTime() - now.getTime())
 }
 
-function clearReminderTimers(): void {
-  for (const timerId of reminderTimers.values()) {
-    clearTimeout(timerId)
-  }
-  reminderTimers.clear()
-}
-
 function clearRoutineReminderTimers(): void {
   for (const timerId of routineReminderTimers.values()) clearTimeout(timerId)
   routineReminderTimers.clear()
@@ -212,7 +193,7 @@ function scheduleRoutineTimer(
   key: string,
   triggerAt: number,
   now: number,
-  payload: RoutineNotificationPayload,
+  payload: RoutinePayload,
   slotLabel: string,
   followUp: boolean,
   config: AppConfig,
@@ -227,7 +208,7 @@ function scheduleRoutineTimer(
 }
 
 function fireRoutineReminder(
-  payload: RoutineNotificationPayload,
+  payload: RoutinePayload,
   slotLabel: string,
   followUp: boolean,
   configSnapshot: AppConfig,
@@ -251,69 +232,16 @@ function fireRoutineReminder(
   notification.show()
 }
 
-function parseRoutinePayload(description: unknown): RoutineNotificationPayload | null {
-  if (typeof description !== 'string') return null
-  const marker = description.match(/<!--\s*vicu-routine:v1:([A-Za-z0-9_-]+={0,2})\s*-->/)
-  if (!marker) return null
-  try {
-    const payload = JSON.parse(Buffer.from(marker[1], 'base64url').toString('utf8')) as RoutineNotificationPayload
-    if (!payload?.definition?.id || !Array.isArray(payload.definition.slots)) return null
-    return payload
-  } catch {
-    return null
-  }
-}
-
-function localDateString(date: Date): string {
-  return `${date.getFullYear()}-${`${date.getMonth() + 1}`.padStart(2, '0')}-${`${date.getDate()}`.padStart(2, '0')}`
-}
-
-function parseLocalDate(value: string): Date {
-  const [year, month, day] = value.split('-').map(Number)
-  return new Date(year, month - 1, day, 12)
-}
-
-function addLocalDays(value: string, days: number): string {
-  const date = parseLocalDate(value)
-  date.setDate(date.getDate() + days)
-  return localDateString(date)
-}
-
-function isoWeekday(value: string): number {
-  return parseLocalDate(value).getDay() || 7
-}
-
-function isoWeekStart(value: string): Date {
-  const date = parseLocalDate(value)
-  date.setDate(date.getDate() + 1 - (date.getDay() || 7))
-  return date
-}
-
-function scheduledRoutineDate(payload: RoutineNotificationPayload, candidate: string): string | null {
-  const { schedule } = payload.definition
-  if (schedule.type === 'calendar') {
-    if (candidate < schedule.anchorDate) return null
-    if (schedule.weekdays.length > 0 && !schedule.weekdays.includes(isoWeekday(candidate))) return null
-    const weeks = Math.round((isoWeekStart(candidate).getTime() - isoWeekStart(schedule.anchorDate).getTime()) / (7 * 86_400_000))
-    return weeks % Math.max(1, schedule.weekInterval) === 0 ? candidate : null
-  }
-  const latest = Object.values(payload.occurrences)
-    .filter((record) => record.status === 'COMPLETED')
-    .map((record) => record.scheduledDate)
-    .sort()
-    .at(-1)
-  const due = latest ? addLocalDays(latest, Math.max(1, schedule.intervalDays)) : schedule.firstDueDate
-  return candidate === due ? due : null
-}
-
 function localDateAtMinutes(value: string, minutes: number): Date {
-  const date = parseLocalDate(value)
+  const date = startOfLocalDay(value)
   date.setHours(Math.max(0, Math.min(23, Math.floor(minutes / 60))), Math.max(0, Math.min(59, minutes % 60)), 0, 0)
   return date
 }
 
 function fireTaskReminder(taskId: number, title: string, configSnapshot: AppConfig): void {
   const config = loadConfig() || configSnapshot
+  // The master toggle covers task reminders too (D-NOTIF-1).
+  if (!config.notifications_enabled) return
 
   const notification = new Notification({
     title: `Reminder: ${title}`,
@@ -428,21 +356,16 @@ async function getNotificationTasks(config: AppConfig): Promise<NotificationTask
     return getStandaloneNotificationTasks(config)
   }
 
-  const now = new Date()
-  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-  const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59)
-  const tomorrowStart = new Date(todayStart)
-  tomorrowStart.setDate(tomorrowStart.getDate() + 1)
-  const tomorrowEnd = new Date(todayEnd)
-  tomorrowEnd.setDate(tomorrowEnd.getDate() + 1)
+  // Local-day boundaries, exclusive upper bounds (cross-app semantics v1, section 2).
+  const filters = notificationFilters(new Date())
 
   // Fetch overdue tasks
   if (config.notifications_overdue_enabled) {
     const overdue = await fetchTasks({
-      filter: `done = false && due_date < "${todayStart.toISOString()}" && due_date != "${NULL_DATE}"`,
+      filter: filters.overdue,
       sort_by: 'due_date',
       order_by: 'asc',
-      per_page: 50,
+      per_page: MAX_PAGE_SIZE,
     })
     if (overdue.success && Array.isArray(overdue.data)) {
       result.overdue = (overdue.data as Array<Record<string, unknown>>)
@@ -459,10 +382,10 @@ async function getNotificationTasks(config: AppConfig): Promise<NotificationTask
   // Fetch tasks due today
   if (config.notifications_due_today_enabled) {
     const dueToday = await fetchTasks({
-      filter: `done = false && due_date >= "${todayStart.toISOString()}" && due_date <= "${todayEnd.toISOString()}"`,
+      filter: filters.dueToday,
       sort_by: 'due_date',
       order_by: 'asc',
-      per_page: 50,
+      per_page: MAX_PAGE_SIZE,
     })
     if (dueToday.success && Array.isArray(dueToday.data)) {
       result.dueToday = (dueToday.data as Array<Record<string, unknown>>)
@@ -479,10 +402,10 @@ async function getNotificationTasks(config: AppConfig): Promise<NotificationTask
   // Fetch upcoming tasks (tomorrow)
   if (config.notifications_upcoming_enabled) {
     const upcoming = await fetchTasks({
-      filter: `done = false && due_date >= "${tomorrowStart.toISOString()}" && due_date <= "${tomorrowEnd.toISOString()}"`,
+      filter: filters.upcoming,
       sort_by: 'due_date',
       order_by: 'asc',
-      per_page: 50,
+      per_page: MAX_PAGE_SIZE,
     })
     if (upcoming.success && Array.isArray(upcoming.data)) {
       result.upcoming = (upcoming.data as Array<Record<string, unknown>>)
@@ -504,32 +427,26 @@ function getStandaloneNotificationTasks(config: AppConfig): NotificationTasks {
   const tasks = getAllStandaloneTasks()
 
   const now = new Date()
-  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-  const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59)
-  const tomorrowStart = new Date(todayStart)
-  tomorrowStart.setDate(tomorrowStart.getDate() + 1)
-  const tomorrowEnd = new Date(todayEnd)
-  tomorrowEnd.setDate(tomorrowEnd.getDate() + 1)
 
   for (const task of tasks) {
     if (task.due_date === NULL_DATE || !task.due_date) continue
-    const dueTime = new Date(task.due_date).getTime()
+    const category = notificationCategory(task.due_date, now)
 
-    if (config.notifications_overdue_enabled && dueTime < todayStart.getTime()) {
+    if (config.notifications_overdue_enabled && category === 'overdue') {
       result.overdue.push({
         id: task.id,
         title: task.title,
         due_date: task.due_date,
         category: 'overdue',
       })
-    } else if (config.notifications_due_today_enabled && dueTime >= todayStart.getTime() && dueTime <= todayEnd.getTime()) {
+    } else if (config.notifications_due_today_enabled && category === 'due_today') {
       result.dueToday.push({
         id: task.id,
         title: task.title,
         due_date: task.due_date,
         category: 'due_today',
       })
-    } else if (config.notifications_upcoming_enabled && dueTime >= tomorrowStart.getTime() && dueTime <= tomorrowEnd.getTime()) {
+    } else if (config.notifications_upcoming_enabled && category === 'upcoming') {
       result.upcoming.push({
         id: task.id,
         title: task.title,
@@ -597,11 +514,8 @@ function formatDueDate(dueDateStr: string, category: 'overdue' | 'due_today' | '
   if (category === 'due_today') return 'Due today'
   if (category === 'upcoming') return 'Due tomorrow'
 
-  // Overdue — calculate how many days
-  const dueDate = new Date(dueDateStr)
-  const now = new Date()
-  const diffMs = now.getTime() - dueDate.getTime()
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+  // Overdue: whole calendar days since the due date's local day
+  const diffDays = overdueDays(dueDateStr)
 
   if (diffDays <= 0) return 'Due today'
   if (diffDays === 1) return 'Overdue by 1 day'

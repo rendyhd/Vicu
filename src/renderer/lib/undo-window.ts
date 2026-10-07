@@ -1,3 +1,4 @@
+import { hasVicuMetadataMarker } from './metadata-tasks'
 import { sortProjectTasks } from './task-sort'
 import type { Task } from './vikunja-types'
 import type { CompletedTaskEntry } from '@/stores/completed-tasks-store'
@@ -108,4 +109,28 @@ export function mergeSectionUndoWindow<
     return { ...section, tasks: sortProjectTasks([...visible, ...extras]) }
   })
   return changed ? next : sections
+}
+
+/**
+ * Apply the undo window to a smart list (Today, Upcoming, Anytime, Tag, Logbook, search): the
+ * tasks toggled on THIS path that the server no longer returns (completed ones leave an open list,
+ * reopened ones leave the Logbook) are appended, so they stay visible until the user navigates away.
+ * Implementation-detail tasks never show. Returns `tasks` itself when nothing is added.
+ */
+export function mergeSmartListUndoWindow(
+  tasks: Task[],
+  completed: Map<number, CompletedTaskEntry>,
+  pathname: string
+): Task[] {
+  const serverIds = new Set(tasks.map((t) => t.id))
+  const extras = Array.from(completed.values())
+    .filter(
+      (entry) =>
+        entry.path === pathname &&
+        !entry.suppressTopLevelUndo &&
+        !serverIds.has(entry.task.id) &&
+        !hasVicuMetadataMarker(entry.task.description)
+    )
+    .map((entry) => entry.task)
+  return extras.length === 0 ? tasks : [...tasks, ...extras]
 }

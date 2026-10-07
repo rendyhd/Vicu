@@ -2,22 +2,24 @@ declare global {
   interface Window {
     quickViewApi: {
       fetchTasks(): Promise<FetchResult>
-      markTaskDone(taskId: number, taskData: Record<string, unknown>): Promise<ActionResult>
-      markTaskUndone(taskId: number, taskData: Record<string, unknown>): Promise<ActionResult>
-      scheduleTaskToday(taskId: number, taskData: Record<string, unknown>): Promise<ActionResult>
-      removeDueDate(taskId: number, taskData: Record<string, unknown>): Promise<ActionResult>
-      updateTask(taskId: number, taskData: Record<string, unknown>): Promise<ActionResult>
+      // A row id is a number, a `local_x` string (standalone) or `pending_x` (queued offline).
+      markTaskDone(taskId: number | string, taskData: Record<string, unknown>): Promise<ActionResult>
+      markTaskUndone(taskId: number | string, taskData: Record<string, unknown>): Promise<ActionResult>
+      scheduleTaskToday(taskId: number | string, taskData: Record<string, unknown>): Promise<ActionResult>
+      removeDueDate(taskId: number | string, taskData: Record<string, unknown>): Promise<ActionResult>
+      updateTask(taskId: number | string, patch: TaskPatch): Promise<ActionResult>
       openTaskInBrowser(taskId: number): Promise<void>
       openTaskInApp(taskId: number): Promise<void>
       closeWindow(): Promise<void>
       setHeight(height: number): Promise<void>
       getPendingCount(): Promise<number>
+      getQueueCounts(): Promise<{ pending: number; failed: number }>
       getConfig(): Promise<QuickViewConfig | null>
       onShowWindow(callback: () => void): void
       onHideWindow(callback: () => void): void
       onSyncCompleted(callback: () => void): void
       onConfigChanged(callback: () => void): void
-      onDragHover(callback: (_event: unknown, hovering: boolean) => void): void
+      onDragHover(callback: (hovering: boolean) => void): void
       openDeepLink(url: string): Promise<void>
     }
   }
@@ -58,20 +60,22 @@ interface QuickViewConfig {
 
 import { extractTaskLink, stripNoteLink, stripPageLink, extractNoteLinkHtml, extractPageLinkHtml } from '@/lib/note-link'
 import { sanitizeTaskHtml } from '@/lib/sanitize-html'
-import { hasRichDescriptionBody } from '@/lib/description-html'
+import { taskPatch, type TaskPatch } from '@/lib/merge-patches'
+import { diffLocalDays, dueToday, isDateOnly, isNoDueDate, toLocalDate } from '@/lib/due-dates'
+import {
+  hasRichDescriptionBody,
+  plainTextFromDescriptionLines,
+  plainTextToDescriptionHtml,
+  resolveOpenableDescriptionHref,
+  withLineBreaksAsNewlines,
+} from '@/lib/description-html'
 
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-}
-
+// The notes as the text box shows them: one line per paragraph (and per <br>), where textContent
+// alone would run the paragraphs together.
 function plainTextFromHtml(html: string): string {
   const tmp = document.createElement('div')
-  tmp.innerHTML = sanitizeTaskHtml(html)
-  return tmp.textContent ?? ''
+  tmp.innerHTML = sanitizeTaskHtml(withLineBreaksAsNewlines(html))
+  return plainTextFromDescriptionLines(tmp.textContent ?? '')
 }
 
 const container = document.getElementById('container')!
@@ -172,31 +176,29 @@ function updateSelection(newIndex: number): void {
   items[selectedIndex].scrollIntoView({ block: 'nearest' })
 }
 
+// Buckets follow the local calendar date (cross-app semantics v1): a task due at 08:00 today
+// is still "Today" at 10:00 and becomes overdue tomorrow. Date-only values show no time.
 function formatDueDate(dueDateStr: string | null | undefined): { label: string; cssClass: string } | null {
-  if (!dueDateStr || dueDateStr === '0001-01-01T00:00:00Z') return null
+  if (isNoDueDate(dueDateStr)) return null
 
-  const due = new Date(dueDateStr)
+  const due = new Date(dueDateStr as string)
   const now = new Date()
-  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-  const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999)
-  const tomorrowEnd = new Date(todayEnd.getTime() + 86400000)
+  const diffDays = diffLocalDays(toLocalDate(now), toLocalDate(due))
 
   let label: string
   let cssClass: string
 
-  if (due < todayStart) {
-    const diffDays = Math.ceil((todayStart.getTime() - due.getTime()) / 86400000)
-    label = diffDays === 1 ? 'Yesterday' : `${diffDays} days overdue`
+  if (diffDays < 0) {
+    label = diffDays === -1 ? 'Yesterday' : `${-diffDays} days overdue`
     cssClass = 'overdue'
-  } else if (due <= todayEnd) {
+  } else if (diffDays === 0) {
     label = 'Today'
     cssClass = 'today'
-  } else if (due <= tomorrowEnd) {
+  } else if (diffDays === 1) {
     label = 'Tomorrow'
     cssClass = 'upcoming'
   } else {
-    const diffDays = Math.ceil((due.getTime() - todayStart.getTime()) / 86400000)
-    if (diffDays <= 7) {
+    if (diffDays <= 6) {
       const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
       label = days[due.getDay()]
     } else {
@@ -205,6 +207,10 @@ function formatDueDate(dueDateStr: string | null | undefined): { label: string; 
       if (due.getFullYear() !== now.getFullYear()) label += `, ${due.getFullYear()}`
     }
     cssClass = 'upcoming'
+  }
+
+  if (diffDays >= -1 && !isDateOnly(dueDateStr as string)) {
+    label += ` ${due.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}`
   }
 
   return { label, cssClass }
@@ -227,6 +233,13 @@ function buildTaskItemDOM(task: TaskData): HTMLElement {
   checkbox.className = 'task-checkbox'
   checkbox.title = 'Mark as done'
   checkbox.addEventListener('change', () => completeTask(task.id, item, checkbox))
+  // A list that includes completed tasks shows them checked; they cannot be completed again.
+  if (task.done) {
+    item.classList.add('task-done')
+    checkbox.checked = true
+    checkbox.disabled = true
+    checkbox.title = 'Completed'
+  }
   item.appendChild(checkbox)
 
   const content = document.createElement('div')
@@ -241,7 +254,8 @@ function buildTaskItemDOM(task: TaskData): HTMLElement {
   if (!isStandaloneMode) {
     title.addEventListener('click', (e) => {
       e.stopPropagation()
-      window.quickViewApi.openTaskInBrowser(Number(task.id))
+      // A task that only exists in the offline queue has no page on the server yet.
+      if (typeof task.id === 'number') window.quickViewApi.openTaskInBrowser(task.id)
     })
   }
   titleRow.appendChild(title)
@@ -256,7 +270,7 @@ function buildTaskItemDOM(task: TaskData): HTMLElement {
       : `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>`
     btn.addEventListener('click', (e) => {
       e.stopPropagation()
-      window.quickViewApi.openDeepLink(taskLink.kind === 'note' ? taskLink.url : taskLink.url)
+      window.quickViewApi.openDeepLink(taskLink.url)
     })
     titleRow.appendChild(btn)
   }
@@ -293,6 +307,16 @@ function buildTaskItemDOM(task: TaskData): HTMLElement {
     desc.innerHTML = sanitizeTaskHtml(stripPageLink(stripNoteLink(task.description)))
     desc.addEventListener('click', (e) => {
       e.stopPropagation()
+      // A link opens in the default handler. Without preventDefault the window would navigate
+      // to it (the navigation guard only rescues the page); links with a scheme that may not
+      // be opened do nothing.
+      const anchor = (e.target as HTMLElement | null)?.closest?.('a')
+      if (anchor && desc.contains(anchor)) {
+        e.preventDefault()
+        const href = resolveOpenableDescriptionHref(anchor.getAttribute('href'))
+        if (href) void window.quickViewApi.openDeepLink(href)
+        return
+      }
       const items = getTaskItems()
       const index = Array.from(items).indexOf(item)
       if (index >= 0) updateSelection(index)
@@ -361,7 +385,7 @@ async function completeTask(taskId: number | string, itemElement: HTMLElement, c
   if (checkbox) checkbox.disabled = true
   itemElement.classList.add('completing')
 
-  const result = await window.quickViewApi.markTaskDone(Number(taskId), originalTask)
+  const result = await window.quickViewApi.markTaskDone(taskId, originalTask)
 
   if (result.success) {
     lastFetchResult = null
@@ -382,7 +406,7 @@ async function completeTask(taskId: number | string, itemElement: HTMLElement, c
 
 async function undoComplete(taskId: number | string, itemElement: HTMLElement): Promise<void> {
   const storedTask = completedTasks.get(String(taskId))
-  const result = await window.quickViewApi.markTaskUndone(Number(taskId), storedTask || {})
+  const result = await window.quickViewApi.markTaskUndone(taskId, storedTask || {})
 
   if (result.success) {
     lastFetchResult = null
@@ -409,7 +433,7 @@ async function toggleDueDate(): Promise<void> {
   const hasDueDate = taskData.due_date && taskData.due_date !== '0001-01-01T00:00:00Z'
 
   if (hasDueDate) {
-    const result = await window.quickViewApi.removeDueDate(Number(taskId), taskData)
+    const result = await window.quickViewApi.removeDueDate(taskId, taskData)
     if (result.success) {
       lastFetchResult = null
       taskData.due_date = '0001-01-01T00:00:00Z'
@@ -420,11 +444,10 @@ async function toggleDueDate(): Promise<void> {
       showError(result.error || 'Failed to remove due date')
     }
   } else {
-    const result = await window.quickViewApi.scheduleTaskToday(Number(taskId), taskData)
+    const result = await window.quickViewApi.scheduleTaskToday(taskId, taskData)
     if (result.success) {
       lastFetchResult = null
-      const now = new Date()
-      taskData.due_date = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59).toISOString()
+      taskData.due_date = dueToday()
       item.dataset.task = JSON.stringify(taskData)
       const content = item.querySelector('.task-content')
       let dueEl = item.querySelector('.task-due')
@@ -460,13 +483,14 @@ function enterEditMode(focusDescription = false): void {
   const taskData: TaskData = JSON.parse(item.dataset.task || '{}')
   const descriptionBody = stripPageLink(stripNoteLink(taskData.description || ''))
   const hasRichDescription = hasRichDescriptionBody(descriptionBody)
-  if (focusDescription && hasRichDescription) {
-    void window.quickViewApi.openTaskInApp(Number(taskData.id))
+  // A task that only exists in the offline queue cannot be opened in the app yet.
+  const canOpenInApp = typeof taskData.id === 'number'
+  if (focusDescription && hasRichDescription && canOpenInApp) {
+    void window.quickViewApi.openTaskInApp(taskData.id as number)
     return
   }
   editingItem = item
   item.classList.add('editing')
-  ;(item as any)._originalHTML = item.innerHTML
 
   item.innerHTML = ''
   const editWrapper = document.createElement('div')
@@ -509,9 +533,9 @@ function enterEditMode(focusDescription = false): void {
 
   descTextarea.addEventListener('keydown', (e) => {
     e.stopPropagation()
-    if (hasRichDescription && e.key === 'Enter') {
+    if (hasRichDescription && canOpenInApp && e.key === 'Enter') {
       e.preventDefault()
-      void window.quickViewApi.openTaskInApp(Number(taskData.id))
+      void window.quickViewApi.openTaskInApp(taskData.id as number)
       return
     }
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); saveEdit(item, titleInput.value, descTextarea.value) }
@@ -521,9 +545,9 @@ function enterEditMode(focusDescription = false): void {
 
   titleInput.addEventListener('keypress', (e) => e.stopPropagation())
   descTextarea.addEventListener('keypress', (e) => e.stopPropagation())
-  if (hasRichDescription) {
+  if (hasRichDescription && canOpenInApp) {
     descTextarea.addEventListener('click', () => {
-      void window.quickViewApi.openTaskInApp(Number(taskData.id))
+      void window.quickViewApi.openTaskInApp(taskData.id as number)
     })
   }
 
@@ -547,14 +571,19 @@ async function saveEdit(item: HTMLElement, newTitle: string, newDescription: str
   const preserveRichDescription = item.querySelector<HTMLElement>('.task-edit-wrapper')?.dataset.preserveRichDescription === 'true'
   let finalDescription = taskData.description || ''
   if (!preserveRichDescription) {
-    const trimmedDesc = newDescription.trim()
-    const linkHtml = extractNoteLinkHtml(taskData.description) + extractPageLinkHtml(taskData.description)
-    const wrapped = trimmedDesc ? `<p>${escapeHtml(trimmedDesc).replace(/\n/g, '<br>')}</p>` : ''
-    finalDescription = wrapped + linkHtml
+    // Notes that were not edited keep their stored HTML exactly; edited text is written the way
+    // every plain-text box writes it (escaped, one <p> per line).
+    const original = plainTextFromHtml(stripPageLink(stripNoteLink(taskData.description || '')))
+    if (plainTextFromDescriptionLines(newDescription) !== original) {
+      const linkHtml = extractNoteLinkHtml(taskData.description) + extractPageLinkHtml(taskData.description)
+      finalDescription = plainTextToDescriptionHtml(newDescription) + linkHtml
+    }
   }
-  const updatedData = { ...taskData, title: trimmedTitle, description: finalDescription }
-
-  const result = await window.quickViewApi.updateTask(Number(taskId), updatedData)
+  // Send only what changed so a stale cached row cannot revert other edits (D-REN-2).
+  const patch = taskPatch(taskData, { title: trimmedTitle, description: finalDescription })
+  const result: ActionResult = Object.keys(patch).length === 0
+    ? { success: true }
+    : await window.quickViewApi.updateTask(taskId, patch)
 
   if (result.success) {
     lastFetchResult = null
@@ -574,18 +603,18 @@ async function saveEdit(item: HTMLElement, newTitle: string, newDescription: str
   }
 }
 
+// The row is built again from the task it carries, like after a save. Putting the old markup
+// back with innerHTML would drop every listener (checkbox, title, link and description clicks).
 function cancelEdit(item: HTMLElement): void {
-  if ((item as any)._originalHTML) {
-    item.innerHTML = (item as any)._originalHTML
-    delete (item as any)._originalHTML
-  }
-  item.classList.remove('editing')
+  const task: TaskData = JSON.parse(item.dataset.task || '{}')
+  const restored = buildTaskItemDOM(task)
+  restored.classList.add('selected')
+  item.replaceWith(restored)
   editingItem = null
   notifyHeight()
 }
 
 function exitEditMode(item: HTMLElement): void {
-  delete (item as any)._originalHTML
   item.classList.remove('editing')
   editingItem = null
 }
@@ -597,7 +626,7 @@ async function handleEnterOnSelected(): Promise<void> {
   const taskId = item.dataset.taskId!
   if (item.classList.contains('completed-undo')) {
     await undoComplete(taskId, item)
-  } else {
+  } else if (!item.classList.contains('task-done')) {
     await completeTask(taskId, item, item.querySelector('.task-checkbox') as HTMLInputElement | null)
   }
 }
@@ -616,7 +645,9 @@ async function loadTasks(forceRefresh = false): Promise<void> {
   hideStatusBar()
 
   const result = await window.quickViewApi.fetchTasks()
-  if (result.success) {
+  // A cached list served because the refresh failed is not remembered as fresh, so
+  // the next show tries the server again.
+  if (result.success && !result.error) {
     lastFetchResult = result
     lastFetchTime = Date.now()
   }
@@ -626,13 +657,23 @@ async function loadTasks(forceRefresh = false): Promise<void> {
 async function applyFetchResult(result: FetchResult): Promise<void> {
   if (result.success) {
     renderTasks(result.tasks || [])
-    if (result.cached) {
+    if (result.cached && result.error) {
+      // The refresh failed for a reason other than being offline: show the cached list
+      // but say why it may be out of date.
+      showStatusBar(`Could not refresh (cached ${formatRelativeTime(result.cachedAt)})`, 'offline')
+      showError(result.error)
+    } else if (result.cached) {
       showStatusBar(`Offline \u2014 cached ${formatRelativeTime(result.cachedAt)}`, 'offline')
     } else if (result.standalone) {
       showStatusBar('Standalone mode', 'standalone')
     } else {
-      const pendingCount = await window.quickViewApi.getPendingCount()
-      if (pendingCount > 0) showStatusBar(`${pendingCount} action(s) pending sync`, 'pending')
+      const { pending, failed } = await window.quickViewApi.getQueueCounts()
+      if (failed > 0) {
+        const waiting = pending > 0 ? `${pending} action(s) pending sync, ` : ''
+        showStatusBar(`${waiting}${failed} failed \u2014 open Vicu to review`, 'failed')
+      } else if (pending > 0) {
+        showStatusBar(`${pending} action(s) pending sync`, 'pending')
+      }
     }
   } else {
     taskList.innerHTML = ''
@@ -679,7 +720,7 @@ window.quickViewApi.onConfigChanged(() => {
   lastFetchTime = 0
 })
 
-window.quickViewApi.onDragHover((_: unknown, hovering: boolean) => {
+window.quickViewApi.onDragHover((hovering: boolean) => {
   if (dragHandle) dragHandle.classList.toggle('hover', hovering)
 })
 

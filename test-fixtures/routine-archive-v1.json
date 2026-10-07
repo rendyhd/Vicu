@@ -1,0 +1,185 @@
+{
+  "contractVersion": 1,
+  "about": "Routine merge, pruning, archive and after-completion vectors for docs/cross-app-semantics-v1.md section 6. Occurrences are written compactly; expand each to a full record with key '<routineId>:<date>:<slotId>', routineId 'r1', slotId 's1', scheduledDate = date, scheduledMinutes 480, timeZoneId 'UTC' unless given, loggedAt '' unless given, note ''. A prune vector may override the definition schedule with \"schedule\" (then kind is CHORE). Keep this file identical in vicu and vicu-android.",
+  "baseDefinition": {
+    "id": "r1",
+    "name": "Vitamin D",
+    "kind": "HEALTH",
+    "healthSubtype": "SUPPLEMENT",
+    "amount": "1",
+    "unit": "pill",
+    "iconName": "pill",
+    "color": "#FF9900",
+    "schedule": { "type": "calendar", "weekdays": [], "weekInterval": 1, "anchorDate": "2025-01-01" },
+    "slots": [
+      { "id": "s1", "label": "Morning", "period": "MORNING", "reminderMinutes": 480, "reminderEnabled": true, "followUpMinutes": 0 }
+    ],
+    "activeFrom": "2025-01-01",
+    "archived": false,
+    "createdAt": "2025-01-01T08:00:00.000Z",
+    "updatedAt": "2025-01-01T08:00:00.000Z",
+    "updatedBy": "desktop-a"
+  },
+  "merge": [
+    {
+      "name": "union of keys",
+      "local": { "prunedBefore": "", "occurrences": [ { "date": "2026-10-01", "status": "COMPLETED", "modifiedAt": "2026-10-01T08:00:00.000Z", "modifiedBy": "a" } ] },
+      "remote": { "prunedBefore": "", "occurrences": [ { "date": "2026-10-02", "status": "SKIPPED", "modifiedAt": "2026-10-02T08:00:00.000Z", "modifiedBy": "b" } ] },
+      "expect": { "prunedBefore": "", "occurrences": { "2026-10-01": "COMPLETED", "2026-10-02": "SKIPPED" } }
+    },
+    {
+      "name": "newer edit wins",
+      "local": { "prunedBefore": "", "occurrences": [ { "date": "2026-10-01", "status": "COMPLETED", "modifiedAt": "2026-10-01T08:00:00.000Z", "modifiedBy": "a" } ] },
+      "remote": { "prunedBefore": "", "occurrences": [ { "date": "2026-10-01", "status": "SKIPPED", "modifiedAt": "2026-10-01T09:00:00.000Z", "modifiedBy": "b" } ] },
+      "expect": { "prunedBefore": "", "occurrences": { "2026-10-01": "SKIPPED" } }
+    },
+    {
+      "name": "tie broken by the larger device id",
+      "local": { "prunedBefore": "", "occurrences": [ { "date": "2026-10-01", "status": "COMPLETED", "modifiedAt": "2026-10-01T08:00:00.000Z", "modifiedBy": "b" } ] },
+      "remote": { "prunedBefore": "", "occurrences": [ { "date": "2026-10-01", "status": "SKIPPED", "modifiedAt": "2026-10-01T08:00:00.000Z", "modifiedBy": "a" } ] },
+      "expect": { "prunedBefore": "", "occurrences": { "2026-10-01": "COMPLETED" } }
+    },
+    {
+      "name": "timestamps compared as instants, not strings",
+      "local": { "prunedBefore": "", "occurrences": [ { "date": "2026-10-01", "status": "COMPLETED", "modifiedAt": "2026-10-01T08:00:00Z", "modifiedBy": "z" } ] },
+      "remote": { "prunedBefore": "", "occurrences": [ { "date": "2026-10-01", "status": "SKIPPED", "modifiedAt": "2026-10-01T08:00:00.100Z", "modifiedBy": "a" } ] },
+      "expect": { "prunedBefore": "", "occurrences": { "2026-10-01": "SKIPPED" } }
+    },
+    {
+      "name": "occurrences before prunedBefore are dropped",
+      "local": { "prunedBefore": "2025-09-01", "occurrences": [
+        { "date": "2025-09-15", "status": "COMPLETED", "modifiedAt": "2025-09-15T08:00:00.000Z", "modifiedBy": "a" },
+        { "date": "2025-10-15", "status": "COMPLETED", "modifiedAt": "2025-10-15T08:00:00.000Z", "modifiedBy": "a" }
+      ] },
+      "remote": { "prunedBefore": "2025-10-01", "occurrences": [
+        { "date": "2025-10-20", "status": "SKIPPED", "modifiedAt": "2025-10-20T08:00:00.000Z", "modifiedBy": "b" }
+      ] },
+      "expect": { "prunedBefore": "2025-10-01", "occurrences": { "2025-10-15": "COMPLETED", "2025-10-20": "SKIPPED" } }
+    },
+    {
+      "name": "empty prunedBefore drops nothing",
+      "local": { "prunedBefore": "", "occurrences": [ { "date": "2020-01-01", "status": "COMPLETED", "modifiedAt": "2020-01-01T08:00:00.000Z", "modifiedBy": "a" } ] },
+      "remote": { "prunedBefore": "", "occurrences": [] },
+      "expect": { "prunedBefore": "", "occurrences": { "2020-01-01": "COMPLETED" } }
+    }
+  ],
+  "definitionMerge": [
+    {
+      "name": "definition timestamps compared as instants",
+      "local": { "name": "Old name", "updatedAt": "2026-10-01T08:00:00Z", "updatedBy": "z" },
+      "remote": { "name": "New name", "updatedAt": "2026-10-01T08:00:00.100Z", "updatedBy": "a" },
+      "expectName": "New name"
+    }
+  ],
+  "prune": [
+    {
+      "name": "400-day window",
+      "today": "2026-10-06",
+      "prunedBefore": "",
+      "occurrences": [
+        { "date": "2025-01-15", "status": "COMPLETED", "modifiedAt": "2025-01-15T08:00:00.000Z", "modifiedBy": "a" },
+        { "date": "2025-08-31", "status": "COMPLETED", "modifiedAt": "2025-08-31T08:00:00.000Z", "modifiedBy": "a" },
+        { "date": "2025-09-01", "status": "COMPLETED", "modifiedAt": "2025-09-01T08:00:00.000Z", "modifiedBy": "a" },
+        { "date": "2026-10-05", "status": "SKIPPED", "modifiedAt": "2026-10-05T08:00:00.000Z", "modifiedBy": "a" }
+      ],
+      "expect": { "prunedBefore": "2025-09-01", "kept": ["2025-09-01", "2026-10-05"], "archived": ["2025-01-15", "2025-08-31"] }
+    },
+    {
+      "name": "prunedBefore never moves backwards",
+      "today": "2026-10-06",
+      "prunedBefore": "2025-10-01",
+      "occurrences": [
+        { "date": "2025-09-20", "status": "COMPLETED", "modifiedAt": "2025-09-20T08:00:00.000Z", "modifiedBy": "a" },
+        { "date": "2025-10-01", "status": "COMPLETED", "modifiedAt": "2025-10-01T08:00:00.000Z", "modifiedBy": "a" }
+      ],
+      "expect": { "prunedBefore": "2025-10-01", "kept": ["2025-10-01"], "archived": ["2025-09-20"] }
+    },
+    {
+      "name": "after_completion keeps the latest completion",
+      "today": "2026-10-06",
+      "prunedBefore": "",
+      "schedule": { "type": "after_completion", "intervalDays": 7, "firstDueDate": "2024-01-01" },
+      "occurrences": [
+        { "date": "2024-01-01", "status": "COMPLETED", "loggedAt": "2024-01-01T08:00:00.000Z", "modifiedAt": "2024-01-01T08:00:00.000Z", "modifiedBy": "a" },
+        { "date": "2024-06-01", "status": "COMPLETED", "loggedAt": "2024-06-01T08:00:00.000Z", "modifiedAt": "2024-06-01T08:00:00.000Z", "modifiedBy": "a" }
+      ],
+      "expect": { "prunedBefore": "2024-06-01", "kept": ["2024-06-01"], "archived": ["2024-01-01"] }
+    },
+    {
+      "name": "after_completion before the first completion keeps firstDueDate",
+      "today": "2026-10-06",
+      "prunedBefore": "",
+      "schedule": { "type": "after_completion", "intervalDays": 7, "firstDueDate": "2024-03-01" },
+      "occurrences": [
+        { "date": "2024-02-01", "status": "SKIPPED", "modifiedAt": "2024-02-01T08:00:00.000Z", "modifiedBy": "a" },
+        { "date": "2024-03-01", "status": "SKIPPED", "modifiedAt": "2024-03-01T08:00:00.000Z", "modifiedBy": "a" }
+      ],
+      "expect": { "prunedBefore": "2024-03-01", "kept": ["2024-03-01"], "archived": ["2024-02-01"] }
+    },
+    {
+      "name": "nothing to prune",
+      "today": "2026-10-06",
+      "prunedBefore": "",
+      "occurrences": [
+        { "date": "2026-10-01", "status": "COMPLETED", "modifiedAt": "2026-10-01T08:00:00.000Z", "modifiedBy": "a" }
+      ],
+      "expect": { "prunedBefore": "", "kept": ["2026-10-01"], "archived": [] }
+    }
+  ],
+  "archiveRead": [
+    {
+      "name": "main plus duplicate archive parts",
+      "main": [ { "date": "2026-10-01", "status": "COMPLETED", "modifiedAt": "2026-10-01T08:00:00.000Z", "modifiedBy": "a" } ],
+      "parts": [
+        { "part": 1, "occurrences": [ { "date": "2025-01-10", "status": "COMPLETED", "modifiedAt": "2025-01-10T08:00:00.000Z", "modifiedBy": "a" } ] },
+        { "part": 1, "occurrences": [
+          { "date": "2025-01-10", "status": "SKIPPED", "modifiedAt": "2025-02-01T08:00:00.000Z", "modifiedBy": "b" },
+          { "date": "2025-01-11", "status": "COMPLETED", "modifiedAt": "2025-01-11T08:00:00.000Z", "modifiedBy": "b" }
+        ] },
+        { "part": 2, "occurrences": [ { "date": "2025-06-01", "status": "COMPLETED", "modifiedAt": "2025-06-01T08:00:00.000Z", "modifiedBy": "a" } ] }
+      ],
+      "expect": { "2025-01-10": "SKIPPED", "2025-01-11": "COMPLETED", "2025-06-01": "COMPLETED", "2026-10-01": "COMPLETED" }
+    }
+  ],
+  "afterCompletion": [
+    {
+      "name": "before the first completion",
+      "intervalDays": 3,
+      "firstDueDate": "2026-10-01",
+      "occurrences": [],
+      "expectDue": "2026-10-01"
+    },
+    {
+      "name": "counts from the completion date",
+      "intervalDays": 3,
+      "firstDueDate": "2026-10-01",
+      "occurrences": [ { "date": "2026-10-01", "status": "COMPLETED", "loggedAt": "2026-10-03T07:00:00.000Z", "modifiedAt": "2026-10-03T07:00:00.000Z", "modifiedBy": "a" } ],
+      "expectDue": "2026-10-06"
+    },
+    {
+      "name": "missing loggedAt falls back to the scheduled date",
+      "intervalDays": 3,
+      "firstDueDate": "2026-10-01",
+      "occurrences": [ { "date": "2026-10-01", "status": "COMPLETED", "loggedAt": "", "modifiedAt": "2026-10-03T07:00:00.000Z", "modifiedBy": "a" } ],
+      "expectDue": "2026-10-04"
+    },
+    {
+      "name": "latest completion wins",
+      "intervalDays": 2,
+      "firstDueDate": "2026-09-01",
+      "occurrences": [
+        { "date": "2026-09-01", "status": "COMPLETED", "loggedAt": "2026-09-01T07:00:00.000Z", "modifiedAt": "2026-09-01T07:00:00.000Z", "modifiedBy": "a" },
+        { "date": "2026-09-03", "status": "COMPLETED", "loggedAt": "2026-09-05T07:00:00.000Z", "modifiedAt": "2026-09-05T07:00:00.000Z", "modifiedBy": "a" },
+        { "date": "2026-09-07", "status": "SKIPPED", "loggedAt": "2026-09-08T07:00:00.000Z", "modifiedAt": "2026-09-08T07:00:00.000Z", "modifiedBy": "a" }
+      ],
+      "expectDue": "2026-09-07"
+    },
+    {
+      "name": "completion date in the occurrence's time zone",
+      "intervalDays": 3,
+      "firstDueDate": "2026-10-01",
+      "occurrences": [ { "date": "2026-10-01", "status": "COMPLETED", "loggedAt": "2026-10-03T23:30:00.000Z", "timeZoneId": "Asia/Tokyo", "modifiedAt": "2026-10-03T23:30:00.000Z", "modifiedBy": "a" } ],
+      "expectDue": "2026-10-07"
+    }
+  ]
+}

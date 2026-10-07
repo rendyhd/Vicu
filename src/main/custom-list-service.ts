@@ -1,10 +1,12 @@
 import { BrowserWindow } from 'electron'
 import { randomUUID } from 'crypto'
-import { createTask, fetchTaskById, fetchTasks, updateTask } from './api-client'
+import { createTask, deleteTask, fetchTaskById, updateTask } from './api-client'
+import { forgetDeletedTask, loadCustomListCarriers, rememberCreatedTask } from './carrier-service'
 import { loadConfig, saveConfig, type AppConfig } from './config'
 import {
   CUSTOM_LIST_CARRIER_TITLE,
   activeLists,
+  appListToWire,
   documentFromLists,
   encodeCustomListEnvelope,
   hasCustomListMarker,
@@ -13,21 +15,18 @@ import {
   normalizeDocument,
   normalizeWireList,
   parseCustomListEnvelope,
+  pruneTombstones,
   validateCustomListDocument,
+  wireToAppList,
+  type CustomList,
   type CustomListSyncDocumentV1,
   type CustomListWire,
 } from './custom-list-protocol'
+import type { CustomListSyncStatus } from '../shared/config-types'
+
+export type { CustomListSyncStatus }
 
 const NULL_DATE = '0001-01-01T00:00:00Z'
-
-export type CustomListSyncStatus =
-  | { state: 'idle'; last_synced_at?: string }
-  | { state: 'syncing' }
-  | { state: 'pending'; message?: string }
-  | { state: 'offline'; message: string }
-  | { state: 'error'; message: string }
-  | { state: 'update_required'; message: string }
-  | { state: 'local_only' }
 
 interface CarrierTask {
   id: number
@@ -38,46 +37,9 @@ interface CarrierTask {
 
 let syncStatus: CustomListSyncStatus = { state: 'idle' }
 let inFlightSync: Promise<CustomListSyncStatus> | null = null
-
-function appListToWire(list: NonNullable<AppConfig['custom_lists']>[number]): CustomListWire {
-  return normalizeWireList({
-    id: list.id,
-    name: list.name,
-    icon: list.icon ?? '',
-    filter: {
-      project_ids: list.filter.project_ids ?? [],
-      project_filter_mode: list.filter.project_filter_mode ?? 'include',
-      add_to_project_id: list.filter.add_to_project_id ?? 0,
-      sort_by: list.filter.sort_by || 'due_date',
-      order_by: list.filter.order_by || 'asc',
-      due_date_filter: list.filter.due_date_filter || 'all',
-      priority_filter: list.filter.priority_filter ?? [],
-      label_ids: list.filter.label_ids ?? [],
-      include_done: list.filter.include_done === true,
-      include_today_all_projects: list.filter.include_today_all_projects === true,
-    },
-  })
-}
-
-function wireToAppList(list: CustomListWire): NonNullable<AppConfig['custom_lists']>[number] {
-  return {
-    id: list.id,
-    name: list.name,
-    ...(list.icon ? { icon: list.icon } : {}),
-    filter: {
-      project_ids: list.filter.project_ids,
-      project_filter_mode: list.filter.project_filter_mode,
-      add_to_project_id: list.filter.add_to_project_id,
-      sort_by: list.filter.sort_by,
-      order_by: list.filter.order_by,
-      due_date_filter: list.filter.due_date_filter,
-      ...(list.filter.priority_filter.length ? { priority_filter: list.filter.priority_filter } : {}),
-      ...(list.filter.label_ids.length ? { label_ids: list.filter.label_ids } : {}),
-      include_done: list.filter.include_done,
-      include_today_all_projects: list.filter.include_today_all_projects,
-    },
-  }
-}
+// The lists as the windows were last told about them (JSON), so the viewer is only told when
+// they really changed.
+let lastBroadcastLists: string | null = null
 
 function ensureSyncState(config: AppConfig): NonNullable<AppConfig['custom_lists_sync']> {
   const current = config.custom_lists_sync
@@ -105,21 +67,39 @@ function persist(config: AppConfig, document: CustomListSyncDocumentV1, dirty: b
   saveConfig(config)
 }
 
-function broadcastLists(config = loadConfig()): void {
-  const lists = config?.custom_lists ?? []
+function sendToWindows(send: (win: BrowserWindow) => void): void {
   for (const win of BrowserWindow.getAllWindows()) {
     if (win.isDestroyed()) continue
     try {
-      win.webContents.send('custom-lists-changed', lists)
-      win.webContents.send('custom-list-sync-status', syncStatus)
-      win.webContents.send('viewer-config-changed')
+      send(win)
     } catch { /* window may close between enumeration and send */ }
   }
 }
 
+/** What the windows currently show is what the config holds; call before the lists can change. */
+function rememberBroadcastBaseline(config: AppConfig | null): void {
+  if (lastBroadcastLists === null) lastBroadcastLists = JSON.stringify(config?.custom_lists ?? [])
+}
+
+/**
+ * Tells the windows the lists changed, and the Quick View to drop its cached tasks, but only when
+ * they differ from what was last announced. Every sync step used to send this, so Quick View
+ * dropped its cache every five minutes for nothing (D-CL-1).
+ */
+function broadcastLists(config = loadConfig()): void {
+  const lists = config?.custom_lists ?? []
+  const snapshot = JSON.stringify(lists)
+  if (snapshot === lastBroadcastLists) return
+  lastBroadcastLists = snapshot
+  sendToWindows((win) => {
+    win.webContents.send('custom-lists-changed', lists)
+    win.webContents.send('viewer-config-changed')
+  })
+}
+
 function setStatus(status: CustomListSyncStatus): CustomListSyncStatus {
   syncStatus = status
-  broadcastLists()
+  sendToWindows((win) => win.webContents.send('custom-list-sync-status', syncStatus))
   return status
 }
 
@@ -130,9 +110,10 @@ export function getCustomListSyncStatus(): CustomListSyncStatus {
   return syncStatus
 }
 
-export function getCustomLists(): NonNullable<AppConfig['custom_lists']> {
+export function getCustomLists(): CustomList[] {
   const config = loadConfig()
   if (!config) return []
+  rememberBroadcastBaseline(config)
   const hadState = !!config.custom_lists_sync
   const state = ensureSyncState(config)
   config.custom_lists = activeLists(state.document).map(wireToAppList)
@@ -140,7 +121,7 @@ export function getCustomLists(): NonNullable<AppConfig['custom_lists']> {
   return config.custom_lists
 }
 
-function saveLocalMutation(config: AppConfig, document: CustomListSyncDocumentV1): NonNullable<AppConfig['custom_lists']> {
+function saveLocalMutation(config: AppConfig, document: CustomListSyncDocumentV1): CustomList[] {
   persist(config, document, true)
   setStatus(config.standalone_mode ? { state: 'local_only' } : { state: 'pending' })
   broadcastLists(config)
@@ -148,9 +129,10 @@ function saveLocalMutation(config: AppConfig, document: CustomListSyncDocumentV1
   return config.custom_lists ?? []
 }
 
-export function upsertCustomList(value: CustomListWire): NonNullable<AppConfig['custom_lists']> {
+export function upsertCustomList(value: CustomListWire): CustomList[] {
   const config = loadConfig()
   if (!config) throw new Error('Configuration not loaded')
+  rememberBroadcastBaseline(config)
   const state = ensureSyncState(config)
   const document = normalizeDocument(state.document)
   const normalized = normalizeWireList(value)
@@ -165,9 +147,10 @@ export function upsertCustomList(value: CustomListWire): NonNullable<AppConfig['
   return saveLocalMutation(config, document)
 }
 
-export function deleteCustomList(id: string): NonNullable<AppConfig['custom_lists']> {
+export function deleteCustomList(id: string): CustomList[] {
   const config = loadConfig()
   if (!config) throw new Error('Configuration not loaded')
+  rememberBroadcastBaseline(config)
   const state = ensureSyncState(config)
   const document = normalizeDocument(state.document)
   document.lists[id] = { value: null, revision: nextRevision(document, state.device_id) }
@@ -178,9 +161,10 @@ export function deleteCustomList(id: string): NonNullable<AppConfig['custom_list
   return saveLocalMutation(config, document)
 }
 
-export function reorderCustomLists(ids: string[]): NonNullable<AppConfig['custom_lists']> {
+export function reorderCustomLists(ids: string[]): CustomList[] {
   const config = loadConfig()
   if (!config) throw new Error('Configuration not loaded')
+  rememberBroadcastBaseline(config)
   const state = ensureSyncState(config)
   const document = normalizeDocument(state.document)
   const activeIds = new Set(activeLists(document).map((list) => list.id))
@@ -195,13 +179,14 @@ function documentsEqual(left: CustomListSyncDocumentV1, right: CustomListSyncDoc
 }
 
 async function fetchCarriers(): Promise<{ valid: Array<{ task: CarrierTask; document: CustomListSyncDocumentV1 }>; malformed: number; futureVersion?: number }> {
-  const result = await fetchTasks({ filter: 'done = true', sort_by: 'updated', order_by: 'desc', per_page: 200 })
+  // The carriers this app has seen are fetched by id; new ones are found with a marker search
+  // (see carrier-discovery.ts). The done tasks are no longer listed on every sync.
+  const result = await loadCustomListCarriers()
   if (!result.success) throw new Error(result.error)
   const valid: Array<{ task: CarrierTask; document: CustomListSyncDocumentV1 }> = []
   let malformed = 0
   let futureVersion: number | undefined
-  for (const raw of result.data) {
-    const task = raw as CarrierTask
+  for (const task of result.data) {
     if (task.title !== CUSTOM_LIST_CARRIER_TITLE && !hasCustomListMarker(task.description)) continue
     const parsed = parseCustomListEnvelope(task.description)
     if (parsed.document) valid.push({ task, document: parsed.document })
@@ -224,7 +209,11 @@ async function writeCarrier(taskId: number, document: CustomListSyncDocumentV1):
   if (!result.success) throw new Error(result.error)
 }
 
-async function createCarrier(projectId: number, document: CustomListSyncDocumentV1): Promise<number> {
+/**
+ * Creates the carrier already completed, in one request. Only a server that ignored `done` on
+ * create (it would leave an open, visible carrier) gets a second one to finish it.
+ */
+async function createCarrier(projectId: number, document: CustomListSyncDocumentV1): Promise<{ id: number; description?: string }> {
   const created = await createTask(projectId, {
     title: CUSTOM_LIST_CARRIER_TITLE,
     description: encodeCustomListEnvelope(document),
@@ -236,8 +225,44 @@ async function createCarrier(projectId: number, document: CustomListSyncDocument
   })
   if (!created.success) throw new Error(created.error)
   const task = created.data as CarrierTask
-  await writeCarrier(task.id, document)
-  return task.id
+  rememberCreatedTask(task)
+  if (task.done !== true) {
+    await writeCarrier(task.id, document)
+    return { id: task.id }
+  }
+  // The create response is the stored task: it is the read-back, no extra request needed.
+  return { id: task.id, description: task.description }
+}
+
+/**
+ * Deletes carriers that were created next to the one this app keeps (two devices that first
+ * synced at the same time each made one). `kept` is what the kept carrier holds after a
+ * successful write and read-back. An extra is read again right before it goes and is only deleted
+ * when the kept carrier already holds everything in it (old tombstones aside), so a list another
+ * device just wrote there is merged first, on the next sync. Carriers that cannot be read are never touched.
+ */
+async function removeDuplicateCarriers(
+  extras: Array<{ task: CarrierTask; document: CustomListSyncDocumentV1 }>,
+  kept: CustomListSyncDocumentV1,
+): Promise<void> {
+  for (const extra of extras) {
+    try {
+      const fresh = await fetchTaskById(extra.task.id)
+      if (!fresh.success) {
+        if (fresh.statusCode === 404) forgetDeletedTask(extra.task.id)
+        continue
+      }
+      const parsed = parseCustomListEnvelope((fresh.data as CarrierTask).description)
+      if (!parsed.document) continue
+      // Tombstones older than 90 days are not kept in the kept carrier, so they do not count.
+      if (!documentsEqual(pruneTombstones(mergeCustomListDocuments(kept, parsed.document)), kept)) continue
+      const removed = await deleteTask(extra.task.id)
+      if (removed.success) forgetDeletedTask(extra.task.id)
+      else console.warn(`[CustomLists] Could not delete the duplicate carrier ${extra.task.id}: ${removed.error}`)
+    } catch (error) {
+      console.warn(`[CustomLists] Could not clean up the duplicate carrier ${extra.task.id}:`, error instanceof Error ? error.message : error)
+    }
+  }
 }
 
 function looksOffline(message: string): boolean {
@@ -247,6 +272,7 @@ function looksOffline(message: string): boolean {
 async function runSync(): Promise<CustomListSyncStatus> {
   let config = loadConfig()
   if (!config) return setStatus({ state: 'error', message: 'Configuration not loaded' })
+  rememberBroadcastBaseline(config)
   if (config.standalone_mode) return setStatus({ state: 'local_only' })
   if (!config.vikunja_url) return setStatus({ state: 'pending', message: 'Connect to Vikunja to sync custom lists' })
   const syncUrl = config.vikunja_url.replace(/\/+$/, '')
@@ -269,6 +295,9 @@ async function runSync(): Promise<CustomListSyncStatus> {
 
     let merged = normalizeDocument(state.document)
     for (const carrier of carriers.valid) merged = mergeCustomListDocuments(merged, carrier.document)
+    // Tombstones older than 90 days are dropped here, so the document the carrier is written with
+    // (and the local copy) stops growing. A carrier that still holds them counts as changed.
+    merged = pruneTombstones(merged)
     persist(config, merged, hadPendingLocalChanges)
     broadcastLists(config)
 
@@ -279,19 +308,28 @@ async function runSync(): Promise<CustomListSyncStatus> {
       ? !documentsEqual(canonicalDocument, merged)
       : Object.keys(merged.lists).length > 0 || hadPendingLocalChanges
 
+    // What the carrier holds right now. Without a write that is what was just read; after a write
+    // it is read back, so a server that altered the description is noticed.
+    let verifiedDocument: CustomListSyncDocumentV1 | undefined = canonicalDocument
     if (needsWrite) {
+      verifiedDocument = undefined
       if (carrierId) await writeCarrier(carrierId, merged)
       else {
         if (!config.inbox_project_id) throw new Error('Choose an Inbox project before syncing custom lists')
-        carrierId = await createCarrier(config.inbox_project_id, merged)
+        const created = await createCarrier(config.inbox_project_id, merged)
+        carrierId = created.id
+        if (created.description !== undefined) verifiedDocument = parseCustomListEnvelope(created.description).document
       }
     }
 
     if (carrierId) {
-      const verified = await fetchTaskById(carrierId)
-      if (!verified.success) throw new Error(verified.error)
-      const parsed = parseCustomListEnvelope((verified.data as CarrierTask).description)
-      if (!parsed.document) throw new Error(parsed.error || 'Cannot verify custom-list carrier')
+      if (!verifiedDocument) {
+        const verified = await fetchTaskById(carrierId)
+        if (!verified.success) throw new Error(verified.error)
+        const parsed = parseCustomListEnvelope((verified.data as CarrierTask).description)
+        if (!parsed.document) throw new Error(parsed.error || 'Cannot verify custom-list carrier')
+        verifiedDocument = parsed.document
+      }
       const latest = loadConfig() ?? config
       if (latest.vikunja_url.replace(/\/+$/, '') !== syncUrl) {
         return setStatus({ state: 'pending', message: 'Account changed during custom-list sync' })
@@ -300,10 +338,10 @@ async function runSync(): Promise<CustomListSyncStatus> {
       // carrier does not contain them yet, keep the merged local document dirty.
       const latestLocalDocument = ensureSyncState(latest).document
       const converged = mergeCustomListDocuments(
-        mergeCustomListDocuments(merged, parsed.document),
+        mergeCustomListDocuments(merged, verifiedDocument),
         latestLocalDocument,
       )
-      if (!documentsEqual(converged, parsed.document)) {
+      if (!documentsEqual(converged, verifiedDocument)) {
         persist(latest, converged, true)
         broadcastLists(latest)
         return setStatus({ state: 'pending', message: 'Custom lists changed during sync; retrying' })
@@ -322,6 +360,11 @@ async function runSync(): Promise<CustomListSyncStatus> {
     latest.custom_lists = activeLists(merged).map(wireToAppList)
     saveConfig(latest)
     broadcastLists(latest)
+    // The oldest carrier now holds everything: the other carriers are only clutter in the user's
+    // Vikunja, so remove them. Never part of the sync result; a failure is retried next time.
+    if (carrierId) {
+      await removeDuplicateCarriers(carriers.valid.filter((entry) => entry.task.id !== carrierId), merged)
+    }
     if (carriers.malformed > 0) {
       return setStatus({ state: 'error', message: 'A malformed custom-list carrier was ignored; valid data was preserved' })
     }

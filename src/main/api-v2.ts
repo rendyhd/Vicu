@@ -1,9 +1,23 @@
+import { withDueWindow } from '../shared/due-dates'
+import { sanitizeProjectPatch, sanitizeTaskPatch } from '../shared/merge-patches'
+import { withoutNestedSubtasks } from '../shared/nested-subtasks'
+
 export interface PaginatedResponse<T> {
   items: T[] | null
   total: number
   page: number
   per_page: number
   total_pages: number
+}
+
+/** Largest `per_page` Vikunja 2.4 accepts; anything above it is a 422. */
+export const MAX_PAGE_SIZE = 1000
+
+/** Turn a caller supplied `per_page` into a value the server accepts, or null. */
+export function clampPageSize(value: unknown): number | null {
+  const n = Math.floor(Number(value))
+  if (!Number.isFinite(n) || n < 1) return null
+  return Math.min(n, MAX_PAGE_SIZE)
 }
 
 export function buildProjectCollectionUrl(baseUrl: string, includeArchived = false): string {
@@ -18,15 +32,20 @@ export function buildProjectCollectionUrl(baseUrl: string, includeArchived = fal
  * on the same page as its parent and populates their reciprocal relations.
  */
 export function createTaskCollectionSearchParams(
-  params: Record<string, unknown>
+  params: Record<string, unknown>,
+  now: Date = new Date()
 ): URLSearchParams {
   const qs = new URLSearchParams()
   qs.append('expand', 'subtasks')
   if (params.q ?? params.s) qs.set('q', String(params.q ?? params.s))
-  if (params.filter) qs.set('filter', String(params.filter))
+  // `due_window` (Today, Upcoming) is a Vicu option: it becomes a clause on the local-day boundary
+  // of this very request and is never sent as a parameter.
+  const filter = withDueWindow(params.filter ? String(params.filter) : undefined, params.due_window, now)
+  if (filter) qs.set('filter', filter)
   if (params.sort_by) qs.set('sort_by', String(params.sort_by))
   if (params.order_by) qs.set('order_by', String(params.order_by))
-  if (params.per_page) qs.set('per_page', String(params.per_page))
+  const perPage = clampPageSize(params.per_page)
+  if (perPage !== null) qs.set('per_page', String(perPage))
   if (params.page) qs.set('page', String(params.page))
   if (params.filter_include_nulls) {
     qs.set('filter_include_nulls', String(params.filter_include_nulls))
@@ -35,33 +54,18 @@ export function createTaskCollectionSearchParams(
   return qs
 }
 
-function taskId(value: unknown): number | null {
-  if (!value || typeof value !== 'object') return null
-  const id = (value as { id?: unknown }).id
-  return typeof id === 'number' ? id : null
-}
+export { withoutNestedSubtasks } from '../shared/nested-subtasks'
 
 /**
- * Remove a task from the top-level list when one of its parents is present,
- * or when the embedded parent is completed. Active matching children remain
- * visible for searches/filters which omit an active parent.
+ * Vicu-only query option (never sent to the server): keep nested subtasks in the result so the
+ * caller can filter first and hide them afterwards (Tag view, custom lists; cross-app
+ * semantics v1 section 3.2).
  */
-export function withoutNestedSubtasks<T>(tasks: T[]): T[] {
-  const visibleIds = new Set(tasks.map(taskId).filter((id): id is number => id !== null))
+export const KEEP_NESTED_SUBTASKS_PARAM = 'keep_nested_subtasks'
 
-  return tasks.filter((task) => {
-    if (!task || typeof task !== 'object') return true
-    const related = (task as { related_tasks?: unknown }).related_tasks
-    if (!related || typeof related !== 'object') return true
-    const parents = (related as { parenttask?: unknown }).parenttask
-    if (!Array.isArray(parents)) return true
-    return !parents.some((parent) => {
-      const parentId = taskId(parent)
-      const parentDone = !!parent && typeof parent === 'object'
-        && (parent as { done?: unknown }).done === true
-      return parentDone || (parentId !== null && visibleIds.has(parentId))
-    })
-  })
+/** The final step of every task fetch: hide nested subtasks unless the caller asked to keep them. */
+export function finishTaskCollection<T>(tasks: T[], params: Record<string, unknown>): T[] {
+  return params[KEEP_NESTED_SUBTASKS_PARAM] === true ? tasks : withoutNestedSubtasks(tasks)
 }
 
 export type AttachmentPreviewSize = 'sm' | 'md' | 'lg' | 'xl'
@@ -81,31 +85,19 @@ export function buildTaskAttachmentDownloadUrl(
   return url.toString()
 }
 
-const WRITABLE_TASK_FIELDS = new Set([
-  'bucket_id',
-  'cover_image_attachment_id',
-  'description',
-  'done',
-  'due_date',
-  'end_date',
-  'hex_color',
-  'is_favorite',
-  'percent_done',
-  'priority',
-  'project_id',
-  'reminders',
-  'repeat_after',
-  'repeat_mode',
-  'start_date',
-  'title',
-])
-
 /**
  * Turn task state or a partial update into a v2-safe merge patch.
- * Undefined and server-owned response fields are never written back.
+ * Undefined and server-owned response fields are never written back, empty
+ * dates become `null`, and reminders never carry a blank `reminder`.
  */
 export function createTaskPatch(task: Record<string, unknown>): Record<string, unknown> {
-  return Object.fromEntries(
-    Object.entries(task).filter(([key, value]) => WRITABLE_TASK_FIELDS.has(key) && value !== undefined)
-  )
+  return { ...sanitizeTaskPatch(task) }
+}
+
+/**
+ * Reduce a project update to the writable PATCH schema. Keys outside it, such
+ * as a tree node's `children`, are rejected by the server with a 422.
+ */
+export function createProjectPatch(project: Record<string, unknown>): Record<string, unknown> {
+  return { ...sanitizeProjectPatch(project) }
 }

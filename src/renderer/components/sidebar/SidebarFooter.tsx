@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { Settings } from 'lucide-react'
 import { api } from '@/lib/api'
+import { SyncStatusButton } from '@/components/sync/SyncStatusButton'
 
 export function SidebarFooter() {
   const navigate = useNavigate()
@@ -40,6 +41,7 @@ export function SidebarFooter() {
 
   return (
     <div className="border-t border-[var(--border-color)] px-2 py-2">
+      <SyncStatusButton />
       <div className="flex items-center gap-1">
         <button
           type="button"

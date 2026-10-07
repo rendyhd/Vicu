@@ -1,4 +1,5 @@
 import type { ParseResult, TokenType } from '@/lib/task-parser'
+import { formatClockTime } from '@/lib/date-utils'
 
 // Match Quick Entry colors: green=date, red=priority, orange=label, blue=project, purple=recurrence
 const chipStyles: Record<string, string> = {
@@ -36,7 +37,8 @@ export function buildChips(result: ParseResult): ChipData[] {
   const chips: ChipData[] = []
 
   if (result.dueDate) {
-    chips.push({ type: 'date', label: formatDateLabel(result.dueDate), key: 'date' })
+    const day = formatDateLabel(result.dueDate)
+    chips.push({ type: 'date', label: result.dueHasTime ? `${day} ${formatClockTime(result.dueDate)}` : day, key: 'date' })
   }
   if (result.priority !== null && result.priority > 0) {
     chips.push({

@@ -59,14 +59,9 @@ function ProjectEditor({
       updateProject.mutate(
         {
           id: project.id,
-          project: {
-            title: trimmed,
-            description: project.description,
-            hex_color: hexColor,
-            is_archived: project.is_archived,
-            position: project.position,
-            parent_project_id: parentId,
-          },
+          // parent_project_id is only sent when it actually changed.
+          changes: { title: trimmed, hex_color: hexColor, parent_project_id: parentId },
+          original: project,
         },
         { onSuccess: onClose },
       )

@@ -1,126 +1,24 @@
 import { app } from 'electron'
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs'
-import { join, dirname } from 'path'
+import { join } from 'path'
 import { isMac } from './platform'
-import type { CustomListSyncDocumentV1 } from './custom-list-protocol'
+import { readFileWithBackup, writeFileAtomic } from './atomic-file'
+import type {
+  AppConfig,
+  ConnectionFields,
+  ReviewConfig,
+  SecondaryProject,
+  ViewerFilter,
+} from '../shared/config-types'
 
-export interface ViewerFilter {
-  project_ids: number[]
-  sort_by: string
-  order_by: string
-  due_date_filter: string
-  include_today_all_projects?: boolean
-  custom_list_id?: string
-  view_type?: 'today' | 'upcoming' | 'anytime'
-}
-
-export interface SecondaryProject {
-  id: number
-  title: string
-}
-
-export interface ReviewConfig {
-  enabled: boolean
-  default_cadence_days: number
-  exclude_inbox: boolean
-}
-
-export interface AppConfig {
-  vikunja_url: string
-  api_token: string
-  inbox_project_id: number
-  auth_method?: 'api_token' | 'oidc' | 'password'
-  theme: 'light' | 'dark' | 'system'
-  window_bounds?: { x: number; y: number; width: number; height: number }
-  sidebar_width?: number
-  custom_lists?: Array<{
-    id: string
-    name: string
-    icon?: string
-    filter: {
-      project_ids: number[]
-      project_filter_mode?: 'include' | 'exclude'
-      add_to_project_id?: number
-      sort_by: string
-      order_by: string
-      due_date_filter: string
-      priority_filter?: number[]
-      label_ids?: number[]
-      include_done?: boolean
-      include_today_all_projects?: boolean
-    }
-  }>
-  custom_lists_sync?: {
-    device_id: string
-    document: CustomListSyncDocumentV1
-    dirty: boolean
-    carrier_task_id?: number
-    last_synced_at?: string
-  }
-  // Quick Entry / Quick View
-  quick_entry_enabled?: boolean
-  quick_view_enabled?: boolean
-  quick_entry_hotkey?: string
-  quick_view_hotkey?: string
-  quick_entry_default_project_id?: number
-  exclamation_today?: boolean
-  project_cycle_modifier?: 'ctrl' | 'alt' | 'ctrl+alt'
-  secondary_projects?: SecondaryProject[]
-  quick_entry_position?: { x: number; y: number }
-  quick_view_position?: { x: number; y: number }
-  viewer_filter?: ViewerFilter
-  launch_on_startup?: boolean
-  standalone_mode?: boolean
-  show_today_overdue_badge?: boolean
-  // Obsidian
-  obsidian_mode?: 'off' | 'ask' | 'always'
-  obsidian_api_key?: string
-  obsidian_port?: number
-  obsidian_vault_name?: string
-  // Browser
-  browser_link_mode?: 'off' | 'ask' | 'always'
-  browser_extension_id?: string
-  // Notifications
-  notifications_enabled?: boolean
-  notifications_persistent?: boolean
-  notifications_daily_reminder_enabled?: boolean
-  notifications_daily_reminder_time?: string
-  notifications_secondary_reminder_enabled?: boolean
-  notifications_secondary_reminder_time?: string
-  notifications_overdue_enabled?: boolean
-  notifications_due_today_enabled?: boolean
-  notifications_upcoming_enabled?: boolean
-  notifications_sound?: boolean
-  // Task reminder settings
-  notifications_task_reminder_sound?: boolean
-  notifications_task_reminder_persistent?: boolean
-  notifications_default_reminder_offset?: number  // seconds, 0 = disabled
-  notifications_default_reminder_relative_to?: 'due_date' | 'start_date' | 'end_date'
-  // Update checker
-  update_check_dismissed_version?: string
-  // Migration flags
-  hotkeys_migrated_macos?: boolean
-  // NLP task parser
-  nlp_enabled?: boolean
-  nlp_syntax_mode?: 'todoist' | 'vikunja'
-  // Delete confirmation
-  confirm_before_delete?: boolean
-  // Subtask presentation in task lists
-  subtask_display?: 'inside_task' | 'expandable'
-  // Task completion sound
-  task_completion_sound_enabled?: boolean
-  task_completion_sound_path?: string | null
-  // Last directory used by file open dialogs (attachments, sound picker)
-  last_file_dialog_directory?: string | null
-  // Cached username for re-login screen
-  last_username?: string
-  // Task context menu
-  urgency_mode?: 'today' | 'important'
-  last_used_project_id?: number
-  last_used_label_id?: number
-  // Project review
-  review?: ReviewConfig
-}
+// The config types are shared with the renderer (src/shared/config-types.ts).
+export type {
+  AppConfig,
+  AuthMethod,
+  ConnectionFields,
+  ReviewConfig,
+  SecondaryProject,
+  ViewerFilter,
+} from '../shared/config-types'
 
 // Platform-aware hotkey defaults
 export const DEFAULT_QUICK_ENTRY_HOTKEY = isMac ? 'Command+Shift+Space' : 'Alt+Shift+V'
@@ -157,37 +55,42 @@ export function loadConfig(): AppConfig | null {
   return cachedConfig ? structuredClone(cachedConfig) : null
 }
 
+function parseConfigFile(raw: string): AppConfig {
+  const parsed: unknown = JSON.parse(raw)
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new Error('config.json does not contain an object')
+  }
+  return normalizeConfig(parsed as Record<string, unknown>)
+}
+
 function readConfigFromDisk(): AppConfig | null {
-  const configPath = getConfigPath()
+  // Falls back to config.json.bak (and logs it) when the file does not parse.
+  const loaded = readFileWithBackup(getConfigPath(), parseConfigFile)
+  if (!loaded) return null
+  const config = loaded.value
 
-  if (!existsSync(configPath)) {
-    return null
-  }
-
-  try {
-    const raw = readFileSync(configPath, 'utf-8')
-    const parsed = JSON.parse(raw)
-    const config = normalizeConfig(parsed)
-
-    // One-time migration: replace Windows hotkey defaults that never worked on macOS
-    if (isMac && !config.hotkeys_migrated_macos) {
-      let changed = false
-      if (config.quick_entry_hotkey === 'Alt+Shift+V') {
-        config.quick_entry_hotkey = DEFAULT_QUICK_ENTRY_HOTKEY
-        changed = true
-      }
-      if (config.quick_view_hotkey === 'Alt+Shift+B') {
-        config.quick_view_hotkey = DEFAULT_QUICK_VIEW_HOTKEY
-        changed = true
-      }
-      config.hotkeys_migrated_macos = true
-      if (changed) saveConfig(config)
+  // One-time migration: replace Windows hotkey defaults that never worked on macOS
+  if (isMac && !config.hotkeys_migrated_macos) {
+    let changed = false
+    if (config.quick_entry_hotkey === 'Alt+Shift+V') {
+      config.quick_entry_hotkey = DEFAULT_QUICK_ENTRY_HOTKEY
+      changed = true
     }
-
-    return config
-  } catch {
-    return null
+    if (config.quick_view_hotkey === 'Alt+Shift+B') {
+      config.quick_view_hotkey = DEFAULT_QUICK_VIEW_HOTKEY
+      changed = true
+    }
+    config.hotkeys_migrated_macos = true
+    if (changed) {
+      try {
+        saveConfig(config)
+      } catch (err) {
+        console.warn('[Config] Could not save the hotkey migration:', err instanceof Error ? err.message : err)
+      }
+    }
   }
+
+  return config
 }
 
 function normalizeReview(raw: unknown): ReviewConfig {
@@ -201,7 +104,7 @@ function normalizeReview(raw: unknown): ReviewConfig {
   }
 }
 
-function normalizeConfig(raw: Record<string, unknown>): AppConfig {
+export function normalizeConfig(raw: Record<string, unknown>): AppConfig {
   return {
     vikunja_url: typeof raw.vikunja_url === 'string'
       ? raw.vikunja_url.replace(/\/+$/, '')
@@ -244,6 +147,7 @@ function normalizeConfig(raw: Record<string, unknown>): AppConfig {
       include_today_all_projects: false,
     },
     launch_on_startup: raw.launch_on_startup === true,
+    start_hidden: raw.start_hidden === true,
     standalone_mode: raw.standalone_mode === true,
     show_today_overdue_badge: raw.show_today_overdue_badge === true,
     // Obsidian
@@ -323,11 +227,122 @@ function isWindowBounds(v: unknown): v is { x: number; y: number; width: number;
 }
 
 export function saveConfig(config: AppConfig): void {
-  cachedConfig = structuredClone(config)
-  const configPath = getConfigPath()
-  const dir = dirname(configPath)
-  if (!existsSync(dir)) {
-    mkdirSync(dir, { recursive: true })
+  const snapshot = structuredClone(config)
+  // Temp file + rename, keeping config.json.bak (see atomic-file.ts)
+  writeFileAtomic(getConfigPath(), JSON.stringify(config, null, 2), { backup: true })
+  // The cache follows the disk: after a failed write it still holds what is on disk, so a caller
+  // that is told the save failed does not keep seeing the unsaved values until the next restart.
+  cachedConfig = snapshot
+}
+
+/**
+ * Save a change nobody is waiting for (window bounds, popup positions): a failure is logged and
+ * reported as `false` instead of being thrown into a timer, where it would show Electron's
+ * main-process error dialog.
+ */
+export function saveConfigQuietly(config: AppConfig, what: string): boolean {
+  try {
+    saveConfig(config)
+    return true
+  } catch (err) {
+    console.warn(`[Config] Could not save ${what}:`, err instanceof Error ? err.message : err)
+    return false
   }
-  writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf-8')
+}
+
+// --- Merging renderer changes into the current config -----------------------
+//
+// The renderer must never replace the whole config: it only holds a snapshot, and
+// main keeps changing fields of its own (window bounds, sidebar width, popup
+// positions, last dialog directory, dismissed update version, custom lists...).
+// These helpers merge a narrow change into the config as it is *now*.
+
+/** Data that belongs to one server/account: IDs and state that mean nothing elsewhere. */
+const ACCOUNT_SPECIFIC_KEYS = [
+  'custom_lists',
+  'custom_lists_sync',
+  'quick_entry_default_project_id',
+  'secondary_projects',
+  'viewer_filter',
+  'standalone_mode',
+  'last_used_project_id',
+  'last_used_label_id',
+  'last_username',
+] as const satisfies readonly (keyof AppConfig)[]
+
+/**
+ * The keys that say which account the app is signed in to. Changing them is an account change: the
+ * previous account's cached lists, known user id and queued changes must go (see accountChanged in
+ * sync.ts), which only `save-connection-config` does. A config patch is refused when it names one,
+ * so a Settings control or a future caller cannot switch accounts around that cleanup (F3).
+ */
+export const CONNECTION_KEYS: readonly string[] = ['vikunja_url', 'api_token', 'auth_method', 'standalone_mode', 'last_username']
+
+/** The connection keys a patch tries to change. */
+export function connectionKeysIn(patch: object): string[] {
+  return Object.keys(patch).filter((key) => CONNECTION_KEYS.includes(key))
+}
+
+/** Owned by the custom list service (its own IPCs and sync); never taken from a renderer patch. */
+const MAIN_OWNED_KEYS: ReadonlySet<string> = new Set(['custom_lists', 'custom_lists_sync'])
+
+/** Every key of AppConfig, derived from the normalizer so the two cannot drift apart. */
+const CONFIG_KEYS: ReadonlySet<string> = new Set(Object.keys(normalizeConfig({})))
+
+function trimUrl(url: unknown): string {
+  return typeof url === 'string' ? url.replace(/\/+$/, '') : ''
+}
+
+function resetAccountData(config: Record<string, unknown>): void {
+  for (const key of ACCOUNT_SPECIFIC_KEYS) config[key] = undefined
+}
+
+/**
+ * Apply a connection change (setup, OIDC/password login, disconnect) to the
+ * existing config. Only the connection fields change. Switching to another server
+ * also drops the previous account's data; every preference (theme, hotkeys,
+ * notifications, quick entry, sounds...) is kept.
+ */
+export function applyConnectionFields(existing: AppConfig | null, conn: ConnectionFields): AppConfig {
+  const url = trimUrl(conn.vikunja_url)
+  const sameServer = existing !== null && trimUrl(existing.vikunja_url) === url
+  const merged: Record<string, unknown> = {
+    ...(existing ?? {}),
+    vikunja_url: url,
+    api_token: conn.api_token,
+    auth_method: conn.auth_method,
+    inbox_project_id: conn.inbox_project_id ?? (sameServer ? existing.inbox_project_id : 0),
+  }
+  if (!sameServer) resetAccountData(merged)
+  return normalizeConfig(merged)
+}
+
+/**
+ * Merge a partial change from the renderer into the current config. Only known
+ * keys are taken, and never the custom list slice. A key whose value is
+ * undefined is reset to its default. Values are replaced at the top level (a
+ * patched `review` or `viewer_filter` object replaces the old one). Pointing
+ * `vikunja_url` at another server drops the previous account's data. The IPC
+ * handler never lets a connection key reach this function (see CONNECTION_KEYS).
+ */
+export function applyConfigPatch(current: AppConfig, patch: Record<string, unknown>): AppConfig {
+  const merged: Record<string, unknown> = { ...current }
+  for (const key of Object.keys(patch)) {
+    if (!CONFIG_KEYS.has(key) || MAIN_OWNED_KEYS.has(key)) continue
+    merged[key] = patch[key]
+  }
+  if (trimUrl(merged.vikunja_url) !== trimUrl(current.vikunja_url)) resetAccountData(merged)
+  return normalizeConfig(merged)
+}
+
+/** Shape check for connection fields arriving over IPC. */
+export function isConnectionFields(v: unknown): v is ConnectionFields {
+  if (!v || typeof v !== 'object') return false
+  const c = v as Record<string, unknown>
+  return (
+    typeof c.vikunja_url === 'string' &&
+    typeof c.api_token === 'string' &&
+    (c.auth_method === 'api_token' || c.auth_method === 'oidc' || c.auth_method === 'password') &&
+    (c.inbox_project_id === undefined || (typeof c.inbox_project_id === 'number' && Number.isFinite(c.inbox_project_id)))
+  )
 }

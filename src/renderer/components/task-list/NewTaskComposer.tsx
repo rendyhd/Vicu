@@ -15,7 +15,10 @@ import { cn } from '@/lib/cn'
 import { api } from '@/lib/api'
 import { NULL_DATE } from '@/lib/constants'
 import { replacePendingTokens } from '@/lib/image-tokens'
-import { recurrenceToVikunja } from '@/lib/task-parser'
+import { parse, recurrenceToVikunja } from '@/lib/task-parser'
+import { dateOnlyDue, parsedDue, toLocalDate } from '@/lib/due-dates'
+import { buildCreateExtras } from '@/lib/composer-queue'
+import { isTempTaskId } from '@/lib/pending-cache'
 import { useTaskParser } from '@/hooks/use-task-parser'
 import { useLabels } from '@/hooks/use-labels'
 import { useProjects } from '@/hooks/use-projects'
@@ -64,10 +67,9 @@ export interface NewTaskComposerProps {
   className?: string
 }
 
-function endOfDayIso(date: Date): string {
-  const value = new Date(date.getTime())
-  value.setHours(23, 59, 59, 0)
-  return value.toISOString()
+/** The date-only due date (local 23:59:59) for the local calendar day of `date`. */
+function dateOnlyIso(date: Date): string {
+  return dateOnlyDue(toLocalDate(date))
 }
 
 function shortDate(value: string): string {
@@ -108,11 +110,12 @@ export function NewTaskComposer({
   const parser = useTaskParser()
   const { data: labels = [] } = useLabels()
   const { data: projects } = useProjects()
-  const createTask = useCreateTask()
-  const addLabel = useAddLabel()
-  const createLabel = useCreateLabel()
-  const uploadAttachment = useUploadAttachmentFromPaste()
-  const updateTask = useUpdateTask()
+  // The composer reports failures inline (and keeps what the user typed), so no global toast.
+  const createTask = useCreateTask({ silent: true })
+  const addLabel = useAddLabel({ silent: true })
+  const createLabel = useCreateLabel({ silent: true })
+  const uploadAttachment = useUploadAttachmentFromPaste({ silent: true })
+  const updateTask = useUpdateTask({ silent: true })
   const [description, setDescription] = useState('')
   const [showNotes, setShowNotes] = useState(false)
   const [openPicker, setOpenPicker] = useState<OpenPicker>(null)
@@ -138,7 +141,7 @@ export function NewTaskComposer({
   const labelItems = useMemo(() => labels.map((label) => ({ id: label.id, title: label.title })), [labels])
   const effectiveDueDate = dateTouched
     ? (explicitDueDate ?? NULL_DATE)
-    : (!defaultDateDismissed && defaultDueDate ? endOfDayIso(defaultDueDate) : NULL_DATE)
+    : (!defaultDateDismissed && defaultDueDate ? dateOnlyIso(defaultDueDate) : NULL_DATE)
   const selectedProjectTitle = projects?.flat.find((project) => project.id === selectedProjectId)?.title ?? 'Project'
   const priorityLabel = priority === null ? 'Priority' : PRIORITY_OPTIONS.find((option) => option.value === priority)?.label ?? 'Priority'
 
@@ -154,7 +157,7 @@ export function NewTaskComposer({
 
   const contextChips = useMemo<ChipData[]>(() => {
     if (!defaultDueDate || defaultDateDismissed || dateTouched || parser.parseResult?.dueDate) return []
-    return [{ type: 'date', label: shortDate(endOfDayIso(defaultDueDate)), key: 'context-date' }]
+    return [{ type: 'date', label: shortDate(dateOnlyIso(defaultDueDate)), key: 'context-date' }]
   }, [defaultDueDate, defaultDateDismissed, dateTouched, parser.parseResult?.dueDate])
 
   const closeAndReset = () => {
@@ -209,7 +212,7 @@ export function NewTaskComposer({
       const patched = replacePendingTokens(currentDescription, mapping)
       if (patched !== currentDescription) {
         try {
-          await updateTask.mutateAsync({ id: taskId, task: { description: patched } })
+          await updateTask.mutateAsync({ id: taskId, changes: { description: patched } })
           currentDescription = patched
         } catch {
           // The files already exist remotely, so retain only the description patch for
@@ -231,7 +234,7 @@ export function NewTaskComposer({
     let descriptionPatch = partialFailure.descriptionPatch
     if (descriptionPatch) {
       try {
-        await updateTask.mutateAsync({ id: partialFailure.taskId, task: { description: descriptionPatch } })
+        await updateTask.mutateAsync({ id: partialFailure.taskId, changes: { description: descriptionPatch } })
         currentDescription = descriptionPatch
         descriptionPatch = undefined
       } catch {
@@ -275,8 +278,10 @@ export function NewTaskComposer({
     setError(null)
     let createdTask: Task | null = null
     try {
-      const parsed = parser.parserConfig.enabled ? parser.parseResult : null
-      const title = parsed?.title.trim() || rawTitle.replace(!parser.enabled && parser.parserConfig.bangToday ? /!/g : /$^/, '').trim()
+      // With the parser off nothing is extracted except the `!` today shortcut, which has one rule
+      // (extractBangToday, applied by parse()) in every entry point.
+      const parsed = parser.parserConfig.enabled ? parser.parseResult : parse(rawTitle, parser.parserConfig)
+      const title = parsed?.title.trim() || (parser.enabled ? rawTitle : '')
       if (!title) throw new Error('Enter a task title')
 
       let targetProjectId = selectedProjectId
@@ -286,9 +291,9 @@ export function NewTaskComposer({
       const payload: CreateTaskPayload = { title }
       const draftDescription = description.trim()
       if (draftDescription) payload.description = draftDescription
-      const parsedDate = parsed?.dueDate ? endOfDayIso(parsed.dueDate) : undefined
-      const legacyBangDate = !parser.enabled && parser.parserConfig.bangToday && rawTitle.includes('!') ? endOfDayIso(new Date()) : undefined
-      const dueDate = dateTouched ? explicitDueDate : (parsedDate ?? legacyBangDate ?? (!defaultDateDismissed && defaultDueDate ? endOfDayIso(defaultDueDate) : undefined))
+      // A parsed time ("tomorrow at 3pm") is kept; a bare date is date-only.
+      const parsedDate = parsed?.dueDate ? parsedDue(parsed.dueDate, parsed.dueHasTime) : undefined
+      const dueDate = dateTouched ? explicitDueDate : (parsedDate ?? (!defaultDateDismissed && defaultDueDate ? dateOnlyIso(defaultDueDate) : undefined))
       if (dueDate && dueDate !== NULL_DATE) payload.due_date = dueDate
       const selectedPriority = priority !== null ? priority : parsed?.priority
       if (selectedPriority && selectedPriority > 0) payload.priority = selectedPriority
@@ -300,10 +305,24 @@ export function NewTaskComposer({
         Object.assign(payload, recurrenceToVikunja(parsed.recurrence))
       }
 
-      const task = await createTask.mutateAsync({ projectId: targetProjectId, task: payload })
-      createdTask = task
       const labelNames = [...new Set(parsed?.labels ?? [])]
       const explicitLabels = labels.filter((label) => selectedLabelIds.includes(label.id))
+      // If the server cannot be reached the create is queued with its labels and attachments, and
+      // the task shows up at once under a temporary id.
+      const extras = buildCreateExtras({
+        explicitLabels,
+        parsedLabelNames: labelNames,
+        knownLabels: labels,
+        attachments,
+        description: draftDescription,
+      })
+      const task = await createTask.mutateAsync({ projectId: targetProjectId, task: payload, extras })
+      if (isTempTaskId(task.id)) {
+        closeAndReset()
+        onCreated?.(task)
+        return
+      }
+      createdTask = task
       const failedLabels: PartialFailure['labels'] = []
       for (const label of explicitLabels) {
         try { await addLabel.mutateAsync({ taskId: task.id, labelId: label.id }) }

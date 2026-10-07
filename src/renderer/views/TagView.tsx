@@ -5,6 +5,7 @@ import { useLabels } from '@/hooks/use-labels'
 import { useProjects } from '@/hooks/use-projects'
 import { useFilters } from '@/hooks/use-filters'
 import { usePrintable } from '@/stores/print-store'
+import { withoutNestedSubtasks } from '@/lib/nested-subtasks'
 import { TaskList } from '@/components/task-list/TaskList'
 import { TaskRow } from '@/components/task-list/TaskRow'
 
@@ -20,7 +21,10 @@ export function TagView() {
 
   const filtered = useMemo(() => {
     const activeIds = new Set(projects?.flat.map((project) => project.id) ?? [])
-    return tasks.filter((t) => activeIds.has(t.project_id) && t.labels?.some((l) => l.id === lid))
+    const labeled = tasks.filter((t) => activeIds.has(t.project_id) && t.labels?.some((l) => l.id === lid))
+    // Filter first, then hide nested subtasks: a labeled subtask is shown even when its parent
+    // lacks the label, and nests under its parent only when the parent is in the list too.
+    return withoutNestedSubtasks(labeled, { hideChildrenOfCompletedParents: false })
   }, [tasks, lid, projects?.flat])
 
   const groups = useMemo(() => {

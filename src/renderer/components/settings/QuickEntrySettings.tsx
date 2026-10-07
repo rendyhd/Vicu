@@ -3,7 +3,7 @@ import { api } from '@/lib/api'
 import { cn } from '@/lib/cn'
 import { HotkeyRecorder } from './HotkeyRecorder'
 import { useCustomLists } from '@/hooks/use-custom-lists'
-import type { AppConfig, Project, ViewerFilter } from '@/lib/vikunja-types'
+import { isQuickEntryEnabled, isQuickViewEnabled, type AppConfig, type Project, type ViewerFilter } from '@/lib/vikunja-types'
 
 interface QuickEntrySettingsProps {
   config: AppConfig
@@ -40,8 +40,8 @@ export function QuickEntrySettings({ config, projects, onChange, hotkeyWarnings 
     })
   }
 
-  const entryEnabled = config.quick_entry_enabled ?? false
-  const viewEnabled = config.quick_view_enabled === true
+  const entryEnabled = isQuickEntryEnabled(config)
+  const viewEnabled = isQuickViewEnabled(config)
   const viewerFilter = config.viewer_filter ?? {
     project_ids: [],
     sort_by: 'due_date',

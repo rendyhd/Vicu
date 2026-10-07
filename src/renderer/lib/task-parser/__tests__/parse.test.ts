@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { parse, extractBangToday } from '../index'
 import { recurrenceToVikunja } from '../recurrence-map'
+import { dateOnlyDue, parsedDue } from '../../due-dates'
 import type { ParserConfig } from '../types'
 
 const todoist: ParserConfig = { enabled: true, syntaxMode: 'todoist' }
@@ -214,6 +215,71 @@ describe('dates', () => {
   })
 })
 
+// ─── A month-name date that is today, with a time that has passed (F6) ────────────────────
+
+describe('a date that falls on today with a time that has already passed', () => {
+  // Wednesday 7 October 2026, 10:30 local time. chrono's forwardDate pushes "oct 7 at 9am" to next
+  // year because 09:00 is behind the clock; the day and the month are certain, so today stays.
+  const now = new Date(2026, 9, 7, 10, 30, 0, 0)
+  const local = (d: Date | null) =>
+    d && [d.getFullYear(), d.getMonth() + 1, d.getDate(), d.getHours(), d.getMinutes()].join('-')
+
+  it.each([
+    ['x oct 7 at 9am'],
+    ['x oct 7 9am'],
+    ['x 7 oct at 9am'],
+    ['x october 7th at 9am'],
+    ['x on oct 7 at 9:00'],
+    ['x 7 October 09:00'],
+  ])('keeps today for %j', (input) => {
+    const r = parse(input, todoist, now)
+    expect(local(r.dueDate)).toBe('2026-10-7-9-0')
+    expect(r.dueHasTime).toBe(true)
+    expect(r.title).toBe('x')
+  })
+
+  it('keeps the time of a slash date written month first', () => {
+    expect(local(parse('x 10/7 at 9am', { ...todoist, locale: 'en-US' }, now).dueDate)).toBe('2026-10-7-9-0')
+  })
+
+  it('does not change a time that is still ahead today', () => {
+    expect(local(parse('x oct 7 at 11am', todoist, now).dueDate)).toBe('2026-10-7-11-0')
+  })
+
+  it('does not change a date-only phrase', () => {
+    const r = parse('x oct 7', todoist, now)
+    expect(local(r.dueDate)?.startsWith('2026-10-7-')).toBe(true)
+    expect(r.dueHasTime).toBe(false)
+  })
+
+  it('still rolls an earlier day to next year: only today is kept', () => {
+    expect(local(parse('x oct 6 at 9am', todoist, now).dueDate)).toBe('2027-10-6-9-0')
+  })
+
+  it('does not touch later days, or other months', () => {
+    expect(local(parse('x oct 8 at 9am', todoist, now).dueDate)).toBe('2026-10-8-9-0')
+    expect(local(parse('x sep 7 at 9am', todoist, now).dueDate)).toBe('2027-9-7-9-0')
+    expect(local(parse('x nov 7 at 9am', todoist, now).dueDate)).toBe('2026-11-7-9-0')
+  })
+
+  it('keeps a year that was typed, even when it is behind us', () => {
+    expect(local(parse('x oct 7 2026 at 9am', todoist, now).dueDate)).toBe('2026-10-7-9-0')
+    expect(local(parse('x oct 7 2025 at 9am', todoist, now).dueDate)).toBe('2025-10-7-9-0')
+    expect(local(parse('x oct 7 2027 at 9am', todoist, now).dueDate)).toBe('2027-10-7-9-0')
+  })
+
+  it('works on the first day of the year, where "next year" is easy to get wrong', () => {
+    const newYear = new Date(2026, 0, 1, 10, 30, 0, 0)
+    expect(local(parse('x jan 1 at 9am', todoist, newYear).dueDate)).toBe('2026-1-1-9-0')
+    expect(local(parse('x dec 31 at 9am', todoist, newYear).dueDate)).toBe('2026-12-31-9-0')
+  })
+
+  it('leaves relative phrases alone: "today at 9am" and "tomorrow at 9am" mean what they say', () => {
+    expect(local(parse('x today at 9am', todoist, now).dueDate)).toBe('2026-10-7-9-0')
+    expect(local(parse('x tomorrow at 9am', todoist, now).dueDate)).toBe('2026-10-8-9-0')
+  })
+})
+
 // ─── Bang Today (!→ today) ──────────────────────────────────
 
 describe('extractBangToday', () => {
@@ -395,5 +461,54 @@ describe('recurrenceToVikunja', () => {
       repeat_after: 2 * 604800,
       repeat_mode: 0,
     })
+  })
+})
+
+// ─── Explicit times (cross-app semantics v1, section 1.1) ───
+
+describe('explicit times', () => {
+  it('flags a date with a time of day', () => {
+    expect(parse('buy groceries tomorrow 3pm', todoist).dueHasTime).toBe(true)
+    expect(parse('call mom at 14:30', todoist).dueHasTime).toBe(true)
+    expect(parse('stand-up in 2 hours', todoist).dueHasTime).toBe(true)
+  })
+
+  it('does not flag a date-only phrase', () => {
+    expect(parse('buy groceries tomorrow', todoist).dueHasTime).toBe(false)
+    expect(parse('renew passport jan 15', todoist).dueHasTime).toBe(false)
+    expect(parse('plan trip in 3 days', todoist).dueHasTime).toBe(false)
+  })
+
+  it('is false when no date was found', () => {
+    expect(parse('buy groceries', todoist).dueHasTime).toBe(false)
+    expect(parse('buy groceries tomorrow', disabled).dueHasTime).toBe(false)
+  })
+
+  it('treats the bang shortcut as date-only', () => {
+    const r = parse('call dentist !', { ...todoist, bangToday: true })
+    expect(r.dueDate).toBeInstanceOf(Date)
+    expect(r.dueHasTime).toBe(false)
+  })
+
+  it('stores a parsed time as typed and a bare date at 23:59:59', () => {
+    const timed = parse('buy groceries tomorrow 3pm', todoist)
+    const tomorrow = new Date()
+    tomorrow.setDate(tomorrow.getDate() + 1)
+    const due = new Date(parsedDue(timed.dueDate!, timed.dueHasTime))
+    expect(due.getDate()).toBe(tomorrow.getDate())
+    expect([due.getHours(), due.getMinutes(), due.getSeconds()]).toEqual([15, 0, 0])
+
+    const bare = parse('buy groceries tomorrow', todoist)
+    const bareDue = new Date(parsedDue(bare.dueDate!, bare.dueHasTime))
+    expect(bareDue.getDate()).toBe(tomorrow.getDate())
+    expect([bareDue.getHours(), bareDue.getMinutes(), bareDue.getSeconds()]).toEqual([23, 59, 59])
+  })
+
+  it('does not change the parse result when building the due date', () => {
+    const r = parse('buy groceries tomorrow', todoist)
+    const before = r.dueDate!.getTime()
+    parsedDue(r.dueDate!, r.dueHasTime)
+    expect(r.dueDate!.getTime()).toBe(before)
+    expect(parsedDue(r.dueDate!, false)).toBe(dateOnlyDue(`${r.dueDate!.getFullYear()}-${String(r.dueDate!.getMonth() + 1).padStart(2, '0')}-${String(r.dueDate!.getDate()).padStart(2, '0')}`))
   })
 })

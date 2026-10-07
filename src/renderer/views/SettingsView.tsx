@@ -9,12 +9,17 @@ import { TokenPermissionsInfo } from '@/views/SetupView'
 import { QuickEntrySettings } from '@/components/settings/QuickEntrySettings'
 import { ObsidianSettings } from '@/components/settings/ObsidianSettings'
 import { BrowserSettings } from '@/components/settings/BrowserSettings'
+import { SecretStorageNotice } from '@/components/settings/SecretStorageNotice'
 import { KeyboardShortcuts } from '@/components/settings/KeyboardShortcuts'
 import { NotificationSettings } from '@/components/settings/NotificationSettings'
 import { CompletionSoundSettings } from '@/components/settings/CompletionSoundSettings'
 import { ReviewSettingsPanel } from '@/components/review/ReviewSettingsPanel'
 import { ProjectSettings } from '@/components/settings/ProjectSettings'
 import { useProjects } from '@/hooks/use-projects'
+import { toast } from '@/stores/toast-store'
+import { connectionAfterTest } from '@/lib/connection-settings'
+import { confirmDelete } from '@/lib/confirm-bridge'
+import { checkUnsyncedWork, signOutWarning } from '@/lib/sign-out-check'
 import type { AppConfig, Project } from '@/lib/vikunja-types'
 
 import type { ThemeOption } from '@/lib/theme'
@@ -33,20 +38,27 @@ export function SettingsView() {
   const [theme, setTheme] = useState<ThemeOption>('system')
   const [authMethod, setAuthMethod] = useState<'api_token' | 'oidc' | 'password'>('api_token')
   const [currentUser, setCurrentUser] = useState<VikunjaUser | null>(null)
+  // Set while sign-out gives queued changes and custom lists a last chance to reach the server.
+  const [signingOut, setSigningOut] = useState(false)
 
   const [projects, setProjects] = useState<Project[]>([])
   const { data: liveProjectData } = useProjects()
   const [testStatus, setTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle')
   const [testError, setTestError] = useState('')
-  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle')
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+  // Linux can only autostart when the app knows its own executable (not in a development run).
+  const [launchOnStartupSupported, setLaunchOnStartupSupported] = useState(true)
   const [hotkeyWarnings, setHotkeyWarnings] = useState<{ entry: boolean; viewer: boolean; waylandLimited: boolean } | undefined>(undefined)
 
-  // Keep full config for preserving fields during save
+  // Config as loaded, plus the edits made here. Used to render the controls only.
   const [fullConfig, setFullConfig] = useState<AppConfig | null>(null)
+  const configLoadedRef = useRef(false)
 
-  // Auto-save with debounce
+  // Auto-save with debounce. Only the keys edited since the last save are sent: main
+  // merges them into the current config, so fields it changes on its own (window
+  // bounds, sidebar width, popup positions...) are never reverted by this snapshot.
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const pendingConfigRef = useRef<AppConfig | null>(null)
+  const pendingPatchRef = useRef<Partial<AppConfig>>({})
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -67,6 +79,7 @@ export function SettingsView() {
   useEffect(() => {
     api.getConfig().then((config) => {
       if (config) {
+        configLoadedRef.current = true
         setFullConfig(config)
         setUrl(config.vikunja_url || '')
         setToken(config.api_token || '')
@@ -84,6 +97,7 @@ export function SettingsView() {
     // Pull current global-shortcut registration state so the banner shows on
     // cold start, not only after the user edits a hotkey.
     api.getGlobalShortcutStatus().then(setHotkeyWarnings).catch(() => {})
+    api.getLaunchOnStartupSupport().then((result) => setLaunchOnStartupSupported(result.supported)).catch(() => {})
   }, [])
 
   useEffect(() => {
@@ -105,65 +119,87 @@ export function SettingsView() {
     if (result.success) {
       setTestStatus('success')
       setProjects(result.data)
-      // Auto-save connection settings on successful test
-      handleQuickEntryChange({
-        vikunja_url: url,
-        api_token: authMethod === 'api_token' ? token : '',
-        auth_method: authMethod,
-      })
+      // Save the connection after a successful test. A new URL or token can be another account,
+      // so it goes through saveConnectionConfig (which also resets what belonged to the previous
+      // account), not through the preference patch.
+      const connection = connectionAfterTest(url, token, authMethod)
+      try {
+        await api.saveConnectionConfig(connection)
+        setFullConfig((prev) => (prev ? { ...prev, ...connection } : prev))
+        queryClient.invalidateQueries({ queryKey: APP_CONFIG_QUERY_KEY })
+      } catch (err) {
+        console.error('Failed to save the connection', err)
+        setTestStatus('error')
+        setTestError('Connected, but the connection settings could not be saved. Try again.')
+      }
     } else {
       setTestStatus('error')
       setTestError(result.error)
     }
   }
 
-  const flushSave = useCallback(async (config: AppConfig) => {
+  const flushSave = useCallback(async () => {
+    const patch = pendingPatchRef.current
+    pendingPatchRef.current = {}
+    if (Object.keys(patch).length === 0) return
     setSaveStatus('saving')
-    await api.saveConfig(config)
-    const result = await api.applyQuickEntrySettings()
-    await api.rescheduleNotifications()
-    queryClient.invalidateQueries({ queryKey: APP_CONFIG_QUERY_KEY })
-    setHotkeyWarnings(result)
-    setSaveStatus('saved')
-    setTimeout(() => setSaveStatus('idle'), 2000)
+    try {
+      await api.saveConfigPatch(patch)
+      const result = await api.applyQuickEntrySettings()
+      await api.rescheduleNotifications()
+      queryClient.invalidateQueries({ queryKey: APP_CONFIG_QUERY_KEY })
+      setHotkeyWarnings(result)
+      setSaveStatus('saved')
+      setTimeout(() => setSaveStatus('idle'), 2000)
+    } catch (err) {
+      console.error('Failed to save settings', err)
+      // The file could not be written (main keeps what is on disk as it was). Keep the changes
+      // so the next one sends them again, and say so instead of showing "saved".
+      pendingPatchRef.current = { ...patch, ...pendingPatchRef.current }
+      setSaveStatus('error')
+      const reason = err instanceof Error ? err.message.replace(/^Error invoking remote method '[^']*': (Error: )?/, '') : ''
+      toast.error(reason ? `Could not save settings: ${reason}` : 'Could not save settings')
+    }
   }, [queryClient])
 
-  const scheduleSave = useCallback((config: AppConfig) => {
-    pendingConfigRef.current = config
+  const scheduleSave = useCallback(() => {
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
     saveTimerRef.current = setTimeout(() => {
-      if (pendingConfigRef.current) flushSave(pendingConfigRef.current)
+      void flushSave()
     }, 500)
   }, [flushSave])
 
   const handleQuickEntryChange = useCallback((partial: Partial<AppConfig>) => {
-    setFullConfig((prev) => {
-      if (!prev) return null
-      const next = { ...prev, ...partial }
-      scheduleSave(next)
-      return next
-    })
+    if (!configLoadedRef.current) return
+    setFullConfig((prev) => (prev ? { ...prev, ...partial } : prev))
+    pendingPatchRef.current = { ...pendingPatchRef.current, ...partial }
+    scheduleSave()
   }, [scheduleSave])
 
   const handleLogout = async () => {
-    await api.logout()
-    // Preserve app preferences (theme, hotkeys, window bounds, notifications, etc.)
-    // but clear connection and account-specific data (project IDs, custom lists, etc.)
-    const existing = await api.getConfig()
-    if (existing) {
-      await api.saveConfig({
-        ...existing,
-        vikunja_url: '',
-        api_token: '',
-        auth_method: 'api_token',
-        inbox_project_id: 0,
-        custom_lists: undefined,
-        quick_entry_default_project_id: undefined,
-        secondary_projects: undefined,
-        viewer_filter: undefined,
-        standalone_mode: undefined,
-      })
+    if (signingOut) return
+    setSigningOut(true)
+    let warning: string | null
+    try {
+      warning = signOutWarning(await checkUnsyncedWork({
+        syncCustomLists: api.syncCustomLists,
+        replayNow: api.offlineQueue.replayNow,
+        snapshot: api.offlineQueue.snapshot,
+        getConfig: api.getConfig,
+      }))
+    } finally {
+      setSigningOut(false)
     }
+    if (warning && !(await confirmDelete(warning, { force: true, confirmLabel: 'Sign Out' }))) return
+    await api.logout()
+    // Main keeps app preferences (theme, hotkeys, window bounds, notifications, etc.)
+    // and clears the connection and account-specific data (project IDs, custom lists, etc.)
+    await api.saveConnectionConfig({
+      vikunja_url: '',
+      api_token: '',
+      auth_method: 'api_token',
+      inbox_project_id: 0,
+    })
     window.location.reload()
   }
 
@@ -237,9 +273,10 @@ export function SettingsView() {
               <button
                 type="button"
                 onClick={handleLogout}
-                className="rounded-md border border-accent-red/30 px-4 py-2 text-sm font-medium text-accent-red transition-colors hover:bg-accent-red/10"
+                disabled={signingOut}
+                className="rounded-md border border-accent-red/30 px-4 py-2 text-sm font-medium text-accent-red transition-colors hover:bg-accent-red/10 disabled:cursor-wait disabled:opacity-60"
               >
-                Sign Out
+                {signingOut ? 'Syncing...' : 'Sign Out'}
               </button>
             </div>
           ) : (
@@ -302,31 +339,52 @@ export function SettingsView() {
                 <button
                   type="button"
                   onClick={handleLogout}
-                  className="rounded-md border border-accent-red/30 px-4 py-2 text-sm font-medium text-accent-red transition-colors hover:bg-accent-red/10"
+                  disabled={signingOut}
+                  className="rounded-md border border-accent-red/30 px-4 py-2 text-sm font-medium text-accent-red transition-colors hover:bg-accent-red/10 disabled:cursor-wait disabled:opacity-60"
                 >
-                  Disconnect
+                  {signingOut ? 'Syncing...' : 'Disconnect'}
                 </button>
               </div>
             </div>
           )}
+          <SecretStorageNotice />
         </div>
 
         <div className="rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] p-5">
           <h2 className="mb-4 text-sm font-semibold text-[var(--text-primary)]">Preferences</h2>
 
           <div className="space-y-3">
-            <label className="flex cursor-pointer items-center gap-2">
-              <input
-                type="checkbox"
-                checked={fullConfig?.launch_on_startup ?? false}
-                onChange={(e) => handleQuickEntryChange({ launch_on_startup: e.target.checked })}
-                className="h-4 w-4 rounded border-[var(--border-color)] accent-accent-blue"
-              />
-              <span className="text-sm text-[var(--text-primary)]">
-                Launch on startup
-              </span>
-              <span className="text-xs text-[var(--text-secondary)]">(advised for Quick Entry / View)</span>
-            </label>
+            {launchOnStartupSupported && (
+              <>
+                <label className="flex cursor-pointer items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={fullConfig?.launch_on_startup ?? false}
+                    onChange={(e) => handleQuickEntryChange({ launch_on_startup: e.target.checked })}
+                    className="h-4 w-4 rounded border-[var(--border-color)] accent-accent-blue"
+                  />
+                  <span className="text-sm text-[var(--text-primary)]">
+                    Launch on startup
+                  </span>
+                  <span className="text-xs text-[var(--text-secondary)]">(advised for Quick Entry / View)</span>
+                </label>
+
+                {fullConfig?.launch_on_startup === true && (
+                  <label className="ml-6 flex cursor-pointer items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={fullConfig?.start_hidden ?? false}
+                      onChange={(e) => handleQuickEntryChange({ start_hidden: e.target.checked })}
+                      className="h-4 w-4 rounded border-[var(--border-color)] accent-accent-blue"
+                    />
+                    <span className="text-sm text-[var(--text-primary)]">
+                      Start hidden
+                    </span>
+                    <span className="text-xs text-[var(--text-secondary)]">(no window at login; needs the tray icon from Quick Entry / View)</span>
+                  </label>
+                )}
+              </>
+            )}
 
             <label className="flex cursor-pointer items-center gap-2">
               <input
@@ -574,6 +632,9 @@ export function SettingsView() {
         {saveStatus === 'saved' && (
           <p className="text-xs text-accent-green">Settings saved</p>
         )}
+        {saveStatus === 'error' && (
+          <p className="text-xs text-accent-red">Settings could not be saved. Your changes are kept and are saved again with the next change.</p>
+        )}
       </div>
       ) : activeTab === 'integrations' ? (
       <div className="mx-6 max-w-lg space-y-6 pb-8 pt-4">
@@ -610,6 +671,9 @@ export function SettingsView() {
         )}
         {saveStatus === 'saved' && (
           <p className="text-xs text-accent-green">Settings saved</p>
+        )}
+        {saveStatus === 'error' && (
+          <p className="text-xs text-accent-red">Settings could not be saved. Your changes are kept and are saved again with the next change.</p>
         )}
       </div>
       ) : null}

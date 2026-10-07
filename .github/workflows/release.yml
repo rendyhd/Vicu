@@ -13,28 +13,47 @@ jobs:
   # build-linux all see an existing release when they call
   # `electron-builder --publish always`. Without this, each runner races
   # to POST /repos/.../releases and whoever loses gets `422 already_exists`
-  # and fails the job. Suffix tags are pre-releases; v1.8.1 is also a
-  # pre-release while retaining the requested plain version number.
+  # and fails the job.
+  #
+  # Whether a release is a pre-release comes from the tag alone: a plain
+  # vX.Y.Z tag is stable, anything else (v1.9.0-beta.1, v2.0.0-rc.1, ...) is
+  # a pre-release. The "kind" step is the only place that decides this; the
+  # publish-release job reads its result.
   create-release:
     runs-on: ubuntu-latest
+    outputs:
+      prerelease: ${{ steps.kind.outputs.prerelease }}
     steps:
       - uses: actions/checkout@v4
+
+      - name: Decide stable or pre-release from the tag
+        id: kind
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          if [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "prerelease=true" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Ensure draft release exists
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ github.ref_name }}
           REPO: ${{ github.repository }}
+          PRERELEASE: ${{ steps.kind.outputs.prerelease }}
         run: |
           if gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; then
             echo "Release $TAG already exists, skipping create."
             exit 0
           fi
-          if [[ "$TAG" == *-* || "$TAG" == "v1.8.1" ]]; then
+          if [[ "$PRERELEASE" == "true" ]]; then
             PRERELEASE_FLAG=--prerelease
           else
             PRERELEASE_FLAG=
           fi
+          # Release notes are read from the repository at the tagged commit.
           NOTES_FILE="docs/releases/${TAG}.md"
           if [[ -f "$NOTES_FILE" ]]; then
             NOTES_ARGS=(--notes-file "$NOTES_FILE")
@@ -203,10 +222,10 @@ jobs:
   # release as the draft that create-release made, so nothing publishes it on its
   # own. This flips it to published only after all builds succeed — a failed
   # build leaves the release as a draft instead of shipping a partial release.
-  # Stable tags become the "Latest" release; suffix tags and v1.8.1
-  # publish with the pre-release flag.
+  # Stable tags become the "Latest" release; suffix tags publish with the
+  # pre-release flag (see the "kind" step in create-release).
   publish-release:
-    needs: [build-windows, build-macos, build-linux]
+    needs: [create-release, build-windows, build-macos, build-linux]
     runs-on: ubuntu-latest
     steps:
       - name: Publish the release
@@ -214,8 +233,9 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ github.ref_name }}
           REPO: ${{ github.repository }}
+          PRERELEASE: ${{ needs.create-release.outputs.prerelease }}
         run: |
-          if [[ "$TAG" == *-* || "$TAG" == "v1.8.1" ]]; then
+          if [[ "$PRERELEASE" == "true" ]]; then
             gh release edit "$TAG" --repo "$REPO" --draft=false --prerelease
           else
             gh release edit "$TAG" --repo "$REPO" --draft=false --latest

@@ -1,5 +1,6 @@
 import type { Task } from './vikunja-types'
-import { isNullDate } from './date-utils'
+import { formatClockTime, isNullDate } from './date-utils'
+import { isDateOnly } from './due-dates'
 import { normalizeHex } from './constants'
 
 export interface PrintGroup {
@@ -44,6 +45,12 @@ function formatPrintDate(date: string): string {
   })
 }
 
+/** The due date, plus the time of day when it has an explicit time (date-only values show none). */
+function formatPrintDue(date: string): string {
+  const day = formatPrintDate(date)
+  return isDateOnly(date) ? day : `${day} ${formatClockTime(new Date(date))}`
+}
+
 function hasText(html: string): boolean {
   return html.replace(/<[^>]*>/g, '').trim().length > 0
 }
@@ -65,7 +72,7 @@ function renderTask(task: Task, sanitize: (html: string) => string): string {
   if (task.priority > 0 && PRIORITY_LABELS[task.priority]) {
     meta.push(`<span class="meta-priority">⚑ ${PRIORITY_LABELS[task.priority]}</span>`)
   }
-  if (!isNullDate(task.due_date)) meta.push(`Due ${formatPrintDate(task.due_date)}`)
+  if (!isNullDate(task.due_date)) meta.push(`Due ${formatPrintDue(task.due_date)}`)
   if (!isNullDate(task.start_date)) meta.push(`Starts ${formatPrintDate(task.start_date)}`)
   if (task.done && !isNullDate(task.done_at)) meta.push(`Completed ${formatPrintDate(task.done_at)}`)
 

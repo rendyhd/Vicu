@@ -3,6 +3,7 @@ import { X } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { useProjects } from '@/hooks/use-projects'
 import { useLabels } from '@/hooks/use-labels'
+import { windowHonorsIncludeOverdue } from '@/lib/custom-list-filter'
 import type { CustomList, CustomListFilter } from '@/lib/vikunja-types'
 
 interface CustomListDialogProps {
@@ -18,6 +19,8 @@ const SORT_OPTIONS = [
   { value: 'created', label: 'Created' },
   { value: 'updated', label: 'Updated' },
   { value: 'title', label: 'Title' },
+  { value: 'done_at', label: 'Completed' },
+  { value: 'position', label: 'Position' },
 ] as const
 
 const DUE_DATE_OPTIONS = [
@@ -171,7 +174,7 @@ export function CustomListDialog({ open, list, onSave, onClose }: CustomListDial
               <label className="mb-1 block text-xs text-[var(--text-secondary)]">Sort By</label>
               <select
                 value={filter.sort_by}
-                onChange={(e) => setFilter((f) => ({ ...f, sort_by: e.target.value as CustomListFilter['sort_by'] }))}
+                onChange={(e) => setFilter((f) => ({ ...f, sort_by: e.target.value }))}
                 className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] focus:border-accent-blue focus:outline-none"
               >
                 {SORT_OPTIONS.map((o) => (
@@ -204,6 +207,17 @@ export function CustomListDialog({ open, list, onSave, onClose }: CustomListDial
                 <option key={o.value} value={o.value}>{o.label}</option>
               ))}
             </select>
+            {windowHonorsIncludeOverdue(filter.due_date_filter) && (
+              <label className="mt-2 flex cursor-pointer items-center gap-2 text-xs text-[var(--text-primary)]">
+                <input
+                  type="checkbox"
+                  checked={filter.include_overdue !== false}
+                  onChange={(e) => setFilter((f) => ({ ...f, include_overdue: e.target.checked ? undefined : false }))}
+                  className="accent-accent-blue"
+                />
+                Include overdue tasks
+              </label>
+            )}
           </div>
 
           {/* Projects */}

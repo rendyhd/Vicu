@@ -4,7 +4,7 @@ import type { ParsedToken, SyntaxMode } from './types'
  * Extract priority from input text.
  * - Todoist mode: p1 (urgent) through p4 (low) — word boundary enforced
  * - Vikunja mode: !1 through !4 — word boundary enforced
- * - Shared: !urgent, !high, !medium, !low (both modes)
+ * - Shared: !urgent/!critical, !high, !medium/!med, !low (both modes)
  *
  * Priority mapping:
  *   Todoist p1 / !urgent → Vikunja 4 (urgent)
@@ -15,8 +15,10 @@ import type { ParsedToken, SyntaxMode } from './types'
 
 const WORD_PRIORITIES: Record<string, number> = {
   urgent: 4,
+  critical: 4,
   high: 3,
   medium: 2,
+  med: 2,
   low: 1,
 }
 
@@ -30,8 +32,8 @@ export function extractPriority(
 ): { priority: number | null; tokens: ParsedToken[] } {
   const tokens: ParsedToken[] = []
 
-  // Word-based priority: !urgent, !high, !medium, !low (both modes)
-  const wordRe = /(?:^|(?<=\s))!(urgent|high|medium|low)(?=\s|$)/gi
+  // Word-based priority: !urgent, !critical, !high, !medium, !med, !low (both modes)
+  const wordRe = /(?:^|(?<=\s))!(urgent|critical|high|medium|med|low)(?=\s|$)/gi
   let match: RegExpExecArray | null
   while ((match = wordRe.exec(input)) !== null) {
     const start = match.index
