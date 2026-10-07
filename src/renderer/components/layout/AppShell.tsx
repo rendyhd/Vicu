@@ -48,50 +48,13 @@ import { refreshTasks } from '@/lib/task-refresh'
 import { reloadCompletionSound, setCompletionSoundEnabled } from '@/lib/completion-sound'
 import { useTodayOverdueCount } from '@/hooks/use-today-overdue-count'
 import { renderBadgeDataUrl } from '@/lib/render-badge-icon'
-import { NULL_DATE } from '@/lib/constants'
+import { insertPosition as slotPosition, isUndatedTask, planMove } from '@/lib/reorder-positions'
 import { usePrintStore } from '@/stores/print-store'
 import { buildPrintHtml } from '@/lib/print-template'
 import { sanitizeTaskHtml } from '@/lib/sanitize-html'
 
 const MIN_WIDTH = 180
 const MAX_WIDTH = 360
-
-function isUndatedTask(t: Task): boolean {
-  return !t.due_date || t.due_date === NULL_DATE
-}
-
-// Position is only meaningful for undated tasks — sortProjectTasks puts dated
-// tasks above (sorted by date) regardless of their position. So when computing
-// a gap between visual neighbors, use the nearest undated neighbors' positions;
-// dated tasks' positions are arbitrary and would pull the midpoint outside the
-// intended slot.
-function calculateInsertPosition(tasks: Task[], targetIdx: number): number {
-  let above = 0
-  const startAbove = Math.min(targetIdx - 1, tasks.length - 1)
-  for (let i = startAbove; i >= 0; i--) {
-    const t = tasks[i]
-    if (t && isUndatedTask(t)) {
-      above = t.position ?? 0
-      break
-    }
-  }
-
-  let below = above + 2 ** 16
-  for (let i = targetIdx; i < tasks.length; i++) {
-    const t = tasks[i]
-    if (t && isUndatedTask(t)) {
-      below = t.position ?? above + 2 ** 16
-      break
-    }
-  }
-
-  return (above + below) / 2
-}
-
-function calculatePosition(tasks: Task[], oldIndex: number, newIndex: number): number {
-  const without = tasks.filter((_, i) => i !== oldIndex)
-  return calculateInsertPosition(without, newIndex)
-}
 
 function calculateProjectPosition(
   siblings: ProjectTreeNode[],
@@ -417,8 +380,15 @@ export function AppShell() {
             const oldIndex = sourceTasks.findIndex((t) => t.id === task.id)
             const newIndex = sourceTasks.findIndex((t) => t.id === targetTaskId)
             if (oldIndex !== -1 && newIndex !== -1) {
-              const newPosition = calculatePosition(sourceTasks, oldIndex, newIndex)
-              reorderTask.mutate({ taskId: task.id, viewId: sourceViewId, position: newPosition })
+              // Usually one position. Tasks that share a position (every task moved into a
+              // project starts at 0) cannot be told apart by a midpoint, so planMove then spreads them.
+              const move = planMove(sourceTasks, oldIndex, newIndex)
+              reorderTask.mutate({
+                taskId: task.id,
+                viewId: sourceViewId,
+                position: move.position,
+                renumbered: move.renumbered,
+              })
             }
           } else if (destViewId && destProjectId && destProjectId !== task.project_id) {
             // Cross-section — move task to destination project + position.
@@ -427,7 +397,7 @@ export function AppShell() {
             // render. deferInvalidation tells useUpdateTask to skip refetching
             // view-tasks/section-tasks; the trailing reorderTask owns that.
             const targetIndex = destTasks.findIndex((t) => t.id === targetTaskId)
-            const insertPosition = calculateInsertPosition(destTasks, targetIndex)
+            const insertPosition = slotPosition(destTasks, targetIndex).position
 
             const finalDestViewId = destViewId
             updateTask.mutate(

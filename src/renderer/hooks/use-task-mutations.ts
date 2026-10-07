@@ -3,6 +3,7 @@ import { useNavigate, useMatches, useRouter } from '@tanstack/react-router'
 import { api } from '@/lib/api'
 import { useCompletedTasksStore } from '@/stores/completed-tasks-store'
 import { sortProjectTasks } from '@/lib/task-sort'
+import { applyPositionUpdates, sendPositionUpdates, type PositionUpdate } from '@/lib/reorder-positions'
 import { playCompletionSound } from '@/lib/completion-sound'
 import {
   mapTaskDoneByIds,
@@ -466,20 +467,30 @@ export function useReorderTask() {
       taskId,
       viewId,
       position,
+      renumbered = [],
     }: {
       taskId: number
       viewId: number
       position: number
+      /** Other tasks whose positions change too: tasks that shared a position are spread apart (see planMove). */
+      renumbered?: PositionUpdate[]
     }) => {
       // Positions are per view and are not queued offline.
-      if (isTempTaskId(taskId)) throw new ApiError('This task has not synced yet. Reorder it once it has been saved.')
-      const result = await api.updateTaskPosition(taskId, viewId, position)
-      if (!result.success) throw apiError(result)
+      if (isTempTaskId(taskId) || renumbered.some((update) => isTempTaskId(update.taskId))) {
+        throw new ApiError('This task has not synced yet. Reorder it once it has been saved.')
+      }
+      await sendPositionUpdates(
+        async (update) => {
+          const result = await api.updateTaskPosition(update.taskId, viewId, update.position)
+          if (!result.success) throw apiError(result)
+        },
+        { taskId, position },
+        renumbered,
+      )
       // A task dragged to the end moves the end of the list; the next new task goes after it.
-      newTaskPlacer.noteViewPosition(viewId, position)
-      return result.data
+      newTaskPlacer.noteViewPosition(viewId, Math.max(position, ...renumbered.map((update) => update.position)))
     },
-    onMutate: ({ taskId, position }) => {
+    onMutate: ({ taskId, position, renumbered = [] }) => {
       qc.cancelQueries({ queryKey: ['view-tasks'] })
       qc.cancelQueries({ queryKey: ['section-tasks'] })
       const previousViewQueries = qc.getQueriesData<Task[]>({ queryKey: ['view-tasks'] })
@@ -489,10 +500,10 @@ export function useReorderTask() {
 
       // Update position AND sort so the array order matches the new visual order immediately.
       // Without sorting, @dnd-kit clears transforms on drop and items snap back to the old array order.
+      const updates = [...renumbered, { taskId, position }]
       const reorderTasks = (old: Task[] | undefined) => {
         if (!old) return old
-        const updated = old.map((t) => (t.id === taskId ? { ...t, position } : t))
-        return sortProjectTasks(updated)
+        return sortProjectTasks(applyPositionUpdates(old, updates))
       }
 
       qc.setQueriesData<Task[]>({ queryKey: ['view-tasks'] }, reorderTasks)
@@ -500,10 +511,7 @@ export function useReorderTask() {
         if (!old) return old
         return old.map((section) => {
           if (!section.tasks.some((t) => t.id === taskId)) return section
-          const updated = section.tasks.map((t) =>
-            t.id === taskId ? { ...t, position } : t
-          )
-          return { ...section, tasks: sortProjectTasks(updated) }
+          return { ...section, tasks: sortProjectTasks(applyPositionUpdates(section.tasks, updates)) }
         })
       })
 
