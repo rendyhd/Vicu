@@ -62,6 +62,7 @@ import { forgetDeletedTask, loadRoutineCarriers, rememberCreatedTask } from './c
 import { dueToday } from '../shared/due-dates'
 import { KEEP_NESTED_SUBTASKS_PARAM } from './api-v2'
 import { fetchPositionSortedTasks } from './quick-entry/position-sort'
+import { activeProjects, invalidateViewerCaches, projectListViewIds } from './quick-entry/viewer-caches'
 import { cachedFallback } from './quick-entry/fetch-fallback'
 import { resolveViewerFilter, selectQuickViewTasks } from './quick-entry/viewer-filter'
 import {
@@ -234,16 +235,24 @@ export function registerIpcHandlers(): void {
     return fetchProjectById(id)
   })
 
-  handleTrusted('create-project', (_event, project: Record<string, unknown>) => {
-    return createProject(project)
+  // Quick View remembers the active projects and their list views for a moment; a project change
+  // makes that out of date.
+  handleTrusted('create-project', async (_event, project: Record<string, unknown>) => {
+    const result = await createProject(project)
+    if (result.success) invalidateViewerCaches()
+    return result
   })
 
-  handleTrusted('update-project', (_event, id: number, project: Record<string, unknown>) => {
-    return updateProject(id, project)
+  handleTrusted('update-project', async (_event, id: number, project: Record<string, unknown>) => {
+    const result = await updateProject(id, project)
+    if (result.success) invalidateViewerCaches()
+    return result
   })
 
-  handleTrusted('delete-project', (_event, id: number) => {
-    return deleteProject(id)
+  handleTrusted('delete-project', async (_event, id: number) => {
+    const result = await deleteProject(id)
+    if (result.success) invalidateViewerCaches()
+    return result
   })
 
   // Labels
@@ -515,10 +524,8 @@ export function registerIpcHandlers(): void {
 
     if (!config.viewer_filter) return { success: false, error: 'No filter configuration' }
 
-    const activeProjectsResult = await fetchProjects(false)
-    const activeProjectIds = activeProjectsResult.success
-      ? new Set((activeProjectsResult.data as Array<{ id?: number }>).map(project => project.id).filter((id): id is number => typeof id === 'number'))
-      : null
+    // Remembered for 30 s: a refresh no longer reads every page of the project list (D-IPC-6).
+    const activeProjectIds = await activeProjects.get(config.vikunja_url)
 
     // A viewer that points at a custom list takes that list's conditions. The server query is a
     // superset; the exact rule is applied below with the same evaluator as the main window.
@@ -546,7 +553,7 @@ export function registerIpcHandlers(): void {
       result = await fetchPositionSortedTasks(projectIds, filterParams, {
         fetchViews: fetchProjectViews,
         fetchViewTasks,
-      })
+      }, { viewCache: projectListViewIds })
     } else {
       result = await fetchTasks(filterParams)
     }

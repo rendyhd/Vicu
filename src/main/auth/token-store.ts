@@ -11,6 +11,7 @@ export const API_TOKEN_NO_EXPIRY = 4102444800 // 2100-01-01T00:00:00Z
 export function isEncryptionAvailable(): boolean {
   return true
 }
+import { existsSync } from 'fs'
 import { join } from 'path'
 import { readFileWithBackup, removeFileAndBackup, writeFileAtomic } from '../atomic-file'
 
@@ -41,14 +42,46 @@ function parseAuthStore(raw: string): AuthStore {
   return parsed as AuthStore
 }
 
+// auth.json is read from disk once and kept in memory; every write and clear goes through this
+// module, so the copy is current without asking the disk again. Before, each token check (several per
+// API call) read and parsed the file on the main thread, and every token read went to the OS keychain
+// to decrypt it (D-AUTH-3). The memory copy is only ever replaced after a write succeeded.
+let memory: { path: string; store: AuthStore } | null = null
+// Plain text of the secrets already decrypted, by their stored (encrypted) form.
+const decryptedSecrets = new Map<string, string>()
+
+function dropMemory(): void {
+  memory = null
+  decryptedSecrets.clear()
+}
+
 function readStore(): AuthStore {
+  const path = getAuthPath()
+  if (memory && memory.path === path) return { ...memory.store }
+
   // Falls back to auth.json.bak (and logs it) when the file does not parse, so a
   // torn write does not log the user out.
-  return readFileWithBackup(getAuthPath(), parseAuthStore)?.value ?? {}
+  const result = readFileWithBackup(path, parseAuthStore)
+  if (result) {
+    memory = { path, store: result.value }
+    return { ...result.value }
+  }
+  // No file at all is a settled answer; a file that exists but could not be read (an antivirus scan
+  // holding it) is not, and must not log the user out until the next start.
+  if (!existsSync(path)) memory = { path, store: {} }
+  return {}
 }
 
 function writeStore(data: AuthStore): void {
-  writeFileAtomic(getAuthPath(), JSON.stringify(data, null, 2), { backup: true, mode: 0o600 })
+  const path = getAuthPath()
+  writeFileAtomic(path, JSON.stringify(data, null, 2), { backup: true, mode: 0o600 })
+  // Only after the write went through: a failed write leaves the previous state in memory too.
+  memory = { path, store: { ...data } }
+  // Plain text of a secret that was replaced does not stay in memory.
+  const stored = new Set(Object.values(data))
+  for (const encoded of [...decryptedSecrets.keys()]) {
+    if (!stored.has(encoded)) decryptedSecrets.delete(encoded)
+  }
 }
 
 // Tokens stored while safeStorage is unavailable get a "plain:" prefix so the
@@ -79,9 +112,13 @@ function decrypt(encoded: string): string | null {
   if (encoded.startsWith(PLAIN_PREFIX)) {
     return encoded.slice(PLAIN_PREFIX.length)
   }
+  const known = decryptedSecrets.get(encoded)
+  if (known !== undefined) return known
   try {
     const buffer = Buffer.from(encoded, 'base64')
-    return safeStorage.decryptString(buffer)
+    const plain = safeStorage.decryptString(buffer)
+    decryptedSecrets.set(encoded, plain)
+    return plain
   } catch (err) {
     console.warn('[Auth] Failed to decrypt stored token:', err instanceof Error ? err.message : err)
     return null
@@ -100,12 +137,18 @@ export function extractJWTExp(jwt: string): number | null {
   }
 }
 
+/** Remember a secret just stored, so reading it back needs no decryption. */
+function rememberSecret(encoded: string | undefined, plain: string): void {
+  if (encoded && !encoded.startsWith(PLAIN_PREFIX)) decryptedSecrets.set(encoded, plain)
+}
+
 export function storeJWT(jwt: string): void {
   const store = readStore()
   store.jwt = encrypt(jwt)
   const exp = extractJWTExp(jwt)
   store.jwt_exp = exp ?? undefined
   writeStore(store)
+  rememberSecret(store.jwt, jwt)
 }
 
 export function getJWT(): string | null {
@@ -147,6 +190,7 @@ export function storeAPIToken(token: string, expiresAt: number, meta?: BackupTok
     delete store.api_token_url
   }
   writeStore(store)
+  rememberSecret(store.api_token, token)
 }
 
 /** The server-side id of the stored backup token, when Vicu created it. */
@@ -202,6 +246,7 @@ export function storeRefreshToken(token: string): void {
   const store = readStore()
   store.refresh_token = encrypt(token)
   writeStore(store)
+  rememberSecret(store.refresh_token, token)
 }
 
 export function getRefreshToken(): string | null {
@@ -229,5 +274,11 @@ export function getBestToken(): string | null {
 
 export function clear(): void {
   // The backup copy must go too, or it would restore the session after logout.
-  removeFileAndBackup(getAuthPath())
+  try {
+    removeFileAndBackup(getAuthPath())
+  } finally {
+    // Whatever happened to the files, nothing is served from memory any more: the next read asks
+    // the disk, and the decrypted secrets do not outlive the logout.
+    dropMemory()
+  }
 }

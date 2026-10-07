@@ -19,6 +19,7 @@ import { getAPIToken } from './auth/token-store'
 import { matchesQueuedCreate } from './offline/duplicate-match'
 import { createReplayRunner, replayQueue, type ReplayApi } from './offline/replay'
 import { KEEP_NESTED_SUBTASKS_PARAM } from './api-v2'
+import { invalidateViewerCaches } from './quick-entry/viewer-caches'
 import { getMainWindow, getQuickEntryWindow, getQuickViewWindow } from './quick-entry-state'
 import type { OfflineReplayEvent } from '../shared/offline-queue-types'
 
@@ -53,6 +54,7 @@ let userLookupAt = 0
 export function accountChanged(): void {
   forgetKnownUser()
   userLookupAt = 0
+  invalidateViewerCaches()
 }
 
 /**

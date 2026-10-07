@@ -8,6 +8,7 @@ import { returnFocusToPreviousWindow, destroyDummyWindow } from './focus'
 import { registerQuickEntryState } from './quick-entry-state'
 import { initNotifications, refreshTaskRemindersOnFocus, rescheduleNotifications, stopNotifications, setNotificationsMainWindow } from './notifications'
 import { getObsidianContext, getForegroundProcessName, getForegroundWindowHandle, prewarmForegroundCheck, type ObsidianNoteContext } from './obsidian-client'
+import { foregroundNeeds, lookUpForeground } from './quick-entry/foreground-gate'
 import { getBrowserContext, type BrowserContext } from './browser-client'
 import { getBrowserUrlFromWindow, prewarmUrlReader, shutdownUrlReader, BROWSER_PROCESSES } from './window-url-reader'
 import { isRegistered, unregisterHosts, registerHosts } from './browser-host-registration'
@@ -105,25 +106,28 @@ async function showQuickEntry(): Promise<void> {
   if (!quickEntryWindow) return
   const config = loadConfig()
 
-  // 1. Detect foreground app — must happen before we steal focus.
-  //    On Windows this is sync FFI (~0μs), on macOS it's osascript (~2ms).
-  const fgProcess = await getForegroundProcessName()
-
-  // 2. Capture the browser's HWND before anything else (~0μs, Windows only).
-  //    This allows PowerShell to use the correct window even after Electron steals focus.
-  const fgHwnd = getForegroundWindowHandle()
-
-  const isObsidian = fgProcess === 'Obsidian' || fgProcess === 'obsidian'
+  // 1. Detect foreground app — must happen before we steal focus, so it cannot move after show().
+  //    Only a link feature (Obsidian note, browser URL) uses the answer, so with both off the
+  //    lookup is skipped and the window shows at once (D-PERF-1). On Windows it is sync FFI
+  //    (~0μs), on Linux there is none, and on macOS it is osascript, capped at 400 ms.
   // Obsidian integration is disabled on Linux by design — Wayland restricts
   // foreground-process detection and "always-fire" Obsidian fetches would
   // surprise users who aren't exclusively working in Obsidian. Users on Linux
   // can still open Obsidian deep links via plain text URIs in task notes.
-  const wantObsidian = !isLinux && !!(config?.obsidian_mode && config.obsidian_mode !== 'off' && config.obsidian_api_key && isObsidian)
+  const needs = foregroundNeeds(config, isLinux)
+  const fgProcess = await lookUpForeground(needs, getForegroundProcessName)
+
+  // 2. Capture the browser's HWND before anything else (~0μs, Windows only).
+  //    This allows PowerShell to use the correct window even after Electron steals focus.
+  const fgHwnd = needs.browser ? getForegroundWindowHandle() : 0
+
+  const isObsidian = fgProcess === 'Obsidian' || fgProcess === 'obsidian'
+  const wantObsidian = needs.obsidian && isObsidian
   // Browser link: on Linux we trust the extension cache's 3-second freshness
   // window to gate stale data instead of foreground checks, so skip the
   // BROWSER_PROCESSES gate (fgProcess is always '' on Wayland).
   const processIsBrowser = isLinux ? true : BROWSER_PROCESSES.has(fgProcess)
-  const wantBrowser = !isObsidian && !!(config?.browser_link_mode && config.browser_link_mode !== 'off' && processIsBrowser)
+  const wantBrowser = !isObsidian && needs.browser && processIsBrowser
 
   // 3. Browser context: try extension cache first (<1ms sync file read).
   let browserContext: BrowserContext | null = null

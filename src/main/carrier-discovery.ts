@@ -25,6 +25,7 @@ import type { ApiResult } from './api-result'
 import { MAX_PAGE_SIZE } from './api-v2'
 import { CUSTOM_LIST_CARRIER_SEARCH, CUSTOM_LIST_CARRIER_TITLE, hasCustomListMarker } from './custom-list-protocol'
 import { JsonFileStore } from './json-file-store'
+import { mapLimited } from './map-limited'
 import { ROUTINE_CARRIER_SEARCH, hasRoutineMarker } from '../shared/routines'
 
 export const DISCOVERY_INTERVAL_MS = 60_000
@@ -197,19 +198,6 @@ export interface CarrierLoader {
 
 function isGone(result: { statusCode?: number }): boolean {
   return result.statusCode === 404 || result.statusCode === 403
-}
-
-async function mapLimited<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
-  const results: R[] = new Array(items.length)
-  let next = 0
-  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
-    while (next < items.length) {
-      const index = next++
-      results[index] = await fn(items[index])
-    }
-  })
-  await Promise.all(workers)
-  return results
 }
 
 export function createCarrierLoader(deps: CarrierLoaderDeps): CarrierLoader {
