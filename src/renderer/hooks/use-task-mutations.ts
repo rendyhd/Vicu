@@ -29,13 +29,18 @@ import {
   snapshotTaskCaches,
 } from '@/lib/pending-cache'
 import { refreshTasks } from '@/lib/task-refresh'
+import { ACCOUNT_CHANGED_EVENT } from '@/lib/account-events'
+import {
+  createNewTaskPlacer,
+  placeNewTaskInBackground,
+  readPositionHints,
+} from '@/lib/new-task-position'
 import { useOfflineStore } from '@/stores/offline-store'
 import type {
   Task,
   Project,
   Label,
   TaskAttachment,
-  ProjectView,
   CreateTaskPayload,
   CreateProjectPayload,
   CreateLabelPayload,
@@ -46,20 +51,37 @@ import {
   type SectionTaskCacheEntry,
 } from '@/lib/section-task-cache'
 
-// Place a freshly-created task at the end of its project's list view so
-// position-0 (Vikunja's default for the create endpoint) doesn't make it
-// jump to the top. Best-effort: skips if the view/tasks aren't cached.
-async function placeNewTaskAtEnd(
+// Vikunja puts a new task at the top of the list view. Anchoring it at the end takes one position
+// update per create; the list view id and the last position are remembered per project and the
+// update runs in the background, so a create costs the caller one request (D-REN-7). See
+// src/renderer/lib/new-task-position.ts.
+const newTaskPlacer = createNewTaskPlacer({
+  fetchProjectViews: (projectId) => api.fetchProjectViews(projectId),
+  fetchViewTasks: (projectId, viewId, params) => api.fetchViewTasks(projectId, viewId, params),
+  updateTaskPosition: (taskId, viewId, position) => api.updateTaskPosition(taskId, viewId, position),
+})
+
+// Another account has other projects and views.
+if (typeof window !== 'undefined') {
+  window.addEventListener(ACCOUNT_CHANGED_EVENT, () => newTaskPlacer.invalidate())
+}
+
+/**
+ * Put a new task at the end of its project's list in the background. When it is done (or could not
+ * be), the project's lists refresh so the task shows up where it belongs; `refreshLists` is false
+ * for a caller that refreshes them itself.
+ */
+function placeNewTaskAtEnd(
   qc: ReturnType<typeof useQueryClient>,
   projectId: number,
-  taskId: number
-): Promise<void> {
-  const views = qc.getQueryData<ProjectView[]>(['project-views', projectId])
-  const listView = views?.find((v) => v.view_kind === 'list')
-  if (!listView) return
-  const tasks = qc.getQueryData<Task[]>(['view-tasks', projectId, listView.id]) ?? []
-  const maxPos = tasks.reduce((m, t) => Math.max(m, t.position ?? 0), 0)
-  await api.updateTaskPosition(taskId, listView.id, maxPos + 2 ** 16)
+  taskId: number,
+  refreshLists = true
+): void {
+  placeNewTaskInBackground(newTaskPlacer, projectId, taskId, readPositionHints(qc, projectId), (placed) => {
+    // The cached views were wrong (or unreachable): read them again before the next create.
+    if (!placed) void qc.invalidateQueries({ queryKey: ['project-views', projectId] })
+    if (refreshLists) refreshTasks(qc, [['view-tasks'], ['section-tasks']])
+  })
 }
 
 /**
@@ -160,7 +182,8 @@ export function useCreateSubtask() {
       const createResult = await api.createTask(parentTask.project_id, { title })
       if (!createResult.success) throw apiError(createResult)
       const childTask = createResult.data as Task
-      await placeNewTaskAtEnd(qc, parentTask.project_id, childTask.id)
+      // In the background; the mutation's own refresh below shows the subtask inside its parent.
+      placeNewTaskAtEnd(qc, parentTask.project_id, childTask.id, false)
 
       // Create the subtask relation (parent → child)
       const relationResult = await api.createTaskRelation(
@@ -194,13 +217,16 @@ export function useCreateTask(options?: MutationHookOptions) {
       extras?: CreateExtras
     }) => {
       const outcome = await createTaskOrQueue(projectId, task, extras)
-      // A queued create has no real id yet; its stand-in carries a temp id.
-      if (!outcome.queued) await placeNewTaskAtEnd(qc, projectId, outcome.task.id)
+      // A queued create has no real id yet; its stand-in carries a temp id. The position update
+      // does not hold the create back; the project's lists refresh once it has landed.
+      if (!outcome.queued) placeNewTaskAtEnd(qc, projectId, outcome.task.id)
       return outcome.task
     },
     onSuccess: (task) => {
       if (isTempTaskId(task.id)) insertPendingTask(qc, task)
-      else refreshTasks(qc)
+      // The project's own lists wait for the position update, so a new task does not show at the
+      // top first and then jump to the end.
+      else refreshTasks(qc, [['tasks'], ['task-detail']])
     },
     meta: metaFor('create the task', options),
   })
@@ -448,6 +474,8 @@ export function useReorderTask() {
       if (isTempTaskId(taskId)) throw new ApiError('This task has not synced yet. Reorder it once it has been saved.')
       const result = await api.updateTaskPosition(taskId, viewId, position)
       if (!result.success) throw apiError(result)
+      // A task dragged to the end moves the end of the list; the next new task goes after it.
+      newTaskPlacer.noteViewPosition(viewId, position)
       return result.data
     },
     onMutate: ({ taskId, position }) => {
@@ -884,6 +912,7 @@ export function useDeleteProject() {
       if (!result.success) throw apiError(result)
     },
     onSuccess: (_data, id) => {
+      newTaskPlacer.invalidate(id)
       const currentPath = matches[matches.length - 1]?.pathname ?? ''
       if (currentPath === `/project/${id}`) {
         navigate({ to: '/inbox' })
