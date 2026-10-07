@@ -72,6 +72,73 @@ describe('weekday abbreviations', () => {
   })
 })
 
+describe('a weekday next to another date', () => {
+  const dateRaw = (r: ReturnType<typeof parse>) => r.tokens.filter((t) => t.type === 'date').map((t) => t.raw)
+
+  it('stays in the title and the other date is used', () => {
+    const r = parse('Call Ana about Saturday tomorrow at 3pm', bang, evening)
+    expect(r.title).toBe('Call Ana about Saturday')
+    expect(ymd(stored(r))).toEqual([2026, 10, 7, 15, 0, 0])
+    expect(dateRaw(r)).toEqual(['tomorrow at 3pm'])
+
+    const cases: Array<[string, string, number[]]> = [
+      ['Party saturday 10/17', 'Party saturday', [2026, 10, 17, 23, 59, 59]],
+      ['Call mom Monday in 3 days', 'Call mom Monday', [2026, 10, 9, 23, 59, 59]],
+      ['Plan Monday next month', 'Plan Monday', [2026, 11, 6, 23, 59, 59]],
+      ['Call Ana about Saturday in 2 hours', 'Call Ana about Saturday', [2026, 10, 6, 22, 15, 0]],
+      // The abbreviation counts because of "on", and then gives way all the same.
+      ['Pay rent on sat tomorrow', 'Pay rent on sat', [2026, 10, 7, 23, 59, 59]],
+    ]
+    for (const [input, title, due] of cases) {
+      const parsed = parse(input, bang, evening)
+      expect(parsed.title, input).toBe(title)
+      expect(ymd(stored(parsed)), input).toEqual(due)
+    }
+
+    // A comma between them still counts as directly.
+    const comma = parse('Call Ana about Saturday, tomorrow', bang, evening)
+    expect(ymd(stored(comma))).toEqual([2026, 10, 7, 23, 59, 59])
+    expect(dateRaw(comma)).toEqual(['tomorrow'])
+  })
+
+  it('keeps its time, and stays the date when a word comes between', () => {
+    expect(ymd(stored(parse('Call wed 3pm', bang, evening)))).toEqual([2026, 10, 7, 15, 0, 0])
+    expect(ymd(stored(parse('Call saturday at 3pm', bang, evening)))).toEqual([2026, 10, 10, 15, 0, 0])
+
+    // chrono starts "on Monday" with the connector; it is still a word between the two.
+    const apart = parse('Meeting about Friday on Monday', bang, evening)
+    expect(ymd(stored(apart))).toEqual([2026, 10, 9, 23, 59, 59])
+    expect(dateRaw(apart)).toEqual(['Friday'])
+  })
+
+  it('is one phrase with "this week" or "next week" after it', () => {
+    const next = parse('Meet friday next week', bang, evening)
+    expect(next.title).toBe('Meet')
+    expect(ymd(stored(next))).toEqual([2026, 10, 16, 23, 59, 59])
+    expect(ymd(stored(parse('Meet friday this week', bang, evening)))).toEqual([2026, 10, 9, 23, 59, 59])
+    expect(ymd(stored(parse('Meet friday next week', bang, new Date(2026, 9, 4, 12, 0, 0))))).toEqual([2026, 10, 9, 23, 59, 59])
+    expect(ymd(stored(parse('Meet friday next week at 3pm', bang, evening)))).toEqual([2026, 10, 16, 15, 0, 0])
+
+    // An abbreviation still needs its marker: "fri next week" is only "next week".
+    const abbreviated = parse('Meet fri next week', bang, evening)
+    expect(abbreviated.title).toBe('Meet fri')
+    expect(ymd(stored(abbreviated))).toEqual([2026, 10, 12, 23, 59, 59])
+  })
+})
+
+describe('weekend and weekday', () => {
+  it('are words, not dates', () => {
+    for (const input of ['Plan the weekend', 'Plan this weekend', 'Plan next weekend', 'Review weekday schedule']) {
+      const r = parse(input, bang, evening)
+      expect(r.dueDate, input).toBeNull()
+      expect(r.title, input).toBe(input)
+    }
+    const trip = parse('Weekend trip tomorrow', bang, evening)
+    expect(trip.title).toBe('Weekend trip')
+    expect(ymd(stored(trip))).toEqual([2026, 10, 7, 23, 59, 59])
+  })
+})
+
 describe('slash dates', () => {
   it('follow the locale order', () => {
     expect(ymd(stored(parse('Report 5/11', { ...bang, locale: 'en-US' }, evening)))).toEqual([2027, 5, 11, 23, 59, 59])

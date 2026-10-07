@@ -8,6 +8,10 @@ import type { ParsedToken } from './types'
  * chrono-node does the parsing; this file adds the rules chrono does not have:
  *
  * - three-letter weekday abbreviations only count after on/next/this/by/due or before a time;
+ * - a weekday directly followed by another date is a word of the title ("call Ana about Saturday
+ *   tomorrow"), where chrono would merge the two into one date;
+ * - "weekend" and "weekday" are words, not dates (chrono reads them as Saturday and the next
+ *   working day);
  * - "next week" is the Monday of next week;
  * - the connectors on/by/due (and `at` before a time) are removed together with the date;
  * - slash dates follow the locale's day/month order;
@@ -77,12 +81,13 @@ export function extractDate(
   const none = { dueDate: null, hasTime: false, tokens }
 
   const reference = options.reference ?? new Date()
-  const parser = isDayFirstLocale(options.locale ?? systemLocale()) ? chrono.en.GB : chrono.en.casual
+  const parser = chronoFor(isDayFirstLocale(options.locale ?? systemLocale()), consumed)
   const chronoOptions = { forwardDate: true }
 
-  // Consumed regions become spaces, and abbreviations that are not dates become spaces too, so
-  // chrono never sees them and every index still points into the input.
-  const working = maskWeekdayAbbreviations(buildWorkingText(input, consumed))
+  // Consumed regions become spaces, and words that are not dates (abbreviations without a
+  // marker, "weekend") become spaces too, so chrono never sees them and every index still points
+  // into the input.
+  const working = maskWeekdayAbbreviations(maskWeekendWords(buildWorkingText(input, consumed)))
 
   const results = parser.parse(working, reference, chronoOptions)
 
@@ -158,6 +163,61 @@ export function extractDate(
   return { dueDate, hasTime, tokens }
 }
 
+/**
+ * chrono's casual English parser (day/month order for day-first locales) with the weekday rule
+ * below in front of chrono's own refiners.
+ */
+function chronoFor(dayFirst: boolean, consumed: Array<{ start: number; end: number }>): chrono.Chrono {
+  const parser = (dayFirst ? chrono.en.GB : chrono.en.casual).clone()
+  parser.refiners.unshift(weekdayBeforeAnotherDate(consumed))
+  return parser
+}
+
+/**
+ * chrono merges a weekday into the date right after it: "Saturday tomorrow" becomes tomorrow and
+ * takes both words. In the contract that weekday is a word of the title ("Call Ana about Saturday
+ * tomorrow at 3pm" is due tomorrow at 15:00, titled "Call Ana about Saturday"), so it is dropped
+ * here, before chrono's refiners can merge it. Only spaces or a comma may be between the two (text
+ * another extractor took counts as a word, as on Android), and a time is not another date ("wed
+ * 3pm" stays Wednesday at 15:00). "friday next week" is one phrase and is not affected.
+ */
+function weekdayBeforeAnotherDate(consumed: Array<{ start: number; end: number }>): chrono.Refiner {
+  return {
+    refine: (context, results) =>
+      results.filter((result) => {
+        if (!result.start.isOnlyWeekdayComponent()) return true
+        const end = result.index + result.text.length
+        const next = firstResultFrom(results, end)
+        if (!next || !namesAnotherDate(next)) return true
+        // chrono starts a weekday or "15 jan" with the connector when there is one ("Friday on
+        // Monday"): that is a word between the two.
+        if (/^on\b/i.test(next.text)) return true
+        const between = context.text.slice(end, next.index)
+        return !/^[\s,]*$/.test(between) || consumed.some((c) => c.start < next.index && c.end > end)
+      }),
+  }
+}
+
+/** The result starting first at or after `index` (the longest of those): the one chrono would merge. */
+function firstResultFrom(results: chrono.ParsingResult[], index: number): chrono.ParsingResult | undefined {
+  let first: chrono.ParsingResult | undefined
+  for (const r of results) {
+    if (r.index < index) continue
+    if (!first || r.index < first.index || (r.index === first.index && r.text.length > first.text.length)) first = r
+  }
+  return first
+}
+
+/**
+ * A result that names a day or a moment: a date, a weekday, "next month", "in 2 hours". Not a
+ * time of day on its own ("3pm") and not "now".
+ */
+function namesAnotherDate(result: chrono.ParsingResult): boolean {
+  if (result.text.trim().toLowerCase() === 'now') return false
+  const start = result.start
+  return start.isCertain('day') || start.isOnlyWeekdayComponent() || start.tags().has('result/relativeDate')
+}
+
 /** A parse result that only names a time of day ("10am"): no weekday, day, month or year. */
 function namesNoDate(components: { isCertain(component: 'weekday' | 'day' | 'month' | 'year'): boolean }): boolean {
   return !(
@@ -166,6 +226,14 @@ function namesNoDate(components: { isCertain(component: 'weekday' | 'day' | 'mon
     components.isCertain('month') ||
     components.isCertain('year')
   )
+}
+
+// chrono reads "weekend" as Saturday and "weekday" as the next working day. Neither is a date in
+// the contract: "Plan the weekend" has no date and keeps its title.
+const WEEKEND_WORD_RE = /\bweek(?:end|day)\b/gi
+
+function maskWeekendWords(text: string): string {
+  return text.replace(WEEKEND_WORD_RE, (word) => ' '.repeat(word.length))
 }
 
 // Three-letter weekday abbreviations chrono knows.

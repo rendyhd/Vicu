@@ -41,6 +41,14 @@
     { "input": "Submit report by friday", "title": "Submit report", "due": "2026-10-09T23:59:59" },
     { "input": "Taxes due tomorrow", "title": "Taxes", "due": "2026-10-07T23:59:59" },
 
+    { "input": "Call Ana about Saturday tomorrow at 3pm @call p2 #Personal", "title": "Call Ana about Saturday", "due": "2026-10-07T15:00:00", "priority": 3, "labels": ["call"], "project": "Personal" },
+    { "mode": "vikunja", "input": "Call Ana about the weekend tomorrow at 3pm *call !3", "title": "Call Ana about the weekend", "due": "2026-10-07T15:00:00", "priority": 3, "labels": ["call"] },
+    { "input": "Call Ana about Saturday tomorrow", "title": "Call Ana about Saturday", "due": "2026-10-07T23:59:59" },
+    { "input": "Party Saturday oct 17", "title": "Party Saturday", "due": "2026-10-17T23:59:59" },
+    { "input": "Call Ana about Saturday in 2 hours", "title": "Call Ana about Saturday", "due": "2026-10-06T12:00:00" },
+    { "input": "Meet friday next week", "title": "Meet", "due": "2026-10-16T23:59:59" },
+    { "input": "Plan the weekend", "title": "Plan the weekend" },
+
     { "input": "Meeting today at 14:00", "title": "Meeting", "due": "2026-10-06T14:00:00" },
     { "input": "Dentist tomorrow 3:30pm", "title": "Dentist", "due": "2026-10-07T15:30:00" },
     { "input": "Call tomorrow at 9am", "title": "Call", "due": "2026-10-07T09:00:00" },

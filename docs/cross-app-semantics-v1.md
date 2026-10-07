@@ -153,17 +153,24 @@ the date and recurrence rules.
 
 - Date-only phrases produce local 23:59:59 (section 1.1). Phrases with a time keep the time.
 - Supported date phrases: `today`, `tomorrow`, weekday names, `this <weekday>`,
-  `next <weekday>`, `next week`, `next month`, `in N days|weeks`, `in N hours|minutes`
-  (exact time), month-name dates (`jan 15`, `15 jan`, `march 3rd`), ISO dates
-  (`2026-10-15`) and slash dates (`10/15`, `15/10`).
+  `next <weekday>`, `<weekday> this week`, `<weekday> next week`, `next week`, `next month`,
+  `in N days|weeks`, `in N hours|minutes` (exact time), month-name dates (`jan 15`, `15 jan`,
+  `march 3rd`), ISO dates (`2026-10-15`) and slash dates (`10/15`, `15/10`). `weekend` and
+  `weekday` are words, not dates: "Plan the weekend" has no due date.
 - Times: `3pm`, `3:30pm`, `14:00`, optionally after `at`, before or after a date phrase. A time
   without a date means today if that time is still ahead, otherwise tomorrow.
 - Weekdays:
   - A bare weekday or `this <weekday>` is the next occurrence on or after today (today
-    included).
+    included). `<weekday> this week` is the same as `this <weekday>`.
   - `next <weekday>` is that weekday in the following Monday-start week. On Tue 2026-10-06,
     `next friday` is 2026-10-16; on Sun 2026-10-04, `next monday` is 2026-10-05.
+    `<weekday> next week` is the same as `next <weekday>`.
   - `next week` is the Monday of the following week.
+  - A weekday directly followed by another date (only spaces or a comma between them) is part
+    of the title, and the other date is the due date: "Call Ana about Saturday tomorrow at 3pm"
+    is due tomorrow at 15:00 with the title "Call Ana about Saturday", and "Party Saturday
+    oct 17" is due on 2026-10-17 with the title "Party Saturday". A time is not another date
+    ("Call wed 3pm" is Wednesday at 15:00); `in N hours|minutes` is.
 - Three-letter weekday abbreviations (`mon`, `tue`, `tues`, `wed`, `thu`, `thur`, `thurs`,
   `fri`, `sat`, `sun`) only count as dates when preceded by `on`, `next`, `this`, `by` or
   `due`, or followed by a time. Full weekday names always count. "Buy sun cream" has no date.
@@ -174,6 +181,9 @@ the date and recurrence rules.
   flips. ISO dates are unambiguous.
 - The connector words `on`, `by` and `due` directly before a date phrase, and `at` directly
   before a time, are removed together with the date.
+- When a text has more than one date phrase (apart from the weekday rule above), the first is
+  the due date and the others stay in the title: "Book Friday dinner tomorrow" is due on
+  Friday with the title "Book dinner tomorrow".
 - `now` is never a date.
 - The `!` today shortcut has one rule in every entry point: a standalone `!`, a leading `!`
   (not followed by a priority token such as `!1` or `!high`) or a trailing `!` means today

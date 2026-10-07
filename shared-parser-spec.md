@@ -2,7 +2,7 @@
 
 This document defines the exact parser behavior that BOTH Vicu (desktop) and Vicu Android must implement identically. Both apps must produce the same `ParseResult` for the same input string and the same `ParserConfig`.
 
-The date and recurrence rules are the contract in `docs/cross-app-semantics-v1.md` section 5, and the test is the shared corpus `test-fixtures/nlp-corpus-v1.json` (74 cases, reference time Tue 2026-10-06 10:00 local; both apps run the same file). If this document and the corpus disagree, the corpus wins. The desktop implementation is `src/renderer/lib/task-parser/`: there is one parser (the main window, the task title editor and Quick Entry all call it), and the date work is done by chrono-node plus the rules below.
+The date and recurrence rules are the contract in `docs/cross-app-semantics-v1.md` section 5, and the test is the shared corpus `test-fixtures/nlp-corpus-v1.json` (81 cases, reference time Tue 2026-10-06 10:00 local; both apps run the same file). If this document and the corpus disagree, the corpus wins. The desktop implementation is `src/renderer/lib/task-parser/`: there is one parser (the main window, the task title editor and Quick Entry all call it), and the date work is done by chrono-node plus the rules below.
 
 ---
 
@@ -218,7 +218,7 @@ This order matters because:
 
 Contract: `docs/cross-app-semantics-v1.md` section 5.1; corpus: `test-fixtures/nlp-corpus-v1.json`. Dates are parsed with chrono-node (`forwardDate: true`) plus the rules below. Text already taken by labels, projects, priority and recurrence is invisible to the date parser.
 
-- Natural language: `today`, `tomorrow`, weekday names, `this <weekday>`, `next <weekday>`, `next week`, `next month`, `in 3 days`, `in 2 weeks`
+- Natural language: `today`, `tomorrow`, weekday names, `this <weekday>`, `next <weekday>`, `<weekday> this week`, `<weekday> next week`, `next week`, `next month`, `in 3 days`, `in 2 weeks`
 - Specific dates: `jan 15`, `15 jan`, `march 3rd`, `10/15`, `2026-10-15`
 - With time: `tomorrow at 3pm`, `next friday 14:00`, `jan 15 9:30am`, `wed 3pm`
 - Relative times: `in 2 hours`, `in 30 minutes` (the exact time)
@@ -228,8 +228,15 @@ Contract: `docs/cross-app-semantics-v1.md` section 5.1; corpus: `test-fixtures/n
 
 - A bare weekday or `this <weekday>` is the next occurrence on or after today (today included). A date-only phrase is judged against the start of the day, so "tuesday" typed on a Tuesday afternoon is today, not next week.
 - `next <weekday>` is that weekday in the following Monday-start week (Tue 2026-10-06: `next friday` = 2026-10-16; Sun 2026-10-04: `next monday` = 2026-10-05).
+- `<weekday> this week` and `<weekday> next week` are one phrase, the same as `this <weekday>` and `next <weekday>` ("Meet friday next week" is 2026-10-16). chrono reads them that way itself.
 - `next week` is the Monday of the following week (chrono itself says "in 7 days"; do not use that). `next month` is the same day next month.
 - **Three-letter abbreviations** (`mon`, `tue`, `tues`, `wed`, `thu`, `thur`, `thurs`, `fri`, `sat`, `sun`) only count as dates when the previous word is `on`, `next`, `this`, `by` or `due`, or when a time follows (`mon 9am`, `wed at 3pm`, `fri 14:00`). Otherwise they are plain words: "Buy sun cream", "Notes we sat on" and "Plan wed anniversary" have no date. Full weekday names always count.
+- `weekend` and `weekday` are words, not dates: "Plan the weekend" has no date. (chrono reads them as Saturday and the next working day; desktop blanks them before chrono runs.)
+
+### More than one date
+
+- **A weekday directly followed by another date** (only spaces or a comma between them) is part of the title, and the other date is the due date: "Call Ana about Saturday tomorrow at 3pm" is due tomorrow at 15:00 with the title "Call Ana about Saturday"; "Party Saturday oct 17" is due on 2026-10-17 with the title "Party Saturday". A time is not another date ("Call wed 3pm" is Wednesday at 15:00); `in 2 hours` is. A word between them, connectors included, keeps them apart ("Meeting about Friday on Monday" is due on Friday). chrono would merge the weekday into the date after it (its `MergeWeekdayComponentRefiner`), so desktop drops such a weekday in a refiner that runs before chrono's own (`weekdayBeforeAnotherDate` in `extract-dates.ts`).
+- **Otherwise the first date phrase is the due date** and the others stay in the title: "Book Friday dinner tomorrow" is due on Friday with the title "Book dinner tomorrow".
 
 ### Connectors
 
@@ -339,6 +346,14 @@ interface VikunjaTaskPayload {
 → { title: "Buy sun cream", dueDate: null }
 // "sun" is an abbreviation with no connector and no time
 
+"Call Ana about Saturday tomorrow at 3pm @call p2 #Personal"
+→ { title: "Call Ana about Saturday", dueDate: <tomorrow 15:00>, priority: 3, labels: ["call"], project: "Personal" }
+// "Saturday" is directly followed by another date, so it stays in the title
+
+"Plan the weekend"
+→ { title: "Plan the weekend", dueDate: null }
+// "weekend" is not a date
+
 "Water plants daily"
 → { title: "Water plants", recurrence: { interval: 1, unit: 'day' } }
 
@@ -362,6 +377,9 @@ interface VikunjaTaskPayload {
 
 "task !4 *urgent +inbox"
 → { title: "task", priority: 4, labels: ["urgent"], project: "inbox" }
+
+"Call Ana about the weekend tomorrow at 3pm *call !3"
+→ { title: "Call Ana about the weekend", dueDate: <tomorrow 15:00>, priority: 3, labels: ["call"] }
 
 "call dentist !"
 → { title: "call dentist", dueDate: <today> }
