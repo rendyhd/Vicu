@@ -14,6 +14,7 @@ import { getBrowserContext, type BrowserContext } from './browser-client'
 import { getBrowserUrlFromWindow, prewarmUrlReader, shutdownUrlReader, BROWSER_PROCESSES } from './window-url-reader'
 import { isRegistered, unregisterHosts, registerHosts } from './browser-host-registration'
 import { checkForUpdates } from './update-checker'
+import { startUpdateChecks, type UpdateChecksHandle } from './update-schedule'
 import { isMac, isWindows, isLinux } from './platform'
 import { setupApplicationMenu } from './app-menu'
 import { storeAPIToken, getAPIToken, API_TOKEN_NO_EXPIRY } from './auth/token-store'
@@ -35,6 +36,7 @@ let mainWindow: BrowserWindow | null = null
 let quickEntryWindow: BrowserWindow | null = null
 let quickViewWindow: BrowserWindow | null = null
 let startupComplete = false
+let updateChecks: UpdateChecksHandle | null = null
 let lastCustomListFocusSync = 0
 /** Tracks intentional app quit (tray Quit / before-quit). */
 let appIsQuitting = false
@@ -777,15 +779,18 @@ if (!gotLock) {
       prewarmUrlReader()
     }
 
-    // Check for updates after a short delay so it doesn't block startup
-    setTimeout(async () => {
-      try {
-        const status = await checkForUpdates()
-        if (status.available && mainWindow && !mainWindow.isDestroyed()) {
-          mainWindow.webContents.send('update-available', status)
-        }
-      } catch { /* never block app */ }
-    }, 5000)
+    // Check for updates shortly after start, then every 12 hours: a tray app runs for weeks.
+    // The window is told once per release, and never about the one the user dismissed.
+    updateChecks?.stop()
+    updateChecks = startUpdateChecks({
+      check: () => checkForUpdates(),
+      dismissedVersion: () => loadConfig()?.update_check_dismissed_version,
+      notify: (status) => {
+        if (!mainWindow || mainWindow.isDestroyed()) return false
+        mainWindow.webContents.send('update-available', status)
+        return true
+      },
+    })
 
     // Quick Entry/View: if either enabled, set up tray + windows + hotkeys.
     // Require config to be non-null: on first launch loadConfig() returns null, and
@@ -847,6 +852,7 @@ if (!gotLock) {
   })
 
   app.on('will-quit', () => {
+    updateChecks?.stop()
     cleanAttachmentTempDir(app.getPath('temp'))
     stopNotifications()
     shutdownUrlReader()

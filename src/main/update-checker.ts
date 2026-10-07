@@ -1,14 +1,9 @@
 import { app } from 'electron'
 import { net } from 'electron'
 import { decodeUtf8Chunks } from './response-body'
+import { isNewerVersion, type UpdateStatus } from './update-version'
 
-export interface UpdateStatus {
-  available: boolean
-  currentVersion: string
-  latestVersion: string
-  releaseUrl: string
-  releaseNotes: string
-}
+export type { UpdateStatus }
 
 const GITHUB_API_URL = 'https://api.github.com/repos/rendyhd/vicu/releases/latest'
 const CACHE_DURATION_MS = 60 * 60 * 1000 // 1 hour
@@ -16,19 +11,6 @@ const REQUEST_TIMEOUT_MS = 10_000
 
 let cachedStatus: UpdateStatus | null = null
 let lastCheckTime = 0
-
-function compareVersions(current: string, latest: string): boolean {
-  const parseParts = (v: string) => v.replace(/^v/, '').split('.').map(Number)
-  const c = parseParts(current)
-  const l = parseParts(latest)
-  for (let i = 0; i < Math.max(c.length, l.length); i++) {
-    const cv = c[i] ?? 0
-    const lv = l[i] ?? 0
-    if (lv > cv) return true
-    if (lv < cv) return false
-  }
-  return false
-}
 
 function fetchLatestRelease(): Promise<UpdateStatus> {
   return new Promise((resolve) => {
@@ -68,7 +50,7 @@ function fetchLatestRelease(): Promise<UpdateStatus> {
             const data = JSON.parse(body)
             const tagName = data.tag_name as string
             const latestVersion = tagName.replace(/^v/, '')
-            const available = compareVersions(currentVersion, latestVersion)
+            const available = isNewerVersion(currentVersion, latestVersion)
 
             resolve({
               available,
