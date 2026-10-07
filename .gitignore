@@ -5,3 +5,8 @@ dist/
 *.log
 *.tsbuildinfo
 config.json
+
+# Local files
+.DS_Store
+.claude/settings.local.json
+.claude/scheduled_tasks.lock
