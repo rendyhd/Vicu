@@ -909,13 +909,6 @@ export function registerIpcHandlers(): void {
     return isRegistered()
   })
 
-  handleTrusted('get-browser-extension-path', () => {
-    const base = app.isPackaged
-      ? path.join(process.resourcesPath, 'extensions', 'browser')
-      : path.join(app.getAppPath(), 'extensions', 'browser')
-    return base
-  })
-
   // --- Update Checker IPC ---
   handleTrusted('update:check', () => {
     return checkForUpdates(true)

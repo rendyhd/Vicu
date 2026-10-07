@@ -140,7 +140,6 @@ const api = {
   // Browser Link
   checkBrowserHostRegistration: () => ipcRenderer.invoke('check-browser-host-registration'),
   registerBrowserHosts: () => ipcRenderer.invoke('register-browser-hosts'),
-  getBrowserExtensionPath: () => ipcRenderer.invoke('get-browser-extension-path') as Promise<string>,
   openBrowserExtensionFolder: () => ipcRenderer.invoke('open-browser-extension-folder'),
 
   // Quick Entry settings

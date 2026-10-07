@@ -169,7 +169,6 @@ export interface ElectronAPI {
   // Browser Link
   checkBrowserHostRegistration(): Promise<{ chrome: boolean; firefox: boolean }>
   registerBrowserHosts(): Promise<{ chrome: boolean; firefox: boolean }>
-  getBrowserExtensionPath(): Promise<string>
   openBrowserExtensionFolder(): Promise<void>
 
   // Update checker
