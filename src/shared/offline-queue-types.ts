@@ -5,7 +5,7 @@
  *
  * Vocabulary:
  * - A *pending* action is a change the server has not accepted yet. They replay in order.
- * - A *failed* action was rejected for good (400/404/409/422 or too many unknown errors). It stays
+ * - A *failed* action was rejected for good (400/404/409/413/422 or too many unknown errors). It stays
  *   in a visible log with the error until the user retries or discards it.
  * - A *temp id* is the negative number a task created offline carries until its create replays.
  *   Quick View rows use the string form `pending_<actionId>`; both name the same task.
@@ -23,7 +23,8 @@ export type OfflineActionType =
   | 'upload-attachment'
 
 export type OfflineFailureReason =
-  | 'rejected' // 400 / 422: the server refused the data
+  | 'rejected' // 400 / 413 / 422: the server refused the data
+  | 'too-large' // 413 on an upload: the file is over the server's size limit
   | 'conflict' // 409
   | 'task-gone' // 404 on a change to a task that no longer exists
   | 'not-found' // 404 on something else (a project, a label)

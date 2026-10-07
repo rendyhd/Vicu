@@ -4,6 +4,7 @@ import { emptyQueueData, type FailedAction, type QueueData, type QueuedAction } 
 
 const FAILURE_REASONS: ReadonlySet<string> = new Set<OfflineFailureReason>([
   'rejected',
+  'too-large',
   'conflict',
   'task-gone',
   'not-found',

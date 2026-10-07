@@ -56,7 +56,7 @@ const fail = (result: { error: string; statusCode?: number }): Step => ({
  * added meanwhile is picked up in the same run. The action being sent is marked in flight: changes
  * to it queue behind it, and an undo cannot pretend to cancel it.
  *
- * What a failure means is decided by `classifyReplayFailure`: only 400/404/409/422 move an action
+ * What a failure means is decided by `classifyReplayFailure`: only 400/404/409/413/422 move an action
  * to the failed log; auth problems, 5xx, 429 and network errors keep it and stop the run.
  */
 export async function replayQueue(queue: OfflineQueue, api: ReplayApi): Promise<OfflineReplayEvent> {

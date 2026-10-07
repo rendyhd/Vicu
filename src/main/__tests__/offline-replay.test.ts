@@ -239,7 +239,7 @@ describe('replayQueue', () => {
     it('an error nobody has a rule for stops the replay, is counted, and surfaces after several replays', async () => {
       const a = await queue.enqueueUpdate(1, { title: 'a' })
       await queue.enqueueUpdate(2, { title: 'b' })
-      const { api, calls } = fakeApi({ updateTask: (id: number) => (id === 1 ? err('HTTP 413', 413) : ok({})) })
+      const { api, calls } = fakeApi({ updateTask: (id: number) => (id === 1 ? err('HTTP 418', 418) : ok({})) })
 
       for (let i = 1; i < MAX_UNKNOWN_ATTEMPTS; i++) {
         const result = await replayQueue(queue, api)
@@ -517,6 +517,23 @@ describe('replayQueue', () => {
 
       expect(result).toMatchObject({ applied: 1, failed: 1, stopped: null })
       expect(queue.snapshot().failed[0].error).toMatch(/could not be read/)
+    })
+
+    it('an upload the server says is too large (413) goes to the failed log and the queue carries on', async () => {
+      await queue.enqueueCreate({ projectId: 7, fields: { title: 'x' }, images: [{ name: 'big.png', mime: 'image/png', bytes: png }] })
+      const file = (queue.getPending()[1] as { file: string }).file
+      await queue.enqueueUpdate(5, { title: 'later' })
+      const { api, ops } = fakeApi({ uploadTaskAttachment: () => err('HTTP 413', 413) })
+
+      const result = await replayQueue(queue, api)
+
+      // The create went out, the oversized upload failed for good, and the update behind it was sent.
+      expect(result).toMatchObject({ stopped: null, applied: 2, failed: 1 })
+      expect(queue.snapshot().failed).toMatchObject([{ reason: 'too-large', statusCode: 413 }])
+      expect(queue.counts().pending).toBe(0)
+      expect(ops()).toEqual(['createTask', 'uploadTaskAttachment', 'updateTask'])
+      // The file stays so the user can retry after raising the limit or shrinking it.
+      expect(existsSync(join(dir, 'offline-attachments', file))).toBe(true)
     })
 
     it('an upload rejected by the server keeps the file so the user can retry', async () => {

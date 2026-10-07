@@ -24,6 +24,18 @@ describe('classifyReplayFailure (D-SYNC-1)', () => {
       expect(classifyReplayFailure(http(404), 'create')).toEqual({ kind: 'drop', reason: 'not-found' })
     })
 
+    // A server that says the body is too large will say so every time: dropping the upload lets
+    // the actions behind it go out instead of wedging the queue on the same 413 (D-SYNC-1).
+    it('413 on an upload means the file is too large', () => {
+      expect(classifyReplayFailure(http(413), 'upload-attachment')).toEqual({ kind: 'drop', reason: 'too-large' })
+    })
+
+    it('413 on any other action is a rejection of that data', () => {
+      for (const type of ['create', 'update', 'add-label'] as const) {
+        expect(classifyReplayFailure(http(413), type)).toEqual({ kind: 'drop', reason: 'rejected' })
+      }
+    })
+
     it('400 and 422 on a create are rejected, 409 is a conflict', () => {
       expect(classifyReplayFailure(http(422), 'create')).toEqual({ kind: 'drop', reason: 'rejected' })
       expect(classifyReplayFailure(http(409), 'create')).toEqual({ kind: 'drop', reason: 'conflict' })
@@ -100,7 +112,7 @@ describe('classifyReplayFailure (D-SYNC-1)', () => {
   })
 
   describe('everything else is kept, counted, and eventually surfaced', () => {
-    it.each([405, 413, 415, 418, 423])('unexpected status %i stops and counts an attempt', (status) => {
+    it.each([405, 415, 418, 423])('unexpected status %i stops and counts an attempt', (status) => {
       expect(classifyReplayFailure(http(status), 'update')).toEqual({ kind: 'stop', why: 'unknown' })
     })
 

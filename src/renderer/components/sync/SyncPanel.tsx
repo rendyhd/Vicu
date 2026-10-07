@@ -14,6 +14,8 @@ export function failureReasonLabel(reason: OfflineFailureReason): string {
   switch (reason) {
     case 'rejected':
       return 'The server refused this change.'
+    case 'too-large':
+      return 'The file is too large for the server. Retry after making it smaller or raising the limit.'
     case 'conflict':
       return 'The task was changed elsewhere in a way that conflicts.'
     case 'task-gone':

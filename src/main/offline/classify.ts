@@ -13,8 +13,8 @@ export type ReplayDecision =
 /**
  * Decide what a failed replay request means. The rule that replaced "drop anything that is not a
  * network error" (which lost queued changes whenever the session had expired or the server was
- * restarting): an action is dropped only when the server answered 400, 404, 409 or 422, because
- * those say the action itself can never succeed. Everything that says something about the
+ * restarting): an action is dropped only when the server answered 400, 404, 409, 413 or 422,
+ * because those say the action itself can never succeed. Everything that says something about the
  * connection, the session or the server's health keeps the action and stops the replay so order is
  * preserved.
  *
@@ -41,6 +41,9 @@ export function classifyReplayFailure(failure: FailureLike, actionType: OfflineA
       return actionType === 'add-label' ? { kind: 'done' } : { kind: 'drop', reason: 'conflict' }
     }
     if (status === 400 || status === 422) return { kind: 'drop', reason: 'rejected' }
+    // Too large for the server, and it will say so every time: a kept action would stop the replay
+    // on the same 413 for ever and block everything behind it.
+    if (status === 413) return { kind: 'drop', reason: actionType === 'upload-attachment' ? 'too-large' : 'rejected' }
     return { kind: 'stop', why: 'unknown' }
   }
 
