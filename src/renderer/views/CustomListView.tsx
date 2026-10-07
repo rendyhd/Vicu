@@ -8,6 +8,7 @@ import { usePrintable } from '@/stores/print-store'
 import { useDayKey } from '@/stores/day-store'
 import { TaskList } from '@/components/task-list/TaskList'
 import { buildCustomListServerFilter, matchesCustomList } from '@/lib/custom-list-filter'
+import { serverSortParams, sortCustomListTasks } from '@/lib/custom-list-sort'
 import { toLocalDate } from '@/lib/due-dates'
 import { withoutNestedSubtasks } from '@/lib/nested-subtasks'
 import type { CustomList, Task, TaskQueryParams } from '@/lib/vikunja-types'
@@ -21,8 +22,8 @@ function buildQueryParams(list: CustomList): TaskQueryParams {
   const { filter } = list
   return {
     filter: buildCustomListServerFilter(filter),
-    sort_by: filter.sort_by,
-    order_by: filter.order_by,
+    // The order shown is applied below (sortCustomListTasks); the server only gets a sort it accepts.
+    ...serverSortParams(filter.sort_by, filter.order_by),
     keep_nested_subtasks: true,
   }
 }
@@ -59,8 +60,11 @@ export function CustomListView() {
     if (!customList) return tasks
     const activeIds = new Set(projects?.flat.map((project) => project.id) ?? [])
     const matching = tasks.filter((task) => taskMatchesCustomList(task, customList, activeIds))
+    // The list's own sort, the same as on Android: tasks without the date last in both directions,
+    // ties in the order they came in. Subtasks are hidden after sorting, so the order holds.
+    const sorted = sortCustomListTasks(matching, customList.filter.sort_by, customList.filter.order_by)
     // A matching subtask is shown even when its parent does not match (cross-app semantics v1, 3.2).
-    return withoutNestedSubtasks(matching, { hideChildrenOfCompletedParents: false })
+    return withoutNestedSubtasks(sorted, { hideChildrenOfCompletedParents: false })
   }, [tasks, customList, projects?.flat, dayKey])
 
   usePrintable(

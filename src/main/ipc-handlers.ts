@@ -538,20 +538,26 @@ export function registerIpcHandlers(): void {
       const projectIds = activeProjectIds
         ? listedProjectIds.filter(projectId => activeProjectIds.has(projectId))
         : listedProjectIds
-      if (!projectIds || projectIds.length === 0) {
+      if (projectIds && projectIds.length > 0) {
+        result = await fetchPositionSortedTasks(projectIds, filterParams, {
+          fetchViews: fetchProjectViews,
+          fetchViewTasks,
+        }, { viewCache: projectListViewIds })
+      } else if (fromCustomList) {
+        // A custom list may sort by position without naming projects (all of them, or all but
+        // some). The tasks endpoint refuses that sort, so the tasks come in their default order
+        // and selectQuickViewTasks sorts them, like the main window does.
+        result = await fetchTasks({ ...filterParams, sort_by: 'updated', order_by: 'desc' })
+      } else {
         return { success: false, error: 'Position sort requires specific projects' }
       }
-      result = await fetchPositionSortedTasks(projectIds, filterParams, {
-        fetchViews: fetchProjectViews,
-        fetchViewTasks,
-      }, { viewCache: projectListViewIds })
     } else {
       result = await fetchTasks(filterParams)
     }
 
     if (result.success) {
       const tasks = selectQuickViewTasks(
-        (result.data ?? []) as Array<{ project_id: number; done?: boolean; due_date?: string | null; priority?: number; labels?: Array<{ id: number }> | null; description?: string }>,
+        (result.data ?? []) as Array<{ project_id: number; done?: boolean; due_date?: string | null; priority?: number; labels?: Array<{ id: number }> | null; description?: string; position?: number; created?: string; updated?: string; done_at?: string; title?: string }>,
         resolved,
         {
           now,

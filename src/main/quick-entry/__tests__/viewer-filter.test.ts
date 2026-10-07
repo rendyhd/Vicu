@@ -182,6 +182,41 @@ describe('selectQuickViewTasks (filter before hiding subtasks, X-16)', () => {
   })
 })
 
+describe('selectQuickViewTasks sorts a custom list like the main window and Android', () => {
+  interface Sortable { id: number; project_id: number; done: boolean; done_at?: string; position?: number; due_date?: string }
+  const row = (id: number, overrides: Partial<Sortable> = {}): Sortable => ({ id, project_id: 10, done: false, ...overrides })
+
+  it('orders by done_at, tasks that are not done last in both directions', () => {
+    const tasks = [
+      row(1, { done: true, done_at: '2026-10-01T08:00:00Z' }),
+      row(2),
+      row(3, { done: true, done_at: '2026-10-03T08:00:00Z' }),
+    ]
+    const newestFirst = resolveViewerFilter({ ...base, custom_list_id: 'list-1' }, [list({ include_done: true, sort_by: 'done_at', order_by: 'desc' })])
+    expect(selectQuickViewTasks(tasks, newestFirst, { now: tuesday() }).map((t) => t.id)).toEqual([3, 1, 2])
+    const oldestFirst = resolveViewerFilter({ ...base, custom_list_id: 'list-1' }, [list({ include_done: true, sort_by: 'done_at', order_by: 'asc' })])
+    expect(selectQuickViewTasks(tasks, oldestFirst, { now: tuesday() }).map((t) => t.id)).toEqual([1, 3, 2])
+  })
+
+  it('orders by position, and keeps ties in the order they came in', () => {
+    const tasks = [row(1, { position: 30 }), row(2, { position: 10 }), row(3, { position: 10 })]
+    const resolved = resolveViewerFilter({ ...base, custom_list_id: 'list-1' }, [list({ sort_by: 'position', order_by: 'asc' })])
+    expect(selectQuickViewTasks(tasks, resolved, { now: tuesday() }).map((t) => t.id)).toEqual([2, 3, 1])
+  })
+
+  it('puts tasks without a due date last in a descending due date list', () => {
+    const tasks = [row(1), row(2, { due_date: '2026-10-08T22:59:59Z' }), row(3, { due_date: '2026-10-09T22:59:59Z' })]
+    const resolved = resolveViewerFilter({ ...base, custom_list_id: 'list-1' }, [list({ sort_by: 'due_date', order_by: 'desc' })])
+    expect(selectQuickViewTasks(tasks, resolved, { now: tuesday() }).map((t) => t.id)).toEqual([3, 2, 1])
+  })
+
+  it('leaves the server order of a plain filter alone', () => {
+    const tasks = [row(1, { position: 30 }), row(2, { position: 10 })]
+    const plain = resolveViewerFilter({ ...base, sort_by: 'position' }, [])
+    expect(selectQuickViewTasks(tasks, plain, { now: tuesday() }).map((t) => t.id)).toEqual([1, 2])
+  })
+})
+
 describe('"this week" ends on Sunday (D-WEEK-1)', () => {
   const week = { ...base, due_date_filter: 'this_week' }
 

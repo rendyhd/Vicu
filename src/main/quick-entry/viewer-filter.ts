@@ -1,6 +1,7 @@
 import type { ViewerFilter } from '../config'
 import type { CustomList } from '../../shared/config-types'
 import { filterCustomList, type CustomListTask } from '../../shared/custom-list-filter'
+import { sortCustomListTasks, type CustomListSortable } from '../../shared/custom-list-sort'
 import { isUpcoming, toLocalDate } from '../../shared/due-dates'
 import { withoutNestedSubtasks } from '../../shared/nested-subtasks'
 
@@ -88,16 +89,22 @@ export interface SelectQuickViewTasksOptions<T> extends SelectViewerTasksOptions
 
 /**
  * What the Quick View shows for a fetch: the exact viewer rule, then `keep`, then (for a custom
- * list only) nested subtasks are hidden. A list fetches the un-nested set and filters first, so a
- * matching subtask whose parent does not match is still shown (cross-app semantics v1, 3.2).
- * Plain filters and built-in views arrive already de-nested by the fetch.
+ * list only) the list's sort is applied and nested subtasks are hidden. A list fetches the
+ * un-nested set and filters first, so a matching subtask whose parent does not match is still
+ * shown (cross-app semantics v1, 3.2). Plain filters and built-in views arrive already de-nested
+ * by the fetch.
  */
-export function selectQuickViewTasks<T extends CustomListTask>(
+export function selectQuickViewTasks<T extends CustomListTask & CustomListSortable>(
   tasks: T[],
   resolved: ResolvedViewerFilter,
   options: SelectQuickViewTasksOptions<T> = {},
 ): T[] {
   const selected = selectViewerTasks(tasks, resolved.filter, options)
   const kept = options.keep ? selected.filter(options.keep) : selected
-  return resolved.fromCustomList ? withoutNestedSubtasks(kept, { hideChildrenOfCompletedParents: false }) : kept
+  if (!resolved.fromCustomList) return kept
+  // A custom list has its own sort, applied here like the main window does: tasks without the
+  // date last in both directions and ties in the order they came in. Plain filters keep the
+  // order the server (or the position fetch) gave.
+  const sorted = sortCustomListTasks(kept, resolved.filter.sort_by, resolved.filter.order_by)
+  return withoutNestedSubtasks(sorted, { hideChildrenOfCompletedParents: false })
 }

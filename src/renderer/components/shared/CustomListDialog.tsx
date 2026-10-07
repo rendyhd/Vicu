@@ -19,6 +19,8 @@ const SORT_OPTIONS = [
   { value: 'created', label: 'Created' },
   { value: 'updated', label: 'Updated' },
   { value: 'title', label: 'Title' },
+  { value: 'done_at', label: 'Completed' },
+  { value: 'position', label: 'Position' },
 ] as const
 
 const DUE_DATE_OPTIONS = [
@@ -172,7 +174,7 @@ export function CustomListDialog({ open, list, onSave, onClose }: CustomListDial
               <label className="mb-1 block text-xs text-[var(--text-secondary)]">Sort By</label>
               <select
                 value={filter.sort_by}
-                onChange={(e) => setFilter((f) => ({ ...f, sort_by: e.target.value as CustomListFilter['sort_by'] }))}
+                onChange={(e) => setFilter((f) => ({ ...f, sort_by: e.target.value }))}
                 className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] focus:border-accent-blue focus:outline-none"
               >
                 {SORT_OPTIONS.map((o) => (
