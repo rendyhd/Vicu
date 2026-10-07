@@ -121,6 +121,7 @@ type DragItem =
 function BadgeSyncEnabled() {
   const count = useTodayOverdueCount()
   useEffect(() => {
+    if (count === null) return
     const dataUrl = renderBadgeDataUrl(count)
     api.setTaskBadge(count, dataUrl)
   }, [count])

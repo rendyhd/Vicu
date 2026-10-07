@@ -4,7 +4,7 @@ import { useProjects } from '@/hooks/use-projects'
 import { useFilters } from '@/hooks/use-filters'
 import { usePrintable } from '@/stores/print-store'
 import { useDayKey } from '@/stores/day-store'
-import { isDueToday, isOverdue } from '@/lib/due-dates'
+import { splitTodayOverdue } from '@/lib/today-overdue'
 import { TaskList } from '@/components/task-list/TaskList'
 import { TaskRow } from '@/components/task-list/TaskRow'
 import { api } from '@/lib/api'
@@ -47,19 +47,10 @@ export function TodayView() {
   }, [])
 
   const { overdueTasks, todayTasks } = useMemo(() => {
-    const overdue: typeof tasks = []
-    const today: typeof tasks = []
     const activeIds = new Set(projects?.flat.map((project) => project.id) ?? [])
-    // Local calendar date: overdue is before today, Today is today whatever the time of day.
-    const now = new Date()
-    for (const t of tasks) {
-      if (!activeIds.has(t.project_id)) continue
-      if (isOverdue(t.due_date, now)) {
-        overdue.push(t)
-      } else if (isDueToday(t.due_date, now)) {
-        today.push(t)
-      }
-    }
+    // Local calendar date: overdue is before today, Today is today whatever the time of day. The
+    // same split feeds the app icon badge, so the two cannot disagree.
+    const { overdue, today } = splitTodayOverdue(tasks, activeIds, new Date())
     return { overdueTasks: overdue, todayTasks: today }
   }, [tasks, projects?.flat, dayKey])
 
