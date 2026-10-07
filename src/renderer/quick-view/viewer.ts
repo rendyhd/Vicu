@@ -62,7 +62,7 @@ import { extractTaskLink, stripNoteLink, stripPageLink, extractNoteLinkHtml, ext
 import { sanitizeTaskHtml } from '@/lib/sanitize-html'
 import { taskPatch, type TaskPatch } from '@/lib/merge-patches'
 import { diffLocalDays, dueToday, isDateOnly, isNoDueDate, toLocalDate } from '@/lib/due-dates'
-import { hasRichDescriptionBody } from '@/lib/description-html'
+import { hasRichDescriptionBody, resolveOpenableDescriptionHref } from '@/lib/description-html'
 
 function escapeHtml(s: string): string {
   return s
@@ -270,7 +270,7 @@ function buildTaskItemDOM(task: TaskData): HTMLElement {
       : `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>`
     btn.addEventListener('click', (e) => {
       e.stopPropagation()
-      window.quickViewApi.openDeepLink(taskLink.kind === 'note' ? taskLink.url : taskLink.url)
+      window.quickViewApi.openDeepLink(taskLink.url)
     })
     titleRow.appendChild(btn)
   }
@@ -307,6 +307,16 @@ function buildTaskItemDOM(task: TaskData): HTMLElement {
     desc.innerHTML = sanitizeTaskHtml(stripPageLink(stripNoteLink(task.description)))
     desc.addEventListener('click', (e) => {
       e.stopPropagation()
+      // A link opens in the default handler. Without preventDefault the window would navigate
+      // to it (the navigation guard only rescues the page); links with a scheme that may not
+      // be opened do nothing.
+      const anchor = (e.target as HTMLElement | null)?.closest?.('a')
+      if (anchor && desc.contains(anchor)) {
+        e.preventDefault()
+        const href = resolveOpenableDescriptionHref(anchor.getAttribute('href'))
+        if (href) void window.quickViewApi.openDeepLink(href)
+        return
+      }
       const items = getTaskItems()
       const index = Array.from(items).indexOf(item)
       if (index >= 0) updateSelection(index)
@@ -481,7 +491,6 @@ function enterEditMode(focusDescription = false): void {
   }
   editingItem = item
   item.classList.add('editing')
-  ;(item as any)._originalHTML = item.innerHTML
 
   item.innerHTML = ''
   const editWrapper = document.createElement('div')
@@ -591,18 +600,18 @@ async function saveEdit(item: HTMLElement, newTitle: string, newDescription: str
   }
 }
 
+// The row is built again from the task it carries, like after a save. Putting the old markup
+// back with innerHTML would drop every listener (checkbox, title, link and description clicks).
 function cancelEdit(item: HTMLElement): void {
-  if ((item as any)._originalHTML) {
-    item.innerHTML = (item as any)._originalHTML
-    delete (item as any)._originalHTML
-  }
-  item.classList.remove('editing')
+  const task: TaskData = JSON.parse(item.dataset.task || '{}')
+  const restored = buildTaskItemDOM(task)
+  restored.classList.add('selected')
+  item.replaceWith(restored)
   editingItem = null
   notifyHeight()
 }
 
 function exitEditMode(item: HTMLElement): void {
-  delete (item as any)._originalHTML
   item.classList.remove('editing')
   editingItem = null
 }

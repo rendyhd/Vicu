@@ -222,12 +222,15 @@ export function registerIpcHandlers(): void {
   // Print
   handleTrusted('print-html', (_event, html: string) => printHtml(html))
 
-  handleTrusted('create-task-relation', (_event, taskId: number, otherTaskId: number, relationKind: string) => {
-    return createTaskRelation(taskId, otherTaskId, relationKind)
+  // Relations, labels, attachments and projects all change what Quick View shows (subtasks that
+  // block completing, label filters, hidden projects), so each successful change refreshes it the
+  // same way a task change does (D-IPC-4).
+  handleTrusted('create-task-relation', async (_event, taskId: number, otherTaskId: number, relationKind: string) => {
+    return refreshViewerOnSuccess(await createTaskRelation(taskId, otherTaskId, relationKind))
   })
 
-  handleTrusted('delete-task-relation', (_event, taskId: number, relationKind: string, otherTaskId: number) => {
-    return deleteTaskRelation(taskId, relationKind, otherTaskId)
+  handleTrusted('delete-task-relation', async (_event, taskId: number, relationKind: string, otherTaskId: number) => {
+    return refreshViewerOnSuccess(await deleteTaskRelation(taskId, relationKind, otherTaskId))
   })
 
   // Projects
@@ -244,19 +247,19 @@ export function registerIpcHandlers(): void {
   handleTrusted('create-project', async (_event, project: Record<string, unknown>) => {
     const result = await createProject(project)
     if (result.success) invalidateViewerCaches()
-    return result
+    return refreshViewerOnSuccess(result)
   })
 
   handleTrusted('update-project', async (_event, id: number, project: Record<string, unknown>) => {
     const result = await updateProject(id, project)
     if (result.success) invalidateViewerCaches()
-    return result
+    return refreshViewerOnSuccess(result)
   })
 
   handleTrusted('delete-project', async (_event, id: number) => {
     const result = await deleteProject(id)
     if (result.success) invalidateViewerCaches()
-    return result
+    return refreshViewerOnSuccess(result)
   })
 
   // Labels
@@ -264,24 +267,24 @@ export function registerIpcHandlers(): void {
     return fetchLabels()
   })
 
-  handleTrusted('add-label-to-task', (_event, taskId: number, labelId: number) => {
-    return addLabelToTask(taskId, labelId)
+  handleTrusted('add-label-to-task', async (_event, taskId: number, labelId: number) => {
+    return refreshViewerOnSuccess(await addLabelToTask(taskId, labelId))
   })
 
-  handleTrusted('remove-label-from-task', (_event, taskId: number, labelId: number) => {
-    return removeLabelFromTask(taskId, labelId)
+  handleTrusted('remove-label-from-task', async (_event, taskId: number, labelId: number) => {
+    return refreshViewerOnSuccess(await removeLabelFromTask(taskId, labelId))
   })
 
-  handleTrusted('create-label', (_event, label: Record<string, unknown>) => {
-    return createLabel(label)
+  handleTrusted('create-label', async (_event, label: Record<string, unknown>) => {
+    return refreshViewerOnSuccess(await createLabel(label))
   })
 
-  handleTrusted('update-label', (_event, id: number, label: Record<string, unknown>) => {
-    return updateLabel(id, label)
+  handleTrusted('update-label', async (_event, id: number, label: Record<string, unknown>) => {
+    return refreshViewerOnSuccess(await updateLabel(id, label))
   })
 
-  handleTrusted('delete-label', (_event, id: number) => {
-    return deleteLabel(id)
+  handleTrusted('delete-label', async (_event, id: number) => {
+    return refreshViewerOnSuccess(await deleteLabel(id))
   })
 
   // Project Views
@@ -758,12 +761,12 @@ export function registerIpcHandlers(): void {
     return fetchTaskAttachments(taskId)
   })
 
-  handleTrusted('upload-task-attachment', (_event, taskId: number, fileData: Uint8Array, fileName: string, mimeType: string) => {
-    return uploadTaskAttachment(taskId, Buffer.from(fileData), fileName, mimeType)
+  handleTrusted('upload-task-attachment', async (_event, taskId: number, fileData: Uint8Array, fileName: string, mimeType: string) => {
+    return refreshViewerOnSuccess(await uploadTaskAttachment(taskId, Buffer.from(fileData), fileName, mimeType))
   })
 
-  handleTrusted('delete-task-attachment', (_event, taskId: number, attachmentId: number) => {
-    return deleteTaskAttachment(taskId, attachmentId)
+  handleTrusted('delete-task-attachment', async (_event, taskId: number, attachmentId: number) => {
+    return refreshViewerOnSuccess(await deleteTaskAttachment(taskId, attachmentId))
   })
 
   handleTrusted('fetch-task-attachment-bytes', async (_event, taskId: number, attachmentId: number) => {
@@ -848,6 +851,7 @@ export function registerIpcHandlers(): void {
     if (count === 0 && dialogResult.filePaths.length > 0) {
       return { success: false, error: lastError || 'Upload failed' }
     }
+    if (count > 0) notifyViewerSync()
     return { success: true, data: { count } }
   })
 
@@ -977,6 +981,12 @@ function notifyMainWindow(excludeWebContentsId?: number): void {
       win.webContents.send('tasks-changed')
     }
   } catch { /* ignore */ }
+}
+
+// Helper: tell Quick View to refresh after a change that went through, and pass the result on.
+function refreshViewerOnSuccess<T extends { success: boolean }>(result: T): T {
+  if (result.success) notifyViewerSync()
+  return result
 }
 
 // Helper: notify Quick View to refresh
