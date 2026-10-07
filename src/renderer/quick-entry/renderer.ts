@@ -17,6 +17,8 @@ declare global {
       fetchTaskAttachments(taskId: number): Promise<{ success: boolean; data?: Array<{ id: number }>; error?: string; statusCode?: number }>
       updateTask(taskId: number, task: Record<string, unknown>): Promise<{ success: boolean; error?: string; statusCode?: number; data?: unknown }>
       closeWindow(): Promise<void>
+      // The note's final link when saving with it linked; the uid is written into the note then.
+      resolveObsidianLink(): Promise<{ deepLink: string; noteName: string; isUidBased: boolean } | null>
       setHeight(height: number): Promise<void>
       getConfig(): Promise<QuickEntryConfig | null>
       getPendingCount(): Promise<number>
@@ -99,6 +101,7 @@ let currentProjectIndex = 0
 let projectCycleModifier = 'ctrl'
 let obsidianContext: { deepLink: string; noteName: string; isUidBased: boolean } | null = null
 let obsidianLinked = false
+let resolvingObsidianLink = false
 let browserContext: { url: string; title: string; displayTitle: string } | null = null
 let browserLinked = false
 let parserConfig: ParserConfig = { enabled: true, syntaxMode: 'todoist' }
@@ -532,9 +535,19 @@ async function saveTask(): Promise<void> {
 
   let description: string | null = descriptionInput.value.trim() || null
 
-  // Inject Obsidian note link into description
+  // Inject Obsidian note link into description. Only now, with the note linked and the task being
+  // saved, does main add the uid to the note (D-OBS-1); if that fails the shown link is used.
   if (obsidianLinked && obsidianContext) {
-    const linkHtml = buildNoteLinkHtml(obsidianContext.deepLink, obsidianContext.noteName)
+    if (resolvingObsidianLink) return
+    resolvingObsidianLink = true
+    let link = { deepLink: obsidianContext.deepLink, noteName: obsidianContext.noteName }
+    try {
+      const resolved = await window.quickEntryApi.resolveObsidianLink()
+      if (resolved) link = { deepLink: resolved.deepLink, noteName: resolved.noteName }
+    } catch { /* keep the link that was shown */ } finally {
+      resolvingObsidianLink = false
+    }
+    const linkHtml = buildNoteLinkHtml(link.deepLink, link.noteName)
     description = description ? `<p>${escapeHtml(description)}</p>${linkHtml}` : linkHtml
   }
 

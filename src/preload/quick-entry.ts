@@ -26,6 +26,9 @@ contextBridge.exposeInMainWorld('quickEntryApi', {
   getQueueCounts: () => ipcRenderer.invoke('qe:get-queue-counts'),
   queueFollowUps: (taskId: number, extras: QueuedCreateExtras, title?: string) =>
     ipcRenderer.invoke('qe:queue-follow-ups', taskId, extras, title),
+  // Asks main for the final Obsidian link when a task is saved with the note linked; main writes
+  // the note's uid at that point and only then.
+  resolveObsidianLink: () => ipcRenderer.invoke('qe:resolve-obsidian-link'),
   fetchLabels: () => ipcRenderer.invoke('fetch-labels'),
   fetchProjects: () => ipcRenderer.invoke('fetch-projects', false),
   addLabelToTask: (taskId: number, labelId: number) => ipcRenderer.invoke('add-label-to-task', taskId, labelId),

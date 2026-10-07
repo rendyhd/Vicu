@@ -7,7 +7,7 @@ import { createTray, destroyTray, hasTray } from './tray'
 import { returnFocusToPreviousWindow, destroyDummyWindow } from './focus'
 import { registerQuickEntryState } from './quick-entry-state'
 import { initNotifications, refreshTaskRemindersOnFocus, rescheduleNotifications, stopNotifications, setNotificationsMainWindow } from './notifications'
-import { getObsidianContext, getForegroundProcessName, getForegroundWindowHandle, prewarmForegroundCheck, type ObsidianNoteContext } from './obsidian-client'
+import { getObsidianContext, getForegroundProcessName, getForegroundWindowHandle, prewarmForegroundCheck, rememberShownObsidianContext, type ObsidianNoteContext } from './obsidian-client'
 import { foregroundNeeds, lookUpForeground } from './quick-entry/foreground-gate'
 import { getBrowserContext, type BrowserContext } from './browser-client'
 import { getBrowserUrlFromWindow, prewarmUrlReader, shutdownUrlReader, BROWSER_PROCESSES } from './window-url-reader'
@@ -196,6 +196,9 @@ async function showQuickEntry(): Promise<void> {
       new Promise<null>(resolve => setTimeout(() => resolve(null), 350))
     ]).then((ctx) => {
       if (ctx && !win.isDestroyed() && win.isVisible() && config?.obsidian_mode) {
+        // Remembered here, not in getObsidianContext: only a context the window actually shows
+        // can be linked, and the uid is written only when a task is saved with it (D-OBS-1).
+        rememberShownObsidianContext(ctx)
         win.webContents.send('obsidian-context', { ...ctx, mode: config.obsidian_mode })
       }
     }).catch(() => {})
@@ -211,6 +214,7 @@ function centerQuickEntry(): void {
 
 function hideQuickEntry(): void {
   if (!quickEntryWindow) return
+  rememberShownObsidianContext(null)
   quickEntryWindow.webContents.send('window-hidden')
   quickEntryWindow.hide()
   stopDragHoverPolling()

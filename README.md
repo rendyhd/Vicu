@@ -34,7 +34,7 @@ Quick Entry was originally a standalone companion app ([vikunja-quick-entry](htt
 
 ## Obsidian integration
 
-Vicu has first-class support for linking Obsidian notes to tasks. When Quick Entry opens, it detects your active note via the Local REST API plugin. Press `Ctrl+L` to attach it — the link uses Advanced URI with frontmatter UIDs, so it survives note renames. Linked tasks show a clickable Obsidian icon throughout the app: in task lists, in Quick View, everywhere. Click it and the note opens.
+Vicu has first-class support for linking Obsidian notes to tasks. When Quick Entry opens, it detects your active note via the Local REST API plugin. Press `Ctrl+L` to attach it — the link uses Advanced URI with frontmatter UIDs, so it survives note renames. Vicu adds the `uid` property to a note only when you save a task linked to it; notes you do not link are never changed. Linked tasks show a clickable Obsidian icon throughout the app: in task lists, in Quick View, everywhere. Click it and the note opens.
 
 Three modes: **ask** (Ctrl+L to opt-in per task), **always** (auto-link), and **off** (zero overhead).
 

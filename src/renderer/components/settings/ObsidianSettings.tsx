@@ -83,6 +83,7 @@ export function ObsidianSettings({ config, onChange, disabled }: ObsidianSetting
                     <p>Same steps &mdash; search &ldquo;Advanced URI&rdquo; in Community Plugins &rarr; Install &rarr; Enable</p>
                     <p>In the plugin settings, turn on &ldquo;Use UID instead of file paths&rdquo;</p>
                     <p>This makes note links survive file renames. All other settings can stay at their defaults.</p>
+                    <p>Vicu adds a <code>uid</code> property to a note only when you save a task linked to it; notes you do not link are never changed.</p>
 
                     <p className="mt-2 border-t border-[var(--border-color)] pt-2">
                       Once both plugins are enabled and Obsidian is running, click Test Connection below to verify.

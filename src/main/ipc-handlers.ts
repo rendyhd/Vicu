@@ -79,7 +79,7 @@ import {
 import { getAPIToken, storeAPIToken, isEncryptionAvailable, API_TOKEN_NO_EXPIRY } from './auth/token-store'
 import { sendTestNotification, rescheduleNotifications, refreshTaskReminders, refreshRoutineReminders } from './notifications'
 import { setTaskBadge, clearTaskBadge } from './badge'
-import { getActiveNote, testObsidianConnection } from './obsidian-client'
+import { resolveShownObsidianLink, testObsidianConnection } from './obsidian-client'
 import { isRegistered, registerHosts } from './browser-host-registration'
 import { checkForUpdates, getCachedUpdateStatus } from './update-checker'
 import {
@@ -838,6 +838,14 @@ export function registerIpcHandlers(): void {
     if (isExternalAllowed(url)) {
       shell.openExternal(url).catch(() => { /* no handler for the scheme */ })
     }
+  })
+
+  // Quick Entry is saving a task with the note linked: this is the one place the note gets its
+  // uid (D-OBS-1). Returns the link to store, or null when no note is being shown.
+  handleTrusted('qe:resolve-obsidian-link', async () => {
+    const link = await resolveShownObsidianLink()
+    if (!link) return null
+    return { deepLink: link.deepLink, noteName: link.noteName, isUidBased: link.isUidBased }
   })
 
   handleTrusted('test-obsidian-connection', async () => {
