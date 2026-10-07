@@ -1,3 +1,4 @@
+import type { DueWindow } from './due-dates'
 import type { ProjectPatch, TaskPatch } from './merge-patches'
 
 export interface TaskReminder {
@@ -136,6 +137,11 @@ export interface TaskQueryParams {
    * filter first and hide them afterwards (Tag view, custom lists).
    */
   keep_nested_subtasks?: boolean
+  /**
+   * Vicu option, never sent to the server: add the due-date clause of the Today or Upcoming list,
+   * built in the main process from the local-day boundary at request time.
+   */
+  due_window?: DueWindow
 }
 
 export type ApiResult<T> =

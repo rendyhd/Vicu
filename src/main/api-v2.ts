@@ -1,3 +1,4 @@
+import { withDueWindow } from '../shared/due-dates'
 import { sanitizeProjectPatch, sanitizeTaskPatch } from '../shared/merge-patches'
 import { withoutNestedSubtasks } from '../shared/nested-subtasks'
 
@@ -31,12 +32,16 @@ export function buildProjectCollectionUrl(baseUrl: string, includeArchived = fal
  * on the same page as its parent and populates their reciprocal relations.
  */
 export function createTaskCollectionSearchParams(
-  params: Record<string, unknown>
+  params: Record<string, unknown>,
+  now: Date = new Date()
 ): URLSearchParams {
   const qs = new URLSearchParams()
   qs.append('expand', 'subtasks')
   if (params.q ?? params.s) qs.set('q', String(params.q ?? params.s))
-  if (params.filter) qs.set('filter', String(params.filter))
+  // `due_window` (Today, Upcoming) is a Vicu option: it becomes a clause on the local-day boundary
+  // of this very request and is never sent as a parameter.
+  const filter = withDueWindow(params.filter ? String(params.filter) : undefined, params.due_window, now)
+  if (filter) qs.set('filter', filter)
   if (params.sort_by) qs.set('sort_by', String(params.sort_by))
   if (params.order_by) qs.set('order_by', String(params.order_by))
   const perPage = clampPageSize(params.per_page)

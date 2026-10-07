@@ -44,10 +44,11 @@ export function useSearchTasks(query: string) {
   return useQuery({
     queryKey: ['tasks', 'search', query],
     queryFn: async () => {
-      // Fetch a large batch with the server-side search param as a pre-filter
+      // The server-side search is a pre-filter; every match is ranked client-side, so the whole set
+      // is read, in full pages (1000 is the server maximum).
       const result = await api.fetchTasks({
         q: query,
-        per_page: 200,
+        per_page: 1000,
       })
       if (!result.success) throw new Error(result.error)
 

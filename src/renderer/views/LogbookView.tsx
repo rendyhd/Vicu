@@ -1,6 +1,5 @@
-import { useMemo } from 'react'
-import { useTasks } from '@/hooks/use-tasks'
-import { useFilters } from '@/hooks/use-filters'
+import { useEffect, useMemo, useRef } from 'react'
+import { useLogbookTasks } from '@/hooks/use-logbook-tasks'
 import { useProjects } from '@/hooks/use-projects'
 import { usePrintable } from '@/stores/print-store'
 import { isNullDate } from '@/lib/date-utils'
@@ -38,13 +37,27 @@ function LogbookRow({ task }: { task: Task }) {
 }
 
 export function LogbookView() {
-  const params = useFilters({ view: 'logbook' })
-  const { data: tasks = [], isLoading } = useTasks(params)
+  const { tasks, isLoading, hasMore, isLoadingMore, moreError, loadMore, retryMore } = useLogbookTasks()
   const { data: projects } = useProjects()
   const visibleTasks = useMemo(() => {
     const activeIds = new Set(projects?.flat.map((project) => project.id) ?? [])
     return tasks.filter((task) => activeIds.has(task.project_id))
   }, [tasks, projects?.flat])
+
+  // The history loads a page at a time: the next page is asked for when the end of the list scrolls
+  // into view (and by the button below, for anyone who cannot scroll).
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const endRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const end = endRef.current
+    if (!end || !hasMore || typeof IntersectionObserver === 'undefined') return
+    const observer = new IntersectionObserver(
+      (entries) => { if (entries.some((entry) => entry.isIntersecting)) loadMore() },
+      { root: scrollRef.current, rootMargin: '200px' }
+    )
+    observer.observe(end)
+    return () => observer.disconnect()
+  }, [hasMore, loadMore, visibleTasks.length])
 
   usePrintable(
     useMemo(() => ({ viewTitle: 'Logbook', sections: [{ groups: [{ tasks: visibleTasks }] }] }), [visibleTasks])
@@ -64,12 +77,32 @@ export function LogbookView() {
         <h1 className="text-xl font-bold text-[var(--text-primary)]">Logbook</h1>
       </div>
 
-      <div className="flex-1 overflow-y-auto">
-        {visibleTasks.length === 0 ? (
+      <div ref={scrollRef} className="flex-1 overflow-y-auto">
+        {visibleTasks.length === 0 && !hasMore && !isLoadingMore && !moreError ? (
           <EmptyState icon={Inbox} title="No completed tasks" subtitle="Completed tasks appear here" />
         ) : (
           visibleTasks.map((task) => <LogbookRow key={task.id} task={task} />)
         )}
+        {moreError ? (
+          <div className="flex items-center justify-center gap-2 px-6 py-3 text-xs text-[var(--text-secondary)]">
+            <span>Could not load more completed tasks.</span>
+            <button type="button" onClick={retryMore} className="text-[var(--accent-blue)] hover:underline">
+              Try again
+            </button>
+          </div>
+        ) : isLoadingMore ? (
+          <div className="px-6 py-3 text-center text-xs text-[var(--text-secondary)]">Loading...</div>
+        ) : hasMore ? (
+          <div ref={endRef} className="flex justify-center px-6 py-3">
+            <button
+              type="button"
+              onClick={loadMore}
+              className="text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:underline"
+            >
+              Load more
+            </button>
+          </div>
+        ) : null}
       </div>
     </div>
   )

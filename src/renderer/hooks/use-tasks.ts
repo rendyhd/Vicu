@@ -5,6 +5,7 @@ import { api } from '@/lib/api'
 import { useCompletedTasksStore } from '@/stores/completed-tasks-store'
 import type { TaskQueryParams } from '@/lib/vikunja-types'
 import { hasVicuMetadataMarker } from '@/lib/metadata-tasks'
+import { mergeSmartListUndoWindow } from '@/lib/undo-window'
 
 export function useTasks(params: TaskQueryParams, enabled = true) {
   const matches = useMatches()
@@ -31,14 +32,7 @@ export function useTasks(params: TaskQueryParams, enabled = true) {
   // - Uncompleted tasks shown without strikethrough in logbook
   const data = useMemo(() => {
     const tasks = (query.data ?? []).filter((task) => !hasVicuMetadataMarker(task.description))
-
-    const serverIds = new Set(tasks.map((t) => t.id))
-    const extras = Array.from(completedTasks.values())
-      .filter((entry) => entry.path === pathname && !entry.suppressTopLevelUndo && !serverIds.has(entry.task.id) && !hasVicuMetadataMarker(entry.task.description))
-      .map((entry) => entry.task)
-
-    if (extras.length === 0) return tasks
-    return [...tasks, ...extras]
+    return mergeSmartListUndoWindow(tasks, completedTasks, pathname)
   }, [query.data, completedTasks, pathname])
 
   return { ...query, data }

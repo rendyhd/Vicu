@@ -221,3 +221,28 @@ export function isUpcoming(value: string | null | undefined, now: Date = new Dat
 export function startOfLocalDayIso(offsetDays = 0, now: Date = new Date()): string {
   return startOfLocalDay(addLocalDays(toLocalDate(now), offsetDays)).toISOString()
 }
+
+/** The due-date windows of the Today and Upcoming lists. */
+export type DueWindow = 'today' | 'upcoming'
+
+/**
+ * The server filter clause for a list window, from the start of local tomorrow: Today is
+ * everything due before it (overdue and due today), Upcoming everything from then on. That is
+ * exactly the client rule (`isOverdue || isDueToday`, `isUpcoming`), so the lists fetch what they
+ * show and no more. Callers combine it with `done = false` and a due date that exists.
+ */
+export function dueWindowClause(window: DueWindow, now: Date = new Date()): string {
+  const tomorrowStart = startOfLocalDayIso(1, now)
+  return window === 'today' ? `due_date < '${tomorrowStart}'` : `due_date >= '${tomorrowStart}'`
+}
+
+/**
+ * `filter` plus the clause of `window`. A window this version does not know adds nothing (the
+ * value comes through IPC, so it is checked). The boundary is read when the request is made, so a
+ * query that outlives midnight moves with the day.
+ */
+export function withDueWindow(filter: string | undefined, window: unknown, now: Date = new Date()): string | undefined {
+  if (window !== 'today' && window !== 'upcoming') return filter
+  const clause = dueWindowClause(window, now)
+  return filter ? `${filter} && ${clause}` : clause
+}
