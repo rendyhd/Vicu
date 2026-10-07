@@ -113,7 +113,7 @@ A few platform caveats:
 
 - **Global hotkeys on Wayland**: Electron binds shortcuts through the GlobalShortcuts portal. Accept the consent dialog if your desktop environment shows one (GNOME). If registration still fails, Settings → Quick Entry shows a warning with copyable commands — bind those via your DE's keyboard settings, or trigger Quick Entry / Quick View from the tray. On X11 sessions, hotkeys work as on Windows/macOS.
 - **System tray**: works out of the box on KDE, XFCE, Cinnamon, and most Wayland compositors. On GNOME you'll need the **AppIndicator and KStatusNotifierItem Support** extension.
-- **Browser link mode**: supported via the bundled Chrome/Firefox extension + native messaging. Enable it in Settings and click "Register browser hosts" — the manifests are written to `~/.config/<browser>/NativeMessagingHosts/` and `~/.mozilla/native-messaging-hosts/`. The Windows/macOS URL-from-window-title fallback is not available on Linux.
+- **Browser link mode**: supported via the bundled Chrome/Firefox extension + native messaging. Enable it in Settings and click "Register browser hosts" — the manifests are written to `~/.config/<browser>/NativeMessagingHosts/` and `~/.mozilla/native-messaging-hosts/`. The bridge runs on Vicu's own bundled runtime, so Node.js does not need to be installed. The Windows/macOS URL-from-window-title fallback is not available on Linux.
 - **Obsidian integration**: Windows and macOS only. On Linux the setting is visible but no foreground-app detection runs.
 
 ### Setup

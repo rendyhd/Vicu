@@ -1,9 +1,17 @@
 import { app } from 'electron'
-import { execSync } from 'child_process'
-import { existsSync, writeFileSync, unlinkSync, mkdirSync } from 'fs'
+import { execFile } from 'child_process'
+import { chmodSync, copyFileSync, existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'fs'
 import { join, dirname } from 'path'
 import { homedir } from 'os'
 import { isMac, isWindows, isLinux } from './platform'
+import {
+  buildPosixWrapper,
+  buildWindowsWrapper,
+  hostRegistryKey,
+  registryAddArgs,
+  registryDeleteArgs,
+  resolveHostExecutable,
+} from './browser-host-wrapper'
 
 const HOST_NAME = 'com.vicu.browser'
 // The existing signed Firefox extension (on AMO) from vikunja-quick-entry
@@ -37,18 +45,74 @@ export function getBridgePath(): string {
   return candidates[0] // fallback, even if non-existent, so the error is visible
 }
 
-function getBatWrapperPath(): string {
-  return join(dirname(getBridgePath()), 'vicu-bridge.bat')
+// The wrapper the browser launches lives in userData, never inside the install directory: that
+// may be read-only (Program Files) and, on macOS, writing into the .app would break its signature.
+// It runs the bridge with the app's own binary as Node (ELECTRON_RUN_AS_NODE), so no system
+// Node.js is needed (D-BRW-1). It is rewritten whenever its content changes (the app was moved or
+// updated), unlike the old static .bat that was only created once.
+function getWrapperPath(): string {
+  return join(app.getPath('userData'), isWindows ? 'vicu-bridge.bat' : 'vicu-bridge.sh')
 }
 
-function ensureBatWrapper(): string {
-  const batPath = getBatWrapperPath()
-  if (!existsSync(batPath)) {
-    const dir = dirname(batPath)
-    if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
-    writeFileSync(batPath, '@echo off\r\nnode "%~dp0\\vicu-bridge.js"\r\n', 'utf-8')
+function getAppImageBridgeCopyPath(): string {
+  return join(app.getPath('userData'), 'vicu-bridge.js')
+}
+
+// Inside an AppImage the bridge script sits in a temporary mount that disappears when the app
+// exits, so the host would fail whenever a browser starts it while Vicu is closed. A copy in
+// userData is stable.
+function getHostBridgePath(): string {
+  const bridge = getBridgePath()
+  if (!process.env.APPIMAGE) return bridge
+  try {
+    const copy = getAppImageBridgeCopyPath()
+    copyFileSync(bridge, copy)
+    return copy
+  } catch {
+    return bridge
   }
-  return batPath
+}
+
+function ensureWrapper(): string | null {
+  try {
+    const runtime = {
+      execPath: resolveHostExecutable({
+        platform: process.platform,
+        execPath: process.execPath,
+        appImage: process.env.APPIMAGE,
+      }),
+      bridgePath: getHostBridgePath(),
+    }
+    const content = isWindows ? buildWindowsWrapper(runtime) : buildPosixWrapper(runtime)
+    const wrapperPath = getWrapperPath()
+    mkdirSync(dirname(wrapperPath), { recursive: true })
+    let current: string | null = null
+    try { current = readFileSync(wrapperPath, 'utf-8') } catch { /* not written yet */ }
+    if (current !== content) writeFileSync(wrapperPath, content, { mode: 0o755 })
+    if (!isWindows) chmodSync(wrapperPath, 0o755)
+    return wrapperPath
+  } catch (err) {
+    console.error('Could not write the browser host wrapper:', err)
+    return null
+  }
+}
+
+// reg.exe is run with an argument array (no shell, so a path with quotes or spaces cannot change
+// the command), one call at a time and off the main thread. Failures are ignored: the manifest
+// files are still written, and Settings reads their presence.
+let regQueue: Promise<void> = Promise.resolve()
+function runReg(args: string[]): void {
+  const exe = join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'reg.exe')
+  regQueue = regQueue.then(
+    () =>
+      new Promise<void>((resolve) => {
+        try {
+          execFile(exe, args, { windowsHide: true, timeout: 10_000 }, () => resolve())
+        } catch {
+          resolve()
+        }
+      }),
+  )
 }
 
 function getChromeHostManifestPath(): string {
@@ -103,27 +167,10 @@ function getLinuxFirefoxHostDir(): string {
   return join(home, '.mozilla', 'native-messaging-hosts')
 }
 
-// macOS GUI apps have PATH = /usr/bin:/bin:/usr/sbin:/sbin which won't find
-// node installed via Homebrew, nvm, fnm, etc. Resolve the full path at
-// registration time and embed it in a shell wrapper.
-// The wrapper lives in userData (NOT inside the .app bundle — that would
-// invalidate the code signature).
-function ensureShellWrapper(): string {
-  const shPath = join(app.getPath('userData'), 'vicu-bridge.sh')
-  const bridgeJs = getBridgePath()
-  let nodePath = '/usr/bin/env node'
-  try {
-    const resolved = execSync('which node', { timeout: 3000 }).toString().trim()
-    if (resolved) nodePath = resolved
-  } catch { /* fallback to env node */ }
-  const content = `#!/bin/bash\nexec "${nodePath}" "${bridgeJs}"\n`
-  writeFileSync(shPath, content, { mode: 0o755 })
-  return shPath
-}
-
 export function registerChromeHost(extensionId: string): void {
   if (isMac) {
-    const hostPath = ensureShellWrapper()
+    const hostPath = ensureWrapper()
+    if (!hostPath) return
     const manifest = {
       name: HOST_NAME,
       description: 'Vicu Browser Link native messaging bridge',
@@ -145,7 +192,8 @@ export function registerChromeHost(extensionId: string): void {
   }
 
   if (isLinux) {
-    const hostPath = ensureShellWrapper()
+    const hostPath = ensureWrapper()
+    if (!hostPath) return
     const manifest = {
       name: HOST_NAME,
       description: 'Vicu Browser Link native messaging bridge',
@@ -165,7 +213,8 @@ export function registerChromeHost(extensionId: string): void {
   }
 
   if (!isWindows) return
-  const hostPath = ensureBatWrapper()
+  const hostPath = ensureWrapper()
+  if (!hostPath) return
   const manifestPath = getChromeHostManifestPath()
   const manifest = {
     name: HOST_NAME,
@@ -178,14 +227,13 @@ export function registerChromeHost(extensionId: string): void {
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
   writeFileSync(manifestPath, JSON.stringify(manifest, null, 2), 'utf-8')
 
-  try {
-    execSync(`reg add "HKCU\\Software\\Google\\Chrome\\NativeMessagingHosts\\${HOST_NAME}" /ve /d "${manifestPath}" /f`, { stdio: 'ignore' })
-  } catch { /* ignore */ }
+  runReg(registryAddArgs(hostRegistryKey('chrome', HOST_NAME), manifestPath))
 }
 
 export function registerFirefoxHost(): void {
   if (isMac) {
-    const hostPath = ensureShellWrapper()
+    const hostPath = ensureWrapper()
+    if (!hostPath) return
     const firefoxDir = getMacFirefoxHostDir()
     mkdirSync(firefoxDir, { recursive: true })
 
@@ -212,7 +260,8 @@ export function registerFirefoxHost(): void {
   }
 
   if (isLinux) {
-    const hostPath = ensureShellWrapper()
+    const hostPath = ensureWrapper()
+    if (!hostPath) return
     const firefoxDir = getLinuxFirefoxHostDir()
     try {
       mkdirSync(firefoxDir, { recursive: true })
@@ -245,7 +294,8 @@ export function registerFirefoxHost(): void {
   }
 
   if (!isWindows) return
-  const hostPath = ensureBatWrapper()
+  const hostPath = ensureWrapper()
+  if (!hostPath) return
 
   // Vicu's own future Firefox extension
   const vicuManifestPath = getFirefoxHostManifestPath(HOST_NAME)
@@ -259,9 +309,7 @@ export function registerFirefoxHost(): void {
   const vicuDir = dirname(vicuManifestPath)
   if (!existsSync(vicuDir)) mkdirSync(vicuDir, { recursive: true })
   writeFileSync(vicuManifestPath, JSON.stringify(vicuManifest, null, 2), 'utf-8')
-  try {
-    execSync(`reg add "HKCU\\Software\\Mozilla\\NativeMessagingHosts\\${HOST_NAME}" /ve /d "${vicuManifestPath}" /f`, { stdio: 'ignore' })
-  } catch { /* ignore */ }
+  runReg(registryAddArgs(hostRegistryKey('firefox', HOST_NAME), vicuManifestPath))
 
   // vikunja-quick-entry's signed Firefox extension (already on AMO)
   const vqeManifestPath = getFirefoxHostManifestPath(VQE_HOST_NAME)
@@ -273,9 +321,7 @@ export function registerFirefoxHost(): void {
     allowed_extensions: ['browser-link@vikunja-quick-entry.app'],
   }
   writeFileSync(vqeManifestPath, JSON.stringify(vqeManifest, null, 2), 'utf-8')
-  try {
-    execSync(`reg add "HKCU\\Software\\Mozilla\\NativeMessagingHosts\\${VQE_HOST_NAME}" /ve /d "${vqeManifestPath}" /f`, { stdio: 'ignore' })
-  } catch { /* ignore */ }
+  runReg(registryAddArgs(hostRegistryKey('firefox', VQE_HOST_NAME), vqeManifestPath))
 }
 
 export function unregisterHosts(): void {
@@ -287,7 +333,7 @@ export function unregisterHosts(): void {
     try { unlinkSync(getMacManifestPath(getMacFirefoxHostDir(), HOST_NAME)) } catch { /* ignore */ }
     try { unlinkSync(getMacManifestPath(getMacFirefoxHostDir(), VQE_HOST_NAME)) } catch { /* ignore */ }
     // Remove shell wrapper
-    try { unlinkSync(join(app.getPath('userData'), 'vicu-bridge.sh')) } catch { /* ignore */ }
+    try { unlinkSync(getWrapperPath()) } catch { /* ignore */ }
     return
   }
 
@@ -298,7 +344,8 @@ export function unregisterHosts(): void {
     const firefoxDir = getLinuxFirefoxHostDir()
     try { unlinkSync(join(firefoxDir, `${HOST_NAME}.json`)) } catch { /* ignore */ }
     try { unlinkSync(join(firefoxDir, `${VQE_HOST_NAME}.json`)) } catch { /* ignore */ }
-    try { unlinkSync(join(app.getPath('userData'), 'vicu-bridge.sh')) } catch { /* ignore */ }
+    try { unlinkSync(getWrapperPath()) } catch { /* ignore */ }
+    try { unlinkSync(getAppImageBridgeCopyPath()) } catch { /* ignore */ }
     return
   }
 
@@ -308,9 +355,10 @@ export function unregisterHosts(): void {
   // Firefox: remove both Vicu and VQE compat manifests + registry keys
   try { unlinkSync(getFirefoxHostManifestPath(HOST_NAME)) } catch { /* ignore */ }
   try { unlinkSync(getFirefoxHostManifestPath(VQE_HOST_NAME)) } catch { /* ignore */ }
-  try { execSync(`reg delete "HKCU\\Software\\Google\\Chrome\\NativeMessagingHosts\\${HOST_NAME}" /f`, { stdio: 'ignore' }) } catch { /* ignore */ }
-  try { execSync(`reg delete "HKCU\\Software\\Mozilla\\NativeMessagingHosts\\${HOST_NAME}" /f`, { stdio: 'ignore' }) } catch { /* ignore */ }
-  try { execSync(`reg delete "HKCU\\Software\\Mozilla\\NativeMessagingHosts\\${VQE_HOST_NAME}" /f`, { stdio: 'ignore' }) } catch { /* ignore */ }
+  runReg(registryDeleteArgs(hostRegistryKey('chrome', HOST_NAME)))
+  runReg(registryDeleteArgs(hostRegistryKey('firefox', HOST_NAME)))
+  runReg(registryDeleteArgs(hostRegistryKey('firefox', VQE_HOST_NAME)))
+  try { unlinkSync(getWrapperPath()) } catch { /* ignore */ }
 }
 
 export function isRegistered(): { chrome: boolean; firefox: boolean } {
