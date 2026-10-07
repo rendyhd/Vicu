@@ -9,6 +9,8 @@ import { isQuickEntryEnabled, isQuickViewEnabled } from '../../shared/config-typ
 import {
   applyConfigPatch,
   applyConnectionFields,
+  CONNECTION_KEYS,
+  connectionKeysIn,
   isConnectionFields,
   normalizeConfig,
   type AppConfig,
@@ -411,5 +413,25 @@ describe('Quick Entry and Quick View defaults', () => {
     const config = normalizeConfig({ quick_view_enabled: true, quick_entry_enabled: true })
     expect(isQuickViewEnabled(config)).toBe(true)
     expect(isQuickEntryEnabled(config)).toBe(true)
+  })
+})
+
+describe('connectionKeysIn (F3)', () => {
+  it('names the connection keys of a patch and nothing else', () => {
+    expect(connectionKeysIn({ theme: 'light', sidebar_width: 300, inbox_project_id: 4 })).toEqual([])
+    expect(connectionKeysIn({ vikunja_url: 'https://x', api_token: 't', auth_method: 'api_token', theme: 'light' })).toEqual([
+      'vikunja_url',
+      'api_token',
+      'auth_method',
+    ])
+    expect(connectionKeysIn({ standalone_mode: true, last_username: 'a' })).toEqual(['standalone_mode', 'last_username'])
+  })
+
+  it('covers every key that says which account the app is signed in to', () => {
+    for (const key of ['vikunja_url', 'api_token', 'auth_method']) expect(CONNECTION_KEYS).toContain(key)
+  })
+
+  it('does not count the inbox project: Settings changes it as a preference within the account', () => {
+    expect(CONNECTION_KEYS).not.toContain('inbox_project_id')
   })
 })

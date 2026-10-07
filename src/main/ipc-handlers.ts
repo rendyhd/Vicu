@@ -40,6 +40,7 @@ import { startupEnv } from './startup-env'
 import {
   applyConfigPatch,
   applyConnectionFields,
+  connectionKeysIn,
   isConnectionFields,
   loadConfig,
   saveConfig,
@@ -346,6 +347,13 @@ export function registerIpcHandlers(): void {
   // dialog directory...) are never reverted by a stale renderer snapshot.
   handleTrusted('save-config-patch', (_event, patch: unknown) => {
     if (!patch || typeof patch !== 'object' || Array.isArray(patch)) throw new Error('Invalid config patch')
+    // Which account the app is signed in to changes only through save-connection-config: it drops
+    // the previous account's cached data and queued changes. A patch that slipped a connection key
+    // in would switch accounts without that, so the whole patch is refused.
+    const connectionKeys = connectionKeysIn(patch)
+    if (connectionKeys.length > 0) {
+      throw new Error(`Connection settings (${connectionKeys.join(', ')}) are saved with save-connection-config, not a config patch`)
+    }
     const latest = loadConfig()
     if (!latest) return
     const keys = Object.keys(patch)

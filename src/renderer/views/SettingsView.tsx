@@ -17,6 +17,7 @@ import { ReviewSettingsPanel } from '@/components/review/ReviewSettingsPanel'
 import { ProjectSettings } from '@/components/settings/ProjectSettings'
 import { useProjects } from '@/hooks/use-projects'
 import { toast } from '@/stores/toast-store'
+import { connectionAfterTest } from '@/lib/connection-settings'
 import type { AppConfig, Project } from '@/lib/vikunja-types'
 
 import type { ThemeOption } from '@/lib/theme'
@@ -114,12 +115,19 @@ export function SettingsView() {
     if (result.success) {
       setTestStatus('success')
       setProjects(result.data)
-      // Auto-save connection settings on successful test
-      handleQuickEntryChange({
-        vikunja_url: url,
-        api_token: authMethod === 'api_token' ? token : '',
-        auth_method: authMethod,
-      })
+      // Save the connection after a successful test. A new URL or token can be another account,
+      // so it goes through saveConnectionConfig (which also resets what belonged to the previous
+      // account), not through the preference patch.
+      const connection = connectionAfterTest(url, token, authMethod)
+      try {
+        await api.saveConnectionConfig(connection)
+        setFullConfig((prev) => (prev ? { ...prev, ...connection } : prev))
+        queryClient.invalidateQueries({ queryKey: APP_CONFIG_QUERY_KEY })
+      } catch (err) {
+        console.error('Failed to save the connection', err)
+        setTestStatus('error')
+        setTestError('Connected, but the connection settings could not be saved. Try again.')
+      }
     } else {
       setTestStatus('error')
       setTestError(result.error)

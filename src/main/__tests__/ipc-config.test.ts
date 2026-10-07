@@ -109,5 +109,54 @@ describe('config writes over IPC', () => {
       await expect(call('save-config-patch', [1])).rejects.toThrow(/Invalid config patch/)
       expect(hoisted.saveConfig).not.toHaveBeenCalled()
     })
+
+    // F3: Settings' "Test connection" used to save url / token / auth method as a patch, which
+    // skipped the account-change cleanup. A token for another user on the same server would then
+    // have replayed user A's queued changes as user B.
+    it.each([
+      [{ vikunja_url: 'https://other.example.org' }],
+      [{ api_token: 'tk_of_another_user' }],
+      [{ auth_method: 'oidc' }],
+      [{ standalone_mode: true }],
+      [{ vikunja_url: 'https://tasks.example.com', api_token: 'tk', auth_method: 'api_token' }],
+    ])('refuses a patch that names a connection key: %j', async (patch) => {
+      await expect(call('save-config-patch', patch)).rejects.toThrow(/save-connection-config/)
+
+      expect(hoisted.saveConfig).not.toHaveBeenCalled()
+      expect(hoisted.storeAPIToken).not.toHaveBeenCalled()
+    })
+
+    it('refuses the whole patch, not just the connection key, so nothing is half applied', async () => {
+      await expect(call('save-config-patch', { theme: 'light', api_token: 'tk' })).rejects.toThrow(/api_token/)
+      expect(hoisted.saveConfig).not.toHaveBeenCalled()
+    })
+
+    it('still accepts the inbox project, a preference within the account', async () => {
+      await call('save-config-patch', { inbox_project_id: 8 })
+      expect(hoisted.saveConfig.mock.calls[0][0]).toMatchObject({ inbox_project_id: 8 })
+    })
+  })
+
+  describe('save-connection-config', () => {
+    it('treats a new token on the same server as an account change: caches are reset and the replay re-checks the owner', async () => {
+      await call('save-connection-config', { vikunja_url: 'https://tasks.example.com', api_token: 'tk_of_another_user', auth_method: 'api_token' })
+
+      expect(hoisted.accountChanged).toHaveBeenCalledTimes(1)
+      expect(hoisted.replay).toHaveBeenCalledTimes(1)
+      expect(hoisted.storeAPIToken).toHaveBeenCalledWith('tk_of_another_user', 0)
+      // The token goes to the token store, never into config.json.
+      expect(hoisted.saveConfig.mock.calls[0][0]).toMatchObject({ vikunja_url: 'https://tasks.example.com', api_token: '', auth_method: 'api_token' })
+    })
+
+    it('keeps the preferences and the inbox project of the same server', async () => {
+      await call('save-connection-config', { vikunja_url: 'https://tasks.example.com', api_token: 'tk', auth_method: 'api_token' })
+      expect(hoisted.saveConfig.mock.calls[0][0]).toMatchObject({ theme: 'dark', inbox_project_id: 5, sidebar_width: 250 })
+    })
+
+    it('does not reset anything when the connection settings are malformed', async () => {
+      await expect(call('save-connection-config', { vikunja_url: 5 })).rejects.toThrow(/Invalid connection settings/)
+      expect(hoisted.accountChanged).not.toHaveBeenCalled()
+      expect(hoisted.saveConfig).not.toHaveBeenCalled()
+    })
   })
 })

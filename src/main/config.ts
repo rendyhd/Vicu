@@ -270,6 +270,19 @@ const ACCOUNT_SPECIFIC_KEYS = [
   'last_username',
 ] as const satisfies readonly (keyof AppConfig)[]
 
+/**
+ * The keys that say which account the app is signed in to. Changing them is an account change: the
+ * previous account's cached lists, known user id and queued changes must go (see accountChanged in
+ * sync.ts), which only `save-connection-config` does. A config patch is refused when it names one,
+ * so a Settings control or a future caller cannot switch accounts around that cleanup (F3).
+ */
+export const CONNECTION_KEYS: readonly string[] = ['vikunja_url', 'api_token', 'auth_method', 'standalone_mode', 'last_username']
+
+/** The connection keys a patch tries to change. */
+export function connectionKeysIn(patch: object): string[] {
+  return Object.keys(patch).filter((key) => CONNECTION_KEYS.includes(key))
+}
+
 /** Owned by the custom list service (its own IPCs and sync); never taken from a renderer patch. */
 const MAIN_OWNED_KEYS: ReadonlySet<string> = new Set(['custom_lists', 'custom_lists_sync'])
 
@@ -309,7 +322,8 @@ export function applyConnectionFields(existing: AppConfig | null, conn: Connecti
  * keys are taken, and never the custom list slice. A key whose value is
  * undefined is reset to its default. Values are replaced at the top level (a
  * patched `review` or `viewer_filter` object replaces the old one). Pointing
- * `vikunja_url` at another server drops the previous account's data.
+ * `vikunja_url` at another server drops the previous account's data. The IPC
+ * handler never lets a connection key reach this function (see CONNECTION_KEYS).
  */
 export function applyConfigPatch(current: AppConfig, patch: Record<string, unknown>): AppConfig {
   const merged: Record<string, unknown> = { ...current }
