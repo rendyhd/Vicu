@@ -1,5 +1,6 @@
 import type { ParseResult, ParsedToken } from '@/lib/task-parser'
 import { formatClockTime } from '@/lib/date-utils'
+import { useIsDark } from '@/hooks/use-is-dark'
 
 function formatDateLabel(date: Date): string {
   const now = new Date()
@@ -125,9 +126,9 @@ interface NlpInputHighlightProps {
 }
 
 export function NlpInputHighlight({ value, tokens, multiline = false }: NlpInputHighlightProps) {
+  const isDark = useIsDark()
   if (!tokens.length) return null
 
-  const isDark = document.documentElement.classList.contains('dark')
   const colors = isDark ? tokenBgColorsDark : tokenBgColors
   const sorted = [...tokens].sort((a, b) => a.start - b.start)
   const parts: Array<{ text: string; bg?: string }> = []
