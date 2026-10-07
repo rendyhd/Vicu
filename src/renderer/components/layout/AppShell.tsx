@@ -48,24 +48,13 @@ import { refreshTasks } from '@/lib/task-refresh'
 import { reloadCompletionSound, setCompletionSoundEnabled } from '@/lib/completion-sound'
 import { useTodayOverdueCount } from '@/hooks/use-today-overdue-count'
 import { renderBadgeDataUrl } from '@/lib/render-badge-icon'
-import { insertPosition as slotPosition, isUndatedTask, planMove } from '@/lib/reorder-positions'
+import { insertPosition as slotPosition, isUndatedTask, planMove, planSiblingMove } from '@/lib/reorder-positions'
 import { usePrintStore } from '@/stores/print-store'
 import { buildPrintHtml } from '@/lib/print-template'
 import { sanitizeTaskHtml } from '@/lib/sanitize-html'
 
 const MIN_WIDTH = 180
 const MAX_WIDTH = 360
-
-function calculateProjectPosition(
-  siblings: ProjectTreeNode[],
-  oldIndex: number,
-  newIndex: number
-): number {
-  const without = siblings.filter((_, i) => i !== oldIndex)
-  const above = without[newIndex - 1]?.position ?? 0
-  const below = without[newIndex]?.position ?? (above + 2 ** 16)
-  return (above + below) / 2
-}
 
 type AppState = 'loading' | 'setup' | 'ready' | 'reauth'
 
@@ -422,11 +411,8 @@ export function AppShell() {
           const overProject = overData.project as Project
           const newIndex = siblings.findIndex((s) => s.id === overProject.id)
           if (oldIndex !== -1 && newIndex !== -1) {
-            const without = siblings.filter((_, i) => i !== oldIndex)
-            const above = without[newIndex - 1]?.position ?? 0
-            const below = without[newIndex]?.position ?? (above + 2 ** 16)
-            const newPosition = (above + below) / 2
-            reorderProject.mutate({ id: dragItem.project.id, position: newPosition })
+            const plan = planSiblingMove(siblings, oldIndex, newIndex)
+            reorderProject.mutate({ id: dragItem.project.id, position: plan.position, renumbered: plan.renumbered })
           }
         }
       } else if (dragItem.type === 'project') {
@@ -438,8 +424,8 @@ export function AppShell() {
             const overNode = overData.node as ProjectTreeNode
             const newIndex = siblings.findIndex((s) => s.id === overNode.id)
             if (oldIndex !== -1 && newIndex !== -1) {
-              const newPosition = calculateProjectPosition(siblings, oldIndex, newIndex)
-              reorderProject.mutate({ id: node.id, position: newPosition })
+              const plan = planSiblingMove(siblings, oldIndex, newIndex)
+              reorderProject.mutate({ id: node.id, position: plan.position, renumbered: plan.renumbered })
             }
           }
         }

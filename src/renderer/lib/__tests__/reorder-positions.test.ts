@@ -8,6 +8,7 @@ import {
   insertPosition,
   isUndatedTask,
   planMove,
+  planSiblingMove,
   sendPositionUpdates,
 } from '../reorder-positions'
 import type { Task } from '../vikunja-types'
@@ -178,5 +179,82 @@ describe('sendPositionUpdates', () => {
       [{ taskId: 2, position: 20 }, { taskId: 3, position: 30 }],
     )).rejects.toThrow('server said no')
     expect(sent).toEqual([2])
+  })
+})
+
+describe('planSiblingMove (sidebar projects and sections)', () => {
+  let nextProjectId = 100
+  const project = (position: number) => ({ id: nextProjectId++, position })
+  /** Apply a plan and read the order the sidebar would show (a stable sort by position). */
+  function shownOrder(
+    siblings: Array<{ id: number; position: number }>,
+    movedId: number,
+    plan: { position: number; renumbered: Array<{ id: number; position: number }> },
+  ): number[] {
+    const positions = new Map(plan.renumbered.map((entry) => [entry.id, entry.position]))
+    positions.set(movedId, plan.position)
+    return siblings
+      .map((entry) => ({ ...entry, position: positions.get(entry.id) ?? entry.position }))
+      .sort((a, b) => a.position - b.position)
+      .map((entry) => entry.id)
+  }
+
+  it('changes only the dragged project when there is room', () => {
+    const [a, b, c] = [project(100), project(200), project(300)]
+    expect(planSiblingMove([a, b, c], 2, 0)).toEqual({ position: 50, renumbered: [] })
+    expect(planSiblingMove([a, b, c], 0, 1)).toEqual({ position: 250, renumbered: [] })
+    expect(planSiblingMove([a, b, c], 0, 2)).toEqual({ position: 300 + POSITION_STEP / 2, renumbered: [] })
+  })
+
+  it('spreads siblings that share a position so the drag takes effect', () => {
+    const [a, b, c] = [project(0), project(0), project(0)]
+    const plan = planSiblingMove([a, b, c], 2, 0)
+    expect(plan.position).toBe(POSITION_STEP)
+    expect(plan.renumbered).toEqual([
+      { id: a.id, position: 2 * POSITION_STEP },
+      { id: b.id, position: 3 * POSITION_STEP },
+    ])
+    expect(shownOrder([a, b, c], c.id, plan)).toEqual([c.id, a.id, b.id])
+  })
+
+  it('does not send positions that stay the same', () => {
+    const [a, b, c] = [project(POSITION_STEP), project(POSITION_STEP), project(3 * POSITION_STEP)]
+    // c between a and b: they tie, so all are spread; a already sits at its spot.
+    const plan = planSiblingMove([a, b, c], 2, 1)
+    expect(plan.renumbered.some((entry) => entry.id === a.id)).toBe(false)
+    expect(shownOrder([a, b, c], c.id, plan)).toEqual([a.id, c.id, b.id])
+  })
+
+  const lists: Array<[string, () => Array<{ id: number; position: number }>]> = [
+    ['distinct positions', () => [100, 200, 300, 400, 500].map(project)],
+    ['all zero', () => [0, 0, 0, 0, 0].map(project)],
+    ['some equal', () => [10, 10, 20, 20, 30].map(project)],
+    ['almost equal', () => [1, 1.25, 1.5, 1.75, 2].map(project)],
+  ]
+
+  it.each(lists)('puts the project where it was dropped: %s', (name, build) => {
+    for (let from = 0; from < 5; from++) {
+      for (let to = 0; to < 5; to++) {
+        if (from === to) continue
+        const list = build()
+        const moved = list[from]
+        const plan = planSiblingMove(list, from, to)
+        const without = list.filter((_, index) => index !== from)
+        const expected = [...without.slice(0, to), moved, ...without.slice(to)].map((entry) => entry.id)
+        expect(shownOrder(list, moved.id, plan), `${name}: ${from} -> ${to}`).toEqual(expected)
+      }
+    }
+  })
+})
+
+describe('sendPositionUpdates with any update shape', () => {
+  it('sends the other siblings first and the dragged project last', async () => {
+    const sent: number[] = []
+    await sendPositionUpdates(
+      async (update: { id: number; position: number }) => { sent.push(update.id) },
+      { id: 1, position: 10 },
+      [{ id: 2, position: 20 }, { id: 3, position: 30 }],
+    )
+    expect(sent).toEqual([2, 3, 1])
   })
 })

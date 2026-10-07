@@ -3,7 +3,12 @@ import { useNavigate, useMatches, useRouter } from '@tanstack/react-router'
 import { api } from '@/lib/api'
 import { useCompletedTasksStore } from '@/stores/completed-tasks-store'
 import { sortProjectTasks } from '@/lib/task-sort'
-import { applyPositionUpdates, sendPositionUpdates, type PositionUpdate } from '@/lib/reorder-positions'
+import {
+  applyPositionUpdates,
+  sendPositionUpdates,
+  type PositionUpdate,
+  type SiblingPositionUpdate,
+} from '@/lib/reorder-positions'
 import { playCompletionSound } from '@/lib/completion-sound'
 import {
   mapTaskDoneByIds,
@@ -882,17 +887,35 @@ export function useReorderProject() {
 
   return useMutation({
     meta: metaFor('move the project'),
-    // A reorder only ever changes the position.
-    mutationFn: ({ id, position }: { id: number; position: number }) =>
-      updateProjectRequest({ id, changes: { position } }),
-    onMutate: ({ id, position }) => {
+    // A reorder only ever changes positions: the dragged project's and, when its neighbours had
+    // no room between them, the spread-out positions of its siblings (see planSiblingMove).
+    mutationFn: async ({
+      id,
+      position,
+      renumbered = [],
+    }: {
+      id: number
+      position: number
+      renumbered?: SiblingPositionUpdate[]
+    }) => {
+      await sendPositionUpdates<SiblingPositionUpdate>(
+        async (update) => {
+          await updateProjectRequest({ id: update.id, changes: { position: update.position } })
+        },
+        { id, position },
+        renumbered,
+      )
+    },
+    onMutate: ({ id, position, renumbered = [] }) => {
       qc.cancelQueries({ queryKey: ['projects'] }) // fire-and-forget
       const previous = qc.getQueryData<Project[]>(['projects'])
 
       if (previous) {
+        const positions = new Map<number, number>(renumbered.map((update) => [update.id, update.position]))
+        positions.set(id, position)
         qc.setQueryData<Project[]>(
           ['projects'],
-          previous.map((p) => (p.id === id ? { ...p, position } : p))
+          previous.map((p) => (positions.has(p.id) ? { ...p, position: positions.get(p.id)! } : p))
         )
       }
 

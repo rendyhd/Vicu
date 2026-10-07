@@ -98,14 +98,56 @@ export function applyPositionUpdates<T extends { id: number; position: number }>
 
 /**
  * Sends the positions of a move one request after the other (the server does not take parallel
- * writes to one view well), the other tasks first and the dragged task last, and stops at the first
+ * writes to one view well), the other items first and the dragged one last, and stops at the first
  * failure by letting `send` throw. A refetch afterwards shows what the server really holds.
  */
-export async function sendPositionUpdates(
-  send: (update: PositionUpdate) => Promise<void>,
-  moved: PositionUpdate,
-  renumbered: readonly PositionUpdate[] = [],
+export async function sendPositionUpdates<U>(
+  send: (update: U) => Promise<void>,
+  moved: U,
+  renumbered: readonly U[] = [],
 ): Promise<void> {
   for (const update of renumbered) await send(update)
   await send(moved)
+}
+
+export interface SiblingPositionUpdate {
+  id: number
+  position: number
+}
+
+export interface SiblingMovePlan {
+  /** The new position of the dragged item. */
+  position: number
+  /** Other siblings that have to move too, when there was no room; empty otherwise. */
+  renumbered: SiblingPositionUpdate[]
+}
+
+/**
+ * The project counterpart of planMove, for sidebar projects and sections: siblings in display
+ * order, the one at `oldIndex` dropped at `newIndex` (the index in the list without it). Equal or
+ * very close neighbours happen (position 0 from imports and API clients, repeated drops into one
+ * gap converging) and the middle between them is the same number, so the drag changed nothing.
+ * With room only the dragged project changes; without, every sibling gets a fresh position one
+ * step apart in the new order and only those whose position changes are listed.
+ */
+export function planSiblingMove(
+  siblings: readonly { id: number; position: number }[],
+  oldIndex: number,
+  newIndex: number,
+): SiblingMovePlan {
+  const moved = siblings[oldIndex]
+  const without = siblings.filter((_, index) => index !== oldIndex)
+  const above = without[newIndex - 1]?.position ?? 0
+  const below = without[newIndex]?.position ?? above + POSITION_STEP
+  if (below - above >= MIN_POSITION_GAP) return { position: (above + below) / 2, renumbered: [] }
+
+  const ordered = [...without.slice(0, newIndex), moved, ...without.slice(newIndex)]
+  const renumbered: SiblingPositionUpdate[] = []
+  let movedPosition = (above + below) / 2
+  ordered.forEach((entry, index) => {
+    const position = (index + 1) * POSITION_STEP
+    if (entry === moved) movedPosition = position
+    else if (entry.position !== position) renumbered.push({ id: entry.id, position })
+  })
+  return { position: movedPosition, renumbered }
 }
