@@ -8,7 +8,8 @@ import { splitTodayOverdue } from '@/lib/today-overdue'
 import { TaskList } from '@/components/task-list/TaskList'
 import { TaskRow } from '@/components/task-list/TaskRow'
 import { api } from '@/lib/api'
-import type { Task } from '@/lib/vikunja-types'
+import { showRoutinesInToday, type Task } from '@/lib/vikunja-types'
+import { useAppConfig } from '@/hooks/use-app-config'
 import { RoutineTodaySection } from '@/components/routines/RoutineTodaySection'
 
 function groupByProject(tasks: Task[], projectsFlat?: { id: number; title: string }[]) {
@@ -32,6 +33,9 @@ export function TodayView() {
   const params = useFilters({ view: 'today' })
   const { data: tasks = [], isLoading } = useTasks(params)
   const { data: projects } = useProjects()
+  const { data: config } = useAppConfig()
+  // Wait for the config, so a turned-off section does not flash in (and fetch routines) on start.
+  const routinesShown = !!config && showRoutinesInToday(config)
   const [inboxProjectId, setInboxProjectId] = useState<number | undefined>()
   // The local day: re-read when it rolls over at midnight (or after sleep), so a task added to Today
   // after midnight is dated today, not yesterday, and the overdue / due-today split follows.
@@ -105,7 +109,7 @@ export function TodayView() {
       emptyTitle="All clear for today"
       emptySubtitle="Tasks due today will appear here"
     >
-      <RoutineTodaySection />
+      {routinesShown && <RoutineTodaySection hideFinished />}
       {overdueTasks.length > 0 && (
         <div>
           <div className="px-6 pb-1 pt-2">

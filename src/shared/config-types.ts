@@ -234,6 +234,11 @@ export interface AppConfig {
   last_used_label_id?: number
   // Project review
   review?: ReviewConfig
+  // Routines
+  /** Routines feature (sidebar entry, Today section, reminders). Missing means on. */
+  routines_enabled?: boolean
+  /** Whether Today shows the routines still open today. Missing means on. */
+  routines_in_today?: boolean
 }
 
 // --- Defaults every reader shares -------------------------------------------------------------
@@ -249,4 +254,16 @@ export function isQuickEntryEnabled(config: Pick<AppConfig, 'quick_entry_enabled
 
 export function isQuickViewEnabled(config: Pick<AppConfig, 'quick_view_enabled'> | null | undefined): boolean {
   return config?.quick_view_enabled === true
+}
+
+/** Routines are on unless the user turned them off (configs from before the setting have none). */
+export function isRoutinesEnabled(config: Pick<AppConfig, 'routines_enabled'> | null | undefined): boolean {
+  return config?.routines_enabled !== false
+}
+
+/** Today lists open routines only while routines are on and the Today section is not turned off. */
+export function showRoutinesInToday(
+  config: Pick<AppConfig, 'routines_enabled' | 'routines_in_today'> | null | undefined,
+): boolean {
+  return isRoutinesEnabled(config) && config?.routines_in_today !== false
 }

@@ -3,6 +3,8 @@ import { Inbox, Sun, Calendar, Layers, BookOpen, RefreshCw, HeartPulse } from 'l
 import { cn } from '@/lib/cn'
 import type { LucideIcon } from 'lucide-react'
 import { useReviewBadgeCount, useReviewFeatureEnabled } from '@/hooks/use-review'
+import { useAppConfig } from '@/hooks/use-app-config'
+import { isRoutinesEnabled } from '@/lib/vikunja-types'
 
 interface SmartListItem {
   id: string
@@ -28,10 +30,11 @@ export function SmartListNav() {
   const currentPath = matches[matches.length - 1]?.pathname ?? ''
   const reviewEnabled = useReviewFeatureEnabled()
   const reviewCount = useReviewBadgeCount()
+  const { data: config } = useAppConfig()
+  const routinesEnabled = isRoutinesEnabled(config)
 
-  const items = reviewEnabled
-    ? ALL_SMART_LISTS
-    : ALL_SMART_LISTS.filter((i) => i.id !== 'review')
+  const items = ALL_SMART_LISTS.filter((i) =>
+    (i.id !== 'review' || reviewEnabled) && (i.id !== 'routines' || routinesEnabled))
 
   return (
     <nav className="flex flex-col gap-0.5 px-2 py-2">

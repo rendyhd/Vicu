@@ -14,6 +14,7 @@ import { KeyboardShortcuts } from '@/components/settings/KeyboardShortcuts'
 import { NotificationSettings } from '@/components/settings/NotificationSettings'
 import { CompletionSoundSettings } from '@/components/settings/CompletionSoundSettings'
 import { ReviewSettingsPanel } from '@/components/review/ReviewSettingsPanel'
+import { RoutinesSettingsPanel } from '@/components/routines/RoutinesSettingsPanel'
 import { ProjectSettings } from '@/components/settings/ProjectSettings'
 import { useProjects } from '@/hooks/use-projects'
 import { toast } from '@/stores/toast-store'
@@ -523,6 +524,13 @@ export function SettingsView() {
 
         {fullConfig && (
           <ReviewSettingsPanel
+            config={fullConfig}
+            onChange={handleQuickEntryChange}
+          />
+        )}
+
+        {fullConfig && (
+          <RoutinesSettingsPanel
             config={fullConfig}
             onChange={handleQuickEntryChange}
           />

@@ -1,6 +1,6 @@
 import { Bell, Check, Clock3, SkipForward, Undo2 } from 'lucide-react'
 import { useRoutines } from '@/hooks/use-routines'
-import { timeLabel, type OccurrenceStatus, type RoutineOccurrence } from '@/lib/routines'
+import { isFinished, timeLabel, type OccurrenceStatus, type RoutineOccurrence } from '@/lib/routines'
 import type { Task } from '@/lib/vikunja-types'
 import { cn } from '@/lib/cn'
 
@@ -74,12 +74,20 @@ function RoutineCheck({
   )
 }
 
-export function RoutineTodaySection({ showEmpty = false }: { showEmpty?: boolean }) {
+export function RoutineTodaySection({
+  showEmpty = false,
+  hideFinished = false,
+}: {
+  showEmpty?: boolean
+  /** Leave out what is done for the day (completed or skipped); the Today view lists only what is left. */
+  hideFinished?: boolean
+}) {
   const routines = useRoutines()
   const completed = routines.today.filter((occurrence) => occurrence.status === 'COMPLETED').length
   const total = routines.today.length
+  const shown = hideFinished ? routines.today.filter((occurrence) => !isFinished(occurrence.status)) : routines.today
 
-  if (!routines.isLoading && total === 0 && !showEmpty) return null
+  if (!routines.isLoading && shown.length === 0 && !showEmpty) return null
 
   return (
     <section className="border-b border-[var(--border-color)] pb-2">
@@ -104,7 +112,7 @@ export function RoutineTodaySection({ showEmpty = false }: { showEmpty?: boolean
       {!routines.isLoading && total === 0 && (
         <div className="px-6 py-3 text-xs text-[var(--text-secondary)]">Nothing scheduled for today.</div>
       )}
-      {routines.today.map((occurrence) => (
+      {shown.map((occurrence) => (
         <RoutineCheck
           key={occurrence.key}
           occurrence={occurrence}

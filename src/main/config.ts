@@ -200,6 +200,8 @@ export function normalizeConfig(raw: Record<string, unknown>): AppConfig {
     last_used_project_id: typeof raw.last_used_project_id === 'number' ? raw.last_used_project_id : undefined,
     last_used_label_id: typeof raw.last_used_label_id === 'number' ? raw.last_used_label_id : undefined,
     review: normalizeReview(raw.review),
+    routines_enabled: raw.routines_enabled !== false,
+    routines_in_today: raw.routines_in_today !== false,
   }
 }
 

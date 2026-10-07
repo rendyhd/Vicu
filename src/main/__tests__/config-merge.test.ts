@@ -336,6 +336,17 @@ describe('applyConfigPatch (D-CFG-2)', () => {
     expect(result.viewer_filter).toMatchObject({ project_ids: [1, 2], sort_by: 'title' })
   })
 
+  it('keeps routines on unless they were turned off, and saves a turned-off switch', () => {
+    const fresh = normalizeConfig({})
+    expect(fresh.routines_enabled).toBe(true)
+    expect(fresh.routines_in_today).toBe(true)
+
+    const off = applyConfigPatch(userConfig(), { routines_enabled: false, routines_in_today: false })
+    expect(off.routines_enabled).toBe(false)
+    expect(off.routines_in_today).toBe(false)
+    expect(normalizeConfig({ ...off }).routines_enabled).toBe(false)
+  })
+
   it('normalizes values (invalid types fall back to defaults)', () => {
     const result = applyConfigPatch(userConfig(), {
       theme: 'neon',

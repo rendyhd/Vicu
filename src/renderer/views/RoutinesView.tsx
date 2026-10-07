@@ -28,7 +28,8 @@ import {
   type RoutinePeriod,
   type RoutineSlot,
 } from '@/lib/routines'
-import type { Task } from '@/lib/vikunja-types'
+import { isRoutinesEnabled, type Task } from '@/lib/vikunja-types'
+import { useAppConfig } from '@/hooks/use-app-config'
 import { cn } from '@/lib/cn'
 
 const FIELD = 'h-9 w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 text-sm text-[var(--text-primary)] outline-none transition focus:border-accent-blue'
@@ -280,6 +281,21 @@ function HistoryDialog({ carrier, onClose }: { carrier: RoutineCarrier<Task>; on
 }
 
 export function RoutinesView() {
+  const { data: config } = useAppConfig()
+  // The sidebar hides Routines when they are off; a route kept from before (history, a link) lands here.
+  if (config && !isRoutinesEnabled(config)) {
+    return (
+      <div className="flex h-full flex-1 flex-col items-center justify-center gap-2 bg-[var(--bg-primary)] px-6 text-center">
+        <HeartPulse className="h-8 w-8 text-[var(--text-tertiary)]" />
+        <p className="text-sm font-medium text-[var(--text-primary)]">Routines are turned off</p>
+        <p className="text-xs text-[var(--text-secondary)]">Turn them on in Settings to track health and home routines.</p>
+      </div>
+    )
+  }
+  return <RoutinesContent />
+}
+
+function RoutinesContent() {
   const routines = useRoutines()
   const [editor, setEditor] = useState<RoutineCarrier<Task> | 'new' | null>(null)
   const [history, setHistory] = useState<RoutineCarrier<Task> | null>(null)

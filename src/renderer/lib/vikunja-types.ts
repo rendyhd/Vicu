@@ -160,7 +160,13 @@ export type {
   SecondaryProject,
   ViewerFilter,
 } from '../../shared/config-types'
-export { CUSTOM_LIST_SORT_FIELDS, isQuickEntryEnabled, isQuickViewEnabled } from '../../shared/config-types'
+export {
+  CUSTOM_LIST_SORT_FIELDS,
+  isQuickEntryEnabled,
+  isQuickViewEnabled,
+  isRoutinesEnabled,
+  showRoutinesInToday,
+} from '../../shared/config-types'
 import type { ConnectionFields } from '../../shared/config-types'
 
 /**

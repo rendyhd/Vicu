@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   encodeRoutineEnvelope,
   isCalendarScheduled,
+  isFinished,
   mergeRoutinePayload,
   occurrencesForDate,
   parseRoutineEnvelope,
@@ -82,5 +83,14 @@ describe('routine merge', () => {
     const merged = mergeRoutinePayload(local, remote)
     expect(merged.definition.name).toBe('Remote')
     expect(merged.occurrences.a.status).toBe('SKIPPED')
+  })
+})
+
+describe('isFinished', () => {
+  it('counts completed and skipped as done for the day, pending and not logged as open', () => {
+    expect(isFinished('COMPLETED')).toBe(true)
+    expect(isFinished('SKIPPED')).toBe(true)
+    expect(isFinished('PENDING')).toBe(false)
+    expect(isFinished('NOT_LOGGED')).toBe(false)
   })
 })

@@ -10,6 +10,7 @@ import { createTaskReminderScheduler } from './task-reminders'
 import { notificationCategory, notificationFilters, overdueDays } from './notification-windows'
 import { addLocalDays, startOfLocalDay, toLocalDate } from '../shared/due-dates'
 import { parseRoutineEnvelope, routineOccurrenceKey, scheduledDateOn, type RoutinePayload } from '../shared/routines'
+import { isRoutinesEnabled } from '../shared/config-types'
 
 const NULL_DATE = '0001-01-01T00:00:00Z'
 
@@ -90,7 +91,7 @@ export function stopNotifications(): void {
 export async function refreshRoutineReminders(): Promise<void> {
   clearRoutineReminderTimers()
   const config = loadConfig()
-  if (!config?.notifications_enabled || config.standalone_mode) return
+  if (!config?.notifications_enabled || config.standalone_mode || !isRoutinesEnabled(config)) return
 
   // Carriers are fetched by their remembered ids; the done tasks are not listed (D-NOTIF-3).
   const result = await loadRoutineCarriers()
@@ -214,7 +215,7 @@ function fireRoutineReminder(
   configSnapshot: AppConfig,
 ): void {
   const config = loadConfig() || configSnapshot
-  if (!config.notifications_enabled) return
+  if (!config.notifications_enabled || !isRoutinesEnabled(config)) return
   const definition = payload.definition
   const amount = [definition.amount, definition.unit].filter(Boolean).join(' ')
   const notification = new Notification({
