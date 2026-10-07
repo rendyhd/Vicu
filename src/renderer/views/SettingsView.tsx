@@ -18,6 +18,8 @@ import { ProjectSettings } from '@/components/settings/ProjectSettings'
 import { useProjects } from '@/hooks/use-projects'
 import { toast } from '@/stores/toast-store'
 import { connectionAfterTest } from '@/lib/connection-settings'
+import { confirmDelete } from '@/lib/confirm-bridge'
+import { checkUnsyncedWork, signOutWarning } from '@/lib/sign-out-check'
 import type { AppConfig, Project } from '@/lib/vikunja-types'
 
 import type { ThemeOption } from '@/lib/theme'
@@ -36,6 +38,8 @@ export function SettingsView() {
   const [theme, setTheme] = useState<ThemeOption>('system')
   const [authMethod, setAuthMethod] = useState<'api_token' | 'oidc' | 'password'>('api_token')
   const [currentUser, setCurrentUser] = useState<VikunjaUser | null>(null)
+  // Set while sign-out gives queued changes and custom lists a last chance to reach the server.
+  const [signingOut, setSigningOut] = useState(false)
 
   const [projects, setProjects] = useState<Project[]>([])
   const { data: liveProjectData } = useProjects()
@@ -173,6 +177,20 @@ export function SettingsView() {
   }, [scheduleSave])
 
   const handleLogout = async () => {
+    if (signingOut) return
+    setSigningOut(true)
+    let warning: string | null
+    try {
+      warning = signOutWarning(await checkUnsyncedWork({
+        syncCustomLists: api.syncCustomLists,
+        replayNow: api.offlineQueue.replayNow,
+        snapshot: api.offlineQueue.snapshot,
+        getConfig: api.getConfig,
+      }))
+    } finally {
+      setSigningOut(false)
+    }
+    if (warning && !(await confirmDelete(warning, { force: true, confirmLabel: 'Sign Out' }))) return
     await api.logout()
     // Main keeps app preferences (theme, hotkeys, window bounds, notifications, etc.)
     // and clears the connection and account-specific data (project IDs, custom lists, etc.)
@@ -255,9 +273,10 @@ export function SettingsView() {
               <button
                 type="button"
                 onClick={handleLogout}
-                className="rounded-md border border-accent-red/30 px-4 py-2 text-sm font-medium text-accent-red transition-colors hover:bg-accent-red/10"
+                disabled={signingOut}
+                className="rounded-md border border-accent-red/30 px-4 py-2 text-sm font-medium text-accent-red transition-colors hover:bg-accent-red/10 disabled:cursor-wait disabled:opacity-60"
               >
-                Sign Out
+                {signingOut ? 'Syncing...' : 'Sign Out'}
               </button>
             </div>
           ) : (
@@ -320,9 +339,10 @@ export function SettingsView() {
                 <button
                   type="button"
                   onClick={handleLogout}
-                  className="rounded-md border border-accent-red/30 px-4 py-2 text-sm font-medium text-accent-red transition-colors hover:bg-accent-red/10"
+                  disabled={signingOut}
+                  className="rounded-md border border-accent-red/30 px-4 py-2 text-sm font-medium text-accent-red transition-colors hover:bg-accent-red/10 disabled:cursor-wait disabled:opacity-60"
                 >
-                  Disconnect
+                  {signingOut ? 'Syncing...' : 'Disconnect'}
                 </button>
               </div>
             </div>

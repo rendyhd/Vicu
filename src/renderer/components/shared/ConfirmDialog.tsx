@@ -53,7 +53,7 @@ export function ConfirmDialog({
         className="mx-4 w-full max-w-sm rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] p-5 shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <p className="mb-4 text-sm text-[var(--text-primary)]">{message}</p>
+        <p className="mb-4 whitespace-pre-line text-sm text-[var(--text-primary)]">{message}</p>
         <div className="flex justify-end gap-2">
           <button
             ref={cancelRef}
