@@ -17,21 +17,15 @@ import {
   parseCustomListEnvelope,
   validateCustomListDocument,
   wireToAppList,
-  type AppCustomList,
+  type CustomList,
   type CustomListSyncDocumentV1,
   type CustomListWire,
 } from './custom-list-protocol'
+import type { CustomListSyncStatus } from '../shared/config-types'
+
+export type { CustomListSyncStatus }
 
 const NULL_DATE = '0001-01-01T00:00:00Z'
-
-export type CustomListSyncStatus =
-  | { state: 'idle'; last_synced_at?: string }
-  | { state: 'syncing' }
-  | { state: 'pending'; message?: string }
-  | { state: 'offline'; message: string }
-  | { state: 'error'; message: string }
-  | { state: 'update_required'; message: string }
-  | { state: 'local_only' }
 
 interface CarrierTask {
   id: number
@@ -94,7 +88,7 @@ export function getCustomListSyncStatus(): CustomListSyncStatus {
   return syncStatus
 }
 
-export function getCustomLists(): AppCustomList[] {
+export function getCustomLists(): CustomList[] {
   const config = loadConfig()
   if (!config) return []
   const hadState = !!config.custom_lists_sync
@@ -104,7 +98,7 @@ export function getCustomLists(): AppCustomList[] {
   return config.custom_lists
 }
 
-function saveLocalMutation(config: AppConfig, document: CustomListSyncDocumentV1): AppCustomList[] {
+function saveLocalMutation(config: AppConfig, document: CustomListSyncDocumentV1): CustomList[] {
   persist(config, document, true)
   setStatus(config.standalone_mode ? { state: 'local_only' } : { state: 'pending' })
   broadcastLists(config)
@@ -112,7 +106,7 @@ function saveLocalMutation(config: AppConfig, document: CustomListSyncDocumentV1
   return config.custom_lists ?? []
 }
 
-export function upsertCustomList(value: CustomListWire): AppCustomList[] {
+export function upsertCustomList(value: CustomListWire): CustomList[] {
   const config = loadConfig()
   if (!config) throw new Error('Configuration not loaded')
   const state = ensureSyncState(config)
@@ -129,7 +123,7 @@ export function upsertCustomList(value: CustomListWire): AppCustomList[] {
   return saveLocalMutation(config, document)
 }
 
-export function deleteCustomList(id: string): AppCustomList[] {
+export function deleteCustomList(id: string): CustomList[] {
   const config = loadConfig()
   if (!config) throw new Error('Configuration not loaded')
   const state = ensureSyncState(config)
@@ -142,7 +136,7 @@ export function deleteCustomList(id: string): AppCustomList[] {
   return saveLocalMutation(config, document)
 }
 
-export function reorderCustomLists(ids: string[]): AppCustomList[] {
+export function reorderCustomLists(ids: string[]): CustomList[] {
   const config = loadConfig()
   if (!config) throw new Error('Configuration not loaded')
   const state = ensureSyncState(config)

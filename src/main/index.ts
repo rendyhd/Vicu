@@ -2,6 +2,7 @@ import { app, BrowserWindow, globalShortcut, nativeTheme, powerMonitor, screen }
 import { createMainWindow, createQuickEntryWindow, createQuickViewWindow } from './window-manager'
 import { registerIpcHandlers } from './ipc-handlers'
 import { loadConfig, saveConfig, type AppConfig, DEFAULT_QUICK_ENTRY_HOTKEY, DEFAULT_QUICK_VIEW_HOTKEY } from './config'
+import { isQuickEntryEnabled, isQuickViewEnabled } from '../shared/config-types'
 import { authManager } from './auth/auth-manager'
 import { createTray, destroyTray, hasTray } from './tray'
 import { returnFocusToPreviousWindow, destroyDummyWindow } from './focus'
@@ -329,8 +330,8 @@ let lastShortcutStatus: { entry: boolean; viewer: boolean; waylandLimited: boole
 function registerQuickEntryShortcuts(config: AppConfig): { entry: boolean; viewer: boolean; waylandLimited: boolean } {
   let entryRegistered = false
   let viewerRegistered = false
-  const entryEnabled = !!config.quick_entry_enabled
-  const viewerEnabled = config.quick_view_enabled !== false
+  const entryEnabled = isQuickEntryEnabled(config)
+  const viewerEnabled = isQuickViewEnabled(config)
 
   if (entryEnabled) {
     const entryHotkey = config.quick_entry_hotkey || DEFAULT_QUICK_ENTRY_HOTKEY
@@ -453,7 +454,7 @@ function setupTray(): void {
 
 // --- Quick Entry/View initialization ---
 function initQuickEntryWindows(config: AppConfig): void {
-  if (config.quick_entry_enabled && !quickEntryWindow) {
+  if (isQuickEntryEnabled(config) && !quickEntryWindow) {
     quickEntryWindow = createQuickEntryWindow(config)
     quickEntryWindow.on('close', (e) => {
       if (!appIsQuitting) {
@@ -481,7 +482,7 @@ function initQuickEntryWindows(config: AppConfig): void {
     })
   }
 
-  if (config.quick_view_enabled !== false && !quickViewWindow) {
+  if (isQuickViewEnabled(config) && !quickViewWindow) {
     quickViewWindow = createQuickViewWindow(config)
     quickViewWindow.on('close', (e) => {
       if (!appIsQuitting) {
@@ -547,7 +548,7 @@ function applyQuickEntrySettings(): { entry: boolean; viewer: boolean; waylandLi
   // Unregister existing shortcuts
   globalShortcut.unregisterAll()
 
-  const eitherEnabled = config.quick_entry_enabled || config.quick_view_enabled !== false
+  const eitherEnabled = isQuickEntryEnabled(config) || isQuickViewEnabled(config)
 
   if (eitherEnabled) {
     setupTray()
@@ -555,11 +556,11 @@ function applyQuickEntrySettings(): { entry: boolean; viewer: boolean; waylandLi
     const result = registerQuickEntryShortcuts(config)
 
     // Clean up windows that were disabled
-    if (!config.quick_entry_enabled && quickEntryWindow && !quickEntryWindow.isDestroyed()) {
+    if (!isQuickEntryEnabled(config) && quickEntryWindow && !quickEntryWindow.isDestroyed()) {
       quickEntryWindow.destroy()
       quickEntryWindow = null
     }
-    if (config.quick_view_enabled === false && quickViewWindow && !quickViewWindow.isDestroyed()) {
+    if (!isQuickViewEnabled(config) && quickViewWindow && !quickViewWindow.isDestroyed()) {
       quickViewWindow.destroy()
       quickViewWindow = null
     }
@@ -718,7 +719,7 @@ if (!gotLock) {
     // Start in the tray when launched at login with "Start hidden" (or with --hidden), but only
     // when there is a way back: the tray icon exists when Quick Entry or Quick View is on, and
     // macOS always has the dock.
-    const trayWillExist = !!config && (config.quick_entry_enabled === true || config.quick_view_enabled !== false)
+    const trayWillExist = !!config && (isQuickEntryEnabled(config) || isQuickViewEnabled(config))
     const startHidden = !!config && shouldStartHidden({
       hiddenArg: parseHiddenArg(process.argv),
       openedAtLogin: isMac && app.getLoginItemSettings().wasOpenedAtLogin,
@@ -787,11 +788,9 @@ if (!gotLock) {
     }, 5000)
 
     // Quick Entry/View: if either enabled, set up tray + windows + hotkeys.
-    // Require config to be non-null: on first launch loadConfig() returns null,
-    // and `config?.quick_view_enabled !== false` is vacuously true (undefined
-    // !== false), which previously caused initQuickEntryWindows(null) to throw
-    // an unhandled rejection before the user finished setup.
-    if (config && (config.quick_entry_enabled || config.quick_view_enabled !== false)) {
+    // Require config to be non-null: on first launch loadConfig() returns null, and
+    // initQuickEntryWindows(null) would throw before the user finished setup.
+    if (config && (isQuickEntryEnabled(config) || isQuickViewEnabled(config))) {
       setupTray()
       initQuickEntryWindows(config)
       globalShortcut.unregisterAll() // Clear stale registrations from crashes

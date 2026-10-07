@@ -5,6 +5,7 @@ vi.mock('electron', () => ({
   safeStorage: { isEncryptionAvailable: () => false },
 }))
 
+import { isQuickEntryEnabled, isQuickViewEnabled } from '../../shared/config-types'
 import {
   applyConfigPatch,
   applyConnectionFields,
@@ -394,5 +395,21 @@ describe('start_hidden (D-LNX-1)', () => {
     const after = applyConfigPatch(before, { start_hidden: true })
     expect(after.start_hidden).toBe(true)
     expect(after.launch_on_startup).toBe(true)
+  })
+})
+
+describe('Quick Entry and Quick View defaults', () => {
+  it('a config without the settings has both turned off, as every reader sees it', () => {
+    const config = normalizeConfig({})
+    expect(config.quick_view_enabled).toBe(false)
+    expect(config.quick_entry_enabled).toBe(false)
+    expect(isQuickViewEnabled(config)).toBe(false)
+    expect(isQuickEntryEnabled(config)).toBe(false)
+  })
+
+  it('keeps an explicit choice through normalizing', () => {
+    const config = normalizeConfig({ quick_view_enabled: true, quick_entry_enabled: true })
+    expect(isQuickViewEnabled(config)).toBe(true)
+    expect(isQuickEntryEnabled(config)).toBe(true)
   })
 })

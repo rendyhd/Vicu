@@ -1,5 +1,5 @@
 import type { ViewerFilter } from '../config'
-import type { AppCustomList } from '../custom-list-protocol'
+import type { CustomList } from '../../shared/config-types'
 import { filterCustomList, type CustomListTask } from '../../shared/custom-list-filter'
 import { isUpcoming, toLocalDate } from '../../shared/due-dates'
 import { withoutNestedSubtasks } from '../../shared/nested-subtasks'
@@ -18,7 +18,7 @@ export interface ResolvedViewerFilter {
  */
 export function resolveViewerFilter(
   viewerFilter: ViewerFilter,
-  customLists: AppCustomList[] | undefined,
+  customLists: CustomList[] | undefined,
 ): ResolvedViewerFilter {
   const list = viewerFilter.custom_list_id
     ? customLists?.find((entry) => entry.id === viewerFilter.custom_list_id)

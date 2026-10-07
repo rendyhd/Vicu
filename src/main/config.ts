@@ -2,118 +2,23 @@ import { app } from 'electron'
 import { join } from 'path'
 import { isMac } from './platform'
 import { readFileWithBackup, writeFileAtomic } from './atomic-file'
-import type { AppCustomList, CustomListSyncDocumentV1 } from './custom-list-protocol'
+import type {
+  AppConfig,
+  ConnectionFields,
+  ReviewConfig,
+  SecondaryProject,
+  ViewerFilter,
+} from '../shared/config-types'
 
-export interface ViewerFilter {
-  project_ids: number[]
-  sort_by: string
-  order_by: string
-  due_date_filter: string
-  include_today_all_projects?: boolean
-  custom_list_id?: string
-  view_type?: 'today' | 'upcoming' | 'anytime'
-  // The conditions of a custom list. The Quick View settings never write these; they are filled
-  // in memory when the viewer points at a custom list (see quick-entry/viewer-filter.ts).
-  project_filter_mode?: 'include' | 'exclude'
-  include_done?: boolean
-  include_overdue?: boolean
-  priority_filter?: number[]
-  label_ids?: number[]
-}
-
-export interface SecondaryProject {
-  id: number
-  title: string
-}
-
-export interface ReviewConfig {
-  enabled: boolean
-  default_cadence_days: number
-  exclude_inbox: boolean
-}
-
-export interface AppConfig {
-  vikunja_url: string
-  api_token: string
-  inbox_project_id: number
-  auth_method?: 'api_token' | 'oidc' | 'password'
-  theme: 'light' | 'dark' | 'system'
-  window_bounds?: { x: number; y: number; width: number; height: number }
-  sidebar_width?: number
-  custom_lists?: AppCustomList[]
-  custom_lists_sync?: {
-    device_id: string
-    document: CustomListSyncDocumentV1
-    dirty: boolean
-    carrier_task_id?: number
-    last_synced_at?: string
-  }
-  // Quick Entry / Quick View
-  quick_entry_enabled?: boolean
-  quick_view_enabled?: boolean
-  quick_entry_hotkey?: string
-  quick_view_hotkey?: string
-  quick_entry_default_project_id?: number
-  exclamation_today?: boolean
-  project_cycle_modifier?: 'ctrl' | 'alt' | 'ctrl+alt'
-  secondary_projects?: SecondaryProject[]
-  quick_entry_position?: { x: number; y: number }
-  quick_view_position?: { x: number; y: number }
-  viewer_filter?: ViewerFilter
-  launch_on_startup?: boolean
-  /** Start in the tray, without showing the main window, when launched at login. */
-  start_hidden?: boolean
-  standalone_mode?: boolean
-  show_today_overdue_badge?: boolean
-  // Obsidian
-  obsidian_mode?: 'off' | 'ask' | 'always'
-  obsidian_api_key?: string
-  obsidian_port?: number
-  obsidian_vault_name?: string
-  // Browser
-  browser_link_mode?: 'off' | 'ask' | 'always'
-  browser_extension_id?: string
-  // Notifications
-  notifications_enabled?: boolean
-  notifications_persistent?: boolean
-  notifications_daily_reminder_enabled?: boolean
-  notifications_daily_reminder_time?: string
-  notifications_secondary_reminder_enabled?: boolean
-  notifications_secondary_reminder_time?: string
-  notifications_overdue_enabled?: boolean
-  notifications_due_today_enabled?: boolean
-  notifications_upcoming_enabled?: boolean
-  notifications_sound?: boolean
-  // Task reminder settings
-  notifications_task_reminder_sound?: boolean
-  notifications_task_reminder_persistent?: boolean
-  notifications_default_reminder_offset?: number  // seconds, 0 = disabled
-  notifications_default_reminder_relative_to?: 'due_date' | 'start_date' | 'end_date'
-  // Update checker
-  update_check_dismissed_version?: string
-  // Migration flags
-  hotkeys_migrated_macos?: boolean
-  // NLP task parser
-  nlp_enabled?: boolean
-  nlp_syntax_mode?: 'todoist' | 'vikunja'
-  // Delete confirmation
-  confirm_before_delete?: boolean
-  // Subtask presentation in task lists
-  subtask_display?: 'inside_task' | 'expandable'
-  // Task completion sound
-  task_completion_sound_enabled?: boolean
-  task_completion_sound_path?: string | null
-  // Last directory used by file open dialogs (attachments, sound picker)
-  last_file_dialog_directory?: string | null
-  // Cached username for re-login screen
-  last_username?: string
-  // Task context menu
-  urgency_mode?: 'today' | 'important'
-  last_used_project_id?: number
-  last_used_label_id?: number
-  // Project review
-  review?: ReviewConfig
-}
+// The config types are shared with the renderer (src/shared/config-types.ts).
+export type {
+  AppConfig,
+  AuthMethod,
+  ConnectionFields,
+  ReviewConfig,
+  SecondaryProject,
+  ViewerFilter,
+} from '../shared/config-types'
 
 // Platform-aware hotkey defaults
 export const DEFAULT_QUICK_ENTRY_HOTKEY = isMac ? 'Command+Shift+Space' : 'Alt+Shift+V'
@@ -333,17 +238,6 @@ export function saveConfig(config: AppConfig): void {
 // main keeps changing fields of its own (window bounds, sidebar width, popup
 // positions, last dialog directory, dismissed update version, custom lists...).
 // These helpers merge a narrow change into the config as it is *now*.
-
-export type AuthMethod = NonNullable<AppConfig['auth_method']>
-
-/** The fields a setup, login or disconnect flow is allowed to change. */
-export interface ConnectionFields {
-  vikunja_url: string
-  api_token: string
-  auth_method: AuthMethod
-  /** Omit to keep the current inbox on the same server (0 on a different one). */
-  inbox_project_id?: number
-}
 
 /** Data that belongs to one server/account: IDs and state that mean nothing elsewhere. */
 const ACCOUNT_SPECIFIC_KEYS = [

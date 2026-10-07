@@ -1,3 +1,21 @@
+// The shapes live with the config types so the renderer sees the same ones (D-CFG-3).
+import type {
+  CustomList,
+  CustomListRevision,
+  CustomListSyncDocumentV1,
+  CustomListSyncRecord,
+  CustomListWire,
+} from '../shared/config-types'
+export type {
+  CustomList,
+  CustomListFilter,
+  CustomListRevision,
+  CustomListSyncDocumentV1,
+  CustomListSyncRecord,
+  CustomListWire,
+  CustomListWireFilter,
+} from '../shared/config-types'
+
 export const CUSTOM_LIST_CARRIER_TITLE = 'Vicu custom lists (sync metadata — do not delete)'
 export const CUSTOM_LIST_MARKER_PREFIX = '<!-- vicu-custom-lists:'
 /** Search text that finds the carrier server side (the marker name inside the HTML comment). */
@@ -7,75 +25,6 @@ export const CUSTOM_LIST_SYNC_MAX_BYTES = 512 * 1024
 
 const MARKER_RE = /<!--\s*vicu-custom-lists:v(\d+):([A-Za-z0-9_-]+={0,2})\s*-->/
 const ANY_MARKER_RE = /<!--\s*vicu-custom-lists:[\s\S]*?-->/
-
-/**
- * The filter of a synced list. Fields this version does not know (added by a newer app) are kept
- * as they are (cross-app semantics v1, section 3), hence the index signature.
- */
-export interface CustomListWireFilter {
-  project_ids: number[]
-  project_filter_mode: 'include' | 'exclude'
-  add_to_project_id: number
-  sort_by: string
-  order_by: string
-  due_date_filter: string
-  priority_filter: number[]
-  label_ids: number[]
-  include_done: boolean
-  include_today_all_projects: boolean
-  /** Whether date windows also include overdue tasks. Absent means true. */
-  include_overdue?: boolean
-  [unknownField: string]: unknown
-}
-
-export interface CustomListWire {
-  id: string
-  name: string
-  icon: string
-  filter: CustomListWireFilter
-  [unknownField: string]: unknown
-}
-
-/** A list as the app keeps it in its config and shows it in the renderer. */
-export interface AppCustomListFilter {
-  project_ids: number[]
-  project_filter_mode?: 'include' | 'exclude'
-  add_to_project_id?: number
-  sort_by: string
-  order_by: string
-  due_date_filter: string
-  priority_filter?: number[]
-  label_ids?: number[]
-  include_done?: boolean
-  include_today_all_projects?: boolean
-  include_overdue?: boolean
-  [unknownField: string]: unknown
-}
-
-export interface AppCustomList {
-  id: string
-  name: string
-  icon?: string
-  filter: AppCustomListFilter
-  [unknownField: string]: unknown
-}
-
-export interface CustomListRevision {
-  wall_time_ms: number
-  counter: number
-  device_id: string
-}
-
-export interface CustomListSyncRecord {
-  value: CustomListWire | null
-  revision: CustomListRevision
-}
-
-export interface CustomListSyncDocumentV1 {
-  version: 1
-  lists: Record<string, CustomListSyncRecord>
-  order: { ids: string[]; revision: CustomListRevision }
-}
 
 export interface ParsedCustomListEnvelope {
   isCarrier: boolean
@@ -192,7 +141,7 @@ export function normalizeWireList(value: CustomListWire): CustomListWire {
 }
 
 /** A list from the app's config as a synced value. Unknown fields pass through. */
-export function appListToWire(list: AppCustomList): CustomListWire {
+export function appListToWire(list: CustomList): CustomListWire {
   return normalizeWireList({ ...list, icon: list.icon ?? '', filter: { ...list.filter } } as CustomListWire)
 }
 
@@ -200,7 +149,7 @@ export function appListToWire(list: AppCustomList): CustomListWire {
  * A synced value as the list the app keeps in its config: empty priority and label conditions
  * are left out. Unknown fields pass through.
  */
-export function wireToAppList(list: CustomListWire): AppCustomList {
+export function wireToAppList(list: CustomListWire): CustomList {
   const { icon, filter, ...rest } = list
   const { priority_filter: priorities, label_ids: labelIds, ...filterRest } = filter
   return {
@@ -211,7 +160,7 @@ export function wireToAppList(list: CustomListWire): AppCustomList {
       ...(priorities.length ? { priority_filter: priorities } : {}),
       ...(labelIds.length ? { label_ids: labelIds } : {}),
     },
-  } as AppCustomList
+  } as CustomList
 }
 
 export function documentFromLists(

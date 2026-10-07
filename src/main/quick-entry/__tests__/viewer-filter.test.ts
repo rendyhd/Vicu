@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import type { ViewerFilter } from '../../config'
-import type { AppCustomList } from '../../custom-list-protocol'
+import type { CustomList } from '../../../shared/config-types'
 import { buildViewerFilterParams } from '../filter-builder'
 import { resolveViewerFilter, selectQuickViewTasks, selectViewerTasks } from '../viewer-filter'
 import { compileServerFilter } from '../../../shared/__tests__/server-filter-eval'
@@ -40,7 +40,7 @@ const task = (id: number, overrides: Partial<Task> & { due?: string } = {}): Tas
   }
 }
 
-const list = (filter: Partial<AppCustomList['filter']>): AppCustomList => ({
+const list = (filter: Partial<CustomList['filter']>): CustomList => ({
   id: 'list-1',
   name: 'A list',
   filter: { project_ids: [], sort_by: 'priority', order_by: 'desc', due_date_filter: 'all', ...filter },
@@ -208,7 +208,7 @@ describe('"this week" ends on Sunday (D-WEEK-1)', () => {
 // --- The Quick View runs the same vectors as the main window -----------------------------
 
 interface FixtureTask { id: number; projectId: number; due: string | null; done: boolean; priority: number; labelIds: number[] }
-interface Vector { name: string; today: string; filter: Partial<AppCustomList['filter']>; expect: number[] }
+interface Vector { name: string; today: string; filter: Partial<CustomList['filter']>; expect: number[] }
 const fixture = JSON.parse(readFileSync(join(process.cwd(), 'test-fixtures', 'cross-app-semantics-v1.json'), 'utf8')) as {
   tasks: FixtureTask[]
   customLists: Vector[]
@@ -235,7 +235,7 @@ describe.each(['America/New_York', 'Pacific/Auckland'])('Quick View custom lists
 
     for (const vector of fixture.customLists) {
       const now = local(`${vector.today}T10:00:00`)
-      const custom: AppCustomList = {
+      const custom: CustomList = {
         id: 'list-1',
         name: vector.name,
         filter: { project_ids: [], sort_by: 'due_date', order_by: 'asc', due_date_filter: 'all', ...vector.filter },

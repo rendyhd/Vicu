@@ -14,7 +14,7 @@ import {
   normalizeWireList,
   parseCustomListEnvelope,
   wireToAppList,
-  type AppCustomList,
+  type CustomList,
   type CustomListSyncDocumentV1,
   type CustomListWire,
 } from '../custom-list-protocol'
@@ -229,7 +229,7 @@ describe('unknown fields from a newer app', () => {
   })
 
   it('keeps a hand-written list from before the flag unchanged', () => {
-    const legacy: AppCustomList = {
+    const legacy: CustomList = {
       id: 'old',
       name: 'Old list',
       filter: { project_ids: [3], sort_by: 'due_date', order_by: 'asc', due_date_filter: 'this_week', priority_filter: [4] },
