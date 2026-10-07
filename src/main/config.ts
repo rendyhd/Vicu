@@ -227,9 +227,27 @@ function isWindowBounds(v: unknown): v is { x: number; y: number; width: number;
 }
 
 export function saveConfig(config: AppConfig): void {
-  cachedConfig = structuredClone(config)
+  const snapshot = structuredClone(config)
   // Temp file + rename, keeping config.json.bak (see atomic-file.ts)
   writeFileAtomic(getConfigPath(), JSON.stringify(config, null, 2), { backup: true })
+  // The cache follows the disk: after a failed write it still holds what is on disk, so a caller
+  // that is told the save failed does not keep seeing the unsaved values until the next restart.
+  cachedConfig = snapshot
+}
+
+/**
+ * Save a change nobody is waiting for (window bounds, popup positions): a failure is logged and
+ * reported as `false` instead of being thrown into a timer, where it would show Electron's
+ * main-process error dialog.
+ */
+export function saveConfigQuietly(config: AppConfig, what: string): boolean {
+  try {
+    saveConfig(config)
+    return true
+  } catch (err) {
+    console.warn(`[Config] Could not save ${what}:`, err instanceof Error ? err.message : err)
+    return false
+  }
 }
 
 // --- Merging renderer changes into the current config -----------------------

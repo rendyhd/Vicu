@@ -1,7 +1,7 @@
 import { app, BrowserWindow, globalShortcut, nativeTheme, powerMonitor, screen } from 'electron'
 import { createMainWindow, createQuickEntryWindow, createQuickViewWindow } from './window-manager'
 import { registerIpcHandlers } from './ipc-handlers'
-import { loadConfig, saveConfig, type AppConfig, DEFAULT_QUICK_ENTRY_HOTKEY, DEFAULT_QUICK_VIEW_HOTKEY } from './config'
+import { loadConfig, saveConfigQuietly, type AppConfig, DEFAULT_QUICK_ENTRY_HOTKEY, DEFAULT_QUICK_VIEW_HOTKEY } from './config'
 import { isQuickEntryEnabled, isQuickViewEnabled } from '../shared/config-types'
 import { authManager } from './auth/auth-manager'
 import { createTray, destroyTray, hasTray } from './tray'
@@ -381,7 +381,7 @@ function createAndWireMainWindow(config: AppConfig | null, options: { startHidde
     const current = loadConfig()
     if (current) {
       current.window_bounds = bounds
-      saveConfig(current)
+      saveConfigQuietly(current, 'the window position')
     }
   }
   // 'moved'/'resized' are macOS/Windows-only; 'move'/'resize' fire everywhere
@@ -478,7 +478,7 @@ function initQuickEntryWindows(config: AppConfig): void {
         const current = loadConfig()
         if (current) {
           current.quick_entry_position = { x, y }
-          saveConfig(current)
+          saveConfigQuietly(current, 'the Quick Entry position')
         }
       }, 500)
     })
@@ -506,7 +506,7 @@ function initQuickEntryWindows(config: AppConfig): void {
         const current = loadConfig()
         if (current) {
           current.quick_view_position = { x, y }
-          saveConfig(current)
+          saveConfigQuietly(current, 'the Quick View position')
         }
       }, 500)
     })
@@ -714,7 +714,7 @@ if (!gotLock) {
     ) {
       storeAPIToken(preConfig.api_token, API_TOKEN_NO_EXPIRY)
       preConfig.api_token = ''
-      saveConfig(preConfig)
+      saveConfigQuietly(preConfig, 'the API token migration')
     }
 
     const config = loadConfig()

@@ -3,7 +3,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs
 import { join } from 'path'
 import { tmpdir } from 'os'
 
-const state = vi.hoisted(() => ({ dir: '', failRename: false }))
+const state = vi.hoisted(() => ({ dir: '', failRename: false, lockedRenames: 0, lockedAlways: false }))
 
 vi.mock('electron', () => ({
   app: { getPath: () => state.dir },
@@ -18,6 +18,8 @@ vi.mock('fs', async (importOriginal) => {
     ...actual,
     renameSync: (from: string, to: string) => {
       if (state.failRename) throw new Error('EPERM: simulated rename failure')
+      // Another process (Defender, the indexer) holds config.json: the rename fails with EPERM.
+      if (state.lockedAlways || state.lockedRenames-- > 0) throw Object.assign(new Error('EPERM: operation not permitted, rename'), { code: 'EPERM' })
       return actual.renameSync(from, to)
     },
   }
@@ -47,6 +49,8 @@ describe('config.json persistence (D-CFG-1)', () => {
   beforeEach(() => {
     state.dir = mkdtempSync(join(tmpdir(), 'vicu-config-'))
     state.failRename = false
+    state.lockedRenames = 0
+    state.lockedAlways = false
     warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
   })
 
@@ -111,6 +115,59 @@ describe('config.json persistence (D-CFG-1)', () => {
     expect(existsSync(configPath() + '.tmp')).toBe(false)
     const relaunched = await launch()
     expect(relaunched.loadConfig()?.sidebar_width).toBe(100)
+  })
+
+  it('a failed save leaves the in-memory config as it was, so memory and disk agree (F2)', async () => {
+    const config = await launch()
+    config.saveConfig(baseConfig({ sidebar_width: 100 }))
+
+    state.failRename = true
+    expect(() => config.saveConfig(baseConfig({ sidebar_width: 999 }))).toThrow(/simulated/)
+    state.failRename = false
+
+    // Before the fix the cache already held 999 here, so Settings looked saved until the next restart.
+    expect(config.loadConfig()?.sidebar_width).toBe(100)
+    expect(readFileSync(configPath(), 'utf-8')).toContain('"sidebar_width": 100')
+  })
+
+  it('a rename that another process blocks for a moment is retried and the save goes through (F2)', async () => {
+    const config = await launch()
+    config.saveConfig(baseConfig({ sidebar_width: 100 }))
+
+    state.lockedRenames = 2
+    config.saveConfig(baseConfig({ sidebar_width: 250 }))
+
+    expect(config.loadConfig()?.sidebar_width).toBe(250)
+    const relaunched = await launch()
+    expect(relaunched.loadConfig()?.sidebar_width).toBe(250)
+    expect(existsSync(configPath() + '.tmp')).toBe(false)
+  })
+
+  it('a file that stays locked is written in place, so the save still lands and cache and disk match (F2)', async () => {
+    const config = await launch()
+    config.saveConfig(baseConfig({ sidebar_width: 100 }))
+
+    state.lockedAlways = true
+    config.saveConfig(baseConfig({ sidebar_width: 300 }))
+    state.lockedAlways = false
+
+    expect(config.loadConfig()?.sidebar_width).toBe(300)
+    expect((await launch()).loadConfig()?.sidebar_width).toBe(300)
+    expect(readFileSync(backupPath(), 'utf-8')).toContain('"sidebar_width": 100')
+  })
+
+  it('saveConfigQuietly reports a failed save instead of throwing it into a timer (F2)', async () => {
+    const config = await launch()
+    config.saveConfig(baseConfig({ sidebar_width: 100 }))
+
+    state.failRename = true
+    expect(config.saveConfigQuietly(baseConfig({ sidebar_width: 999 }), 'the window position')).toBe(false)
+    state.failRename = false
+
+    expect(warn).toHaveBeenCalledWith('[Config] Could not save the window position:', expect.stringContaining('simulated'))
+    expect(config.loadConfig()?.sidebar_width).toBe(100)
+    expect(config.saveConfigQuietly(baseConfig({ sidebar_width: 400 }), 'the window position')).toBe(true)
+    expect(config.loadConfig()?.sidebar_width).toBe(400)
   })
 
   it('a leftover partial temp file does not affect loading or the next save', async () => {

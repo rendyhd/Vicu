@@ -1,7 +1,7 @@
 import { BrowserWindow, net } from 'electron'
 import { randomUUID } from 'crypto'
 import { discoverProviders } from './oidc-discovery'
-import { getProviderKey, storeJWT, storeRefreshToken } from './token-store'
+import { getProviderKey, storeRenewedSession } from './token-store'
 import { extractRefreshToken } from './cookie-utils'
 import { AUTH_WINDOW_PARTITION } from '../web-security-policy'
 import { buildAuthorizationUrl, interpretRedirect } from './oidc-url'
@@ -130,12 +130,8 @@ export async function silentReauth(vikunjaUrl: string): Promise<string> {
       throw new Error('Token exchange response missing "token" field')
     }
 
-    // 12. Store the new JWT and refresh token
-    storeJWT(jwt)
-    const refreshToken = extractRefreshToken(tokenResponse)
-    if (refreshToken) {
-      storeRefreshToken(refreshToken)
-    }
+    // 12. Store the new JWT and refresh token, in one write
+    storeRenewedSession({ jwt, refreshToken: extractRefreshToken(tokenResponse) ?? undefined })
 
     return jwt
   } finally {

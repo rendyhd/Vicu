@@ -39,20 +39,82 @@ function errorMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err)
 }
 
+/** The errors a file that another process is holding for a moment fails with (antivirus, search indexer, backup tools). */
+export function isTransientFileError(err: unknown): boolean {
+  const code = (err as NodeJS.ErrnoException | undefined)?.code
+  return code === 'EPERM' || code === 'EBUSY' || code === 'EACCES'
+}
+
+/** Block the thread for `ms` without spinning. Only for the few milliseconds a synchronous retry waits. */
+export function sleepSync(ms: number): void {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms)
+}
+
+/**
+ * Synchronous twin of `retryTransient`: run `fn`, retrying while `isTransient` says the error is
+ * worth another try, and wait `delayMs`, doubling each time, between attempts. The total wait is
+ * bounded by `attempts` (the last attempt is not followed by a wait).
+ */
+export function retryTransientSync<T>(
+  fn: () => T,
+  options: { attempts: number; delayMs: number; isTransient: (err: unknown) => boolean; sleep?: (ms: number) => void }
+): T {
+  const sleep = options.sleep ?? sleepSync
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return fn()
+    } catch (err) {
+      if (attempt >= options.attempts || !options.isTransient(err)) throw err
+      sleep(options.delayMs * 2 ** (attempt - 1))
+    }
+  }
+}
+
+/** The file operations of `writeFileAtomic` that a test replaces to simulate a locked file. */
+export interface AtomicWriteHooks {
+  rename?: (from: string, to: string) => void
+  /** Wait between rename attempts. */
+  sleep?: (ms: number) => void
+  /** Replace the target's contents in place, the last resort when the rename stays locked. */
+  writeInPlace?: (path: string, data: string, mode?: number) => void
+}
+
+/** Rename attempts before giving up on the temp file: waits of 15, 30, 60, 120 and 240 ms in between. */
+const SYNC_RENAME_ATTEMPTS = 6
+const SYNC_RENAME_DELAY_MS = 15
+
+function writeInPlaceSync(path: string, data: string, mode?: number): void {
+  const fd = openSync(path, 'w', mode)
+  try {
+    writeFileSync(fd, data, 'utf-8')
+    fsyncSync(fd)
+  } finally {
+    closeSync(fd)
+  }
+}
+
 /**
  * Replace `path` with `data` atomically: write and fsync a temp file next to it,
  * then rename it over the target. A crash at any point leaves either the old or
  * the new file, never a partial one. With `backup`, the previous file is first
  * copied to `<path>.bak`, but only while it still parses as JSON, so a corrupt
  * file can never overwrite the last good backup.
+ *
+ * On Windows the rename fails with EPERM/EBUSY/EACCES while another process holds the target. It
+ * is retried for a short while (bounded, so the main thread is blocked for half a second at most);
+ * if the target stays locked, the contents are written in place instead. That is not crash-safe by
+ * itself, but the previous file is already in the backup when `backup` is set, and a save that
+ * fails is worse than one that is not atomic. The error is thrown only when nothing worked.
  */
 export function writeFileAtomic(
   path: string,
   data: string,
-  options: { backup?: boolean; mode?: number } = {}
+  options: { backup?: boolean; mode?: number; hooks?: AtomicWriteHooks } = {}
 ): void {
   mkdirSync(dirname(path), { recursive: true })
   const tmp = tmpPathFor(path)
+  const rename = options.hooks?.rename ?? renameSync
+  const writeInPlace = options.hooks?.writeInPlace ?? writeInPlaceSync
   try {
     const fd = openSync(tmp, 'w', options.mode)
     try {
@@ -62,7 +124,28 @@ export function writeFileAtomic(
       closeSync(fd)
     }
     if (options.backup) keepBackup(path)
-    renameSync(tmp, path)
+    try {
+      retryTransientSync(() => rename(tmp, path), {
+        attempts: SYNC_RENAME_ATTEMPTS,
+        delayMs: SYNC_RENAME_DELAY_MS,
+        isTransient: isTransientFileError,
+        sleep: options.hooks?.sleep,
+      })
+    } catch (renameError) {
+      if (!isTransientFileError(renameError)) throw renameError
+      try {
+        writeInPlace(path, data, options.mode)
+        console.warn(`[Files] ${basename(path)} stayed locked; wrote it in place (${errorMessage(renameError)})`)
+        try {
+          unlinkSync(tmp)
+        } catch {
+          // The temp file is only a leftover now.
+        }
+      } catch (inPlaceError) {
+        console.warn(`[Files] Could not write ${basename(path)} in place either:`, errorMessage(inPlaceError))
+        throw renameError
+      }
+    }
   } catch (err) {
     try {
       unlinkSync(tmp)
@@ -107,11 +190,6 @@ export async function retryTransient<T>(
   throw lastError
 }
 
-function isTransientRenameError(err: unknown): boolean {
-  const code = (err as NodeJS.ErrnoException | undefined)?.code
-  return code === 'EPERM' || code === 'EBUSY' || code === 'EACCES'
-}
-
 /**
  * Async twin of `writeFileAtomic` for hot paths: the event loop keeps running
  * while the data is written and fsynced. Same guarantees (temp file + rename, an
@@ -138,7 +216,7 @@ export async function writeFileAtomicAsync(
     await retryTransient(() => fsp.rename(tmp, path), {
       attempts: 5,
       delayMs: 20,
-      isTransient: isTransientRenameError,
+      isTransient: isTransientFileError,
     })
   } catch (err) {
     try {

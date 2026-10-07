@@ -272,6 +272,35 @@ export function storeRefreshToken(token: string): void {
   rememberSecret(store.refresh_token, token)
 }
 
+/**
+ * Store a renewed session: the new JWT and the rotated refresh token in one write, so a failure
+ * cannot keep one and lose the other. The server has already rotated the refresh token by the time
+ * this runs, so the old one on disk no longer works and the new one must not be lost: when the
+ * file cannot be written (a scanner or backup tool holding it), the tokens still serve this session
+ * from memory and the next write to the store saves them. Returns whether they reached the disk.
+ */
+export function storeRenewedSession(tokens: { jwt?: string; refreshToken?: string }): boolean {
+  const store = readStore()
+  if (tokens.jwt) {
+    store.jwt = encrypt(tokens.jwt)
+    store.jwt_exp = extractJWTExp(tokens.jwt) ?? undefined
+  }
+  if (tokens.refreshToken) store.refresh_token = encrypt(tokens.refreshToken)
+
+  let persisted = true
+  try {
+    writeStore(store)
+  } catch (err) {
+    persisted = false
+    memory = { path: getAuthPath(), store: { ...store } }
+    console.warn('[Auth] Could not save the renewed session; keeping it in memory until the file can be written:',
+      err instanceof Error ? err.message : err)
+  }
+  if (tokens.jwt) rememberSecret(store.jwt, tokens.jwt)
+  if (tokens.refreshToken) rememberSecret(store.refresh_token, tokens.refreshToken)
+  return persisted
+}
+
 export function getRefreshToken(): string | null {
   const store = readStore()
   if (!store.refresh_token) return null

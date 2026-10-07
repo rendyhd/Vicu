@@ -16,6 +16,7 @@ import { CompletionSoundSettings } from '@/components/settings/CompletionSoundSe
 import { ReviewSettingsPanel } from '@/components/review/ReviewSettingsPanel'
 import { ProjectSettings } from '@/components/settings/ProjectSettings'
 import { useProjects } from '@/hooks/use-projects'
+import { toast } from '@/stores/toast-store'
 import type { AppConfig, Project } from '@/lib/vikunja-types'
 
 import type { ThemeOption } from '@/lib/theme'
@@ -39,7 +40,7 @@ export function SettingsView() {
   const { data: liveProjectData } = useProjects()
   const [testStatus, setTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle')
   const [testError, setTestError] = useState('')
-  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle')
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   // Linux can only autostart when the app knows its own executable (not in a development run).
   const [launchOnStartupSupported, setLaunchOnStartupSupported] = useState(true)
   const [hotkeyWarnings, setHotkeyWarnings] = useState<{ entry: boolean; viewer: boolean; waylandLimited: boolean } | undefined>(undefined)
@@ -140,7 +141,12 @@ export function SettingsView() {
       setTimeout(() => setSaveStatus('idle'), 2000)
     } catch (err) {
       console.error('Failed to save settings', err)
-      setSaveStatus('idle')
+      // The file could not be written (main keeps what is on disk as it was). Keep the changes
+      // so the next one sends them again, and say so instead of showing "saved".
+      pendingPatchRef.current = { ...patch, ...pendingPatchRef.current }
+      setSaveStatus('error')
+      const reason = err instanceof Error ? err.message.replace(/^Error invoking remote method '[^']*': (Error: )?/, '') : ''
+      toast.error(reason ? `Could not save settings: ${reason}` : 'Could not save settings')
     }
   }, [queryClient])
 
@@ -598,6 +604,9 @@ export function SettingsView() {
         {saveStatus === 'saved' && (
           <p className="text-xs text-accent-green">Settings saved</p>
         )}
+        {saveStatus === 'error' && (
+          <p className="text-xs text-accent-red">Settings could not be saved. Your changes are kept and are saved again with the next change.</p>
+        )}
       </div>
       ) : activeTab === 'integrations' ? (
       <div className="mx-6 max-w-lg space-y-6 pb-8 pt-4">
@@ -634,6 +643,9 @@ export function SettingsView() {
         )}
         {saveStatus === 'saved' && (
           <p className="text-xs text-accent-green">Settings saved</p>
+        )}
+        {saveStatus === 'error' && (
+          <p className="text-xs text-accent-red">Settings could not be saved. Your changes are kept and are saved again with the next change.</p>
         )}
       </div>
       ) : null}

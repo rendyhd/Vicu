@@ -1,5 +1,5 @@
 import { net } from 'electron'
-import { getRefreshToken, storeJWT, storeRefreshToken } from './token-store'
+import { getRefreshToken, storeRenewedSession } from './token-store'
 import { extractRefreshToken } from './cookie-utils'
 
 const RENEWAL_TIMEOUT = 10_000
@@ -102,23 +102,30 @@ export async function renewJWT(vikunjaUrl: string): Promise<string> {
     )
   }
 
-  // Store rotated refresh token from Set-Cookie
+  // The server rotated the refresh token (Set-Cookie): the old one no longer works, so the new
+  // one is saved even when the rest of the response is unusable. With the JWT, both go into the
+  // store in one write.
   const newRefreshToken = extractRefreshToken(response)
-  if (newRefreshToken) {
-    storeRefreshToken(newRefreshToken)
-  }
 
-  let data: { token?: string }
+  let data: { token?: string } | null = null
+  let parseError: unknown
   try {
     data = (await response.json()) as { token?: string }
   } catch (err) {
+    parseError = err
+  }
+  const newJWT = data?.token
+
+  if (newJWT) storeRenewedSession({ jwt: newJWT, refreshToken: newRefreshToken ?? undefined })
+  else if (newRefreshToken) storeRenewedSession({ refreshToken: newRefreshToken })
+
+  if (parseError !== undefined) {
     throw new JWTRenewalError(
-      `JWT refresh response was not valid JSON: ${err instanceof Error ? err.message : String(err)}`,
+      `JWT refresh response was not valid JSON: ${parseError instanceof Error ? parseError.message : String(parseError)}`,
       'server-error',
       response.status,
     )
   }
-  const newJWT = data.token
   if (!newJWT) {
     throw new JWTRenewalError(
       'JWT refresh response missing token',
@@ -127,6 +134,5 @@ export async function renewJWT(vikunjaUrl: string): Promise<string> {
     )
   }
 
-  storeJWT(newJWT)
   return newJWT
 }
