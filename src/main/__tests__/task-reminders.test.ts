@@ -3,6 +3,7 @@ import {
   CATCH_UP_MS,
   FOCUS_REFRESH_MIN_MS,
   MAX_TIMER_DELAY_MS,
+  REFRESH_DEBOUNCE_MS,
   REFRESH_INTERVAL_MS,
   REMINDER_WINDOW_MS,
   createTaskReminderScheduler,
@@ -300,6 +301,70 @@ describe('task reminder scheduling (D-NOTIF-1, D-NOTIF-2, D-NOTIF-4)', () => {
       scheduler.refreshOnFocus()
       await vi.advanceTimersByTimeAsync(0)
       expect(fetchTasks).toHaveBeenCalledTimes(2)
+    })
+  })
+
+  // F8: every completed, deleted or edited task asks for a refresh. Completing 20 tasks at once
+  // used to send 20 requests for the same list; the requests now collapse into one.
+  describe('refreshSoon: a burst of requests becomes one refresh', () => {
+    it('waits a moment, then refreshes once however many requests came', async () => {
+      for (let i = 0; i < 20; i++) scheduler.refreshSoon()
+
+      await vi.advanceTimersByTimeAsync(REFRESH_DEBOUNCE_MS - 1)
+      expect(fetchTasks).not.toHaveBeenCalled()
+
+      await vi.advanceTimersByTimeAsync(1)
+      expect(fetchTasks).toHaveBeenCalledTimes(1)
+
+      // Nothing is left over from the burst.
+      await vi.advanceTimersByTimeAsync(REFRESH_DEBOUNCE_MS * 5)
+      expect(fetchTasks).toHaveBeenCalledTimes(1)
+      expect(REFRESH_DEBOUNCE_MS).toBe(1000)
+    })
+
+    it('restarts the wait with every request, so the refresh runs after the last one (trailing)', async () => {
+      scheduler.refreshSoon()
+      await vi.advanceTimersByTimeAsync(600)
+      scheduler.refreshSoon()
+      await vi.advanceTimersByTimeAsync(600)
+      scheduler.refreshSoon()
+
+      await vi.advanceTimersByTimeAsync(REFRESH_DEBOUNCE_MS - 1)
+      expect(fetchTasks).not.toHaveBeenCalled()
+      await vi.advanceTimersByTimeAsync(1)
+      expect(fetchTasks).toHaveBeenCalledTimes(1)
+    })
+
+    it('a request after the refresh started a new wait and a second refresh', async () => {
+      scheduler.refreshSoon()
+      await vi.advanceTimersByTimeAsync(REFRESH_DEBOUNCE_MS)
+      expect(fetchTasks).toHaveBeenCalledTimes(1)
+
+      scheduler.refreshSoon()
+      scheduler.refreshSoon()
+      await vi.advanceTimersByTimeAsync(REFRESH_DEBOUNCE_MS)
+      expect(fetchTasks).toHaveBeenCalledTimes(2)
+    })
+
+    it('does not delay refresh(), which runs at once', async () => {
+      scheduler.refreshSoon()
+      await scheduler.refresh()
+      expect(fetchTasks).toHaveBeenCalledTimes(1)
+    })
+
+    it('stop() cancels a refresh that was waiting', async () => {
+      scheduler.refreshSoon()
+      scheduler.stop()
+      await vi.advanceTimersByTimeAsync(REFRESH_DEBOUNCE_MS * 3)
+      expect(fetchTasks).not.toHaveBeenCalled()
+    })
+
+    it('arms the timers from the refresh it runs, like any other refresh', async () => {
+      tasks = [task(1, T0 + 10 * MIN)]
+      scheduler.refreshSoon()
+      scheduler.refreshSoon()
+      await vi.advanceTimersByTimeAsync(REFRESH_DEBOUNCE_MS)
+      expect(scheduler.scheduledCount()).toBe(1)
     })
   })
 

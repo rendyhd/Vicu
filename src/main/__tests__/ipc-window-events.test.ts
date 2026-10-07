@@ -1,13 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-// "Open in app" from Quick View: main raises the main window and tells it which task to show
-// (channel navigate-to-task, which the preload exposes as onNavigateToTask, F5).
+// IPC handlers that act on the windows or the notification scheduler:
+// - "Open in app" from Quick View: main raises the main window and tells it which task to show
+//   (channel navigate-to-task, which the preload exposes as onNavigateToTask, F5).
+// - The reminder refresh every changed task asks for is collapsed into one (F8).
 
 const hoisted = vi.hoisted(() => ({
   handlers: new Map<string, (event: unknown, ...args: unknown[]) => unknown>(),
   viewerSend: vi.fn(),
   mainSend: vi.fn(),
   hideQuickView: vi.fn(),
+  refreshTaskRemindersSoon: vi.fn(),
   forgetDeletedTask: vi.fn(),
   replay: vi.fn(async () => null),
   api: {} as Record<string, ReturnType<typeof vi.fn>>,
@@ -64,7 +67,7 @@ vi.mock('../auth/user-info', () => ({}))
 vi.mock('../auth/auth-manager', () => ({ authManager: {} }))
 vi.mock('../auth/oidc-login', () => ({ OidcTotpRequiredError: class extends Error {} }))
 vi.mock('../auth/token-store', () => ({ API_TOKEN_NO_EXPIRY: 0 }))
-vi.mock('../notifications', () => ({}))
+vi.mock('../notifications', () => ({ refreshTaskRemindersSoon: hoisted.refreshTaskRemindersSoon }))
 vi.mock('../badge', () => ({ setTaskBadge: () => undefined, clearTaskBadge: () => undefined }))
 vi.mock('../obsidian-client', () => ({}))
 vi.mock('../browser-host-registration', () => ({}))
@@ -125,5 +128,18 @@ describe('qv:open-task-in-app', () => {
     hoisted.mainWindow.current = null
     await call('qv:open-task-in-app', 42)
     expect(hoisted.mainSend).not.toHaveBeenCalled()
+  })
+})
+
+describe('notifications:refresh-task-reminders', () => {
+  beforeEach(() => {
+    hoisted.handlers.clear()
+    hoisted.refreshTaskRemindersSoon.mockClear()
+    registerIpcHandlers()
+  })
+
+  it('asks for the debounced refresh, once per call, so main can collapse a burst into one request', async () => {
+    for (let i = 0; i < 5; i++) await call('notifications:refresh-task-reminders')
+    expect(hoisted.refreshTaskRemindersSoon).toHaveBeenCalledTimes(5)
   })
 })

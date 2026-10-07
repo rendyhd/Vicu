@@ -81,7 +81,7 @@ import {
   getLastShortcutStatus,
 } from './quick-entry-state'
 import { getAPIToken, getSecretStorageStatus, storeAPIToken, API_TOKEN_NO_EXPIRY } from './auth/token-store'
-import { sendTestNotification, rescheduleNotifications, refreshTaskReminders, refreshRoutineReminders } from './notifications'
+import { sendTestNotification, rescheduleNotifications, refreshTaskRemindersSoon, refreshRoutineReminders } from './notifications'
 import { setTaskBadge, clearTaskBadge } from './badge'
 import { resolveShownObsidianLink, testObsidianConnection } from './obsidian-client'
 import { isRegistered, registerHosts } from './browser-host-registration'
@@ -720,8 +720,10 @@ export function registerIpcHandlers(): void {
     rescheduleNotifications()
   })
 
+  // Every completed, deleted or edited task asks for this; a bulk change asks many times in a row,
+  // so main waits for a quiet second and refreshes once.
   handleTrusted('notifications:refresh-task-reminders', () => {
-    refreshTaskReminders()
+    refreshTaskRemindersSoon()
   })
 
   handleTrusted('notifications:refresh-routine-reminders', () => {

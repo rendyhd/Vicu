@@ -20,6 +20,11 @@ import { KEEP_NESTED_SUBTASKS_PARAM, MAX_PAGE_SIZE } from './api-v2'
 export const REFRESH_INTERVAL_MS = 15 * 60_000
 /** Window focus refreshes at most this often. */
 export const FOCUS_REFRESH_MIN_MS = 2 * 60_000
+/**
+ * How long `refreshSoon` waits for more requests before it refreshes. Completing, deleting or
+ * editing a task each ask for a refresh; a bulk change asks many times in a row and needs one.
+ */
+export const REFRESH_DEBOUNCE_MS = 1_000
 /** Reminders further out than this are left to a later refresh. */
 export const REMINDER_WINDOW_MS = 25 * 24 * 60 * 60_000
 /**
@@ -60,6 +65,11 @@ export interface TaskReminderDeps {
 export interface TaskReminderScheduler {
   /** Fetch the reminders in the window and re-arm every timer. Safe to call at any time. */
   refresh(): Promise<void>
+  /**
+   * Ask for a refresh once requests stop coming for `REFRESH_DEBOUNCE_MS` (trailing): what every
+   * completed, deleted or edited task calls, so a bulk change makes one request instead of one per task.
+   */
+  refreshSoon(): void
   /** `refresh`, unless one started very recently. */
   refreshOnFocus(): void
   /** First refresh now, then every 15 minutes. */
@@ -93,6 +103,12 @@ export function createTaskReminderScheduler(deps: TaskReminderDeps): TaskReminde
   let refreshedOnce = false
   let lastRefreshAt = Number.NEGATIVE_INFINITY
   let interval: ReturnType<typeof setInterval> | null = null
+  let soonTimer: ReturnType<typeof setTimeout> | null = null
+
+  function cancelSoon(): void {
+    if (soonTimer !== null) clearTimeout(soonTimer)
+    soonTimer = null
+  }
 
   function clearTimers(): void {
     for (const id of timers.values()) clearTimeout(id)
@@ -178,6 +194,13 @@ export function createTaskReminderScheduler(deps: TaskReminderDeps): TaskReminde
 
   return {
     refresh,
+    refreshSoon() {
+      cancelSoon()
+      soonTimer = setTimeout(() => {
+        soonTimer = null
+        void refresh()
+      }, REFRESH_DEBOUNCE_MS)
+    },
     refreshOnFocus() {
       if (deps.now() - lastRefreshAt < FOCUS_REFRESH_MIN_MS) return
       void refresh()
@@ -189,6 +212,7 @@ export function createTaskReminderScheduler(deps: TaskReminderDeps): TaskReminde
     },
     stop() {
       generation++
+      cancelSoon()
       if (interval !== null) clearInterval(interval)
       interval = null
       clearTimers()

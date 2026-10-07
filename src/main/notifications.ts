@@ -131,6 +131,14 @@ export function refreshTaskReminders(): Promise<void> {
   return taskReminders.refresh()
 }
 
+/**
+ * What a completed, deleted or edited task calls: the refresh runs once the changes stop coming
+ * (about a second later), so completing 20 tasks at once reads the reminder list once, not 20 times.
+ */
+export function refreshTaskRemindersSoon(): void {
+  taskReminders.refreshSoon()
+}
+
 /** Window focus: refresh unless a refresh ran a moment ago. */
 export function refreshTaskRemindersOnFocus(): void {
   taskReminders.refreshOnFocus()
