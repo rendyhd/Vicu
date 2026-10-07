@@ -18,6 +18,9 @@ import type { ApiError, ApiResult } from './api-result'
 import { collectAllPages } from './paginate'
 import { decodeUtf8Chunks } from './response-body'
 import { MAX_BINARY_DOWNLOAD_BYTES, describeDownloadLimit, parseContentLength } from './attachment-safety'
+import { buildMultipartBody } from './multipart'
+import { createIdleTimeout } from './idle-timeout'
+import { DEFAULT_MAX_UPLOAD_BYTES, parseMaxFileSize, uploadSizeError, uploadTimeoutMs } from './upload-limits'
 
 /**
  * Send 'auth-required' IPC event to all renderer windows.
@@ -33,7 +36,9 @@ function notifyAuthRequired(): void {
 }
 
 const REQUEST_TIMEOUT = 10_000
-const UPLOAD_TIMEOUT = 60_000
+// A download is cut off after this long WITHOUT data, not after this long in total, so a large file
+// on a slow link still arrives as long as it keeps moving (D-API-3).
+const DOWNLOAD_IDLE_TIMEOUT = 60_000
 const API_BASE_PATH = '/api/v2'
 const JSON_MERGE_PATCH = 'application/merge-patch+json'
 
@@ -615,18 +620,17 @@ function requestMultipart<T>(
 
   return new Promise((resolve) => {
     let req: Electron.ClientRequest | null = null
+    // The time allowed grows with the file, so a file the server accepts is not cut off on a slow link.
+    const uploadTimeout = uploadTimeoutMs(fileBuffer.length)
     const timeout = setTimeout(() => {
       try { req?.abort() } catch { /* ignore */ }
-      resolve({ success: false, error: `Upload timed out (${UPLOAD_TIMEOUT / 1000}s)` })
-    }, UPLOAD_TIMEOUT)
+      resolve({ success: false, error: `Upload timed out (${Math.round(uploadTimeout / 1000)}s)` })
+    }, uploadTimeout)
 
     try {
       const boundary = `----ViCU${Date.now()}${Math.random().toString(36).slice(2)}`
-      const header = Buffer.from(
-        `--${boundary}\r\nContent-Disposition: form-data; name="files"; filename="${fileName}"\r\nContent-Type: ${mimeType}\r\n\r\n`
-      )
-      const footer = Buffer.from(`\r\n--${boundary}--\r\n`)
-      const body = Buffer.concat([header, fileBuffer, footer])
+      // The file name and type are escaped inside buildMultipartBody (D-API-3).
+      const body = buildMultipartBody({ boundary, fieldName: 'files', fileName, mimeType, file: fileBuffer })
 
       req = net.request({ method, url })
       req.setHeader('Authorization', `Bearer ${token}`)
@@ -699,10 +703,11 @@ function requestBinary(
 
   return new Promise((resolve) => {
     let req: Electron.ClientRequest | null = null
-    const timeout = setTimeout(() => {
+    // Restarted by every sign of life (response headers, each chunk), so only a stalled transfer times out.
+    const idle = createIdleTimeout(DOWNLOAD_IDLE_TIMEOUT, () => {
       try { req?.abort() } catch { /* ignore */ }
-      resolve({ success: false, error: `Download timed out (${UPLOAD_TIMEOUT / 1000}s)` })
-    }, UPLOAD_TIMEOUT)
+      resolve({ success: false, error: `Download timed out (no data for ${DOWNLOAD_IDLE_TIMEOUT / 1000}s)` })
+    })
 
     try {
       req = net.request({ method: 'GET', url })
@@ -717,12 +722,13 @@ function requestBinary(
         if (tooLarge) return
         tooLarge = true
         chunks.length = 0
-        clearTimeout(timeout)
+        idle.clear()
         try { req?.abort() } catch { /* ignore */ }
         resolve({ success: false, error: describeDownloadLimit(MAX_BINARY_DOWNLOAD_BYTES) })
       }
 
       req.on('response', (response) => {
+        idle.touch()
         statusCode = response.statusCode
 
         // Refuse oversized downloads up front when the server declares a length,
@@ -735,6 +741,7 @@ function requestBinary(
 
         response.on('data', (chunk) => {
           if (tooLarge) return
+          idle.touch()
           receivedBytes += chunk.length
           if (receivedBytes > MAX_BINARY_DOWNLOAD_BYTES) {
             rejectTooLarge()
@@ -745,7 +752,7 @@ function requestBinary(
 
         response.on('end', () => {
           if (tooLarge) return
-          clearTimeout(timeout)
+          idle.clear()
           if (statusCode >= 200 && statusCode < 300) {
             resolve({ success: true, data: Buffer.concat(chunks) })
           } else {
@@ -766,13 +773,13 @@ function requestBinary(
       })
 
       req.on('error', (err) => {
-        clearTimeout(timeout)
+        idle.clear()
         resolve({ success: false, error: err.message || 'Download failed' })
       })
 
       req.end()
     } catch (err: unknown) {
-      clearTimeout(timeout)
+      idle.clear()
       const message = err instanceof Error ? err.message : 'Download failed'
       resolve({ success: false, error: message })
     }
@@ -789,6 +796,37 @@ export async function fetchTaskAttachments(taskId: number): Promise<ApiResult<un
   )
 }
 
+// The server's upload limit comes from the public /info endpoint. A found value is kept for ten
+// minutes; when /info cannot be read the default is used and the lookup is retried after a minute.
+const UPLOAD_LIMIT_TTL = 10 * 60_000
+const UPLOAD_LIMIT_RETRY = 60_000
+let uploadLimitCache: { baseUrl: string; bytes: number; fetchedAt: number; fromServer: boolean } | null = null
+
+async function resolveMaxUploadBytes(baseUrl: string, token: string): Promise<number> {
+  const cached = uploadLimitCache
+  if (cached && cached.baseUrl === baseUrl) {
+    const ttl = cached.fromServer ? UPLOAD_LIMIT_TTL : UPLOAD_LIMIT_RETRY
+    if (Date.now() - cached.fetchedAt < ttl) return cached.bytes
+  }
+  const info = await request<{ max_file_size?: unknown }>('GET', `${baseUrl}${API_BASE_PATH}/info`, token)
+  const fromServer = info.success ? parseMaxFileSize(info.data?.max_file_size) : null
+  const bytes = fromServer ?? DEFAULT_MAX_UPLOAD_BYTES
+  uploadLimitCache = { baseUrl, bytes, fetchedAt: Date.now(), fromServer: fromServer !== null }
+  return bytes
+}
+
+/** The largest file the connected server accepts, in bytes (20 MB when it does not say). */
+export async function getMaxUploadBytes(): Promise<number> {
+  const c = await getConfigOrFail()
+  if ('success' in c) return DEFAULT_MAX_UPLOAD_BYTES
+  return resolveMaxUploadBytes(c.url, c.token)
+}
+
+/** The error for a file over the server's limit, or null; used before reading it from disk. */
+export async function checkUploadSize(size: number): Promise<string | null> {
+  return uploadSizeError(size, await getMaxUploadBytes())
+}
+
 export async function uploadTaskAttachment(
   taskId: number,
   fileBuffer: Buffer,
@@ -797,6 +835,11 @@ export async function uploadTaskAttachment(
 ): Promise<ApiResult<unknown>> {
   const c = await getConfigOrFail()
   if ('success' in c) return c
+
+  // Over the limit: say so now instead of sending megabytes the server will refuse. Reported as
+  // 422 so the offline replay drops such an upload into the failed log instead of retrying it for ever.
+  const tooLarge = uploadSizeError(fileBuffer.length, await resolveMaxUploadBytes(c.url, c.token))
+  if (tooLarge) return { success: false, error: tooLarge, statusCode: 422 }
 
   return requestMultipartWithRetry<unknown>(
     'POST',

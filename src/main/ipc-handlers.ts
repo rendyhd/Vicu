@@ -30,9 +30,11 @@ import {
   updateTaskPosition,
   fetchTaskAttachments,
   uploadTaskAttachment,
+  checkUploadSize as checkSize,
   deleteTaskAttachment,
   downloadTaskAttachment,
 } from './api-client'
+import { loadFileForUpload } from './upload-file'
 import {
   applyConfigPatch,
   applyConnectionFields,
@@ -824,10 +826,16 @@ export function registerIpcHandlers(): void {
     let count = 0
     let lastError = ''
     for (const filePath of dialogResult.filePaths) {
-      const fileBuffer = fs.readFileSync(filePath)
+      // Size is checked against the server's limit from stat, before the file is read, and the read
+      // is asynchronous: picking a huge file neither freezes the app nor fills memory (D-IPC-5).
+      const loaded = await loadFileForUpload(filePath, { checkSize })
+      if (!loaded.ok) {
+        lastError = loaded.error
+        continue
+      }
       const fileName = path.basename(filePath)
       const mimeType = getMimeType(fileName)
-      const result = await uploadTaskAttachment(taskId, fileBuffer, fileName, mimeType)
+      const result = await uploadTaskAttachment(taskId, loaded.buffer, fileName, mimeType)
       if (result.success) count++
       else lastError = result.error
     }
