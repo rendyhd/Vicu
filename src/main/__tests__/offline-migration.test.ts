@@ -91,6 +91,53 @@ describe('migrateLegacyCache (one-time split of offline-cache.json)', () => {
     expect(queue.getPending().filter((a) => a.type === 'create')).toHaveLength(1)
   })
 
+  // F4: the snapshot a legacy update-task carries is the whole row as it was when the edit was
+  // made. Only the title and the description were ever edited; the rest would overwrite what
+  // other devices changed since.
+  it('keeps only the title and the description of a legacy update-task snapshot', () => {
+    const snapshot = {
+      id: 12, title: 'Renamed', description: '<p>new notes</p>', priority: 4, due_date: '2026-10-03T23:59:59Z', done: false,
+      repeat_after: 86400, repeat_mode: 0, project_id: 3, percent_done: 0.5, hex_color: 'ff0000', is_favorite: true,
+      reminders: [{ reminder: '2026-10-03T08:00:00Z' }], labels: [{ id: 1 }], created: 'x', updated: 'y',
+    }
+    writeFileSync(cachePath(), JSON.stringify({ pendingActions: [{ id: 'u9', type: 'update-task', createdAt: '2026-10-01T10:00:00Z', taskId: 12, taskData: snapshot }] }))
+
+    migrateLegacyCache(dir)
+
+    const queue = new OfflineQueue({ queuePath: queuePath(), attachmentsDir: join(dir, 'att') })
+    queue.load()
+    const [action] = queue.getPending()
+    expect(action).toMatchObject({ type: 'update', taskId: 12, title: 'Renamed', patch: { title: 'Renamed', description: '<p>new notes</p>' } })
+    expect(Object.keys((action as { patch: object }).patch).sort()).toEqual(['description', 'title'])
+  })
+
+  it('drops a legacy update-task that carries neither a title nor a description', () => {
+    writeFileSync(cachePath(), JSON.stringify({ pendingActions: [
+      { id: 'u9', type: 'update-task', createdAt: '2026-10-01T10:00:00Z', taskId: 12, taskData: { id: 12, priority: 4, due_date: '2026-10-03T23:59:59Z' } },
+      { id: 'u10', type: 'complete', createdAt: '2026-10-01T10:01:00Z', taskId: 13 },
+    ] }))
+
+    migrateLegacyCache(dir)
+
+    const queue = new OfflineQueue({ queuePath: queuePath(), attachmentsDir: join(dir, 'att') })
+    queue.load()
+    expect(queue.getPending().map((a) => a.id)).toEqual(['u10'])
+  })
+
+  it('a legacy title edit and a later complete of the same task end up as one patch without snapshot fields', () => {
+    writeFileSync(cachePath(), JSON.stringify({ pendingActions: [
+      { id: 'u1', type: 'update-task', createdAt: '2026-10-01T10:00:00Z', taskId: 12, taskData: { id: 12, title: 'New', priority: 3 } },
+      { id: 'u2', type: 'complete', createdAt: '2026-10-01T10:01:00Z', taskId: 12 },
+    ] }))
+
+    migrateLegacyCache(dir)
+
+    const queue = new OfflineQueue({ queuePath: queuePath(), attachmentsDir: join(dir, 'att') })
+    queue.load()
+    expect(queue.getPending()).toHaveLength(1)
+    expect((queue.getPending()[0] as { patch: object }).patch).toEqual({ title: 'New', done: true })
+  })
+
   it('temp ids continue counting down after migrated creates', async () => {
     writeFileSync(cachePath(), JSON.stringify(legacy))
     migrateLegacyCache(dir)

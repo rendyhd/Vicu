@@ -18,6 +18,15 @@ export interface MigrationResult {
 
 const isRecord = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v)
 
+/** What a legacy `update-task` entry changed (the old Quick View's inline edit). */
+const LEGACY_EDITABLE_FIELDS = ['title', 'description'] as const
+
+function pick(source: Record<string, unknown>, keys: readonly string[]): Record<string, unknown> {
+  const picked: Record<string, unknown> = {}
+  for (const key of keys) if (key in source) picked[key] = source[key]
+  return picked
+}
+
 function toUpdate(
   legacy: Record<string, unknown>,
   patch: Record<string, unknown>,
@@ -78,7 +87,10 @@ export function convertLegacyActions(legacy: unknown[]): { actions: QueuedAction
         update = toUpdate(raw, { due_date: null }, taskId)
         break
       case 'update-task':
-        if (isRecord(raw.taskData)) update = toUpdate(raw, raw.taskData, taskId)
+        // The old Quick View only ever changed the title and the description. Its `taskData` is a
+        // full snapshot of the row as it was when the edit was made: every other field in it is
+        // stale and would overwrite what changed on the server since.
+        if (isRecord(raw.taskData)) update = toUpdate(raw, pick(raw.taskData, LEGACY_EDITABLE_FIELDS), taskId)
         break
     }
     if (update) actions = mergeUpdate(actions, update, null).actions
