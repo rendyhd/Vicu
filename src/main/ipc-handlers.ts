@@ -105,6 +105,7 @@ import {
   quickViewReopen,
   type QuickActionDeps,
 } from './offline/quick-actions'
+import { parseTaskWriteOptions, taskWriteReply, taskWrites, writeTask } from './offline/task-writes'
 import {
   setCachedTasks,
   getCachedTasks,
@@ -121,13 +122,29 @@ import {
   removeStandaloneTask,
 } from './cache'
 
+/** A write that got through, or joined a waiting queue, asks for a replay; bursts of them ask once. */
+const REPLAY_REQUEST_MIN_INTERVAL_MS = 5_000
+let lastReplayRequestAt = 0
+function requestReplay(): void {
+  const now = Date.now()
+  if (now - lastReplayRequestAt < REPLAY_REQUEST_MIN_INTERVAL_MS) return
+  lastReplayRequestAt = now
+  void replayPendingActions()
+}
+
 /** What the Quick Entry / Quick View handlers need: the queue, the API client and a way to refresh the main window. */
 function quickActionDeps(): QuickActionDeps {
   return {
     queue: getOfflineQueue(),
     api: { createTask, updateTask },
     notifyMainWindow: () => notifyMainWindow(),
+    requestReplay,
   }
+}
+
+/** Every change to an existing task goes through the write gate (see offline/task-writes.ts). */
+function taskWriteDeps() {
+  return { queue: getOfflineQueue(), requestReplay }
 }
 
 // Config keys that only record UI state. Changing just these needs no badge refresh,
@@ -195,23 +212,30 @@ export function registerIpcHandlers(): void {
   })
 
   // `patch` holds only the writable fields that changed (see src/shared/merge-patches.ts);
-  // the API client reduces it to the PATCH schema once more before sending.
-  handleTrusted('update-task', async (event, id: number, patch: Record<string, unknown>) => {
-    const result = await updateTask(id, patch)
-    if (result.success) {
+  // the API client reduces it to the PATCH schema once more before sending. Like the other task
+  // writes below, it goes through the write gate: while changes for the task wait in the offline
+  // queue a newer one joins the queue instead of overtaking them, and with `options.queue` a change
+  // the server cannot take is queued here (see offline/task-writes.ts).
+  handleTrusted('update-task', async (event, id: number, patch: Record<string, unknown>, options?: unknown) => {
+    const { queue, title } = parseTaskWriteOptions(options)
+    const deps = taskWriteDeps()
+    const outcome = await writeTask(deps, taskWrites.update(deps.queue, { updateTask }, id, patch, title), { queue })
+    if (outcome.kind === 'sent') {
       notifyViewerSync()
       notifyMainWindow(event.sender.id)
     }
-    return result
+    return taskWriteReply(outcome)
   })
 
-  handleTrusted('delete-task', async (_event, id: number) => {
-    const result = await deleteTask(id)
-    if (result.success) {
+  handleTrusted('delete-task', async (_event, id: number, options?: unknown) => {
+    const { queue, title } = parseTaskWriteOptions(options)
+    const deps = taskWriteDeps()
+    const outcome = await writeTask(deps, taskWrites.delete(deps.queue, { deleteTask }, id, title), { queue })
+    if (outcome.kind === 'sent') {
       notifyViewerSync()
       forgetDeletedTask(id)
     }
-    return result
+    return taskWriteReply(outcome)
   })
 
   handleTrusted('fetch-task-by-id', (_event, id: number) => {
@@ -266,12 +290,21 @@ export function registerIpcHandlers(): void {
     return fetchLabels()
   })
 
-  handleTrusted('add-label-to-task', async (_event, taskId: number, labelId: number) => {
-    return refreshViewerOnSuccess(await addLabelToTask(taskId, labelId))
+  handleTrusted('add-label-to-task', async (_event, taskId: number, labelId: number, options?: unknown) => {
+    const { queue, title, labelTitle } = parseTaskWriteOptions(options)
+    const deps = taskWriteDeps()
+    const label = labelTitle ? { id: labelId, title: labelTitle } : { id: labelId }
+    const outcome = await writeTask(deps, taskWrites.addLabel(deps.queue, { addLabelToTask }, taskId, label, title), { queue })
+    if (outcome.kind === 'sent') notifyViewerSync()
+    return taskWriteReply(outcome)
   })
 
-  handleTrusted('remove-label-from-task', async (_event, taskId: number, labelId: number) => {
-    return refreshViewerOnSuccess(await removeLabelFromTask(taskId, labelId))
+  handleTrusted('remove-label-from-task', async (_event, taskId: number, labelId: number, options?: unknown) => {
+    const { queue, title } = parseTaskWriteOptions(options)
+    const deps = taskWriteDeps()
+    const outcome = await writeTask(deps, taskWrites.removeLabel(deps.queue, { removeLabelFromTask }, taskId, labelId, title), { queue })
+    if (outcome.kind === 'sent') notifyViewerSync()
+    return taskWriteReply(outcome)
   })
 
   handleTrusted('create-label', async (_event, label: Record<string, unknown>) => {

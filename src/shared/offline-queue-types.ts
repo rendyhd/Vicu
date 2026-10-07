@@ -157,3 +157,25 @@ export interface OfflineCreateResult {
 }
 
 export const OFFLINE_PENDING_ID_PREFIX = 'pending_'
+
+/**
+ * Options of the task write calls that go through the main process's write gate
+ * (`update-task`, `delete-task`, `add-label-to-task`, `remove-label-from-task`). Without them a
+ * call needs the server's answer: when changes for the task are still waiting in the queue it is
+ * refused instead of being sent around them.
+ */
+export interface TaskWriteOptions {
+  /** The caller can live with the change being queued (behind waiting changes, or when the server cannot be reached). */
+  queue?: boolean
+  /** The task's title, for the sync panel's summary line. */
+  title?: string
+  /** A label's title, kept with a queued "add label" so the replay can look the label up by name. */
+  labelTitle?: string
+}
+
+/** What a queue-aware task write answers when the change went into the offline queue instead of the server. */
+export interface QueuedWriteReply {
+  success: true
+  queued: true
+  data: null
+}

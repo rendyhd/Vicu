@@ -2,6 +2,7 @@ import { isQueueableFailure } from '../../shared/error-classify'
 import type { ApiResult } from '../api-result'
 import type { OfflineQueue } from './queue'
 import { parseQueuedImages, parseQueuedLabels } from './parse-input'
+import { taskWrites, writeTask } from './task-writes'
 
 // What Quick Entry and Quick View do when the server cannot be reached. The IPC handlers in
 // ipc-handlers.ts stay thin (standalone mode, argument shapes, window notifications) and call into
@@ -18,6 +19,8 @@ export interface QuickActionDeps {
   api: QuickActionApi
   /** Tell the main window its task lists are stale. */
   notifyMainWindow: () => void
+  /** Ask for a replay soon (see `TaskWriteDeps.requestReplay`). */
+  requestReplay?: () => void
 }
 
 /** Quick View stores the subtasks it completed along with a task under this key, to undo them together. */
@@ -169,16 +172,13 @@ export async function quickViewPatch(
     return { success: true, cached: true }
   }
 
-  const result = await deps.api.updateTask(target.id, patch)
-  if (result.success) {
+  const outcome = await writeTask(deps, taskWrites.update(deps.queue, deps.api, target.id, patch, meta.title), { queue: true })
+  if (outcome.kind === 'sent') {
     deps.notifyMainWindow()
-    return result
+    return outcome.result
   }
-  if (isQueueableFailure(result, 'change')) {
-    await deps.queue.enqueueUpdate(target.id, patch, meta)
-    return { success: true, cached: true }
-  }
-  return result
+  if (outcome.kind === 'queued') return { success: true, cached: true }
+  return outcome.result
 }
 
 /**
@@ -203,39 +203,33 @@ export async function quickViewComplete(
   const cleanTask = withoutCompletionMetadata(taskData)
   const autoCompleted = taskDescendants(cleanTask).filter((task) => task.done !== true)
   const changed: Array<{ task: Record<string, unknown>; queued: boolean }> = []
+  const complete = (id: number, task: Record<string, unknown>) =>
+    writeTask(deps, taskWrites.update(queue, api, id, { done: true }, titleMeta(task).title), { queue: true })
   const undoChanged = async () => {
     for (const entry of changed.reverse()) {
       const id = entry.task.id as number
       // A completion that is still queued is taken back out; one that reached the server is reopened.
       if (entry.queued && (await queue.cancelChange(id, ['done']))) continue
-      await api.updateTask(id, { done: false })
+      await writeTask(deps, taskWrites.update(queue, api, id, { done: false }, titleMeta(entry.task).title), { queue: true })
     }
   }
 
   for (const child of [...autoCompleted].reverse()) {
-    const childId = child.id as number
-    const result = await api.updateTask(childId, { done: true })
-    if (result.success) {
-      changed.push({ task: child, queued: false })
-    } else if (isQueueableFailure(result, 'change')) {
-      await queue.enqueueComplete(childId, true, titleMeta(child))
-      changed.push({ task: child, queued: true })
-    } else {
+    const outcome = await complete(child.id as number, child)
+    if (outcome.kind === 'refused') {
       await undoChanged()
-      return result
+      return outcome.result
     }
+    changed.push({ task: child, queued: outcome.kind === 'queued' })
   }
 
-  const result = await api.updateTask(taskId, { done: true })
-  if (!result.success && !isQueueableFailure(result, 'change')) {
+  const outcome = await complete(taskId, cleanTask)
+  if (outcome.kind === 'refused') {
     await undoChanged()
-    return result
-  }
-  if (!result.success) {
-    await queue.enqueueComplete(taskId, true, titleMeta(cleanTask))
+    return outcome.result
   }
   deps.notifyMainWindow()
-  return result.success ? result : { success: true, cached: true }
+  return outcome.kind === 'sent' ? outcome.result : { success: true, cached: true }
 }
 
 /**
@@ -268,13 +262,12 @@ export async function quickViewReopen(
       usedCache = true
       return { success: true }
     }
-    const result = await api.updateTask(target.id, { done: false })
-    if (!result.success && isQueueableFailure(result, 'change')) {
-      await queue.enqueueComplete(target.id, false, titleMeta(task))
+    const outcome = await writeTask(deps, taskWrites.update(queue, api, target.id, { done: false }, titleMeta(task).title), { queue: true })
+    if (outcome.kind === 'queued') {
       usedCache = true
       return { success: true }
     }
-    return result
+    return outcome.result
   }
 
   const rootResult = await restore(rawTaskId, cleanTask)

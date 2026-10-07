@@ -4,6 +4,7 @@ import type {
   OfflineCreateInput,
   OfflineLabelRef,
   OfflineReplayEvent,
+  TaskWriteOptions,
 } from '../shared/offline-queue-types'
 
 const api = {
@@ -16,10 +17,12 @@ const api = {
     ipcRenderer.invoke('fetch-routine-carriers'),
   createTask: (projectId: number, task: Record<string, unknown>) =>
     ipcRenderer.invoke('create-task', projectId, task),
-  updateTask: (id: number, patch: TaskPatch) =>
-    ipcRenderer.invoke('update-task', id, patch),
-  deleteTask: (id: number) =>
-    ipcRenderer.invoke('delete-task', id),
+  // The task writes go through the main process's write gate; `options.queue` says the caller can
+  // live with the change being queued (see src/main/offline/task-writes.ts).
+  updateTask: (id: number, patch: TaskPatch, options?: TaskWriteOptions) =>
+    ipcRenderer.invoke('update-task', id, patch, options),
+  deleteTask: (id: number, options?: TaskWriteOptions) =>
+    ipcRenderer.invoke('delete-task', id, options),
   fetchTaskById: (id: number) =>
     ipcRenderer.invoke('fetch-task-by-id', id),
   createTaskRelation: (taskId: number, otherTaskId: number, relationKind: string) =>
@@ -42,10 +45,10 @@ const api = {
   // Labels
   fetchLabels: () =>
     ipcRenderer.invoke('fetch-labels'),
-  addLabelToTask: (taskId: number, labelId: number) =>
-    ipcRenderer.invoke('add-label-to-task', taskId, labelId),
-  removeLabelFromTask: (taskId: number, labelId: number) =>
-    ipcRenderer.invoke('remove-label-from-task', taskId, labelId),
+  addLabelToTask: (taskId: number, labelId: number, options?: TaskWriteOptions) =>
+    ipcRenderer.invoke('add-label-to-task', taskId, labelId, options),
+  removeLabelFromTask: (taskId: number, labelId: number, options?: TaskWriteOptions) =>
+    ipcRenderer.invoke('remove-label-from-task', taskId, labelId, options),
   createLabel: (label: Record<string, unknown>) =>
     ipcRenderer.invoke('create-label', label),
   updateLabel: (id: number, label: Record<string, unknown>) =>

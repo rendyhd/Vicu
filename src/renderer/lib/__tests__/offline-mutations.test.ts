@@ -43,29 +43,33 @@ describe('mutation helpers with the offline queue (D-SYNC-6, decision 4)', () =>
     vi.unstubAllGlobals()
   })
 
+  // The main process decides whether a change to an existing task is sent or queued (the write
+  // gate, src/main/offline/task-writes.ts): the window asks with `{ queue: true }` and gets either
+  // the server's answer or `{ success: true, queued: true }`.
+  const queuedReply = { success: true as const, queued: true as const, data: null }
+
   describe('sendTaskPatch', () => {
-    it('sends the change and does not queue it when the server answers', async () => {
+    it('asks for the change to be sent, or queued, and reports the server task when it was sent', async () => {
       const result = await sendTaskPatch(5, { priority: 2 }, 'Pay rent')
 
-      expect(updateTask).toHaveBeenCalledWith(5, { priority: 2 })
+      expect(updateTask).toHaveBeenCalledWith(5, { priority: 2 }, { queue: true, title: 'Pay rent' })
       expect(queue.enqueueUpdate).not.toHaveBeenCalled()
       expect(result).toEqual({ queued: false, task: { id: 5 } })
     })
 
-    it.each([
-      ['a network error', fail('net::ERR_INTERNET_DISCONNECTED')],
-      ['a connection refusal', fail('connect ECONNREFUSED 127.0.0.1:3456')],
-      ['a timeout', fail('Request timed out')],
-      ['a server error', fail('Internal Server Error', 500)],
-      ['a gateway error', fail('Bad Gateway', 502)],
-      ['rate limiting', fail('Too Many Requests', 429)],
-    ])('queues the change on %s and keeps the optimistic cache (no error thrown)', async (_name, failure) => {
-      updateTask.mockResolvedValueOnce(failure)
+    it('reports a queued change (the server was unreachable, or changes for the task were waiting) without a task', async () => {
+      updateTask.mockResolvedValueOnce(queuedReply)
 
       const result = await sendTaskPatch(5, { priority: 2 }, 'Pay rent')
 
-      expect(queue.enqueueUpdate).toHaveBeenCalledWith(5, { priority: 2 }, { title: 'Pay rent' })
-      expect(result.queued).toBe(true)
+      expect(result).toEqual({ queued: true, task: null })
+      // Queueing happened in the main process; the window does not queue it a second time.
+      expect(queue.enqueueUpdate).not.toHaveBeenCalled()
+    })
+
+    it('leaves the title out of the options when there is none', async () => {
+      await sendTaskPatch(5, { priority: 2 })
+      expect(updateTask).toHaveBeenCalledWith(5, { priority: 2 }, { queue: true })
     })
 
     it.each([
@@ -75,7 +79,8 @@ describe('mutation helpers with the offline queue (D-SYNC-6, decision 4)', () =>
       ['an expired session', fail('Session expired', 401)],
       ['a permission error', fail('Forbidden', 403)],
       ['an invalid token', fail('API token is invalid')],
-    ])('does not queue %s: it throws so the cache rolls back and the user sees why', async (_name, failure) => {
+      ['a queue that could not take the change', fail('Could not save offline: disk full', 502)],
+    ])('throws on %s so the cache rolls back and the user sees why', async (_name, failure) => {
       updateTask.mockResolvedValueOnce(failure)
 
       await expect(sendTaskPatch(5, { priority: 2 }, 'x')).rejects.toBeInstanceOf(ApiError)
@@ -95,24 +100,24 @@ describe('mutation helpers with the offline queue (D-SYNC-6, decision 4)', () =>
       expect(result.queued).toBe(true)
     })
 
-    it('throws when the queue itself cannot take the change', async () => {
-      updateTask.mockResolvedValueOnce(fail('net::ERR_INTERNET_DISCONNECTED'))
+    it('throws when the queue itself cannot take a change to a pending create', async () => {
       queue.enqueueUpdate.mockResolvedValueOnce({ success: false, error: 'disk full' })
 
-      await expect(sendTaskPatch(5, { priority: 2 })).rejects.toThrow(/disk full/)
+      await expect(sendTaskPatch(-4, { priority: 2 })).rejects.toThrow(/disk full/)
     })
   })
 
   describe('deleteTaskOrQueue', () => {
     it('deletes online', async () => {
       expect(await deleteTaskOrQueue(5, 'x')).toEqual({ queued: false })
+      expect(deleteTask).toHaveBeenCalledWith(5, { queue: true, title: 'x' })
       expect(queue.enqueueDelete).not.toHaveBeenCalled()
     })
 
-    it('queues the delete when the server cannot be reached', async () => {
-      deleteTask.mockResolvedValueOnce(fail('net::ERR_NETWORK_CHANGED'))
+    it('reports a delete the main process queued', async () => {
+      deleteTask.mockResolvedValueOnce(queuedReply)
       expect(await deleteTaskOrQueue(5, 'Old task')).toEqual({ queued: true })
-      expect(queue.enqueueDelete).toHaveBeenCalledWith(5, { title: 'Old task' })
+      expect(queue.enqueueDelete).not.toHaveBeenCalled()
     })
 
     it('drops a pending create from the queue instead of sending a delete', async () => {
@@ -128,10 +133,15 @@ describe('mutation helpers with the offline queue (D-SYNC-6, decision 4)', () =>
   })
 
   describe('labels', () => {
-    it('queues an add by id when the server cannot be reached', async () => {
-      addLabelToTask.mockResolvedValueOnce(fail('net::ERR_INTERNET_DISCONNECTED'))
+    it('asks for an add to be sent or queued, with the label title for the queue', async () => {
+      expect(await addLabelOrQueue(5, { id: 3, title: 'home' }, 'Pay rent')).toEqual({ queued: false })
+      expect(addLabelToTask).toHaveBeenCalledWith(5, 3, { queue: true, title: 'Pay rent', labelTitle: 'home' })
+    })
+
+    it('reports an add the main process queued', async () => {
+      addLabelToTask.mockResolvedValueOnce(queuedReply)
       expect(await addLabelOrQueue(5, { id: 3, title: 'home' }, 'Pay rent')).toEqual({ queued: true })
-      expect(queue.enqueueAddLabel).toHaveBeenCalledWith(5, { id: 3, title: 'home' }, { title: 'Pay rent' })
+      expect(queue.enqueueAddLabel).not.toHaveBeenCalled()
     })
 
     it('adds a label to a pending create through the queue', async () => {
@@ -140,10 +150,19 @@ describe('mutation helpers with the offline queue (D-SYNC-6, decision 4)', () =>
       expect(queue.enqueueAddLabel).toHaveBeenCalledWith(-4, { id: 3 }, {})
     })
 
-    it('queues a removal', async () => {
-      removeLabelFromTask.mockResolvedValueOnce(fail('Bad Gateway', 502))
+    it('asks for a removal to be sent or queued and reports a queued one', async () => {
+      expect(await removeLabelOrQueue(5, 3, 'Pay rent')).toEqual({ queued: false })
+      expect(removeLabelFromTask).toHaveBeenCalledWith(5, 3, { queue: true, title: 'Pay rent' })
+
+      removeLabelFromTask.mockResolvedValueOnce(queuedReply)
       expect(await removeLabelOrQueue(5, 3, 'Pay rent')).toEqual({ queued: true })
-      expect(queue.enqueueRemoveLabel).toHaveBeenCalledWith(5, 3, { title: 'Pay rent' })
+      expect(queue.enqueueRemoveLabel).not.toHaveBeenCalled()
+    })
+
+    it('removes a label from a pending create through the queue', async () => {
+      await removeLabelOrQueue(-4, 3)
+      expect(removeLabelFromTask).not.toHaveBeenCalled()
+      expect(queue.enqueueRemoveLabel).toHaveBeenCalledWith(-4, 3, {})
     })
 
     it('does not queue a label the server rejected', async () => {

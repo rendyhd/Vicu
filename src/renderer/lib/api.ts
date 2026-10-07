@@ -31,6 +31,8 @@ import type {
   OfflineQueueResult,
   OfflineQueueSnapshot,
   OfflineReplayEvent,
+  QueuedWriteReply,
+  TaskWriteOptions,
 } from '../../shared/offline-queue-types'
 
 export type {
@@ -45,6 +47,10 @@ export type OidcLoginResult =
   | { success: true }
   | { success: false; error: string; totpRequired?: boolean }
 
+function queueOptions(title?: string): TaskWriteOptions {
+  return title ? { queue: true, title } : { queue: true }
+}
+
 export const api = {
   fetchTasks: (params: TaskQueryParams) =>
     window.api.fetchTasks(params) as Promise<ApiResult<Task[]>>,
@@ -55,11 +61,21 @@ export const api = {
   createTask: (projectId: number, task: CreateTaskPayload) =>
     window.api.createTask(projectId, task) as Promise<ApiResult<Task>>,
 
+  // The task writes below need the server's answer. When changes for the task are still waiting in
+  // the offline queue they are refused instead of being sent around them. The `...OrQueue` variants
+  // are for edits that can be queued: the main process queues them behind waiting changes, or when
+  // the server cannot be reached, and answers `{ success: true, queued: true }`.
   updateTask: (id: number, task: UpdateTaskPayload) =>
     window.api.updateTask(id, task) as Promise<ApiResult<Task>>,
 
+  updateTaskOrQueue: (id: number, task: UpdateTaskPayload, title?: string) =>
+    window.api.updateTask(id, task, queueOptions(title)) as Promise<ApiResult<Task> | QueuedWriteReply>,
+
   deleteTask: (id: number) =>
     window.api.deleteTask(id) as Promise<ApiResult<void>>,
+
+  deleteTaskOrQueue: (id: number, title?: string) =>
+    window.api.deleteTask(id, queueOptions(title)) as Promise<ApiResult<void> | QueuedWriteReply>,
 
   fetchTaskById: (id: number) =>
     window.api.fetchTaskById(id) as Promise<ApiResult<Task>>,
@@ -100,8 +116,17 @@ export const api = {
   addLabelToTask: (taskId: number, labelId: number) =>
     window.api.addLabelToTask(taskId, labelId) as Promise<ApiResult<void>>,
 
+  addLabelToTaskOrQueue: (taskId: number, label: { id: number; title?: string }, taskTitle?: string) =>
+    window.api.addLabelToTask(taskId, label.id, {
+      ...queueOptions(taskTitle),
+      ...(label.title ? { labelTitle: label.title } : {}),
+    }) as Promise<ApiResult<void> | QueuedWriteReply>,
+
   removeLabelFromTask: (taskId: number, labelId: number) =>
     window.api.removeLabelFromTask(taskId, labelId) as Promise<ApiResult<void>>,
+
+  removeLabelFromTaskOrQueue: (taskId: number, labelId: number, taskTitle?: string) =>
+    window.api.removeLabelFromTask(taskId, labelId, queueOptions(taskTitle)) as Promise<ApiResult<void> | QueuedWriteReply>,
 
   createLabel: (label: CreateLabelPayload) =>
     window.api.createLabel(label) as Promise<ApiResult<Label>>,

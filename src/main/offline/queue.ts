@@ -215,6 +215,15 @@ export class OfflineQueue {
   }
 
   /**
+   * Whether any pending action (including the one being sent right now) belongs to this task, a
+   * pending create of it included. While it does, a newer change to the task must join the queue
+   * instead of going straight to the server, or the replay would later send the older change on top.
+   */
+  hasPendingFor(taskId: number): boolean {
+    return this.data.actions.some((a) => (a.type === 'create' ? a.tempId === taskId : a.taskId === taskId))
+  }
+
+  /**
    * Turn whatever a window calls a task into the number the queue uses: a real id, a negative temp
    * id still pending, `pending_<actionId>`, or either of those after the create replayed (the
    * real id). Null when the task is not known: it was never queued, or its create failed.

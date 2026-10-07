@@ -4,13 +4,16 @@ import { ApiError, apiError } from './mutation-errors'
 import { isTempTaskId, pendingTaskFromCreate } from './pending-cache'
 import type { TaskPatch } from './merge-patches'
 import type { CreateTaskPayload, Label, Task } from './vikunja-types'
-import type { OfflineImageInput, OfflineLabelRef, OfflineQueueResult } from '../../shared/offline-queue-types'
+import type { OfflineImageInput, OfflineLabelRef, OfflineQueueResult, QueuedWriteReply } from '../../shared/offline-queue-types'
 
 // The main window's writes (D-SYNC-6, decision 4): try the server; when it cannot be reached or is
-// having trouble, hand the change to the main-process offline queue instead of failing, so the
-// optimistic cache stays and the change is replayed later. A task that only exists as a pending
-// create (negative temp id) never goes to the server: its changes go straight into the queue,
-// where they fold into the create.
+// having trouble, the change goes into the main-process offline queue instead of failing, so the
+// optimistic cache stays and the change is replayed later. Where a change to an existing task goes
+// is decided in the main process (src/main/offline/task-writes.ts), in one place for every caller:
+// it queues the change when the server cannot be reached and also when changes for that task are
+// already waiting, because sending it around them would let the replay overwrite it later. A task
+// that only exists as a pending create (negative temp id) never goes to the server: its changes go
+// straight into the queue, where they fold into the create.
 //
 // A change the server looked at and refused (4xx) or an auth problem is not queued: it throws an
 // `ApiError`, the hook rolls the cache back and the global handler tells the user why.
@@ -37,6 +40,11 @@ async function queueChange<T>(enqueue: () => Promise<OfflineQueueResult<T>>, ori
 
 const titleMeta = (title?: string): { title?: string } => (title ? { title } : {})
 
+/** The main process queued the change instead of sending it. */
+function isQueuedReply(result: { success: boolean }): result is QueuedWriteReply {
+  return result.success && (result as Partial<QueuedWriteReply>).queued === true
+}
+
 export interface PatchOutcome {
   queued: boolean
   /** The server's task, or null when the change was queued. */
@@ -49,11 +57,10 @@ export async function sendTaskPatch(id: number, patch: TaskPatch, title?: string
     await queueChange(() => api.offlineQueue.enqueueUpdate(id, patch, titleMeta(title)))
     return { queued: true, task: null }
   }
-  const result = await api.updateTask(id, patch)
-  if (result.success) return { queued: false, task: result.data }
-  if (!isQueueableFailure(result, 'change')) throw apiError(result)
-  await queueChange(() => api.offlineQueue.enqueueUpdate(id, patch, titleMeta(title)), result)
-  return { queued: true, task: null }
+  const result = await api.updateTaskOrQueue(id, patch, title)
+  if (!result.success) throw apiError(result)
+  if (isQueuedReply(result)) return { queued: true, task: null }
+  return { queued: false, task: result.data }
 }
 
 /** Delete a task, or queue the delete. Deleting a pending create just removes it from the queue. */
@@ -62,11 +69,9 @@ export async function deleteTaskOrQueue(id: number, title?: string): Promise<{ q
     await queueChange(() => api.offlineQueue.enqueueDelete(id, titleMeta(title)))
     return { queued: true }
   }
-  const result = await api.deleteTask(id)
-  if (result.success) return { queued: false }
-  if (!isQueueableFailure(result, 'change')) throw apiError(result)
-  await queueChange(() => api.offlineQueue.enqueueDelete(id, titleMeta(title)), result)
-  return { queued: true }
+  const result = await api.deleteTaskOrQueue(id, title)
+  if (!result.success) throw apiError(result)
+  return { queued: isQueuedReply(result) }
 }
 
 export async function addLabelOrQueue(
@@ -74,16 +79,14 @@ export async function addLabelOrQueue(
   label: { id: number; title?: string },
   taskTitle?: string,
 ): Promise<{ queued: boolean }> {
-  const ref: OfflineLabelRef = label.title ? { id: label.id, title: label.title } : { id: label.id }
   if (isTempTaskId(taskId)) {
+    const ref: OfflineLabelRef = label.title ? { id: label.id, title: label.title } : { id: label.id }
     await queueChange(() => api.offlineQueue.enqueueAddLabel(taskId, ref, titleMeta(taskTitle)))
     return { queued: true }
   }
-  const result = await api.addLabelToTask(taskId, label.id)
-  if (result.success) return { queued: false }
-  if (!isQueueableFailure(result, 'change')) throw apiError(result)
-  await queueChange(() => api.offlineQueue.enqueueAddLabel(taskId, ref, titleMeta(taskTitle)), result)
-  return { queued: true }
+  const result = await api.addLabelToTaskOrQueue(taskId, label, taskTitle)
+  if (!result.success) throw apiError(result)
+  return { queued: isQueuedReply(result) }
 }
 
 export async function removeLabelOrQueue(taskId: number, labelId: number, taskTitle?: string): Promise<{ queued: boolean }> {
@@ -91,11 +94,9 @@ export async function removeLabelOrQueue(taskId: number, labelId: number, taskTi
     await queueChange(() => api.offlineQueue.enqueueRemoveLabel(taskId, labelId, titleMeta(taskTitle)))
     return { queued: true }
   }
-  const result = await api.removeLabelFromTask(taskId, labelId)
-  if (result.success) return { queued: false }
-  if (!isQueueableFailure(result, 'change')) throw apiError(result)
-  await queueChange(() => api.offlineQueue.enqueueRemoveLabel(taskId, labelId, titleMeta(taskTitle)), result)
-  return { queued: true }
+  const result = await api.removeLabelFromTaskOrQueue(taskId, labelId, taskTitle)
+  if (!result.success) throw apiError(result)
+  return { queued: isQueuedReply(result) }
 }
 
 export interface CreateExtras {

@@ -316,4 +316,77 @@ describe('Quick Entry and Quick View with the offline queue', () => {
       expect(queue.counts().pending).toBe(0)
     })
   })
+
+  // F1: a newer change must not be sent around an older one that still waits in the queue, or the
+  // replay later sends the older one on top of it.
+  describe('changes made while others wait for the same task', () => {
+    it('quickViewPatch joins the queue instead of overtaking the waiting change', async () => {
+      updateTask.mockResolvedValueOnce(err('net::ERR_INTERNET_DISCONNECTED'))
+      await quickViewPatch(deps(), 5, { title: 'EDIT1' }, { id: 5, title: 'T' })
+      updateTask.mockClear()
+
+      const result = await quickViewPatch(deps(), 5, { title: 'EDIT2' }, { id: 5, title: 'T' })
+
+      expect(result).toEqual({ success: true, cached: true })
+      expect(updateTask).not.toHaveBeenCalled()
+      expect(queue.getPending()).toMatchObject([{ type: 'update', taskId: 5, patch: { title: 'EDIT2' } }])
+    })
+
+    it('quickViewComplete completes through the queue while a change for the task is waiting', async () => {
+      await queue.enqueueUpdate(5, { title: 'Edited offline' }, { title: 'T' })
+
+      const result = await quickViewComplete(deps(), 5, { id: 5, title: 'T' })
+
+      expect(result).toEqual({ success: true, cached: true })
+      expect(updateTask).not.toHaveBeenCalled()
+      expect(queue.getPending()).toMatchObject([{ type: 'update', taskId: 5, patch: { title: 'Edited offline', done: true } }])
+    })
+
+    it('a subtask with a waiting change is completed through the queue, and a refused parent takes that back out', async () => {
+      await queue.enqueueUpdate(2, { title: 'Sub edited' })
+      updateTask.mockImplementation(async (id: number) => (id === 1 ? err('validation failed', 422) : ok()))
+      const parent = { id: 1, title: 'P', related_tasks: { subtask: [{ id: 2, title: 'a', done: false }] } }
+
+      const result = await quickViewComplete(deps(), 1, parent)
+
+      expect(result).toMatchObject({ success: false, error: 'validation failed' })
+      expect(updateTask.mock.calls).toEqual([[1, { done: true }]])
+      // The completion folded into the waiting edit and was cancelled again; the edit itself stays.
+      expect(queue.getPending()).toMatchObject([{ type: 'update', taskId: 2, patch: { title: 'Sub edited' } }])
+    })
+
+    it('quickViewReopen queues the reopen behind a waiting change that is not a completion', async () => {
+      await queue.enqueueUpdate(5, { title: 'Edited offline' })
+
+      const result = await quickViewReopen(deps(), 5, { id: 5, title: 'T' })
+
+      expect(result).toMatchObject({ success: true, cached: true })
+      expect(updateTask).not.toHaveBeenCalled()
+      expect(queue.getPending()).toMatchObject([{ patch: { title: 'Edited offline', done: false } }])
+    })
+
+    it('a request still on the wire is not overtaken: when it fails, the next change queues behind it', async () => {
+      let fail: (value: ApiResult<unknown>) => void = () => undefined
+      updateTask.mockImplementationOnce(() => new Promise((resolve) => { fail = resolve }))
+
+      const first = quickViewPatch(deps(), 5, { title: 'EDIT1' }, { id: 5 })
+      const second = quickViewPatch(deps(), 5, { title: 'EDIT2' }, { id: 5 })
+      await Promise.resolve()
+      expect(updateTask).toHaveBeenCalledTimes(1)
+      fail(err('Request timed out (10s)'))
+      await Promise.all([first, second])
+
+      expect(updateTask).toHaveBeenCalledTimes(1)
+      expect(queue.getPending()).toMatchObject([{ type: 'update', taskId: 5, patch: { title: 'EDIT2' } }])
+    })
+
+    it('asks for a replay when a request got through while changes for other tasks wait', async () => {
+      await queue.enqueueUpdate(9, { title: 'Waiting' })
+      const requestReplay = vi.fn()
+
+      await quickViewPatch({ ...deps(), requestReplay }, 5, { title: 'Fine' })
+
+      expect(requestReplay).toHaveBeenCalledTimes(1)
+    })
+  })
 })

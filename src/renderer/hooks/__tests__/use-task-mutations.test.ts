@@ -56,6 +56,8 @@ function project(id: number, overrides: Partial<Project> = {}): Project {
 const ok = (data: unknown = {}) => ({ success: true as const, data })
 let updateTask: ReturnType<typeof vi.fn>
 let updateProject: ReturnType<typeof vi.fn>
+/** What was asked of `updateTask`, without the options (`{ queue: true, title }`) every main-window write carries. */
+const patchCalls = () => updateTask.mock.calls.map(([id, patch]) => [id, patch])
 
 beforeEach(() => {
   updateTask = vi.fn(async () => ok())
@@ -74,7 +76,7 @@ describe('updateTaskRequest', () => {
     await updateTaskRequest({ id: 1, changes: { priority: 3 }, original })
 
     expect(updateTask).toHaveBeenCalledTimes(1)
-    expect(updateTask).toHaveBeenCalledWith(1, { priority: 3 })
+    expect(updateTask).toHaveBeenCalledWith(1, { priority: 3 }, expect.objectContaining({ queue: true }))
   })
 
   it('does not revert fields another client changed: a full spread diffs down to the change', async () => {
@@ -82,7 +84,7 @@ describe('updateTaskRequest', () => {
 
     await updateTaskRequest({ id: 1, changes: { ...original, due_date: '2026-10-12T00:00:00.000Z' }, original })
 
-    expect(updateTask).toHaveBeenCalledWith(1, { due_date: '2026-10-12T00:00:00.000Z' })
+    expect(updateTask).toHaveBeenCalledWith(1, { due_date: '2026-10-12T00:00:00.000Z' }, expect.objectContaining({ queue: true }))
   })
 
   it('sends a project move as just project_id and never the position', async () => {
@@ -90,13 +92,13 @@ describe('updateTaskRequest', () => {
 
     await updateTaskRequest({ id: 1, changes: { project_id: 9, position: 4096 }, original })
 
-    expect(updateTask).toHaveBeenCalledWith(1, { project_id: 9 })
+    expect(updateTask).toHaveBeenCalledWith(1, { project_id: 9 }, expect.objectContaining({ queue: true }))
   })
 
   it('sends a recurrence change as both halves and nothing else', async () => {
     await updateTaskRequest({ id: 1, changes: { repeat_after: 604_800, repeat_mode: 0 }, original: task(1) })
 
-    expect(updateTask).toHaveBeenCalledWith(1, { repeat_after: 604_800, repeat_mode: 0 })
+    expect(updateTask).toHaveBeenCalledWith(1, { repeat_after: 604_800, repeat_mode: 0 }, expect.objectContaining({ queue: true }))
   })
 
   it('sends a reminder change without blank reminder fields', async () => {
@@ -106,15 +108,17 @@ describe('updateTaskRequest', () => {
       original: task(1),
     })
 
-    expect(updateTask).toHaveBeenCalledWith(1, {
-      reminders: [{ relative_period: -900, relative_to: 'due_date' }],
-    })
+    expect(updateTask).toHaveBeenCalledWith(
+      1,
+      { reminders: [{ relative_period: -900, relative_to: 'due_date' }] },
+      expect.objectContaining({ queue: true }),
+    )
   })
 
   it('clears a due date with null', async () => {
     await updateTaskRequest({ id: 1, changes: { due_date: NULL_DATE }, original: task(1) })
 
-    expect(updateTask).toHaveBeenCalledWith(1, { due_date: null })
+    expect(updateTask).toHaveBeenCalledWith(1, { due_date: null }, expect.objectContaining({ queue: true }))
   })
 
   it('skips the request when nothing differs', async () => {
@@ -129,7 +133,7 @@ describe('updateTaskRequest', () => {
   it('sends an explicit change as is when there is no cached original', async () => {
     await updateTaskRequest({ id: 5, changes: { description: '<p>patched</p>' } })
 
-    expect(updateTask).toHaveBeenCalledWith(5, { description: '<p>patched</p>' })
+    expect(updateTask).toHaveBeenCalledWith(5, { description: '<p>patched</p>' }, expect.objectContaining({ queue: true }))
   })
 
   it('throws the server error', async () => {
@@ -150,7 +154,7 @@ describe('completeTaskRequest', () => {
 
     await completeTaskRequest(parent)
 
-    expect(updateTask.mock.calls).toEqual([
+    expect(patchCalls()).toEqual([
       [12, { done: true }],
       [11, { done: true }],
       [10, { done: true }],
@@ -164,7 +168,7 @@ describe('completeTaskRequest', () => {
 
     await expect(completeTaskRequest(parent)).rejects.toThrow('nope')
 
-    expect(updateTask.mock.calls).toEqual([
+    expect(patchCalls()).toEqual([
       [11, { done: true }],
       [10, { done: true }],
       [11, { done: false }],
@@ -178,7 +182,7 @@ describe('uncompleteTaskRequest', () => {
 
     await uncompleteTaskRequest(task(10, { done: true }), [child])
 
-    expect(updateTask.mock.calls).toEqual([
+    expect(patchCalls()).toEqual([
       [11, { done: false }],
       [10, { done: false }],
     ])
@@ -190,7 +194,7 @@ describe('uncompleteTaskRequest', () => {
 
     await expect(uncompleteTaskRequest(task(10, { done: true }), [child])).rejects.toThrow('nope')
 
-    expect(updateTask.mock.calls).toEqual([
+    expect(patchCalls()).toEqual([
       [11, { done: false }],
       [10, { done: false }],
       [11, { done: true }],
@@ -270,7 +274,9 @@ describe('updateProjectRequest', () => {
 })
 
 describe('main-window changes that go into the offline queue (D-SYNC-6, decision 4)', () => {
-  const network = { success: false as const, error: 'net::ERR_INTERNET_DISCONNECTED' }
+  // The main process queues a change the server cannot take, and one that arrives while changes
+  // for the task are waiting (src/main/offline/task-writes.ts); the window sees `queued: true`.
+  const queuedReply = { success: true as const, queued: true as const, data: null }
   const queuedOk = { success: true as const, data: { actionId: 'a', taskId: 1, folded: false } }
   let enqueueUpdate: ReturnType<typeof vi.fn>
   let cancelChange: ReturnType<typeof vi.fn>
@@ -282,13 +288,13 @@ describe('main-window changes that go into the offline queue (D-SYNC-6, decision
     useOfflineStore.setState({ counts: { pending: 0, failed: 0 } })
   })
 
-  it('an edit that cannot reach the server is queued as the same minimal patch and resolves with the optimistic task', async () => {
-    updateTask.mockResolvedValueOnce(network)
+  it('an edit the main process queued resolves with the optimistic task', async () => {
+    updateTask.mockResolvedValueOnce(queuedReply)
     const original = task(1)
 
     const result = await updateTaskRequest({ id: 1, changes: { priority: 3 }, original })
 
-    expect(enqueueUpdate).toHaveBeenCalledWith(1, { priority: 3 }, { title: 'Task 1' })
+    expect(updateTask).toHaveBeenCalledWith(1, { priority: 3 }, { queue: true, title: 'Task 1' })
     expect(result).toMatchObject({ id: 1, priority: 3, title: 'Task 1' })
   })
 
@@ -308,18 +314,18 @@ describe('main-window changes that go into the offline queue (D-SYNC-6, decision
     expect(enqueueUpdate).toHaveBeenCalledWith(-3, { title: 'Renamed' }, { title: 'Offline task' })
   })
 
-  it('completing offline queues every step, children first, and does not fail', async () => {
-    updateTask.mockResolvedValue(network)
+  it('completing offline sends every step, children first, and does not fail', async () => {
+    updateTask.mockResolvedValue(queuedReply)
     const child1 = { id: 11, title: 'Child 1', done: false } as unknown as Task
     const child2 = { id: 12, title: 'Child 2', done: false } as unknown as Task
     const parent = task(10, { related_tasks: { subtask: [child1, child2] } })
 
     const result = await completeTaskRequest(parent)
 
-    expect(enqueueUpdate.mock.calls.map((call) => [call[0], call[1]])).toEqual([
-      [12, { done: true }],
-      [11, { done: true }],
-      [10, { done: true }],
+    expect(updateTask.mock.calls).toEqual([
+      [12, { done: true }, { queue: true, title: 'Child 2' }],
+      [11, { done: true }, { queue: true, title: 'Child 1' }],
+      [10, { done: true }, { queue: true, title: 'Task 10' }],
     ])
     expect(result.done).toBe(true)
   })
@@ -327,14 +333,13 @@ describe('main-window changes that go into the offline queue (D-SYNC-6, decision
   it('takes a queued child completion back out of the queue when the parent is refused', async () => {
     const child = { id: 11, title: 'Child', done: false } as unknown as Task
     const parent = task(10, { related_tasks: { subtask: [child] } })
-    updateTask.mockResolvedValueOnce(network).mockResolvedValueOnce({ success: false, error: 'nope', statusCode: 403 })
+    updateTask.mockResolvedValueOnce(queuedReply).mockResolvedValueOnce({ success: false, error: 'nope', statusCode: 403 })
 
     await expect(completeTaskRequest(parent)).rejects.toThrow('nope')
 
-    expect(enqueueUpdate).toHaveBeenCalledWith(11, { done: true }, { title: 'Child' })
     expect(cancelChange).toHaveBeenCalledWith(11, ['done'])
     // The cancel worked, so no request undoes it.
-    expect(updateTask.mock.calls).toEqual([
+    expect(patchCalls()).toEqual([
       [11, { done: true }],
       [10, { done: true }],
     ])
@@ -350,20 +355,20 @@ describe('main-window changes that go into the offline queue (D-SYNC-6, decision
     expect(enqueueUpdate).not.toHaveBeenCalled()
   })
 
-  it('undoing queues the reopen when the completion had already been sent', async () => {
+  it('undoing asks for the reopen to be sent or queued when the completion had already been sent', async () => {
     useOfflineStore.setState({ counts: { pending: 1, failed: 0 } })
     cancelChange.mockResolvedValueOnce({ success: true, data: false })
-    updateTask.mockResolvedValueOnce(network)
+    updateTask.mockResolvedValueOnce(queuedReply)
 
     await uncompleteTaskRequest(task(10, { done: true }), [])
 
-    expect(enqueueUpdate).toHaveBeenCalledWith(10, { done: false }, { title: 'Task 10' })
+    expect(updateTask).toHaveBeenCalledWith(10, { done: false }, { queue: true, title: 'Task 10' })
   })
 
   it('does not ask the queue about a completion when nothing is pending', async () => {
     await uncompleteTaskRequest(task(10, { done: true }), [])
 
     expect(cancelChange).not.toHaveBeenCalled()
-    expect(updateTask).toHaveBeenCalledWith(10, { done: false })
+    expect(updateTask).toHaveBeenCalledWith(10, { done: false }, { queue: true, title: 'Task 10' })
   })
 })

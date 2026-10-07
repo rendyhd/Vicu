@@ -51,7 +51,9 @@ vi.mock('../quick-entry/viewer-caches', () => ({
   projectListViewIds: {},
 }))
 vi.mock('../offline/ipc', () => ({ registerOfflineQueueIpc: () => undefined }))
-vi.mock('../offline/service', () => ({ getOfflineQueue: () => ({}), rememberKnownUser: () => undefined }))
+// Nothing waits in the queue, so the write gate sends label changes straight to the (mocked) API.
+const emptyQueue = { hasPendingFor: () => false, counts: () => ({ pending: 0, failed: 0 }) }
+vi.mock('../offline/service', () => ({ getOfflineQueue: () => emptyQueue, rememberKnownUser: () => undefined }))
 vi.mock('../offline/quick-actions', () => ({}))
 vi.mock('../sync', () => ({ accountChanged: () => undefined, replayPendingActions: async () => null }))
 vi.mock('../carrier-service', () => ({

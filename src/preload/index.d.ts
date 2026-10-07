@@ -32,6 +32,8 @@ import type {
   OfflineQueueResult,
   OfflineQueueSnapshot,
   OfflineReplayEvent,
+  QueuedWriteReply,
+  TaskWriteOptions,
 } from '../shared/offline-queue-types'
 
 type OidcLoginResult =
@@ -54,8 +56,9 @@ export interface ElectronAPI {
   /** The routine carrier tasks (hidden done tasks), found without listing every done task. */
   fetchRoutineCarriers(): Promise<ApiResult<Task[]>>
   createTask(projectId: number, task: CreateTaskPayload): Promise<ApiResult<Task>>
-  updateTask(id: number, task: UpdateTaskPayload): Promise<ApiResult<Task>>
-  deleteTask(id: number): Promise<ApiResult<void>>
+  /** With `options.queue` the answer may be `QueuedWriteReply`: the change was queued instead of sent. */
+  updateTask(id: number, task: UpdateTaskPayload, options?: TaskWriteOptions): Promise<ApiResult<Task> | QueuedWriteReply>
+  deleteTask(id: number, options?: TaskWriteOptions): Promise<ApiResult<void> | QueuedWriteReply>
   fetchTaskById(id: number): Promise<ApiResult<Task>>
   createTaskRelation(taskId: number, otherTaskId: number, relationKind: string): Promise<ApiResult<unknown>>
   deleteTaskRelation(taskId: number, relationKind: string, otherTaskId: number): Promise<ApiResult<void>>
@@ -74,8 +77,8 @@ export interface ElectronAPI {
 
   // Labels
   fetchLabels(): Promise<ApiResult<Label[]>>
-  addLabelToTask(taskId: number, labelId: number): Promise<ApiResult<void>>
-  removeLabelFromTask(taskId: number, labelId: number): Promise<ApiResult<void>>
+  addLabelToTask(taskId: number, labelId: number, options?: TaskWriteOptions): Promise<ApiResult<void> | QueuedWriteReply>
+  removeLabelFromTask(taskId: number, labelId: number, options?: TaskWriteOptions): Promise<ApiResult<void> | QueuedWriteReply>
   createLabel(label: CreateLabelPayload): Promise<ApiResult<Label>>
   updateLabel(id: number, label: UpdateLabelPayload): Promise<ApiResult<Label>>
   deleteLabel(id: number): Promise<ApiResult<void>>
