@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Outlet, useMatches, useNavigate } from '@tanstack/react-router'
 import {
@@ -31,8 +31,9 @@ import { Sidebar } from './Sidebar'
 import { ContentArea } from './ContentArea'
 import { WindowControls } from './WindowControls'
 import { SearchBar } from './SearchBar'
-import { SetupView } from '@/views/SetupView'
-import { ReauthView } from '@/views/ReauthView'
+// The sign-in screens are only needed when nobody is signed in: their own chunks.
+const SetupView = lazy(() => import('@/views/SetupView').then((module) => ({ default: module.SetupView })))
+const ReauthView = lazy(() => import('@/views/ReauthView').then((module) => ({ default: module.ReauthView })))
 import { TaskDragOverlay } from '@/components/task-list/TaskDragOverlay'
 import { ProjectDragOverlay } from '@/components/sidebar/ProjectDragOverlay'
 import { CustomListDragOverlay } from '@/components/sidebar/CustomListDragOverlay'
@@ -51,7 +52,6 @@ import { NULL_DATE } from '@/lib/constants'
 import { usePrintStore } from '@/stores/print-store'
 import { buildPrintHtml } from '@/lib/print-template'
 import { sanitizeTaskHtml } from '@/lib/sanitize-html'
-import { VICU_LOGO_DATA_URL } from '@/assets/vicu-logo'
 
 const MIN_WIDTH = 180
 const MAX_WIDTH = 360
@@ -547,6 +547,8 @@ export function AppShell() {
       try {
         const payload = usePrintStore.getState().payload
         if (!payload) return
+        // The logo is a 90 KB data URL used only here: loaded when something is printed.
+        const { VICU_LOGO_DATA_URL } = await import('@/assets/vicu-logo')
         const html = buildPrintHtml(payload, {
           sanitize: sanitizeTaskHtml,
           logoDataUrl: VICU_LOGO_DATA_URL,
@@ -640,24 +642,30 @@ export function AppShell() {
 
   if (appState === 'reauth' && reauthInfo) {
     return (
-      <ReauthView
-        authMethod={reauthInfo.authMethod}
-        vikunjaUrl={reauthInfo.vikunjaUrl}
-        lastUsername={reauthInfo.lastUsername}
-        onSuccess={() => {
-          setReauthInfo(null)
-          setAppState('ready')
-        }}
-        onSwitchAccount={() => {
-          setReauthInfo(null)
-          setAppState('setup')
-        }}
-      />
+      <Suspense fallback={<div className="flex h-screen w-screen items-center justify-center bg-[var(--bg-primary)]" />}>
+        <ReauthView
+          authMethod={reauthInfo.authMethod}
+          vikunjaUrl={reauthInfo.vikunjaUrl}
+          lastUsername={reauthInfo.lastUsername}
+          onSuccess={() => {
+            setReauthInfo(null)
+            setAppState('ready')
+          }}
+          onSwitchAccount={() => {
+            setReauthInfo(null)
+            setAppState('setup')
+          }}
+        />
+      </Suspense>
     )
   }
 
   if (appState === 'setup') {
-    return <SetupView onComplete={() => setAppState('ready')} />
+    return (
+      <Suspense fallback={<div className="flex h-screen w-screen items-center justify-center bg-[var(--bg-primary)]" />}>
+        <SetupView onComplete={() => setAppState('ready')} />
+      </Suspense>
+    )
   }
 
   return (

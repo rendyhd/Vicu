@@ -3,6 +3,7 @@ import {
   createRootRoute,
   createRoute,
   createHashHistory,
+  lazyRouteComponent,
 } from '@tanstack/react-router'
 import { AppShell } from '@/components/layout/AppShell'
 import { InboxView } from '@/views/InboxView'
@@ -10,14 +11,13 @@ import { TodayView } from '@/views/TodayView'
 import { UpcomingView } from '@/views/UpcomingView'
 import { AnytimeView } from '@/views/AnytimeView'
 import { LogbookView } from '@/views/LogbookView'
-import { ReviewView } from '@/views/ReviewView'
 import { ProjectView } from '@/views/ProjectView'
 import { TagView } from '@/views/TagView'
-import { SettingsView } from '@/views/SettingsView'
 import { CustomListView } from '@/views/CustomListView'
 import { SearchView } from '@/views/SearchView'
-import { RoutinesView } from '@/views/RoutinesView'
 
+// Routines, Review and Settings are used now and then and are their own chunks, loaded when first
+// opened, so the main chunk holds what every session needs.
 const rootRoute = createRootRoute({
   component: AppShell,
 })
@@ -50,7 +50,7 @@ const upcomingRoute = createRoute({
 const routinesRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/routines',
-  component: RoutinesView,
+  component: lazyRouteComponent(() => import('@/views/RoutinesView'), 'RoutinesView'),
 })
 
 const anytimeRoute = createRoute({
@@ -62,7 +62,7 @@ const anytimeRoute = createRoute({
 const reviewRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/review',
-  component: ReviewView,
+  component: lazyRouteComponent(() => import('@/views/ReviewView'), 'ReviewView'),
 })
 
 const logbookRoute = createRoute({
@@ -92,7 +92,7 @@ const customListRoute = createRoute({
 const settingsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/settings',
-  component: SettingsView,
+  component: lazyRouteComponent(() => import('@/views/SettingsView'), 'SettingsView'),
 })
 
 const searchRoute = createRoute({

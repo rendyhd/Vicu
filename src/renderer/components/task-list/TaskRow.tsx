@@ -13,7 +13,8 @@ import { useConfirmDelete } from '@/hooks/use-confirm-delete'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { isNullDate } from '@/lib/date-utils'
 import { dueToday, parsedDue } from '@/lib/due-dates'
-import { normalizeHex } from '@/lib/constants'
+import { labelChipStyle } from '@/lib/label-style'
+import { useIsDark } from '@/hooks/use-is-dark'
 import type { Task, TaskReminder } from '@/lib/vikunja-types'
 import { TaskCheckbox } from './TaskCheckbox'
 import { TaskDueBadge } from './TaskDueBadge'
@@ -32,7 +33,6 @@ import { TaskLinkIcon } from '@/components/TaskLinkIcon'
 import { TaskSyncIcon } from '@/components/task-list/TaskSyncIcon'
 import { stripNoteLink, stripPageLink, extractNoteLinkHtml, extractPageLinkHtml, hasNotesContent } from '@/lib/note-link'
 import { formatRecurrenceLabel } from '@/lib/recurrence'
-import { RichTextEditor } from '@/components/rich-text/RichTextEditor'
 import { useTaskParser } from '@/hooks/use-task-parser'
 import { useLabels } from '@/hooks/use-labels'
 import { useProjects } from '@/hooks/use-projects'
@@ -47,25 +47,6 @@ import {
 import { confirmTaskCompletion } from '@/lib/task-completion'
 
 type PopoverType = 'date' | 'label' | 'project' | 'subtasks' | 'reminder' | 'attachment' | 'info' | 'priority' | null
-
-function getLabelStyle(rawHex: string | undefined): React.CSSProperties {
-  const hex = normalizeHex(rawHex)
-  if (!hex) return { backgroundColor: 'var(--bg-hover)', color: 'var(--text-secondary)' }
-  const r = parseInt(hex.slice(1, 3), 16)
-  const g = parseInt(hex.slice(3, 5), 16)
-  const b = parseInt(hex.slice(5, 7), 16)
-  const isDark = document.documentElement.classList.contains('dark')
-  if (isDark) {
-    const lr = Math.min(255, r + Math.round((255 - r) * 0.45))
-    const lg = Math.min(255, g + Math.round((255 - g) * 0.45))
-    const lb = Math.min(255, b + Math.round((255 - b) * 0.45))
-    return {
-      backgroundColor: `rgba(${r}, ${g}, ${b}, 0.12)`,
-      color: `rgb(${lr}, ${lg}, ${lb})`,
-    }
-  }
-  return { backgroundColor: `rgba(${r}, ${g}, ${b}, 0.12)`, color: hex }
-}
 
 interface TaskRowProps {
   task: Task
@@ -84,39 +65,49 @@ const sortableAnimateLayoutChanges: AnimateLayoutChanges = (args) => {
   return false
 }
 
-function useDragBehavior(task: Task, sortable: boolean) {
-  const draggable = useDraggable({
-    id: `task-${task.id}`,
-    data: { type: 'task', task },
-    disabled: sortable,
-  })
+/** What a row takes from drag and drop, whichever hook provided it. */
+interface DragBehavior {
+  attributes: ReturnType<typeof useDraggable>['attributes']
+  listeners: ReturnType<typeof useDraggable>['listeners']
+  setNodeRef: (node: HTMLElement | null) => void
+  isDragging: boolean
+  style: React.CSSProperties
+}
 
+const NO_STYLE: React.CSSProperties = {}
+
+// A row registers with the drag context once (D-REN-5): `useSortable` (a draggable and a droppable in
+// one) where the list reorders, `useDraggable` everywhere else. A row used to call both hooks on one
+// id and keep the unused one disabled, which registered every row twice.
+function useSortableRow(task: Task): DragBehavior {
   const sortableHook = useSortable({
     id: `task-${task.id}`,
     data: { type: 'task', task, sortable: true },
-    disabled: !sortable,
     animateLayoutChanges: sortableAnimateLayoutChanges,
   })
-
-  if (sortable) {
-    return {
-      attributes: sortableHook.attributes,
-      listeners: sortableHook.listeners,
-      setNodeRef: sortableHook.setNodeRef,
-      isDragging: sortableHook.isDragging,
-      style: {
-        transform: CSS.Transform.toString(sortableHook.transform),
-        transition: sortableHook.transition,
-      } as React.CSSProperties,
-    }
+  return {
+    attributes: sortableHook.attributes,
+    listeners: sortableHook.listeners,
+    setNodeRef: sortableHook.setNodeRef,
+    isDragging: sortableHook.isDragging,
+    style: {
+      transform: CSS.Transform.toString(sortableHook.transform),
+      transition: sortableHook.transition,
+    },
   }
+}
 
+function useDraggableRow(task: Task): DragBehavior {
+  const draggable = useDraggable({
+    id: `task-${task.id}`,
+    data: { type: 'task', task },
+  })
   return {
     attributes: draggable.attributes,
     listeners: draggable.listeners,
     setNodeRef: draggable.setNodeRef,
     isDragging: draggable.isDragging,
-    style: {} as React.CSSProperties,
+    style: NO_STYLE,
   }
 }
 
@@ -302,7 +293,7 @@ const TaskTitleEditor = forwardRef<TaskTitleEditorHandle, TaskTitleEditorProps>(
   },
 )
 
-function TaskRowInner({ task, sortable = false, nestedDepth = 0, parentProjectId }: TaskRowProps) {
+function TaskRowInner({ task, nestedDepth = 0, parentProjectId, drag }: Omit<TaskRowProps, 'sortable'> & { drag: DragBehavior }) {
   // Per-field subscriptions: each row re-renders only when *its own* derived
   // state flips, not on every focus/selection change anywhere in the list.
   const isExpanded = useSelectionStore((s) => s.expandedTaskId === task.id)
@@ -323,7 +314,8 @@ function TaskRowInner({ task, sortable = false, nestedDepth = 0, parentProjectId
   const uploadFromDrop = useUploadAttachmentFromDrop()
   const { data: appConfig } = useAppConfig()
 
-  const { attributes, listeners, setNodeRef, isDragging, style } = useDragBehavior(task, sortable)
+  const { attributes, listeners, setNodeRef, isDragging, style } = drag
+  const isDark = useIsDark()
 
   const [editDescription, setEditDescription] = useState(stripPageLink(stripNoteLink(task.description)))
   const [isDragOver, setIsDragOver] = useState(false)
@@ -565,7 +557,7 @@ function TaskRowInner({ task, sortable = false, nestedDepth = 0, parentProjectId
               <span
                 key={l.id}
                 className="rounded-full px-1.5 py-px text-[10px] font-medium leading-tight"
-                style={getLabelStyle(l.hex_color)}
+                style={labelChipStyle(l.hex_color, isDark)}
               >
                 {l.title}
               </span>
@@ -746,7 +738,7 @@ function TaskRowInner({ task, sortable = false, nestedDepth = 0, parentProjectId
             <span
               key={l.id}
               className="rounded-full px-2 py-0.5 text-2xs font-medium"
-              style={getLabelStyle(l.hex_color)}
+              style={labelChipStyle(l.hex_color, isDark)}
             >
               {l.title}
             </span>
@@ -974,4 +966,17 @@ function TaskRowInner({ task, sortable = false, nestedDepth = 0, parentProjectId
   )
 }
 
-export const TaskRow = memo(TaskRowInner)
+const SortableTaskRow = memo(function SortableTaskRow(props: TaskRowProps) {
+  const drag = useSortableRow(props.task)
+  return <TaskRowInner task={props.task} nestedDepth={props.nestedDepth} parentProjectId={props.parentProjectId} drag={drag} />
+})
+
+const DraggableTaskRow = memo(function DraggableTaskRow(props: TaskRowProps) {
+  const drag = useDraggableRow(props.task)
+  return <TaskRowInner task={props.task} nestedDepth={props.nestedDepth} parentProjectId={props.parentProjectId} drag={drag} />
+})
+
+export const TaskRow = memo(function TaskRow(props: TaskRowProps) {
+  // `sortable` is fixed by the list a row belongs to, so a row never switches between the two.
+  return props.sortable ? <SortableTaskRow {...props} /> : <DraggableTaskRow {...props} />
+})

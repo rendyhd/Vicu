@@ -10,7 +10,7 @@ import {
   useDeleteAttachment,
 } from '@/hooks/use-task-mutations'
 import { useAttachmentBlobUrl } from '@/hooks/use-attachment-bytes'
-import { RichTextEditor } from '@/components/rich-text/RichTextEditor'
+import { LazyRichTextEditor } from '@/components/rich-text/LazyRichTextEditor'
 
 export interface PendingImage {
   uuid: string
@@ -171,7 +171,7 @@ export function TaskDescription({
 
   return (
     <div className={cn('flex flex-col gap-2', className)}>
-      <RichTextEditor
+      <LazyRichTextEditor
         value={text}
         onChange={handleTextChange}
         onBlur={onBlur}

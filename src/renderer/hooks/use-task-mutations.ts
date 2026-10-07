@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useNavigate, useMatches } from '@tanstack/react-router'
+import { useNavigate, useMatches, useRouter } from '@tanstack/react-router'
 import { api } from '@/lib/api'
 import { useCompletedTasksStore } from '@/stores/completed-tasks-store'
 import { sortProjectTasks } from '@/lib/task-sort'
@@ -30,6 +30,7 @@ import {
 } from '@/lib/pending-cache'
 import { refreshTasks } from '@/lib/task-refresh'
 import { ACCOUNT_CHANGED_EVENT } from '@/lib/account-events'
+import { currentPathname } from '@/lib/route-path'
 import {
   createNewTaskPlacer,
   placeNewTaskInBackground,
@@ -594,8 +595,9 @@ export async function uncompleteTaskRequest(task: Task, autoCompleted: readonly 
 
 export function useCompleteTask() {
   const qc = useQueryClient()
-  const matches = useMatches()
-  const pathname = matches[matches.length - 1]?.pathname ?? ''
+  // The path is read when a task is completed, not by subscribing to the router: every row has this
+  // hook (and its checkbox two more), and a subscription re-rendered all of them on each navigation.
+  const router = useRouter()
   const addCompleted = useCompletedTasksStore((s) => s.add)
   const removeCompleted = useCompletedTasksStore((s) => s.remove)
 
@@ -614,7 +616,7 @@ export function useCompleteTask() {
         ...autoCompleted.map((child) => [child.id, true] as const),
       ])
       // Track completed task so it stays visible (with strikethrough) until navigation
-      addCompleted(mapTaskDoneByIds(task, doneById), pathname, autoCompleted, suppressTopLevelUndo)
+      addCompleted(mapTaskDoneByIds(task, doneById), currentPathname(router), autoCompleted, suppressTopLevelUndo)
 
       await qc.cancelQueries({ queryKey: ['tasks'] })
       await qc.cancelQueries({ queryKey: ['view-tasks'] })
@@ -682,8 +684,7 @@ export function useCompleteTask() {
 
 export function useUncompleteTask() {
   const qc = useQueryClient()
-  const matches = useMatches()
-  const pathname = matches[matches.length - 1]?.pathname ?? ''
+  const router = useRouter()
   const addToStore = useCompletedTasksStore((s) => s.add)
   const updateCompleted = useCompletedTasksStore((s) => s.update)
   const removeCompleted = useCompletedTasksStore((s) => s.remove)
@@ -709,7 +710,7 @@ export function useUncompleteTask() {
       if (wasInStore) {
         updateCompleted(task.id, { done: false })
       } else {
-        addToStore({ ...task, done: false }, pathname)
+        addToStore({ ...task, done: false }, currentPathname(router))
       }
 
       await qc.cancelQueries({ queryKey: ['tasks'] })
