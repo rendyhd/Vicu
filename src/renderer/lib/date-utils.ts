@@ -1,4 +1,3 @@
-import * as chrono from 'chrono-node'
 import { NULL_DATE } from './constants'
 import {
   addLocalDays,
@@ -58,12 +57,6 @@ export function formatDueDate(date: string, now: Date = new Date(), locale?: str
   const base = formatRelativeDate(date, now)
   if (!base || isDateOnly(date)) return base
   return `${base} ${formatClockTime(new Date(date), locale)}`
-}
-
-export function parseNaturalDate(text: string): Date | null {
-  const results = chrono.parse(text)
-  if (results.length === 0) return null
-  return results[0].start.date()
 }
 
 export function formatAbsoluteDateTime(date: string): string {

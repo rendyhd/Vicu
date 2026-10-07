@@ -42,7 +42,6 @@ import {
   applyConnectionFields,
   isConnectionFields,
   loadConfig,
-  normalizeConfig,
   saveConfig,
   type AppConfig,
 } from './config'
@@ -305,24 +304,9 @@ export function registerIpcHandlers(): void {
     return loadConfig()
   })
 
-  // Full-snapshot save. The renderer's copy can be stale (main changes window bounds,
-  // sidebar width, popup positions... on its own), so prefer save-config-patch for
-  // preference changes and save-connection-config for setup/login/disconnect.
-  handleTrusted('save-config', (_event, snapshot: AppConfig) => {
-    const config = normalizeConfig(snapshot as unknown as Record<string, unknown>)
-    const latest = loadConfig()
-    const accountChanged = !!latest && latest.vikunja_url.replace(/\/+$/, '') !== config.vikunja_url.replace(/\/+$/, '')
-    // Renderer settings forms save a full config snapshot and may have been open while a
-    // custom-list mutation or remote merge completed. Preserve the main-owned slice unless
-    // setup/logout is deliberately switching accounts.
-    if (!accountChanged && latest?.custom_lists_sync) {
-      config.custom_lists_sync = latest.custom_lists_sync
-      config.custom_lists = latest.custom_lists
-    } else if (accountChanged) {
-      config.custom_lists_sync = undefined
-    }
-    persistConfig(config)
-  })
+  // The renderer never saves a whole config: its copy can be stale (main changes window bounds,
+  // sidebar width, popup positions... on its own). Preferences go through save-config-patch and
+  // setup/login/disconnect through save-connection-config.
 
   // Preference changes: only the keys in the patch change, merged into the config as it
   // is now, so fields main changes on its own (window bounds, popup positions, last
