@@ -13,7 +13,9 @@ import type { ParsedToken } from './types'
  * - slash dates follow the locale's day/month order;
  * - "now" is never a date;
  * - a date-only phrase is judged against the start of the day, so "tuesday" typed on a Tuesday
- *   afternoon is today and not next week (chrono would compare it with the current time).
+ *   afternoon is today and not next week (chrono would compare it with the current time);
+ * - a day and month that are today stay today when the time typed with them has passed ("oct 7 at
+ *   9am" at 10:30 on 7 October), instead of moving to next year.
  */
 
 export interface ExtractDateOptions {
@@ -106,6 +108,23 @@ export function extractDate(
       .parse(working, noon, chronoOptions)
       .find((r) => r.index === result.index && r.text === result.text)
     if (again) dueDate = again.start.date()
+  }
+
+  // "oct 7 at 9am" typed at 10:30 on 7 October: forwardDate sees 09:00 behind the clock and moves
+  // the date to next year. The day and month are certain and the year is not, so a date that is
+  // today stays today (its time is simply in the past); only an earlier day rolls to next year.
+  if (
+    result.start.isCertain('day') &&
+    result.start.isCertain('month') &&
+    !result.start.isCertain('year') &&
+    result.start.get('day') === reference.getDate() &&
+    result.start.get('month') === reference.getMonth() + 1 &&
+    dueDate.getFullYear() !== reference.getFullYear()
+  ) {
+    dueDate = new Date(
+      reference.getFullYear(), reference.getMonth(), reference.getDate(),
+      dueDate.getHours(), dueDate.getMinutes(), dueDate.getSeconds(), 0,
+    )
   }
 
   // "next week" is the Monday of the following week (chrono says "in 7 days").
