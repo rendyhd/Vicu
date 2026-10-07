@@ -233,3 +233,58 @@ describe('downloadTaskAttachment timeout', () => {
     if (!result.success) expect(result.error).toContain('100 MB')
   })
 })
+
+describe('merge patches the server answers with 304 Not Modified', () => {
+  beforeEach(() => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+  })
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  function notModified(req: FakeRequest): void {
+    const res = req.respond(304)
+    res.emit('end')
+  }
+
+  it.each([
+    ['task', (client: Awaited<ReturnType<typeof loadClient>>) => client.updateTask(7, { title: 'Same' }), '/api/v2/tasks/7'],
+    ['project', (client: Awaited<ReturnType<typeof loadClient>>) => client.updateProject(3, { title: 'Same' }), '/api/v2/projects/3'],
+    ['label', (client: Awaited<ReturnType<typeof loadClient>>) => client.updateLabel(5, { title: 'Same' }), '/api/v2/labels/5'],
+  ])('treats a %s patch that changed nothing as done and reads the current state back', async (_kind, call, path) => {
+    const client = await loadClient()
+    serve((req) => {
+      if (req.method === 'PATCH') notModified(req)
+      else answerJson(req, 200, { id: 1, title: 'Same', from: 'read-back' })
+    })
+
+    const result = await call(client)
+
+    expect(result).toEqual({ success: true, data: { id: 1, title: 'Same', from: 'read-back' } })
+    expect(sent().map((req) => `${req.method} ${new URL(req.url).pathname}`)).toEqual([`PATCH ${path}`, `GET ${path}`])
+  })
+
+  it('reports the read-back failure when the current state cannot be read', async () => {
+    const client = await loadClient()
+    serve((req) => {
+      if (req.method === 'PATCH') notModified(req)
+      else answerJson(req, 503, { message: 'down' })
+    })
+
+    const result = await client.updateTask(7, { title: 'Same' })
+
+    expect(result.success).toBe(false)
+    if (!result.success) expect(result.statusCode).toBe(503)
+  })
+
+  it('still reports other failures of a patch without reading back', async () => {
+    const client = await loadClient()
+    serve((req) => answerJson(req, 422, { message: 'invalid' }))
+
+    const result = await client.updateTask(7, { title: '' })
+
+    expect(result.success).toBe(false)
+    if (!result.success) expect(result.statusCode).toBe(422)
+    expect(sent()).toHaveLength(1)
+  })
+})

@@ -28,6 +28,8 @@ export function classifyReplayFailure(failure: FailureLike, actionType: OfflineA
   if (failure.error.includes('is not configured')) return { kind: 'stop', why: 'config' }
 
   if (status !== undefined) {
+    // Vikunja 2.4 answers a merge patch that changes nothing with 304: the server already has it.
+    if (status === 304) return { kind: 'done' }
     if (status === 429) return { kind: 'stop', why: 'rate-limit' }
     if (status === 408) return { kind: 'stop', why: 'network' }
     if (status >= 500) return { kind: 'stop', why: 'server' }

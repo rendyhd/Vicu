@@ -220,6 +220,19 @@ async function requestWithRetry<T>(
   return result
 }
 
+/**
+ * A merge patch (PATCH). Vikunja 2.4 answers a patch that changes nothing (the server already has
+ * those values) with 304 Not Modified and no body. The change is in effect, so that is a success,
+ * not an error: the current state is read back for callers that use the answer. Without this a
+ * replayed change that had already landed (a request that timed out after reaching the server)
+ * would stop the offline queue for good.
+ */
+async function patchWithRetry<T>(url: string, token: string, body: unknown): Promise<ApiResult<T>> {
+  const result = await requestWithRetry<T>('PATCH', url, token, body, JSON_MERGE_PATCH)
+  if (result.success || result.statusCode !== 304) return result
+  return requestWithRetry<T>('GET', url, token)
+}
+
 async function requestPaginatedWithRetry<T>(
   url: string,
   token: string
@@ -365,13 +378,7 @@ export async function updateTask(
   const c = await getConfigOrFail()
   if ('success' in c) return c
 
-  return requestWithRetry<unknown>(
-    'PATCH',
-    `${c.url}${API_BASE_PATH}/tasks/${id}`,
-    c.token,
-    createTaskPatch(task),
-    JSON_MERGE_PATCH
-  )
+  return patchWithRetry<unknown>(`${c.url}${API_BASE_PATH}/tasks/${id}`, c.token, createTaskPatch(task))
 }
 
 export async function deleteTask(id: number): Promise<ApiResult<void>> {
@@ -415,13 +422,7 @@ export async function updateProject(
   const c = await getConfigOrFail()
   if ('success' in c) return c
 
-  return requestWithRetry<unknown>(
-    'PATCH',
-    `${c.url}${API_BASE_PATH}/projects/${id}`,
-    c.token,
-    createProjectPatch(project),
-    JSON_MERGE_PATCH
-  )
+  return patchWithRetry<unknown>(`${c.url}${API_BASE_PATH}/projects/${id}`, c.token, createProjectPatch(project))
 }
 
 export async function deleteProject(id: number): Promise<ApiResult<void>> {
@@ -477,13 +478,7 @@ export async function updateLabel(
   const c = await getConfigOrFail()
   if ('success' in c) return c
 
-  return requestWithRetry<unknown>(
-    'PATCH',
-    `${c.url}${API_BASE_PATH}/labels/${id}`,
-    c.token,
-    label,
-    JSON_MERGE_PATCH
-  )
+  return patchWithRetry<unknown>(`${c.url}${API_BASE_PATH}/labels/${id}`, c.token, label)
 }
 
 export async function deleteLabel(id: number): Promise<ApiResult<void>> {

@@ -5,6 +5,10 @@ import { isQueueableFailure } from '../../shared/error-classify'
 const http = (statusCode: number, error = `HTTP ${statusCode}`) => ({ error, statusCode })
 
 describe('classifyReplayFailure (D-SYNC-1)', () => {
+  it('304 means the server already has the change', () => {
+    expect(classifyReplayFailure(http(304), 'update')).toEqual({ kind: 'done' })
+  })
+
   describe('actions the server will never accept are dropped into the failed log', () => {
     it.each([
       [400, 'rejected'],
