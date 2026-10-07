@@ -3,6 +3,7 @@ import { getMainWindow } from '../quick-entry-state'
 import { randomUUID } from 'crypto'
 import { hostname } from 'node:os'
 import { discoverProviders, type OIDCProvider } from './oidc-discovery'
+import { buildAuthorizationUrl, interpretRedirect } from './oidc-url'
 import {
   API_TOKEN_NO_EXPIRY,
   getAPITokenExpiry,
@@ -28,6 +29,13 @@ import {
 
 const TOKEN_EXCHANGE_TIMEOUT = 15_000
 const LOGIN_TIMEOUT = 5 * 60 * 1000 // 5 minutes
+
+// Provider details and the full sign-in URL are not written to the log in a normal run. Set
+// VICU_DEBUG_OIDC=1 to see them while debugging a login (D-AUTH-4). Tokens are never logged.
+const OIDC_DEBUG = process.env.VICU_DEBUG_OIDC === '1'
+function oidcDebug(...args: unknown[]): void {
+  if (OIDC_DEBUG) console.log('[OIDC]', ...args)
+}
 
 export class OidcTotpRequiredError extends Error {
   constructor(message: string) {
@@ -74,23 +82,11 @@ export async function loginWithOIDC(
   // 2. Use Vikunja's own frontend callback URL (already allowed in the IdP)
   const redirectUri = `${baseUrl}/auth/openid/${provider.key}`
 
-  // 3. Generate state
+  // 3. Generate state. The redirect is only accepted when it carries this value back.
   const state = randomUUID()
 
-  // 4. Build authorization URL
-  // NOTE: No PKCE (code_challenge) — Vikunja's backend handles the token
-  // exchange with the IdP using its own client secret, so it won't forward
-  // our code_verifier. Sending PKCE here causes "invalid_grant" errors.
-  // Add offline_access scope so the IdP issues longer-lived refresh tokens.
-  const scope = provider.scope.includes('offline_access')
-    ? provider.scope
-    : `${provider.scope} offline_access`
-  const authUrl =
-    `${provider.auth_url}?client_id=${provider.client_id}` +
-    `&redirect_uri=${encodeURIComponent(redirectUri)}` +
-    `&response_type=code` +
-    `&state=${state}` +
-    `&scope=${encodeURIComponent(scope)}`
+  // 4. Build authorization URL (see buildAuthorizationUrl: no PKCE, offline_access added).
+  const authUrl = buildAuthorizationUrl(provider, redirectUri, state)
 
   // 5. Create visible BrowserWindow for login, centered on the main window's display
   const mainWin = getMainWindow()
@@ -117,10 +113,10 @@ export async function loginWithOIDC(
     },
   })
 
-  // 5b. Diagnostic logging
-  console.log('[OIDC] provider:', JSON.stringify(provider, null, 2))
-  console.log('[OIDC] redirectUri:', redirectUri)
-  console.log('[OIDC] authUrl:', authUrl)
+  // 5b. Diagnostic logging (opt-in)
+  oidcDebug('provider:', JSON.stringify(provider, null, 2))
+  oidcDebug('redirectUri:', redirectUri)
+  oidcDebug('authUrl:', authUrl)
 
   let succeeded = false
   let preserveSessionForTotpRetry = false
@@ -128,28 +124,13 @@ export async function loginWithOIDC(
     // 6. Intercept redirects to extract authorization code
     const codePromise = new Promise<string>((resolve, reject) => {
       const checkForCode = (event: Electron.Event, url: string): void => {
-        if (!url.startsWith(redirectUri)) return
-
-        try {
-          const parsed = new URL(url)
-          const error = parsed.searchParams.get('error')
-          if (error) {
-            event.preventDefault()
-            reject(
-              new Error(
-                `OIDC login failed: ${error} — ${parsed.searchParams.get('error_description') ?? 'unknown error'}`
-              )
-            )
-            return
-          }
-
-          const code = parsed.searchParams.get('code')
-          if (code) {
-            event.preventDefault()
-            resolve(code)
-          }
-        } catch {
-          // Not a valid URL, ignore
+        const outcome = interpretRedirect(url, redirectUri, state)
+        if (outcome.kind === 'ignore') return
+        event.preventDefault()
+        if (outcome.kind === 'error') {
+          reject(new Error(outcome.message))
+        } else {
+          resolve(outcome.code)
         }
       }
 

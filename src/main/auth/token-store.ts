@@ -3,17 +3,12 @@ import { app, safeStorage } from 'electron'
 /** Expiry far in the future for user-provided API tokens with no inherent expiry */
 export const API_TOKEN_NO_EXPIRY = 4102444800 // 2100-01-01T00:00:00Z
 
-// Returns true if the token store can persist a value — either via real
-// safeStorage encryption or via the plaintext fallback. Callers that gate on
-// "should we save tokens at all?" want this to always be true; callers that
-// want to know specifically whether on-disk encryption is in effect should
-// call safeStorage.isEncryptionAvailable() directly.
-export function isEncryptionAvailable(): boolean {
-  return true
-}
 import { existsSync } from 'fs'
 import { join } from 'path'
 import { readFileWithBackup, removeFileAndBackup, writeFileAtomic } from '../atomic-file'
+import { classifySecretStorage, type SecretStorageLevel } from './secret-storage'
+
+export type { SecretStorageLevel } from './secret-storage'
 
 interface AuthStore {
   jwt?: string
@@ -88,11 +83,39 @@ function writeStore(data: AuthStore): void {
 // reader can tell them apart from base64-encoded ciphertext. Without this, a
 // keyring appearing after the first launch would leave the reader trying to
 // decrypt raw plaintext as base64 and permanently wedge auth until the user
-// logged in again. On Linux without a usable keyring, the fallback stores
-// tokens in cleartext under ~/.config/vicu/auth.json — the same effective
-// posture as every other Electron app in this situation (VS Code, Slack,
-// Signal, etc. all degrade to basic obfuscation when no keyring is available).
+// logged in again. Such a token sits in auth.json as written (file mode 600).
+// Vicu does not hide that: getSecretStorageStatus() reports it and Settings shows a
+// warning (D-AUTH-4). Linux is a related case: the app pins Chromium's "basic"
+// password store, where safeStorage works but only obfuscates (constant key), so the
+// status there is 'obfuscated', never 'encrypted'.
 const PLAIN_PREFIX = 'plain:'
+
+/**
+ * How the secrets in auth.json are protected right now: 'encrypted', 'obfuscated' (Linux basic
+ * backend) or 'plaintext' (no encryption available, or a secret was written without it).
+ * Settings shows a warning for anything but 'encrypted'.
+ */
+export function getSecretStorageStatus(platform: NodeJS.Platform = process.platform): SecretStorageLevel {
+  let encryptionAvailable = false
+  try {
+    encryptionAvailable = safeStorage.isEncryptionAvailable()
+  } catch {
+    encryptionAvailable = false
+  }
+  let backend: string | undefined
+  if (platform === 'linux') {
+    try {
+      backend = safeStorage.getSelectedStorageBackend()
+    } catch {
+      backend = undefined
+    }
+  }
+  const store = readStore()
+  const hasPlainSecrets = [store.jwt, store.api_token, store.refresh_token].some(
+    (value) => typeof value === 'string' && value.startsWith(PLAIN_PREFIX),
+  )
+  return classifySecretStorage({ encryptionAvailable, platform, backend, hasPlainSecrets })
+}
 
 function encrypt(value: string): string {
   try {

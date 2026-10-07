@@ -122,6 +122,7 @@ export interface ElectronAPI {
   // Quick Entry/View
   applyQuickEntrySettings(): Promise<{ entry: boolean; viewer: boolean; waylandLimited: boolean }>
   getGlobalShortcutStatus(): Promise<{ entry: boolean; viewer: boolean; waylandLimited: boolean }>
+  getSecretStorageStatus(): Promise<'encrypted' | 'obfuscated' | 'plaintext'>
   getHotkeyLauncherCommand(): Promise<{ quickEntry: string; quickView: string; kind: 'appimage' | 'packaged' | 'dev' }>
 
   // Offline queue (main process): changes that could not reach the server, replayed in order

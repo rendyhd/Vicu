@@ -519,6 +519,11 @@ class AuthManager {
    * Ensure a backup API token exists and is not expiring soon.
    * Creates one if missing, renews when it expires within 30 days or its expiry
    * is unknown. Runs async — does not block the caller.
+   *
+   * If creating the token fails and the JWT itself is long-lived (more than 24 h, which only
+   * older servers issue), the JWT is kept as the fallback credential. It is stored without a
+   * server-side id, so logout does not try to revoke it: it simply expires. A short-lived JWT
+   * (the norm with API v2) is never stored as a fallback, so that failure is rethrown.
    */
   private async _ensureBackupAPIToken(jwt: string): Promise<void> {
     const config = loadConfig()
@@ -545,8 +550,7 @@ class AuthManager {
     try {
       await createBackupAPIToken(baseUrl, jwt)
     } catch (err) {
-      // Fallback: if the JWT is long-lived (>24h, pre-2.0 Vikunja),
-      // store it as the backup API token.
+      // Fallback (see above): a JWT valid for more than 24 h stands in for the backup token.
       const jwtExp = extractJWTExp(jwt)
       if (jwtExp != null) {
         const lifetimeSeconds = jwtExp - Date.now() / 1000

@@ -15,7 +15,7 @@ import { isRegistered, unregisterHosts, registerHosts } from './browser-host-reg
 import { checkForUpdates } from './update-checker'
 import { isMac, isWindows, isLinux } from './platform'
 import { setupApplicationMenu } from './app-menu'
-import { storeAPIToken, getAPIToken, isEncryptionAvailable, API_TOKEN_NO_EXPIRY } from './auth/token-store'
+import { storeAPIToken, getAPIToken, API_TOKEN_NO_EXPIRY } from './auth/token-store'
 import { clearTaskBadge, reapplyTaskBadge } from './badge'
 import { replayPendingActions } from './sync'
 import { flushOfflineQueue, offlineQueueHasUnsavedChanges } from './offline/service'
@@ -687,12 +687,13 @@ if (!gotLock) {
       }
     })
 
-    // One-time migration: move plaintext API token to encrypted store
+    // One-time migration: move the API token out of config.json into the token store. The store
+    // encrypts it when the OS offers secure storage; when it does not, the token is kept as
+    // written (still better off in auth.json, mode 600) and Settings says so (D-AUTH-4).
     const preConfig = loadConfig()
     if (
       preConfig?.auth_method === 'api_token' &&
       preConfig.api_token &&
-      isEncryptionAvailable() &&
       !getAPIToken()
     ) {
       storeAPIToken(preConfig.api_token, API_TOKEN_NO_EXPIRY)

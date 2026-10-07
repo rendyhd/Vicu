@@ -76,7 +76,7 @@ import {
   applyQuickEntrySettings,
   getLastShortcutStatus,
 } from './quick-entry-state'
-import { getAPIToken, storeAPIToken, isEncryptionAvailable, API_TOKEN_NO_EXPIRY } from './auth/token-store'
+import { getAPIToken, getSecretStorageStatus, storeAPIToken, API_TOKEN_NO_EXPIRY } from './auth/token-store'
 import { sendTestNotification, rescheduleNotifications, refreshTaskReminders, refreshRoutineReminders } from './notifications'
 import { setTaskBadge, clearTaskBadge } from './badge'
 import { resolveShownObsidianLink, testObsidianConnection } from './obsidian-client'
@@ -143,8 +143,8 @@ const QUIET_PATCH_KEYS: ReadonlySet<string> = new Set([
 // Shared tail of every renderer-driven config write: keep the API token out of
 // config.json, save, then (unless `announce` is false) tell the rest of the app.
 function persistConfig(config: AppConfig, announce = true): void {
-  // Encrypt API token into token-store if available
-  if (config.auth_method === 'api_token' && config.api_token && isEncryptionAvailable()) {
+  // The API token goes to the token store (encrypted when the OS allows it), not config.json
+  if (config.auth_method === 'api_token' && config.api_token) {
     storeAPIToken(config.api_token, API_TOKEN_NO_EXPIRY)
     config.api_token = ''
   }
@@ -701,6 +701,10 @@ export function registerIpcHandlers(): void {
   handleTrusted('get-global-shortcut-status', () => {
     return getLastShortcutStatus()
   })
+
+  // How the sign-in secrets are protected on this machine ('encrypted', 'obfuscated' or
+  // 'plaintext'), so Settings can warn instead of implying they are always encrypted (D-AUTH-4).
+  handleTrusted('get-secret-storage-status', () => getSecretStorageStatus())
 
   // --- Hotkey launcher command (Linux/Wayland escape hatch) ---
   // Returns the exact shell command a user should bind in their desktop

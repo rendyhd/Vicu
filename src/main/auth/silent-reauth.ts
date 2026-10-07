@@ -4,6 +4,7 @@ import { discoverProviders } from './oidc-discovery'
 import { getProviderKey, storeJWT, storeRefreshToken } from './token-store'
 import { extractRefreshToken } from './cookie-utils'
 import { AUTH_WINDOW_PARTITION } from '../web-security-policy'
+import { buildAuthorizationUrl, interpretRedirect } from './oidc-url'
 
 const SILENT_AUTH_TIMEOUT = 15_000
 const TOKEN_EXCHANGE_TIMEOUT = 15_000
@@ -48,18 +49,8 @@ export async function silentReauth(vikunjaUrl: string): Promise<string> {
   // 4. Generate state
   const state = randomUUID()
 
-  // 5. Build auth URL with prompt=none (no PKCE — same reason as interactive login)
-  // Add offline_access scope so the IdP issues longer-lived refresh tokens.
-  const scope = provider.scope.includes('offline_access')
-    ? provider.scope
-    : `${provider.scope} offline_access`
-  const authUrl =
-    `${provider.auth_url}?client_id=${provider.client_id}` +
-    `&redirect_uri=${encodeURIComponent(redirectUri)}` +
-    `&response_type=code` +
-    `&state=${state}` +
-    `&scope=${encodeURIComponent(scope)}` +
-    `&prompt=none`
+  // 5. Build auth URL with prompt=none (no PKCE, offline_access added: see buildAuthorizationUrl)
+  const authUrl = buildAuthorizationUrl(provider, redirectUri, state, { prompt: 'none' })
 
   // 6. Create hidden BrowserWindow with persistent session partition
   //    (shares cookies with interactive login so the IdP session is available)
@@ -79,28 +70,16 @@ export async function silentReauth(vikunjaUrl: string): Promise<string> {
     // 7. Intercept redirects for both code and error detection
     const codePromise = new Promise<string>((resolve, reject) => {
       const checkRedirect = (event: Electron.Event, url: string): void => {
-        if (!url.startsWith(redirectUri)) return
-
-        try {
-          const parsed = new URL(url)
-          const error = parsed.searchParams.get('error')
-          if (error) {
-            event.preventDefault()
-            reject(
-              new Error(
-                `Silent reauth failed: ${error} — ${parsed.searchParams.get('error_description') ?? 'session expired'}`
-              )
-            )
-            return
-          }
-
-          const code = parsed.searchParams.get('code')
-          if (code) {
-            event.preventDefault()
-            resolve(code)
-          }
-        } catch {
-          // Not a valid URL, ignore
+        const outcome = interpretRedirect(url, redirectUri, state, {
+          errorPrefix: 'Silent reauth failed',
+          defaultErrorDescription: 'session expired',
+        })
+        if (outcome.kind === 'ignore') return
+        event.preventDefault()
+        if (outcome.kind === 'error') {
+          reject(new Error(outcome.message))
+        } else {
+          resolve(outcome.code)
         }
       }
 

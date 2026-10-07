@@ -9,6 +9,7 @@ import { TokenPermissionsInfo } from '@/views/SetupView'
 import { QuickEntrySettings } from '@/components/settings/QuickEntrySettings'
 import { ObsidianSettings } from '@/components/settings/ObsidianSettings'
 import { BrowserSettings } from '@/components/settings/BrowserSettings'
+import { SecretStorageNotice } from '@/components/settings/SecretStorageNotice'
 import { KeyboardShortcuts } from '@/components/settings/KeyboardShortcuts'
 import { NotificationSettings } from '@/components/settings/NotificationSettings'
 import { CompletionSoundSettings } from '@/components/settings/CompletionSoundSettings'
@@ -309,6 +310,7 @@ export function SettingsView() {
               </div>
             </div>
           )}
+          <SecretStorageNotice />
         </div>
 
         <div className="rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] p-5">

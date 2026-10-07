@@ -182,6 +182,8 @@ export const api = {
 
   getGlobalShortcutStatus: () =>
     window.api.getGlobalShortcutStatus() as Promise<{ entry: boolean; viewer: boolean; waylandLimited: boolean }>,
+  getSecretStorageStatus: () =>
+    window.api.getSecretStorageStatus() as Promise<'encrypted' | 'obfuscated' | 'plaintext'>,
 
   getHotkeyLauncherCommand: () =>
     window.api.getHotkeyLauncherCommand() as Promise<{ quickEntry: string; quickView: string; kind: 'appimage' | 'packaged' | 'dev' }>,
