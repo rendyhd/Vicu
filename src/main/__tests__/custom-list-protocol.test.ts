@@ -2,10 +2,12 @@ import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import {
+  TOMBSTONE_MAX_AGE_MS,
   activeLists,
   appListToWire,
   compareRevision,
   documentFromLists,
+  emptyCustomListDocument,
   encodeCustomListEnvelope,
   hasVicuMetadataMarker,
   mergeCustomListDocuments,
@@ -13,6 +15,7 @@ import {
   normalizeDocument,
   normalizeWireList,
   parseCustomListEnvelope,
+  pruneTombstones,
   wireToAppList,
   type CustomList,
   type CustomListSyncDocumentV1,
@@ -251,5 +254,71 @@ describe('unknown fields from a newer app', () => {
         include_today_all_projects: false,
       },
     })
+  })
+})
+
+describe('a document that has never been written to', () => {
+  it('has an order older than any real one, so the order of another device wins the first sync', () => {
+    for (const fresh of [emptyCustomListDocument('desktop'), documentFromLists([], 'desktop', 5_000)]) {
+      expect(fresh.order.revision.wall_time_ms).toBe(0)
+      expect(fresh.order.ids).toEqual([])
+    }
+  })
+
+  it('keeps the remote order when merged with a remote that has one', () => {
+    const remote = documentFromLists([list('a'), list('b')], 'android', 1_000)
+    remote.order = { ids: ['b', 'a'], revision: { wall_time_ms: 2_000, counter: 0, device_id: 'android' } }
+    const merged = mergeCustomListDocuments(emptyCustomListDocument('desktop'), remote)
+    expect(merged.order.ids).toEqual(['b', 'a'])
+    expect(activeLists(merged).map((entry) => entry.id)).toEqual(['b', 'a'])
+    // Whichever side it is on.
+    const flipped = mergeCustomListDocuments(remote, emptyCustomListDocument('desktop'))
+    expect(activeLists(flipped).map((entry) => entry.id)).toEqual(['b', 'a'])
+  })
+
+  it('still stamps the order of lists that exist locally', () => {
+    const local = documentFromLists([list('a')], 'desktop', 5_000)
+    expect(local.order.revision.wall_time_ms).toBe(5_000)
+  })
+})
+
+describe('pruneTombstones', () => {
+  const DAY = 24 * 60 * 60 * 1000
+  const now = 1_800_000_000_000
+
+  function withTombstones(): CustomListSyncDocumentV1 {
+    const document = documentFromLists([list('live')], 'desktop', now - 200 * DAY)
+    document.lists.old = { value: null, revision: { wall_time_ms: now - 91 * DAY, counter: 0, device_id: 'desktop' } }
+    document.lists.edge = { value: null, revision: { wall_time_ms: now - 90 * DAY, counter: 0, device_id: 'android' } }
+    document.lists.recent = { value: null, revision: { wall_time_ms: now - 5 * DAY, counter: 0, device_id: 'android' } }
+    return document
+  }
+
+  it('is 90 days', () => {
+    expect(TOMBSTONE_MAX_AGE_MS).toBe(90 * DAY)
+  })
+
+  it('drops tombstones older than 90 days and keeps newer ones', () => {
+    const pruned = pruneTombstones(withTombstones(), now)
+    expect(Object.keys(pruned.lists).sort()).toEqual(['edge', 'live', 'recent'])
+  })
+
+  it('never drops a list that is still there, however old its revision', () => {
+    const pruned = pruneTombstones(withTombstones(), now)
+    expect(pruned.lists.live.value?.id).toBe('live')
+    expect(activeLists(pruned).map((entry) => entry.id)).toEqual(['live'])
+  })
+
+  it('leaves the order alone and does not change its input', () => {
+    const input = withTombstones()
+    const before = JSON.stringify(input)
+    const pruned = pruneTombstones(input, now)
+    expect(JSON.stringify(input)).toBe(before)
+    expect(pruned.order).toEqual(input.order)
+  })
+
+  it('returns an equal document when there is nothing to drop', () => {
+    const document = documentFromLists([list('a')], 'desktop', now)
+    expect(pruneTombstones(document, now)).toEqual(document)
   })
 })

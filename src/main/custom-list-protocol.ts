@@ -76,12 +76,35 @@ export function nextRevision(
   }
 }
 
-export function emptyCustomListDocument(deviceId: string, now = Date.now()): CustomListSyncDocumentV1 {
+/**
+ * A document nobody has written to. Its order carries a zero revision, not "now": an empty order
+ * stamped with the current time beat the real order of another device on a first sync and was
+ * then written back over it.
+ */
+export function emptyCustomListDocument(deviceId: string): CustomListSyncDocumentV1 {
   return {
     version: 1,
     lists: {},
-    order: { ids: [], revision: { wall_time_ms: now, counter: 0, device_id: deviceId } },
+    order: { ids: [], revision: { wall_time_ms: 0, counter: 0, device_id: deviceId } },
   }
+}
+
+/** Deleted lists are remembered as tombstones so the deletion reaches every device; after this long they are dropped. */
+export const TOMBSTONE_MAX_AGE_MS = 90 * 24 * 60 * 60 * 1000
+
+/**
+ * The document without the tombstones (`value: null`) whose revision is older than 90 days. Lists
+ * that exist are never touched. A device that has been offline longer than that and still holds a
+ * deleted list may bring it back; the age is the price of a document that does not grow forever.
+ */
+export function pruneTombstones(document: CustomListSyncDocumentV1, now = Date.now()): CustomListSyncDocumentV1 {
+  const cutoff = now - TOMBSTONE_MAX_AGE_MS
+  const lists: Record<string, CustomListSyncRecord> = {}
+  for (const [id, record] of Object.entries(document.lists)) {
+    if (record.value === null && record.revision.wall_time_ms < cutoff) continue
+    lists[id] = record
+  }
+  return { ...document, lists }
 }
 
 const KNOWN_LIST_KEYS: ReadonlySet<string> = new Set(['id', 'name', 'icon', 'filter'])
@@ -168,7 +191,9 @@ export function documentFromLists(
   deviceId: string,
   now = Date.now(),
 ): CustomListSyncDocumentV1 {
-  const document = emptyCustomListDocument(deviceId, now)
+  const document = emptyCustomListDocument(deviceId)
+  // Nothing written yet: keep the zero revision so the first sync takes another device's order.
+  if (lists.length === 0) return document
   let counter = 0
   for (const value of lists) {
     const normalized = normalizeWireList(value)

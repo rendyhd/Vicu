@@ -52,6 +52,10 @@ vi.mock('../api-client', () => ({
     if (patch.done !== undefined) task.done = patch.done
     return { success: true, data: { ...task } }
   },
+  deleteTask: async (id: number) => {
+    state.tasks.delete(id)
+    return { success: true, data: undefined }
+  },
 }))
 
 import {
@@ -203,5 +207,8 @@ describe('custom-list carrier sync (D-NOTIF-3, D-RT-2)', () => {
     expect(state.calls.list.some((params) => params.q === 'vicu-custom-lists')).toBe(true)
     expect(state.calls.list.every((params) => typeof params.q === 'string')).toBe(true)
     expect(restarted.getCustomLists().map((l) => l.id).sort()).toEqual(['a', 'x'])
+    // Two carriers now: the lists live in the older one and the extra is removed.
+    expect([...state.tasks.keys()]).toEqual([7])
+    expect(activeLists(parseCustomListEnvelope(state.tasks.get(7)!.description).document!).map((l) => l.id).sort()).toEqual(['a', 'x'])
   })
 })
