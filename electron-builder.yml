@@ -8,9 +8,11 @@ directories:
 
 files:
   - out/**/*
-  - resources/**/*
   - "!node_modules/**/{test,__tests__,tests,*.test.*,*.spec.*}"
 
+# resources/ and extensions/ ship once, as plain files next to app.asar (read through
+# process.resourcesPath: tray and notification icons, the done sound, the browser bridge, the
+# window-URL script, the browser extension). They are not packed into the asar as well.
 extraResources:
   - from: resources/
     to: resources/
