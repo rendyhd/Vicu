@@ -7,6 +7,7 @@ import { isNullDate } from '@/lib/date-utils'
 import { formatDateDisplay, type DateFormat } from '@/lib/date-display'
 import { useDateFormat } from '@/hooks/use-date-format'
 import { cn } from '@/lib/cn'
+import { ListSectionHeader } from '@/components/task-list/ListSectionHeader'
 import { TaskCheckbox } from '@/components/task-list/TaskCheckbox'
 import { Inbox } from 'lucide-react'
 import { EmptyState } from '@/components/shared/EmptyState'
@@ -31,7 +32,7 @@ function LogbookRow({ task, time }: { task: Task; time: string }) {
       <TaskCheckbox task={task} />
       <span
         className={cn(
-          'min-w-0 flex-1 truncate text-[13px]',
+          'min-w-0 flex-1 truncate text-task-title',
           task.done
             ? 'text-[var(--text-secondary)] line-through'
             : 'text-[var(--text-primary)]'
@@ -103,9 +104,7 @@ export function LogbookView() {
             return (
               <Fragment key={task.id}>
                 {group !== '' && group !== previous && (
-                  <div className="px-6 pb-1 pt-3">
-                    <h2 className="text-caption font-semibold uppercase tracking-wider text-text-secondary">{group}</h2>
-                  </div>
+                  <ListSectionHeader level={1} title={group} />
                 )}
                 <LogbookRow task={task} time={completionTime(task.done_at, now, dateFormat)} />
               </Fragment>

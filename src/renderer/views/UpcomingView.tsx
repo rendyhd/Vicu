@@ -6,7 +6,9 @@ import { usePrintable } from '@/stores/print-store'
 import { useDayKey } from '@/stores/day-store'
 import { isUpcoming, localDateOf } from '@/lib/due-dates'
 import { TaskList } from '@/components/task-list/TaskList'
-import { TaskRow } from '@/components/task-list/TaskRow'
+import { ListSectionHeader } from '@/components/task-list/ListSectionHeader'
+import { ProjectTaskGroup } from '@/components/task-list/ProjectTaskGroup'
+import { openCount } from '@/lib/list-sections'
 import { DueDateContextProvider } from '@/components/task-list/TaskDueBadge'
 import { useDateFormat } from '@/hooks/use-date-format'
 import { formatDateDisplay, type DateFormat } from '@/lib/date-display'
@@ -21,15 +23,16 @@ function getDateKey(date: string): string {
   return localDateOf(date)
 }
 
-function groupByProject(tasks: Task[], projectsFlat?: { id: number; title: string }[]) {
+function groupByProject(tasks: Task[], projectsFlat?: { id: number; title: string; hex_color?: string }[]) {
   const activeIds = new Set(projectsFlat?.map((project) => project.id) ?? [])
-  const byProject = new Map<number, { name: string; tasks: Task[] }>()
+  const byProject = new Map<number, { name: string; color?: string; tasks: Task[] }>()
   for (const task of tasks) {
     const pid = task.project_id
     if (!activeIds.has(pid)) continue
     if (!byProject.has(pid)) {
       byProject.set(pid, {
         name: projectsFlat?.find((p) => p.id === pid)?.title ?? 'Unknown Project',
+        color: projectsFlat?.find((p) => p.id === pid)?.hex_color,
         tasks: [],
       })
     }
@@ -121,22 +124,9 @@ export function UpcomingView() {
           const projectGroups = groupByProject(group.tasks, projects?.flat)
           return (
             <div key={group.key}>
-              <div className="px-6 pb-1 pt-3">
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
-                  {group.label}
-                </span>
-              </div>
+              <ListSectionHeader level={1} title={group.label} count={openCount(group.tasks)} />
               {projectGroups.map((pg) => (
-                <div key={pg.name}>
-                  <div className="px-6 pb-0.5 pt-1.5">
-                    <span className="text-caption font-medium tracking-wide text-[var(--text-secondary)]">
-                      {pg.name}
-                    </span>
-                  </div>
-                  {pg.tasks.map((task) => (
-                    <TaskRow key={task.id} task={task} />
-                  ))}
-                </div>
+                <ProjectTaskGroup key={pg.name} level={2} name={pg.name} color={pg.color} tasks={pg.tasks} />
               ))}
             </div>
           )

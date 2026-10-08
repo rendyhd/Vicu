@@ -5,6 +5,9 @@ import { useProjects } from '@/hooks/use-projects'
 import { usePrintable } from '@/stores/print-store'
 import { TaskList } from '@/components/task-list/TaskList'
 import { TaskRow } from '@/components/task-list/TaskRow'
+import { ListSectionHeader } from '@/components/task-list/ListSectionHeader'
+import { ProjectTaskGroup } from '@/components/task-list/ProjectTaskGroup'
+import { openCount, showsGroupHeader } from '@/lib/list-sections'
 import { api } from '@/lib/api'
 import type { Task } from '@/lib/vikunja-types'
 
@@ -35,11 +38,13 @@ export function AnytimeView() {
     interface SubGroup {
       projectId: number
       projectName: string
+      color?: string
       tasks: Task[]
     }
     interface RootGroup {
       projectId: number
       projectName: string
+      color?: string
       subGroups: SubGroup[]
     }
 
@@ -59,9 +64,11 @@ export function AnytimeView() {
     return Array.from(byRoot.entries()).map(([rootId, subMap]): RootGroup => ({
       projectId: rootId,
       projectName: projectMap.get(rootId)?.title ?? `Project ${rootId}`,
+      color: projectMap.get(rootId)?.hex_color,
       subGroups: Array.from(subMap.entries()).map(([pid, tasks]) => ({
         projectId: pid,
         projectName: projectMap.get(pid)?.title ?? `Project ${pid}`,
+        color: projectMap.get(pid)?.hex_color,
         tasks,
       })),
     }))
@@ -101,35 +108,27 @@ export function AnytimeView() {
       emptyTitle="Nothing here"
       emptySubtitle="Open tasks from all projects"
     >
-      {groups.map((group) => (
-        <div key={group.projectId}>
-          <div className="px-6 pb-1 pt-3">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
-              {group.projectName}
-            </span>
+      {groups.map((group) => {
+        const groupTasks = group.subGroups.flatMap((sub) => sub.tasks)
+        // A project with a single open task gets no header: the project goes on the row's meta line.
+        if (!showsGroupHeader(groupTasks)) {
+          return groupTasks.map((task) => (
+            <TaskRow key={task.id} task={task} projectMeta={{ title: group.projectName, color: group.color }} />
+          ))
+        }
+        return (
+          <div key={group.projectId}>
+            <ListSectionHeader level={1} title={group.projectName} count={openCount(groupTasks)} dotColor={group.color ?? ''} />
+            {group.subGroups.map((sub) =>
+              sub.projectId === group.projectId ? (
+                sub.tasks.map((task) => <TaskRow key={task.id} task={task} />)
+              ) : (
+                <ProjectTaskGroup key={sub.projectId} level={2} name={sub.projectName} color={sub.color} tasks={sub.tasks} />
+              )
+            )}
           </div>
-          {group.subGroups.map((sub) =>
-            sub.projectId === group.projectId ? (
-              sub.tasks.map((task) => (
-                <TaskRow key={task.id} task={task} />
-              ))
-            ) : (
-              <div key={sub.projectId}>
-                <div className="pb-1 pt-2 pl-10">
-                  <span className="text-caption font-medium uppercase tracking-wider text-[var(--text-secondary)] opacity-70">
-                    {sub.projectName}
-                  </span>
-                </div>
-                <div className="pl-4">
-                  {sub.tasks.map((task) => (
-                    <TaskRow key={task.id} task={task} />
-                  ))}
-                </div>
-              </div>
-            )
-          )}
-        </div>
-      ))}
+        )
+      })}
     </TaskList>
   )
 }

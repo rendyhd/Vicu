@@ -8,6 +8,7 @@ import { cn } from '@/lib/cn'
 import { useUpdateProject, useDeleteProject } from '@/hooks/use-task-mutations'
 import { useConfirmDelete } from '@/hooks/use-confirm-delete'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
+import { normalizeHex } from '@/lib/constants'
 import type { Project } from '@/lib/vikunja-types'
 
 interface SectionHeaderProps {
@@ -113,6 +114,11 @@ export function SectionHeader({ project, siblings, onAddTask }: SectionHeaderPro
       )}
       style={style}
     >
+      <span
+        aria-hidden="true"
+        className="h-2 w-2 shrink-0 rounded-full"
+        style={{ backgroundColor: normalizeHex(project.hex_color) ?? 'var(--text-tertiary)' }}
+      />
       {isRenaming ? (
         <input
           ref={renameRef}
@@ -127,10 +133,10 @@ export function SectionHeader({ project, siblings, onAddTask }: SectionHeaderPro
             }
           }}
           onBlur={handleRenameSubmit}
-          className="flex-1 bg-transparent text-[13px] font-bold text-[var(--text-primary)] focus:outline-none"
+          className="flex-1 bg-transparent text-group text-text-secondary focus:outline-none"
         />
       ) : (
-        <span className="flex-1 truncate text-[13px] font-bold text-[var(--text-primary)]">
+        <span className="flex-1 truncate text-group text-text-secondary">
           {project.title}
         </span>
       )}

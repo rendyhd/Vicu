@@ -6,7 +6,9 @@ import { usePrintable } from '@/stores/print-store'
 import { useDayKey } from '@/stores/day-store'
 import { splitTodayOverdue } from '@/lib/today-overdue'
 import { TaskList } from '@/components/task-list/TaskList'
-import { TaskRow } from '@/components/task-list/TaskRow'
+import { ListSectionHeader } from '@/components/task-list/ListSectionHeader'
+import { ProjectTaskGroup } from '@/components/task-list/ProjectTaskGroup'
+import { openCount } from '@/lib/list-sections'
 import { DueDateContextProvider } from '@/components/task-list/TaskDueBadge'
 import { useDateFormat } from '@/hooks/use-date-format'
 import { formatDateDisplay } from '@/lib/date-display'
@@ -15,15 +17,16 @@ import { showRoutinesInToday, type Task } from '@/lib/vikunja-types'
 import { useAppConfig } from '@/hooks/use-app-config'
 import { RoutineTodaySection } from '@/components/routines/RoutineTodaySection'
 
-function groupByProject(tasks: Task[], projectsFlat?: { id: number; title: string }[]) {
+function groupByProject(tasks: Task[], projectsFlat?: { id: number; title: string; hex_color?: string }[]) {
   const activeIds = new Set(projectsFlat?.map((project) => project.id) ?? [])
-  const byProject = new Map<number, { name: string; tasks: Task[] }>()
+  const byProject = new Map<number, { name: string; color?: string; tasks: Task[] }>()
   for (const task of tasks) {
     const pid = task.project_id
     if (!activeIds.has(pid)) continue
     if (!byProject.has(pid)) {
       byProject.set(pid, {
         name: projectsFlat?.find((p) => p.id === pid)?.title ?? 'Unknown Project',
+        color: projectsFlat?.find((p) => p.id === pid)?.hex_color,
         tasks: [],
       })
     }
@@ -115,22 +118,9 @@ export function TodayView() {
         {routinesShown && <RoutineTodaySection hideFinished />}
         {overdueTasks.length > 0 && (
           <div>
-            <div className="px-6 pb-1 pt-2">
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-status-overdue">
-                Overdue
-              </span>
-            </div>
+            <ListSectionHeader level={1} title="Overdue" count={openCount(overdueTasks)} tone="overdue" />
             {overdueGroups.map((group) => (
-              <div key={group.name}>
-                <div className="px-6 pb-0.5 pt-1.5">
-                  <span className="text-caption font-medium tracking-wide text-[var(--text-secondary)]">
-                    {group.name}
-                  </span>
-                </div>
-                {group.tasks.map((task) => (
-                  <TaskRow key={task.id} task={task} />
-                ))}
-              </div>
+              <ProjectTaskGroup key={group.name} level={2} name={group.name} color={group.color} tasks={group.tasks} />
             ))}
           </div>
         )}
@@ -138,23 +128,17 @@ export function TodayView() {
         {todayTasks.length > 0 && (
           <div>
             {overdueTasks.length > 0 && (
-              <div className="px-6 pb-1 pt-3">
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
-                  Today
-                </span>
-              </div>
+              <ListSectionHeader level={1} title="Today" count={openCount(todayTasks)} />
             )}
+            {/* Without an Overdue section above, the projects are the top level of the list. */}
             {todayGroups.map((group) => (
-              <div key={group.name}>
-                <div className="px-6 pb-0.5 pt-1.5">
-                  <span className="text-caption font-medium tracking-wide text-[var(--text-secondary)]">
-                    {group.name}
-                  </span>
-                </div>
-                {group.tasks.map((task) => (
-                  <TaskRow key={task.id} task={task} />
-                ))}
-              </div>
+              <ProjectTaskGroup
+                key={group.name}
+                level={overdueTasks.length > 0 ? 2 : 1}
+                name={group.name}
+                color={group.color}
+                tasks={group.tasks}
+              />
             ))}
           </div>
         )}

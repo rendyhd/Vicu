@@ -53,6 +53,11 @@ interface TaskRowProps {
   sortable?: boolean
   nestedDepth?: number
   parentProjectId?: number
+  /**
+   * Set by a list view when the task is alone in its project group (no group header): the project
+   * goes on the row's meta line. Rendered by the row anatomy card (2.6); until then it is carried only.
+   */
+  projectMeta?: { title: string; color?: string }
 }
 
 // Animate displacement during active drag, but never animate layout changes after drop.

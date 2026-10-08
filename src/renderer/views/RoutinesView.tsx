@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { formatDateChip, formatMinutesOfDay } from '@/lib/date-utils'
 import { useDateFormat } from '@/hooks/use-date-format'
+import { ListSectionHeader } from '@/components/task-list/ListSectionHeader'
 import {
   Archive,
   Bell,
@@ -36,7 +37,7 @@ import { useAppConfig } from '@/hooks/use-app-config'
 import { cn } from '@/lib/cn'
 
 const FIELD = 'h-9 w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 text-sm text-[var(--text-primary)] transition'
-const LABEL = 'mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-[var(--text-secondary)]'
+const LABEL = 'mb-1.5 block text-caption uppercase tracking-wide text-[var(--text-secondary)]'
 // Stored data, not theme colours: a routine saves the hex it was given (definition.color), so these
 // values are fixed here and must not follow the palette roles or the theme.
 const STORED_ROUTINE_COLORS = ['#AF52DE', '#007AFF', '#34C759', '#FF9500', '#FF3B30', '#5AC8FA']
@@ -222,7 +223,7 @@ function RoutineEditor({
 
           <div>
             <div className="mb-2 flex items-center">
-              <label className="flex-1 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-secondary)]">Times & reminders</label>
+              <label className="flex-1 text-caption uppercase tracking-wide text-[var(--text-secondary)]">Times & reminders</label>
               {draft.kind === 'HEALTH' && <button type="button" onClick={() => setDraft({ ...draft, slots: [...draft.slots, defaultSlot('HEALTH', draft.slots.length)] })} className="flex items-center gap-1 text-xs font-medium text-accent-blue"><Plus className="h-3.5 w-3.5" /> Add time</button>}
             </div>
             <div className="space-y-2">
@@ -265,7 +266,7 @@ function HistoryDialog({ carrier, onClose }: { carrier: RoutineCarrier<Task>; on
           <div className="rounded-card bg-[var(--bg-secondary)] p-4"><div className="text-2xl font-semibold text-[var(--text-primary)]">{adherence}%</div><div className="text-xs text-[var(--text-secondary)]">Logged adherence</div></div>
           <div className="rounded-card bg-[var(--bg-secondary)] p-4"><div className="text-2xl font-semibold text-[var(--text-primary)]">{completed}</div><div className="text-xs text-[var(--text-secondary)]">Completions</div></div>
         </div>
-        <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-secondary)]">History</h3>
+        <h3 className="mb-2 text-caption uppercase tracking-wide text-[var(--text-secondary)]">History</h3>
         {loadingArchive && <p className="mb-2 text-xs text-[var(--text-secondary)]">Loading earlier history...</p>}
         {archiveError && <p className="mb-2 text-xs text-danger">Could not load earlier history: {archiveError}</p>}
         {records.length === 0 ? <p className="py-8 text-center text-sm text-[var(--text-secondary)]">No check-ins yet.</p> : (
@@ -275,8 +276,8 @@ function HistoryDialog({ carrier, onClose }: { carrier: RoutineCarrier<Task>; on
                 <div className={cn('flex h-6 w-6 items-center justify-center rounded-full', record.status === 'COMPLETED' ? 'bg-status-done/15 text-status-done' : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)]')}>
                   {record.status === 'COMPLETED' ? <Check className="h-3.5 w-3.5" /> : <X className="h-3.5 w-3.5" />}
                 </div>
-                <div className="min-w-0 flex-1"><div className="text-sm text-[var(--text-primary)]">{formatDateChip(new Date(`${record.scheduledDate}T12:00:00`), true, new Date(), dateFormat)}</div><div className="text-[11px] text-[var(--text-secondary)]">{formatMinutesOfDay(record.scheduledMinutes, dateFormat)}</div></div>
-                <span className="text-[11px] font-medium capitalize text-[var(--text-secondary)]">{record.status.toLowerCase().replace('_', ' ')}</span>
+                <div className="min-w-0 flex-1"><div className="text-sm text-[var(--text-primary)]">{formatDateChip(new Date(`${record.scheduledDate}T12:00:00`), true, new Date(), dateFormat)}</div><div className="text-meta text-[var(--text-secondary)]">{formatMinutesOfDay(record.scheduledMinutes, dateFormat)}</div></div>
+                <span className="text-meta capitalize text-[var(--text-secondary)]">{record.status.toLowerCase().replace('_', ' ')}</span>
               </div>
             ))}
           </div>
@@ -341,7 +342,7 @@ function RoutinesContent() {
           <RoutineTodaySection showEmpty />
 
           <section className="px-6 pt-6">
-            <div className="mb-3 flex items-center"><h2 className="flex-1 text-[11px] font-semibold uppercase tracking-wider text-[var(--text-secondary)]">Your routines</h2><span className="text-xs text-[var(--text-secondary)]">{active.length} active</span></div>
+            <ListSectionHeader level={1} title="Your routines" count={active.length} sticky={false} className="mb-3 px-0" />
             {routines.isLoading && <div className="rounded-card border border-[var(--border-color)] p-8 text-center text-sm text-[var(--text-secondary)]">Loading routines...</div>}
             {!routines.isLoading && active.length === 0 && (
               <button type="button" onClick={() => setEditor('new')} className="flex w-full flex-col items-center rounded-card border border-dashed border-[var(--border-color)] px-6 py-10 text-center hover:bg-[var(--bg-hover)]"><div className="mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-accent-purple/15 text-accent-purple"><Plus className="h-5 w-5" /></div><span className="text-sm font-semibold text-[var(--text-primary)]">Create your first routine</span><span className="mt-1 max-w-sm text-xs leading-5 text-[var(--text-secondary)]">Track supplements, medication, or chores without turning them into an endless pile of recurring tasks.</span></button>
@@ -365,7 +366,7 @@ function RoutinesContent() {
 
           {routines.archived.length > 0 && (
             <section className="px-6 pt-7">
-              <button type="button" onClick={() => setShowArchived(!showArchived)} className="mb-3 flex w-full items-center text-left text-[11px] font-semibold uppercase tracking-wider text-[var(--text-secondary)]"><span className="flex-1">Archived</span><span>{routines.archived.length}</span></button>
+              <button type="button" onClick={() => setShowArchived(!showArchived)} aria-expanded={showArchived} className="mb-3 flex h-8 w-full items-center gap-2 text-left text-section text-text"><span>Archived</span><span className="font-medium tabular-nums text-text-secondary">{routines.archived.length}</span></button>
               {showArchived && <div className="space-y-2">{routines.archived.map((carrier) => <div key={carrier.payload.definition.id} className="flex items-center gap-3 rounded-card border border-[var(--border-color)] px-3 py-2.5"><Archive className="h-4 w-4 text-[var(--text-secondary)]" /><span className="flex-1 text-sm text-[var(--text-primary)]">{carrier.payload.definition.name}</span><button type="button" onClick={() => routines.archiveRoutine.mutate({ carrier, archived: false })} className="flex items-center gap-1 text-xs font-medium text-accent-blue"><Undo2 className="h-3.5 w-3.5" /> Restore</button><button type="button" onClick={() => { if (window.confirm(`Permanently delete "${carrier.payload.definition.name}" and its history?`)) routines.deleteRoutine.mutate(carrier) }} className="rounded-control p-1.5 text-[var(--text-secondary)] hover:bg-danger/10 hover:text-danger"><Trash2 className="h-4 w-4" /></button></div>)}</div>}
             </section>
           )}

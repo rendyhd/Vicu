@@ -17,7 +17,6 @@ const renderer = resolve(__dirname, '..', '..')
 const ARBITRARY_SIZE_ALLOWLIST = [
   'components/layout/Sidebar.tsx',
   'components/review/ProjectBranch.tsx',
-  'components/routines/RoutineTodaySection.tsx',
   'components/settings/QuickEntrySettings.tsx',
   'components/sidebar/CustomListDragOverlay.tsx',
   'components/sidebar/CustomListNav.tsx',
@@ -32,16 +31,9 @@ const ARBITRARY_SIZE_ALLOWLIST = [
   'components/task-list/NlpParsePreview.tsx',
   'components/task-list/ParentDropZone.tsx',
   'components/task-list/SectionDragOverlay.tsx',
-  'components/task-list/SectionHeader.tsx',
   'components/task-list/TaskDragOverlay.tsx',
   'components/task-list/TaskRow.tsx',
-  'views/AnytimeView.tsx',
-  'views/LogbookView.tsx',
   'views/ReviewView.tsx',
-  'views/RoutinesView.tsx',
-  'views/TagView.tsx',
-  'views/TodayView.tsx',
-  'views/UpcomingView.tsx',
 ]
 
 // Built from parts so this file does not carry literal classes into the Tailwind content scan.

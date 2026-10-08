@@ -7,7 +7,7 @@ import { useFilters } from '@/hooks/use-filters'
 import { usePrintable } from '@/stores/print-store'
 import { withoutNestedSubtasks } from '@/lib/nested-subtasks'
 import { TaskList } from '@/components/task-list/TaskList'
-import { TaskRow } from '@/components/task-list/TaskRow'
+import { ProjectTaskGroup } from '@/components/task-list/ProjectTaskGroup'
 
 export function TagView() {
   const { labelId } = useParams({ from: '/tag/$labelId' })
@@ -28,13 +28,14 @@ export function TagView() {
   }, [tasks, lid, projects?.flat])
 
   const groups = useMemo(() => {
-    const projectMap = new Map<number, { name: string; tasks: typeof filtered }>()
+    const projectMap = new Map<number, { name: string; color?: string; tasks: typeof filtered }>()
     for (const task of filtered) {
       const pid = task.project_id
       if (!projectMap.has(pid)) {
         const project = projects?.flat.find((p) => p.id === pid)
         projectMap.set(pid, {
           name: project?.title ?? 'Unknown Project',
+          color: project?.hex_color,
           tasks: [],
         })
       }
@@ -71,16 +72,7 @@ export function TagView() {
       emptyTitle={`No tasks tagged "${labelName}"`}
     >
       {groups.map((group) => (
-        <div key={group.name}>
-          <div className="px-6 pb-1 pt-3">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
-              {group.name}
-            </span>
-          </div>
-          {group.tasks.map((task) => (
-            <TaskRow key={task.id} task={task} />
-          ))}
-        </div>
+        <ProjectTaskGroup key={group.name} level={1} name={group.name} color={group.color} tasks={group.tasks} />
       ))}
     </TaskList>
   )
