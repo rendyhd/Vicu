@@ -249,6 +249,19 @@ await setSize(SIZE.width, SIZE.height)
 const token = readApiToken()
 const serverApi = createApi(token)
 
+// Stale content: a task that was completed or deleted after the seed changes what the captures show,
+// even when the seed is from today. seed.mjs keys the tasks that scenarios rely on.
+{
+  const gone = []
+  for (const [key, id] of Object.entries(ids.tasks ?? {})) {
+    const task = await serverApi.get(`/tasks/${id}`).catch(() => null)
+    if (!task || task.done) gone.push(key)
+  }
+  if (gone.length > 0) {
+    emit({ t: 'warn', message: `seeded tasks are missing or done (${gone.join(', ')}); run node scripts/ui-verify/seed.mjs to re-seed.` })
+  }
+}
+
 function isSelector(s) {
   return /^(css|text|role|xpath|id|data-testid|internal:)[:=]/.test(s) || /^[.#[]/.test(s) || s.startsWith('//') || /[[\]>]/.test(s) || /^[a-z]+\./.test(s)
 }

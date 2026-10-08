@@ -477,6 +477,20 @@ body {
   opacity: 1;
 }
 
+/* Focus (card 1.5): the ring the main window draws. Buttons get it outside. The input and the
+ * description field are borderless and run to the card edge, so their ring is drawn inside, where
+ * the card's overflow clip cannot cut it. */
+button:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+#task-input:focus-visible,
+.description-input:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
+}
+
 /* Dark mode */
 @media (prefers-color-scheme: dark) {
   .drag-handle-pill {
@@ -526,4 +540,17 @@ body {
   .autocomplete-item:hover { background: rgba(59, 130, 246, 0.12); }
   .autocomplete-item-project::before { background: rgba(59, 130, 246, 0.7); }
   .autocomplete-item-label::before { background: rgba(249, 115, 22, 0.7); }
+}
+
+/* Reduced motion (card 1.5): the rules of the base layer in assets/index.css, which this window does
+ * not load. Colour and opacity only, at most fade.fast; transforms still apply, instantly. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, opacity !important;
+    transition-duration: var(--dur-fade-fast) !important;
+    transition-delay: 0s !important;
+    scroll-behavior: auto !important;
+  }
 }

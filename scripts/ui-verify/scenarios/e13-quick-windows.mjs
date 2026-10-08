@@ -76,7 +76,7 @@ export default async function run(h) {
   // Quick View
   const qv = await h.showQuick('view')
   const shown = await qv
-    .getByText('Renew passport')
+    .getByText('Call the plumber about the kitchen leak')
     .first()
     .waitFor({ timeout: 10000 })
     .then(() => true)

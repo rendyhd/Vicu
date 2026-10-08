@@ -14,6 +14,20 @@ const config: Config = {
   theme: {
     extend: {
       colors: tokenTheme.colors,
+      // Motion roles (test-fixtures/design-tokens-v1.json, "motion"). The variables are in tokens.css, so
+      // components write duration-fade-base or ease-standard instead of a millisecond value.
+      transitionDuration: {
+        'fade-fast': 'var(--dur-fade-fast)',
+        'fade-base': 'var(--dur-fade-base)',
+        move: 'var(--dur-move)',
+        'move-expressive': 'var(--dur-move-expressive)',
+        pop: 'var(--dur-pop)',
+      },
+      transitionTimingFunction: {
+        standard: 'var(--ease-standard)',
+        enter: 'var(--ease-enter)',
+        exit: 'var(--ease-exit)',
+      },
       fontSize: tokenTheme.fontSize,
       borderRadius: tokenTheme.borderRadius,
       opacity: tokenTheme.opacity,

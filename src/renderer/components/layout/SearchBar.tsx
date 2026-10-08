@@ -44,7 +44,7 @@ export function SearchBar() {
     <div style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties} className="flex items-center mr-1">
       <div
         className={cn(
-          'flex items-center transition-all duration-200 overflow-hidden rounded-control',
+          'flex items-center transition-all duration-fade-base overflow-hidden rounded-control',
           open
             ? 'w-60 bg-[var(--bg-secondary)] border border-[var(--border-color)]'
             : 'w-7'

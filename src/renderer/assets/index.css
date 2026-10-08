@@ -50,7 +50,7 @@
 /*
  * Reduced motion base layer (card 1.5). Under prefers-reduced-motion: reduce nothing moves, grows
  * or slides: transitions are limited to colour and opacity and last at most --dur-fade-fast, a
- * spinner becomes a slow fade, and smooth scrolling is off. Transforms still apply, instantly.
+ * spinner becomes a slow fade, a pulse stops, and smooth scrolling is off. Transforms still apply, instantly.
  */
 @keyframes vicu-fade-pulse {
   50% {
@@ -70,6 +70,10 @@
 
   .animate-spin {
     animation: vicu-fade-pulse 1.5s ease-in-out infinite;
+  }
+
+  .animate-pulse {
+    animation: none;
   }
 }
 

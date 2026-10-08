@@ -511,6 +511,16 @@ textarea {
 }
 .browser-link-btn:hover { opacity: 1; background: rgba(37, 99, 235, 0.12); }
 
+/* Focus (card 1.5): the ring the main window draws, outside the control. Quick View rows are not
+ * focusable; the keyboard cursor is the .selected row. */
+button:focus-visible,
+.task-checkbox:focus-visible,
+.task-edit-title:focus-visible,
+.task-edit-description:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
 /* Dark mode */
 @media (prefers-color-scheme: dark) {
   .drag-handle-pill {
@@ -592,4 +602,17 @@ textarea {
 
   .browser-link-btn { color: #60a5fa; }
   .browser-link-btn:hover { background: rgba(96, 165, 250, 0.15); }
+}
+
+/* Reduced motion (card 1.5): the rules of the base layer in assets/index.css, which this window does
+ * not load. Colour and opacity only, at most fade.fast; transforms still apply, instantly. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, opacity !important;
+    transition-duration: var(--dur-fade-fast) !important;
+    transition-delay: 0s !important;
+    scroll-behavior: auto !important;
+  }
 }

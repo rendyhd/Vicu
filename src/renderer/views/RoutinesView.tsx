@@ -36,7 +36,9 @@ import { cn } from '@/lib/cn'
 
 const FIELD = 'h-9 w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 text-sm text-[var(--text-primary)] transition'
 const LABEL = 'mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-[var(--text-secondary)]'
-const COLORS = ['#AF52DE', '#007AFF', '#34C759', '#FF9500', '#FF3B30', '#5AC8FA']
+// Stored data, not theme colours: a routine saves the hex it was given (definition.color), so these
+// values are fixed here and must not follow the palette roles or the theme.
+const STORED_ROUTINE_COLORS = ['#AF52DE', '#007AFF', '#34C759', '#FF9500', '#FF3B30', '#5AC8FA']
 const WEEKDAYS = [
   { id: 1, label: 'M' }, { id: 2, label: 'T' }, { id: 3, label: 'W' },
   { id: 4, label: 'T' }, { id: 5, label: 'F' }, { id: 6, label: 'S' }, { id: 7, label: 'S' },
@@ -63,7 +65,7 @@ function emptyDraft(kind: RoutineKind = 'HEALTH'): RoutineDraft {
     amount: '',
     unit: '',
     iconName: kind === 'HEALTH' ? 'pill' : 'home',
-    color: kind === 'HEALTH' ? COLORS[0] : COLORS[2],
+    color: kind === 'HEALTH' ? STORED_ROUTINE_COLORS[0] : STORED_ROUTINE_COLORS[2],
     schedule: { type: 'calendar', weekdays: kind === 'HEALTH' ? [] : [isoWeekday(today)], weekInterval: 1, anchorDate: today },
     slots: [defaultSlot(kind)],
   }
@@ -173,7 +175,7 @@ function RoutineEditor({
           <div>
             <label className={LABEL}>Color</label>
             <div className="flex gap-2">
-              {COLORS.map((color) => (
+              {STORED_ROUTINE_COLORS.map((color) => (
                 <button key={color} type="button" onClick={() => setDraft({ ...draft, color })} className={cn('h-7 w-7 rounded-full transition-transform hover:scale-110', draft.color === color && 'ring-2 ring-offset-2 ring-offset-[var(--bg-primary)]')} style={{ backgroundColor: color, color }} aria-label={`Use ${color}`} />
               ))}
             </div>
@@ -349,7 +351,7 @@ function RoutinesContent() {
                 const Icon = definition.kind === 'HEALTH' ? Pill : Home
                 return (
                   <article key={definition.id} className="group flex items-center gap-3 rounded-card border border-[var(--border-color)] bg-[var(--bg-primary)] p-3.5 transition hover:border-[var(--text-tertiary)] hover:shadow-sm">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-card text-white" style={{ backgroundColor: definition.color || COLORS[0] }}><Icon className="h-5 w-5" /></div>
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-card text-white" style={{ backgroundColor: definition.color || STORED_ROUTINE_COLORS[0] }}><Icon className="h-5 w-5" /></div>
                     <button type="button" onClick={() => setHistory(carrier)} className="min-w-0 flex-1 text-left"><div className="truncate text-sm font-semibold text-[var(--text-primary)]">{definition.name}</div><div className="mt-0.5 truncate text-xs text-[var(--text-secondary)]">{[definition.amount, definition.unit, scheduleSummary(definition)].filter(Boolean).join(' / ')}</div></button>
                     <button type="button" title="History" onClick={() => setHistory(carrier)} className="rounded-control p-2 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"><History className="h-4 w-4" /></button>
                     <button type="button" title="Edit" onClick={() => setEditor(carrier)} className="rounded-control p-2 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"><ChevronRight className="h-4 w-4" /></button>

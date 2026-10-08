@@ -130,6 +130,7 @@ const roadmap = await task(q4.id, 'Draft Q4 roadmap', {
     '<p>Outline the three big bets for Q4 and the metric that tells us each one worked.</p><ul><li><p>Growth: self-serve onboarding</p></li><li><p>Retention: weekly review flow</p></li></ul>',
 })
 await task(home.id, 'Call the plumber about the kitchen leak', {
+  key: 'plumber',
   due_date: at(0, 14, 0, 0),
   labels: ['call'],
   reminders: [{ reminder: at(0, 13, 45, 0) }],

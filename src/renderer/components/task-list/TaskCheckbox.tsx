@@ -27,7 +27,7 @@ export function TaskCheckbox({ task, className, suppressTopLevelUndo = false }: 
       className={cn(
         // 20 px circle in a 24 px hit area: the pseudo-element grows the 18 px padding box (20 minus the
         // 1 px border) by 3 px on each side, and the pointer treats it as part of the button.
-        'group/check relative flex h-5 w-5 shrink-0 items-center justify-center rounded-full border transition-colors duration-200 after:absolute after:-inset-[3px] after:content-[""]',
+        'group/check relative flex h-5 w-5 shrink-0 items-center justify-center rounded-full border transition-colors duration-fade-base after:absolute after:-inset-[3px] after:content-[""]',
         task.done
           ? 'border-accent-fill bg-accent-fill hover:bg-accent-fill/80'
           : 'border-control-ring hover:border-accent-fill hover:bg-accent-fill/10',
