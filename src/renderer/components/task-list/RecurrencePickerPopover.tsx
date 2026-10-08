@@ -90,11 +90,14 @@ export function RecurrencePickerPopover({
       )}
 
       {/* Presets */}
-      <div className="flex flex-col gap-1">
+      <div role="listbox" aria-label="Repeat" className="flex flex-col gap-1">
         {presetButtons.map(({ key, label }) => (
           <button
             key={key}
             type="button"
+            role="option"
+            tabIndex={-1}
+            aria-selected={activePreset === key}
             onClick={() => applyPreset(key)}
             className={cn(
               'rounded-control px-2 py-1.5 text-left text-xs transition-colors',
@@ -108,6 +111,9 @@ export function RecurrencePickerPopover({
         ))}
         <button
           type="button"
+          role="option"
+          tabIndex={-1}
+          aria-selected={showCustom || activePreset === 'custom'}
           onClick={() => setShowCustom(!showCustom)}
           className={cn(
             'rounded-control px-2 py-1.5 text-left text-xs transition-colors',

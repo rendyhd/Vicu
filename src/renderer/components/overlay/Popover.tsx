@@ -55,7 +55,7 @@ export interface PopoverProps {
  *
  * Focus moves into it on open and returns to the anchor on close. Listboxes and menus move
  * between their `role="option"` / `role="menuitem"` children with the arrow keys, Home, End and by
- * typing the start of a name; Tab closes a menu.
+ * typing the start of a name; Tab closes a menu or list.
  */
 export function Popover({
   anchorRef,
@@ -121,13 +121,19 @@ export function Popover({
 
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     onKeyDownProp?.(event)
-    if (event.defaultPrevented || role === 'dialog') return
+    if (event.defaultPrevented) return
     const el = ref.current
     // A key typed in a popover nested inside this one belongs to that popover.
     if (!el || (event.target as HTMLElement).closest('[popover]') !== el) return
 
-    // Tab leaves a menu: it closes, and focus goes back where it came from.
-    if (role === 'menu' && event.key === 'Tab') {
+    // A field inside keeps its own keys: Up and Down still move between options (a search field
+    // above a list), but Home, End and typing belong to the field; a number or select keeps all.
+    const target = event.target as HTMLElement
+    if (target.matches('select, input[type="number"]')) return
+    if (target.matches('input, textarea, [contenteditable]') && event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return
+
+    // Tab leaves a menu or a plain list: it closes, and focus goes back where it came from.
+    if ((role === 'menu' || role === 'listbox') && event.key === 'Tab') {
       event.preventDefault()
       el.hidePopover()
       return
@@ -182,7 +188,8 @@ function focusInitial(el: HTMLElement, mode: PopoverInitialFocus): void {
     target =
       el.querySelector<HTMLElement>('[data-autofocus]') ??
       el.querySelector<HTMLElement>('[aria-selected="true"],[aria-checked="true"]') ??
-      el.querySelector<HTMLElement>(TABBABLE_SELECTOR)
+      el.querySelector<HTMLElement>(TABBABLE_SELECTOR) ??
+      el.querySelector<HTMLElement>(OPTION_SELECTOR)
   } else if (mode !== 'container') {
     target = el.querySelector<HTMLElement>(mode)
   }

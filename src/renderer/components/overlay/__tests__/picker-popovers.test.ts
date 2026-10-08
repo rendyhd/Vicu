@@ -79,3 +79,35 @@ describe('the Popover primitive', () => {
     expect(popover).not.toMatch(/\sonToggle=|\sonBeforeToggle=/)
   })
 })
+
+// Card 3.2c (D-20): the list pickers are listboxes of options with aria-selected; the arrow keys,
+// Home, End and type-ahead come from the Popover. The scenario `picker-keys` drives them.
+describe('list pickers', () => {
+  const LISTS = [
+    'PriorityPickerPopover',
+    'ProjectPickerPopover',
+    'LabelPickerPopover',
+    'DraftLabelPickerPopover',
+    'RecurrencePickerPopover',
+  ]
+
+  it('use option roles with aria-selected, and not toggle-button pressed state', () => {
+    for (const name of LISTS) {
+      const source = read(`components/task-list/${name}.tsx`)
+      expect(source, name).toContain('role="option"')
+      expect(source, name).toContain('aria-selected')
+      expect(source, name).toContain('role="listbox"')
+      expect(source, name).not.toContain('aria-pressed')
+    }
+  })
+
+  it('keep the options out of the tab order (arrows move between them)', () => {
+    for (const name of LISTS) {
+      expect(read(`components/task-list/${name}.tsx`), name).toContain('tabIndex={-1}')
+    }
+  })
+
+  it('has the info popover as a dialog', () => {
+    expect(read('components/task-list/InfoPopover.tsx')).toContain('role="dialog"')
+  })
+})

@@ -91,16 +91,18 @@ export function LabelPickerPopover({ anchorRef, placement = 'bottom-start', task
         />
       </div>
 
-      <div className="max-h-60 overflow-y-auto py-1">
-        {filteredLabels.length === 0 && !trimmedQuery && (
-          <div className="px-3 py-2 text-xs text-[var(--text-secondary)]">No labels</div>
-        )}
+      {filteredLabels.length === 0 && !trimmedQuery && (
+        <div className="px-3 py-2 text-xs text-[var(--text-secondary)]">No labels</div>
+      )}
 
+      <div role="listbox" aria-label="Labels" aria-multiselectable="true" className="max-h-60 overflow-y-auto py-1">
         {filteredLabels.map((label) => (
           <button
             key={label.id}
             type="button"
-            aria-pressed={commonIds.has(label.id)}
+            role="option"
+            tabIndex={-1}
+            aria-selected={commonIds.has(label.id)}
             onClick={() => toggle(label)}
             className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-[var(--text-primary)] hover:bg-[var(--bg-hover)]"
           >
@@ -119,6 +121,9 @@ export function LabelPickerPopover({ anchorRef, placement = 'bottom-start', task
         {trimmedQuery && !exactMatch && (
           <button
             type="button"
+            role="option"
+            tabIndex={-1}
+            aria-selected={false}
             onClick={() => handleCreateAndAssign(trimmedQuery)}
             className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs italic text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
           >

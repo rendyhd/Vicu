@@ -24,7 +24,7 @@ export function InfoPopover({ anchorRef, task, onClose }: InfoPopoverProps) {
   const completed = showCompleted ? formatAbsoluteDateTime(task.done_at, fmt) : ''
 
   return (
-    <Popover anchorRef={anchorRef} onClose={onClose} label="Task info" initialFocus="container" className="w-64 p-3">
+    <Popover anchorRef={anchorRef} onClose={onClose} role="dialog" label="Task info" initialFocus="container" className="w-64 p-3">
       <div className="flex flex-col gap-2">
         <Row label="Identifier" value={identifier} />
         <Row label="Created" value={created} />
