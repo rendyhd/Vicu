@@ -1,7 +1,7 @@
 import { useRef, useState, useCallback, useEffect } from 'react'
 import { extractBangToday } from '@/lib/task-parser'
 import type { ParseResult, ParserConfig, TokenType, SyntaxPrefixes } from '@/lib/task-parser'
-import { NlpInputHighlight } from '@/components/task-list/NlpParsePreview'
+import { NlpInputHighlight } from '@/components/task-list/NlpInputHighlight'
 import { TokenChip } from './TokenChip'
 import { parseChips, type ChipData } from '@/lib/parse-chips'
 import { AutocompleteDropdown } from './AutocompleteDropdown'

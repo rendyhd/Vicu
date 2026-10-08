@@ -174,7 +174,7 @@ export default async function run(h) {
     await h.assert('the suggestions are a listbox on the popover primitive', async () => ({ ok: (await list.count()) === 1, detail: String(await list.count()) }))
     await h.assert('the input is the combobox of the list', async () => {
       const a11y = await page.evaluate(() => {
-        const el = document.querySelector('input[role="combobox"]')
+        const el = document.querySelector('input[role="combobox"][placeholder="New task"]')
         if (!el) return null
         const listbox = document.getElementById(el.getAttribute('aria-controls') ?? '')
         const active = document.getElementById(el.getAttribute('aria-activedescendant') ?? '')
@@ -192,7 +192,7 @@ export default async function run(h) {
       const box = await list.boundingBox()
       const field = await input().boundingBox()
       const textWidth = await page.evaluate(() => {
-        const el = document.querySelector('input[role="combobox"]')
+        const el = document.querySelector('input[role="combobox"][placeholder="New task"]')
         const cs = getComputedStyle(el)
         const ctx = document.createElement('canvas').getContext('2d')
         ctx.font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`
@@ -203,10 +203,10 @@ export default async function run(h) {
     })
     const optionCount = await list.getByRole('option').count()
     if (optionCount > 1) {
-      const first = await page.evaluate(() => document.querySelector('input[role="combobox"]').getAttribute('aria-activedescendant'))
+      const first = await page.evaluate(() => document.querySelector('input[role="combobox"][placeholder="New task"]').getAttribute('aria-activedescendant'))
       await h.key('ArrowDown')
       await h.wait(120)
-      const second = await page.evaluate(() => document.querySelector('input[role="combobox"]').getAttribute('aria-activedescendant'))
+      const second = await page.evaluate(() => document.querySelector('input[role="combobox"][placeholder="New task"]').getAttribute('aria-activedescendant'))
       await h.assert('ArrowDown moves aria-activedescendant to the next option', { ok: !!first && !!second && first !== second, detail: `${first} -> ${second}` })
       await h.key('ArrowUp')
       await h.wait(120)
@@ -217,7 +217,7 @@ export default async function run(h) {
       ok: (await list.count()) === 0 && (await input().count()) === 1 && (await input().inputValue()).includes('+Pe'),
       detail: `${await list.count()} lists, ${await input().count()} inputs`,
     }))
-    await h.assert('the combobox is collapsed again', async () => (await page.evaluate(() => document.querySelector('input[role="combobox"]')?.getAttribute('aria-expanded'))) === 'false')
+    await h.assert('the combobox is collapsed again', async () => (await page.evaluate(() => document.querySelector('input[role="combobox"][placeholder="New task"]')?.getAttribute('aria-expanded'))) === 'false')
     // Type on: the list comes back, Tab takes the highlighted project.
     await h.type('r', { delay: 30 })
     await h.wait(400)

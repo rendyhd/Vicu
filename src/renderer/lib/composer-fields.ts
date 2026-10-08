@@ -104,6 +104,13 @@ export function resolveComposerFields(input: ComposerInput): ComposerFields {
   return { dueDate, dueSource, priority, prioritySource, projectId, projectSource, projectNotFound, repeat, repeatSource }
 }
 
+/** True while the caret is still in the project word ("+Pe" at the end of the text): the name may be unfinished. */
+function projectTokenOpen(parsed: ParseResult, text: string | undefined): boolean {
+  if (text === undefined) return false
+  const token = parsed.tokens.find((t) => t.type === 'project')
+  return !!token && text.slice(token.end).length === 0
+}
+
 export interface ComposerChipInput {
   fields: ComposerFields
   parsed: ParseResult | null
@@ -112,6 +119,8 @@ export interface ComposerChipInput {
   projectTitle: string
   fmt: DateFormat
   now?: Date
+  /** The typed text. Without it a project token counts as finished. */
+  text?: string
 }
 
 /**
@@ -119,7 +128,7 @@ export interface ComposerChipInput {
  * priority name, the labels, the project and the repeat, each from the text or from the control
  * that was used. A default date from the list is not a chip here (the composer shows it apart).
  */
-export function composerChips({ fields, parsed, chipLabels, projectTitle, fmt, now = new Date() }: ComposerChipInput): ChipData[] {
+export function composerChips({ fields, parsed, chipLabels, projectTitle, fmt, now = new Date(), text }: ComposerChipInput): ChipData[] {
   const chips: ChipData[] = []
   const source = (s: FieldSource | null): ChipSource => (s === 'chip' ? 'chip' : 'text')
 
@@ -152,7 +161,7 @@ export function composerChips({ fields, parsed, chipLabels, projectTitle, fmt, n
       type: 'project',
       key: 'project',
       source: 'text',
-      label: fields.projectNotFound ? `${parsed.project} (no such project)` : projectTitle,
+      label: fields.projectNotFound && !projectTokenOpen(parsed, text) ? `${parsed.project} (no such project)` : fields.projectNotFound ? parsed.project : projectTitle,
     })
   }
   if (fields.repeat && fields.repeatSource) {

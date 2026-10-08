@@ -87,7 +87,7 @@ export default async function run(h) {
   await h.key('Enter')
   await h.wait(900)
   const opened = await page.evaluate(() => {
-    const card = [...document.querySelectorAll('[data-task-id]')].find((r) => /plumber/i.test(r.textContent ?? '') && r.querySelector('button[title="Schedule"]'))
+    const card = [...document.querySelectorAll('[data-task-id]')].find((r) => /plumber/i.test(r.textContent ?? '') && r.querySelector('button[data-prop="schedule"]'))
     return { hash: location.hash, card: !!card }
   })
   await h.assert('Enter opens the task: its list shows and the row is expanded', { ok: opened.card && /#\/(project|inbox|today)/.test(opened.hash), detail: JSON.stringify(opened) })

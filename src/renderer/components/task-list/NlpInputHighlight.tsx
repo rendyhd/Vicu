@@ -1,0 +1,78 @@
+import type { ParsedToken } from '@/lib/task-parser'
+import { useIsDark } from '@/hooks/use-is-dark'
+
+// Token highlight colours match Quick Entry: green=date, red=priority, orange=label, blue=project, purple=recurrence
+const tokenBgColors: Record<string, string> = {
+  date: 'rgba(34, 197, 94, 0.15)',
+  priority: 'rgba(239, 68, 68, 0.15)',
+  label: 'rgba(249, 115, 22, 0.15)',
+  project: 'rgba(59, 130, 246, 0.15)',
+  recurrence: 'rgba(168, 85, 247, 0.15)',
+}
+
+const tokenBgColorsDark: Record<string, string> = {
+  date: 'rgba(34, 197, 94, 0.25)',
+  priority: 'rgba(239, 68, 68, 0.25)',
+  label: 'rgba(249, 115, 22, 0.25)',
+  project: 'rgba(59, 130, 246, 0.25)',
+  recurrence: 'rgba(168, 85, 247, 0.25)',
+}
+
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/ /g, '\u00a0')
+}
+
+interface NlpInputHighlightProps {
+  value: string
+  tokens: ParsedToken[]
+  multiline?: boolean
+}
+
+export function NlpInputHighlight({ value, tokens, multiline = false }: NlpInputHighlightProps) {
+  const isDark = useIsDark()
+  if (!tokens.length) return null
+
+  const colors = isDark ? tokenBgColorsDark : tokenBgColors
+  const sorted = [...tokens].sort((a, b) => a.start - b.start)
+  const parts: Array<{ text: string; bg?: string }> = []
+  let pos = 0
+
+  for (const token of sorted) {
+    if (token.start > pos) {
+      parts.push({ text: value.slice(pos, token.start) })
+    }
+    parts.push({
+      text: value.slice(token.start, token.end),
+      bg: colors[token.type],
+    })
+    pos = token.end
+  }
+  if (pos < value.length) {
+    parts.push({ text: value.slice(pos) })
+  }
+
+  return (
+    <div
+      className={
+        multiline
+          ? 'pointer-events-none absolute inset-0 overflow-hidden whitespace-pre-wrap break-words text-[13px] font-medium leading-snug text-transparent'
+          : 'pointer-events-none absolute inset-0 flex items-center overflow-hidden whitespace-pre text-[13px] text-transparent'
+      }
+      aria-hidden
+    >
+      {parts.map((part, i) =>
+        part.bg ? (
+          <span key={i} style={{ background: part.bg, borderRadius: 3 }}>
+            {escapeHtml(part.text)}
+          </span>
+        ) : (
+          <span key={i}>{escapeHtml(part.text)}</span>
+        )
+      )}
+    </div>
+  )
+}

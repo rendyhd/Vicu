@@ -201,6 +201,7 @@ export function NewTaskComposer({
     chipLabels: selectedLabelIds.flatMap((id) => labels.find((label) => label.id === id)?.title ?? []),
     projectTitle: selectedProjectTitle,
     fmt: dateFormat,
+    text: parser.inputValue,
   })
 
   // A chip read from the text is dismissed by no longer reading that kind of token; a chip made by a

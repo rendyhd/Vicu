@@ -26,7 +26,7 @@ const ARBITRARY_SIZE_ALLOWLIST = [
   'components/task-input/TaskInputParser.tsx',
   'components/task-input/TokenChip.tsx',
   'components/task-list/NewTaskComposer.tsx',
-  'components/task-list/NlpParsePreview.tsx',
+  'components/task-list/NlpInputHighlight.tsx',
   'components/task-list/ParentDropZone.tsx',
   'components/task-list/SectionDragOverlay.tsx',
 ]

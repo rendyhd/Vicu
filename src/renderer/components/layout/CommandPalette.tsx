@@ -17,6 +17,7 @@ import { applyTheme } from '@/lib/theme'
 import { buildPaletteItems, rankPalette, type PaletteCommand, type PaletteItem, type PaletteKind } from '@/lib/palette'
 import { shortcutHint } from '@/lib/shortcut-hint'
 import { useUIStore } from '@/stores/ui-store'
+import { useNewTaskRequestStore } from '@/stores/new-task-request-store'
 
 const ICONS: Record<PaletteKind, typeof Circle> = {
   Action: Plus,
@@ -88,11 +89,12 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
       useUIStore.getState().setTheme(next)
       void api.saveConfigPatch({ theme: next })
     } else {
-      // The composer belongs to the list on screen and listens for Ctrl+N; Inbox is where a task
-      // lands when no list with a composer is showing.
-      const onList = !!document.querySelector('button[aria-label="New task"]')
-      if (!onList) void navigate({ to: '/inbox' })
-      setTimeout(() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'n', ctrlKey: true, bubbles: true })), onList ? 60 : 450)
+      // The composer belongs to the list on screen: ask it. When no list takes the request (a view
+      // without a composer), Inbox is where a task lands, and its list takes it once it mounts.
+      useNewTaskRequestStore.getState().request()
+      setTimeout(() => {
+        if (useNewTaskRequestStore.getState().requestedAt !== null) void navigate({ to: '/inbox' })
+      }, 80)
     }
   }
 

@@ -100,7 +100,9 @@ export default async function run(h) {
   await row.focus()
   await h.key('Enter')
   await h.wait(700)
-  const button = (title) => page.locator(`[data-task-id="${id}"] button[title="${title}"]`)
+  // The card bar's buttons carry a stable data-prop hook (card 3.3); Task info lives under More.
+  const PROP = { Priority: 'priority', 'Move to project': 'project', Labels: 'labels', Schedule: 'schedule', 'Task info': 'more' }
+  const button = (title) => page.locator(`[data-task-id="${id}"] button[data-prop="${PROP[title]}"]`)
   const press = (title) => async () => {
     await button(title).focus()
     await h.key('Enter')
@@ -131,6 +133,8 @@ export default async function run(h) {
 
   // Task info is a plain dialog.
   await press('Task info')()
+  await h.wait(350)
+  await page.getByRole('menuitem', { name: 'Task info' }).click()
   await h.wait(450)
   let s = await state(page)
   await h.assert('Task info: a dialog named "Task info" with focus inside', { ok: s.role === 'dialog' && s.name === 'Task info' && s.focusInside, detail: JSON.stringify(s) })
@@ -139,7 +143,7 @@ export default async function run(h) {
   await h.key('Escape')
   await h.wait(350)
   s = await state(page)
-  await h.assert('Task info: Escape closes it and focus returns to its button', { ok: s.popovers === 0 && (await triggerFocused('Task info')()), detail: JSON.stringify(s) })
+  await h.assert('Task info: Escape closes it and focus returns to More', { ok: s.popovers === 0 && (await triggerFocused('Task info')()), detail: JSON.stringify(s) })
 
   // The label picker of the new-task composer.
   await h.dismiss()

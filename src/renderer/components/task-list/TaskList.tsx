@@ -7,6 +7,7 @@ import { verticalListSortingStrategyForeignSafe } from '@/lib/sortable-strategy'
 import { useCompleteTask, useUpdateTask, useDeleteTask } from '@/hooks/use-task-mutations'
 import { usePasteTasks } from '@/hooks/use-paste-tasks'
 import { useSelectionStore } from '@/stores/selection-store'
+import { useNewTaskRequestStore } from '@/stores/new-task-request-store'
 import { orderedTaskIds, resolveSelectedTasks, copySelectedTitles, isTaskNestedInCurrentList } from '@/lib/task-selection'
 import { confirmDelete } from '@/lib/confirm-bridge'
 import { api } from '@/lib/api'
@@ -431,6 +432,17 @@ export function TaskList({
       }
     })
   }, [showNewTask, projectId])
+
+  // The command palette's "New task" asks the list on screen; the first list that can add a task
+  // takes the request (also one that mounts after the palette navigated to Inbox).
+  const newTaskRequestedAt = useNewTaskRequestStore((s) => s.requestedAt)
+  useEffect(() => {
+    if (newTaskRequestedAt === null || !showNewTask || !projectId) return
+    if (useNewTaskRequestStore.getState().take()) {
+      setAddPosition('top')
+      setIsAdding(true)
+    }
+  }, [newTaskRequestedAt, showNewTask, projectId])
 
   // Scroll focused task into view
   useEffect(() => {

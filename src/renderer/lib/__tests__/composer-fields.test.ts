@@ -55,6 +55,14 @@ describe('the text decides until a control is used', () => {
     expect(chips.find((c) => c.type === 'project')!.label).toBe('Nowhere (no such project)')
   })
 
+  it('does not call a project missing while its word is still being typed', () => {
+    const typing = input('Call Ana +Pe')
+    const fields = resolveComposerFields(typing)
+    const chip = (text: string) => composerChips({ fields, parsed: typing.parsed, chipLabels: [], projectTitle: 'Inbox', fmt: GB, now: NOW, text }).find((c) => c.type === 'project')!.label
+    expect(chip('Call Ana +Pe')).toBe('Pe')
+    expect(chip('Call Ana +Pe ')).toBe('Pe (no such project)')
+  })
+
   it('falls back to the list default date only when the text has none', () => {
     const base = { contextDue: dateOnlyDue('2026-10-07') }
     expect(resolveComposerFields(input('Call Ana', base))).toMatchObject({ dueDate: dateOnlyDue('2026-10-07'), dueSource: 'default' })

@@ -404,20 +404,21 @@ export default async function run(h) {
       await row.scrollIntoViewIfNeeded()
       await row.click({ button: 'right', position: { x: 180, y: 12 } })
       await h.wait(500)
-      const item = page.getByRole('button', { name: 'Schedule…' })
+      const item = page.getByRole('menuitem', { name: /^Schedule…/ })
       if ((await item.count()) === 0) {
         await h.assert(`${t}: the menu opens`, false)
       } else {
         const menu = await item.evaluate((el) => {
-          const m = el.closest('.fixed')
+          const m = el.closest('[role="menu"]')
           const r = m.getBoundingClientRect()
           return { x: r.x, y: r.y, right: r.right, bottom: r.bottom }
         })
         await item.click()
         await h.wait(450)
         state = await readState(page)
-        const p = state.popovers[0]
-        await h.assert(`${t}: Schedule opens as a popover`, state.popovers.length === 1 && p.label === 'Schedule')
+        const pickers = state.popovers.filter((x) => x.role !== 'menu') // the menu is a popover too
+        const p = pickers[0]
+        await h.assert(`${t}: Schedule opens as a popover`, pickers.length === 1 && p.label === 'Schedule')
         if (p) {
           await h.assert(`${t}: the popover is inside the window`, { ok: inside(p, state), detail: `box ${fmt(p)} in ${state.innerWidth}x${state.innerHeight}` })
           await h.assert(`${t}: the popover sits beside the menu, not over it`, {
@@ -427,20 +428,21 @@ export default async function run(h) {
           await h.capture(`context-schedule-${tag}`)
 
           // A press on another menu entry while the picker is open reaches that entry.
-          await page.getByRole('button', { name: 'Move to project…' }).click()
+          await page.getByRole('menuitem', { name: /^Move to project…/ }).click()
           await h.wait(450)
           state = await readState(page)
+          const others = state.popovers.filter((x) => x.role !== 'menu')
           await h.assert(`${t}: a press on another entry opens its picker and leaves the menu open`, {
-            ok: state.popovers.length === 1 && state.popovers[0].label === 'Move to project',
+            ok: others.length === 1 && others[0].label === 'Move to project' && state.popovers.some((x) => x.role === 'menu'),
             detail: state.popovers.map((x) => x.label).join(', '),
           })
           await h.key('Escape')
           await h.wait(350)
           state = await readState(page)
-          await h.assert(`${t}: Escape closes the picker and leaves the menu`, async () => state.popovers.length === 0 && (await page.getByRole('button', { name: 'Schedule…' }).count()) === 1)
+          await h.assert(`${t}: Escape closes the picker and leaves the menu`, async () => state.popovers.filter((x) => x.role !== 'menu').length === 0 && (await page.getByRole('menuitem', { name: /^Schedule…/ }).count()) === 1)
           await h.key('Escape')
           await h.wait(350)
-          await h.assert(`${t}: a second Escape closes the menu`, async () => (await page.getByRole('button', { name: 'Schedule…' }).count()) === 0)
+          await h.assert(`${t}: a second Escape closes the menu`, async () => (await page.getByRole('menuitem', { name: /^Schedule…/ }).count()) === 0)
         }
       }
       await h.dismiss()
