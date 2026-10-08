@@ -33,7 +33,7 @@ export function SubtaskList({ parentTask, showInput = false }: SubtaskListProps)
   }
 
   if (isLoading && subtasks.length === 0 && showInput) {
-    return <div className="py-1 text-2xs text-[var(--text-secondary)]">Loading subtasks...</div>
+    return <div className="py-1 text-caption text-[var(--text-secondary)]">Loading subtasks...</div>
   }
 
   if (subtasks.length === 0 && !showInput) return null
@@ -77,7 +77,7 @@ export function SubtaskList({ parentTask, showInput = false }: SubtaskListProps)
         </div>
       )}
       {completeTask.isError && (
-        <div role="alert" className="mb-1 text-2xs text-danger">
+        <div role="alert" className="mb-1 text-caption text-danger">
           Could not complete subtask: {completeTask.error.message}
         </div>
       )}

@@ -29,7 +29,7 @@ function LogbookRow({ task }: { task: Task }) {
       >
         {task.title}
       </span>
-      <span className="shrink-0 text-2xs text-[var(--text-secondary)]">
+      <span className="shrink-0 text-meta text-[var(--text-secondary)]">
         {formatCompletionDate(task.done_at)}
       </span>
     </div>

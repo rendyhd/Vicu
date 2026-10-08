@@ -18,6 +18,14 @@ html, body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
+/* Form controls take the page font, so the input and its highlight layer line up (D-11). */
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
 body {
   display: flex;
   align-items: flex-start;
@@ -340,7 +348,7 @@ body {
   background: rgba(124, 58, 237, 0.1);
   padding: 1px 4px;
   border-radius: 3px;
-  font-size: 10px;
+  font-size: var(--type-caption-size);
 }
 
 /* Obsidian badge */
@@ -384,7 +392,7 @@ body {
   background: rgba(37, 99, 235, 0.1);
   padding: 1px 4px;
   border-radius: 3px;
-  font-size: 10px;
+  font-size: var(--type-caption-size);
 }
 
 /* Browser badge */

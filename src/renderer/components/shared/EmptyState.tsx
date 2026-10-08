@@ -14,7 +14,7 @@ export function EmptyState({ icon: Icon, title, subtitle, className }: EmptyStat
       <Icon className="h-10 w-10 text-[var(--text-secondary)] opacity-40" strokeWidth={1.5} />
       <p className="text-sm font-medium text-[var(--text-secondary)]">{title}</p>
       {subtitle && (
-        <p className="text-xs text-[var(--text-secondary)] opacity-60">{subtitle}</p>
+        <p className="text-xs text-[var(--text-secondary)]">{subtitle}</p>
       )}
     </div>
   )

@@ -12,7 +12,7 @@ function TokenPermissionsInfo() {
         type="button"
         onClick={() => setOpen(!open)}
         className={cn(
-          'inline-flex h-4 w-4 items-center justify-center rounded-full text-[10px] font-bold leading-none transition-colors',
+          'inline-flex h-4 w-4 items-center justify-center rounded-full text-caption font-bold leading-none transition-colors',
           open
             ? 'bg-accent-fill text-on-accent'
             : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:bg-accent-blue/20 hover:text-accent-blue'
@@ -36,37 +36,37 @@ function TokenPermissionsInfo() {
             </thead>
             <tbody className="text-[var(--text-primary)]">
               <tr className="border-b border-border/50">
-                <td className="py-1.5 pr-2 font-mono text-[10px]">tasks</td>
+                <td className="py-1.5 pr-2 font-mono text-caption">tasks</td>
                 <td className="py-1.5 pr-2">read_all, create, update, delete</td>
                 <td className="py-1.5">Task CRUD</td>
               </tr>
               <tr className="border-b border-border/50">
-                <td className="py-1.5 pr-2 font-mono text-[10px]">projects</td>
+                <td className="py-1.5 pr-2 font-mono text-caption">projects</td>
                 <td className="py-1.5 pr-2">read_all, create, update, delete</td>
                 <td className="py-1.5">Project CRUD</td>
               </tr>
               <tr className="border-b border-border/50">
-                <td className="py-1.5 pr-2 font-mono text-[10px]">labels</td>
+                <td className="py-1.5 pr-2 font-mono text-caption">labels</td>
                 <td className="py-1.5 pr-2">read_all, create, update, delete</td>
                 <td className="py-1.5">Label CRUD</td>
               </tr>
               <tr className="border-b border-border/50">
-                <td className="py-1.5 pr-2 font-mono text-[10px]">task_labels</td>
+                <td className="py-1.5 pr-2 font-mono text-caption">task_labels</td>
                 <td className="py-1.5 pr-2">create, delete</td>
                 <td className="py-1.5">Adding/removing labels</td>
               </tr>
               <tr className="border-b border-border/50">
-                <td className="py-1.5 pr-2 font-mono text-[10px]">task_relations</td>
+                <td className="py-1.5 pr-2 font-mono text-caption">task_relations</td>
                 <td className="py-1.5 pr-2">create, delete</td>
                 <td className="py-1.5">Subtasks & relations</td>
               </tr>
               <tr className="border-b border-border/50">
-                <td className="py-1.5 pr-2 font-mono text-[10px]">task_attachments</td>
+                <td className="py-1.5 pr-2 font-mono text-caption">task_attachments</td>
                 <td className="py-1.5 pr-2">read_all, create, delete</td>
                 <td className="py-1.5">File attachments</td>
               </tr>
               <tr>
-                <td className="py-1.5 pr-2 font-mono text-[10px]">project_views</td>
+                <td className="py-1.5 pr-2 font-mono text-caption">project_views</td>
                 <td className="py-1.5 pr-2">read_all</td>
                 <td className="py-1.5">Position sorting</td>
               </tr>

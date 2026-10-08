@@ -131,7 +131,7 @@ export function UpcomingView() {
             {projectGroups.map((pg) => (
               <div key={pg.name}>
                 <div className="px-6 pb-0.5 pt-1.5">
-                  <span className="text-[10px] font-medium tracking-wide text-[var(--text-secondary)]">
+                  <span className="text-caption font-medium tracking-wide text-[var(--text-secondary)]">
                     {pg.name}
                   </span>
                 </div>

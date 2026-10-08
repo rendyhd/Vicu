@@ -150,7 +150,7 @@ export function buildPrintHtml(payload: PrintablePayload, options: PrintOptions)
     color: #444; margin: 18px 0 4px; break-after: avoid;
   }
   .group-heading {
-    font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em;
+    font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em;
     color: #888; margin: 10px 0 2px; break-after: avoid;
   }
   .task {
@@ -161,7 +161,7 @@ export function buildPrintHtml(payload: PrintablePayload, options: PrintOptions)
   .checkbox {
     flex-shrink: 0; width: 13px; height: 13px; margin-top: 2px;
     border: 1.5px solid #555; border-radius: 3px;
-    font-size: 10px; line-height: 11px; text-align: center; color: #555;
+    font-size: 11px; line-height: 12px; text-align: center; color: #555;
   }
   .task-body { min-width: 0; flex: 1; }
   .task-line { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
@@ -170,7 +170,7 @@ export function buildPrintHtml(payload: PrintablePayload, options: PrintOptions)
   .labels { display: inline-flex; gap: 4px; flex-wrap: wrap; }
   .label {
     display: inline-flex; align-items: center; gap: 4px;
-    font-size: 10px; color: #555; border: 1px solid #ccc; border-radius: 9px;
+    font-size: 11px; color: #555; border: 1px solid #ccc; border-radius: 9px;
     padding: 0 7px; line-height: 16px;
   }
   .label-dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
@@ -181,12 +181,12 @@ export function buildPrintHtml(payload: PrintablePayload, options: PrintOptions)
   .task-notes p { margin: 0 0 4px; }
   .task-notes ul, .task-notes ol { margin: 2px 0 4px; padding-left: 18px; }
   .task-notes a { color: #444; }
-  .task-notes pre, .task-notes code { font-family: Consolas, monospace; font-size: 10.5px; }
+  .task-notes pre, .task-notes code { font-family: Consolas, monospace; font-size: 11px; }
   .task-notes blockquote { margin: 2px 0; padding-left: 8px; border-left: 2px solid #ccc; color: #666; }
   .empty { color: #777; font-size: 13px; }
   footer {
     margin-top: 28px; padding-top: 8px; border-top: 1px solid #ddd;
-    font-size: 10px; color: #999;
+    font-size: 11px; color: #999;
   }
 </style>
 </head>

@@ -241,7 +241,7 @@ export function CustomListDialog({ open, list, onSave, onClose }: CustomListDial
                     type="button"
                     onClick={() => setFilter((f) => ({ ...f, project_filter_mode: mode, project_ids: [] }))}
                     className={cn(
-                      'px-2.5 py-0.5 text-[10px] font-medium capitalize transition-colors',
+                      'px-2.5 py-0.5 text-caption font-medium capitalize transition-colors',
                       (filter.project_filter_mode ?? 'include') === mode
                         ? 'bg-accent-fill text-on-accent'
                         : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'

@@ -6,8 +6,8 @@ import { useToastStore } from '@/stores/toast-store'
 export function ToastHost() {
   const toasts = useToastStore((s) => s.toasts)
   const dismiss = useToastStore((s) => s.dismiss)
-  if (toasts.length === 0) return null
 
+  // The live region is always mounted so screen readers pick up the first toast added to it.
   return (
     <div
       className="pointer-events-none fixed bottom-4 right-4 z-[60] flex w-80 max-w-[calc(100vw-2rem)] flex-col gap-2"

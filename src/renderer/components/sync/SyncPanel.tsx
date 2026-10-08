@@ -79,7 +79,7 @@ function FailedRow({
       {item.reason === 'other-account' && item.error && (
         <p className="break-words text-[11px] text-[var(--text-secondary)]">{item.error}</p>
       )}
-      <p className="text-[10px] text-[var(--text-secondary)] opacity-70">{formatWhen(item.failedAt)}</p>
+      <p className="text-caption text-[var(--text-secondary)] opacity-70">{formatWhen(item.failedAt)}</p>
     </li>
   )
 }

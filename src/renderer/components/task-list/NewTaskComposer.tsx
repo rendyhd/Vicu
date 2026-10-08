@@ -499,7 +499,7 @@ export function NewTaskComposer({
       {attachments.length > 0 && (
         <div className="flex flex-wrap gap-1 pb-2 pl-[46px] pr-4">
           {attachments.map((attachment) => (
-            <span key={attachment.id} className="flex max-w-48 items-center gap-1 rounded bg-[var(--bg-hover)] px-2 py-1 text-[10px] text-[var(--text-secondary)]">
+            <span key={attachment.id} className="flex max-w-48 items-center gap-1 rounded bg-[var(--bg-hover)] px-2 py-1 text-caption text-[var(--text-secondary)]">
               <span className="truncate">{attachment.name}</span>
               <button type="button" onClick={() => removeAttachment(attachment.id)} aria-label={`Remove ${attachment.name}`}><X className="h-3 w-3" /></button>
             </span>

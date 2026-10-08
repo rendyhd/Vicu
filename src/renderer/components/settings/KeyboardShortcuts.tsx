@@ -29,7 +29,7 @@ const shortcuts = [
 
 function Kbd({ children }: { children: string }) {
   return (
-    <kbd className="inline-flex h-5 min-w-[20px] items-center justify-center rounded border border-[var(--border-color)] bg-[var(--bg-secondary)] px-1.5 text-2xs font-medium text-[var(--text-secondary)]">
+    <kbd className="inline-flex h-5 min-w-[20px] items-center justify-center rounded border border-[var(--border-color)] bg-[var(--bg-secondary)] px-1.5 text-caption font-medium text-[var(--text-secondary)]">
       {children}
     </kbd>
   )
@@ -59,7 +59,7 @@ export function KeyboardShortcuts() {
                   {item.keys.map((key, j) => (
                     <span key={j} className="flex items-center gap-0.5">
                       {j > 0 && (
-                        <span className="text-2xs text-[var(--text-secondary)]">+</span>
+                        <span className="text-caption text-[var(--text-secondary)]">+</span>
                       )}
                       <Kbd>{key}</Kbd>
                     </span>

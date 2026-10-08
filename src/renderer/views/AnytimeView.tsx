@@ -115,7 +115,7 @@ export function AnytimeView() {
             ) : (
               <div key={sub.projectId}>
                 <div className="pb-1 pt-2 pl-10">
-                  <span className="text-[10px] font-medium uppercase tracking-wider text-[var(--text-secondary)] opacity-70">
+                  <span className="text-caption font-medium uppercase tracking-wider text-[var(--text-secondary)] opacity-70">
                     {sub.projectName}
                   </span>
                 </div>

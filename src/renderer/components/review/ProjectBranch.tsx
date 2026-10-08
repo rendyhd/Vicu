@@ -153,7 +153,7 @@ function ProjectHeader({ node, depth, isOpen, isReviewed, isFocused, onToggle, o
         {project.title}
       </span>
       {depth === 0 && subCount > 0 && (
-        <span style={{ fontSize: 10, color: 'var(--text-tertiary)', flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>
+        <span style={{ fontSize: 'var(--type-caption-size)', color: 'var(--text-tertiary)', flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>
           {subCount} sub-project{subCount === 1 ? '' : 's'}
         </span>
       )}
@@ -214,7 +214,7 @@ function StalenessPill({ node }: { node: ReviewTreeNode }) {
   return (
     <span
       style={{
-        fontSize: 10,
+        fontSize: 'var(--type-caption-size)',
         fontWeight: 600,
         padding: '2px 7px',
         borderRadius: 999,

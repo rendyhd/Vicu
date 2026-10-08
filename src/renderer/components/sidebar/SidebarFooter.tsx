@@ -67,7 +67,7 @@ export function SidebarFooter() {
               }
             }
           }}
-          className="relative flex h-7 items-center rounded-md px-2 text-[10px] text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
+          className="relative flex h-7 items-center rounded-md px-2 text-caption text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
           title={updateAvailable ? `v${latestVersion} available — click to download` : 'Click to check for updates'}
         >
           {checking ? 'checking…' : `v${__APP_VERSION__}`}

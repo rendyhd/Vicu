@@ -230,7 +230,7 @@ export function ReviewView() {
           <kbd
             style={{
               fontFamily: '"SF Mono", ui-monospace, Menlo, Consolas, monospace',
-              fontSize: 10,
+              fontSize: 'var(--type-caption-size)',
               padding: '1px 5px',
               borderRadius: 3,
               background: 'var(--bg-hover)',

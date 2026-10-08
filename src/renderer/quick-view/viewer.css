@@ -18,6 +18,14 @@ html, body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
+/* Form controls take the page font, so they match the rest of the window (D-11). */
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
 /* Drag handle — visible on hover (hover driven by main-process cursor polling) */
 .drag-handle {
   -webkit-app-region: drag;
@@ -417,7 +425,7 @@ html, body {
 }
 
 .task-edit-hint {
-  font-size: 10px;
+  font-size: var(--type-caption-size);
   color: var(--text-secondary);
   text-align: right;
 }

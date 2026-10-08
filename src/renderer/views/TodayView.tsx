@@ -120,7 +120,7 @@ export function TodayView() {
           {overdueGroups.map((group) => (
             <div key={group.name}>
               <div className="px-6 pb-0.5 pt-1.5">
-                <span className="text-[10px] font-medium tracking-wide text-[var(--text-secondary)]">
+                <span className="text-caption font-medium tracking-wide text-[var(--text-secondary)]">
                   {group.name}
                 </span>
               </div>
@@ -144,7 +144,7 @@ export function TodayView() {
           {todayGroups.map((group) => (
             <div key={group.name}>
               <div className="px-6 pb-0.5 pt-1.5">
-                <span className="text-[10px] font-medium tracking-wide text-[var(--text-secondary)]">
+                <span className="text-caption font-medium tracking-wide text-[var(--text-secondary)]">
                   {group.name}
                 </span>
               </div>

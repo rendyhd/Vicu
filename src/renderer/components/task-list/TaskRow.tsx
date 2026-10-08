@@ -561,7 +561,7 @@ function TaskRowInner({ task, nestedDepth = 0, parentProjectId, drag }: Omit<Tas
             {labels.map((l) => (
               <span
                 key={l.id}
-                className="rounded-full px-1.5 py-px text-[10px] font-medium leading-tight"
+                className="rounded-full px-1.5 py-px text-caption font-medium leading-tight"
                 style={labelChipStyle(l.hex_color, isDark)}
               >
                 {l.title}
@@ -580,12 +580,12 @@ function TaskRowInner({ task, nestedDepth = 0, parentProjectId, drag }: Omit<Tas
             {dropError ? <span className="text-danger">{dropError}</span> : task.title}
           </span>
           {nestedDepth === 0 && parentTitle(task) && (
-            <span className="block truncate text-[10px] text-[var(--text-secondary)]">
+            <span className="block truncate text-caption text-[var(--text-secondary)]">
               Subtask of {parentTitle(task)}
             </span>
           )}
           {nestedDepth > 0 && parentProjectId !== undefined && parentProjectId !== task.project_id && (
-            <span className="block text-[10px] text-[var(--text-secondary)]">Different project</span>
+            <span className="block text-caption text-[var(--text-secondary)]">Different project</span>
           )}
         </div>
 
@@ -608,7 +608,7 @@ function TaskRowInner({ task, nestedDepth = 0, parentProjectId, drag }: Omit<Tas
                 if (canExpandSubtasks) setSubtasksExpanded((expanded) => !expanded)
               }}
               className={cn(
-                'flex items-center gap-0.5 text-[10px] text-[var(--text-secondary)]',
+                'flex items-center gap-0.5 text-caption text-[var(--text-secondary)]',
                 canExpandSubtasks && 'rounded px-0.5 hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]',
               )}
               aria-label={`${progress.completed} of ${progress.total} subtasks complete`}
@@ -742,7 +742,7 @@ function TaskRowInner({ task, nestedDepth = 0, parentProjectId, drag }: Omit<Tas
           {labels.map((l) => (
             <span
               key={l.id}
-              className="rounded-full px-2 py-0.5 text-2xs font-medium"
+              className="rounded-full px-2 py-0.5 text-caption font-medium"
               style={labelChipStyle(l.hex_color, isDark)}
             >
               {l.title}
@@ -752,7 +752,7 @@ function TaskRowInner({ task, nestedDepth = 0, parentProjectId, drag }: Omit<Tas
             <TaskDueBadge dueDate={task.due_date} />
           )}
           {((task.repeat_after ?? 0) > 0 || (task.repeat_mode ?? 0) > 0) && (
-            <span className="flex items-center gap-0.5 text-2xs text-[var(--text-secondary)]">
+            <span className="flex items-center gap-0.5 text-caption text-[var(--text-secondary)]">
               <Repeat className="h-3 w-3" />
               {formatRecurrenceLabel(task.repeat_after ?? 0, task.repeat_mode ?? 0)}
             </span>

@@ -126,7 +126,7 @@ export function TaskContextMenu({ fallbackTask, x, y, onClose }: TaskContextMenu
     >
       {multi && (
         <>
-          <div className="px-3 py-1 text-2xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
+          <div className="px-3 py-1 text-caption font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
             {tasks.length} tasks
           </div>
           <Divider />
