@@ -1,15 +1,18 @@
-import { useRef, useEffect } from 'react'
+import type { RefObject } from 'react'
 import { Check, FolderOpen } from 'lucide-react'
 import { useProjects } from '@/hooks/use-projects'
 import type { ProjectTreeNode } from '@/hooks/use-projects'
-import { usePopoverAlignment } from './use-popover-alignment'
+import { Popover, type PopoverCloseReason } from '../overlay/Popover'
 
 interface ProjectPickerPopoverProps {
+  anchorRef: RefObject<HTMLElement | null>
+  /** Where it opens relative to the anchor; a menu entry opens it beside the menu. */
+  placement?: 'bottom-start' | 'right-start'
   /** The task(s)' current project — shows a checkmark; undefined for a mixed multi-selection. */
   currentProjectId?: number
   /** Called with the chosen project id. The caller owns the move mutation(s). */
   onSelect: (projectId: number) => void
-  onClose: () => void
+  onClose: (reason?: PopoverCloseReason) => void
 }
 
 function flattenTree(nodes: ProjectTreeNode[], depth = 0): { node: ProjectTreeNode; depth: number }[] {
@@ -23,20 +26,8 @@ function flattenTree(nodes: ProjectTreeNode[], depth = 0): { node: ProjectTreeNo
   return result
 }
 
-export function ProjectPickerPopover({ currentProjectId, onSelect, onClose }: ProjectPickerPopoverProps) {
-  const ref = useRef<HTMLDivElement>(null)
-  const align = usePopoverAlignment(ref)
+export function ProjectPickerPopover({ anchorRef, placement = 'bottom-start', currentProjectId, onSelect, onClose }: ProjectPickerPopoverProps) {
   const { data } = useProjects()
-
-  useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        onClose()
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [onClose])
 
   const handleSelect = (projectId: number) => {
     if (projectId !== currentProjectId) {
@@ -48,10 +39,7 @@ export function ProjectPickerPopover({ currentProjectId, onSelect, onClose }: Pr
   const items = data ? flattenTree(data.tree) : []
 
   return (
-    <div
-      ref={ref}
-      className={`absolute ${align} top-full z-50 mt-1 w-56 rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] py-1 shadow-lg`}
-    >
+    <Popover anchorRef={anchorRef} onClose={onClose} placement={placement} role="listbox" label="Move to project" className="w-56 py-1">
       {items.length === 0 ? (
         <div className="px-3 py-2 text-xs text-[var(--text-secondary)]">No projects</div>
       ) : (
@@ -60,6 +48,8 @@ export function ProjectPickerPopover({ currentProjectId, onSelect, onClose }: Pr
             <button
               key={node.id}
               type="button"
+              role="option"
+              aria-selected={node.id === currentProjectId}
               onClick={() => handleSelect(node.id)}
               className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-[var(--text-primary)] hover:bg-[var(--bg-hover)]"
               style={{ paddingLeft: `${depth * 12 + 12}px` }}
@@ -77,6 +67,6 @@ export function ProjectPickerPopover({ currentProjectId, onSelect, onClose }: Pr
           ))}
         </div>
       )}
-    </div>
+    </Popover>
   )
 }

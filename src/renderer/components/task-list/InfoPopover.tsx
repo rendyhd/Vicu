@@ -1,27 +1,15 @@
-import { useRef, useEffect } from 'react'
+import type { RefObject } from 'react'
 import type { Task } from '@/lib/vikunja-types'
 import { formatAbsoluteDateTime, isNullDate } from '@/lib/date-utils'
-import { usePopoverAlignment } from './use-popover-alignment'
+import { Popover, type PopoverCloseReason } from '../overlay/Popover'
 
 interface InfoPopoverProps {
+  anchorRef: RefObject<HTMLElement | null>
   task: Task
-  onClose: () => void
+  onClose: (reason?: PopoverCloseReason) => void
 }
 
-export function InfoPopover({ task, onClose }: InfoPopoverProps) {
-  const ref = useRef<HTMLDivElement>(null)
-  const align = usePopoverAlignment(ref)
-
-  useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        onClose()
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [onClose])
-
+export function InfoPopover({ anchorRef, task, onClose }: InfoPopoverProps) {
   const identifier = task.identifier && task.identifier.length > 0 ? task.identifier : '—'
   const created = formatAbsoluteDateTime(task.created) || '—'
   const updated = formatAbsoluteDateTime(task.updated) || '—'
@@ -34,10 +22,7 @@ export function InfoPopover({ task, onClose }: InfoPopoverProps) {
   const completed = showCompleted ? formatAbsoluteDateTime(task.done_at) : ''
 
   return (
-    <div
-      ref={ref}
-      className={`absolute ${align} top-full z-50 mt-1 w-64 rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] p-3 shadow-lg`}
-    >
+    <Popover anchorRef={anchorRef} onClose={onClose} label="Task info" initialFocus="container" className="w-64 p-3">
       <div className="flex flex-col gap-2">
         <Row label="Identifier" value={identifier} />
         <Row label="Created" value={created} />
@@ -45,7 +30,7 @@ export function InfoPopover({ task, onClose }: InfoPopoverProps) {
         {showCreator && <Row label="Created by" value={creatorName!} />}
         {showCompleted && <Row label="Completed" value={completed} />}
       </div>
-    </div>
+    </Popover>
   )
 }
 

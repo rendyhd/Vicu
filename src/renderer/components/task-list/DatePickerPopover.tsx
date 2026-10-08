@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, type RefObject } from 'react'
 import { X, Repeat } from 'lucide-react'
 import {
   datePickerPresets,
@@ -8,19 +8,24 @@ import {
 import { dateOnlyDue } from '@/lib/due-dates'
 import { NULL_DATE } from '@/lib/constants'
 import { detectRecurrencePreset, formatRecurrenceLabel } from '@/lib/recurrence'
+import { Popover, type PopoverCloseReason } from '../overlay/Popover'
 import { RecurrencePickerPopover } from './RecurrencePickerPopover'
-import { usePopoverAlignment } from './use-popover-alignment'
 
 interface DatePickerPopoverProps {
+  anchorRef: RefObject<HTMLElement | null>
+  /** Where it opens relative to the anchor; a menu entry opens it beside the menu. */
+  placement?: 'bottom-start' | 'right-start'
   currentDate: string
   onDateChange: (isoDate: string) => void
-  onClose: () => void
+  onClose: (reason?: PopoverCloseReason) => void
   repeatAfter?: number
   repeatMode?: number
   onRecurrenceChange?: (repeatAfter: number, repeatMode: number) => void
 }
 
 export function DatePickerPopover({
+  anchorRef,
+  placement = 'bottom-start',
   currentDate,
   onDateChange,
   onClose,
@@ -28,22 +33,11 @@ export function DatePickerPopover({
   repeatMode = 0,
   onRecurrenceChange,
 }: DatePickerPopoverProps) {
-  const ref = useRef<HTMLDivElement>(null)
-  const align = usePopoverAlignment(ref)
+  const repeatButtonRef = useRef<HTMLButtonElement>(null)
   const [dateValue, setDateValue] = useState(localDateInputValue(currentDate))
   const [showRecurrence, setShowRecurrence] = useState(false)
 
   const hasRecurrence = detectRecurrencePreset(repeatAfter, repeatMode) !== 'none'
-
-  useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        onClose()
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [onClose])
 
   // A picked day is date-only: local 23:59:59 of that calendar day, never built from UTC.
   const applyDate = (dateStr: string) => {
@@ -54,10 +48,7 @@ export function DatePickerPopover({
   const presets = datePickerPresets()
 
   return (
-    <div
-      ref={ref}
-      className={`absolute ${align} top-full z-50 mt-1 w-56 rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] p-3 shadow-lg`}
-    >
+    <Popover anchorRef={anchorRef} onClose={onClose} placement={placement} label="Schedule" className="w-56 p-3">
       <div className="mb-2 flex flex-col gap-1">
         <button
           type="button"
@@ -85,6 +76,7 @@ export function DatePickerPopover({
       <div className="border-t border-[var(--border-color)] pt-2">
         <input
           type="date"
+          aria-label="Pick a date"
           value={dateValue}
           onChange={(e) => {
             setDateValue(e.target.value)
@@ -109,7 +101,10 @@ export function DatePickerPopover({
       {onRecurrenceChange && (
         <div className="relative mt-2 border-t border-[var(--border-color)] pt-2">
           <button
+            ref={repeatButtonRef}
             type="button"
+            aria-haspopup="dialog"
+            aria-expanded={showRecurrence}
             onClick={() => setShowRecurrence(!showRecurrence)}
             className="flex w-full items-center gap-1.5 rounded px-2 py-1.5 text-left text-xs text-[var(--text-primary)] hover:bg-[var(--bg-hover)]"
           >
@@ -122,8 +117,11 @@ export function DatePickerPopover({
             )}
           </button>
 
+          {/* Rendered inside this popover, so the browser treats it as nested: Escape and a press
+              outside close the repeat panel first, a press inside the date panel keeps this one. */}
           {showRecurrence && (
             <RecurrencePickerPopover
+              anchorRef={repeatButtonRef}
               repeatAfter={repeatAfter}
               repeatMode={repeatMode}
               onRecurrenceChange={onRecurrenceChange}
@@ -132,6 +130,6 @@ export function DatePickerPopover({
           )}
         </div>
       )}
-    </div>
+    </Popover>
   )
 }

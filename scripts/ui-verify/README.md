@@ -100,8 +100,11 @@ and Quick View.
 
 `scenarios/<name>.mjs` exports `meta = { id, wave, title }` and a default `async function (h)`.
 Files starting with `_` are helpers. `baseline` is not part of a wave. E4 and E13 (wave 1) are
-real and assert behaviour that the current app fails (clipped popover, Escape, offset highlights);
-the others are stubs that log `skip: not implemented yet` until their card fills them in.
+real. E4 covers the popover primitive (card 1.3): the pickers stay inside the window, Escape and
+focus return, all nine pickers by mouse and keyboard, the nested Repeat panel, the composer and
+context-menu pickers, scrolling and transformed ancestors. E13 asserts behaviour the app fails until
+its card lands (offset highlights). The others are stubs that log `skip: not implemented yet` until
+their card fills them in.
 Scenario code computes dates from the run day (`lib.mjs`: `localDate`, `comingWeekday`, `at`).
 
 The helpers on `h`:

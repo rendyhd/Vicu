@@ -330,6 +330,17 @@ function TaskRowInner({ task, nestedDepth = 0, parentProjectId, drag }: Omit<Tas
   const [subtasksExpanded, setSubtasksExpanded] = useState(false)
   const [structuralDeleteOpen, setStructuralDeleteOpen] = useState(false)
   const [activePopover, setActivePopover] = useState<PopoverType>(null)
+  // The toolbar buttons that open the pickers: each picker sits next to its button and gives
+  // focus back to it when it closes.
+  const dateButtonRef = useRef<HTMLButtonElement>(null)
+  const priorityButtonRef = useRef<HTMLButtonElement>(null)
+  const labelButtonRef = useRef<HTMLButtonElement>(null)
+  const reminderButtonRef = useRef<HTMLButtonElement>(null)
+  const attachmentButtonRef = useRef<HTMLButtonElement>(null)
+  const headerAttachmentButtonRef = useRef<HTMLButtonElement>(null)
+  const attachmentInvokers = useMemo(() => [headerAttachmentButtonRef], [])
+  const projectButtonRef = useRef<HTMLButtonElement>(null)
+  const infoButtonRef = useRef<HTMLButtonElement>(null)
   useEffect(() => {
     if (isOpenRequested) useSelectionStore.getState().openRequestedTask(task.id)
   }, [isOpenRequested, task.id])
@@ -693,7 +704,10 @@ function TaskRowInner({ task, nestedDepth = 0, parentProjectId, drag }: Omit<Tas
         <TaskLinkIcon description={task.description} />
         {(task.attachments?.length ?? 0) > 0 && (
           <button
+            ref={headerAttachmentButtonRef}
             type="button"
+            aria-haspopup="dialog"
+            aria-expanded={activePopover === 'attachment'}
             onClick={() => togglePopover('attachment')}
             className="shrink-0 text-[var(--text-secondary)]"
             title="Attachments"
@@ -764,7 +778,10 @@ function TaskRowInner({ task, nestedDepth = 0, parentProjectId, drag }: Omit<Tas
         <div className="flex items-center gap-1">
           <div className="relative">
             <button
+              ref={dateButtonRef}
               type="button"
+              aria-haspopup="dialog"
+              aria-expanded={activePopover === 'date'}
               onClick={() => togglePopover('date')}
               className={cn(
                 'flex h-6 w-6 items-center justify-center rounded-control transition-colors',
@@ -778,6 +795,7 @@ function TaskRowInner({ task, nestedDepth = 0, parentProjectId, drag }: Omit<Tas
             </button>
             {activePopover === 'date' && (
               <DatePickerPopover
+                anchorRef={dateButtonRef}
                 currentDate={task.due_date}
                 onDateChange={handleDateChange}
                 onClose={() => setActivePopover(null)}
@@ -789,7 +807,10 @@ function TaskRowInner({ task, nestedDepth = 0, parentProjectId, drag }: Omit<Tas
           </div>
           <div className="relative">
             <button
+              ref={priorityButtonRef}
               type="button"
+              aria-haspopup="listbox"
+              aria-expanded={activePopover === 'priority'}
               onClick={() => togglePopover('priority')}
               className={cn(
                 'flex h-6 w-6 items-center justify-center rounded-control transition-colors',
@@ -803,6 +824,7 @@ function TaskRowInner({ task, nestedDepth = 0, parentProjectId, drag }: Omit<Tas
             </button>
             {activePopover === 'priority' && (
               <PriorityPickerPopover
+                anchorRef={priorityButtonRef}
                 currentPriority={task.priority}
                 onPriorityChange={handlePriorityChange}
                 onClose={() => setActivePopover(null)}
@@ -811,7 +833,10 @@ function TaskRowInner({ task, nestedDepth = 0, parentProjectId, drag }: Omit<Tas
           </div>
           <div className="relative">
             <button
+              ref={labelButtonRef}
               type="button"
+              aria-haspopup="dialog"
+              aria-expanded={activePopover === 'label'}
               onClick={() => togglePopover('label')}
               className={cn(
                 'flex h-6 w-6 items-center justify-center rounded-control transition-colors',
@@ -825,6 +850,7 @@ function TaskRowInner({ task, nestedDepth = 0, parentProjectId, drag }: Omit<Tas
             </button>
             {activePopover === 'label' && (
               <LabelPickerPopover
+                anchorRef={labelButtonRef}
                 tasks={[task]}
                 onClose={() => setActivePopover(null)}
               />
@@ -845,7 +871,10 @@ function TaskRowInner({ task, nestedDepth = 0, parentProjectId, drag }: Omit<Tas
           </button>
           <div className="relative">
             <button
+              ref={reminderButtonRef}
               type="button"
+              aria-haspopup="dialog"
+              aria-expanded={activePopover === 'reminder'}
               onClick={() => togglePopover('reminder')}
               className={cn(
                 'flex h-6 w-6 items-center justify-center rounded-control transition-colors',
@@ -859,6 +888,7 @@ function TaskRowInner({ task, nestedDepth = 0, parentProjectId, drag }: Omit<Tas
             </button>
             {activePopover === 'reminder' && (
               <ReminderPickerPopover
+                anchorRef={reminderButtonRef}
                 task={task}
                 onReminderChange={handleReminderChange}
                 onClose={() => setActivePopover(null)}
@@ -867,7 +897,10 @@ function TaskRowInner({ task, nestedDepth = 0, parentProjectId, drag }: Omit<Tas
           </div>
           <div className="relative">
             <button
+              ref={attachmentButtonRef}
               type="button"
+              aria-haspopup="dialog"
+              aria-expanded={activePopover === 'attachment'}
               onClick={() => togglePopover('attachment')}
               className={cn(
                 'flex h-6 w-6 items-center justify-center rounded-control transition-colors',
@@ -881,6 +914,8 @@ function TaskRowInner({ task, nestedDepth = 0, parentProjectId, drag }: Omit<Tas
             </button>
             {activePopover === 'attachment' && (
               <AttachmentPickerPopover
+                anchorRef={attachmentButtonRef}
+                invokedBy={attachmentInvokers}
                 taskId={task.id}
                 onClose={() => setActivePopover(null)}
               />
@@ -888,7 +923,10 @@ function TaskRowInner({ task, nestedDepth = 0, parentProjectId, drag }: Omit<Tas
           </div>
           <div className="relative">
             <button
+              ref={projectButtonRef}
               type="button"
+              aria-haspopup="listbox"
+              aria-expanded={activePopover === 'project'}
               onClick={() => togglePopover('project')}
               className={cn(
                 'flex h-6 w-6 items-center justify-center rounded-control transition-colors',
@@ -902,6 +940,7 @@ function TaskRowInner({ task, nestedDepth = 0, parentProjectId, drag }: Omit<Tas
             </button>
             {activePopover === 'project' && (
               <ProjectPickerPopover
+                anchorRef={projectButtonRef}
                 currentProjectId={task.project_id}
                 onSelect={(pid) => updateTask.mutate({ id: task.id, changes: { project_id: pid }, original: task })}
                 onClose={() => setActivePopover(null)}
@@ -910,7 +949,10 @@ function TaskRowInner({ task, nestedDepth = 0, parentProjectId, drag }: Omit<Tas
           </div>
           <div className="relative">
             <button
+              ref={infoButtonRef}
               type="button"
+              aria-haspopup="dialog"
+              aria-expanded={activePopover === 'info'}
               onClick={() => togglePopover('info')}
               className={cn(
                 'flex h-6 w-6 items-center justify-center rounded-control transition-colors',
@@ -924,6 +966,7 @@ function TaskRowInner({ task, nestedDepth = 0, parentProjectId, drag }: Omit<Tas
             </button>
             {activePopover === 'info' && (
               <InfoPopover
+                anchorRef={infoButtonRef}
                 task={task}
                 onClose={() => setActivePopover(null)}
               />

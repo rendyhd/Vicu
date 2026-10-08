@@ -77,15 +77,22 @@ function shortDate(value: string): string {
   return new Date(value).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 }
 
-function ActionButton({ active, label, children, onClick }: {
+function ActionButton({ active, label, children, onClick, buttonRef, popup, expanded }: {
   active?: boolean
   label: string
   children: React.ReactNode
   onClick: () => void
+  /** For buttons that open a picker: the picker sits next to the button and returns focus to it. */
+  buttonRef?: React.RefObject<HTMLButtonElement>
+  popup?: 'dialog' | 'listbox'
+  expanded?: boolean
 }) {
   return (
     <button
+      ref={buttonRef}
       type="button"
+      aria-haspopup={popup}
+      aria-expanded={popup ? !!expanded : undefined}
       onClick={onClick}
       className={cn(
         'flex h-7 items-center gap-1 rounded-control px-2 text-[11px] transition-colors hover:bg-[var(--bg-hover)]',
@@ -119,6 +126,11 @@ export function NewTaskComposer({
   const [description, setDescription] = useState('')
   const [showNotes, setShowNotes] = useState(false)
   const [openPicker, setOpenPicker] = useState<OpenPicker>(null)
+  const dateButtonRef = useRef<HTMLButtonElement>(null)
+  const reminderButtonRef = useRef<HTMLButtonElement>(null)
+  const priorityButtonRef = useRef<HTMLButtonElement>(null)
+  const labelsButtonRef = useRef<HTMLButtonElement>(null)
+  const projectButtonRef = useRef<HTMLButtonElement>(null)
   const [explicitDueDate, setExplicitDueDate] = useState<string | null>(null)
   const [dateTouched, setDateTouched] = useState(false)
   const [defaultDateDismissed, setDefaultDateDismissed] = useState(false)
@@ -458,34 +470,34 @@ export function NewTaskComposer({
 
       <div className="flex flex-wrap items-center gap-0.5 pb-2 pl-[46px] pr-4">
         <div className="relative">
-          <ActionButton active={effectiveDueDate !== NULL_DATE || repeatAfter > 0} label="Date and repeat" onClick={() => setOpenPicker(openPicker === 'date' ? null : 'date')}>
+          <ActionButton buttonRef={dateButtonRef} popup="dialog" expanded={openPicker === 'date'} active={effectiveDueDate !== NULL_DATE || repeatAfter > 0} label="Date and repeat" onClick={() => setOpenPicker(openPicker === 'date' ? null : 'date')}>
             <CalendarDays className="h-3.5 w-3.5" /> {shortDate(effectiveDueDate)}
           </ActionButton>
-          {openPicker === 'date' && <DatePickerPopover currentDate={effectiveDueDate} onDateChange={(value) => { setDateTouched(true); setExplicitDueDate(value) }} repeatAfter={repeatAfter} repeatMode={repeatMode} onRecurrenceChange={(after, mode) => { setRecurrenceTouched(true); setRepeatAfter(after); setRepeatMode(mode) }} onClose={() => setOpenPicker(null)} />}
+          {openPicker === 'date' && <DatePickerPopover anchorRef={dateButtonRef} currentDate={effectiveDueDate} onDateChange={(value) => { setDateTouched(true); setExplicitDueDate(value) }} repeatAfter={repeatAfter} repeatMode={repeatMode} onRecurrenceChange={(after, mode) => { setRecurrenceTouched(true); setRepeatAfter(after); setRepeatMode(mode) }} onClose={() => setOpenPicker(null)} />}
         </div>
         <div className="relative">
-          <ActionButton active={reminders.length > 0} label="Reminder" onClick={() => setOpenPicker(openPicker === 'reminder' ? null : 'reminder')}>
+          <ActionButton buttonRef={reminderButtonRef} popup="dialog" expanded={openPicker === 'reminder'} active={reminders.length > 0} label="Reminder" onClick={() => setOpenPicker(openPicker === 'reminder' ? null : 'reminder')}>
             <Bell className="h-3.5 w-3.5" /> {reminders.length ? `${reminders.length} reminder${reminders.length === 1 ? '' : 's'}` : 'Reminder'}
           </ActionButton>
-          {openPicker === 'reminder' && <ReminderPickerPopover dueDate={effectiveDueDate} reminders={reminders} onReminderChange={setReminders} onClose={() => setOpenPicker(null)} />}
+          {openPicker === 'reminder' && <ReminderPickerPopover anchorRef={reminderButtonRef} dueDate={effectiveDueDate} reminders={reminders} onReminderChange={setReminders} onClose={() => setOpenPicker(null)} />}
         </div>
         <div className="relative">
-          <ActionButton active={priority !== null && priority > 0} label="Priority" onClick={() => setOpenPicker(openPicker === 'priority' ? null : 'priority')}>
+          <ActionButton buttonRef={priorityButtonRef} popup="listbox" expanded={openPicker === 'priority'} active={priority !== null && priority > 0} label="Priority" onClick={() => setOpenPicker(openPicker === 'priority' ? null : 'priority')}>
             <Flag className="h-3.5 w-3.5" /> {priorityLabel}
           </ActionButton>
-          {openPicker === 'priority' && <PriorityPickerPopover currentPriority={priority ?? 0} onPriorityChange={setPriority} onClose={() => setOpenPicker(null)} />}
+          {openPicker === 'priority' && <PriorityPickerPopover anchorRef={priorityButtonRef} currentPriority={priority ?? 0} onPriorityChange={setPriority} onClose={() => setOpenPicker(null)} />}
         </div>
         <div className="relative">
-          <ActionButton active={selectedLabelIds.length > 0} label="Labels" onClick={() => setOpenPicker(openPicker === 'labels' ? null : 'labels')}>
+          <ActionButton buttonRef={labelsButtonRef} popup="dialog" expanded={openPicker === 'labels'} active={selectedLabelIds.length > 0} label="Labels" onClick={() => setOpenPicker(openPicker === 'labels' ? null : 'labels')}>
             <Tags className="h-3.5 w-3.5" /> {selectedLabelIds.length ? `${selectedLabelIds.length} label${selectedLabelIds.length === 1 ? '' : 's'}` : 'Labels'}
           </ActionButton>
-          {openPicker === 'labels' && <DraftLabelPickerPopover selectedIds={selectedLabelIds} onChange={setSelectedLabelIds} onClose={() => setOpenPicker(null)} />}
+          {openPicker === 'labels' && <DraftLabelPickerPopover anchorRef={labelsButtonRef} selectedIds={selectedLabelIds} onChange={setSelectedLabelIds} onClose={() => setOpenPicker(null)} />}
         </div>
         <div className="relative">
-          <ActionButton active={projectTouched} label="Project" onClick={() => setOpenPicker(openPicker === 'project' ? null : 'project')}>
+          <ActionButton buttonRef={projectButtonRef} popup="listbox" expanded={openPicker === 'project'} active={projectTouched} label="Project" onClick={() => setOpenPicker(openPicker === 'project' ? null : 'project')}>
             <FolderOpen className="h-3.5 w-3.5" /> <span className="max-w-28 truncate">{selectedProjectTitle}</span>
           </ActionButton>
-          {openPicker === 'project' && <ProjectPickerPopover currentProjectId={selectedProjectId} onSelect={(id) => { setSelectedProjectId(id); setProjectTouched(true) }} onClose={() => setOpenPicker(null)} />}
+          {openPicker === 'project' && <ProjectPickerPopover anchorRef={projectButtonRef} currentProjectId={selectedProjectId} onSelect={(id) => { setSelectedProjectId(id); setProjectTouched(true) }} onClose={() => setOpenPicker(null)} />}
         </div>
         <ActionButton active={showNotes || !!description} label="Notes" onClick={() => setShowNotes((value) => !value)}>
           <AlignLeft className="h-3.5 w-3.5" /> Notes

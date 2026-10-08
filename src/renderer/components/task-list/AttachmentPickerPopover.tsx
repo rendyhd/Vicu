@@ -1,12 +1,15 @@
-import { useRef, useEffect } from 'react'
+import type { RefObject } from 'react'
 import { X, FileText, Image, File, Loader2 } from 'lucide-react'
 import { useTaskAttachments, useUploadAttachment, useDeleteAttachment } from '@/hooks/use-task-mutations'
 import { api } from '@/lib/api'
-import { usePopoverAlignment } from './use-popover-alignment'
+import { Popover, type PopoverCloseReason } from '../overlay/Popover'
 
 interface AttachmentPickerPopoverProps {
+  anchorRef: RefObject<HTMLElement | null>
+  /** A second button that toggles the same popover (the paperclip in the card header). */
+  invokedBy?: RefObject<HTMLElement | null>[]
   taskId: number
-  onClose: () => void
+  onClose: (reason?: PopoverCloseReason) => void
 }
 
 function formatFileSize(bytes: number): string {
@@ -21,22 +24,10 @@ function getFileIcon(mime: string) {
   return File
 }
 
-export function AttachmentPickerPopover({ taskId, onClose }: AttachmentPickerPopoverProps) {
-  const ref = useRef<HTMLDivElement>(null)
-  const align = usePopoverAlignment(ref)
+export function AttachmentPickerPopover({ anchorRef, invokedBy, taskId, onClose }: AttachmentPickerPopoverProps) {
   const { data: attachments, isLoading } = useTaskAttachments(taskId, true)
   const uploadAttachment = useUploadAttachment()
   const deleteAttachment = useDeleteAttachment()
-
-  useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        onClose()
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [onClose])
 
   const handleOpen = (attachmentId: number, fileName: string) => {
     api.openTaskAttachment(taskId, attachmentId, fileName)
@@ -51,10 +42,7 @@ export function AttachmentPickerPopover({ taskId, onClose }: AttachmentPickerPop
   }
 
   return (
-    <div
-      ref={ref}
-      className={`absolute ${align} top-full z-50 mt-1 w-72 rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] p-3 shadow-lg`}
-    >
+    <Popover anchorRef={anchorRef} invokedBy={invokedBy} onClose={onClose} label="Attachments" className="w-72 p-3">
       {isLoading ? (
         <div className="flex items-center justify-center py-4">
           <Loader2 className="h-4 w-4 animate-spin text-[var(--text-secondary)]" />
@@ -87,7 +75,9 @@ export function AttachmentPickerPopover({ taskId, onClose }: AttachmentPickerPop
                     e.stopPropagation()
                     handleDelete(att.id)
                   }}
-                  className="shrink-0 opacity-0 group-hover/att:opacity-100 text-[var(--text-secondary)] hover:text-red-500"
+                  aria-label={`Remove ${att.file.name}`}
+                  title="Remove attachment"
+                  className="shrink-0 opacity-0 group-hover/att:opacity-100 focus-visible:opacity-100 text-[var(--text-secondary)] hover:text-red-500"
                 >
                   <X className="h-3 w-3" />
                 </button>
@@ -118,6 +108,6 @@ export function AttachmentPickerPopover({ taskId, onClose }: AttachmentPickerPop
           {deleteAttachment.error?.message || 'Delete failed'}
         </p>
       )}
-    </div>
+    </Popover>
   )
 }

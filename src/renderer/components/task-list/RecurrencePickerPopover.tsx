@@ -1,19 +1,19 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, type RefObject } from 'react'
 import { X } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import {
   detectRecurrencePreset,
   formatRecurrenceLabel,
   getPresetValues,
-  type RecurrencePreset,
 } from '@/lib/recurrence'
-import { usePopoverAlignment } from './use-popover-alignment'
+import { Popover, type PopoverCloseReason } from '../overlay/Popover'
 
 interface RecurrencePickerPopoverProps {
+  anchorRef: RefObject<HTMLElement | null>
   repeatAfter: number
   repeatMode: number
   onRecurrenceChange: (repeatAfter: number, repeatMode: number) => void
-  onClose: () => void
+  onClose: (reason?: PopoverCloseReason) => void
 }
 
 type CustomUnit = 'days' | 'weeks'
@@ -22,13 +22,12 @@ const DAY = 86400
 const WEEK = 604800
 
 export function RecurrencePickerPopover({
+  anchorRef,
   repeatAfter,
   repeatMode,
   onRecurrenceChange,
   onClose,
 }: RecurrencePickerPopoverProps) {
-  const ref = useRef<HTMLDivElement>(null)
-  const align = usePopoverAlignment(ref)
   const activePreset = detectRecurrencePreset(repeatAfter, repeatMode)
   const hasRecurrence = activePreset !== 'none'
 
@@ -46,16 +45,6 @@ export function RecurrencePickerPopover({
     return 'days'
   })
   const [fromCompletion, setFromCompletion] = useState(repeatMode === 2)
-
-  useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        onClose()
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [onClose])
 
   const applyPreset = (preset: 'daily' | 'weekly' | 'monthly') => {
     const values = getPresetValues(preset)
@@ -81,10 +70,7 @@ export function RecurrencePickerPopover({
   ]
 
   return (
-    <div
-      ref={ref}
-      className={`absolute ${align} top-full z-[60] mt-1 w-60 rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] p-3 shadow-lg`}
-    >
+    <Popover anchorRef={anchorRef} onClose={onClose} placement="right-start" label="Repeat" className="w-60 p-3">
       {/* Current recurrence display */}
       {hasRecurrence && (
         <div className="mb-2 flex items-center justify-between rounded bg-[var(--bg-hover)] px-2 py-1.5">
@@ -94,6 +80,8 @@ export function RecurrencePickerPopover({
           <button
             type="button"
             onClick={clearRecurrence}
+            aria-label="Clear repeat"
+            title="Clear repeat"
             className="text-[var(--text-secondary)] hover:text-red-500"
           >
             <X className="h-3 w-3" />
@@ -139,6 +127,7 @@ export function RecurrencePickerPopover({
             <span className="text-xs text-[var(--text-secondary)]">Every</span>
             <input
               type="number"
+              aria-label="Repeat every"
               min={1}
               max={365}
               value={customValue}
@@ -146,6 +135,7 @@ export function RecurrencePickerPopover({
               className="w-14 rounded border border-[var(--border-color)] bg-[var(--bg-secondary)] px-1.5 py-1 text-center text-xs text-[var(--text-primary)] focus:border-[var(--accent-blue)] focus:outline-none"
             />
             <select
+              aria-label="Repeat unit"
               value={customUnit}
               onChange={(e) => setCustomUnit(e.target.value as CustomUnit)}
               className="rounded border border-[var(--border-color)] bg-[var(--bg-secondary)] px-1.5 py-1 text-xs text-[var(--text-primary)] focus:border-[var(--accent-blue)] focus:outline-none"
@@ -174,6 +164,6 @@ export function RecurrencePickerPopover({
           </button>
         </div>
       )}
-    </div>
+    </Popover>
   )
 }

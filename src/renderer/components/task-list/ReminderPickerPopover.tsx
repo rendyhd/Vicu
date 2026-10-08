@@ -1,15 +1,16 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, type RefObject } from 'react'
 import { X } from 'lucide-react'
 import type { Task, TaskReminder } from '@/lib/vikunja-types'
 import { NULL_DATE } from '@/lib/constants'
-import { usePopoverAlignment } from './use-popover-alignment'
+import { Popover, type PopoverCloseReason } from '../overlay/Popover'
 
 interface ReminderPickerPopoverProps {
+  anchorRef: RefObject<HTMLElement | null>
   task?: Task
   dueDate?: string
   reminders?: TaskReminder[]
   onReminderChange: (reminders: TaskReminder[]) => void
-  onClose: () => void
+  onClose: (reason?: PopoverCloseReason) => void
 }
 
 const RELATIVE_PRESETS = [
@@ -19,24 +20,12 @@ const RELATIVE_PRESETS = [
   { label: '1 day before', offset: -86400 },
 ]
 
-export function ReminderPickerPopover({ task, dueDate, reminders: controlledReminders, onReminderChange, onClose }: ReminderPickerPopoverProps) {
-  const ref = useRef<HTMLDivElement>(null)
-  const align = usePopoverAlignment(ref)
+export function ReminderPickerPopover({ anchorRef, task, dueDate, reminders: controlledReminders, onReminderChange, onClose }: ReminderPickerPopoverProps) {
   const [customDateTime, setCustomDateTime] = useState('')
 
   const reminders = controlledReminders ?? task?.reminders ?? []
   const effectiveDueDate = dueDate ?? task?.due_date ?? NULL_DATE
   const hasDueDate = effectiveDueDate && effectiveDueDate !== NULL_DATE
-
-  useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        onClose()
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [onClose])
 
   const addReminder = (date: Date) => {
     const newReminder: TaskReminder = { reminder: date.toISOString() }
@@ -98,10 +87,7 @@ export function ReminderPickerPopover({ task, dueDate, reminders: controlledRemi
   }
 
   return (
-    <div
-      ref={ref}
-      className={`absolute ${align} top-full z-50 mt-1 w-64 rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] p-3 shadow-lg`}
-    >
+    <Popover anchorRef={anchorRef} onClose={onClose} label="Reminders" className="w-64 p-3">
       {/* Existing reminders */}
       {reminders.length > 0 && (
         <div className="mb-2 flex flex-col gap-1">
@@ -114,6 +100,8 @@ export function ReminderPickerPopover({ task, dueDate, reminders: controlledRemi
               <button
                 type="button"
                 onClick={() => removeReminder(i)}
+                aria-label={`Remove reminder ${formatReminder(r)}`}
+                title="Remove reminder"
                 className="ml-2 text-[var(--text-secondary)] hover:text-red-500"
               >
                 <X className="h-3 w-3" />
@@ -165,6 +153,7 @@ export function ReminderPickerPopover({ task, dueDate, reminders: controlledRemi
       <div className="border-t border-[var(--border-color)] pt-2">
         <input
           type="datetime-local"
+          aria-label="Custom reminder time"
           value={customDateTime}
           onChange={(e) => setCustomDateTime(e.target.value)}
           className="w-full rounded border border-[var(--border-color)] bg-[var(--bg-secondary)] px-2 py-1.5 text-xs text-[var(--text-primary)] focus:border-[var(--accent-blue)] focus:outline-none"
@@ -178,7 +167,7 @@ export function ReminderPickerPopover({ task, dueDate, reminders: controlledRemi
           Add reminder
         </button>
       </div>
-    </div>
+    </Popover>
   )
 }
 

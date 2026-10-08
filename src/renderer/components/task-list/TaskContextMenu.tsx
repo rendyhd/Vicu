@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useLayoutEffect, useMemo } from 'react'
+import type { PopoverCloseReason } from '../overlay/Popover'
 import { Check, Copy, CheckCircle2, Trash2 } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { cn } from '@/lib/cn'
@@ -35,6 +36,9 @@ function Divider() {
 
 export function TaskContextMenu({ fallbackTask, x, y, onClose }: TaskContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null)
+  const scheduleRef = useRef<HTMLButtonElement>(null)
+  const projectRef = useRef<HTMLButtonElement>(null)
+  const labelRef = useRef<HTMLButtonElement>(null)
   const qc = useQueryClient()
   const { data: config } = useAppConfig()
   const { data: projectData } = useProjects()
@@ -89,9 +93,12 @@ export function TaskContextMenu({ fallbackTask, x, y, onClose }: TaskContextMenu
     }
   }, [onClose])
 
-  const closeSubAndMenu = () => {
+  // A picker closes the menu too once something was chosen. When the browser dismissed the picker
+  // (Escape, or a press that landed elsewhere) only the picker closes: the press may be on a menu
+  // entry that still has to receive its click, and Escape closes one layer at a time.
+  const closeSubAndMenu = (reason?: PopoverCloseReason) => {
     setSub(null)
-    onClose()
+    if (reason !== 'dismiss') onClose()
   }
 
   const run = (fn: () => void) => () => {
@@ -153,7 +160,10 @@ export function TaskContextMenu({ fallbackTask, x, y, onClose }: TaskContextMenu
       </button>
       <div className="relative">
         <button
+          ref={scheduleRef}
           type="button"
+          aria-haspopup="dialog"
+          aria-expanded={sub === 'date'}
           className={itemClass}
           onClick={() => setSub((s) => (s === 'date' ? null : 'date'))}
         >
@@ -161,6 +171,8 @@ export function TaskContextMenu({ fallbackTask, x, y, onClose }: TaskContextMenu
         </button>
         {sub === 'date' && (
           <DatePickerPopover
+            anchorRef={scheduleRef}
+            placement="right-start"
             currentDate={datePickerCurrent}
             onDateChange={actions.setDueDateIso}
             onClose={closeSubAndMenu}
@@ -214,7 +226,10 @@ export function TaskContextMenu({ fallbackTask, x, y, onClose }: TaskContextMenu
       )}
       <div className="relative">
         <button
+          ref={projectRef}
           type="button"
+          aria-haspopup="listbox"
+          aria-expanded={sub === 'project'}
           className={itemClass}
           onClick={() => setSub((s) => (s === 'project' ? null : 'project'))}
         >
@@ -222,6 +237,8 @@ export function TaskContextMenu({ fallbackTask, x, y, onClose }: TaskContextMenu
         </button>
         {sub === 'project' && (
           <ProjectPickerPopover
+            anchorRef={projectRef}
+            placement="right-start"
             currentProjectId={currentProjectId}
             onSelect={(pid) => {
               actions.moveToProject(pid)
@@ -250,14 +267,23 @@ export function TaskContextMenu({ fallbackTask, x, y, onClose }: TaskContextMenu
       )}
       <div className="relative">
         <button
+          ref={labelRef}
           type="button"
+          aria-haspopup="dialog"
+          aria-expanded={sub === 'label'}
           className={itemClass}
           onClick={() => setSub((s) => (s === 'label' ? null : 'label'))}
         >
           Apply label…
         </button>
         {sub === 'label' && (
-          <LabelPickerPopover tasks={tasks} onApplied={actions.recordLastLabel} onClose={closeSubAndMenu} />
+          <LabelPickerPopover
+            anchorRef={labelRef}
+            placement="right-start"
+            tasks={tasks}
+            onApplied={actions.recordLastLabel}
+            onClose={closeSubAndMenu}
+          />
         )}
       </div>
 
