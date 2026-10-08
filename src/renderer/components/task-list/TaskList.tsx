@@ -15,6 +15,8 @@ import type { Task } from '@/lib/vikunja-types'
 import { TaskRow } from './TaskRow'
 import { AddTaskButton } from './AddTaskButton'
 import { EmptyState } from '@/components/shared/EmptyState'
+import { PageHeader } from '@/components/shared/PageHeader'
+import { Button } from '@/components/shared/Button'
 import { NewTaskComposer } from './NewTaskComposer'
 import { taskDescendants, unfinishedDescendants } from '@/lib/task-hierarchy'
 import { confirmTaskCompletion } from '@/lib/task-completion'
@@ -25,6 +27,8 @@ interface TaskListProps {
   title: string
   /** A smart list: its identity icon shows before the title. */
   identity?: SmartListId
+  /** One line under the title (Today's full date). */
+  subtitle?: React.ReactNode
   tasks: Task[]
   projectId?: number
   emptyTitle?: string
@@ -34,6 +38,8 @@ interface TaskListProps {
   viewId?: number
   className?: string
   children?: React.ReactNode
+  /** Overrides the guess that the list is empty (no tasks and no children); a view that fills the list through children says so. */
+  empty?: boolean
   insertIndex?: number
   /** When set, new tasks get this due date by default. Shown as a dismissible chip. */
   defaultDueDate?: Date
@@ -51,6 +57,7 @@ interface TaskListProps {
 export function TaskList({
   title,
   identity,
+  subtitle,
   tasks,
   projectId,
   emptyTitle = 'No tasks',
@@ -60,6 +67,7 @@ export function TaskList({
   viewId,
   className,
   children,
+  empty,
   insertIndex,
   defaultDueDate,
   headerContent,
@@ -136,6 +144,15 @@ export function TaskList({
     },
     [collapseAll, setFocusedTask, clearSelection]
   )
+
+  // The empty state has its own "Add task" button, so the list shows no second one under it.
+  const isEmpty = empty ?? (tasks.length === 0 && !children)
+
+  // The header's + button and the empty state's "Add task" open the composer at the top.
+  const startAdding = useCallback(() => {
+    setAddPosition('top')
+    setIsAdding(true)
+  }, [])
 
   const handleHeaderClick = useCallback(
     (e: React.MouseEvent) => {
@@ -441,7 +458,7 @@ export function TaskList({
   const endOfList = (
     <>
       {isAdding && addPosition === 'bottom' && taskInputElement}
-      {showNewTask && projectId && !isAdding && (
+      {showNewTask && projectId && !isAdding && !isEmpty && (
         <AddTaskButton
           onClick={() => {
             setAddPosition('bottom')
@@ -454,28 +471,24 @@ export function TaskList({
 
   return (
     <div className={cn('flex h-full flex-col', className)} onClick={handleContainerClick}>
-      <div
-        className="flex items-center justify-between px-6 pb-2 pt-6"
+      <PageHeader
+        title={title}
+        subtitle={subtitle}
+        icon={identity && <SmartListIcon list={identity} className="h-5 w-5" />}
         onClick={handleHeaderClick}
-      >
-        <div className="flex min-w-0 items-center gap-2.5">
-          {identity && <SmartListIcon list={identity} className="h-5 w-5" />}
-          <h1 className="text-xl font-bold text-[var(--text-primary)]">{title}</h1>
-        </div>
-        {showNewTask && projectId && (
-          <button
-            type="button"
-            onClick={() => {
-              setAddPosition('top')
-              setIsAdding(true)
-            }}
-            className="flex h-7 w-7 items-center justify-center rounded-control text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--accent-blue)]"
-            aria-label="New task"
-          >
-            <Plus className="h-4 w-4" />
-          </button>
-        )}
-      </div>
+        actions={
+          showNewTask && projectId ? (
+            <button
+              type="button"
+              onClick={startAdding}
+              className="flex h-7 w-7 items-center justify-center rounded-control text-[var(--text-secondary)] transition-colors duration-fade-fast hover:bg-[var(--bg-hover)] hover:text-[var(--accent-blue)]"
+              aria-label="New task"
+            >
+              <Plus className="h-4 w-4" />
+            </button>
+          ) : undefined
+        }
+      />
 
       <div
         ref={listRef}
@@ -486,8 +499,21 @@ export function TaskList({
 
         {isAdding && addPosition === 'top' && taskInputElement}
 
-        {tasks.length === 0 && !isAdding && !children ? (
-          <EmptyState icon={Inbox} title={emptyTitle} subtitle={emptySubtitle} />
+        {isEmpty && !isAdding ? (
+          <EmptyState
+            icon={Inbox}
+            identity={identity}
+            title={emptyTitle}
+            subtitle={emptySubtitle}
+            action={
+              showNewTask && projectId ? (
+                <Button variant="secondary" onClick={startAdding}>
+                  <Plus className="h-4 w-4" />
+                  Add task
+                </Button>
+              ) : undefined
+            }
+          />
         ) : sortable ? (
           <SortableContext
             items={tasks.map((t) => `task-${t.id}`)}

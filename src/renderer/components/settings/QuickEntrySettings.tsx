@@ -1,3 +1,4 @@
+import { Checkbox } from '@/components/shared/Checkbox'
 import { useEffect, useState } from 'react'
 import { api } from '@/lib/api'
 import { cn } from '@/lib/cn'
@@ -152,22 +153,18 @@ export function QuickEntrySettings({ config, projects, onChange, hotkeyWarnings 
         {/* Enable toggles */}
         <div className="space-y-2">
           <label className="flex cursor-pointer items-center gap-2">
-            <input
-              type="checkbox"
+            <Checkbox
               checked={entryEnabled}
               onChange={(e) => onChange({ quick_entry_enabled: e.target.checked })}
-              className="h-4 w-4 rounded-control border-[var(--border-color)] accent-accent-blue"
             />
             <span className="text-sm text-[var(--text-primary)]">
               Enable Quick Entry
             </span>
           </label>
           <label className="flex cursor-pointer items-center gap-2">
-            <input
-              type="checkbox"
+            <Checkbox
               checked={viewEnabled}
               onChange={(e) => onChange({ quick_view_enabled: e.target.checked })}
-              className="h-4 w-4 rounded-control border-[var(--border-color)] accent-accent-blue"
             />
             <span className="text-sm text-[var(--text-primary)]">
               Enable Quick View
@@ -372,11 +369,9 @@ export function QuickEntrySettings({ config, projects, onChange, hotkeyWarnings 
 
                 {/* Include today from all projects */}
                 <label className="flex cursor-pointer items-center gap-2">
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     checked={viewerFilter.include_today_all_projects ?? false}
                     onChange={(e) => updateViewerFilter({ include_today_all_projects: e.target.checked })}
-                    className="h-4 w-4 rounded-control border-[var(--border-color)] accent-accent-blue"
                   />
                   <span className="text-sm text-[var(--text-primary)]">
                     Include tasks due today from all projects

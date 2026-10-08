@@ -1,3 +1,6 @@
+import { Checkbox } from '@/components/shared/Checkbox'
+import { Switch } from '@/components/shared/Switch'
+import { Button } from '@/components/shared/Button'
 import { useState } from 'react'
 import { api } from '@/lib/api'
 import { cn } from '@/lib/cn'
@@ -40,11 +43,9 @@ export function NotificationSettings({ config, onChange }: NotificationSettingsP
       {/* Master toggle */}
       <div className="rounded-card border border-[var(--border-color)] bg-[var(--bg-primary)] p-5">
         <label className="flex cursor-pointer items-center gap-2">
-          <input
-            type="checkbox"
+          <Switch
             checked={enabled}
-            onChange={(e) => onChange({ notifications_enabled: e.target.checked })}
-            className="h-4 w-4 rounded-control border-[var(--border-color)] accent-accent-blue"
+            onCheckedChange={(checked) => onChange({ notifications_enabled: checked })}
           />
           <span className="text-sm font-semibold text-[var(--text-primary)]">Enable desktop notifications</span>
         </label>
@@ -69,11 +70,9 @@ export function NotificationSettings({ config, onChange }: NotificationSettingsP
           {/* Primary time */}
           <div className="flex items-center gap-3">
             <label className="flex flex-1 cursor-pointer items-center gap-2">
-              <input
-                type="checkbox"
+              <Checkbox
                 checked={config.notifications_daily_reminder_enabled !== false}
                 onChange={(e) => onChange({ notifications_daily_reminder_enabled: e.target.checked })}
-                className="h-4 w-4 rounded-control border-[var(--border-color)] accent-accent-blue"
               />
               <span className="text-sm text-[var(--text-primary)]">Morning reminder</span>
             </label>
@@ -90,11 +89,9 @@ export function NotificationSettings({ config, onChange }: NotificationSettingsP
           {/* Secondary time */}
           <div className="flex items-center gap-3">
             <label className="flex flex-1 cursor-pointer items-center gap-2">
-              <input
-                type="checkbox"
+              <Checkbox
                 checked={config.notifications_secondary_reminder_enabled ?? false}
                 onChange={(e) => onChange({ notifications_secondary_reminder_enabled: e.target.checked })}
-                className="h-4 w-4 rounded-control border-[var(--border-color)] accent-accent-blue"
               />
               <span className="text-sm text-[var(--text-primary)]">Afternoon reminder</span>
             </label>
@@ -113,29 +110,23 @@ export function NotificationSettings({ config, onChange }: NotificationSettingsP
             <span className="text-xs font-medium text-[var(--text-secondary)]">Include</span>
             <div className="mt-2 space-y-2">
               <label className="flex cursor-pointer items-center gap-2">
-                <input
-                  type="checkbox"
+                <Checkbox
                   checked={config.notifications_overdue_enabled !== false}
                   onChange={(e) => onChange({ notifications_overdue_enabled: e.target.checked })}
-                  className="h-4 w-4 rounded-control border-[var(--border-color)] accent-accent-blue"
                 />
                 <span className="text-sm text-[var(--text-primary)]">Overdue tasks</span>
               </label>
               <label className="flex cursor-pointer items-center gap-2">
-                <input
-                  type="checkbox"
+                <Checkbox
                   checked={config.notifications_due_today_enabled !== false}
                   onChange={(e) => onChange({ notifications_due_today_enabled: e.target.checked })}
-                  className="h-4 w-4 rounded-control border-[var(--border-color)] accent-accent-blue"
                 />
                 <span className="text-sm text-[var(--text-primary)]">Tasks due today</span>
               </label>
               <label className="flex cursor-pointer items-center gap-2">
-                <input
-                  type="checkbox"
+                <Checkbox
                   checked={config.notifications_upcoming_enabled ?? false}
                   onChange={(e) => onChange({ notifications_upcoming_enabled: e.target.checked })}
-                  className="h-4 w-4 rounded-control border-[var(--border-color)] accent-accent-blue"
                 />
                 <span className="text-sm text-[var(--text-primary)]">Tasks due tomorrow</span>
               </label>
@@ -146,20 +137,16 @@ export function NotificationSettings({ config, onChange }: NotificationSettingsP
           <div className="border-t border-[var(--border-color)] pt-3">
             <div className="space-y-2">
               <label className="flex cursor-pointer items-center gap-2">
-                <input
-                  type="checkbox"
+                <Checkbox
                   checked={config.notifications_sound !== false}
                   onChange={(e) => onChange({ notifications_sound: e.target.checked })}
-                  className="h-4 w-4 rounded-control border-[var(--border-color)] accent-accent-blue"
                 />
                 <span className="text-sm text-[var(--text-primary)]">Play sound</span>
               </label>
               <label className="flex cursor-pointer items-center gap-2">
-                <input
-                  type="checkbox"
+                <Checkbox
                   checked={config.notifications_persistent ?? false}
                   onChange={(e) => onChange({ notifications_persistent: e.target.checked })}
-                  className="h-4 w-4 rounded-control border-[var(--border-color)] accent-accent-blue"
                 />
                 <span className="text-sm text-[var(--text-primary)]">Stay until dismissed</span>
               </label>
@@ -181,20 +168,16 @@ export function NotificationSettings({ config, onChange }: NotificationSettingsP
         <div className="space-y-4">
           <div className="space-y-2">
             <label className="flex cursor-pointer items-center gap-2">
-              <input
-                type="checkbox"
+              <Checkbox
                 checked={config.notifications_task_reminder_sound !== false}
                 onChange={(e) => onChange({ notifications_task_reminder_sound: e.target.checked })}
-                className="h-4 w-4 rounded-control border-[var(--border-color)] accent-accent-blue"
               />
               <span className="text-sm text-[var(--text-primary)]">Play sound</span>
             </label>
             <label className="flex cursor-pointer items-center gap-2">
-              <input
-                type="checkbox"
+              <Checkbox
                 checked={config.notifications_task_reminder_persistent ?? false}
                 onChange={(e) => onChange({ notifications_task_reminder_persistent: e.target.checked })}
-                className="h-4 w-4 rounded-control border-[var(--border-color)] accent-accent-blue"
               />
               <span className="text-sm text-[var(--text-primary)]">Stay until dismissed</span>
             </label>
@@ -244,17 +227,9 @@ export function NotificationSettings({ config, onChange }: NotificationSettingsP
 
       {/* Test */}
       <div className="flex items-center gap-3">
-        <button
-          type="button"
-          onClick={handleTestNotification}
-          className={cn(
-            'rounded-control px-4 py-2 text-sm font-medium transition-colors',
-            'border border-[var(--border-color)] text-[var(--text-primary)]',
-            'hover:bg-[var(--bg-secondary)]'
-          )}
-        >
+        <Button variant="secondary" onClick={handleTestNotification}>
           Test Notification
-        </button>
+        </Button>
         {testStatus === 'sent' && (
           <span className="text-xs text-status-done">Notification sent</span>
         )}

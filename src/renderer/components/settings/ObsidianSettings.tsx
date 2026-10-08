@@ -1,3 +1,4 @@
+import { Button } from '@/components/shared/Button'
 import { useState, useCallback } from 'react'
 import type { AppConfig } from '@/lib/vikunja-types'
 
@@ -102,13 +103,9 @@ export function ObsidianSettings({ config, onChange, disabled }: ObsidianSetting
                     placeholder="Obsidian > Settings > Local REST API > Copy API Key"
                     className="flex-1 rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]"
                   />
-                  <button
-                    type="button"
-                    onClick={() => setShowKey(!showKey)}
-                    className="rounded-control border border-[var(--border-color)] px-3 py-2 text-xs text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
-                  >
+                  <Button variant="quiet" onClick={() => setShowKey(!showKey)}>
                     {showKey ? 'Hide' : 'Show'}
-                  </button>
+                  </Button>
                 </div>
               </div>
 
@@ -134,14 +131,9 @@ export function ObsidianSettings({ config, onChange, disabled }: ObsidianSetting
               </div>
 
               <div>
-                <button
-                  type="button"
-                  onClick={handleTest}
-                  disabled={testStatus.type === 'loading'}
-                  className="rounded-control border border-[var(--border-color)] px-4 py-2 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-hover)] disabled:opacity-50"
-                >
+                <Button variant="secondary" onClick={handleTest} disabled={testStatus.type === 'loading'}>
                   {testStatus.type === 'loading' ? 'Testing...' : 'Test Connection'}
-                </button>
+                </Button>
                 {testStatus.type === 'success' && (
                   <span className="ml-2 text-xs text-status-done">{testStatus.message}</span>
                 )}

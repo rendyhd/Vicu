@@ -16,6 +16,8 @@ import { api } from '@/lib/api'
 import { showRoutinesInToday, type Task } from '@/lib/vikunja-types'
 import { useAppConfig } from '@/hooks/use-app-config'
 import { RoutineTodaySection } from '@/components/routines/RoutineTodaySection'
+import { useRoutines } from '@/hooks/use-routines'
+import { isFinished } from '@/lib/routines'
 
 function groupByProject(tasks: Task[], projectsFlat?: { id: number; title: string; hex_color?: string }[]) {
   const activeIds = new Set(projectsFlat?.map((project) => project.id) ?? [])
@@ -42,6 +44,9 @@ export function TodayView() {
   const { data: config } = useAppConfig()
   // Wait for the config, so a turned-off section does not flash in (and fetch routines) on start.
   const routinesShown = !!config && showRoutinesInToday(config)
+  // The routines section draws itself, so Today is only empty once it has nothing left to show either.
+  const routines = useRoutines({ enabled: routinesShown })
+  const routinesLeft = routinesShown && (routines.isLoading || routines.today.some((o) => !isFinished(o.status)))
   const [inboxProjectId, setInboxProjectId] = useState<number | undefined>()
   // The local day: re-read when it rolls over at midnight (or after sleep), so a task added to Today
   // after midnight is dated today, not yesterday, and the overdue / due-today split follows.
@@ -111,9 +116,10 @@ export function TodayView() {
         projectId={inboxProjectId}
         showNewTask={!!inboxProjectId && projects?.flat.some((project) => project.id === inboxProjectId)}
         defaultDueDate={today}
-        headerContent={<p className="px-6 pb-3 text-xs text-[var(--text-secondary)]">{dateStr}</p>}
-        emptyTitle="All clear for today"
-        emptySubtitle="Tasks due today will appear here"
+        subtitle={dateStr}
+        empty={overdueTasks.length === 0 && todayTasks.length === 0 && !routinesLeft}
+        emptyTitle="All clear"
+        emptySubtitle="Nothing is due today"
       >
         {routinesShown && <RoutineTodaySection hideFinished />}
         {overdueTasks.length > 0 && (

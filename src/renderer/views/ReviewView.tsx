@@ -13,6 +13,7 @@ import { useSelectionStore } from '@/stores/selection-store'
 import { useReviewNoticeStore } from '@/stores/review-notice-store'
 import { ProjectBranch } from '@/components/review/ProjectBranch'
 import { SmartListIcon } from '@/components/shared/SmartListIcon'
+import { PageHeader } from '@/components/shared/PageHeader'
 import type { Project } from '@/lib/vikunja-types'
 
 type Tab = 'due' | 'all'
@@ -206,15 +207,31 @@ export function ReviewView() {
   return (
     <div className="relative flex h-full flex-col" style={{ background: 'var(--bg-primary)' }}>
       {/* Header */}
-      <div style={{ padding: '20px 28px 14px', borderBottom: '1px solid var(--border-color)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
-          <SmartListIcon list="review" className="h-5 w-5" />
-          <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, letterSpacing: '-0.01em', color: 'var(--text-primary)' }}>
-            Review
-          </h1>
+      <PageHeader
+        title="Review"
+        icon={<SmartListIcon list="review" className="h-5 w-5" />}
+        subtitle={
+          <>
+            Click a project to review tasks in place. Press{' '}
+            <kbd
+              style={{
+                fontFamily: '"SF Mono", ui-monospace, Menlo, Consolas, monospace',
+                fontSize: 'var(--type-caption-size)',
+                padding: '1px 5px',
+                borderRadius: 3,
+                background: 'var(--bg-hover)',
+                border: '1px solid var(--border-color)',
+              }}
+            >
+              R
+            </kbd>{' '}
+            to mark reviewed.
+          </>
+        }
+        actions={
           <span
             style={{
-              fontSize: 11,
+              fontSize: 'var(--type-chip-size)',
               fontWeight: 600,
               padding: '2px 8px',
               borderRadius: 999,
@@ -225,24 +242,9 @@ export function ReviewView() {
           >
             {remaining} due
           </span>
-        </div>
-        <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-          Click a project to review tasks in place. Press{' '}
-          <kbd
-            style={{
-              fontFamily: '"SF Mono", ui-monospace, Menlo, Consolas, monospace',
-              fontSize: 'var(--type-caption-size)',
-              padding: '1px 5px',
-              borderRadius: 3,
-              background: 'var(--bg-hover)',
-              border: '1px solid var(--border-color)',
-            }}
-          >
-            R
-          </kbd>{' '}
-          to mark reviewed.
-        </div>
-
+        }
+      />
+      <div className="px-6 pb-3.5" style={{ borderBottom: '1px solid var(--border-color)' }}>
         {/* Tabs */}
         <div style={{ display: 'flex', gap: 6, marginTop: 12 }} role="tablist">
           <TabButton active={tab === 'due'} onClick={() => setTab('due')} count={remaining}>

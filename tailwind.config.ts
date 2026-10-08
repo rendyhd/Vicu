@@ -28,6 +28,8 @@ const config: Config = {
         enter: 'var(--ease-enter)',
         exit: 'var(--ease-exit)',
       },
+      // The reading column every view sits in (ContentArea.tsx).
+      maxWidth: { reading: '760px' },
       fontSize: tokenTheme.fontSize,
       borderRadius: tokenTheme.borderRadius,
       opacity: tokenTheme.opacity,

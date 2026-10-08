@@ -11,6 +11,7 @@ import { ListSectionHeader } from '@/components/task-list/ListSectionHeader'
 import { TaskCheckbox } from '@/components/task-list/TaskCheckbox'
 import { Inbox } from 'lucide-react'
 import { EmptyState } from '@/components/shared/EmptyState'
+import { PageHeader } from '@/components/shared/PageHeader'
 import { SmartListIcon } from '@/components/shared/SmartListIcon'
 import type { Task } from '@/lib/vikunja-types'
 
@@ -88,14 +89,11 @@ export function LogbookView() {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center gap-2.5 px-6 pb-2 pt-6">
-        <SmartListIcon list="logbook" className="h-5 w-5" />
-        <h1 className="text-xl font-bold text-[var(--text-primary)]">Logbook</h1>
-      </div>
+      <PageHeader title="Logbook" icon={<SmartListIcon list="logbook" className="h-5 w-5" />} />
 
       <div ref={scrollRef} className="flex-1 overflow-y-auto">
         {visibleTasks.length === 0 && !hasMore && !isLoadingMore && !moreError ? (
-          <EmptyState icon={Inbox} title="No completed tasks" subtitle="Completed tasks appear here" />
+          <EmptyState icon={Inbox} identity="logbook" title="No completed tasks" subtitle="Completed tasks appear here" />
         ) : (
           visibleTasks.map((task, index) => {
             // Newest first: a heading wherever the day group changes.

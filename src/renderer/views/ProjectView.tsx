@@ -206,6 +206,7 @@ export function ProjectView() {
       projectId={pid}
       sortable
       viewId={viewId}
+      empty={tasks.length === 0 && !hasSections}
       emptyTitle="No tasks in this project"
       emptySubtitle="Create a new task to get started"
       insertIndex={parentInsertIndex}

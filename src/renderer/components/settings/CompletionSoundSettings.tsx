@@ -1,3 +1,5 @@
+import { Button } from '@/components/shared/Button'
+import { Checkbox } from '@/components/shared/Checkbox'
 import { useEffect, useState } from 'react'
 import { api } from '@/lib/api'
 import { cn } from '@/lib/cn'
@@ -67,11 +69,9 @@ export function CompletionSoundSettings({ config, onChange }: Props) {
 
       <div className="space-y-3">
         <label className="flex cursor-pointer items-center gap-2">
-          <input
-            type="checkbox"
+          <Checkbox
             checked={enabled}
             onChange={(e) => onChange({ task_completion_sound_enabled: e.target.checked })}
-            className="h-4 w-4 rounded-control border-[var(--border-color)] accent-accent-blue"
           />
           <span className="text-sm text-[var(--text-primary)]">
             Play a sound when completing a task
@@ -90,32 +90,17 @@ export function CompletionSoundSettings({ config, onChange }: Props) {
           </div>
 
           <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={handleChooseFile}
-              disabled={busy}
-              className="rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-1.5 text-xs font-medium text-[var(--text-primary)] transition-colors hover:border-accent-blue hover:text-accent-blue disabled:opacity-50"
-            >
+            <Button variant="secondary" onClick={handleChooseFile} disabled={busy}>
               Choose file...
-            </button>
+            </Button>
             {info && !info.isDefault && (
-              <button
-                type="button"
-                onClick={handleReset}
-                disabled={busy}
-                className="rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-1.5 text-xs font-medium text-[var(--text-primary)] transition-colors hover:border-accent-blue hover:text-accent-blue disabled:opacity-50"
-              >
+              <Button variant="secondary" onClick={handleReset} disabled={busy}>
                 Reset to default
-              </button>
+              </Button>
             )}
-            <button
-              type="button"
-              onClick={handleTest}
-              disabled={busy}
-              className="rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-1.5 text-xs font-medium text-[var(--text-primary)] transition-colors hover:border-accent-blue hover:text-accent-blue disabled:opacity-50"
-            >
+            <Button variant="secondary" onClick={handleTest} disabled={busy}>
               Test
-            </button>
+            </Button>
           </div>
 
           {error && <p className="text-xs text-danger">{error}</p>}

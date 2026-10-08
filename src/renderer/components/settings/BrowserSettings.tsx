@@ -1,3 +1,4 @@
+import { Button } from '@/components/shared/Button'
 import { useState, useEffect, useCallback } from 'react'
 import type { AppConfig } from '@/lib/vikunja-types'
 
@@ -95,14 +96,9 @@ export function BrowserSettings({ config, onChange, disabled }: BrowserSettingsP
                 </div>
               )}
 
-              <button
-                type="button"
-                onClick={handleRegister}
-                disabled={registering}
-                className="rounded-control border border-[var(--border-color)] px-4 py-2 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-hover)] disabled:opacity-50"
-              >
+              <Button variant="secondary" onClick={handleRegister} disabled={registering}>
                 {registering ? 'Registering...' : 'Re-register Bridge'}
-              </button>
+              </Button>
 
               <div>
                 <button

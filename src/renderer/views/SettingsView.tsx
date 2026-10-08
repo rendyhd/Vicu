@@ -4,6 +4,9 @@ import { useNavigate, useRouter } from '@tanstack/react-router'
 import { api, type VikunjaUser } from '@/lib/api'
 import { APP_CONFIG_QUERY_KEY } from '@/hooks/use-app-config'
 import { cn } from '@/lib/cn'
+import { Checkbox } from '@/components/shared/Checkbox'
+import { Button } from '@/components/shared/Button'
+import { PageHeader } from '@/components/shared/PageHeader'
 import { applyTheme } from '@/lib/theme'
 import { TokenPermissionsInfo } from '@/views/SetupView'
 import { QuickEntrySettings } from '@/components/settings/QuickEntrySettings'
@@ -34,6 +37,8 @@ export function SettingsView() {
   const [activeTab, setActiveTab] = useState<SettingsTab>('general')
   const [url, setUrl] = useState('')
   const [token, setToken] = useState('')
+  // The token itself never reaches this page: only whether one is saved, so Test Connection can use it.
+  const [hasSavedToken, setHasSavedToken] = useState(false)
   const [showToken, setShowToken] = useState(false)
   const [inboxProjectId, setInboxProjectId] = useState(0)
   const [theme, setTheme] = useState<ThemeOption>('system')
@@ -87,6 +92,9 @@ export function SettingsView() {
         setInboxProjectId(config.inbox_project_id || 0)
         setTheme(config.theme || 'system')
         setAuthMethod(config.auth_method || 'api_token')
+        if (!config.auth_method || config.auth_method === 'api_token') {
+          api.checkAuth().then((auth) => setHasSavedToken(auth.status === 'authenticated')).catch(() => {})
+        }
 
         if (config.auth_method === 'password' || config.auth_method === 'oidc') {
           api.getUser().then((user) => {
@@ -120,6 +128,8 @@ export function SettingsView() {
     if (result.success) {
       setTestStatus('success')
       setProjects(result.data)
+      // Nothing was typed: the saved token passed, so the connection is already what is saved.
+      if (!token) return
       // Save the connection after a successful test. A new URL or token can be another account,
       // so it goes through saveConnectionConfig (which also resets what belonged to the previous
       // account), not through the preference patch.
@@ -205,10 +215,8 @@ export function SettingsView() {
   }
 
   return (
-    <div className="flex h-full flex-col overflow-y-auto bg-[var(--bg-secondary)]">
-      <div className="px-6 pb-2 pt-6">
-        <h1 className="text-xl font-bold text-[var(--text-primary)]">Settings</h1>
-      </div>
+    <div className="flex h-full flex-col overflow-y-auto bg-[var(--bg-primary)]">
+      <PageHeader title="Settings" />
 
       {/* Tab bar */}
       <div className="flex gap-1 border-b border-[var(--border-color)] px-6">
@@ -271,14 +279,9 @@ export function SettingsView() {
                 </span>
               </div>
 
-              <button
-                type="button"
-                onClick={handleLogout}
-                disabled={signingOut}
-                className="rounded-control border border-danger/30 px-4 py-2 text-sm font-medium text-danger transition-colors hover:bg-danger/10 disabled:cursor-wait disabled:opacity-60"
-              >
+              <Button variant="secondary" danger onClick={handleLogout} disabled={signingOut}>
                 {signingOut ? 'Syncing...' : 'Sign Out'}
-              </button>
+              </Button>
             </div>
           ) : (
             <div className="space-y-3">
@@ -309,25 +312,25 @@ export function SettingsView() {
                   <button
                     type="button"
                     onClick={() => setShowToken(!showToken)}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded-control px-2 py-0.5 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded-control px-2 py-0.5 text-meta text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                   >
                     {showToken ? 'Hide' : 'Show'}
                   </button>
                 </div>
+                {hasSavedToken && (
+                  <p className="mt-1 text-meta text-[var(--text-secondary)]">
+                    Uses the saved token. Paste a new one to replace it.
+                  </p>
+                )}
               </div>
 
-              <button
-                type="button"
+              <Button
+                variant="primary"
                 onClick={handleTestConnection}
-                disabled={!url || !token || testStatus === 'testing'}
-                className={cn(
-                  'rounded-control px-4 py-2 text-sm font-medium transition-colors',
-                  'bg-accent-fill text-on-accent hover:bg-accent-fill/90',
-                  'disabled:cursor-not-allowed disabled:opacity-50'
-                )}
+                disabled={!url || (!token && !hasSavedToken) || testStatus === 'testing'}
               >
                 {testStatus === 'testing' ? 'Testing...' : 'Test Connection'}
-              </button>
+              </Button>
 
               {testStatus === 'success' && (
                 <p className="text-xs text-status-done">Connected successfully</p>
@@ -337,14 +340,9 @@ export function SettingsView() {
               )}
 
               <div className="border-t border-[var(--border-color)] pt-3">
-                <button
-                  type="button"
-                  onClick={handleLogout}
-                  disabled={signingOut}
-                  className="rounded-control border border-danger/30 px-4 py-2 text-sm font-medium text-danger transition-colors hover:bg-danger/10 disabled:cursor-wait disabled:opacity-60"
-                >
+                <Button variant="secondary" danger onClick={handleLogout} disabled={signingOut}>
                   {signingOut ? 'Syncing...' : 'Disconnect'}
-                </button>
+                </Button>
               </div>
             </div>
           )}
@@ -358,11 +356,9 @@ export function SettingsView() {
             {launchOnStartupSupported && (
               <>
                 <label className="flex cursor-pointer items-center gap-2">
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     checked={fullConfig?.launch_on_startup ?? false}
                     onChange={(e) => handleQuickEntryChange({ launch_on_startup: e.target.checked })}
-                    className="h-4 w-4 rounded-control border-[var(--border-color)] accent-accent-blue"
                   />
                   <span className="text-sm text-[var(--text-primary)]">
                     Launch on startup
@@ -372,11 +368,9 @@ export function SettingsView() {
 
                 {fullConfig?.launch_on_startup === true && (
                   <label className="ml-6 flex cursor-pointer items-center gap-2">
-                    <input
-                      type="checkbox"
+                    <Checkbox
                       checked={fullConfig?.start_hidden ?? false}
                       onChange={(e) => handleQuickEntryChange({ start_hidden: e.target.checked })}
-                      className="h-4 w-4 rounded-control border-[var(--border-color)] accent-accent-blue"
                     />
                     <span className="text-sm text-[var(--text-primary)]">
                       Start hidden
@@ -388,11 +382,9 @@ export function SettingsView() {
             )}
 
             <label className="flex cursor-pointer items-center gap-2">
-              <input
-                type="checkbox"
+              <Checkbox
                 checked={fullConfig?.confirm_before_delete !== false}
                 onChange={(e) => handleQuickEntryChange({ confirm_before_delete: e.target.checked })}
-                className="h-4 w-4 rounded-control border-[var(--border-color)] accent-accent-blue"
               />
               <span className="text-sm text-[var(--text-primary)]">
                 Confirm before deleting
@@ -419,11 +411,9 @@ export function SettingsView() {
             </label>
 
             <label className="flex cursor-pointer items-center gap-2">
-              <input
-                type="checkbox"
+              <Checkbox
                 checked={fullConfig?.show_today_overdue_badge === true}
                 onChange={(e) => handleQuickEntryChange({ show_today_overdue_badge: e.target.checked })}
-                className="h-4 w-4 rounded-control border-[var(--border-color)] accent-accent-blue"
               />
               <span className="text-sm text-[var(--text-primary)]">
                 Show today &amp; overdue count on app icon
@@ -579,11 +569,9 @@ export function SettingsView() {
 
           <div className="space-y-3">
             <label className="flex cursor-pointer items-center gap-2">
-              <input
-                type="checkbox"
+              <Checkbox
                 checked={fullConfig?.nlp_enabled !== false}
                 onChange={(e) => handleQuickEntryChange({ nlp_enabled: e.target.checked })}
-                className="h-4 w-4 rounded-control border-[var(--border-color)] accent-accent-blue"
               />
               <div>
                 <span className="text-sm text-[var(--text-primary)]">
@@ -651,11 +639,9 @@ export function SettingsView() {
 
                 {/* ! → today shortcut */}
                 <label className="flex cursor-pointer items-center gap-2">
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     checked={fullConfig?.exclamation_today !== false}
                     onChange={(e) => handleQuickEntryChange({ exclamation_today: e.target.checked })}
-                    className="h-4 w-4 rounded-control border-[var(--border-color)] accent-accent-blue"
                   />
                   <div>
                     <span className="text-sm text-[var(--text-primary)]">

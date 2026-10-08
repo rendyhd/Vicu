@@ -1,3 +1,5 @@
+import { Button } from '@/components/shared/Button'
+import { Checkbox } from '@/components/shared/Checkbox'
 import { useEffect, useMemo, useState } from 'react'
 import { Archive, Folder, Pencil, Plus, RefreshCw, RotateCcw, Trash2, X } from 'lucide-react'
 import { useAppConfig } from '@/hooks/use-app-config'
@@ -101,8 +103,8 @@ function ProjectEditor({
           {mutation.error && <p className="text-xs text-danger">{mutation.error.message}</p>}
         </div>
         <div className="flex justify-end gap-2 border-t border-[var(--border-color)] px-5 py-3">
-          <button type="button" onClick={onClose} className="rounded-control border border-[var(--border-color)] px-4 py-1.5 text-xs text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]">Cancel</button>
-          <button type="button" onClick={save} disabled={!title.trim() || mutation.isPending} className="rounded-control bg-accent-fill px-4 py-1.5 text-xs font-medium text-on-accent disabled:opacity-50">{mutation.isPending ? 'Saving…' : project ? 'Save' : 'Create'}</button>
+          <Button variant="secondary" onClick={onClose}>Cancel</Button>
+          <Button variant="primary" onClick={save} disabled={!title.trim() || mutation.isPending}>{mutation.isPending ? 'Saving…' : project ? 'Save' : 'Create'}</Button>
         </div>
       </div>
     </div>
@@ -182,10 +184,10 @@ export function ProjectSettings() {
             <p className="text-xs text-[var(--text-secondary)]">Archive projects without deleting their tasks.</p>
           </div>
           <button type="button" title="Refresh projects" onClick={() => refetch()} disabled={isFetching} className="rounded-control p-2 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] disabled:opacity-50"><RefreshCw className={cn('h-4 w-4', isFetching && 'animate-spin')} /></button>
-          <button type="button" onClick={() => setEditing(null)} className="flex items-center gap-1.5 rounded-control bg-accent-fill px-3 py-1.5 text-xs font-medium text-on-accent hover:bg-accent-fill/90"><Plus className="h-3.5 w-3.5" />New project</button>
+          <Button variant="primary" onClick={() => setEditing(null)}><Plus className="h-3.5 w-3.5" />New project</Button>
         </div>
         <label className="flex cursor-pointer items-center gap-2 border-b border-[var(--border-color)] px-4 py-2.5">
-          <input type="checkbox" checked={showArchived} onChange={(event) => setShowArchived(event.target.checked)} className="h-4 w-4 rounded-control border-[var(--border-color)] accent-accent-blue" />
+          <Checkbox checked={showArchived} onChange={(event) => setShowArchived(event.target.checked)} />
           <span className="text-sm text-[var(--text-primary)]">Show archived projects</span>
           <span className="text-xs text-[var(--text-secondary)]">({data?.archived.length ?? 0})</span>
         </label>

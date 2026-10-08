@@ -1,3 +1,5 @@
+import { Checkbox } from '@/components/shared/Checkbox'
+import { Switch } from '@/components/shared/Switch'
 import { isRoutinesEnabled, type AppConfig } from '@/lib/vikunja-types'
 
 interface RoutinesSettingsPanelProps {
@@ -18,22 +20,19 @@ export function RoutinesSettingsPanel({ config, onChange }: RoutinesSettingsPane
 
       <div className="space-y-3">
         <label className="flex cursor-pointer items-center gap-2">
-          <input
-            type="checkbox"
+          <Switch
             checked={enabled}
-            onChange={(e) => onChange({ routines_enabled: e.target.checked })}
-            className="h-4 w-4 rounded-control border-[var(--border-color)] accent-accent-blue"
+            onCheckedChange={(checked) => onChange({ routines_enabled: checked })}
           />
           <span className="text-sm text-[var(--text-primary)]">Enable routines</span>
         </label>
 
         <label className="flex cursor-pointer items-start gap-2">
-          <input
-            type="checkbox"
+          <Checkbox
             checked={inToday}
             disabled={!enabled}
             onChange={(e) => onChange({ routines_in_today: e.target.checked })}
-            className="mt-0.5 h-4 w-4 rounded-control border-[var(--border-color)] accent-accent-blue disabled:opacity-50"
+            className="mt-0.5"
           />
           <div>
             <div className="text-sm text-[var(--text-primary)]">Show routines in Today</div>

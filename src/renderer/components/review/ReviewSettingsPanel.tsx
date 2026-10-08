@@ -1,3 +1,5 @@
+import { Checkbox } from '@/components/shared/Checkbox'
+import { Switch } from '@/components/shared/Switch'
 import type { AppConfig } from '@/lib/vikunja-types'
 
 interface ReviewSettingsPanelProps {
@@ -23,11 +25,9 @@ export function ReviewSettingsPanel({ config, onChange }: ReviewSettingsPanelPro
 
       <div className="space-y-3">
         <label className="flex cursor-pointer items-center gap-2">
-          <input
-            type="checkbox"
+          <Switch
             checked={review.enabled}
-            onChange={(e) => update({ enabled: e.target.checked })}
-            className="h-4 w-4 rounded-control border-[var(--border-color)] accent-accent-blue"
+            onCheckedChange={(checked) => update({ enabled: checked })}
           />
           <span className="text-sm text-[var(--text-primary)]">Enable project review tracking</span>
         </label>
@@ -54,12 +54,11 @@ export function ReviewSettingsPanel({ config, onChange }: ReviewSettingsPanelPro
         </div>
 
         <label className="flex cursor-pointer items-start gap-2">
-          <input
-            type="checkbox"
+          <Checkbox
             checked={review.exclude_inbox}
             disabled={!review.enabled}
             onChange={(e) => update({ exclude_inbox: e.target.checked })}
-            className="mt-0.5 h-4 w-4 rounded-control border-[var(--border-color)] accent-accent-blue disabled:opacity-50"
+            className="mt-0.5"
           />
           <div>
             <div className="text-sm text-[var(--text-primary)]">Exclude Inbox from review list</div>

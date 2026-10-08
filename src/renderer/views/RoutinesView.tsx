@@ -1,3 +1,4 @@
+import { Checkbox } from '@/components/shared/Checkbox'
 import { useMemo, useState } from 'react'
 import { formatDateChip, formatMinutesOfDay } from '@/lib/date-utils'
 import { useDateFormat } from '@/hooks/use-date-format'
@@ -19,6 +20,8 @@ import {
 } from 'lucide-react'
 import { RoutineTodaySection } from '@/components/routines/RoutineTodaySection'
 import { SmartListIcon } from '@/components/shared/SmartListIcon'
+import { PageHeader } from '@/components/shared/PageHeader'
+import { Button } from '@/components/shared/Button'
 import { useRoutineHistory, useRoutines, type RoutineDraft } from '@/hooks/use-routines'
 import {
   csvForRoutines,
@@ -235,7 +238,7 @@ function RoutineEditor({
                     {draft.slots.length > 1 && <button type="button" onClick={() => setDraft({ ...draft, slots: draft.slots.filter((item) => item.id !== slot.id) })} className="p-1 text-[var(--text-secondary)] hover:text-danger"><X className="h-4 w-4" /></button>}
                   </div>
                   <div className="mt-2 flex items-center gap-4">
-                    <label className="flex items-center gap-2 text-xs text-[var(--text-secondary)]"><input type="checkbox" checked={slot.reminderEnabled} onChange={(event) => updateSlot(slot.id, { reminderEnabled: event.target.checked })} /><Bell className="h-3.5 w-3.5" /> Remind me</label>
+                    <label className="flex items-center gap-2 text-xs text-[var(--text-secondary)]"><Checkbox checked={slot.reminderEnabled} onChange={(event) => updateSlot(slot.id, { reminderEnabled: event.target.checked })} /><Bell className="h-3.5 w-3.5" /> Remind me</label>
                     {slot.reminderEnabled && <label className="flex items-center gap-2 text-xs text-[var(--text-secondary)]">Follow up<select className="h-7 rounded-control border border-[var(--border-color)] bg-[var(--bg-primary)] px-1 text-[var(--text-primary)]" value={slot.followUpMinutes} onChange={(event) => updateSlot(slot.id, { followUpMinutes: Number(event.target.value) })}><option value={0}>Off</option><option value={15}>15 min</option><option value={30}>30 min</option><option value={60}>1 hour</option></select></label>}
                   </div>
                 </div>
@@ -330,15 +333,20 @@ function RoutinesContent() {
 
   return (
     <div className="flex h-full min-w-0 flex-1 flex-col bg-[var(--bg-primary)]">
-      <header className="flex h-16 shrink-0 items-center gap-3 border-b border-[var(--border-color)] px-6">
-        <div className="flex h-9 w-9 items-center justify-center rounded-card bg-[var(--bg-hover)]"><SmartListIcon list="routines" className="h-5 w-5" /></div>
-        <div className="min-w-0 flex-1"><h1 className="text-xl font-semibold text-[var(--text-primary)]">Routines</h1><p className="text-xs text-[var(--text-secondary)]">Daily health and recurring home rhythms</p></div>
-        <button type="button" onClick={exportCsv} disabled={routines.carriers.length === 0} className="flex h-9 items-center gap-2 rounded-control border border-[var(--border-color)] px-3 text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--bg-hover)] disabled:opacity-40"><Download className="h-4 w-4" /> Export</button>
-        <button type="button" onClick={() => setEditor('new')} className="flex h-9 items-center gap-2 rounded-control bg-accent-fill px-3 text-xs font-semibold text-on-accent"><Plus className="h-4 w-4" /> New routine</button>
-      </header>
+      <PageHeader
+        title="Routines"
+        subtitle="Daily health and recurring home rhythms"
+        icon={<SmartListIcon list="routines" className="h-5 w-5" />}
+        actions={
+          <>
+            <Button variant="secondary" onClick={exportCsv} disabled={routines.carriers.length === 0}><Download className="h-4 w-4" /> Export</Button>
+            <Button variant="primary" onClick={() => setEditor('new')}><Plus className="h-4 w-4" /> New routine</Button>
+          </>
+        }
+      />
 
       <div className="min-h-0 flex-1 overflow-y-auto pb-10">
-        <div className="mx-auto max-w-3xl">
+        <div>
           <RoutineTodaySection showEmpty />
 
           <section className="px-6 pt-6">
