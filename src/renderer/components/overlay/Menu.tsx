@@ -2,6 +2,7 @@ import {
   createContext,
   forwardRef,
   useContext,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -17,7 +18,7 @@ import { Popover, type PopoverCloseReason } from './Popover'
 import { OPTION_SELECTOR } from './popover-logic'
 
 interface MenuContextValue {
-  /** Closes the menu and puts focus back where it was. */
+  /** Closes the menu (focus goes back to where it was). */
   close: () => void
 }
 
@@ -52,16 +53,23 @@ export function Menu({ anchorRef, anchorPoint, label, onClose, placement, classN
   // A menu opened at a point has no button to return to: it gives focus back to what had it.
   const [opener] = useState<Element | null>(() => (typeof document === 'undefined' ? null : document.activeElement))
 
-  const handleClose = (reason?: PopoverCloseReason) => {
-    if (anchorPoint && opener instanceof HTMLElement && opener.isConnected && opener !== document.body) {
-      opener.focus({ preventScroll: true })
+  // When the menu goes away (a choice, Escape, a picker inside it) focus goes back to what had it,
+  // unless it was already moved somewhere else on purpose (a dialog the choice opened).
+  useLayoutEffect(() => {
+    if (!anchorPoint) return
+    return () => {
+      const active = document.activeElement
+      const lost = !active || active === document.body || !!active.closest('[role="menu"]')
+      if (lost && opener instanceof HTMLElement && opener.isConnected && opener !== document.body) {
+        opener.focus({ preventScroll: true })
+      }
     }
-    onClose(reason)
-  }
-  const handleCloseRef = useRef(handleClose)
-  handleCloseRef.current = handleClose
+    // The point is fixed for the life of the menu; the opener is read once.
+  }, [])
 
-  const context = useMemo<MenuContextValue>(() => ({ close: () => handleCloseRef.current() }), [])
+  const closeRef = useRef(onClose)
+  closeRef.current = onClose
+  const context = useMemo<MenuContextValue>(() => ({ close: () => closeRef.current() }), [])
 
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     const target = event.target as HTMLElement
@@ -89,7 +97,7 @@ export function Menu({ anchorRef, anchorPoint, label, onClose, placement, classN
   const popover = (
     <Popover
       anchorRef={(anchorPoint ? pointRef : anchorRef) as RefObject<HTMLElement | null>}
-      onClose={handleClose}
+      onClose={onClose}
       label={label}
       role="menu"
       initialFocus={FIRST_ITEM}

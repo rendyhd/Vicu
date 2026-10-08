@@ -144,6 +144,9 @@ export function Popover({
     if (next === null && current >= 0 && isTypeaheadKey(event.nativeEvent, typeahead.current.buffer)) {
       typeahead.current = typeaheadAppend(typeahead.current, event.key, Date.now())
       next = typeaheadMatch(options.map(optionLabel), current, typeahead.current.buffer)
+      // A space inside a search belongs to the search even when nothing matches: it must not
+      // choose the focused option.
+      if (next === null) event.preventDefault()
     }
     if (next === null) return
     event.preventDefault()

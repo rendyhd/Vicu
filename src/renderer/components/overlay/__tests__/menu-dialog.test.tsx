@@ -111,3 +111,21 @@ describe('the Dialog primitive', () => {
     expect(read('components/shared/CustomListDialog.tsx')).toContain('labelledBy=')
   })
 })
+
+describe('the task context menu', () => {
+  const source = read('components/task-list/TaskContextMenu.tsx')
+
+  it('is a Menu at the pointer, not a hand-placed div', () => {
+    expect(source).toContain("from '../overlay/Menu'")
+    expect(source).toMatch(/<Menu\s/)
+    expect(source).toContain('anchorPoint')
+    expect(source).not.toContain('fixed z-50')
+    expect(source).not.toContain('mousedown')
+  })
+
+  it('shows priorities as radios with the priority mark and only real shortcuts', () => {
+    expect(source).toContain('MenuRadioItem')
+    expect(source).toContain('PriorityMark')
+    expect([...source.matchAll(/hint\('([^']+)'\)/g)].map((m) => m[1]).sort()).toEqual(['Delete', 'Mod+C', 'Mod+K', 'Mod+T'])
+  })
+})

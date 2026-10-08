@@ -1,6 +1,20 @@
-import { useState, useRef, useEffect, useLayoutEffect, useMemo } from 'react'
+import { useState, useRef, useMemo } from 'react'
 import type { PopoverCloseReason } from '../overlay/Popover'
-import { Check, Copy, CheckCircle2, Trash2 } from 'lucide-react'
+import {
+  CalendarClock,
+  CalendarRange,
+  CalendarX,
+  CheckCircle2,
+  Copy,
+  FlagOff,
+  Folder,
+  FolderInput,
+  Star,
+  Sun,
+  Sunrise,
+  Tag,
+  Trash2,
+} from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { isNullDate } from '@/lib/date-utils'
 import { normalizeHex, NULL_DATE } from '@/lib/constants'
@@ -16,6 +30,8 @@ import { ProjectPickerPopover } from './ProjectPickerPopover'
 import { LabelPickerPopover } from './LabelPickerPopover'
 import { PRIORITY_OPTIONS } from './PriorityPickerPopover'
 import { PriorityMark } from '../shared/PriorityMark'
+import { Menu, MenuHeading, MenuItem, MenuRadioItem, MenuSeparator } from '../overlay/Menu'
+import { shortcutHint } from '@/lib/shortcut-hint'
 
 interface TaskContextMenuProps {
   /** The right-clicked row — guarantees at least one target if the cache can't resolve the selection. */
@@ -27,15 +43,7 @@ interface TaskContextMenuProps {
 
 type SubMenu = 'date' | 'project' | 'label' | null
 
-const itemClass =
-  'flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-[var(--text-primary)] hover:bg-[var(--bg-hover)]'
-
-function Divider() {
-  return <div className="my-1 h-px bg-[var(--border-color)]" />
-}
-
 export function TaskContextMenu({ fallbackTask, x, y, onClose }: TaskContextMenuProps) {
-  const menuRef = useRef<HTMLDivElement>(null)
   const scheduleRef = useRef<HTMLButtonElement>(null)
   const projectRef = useRef<HTMLButtonElement>(null)
   const labelRef = useRef<HTMLButtonElement>(null)
@@ -54,44 +62,6 @@ export function TaskContextMenu({ fallbackTask, x, y, onClose }: TaskContextMenu
   const actions = useTaskActions(tasks)
 
   const [sub, setSub] = useState<SubMenu>(null)
-  const [pos, setPos] = useState({ left: x, top: y })
-  const [measured, setMeasured] = useState(false)
-
-  // Position at the cursor, flipping left/up when the menu would overflow.
-  // Rendered hidden until measured so it never flashes at an overflowing spot.
-  useLayoutEffect(() => {
-    const el = menuRef.current
-    if (!el) return
-    const { width, height } = el.getBoundingClientRect()
-    const m = 8
-    let left = x
-    let top = y
-    if (x + width > window.innerWidth - m) left = Math.max(m, x - width)
-    if (y + height > window.innerHeight - m) top = Math.max(m, y - height)
-    setPos({ left, top })
-    setMeasured(true)
-  }, [x, y])
-
-  // Close on outside mousedown + Escape. Using mousedown (the same phase the
-  // nested popovers use) means a click inside an open popover — which lives
-  // inside menuRef — is ignored here, so the popover alone decides.
-  useEffect(() => {
-    const onDown = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) onClose()
-    }
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.stopPropagation()
-        onClose()
-      }
-    }
-    document.addEventListener('mousedown', onDown)
-    document.addEventListener('keydown', onKey)
-    return () => {
-      document.removeEventListener('mousedown', onDown)
-      document.removeEventListener('keydown', onKey)
-    }
-  }, [onClose])
 
   // A picker closes the menu too once something was chosen. When the browser dismissed the picker
   // (Escape, or a press that landed elsewhere) only the picker closes: the press may be on a menu
@@ -99,11 +69,6 @@ export function TaskContextMenu({ fallbackTask, x, y, onClose }: TaskContextMenu
   const closeSubAndMenu = (reason?: PopoverCloseReason) => {
     setSub(null)
     if (reason !== 'dismiss') onClose()
-  }
-
-  const run = (fn: () => void) => () => {
-    fn()
-    onClose()
   }
 
   const urgencyImportant = config?.urgency_mode === 'important'
@@ -124,193 +89,163 @@ export function TaskContextMenu({ fallbackTask, x, y, onClose }: TaskContextMenu
   const currentProjectId = allSameProject ? tasks[0].project_id : undefined
   const datePickerCurrent = tasks.length === 1 ? tasks[0].due_date : NULL_DATE
 
+  const hint = (spec: string) => shortcutHint(spec, window.api.platform === 'darwin')
+
   return (
-    <div
-      ref={menuRef}
-      className="fixed z-50 min-w-[200px] rounded-popover border border-[var(--border-color)] bg-[var(--bg-primary)] py-1 shadow-lg"
-      style={{ left: pos.left, top: pos.top, visibility: measured ? 'visible' : 'hidden' }}
-      onContextMenu={(e) => e.preventDefault()}
+    <Menu
+      anchorPoint={{ x, y }}
+      label={multi ? `${tasks.length} tasks` : 'Task actions'}
+      onClose={onClose}
     >
-      {multi && (
-        <>
-          <div className="px-3 py-1 text-caption font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
-            {tasks.length} tasks
-          </div>
-          <Divider />
-        </>
+      {multi && <MenuHeading>{tasks.length} tasks</MenuHeading>}
+
+      {/* When: the top entry follows the "What does urgent mean?" setting */}
+      {urgencyImportant ? (
+        <MenuItem icon={<Star />} onSelect={actions.setUrgentPriority}>
+          Set Important
+        </MenuItem>
+      ) : (
+        <MenuItem icon={<Sun />} shortcut={hint('Mod+T')} onSelect={actions.setDueToday}>
+          Set Today
+        </MenuItem>
       )}
-
-      {/* Adaptive top item — driven by the "What does urgent mean?" setting */}
-      <button
-        type="button"
-        className={itemClass}
-        onClick={run(urgencyImportant ? actions.setUrgentPriority : actions.setDueToday)}
-      >
-        {urgencyImportant ? 'Set Important' : 'Set Today'}
-      </button>
-
-      <Divider />
-
-      {/* Date */}
-      <button type="button" className={itemClass} onClick={run(actions.postponeTomorrow)}>
+      <MenuItem icon={<Sunrise />} onSelect={actions.postponeTomorrow}>
         Postpone to tomorrow
-      </button>
-      <button type="button" className={itemClass} onClick={run(actions.postponeNextMonday)}>
+      </MenuItem>
+      <MenuItem icon={<CalendarRange />} onSelect={actions.postponeNextMonday}>
         Postpone to next Monday
-      </button>
-      <div className="relative">
-        <button
-          ref={scheduleRef}
-          type="button"
-          aria-haspopup="dialog"
-          aria-expanded={sub === 'date'}
-          className={itemClass}
-          onClick={() => setSub((s) => (s === 'date' ? null : 'date'))}
-        >
-          Schedule…
-        </button>
-        {sub === 'date' && (
-          <DatePickerPopover
-            anchorRef={scheduleRef}
-            placement="right-start"
-            currentDate={datePickerCurrent}
-            onDateChange={actions.setDueDateIso}
-            onClose={closeSubAndMenu}
-          />
-        )}
-      </div>
+      </MenuItem>
+      <MenuItem
+        ref={scheduleRef}
+        icon={<CalendarClock />}
+        popup="dialog"
+        expanded={sub === 'date'}
+        onSelect={() => setSub((s) => (s === 'date' ? null : 'date'))}
+      >
+        Schedule…
+      </MenuItem>
+      {sub === 'date' && (
+        <DatePickerPopover
+          anchorRef={scheduleRef}
+          placement="right-start"
+          currentDate={datePickerCurrent}
+          onDateChange={actions.setDueDateIso}
+          onClose={closeSubAndMenu}
+        />
+      )}
       {anyHasDate && (
-        <button type="button" className={itemClass} onClick={run(actions.clearDate)}>
+        <MenuItem icon={<CalendarX />} onSelect={actions.clearDate}>
           Clear date
-        </button>
+        </MenuItem>
       )}
 
-      <Divider />
+      <MenuSeparator />
 
-      {/* Priority */}
+      {/* Priority: the current one is the checked radio */}
       {PRIORITY_OPTIONS.filter((o) => o.value > 0).map((option) => (
-        <button
+        <MenuRadioItem
           key={option.value}
-          type="button"
-          className={itemClass}
-          onClick={run(() => actions.setPriority(option.value))}
+          icon={<PriorityMark priority={option.value} decorative />}
+          checked={tasks.every((t) => t.priority === option.value)}
+          onSelect={() => actions.setPriority(option.value)}
         >
-          <PriorityMark priority={option.value} decorative />
-          <span className="min-w-0 flex-1 truncate">{option.label}</span>
-          {tasks.every((t) => t.priority === option.value) && (
-            <Check className="h-3.5 w-3.5 shrink-0 text-[var(--accent-blue)]" />
-          )}
-        </button>
+          {option.label}
+        </MenuRadioItem>
       ))}
       {anyHasPriority && (
-        <button type="button" className={itemClass} onClick={run(actions.clearPriority)}>
-          <span className="h-3.5 w-3.5 shrink-0" />
-          <span className="min-w-0 flex-1 truncate">Clear priority</span>
-        </button>
+        <MenuItem icon={<FlagOff />} onSelect={actions.clearPriority}>
+          Clear priority
+        </MenuItem>
       )}
 
-      <Divider />
+      <MenuSeparator />
 
-      {/* Project */}
+      {/* Tags */}
+      {lastLabel && tasks.some((t) => !(t.labels ?? []).some((l) => l.id === lastLabel.id)) && (
+        <MenuItem
+          icon={
+            <span
+              className="!h-2.5 !w-2.5 rounded-full"
+              style={{ backgroundColor: normalizeHex(lastLabel.hex_color) || 'var(--text-secondary)' }}
+            />
+          }
+          onSelect={() => actions.applyLabel(lastLabel.id)}
+        >
+          {`Apply "${lastLabel.title}"`}
+        </MenuItem>
+      )}
+      <MenuItem
+        ref={labelRef}
+        icon={<Tag />}
+        popup="dialog"
+        expanded={sub === 'label'}
+        onSelect={() => setSub((s) => (s === 'label' ? null : 'label'))}
+      >
+        Apply label…
+      </MenuItem>
+      {sub === 'label' && (
+        <LabelPickerPopover
+          anchorRef={labelRef}
+          placement="right-start"
+          tasks={tasks}
+          onApplied={actions.recordLastLabel}
+          onClose={closeSubAndMenu}
+        />
+      )}
+
+      <MenuSeparator />
+
+      {/* Move */}
       {lastProject && tasks.some((t) => t.project_id !== lastProject.id) && (
-        <button
-          type="button"
-          className={itemClass}
-          onClick={run(() => {
+        <MenuItem
+          icon={<Folder />}
+          onSelect={() => {
             actions.moveToProject(lastProject.id)
             actions.recordLastProject(lastProject.id)
-          })}
+          }}
         >
-          <span className="min-w-0 flex-1 truncate">{`Move to "${lastProject.title}"`}</span>
-        </button>
+          {`Move to "${lastProject.title}"`}
+        </MenuItem>
       )}
-      <div className="relative">
-        <button
-          ref={projectRef}
-          type="button"
-          aria-haspopup="listbox"
-          aria-expanded={sub === 'project'}
-          className={itemClass}
-          onClick={() => setSub((s) => (s === 'project' ? null : 'project'))}
-        >
-          Move to project…
-        </button>
-        {sub === 'project' && (
-          <ProjectPickerPopover
-            anchorRef={projectRef}
-            placement="right-start"
-            currentProjectId={currentProjectId}
-            onSelect={(pid) => {
-              actions.moveToProject(pid)
-              actions.recordLastProject(pid)
-            }}
-            onClose={closeSubAndMenu}
-          />
-        )}
-      </div>
-
-      <Divider />
-
-      {/* Labels */}
-      {lastLabel && tasks.some((t) => !(t.labels ?? []).some((l) => l.id === lastLabel.id)) && (
-        <button
-          type="button"
-          className={itemClass}
-          onClick={run(() => actions.applyLabel(lastLabel.id))}
-        >
-          <span
-            className="h-2.5 w-2.5 shrink-0 rounded-full"
-            style={{ backgroundColor: normalizeHex(lastLabel.hex_color) || 'var(--text-secondary)' }}
-          />
-          <span className="min-w-0 flex-1 truncate">{`Apply "${lastLabel.title}"`}</span>
-        </button>
+      <MenuItem
+        ref={projectRef}
+        icon={<FolderInput />}
+        popup="listbox"
+        expanded={sub === 'project'}
+        onSelect={() => setSub((s) => (s === 'project' ? null : 'project'))}
+      >
+        Move to project…
+      </MenuItem>
+      {sub === 'project' && (
+        <ProjectPickerPopover
+          anchorRef={projectRef}
+          placement="right-start"
+          currentProjectId={currentProjectId}
+          onSelect={(pid) => {
+            actions.moveToProject(pid)
+            actions.recordLastProject(pid)
+          }}
+          onClose={closeSubAndMenu}
+        />
       )}
-      <div className="relative">
-        <button
-          ref={labelRef}
-          type="button"
-          aria-haspopup="dialog"
-          aria-expanded={sub === 'label'}
-          className={itemClass}
-          onClick={() => setSub((s) => (s === 'label' ? null : 'label'))}
-        >
-          Apply label…
-        </button>
-        {sub === 'label' && (
-          <LabelPickerPopover
-            anchorRef={labelRef}
-            placement="right-start"
-            tasks={tasks}
-            onApplied={actions.recordLastLabel}
-            onClose={closeSubAndMenu}
-          />
-        )}
-      </div>
 
-      <Divider />
+      <MenuSeparator />
 
       {/* Bulk-friendly actions */}
-      <button type="button" className={itemClass} onClick={run(actions.copyAll)}>
-        <Copy className="h-3.5 w-3.5 shrink-0 text-[var(--text-secondary)]" />
-        <span className="min-w-0 flex-1 truncate">{multi ? 'Copy tasks' : 'Copy task'}</span>
-      </button>
+      <MenuItem icon={<Copy />} shortcut={hint('Mod+C')} onSelect={actions.copyAll}>
+        {multi ? 'Copy tasks' : 'Copy task'}
+      </MenuItem>
       {anyNotDone && (
-        <button type="button" className={itemClass} onClick={run(actions.completeAll)}>
-          <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-[var(--text-secondary)]" />
-          <span className="min-w-0 flex-1 truncate">{multi ? 'Complete tasks' : 'Complete task'}</span>
-        </button>
+        <MenuItem icon={<CheckCircle2 />} shortcut={hint('Mod+K')} onSelect={actions.completeAll}>
+          {multi ? 'Complete tasks' : 'Complete task'}
+        </MenuItem>
       )}
-      <button
-        type="button"
-        className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-danger hover:bg-danger/10"
-        onClick={() => {
-          onClose()
-          actions.deleteAll()
-        }}
-      >
-        <Trash2 className="h-3.5 w-3.5 shrink-0" />
-        <span className="min-w-0 flex-1 truncate">{multi ? 'Delete tasks' : 'Delete task'}</span>
-      </button>
-    </div>
+
+      <MenuSeparator />
+
+      <MenuItem icon={<Trash2 />} danger shortcut={hint('Delete')} onSelect={actions.deleteAll}>
+        {multi ? 'Delete tasks' : 'Delete task'}
+      </MenuItem>
+    </Menu>
   )
 }
