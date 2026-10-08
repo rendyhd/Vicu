@@ -69,6 +69,7 @@ export interface ElectronAPI {
   updateTaskPosition(taskId: number, viewId: number, position: number): Promise<ApiResult<unknown>>
 
   // Projects
+  countProjectTasks(projectId: number, done: boolean): Promise<ApiResult<number>>
   fetchProjects(includeArchived?: boolean): Promise<ApiResult<Project[]>>
   fetchProject(id: number): Promise<ApiResult<Project>>
   createProject(project: CreateProjectPayload): Promise<ApiResult<Project>>

@@ -6,6 +6,9 @@ import { useCreateProject, useUpdateProject, useDeleteProject, useSetProjectArch
 import { useConfirmDelete } from '@/hooks/use-confirm-delete'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { useSidebarStore } from '@/stores/sidebar-store'
+import { useOpenTaskCounts } from '@/hooks/use-project-progress'
+import { useSidebarCollapsed } from '@/hooks/use-sidebar-collapsed'
+import { useAppConfig } from '@/hooks/use-app-config'
 import { cn } from '@/lib/cn'
 import { api } from '@/lib/api'
 import { ProjectTreeItem } from './ProjectTreeItem'
@@ -169,8 +172,9 @@ export function ProjectTree() {
   const setArchived = useSetProjectArchived()
   const { confirmDelete, dialogProps: deleteDialogProps } = useConfirmDelete()
   const { projectDialogOpen, setProjectDialogOpen } = useSidebarStore()
+  const openCounts = useOpenTaskCounts()
+  const { collapsed, setCollapsed } = useSidebarCollapsed()
 
-  const [inboxProjectId, setInboxProjectId] = useState<number | undefined>()
   const [editingProject, setEditingProject] = useState<Project | null>(null)
   const [archiveTarget, setArchiveTarget] = useState<Project | null>(null)
   const [sectionParent, setSectionParent] = useState<Project | null>(null)
@@ -180,11 +184,9 @@ export function ProjectTree() {
     project: ProjectTreeNode
   } | null>(null)
 
-  useEffect(() => {
-    api.getConfig().then((config) => {
-      if (config?.inbox_project_id) setInboxProjectId(config.inbox_project_id)
-    })
-  }, [])
+  // The tree waits for the config so the Inbox is never drawn (and counted) for a moment.
+  const { data: config, isLoading: configLoading } = useAppConfig()
+  const inboxProjectId = config?.inbox_project_id || undefined
 
   const visibleTree = useMemo(
     () => (inboxProjectId ? data?.tree.filter((n) => n.id !== inboxProjectId) : data?.tree) ?? [],
@@ -209,7 +211,7 @@ export function ProjectTree() {
     setEditingProject(null)
   }
 
-  if (isLoading || !data) {
+  if (isLoading || configLoading || !data) {
     return (
       <div className="px-4 py-2 text-xs text-[var(--text-secondary)]">
         Loading...
@@ -239,7 +241,15 @@ export function ProjectTree() {
       <div className="flex flex-col gap-0.5 px-2">
         <SortableContext items={sortableIds} strategy={verticalListSortingStrategy}>
           {visibleTree.map((node) => (
-            <ProjectTreeItem key={node.id} node={node} siblings={visibleTree} onContextMenu={handleContextMenu} />
+            <ProjectTreeItem
+              key={node.id}
+              node={node}
+              siblings={visibleTree}
+              openCounts={openCounts}
+              collapsed={collapsed}
+              onToggleCollapsed={setCollapsed}
+              onContextMenu={handleContextMenu}
+            />
           ))}
         </SortableContext>
       </div>

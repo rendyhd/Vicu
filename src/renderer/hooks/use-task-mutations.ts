@@ -456,7 +456,7 @@ export function useDeleteTask() {
       }
     },
     onSettled: () => {
-      refreshTasks(qc, [['tasks'], ['view-tasks'], ['section-tasks']])
+      refreshTasks(qc, [['tasks'], ['view-tasks'], ['section-tasks'], ['project-counts']])
       // A deleted task's reminders must not fire.
       api.refreshTaskReminders()
     },
@@ -685,7 +685,7 @@ export function useCompleteTask() {
       }
     },
     onSettled: () => {
-      refreshTasks(qc, [['task-detail']])
+      refreshTasks(qc, [['task-detail'], ['project-counts']])
       // Completing stops a task's reminders; a recurring task's advance to the next ones.
       api.refreshTaskReminders()
     },
@@ -780,7 +780,7 @@ export function useUncompleteTask() {
       }
     },
     onSettled: () => {
-      refreshTasks(qc, [['task-detail']])
+      refreshTasks(qc, [['task-detail'], ['project-counts']])
       api.refreshTaskReminders()
     },
     // Skip list invalidation — the optimistic update keeps the task at its

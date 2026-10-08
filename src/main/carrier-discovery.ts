@@ -42,6 +42,7 @@ export interface CarrierTask {
   title?: string
   description?: string
   done?: boolean
+  project_id?: number
 }
 
 export interface CarrierSpec {

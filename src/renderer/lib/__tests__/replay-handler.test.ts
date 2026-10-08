@@ -45,6 +45,7 @@ describe('handleReplayed', () => {
       ['view-tasks'],
       ['section-tasks'],
       ['task-detail'],
+      ['project-counts'],
     ])
   })
 

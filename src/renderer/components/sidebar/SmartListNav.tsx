@@ -4,6 +4,8 @@ import { SmartListIcon } from '@/components/shared/SmartListIcon'
 import type { SmartListId } from '@/lib/smart-list-identity'
 import { useReviewBadgeCount, useReviewFeatureEnabled } from '@/hooks/use-review'
 import { useAppConfig } from '@/hooks/use-app-config'
+import { useOpenTaskCounts } from '@/hooks/use-project-progress'
+import { useTodayOverdueCount } from '@/hooks/use-today-overdue-count'
 import { isRoutinesEnabled } from '@/lib/vikunja-types'
 
 export interface SmartListItem {
@@ -39,6 +41,17 @@ export function SmartListNav() {
   const currentPath = matches[matches.length - 1]?.pathname ?? ''
   const reviewCount = useReviewBadgeCount()
   const items = useSmartLists()
+  const { data: config } = useAppConfig()
+  const openCounts = useOpenTaskCounts()
+  const todayCount = useTodayOverdueCount()
+
+  // Counts as in the sidebar mock: open tasks in the Inbox, due today or overdue, projects to review.
+  const countOf = (id: SmartListId): number => {
+    if (id === 'review') return reviewCount
+    if (id === 'today') return todayCount ?? 0
+    if (id === 'inbox') return config?.inbox_project_id ? (openCounts?.get(config.inbox_project_id) ?? 0) : 0
+    return 0
+  }
 
   return (
     <nav aria-label="Lists" className="flex flex-col gap-0.5 px-2 py-2">
@@ -46,6 +59,7 @@ export function SmartListNav() {
         const isActive = currentPath === item.path
         const isReview = item.id === 'review'
         const reviewActiveBorder = isReview && isActive && reviewCount > 0
+        const count = countOf(item.id)
         return (
           <button
             key={item.id}
@@ -61,9 +75,9 @@ export function SmartListNav() {
           >
             <SmartListIcon list={item.id} className="h-4 w-4" />
             <span className="flex-1 text-left">{item.label}</span>
-            {isReview && reviewCount > 0 && (
+            {count > 0 && (
               <span className="text-[11px] font-semibold tabular-nums text-[var(--text-secondary)]">
-                {reviewCount}
+                {count}
               </span>
             )}
           </button>

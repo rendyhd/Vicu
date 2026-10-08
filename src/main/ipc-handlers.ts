@@ -65,6 +65,7 @@ import { authManager } from './auth/auth-manager'
 import { OidcTotpRequiredError } from './auth/oidc-login'
 import { buildViewerFilterParams } from './quick-entry/filter-builder'
 import { forgetDeletedTask, loadRoutineCarriers, rememberCreatedTask } from './carrier-service'
+import { countProjectTasks, invalidateProjectCounts } from './project-counts-service'
 import { dueToday } from '../shared/due-dates'
 import { KEEP_NESTED_SUBTASKS_PARAM } from './api-v2'
 import { fetchPositionSortedTasks } from './quick-entry/position-sort'
@@ -154,6 +155,7 @@ function taskWriteDeps() {
 // Quick View refresh or custom list sync.
 const QUIET_PATCH_KEYS: ReadonlySet<string> = new Set([
   'sidebar_width',
+  'sidebar_collapsed_projects',
   'window_bounds',
   'last_used_project_id',
   'last_used_label_id',
@@ -193,6 +195,12 @@ function persistConfig(config: AppConfig, announce = true): void {
   if (config.custom_lists?.length || config.custom_lists_sync?.dirty) void syncCustomLists()
 }
 
+/** The project of a task as the server returned it, or undefined (then every project is asked again). */
+function projectIdOf(task: unknown): number | undefined {
+  const id = (task as { project_id?: unknown } | null)?.project_id
+  return typeof id === 'number' && Number.isInteger(id) && id > 0 ? id : undefined
+}
+
 export function registerIpcHandlers(): void {
   registerOfflineQueueIpc()
 
@@ -212,6 +220,7 @@ export function registerIpcHandlers(): void {
     if (result.success) {
       notifyViewerSync()
       rememberCreatedTask(result.data)
+      invalidateProjectCounts(projectId)
     }
     return result
   })
@@ -228,6 +237,10 @@ export function registerIpcHandlers(): void {
     if (outcome.kind === 'sent') {
       notifyViewerSync()
       notifyMainWindow(event.sender.id)
+      // A completion, a reopening or a move changes the progress of the task's project (both
+      // projects after a move, which the response does not tell: everything is asked again).
+      if ('project_id' in patch) invalidateProjectCounts()
+      else if ('done' in patch) invalidateProjectCounts(projectIdOf(outcome.result.data))
     }
     return taskWriteReply(outcome)
   })
@@ -239,6 +252,7 @@ export function registerIpcHandlers(): void {
     if (outcome.kind === 'sent') {
       notifyViewerSync()
       forgetDeletedTask(id)
+      invalidateProjectCounts()
     }
     return taskWriteReply(outcome)
   })
@@ -259,6 +273,15 @@ export function registerIpcHandlers(): void {
 
   handleTrusted('delete-task-relation', async (_event, taskId: number, relationKind: string, otherTaskId: number) => {
     return refreshViewerOnSuccess(await deleteTaskRelation(taskId, relationKind, otherTaskId))
+  })
+
+  // Sidebar progress rings: how many tasks of a project are (not) done, from one one-task page
+  // (the envelope's `total`), minus the known hidden carrier tasks; cached for ten minutes.
+  handleTrusted('count-project-tasks', (_event, projectId: unknown, done: unknown) => {
+    if (typeof projectId !== 'number' || !Number.isInteger(projectId) || projectId <= 0 || typeof done !== 'boolean') {
+      return { success: false as const, error: 'Invalid project count request' }
+    }
+    return countProjectTasks(projectId, done)
   })
 
   // Projects

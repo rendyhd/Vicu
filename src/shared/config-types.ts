@@ -165,6 +165,11 @@ export interface AppConfig {
   clock_format?: 'system' | '12h' | '24h'
   window_bounds?: { x: number; y: number; width: number; height: number }
   sidebar_width?: number
+  /**
+   * Ids of the sidebar projects (areas) the person collapsed. Everything else shows its child
+   * projects. Ids belong to one server, so this is dropped with the rest of the account's data.
+   */
+  sidebar_collapsed_projects?: number[]
   custom_lists?: CustomList[]
   /** Owned by the custom list service in the main process; the renderer never writes it. */
   custom_lists_sync?: {

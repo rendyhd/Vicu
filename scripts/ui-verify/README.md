@@ -118,6 +118,11 @@ The helpers on `h`:
   `{ ok, detail }`), `axe(selector?)` (axe-core; one line per violation, returns them),
   `frames(ms)` (requestAnimationFrame timing sample), `api(method, path)` (reads the server to check
   what was really saved).
+- `requests(since?)`: the HTTP requests the app's main process has started since launch
+  (`[{ t, method, url }]`, no headers or bodies), read from `main-requests.jsonl` in the run folder.
+  `request-log.cjs` is loaded into the main process with `electron --require` by `desktop.mjs` and
+  wraps `net.request`; it is test-only and not packaged. The `sidebar-tree` scenario (card 3.9a)
+  uses it to assert at most projects + 1 count requests; run it alone for a clean count.
 - `showQuick('entry' | 'view')` and `hideQuick(...)`: the popups open through the app's own
   second-instance path, the code a global hotkey runs; the returned page is the popup window.
 - `h.ids` (seed ids), `h.wave`, `h.options`, `h.app`, `h.page` (the raw Playwright objects).

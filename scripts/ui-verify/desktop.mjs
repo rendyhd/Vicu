@@ -156,13 +156,22 @@ if (ids.seededOn !== localDate(0)) {
 // --- Launch --------------------------------------------------------------------------------
 
 const profile = await writeProfile(opt.theme, { size: SIZE })
+// The main process logs the URL of every request it starts (request-log.cjs, test-only), for the
+// scenarios that count requests (h.requests()).
+const REQUEST_LOG = join(RUN_DIR, 'main-requests.jsonl')
+writeFileSync(REQUEST_LOG, '')
+const requestLogModule = join(HERE, 'request-log.cjs')
 const app = await electron.launch({
   executablePath: require('electron'),
   // Device scale 1 for predictable pixels; the GitHub release check is cut off so no update banner
   // or outside traffic can show up in a capture.
-  args: ['.', '--force-device-scale-factor=1', '--host-resolver-rules=MAP api.github.com ~NOTFOUND'],
+  args: ['--require', requestLogModule, '.', '--force-device-scale-factor=1', '--host-resolver-rules=MAP api.github.com ~NOTFOUND'],
   cwd: REPO,
-  env: { ...process.env, VICU_USER_DATA_DIR: profile },
+  env: {
+    ...process.env,
+    VICU_USER_DATA_DIR: profile,
+    VICU_UI_REQUEST_LOG: REQUEST_LOG,
+  },
   timeout: 60000,
 })
 
@@ -430,6 +439,15 @@ const h = {
     tally.axe += result.length
     emit({ t: 'axe-summary', on: label, violations: result.length, serious: result.filter((v) => v.impact === 'serious' || v.impact === 'critical').length })
     return result
+  },
+
+  /**
+   * The HTTP requests the app's main process has started since launch (or since `since`, a count
+   * from a previous call): [{ t, method, url }]. Test-only: see request-log.cjs.
+   */
+  requests(since = 0) {
+    const lines = readFileSync(REQUEST_LOG, 'utf8').split(/\r?\n/).filter(Boolean)
+    return lines.slice(since).map((l) => JSON.parse(l))
   },
 
   /** Reads the server (what was really saved): api('GET', '/tasks/12'). Returns parsed JSON. */
