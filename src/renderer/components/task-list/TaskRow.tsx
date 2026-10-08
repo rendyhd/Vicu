@@ -9,6 +9,7 @@ import { cn } from '@/lib/cn'
 import { useSelectionStore } from '@/stores/selection-store'
 import { orderedTaskIds } from '@/lib/task-selection'
 import { useUpdateTask, useCompleteTask, useDeleteTask, useUploadAttachmentFromDrop, useAddLabel, useCreateLabel } from '@/hooks/use-task-mutations'
+import { useCompletionHoldEngagement } from '@/hooks/use-completion-hold'
 import { useConfirmDelete } from '@/hooks/use-confirm-delete'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { dueToday, parsedDue } from '@/lib/due-dates'
@@ -349,6 +350,8 @@ function TaskRowInner({ task, nestedDepth = 0, parentProjectId, projectMeta, dra
   const uploadFromDrop = useUploadAttachmentFromDrop()
   const { data: appConfig } = useAppConfig()
   const rowView = useRowView()
+  // Pointer and keyboard focus on the row keep a completed row in its list (the completion hold).
+  const holdEngagement = useCompletionHoldEngagement(task.id)
 
   const { listeners, setNodeRef, isDragging, style } = drag
   const isDark = useIsDark()
@@ -546,7 +549,11 @@ function TaskRowInner({ task, nestedDepth = 0, parentProjectId, projectMeta, dra
         onFocus={(e) => {
           // Keyboard focus anywhere in the row (the row itself, its checkbox) moves the keyboard selection here.
           if (!isFocused && e.target.matches(':focus-visible')) setFocusedTask(task.id)
+          holdEngagement.onFocus(e)
         }}
+        onBlur={holdEngagement.onBlur}
+        onPointerEnter={holdEngagement.onPointerEnter}
+        onPointerLeave={holdEngagement.onPointerLeave}
         className={cn(
           'vicu-task-fade group grid cursor-default grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-x-3 border-b border-[var(--border-color)] px-4 py-2.5 transition-colors hover:bg-[var(--bg-hover)]',
           isSelected && 'bg-bg-selected ring-1 ring-inset ring-accent-blue/40',
@@ -732,6 +739,10 @@ function TaskRowInner({ task, nestedDepth = 0, parentProjectId, projectMeta, dra
         dropError && 'ring-2 ring-danger bg-danger/5'
       )}
       onKeyDown={handleExpandedKeyDown}
+      onFocus={holdEngagement.onFocus}
+      onBlur={holdEngagement.onBlur}
+      onPointerEnter={holdEngagement.onPointerEnter}
+      onPointerLeave={holdEngagement.onPointerLeave}
       onDragOver={handleFileDragOver}
       onDragLeave={handleFileDragLeave}
       onDrop={handleFileDrop}

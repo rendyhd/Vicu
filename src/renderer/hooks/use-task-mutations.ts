@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useMatches, useRouter } from '@tanstack/react-router'
 import { api } from '@/lib/api'
 import { useCompletedTasksStore } from '@/stores/completed-tasks-store'
+import { completionHold } from '@/stores/completion-hold-store'
 import { sortProjectTasks } from '@/lib/task-sort'
 import {
   applyPositionUpdates,
@@ -628,8 +629,10 @@ export function useCompleteTask() {
         [task.id, true],
         ...autoCompleted.map((child) => [child.id, true] as const),
       ])
-      // Track completed task so it stays visible (with strikethrough) until navigation
+      // Keep the row in its list, struck through, while the completion hold runs (a few seconds after
+      // the pointer or focus leaves it, or until the user leaves the view); then the hold removes it.
       addCompleted(mapTaskDoneByIds(task, doneById), currentPathname(router), autoCompleted, suppressTopLevelUndo)
+      completionHold.complete(task.id)
 
       await qc.cancelQueries({ queryKey: ['tasks'] })
       await qc.cancelQueries({ queryKey: ['view-tasks'] })
@@ -663,6 +666,7 @@ export function useCompleteTask() {
     onError: (_err, input, context) => {
       const task = 'task' in input ? input.task : input
       removeCompleted(task.id)
+      completionHold.reopened(task.id)
       if (context?.previousTaskQueries) {
         for (const [key, data] of context.previousTaskQueries) {
           qc.setQueryData(key, data)
@@ -716,6 +720,8 @@ export function useUncompleteTask() {
       const wasInStore = useCompletedTasksStore.getState().tasks.has(task.id)
       const autoCompleted = useCompletedTasksStore.getState().tasks
         .get(task.id)?.autoCompletedSubtasks ?? []
+      // Unchecking a held row cancels its hold (no toast); a row reopened from the Logbook or the toast is just open.
+      completionHold.reopened(task.id)
       const doneById = new Map<number, boolean>([
         [task.id, false],
         ...autoCompleted.map((child) => [child.id, false] as const),
@@ -755,6 +761,8 @@ export function useUncompleteTask() {
     onError: (_err, task, context) => {
       if (context?.wasInStore) {
         updateCompleted(task.id, { done: true })
+        // The reopen failed: the row is done again, so it is held again.
+        completionHold.complete(task.id)
       } else {
         removeCompleted(task.id)
       }

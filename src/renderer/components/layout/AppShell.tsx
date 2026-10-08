@@ -27,6 +27,7 @@ import type { ThemeOption } from '@/lib/theme'
 import type { Task, Project, CustomList } from '@/lib/vikunja-types'
 import type { ProjectTreeNode } from '@/hooks/use-projects'
 import { useCompletedTasksStore } from '@/stores/completed-tasks-store'
+import { completionHold } from '@/stores/completion-hold-store'
 import { Sidebar } from './Sidebar'
 import { ContentArea } from './ContentArea'
 import { WindowControls } from './WindowControls'
@@ -138,13 +139,16 @@ export function AppShell() {
   // Task lists refetch on focus and on a timer, and the date-dependent views roll over at midnight.
   useFreshness()
 
-  // Clear recently-completed-tasks store on route change so completed tasks
-  // don't bleed into the next view.
+  // On a route change the completion hold ends and the recently-completed-tasks store is cleared,
+  // so completed tasks don't bleed into the next view.
   const routeMatches = useMatches()
   const routePath = routeMatches[routeMatches.length - 1]?.pathname ?? ''
   const prevRouteRef = useRef(routePath)
   useEffect(() => {
     if (prevRouteRef.current !== routePath) {
+      // Leaving the view ends every completion hold at once: the held rows collapse into the toast
+      // (which keeps what Undo needs), then whatever else the store still shows is dropped.
+      completionHold.navigate()
       useCompletedTasksStore.getState().clear()
       // Drop any multi-selection so its ids can't act on a different view's tasks.
       useSelectionStore.getState().clearSelection()
