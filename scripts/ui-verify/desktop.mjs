@@ -13,6 +13,8 @@
 //   --scenario a,b             scenarios by file name or id (baseline, e4, e04-schedule-popover)
 //   --wave N                   every E scenario whose first wave is N or earlier
 //   --run NAME                 output folder name under scripts/ui-verify/out/ (default: stamp+label)
+//   --reseed                   run seed.mjs before the run (the scenarios mutate the shared server)
+//   --no-reseed                with --wave: skip the reseed that wave runs do by default
 //   --build                    run `npm run build` first
 //   --list                     list the scenarios and exit
 //
@@ -41,6 +43,8 @@ const { values: opt } = parseArgs({
     scenario: { type: 'string' },
     wave: { type: 'string' },
     run: { type: 'string' },
+    reseed: { type: 'boolean', default: false },
+    'no-reseed': { type: 'boolean', default: false },
     build: { type: 'boolean', default: false },
     list: { type: 'boolean', default: false },
   },
@@ -51,6 +55,7 @@ const sizeMatch = /^(\d+)x(\d+)$/.exec(opt.size)
 if (!sizeMatch) fail(`--size must look like 1280x820, got "${opt.size}"`)
 if (!['light', 'dark'].includes(opt.theme)) fail(`--theme must be light or dark, got "${opt.theme}"`)
 if (!['full', 'reduce'].includes(opt.motion)) fail(`--motion must be full or reduce, got "${opt.motion}"`)
+if (opt.reseed && opt['no-reseed']) fail('--reseed and --no-reseed contradict each other.')
 const SIZE = { width: Number(sizeMatch[1]), height: Number(sizeMatch[2]) }
 
 function fail(message) {
@@ -92,7 +97,11 @@ if (opt.scenario) {
 } else if (opt.wave !== undefined) {
   const wave = Number(opt.wave)
   if (!Number.isInteger(wave) || wave < 0) fail(`--wave must be a whole number, got "${opt.wave}"`)
-  selected = all.filter((s) => typeof s.meta.wave === 'number' && s.meta.wave <= wave).sort((a, b) => idNumber(a) - idNumber(b))
+  // A destructive scenario (meta.destructive: it completes or deletes seeded tasks, or needs views the
+  // app has not loaded yet) runs first, on the fresh seed and a cold app; the run re-seeds after it.
+  selected = all
+    .filter((s) => typeof s.meta.wave === 'number' && s.meta.wave <= wave)
+    .sort((a, b) => Number(!!b.meta.destructive) - Number(!!a.meta.destructive) || idNumber(a) - idNumber(b))
   label = `wave${wave}`
 } else {
   selected = all.filter((s) => s.name === 'baseline')
@@ -148,6 +157,23 @@ for (const rel of ['out/main/index.js', 'out/renderer/index.html']) {
 }
 
 await requireServer()
+
+// The scenarios mutate the shared server (they complete, move and delete tasks), so a wave run starts
+// from a fresh seed unless --no-reseed; any run can ask for one with --reseed.
+const RESEED = opt.reseed || (WAVE !== null && !opt['no-reseed'])
+
+function reseedServer() {
+  const seeded = spawnSync(process.execPath, [join(HERE, 'seed.mjs')], { encoding: 'utf8' })
+  if (seeded.status !== 0) {
+    const tail = (seeded.stdout + seeded.stderr).trim().split(String.fromCharCode(10)).slice(-12).join(String.fromCharCode(10))
+    fail('seed.mjs failed (exit ' + seeded.status + '):' + String.fromCharCode(10) + tail)
+  }
+}
+
+if (RESEED) {
+  reseedServer()
+  emit({ t: 'env', message: 'the test server was re-seeded before the run (seed.mjs)' })
+}
 const ids = readSeedIds()
 if (ids.seededOn !== localDate(0)) {
   emit({ t: 'warn', message: `the seed is from ${ids.seededOn}, not today; run node scripts/ui-verify/seed.mjs so dates line up.` })
@@ -554,6 +580,26 @@ for (const s of selected) {
   } catch (e) {
     tally.errors++
     emit({ t: 'error', message: String(e.message ?? e).split('\n')[0] })
+  }
+  if (s.meta.destructive && RESEED && s !== selected[selected.length - 1]) {
+    // Put the data back for the scenarios after it: same seed, new ids, and the app drops what it cached.
+    try {
+      reseedServer()
+      Object.assign(ids, readSeedIds())
+      await page.evaluate(async () => {
+        const dbs = (await indexedDB.databases?.()) ?? []
+        await Promise.all(dbs.map((d) => new Promise((done) => {
+          const request = indexedDB.deleteDatabase(d.name)
+          request.onsuccess = request.onerror = request.onblocked = () => done(undefined)
+        })))
+      })
+      await page.reload()
+      await settle(page, 1500)
+      emit({ t: 'env', message: 'the test server was re-seeded after a destructive scenario' })
+    } catch (e) {
+      tally.errors++
+      emit({ t: 'error', message: 're-seed after the scenario failed: ' + String(e.message ?? e).split(String.fromCharCode(10))[0] })
+    }
   }
   // Back to the starting size, motion and colours for the next scenario.
   await h.setMotion(opt.motion).catch(() => {})

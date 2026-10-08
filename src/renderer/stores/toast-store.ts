@@ -2,6 +2,13 @@ import { create } from 'zustand'
 
 export type ToastKind = 'error' | 'info' | 'success'
 
+/** What a screen reader hears before the message: the kind is never carried by colour alone. */
+export const TOAST_KIND_LABEL: Record<ToastKind, string> = {
+  error: 'Error',
+  info: 'Information',
+  success: 'Success',
+}
+
 export interface ToastAction {
   label: string
   onAction: () => void

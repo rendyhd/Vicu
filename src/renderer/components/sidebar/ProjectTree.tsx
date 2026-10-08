@@ -10,6 +10,7 @@ import { useOpenTaskCounts } from '@/hooks/use-project-progress'
 import { useSidebarCollapsed } from '@/hooks/use-sidebar-collapsed'
 import { useAppConfig } from '@/hooks/use-app-config'
 import { cn } from '@/lib/cn'
+import { focusTargetOf } from '@/lib/focus-target'
 import { api } from '@/lib/api'
 import { ProjectTreeItem } from './ProjectTreeItem'
 import type { Project } from '@/lib/vikunja-types'
@@ -182,7 +183,10 @@ export function ProjectTree() {
     x: number
     y: number
     project: ProjectTreeNode
+    /** The row's control: a confirmation opened from a menu entry gives focus back here. */
+    opener: HTMLElement | null
   } | null>(null)
+  const [archiveOpener, setArchiveOpener] = useState<HTMLElement | null>(null)
 
   // The tree waits for the config so the Inbox is never drawn (and counted) for a moment.
   const { data: config, isLoading: configLoading } = useAppConfig()
@@ -203,7 +207,7 @@ export function ProjectTree() {
 
   const handleContextMenu = (e: React.MouseEvent, node: ProjectTreeNode) => {
     e.preventDefault()
-    setContextMenu({ x: e.clientX, y: e.clientY, project: node })
+    setContextMenu({ x: e.clientX, y: e.clientY, project: node, opener: focusTargetOf(e.currentTarget) })
   }
 
   const handleCloseDialog = () => {
@@ -289,6 +293,7 @@ export function ProjectTree() {
                 type="button"
                 onClick={() => {
                   setArchiveTarget(contextMenu.project)
+                  setArchiveOpener(contextMenu.opener)
                   setContextMenu(null)
                 }}
                 className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-[var(--text-primary)] hover:bg-[var(--bg-hover)]"
@@ -300,8 +305,11 @@ export function ProjectTree() {
                 type="button"
                 onClick={async () => {
                   const project = contextMenu.project
+                  const opener = contextMenu.opener
                   setContextMenu(null)
-                  const ok = await confirmDelete('Delete this project? All tasks in it will be deleted. This cannot be undone.')
+                  const ok = await confirmDelete('Delete this project? All tasks in it will be deleted. This cannot be undone.', {
+                    returnFocusTo: opener,
+                  })
                   if (ok) {
                     deleteProject.mutate(project.id)
                   }
@@ -333,6 +341,7 @@ export function ProjectTree() {
         message={archiveTarget ? `Archive “${archiveTarget.title}”? Its tasks will be kept and it can be restored from Settings.` : ''}
         confirmLabel="Archive"
         destructive={false}
+        returnFocusTo={archiveOpener}
         onCancel={() => setArchiveTarget(null)}
         onConfirm={() => {
           if (archiveTarget) setArchived.mutate({ project: archiveTarget, archived: true })

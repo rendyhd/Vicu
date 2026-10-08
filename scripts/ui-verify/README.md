@@ -78,11 +78,20 @@ npm run ui:verify -- --scenario baseline --theme dark
 | `--forced-colors` | Emulate `forced-colors: active`. |
 | `--scenario a,b` | Scenarios by file name or id: `baseline`, `e4`, `e04-schedule-popover`. |
 | `--wave N` | Every E scenario whose first wave (in the plan, section 5) is N or earlier. |
+| `--reseed` | Run `seed.mjs` before the run, so it starts from the known dataset. |
+| `--no-reseed` | With `--wave`: skip the reseed that wave runs do by default. |
 | `--run NAME` | Folder name under `out/` (default: time stamp, scenarios, theme). |
 | `--build` | Run `npm run build` first. |
 | `--list` | List the scenarios with their ids and waves. |
 
-With neither `--scenario` nor `--wave`, `baseline` runs. The harness warns when `src/` is newer than
+With neither `--scenario` nor `--wave`, `baseline` runs. Scenarios mutate the shared test server
+(they complete, move, reschedule and delete tasks), so a `--wave N` run re-seeds first by default
+(`--no-reseed` skips it) and any other run can ask for it with `--reseed`. Do not run a scenario
+against the server while another harness uses it (the Android one shares the same dataset), and
+`moments` and E10 (`e10-drag-reorder`) in particular must not run then: `moments` completes every
+Today task and pauses the container with `docker pause`, and E10 reorders tasks. A scenario that
+exports `meta.destructive = true` (`moments`) runs first in a wave run, on the fresh seed and a cold
+app, and the run re-seeds again after it (new ids, app cache dropped) before the next scenario. The harness warns when `src/` is newer than
 `out/`, when the seed is from another day, and it refuses to run without a build or the server.
 Each launch rebuilds the profile, so runs never depend on each other. The GitHub update check is
 cut off (no update banner, no outside traffic), device scale is 1, and the app is shut down with

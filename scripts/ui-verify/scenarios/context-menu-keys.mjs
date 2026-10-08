@@ -9,6 +9,7 @@
 //      focus is back on the row each time.
 //   E. A right click opens it at the pointer and Escape closes it.
 //   F. axe finds nothing serious in the open menu.
+//   G. The sidebar tag and project menus: Delete opens a confirmation, and cancelling it returns focus to the row.
 export const meta = {
   id: 'CMK',
   wave: 3,
@@ -167,4 +168,39 @@ export default async function run(h) {
   await h.key('Escape')
   await h.wait(300)
   await h.assert('Escape closes it', async () => !(await menuState(page)).open)
+
+  // ---- G. Sidebar menus: the confirmation gives focus back to the row ---------------------
+  await h.dismiss()
+  // The harness profile turns the delete confirmation off, which would make Delete real here: turn it
+  // on for this section (the dialog reads it at start-up, so reload), and cancel every dialog.
+  await page.evaluate(() => window.api.saveConfigPatch({ confirm_before_delete: true }))
+  await page.reload()
+  await h.goto('/today')
+  await h.wait(800)
+  const focusedLabel = () =>
+    page.evaluate(() => {
+      const a = document.activeElement
+      return a ? (a.getAttribute('aria-label') || a.textContent || '').trim().slice(0, 40) : null
+    })
+  for (const [kind, rows] of [
+    ['tag', page.locator('button:has(> span[class*="h-2.5"][class*="rounded-full"])')],
+    ['project', page.locator('[role="button"][tabindex="0"]', { hasText: 'Personal' })],
+  ]) {
+    const row = rows.first()
+    if (!(await row.count())) {
+      h.emit({ t: 'skip', id: 'CMK', message: `no sidebar ${kind} row found for the confirmation focus check` })
+      continue
+    }
+    const name = ((await row.textContent()) ?? '').trim()
+    await row.click({ button: 'right' })
+    await h.wait(200)
+    await page.locator('div.fixed.z-50 button', { hasText: 'Delete' }).first().click()
+    await h.wait(300)
+    const dialogOpen = await page.evaluate(() => !!document.querySelector('dialog[open][role="alertdialog"]'))
+    await h.assert(`the sidebar ${kind} Delete opens a confirmation`, dialogOpen)
+    await h.key('Escape')
+    await h.wait(300)
+    const back = await focusedLabel()
+    await h.assert(`cancelling it returns focus to the ${kind} row (${name})`, { ok: !!back && back.includes(name.slice(0, 10)), detail: String(back) })
+  }  await page.evaluate(() => window.api.saveConfigPatch({ confirm_before_delete: false }))
 }

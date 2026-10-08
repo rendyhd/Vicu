@@ -70,6 +70,36 @@ export default async function run(h) {
     await h.assert('Quick Entry token types have different colours', { ok: paints.size === m.tokens.length && m.tokens.length > 1, detail: m.tokens.map((t) => `${t.type}: ${t.paint}`).join(' | ') })
   }
 
+  // A recognised token travels into its chip (like the composer, card 4.11a); reduced motion fades it in.
+  await qe.keyboard.press('Control+A')
+  await qe.keyboard.press('Backspace')
+  await h.wait(400)
+  await qe.keyboard.type('Call mum tomorrow', { delay: 20 })
+  const travel = await qe.evaluate(() => {
+    const chip = document.querySelector('#parse-preview .parse-chip[data-chip-type="date"]')
+    const anim = chip?.getAnimations?.()[0]
+    const frames = anim?.effect?.getKeyframes?.() ?? []
+    const timing = anim?.effect?.getTiming?.()
+    return {
+      chip: !!chip,
+      running: !!anim,
+      transform: frames.some((f) => f.transform && f.transform !== 'none'),
+      opacity: frames.some((f) => f.opacity !== undefined && f.opacity !== null),
+      duration: timing ? Number(timing.duration) : 0,
+      token: !!document.querySelector('#input-highlight [data-token-type="date"]'),
+    }
+  })
+  await h.assert('Quick Entry: a recognised date token travels into its chip', {
+    ok: travel.chip && travel.token && travel.running && travel.duration > 0 && (h.motion === 'reduce' ? !travel.transform && travel.opacity : travel.transform),
+    detail: JSON.stringify({ motion: h.motion, ...travel }),
+  })
+  await h.wait(500)
+  const settled = await qe.evaluate(() => {
+    const chip = document.querySelector('#parse-preview .parse-chip[data-chip-type="date"]')
+    return { chips: document.querySelectorAll('#parse-preview .parse-chip').length, still: chip ? chip.getAnimations().length : -1, transform: chip ? getComputedStyle(chip).transform : null }
+  })
+  await h.assert('Quick Entry: the chip rests in place after the travel', { ok: settled.chips === 1 && settled.still === 0 && settled.transform === 'none', detail: JSON.stringify(settled) })
+
   await qe.keyboard.press('Escape')
   await h.hideQuick('entry')
 

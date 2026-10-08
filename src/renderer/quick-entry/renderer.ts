@@ -66,6 +66,7 @@ import { parse, getParserConfig, recurrenceToVikunja, extractBangToday } from '.
 import { dueToday, parsedDue } from '../lib/due-dates'
 import { followColorScheme } from '../lib/theme'
 import { parseChips } from '../lib/parse-chips'
+import { motionMs, motionSpringCurve, travelStart } from '../lib/motion'
 import { initDateFormat, subscribeDateFormat } from '../lib/date-format'
 import type { ParseResult, ParserConfig, ParsedToken, TokenType } from '../lib/task-parser'
 import { getClipboardImages, fileToUint8Array } from '../lib/clipboard-images'
@@ -403,7 +404,7 @@ function renderHighlights(inputValue: string, tokens: ParsedToken[]): void {
     if (token.start > pos) {
       html += escapeHighlightText(inputValue.slice(pos, token.start))
     }
-    html += `<span class="token-${token.type}">${escapeHighlightText(inputValue.slice(token.start, token.end))}</span>`
+    html += `<span class="token-${token.type}" data-token-type="${token.type}">${escapeHighlightText(inputValue.slice(token.start, token.end))}</span>`
     pos = token.end
   }
   if (pos < inputValue.length) {
@@ -420,20 +421,76 @@ function escapeHighlightText(text: string): string {
     .replace(/ /g, '\u00a0')
 }
 
+/** Keys of the chips on screen: a chip travels out of its token only the first time it appears. */
+let shownChipKeys = new Set<string>()
+
+/**
+ * A chip read from the typed text travels out of the highlighted token it came from, like the main
+ * window's composer (card 4.11a, lib/motion.ts travelStart). Under reduced motion it fades in.
+ */
+function animateChipIn(chip: HTMLElement, type: string): void {
+  if (typeof chip.animate !== 'function') return
+  const fade = (): void => {
+    chip.animate([{ opacity: 0 }, { opacity: 1 }], { duration: motionMs('fade-fast'), easing: 'linear' })
+  }
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    fade()
+    return
+  }
+  const token = inputHighlight.querySelector<HTMLElement>(`[data-token-type="${type}"]`)
+  if (!token) {
+    fade()
+    return
+  }
+  const from = travelStart(token.getBoundingClientRect(), chip.getBoundingClientRect())
+  chip.animate(
+    [
+      { transform: `translate(${from.dx}px, ${from.dy}px) scale(${from.scale})`, opacity: 0.4 },
+      { transform: 'none', opacity: 1 },
+    ],
+    { duration: motionMs('move'), easing: motionSpringCurve('move') },
+  )
+}
+
 function renderParsePreview(result: ParseResult): void {
   // The same chips, in the same words, as the main window's composer (lib/parse-chips.ts).
-  const chips = parseChips(result).map((chip) => {
-    const level = chip.type === 'priority' ? ` priority-${Math.min(Math.max(chip.priority ?? 1, 1), 5)}` : ''
-    return `<span class="parse-chip parse-chip-${chip.type}${level}" data-chip-type="${chip.type}" data-chip-source="${chip.source ?? 'text'}">${escapeHtml(chip.label)}<button class="parse-chip-dismiss" data-type="${chip.type}" aria-label="Dismiss ${chip.type}">&times;</button></span>`
-  })
+  const chips = parseChips(result)
 
-  if (chips.length > 0) {
-    parsePreview.innerHTML = chips.join('')
-    parsePreview.classList.remove('hidden')
-  } else {
+  if (chips.length === 0) {
     parsePreview.innerHTML = ''
     parsePreview.classList.add('hidden')
+    shownChipKeys = new Set()
+    return
   }
+
+  // Chips that are unchanged keep their element (a travel in progress is not cut by the next key);
+  // changed ones are rebuilt; new ones are animated in once the container is visible.
+  const existing = new Map<string, HTMLElement>()
+  for (const el of parsePreview.querySelectorAll<HTMLElement>('.parse-chip')) existing.set(el.dataset.chipKey ?? '', el)
+  const entering: Array<{ el: HTMLElement; type: string }> = []
+  const next: HTMLElement[] = []
+  const nextKeys = new Set<string>()
+  for (const chip of chips) {
+    const level = chip.type === 'priority' ? ` priority-${Math.min(Math.max(chip.priority ?? 1, 1), 5)}` : ''
+    const source = chip.source ?? 'text'
+    const signature = `${chip.label}|${chip.priority ?? ''}|${source}`
+    const html = `<span class="parse-chip parse-chip-${chip.type}${level}" data-chip-key="${escapeHtml(chip.key)}" data-chip-sig="${escapeHtml(signature)}" data-chip-type="${chip.type}" data-chip-source="${source}">${escapeHtml(chip.label)}<button class="parse-chip-dismiss" data-type="${chip.type}" aria-label="Dismiss ${chip.type}">&times;</button></span>`
+    const kept = existing.get(chip.key)
+    if (kept && kept.dataset.chipSig === signature) {
+      next.push(kept)
+    } else {
+      const holder = document.createElement('template')
+      holder.innerHTML = html
+      const el = holder.content.firstElementChild as HTMLElement
+      next.push(el)
+      if (!shownChipKeys.has(chip.key) && source === 'text') entering.push({ el, type: chip.type })
+    }
+    nextKeys.add(chip.key)
+  }
+  parsePreview.replaceChildren(...next)
+  parsePreview.classList.remove('hidden')
+  shownChipKeys = nextKeys
+  for (const { el, type } of entering) animateChipIn(el, type)
 }
 
 // --- Image staging ---
@@ -495,6 +552,7 @@ function clearPendingImages(): void {
 function clearNlpState(): void {
   inputHighlight.innerHTML = ''
   parsePreview.innerHTML = ''
+  shownChipKeys = new Set()
   parsePreview.classList.add('hidden')
   lastParseResult = null
   suppressedTypes = new Map()

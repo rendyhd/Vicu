@@ -21,6 +21,8 @@ import { checkboxOf, makeTasks, removeTasks } from './_completion.mjs'
 export const meta = {
   id: 'MO',
   wave: 4,
+  // Completes every Today task and needs views the app has not loaded: wave runs put it first and re-seed after it.
+  destructive: true,
   title: 'Signature moments: skeleton shimmer, rolling counts, token into chip, stuck hairline, All clear',
 }
 

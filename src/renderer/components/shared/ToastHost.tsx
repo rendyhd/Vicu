@@ -5,6 +5,7 @@ import { useUndoCompletedTasks } from '@/hooks/use-completion-hold'
 import { setCompletionUndoHandler } from '@/stores/completion-hold-store'
 import { useAnnouncerStore } from '@/stores/announcer-store'
 import { useToastStore } from '@/stores/toast-store'
+import { ToastKindMark } from './ToastKindMark'
 import type { Toast } from '@/stores/toast-store'
 
 /** A toast that left the store stays here while it fades out; the animation end (or this limit) drops it. */
@@ -123,13 +124,7 @@ function ToastItem({ toast, onGone }: { toast: Shown; onGone: () => void }) {
         isError ? 'border-danger/60' : 'border-[var(--border-color)]'
       )}
     >
-      <span
-        className={cn(
-          'mt-1 h-1.5 w-1.5 shrink-0 rounded-full',
-          isError ? 'bg-danger' : toast.kind === 'success' ? 'bg-status-done' : 'bg-[var(--accent-blue)]'
-        )}
-        aria-hidden="true"
-      />
+      <ToastKindMark kind={toast.kind} />
       <span className="min-w-0 flex-1 break-words">{toast.message}</span>
       {toast.action && (
         <button

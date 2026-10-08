@@ -9,6 +9,7 @@ import { useConfirmDelete } from '@/hooks/use-confirm-delete'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { useSidebarStore } from '@/stores/sidebar-store'
 import { cn } from '@/lib/cn'
+import { focusTargetOf } from '@/lib/focus-target'
 import type { Label } from '@/lib/vikunja-types'
 import { normalizeHex } from '@/lib/constants'
 
@@ -207,6 +208,8 @@ export function TagList() {
     x: number
     y: number
     label: Label
+    /** The row's button: the delete confirmation gives focus back here. */
+    opener: HTMLElement | null
   } | null>(null)
 
   // Close context menu on click outside
@@ -219,7 +222,7 @@ export function TagList() {
 
   const handleContextMenu = (e: React.MouseEvent, label: Label) => {
     e.preventDefault()
-    setContextMenu({ x: e.clientX, y: e.clientY, label })
+    setContextMenu({ x: e.clientX, y: e.clientY, label, opener: focusTargetOf(e.currentTarget) })
   }
 
   const handleCloseDialog = () => {
@@ -259,8 +262,11 @@ export function TagList() {
             type="button"
             onClick={async () => {
               const label = contextMenu.label
+              const opener = contextMenu.opener
               setContextMenu(null)
-              const ok = await confirmDelete('Delete this label? It will be removed from all tasks. This cannot be undone.')
+              const ok = await confirmDelete('Delete this label? It will be removed from all tasks. This cannot be undone.', {
+                returnFocusTo: opener,
+              })
               if (ok) {
                 deleteLabel.mutate(label.id)
               }
