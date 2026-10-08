@@ -169,6 +169,12 @@ export class CompletionHold {
     return ids
   }
 
+  /** The user closed the toast (its Dismiss button): it goes, the rows stay collapsed and can no longer be undone from it. */
+  dismissToast(at: number): void {
+    this.advance(at)
+    this.toast = null
+  }
+
   /**
    * A row is open or gone for a reason outside the contract (a failed request rolled it back, it was
    * reopened from the Logbook): drop it from the hold, the collapsed set and the toast. The toast

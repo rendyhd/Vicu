@@ -72,3 +72,14 @@ export async function serverDone(h, id) {
   const task = await h.api('GET', `/tasks/${id}`)
   return task.done === true
 }
+
+/** The success toast ("Completed", "n completed") in the live region. */
+export const toastRegion = (h) => h.page.locator('[aria-live="polite"] [data-toast-kind="success"]').first()
+
+/** The message of the success toast, or null when none is showing (a toast that is fading out counts as gone). */
+export function toastText(h) {
+  return h.page.evaluate(() => {
+    const el = document.querySelector('[aria-live="polite"] [data-toast-kind="success"]:not(.vicu-toast-out)')
+    return el ? el.querySelector('span.flex-1')?.textContent ?? '' : null
+  })
+}

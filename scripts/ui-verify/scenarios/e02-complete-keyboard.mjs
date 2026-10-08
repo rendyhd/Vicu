@@ -1,6 +1,6 @@
 // E2 (card 4.2): complete rows by keyboard (Space on the focused checkbox). Keyboard focus on a row
 // holds it; 5 s after focus has left every completed row they collapse.
-import { HOLD_MS, checkboxOf, makeTasks, openToday, pageNow, removeTasks, rowGoneAt, rowOf, serverDone } from './_completion.mjs'
+import { HOLD_MS, checkboxOf, makeTasks, openToday, pageNow, removeTasks, rowGoneAt, rowOf, serverDone, toastRegion, toastText } from './_completion.mjs'
 
 export const meta = {
   id: 'E2',
@@ -50,8 +50,24 @@ export default async function run(h) {
       detail: goneB === null ? 'still there' : `${Math.round(goneB - left)} ms`,
     })
     await h.assert('A is gone too', { ok: goneA !== null })
+    await h.assert('the toast reads "2 completed"', { ok: (await toastText(h)) === '2 completed', detail: await toastText(h) })
+    await h.assert('the live region carries the toast', async () => (await page.locator('[aria-live="polite"] [data-toast-kind="success"]').count()) === 1)
+    await h.capture('toast')
     await h.assert('C, which was not completed, is still listed and open', async () => (await rowOf(h, c).count()) === 1 && (await checkboxOf(h, c).getAttribute('aria-checked')) === 'false')
     await h.capture('after')
+
+    // Undo on the toast sends { done: false } for both and the rows come back.
+    await toastRegion(h).getByRole('button', { name: 'Undo' }).click()
+    await h.wait(700)
+    await h.assert('Undo removes the toast', async () => (await toastText(h)) === null)
+    await h.assert('A and B are open again on the server', async () => !(await serverDone(h, a)) && !(await serverDone(h, b)))
+    await h.assert('A and B are back in Today, unchecked', async () => {
+      for (const id of [a, b]) {
+        if ((await rowOf(h, id).count()) !== 1 || (await checkboxOf(h, id).getAttribute('aria-checked')) !== 'false') return false
+      }
+      return true
+    })
+    await h.capture('undone')
   } finally {
     await removeTasks(h, ids)
   }

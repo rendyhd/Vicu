@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { COMPLETION_HOLD_MS, COMPLETION_TOAST_MS } from '../../../shared/completion-hold'
 import { useCompletedTasksStore } from '../completed-tasks-store'
-import { completionHold, resetCompletionHold, useCompletionHoldStore } from '../completion-hold-store'
+import { completionHold, resetCompletionHold, setCompletionUndoHandler, useCompletionHoldStore } from '../completion-hold-store'
+import { useToastStore } from '../toast-store'
 import type { Task } from '@/lib/vikunja-types'
 
 const task = (id: number) => ({ id, done: true, title: `Task ${id}` }) as Task
@@ -18,6 +19,7 @@ describe('completion hold store', () => {
     vi.useFakeTimers()
     vi.setSystemTime(0)
     resetCompletionHold()
+    useToastStore.setState({ toasts: [] })
     useCompletedTasksStore.getState().clear()
   })
   afterEach(() => {
@@ -97,5 +99,63 @@ describe('completion hold store', () => {
     complete(1)
     vi.advanceTimersByTime(COMPLETION_HOLD_MS)
     expect(held()).toEqual([])
+  })
+
+  describe('the toast', () => {
+    const toasts = () => useToastStore.getState().toasts
+
+    it('shows "Completed" with Undo when a row collapses, then "2 completed", and leaves 6 s after the last change', () => {
+      complete(1)
+      vi.advanceTimersByTime(COMPLETION_HOLD_MS)
+      expect(toasts().map((t) => [t.kind, t.message, t.action?.label])).toEqual([['success', 'Completed', 'Undo']])
+      vi.advanceTimersByTime(500)
+      complete(2)
+      vi.advanceTimersByTime(COMPLETION_HOLD_MS)
+      expect(toasts().map((t) => t.message)).toEqual(['2 completed'])
+      vi.advanceTimersByTime(COMPLETION_TOAST_MS - 1)
+      expect(toasts()).toHaveLength(1)
+      vi.advanceTimersByTime(1)
+      expect(toasts()).toHaveLength(0)
+    })
+
+    it('stays while the pointer is on it', () => {
+      complete(1)
+      vi.advanceTimersByTime(COMPLETION_HOLD_MS)
+      const id = toasts()[0].id
+      useToastStore.getState().engage(id, true)
+      vi.advanceTimersByTime(60_000)
+      expect(toasts()).toHaveLength(1)
+      useToastStore.getState().engage(id, false)
+      vi.advanceTimersByTime(COMPLETION_TOAST_MS)
+      expect(toasts()).toHaveLength(0)
+    })
+
+    it('Undo runs the registered handler and the toast goes', () => {
+      complete(1)
+      completionHold.navigate()
+      const handler = vi.fn(() => {
+        expect(completionHold.takeUndo().map((e) => e.task.id)).toEqual([1])
+      })
+      setCompletionUndoHandler(handler)
+      toasts()[0].action?.onAction()
+      expect(handler).toHaveBeenCalledTimes(1)
+      expect(toasts()).toHaveLength(0)
+    })
+
+    it('Dismiss closes the toast but keeps the rows collapsed', () => {
+      complete(1)
+      completionHold.navigate()
+      useToastStore.getState().dismiss(toasts()[0].id)
+      expect(toasts()).toHaveLength(0)
+      expect(useCompletionHoldStore.getState().toast).toBeNull()
+      expect(completionHold.takeUndo()).toEqual([])
+    })
+
+    it('a row reopened elsewhere takes the toast away when it was the only one', () => {
+      complete(1)
+      completionHold.navigate()
+      completionHold.reopened(1)
+      expect(toasts()).toHaveLength(0)
+    })
   })
 })

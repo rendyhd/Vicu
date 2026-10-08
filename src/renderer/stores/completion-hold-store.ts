@@ -1,5 +1,6 @@
 import { create } from 'zustand'
-import { CompletionHold } from '../../shared/completion-hold'
+import { COMPLETION_TOAST_ACTION, CompletionHold } from '../../shared/completion-hold'
+import { useToastStore } from '@/stores/toast-store'
 import { useCompletedTasksStore } from '@/stores/completed-tasks-store'
 import type { CompletedTaskEntry } from '@/stores/completed-tasks-store'
 
@@ -65,6 +66,7 @@ function sync(): void {
         ? current.toast
         : { text: snapshot.toast, ids: toastIds }
   if (held !== current.held || toast !== current.toast) useCompletionHoldStore.setState({ held, toast })
+  if (toast !== current.toast) showToast(toast)
 
   if (timer !== null) clearTimeout(timer)
   timer = null
@@ -76,6 +78,36 @@ function sync(): void {
       sync()
     }, Math.max(0, deadline - Date.now()))
   }
+}
+
+const TOAST_KEY = 'completion'
+let undoHandler: (() => void) | null = null
+
+/**
+ * Who reopens the tasks when the toast's Undo is pressed: a mounted component that has the reopen
+ * mutation (`useUndoCompletedTasks`). Returns the function that removes it again.
+ */
+export function setCompletionUndoHandler(handler: () => void): () => void {
+  undoHandler = handler
+  return () => {
+    if (undoHandler === handler) undoHandler = null
+  }
+}
+
+/** The machine owns this toast's clock (6 s, paused while engaged), so the toast store never expires it. */
+function showToast(toast: CompletionToastState | null): void {
+  const toasts = useToastStore.getState()
+  if (toast === null) {
+    toasts.remove(TOAST_KEY)
+    return
+  }
+  toasts.push('success', toast.text, {
+    key: TOAST_KEY,
+    durationMs: null,
+    action: { label: COMPLETION_TOAST_ACTION, onAction: () => undoHandler?.() },
+    onEngage: (engaged) => completionHold.hoverToast(engaged),
+    onClose: () => completionHold.dismissToast(),
+  })
 }
 
 function sameArray(a: readonly number[], b: readonly number[]): boolean {
@@ -119,6 +151,11 @@ export const completionHold = {
     machine.navigate(Date.now())
     sync()
   },
+  /** The user closed the toast: it goes, the rows stay collapsed. */
+  dismissToast(): void {
+    machine.dismissToast(Date.now())
+    sync()
+  },
   /**
    * Take the toast's Undo: the toast goes and the entries of the rows it covered are returned, to be
    * put back in the completed-tasks store and reopened with `{ done: false }` each.
@@ -141,5 +178,7 @@ export function resetCompletionHold(): void {
   timer = null
   machine = new CompletionHold()
   collapsedEntries.clear()
+  undoHandler = null
   useCompletionHoldStore.setState({ held: EMPTY, toast: null })
+  useToastStore.getState().remove(TOAST_KEY)
 }

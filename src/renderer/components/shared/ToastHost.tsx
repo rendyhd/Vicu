@@ -1,11 +1,34 @@
+import { useEffect, useRef, useState } from 'react'
 import { X } from 'lucide-react'
 import { cn } from '@/lib/cn'
+import { useUndoCompletedTasks } from '@/hooks/use-completion-hold'
+import { setCompletionUndoHandler } from '@/stores/completion-hold-store'
 import { useToastStore } from '@/stores/toast-store'
+import type { Toast } from '@/stores/toast-store'
 
-/** Transient messages in the bottom-right corner: failed changes, "saved offline" notes. */
+/** A toast that left the store stays here while it fades out; the animation end (or this limit) drops it. */
+type Shown = Toast & { leaving: boolean }
+const LEAVE_LIMIT_MS = 600
+
+/** Transient messages in the bottom-right corner: failed changes, "saved offline" notes, "Completed, Undo". */
 export function ToastHost() {
   const toasts = useToastStore((s) => s.toasts)
-  const dismiss = useToastStore((s) => s.dismiss)
+  const [shown, setShown] = useState<Shown[]>([])
+
+  // Toasts that left the store keep rendering, marked as leaving, until their fade ends.
+  useEffect(() => {
+    setShown((previous) => {
+      const live = new Set(toasts.map((t) => t.id))
+      const leaving = previous.filter((t) => !live.has(t.id)).map((t) => ({ ...t, leaving: true }))
+      return [...toasts.map((t) => ({ ...t, leaving: false })), ...leaving]
+    })
+  }, [toasts])
+
+  // Undo on the completion toast reopens the tasks it covers (needs the reopen mutation).
+  const undoCompleted = useUndoCompletedTasks()
+  useEffect(() => setCompletionUndoHandler(undoCompleted), [undoCompleted])
+
+  const drop = (id: number) => setShown((previous) => previous.filter((t) => t.id !== id))
 
   // The live region is always mounted so screen readers pick up the first toast added to it.
   return (
@@ -13,33 +36,106 @@ export function ToastHost() {
       className="pointer-events-none fixed bottom-4 right-4 z-[60] flex w-80 max-w-[calc(100vw-2rem)] flex-col gap-2"
       aria-live="polite"
     >
-      {toasts.map((t) => (
-        <div
-          key={t.id}
-          role={t.kind === 'error' ? 'alert' : 'status'}
-          className={cn(
-            'pointer-events-auto flex items-start gap-2 rounded-popover border bg-[var(--bg-primary)] px-3 py-2 text-xs text-[var(--text-primary)] shadow-lg',
-            t.kind === 'error' ? 'border-danger/60' : 'border-[var(--border-color)]',
-          )}
-        >
-          <span
-            className={cn(
-              'mt-1 h-1.5 w-1.5 shrink-0 rounded-full',
-              t.kind === 'error' ? 'bg-danger' : 'bg-[var(--accent-blue)]',
-            )}
-            aria-hidden="true"
-          />
-          <span className="min-w-0 flex-1 break-words">{t.message}</span>
-          <button
-            type="button"
-            onClick={() => dismiss(t.id)}
-            className="shrink-0 rounded-control p-0.5 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
-            aria-label="Dismiss"
-          >
-            <X className="h-3 w-3" />
-          </button>
-        </div>
+      {shown.map((t) => (
+        <ToastItem key={t.id} toast={t} onGone={() => drop(t.id)} />
       ))}
+    </div>
+  )
+}
+
+function ToastItem({ toast, onGone }: { toast: Shown; onGone: () => void }) {
+  const dismiss = useToastStore((s) => s.dismiss)
+  const engage = useToastStore((s) => s.engage)
+  const pointer = useRef(false)
+  const focus = useRef(false)
+  const engaged = useRef(false)
+  const id = toast.id
+
+  // One engagement signal from the pointer and keyboard focus together: the clock waits while either is on the toast.
+  const update = () => {
+    const now = pointer.current || focus.current
+    if (now === engaged.current) return
+    engaged.current = now
+    engage(id, now)
+  }
+
+  useEffect(() => {
+    if (!toast.leaving) return
+    const timer = setTimeout(onGone, LEAVE_LIMIT_MS)
+    return () => clearTimeout(timer)
+  }, [toast.leaving, onGone])
+
+  // A toast that is removed while engaged never sees the pointer leave.
+  useEffect(
+    () => () => {
+      if (engaged.current) engage(id, false)
+    },
+    [id, engage]
+  )
+
+  const isError = toast.kind === 'error'
+  return (
+    <div
+      role={isError ? 'alert' : 'status'}
+      data-toast-kind={toast.kind}
+      onAnimationEnd={() => {
+        if (toast.leaving) onGone()
+      }}
+      onPointerEnter={() => {
+        pointer.current = true
+        update()
+      }}
+      onPointerLeave={() => {
+        pointer.current = false
+        update()
+      }}
+      onFocus={(e) => {
+        // Keyboard focus only: a mouse click leaves focus on the button and must not hold the toast.
+        if (e.target.matches(':focus-visible')) {
+          focus.current = true
+          update()
+        }
+      }}
+      onBlur={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+          focus.current = false
+          update()
+        }
+      }}
+      className={cn(
+        'flex items-start gap-2 rounded-popover border bg-[var(--bg-primary)] px-3 py-2 text-xs text-[var(--text-primary)] shadow-lg',
+        toast.leaving ? 'pointer-events-none vicu-toast-out' : 'pointer-events-auto vicu-toast-in',
+        isError ? 'border-danger/60' : 'border-[var(--border-color)]'
+      )}
+    >
+      <span
+        className={cn(
+          'mt-1 h-1.5 w-1.5 shrink-0 rounded-full',
+          isError ? 'bg-danger' : toast.kind === 'success' ? 'bg-status-done' : 'bg-[var(--accent-blue)]'
+        )}
+        aria-hidden="true"
+      />
+      <span className="min-w-0 flex-1 break-words">{toast.message}</span>
+      {toast.action && (
+        <button
+          type="button"
+          onClick={() => {
+            toast.action?.onAction()
+            dismiss(id)
+          }}
+          className="shrink-0 rounded-control px-2 py-1 font-medium text-accent hover:bg-[var(--bg-hover)]"
+        >
+          {toast.action.label}
+        </button>
+      )}
+      <button
+        type="button"
+        onClick={() => dismiss(id)}
+        className="shrink-0 rounded-control p-1.5 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
+        aria-label="Dismiss"
+      >
+        <X className="h-3 w-3" />
+      </button>
     </div>
   )
 }

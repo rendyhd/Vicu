@@ -11,6 +11,7 @@ import {
 import { useAppConfig } from '@/hooks/use-app-config'
 import { useSelectionStore } from '@/stores/selection-store'
 import { useReviewNoticeStore } from '@/stores/review-notice-store'
+import { toast, useToastStore } from '@/stores/toast-store'
 import { ProjectBranch } from '@/components/review/ProjectBranch'
 import { SmartListIcon } from '@/components/shared/SmartListIcon'
 import { PageHeader } from '@/components/shared/PageHeader'
@@ -20,11 +21,7 @@ import type { Project } from '@/lib/vikunja-types'
 
 type Tab = 'due' | 'all'
 
-interface ToastState {
-  projectId: number
-  title: string
-  prevProject: Project
-}
+const REVIEW_TOAST_KEY = 'review-reviewed'
 
 function isEditableTarget(el: EventTarget | null): boolean {
   if (!(el instanceof HTMLElement)) return false
@@ -37,7 +34,6 @@ export function ReviewView() {
   const [reviewedThisSession, setReviewedThisSession] = useState<ReadonlySet<number>>(new Set())
   const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set())
   const [focusedId, setFocusedId] = useState<number | null>(null)
-  const [toast, setToast] = useState<ToastState | null>(null)
 
   const due = useReviewTree('due', reviewedThisSession)
   const all = useReviewTree('all', reviewedThisSession)
@@ -74,11 +70,13 @@ export function ReviewView() {
     })
   }
 
-  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const showToast = (t: ToastState) => {
-    if (toastTimer.current) clearTimeout(toastTimer.current)
-    setToast(t)
-    toastTimer.current = setTimeout(() => setToast(null), 6000)
+  // "Marked X reviewed, Undo" is an app toast (6 s, paused while the pointer or focus is on it).
+  const showReviewedToast = (prevProject: Project) => {
+    toast.success(`Marked ${prevProject.title} reviewed`, {
+      key: REVIEW_TOAST_KEY,
+      durationMs: 6000,
+      action: { label: 'Undo', onAction: () => handleUndo(prevProject) },
+    })
   }
 
   const handleMarkReviewed = (node: ReviewTreeNode) => {
@@ -94,7 +92,7 @@ export function ReviewView() {
     markReviewed.mutate(
       { project: prevProject },
       {
-        onSuccess: () => showToast({ projectId: prevProject.id, title: prevProject.title, prevProject }),
+        onSuccess: () => showReviewedToast(prevProject),
         onError: () =>
           setReviewedThisSession((prev) => {
             const next = new Set(prev)
@@ -113,20 +111,16 @@ export function ReviewView() {
     if (nextDue) setFocusedId(nextDue.project.id)
   }
 
-  const handleUndo = () => {
-    if (!toast) return
-    const undone = toast
+  const handleUndo = (undone: Project) => {
     restoreDescription.mutate(
-      { project: undone.prevProject },
-      { onError: () => setReviewedThisSession((prev) => new Set(prev).add(undone.projectId)) },
+      { project: undone },
+      { onError: () => setReviewedThisSession((prev) => new Set(prev).add(undone.id)) },
     )
     setReviewedThisSession((prev) => {
       const next = new Set(prev)
-      next.delete(toast.projectId)
+      next.delete(undone.id)
       return next
     })
-    if (toastTimer.current) clearTimeout(toastTimer.current)
-    setToast(null)
   }
 
   const collapseEverything = () => {
@@ -193,9 +187,8 @@ export function ReviewView() {
     return () => window.removeEventListener('keydown', handler)
   }, [])
 
-  useEffect(() => () => {
-    if (toastTimer.current) clearTimeout(toastTimer.current)
-  }, [])
+  // The toast belongs to this screen: leaving it takes the toast away.
+  useEffect(() => () => useToastStore.getState().remove(REVIEW_TOAST_KEY), [])
 
   // A failed save stays visible long enough to read, then clears itself.
   useEffect(() => {
@@ -321,7 +314,7 @@ export function ReviewView() {
           role="alert"
           className="absolute left-1/2 -translate-x-1/2"
           style={{
-            bottom: toast ? 72 : 20,
+            bottom: 20,
             display: 'flex',
             alignItems: 'center',
             gap: 12,
@@ -343,38 +336,6 @@ export function ReviewView() {
             style={{ fontSize: 13, fontWeight: 600, color: 'var(--accent-red)', cursor: 'pointer' }}
           >
             Dismiss
-          </button>
-        </div>
-      )}
-
-      {/* Undo toast */}
-      {toast && (
-        <div
-          className="absolute left-1/2 -translate-x-1/2"
-          style={{
-            bottom: 20,
-            display: 'flex',
-            alignItems: 'center',
-            gap: 12,
-            padding: '8px 12px 8px 14px',
-            borderRadius: 8,
-            background: 'var(--bg-secondary)',
-            border: '1px solid var(--border-color)',
-            boxShadow: '0 8px 24px rgba(0,0,0,0.18)',
-            fontSize: 13,
-            color: 'var(--text-primary)',
-            zIndex: 30,
-          }}
-        >
-          <span>
-            Marked <strong>{toast.title}</strong> reviewed
-          </span>
-          <button
-            type="button"
-            onClick={handleUndo}
-            style={{ fontSize: 13, fontWeight: 600, color: 'var(--accent-purple)', cursor: 'pointer' }}
-          >
-            Undo
           </button>
         </div>
       )}
