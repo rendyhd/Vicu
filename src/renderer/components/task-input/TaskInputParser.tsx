@@ -190,7 +190,7 @@ export function TaskInputParser({
   const hasTokens = enabled && parseResult && parseResult.tokens.length > 0
 
   return (
-    <div className={cn('relative', className)}>
+    <div data-token-scope className={cn('relative', className)}>
       {/* Input wrapper with highlight overlay */}
       <div className="relative">
         {hasTokens && (

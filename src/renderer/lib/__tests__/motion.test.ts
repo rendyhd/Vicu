@@ -121,3 +121,17 @@ describe('flipDelta', () => {
     expect(flipDelta(box(5, 5), box(5.2, 5.3))).toBeNull()
   })
 })
+
+describe('travelStart', () => {
+  it('starts the chip at the token: centre shift and a scale between 0.5 and 1', async () => {
+    const { travelStart } = await import('../motion')
+    const token = { left: 100, top: 10, width: 60, height: 18 }
+    const chip = { left: 20, top: 60, width: 80, height: 22 }
+    const from = travelStart(token, chip)
+    expect(from.dx).toBeCloseTo(130 - 60, 6)
+    expect(from.dy).toBeCloseTo(19 - 71, 6)
+    expect(from.scale).toBeCloseTo(0.75, 6)
+    expect(travelStart({ ...token, width: 10 }, chip).scale).toBe(0.5)
+    expect(travelStart({ ...token, width: 300 }, chip).scale).toBe(1)
+  })
+})

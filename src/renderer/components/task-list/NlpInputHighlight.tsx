@@ -38,7 +38,7 @@ export function NlpInputHighlight({ value, tokens, multiline = false }: NlpInput
 
   const colors = isDark ? tokenBgColorsDark : tokenBgColors
   const sorted = [...tokens].sort((a, b) => a.start - b.start)
-  const parts: Array<{ text: string; bg?: string }> = []
+  const parts: Array<{ text: string; bg?: string; type?: string }> = []
   let pos = 0
 
   for (const token of sorted) {
@@ -48,6 +48,7 @@ export function NlpInputHighlight({ value, tokens, multiline = false }: NlpInput
     parts.push({
       text: value.slice(token.start, token.end),
       bg: colors[token.type],
+      type: token.type,
     })
     pos = token.end
   }
@@ -66,7 +67,7 @@ export function NlpInputHighlight({ value, tokens, multiline = false }: NlpInput
     >
       {parts.map((part, i) =>
         part.bg ? (
-          <span key={i} style={{ background: part.bg, borderRadius: 3 }}>
+          <span key={i} data-token-type={part.type} style={{ background: part.bg, borderRadius: 3 }}>
             {escapeHtml(part.text)}
           </span>
         ) : (

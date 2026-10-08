@@ -429,6 +429,167 @@ html:active-view-transition-type(page) main {
   }
 }
 
+/*
+ * Signature moments (card 4.11a).
+ *
+ * Counts roll: the old number leaves and the new one comes in, over fade.base. A larger count
+ * rolls up, a smaller one down (RollingCount). Reduced motion: a cross-fade, no travel.
+ */
+@keyframes vicu-roll-in-up {
+  from {
+    opacity: 0;
+    translate: 0 60%;
+  }
+}
+
+@keyframes vicu-roll-in-down {
+  from {
+    opacity: 0;
+    translate: 0 -60%;
+  }
+}
+
+@keyframes vicu-roll-out-up {
+  to {
+    opacity: 0;
+    translate: 0 -60%;
+  }
+}
+
+@keyframes vicu-roll-out-down {
+  to {
+    opacity: 0;
+    translate: 0 60%;
+  }
+}
+
+.vicu-roll-in[data-roll-in='up'] {
+  animation: vicu-roll-in-up var(--dur-fade-base) var(--ease-enter) both;
+}
+
+.vicu-roll-in[data-roll-in='down'] {
+  animation: vicu-roll-in-down var(--dur-fade-base) var(--ease-enter) both;
+}
+
+.vicu-roll-out[data-roll-out='up'] {
+  animation: vicu-roll-out-up var(--dur-fade-base) var(--ease-exit) both;
+}
+
+.vicu-roll-out[data-roll-out='down'] {
+  animation: vicu-roll-out-down var(--dur-fade-base) var(--ease-exit) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vicu-roll-in[data-roll-in] {
+    animation: vicu-bar-fade var(--dur-fade-fast) var(--ease-standard) both;
+  }
+
+  .vicu-roll-out[data-roll-out] {
+    animation: vicu-fade-out var(--dur-fade-fast) var(--ease-standard) both;
+  }
+}
+
+/*
+ * All clear: when the last task of Today is done the empty state fades in and the sun warms from
+ * grey to its identity colour (the colour of the icon only, never of text). Reduced motion: the fade.
+ */
+@keyframes vicu-warm {
+  from {
+    color: var(--text-tertiary);
+  }
+}
+
+.vicu-all-clear {
+  animation: vicu-bar-fade var(--dur-fade-base) var(--ease-enter) both;
+}
+
+.vicu-warm {
+  animation: vicu-warm var(--dur-move-expressive) var(--ease-standard) var(--dur-fade-fast) backwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vicu-all-clear {
+    animation-duration: var(--dur-fade-fast);
+  }
+
+  .vicu-warm {
+    animation: none;
+  }
+}
+
+/*
+ * A stuck section header gets a hairline under it (ListSectionHeader reports it with data-stuck).
+ */
+.vicu-hairline {
+  opacity: 0;
+  transition: opacity var(--dur-fade-fast) var(--ease-standard);
+}
+
+[data-stuck] > .vicu-hairline {
+  opacity: 1;
+}
+
+/*
+ * Skeleton rows shimmer once: a light sweeps across each placeholder, then they rest. Reduced
+ * motion: they fade in instead.
+ */
+@keyframes vicu-shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
+}
+
+.vicu-shimmer {
+  background-image: linear-gradient(100deg, transparent 30%, var(--bg-primary) 50%, transparent 70%);
+  background-size: 200% 100%;
+  background-repeat: no-repeat;
+  background-position: 200% 0;
+  animation: vicu-shimmer calc(var(--dur-move-expressive) * 3) var(--ease-standard) 1 both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vicu-shimmer {
+    background-image: none;
+    animation: vicu-bar-fade var(--dur-fade-base) var(--ease-enter) both;
+  }
+}
+
+/*
+ * Setup steps slide: the next step comes in from the right (back: from the left) with a fade. Reduced
+ * motion: the fade only.
+ */
+@keyframes vicu-step-forward {
+  from {
+    opacity: 0;
+    translate: 24px 0;
+  }
+}
+
+@keyframes vicu-step-back {
+  from {
+    opacity: 0;
+    translate: -24px 0;
+  }
+}
+
+.vicu-step-forward {
+  animation: vicu-step-forward var(--dur-fade-base) var(--ease-enter) both;
+}
+
+.vicu-step-back {
+  animation: vicu-step-back var(--dur-fade-base) var(--ease-enter) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vicu-step-forward,
+  .vicu-step-back {
+    animation: vicu-bar-fade var(--dur-fade-fast) var(--ease-standard) both;
+  }
+}
+
 /* Thin overlay scrollbar — light mode */
 .custom-scrollbar::-webkit-scrollbar,
 .overflow-y-auto::-webkit-scrollbar {

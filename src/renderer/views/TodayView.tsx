@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTasks } from '@/hooks/use-tasks'
 import { useProjects } from '@/hooks/use-projects'
 import { useFilters } from '@/hooks/use-filters'
@@ -19,6 +19,7 @@ import { RoutineTodaySection } from '@/components/routines/RoutineTodaySection'
 import { useRoutines } from '@/hooks/use-routines'
 import { isFinished } from '@/lib/routines'
 import { ListSkeleton } from '@/components/shared/ListSkeleton'
+import { NextUpcomingOffer } from '@/components/task-list/NextUpcomingOffer'
 
 function groupByProject(tasks: Task[], projectsFlat?: { id: number; title: string; hex_color?: string }[]) {
   const activeIds = new Set(projectsFlat?.map((project) => project.id) ?? [])
@@ -100,6 +101,13 @@ export function TodayView() {
   const now = new Date()
   const dateStr = formatDateDisplay('header.full', now, now, true, dateFormat)
 
+  // Empty after having had tasks in this visit (the last one was done): All clear warms in and offers
+  // the next upcoming task. Empty from the start it simply shows.
+  const empty = overdueTasks.length === 0 && todayTasks.length === 0 && !routinesLeft
+  const hadTasks = useRef(false)
+  if (!empty) hadTasks.current = true
+  const justCleared = empty && hadTasks.current
+
   if (isLoading) {
     return <ListSkeleton title="Today" identity="today" subtitle={dateStr} />
   }
@@ -114,9 +122,11 @@ export function TodayView() {
         showNewTask={!!inboxProjectId && projects?.flat.some((project) => project.id === inboxProjectId)}
         defaultDueDate={today}
         subtitle={dateStr}
-        empty={overdueTasks.length === 0 && todayTasks.length === 0 && !routinesLeft}
+        empty={empty}
         emptyTitle="All clear"
         emptySubtitle="Nothing is due today"
+        emptyWarm={justCleared}
+        emptyExtra={empty ? <NextUpcomingOffer /> : undefined}
       >
         {routinesShown && <RoutineTodaySection hideFinished />}
         {overdueTasks.length > 0 && (

@@ -110,6 +110,10 @@ asserts the focus ring on every stop, the 20 px checkbox with its 24 px hit area
 `motion-popover` (id MP, card 4.1) opens a popover, a menu and a tooltip with full motion and samples
 the enter frame by frame (opacity, scale from 0.96), freezes a mid-animation frame for a capture, checks the
 leaving copy, then repeats with `--motion reduce` and asserts no scale, transform or translate.
+`moments` (id MO, card 4.11a) captures each signature moment mid-motion (animations paused at 40 percent) and settled:
+the skeleton shimmer (it pauses the test server with `docker pause`, resumes it afterwards), rolling counts, a token travelling
+into its chip, the stuck-header hairline and Today turning into All clear. Run seed.mjs before it (it completes every Today
+task) and after it; it runs with `--motion reduce` too.
 Scenario code computes dates from the run day (`lib.mjs`: `localDate`, `comingWeekday`, `at`).
 
 The helpers on `h`:

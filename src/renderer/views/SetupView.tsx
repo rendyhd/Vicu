@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Button } from '@/components/shared/Button'
 import { api, type OIDCProvider, type ServerAuthInfo } from '@/lib/api'
 import { cn } from '@/lib/cn'
@@ -83,12 +83,20 @@ export { TokenPermissionsInfo }
 
 type Step = 'url' | 'auth-method' | 'oidc-login' | 'oidc-totp' | 'password-login' | 'totp' | 'api-token' | 'project'
 
+// The order the steps are reached in; a step later in it slides in from the right, an earlier one from the left.
+const STEP_ORDER: Step[] = ['url', 'auth-method', 'oidc-login', 'oidc-totp', 'password-login', 'totp', 'api-token', 'project']
+
 interface SetupViewProps {
   onComplete: () => void
 }
 
 export function SetupView({ onComplete }: SetupViewProps) {
   const [step, setStep] = useState<Step>('url')
+  // Which way the step slid (card 4.11a), read while rendering so the new step starts sliding in its first frame.
+  const shown = useRef<{ step: Step; direction: 'forward' | 'back' | null }>({ step: 'url', direction: null })
+  if (shown.current.step !== step) {
+    shown.current = { step, direction: STEP_ORDER.indexOf(step) >= STEP_ORDER.indexOf(shown.current.step) ? 'forward' : 'back' }
+  }
   const [url, setUrl] = useState('')
   const [token, setToken] = useState('')
   const [showToken, setShowToken] = useState(false)
@@ -307,7 +315,7 @@ export function SetupView({ onComplete }: SetupViewProps) {
           {step === 'project' && 'Choose your inbox project.'}
         </p>
 
-        <div className="space-y-4">
+        <div key={step} data-step={step} data-step-direction={shown.current.direction ?? undefined} className={cn('space-y-4', shown.current.direction === 'forward' && 'vicu-step-forward', shown.current.direction === 'back' && 'vicu-step-back')}>
           {/* Step 1: URL Input */}
           {step === 'url' && (
             <>

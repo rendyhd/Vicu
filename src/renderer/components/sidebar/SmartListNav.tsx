@@ -1,6 +1,7 @@
 import { useNavigate, useMatches } from '@tanstack/react-router'
 import { cn } from '@/lib/cn'
 import { SelectionPill } from './SelectionPill'
+import { RollingCount } from '@/components/shared/RollingCount'
 import { SmartListIcon } from '@/components/shared/SmartListIcon'
 import type { SmartListId } from '@/lib/smart-list-identity'
 import { useReviewBadgeCount, useReviewFeatureEnabled } from '@/hooks/use-review'
@@ -77,9 +78,7 @@ export function SmartListNav() {
             <SmartListIcon list={item.id} className="h-4 w-4" />
             <span className="flex-1 text-left">{item.label}</span>
             {count > 0 && (
-              <span className="text-[11px] font-semibold tabular-nums text-[var(--text-secondary)]">
-                {count}
-              </span>
+              <RollingCount value={count} className="text-[11px] font-semibold text-[var(--text-secondary)]" />
             )}
             {isActive && <SelectionPill />}
           </button>

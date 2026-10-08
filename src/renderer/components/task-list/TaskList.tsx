@@ -37,6 +37,10 @@ interface TaskListProps {
   projectId?: number
   emptyTitle?: string
   emptySubtitle?: string
+  /** The list has just been emptied: the empty state warms in (Today's All clear). */
+  emptyWarm?: boolean
+  /** Under the empty state's title (the next upcoming task). */
+  emptyExtra?: React.ReactNode
   showNewTask?: boolean
   sortable?: boolean
   viewId?: number
@@ -66,6 +70,8 @@ export function TaskList({
   projectId,
   emptyTitle = 'No tasks',
   emptySubtitle,
+  emptyWarm,
+  emptyExtra,
   showNewTask = true,
   sortable = false,
   viewId,
@@ -535,6 +541,8 @@ export function TaskList({
             identity={identity}
             title={emptyTitle}
             subtitle={emptySubtitle}
+            warm={emptyWarm}
+            extra={emptyExtra}
             action={
               showNewTask && projectId ? (
                 <Button variant="secondary" onClick={startAdding}>

@@ -159,6 +159,18 @@ export function flipDelta(first: Box, last: Box): { dx: number; dy: number } | n
   return Math.abs(dx) < MIN_SHIFT && Math.abs(dy) < MIN_SHIFT ? null : { dx, dy }
 }
 
+/**
+ * Where a chip starts when it travels out of the token it was read from (card 4.11a): the shift from
+ * the chip's centre to the token's centre, and the scale that makes the chip as wide as the token
+ * (not below 0.5, not above 1).
+ */
+export function travelStart(token: Box, chip: Box): { dx: number; dy: number; scale: number } {
+  const dx = token.left + token.width / 2 - (chip.left + chip.width / 2)
+  const dy = token.top + token.height / 2 - (chip.top + chip.height / 2)
+  const scale = chip.width > 0 ? Math.min(1, Math.max(0.5, token.width / chip.width)) : 1
+  return { dx, dy, scale }
+}
+
 /** The position of every element now, to hand to `animateFLIP` after the layout changed. */
 export function measureRects(elements: Iterable<HTMLElement>): Map<HTMLElement, DOMRect> {
   const rects = new Map<HTMLElement, DOMRect>()
