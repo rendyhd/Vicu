@@ -352,22 +352,23 @@ textarea {
   color: var(--text-secondary);
 }
 
-/* Priority indicator */
+/* Priority mark: the shared SVG (src/shared/priority-mark-svg.ts), drawn in the role colour at the end of the row */
 .task-priority {
-  display: inline-block;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  margin-right: 6px;
+  display: inline-flex;
   flex-shrink: 0;
-  margin-top: 6px;
+  align-self: flex-start;
+  margin-left: 0;
+  margin-top: 2px;
+  line-height: 0;
 }
 
-.task-priority.priority-1 { background: var(--priority-low); }
-.task-priority.priority-2 { background: var(--priority-medium); }
-.task-priority.priority-3 { background: var(--priority-high); }
-.task-priority.priority-4 { background: var(--priority-urgent); }
-.task-priority.priority-5 { background: var(--priority-urgent); }
+.task-priority svg { display: block; }
+
+.task-priority.priority-1 { color: var(--priority-low); }
+.task-priority.priority-2 { color: var(--priority-medium); }
+.task-priority.priority-3 { color: var(--priority-high); }
+.task-priority.priority-4 { color: var(--priority-urgent); }
+.task-priority.priority-5 { color: var(--priority-urgent); }
 
 /* Selected task */
 .task-item.selected {

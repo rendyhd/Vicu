@@ -68,6 +68,7 @@ import { diffLocalDays, dueToday, isDateOnly, isNoDueDate, toLocalDate } from '@
 import { followColorScheme } from '@/lib/theme'
 import { formatDateDisplay } from '@/lib/date-display'
 import { getDateFormat, initDateFormat, subscribeDateFormat } from '@/lib/date-format'
+import { priorityMarkSvg } from '../../shared/priority-mark-svg'
 import {
   hasRichDescriptionBody,
   plainTextFromDescriptionLines,
@@ -206,12 +207,6 @@ function buildTaskItemDOM(task: TaskData): HTMLElement {
   item.dataset.taskId = String(task.id)
   item.dataset.task = JSON.stringify(task)
 
-  if (task.priority && task.priority > 0) {
-    const priority = document.createElement('span')
-    priority.className = `task-priority priority-${Math.min(task.priority, 5)}`
-    item.appendChild(priority)
-  }
-
   const checkbox = document.createElement('input') as HTMLInputElement
   checkbox.type = 'checkbox'
   checkbox.className = 'task-checkbox'
@@ -310,6 +305,14 @@ function buildTaskItemDOM(task: TaskData): HTMLElement {
   }
 
   item.appendChild(content)
+  // The priority mark closes the row (the shared SVG, drawn in the priority role colour).
+  const markSvg = priorityMarkSvg(task.priority)
+  if (markSvg) {
+    const mark = document.createElement('span')
+    mark.className = `task-priority priority-${Math.min(task.priority, 5)}`
+    mark.innerHTML = markSvg
+    item.appendChild(mark)
+  }
   return item
 }
 

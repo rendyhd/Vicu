@@ -2,7 +2,6 @@ import { useState, useRef, useEffect, useLayoutEffect, useMemo } from 'react'
 import type { PopoverCloseReason } from '../overlay/Popover'
 import { Check, Copy, CheckCircle2, Trash2 } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
-import { cn } from '@/lib/cn'
 import { isNullDate } from '@/lib/date-utils'
 import { normalizeHex, NULL_DATE } from '@/lib/constants'
 import { useAppConfig } from '@/hooks/use-app-config'
@@ -16,6 +15,7 @@ import { DatePickerPopover } from './DatePickerPopover'
 import { ProjectPickerPopover } from './ProjectPickerPopover'
 import { LabelPickerPopover } from './LabelPickerPopover'
 import { PRIORITY_OPTIONS } from './PriorityPickerPopover'
+import { PriorityMark } from '../shared/PriorityMark'
 
 interface TaskContextMenuProps {
   /** The right-clicked row — guarantees at least one target if the cache can't resolve the selection. */
@@ -195,7 +195,7 @@ export function TaskContextMenu({ fallbackTask, x, y, onClose }: TaskContextMenu
           className={itemClass}
           onClick={run(() => actions.setPriority(option.value))}
         >
-          <span className={cn('h-2.5 w-2.5 shrink-0 rounded-full', option.dot)} />
+          <PriorityMark priority={option.value} decorative />
           <span className="min-w-0 flex-1 truncate">{option.label}</span>
           {tasks.every((t) => t.priority === option.value) && (
             <Check className="h-3.5 w-3.5 shrink-0 text-[var(--accent-blue)]" />
@@ -204,7 +204,7 @@ export function TaskContextMenu({ fallbackTask, x, y, onClose }: TaskContextMenu
       ))}
       {anyHasPriority && (
         <button type="button" className={itemClass} onClick={run(actions.clearPriority)}>
-          <span className="h-2.5 w-2.5 shrink-0" />
+          <span className="h-3.5 w-3.5 shrink-0" />
           <span className="min-w-0 flex-1 truncate">Clear priority</span>
         </button>
       )}

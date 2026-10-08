@@ -18,7 +18,7 @@ import { useIsDark } from '@/hooks/use-is-dark'
 import type { Task, TaskReminder } from '@/lib/vikunja-types'
 import { TaskCheckbox } from './TaskCheckbox'
 import { TaskDueBadge } from './TaskDueBadge'
-import { PriorityDot } from '@/components/shared/PriorityDot'
+import { PriorityMark } from '@/components/shared/PriorityMark'
 import { DatePickerPopover } from './DatePickerPopover'
 import { LabelPickerPopover } from './LabelPickerPopover'
 import { SubtaskList } from './SubtaskList'
@@ -572,7 +572,7 @@ function TaskRowInner({ task, nestedDepth = 0, parentProjectId, drag }: Omit<Tas
             {labels.map((l) => (
               <span
                 key={l.id}
-                className="rounded-full px-1.5 py-px text-caption font-medium leading-tight"
+                className="rounded-chip px-2 py-px text-chip leading-tight"
                 style={labelChipStyle(l.hex_color, isDark)}
               >
                 {l.title}
@@ -652,8 +652,8 @@ function TaskRowInner({ task, nestedDepth = 0, parentProjectId, drag }: Omit<Tas
           {(task.reminders?.length ?? 0) > 0 && (
             <Bell className="h-3 w-3 text-[var(--text-secondary)]" />
           )}
-          <PriorityDot priority={task.priority} />
           <TaskDueBadge dueDate={task.due_date} />
+          <PriorityMark priority={task.priority} />
         </div>
       </div>
       {contextMenu && (
@@ -757,7 +757,7 @@ function TaskRowInner({ task, nestedDepth = 0, parentProjectId, drag }: Omit<Tas
           {labels.map((l) => (
             <span
               key={l.id}
-              className="rounded-full px-2 py-0.5 text-caption font-medium"
+              className="rounded-chip px-2 py-0.5 text-chip"
               style={labelChipStyle(l.hex_color, isDark)}
             >
               {l.title}
@@ -772,7 +772,7 @@ function TaskRowInner({ task, nestedDepth = 0, parentProjectId, drag }: Omit<Tas
               {formatRecurrenceLabel(task.repeat_after ?? 0, task.repeat_mode ?? 0)}
             </span>
           )}
-          <PriorityDot priority={task.priority} />
+          <PriorityMark priority={task.priority} />
         </div>
 
         {/* Action buttons */}

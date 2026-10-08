@@ -428,9 +428,9 @@ function renderParsePreview(result: ParseResult): void {
     chips.push(`<span class="parse-chip parse-chip-date">${escapeHtml(label)}<button class="parse-chip-dismiss" data-type="date">&times;</button></span>`)
   }
   if (result.priority !== null && result.priority > 0) {
-    const labels = ['', 'Low', 'Medium', 'High', 'Urgent']
+    const labels = ['', 'Low', 'Medium', 'High', 'Urgent', 'Do now']
     const label = labels[result.priority] || `P${result.priority}`
-    chips.push(`<span class="parse-chip parse-chip-priority">${escapeHtml(label)}<button class="parse-chip-dismiss" data-type="priority">&times;</button></span>`)
+    chips.push(`<span class="parse-chip parse-chip-priority priority-${Math.min(Math.max(result.priority, 1), 5)}">${escapeHtml(label)}<button class="parse-chip-dismiss" data-type="priority">&times;</button></span>`)
   }
   for (const lbl of result.labels) {
     chips.push(`<span class="parse-chip parse-chip-label">${escapeHtml(lbl)}<button class="parse-chip-dismiss" data-type="label">&times;</button></span>`)
