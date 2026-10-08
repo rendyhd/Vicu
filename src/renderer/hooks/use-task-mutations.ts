@@ -465,6 +465,35 @@ export function useDeleteTask() {
   })
 }
 
+/** What a reorder changed in the caches, to put back when the write fails. */
+export interface ReorderSnapshot {
+  previousViewQueries: [readonly unknown[], Task[] | undefined][]
+  previousSectionQueries: [readonly unknown[], SectionTaskCacheEntry[] | undefined][]
+}
+
+/**
+ * Writes the new position (and any renumbered ones) into the cached lists and sorts them, so the
+ * array order matches the new visual order at once. Without sorting, @dnd-kit clears transforms on
+ * drop and items snap back to the old array order. Returns the previous data for a rollback.
+ */
+export function applyReorderToCache(
+  qc: ReturnType<typeof useQueryClient>,
+  { taskId, position, renumbered = [] }: { taskId: number; position: number; renumbered?: PositionUpdate[] },
+): ReorderSnapshot {
+  const previousViewQueries = qc.getQueriesData<Task[]>({ queryKey: ['view-tasks'] })
+  const previousSectionQueries = qc.getQueriesData<SectionTaskCacheEntry[]>({ queryKey: ['section-tasks'] })
+  const updates = [...renumbered, { taskId, position }]
+  qc.setQueriesData<Task[]>({ queryKey: ['view-tasks'] }, (old) => (old ? sortProjectTasks(applyPositionUpdates(old, updates)) : old))
+  qc.setQueriesData<SectionTaskCacheEntry[]>({ queryKey: ['section-tasks'] }, (old) => {
+    if (!old) return old
+    return old.map((section) => {
+      if (!section.tasks.some((t) => t.id === taskId)) return section
+      return { ...section, tasks: sortProjectTasks(applyPositionUpdates(section.tasks, updates)) }
+    })
+  })
+  return { previousViewQueries, previousSectionQueries }
+}
+
 export function useReorderTask() {
   const qc = useQueryClient()
 
@@ -481,6 +510,8 @@ export function useReorderTask() {
       position: number
       /** Other tasks whose positions change too: tasks that shared a position are spread apart (see planMove). */
       renumbered?: PositionUpdate[]
+      /** The caller already wrote the new order into the caches (a drop does, so it is on screen at once): what to put back on failure. */
+      applied?: ReorderSnapshot
     }) => {
       // Positions are per view and are not queued offline.
       if (isTempTaskId(taskId) || renumbered.some((update) => isTempTaskId(update.taskId))) {
@@ -497,32 +528,10 @@ export function useReorderTask() {
       // A task dragged to the end moves the end of the list; the next new task goes after it.
       newTaskPlacer.noteViewPosition(viewId, Math.max(position, ...renumbered.map((update) => update.position)))
     },
-    onMutate: ({ taskId, position, renumbered = [] }) => {
+    onMutate: ({ taskId, position, renumbered = [], applied }) => {
       qc.cancelQueries({ queryKey: ['view-tasks'] })
       qc.cancelQueries({ queryKey: ['section-tasks'] })
-      const previousViewQueries = qc.getQueriesData<Task[]>({ queryKey: ['view-tasks'] })
-      const previousSectionQueries = qc.getQueriesData<SectionTaskCacheEntry[]>({
-        queryKey: ['section-tasks'],
-      })
-
-      // Update position AND sort so the array order matches the new visual order immediately.
-      // Without sorting, @dnd-kit clears transforms on drop and items snap back to the old array order.
-      const updates = [...renumbered, { taskId, position }]
-      const reorderTasks = (old: Task[] | undefined) => {
-        if (!old) return old
-        return sortProjectTasks(applyPositionUpdates(old, updates))
-      }
-
-      qc.setQueriesData<Task[]>({ queryKey: ['view-tasks'] }, reorderTasks)
-      qc.setQueriesData<SectionTaskCacheEntry[]>({ queryKey: ['section-tasks'] }, (old) => {
-        if (!old) return old
-        return old.map((section) => {
-          if (!section.tasks.some((t) => t.id === taskId)) return section
-          return { ...section, tasks: sortProjectTasks(applyPositionUpdates(section.tasks, updates)) }
-        })
-      })
-
-      return { previousViewQueries, previousSectionQueries }
+      return applied ?? applyReorderToCache(qc, { taskId, position, renumbered })
     },
     onError: (_err, _vars, context) => {
       if (context?.previousViewQueries) {

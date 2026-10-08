@@ -406,6 +406,29 @@ html:active-view-transition-type(page) main {
   }
 }
 
+/*
+ * Dragging a task row (card 4.8). The overlay lifts on pickup: scale 1.02 and the deeper shadow it
+ * already has, over fade.fast. The drop animation settles the scale again (lib/drop-animation.ts).
+ * Reduced motion: no lift.
+ */
+@keyframes vicu-lift {
+  from {
+    scale: 1;
+  }
+}
+
+.vicu-lift {
+  scale: 1.02;
+  animation: vicu-lift var(--dur-fade-fast) var(--ease-enter);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vicu-lift {
+    scale: none;
+    animation: none;
+  }
+}
+
 /* Thin overlay scrollbar — light mode */
 .custom-scrollbar::-webkit-scrollbar,
 .overflow-y-auto::-webkit-scrollbar {

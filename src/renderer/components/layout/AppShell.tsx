@@ -1,10 +1,9 @@
-import { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react'
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Outlet, useMatches, useNavigate } from '@tanstack/react-router'
 import {
   DndContext,
   DragOverlay,
-  defaultDropAnimationSideEffects,
   PointerSensor,
   pointerWithin,
   rectIntersection,
@@ -12,10 +11,13 @@ import {
   useSensors,
 } from '@dnd-kit/core'
 import type { CollisionDetection, DragStartEvent, DragEndEvent } from '@dnd-kit/core'
-import { CSS } from '@dnd-kit/utilities'
 import { useSidebarStore } from '@/stores/sidebar-store'
 import { useSelectionStore } from '@/stores/selection-store'
-import { useUpdateTask, useReorderTask, useReorderProject, useAddLabel } from '@/hooks/use-task-mutations'
+import { useUpdateTask, useReorderTask, useReorderProject, useAddLabel, applyReorderToCache } from '@/hooks/use-task-mutations'
+import { commitSync } from '@/lib/sync-commit'
+import { taskDropAnimation } from '@/lib/drop-animation'
+import { motionEasing, motionMs } from '@/lib/motion'
+import { useReducedMotion } from '@/hooks/use-reduced-motion'
 import { useConfirmDelete } from '@/hooks/use-confirm-delete'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { registerConfirm } from '@/lib/confirm-bridge'
@@ -124,6 +126,12 @@ export function AppShell() {
   const reorderTask = useReorderTask()
   const reorderProject = useReorderProject()
   const addLabel = useAddLabel()
+  const reducedMotion = useReducedMotion()
+  // The drop travels into the slot over fade.base with the enter curve; reduced motion has none.
+  const dropAnimation = useMemo(
+    () => taskDropAnimation({ duration: motionMs('fade-base'), easing: motionEasing('enter') }, reducedMotion),
+    [reducedMotion],
+  )
   const dragging = useRef(false)
   const startX = useRef(0)
   const startWidth = useRef(0)
@@ -378,11 +386,18 @@ export function AppShell() {
               // Usually one position. Tasks that share a position (every task moved into a
               // project starts at 0) cannot be told apart by a midpoint, so planMove then spreads them.
               const move = planMove(sourceTasks, oldIndex, newIndex)
+              // The new order is rendered before the drag ends: the overlay then travels into the
+              // slot the row really has, and no row is drawn in its old place for a frame.
+              let applied: ReturnType<typeof applyReorderToCache> | undefined
+              commitSync(() => {
+                applied = applyReorderToCache(queryClient, { taskId: task.id, position: move.position, renumbered: move.renumbered })
+              })
               reorderTask.mutate({
                 taskId: task.id,
                 viewId: sourceViewId,
                 position: move.position,
                 renumbered: move.renumbered,
+                applied,
               })
             }
           } else if (destViewId && destProjectId && destProjectId !== task.project_id) {
@@ -695,19 +710,7 @@ export function AppShell() {
         <CommandPalette />
       </div>
 
-      <DragOverlay
-        dropAnimation={{
-          duration: 150,
-          easing: 'ease',
-          keyframes: ({ transform: { initial } }) => [
-            { opacity: 1, transform: CSS.Transform.toString(initial) },
-            { opacity: 0, transform: CSS.Transform.toString(initial) },
-          ],
-          sideEffects: defaultDropAnimationSideEffects({
-            styles: { active: { opacity: '0' } },
-          }),
-        }}
-      >
+      <DragOverlay dropAnimation={dropAnimation}>
         {dragItem?.type === 'task' && (
           <TaskDragOverlay task={dragItem.task} count={dragItem.tasks.length} />
         )}

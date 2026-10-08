@@ -69,15 +69,11 @@ function sameRowProps(a: TaskRowProps, b: TaskRowProps): boolean {
   )
 }
 
-// Animate displacement during active drag, but never animate layout changes after drop.
-// The default FLIP animation after drop causes a visual "bump" because items briefly
-// snap to their old positions before animating to new ones.
-const sortableAnimateLayoutChanges: AnimateLayoutChanges = (args) => {
-  if (args.isSorting) {
-    return defaultAnimateLayoutChanges(args)
-  }
-  return false
-}
+// dnd-kit's own layout animation is on again (card 4.8). It used to be off after a drop because the
+// rows were drawn in their old order for a frame before the list reordered, which looked like a
+// bump; the drop now renders the new order first (AppShell, commitSync), so the dragged row's
+// layout animation starts from where it was and ends in its slot, hidden under the drag overlay.
+const sortableAnimateLayoutChanges: AnimateLayoutChanges = defaultAnimateLayoutChanges
 
 /**
  * What a row takes from drag and drop, whichever hook provided it. The hooks' `attributes` (role

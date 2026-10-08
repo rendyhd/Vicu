@@ -42,6 +42,13 @@ function expandedNow(get: Get): number | null {
   return requested ? requested.id : get().expandedTaskId
 }
 
+/**
+ * The expanded task as the user last asked for it. Key handlers read this instead of
+ * `getState().expandedTaskId`, which still shows the old task while an open/close transition has not
+ * applied its change yet (two handlers for one key press would otherwise disagree).
+ */
+export const currentExpandedTaskId = (): number | null => expandedNow(useSelectionStore.getState)
+
 function expand(get: Get, set: SetState, next: number | null): void {
   const current = expandedNow(get)
   if (current === next) return

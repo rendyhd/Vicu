@@ -24,7 +24,11 @@ export function useCompletionCollapse(taskId: number, rowRef: RefObject<HTMLElem
     let live = true
     animation.finished.then(
       () => {
-        if (live) completionHold.finishCollapse(taskId)
+        if (live) {
+          // Marks the element so the list's removal motion (use-list-motion) does not close it again.
+          el.dataset.rowClosed = ''
+          completionHold.finishCollapse(taskId)
+        }
       },
       () => {}
     )

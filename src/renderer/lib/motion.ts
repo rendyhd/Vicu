@@ -169,6 +169,41 @@ export function measureRects(elements: Iterable<HTMLElement>): Map<HTMLElement, 
 export interface FlipOptions {
   /** The move was caused by the keyboard: it is capped at the keyboard-move token and does not bounce. */
   keyboard?: boolean
+  /** Start each element a little after the one before it (the stagger token, at most its maximum). */
+  stagger?: boolean
+}
+
+/** The start delay of the element at `index` in a staggered group: `stepMs` apart, the index capped at `max`. */
+export function staggerDelay(index: number, stepMs: number, max: number): number {
+  return Math.max(0, Math.min(index, max)) * stepMs
+}
+
+/** The delay of element `index` of a staggered group, from the --stagger and --stagger-max tokens. */
+export function motionStagger(index: number): number {
+  const step = parseCssTime(rootStyle()?.getPropertyValue('--stagger') ?? '')
+  const max = Number(rootStyle()?.getPropertyValue('--stagger-max')) || 5
+  return staggerDelay(index, step, max)
+}
+
+/**
+ * Plays one element from `(dx, dy)` away to where it is: the spring of `token`, or capped and
+ * eased for a keyboard move. Does nothing under reduced motion. Returns the animation.
+ */
+export function playMoveFrom(
+  el: HTMLElement,
+  dx: number,
+  dy: number,
+  token: Extract<MotionSpringToken, 'move' | 'move-expressive'> = 'move',
+  { keyboard = false, delay = 0 }: { keyboard?: boolean; delay?: number } = {},
+): Animation | null {
+  if (readReducedMotion() || typeof el.animate !== 'function') return null
+  if (Math.abs(dx) < MIN_SHIFT && Math.abs(dy) < MIN_SHIFT) return null
+  return el.animate([{ transform: `translate(${dx}px, ${dy}px)` }, { transform: 'translate(0, 0)' }], {
+    duration: keyboard ? Math.min(motionMs(token), motionMs('keyboard-move-max')) : motionMs(token),
+    easing: keyboard ? motionEasing('standard') : motionSpringCurve(token),
+    delay,
+    fill: 'backwards',
+  })
 }
 
 /**
@@ -181,23 +216,21 @@ export function animateFLIP(
   elements: Iterable<HTMLElement>,
   first: ReadonlyMap<HTMLElement, DOMRect>,
   token: Extract<MotionSpringToken, 'move' | 'move-expressive'> = 'move',
-  { keyboard = false }: FlipOptions = {},
+  { keyboard = false, stagger = false }: FlipOptions = {},
 ): Animation[] {
   if (readReducedMotion()) return []
   const running: Animation[] = []
-  const duration = keyboard ? Math.min(motionMs(token), motionMs('keyboard-move-max')) : motionMs(token)
-  const easing = keyboard ? motionEasing('standard') : motionSpringCurve(token)
+  let index = 0
   for (const el of elements) {
     const before = first.get(el)
-    if (!before || typeof el.animate !== 'function') continue
+    if (!before) continue
     const delta = flipDelta(before, el.getBoundingClientRect())
     if (!delta) continue
-    running.push(
-      el.animate([{ transform: `translate(${delta.dx}px, ${delta.dy}px)` }, { transform: 'translate(0, 0)' }], {
-        duration,
-        easing,
-      }),
-    )
+    const animation = playMoveFrom(el, delta.dx, delta.dy, token, { keyboard, delay: stagger ? motionStagger(index) : 0 })
+    if (animation) {
+      running.push(animation)
+      index++
+    }
   }
   return running
 }

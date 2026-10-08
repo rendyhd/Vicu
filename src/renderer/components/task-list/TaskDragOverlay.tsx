@@ -16,7 +16,7 @@ export function TaskDragOverlay({ task, count = 1 }: TaskDragOverlayProps) {
           <div className="absolute inset-x-1 -bottom-[3px] h-10 rounded-card border-2 border-accent-blue/50 bg-[var(--bg-primary)]" />
         </>
       )}
-      <div className="relative flex h-10 items-center gap-3 rounded-card border-2 border-[var(--accent-blue)] bg-[var(--bg-primary)] px-4 shadow-lg">
+      <div className="vicu-lift relative flex h-10 items-center gap-3 rounded-card border-2 border-[var(--accent-blue)] bg-[var(--bg-primary)] px-4 shadow-xl">
         <div className="h-5 w-5 shrink-0 rounded-full border border-control-ring" />
         <span className="truncate text-task-title text-text">{task.title}</span>
         {multi && (

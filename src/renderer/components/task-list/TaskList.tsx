@@ -6,7 +6,7 @@ import { cn } from '@/lib/cn'
 import { verticalListSortingStrategyForeignSafe } from '@/lib/sortable-strategy'
 import { useCompleteTask, useUpdateTask, useDeleteTask } from '@/hooks/use-task-mutations'
 import { usePasteTasks } from '@/hooks/use-paste-tasks'
-import { useSelectionStore } from '@/stores/selection-store'
+import { currentExpandedTaskId, useSelectionStore } from '@/stores/selection-store'
 import { useNewTaskRequestStore } from '@/stores/new-task-request-store'
 import { orderedTaskIds, resolveSelectedTasks, copySelectedTitles, isTaskNestedInCurrentList } from '@/lib/task-selection'
 import { confirmDelete } from '@/lib/confirm-bridge'
@@ -95,7 +95,6 @@ export function TaskList({
   const focusedTaskId = useSelectionStore((s) => s.focusedTaskId)
   const setFocusedTask = useSelectionStore((s) => s.setFocusedTask)
   const setExpandedTask = useSelectionStore((s) => s.setExpandedTask)
-  const toggleExpandedTask = useSelectionStore((s) => s.toggleExpandedTask)
   const collapseAll = useSelectionStore((s) => s.collapseAll)
   const setSelectedRange = useSelectionStore((s) => s.setSelectedRange)
   const clearSelection = useSelectionStore((s) => s.clearSelection)
@@ -195,7 +194,8 @@ export function TaskList({
 
       // Handler wants current-at-keypress values — read imperatively instead
       // of subscribing the whole list to selection/expansion changes.
-      const { expandedTaskId, selectedTaskIds } = useSelectionStore.getState()
+      const { selectedTaskIds } = useSelectionStore.getState()
+      const expandedTaskId = currentExpandedTaskId()
 
       // --- Multi-selection shortcuts (work even when this list's own `tasks`
       // prop is empty, e.g. a project whose tasks all live in sections) ---
@@ -330,7 +330,9 @@ export function TaskList({
       if (e.key === 'Enter' && !e.ctrlKey && !e.metaKey && (!active || active === document.body || active.hasAttribute('data-task-id'))) {
         e.preventDefault()
         if (focusedTaskId && !expandedTaskId) {
-          toggleExpandedTask(focusedTaskId)
+          // Not a toggle: the row's own Enter handler has just asked for the same task, and an open/close
+          // transition applies the change a moment later, so a second toggle would close it again.
+          setExpandedTask(focusedTaskId)
         }
         return
       }
@@ -409,7 +411,6 @@ export function TaskList({
       updateTask,
       deleteTask,
       setFocusedTask,
-      toggleExpandedTask,
       collapseAll,
       setIsAdding,
       qc,

@@ -46,3 +46,36 @@ export function playRowClose(el: HTMLElement, reduced: boolean): Animation {
     }
   )
 }
+
+/**
+ * The opening of a row that was added to a list (card 4.8): the mirror of `playRowClose`. The row
+ * grows from no height with the move spring while it fades in, so the rows below it make room
+ * smoothly. Reduced motion: a fade only.
+ */
+export function playRowOpen(el: HTMLElement, reduced: boolean): Animation {
+  if (reduced) {
+    return el.animate([{ opacity: 0 }, { opacity: 1 }], {
+      duration: parseCssMs(token('--dur-fade-fast'), 150),
+      easing: 'linear',
+    })
+  }
+  const style = getComputedStyle(el)
+  const height = el.getBoundingClientRect().height
+  return el.animate(
+    [
+      { height: '0px', opacity: 0, paddingTop: '0px', paddingBottom: '0px', borderBottomWidth: '0px', overflow: 'hidden' },
+      {
+        height: `${height}px`,
+        opacity: 1,
+        paddingTop: style.paddingTop,
+        paddingBottom: style.paddingBottom,
+        borderBottomWidth: style.borderBottomWidth,
+        overflow: 'hidden',
+      },
+    ],
+    {
+      duration: parseCssMs(token('--dur-move'), 320),
+      easing: token('--spring-move') || 'ease',
+    }
+  )
+}

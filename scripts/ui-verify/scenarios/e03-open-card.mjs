@@ -166,6 +166,20 @@ export default async function run(h) {
   await h.assert('C: Enter on a focused row opens it and closes the other card', { ok: afterC.cards.length === 1 && afterC.cards[0] === c, detail: JSON.stringify(afterC) })
   await h.capture('enter-open')
 
+  // Enter on a row that is not the keyboard selection (the selection is still on the row clicked
+  // last): only the focused row opens; the list's own Enter handler must not switch it to the selection.
+  await h.dismiss()
+  await h.wait(500)
+  await clickRow(page, a)
+  await h.wait(700)
+  await h.dismiss()
+  await h.wait(500)
+  await page.locator(`[data-task-id="${c}"]`).first().focus()
+  await h.key('Enter')
+  await h.wait(1000)
+  const afterC2 = await openState(page)
+  await h.assert('C: Enter opens the focused row even when the keyboard selection is on another row', { ok: afterC2.cards.length === 1 && afterC2.cards[0] === c, detail: JSON.stringify(afterC2) })
+
   // ---- D. Latest wins -------------------------------------------------------------------------
   await h.dismiss()
   await h.wait(600)
