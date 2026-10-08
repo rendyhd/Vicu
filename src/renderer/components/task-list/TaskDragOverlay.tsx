@@ -12,8 +12,8 @@ export function TaskDragOverlay({ task, count = 1 }: TaskDragOverlayProps) {
     <div className="relative">
       {multi && (
         <>
-          <div className="absolute inset-x-2 -bottom-1.5 h-10 rounded-lg border-2 border-[var(--accent-blue)]/30 bg-[var(--bg-primary)]" />
-          <div className="absolute inset-x-1 -bottom-[3px] h-10 rounded-lg border-2 border-[var(--accent-blue)]/50 bg-[var(--bg-primary)]" />
+          <div className="absolute inset-x-2 -bottom-1.5 h-10 rounded-lg border-2 border-accent-blue/30 bg-[var(--bg-primary)]" />
+          <div className="absolute inset-x-1 -bottom-[3px] h-10 rounded-lg border-2 border-accent-blue/50 bg-[var(--bg-primary)]" />
         </>
       )}
       <div className="relative flex h-10 items-center gap-3 rounded-lg border-2 border-[var(--accent-blue)] bg-[var(--bg-primary)] px-4 shadow-lg">

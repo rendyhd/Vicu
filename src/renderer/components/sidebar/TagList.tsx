@@ -179,7 +179,7 @@ function TagListItem({
       className={cn(
         'flex h-7 items-center gap-2.5 rounded-md px-2.5 text-xs transition-colors',
         isOver
-          ? 'bg-[var(--accent-blue)]/15 ring-1 ring-[var(--accent-blue)]'
+          ? 'bg-accent-blue/15 ring-1 ring-[var(--accent-blue)]'
           : isActive
             ? 'bg-[var(--bg-selected)] text-[var(--text-primary)]'
             : 'text-[var(--text-primary)] hover:bg-[var(--bg-hover)]'

@@ -109,7 +109,7 @@ export function SectionHeader({ project, siblings, onAddTask }: SectionHeaderPro
       className={cn(
         'group flex h-9 cursor-grab items-center gap-2 px-4 pt-4 pb-1 rounded-md',
         isDragging && 'cursor-grabbing',
-        isTaskDragOver && 'bg-[var(--accent-blue)]/10'
+        isTaskDragOver && 'bg-accent-blue/10'
       )}
       style={style}
     >

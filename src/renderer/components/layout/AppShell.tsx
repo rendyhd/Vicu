@@ -671,7 +671,7 @@ export function AppShell() {
         </div>
 
         <div
-          className="w-1 shrink-0 cursor-col-resize bg-transparent transition-colors hover:bg-[var(--accent-blue)]/20"
+          className="w-1 shrink-0 cursor-col-resize bg-transparent transition-colors hover:bg-accent-blue/20"
           onMouseDown={handleMouseDown}
           role="separator"
           aria-orientation="vertical"

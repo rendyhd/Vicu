@@ -43,7 +43,7 @@ export function UpdateBanner() {
   if (!update || dismissed) return null
 
   return (
-    <div className="flex items-center gap-3 border-b border-[var(--border-color)] bg-[var(--accent-blue)]/10 px-4 py-2">
+    <div className="flex items-center gap-3 border-b border-[var(--border-color)] bg-accent-blue/10 px-4 py-2">
       <span className="flex-1 text-xs text-[var(--text-primary)]">
         Vicu <span className="font-medium">v{update.latestVersion}</span> is available
       </span>
@@ -53,7 +53,7 @@ export function UpdateBanner() {
           e.preventDefault()
           window.api.openDeepLink(update.releaseUrl)
         }}
-        className="flex items-center gap-1 rounded px-2 py-1 text-xs font-medium text-[var(--accent-blue)] transition-colors hover:bg-[var(--accent-blue)]/20"
+        className="flex items-center gap-1 rounded px-2 py-1 text-xs font-medium text-[var(--accent-blue)] transition-colors hover:bg-accent-blue/20"
       >
         <Download className="h-3 w-3" />
         Download

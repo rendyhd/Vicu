@@ -119,7 +119,7 @@ export function ReauthView({
                   inputMode="numeric"
                   autoComplete="one-time-code"
                   autoFocus
-                  className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2 text-center text-lg tracking-widest text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-accent-blue focus:outline-none"
+                  className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2 text-center text-lg tracking-widest text-[var(--text-primary)] placeholder:text-text-secondary/50 focus:border-accent-blue focus:outline-none"
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && totpCode.length === 6) handleOidcLogin(totpCode)
                   }}
@@ -168,7 +168,7 @@ export function ReauthView({
                   onChange={(e) => setUsername(e.target.value)}
                   placeholder="Enter your username or email"
                   autoComplete="username"
-                  className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-accent-blue focus:outline-none"
+                  className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-text-secondary/50 focus:border-accent-blue focus:outline-none"
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && username && password) handlePasswordLogin()
                   }}
@@ -186,7 +186,7 @@ export function ReauthView({
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="Enter your password"
                     autoComplete="current-password"
-                    className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2 pr-16 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-accent-blue focus:outline-none"
+                    className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2 pr-16 text-sm text-[var(--text-primary)] placeholder:text-text-secondary/50 focus:border-accent-blue focus:outline-none"
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' && username && password) handlePasswordLogin()
                     }}
@@ -229,7 +229,7 @@ export function ReauthView({
                   placeholder="000000"
                   inputMode="numeric"
                   autoComplete="one-time-code"
-                  className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2 text-center text-lg tracking-widest text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-accent-blue focus:outline-none"
+                  className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2 text-center text-lg tracking-widest text-[var(--text-primary)] placeholder:text-text-secondary/50 focus:border-accent-blue focus:outline-none"
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && totpCode.length === 6) handlePasswordLogin(totpCode)
                   }}

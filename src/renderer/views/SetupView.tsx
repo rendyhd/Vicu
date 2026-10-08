@@ -35,32 +35,32 @@ function TokenPermissionsInfo() {
               </tr>
             </thead>
             <tbody className="text-[var(--text-primary)]">
-              <tr className="border-b border-[var(--border-color)]/50">
+              <tr className="border-b border-border/50">
                 <td className="py-1.5 pr-2 font-mono text-[10px]">tasks</td>
                 <td className="py-1.5 pr-2">read_all, create, update, delete</td>
                 <td className="py-1.5">Task CRUD</td>
               </tr>
-              <tr className="border-b border-[var(--border-color)]/50">
+              <tr className="border-b border-border/50">
                 <td className="py-1.5 pr-2 font-mono text-[10px]">projects</td>
                 <td className="py-1.5 pr-2">read_all, create, update, delete</td>
                 <td className="py-1.5">Project CRUD</td>
               </tr>
-              <tr className="border-b border-[var(--border-color)]/50">
+              <tr className="border-b border-border/50">
                 <td className="py-1.5 pr-2 font-mono text-[10px]">labels</td>
                 <td className="py-1.5 pr-2">read_all, create, update, delete</td>
                 <td className="py-1.5">Label CRUD</td>
               </tr>
-              <tr className="border-b border-[var(--border-color)]/50">
+              <tr className="border-b border-border/50">
                 <td className="py-1.5 pr-2 font-mono text-[10px]">task_labels</td>
                 <td className="py-1.5 pr-2">create, delete</td>
                 <td className="py-1.5">Adding/removing labels</td>
               </tr>
-              <tr className="border-b border-[var(--border-color)]/50">
+              <tr className="border-b border-border/50">
                 <td className="py-1.5 pr-2 font-mono text-[10px]">task_relations</td>
                 <td className="py-1.5 pr-2">create, delete</td>
                 <td className="py-1.5">Subtasks & relations</td>
               </tr>
-              <tr className="border-b border-[var(--border-color)]/50">
+              <tr className="border-b border-border/50">
                 <td className="py-1.5 pr-2 font-mono text-[10px]">task_attachments</td>
                 <td className="py-1.5 pr-2">read_all, create, delete</td>
                 <td className="py-1.5">File attachments</td>
@@ -303,7 +303,7 @@ export function SetupView({ onComplete }: SetupViewProps) {
                   value={url}
                   onChange={(e) => setUrl(e.target.value)}
                   placeholder="https://app.vikunja.cloud"
-                  className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-accent-blue focus:outline-none"
+                  className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-text-secondary/50 focus:border-accent-blue focus:outline-none"
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && !discovering) handleUrlContinue()
                   }}
@@ -426,7 +426,7 @@ export function SetupView({ onComplete }: SetupViewProps) {
                   inputMode="numeric"
                   autoComplete="one-time-code"
                   autoFocus
-                  className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2 text-center text-lg tracking-widest text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-accent-blue focus:outline-none"
+                  className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2 text-center text-lg tracking-widest text-[var(--text-primary)] placeholder:text-text-secondary/50 focus:border-accent-blue focus:outline-none"
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && totpCode.length === 6) {
                       handleOidcLogin(selectedOidcProvider, totpCode)
@@ -482,7 +482,7 @@ export function SetupView({ onComplete }: SetupViewProps) {
                   onChange={(e) => setUsername(e.target.value)}
                   placeholder="Enter your username or email"
                   autoComplete="username"
-                  className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-accent-blue focus:outline-none"
+                  className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-text-secondary/50 focus:border-accent-blue focus:outline-none"
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && username && password) handlePasswordLogin()
                   }}
@@ -500,7 +500,7 @@ export function SetupView({ onComplete }: SetupViewProps) {
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="Enter your password"
                     autoComplete="current-password"
-                    className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2 pr-16 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-accent-blue focus:outline-none"
+                    className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2 pr-16 text-sm text-[var(--text-primary)] placeholder:text-text-secondary/50 focus:border-accent-blue focus:outline-none"
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' && username && password) handlePasswordLogin()
                     }}
@@ -559,7 +559,7 @@ export function SetupView({ onComplete }: SetupViewProps) {
                   placeholder="000000"
                   inputMode="numeric"
                   autoComplete="one-time-code"
-                  className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2 text-center text-lg tracking-widest text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-accent-blue focus:outline-none"
+                  className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2 text-center text-lg tracking-widest text-[var(--text-primary)] placeholder:text-text-secondary/50 focus:border-accent-blue focus:outline-none"
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && totpCode.length === 6) handlePasswordLogin(totpCode)
                   }}
@@ -623,7 +623,7 @@ export function SetupView({ onComplete }: SetupViewProps) {
                     value={token}
                     onChange={(e) => setToken(e.target.value)}
                     placeholder="Enter your API token"
-                    className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2 pr-16 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-accent-blue focus:outline-none"
+                    className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2 pr-16 text-sm text-[var(--text-primary)] placeholder:text-text-secondary/50 focus:border-accent-blue focus:outline-none"
                   />
                   <button
                     type="button"

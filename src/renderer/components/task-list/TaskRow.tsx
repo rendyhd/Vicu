@@ -492,10 +492,10 @@ function TaskRowInner({ task, nestedDepth = 0, parentProjectId, drag }: Omit<Tas
         data-task-id={task.id}
         className={cn(
           'group flex min-h-10 cursor-default items-center gap-3 border-b border-[var(--border-color)] px-4 py-2 transition-colors hover:bg-[var(--bg-hover)]',
-          isSelected && 'bg-[var(--accent-blue)]/15 ring-1 ring-inset ring-[var(--accent-blue)]/40',
-          isFocused && !isSelected && !isExpanded && 'bg-[var(--accent-blue)]/8 ring-1 ring-inset ring-[var(--accent-blue)]/30',
+          isSelected && 'bg-accent-blue/15 ring-1 ring-inset ring-accent-blue/40',
+          isFocused && !isSelected && !isExpanded && 'bg-accent-blue/8 ring-1 ring-inset ring-accent-blue/30',
           isDragging && 'opacity-30',
-          isDragOver && 'ring-2 ring-inset ring-[var(--accent-blue)] bg-[var(--accent-blue)]/5',
+          isDragOver && 'ring-2 ring-inset ring-[var(--accent-blue)] bg-accent-blue/5',
           dropError && 'ring-2 ring-inset ring-red-500 bg-red-500/5'
         )}
         style={{
@@ -671,7 +671,7 @@ function TaskRowInner({ task, nestedDepth = 0, parentProjectId, drag }: Omit<Tas
       data-task-id={task.id}
       className={cn(
         'mx-2 my-1 rounded-xl border border-[var(--border-color)] bg-[var(--bg-primary)] shadow-md',
-        isDragOver && 'ring-2 ring-[var(--accent-blue)] bg-[var(--accent-blue)]/5',
+        isDragOver && 'ring-2 ring-[var(--accent-blue)] bg-accent-blue/5',
         dropError && 'ring-2 ring-red-500 bg-red-500/5'
       )}
       onKeyDown={handleExpandedKeyDown}
@@ -769,7 +769,7 @@ function TaskRowInner({ task, nestedDepth = 0, parentProjectId, drag }: Omit<Tas
               className={cn(
                 'flex h-6 w-6 items-center justify-center rounded transition-colors',
                 activePopover === 'date'
-                  ? 'bg-[var(--accent-blue)]/10 text-[var(--accent-blue)]'
+                  ? 'bg-accent-blue/10 text-[var(--accent-blue)]'
                   : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]'
               )}
               title="Schedule"
@@ -794,7 +794,7 @@ function TaskRowInner({ task, nestedDepth = 0, parentProjectId, drag }: Omit<Tas
               className={cn(
                 'flex h-6 w-6 items-center justify-center rounded transition-colors',
                 activePopover === 'priority'
-                  ? 'bg-[var(--accent-blue)]/10 text-[var(--accent-blue)]'
+                  ? 'bg-accent-blue/10 text-[var(--accent-blue)]'
                   : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]'
               )}
               title="Priority"
@@ -816,7 +816,7 @@ function TaskRowInner({ task, nestedDepth = 0, parentProjectId, drag }: Omit<Tas
               className={cn(
                 'flex h-6 w-6 items-center justify-center rounded transition-colors',
                 activePopover === 'label'
-                  ? 'bg-[var(--accent-blue)]/10 text-[var(--accent-blue)]'
+                  ? 'bg-accent-blue/10 text-[var(--accent-blue)]'
                   : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]'
               )}
               title="Labels"
@@ -836,7 +836,7 @@ function TaskRowInner({ task, nestedDepth = 0, parentProjectId, drag }: Omit<Tas
             className={cn(
               'flex h-6 w-6 items-center justify-center rounded transition-colors',
               activePopover === 'subtasks'
-                ? 'bg-[var(--accent-blue)]/10 text-[var(--accent-blue)]'
+                ? 'bg-accent-blue/10 text-[var(--accent-blue)]'
                 : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]'
             )}
             title={activePopover === 'subtasks' ? 'Hide add subtask' : 'Add subtask'}
@@ -850,7 +850,7 @@ function TaskRowInner({ task, nestedDepth = 0, parentProjectId, drag }: Omit<Tas
               className={cn(
                 'flex h-6 w-6 items-center justify-center rounded transition-colors',
                 activePopover === 'reminder'
-                  ? 'bg-[var(--accent-blue)]/10 text-[var(--accent-blue)]'
+                  ? 'bg-accent-blue/10 text-[var(--accent-blue)]'
                   : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]'
               )}
               title="Reminders"
@@ -872,7 +872,7 @@ function TaskRowInner({ task, nestedDepth = 0, parentProjectId, drag }: Omit<Tas
               className={cn(
                 'flex h-6 w-6 items-center justify-center rounded transition-colors',
                 activePopover === 'attachment' || (task.attachments?.length ?? 0) > 0
-                  ? 'bg-[var(--accent-blue)]/10 text-[var(--accent-blue)]'
+                  ? 'bg-accent-blue/10 text-[var(--accent-blue)]'
                   : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]'
               )}
               title="Attachments"
@@ -893,7 +893,7 @@ function TaskRowInner({ task, nestedDepth = 0, parentProjectId, drag }: Omit<Tas
               className={cn(
                 'flex h-6 w-6 items-center justify-center rounded transition-colors',
                 activePopover === 'project'
-                  ? 'bg-[var(--accent-blue)]/10 text-[var(--accent-blue)]'
+                  ? 'bg-accent-blue/10 text-[var(--accent-blue)]'
                   : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]'
               )}
               title="Move to project"
@@ -915,7 +915,7 @@ function TaskRowInner({ task, nestedDepth = 0, parentProjectId, drag }: Omit<Tas
               className={cn(
                 'flex h-6 w-6 items-center justify-center rounded transition-colors',
                 activePopover === 'info'
-                  ? 'bg-[var(--accent-blue)]/10 text-[var(--accent-blue)]'
+                  ? 'bg-accent-blue/10 text-[var(--accent-blue)]'
                   : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]'
               )}
               title="Task info"

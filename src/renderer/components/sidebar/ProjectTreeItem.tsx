@@ -58,7 +58,7 @@ export function ProjectTreeItem({ node, depth = 0, siblings, onContextMenu }: Pr
       className={cn(
         'group flex h-7 cursor-default items-center rounded-md transition-colors',
         isTaskDragOver
-          ? 'bg-[var(--accent-blue)]/15 ring-1 ring-[var(--accent-blue)]'
+          ? 'bg-accent-blue/15 ring-1 ring-[var(--accent-blue)]'
           : isActive
             ? 'bg-[var(--bg-selected)] text-[var(--text-primary)]'
             : 'text-[var(--text-primary)] hover:bg-[var(--bg-hover)]'

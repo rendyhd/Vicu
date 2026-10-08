@@ -132,7 +132,7 @@ function ProjectRows({
     const isInbox = node.id === inboxId
     return (
       <div key={node.id}>
-        <div className="flex min-h-10 items-center gap-2 border-b border-[var(--border-color)]/60 py-1 pr-2" style={{ paddingLeft: `${12 + depth * 20}px` }}>
+        <div className="flex min-h-10 items-center gap-2 border-b border-border/60 py-1 pr-2" style={{ paddingLeft: `${12 + depth * 20}px` }}>
           <Folder className="h-4 w-4 shrink-0" style={{ color: node.hex_color || 'var(--text-secondary)' }} />
           <span className={cn('min-w-0 flex-1 truncate text-sm', archived ? 'text-[var(--text-secondary)]' : 'text-[var(--text-primary)]')}>{node.title}</span>
           {isInbox && <span className="rounded bg-[var(--bg-secondary)] px-1.5 py-0.5 text-[10px] text-[var(--text-secondary)]">Inbox</span>}

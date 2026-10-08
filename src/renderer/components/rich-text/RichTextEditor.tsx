@@ -247,7 +247,7 @@ function ToolbarButton({ onClick, active, title, children }: ToolbarButtonProps)
       className={cn(
         'flex h-6 w-6 items-center justify-center rounded transition-colors',
         active
-          ? 'bg-[var(--accent-blue)]/15 text-[var(--accent-blue)]'
+          ? 'bg-accent-blue/15 text-[var(--accent-blue)]'
           : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]',
       )}
     >

@@ -28,7 +28,7 @@ export function TaskCheckbox({ task, className, suppressTopLevelUndo = false }: 
         'group/check flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full border transition-all duration-200',
         task.done
           ? 'border-[var(--text-secondary)] bg-[var(--text-secondary)] hover:border-[var(--accent-blue)] hover:bg-[var(--accent-blue)]'
-          : 'border-[var(--border-color)] hover:border-[var(--accent-blue)] hover:bg-[var(--accent-blue)]/10',
+          : 'border-[var(--border-color)] hover:border-[var(--accent-blue)] hover:bg-accent-blue/10',
         className
       )}
       aria-label={task.done ? 'Mark as incomplete' : 'Mark as done'}
