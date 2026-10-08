@@ -162,8 +162,19 @@ export default async function run(h) {
       await page.evaluate(() => document.querySelector('[data-test-spacer]')?.remove())
       await h.wait(350)
 
-      // Arrow keys and End move through the day grid (the keyboard grid arrives with wave 3).
-      if (h.wave !== null && h.wave >= 3) h.emit({ t: 'skip', id: 'E4', wave: 3, message: 'arrow and End navigation of the day grid: not implemented yet' })
+      // Arrow keys and End move through the day grid (card 3.4a1).
+      const cell = page.locator('[popover]:popover-open [role="grid"] button[tabindex="0"]')
+      await cell.focus()
+      const dateOf = () => page.evaluate(() => document.activeElement?.getAttribute('data-date') ?? null)
+      const start = await dateOf()
+      await h.key('ArrowRight')
+      const next = await dateOf()
+      await h.key('End')
+      const end = await dateOf()
+      await h.assert(`${tag}: ArrowRight and End move through the day grid`, {
+        ok: !!start && !!next && !!end && next > start && end >= next && new Date(`${end}T12:00:00`).getDay() === 0,
+        detail: `${start} -> ${next} -> ${end}`,
+      })
 
       await h.key('Escape')
       await h.wait(350)
@@ -341,7 +352,7 @@ export default async function run(h) {
       const t = `${tag} composer labels`
       await h.dismiss()
       await h.goto('/today')
-      await h.click('button[aria-label="New task"]')
+      await page.locator('button[aria-label="New task"]').last().click()
       await h.wait(500)
       const btn = page.locator('button[title="Labels"]').first()
       await btn.click()

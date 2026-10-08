@@ -302,3 +302,21 @@ export function formatDayMonthYear(value: Date, fmt: DateFormat): string {
 export function formatFullDateWithYear(value: Date, fmt: DateFormat): string {
   return phrasesFor(fmt.locale).fullDate(value, true)
 }
+
+// Small labels for a month grid and its quick choices (the When panel). Not contract contexts;
+// built from the same patterns so the names match the rest of the app.
+
+/** The short weekday name ("Wed"). */
+export function formatWeekdayShort(value: Date, fmt: DateFormat): string {
+  return phrasesFor(fmt.locale).weekdayShort(value)
+}
+
+/** The short weekday with the day of the month ("Mon 12"). */
+export function formatWeekdayDay(value: Date, fmt: DateFormat): string {
+  return phrasesFor(fmt.locale).weekdayDay(value)
+}
+
+/** The month with its year ("October 2026"). */
+export function formatMonthYear(value: Date, fmt: DateFormat): string {
+  return phrasesFor(fmt.locale).monthYear(value)
+}

@@ -9,7 +9,7 @@ const read = (path: string) => readFileSync(resolve(root, path), 'utf-8')
 // card, list or content area can clip it. The scenario `popover-edge` (E4) checks the behaviour
 // in the running app; this keeps a picker from going back to an absolutely positioned div.
 const PICKERS = [
-  'DatePickerPopover',
+  'WhenPopover',
   'ReminderPickerPopover',
   'PriorityPickerPopover',
   'LabelPickerPopover',
@@ -53,7 +53,7 @@ describe('picker popovers', () => {
       expect(row, picker).toMatch(new RegExp(`<${picker}\\s+anchorRef=`))
     }
     const composer = read('components/task-list/NewTaskComposer.tsx')
-    for (const picker of ['DatePickerPopover', 'ReminderPickerPopover', 'PriorityPickerPopover', 'DraftLabelPickerPopover', 'ProjectPickerPopover']) {
+    for (const picker of ['WhenPopover', 'ReminderPickerPopover', 'PriorityPickerPopover', 'DraftLabelPickerPopover', 'ProjectPickerPopover']) {
       expect(composer, picker).toMatch(new RegExp(`<${picker} anchorRef=`))
     }
   })

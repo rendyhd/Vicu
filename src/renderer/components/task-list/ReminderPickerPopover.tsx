@@ -3,9 +3,11 @@ import { X } from 'lucide-react'
 import type { Task, TaskReminder } from '@/lib/vikunja-types'
 import { NULL_DATE } from '@/lib/constants'
 import { formatDateChip } from '@/lib/date-utils'
-import { formatDateDisplay } from '@/lib/date-display'
+import { DEFAULT_REMINDER_TIME, EMPTY_WHEN, instantOf, whenText, type WhenValue } from '@/lib/when-logic'
 import { useDateFormat } from '@/hooks/use-date-format'
+import { Button } from '../shared/Button'
 import { Popover, type PopoverCloseReason } from '../overlay/Popover'
+import { WhenPanel } from './WhenPanel'
 
 interface ReminderPickerPopoverProps {
   anchorRef: RefObject<HTMLElement | null>
@@ -24,7 +26,9 @@ const RELATIVE_PRESETS = [
 ]
 
 export function ReminderPickerPopover({ anchorRef, task, dueDate, reminders: controlledReminders, onReminderChange, onClose }: ReminderPickerPopoverProps) {
-  const [customDateTime, setCustomDateTime] = useState('')
+  // The day and time picked in the panel and not added yet; a quick choice or Enter adds at once.
+  const [staged, setStaged] = useState<WhenValue>(EMPTY_WHEN)
+  const [panelKey, setPanelKey] = useState(0)
   const dateFormat = useDateFormat()
 
   const reminders = controlledReminders ?? task?.reminders ?? []
@@ -51,31 +55,15 @@ export function ReminderPickerPopover({ anchorRef, task, dueDate, reminders: con
     onReminderChange(reminders.filter((_, i) => i !== index))
   }
 
-  const handleAddCustom = () => {
-    if (!customDateTime) return
-    addReminder(new Date(customDateTime))
-    setCustomDateTime('')
-  }
-
   const now = new Date()
 
-  const tomorrowNineAm = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 9, 0, 0)
-
-  const presets = [
-    {
-      label: 'In 1 hour',
-      getDate: () => new Date(now.getTime() + 60 * 60 * 1000),
-    },
-    {
-      // "Tomorrow, 9:00 AM" or "Tomorrow, 09:00": the clock follows the setting.
-      label: formatDateDisplay('row', tomorrowNineAm, now, false, dateFormat),
-      getDate: () => tomorrowNineAm,
-    },
-    {
-      label: 'In 3 days',
-      getDate: () => new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000),
-    },
-  ]
+  // A day without a time gets the default reminder time; a time picked first starts from today.
+  const addPicked = (value: WhenValue) => {
+    if (!value.date) return
+    addReminder(instantOf(value.date, value.time ?? DEFAULT_REMINDER_TIME))
+    setStaged(EMPTY_WHEN)
+    setPanelKey((k) => k + 1)
+  }
 
   const formatReminder = (r: TaskReminder) => {
     if (r.relative_period !== undefined && r.relative_period !== null && r.relative_to) {
@@ -86,7 +74,7 @@ export function ReminderPickerPopover({ anchorRef, task, dueDate, reminders: con
   }
 
   return (
-    <Popover anchorRef={anchorRef} onClose={onClose} label="Reminders" className="w-64 p-3">
+    <Popover anchorRef={anchorRef} onClose={onClose} label="Reminders" className="w-72 p-3">
       {/* Existing reminders */}
       {reminders.length > 0 && (
         <div className="mb-2 flex flex-col gap-1">
@@ -129,43 +117,28 @@ export function ReminderPickerPopover({ anchorRef, task, dueDate, reminders: con
         </div>
       )}
 
-      {/* Quick presets */}
-      <div className="mb-2 flex flex-col gap-1">
-        {hasDueDate && (
-          <span className="px-2 text-caption font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
-            Absolute
-          </span>
-        )}
-        {presets.map((p) => (
-          <button
-            key={p.label}
-            type="button"
-            onClick={() => addReminder(p.getDate())}
-            className="rounded-control px-2 py-1.5 text-left text-xs text-[var(--text-primary)] hover:bg-[var(--bg-hover)]"
-          >
-            {p.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Custom datetime */}
-      <div className="border-t border-[var(--border-color)] pt-2">
-        <input
-          type="datetime-local"
-          aria-label="Custom reminder time"
-          value={customDateTime}
-          onChange={(e) => setCustomDateTime(e.target.value)}
-          className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-2 py-1.5 text-xs text-[var(--text-primary)]"
-        />
-        <button
-          type="button"
-          onClick={handleAddCustom}
-          disabled={!customDateTime}
-          className="mt-1 w-full rounded-control bg-accent-fill px-2 py-1.5 text-xs text-on-accent hover:opacity-90 disabled:opacity-40"
+      {hasDueDate && (
+        <span className="mb-1 block px-2 text-caption font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
+          Absolute
+        </span>
+      )}
+      {/* A quick choice or Enter in the text field adds the reminder; a day or time picked in the grid
+          waits for the button, which is there as soon as a day is picked. */}
+      <WhenPanel
+        key={panelKey}
+        value={staged}
+        onChange={(value, { commit }) => (commit ? addPicked(value) : setStaged(value))}
+      />
+      {staged.date && (
+        <Button
+          variant="primary"
+          onClick={() => addPicked(staged)}
+          aria-label={`Add reminder, ${whenText({ date: staged.date, time: staged.time ?? DEFAULT_REMINDER_TIME }, now, dateFormat)}`}
+          className="mt-2 w-full"
         >
           Add reminder
-        </button>
-      </div>
+        </Button>
+      )}
     </Popover>
   )
 }

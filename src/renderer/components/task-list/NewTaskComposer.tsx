@@ -36,7 +36,7 @@ import type { CreateTaskPayload, Label, Task, TaskReminder } from '@/lib/vikunja
 import type { ChipData } from '@/components/task-input/TokenChip'
 import { TaskInputParser } from '@/components/task-input/TaskInputParser'
 import { TaskDescription, type PendingImage } from './TaskDescription'
-import { DatePickerPopover } from './DatePickerPopover'
+import { WhenPopover } from './WhenPopover'
 import { PriorityPickerPopover, PRIORITY_OPTIONS } from './PriorityPickerPopover'
 import { ProjectPickerPopover } from './ProjectPickerPopover'
 import { ReminderPickerPopover } from './ReminderPickerPopover'
@@ -478,7 +478,7 @@ export function NewTaskComposer({
           <ActionButton buttonRef={dateButtonRef} popup="dialog" expanded={openPicker === 'date'} active={effectiveDueDate !== NULL_DATE || repeatAfter > 0} label="Date and repeat" onClick={() => setOpenPicker(openPicker === 'date' ? null : 'date')}>
             <CalendarDays className="h-3.5 w-3.5" /> {shortDate(effectiveDueDate, dateFormat)}
           </ActionButton>
-          {openPicker === 'date' && <DatePickerPopover anchorRef={dateButtonRef} currentDate={effectiveDueDate} onDateChange={(value) => { setDateTouched(true); setExplicitDueDate(value) }} repeatAfter={repeatAfter} repeatMode={repeatMode} onRecurrenceChange={(after, mode) => { setRecurrenceTouched(true); setRepeatAfter(after); setRepeatMode(mode) }} onClose={() => setOpenPicker(null)} />}
+          {openPicker === 'date' && <WhenPopover anchorRef={dateButtonRef} currentDate={effectiveDueDate} onDateChange={(value) => { setDateTouched(true); setExplicitDueDate(value) }} repeatAfter={repeatAfter} repeatMode={repeatMode} onRecurrenceChange={(after, mode) => { setRecurrenceTouched(true); setRepeatAfter(after); setRepeatMode(mode) }} onClose={() => setOpenPicker(null)} />}
         </div>
         <div className="relative">
           <ActionButton buttonRef={reminderButtonRef} popup="dialog" expanded={openPicker === 'reminder'} active={reminders.length > 0} label="Reminder" onClick={() => setOpenPicker(openPicker === 'reminder' ? null : 'reminder')}>
