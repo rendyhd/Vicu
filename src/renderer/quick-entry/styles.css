@@ -554,3 +554,81 @@ button:focus-visible {
     scroll-behavior: auto !important;
   }
 }
+
+/*
+ * Forced colours (card 5.2): system colours replace the tints and the translucent card. The card keeps an
+ * edge, chips are outlined shapes, the typed-text highlight becomes an underline, and the focus ring is
+ * the highlight colour.
+ */
+@media (forced-colors: active) {
+  :focus-visible {
+    outline-color: Highlight;
+  }
+
+  .container {
+    background: Canvas;
+    border: 1px solid CanvasText;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  /* The highlight layer is transparent text drawn under the input; only the underline of a token shows. */
+  .input-highlight {
+    forced-color-adjust: none;
+  }
+
+  .input-highlight [class^='token-'] {
+    background: transparent;
+    text-decoration: underline 2px Highlight;
+    text-underline-offset: 3px;
+  }
+
+  .parse-chip,
+  .obsidian-badge,
+  .browser-badge {
+    outline: 1px solid currentColor;
+    outline-offset: -1px;
+  }
+
+  .autocomplete-item.active,
+  .autocomplete-item:hover {
+    background: Highlight;
+    color: HighlightText;
+    forced-color-adjust: none;
+  }
+
+  .autocomplete-item.active *,
+  .autocomplete-item:hover * {
+    color: HighlightText;
+  }
+
+  .autocomplete-item-project::before,
+  .autocomplete-item-label::before {
+    background: currentColor;
+  }
+
+  .image-gallery-delete {
+    border: 1px solid ButtonText;
+  }
+
+  /* The input sits over the highlight layer; its own Canvas fill would hide the token underlines. */
+  #task-input {
+    forced-color-adjust: none;
+    background: transparent;
+    color: CanvasText;
+  }
+
+  #task-input::placeholder {
+    color: GrayText;
+  }
+
+  #task-input:focus-visible,
+  .description-input:focus-visible {
+    outline-color: Highlight;
+  }
+
+  #task-input:disabled {
+    opacity: 1;
+    color: GrayText;
+  }
+}

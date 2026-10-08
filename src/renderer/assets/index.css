@@ -681,3 +681,202 @@ html:active-view-transition-type(page) main {
   flex: 1;
   min-width: 0;
 }
+
+/*
+ * Forced colours (card 5.2): Windows contrast themes, and any user who sets their own palette. The browser
+ * replaces text, background and border colours with the system colours and drops background images and
+ * box shadows. What carries meaning has to survive that, so it is drawn with shapes, borders, outlines and
+ * system colours: Canvas and CanvasText for the page, Highlight and HighlightText for what is selected or
+ * checked, GrayText for what is off, currentColor for icons and marks.
+ */
+@media (forced-colors: active) {
+  /* An svg keeps the colour its author gave it; icons and marks follow the text of their surface instead,
+     so the shape (bars, a square with "!", a ring that fills) is what says what they mean. */
+  svg {
+    color: inherit !important;
+  }
+
+  /* Focus: the same ring, in the highlight colour; on a highlighted surface it flips to the text colour. */
+  :focus-visible {
+    outline-color: Highlight;
+  }
+
+  /* Ring utilities are box shadows and vanish: draw them as outlines. A focus ring keeps priority. */
+  [class~='ring-1']:not(:focus-visible),
+  [class~='ring-2']:not(:focus-visible) {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
+  }
+
+  /* Things that float on a shadow alone get an edge. */
+  :is([class~='shadow-md'], [class~='shadow-lg'], [class~='shadow-xl']):not([class*='border']),
+  .vicu-tooltip {
+    outline: 1px solid CanvasText;
+    outline-offset: -1px;
+  }
+
+  /* Solid fills (primary buttons, drop lines, dots) */
+  .bg-accent-fill,
+  .bg-danger,
+  .bg-\[var\(--accent-blue\)\] {
+    background-color: Highlight;
+    color: HighlightText;
+    forced-color-adjust: none;
+  }
+
+  /* Chips: the tint is gone, so the chip is an outlined shape. */
+  .vicu-chip {
+    outline: 1px solid currentColor;
+    outline-offset: -1px;
+  }
+
+  /* Borderless buttons are text on a hover tint: outline them so a control looks like one. Icon-only
+     buttons (they have a name), the toolbar and toast buttons, and the quiet buttons (vicu-edge). */
+  :is(button[aria-label]:not([role], [data-date], [class*='border']), .vicu-edge, [role='toolbar'] button, .vicu-toast-in button, [role='group'][aria-label='Quick choices'] button):not(:focus-visible) {
+    outline: 1px solid ButtonBorder;
+    outline-offset: -1px;
+  }
+
+  /* Disabled */
+  :is(:disabled, [aria-disabled='true']),
+  :is(:disabled, [aria-disabled='true']) * {
+    color: GrayText;
+    border-color: GrayText;
+    opacity: 1;
+  }
+
+  /* Task checkbox: a ring; checked, a filled disc with a check in the text-on-highlight colour. */
+  [role='checkbox'] {
+    border-color: CanvasText;
+  }
+  [role='checkbox']:hover {
+    border-color: Highlight;
+  }
+  [role='checkbox'][aria-checked='true'] {
+    border-color: Highlight;
+    background-color: Highlight;
+  }
+  [role='checkbox'][aria-checked='true'] > span {
+    background-color: Highlight;
+  }
+  [role='checkbox'][aria-checked='true'] svg {
+    color: HighlightText !important;
+  }
+
+  /* Form checkbox and switch */
+  input[type='checkbox'] {
+    border-color: CanvasText;
+  }
+  input[type='checkbox']:checked {
+    border-color: Highlight;
+    background-color: Highlight;
+  }
+  input[type='checkbox']:checked + svg {
+    color: HighlightText !important;
+  }
+  [role='switch'] {
+    border-color: CanvasText;
+  }
+  [role='switch'] > span {
+    background-color: CanvasText;
+  }
+  [role='switch'][aria-checked='true'] {
+    background-color: Highlight;
+    border-color: Highlight;
+  }
+  [role='switch'][aria-checked='true'] > span {
+    background-color: HighlightText;
+  }
+  [aria-invalid='true'] {
+    border-style: dashed;
+    border-width: 2px;
+  }
+
+  /* Selected rows and the active sidebar item. */
+  /* forced-color-adjust: none keeps the browser from painting a Canvas plate behind text on Highlight. */
+  [data-selected],
+  :has(> [data-sidebar-pill]) {
+    background-color: Highlight;
+    color: HighlightText;
+    outline-color: HighlightText;
+    forced-color-adjust: none;
+  }
+  [data-selected] *,
+  :has(> [data-sidebar-pill]) * {
+    color: HighlightText;
+  }
+  [data-sidebar-pill] {
+    display: none;
+  }
+  [data-selected] [role='checkbox'] {
+    border-color: HighlightText;
+  }
+  [data-selected] [role='checkbox'][aria-checked='true'],
+  [data-selected] [role='checkbox'][aria-checked='true'] > span {
+    background-color: HighlightText;
+  }
+  [data-selected] [role='checkbox'][aria-checked='true'] svg {
+    color: Highlight !important;
+  }
+  [data-selected] .vicu-chip {
+    background-color: Highlight;
+  }
+
+  /* Menu items, options and open toggles: the current one is the highlighted one. */
+  :is([role='menuitem'], [role='menuitemradio'], [role='option']):not(:disabled, [aria-disabled='true']):is(:hover, :focus-visible, [aria-selected='true']),
+  button[aria-expanded='true'][aria-haspopup],
+  button[aria-pressed='true'] {
+    background-color: Highlight;
+    color: HighlightText;
+    outline-color: HighlightText;
+    border-color: Highlight;
+    forced-color-adjust: none;
+  }
+  :is([role='menuitem'], [role='menuitemradio'], [role='option']):not(:disabled, [aria-disabled='true']):is(:hover, :focus-visible, [aria-selected='true']) *,
+  button[aria-expanded='true'][aria-haspopup] *,
+  button[aria-pressed='true'] * {
+    color: HighlightText;
+  }
+
+  /* The When panel: the chosen day is filled, today is ringed, both read without colour. */
+  [role='gridcell'][aria-selected='true'] > button {
+    background-color: Highlight;
+    color: HighlightText;
+    forced-color-adjust: none;
+  }
+  button[aria-current='date'] {
+    outline: 1px solid CanvasText;
+    outline-offset: -1px;
+  }
+  [role='gridcell'][aria-selected='true'] > button[aria-current='date'] {
+    outline-color: HighlightText;
+  }
+
+  /* Progress rings: the arc is the text colour, the track a faint copy of it. */
+  [data-progress-ring] circle:first-of-type {
+    stroke: currentColor;
+    opacity: 0.35;
+  }
+  [data-progress-ring] circle:nth-of-type(2) {
+    stroke: currentColor;
+  }
+
+  /* The typed-text highlight layer is transparent text over the input; forced colours would paint it. */
+  .vicu-token-layer {
+    forced-color-adjust: none;
+  }
+  .vicu-token-layer [data-token-type] {
+    background: transparent !important;
+    text-decoration: underline 2px Highlight;
+    text-underline-offset: 3px;
+  }
+  /* The field sits over the layer; its own Canvas fill would hide the underlines. */
+  .vicu-token-layer + :is(input, textarea) {
+    forced-color-adjust: none;
+    background: transparent;
+    color: CanvasText;
+  }
+  .vicu-token-layer + :is(input, textarea)::placeholder {
+    color: GrayText;
+  }
+}

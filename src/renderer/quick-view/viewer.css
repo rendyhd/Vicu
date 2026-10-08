@@ -553,3 +553,96 @@ button:focus-visible,
     scroll-behavior: auto !important;
   }
 }
+
+/*
+ * Forced colours (card 5.2): system colours replace the tints and the translucent card. The card keeps an
+ * edge, the circle checkbox is a ring and, checked, a filled disc, the selected row is highlighted, the
+ * priority mark is drawn in the text colour (its shape carries the level) and disabled things are grey.
+ */
+@media (forced-colors: active) {
+  :focus-visible {
+    outline-color: Highlight;
+  }
+
+  svg {
+    color: inherit !important;
+  }
+
+  .container {
+    background: Canvas;
+    border: 1px solid CanvasText;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  .status-bar {
+    border-bottom-color: CanvasText;
+  }
+
+  .task-checkbox {
+    border-color: CanvasText;
+  }
+
+  .task-checkbox:hover {
+    border-color: Highlight;
+  }
+
+  .task-checkbox:checked {
+    background: Highlight;
+    border-color: Highlight;
+  }
+
+  .task-checkbox:checked::after {
+    border-color: HighlightText;
+  }
+
+  .task-checkbox:disabled:not(:checked) {
+    border-color: GrayText;
+    opacity: 1;
+  }
+
+  .task-item.selected,
+  .task-item.selected * {
+    color: HighlightText;
+  }
+
+  .task-item.selected {
+    background: Highlight;
+    forced-color-adjust: none;
+  }
+
+  .task-item.selected .task-checkbox {
+    border-color: HighlightText;
+  }
+
+  .task-item.selected .task-checkbox:checked {
+    background: HighlightText;
+  }
+
+  .task-item.selected .task-checkbox:checked::after {
+    border-color: Highlight;
+  }
+
+  .task-item.editing {
+    border-left-color: Highlight;
+  }
+
+  .task-description {
+    border: 1px solid CanvasText;
+  }
+
+  .task-title:hover {
+    color: LinkText;
+  }
+
+  .obsidian-link-btn,
+  .browser-link-btn {
+    opacity: 1;
+    border: 1px solid ButtonText;
+  }
+
+  .task-item.completing .task-title,
+  .task-item.task-done .task-title {
+    opacity: 1;
+  }
+}

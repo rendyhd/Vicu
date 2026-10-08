@@ -70,7 +70,7 @@ export function TokenChip({ type, label, source, priority, onDismiss }: TokenChi
       data-chip-type={type}
       data-chip-source={source}
       style={type === 'priority' ? priorityStyle(priority) : undefined}
-      className={`group inline-flex items-center gap-0.5 rounded-chip px-2 py-0.5 text-[11px] font-medium leading-snug ${chipStyles[type] ?? ''}`}
+      className={`vicu-chip group inline-flex items-center gap-0.5 rounded-chip px-2 py-0.5 text-[11px] font-medium leading-snug ${chipStyles[type] ?? ''}`}
     >
       {label}
       {onDismiss && (

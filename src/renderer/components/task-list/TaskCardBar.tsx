@@ -204,7 +204,7 @@ export function TaskCardBar({
       <PropertyButton prop="labels" name="Labels" unsetName="Add label" value={labels.map((l) => l.title).join(' ')} isSet={labels.length > 0} open={is('label')} haspopup="dialog" buttonRef={labelRef} onClick={() => onToggle('label')} unsetLabel="Label" className="gap-1.5 px-1.5">
         {labels.map((l) => (
           <Fragment key={l.id}>
-            <span className="rounded-chip px-2 py-px text-chip leading-tight" style={labelChipStyle(l.hex_color, isDark)}>
+            <span className="vicu-chip rounded-chip px-2 py-px text-chip leading-tight" style={labelChipStyle(l.hex_color, isDark)}>
               {l.title}
             </span>
             {/* A space between chips, so the visible text reads as separate words. */}

@@ -137,7 +137,7 @@ function ProjectRows({
         <div className="flex min-h-10 items-center gap-2 border-b border-border/60 py-1 pr-2" style={{ paddingLeft: `${12 + depth * 20}px` }}>
           <Folder className="h-4 w-4 shrink-0" style={{ color: node.hex_color || 'var(--text-secondary)' }} />
           <span className={cn('min-w-0 flex-1 truncate text-sm', archived ? 'text-[var(--text-secondary)]' : 'text-[var(--text-primary)]')}>{node.title}</span>
-          {isInbox && <span className="rounded-chip bg-[var(--bg-secondary)] px-1.5 py-0.5 text-caption text-[var(--text-secondary)]">Inbox</span>}
+          {isInbox && <span className="vicu-chip rounded-chip bg-[var(--bg-secondary)] px-1.5 py-0.5 text-caption text-[var(--text-secondary)]">Inbox</span>}
           {!archived && (
             <button type="button" title="Edit" onClick={() => onEdit(node)} className="rounded-control p-1.5 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"><Pencil className="h-3.5 w-3.5" /></button>
           )}

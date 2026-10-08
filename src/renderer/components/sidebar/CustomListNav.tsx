@@ -81,6 +81,7 @@ function CustomListItem({
       {...listeners}
       type="button"
       onClick={onNavigate}
+      aria-current={isActive ? 'page' : undefined}
       onContextMenu={onContextMenu}
       className={cn(
         'relative flex h-8 items-center gap-2.5 rounded-control px-2.5 text-[13px] font-medium transition-colors',

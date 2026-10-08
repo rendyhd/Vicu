@@ -25,8 +25,8 @@ const VARIANTS: Record<ButtonVariant, { normal: string; danger: string }> = {
     danger: 'border border-danger/30 text-danger hover:bg-danger/10',
   },
   quiet: {
-    normal: 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]',
-    danger: 'text-danger hover:bg-danger/10',
+    normal: 'vicu-edge text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]',
+    danger: 'vicu-edge text-danger hover:bg-danger/10',
   },
 }
 

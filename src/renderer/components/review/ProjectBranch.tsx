@@ -214,7 +214,7 @@ function StalenessPill({ node }: { node: ReviewTreeNode }) {
   }
   return (
     // Not through cn(): tailwind-merge reads text-caption as a colour and drops it next to the tone.
-    <span className={`shrink-0 rounded-chip px-[7px] py-0.5 text-caption ${tones[pill.tone]}`}>
+    <span className={`vicu-chip shrink-0 rounded-chip px-[7px] py-0.5 text-caption ${tones[pill.tone]}`}>
       {pill.text}
     </span>
   )

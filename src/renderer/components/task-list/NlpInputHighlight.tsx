@@ -60,8 +60,8 @@ export function NlpInputHighlight({ value, tokens, multiline = false }: NlpInput
     <div
       className={
         multiline
-          ? 'pointer-events-none absolute inset-0 overflow-hidden whitespace-pre-wrap break-words text-[13px] font-medium leading-snug text-transparent'
-          : 'pointer-events-none absolute inset-0 flex items-center overflow-hidden whitespace-pre text-[13px] text-transparent'
+          ? 'vicu-token-layer pointer-events-none absolute inset-0 overflow-hidden whitespace-pre-wrap break-words text-[13px] font-medium leading-snug text-transparent'
+          : 'vicu-token-layer pointer-events-none absolute inset-0 flex items-center overflow-hidden whitespace-pre text-[13px] text-transparent'
       }
       aria-hidden
     >

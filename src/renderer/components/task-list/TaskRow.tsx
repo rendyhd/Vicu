@@ -552,6 +552,7 @@ function TaskRowInner({ task, nestedDepth = 0, parentProjectId, projectMeta, dra
       <div
         ref={setRowElement}
         data-task-id={task.id}
+        data-selected={isSelected ? '' : undefined}
         role="listitem"
         // Roving tabindex: the row the keyboard selection is on is the one Tab stop of the list.
         tabIndex={isFocused ? 0 : -1}
@@ -652,7 +653,7 @@ function TaskRowInner({ task, nestedDepth = 0, parentProjectId, projectMeta, dra
               {metaLabels.map((l) => (
                 <span
                   key={l.id}
-                  className="shrink-0 rounded-chip px-2 py-px text-chip leading-tight"
+                  className="vicu-chip shrink-0 rounded-chip px-2 py-px text-chip leading-tight"
                   style={labelChipStyle(l.hex_color, isDark)}
                 >
                   {l.title}

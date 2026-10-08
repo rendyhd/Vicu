@@ -67,6 +67,7 @@ export function SmartListNav() {
             key={item.id}
             type="button"
             onClick={() => navigate({ to: item.path })}
+            aria-current={isActive ? 'page' : undefined}
             className={cn(
               'relative flex h-8 items-center gap-2.5 rounded-control px-2.5 text-[13px] font-medium transition-colors',
               isActive
