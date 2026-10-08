@@ -3,6 +3,7 @@ import { useNavigate, useMatches, useRouter } from '@tanstack/react-router'
 import { api } from '@/lib/api'
 import { useCompletedTasksStore } from '@/stores/completed-tasks-store'
 import { completionHold } from '@/stores/completion-hold-store'
+import { announce } from '@/stores/announcer-store'
 import { sortProjectTasks } from '@/lib/task-sort'
 import {
   applyPositionUpdates,
@@ -633,6 +634,7 @@ export function useCompleteTask() {
       // the pointer or focus leaves it, or until the user leaves the view); then the hold removes it.
       addCompleted(mapTaskDoneByIds(task, doneById), currentPathname(router), autoCompleted, suppressTopLevelUndo)
       completionHold.complete(task.id)
+      announce(`Completed ${task.title}`)
 
       await qc.cancelQueries({ queryKey: ['tasks'] })
       await qc.cancelQueries({ queryKey: ['view-tasks'] })

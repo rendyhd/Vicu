@@ -3,6 +3,9 @@ import type { FocusEvent } from 'react'
 import { useUncompleteTask } from '@/hooks/use-task-mutations'
 import { useCompletedTasksStore } from '@/stores/completed-tasks-store'
 import { completionHold } from '@/stores/completion-hold-store'
+import { announce } from '@/stores/announcer-store'
+import { useSelectionStore } from '@/stores/selection-store'
+import { focusCheckboxWhenShown } from '@/lib/next-row'
 
 /**
  * Pointer and keyboard-focus engagement of one task row, for the completion hold. A completed row is
@@ -46,11 +49,18 @@ export function useUndoCompletedTasks() {
   const uncomplete = useUncompleteTask()
   const mutate = uncomplete.mutate
   return useCallback(() => {
-    for (const entry of completionHold.takeUndo()) {
+    const entries = completionHold.takeUndo()
+    for (const entry of entries) {
       useCompletedTasksStore
         .getState()
         .add(entry.task, entry.path, entry.autoCompletedSubtasks, entry.suppressTopLevelUndo)
       mutate(entry.task)
     }
+    if (entries.length === 0) return
+    announce(entries.length === 1 ? `Reopened ${entries[0].task.title}` : `Reopened ${entries.length} tasks`)
+    // The toast (and the button that was pressed) is gone: focus goes to the first restored row.
+    const first = entries[0].task.id
+    useSelectionStore.getState().setFocusedTask(first)
+    focusCheckboxWhenShown(first)
   }, [mutate])
 }

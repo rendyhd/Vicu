@@ -3,6 +3,7 @@ import { X } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { useUndoCompletedTasks } from '@/hooks/use-completion-hold'
 import { setCompletionUndoHandler } from '@/stores/completion-hold-store'
+import { useAnnouncerStore } from '@/stores/announcer-store'
 import { useToastStore } from '@/stores/toast-store'
 import type { Toast } from '@/stores/toast-store'
 
@@ -30,15 +31,29 @@ export function ToastHost() {
 
   const drop = (id: number) => setShown((previous) => previous.filter((t) => t.id !== id))
 
-  // The live region is always mounted so screen readers pick up the first toast added to it.
+  // The live regions are always mounted so screen readers pick up the first message added to them.
   return (
-    <div
-      className="pointer-events-none fixed bottom-4 right-4 z-[60] flex w-80 max-w-[calc(100vw-2rem)] flex-col gap-2"
-      aria-live="polite"
-    >
-      {shown.map((t) => (
-        <ToastItem key={t.id} toast={t} onGone={() => drop(t.id)} />
-      ))}
+    <>
+      <Announcer />
+      <div
+        className="pointer-events-none fixed bottom-4 right-4 z-[60] flex w-80 max-w-[calc(100vw-2rem)] flex-col gap-2"
+        aria-live="polite"
+      >
+        {shown.map((t) => (
+          <ToastItem key={t.id} toast={t} onGone={() => drop(t.id)} />
+        ))}
+      </div>
+    </>
+  )
+}
+
+/** "Completed Buy milk" for screen readers, the moment a task is completed. */
+function Announcer() {
+  const message = useAnnouncerStore((s) => s.message)
+  const nonce = useAnnouncerStore((s) => s.nonce)
+  return (
+    <div className="sr-only" role="status" aria-live="polite" aria-atomic="true" data-announcer="">
+      {message && <span key={nonce}>{message}</span>}
     </div>
   )
 }

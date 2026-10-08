@@ -10,9 +10,11 @@ import type { CompletedTaskEntry } from '@/stores/completed-tasks-store'
  * app has to do when it moves.
  *
  * - A held row is a `completed-tasks-store` entry (the list merges keep showing it, struck through).
- *   When the hold ends the entry is removed, which is what makes the row leave the list.
+ *   When the hold ends the row is marked `collapsing` (it fades and its height closes, see
+ *   `useCompletionCollapse`) and the entry is removed when that is done, which is what makes the row
+ *   leave the list. Leaving the view removes the entries at once.
  * - Rows that collapsed make up the toast. Their entries are kept here so the toast's Undo can put
- *   them back and send `{ done: false }` for each (`useUndoCompletionToast`).
+ *   them back and send `{ done: false }` for each (`useUndoCompletedTasks`).
  */
 
 export interface CompletionToastState {
@@ -25,24 +27,53 @@ export interface CompletionToastState {
 interface CompletionHoldState {
   /** Task ids still shown in their list as done. */
   held: ReadonlySet<number>
+  /** Task ids whose hold ended and whose row is closing; the entry goes when the row says it is done. */
+  collapsing: ReadonlySet<number>
   toast: CompletionToastState | null
 }
 
+/** If no row reports that it finished closing (it is not on screen), the entry goes after this. */
+export const COLLAPSE_LIMIT_MS = 600
+
 const EMPTY: ReadonlySet<number> = new Set()
 
-export const useCompletionHoldStore = create<CompletionHoldState>(() => ({ held: EMPTY, toast: null }))
+export const useCompletionHoldStore = create<CompletionHoldState>(() => ({ held: EMPTY, collapsing: EMPTY, toast: null }))
 
 let machine = new CompletionHold()
 let timer: ReturnType<typeof setTimeout> | null = null
 /** Entries of the rows the toast covers, so Undo can bring them back. */
 const collapsedEntries = new Map<number, CompletedTaskEntry>()
+const collapseTimers = new Map<number, ReturnType<typeof setTimeout>>()
 
 function sameIds(a: ReadonlySet<number>, b: readonly number[]): boolean {
   return a.size === b.length && b.every((id) => a.has(id))
 }
 
+function setCollapsing(next: (ids: Set<number>) => void): void {
+  const ids = new Set(useCompletionHoldStore.getState().collapsing)
+  next(ids)
+  useCompletionHoldStore.setState({ collapsing: ids.size === 0 ? EMPTY : ids })
+}
+
+/** The row has closed (or was never on screen): its entry leaves the completed-tasks store. */
+function finishCollapse(id: number): void {
+  const timerId = collapseTimers.get(id)
+  if (timerId !== undefined) clearTimeout(timerId)
+  collapseTimers.delete(id)
+  if (!useCompletionHoldStore.getState().collapsing.has(id)) return
+  setCollapsing((ids) => ids.delete(id))
+  useCompletedTasksStore.getState().remove(id)
+}
+
+function cancelCollapse(id: number): void {
+  const timerId = collapseTimers.get(id)
+  if (timerId !== undefined) clearTimeout(timerId)
+  collapseTimers.delete(id)
+  if (useCompletionHoldStore.getState().collapsing.has(id)) setCollapsing((ids) => ids.delete(id))
+}
+
 /** Move the machine to now, apply what it did to the stores, publish the state and re-arm the timer. */
-function sync(): void {
+function sync(animate = true): void {
   const now = Date.now()
   machine.advance(now)
 
@@ -50,7 +81,12 @@ function sync(): void {
     const completed = useCompletedTasksStore.getState()
     const entry = completed.tasks.get(id)
     if (entry) collapsedEntries.set(id, entry)
-    completed.remove(id)
+    if (animate && entry) {
+      setCollapsing((ids) => ids.add(id))
+      collapseTimers.set(id, setTimeout(() => finishCollapse(id), COLLAPSE_LIMIT_MS))
+    } else {
+      completed.remove(id)
+    }
   }
 
   const snapshot = machine.snapshot(now)
@@ -126,6 +162,7 @@ export const completionHold = {
   },
   /** A task is open again (unchecked, reopened from the Logbook, or its completion failed). No toast. */
   reopened(taskId: number): void {
+    cancelCollapse(taskId)
     machine.forget(taskId, Date.now())
     collapsedEntries.delete(taskId)
     sync()
@@ -148,9 +185,12 @@ export const completionHold = {
   },
   /** The user left the view: every held row collapses now. */
   navigate(): void {
+    for (const id of useCompletionHoldStore.getState().collapsing) finishCollapse(id)
     machine.navigate(Date.now())
-    sync()
+    sync(false)
   },
+  /** The row of a collapsed task finished closing: take its entry out of the completed-tasks store. */
+  finishCollapse,
   /** The user closed the toast: it goes, the rows stay collapsed. */
   dismissToast(): void {
     machine.dismissToast(Date.now())
@@ -166,7 +206,10 @@ export const completionHold = {
       const entry = collapsedEntries.get(id)
       return entry ? [entry] : []
     })
-    for (const id of ids) collapsedEntries.delete(id)
+    for (const id of ids) {
+      collapsedEntries.delete(id)
+      cancelCollapse(id)
+    }
     sync()
     return entries
   },
@@ -178,7 +221,9 @@ export function resetCompletionHold(): void {
   timer = null
   machine = new CompletionHold()
   collapsedEntries.clear()
+  for (const timerId of collapseTimers.values()) clearTimeout(timerId)
+  collapseTimers.clear()
   undoHandler = null
-  useCompletionHoldStore.setState({ held: EMPTY, toast: null })
+  useCompletionHoldStore.setState({ held: EMPTY, collapsing: EMPTY, toast: null })
   useToastStore.getState().remove(TOAST_KEY)
 }

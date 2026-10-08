@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { COMPLETION_HOLD_MS, COMPLETION_TOAST_MS } from '../../../shared/completion-hold'
 import { useCompletedTasksStore } from '../completed-tasks-store'
-import { completionHold, resetCompletionHold, setCompletionUndoHandler, useCompletionHoldStore } from '../completion-hold-store'
+import { COLLAPSE_LIMIT_MS, completionHold, resetCompletionHold, setCompletionUndoHandler, useCompletionHoldStore } from '../completion-hold-store'
 import { useToastStore } from '../toast-store'
 import type { Task } from '@/lib/vikunja-types'
 
@@ -34,9 +34,14 @@ describe('completion hold store', () => {
     expect(useCompletionHoldStore.getState().toast).toBeNull()
     vi.advanceTimersByTime(1)
     expect(held()).toEqual([])
-    expect(inList()).toEqual([])
+    // The row closes first (a fade and the height), the entry goes when it is done.
+    expect([...useCompletionHoldStore.getState().collapsing]).toEqual([1])
+    expect(inList()).toEqual([1])
     expect(useCompletionHoldStore.getState().toast).toEqual({ text: 'Completed', ids: [1] })
-    vi.advanceTimersByTime(COMPLETION_TOAST_MS)
+    vi.advanceTimersByTime(COLLAPSE_LIMIT_MS)
+    expect(inList()).toEqual([])
+    expect(useCompletionHoldStore.getState().collapsing.size).toBe(0)
+    vi.advanceTimersByTime(COMPLETION_TOAST_MS - COLLAPSE_LIMIT_MS)
     expect(useCompletionHoldStore.getState().toast).toBeNull()
   })
 
@@ -68,6 +73,33 @@ describe('completion hold store', () => {
     vi.advanceTimersByTime(60_000)
     expect(held()).toEqual([])
     expect(useCompletionHoldStore.getState().toast).toBeNull()
+  })
+
+  it('the row reports that it has closed and its entry goes at once', () => {
+    complete(1)
+    vi.advanceTimersByTime(COMPLETION_HOLD_MS)
+    completionHold.finishCollapse(1)
+    expect(inList()).toEqual([])
+    expect(useCompletionHoldStore.getState().collapsing.size).toBe(0)
+    vi.advanceTimersByTime(COLLAPSE_LIMIT_MS)
+    expect(inList()).toEqual([])
+  })
+
+  it('Undo while the row is closing cancels the close and keeps the entry', () => {
+    complete(1)
+    vi.advanceTimersByTime(COMPLETION_HOLD_MS)
+    expect(completionHold.takeUndo().map((e) => e.task.id)).toEqual([1])
+    expect(useCompletionHoldStore.getState().collapsing.size).toBe(0)
+    vi.advanceTimersByTime(COLLAPSE_LIMIT_MS)
+    expect(inList()).toEqual([1])
+  })
+
+  it('leaving the view takes a closing row out at once', () => {
+    complete(1)
+    vi.advanceTimersByTime(COMPLETION_HOLD_MS)
+    completionHold.navigate()
+    expect(inList()).toEqual([])
+    expect(useCompletionHoldStore.getState().collapsing.size).toBe(0)
   })
 
   it('hands the toast Undo the entries of the collapsed rows and removes the toast', () => {

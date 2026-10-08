@@ -83,3 +83,47 @@ export function toastText(h) {
     return el ? el.querySelector('span.flex-1')?.textContent ?? '' : null
   })
 }
+
+/**
+ * Starts recording, in the page, the CSS animations that start (name, duration, easing) and the
+ * animations on the row of one task (the Web Animations of its close: the properties they change and
+ * their duration), sampled every 16 ms. `readAnimations` returns what was seen.
+ */
+export async function recordAnimations(h, taskId) {
+  await h.page.evaluate((id) => {
+    window.__anims = []
+    window.__rowAnims = []
+    document.addEventListener(
+      'animationstart',
+      (e) => {
+        const a = e.target.getAnimations?.().find((x) => x.animationName === e.animationName)
+        const timing = a?.effect?.getTiming()
+        window.__anims.push({ name: e.animationName, duration: timing ? Number(timing.duration) : null, easing: a?.effect?.getKeyframes()?.[0]?.easing ?? timing?.easing ?? '' })
+      },
+      true
+    )
+    window.__rowTimer = setInterval(() => {
+      const row = document.querySelector(`[data-task-id="${id}"]`)
+      if (!row) return
+      for (const a of row.getAnimations()) {
+        const effect = a.effect
+        if (!effect || a.animationName || a.transitionProperty) continue
+        const props = new Set()
+        for (const k of effect.getKeyframes()) for (const key of Object.keys(k)) if (!['offset', 'easing', 'composite', 'computedOffset'].includes(key)) props.add(key)
+        window.__rowAnims.push({ props: [...props].sort(), duration: Number(effect.getTiming().duration) })
+      }
+    }, 16)
+  }, taskId)
+}
+
+export async function readAnimations(h) {
+  return h.page.evaluate(() => {
+    clearInterval(window.__rowTimer)
+    const rowAnims = []
+    for (const a of window.__rowAnims ?? []) if (!rowAnims.some((x) => x.props.join() === a.props.join() && x.duration === a.duration)) rowAnims.push(a)
+    return { anims: window.__anims ?? [], rowAnims }
+  })
+}
+
+/** The text of the screen-reader announcement ("Completed Buy milk"), or ''. */
+export const announcement = (h) => h.page.evaluate(() => document.querySelector('[data-announcer]')?.textContent?.trim() ?? '')

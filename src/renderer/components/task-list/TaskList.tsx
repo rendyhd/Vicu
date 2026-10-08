@@ -454,7 +454,9 @@ export function TaskList({
       // The keyboard selection and DOM focus travel together (roving tabindex), unless the user is
       // typing somewhere else.
       const active = document.activeElement
-      if (el instanceof HTMLElement && el.tabIndex >= 0 && (!active || active === document.body || listRef.current.contains(active))) {
+      // Focus already inside the row (its checkbox, after a completion by keyboard) stays where it is.
+      const insideRow = el instanceof HTMLElement && active !== null && el.contains(active)
+      if (el instanceof HTMLElement && el.tabIndex >= 0 && !insideRow && (!active || active === document.body || listRef.current.contains(active))) {
         el.focus({ preventScroll: true })
       }
     }

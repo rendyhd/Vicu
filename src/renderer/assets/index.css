@@ -214,6 +214,71 @@
 }
 
 /*
+ * Completing a task (card 4.2c, the same moves as Android). The checkbox ring fills with the pop
+ * spring (360 ms, it overshoots a little), the check draws over 220 ms and the title strike draws
+ * left to right over 240 ms. They only play when the task was completed while the row is on screen
+ * (the *-play classes); a row that is already done is simply drawn. Reduced motion: no scale and no
+ * drawing, the fill and the check fade in over fade.fast and the strike appears.
+ */
+@keyframes vicu-check-fill {
+  from {
+    scale: 0;
+  }
+}
+
+@keyframes vicu-check-draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+}
+
+@keyframes vicu-strike-draw {
+  from {
+    background-size: 0 1px;
+  }
+}
+
+.vicu-check-fill-play {
+  animation: vicu-check-fill var(--dur-pop) var(--spring-pop) both;
+}
+
+.vicu-check-draw {
+  stroke-dasharray: 1;
+}
+
+.vicu-check-draw-play {
+  animation: vicu-check-draw var(--dur-check-draw) var(--ease-standard) both;
+}
+
+/* The strike is a one pixel line behind the text, in the text's own colour. */
+.vicu-strike {
+  background: linear-gradient(currentColor, currentColor) no-repeat 0 55% / 100% 1px;
+}
+
+.vicu-strike-play {
+  animation: vicu-strike-draw var(--dur-strike-draw) var(--ease-standard) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vicu-check-fill-play,
+  .vicu-check-draw-play {
+    animation: vicu-bar-fade var(--dur-fade-fast) var(--ease-standard) both;
+  }
+
+  .vicu-strike-play {
+    animation: none;
+  }
+}
+
+/* Forced colours drop background images: the strike goes back to a text decoration. */
+@media (forced-colors: active) {
+  .vicu-strike {
+    background: none;
+    text-decoration: line-through;
+  }
+}
+
+/*
  * Opening and closing a task (card 4.4, lib/task-transition.ts). The row and the card of a task share
  * a view-transition-name for the length of the transition; their group moves and resizes with the
  * move spring, and the card's content fades in one item after another (--stagger apart). The page

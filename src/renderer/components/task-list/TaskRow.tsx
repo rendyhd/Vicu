@@ -10,6 +10,8 @@ import { useSelectionStore } from '@/stores/selection-store'
 import { orderedTaskIds } from '@/lib/task-selection'
 import { useUpdateTask, useCompleteTask, useDeleteTask, useUploadAttachmentFromDrop, useAddLabel, useCreateLabel } from '@/hooks/use-task-mutations'
 import { useCompletionHoldEngagement } from '@/hooks/use-completion-hold'
+import { useCompletionCollapse } from '@/hooks/use-completion-collapse'
+import { useCompletionPlay } from '@/hooks/use-completion-play'
 import { useConfirmDelete } from '@/hooks/use-confirm-delete'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { dueToday, parsedDue } from '@/lib/due-dates'
@@ -354,6 +356,17 @@ function TaskRowInner({ task, nestedDepth = 0, parentProjectId, projectMeta, dra
   const holdEngagement = useCompletionHoldEngagement(task.id)
 
   const { listeners, setNodeRef, isDragging, style } = drag
+  // When the hold ends the row fades and its height closes before it leaves the list.
+  const rowElement = useRef<HTMLElement | null>(null)
+  const setRowElement = useCallback(
+    (node: HTMLElement | null) => {
+      setNodeRef(node)
+      rowElement.current = node
+    },
+    [setNodeRef]
+  )
+  useCompletionCollapse(task.id, rowElement)
+  const strikePlay = useCompletionPlay(task.done)
   const isDark = useIsDark()
 
   const [editDescription, setEditDescription] = useState(stripPageLink(stripNoteLink(task.description)))
@@ -541,7 +554,7 @@ function TaskRowInner({ task, nestedDepth = 0, parentProjectId, projectMeta, dra
     return (
       <>
       <div
-        ref={setNodeRef}
+        ref={setRowElement}
         data-task-id={task.id}
         role="listitem"
         // Roving tabindex: the row the keyboard selection is on is the one Tab stop of the list.
@@ -624,10 +637,15 @@ function TaskRowInner({ task, nestedDepth = 0, parentProjectId, projectMeta, dra
           <span
             className={cn(
               'block truncate text-task-title',
-              task.done ? 'text-text-secondary line-through' : 'text-text'
+              task.done ? 'text-text-secondary' : 'text-text'
             )}
           >
-            {dropError ? <span className="text-danger">{dropError}</span> : task.title}
+            {dropError ? (
+              <span className="text-danger">{dropError}</span>
+            ) : (
+              // The strike is drawn behind the text left to right when the task has just been completed.
+              <span className={cn(task.done && 'vicu-strike', task.done && strikePlay && 'vicu-strike-play')}>{task.title}</span>
+            )}
           </span>
           {hasMeta && (
             <div className="mt-0.5 flex min-w-0 items-center gap-x-2 overflow-hidden whitespace-nowrap text-meta text-text-secondary">

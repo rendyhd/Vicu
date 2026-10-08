@@ -1,7 +1,7 @@
 // E1 (card 4.2): click a Today checkbox, rest the pointer, move away. The row is held while the
 // pointer is on it and collapses about 5 s after the pointer leaves (docs/cross-app-semantics-v1.md
 // section 7). Leaving the view ends the hold at once.
-import { HOLD_MS, TOAST_MS, checkboxOf, makeTasks, openToday, pageNow, pointerAway, removeTasks, rowGoneAt, rowOf, serverDone, toastRegion, toastText } from './_completion.mjs'
+import { HOLD_MS, TOAST_MS, checkboxOf, makeTasks, openToday, pageNow, pointerAway, readAnimations, recordAnimations, removeTasks, rowGoneAt, rowOf, serverDone, toastRegion, toastText } from './_completion.mjs'
 
 export const meta = {
   id: 'E1',
@@ -20,15 +20,18 @@ export default async function run(h) {
 
     // ---- A. A real click, the pointer rests on the row ---------------------------------------
     await h.capture('before')
+    await recordAnimations(h, a)
     await checkboxOf(h, a).click()
+    await h.wait(60)
+    await h.capture('pop-early', { clip: rowOf(h, a) })
     const clicked = await pageNow(h)
     await h.wait(400)
     await h.assert('the checkbox reads checked and the title is struck through', async () => {
       const state = await rowOf(h, a).evaluate((row) => ({
         checked: row.querySelector('button[role="checkbox"]')?.getAttribute('aria-checked'),
-        struck: getComputedStyle(row.querySelector('span.truncate')).textDecorationLine,
+        struck: getComputedStyle(row.querySelector('.vicu-strike')).backgroundImage,
       }))
-      return { ok: state.checked === 'true' && state.struck.includes('line-through'), detail: JSON.stringify(state) }
+      return { ok: state.checked === 'true' && state.struck.includes('linear-gradient'), detail: JSON.stringify(state) }
     })
     await h.assert('the completion is on the server at once', { ok: await serverDone(h, a) })
     await h.capture('held-hovered')
@@ -48,6 +51,17 @@ export default async function run(h) {
     await h.assert('the row collapses 5 s after the pointer left (4.8 s to 6.0 s)', {
       ok: heldFor !== null && heldFor >= HOLD_MS - 200 && heldFor <= HOLD_MS + 1000,
       detail: heldFor === null ? 'still there' : `${Math.round(heldFor)} ms`,
+    })
+    // The motion of the completion, read from the page: the same values as Android.
+    const seen = await readAnimations(h)
+    const named = (name) => seen.anims.find((x) => x.name === name)
+    await h.assert('the ring fill pops with the pop spring over 360 ms', { ok: named('vicu-check-fill')?.duration === 360 && named('vicu-check-fill').easing.startsWith('linear('), detail: JSON.stringify(named('vicu-check-fill')) })
+    await h.assert('the check draws over 220 ms', { ok: named('vicu-check-draw')?.duration === 220, detail: JSON.stringify(named('vicu-check-draw')) })
+    await h.assert('the title strike draws over 240 ms', { ok: named('vicu-strike-draw')?.duration === 240, detail: JSON.stringify(named('vicu-strike-draw')) })
+    const closing = seen.rowAnims.find((x) => x.props.includes('height'))
+    await h.assert('the row closes its height and fades with the move spring (320 ms), without a transform', {
+      ok: !!closing && closing.duration === 320 && closing.props.includes('opacity') && !closing.props.some((p) => /transform|scale|translate|rotate/.test(p)),
+      detail: JSON.stringify(seen.rowAnims),
     })
     await h.assert('the other rows did not move out', async () => (await rowOf(h, b).count()) === 1 && (await rowOf(h, c).count()) === 1)
 
