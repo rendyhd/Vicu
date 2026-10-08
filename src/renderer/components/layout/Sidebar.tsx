@@ -11,7 +11,7 @@ export function Sidebar() {
   const { openProjectDialog, openLabelDialog } = useSidebarActions()
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="isolate flex h-full flex-col">
       <div role="search" className="px-2 pt-2">
         <QuickFind />
       </div>

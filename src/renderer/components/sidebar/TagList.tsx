@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { SelectionPill } from './SelectionPill'
 import { useNavigate, useMatches } from '@tanstack/react-router'
 import { useDroppable } from '@dnd-kit/core'
 import { Pencil, Trash2, X } from 'lucide-react'
@@ -177,14 +178,15 @@ function TagListItem({
       onClick={() => navigate({ to: '/tag/$labelId', params: { labelId: String(label.id) } })}
       onContextMenu={(e) => onContextMenu(e, label)}
       className={cn(
-        'flex h-7 items-center gap-2.5 rounded-control px-2.5 text-xs transition-colors',
+        'relative flex h-7 items-center gap-2.5 rounded-control px-2.5 text-xs transition-colors',
         isOver
           ? 'bg-accent-blue/15 ring-1 ring-[var(--accent-blue)]'
           : isActive
-            ? 'bg-[var(--bg-selected)] text-[var(--text-primary)]'
+            ? 'text-[var(--text-primary)]'
             : 'text-[var(--text-primary)] hover:bg-[var(--bg-hover)]'
       )}
     >
+      {isActive && !isOver && <SelectionPill />}
       <span
         className="h-2.5 w-2.5 shrink-0 rounded-full bg-[var(--text-secondary)]"
         style={normalizeHex(label.hex_color) ? { backgroundColor: normalizeHex(label.hex_color) } : undefined}

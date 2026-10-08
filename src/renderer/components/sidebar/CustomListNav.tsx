@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { SelectionPill } from './SelectionPill'
 import { useNavigate, useMatches } from '@tanstack/react-router'
 import {
   Plus, List, ListFilter, Folder, Star, Heart, Home, Briefcase, GraduationCap,
@@ -82,12 +83,13 @@ function CustomListItem({
       onClick={onNavigate}
       onContextMenu={onContextMenu}
       className={cn(
-        'flex h-8 items-center gap-2.5 rounded-control px-2.5 text-[13px] font-medium transition-colors',
+        'relative flex h-8 items-center gap-2.5 rounded-control px-2.5 text-[13px] font-medium transition-colors',
         isActive
-          ? 'bg-[var(--bg-selected)] text-[var(--text-primary)]'
+          ? 'text-[var(--text-primary)]'
           : 'text-[var(--text-primary)] hover:bg-[var(--bg-hover)]'
       )}
     >
+      {isActive && <SelectionPill />}
       <ItemIcon className="h-4 w-4 shrink-0 text-[var(--text-secondary)]" strokeWidth={1.8} />
       <span className="flex-1 truncate text-left">{item.name}</span>
     </button>

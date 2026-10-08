@@ -28,6 +28,15 @@ export function transitionIds(from: number | null, to: number | null): number[] 
   return [...new Set([from, to].filter((id): id is number => id !== null))]
 }
 
+/** Whether a change of view is animating (the router starts its transition with the type "page"). */
+function pageTransitionActive(root: HTMLElement): boolean {
+  try {
+    return root.matches(':active-view-transition-type(page)')
+  } catch {
+    return false
+  }
+}
+
 function nameElements(ids: readonly number[]): void {
   for (const id of ids) {
     // The first element of the task in the document; a task shown twice would make the name a duplicate.
@@ -64,7 +73,8 @@ export function runTaskTransition(ids: readonly number[], update: () => void): v
     update()
     return
   }
-  if (typeof document.startViewTransition !== 'function') {
+  if (typeof document.startViewTransition !== 'function' || pageTransitionActive(root)) {
+    // A change of view is running (card 4.6): its transition keeps the document, this change just applies.
     update()
     return
   }

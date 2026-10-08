@@ -15,6 +15,7 @@ import { ProjectView } from '@/views/ProjectView'
 import { TagView } from '@/views/TagView'
 import { CustomListView } from '@/views/CustomListView'
 import { SearchView } from '@/views/SearchView'
+import { pageTransitionTypes, trackInput } from '@/lib/navigation-motion'
 
 // Routines, Review and Settings are used now and then and are their own chunks, loaded when first
 // opened, so the main chunk holds what every session needs.
@@ -123,10 +124,16 @@ const routeTree = rootRoute.addChildren([
 // Use hash history for Electron compatibility (file:// URLs don't support browser history)
 const hashHistory = createHashHistory()
 
+// Changing view by pointer cross-fades the content region (card 4.6, assets/index.css); by keyboard it is instant.
+trackInput(window)
+
 export const router = createRouter({
   routeTree,
   history: hashHistory,
   defaultPreload: 'intent',
+  defaultViewTransition: {
+    types: ({ fromLocation, pathChanged }) => pageTransitionTypes({ hasFrom: !!fromLocation, pathChanged }),
+  },
 })
 
 declare module '@tanstack/react-router' {

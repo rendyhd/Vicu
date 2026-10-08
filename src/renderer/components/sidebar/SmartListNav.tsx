@@ -1,5 +1,6 @@
 import { useNavigate, useMatches } from '@tanstack/react-router'
 import { cn } from '@/lib/cn'
+import { SelectionPill } from './SelectionPill'
 import { SmartListIcon } from '@/components/shared/SmartListIcon'
 import type { SmartListId } from '@/lib/smart-list-identity'
 import { useReviewBadgeCount, useReviewFeatureEnabled } from '@/hooks/use-review'
@@ -66,9 +67,9 @@ export function SmartListNav() {
             type="button"
             onClick={() => navigate({ to: item.path })}
             className={cn(
-              'flex h-8 items-center gap-2.5 rounded-control px-2.5 text-[13px] font-medium transition-colors',
+              'relative flex h-8 items-center gap-2.5 rounded-control px-2.5 text-[13px] font-medium transition-colors',
               isActive
-                ? 'bg-[var(--bg-selected)] text-[var(--text-primary)]'
+                ? 'text-[var(--text-primary)]'
                 : 'text-[var(--text-primary)] hover:bg-[var(--bg-hover)]',
               reviewActiveBorder && 'border border-[rgba(175,82,222,0.4)]'
             )}
@@ -80,6 +81,7 @@ export function SmartListNav() {
                 {count}
               </span>
             )}
+            {isActive && <SelectionPill />}
           </button>
         )
       })}

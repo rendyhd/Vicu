@@ -1,4 +1,5 @@
 import { useNavigate, useMatches } from '@tanstack/react-router'
+import { SelectionPill } from './SelectionPill'
 import { ChevronRight, FolderOpen } from 'lucide-react'
 import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { useDndContext } from '@dnd-kit/core'
@@ -80,16 +81,17 @@ export function ProjectTreeItem({
       <div
         ref={setNodeRef}
         className={cn(
-          'group flex h-7 cursor-default items-center rounded-control transition-colors',
+          'group relative flex h-7 cursor-default items-center rounded-control transition-colors',
           isTaskDragOver
             ? 'bg-accent-blue/15 ring-1 ring-[var(--accent-blue)]'
             : isActive
-              ? 'bg-[var(--bg-selected)] text-[var(--text-primary)]'
+              ? 'text-[var(--text-primary)]'
               : 'text-[var(--text-primary)] hover:bg-[var(--bg-hover)]'
         )}
         style={style}
         onContextMenu={(e) => onContextMenu?.(e, node)}
       >
+        {isActive && !isTaskDragOver && <SelectionPill />}
         {hasChildren ? (
           <button
             type="button"

@@ -260,6 +260,56 @@ html[data-task-transition='morph'] .vicu-card > :nth-child(n + 6) { animation-de
 }
 
 /*
+ * Changing view (card 4.6, lib/navigation-motion.ts). A pointer navigation runs a view transition
+ * with the type "page". Only while it runs does the content region carry a view-transition-name
+ * (so the task morph of card 4.4 never captures it). The sidebar and the title bar are not in the
+ * content group and the root does not animate; the sidebar selection pill slides on its own
+ * (components/sidebar/SelectionPill.tsx), so it stays behind the labels. The old page
+ * fades out over page-out, the new one fades in over page-in after it with a rise of --page-rise.
+ * Reduced motion: a plain cross-fade over fade.fast, no rise.
+ */
+html:active-view-transition-type(page) main {
+  view-transition-name: content;
+}
+
+@keyframes vicu-page-out {
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes vicu-page-in {
+  from {
+    opacity: 0;
+    translate: 0 var(--page-rise);
+  }
+}
+
+::view-transition-group(content) {
+  animation: none;
+}
+
+::view-transition-old(content) {
+  mix-blend-mode: normal;
+  animation: vicu-page-out var(--dur-page-out) var(--ease-exit) both;
+}
+
+::view-transition-new(content) {
+  mix-blend-mode: normal;
+  animation: vicu-page-in var(--dur-page-in) var(--ease-enter) var(--dur-page-out) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(content) {
+    animation: vicu-page-out var(--dur-fade-fast) var(--ease-standard) both;
+  }
+
+  ::view-transition-new(content) {
+    animation: vicu-bar-fade var(--dur-fade-fast) var(--ease-standard) both;
+  }
+}
+
+/*
  * Dialogs (card 4.4): a small entrance, scale 0.98 to 1 with a fade of fade.base, the backdrop
  * fades with it. Reduced motion: opacity only. No exit animation (the dialog is removed when it closes).
  */
