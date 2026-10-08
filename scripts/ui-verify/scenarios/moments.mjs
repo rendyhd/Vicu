@@ -102,6 +102,18 @@ export default async function run(h) {
   await h.resize(1280, 820)
 
   // ---- A. Skeleton ------------------------------------------------------------------------------
+  // Anytime is only cold when nothing loaded it before: the completion scenarios visit it, and the query
+  // cache is kept in IndexedDB across reloads, so drop the saved cache and reload first.
+  await page.evaluate(async () => {
+    const dbs = (await indexedDB.databases?.()) ?? []
+    await Promise.all(dbs.map((d) => new Promise((done) => {
+      const request = indexedDB.deleteDatabase(d.name)
+      request.onsuccess = request.onerror = request.onblocked = () => done(undefined)
+    })))
+  })
+  await page.reload()
+  await h.goto('/today')
+  await h.wait(1500)
   await h.dismiss()
   await arm(page, '.vicu-shimmer', 0.4)
   await withServerPaused(async () => {
