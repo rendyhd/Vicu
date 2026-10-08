@@ -17,6 +17,8 @@ const config: Config = {
       // Motion roles (test-fixtures/design-tokens-v1.json, "motion"). The variables are in tokens.css, so
       // components write duration-fade-base or ease-standard instead of a millisecond value.
       transitionDuration: {
+        // A bare `transition` or `transition-colors` takes the fast fade, not Tailwind's own 150 ms.
+        DEFAULT: 'var(--dur-fade-fast)',
         'fade-fast': 'var(--dur-fade-fast)',
         'fade-base': 'var(--dur-fade-base)',
         move: 'var(--dur-move)',
@@ -24,6 +26,7 @@ const config: Config = {
         pop: 'var(--dur-pop)',
       },
       transitionTimingFunction: {
+        DEFAULT: 'var(--ease-standard)',
         standard: 'var(--ease-standard)',
         enter: 'var(--ease-enter)',
         exit: 'var(--ease-exit)',

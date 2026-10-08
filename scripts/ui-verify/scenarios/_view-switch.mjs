@@ -90,8 +90,10 @@ export async function mouseSwitch(h, page, { full }) {
 
   // Free-running sample of the whole transition.
   await startSampler(page)
+  await h.startFrames()
   await sidebarButton(page, 'Upcoming').click()
   await h.wait(900)
+  await h.assertSmooth(`${tag}: Today to Upcoming`, await h.stopFrames())
   const free = await readSampler(page)
   const running = free.samples.filter((s) => s.active)
   await h.assert(`${tag}: a page transition runs after a mouse click (type "page" active on several frames)`, { ok: running.length >= 3, detail: `${running.length} frames` })

@@ -48,7 +48,7 @@ textarea {
   border-radius: 2px;
   background: rgb(var(--text-secondary-rgb) / 0.35);
   opacity: 0;
-  transition: opacity var(--dur-fade-fast) ease;
+  transition: opacity var(--dur-fade-fast) var(--ease-standard);
   pointer-events: none;
 }
 
@@ -71,7 +71,7 @@ textarea {
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12), 0 1px 4px rgba(0, 0, 0, 0.08);
   opacity: 0;
   transform: translateY(-4px);
-  transition: opacity var(--dur-fade-fast) ease, transform var(--dur-fade-fast) ease;
+  transition: opacity var(--dur-fade-fast) var(--ease-standard), transform var(--dur-fade-fast) var(--ease-standard);
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -143,7 +143,7 @@ textarea {
   padding: 8px 16px;
   border-bottom: 1px solid var(--border-color);
   gap: 10px;
-  transition: background var(--dur-fade-fast) ease;
+  transition: background var(--dur-fade-fast) var(--ease-standard);
 }
 
 .task-item:last-child {
@@ -467,7 +467,7 @@ textarea {
   font-size: var(--type-meta-size);
   color: var(--danger);
   opacity: 0;
-  transition: opacity var(--dur-fade-fast) ease;
+  transition: opacity var(--dur-fade-fast) var(--ease-standard);
 }
 
 .error-message.show {
@@ -551,6 +551,12 @@ button:focus-visible,
     transition-duration: var(--dur-fade-fast) !important;
     transition-delay: 0s !important;
     scroll-behavior: auto !important;
+  }
+
+  /* The window appears with a fade only, not from 4 px above. */
+  .container,
+  .container.visible {
+    transform: none;
   }
 }
 

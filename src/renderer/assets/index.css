@@ -125,7 +125,7 @@ html[data-platform="win32"],
   }
 
   .animate-spin {
-    animation: vicu-fade-pulse 1.5s ease-in-out infinite;
+    animation: vicu-fade-pulse calc(var(--dur-move-expressive) * 3) var(--ease-standard) infinite;
   }
 
   .animate-pulse {

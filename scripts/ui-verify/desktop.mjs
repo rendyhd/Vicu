@@ -293,6 +293,20 @@ async function setSize(width, height) {
 }
 await setSize(SIZE.width, SIZE.height)
 
+/** Mean, 95th percentile and worst of frame intervals (ms), and how many were over 20 and 50 ms. */
+function frameStats(deltas) {
+  const d = [...deltas].sort((a, b) => a - b)
+  const mean = d.reduce((s, x) => s + x, 0) / Math.max(d.length, 1)
+  return {
+    frames: d.length,
+    meanMs: +mean.toFixed(2),
+    p95Ms: +(d[Math.floor(d.length * 0.95)] ?? 0).toFixed(2),
+    maxMs: +(d[d.length - 1] ?? 0).toFixed(2),
+    over20ms: d.filter((x) => x > 20).length,
+    over50ms: d.filter((x) => x > 50).length,
+  }
+}
+
 // --- Helpers handed to scenarios -----------------------------------------------------------
 
 const token = readApiToken()
@@ -511,15 +525,101 @@ const h = {
         }),
       ms,
     )
-    const d = deltas.slice(1).sort((a, b) => a - b)
-    const mean = d.reduce((s, x) => s + x, 0) / Math.max(d.length, 1)
-    return {
-      frames: d.length,
-      meanMs: +mean.toFixed(2),
-      p95Ms: +(d[Math.floor(d.length * 0.95)] ?? 0).toFixed(2),
-      maxMs: +(d[d.length - 1] ?? 0).toFixed(2),
-      over20ms: d.filter((x) => x > 20).length,
-    }
+    return frameStats(deltas.slice(1))
+  },
+
+  /**
+   * Starts recording requestAnimationFrame intervals in the page and returns at once; the matching
+   * `stopFrames()` returns the same statistics as `frames()`. Use it around an interaction instead
+   * of a fixed span, and keep captures (screenshots stall the page) outside the two calls.
+   */
+  async startFrames({ page: p = page } = {}) {
+    await p.evaluate(() => {
+      const rec = { on: true, last: null, start: performance.now(), deltas: [], at: [], longTasks: [] }
+      window.__frameRec = rec
+      // Tasks that kept the main thread busy for 50 ms or more explain a long frame.
+      try {
+        new PerformanceObserver((list) => {
+          for (const e of list.getEntries()) rec.longTasks.push([Math.round(e.startTime - rec.start), Math.round(e.duration)])
+        }).observe({ type: 'longtask', buffered: false })
+      } catch {}
+      const tick = (t) => {
+        if (!rec.on) return
+        if (rec.last !== null) {
+          rec.deltas.push(t - rec.last)
+          rec.at.push(t - rec.start)
+        }
+        rec.last = t
+        requestAnimationFrame(tick)
+      }
+      requestAnimationFrame(tick)
+    })
+  },
+
+  async stopFrames({ page: p = page } = {}) {
+    const rec = await p.evaluate(() => {
+      const r = window.__frameRec
+      if (!r) return { deltas: [], at: [], longTasks: [] }
+      r.on = false
+      return { deltas: r.deltas, at: r.at, longTasks: r.longTasks }
+    })
+    const stats = frameStats(rec.deltas)
+    // When (ms after startFrames) the worst frame ended, to tell a start-up hitch from a mid-run one.
+    stats.worstAtMs = Math.round(rec.at[rec.deltas.indexOf(Math.max(...rec.deltas))] ?? 0)
+    stats.longTasks = rec.longTasks
+    return stats
+  },
+
+  /**
+   * Starts listing, in the page, every CSS animation, CSS transition, Web Animation and view
+   * transition animation that runs (polled every 4 ms) with the properties it changes. The matching
+   * `stopMotionAudit()` returns { seen, moving }: how many different animations were seen and those
+   * that change a property which moves, resizes or draws (transform, scale, translate, rotate,
+   * width, height, margin, padding, stroke-dashoffset, background-size and the like). Reduced motion
+   * allows only fades (opacity and colours).
+   */
+  async startMotionAudit({ page: p = page } = {}) {
+    await p.evaluate(() => {
+      const audit = { seen: new Map(), timer: 0 }
+      const moving = /^(transform|scale|translate|rotate|perspective|width|height|top|left|right|bottom|inset|margin|padding|max|min|stroke-dash|strokeDash|background-size|backgroundSize|background-position|backgroundPosition|border-.*-width|border.*Width|flex)/i
+      const describe = (el, pseudo) => {
+        if (!el) return pseudo ?? '?'
+        const id = el.id ? `#${el.id}` : ''
+        const cls = typeof el.className === 'string' ? el.className.split(/\s+/).filter(Boolean).slice(0, 2).map((c) => `.${c}`).join('') : ''
+        return `${el.tagName?.toLowerCase() ?? '?'}${id}${cls}${pseudo ? pseudo : ''}`
+      }
+      const poll = () => {
+        for (const a of document.getAnimations()) {
+          const effect = a.effect
+          if (!effect || typeof effect.getKeyframes !== 'function') continue
+          const props = new Set()
+          for (const k of effect.getKeyframes()) for (const key of Object.keys(k)) if (!['offset', 'easing', 'composite', 'computedOffset'].includes(key)) props.add(key)
+          const name = a.animationName || a.transitionProperty || 'web-animation'
+          const key = `${describe(effect.target, effect.pseudoElement)}|${name}|${[...props].sort().join(',')}`
+          if (!audit.seen.has(key)) audit.seen.set(key, { target: describe(effect.target, effect.pseudoElement), name, props: [...props].sort(), moving: [...props].filter((x) => moving.test(x)) })
+        }
+      }
+      audit.timer = setInterval(poll, 4)
+      window.__motionAudit = audit
+    })
+  },
+
+  async stopMotionAudit({ page: p = page } = {}) {
+    return p.evaluate(() => {
+      const audit = window.__motionAudit
+      if (!audit) return { seen: 0, moving: [] }
+      clearInterval(audit.timer)
+      const all = [...audit.seen.values()]
+      return { seen: all.length, moving: all.filter((x) => x.moving.length > 0) }
+    })
+  },
+
+  /** Asserts that no frame of `stats` (from frames() or stopFrames()) took longer than `limitMs`; the worst and p95 go in the detail. */
+  assertSmooth(label, stats, limitMs = 50) {
+    return h.assert(`${label}: no frame over ${limitMs} ms`, {
+      ok: stats.frames >= 5 && stats.maxMs <= limitMs,
+      detail: `${stats.frames} frames, max ${stats.maxMs} ms, p95 ${stats.p95Ms} ms, mean ${stats.meanMs} ms, over 20 ms: ${stats.over20ms}${stats.worstAtMs === undefined ? '' : `, worst at ${stats.worstAtMs} ms`}${stats.longTasks?.length ? `, long tasks [start, ms]: ${JSON.stringify(stats.longTasks)}` : ''}`,
+    })
   },
 
   // Quick Entry and Quick View open through the app's own second-instance path (the same code a

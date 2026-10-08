@@ -15,7 +15,10 @@ export default async function run(h) {
   await h.resize(1280, 820)
   await h.setMotion('reduce')
   await h.assert('prefers-reduced-motion is emulated as reduce', () => h.page.evaluate(() => matchMedia('(prefers-reduced-motion: reduce)').matches))
+  await h.startMotionAudit()
   await mouseSwitch(h, h.page, { full: false })
+  const viewAudit = await h.stopMotionAudit()
+  await h.assert('reduced: changing view runs only fades (no animation changes a transform, size or drawn property)', { ok: viewAudit.seen > 0 && viewAudit.moving.length === 0, detail: `${viewAudit.seen} animations seen; ${JSON.stringify(viewAudit.moving.slice(0, 4))}` })
   await h.setMotion('full')
   await h.dismiss()
 
@@ -27,6 +30,7 @@ export default async function run(h) {
     await h.assert('the task is listed in Today', { ok: await openToday(h, ids) })
 
     await recordAnimations(h, a)
+    await h.startMotionAudit()
     await checkboxOf(h, a).click()
     await h.wait(300)
     const left = await pointerAway(h)
@@ -38,6 +42,8 @@ export default async function run(h) {
     })
 
     const seen = await readAnimations(h)
+    const doneAudit = await h.stopMotionAudit()
+    await h.assert('reduced: completing a task runs only fades (no animation changes a transform, size or drawn property)', { ok: doneAudit.seen > 0 && doneAudit.moving.length === 0, detail: `${doneAudit.seen} animations seen; ${JSON.stringify(doneAudit.moving.slice(0, 4))}` })
     await h.assert('reduced motion: no scale or drawing animation starts, the fill and the check fade over 150 ms', {
       ok:
         !seen.anims.some((x) => ['vicu-check-fill', 'vicu-check-draw', 'vicu-strike-draw'].includes(x.name)) &&

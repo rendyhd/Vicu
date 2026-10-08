@@ -183,7 +183,7 @@ function RoutineEditor({
             <label className={LABEL}>Color</label>
             <div className="flex gap-2">
               {STORED_ROUTINE_COLORS.map((color) => (
-                <button key={color} type="button" onClick={() => setDraft({ ...draft, color })} className={cn('h-7 w-7 rounded-full transition-transform hover:scale-110', draft.color === color && 'ring-2 ring-offset-2 ring-offset-[var(--bg-primary)]')} style={{ backgroundColor: color, color }} aria-label={`Use ${color}`} />
+                <button key={color} type="button" onClick={() => setDraft({ ...draft, color })} className={cn('h-7 w-7 rounded-full transition-transform hover:scale-110 motion-reduce:hover:scale-100', draft.color === color && 'ring-2 ring-offset-2 ring-offset-[var(--bg-primary)]')} style={{ backgroundColor: color, color }} aria-label={`Use ${color}`} />
               ))}
             </div>
           </div>

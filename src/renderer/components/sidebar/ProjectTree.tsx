@@ -109,7 +109,7 @@ function ProjectDialog({
                   type="button"
                   onClick={() => setHexColor(c)}
                   className={cn(
-                    'h-6 w-6 rounded-full transition-transform hover:scale-110',
+                    'h-6 w-6 rounded-full transition-transform hover:scale-110 motion-reduce:hover:scale-100',
                     hexColor === c && 'ring-2 ring-[var(--text-primary)] ring-offset-1 ring-offset-[var(--bg-primary)]'
                   )}
                   style={{ backgroundColor: c }}

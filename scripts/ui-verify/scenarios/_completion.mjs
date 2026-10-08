@@ -60,6 +60,38 @@ export function rowGoneAt(h, id, timeoutMs) {
   )
 }
 
+/**
+ * Starts checking, every 16 ms in the page, that the rows of `ids` can be hit: the element under the
+ * centre of each one that is on screen is the row or inside it. `stopHitWatch` returns { ticks,
+ * blocked } (a row that sits under a closing row, a transition or a list-wide pointer-events: none
+ * counts as blocked). Nothing may wait for an animation to finish before it takes input.
+ */
+export async function startHitWatch(h, ids) {
+  await h.page.evaluate((taskIds) => {
+    const state = { ticks: 0, blocked: [] }
+    window.__hitWatch = state
+    state.timer = setInterval(() => {
+      for (const id of taskIds) {
+        const row = document.querySelector(`[data-task-id="${id}"]`)
+        if (!row || row.hasAttribute('data-row-closing')) continue
+        const r = row.getBoundingClientRect()
+        if (r.height < 4 || r.top < 0 || r.bottom > innerHeight) continue
+        state.ticks++
+        const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2)
+        if (!hit || !row.contains(hit)) state.blocked.push({ id, hit: hit ? `${hit.tagName.toLowerCase()}.${String(hit.className).slice(0, 30)}` : null })
+      }
+    }, 16)
+  }, ids)
+}
+
+export async function stopHitWatch(h) {
+  return h.page.evaluate(() => {
+    const state = window.__hitWatch
+    clearInterval(state.timer)
+    return { ticks: state.ticks, blocked: state.blocked.slice(0, 3) }
+  })
+}
+
 /** Moves the real pointer to the view heading, away from every row. Returns the page time. */
 export async function pointerAway(h) {
   const box = await h.page.locator('h1').first().boundingBox()

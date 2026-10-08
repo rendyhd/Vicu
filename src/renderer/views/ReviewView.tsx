@@ -259,7 +259,7 @@ export function ReviewView() {
                 width: total > 0 ? `${(done / total) * 100}%` : '0%',
                 height: '100%',
                 background: 'var(--accent-purple)',
-                transition: 'width 0.3s',
+                transition: 'width var(--dur-fade-base) var(--ease-standard)',
               }}
             />
           </div>

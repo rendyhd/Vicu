@@ -1,7 +1,7 @@
 // E1 (card 4.2): click a Today checkbox, rest the pointer, move away. The row is held while the
 // pointer is on it and collapses about 5 s after the pointer leaves (docs/cross-app-semantics-v1.md
 // section 7). Leaving the view ends the hold at once.
-import { HOLD_MS, TOAST_MS, checkboxOf, makeTasks, openToday, pageNow, pointerAway, readAnimations, recordAnimations, removeTasks, rowGoneAt, rowOf, serverDone, toastRegion, toastText } from './_completion.mjs'
+import { HOLD_MS, TOAST_MS, checkboxOf, makeTasks, openToday, pageNow, pointerAway, readAnimations, recordAnimations, removeTasks, rowGoneAt, rowOf, serverDone, startHitWatch, stopHitWatch, toastRegion, toastText } from './_completion.mjs'
 
 export const meta = {
   id: 'E1',
@@ -44,9 +44,14 @@ export default async function run(h) {
     })
 
     // ---- B. The pointer leaves: the row goes about 5 s later ---------------------------------
+    await h.startFrames()
+    await startHitWatch(h, [b, c])
     const left = await pointerAway(h)
     await h.assert('the row stays right after the pointer leaves', async () => (await rowOf(h, a).count()) === 1)
     const gone = await rowGoneAt(h, a, HOLD_MS + 4000)
+    await h.assertSmooth('E1 the hold and the row closing', await h.stopFrames())
+    const hits = await stopHitWatch(h)
+    await h.assert('the other rows take input all the time, also while the first one closes (the element at their centre is the row)', { ok: hits.ticks > 20 && hits.blocked.length === 0, detail: `${hits.ticks} checks, blocked ${JSON.stringify(hits.blocked)}` })
     const heldFor = gone === null ? null : gone - left
     await h.assert('the row collapses 5 s after the pointer left (4.8 s to 6.0 s)', {
       ok: heldFor !== null && heldFor >= HOLD_MS - 200 && heldFor <= HOLD_MS + 1000,
@@ -55,14 +60,23 @@ export default async function run(h) {
     // The motion of the completion, read from the page: the same values as Android.
     const seen = await readAnimations(h)
     const named = (name) => seen.anims.find((x) => x.name === name)
-    await h.assert('the ring fill pops with the pop spring over 360 ms', { ok: named('vicu-check-fill')?.duration === 360 && named('vicu-check-fill').easing.startsWith('linear('), detail: JSON.stringify(named('vicu-check-fill')) })
-    await h.assert('the check draws over 220 ms', { ok: named('vicu-check-draw')?.duration === 220, detail: JSON.stringify(named('vicu-check-draw')) })
-    await h.assert('the title strike draws over 240 ms', { ok: named('vicu-strike-draw')?.duration === 240, detail: JSON.stringify(named('vicu-strike-draw')) })
-    const closing = seen.rowAnims.find((x) => x.props.includes('height'))
-    await h.assert('the row closes its height and fades with the move spring (320 ms), without a transform', {
-      ok: !!closing && closing.duration === 320 && closing.props.includes('opacity') && !closing.props.some((p) => /transform|scale|translate|rotate/.test(p)),
-      detail: JSON.stringify(seen.rowAnims),
-    })
+    if (h.motion === 'reduce') {
+      // --motion reduce: the same moments as fades (E11 pins the details).
+      await h.assert('reduced: no scale or drawing animation starts, the fill and the check fade over 150 ms', {
+        ok: !seen.anims.some((x) => ['vicu-check-fill', 'vicu-check-draw', 'vicu-strike-draw'].includes(x.name)) && seen.anims.filter((x) => x.name === 'vicu-bar-fade' && x.duration === 150).length >= 2,
+        detail: JSON.stringify(seen.anims),
+      })
+      await h.assert('reduced: the row closes with a fade only, no height or transform', { ok: seen.rowAnims.length > 0 && seen.rowAnims.every((x) => x.props.join() === 'opacity'), detail: JSON.stringify(seen.rowAnims) })
+    } else {
+      await h.assert('the ring fill pops with the pop spring over 360 ms', { ok: named('vicu-check-fill')?.duration === 360 && named('vicu-check-fill').easing.startsWith('linear('), detail: JSON.stringify(named('vicu-check-fill')) })
+      await h.assert('the check draws over 220 ms', { ok: named('vicu-check-draw')?.duration === 220, detail: JSON.stringify(named('vicu-check-draw')) })
+      await h.assert('the title strike draws over 240 ms', { ok: named('vicu-strike-draw')?.duration === 240, detail: JSON.stringify(named('vicu-strike-draw')) })
+      const closing = seen.rowAnims.find((x) => x.props.includes('height'))
+      await h.assert('the row closes its height and fades with the move spring (320 ms), without a transform', {
+        ok: !!closing && closing.duration === 320 && closing.props.includes('opacity') && !closing.props.some((p) => /transform|scale|translate|rotate/.test(p)),
+        detail: JSON.stringify(seen.rowAnims),
+      })
+    }
     await h.assert('the other rows did not move out', async () => (await rowOf(h, b).count()) === 1 && (await rowOf(h, c).count()) === 1)
 
     // ---- B2. The toast: "Completed" with Undo, 6 s, held while the pointer is on it ----------
@@ -86,9 +100,11 @@ export default async function run(h) {
     await h.assert('the row stays collapsed when the toast expires', async () => (await rowOf(h, a).count()) === 0 && (await serverDone(h, a)))
 
     // ---- C. Leaving the view ends a hold at once ---------------------------------------------
+    await h.startFrames()
     await checkboxOf(h, b).click()
     await pointerAway(h)
-    await h.wait(300)
+    await h.wait(700)
+    await h.assertSmooth('E1 the check pop, ring fill and strike', await h.stopFrames())
     await h.assert('B is held after the click', async () => (await rowOf(h, b).count()) === 1)
     await h.goto('/upcoming')
     await h.assert('the toast survives the navigation and reads "Completed"', async () => (await toastText(h)) === 'Completed')

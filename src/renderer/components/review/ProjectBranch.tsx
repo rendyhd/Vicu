@@ -134,7 +134,7 @@ function ProjectHeader({ node, depth, isOpen, isReviewed, isFocused, onToggle, o
           color: 'var(--text-secondary)',
           flexShrink: 0,
           transform: isOpen ? 'rotate(90deg)' : 'none',
-          transition: 'transform 0.15s',
+          transition: 'transform var(--dur-fade-fast) var(--ease-standard)',
         }}
       />
       <span

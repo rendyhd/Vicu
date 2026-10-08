@@ -22,7 +22,14 @@ export default async function run(h) {
   await h.resize(1280, 820)
   await h.setMotion('full')
 
+  await h.startMotionAudit()
   await mouseSwitch(h, page, { full: true })
+  const fullAudit = await h.stopMotionAudit()
+  // The control for the reduced-motion audits of E3 and E11: with full motion the same audit sees the rise.
+  await h.assert('full motion: the motion audit sees the page rise and the pill slide (the reduced-motion audits can find a moving animation)', {
+    ok: fullAudit.moving.length > 0,
+    detail: `${fullAudit.seen} animations seen; ${JSON.stringify(fullAudit.moving.slice(0, 3))}`,
+  })
   await keyboardSwitch(h, page)
 
   // ---- C. Task morph and navigation ----------------------------------------------------------
