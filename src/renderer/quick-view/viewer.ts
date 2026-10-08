@@ -59,13 +59,15 @@ interface ActionResult {
 
 interface QuickViewConfig {
   standalone_mode: boolean
+  // The app theme ('light' | 'dark' | 'system'): this window is dark whenever the main window is.
+  theme?: string
 }
 
 import { extractTaskLink, stripNoteLink, stripPageLink, extractNoteLinkHtml, extractPageLinkHtml } from '@/lib/note-link'
 import { sanitizeTaskHtml } from '@/lib/sanitize-html'
 import { taskPatch, type TaskPatch } from '@/lib/merge-patches'
 import { diffLocalDays, dueToday, isDateOnly, isNoDueDate, toLocalDate } from '@/lib/due-dates'
-import { followColorScheme } from '@/lib/theme'
+import { followColorScheme, followConfiguredTheme } from '@/lib/theme'
 import { formatDateDisplay } from '@/lib/date-display'
 import { getDateFormat, initDateFormat, subscribeDateFormat } from '@/lib/date-format'
 import { priorityMarkSvg } from '../../shared/priority-mark-svg'
@@ -272,14 +274,6 @@ function buildTaskItemDOM(task: TaskData): HTMLElement {
 
   content.appendChild(titleRow)
 
-  const dueInfo = formatDueDate(task.due_date)
-  if (dueInfo) {
-    const due = document.createElement('div')
-    due.className = `task-due ${dueInfo.cssClass}`
-    due.textContent = dueInfo.label
-    content.appendChild(due)
-  }
-
   if (task.description) {
     const desc = document.createElement('div')
     desc.className = 'task-description task-description-rich hidden'
@@ -305,6 +299,14 @@ function buildTaskItemDOM(task: TaskData): HTMLElement {
   }
 
   item.appendChild(content)
+  // The due phrase sits in the trailing cluster, level with the title (design system, section 4).
+  const dueInfo = formatDueDate(task.due_date)
+  if (dueInfo) {
+    const due = document.createElement('div')
+    due.className = `task-due ${dueInfo.cssClass}`
+    due.textContent = dueInfo.label
+    item.appendChild(due)
+  }
   // The priority mark closes the row (the shared SVG, drawn in the priority role colour).
   const markSvg = priorityMarkSvg(task.priority)
   if (markSvg) {
@@ -436,22 +438,14 @@ async function toggleDueDate(): Promise<void> {
       lastFetchResult = null
       taskData.due_date = dueToday()
       item.dataset.task = JSON.stringify(taskData)
-      const content = item.querySelector('.task-content')
       let dueEl = item.querySelector('.task-due')
-      if (dueEl) {
-        dueEl.textContent = 'Today'
-        dueEl.className = 'task-due today'
-      } else if (content) {
+      if (!dueEl) {
+        // Before the priority mark, which closes the row.
         dueEl = document.createElement('div')
-        dueEl.className = 'task-due today'
-        dueEl.textContent = 'Today'
-        const titleRow = content.querySelector('.task-title-row')
-        if (titleRow && titleRow.nextSibling) {
-          content.insertBefore(dueEl, titleRow.nextSibling)
-        } else {
-          content.appendChild(dueEl)
-        }
+        item.insertBefore(dueEl, item.querySelector('.task-priority'))
       }
+      dueEl.textContent = 'Today'
+      dueEl.className = 'task-due today'
     } else {
       showError(result.error || 'Failed to schedule task')
     }
@@ -620,7 +614,10 @@ async function handleEnterOnSelected(): Promise<void> {
 
 async function loadConfig(): Promise<void> {
   const cfg = await window.quickViewApi.getConfig()
-  if (cfg) isStandaloneMode = cfg.standalone_mode === true
+  if (cfg) {
+    isStandaloneMode = cfg.standalone_mode === true
+    followConfiguredTheme(cfg.theme)
+  }
 }
 
 async function loadTasks(forceRefresh = false): Promise<void> {

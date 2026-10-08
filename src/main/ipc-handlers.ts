@@ -1,5 +1,6 @@
 import { shell, dialog, app, nativeTheme } from 'electron'
 import { handleTrusted } from './secure-ipc'
+import { tokenForConnectionTest } from './connection-test-token'
 import { isExternalAllowed } from './web-security-policy'
 import { isRiskyAttachment, sanitizeAttachmentFileName } from './attachment-safety'
 import { ensureAttachmentTempDir } from './attachment-temp'
@@ -394,7 +395,9 @@ export function registerIpcHandlers(): void {
 
   // Connection test
   handleTrusted('test-connection', (_event, url: string, token: string) => {
-    return testConnection(url, token)
+    const config = loadConfig()
+    const saved = config?.auth_method === 'api_token' ? (getAPIToken() || config.api_token) : null
+    return testConnection(url, tokenForConnectionTest(url, token, config?.vikunja_url ?? '', saved))
   })
 
   // Auth
@@ -714,6 +717,7 @@ export function registerIpcHandlers(): void {
     if (!config) return null
     return {
       standalone_mode: config.standalone_mode === true,
+      theme: config.theme,
     }
   })
 

@@ -26,7 +26,13 @@ textarea {
   font: inherit;
 }
 
-/* Drag handle — visible on hover (hover driven by main-process cursor polling) */
+/*
+ * Colours come from the token roles, which switch with the `.dark` class on <html>. The class is
+ * set from the configured app theme (followConfiguredTheme in lib/theme.ts), so this window is
+ * dark whenever the main window is, whatever the media query of a transparent window reports.
+ */
+
+/* Drag handle: visible on hover (hover driven by main-process cursor polling) */
 .drag-handle {
   -webkit-app-region: drag;
   display: flex;
@@ -40,9 +46,9 @@ textarea {
   width: 36px;
   height: 4px;
   border-radius: 2px;
-  background: rgba(0, 0, 0, 0.15);
+  background: rgb(var(--text-secondary-rgb) / 0.35);
   opacity: 0;
-  transition: opacity 200ms ease;
+  transition: opacity var(--dur-fade-fast) ease;
   pointer-events: none;
 }
 
@@ -57,18 +63,22 @@ textarea {
   left: 20px;
   right: 20px;
   bottom: 20px;
-  background: rgba(255, 255, 255, 0.90);
+  background: rgb(var(--bg-primary-rgb) / 0.90);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: var(--radius-card);
+  border: 1px solid rgb(var(--border-color-rgb) / 0.6);
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12), 0 1px 4px rgba(0, 0, 0, 0.08);
   opacity: 0;
   transform: translateY(-4px);
-  transition: opacity 150ms ease, transform 150ms ease;
+  transition: opacity var(--dur-fade-fast) ease, transform var(--dur-fade-fast) ease;
   overflow: hidden;
   display: flex;
   flex-direction: column;
+}
+
+.dark .container {
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4), 0 1px 4px rgba(0, 0, 0, 0.2);
 }
 
 .container.visible {
@@ -79,14 +89,14 @@ textarea {
 /* Status bar (offline / pending sync indicator) */
 .status-bar {
   padding: 5px 16px;
-  font-size: 11px;
+  font-size: var(--type-caption-size);
   font-style: italic;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  border-bottom: 1px solid var(--border-color);
 }
 
 .status-bar.offline {
   color: var(--status-today);
-  background: rgba(183, 121, 31, 0.06);
+  background: rgb(var(--status-today-rgb) / 0.08);
 }
 
 .status-bar.pending {
@@ -95,12 +105,12 @@ textarea {
 
 .status-bar.failed {
   color: var(--danger);
-  background: rgba(197, 48, 48, 0.06);
+  background: rgb(var(--danger-rgb) / 0.08);
 }
 
 .status-bar.standalone {
   color: var(--accent-blue);
-  background: rgba(74, 144, 217, 0.06);
+  background: rgb(var(--accent-blue-rgb) / 0.08);
 }
 
 /* Task list */
@@ -114,26 +124,26 @@ textarea {
 /* Loading state */
 .loading {
   padding: 16px 20px;
-  font-size: 14px;
+  font-size: var(--type-task-title-size);
   color: var(--text-secondary);
 }
 
 /* Empty state */
 .empty-state {
   padding: 24px 20px;
-  font-size: 14px;
+  font-size: var(--type-task-title-size);
   color: var(--text-secondary);
   text-align: center;
 }
 
-/* Task item */
+/* Task item: [checkbox] [title + notes] [due phrase] [priority mark] (design system, section 4) */
 .task-item {
   display: flex;
   align-items: flex-start;
-  padding: 10px 16px;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border-color);
   gap: 10px;
-  transition: background 100ms ease;
+  transition: background var(--dur-fade-fast) ease;
 }
 
 .task-item:last-child {
@@ -141,28 +151,34 @@ textarea {
 }
 
 .task-item:hover {
-  background: rgba(0, 0, 0, 0.03);
+  background: var(--bg-hover);
 }
 
-/* Checkbox */
+/* Checkbox: a 20 px circle, like the main window. The pseudo-element ::before grows the hit area to 26 px. */
 .task-checkbox {
   -webkit-app-region: no-drag;
   flex-shrink: 0;
-  width: 18px;
-  height: 18px;
-  margin-top: 1px;
-  border: 2px solid var(--control-ring);
-  border-radius: 4px;
+  width: 20px;
+  height: 20px;
+  border: 1px solid var(--control-ring);
+  border-radius: 50%;
   cursor: pointer;
   appearance: none;
   -webkit-appearance: none;
   background: transparent;
-  transition: border-color 150ms, background 150ms;
+  transition: border-color var(--dur-fade-fast), background var(--dur-fade-fast);
   position: relative;
+}
+
+.task-checkbox::before {
+  content: '';
+  position: absolute;
+  inset: -3px;
 }
 
 .task-checkbox:hover {
   border-color: var(--accent-fill);
+  background: rgb(var(--accent-fill-rgb) / 0.10);
 }
 
 .task-checkbox:checked {
@@ -173,8 +189,8 @@ textarea {
 .task-checkbox:checked::after {
   content: '';
   position: absolute;
-  left: 4px;
-  top: 1px;
+  left: 6px;
+  top: 2px;
   width: 5px;
   height: 9px;
   border: solid var(--on-accent);
@@ -206,9 +222,10 @@ textarea {
 
 .task-title {
   -webkit-app-region: no-drag;
-  font-size: 14px;
+  font-size: var(--type-task-title-size);
+  font-weight: var(--type-task-title-weight);
   color: var(--text-primary);
-  line-height: 1.4;
+  line-height: var(--type-task-title-line);
   word-wrap: break-word;
   overflow-wrap: break-word;
   cursor: pointer;
@@ -223,14 +240,14 @@ textarea {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 20px;
+  min-width: 24px;
   min-height: 20px;
-  font-size: 14px;
-  line-height: 1.4;
+  font-size: var(--type-task-title-size);
+  line-height: var(--type-task-title-line);
   color: var(--text-secondary);
   cursor: pointer;
   opacity: 0.6;
-  transition: opacity 150ms;
+  transition: opacity var(--dur-fade-fast);
   user-select: none;
 }
 
@@ -262,13 +279,13 @@ textarea {
 /* Task description (expandable) */
 .task-description {
   -webkit-app-region: no-drag;
-  font-size: 12px;
+  font-size: var(--type-meta-size);
   color: var(--text-secondary);
   line-height: 1.4;
   margin-top: 4px;
   padding: 6px 8px;
-  background: rgba(0, 0, 0, 0.03);
-  border-radius: 4px;
+  background: var(--bg-hover);
+  border-radius: var(--radius-control);
   white-space: pre-wrap;
   word-wrap: break-word;
   overflow-wrap: break-word;
@@ -277,7 +294,7 @@ textarea {
   cursor: text;
 }
 
-/* Rich-text description — HTML content from Vikunja (TipTap output). */
+/* Rich-text description: HTML content from Vikunja (TipTap output). */
 .task-description-rich {
   white-space: normal;
 }
@@ -295,20 +312,20 @@ textarea {
 .task-description-rich s { text-decoration: line-through; }
 .task-description-rich a { color: var(--accent-blue); text-decoration: underline; }
 .task-description-rich code {
-  background: rgba(0, 0, 0, 0.06);
+  background: rgb(var(--text-secondary-rgb) / 0.15);
   padding: 0.1em 0.3em;
   border-radius: 3px;
   font-size: 0.9em;
 }
 .task-description-rich pre {
-  background: rgba(0, 0, 0, 0.06);
+  background: rgb(var(--text-secondary-rgb) / 0.15);
   padding: 0.4em 0.6em;
-  border-radius: 4px;
+  border-radius: var(--radius-control);
   font-size: 0.9em;
   overflow-x: auto;
 }
 .task-description-rich blockquote {
-  border-left: 2px solid rgba(0, 0, 0, 0.15);
+  border-left: 2px solid var(--border-color);
   padding-left: 0.6em;
   margin: 0.3em 0;
   color: var(--text-secondary);
@@ -324,28 +341,30 @@ textarea {
 }
 
 .task-description:hover {
-  background: rgba(0, 0, 0, 0.06);
+  background: var(--bg-selected);
 }
 
 .task-description.hidden {
   display: none;
 }
 
-/* Due date */
+/* Due phrase: the trailing cluster, level with the title line, coloured by status (section 4) */
 .task-due {
-  font-size: 11px;
+  flex-shrink: 0;
+  align-self: flex-start;
+  font-size: var(--type-meta-size);
+  font-weight: var(--type-meta-weight);
   color: var(--text-secondary);
-  line-height: 1.3;
+  line-height: var(--type-task-title-line);
+  white-space: nowrap;
 }
 
 .task-due.overdue {
   color: var(--status-overdue);
-  font-weight: 500;
 }
 
 .task-due.today {
   color: var(--status-today);
-  font-weight: 500;
 }
 
 .task-due.upcoming {
@@ -358,7 +377,7 @@ textarea {
   flex-shrink: 0;
   align-self: flex-start;
   margin-left: 0;
-  margin-top: 2px;
+  margin-top: 3px;
   line-height: 0;
 }
 
@@ -372,7 +391,7 @@ textarea {
 
 /* Selected task */
 .task-item.selected {
-  background: rgba(74, 144, 217, 0.10);
+  background: var(--bg-selected);
 }
 
 /* Inline edit mode */
@@ -390,12 +409,12 @@ textarea {
 }
 
 .task-edit-title {
-  font-size: 14px;
+  font-size: var(--type-task-title-size);
   font-family: inherit;
   color: var(--text-primary);
   background: transparent;
-  border: 1px solid rgba(0, 0, 0, 0.12);
-  border-radius: 4px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-control);
   padding: 4px 6px;
   width: 100%;
   outline: none;
@@ -406,12 +425,12 @@ textarea {
 }
 
 .task-edit-description {
-  font-size: 12px;
+  font-size: var(--type-meta-size);
   font-family: inherit;
   color: var(--text-secondary);
-  background: rgba(0, 0, 0, 0.03);
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  border-radius: 4px;
+  background: var(--bg-hover);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-control);
   padding: 6px 8px;
   width: 100%;
   resize: vertical;
@@ -437,7 +456,7 @@ textarea {
 }
 
 .task-item.completed-undo .completed-message {
-  font-size: 13px;
+  font-size: var(--type-task-title-size);
   color: var(--text-secondary);
   font-style: italic;
 }
@@ -445,17 +464,17 @@ textarea {
 /* Error message */
 .error-message {
   padding: 8px 16px;
-  font-size: 13px;
+  font-size: var(--type-meta-size);
   color: var(--danger);
   opacity: 0;
-  transition: opacity 200ms ease;
+  transition: opacity var(--dur-fade-fast) ease;
 }
 
 .error-message.show {
   opacity: 1;
 }
 
-/* Scrollbar — auto-hiding overlay style */
+/* Scrollbar: auto-hiding overlay style */
 .task-list::-webkit-scrollbar {
   width: 6px;
 }
@@ -467,15 +486,15 @@ textarea {
 .task-list::-webkit-scrollbar-thumb {
   background: transparent;
   border-radius: 3px;
-  transition: background 0.3s;
+  transition: background var(--dur-fade-base);
 }
 
 .task-list:hover::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.15);
+  background: rgb(var(--text-secondary-rgb) / 0.35);
 }
 
 .task-list:hover::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 0, 0, 0.25);
+  background: rgb(var(--text-secondary-rgb) / 0.55);
 }
 
 /* Obsidian link button */
@@ -490,7 +509,7 @@ textarea {
   display: inline-flex;
   align-items: center;
   opacity: 0.5;
-  transition: opacity 150ms, background 150ms;
+  transition: opacity var(--dur-fade-fast), background var(--dur-fade-fast);
   flex-shrink: 0;
 }
 .obsidian-link-btn:hover { opacity: 1; background: rgba(124, 58, 237, 0.12); }
@@ -500,17 +519,17 @@ textarea {
   -webkit-app-region: no-drag;
   background: none;
   border: none;
-  color: #2563EB;
+  color: var(--accent-blue);
   cursor: pointer;
   padding: 2px;
   border-radius: 3px;
   display: inline-flex;
   align-items: center;
   opacity: 0.5;
-  transition: opacity 150ms, background 150ms;
+  transition: opacity var(--dur-fade-fast), background var(--dur-fade-fast);
   flex-shrink: 0;
 }
-.browser-link-btn:hover { opacity: 1; background: rgba(37, 99, 235, 0.12); }
+.browser-link-btn:hover { opacity: 1; background: rgb(var(--accent-blue-rgb) / 0.12); }
 
 /* Focus (card 1.5): the ring the main window draws, outside the control. Quick View rows are not
  * focusable; the keyboard cursor is the .selected row. */
@@ -520,89 +539,6 @@ button:focus-visible,
 .task-edit-description:focus-visible {
   outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
-}
-
-/* Dark mode */
-@media (prefers-color-scheme: dark) {
-  .drag-handle-pill {
-    background: rgba(255, 255, 255, 0.2);
-  }
-
-  .container {
-    background: rgba(30, 30, 30, 0.90);
-    border-color: rgba(255, 255, 255, 0.08);
-    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4), 0 1px 4px rgba(0, 0, 0, 0.2);
-  }
-
-  .task-item {
-    border-bottom-color: rgba(255, 255, 255, 0.06);
-  }
-
-  .task-item:hover {
-    background: rgba(255, 255, 255, 0.04);
-  }
-
-  .task-checkbox {
-    border-color: var(--control-ring);
-  }
-
-  .task-item.selected {
-    background: rgba(90, 155, 230, 0.15);
-  }
-
-  .task-list:hover::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.15);
-  }
-
-  .task-list:hover::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.25);
-  }
-
-  .status-bar {
-    border-bottom-color: rgba(255, 255, 255, 0.06);
-  }
-
-  .status-bar.offline {
-    background: rgba(236, 201, 75, 0.08);
-  }
-
-  .status-bar.failed {
-    background: rgba(252, 129, 129, 0.08);
-  }
-
-  .status-bar.standalone {
-    background: rgba(90, 155, 230, 0.08);
-  }
-
-  .task-description {
-    background: rgba(255, 255, 255, 0.04);
-  }
-
-  .task-description:hover {
-    background: rgba(255, 255, 255, 0.08);
-  }
-  .task-description-rich code,
-  .task-description-rich pre { background: rgba(255, 255, 255, 0.08); }
-
-  .task-description-rich blockquote {
-    border-left-color: rgba(255, 255, 255, 0.2);
-  }
-
-  .task-item.editing {
-    border-left-color: var(--accent-blue);
-  }
-
-  .task-edit-title {
-    border-color: rgba(255, 255, 255, 0.12);
-  }
-
-  .task-edit-description {
-    background: rgba(255, 255, 255, 0.04);
-    border-color: rgba(255, 255, 255, 0.08);
-  }
-
-  .browser-link-btn { color: #60a5fa; }
-  .browser-link-btn:hover { background: rgba(96, 165, 250, 0.15); }
 }
 
 /* Reduced motion (card 1.5): the rules of the base layer in assets/index.css, which this window does
