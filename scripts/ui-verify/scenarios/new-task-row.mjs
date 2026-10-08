@@ -6,7 +6,7 @@ export const meta = {
   title: 'The New task row ends each list; the composer opens at the end and, from the header +, at the top',
 }
 
-const composerBox = (page) => page.getByPlaceholder('New Task').first().boundingBox()
+const composerBox = (page) => page.getByPlaceholder('New task').first().boundingBox()
 
 export default async function run(h) {
   const page = h.page

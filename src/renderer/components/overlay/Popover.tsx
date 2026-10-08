@@ -34,6 +34,8 @@ export interface PopoverProps {
   onClose: (reason?: PopoverCloseReason) => void
   /** Accessible name. */
   label: string
+  /** For a combobox that points at it with aria-controls. */
+  id?: string
   role?: PopoverRole
   placement?: Placement
   /** Where focus goes on open: the first control (default), the popover itself, nowhere, or a selector. */
@@ -62,6 +64,7 @@ export function Popover({
   invokedBy,
   onClose,
   label,
+  id,
   role = 'dialog',
   placement = 'bottom-start',
   initialFocus = 'first',
@@ -163,6 +166,7 @@ export function Popover({
   return (
     <div
       ref={ref}
+      id={id}
       popover="auto"
       role={role}
       aria-label={label}

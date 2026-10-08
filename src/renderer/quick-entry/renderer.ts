@@ -65,7 +65,7 @@ interface QuickEntryConfig {
 import { parse, getParserConfig, recurrenceToVikunja, extractBangToday } from '../lib/task-parser'
 import { dueToday, parsedDue } from '../lib/due-dates'
 import { followColorScheme } from '../lib/theme'
-import { formatDateChip } from '../lib/date-utils'
+import { parseChips } from '../lib/parse-chips'
 import { initDateFormat, subscribeDateFormat } from '../lib/date-format'
 import type { ParseResult, ParserConfig, ParsedToken, TokenType } from '../lib/task-parser'
 import { getClipboardImages, fileToUint8Array } from '../lib/clipboard-images'
@@ -421,29 +421,11 @@ function escapeHighlightText(text: string): string {
 }
 
 function renderParsePreview(result: ParseResult): void {
-  const chips: string[] = []
-
-  if (result.dueDate) {
-    const label = formatDateChip(result.dueDate, !result.dueHasTime)
-    chips.push(`<span class="parse-chip parse-chip-date">${escapeHtml(label)}<button class="parse-chip-dismiss" data-type="date">&times;</button></span>`)
-  }
-  if (result.priority !== null && result.priority > 0) {
-    const labels = ['', 'Low', 'Medium', 'High', 'Urgent', 'Do now']
-    const label = labels[result.priority] || `P${result.priority}`
-    chips.push(`<span class="parse-chip parse-chip-priority priority-${Math.min(Math.max(result.priority, 1), 5)}">${escapeHtml(label)}<button class="parse-chip-dismiss" data-type="priority">&times;</button></span>`)
-  }
-  for (const lbl of result.labels) {
-    chips.push(`<span class="parse-chip parse-chip-label">${escapeHtml(lbl)}<button class="parse-chip-dismiss" data-type="label">&times;</button></span>`)
-  }
-  if (result.project) {
-    chips.push(`<span class="parse-chip parse-chip-project">${escapeHtml(result.project)}<button class="parse-chip-dismiss" data-type="project">&times;</button></span>`)
-  }
-  if (result.recurrence) {
-    const unit = result.recurrence.unit
-    const interval = result.recurrence.interval
-    const label = interval === 1 ? `Every ${unit}` : `Every ${interval} ${unit}s`
-    chips.push(`<span class="parse-chip parse-chip-recurrence">${escapeHtml(label)}<button class="parse-chip-dismiss" data-type="recurrence">&times;</button></span>`)
-  }
+  // The same chips, in the same words, as the main window's composer (lib/parse-chips.ts).
+  const chips = parseChips(result).map((chip) => {
+    const level = chip.type === 'priority' ? ` priority-${Math.min(Math.max(chip.priority ?? 1, 1), 5)}` : ''
+    return `<span class="parse-chip parse-chip-${chip.type}${level}" data-chip-type="${chip.type}" data-chip-source="${chip.source ?? 'text'}">${escapeHtml(chip.label)}<button class="parse-chip-dismiss" data-type="${chip.type}" aria-label="Dismiss ${chip.type}">&times;</button></span>`
+  })
 
   if (chips.length > 0) {
     parsePreview.innerHTML = chips.join('')

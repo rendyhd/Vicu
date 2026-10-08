@@ -15,8 +15,9 @@ import { cn } from '@/lib/cn'
 import { api } from '@/lib/api'
 import { NULL_DATE } from '@/lib/constants'
 import { replacePendingTokens } from '@/lib/image-tokens'
-import { parse, recurrenceToVikunja } from '@/lib/task-parser'
-import { dateOnlyDue, isDateOnly, parsedDue, toLocalDate } from '@/lib/due-dates'
+import { parse, type ParseResult } from '@/lib/task-parser'
+import { dateOnlyDue, isDateOnly, toLocalDate } from '@/lib/due-dates'
+import { composerChips, resolveComposerFields } from '@/lib/composer-fields'
 import { formatDateChip } from '@/lib/date-utils'
 import type { DateFormat } from '@/lib/date-display'
 import { useDateFormat } from '@/hooks/use-date-format'
@@ -33,7 +34,7 @@ import {
   useUploadAttachmentFromPaste,
 } from '@/hooks/use-task-mutations'
 import type { CreateTaskPayload, Label, Task, TaskReminder } from '@/lib/vikunja-types'
-import type { ChipData } from '@/components/task-input/TokenChip'
+import type { ChipData } from '@/lib/parse-chips'
 import { TaskInputParser } from '@/components/task-input/TaskInputParser'
 import { TaskDescription, type PendingImage } from './TaskDescription'
 import { WhenPopover } from './WhenPopover'
@@ -156,12 +157,29 @@ export function NewTaskComposer({
 
   const projectItems = useMemo(() => (projects?.flat ?? []).map((project) => ({ id: project.id, title: project.title })), [projects])
   const labelItems = useMemo(() => labels.map((label) => ({ id: label.id, title: label.title })), [labels])
-  const effectiveDueDate = dateTouched
-    ? (explicitDueDate ?? NULL_DATE)
-    : (!defaultDateDismissed && defaultDueDate ? dateOnlyIso(defaultDueDate) : NULL_DATE)
-  const selectedProjectTitle = projects?.flat.find((project) => project.id === selectedProjectId)?.title ?? 'Project'
-  const priorityLabel = priority === null ? 'Priority' : PRIORITY_OPTIONS.find((option) => option.value === priority)?.label ?? 'Priority'
-
+  // What the text says unless a control was used: the buttons, the chips and the save all read this.
+  const parsed = parser.parserConfig.enabled ? parser.parseResult : null
+  const resolveWith = (read: ParseResult | null) => resolveComposerFields({
+    parsed: read,
+    dueTouched: dateTouched,
+    dueValue: explicitDueDate,
+    contextDue: defaultDueDate ? dateOnlyIso(defaultDueDate) : null,
+    contextDueDismissed: defaultDateDismissed,
+    priority,
+    projectTouched,
+    selectedProjectId,
+    findProjectId: (title) => projects?.flat.find((project) => project.title.toLowerCase() === title.toLowerCase())?.id,
+    recurrenceTouched,
+    repeatAfter,
+    repeatMode,
+  })
+  const fields = resolveWith(parsed)
+  const effectiveDueDate = fields.dueDate ?? NULL_DATE
+  const effectiveRepeatAfter = fields.repeat?.repeat_after ?? 0
+  const effectiveRepeatMode = fields.repeat?.repeat_mode ?? 0
+  const selectedProjectTitle = projects?.flat.find((project) => project.id === fields.projectId)?.title ?? 'Project'
+  const priorityLabel = fields.priority > 0 ? PRIORITY_OPTIONS.find((option) => option.value === fields.priority)?.label ?? 'Priority' : 'Priority'
+  const labelCount = new Set([...selectedLabelIds.map((id) => labels.find((label) => label.id === id)?.title.toLowerCase() ?? String(id)), ...(parsed?.labels ?? []).map((name) => name.toLowerCase())]).size
   useEffect(() => {
     if (!projectTouched) setSelectedProjectId(projectId)
   }, [projectId, projectTouched])
@@ -173,9 +191,34 @@ export function NewTaskComposer({
   }, [])
 
   const contextChips = useMemo<ChipData[]>(() => {
-    if (!defaultDueDate || defaultDateDismissed || dateTouched || parser.parseResult?.dueDate) return []
+    if (!defaultDueDate || fields.dueSource !== 'default') return []
     return [{ type: 'date', label: shortDate(dateOnlyIso(defaultDueDate), dateFormat), key: 'context-date' }]
-  }, [defaultDueDate, defaultDateDismissed, dateTouched, parser.parseResult?.dueDate, dateFormat])
+  }, [defaultDueDate, fields.dueSource, dateFormat])
+
+  const chips = composerChips({
+    fields,
+    parsed,
+    chipLabels: selectedLabelIds.flatMap((id) => labels.find((label) => label.id === id)?.title ?? []),
+    projectTitle: selectedProjectTitle,
+    fmt: dateFormat,
+  })
+
+  // A chip read from the text is dismissed by no longer reading that kind of token; a chip made by a
+  // control is undone on its control.
+  const dismissChip = (chip: ChipData) => {
+    if (chip.source !== 'chip') {
+      parser.suppressType(chip.type)
+      return
+    }
+    if (chip.type === 'date') { setDateTouched(true); setExplicitDueDate(NULL_DATE); parser.pinType('date') }
+    else if (chip.type === 'priority') { setPriority(0); parser.pinType('priority') }
+    else if (chip.type === 'project') { setProjectTouched(false); setSelectedProjectId(projectId) }
+    else if (chip.type === 'recurrence') { setRecurrenceTouched(true); setRepeatAfter(0); setRepeatMode(0); parser.pinType('recurrence') }
+    else if (chip.type === 'label') {
+      const id = labels.find((label) => `label-chip-${label.title}` === chip.key)?.id
+      if (id !== undefined) setSelectedLabelIds((ids) => ids.filter((x) => x !== id))
+    }
+  }
 
   const closeAndReset = () => {
     attachments.forEach((attachment) => { if (attachment.blobUrl) URL.revokeObjectURL(attachment.blobUrl) })
@@ -301,26 +344,16 @@ export function NewTaskComposer({
       const title = parsed?.title.trim() || (parser.enabled ? rawTitle : '')
       if (!title) throw new Error('Enter a task title')
 
-      let targetProjectId = selectedProjectId
-      if (!projectTouched && parsed?.project) {
-        targetProjectId = projects?.flat.find((project) => project.title.toLowerCase() === parsed.project?.toLowerCase())?.id ?? targetProjectId
-      }
+      // The same rules the buttons and chips show: the text, unless a control was used.
+      const saved = parser.parserConfig.enabled ? fields : resolveWith(parsed)
+      const targetProjectId = saved.projectId
       const payload: CreateTaskPayload = { title }
       const draftDescription = description.trim()
       if (draftDescription) payload.description = draftDescription
-      // A parsed time ("tomorrow at 3pm") is kept; a bare date is date-only.
-      const parsedDate = parsed?.dueDate ? parsedDue(parsed.dueDate, parsed.dueHasTime) : undefined
-      const dueDate = dateTouched ? explicitDueDate : (parsedDate ?? (!defaultDateDismissed && defaultDueDate ? dateOnlyIso(defaultDueDate) : undefined))
-      if (dueDate && dueDate !== NULL_DATE) payload.due_date = dueDate
-      const selectedPriority = priority !== null ? priority : parsed?.priority
-      if (selectedPriority && selectedPriority > 0) payload.priority = selectedPriority
+      if (saved.dueDate) payload.due_date = saved.dueDate
+      if (saved.priority > 0) payload.priority = saved.priority
       if (reminders.length) payload.reminders = reminders
-      if (recurrenceTouched) {
-        payload.repeat_after = repeatAfter
-        payload.repeat_mode = repeatMode
-      } else if (parsed?.recurrence) {
-        Object.assign(payload, recurrenceToVikunja(parsed.recurrence))
-      }
+      if (saved.repeat) Object.assign(payload, saved.repeat)
 
       const labelNames = [...new Set(parsed?.labels ?? [])]
       const explicitLabels = labels.filter((label) => selectedLabelIds.includes(label.id))
@@ -438,13 +471,18 @@ export function NewTaskComposer({
           projects={projectItems}
           labels={labelItems}
           inputRef={inputRef}
-          placeholder="New Task"
+          placeholder="New task"
           showBangTodayHint={!parser.enabled && !!parser.parserConfig.bangToday}
           className="min-w-0 flex-1"
           contextChips={contextChips}
+          chips={chips}
+          onDismissChip={dismissChip}
           onDismissContextChip={() => setDefaultDateDismissed(true)}
         />
-        <button type="button" onClick={() => { void submit() }} disabled={submitting || !parser.inputValue.trim()} className="mt-0.5 flex h-7 w-7 items-center justify-center rounded-control bg-accent-fill text-on-accent disabled:opacity-40" aria-label="Create task">
+        {parser.inputValue.trim() && !submitting && (
+          <kbd aria-hidden className="mt-1 shrink-0 rounded-control border border-[var(--border-color)] px-1.5 py-0.5 font-sans text-caption text-[var(--text-secondary)]">Enter</kbd>
+        )}
+        <button type="button" onClick={() => { void submit() }} disabled={submitting || !parser.inputValue.trim()} className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-control bg-accent-fill text-on-accent disabled:opacity-40" aria-label="Create task" title="Create task (Enter)">
           {submitting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
         </button>
       </div>
@@ -475,10 +513,10 @@ export function NewTaskComposer({
 
       <div className="flex flex-wrap items-center gap-0.5 pb-2 pl-[46px] pr-4">
         <div className="relative">
-          <ActionButton buttonRef={dateButtonRef} popup="dialog" expanded={openPicker === 'date'} active={effectiveDueDate !== NULL_DATE || repeatAfter > 0} label="Date and repeat" onClick={() => setOpenPicker(openPicker === 'date' ? null : 'date')}>
+          <ActionButton buttonRef={dateButtonRef} popup="dialog" expanded={openPicker === 'date'} active={effectiveDueDate !== NULL_DATE || fields.repeatSource !== null} label="Date and repeat" onClick={() => setOpenPicker(openPicker === 'date' ? null : 'date')}>
             <CalendarDays className="h-3.5 w-3.5" /> {shortDate(effectiveDueDate, dateFormat)}
           </ActionButton>
-          {openPicker === 'date' && <WhenPopover anchorRef={dateButtonRef} currentDate={effectiveDueDate} onDateChange={(value) => { setDateTouched(true); setExplicitDueDate(value) }} repeatAfter={repeatAfter} repeatMode={repeatMode} onRecurrenceChange={(after, mode) => { setRecurrenceTouched(true); setRepeatAfter(after); setRepeatMode(mode) }} onClose={() => setOpenPicker(null)} />}
+          {openPicker === 'date' && <WhenPopover anchorRef={dateButtonRef} currentDate={effectiveDueDate} onDateChange={(value) => { setDateTouched(true); setExplicitDueDate(value); parser.pinType('date') }} repeatAfter={effectiveRepeatAfter} repeatMode={effectiveRepeatMode} onRecurrenceChange={(after, mode) => { setRecurrenceTouched(true); setRepeatAfter(after); setRepeatMode(mode); parser.pinType('recurrence') }} onClose={() => setOpenPicker(null)} />}
         </div>
         <div className="relative">
           <ActionButton buttonRef={reminderButtonRef} popup="dialog" expanded={openPicker === 'reminder'} active={reminders.length > 0} label="Reminder" onClick={() => setOpenPicker(openPicker === 'reminder' ? null : 'reminder')}>
@@ -487,22 +525,22 @@ export function NewTaskComposer({
           {openPicker === 'reminder' && <ReminderPickerPopover anchorRef={reminderButtonRef} dueDate={effectiveDueDate} reminders={reminders} onReminderChange={setReminders} onClose={() => setOpenPicker(null)} />}
         </div>
         <div className="relative">
-          <ActionButton buttonRef={priorityButtonRef} popup="listbox" expanded={openPicker === 'priority'} active={priority !== null && priority > 0} label="Priority" onClick={() => setOpenPicker(openPicker === 'priority' ? null : 'priority')}>
+          <ActionButton buttonRef={priorityButtonRef} popup="listbox" expanded={openPicker === 'priority'} active={fields.priority > 0} label="Priority" onClick={() => setOpenPicker(openPicker === 'priority' ? null : 'priority')}>
             <Flag className="h-3.5 w-3.5" /> {priorityLabel}
           </ActionButton>
-          {openPicker === 'priority' && <PriorityPickerPopover anchorRef={priorityButtonRef} currentPriority={priority ?? 0} onPriorityChange={setPriority} onClose={() => setOpenPicker(null)} />}
+          {openPicker === 'priority' && <PriorityPickerPopover anchorRef={priorityButtonRef} currentPriority={fields.priority} onPriorityChange={(value) => { setPriority(value); parser.pinType('priority') }} onClose={() => setOpenPicker(null)} />}
         </div>
         <div className="relative">
-          <ActionButton buttonRef={labelsButtonRef} popup="dialog" expanded={openPicker === 'labels'} active={selectedLabelIds.length > 0} label="Labels" onClick={() => setOpenPicker(openPicker === 'labels' ? null : 'labels')}>
-            <Tags className="h-3.5 w-3.5" /> {selectedLabelIds.length ? `${selectedLabelIds.length} label${selectedLabelIds.length === 1 ? '' : 's'}` : 'Labels'}
+          <ActionButton buttonRef={labelsButtonRef} popup="dialog" expanded={openPicker === 'labels'} active={labelCount > 0} label="Labels" onClick={() => setOpenPicker(openPicker === 'labels' ? null : 'labels')}>
+            <Tags className="h-3.5 w-3.5" /> {labelCount ? `${labelCount} label${labelCount === 1 ? '' : 's'}` : 'Labels'}
           </ActionButton>
           {openPicker === 'labels' && <DraftLabelPickerPopover anchorRef={labelsButtonRef} selectedIds={selectedLabelIds} onChange={setSelectedLabelIds} onClose={() => setOpenPicker(null)} />}
         </div>
         <div className="relative">
-          <ActionButton buttonRef={projectButtonRef} popup="listbox" expanded={openPicker === 'project'} active={projectTouched} label="Project" onClick={() => setOpenPicker(openPicker === 'project' ? null : 'project')}>
+          <ActionButton buttonRef={projectButtonRef} popup="listbox" expanded={openPicker === 'project'} active={fields.projectSource !== 'default'} label="Project" onClick={() => setOpenPicker(openPicker === 'project' ? null : 'project')}>
             <FolderOpen className="h-3.5 w-3.5" /> <span className="max-w-28 truncate">{selectedProjectTitle}</span>
           </ActionButton>
-          {openPicker === 'project' && <ProjectPickerPopover anchorRef={projectButtonRef} currentProjectId={selectedProjectId} onSelect={(id) => { setSelectedProjectId(id); setProjectTouched(true) }} onClose={() => setOpenPicker(null)} />}
+          {openPicker === 'project' && <ProjectPickerPopover anchorRef={projectButtonRef} currentProjectId={fields.projectId} onSelect={(id) => { setSelectedProjectId(id); setProjectTouched(true); parser.pinType('project') }} onClose={() => setOpenPicker(null)} />}
         </div>
         <ActionButton active={showNotes || !!description} label="Notes" onClick={() => setShowNotes((value) => !value)}>
           <AlignLeft className="h-3.5 w-3.5" /> Notes
