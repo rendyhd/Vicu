@@ -6,7 +6,7 @@ import { useReviewBadgeCount, useReviewFeatureEnabled } from '@/hooks/use-review
 import { useAppConfig } from '@/hooks/use-app-config'
 import { isRoutinesEnabled } from '@/lib/vikunja-types'
 
-interface SmartListItem {
+export interface SmartListItem {
   id: SmartListId
   label: string
   path: string
@@ -23,17 +23,22 @@ const ALL_SMART_LISTS: SmartListItem[] = [
   { id: 'logbook', label: 'Logbook', path: '/logbook' },
 ]
 
+/** The smart lists that are switched on (Review and Routines can be off). */
+export function useSmartLists(): SmartListItem[] {
+  const reviewEnabled = useReviewFeatureEnabled()
+  const { data: config } = useAppConfig()
+  const routinesEnabled = isRoutinesEnabled(config)
+
+  return ALL_SMART_LISTS.filter((i) =>
+    (i.id !== 'review' || reviewEnabled) && (i.id !== 'routines' || routinesEnabled))
+}
+
 export function SmartListNav() {
   const navigate = useNavigate()
   const matches = useMatches()
   const currentPath = matches[matches.length - 1]?.pathname ?? ''
-  const reviewEnabled = useReviewFeatureEnabled()
   const reviewCount = useReviewBadgeCount()
-  const { data: config } = useAppConfig()
-  const routinesEnabled = isRoutinesEnabled(config)
-
-  const items = ALL_SMART_LISTS.filter((i) =>
-    (i.id !== 'review' || reviewEnabled) && (i.id !== 'routines' || routinesEnabled))
+  const items = useSmartLists()
 
   return (
     <nav aria-label="Lists" className="flex flex-col gap-0.5 px-2 py-2">

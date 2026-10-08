@@ -129,3 +129,32 @@ describe('the task context menu', () => {
     expect([...source.matchAll(/hint\('([^']+)'\)/g)].map((m) => m[1]).sort()).toEqual(['Delete', 'Mod+C', 'Mod+K', 'Mod+T'])
   })
 })
+
+// Card 3.8 (D-8): search left the window controls; Quick find lives in the sidebar and the
+// command palette sits on the Dialog. The scenario E8 drives both.
+describe('Quick find and the command palette', () => {
+  it('has Quick find at the top of the sidebar and no search button in the window controls', () => {
+    const sidebar = read('components/layout/Sidebar.tsx')
+    expect(sidebar).toContain('<QuickFind')
+    expect(sidebar.indexOf('<QuickFind')).toBeLessThan(sidebar.indexOf('<SmartListNav'))
+    const shell = read('components/layout/AppShell.tsx')
+    expect(shell).not.toContain('SearchBar')
+    expect(shell).toContain('<CommandPalette')
+  })
+
+  it('opens the palette on Ctrl+Shift+P, on the Dialog primitive', () => {
+    const palette = read('components/layout/CommandPalette.tsx')
+    expect(palette).toContain('event.shiftKey')
+    expect(palette).toContain("event.key.toLowerCase() === 'p'")
+    expect(palette).toContain("from '@/components/overlay/Dialog'")
+    expect(palette).toMatch(/<Dialog[\s>]/)
+  })
+
+  it('shows Quick find as a combobox over a listbox', () => {
+    const find = read('components/sidebar/QuickFind.tsx')
+    expect(find).toContain('role="combobox"')
+    expect(find).toContain('role="listbox"')
+    expect(find).toContain('aria-activedescendant')
+    expect(find).toContain("event.key.toLowerCase() === 'f'")
+  })
+})

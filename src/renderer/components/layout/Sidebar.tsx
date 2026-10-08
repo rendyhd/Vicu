@@ -1,4 +1,5 @@
 import { Plus } from 'lucide-react'
+import { QuickFind } from '@/components/sidebar/QuickFind'
 import { SmartListNav } from '@/components/sidebar/SmartListNav'
 import { CustomListNav } from '@/components/sidebar/CustomListNav'
 import { ProjectTree } from '@/components/sidebar/ProjectTree'
@@ -11,6 +12,10 @@ export function Sidebar() {
 
   return (
     <div className="flex h-full flex-col">
+      <div role="search" className="px-2 pt-2">
+        <QuickFind />
+      </div>
+
       <SmartListNav />
 
       <div className="mx-4 border-t border-[var(--border-color)]" />

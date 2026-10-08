@@ -30,7 +30,7 @@ import { useCompletedTasksStore } from '@/stores/completed-tasks-store'
 import { Sidebar } from './Sidebar'
 import { ContentArea } from './ContentArea'
 import { WindowControls } from './WindowControls'
-import { SearchBar } from './SearchBar'
+import { CommandPalette } from './CommandPalette'
 // The sign-in screens are only needed when nobody is signed in: their own chunks.
 const SetupView = lazy(() => import('@/views/SetupView').then((module) => ({ default: module.SetupView })))
 const ReauthView = lazy(() => import('@/views/ReauthView').then((module) => ({ default: module.ReauthView })))
@@ -654,7 +654,6 @@ export function AppShell() {
           } as React.CSSProperties}
         >
           <div className="flex-1" />
-          <SearchBar />
           <WindowControls />
         </header>
 
@@ -689,6 +688,7 @@ export function AppShell() {
         <CompletionSoundSync />
         <GlobalConfirm />
         <ToastHost />
+        <CommandPalette />
       </div>
 
       <DragOverlay
