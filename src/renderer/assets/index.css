@@ -61,7 +61,29 @@
   }
 }
 
+/* The selection bar rises from the bottom of the list; reduced motion only fades it in. */
+@keyframes vicu-bar-rise {
+  from {
+    opacity: 0;
+    transform: translateY(0.75rem);
+  }
+}
+
+@keyframes vicu-bar-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+.vicu-bar-rise {
+  animation: vicu-bar-rise var(--dur-move) var(--ease-enter);
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .vicu-bar-rise {
+    animation: vicu-bar-fade var(--dur-fade-fast) var(--ease-standard);
+  }
+
   *,
   ::before,
   ::after {

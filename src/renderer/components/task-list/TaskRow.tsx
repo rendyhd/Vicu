@@ -549,7 +549,7 @@ function TaskRowInner({ task, nestedDepth = 0, parentProjectId, projectMeta, dra
         }}
         className={cn(
           'group grid cursor-default grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-x-3 border-b border-[var(--border-color)] px-4 py-2.5 transition-colors hover:bg-[var(--bg-hover)]',
-          isSelected && 'bg-accent-blue/15 ring-1 ring-inset ring-accent-blue/40',
+          isSelected && 'bg-bg-selected ring-1 ring-inset ring-accent-blue/40',
           isFocused && !isSelected && !isExpanded && 'bg-accent-blue/8 ring-1 ring-inset ring-accent-blue/30',
           isDragging && 'opacity-30',
           isDragOver && 'ring-2 ring-inset ring-[var(--accent-blue)] bg-accent-blue/5',

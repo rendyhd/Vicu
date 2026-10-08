@@ -20,6 +20,7 @@ import { EmptyState } from '@/components/shared/EmptyState'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { Button } from '@/components/shared/Button'
 import { NewTaskComposer } from './NewTaskComposer'
+import { SelectionBar } from './SelectionBar'
 import { taskDescendants, unfinishedDescendants } from '@/lib/task-hierarchy'
 import { confirmTaskCompletion } from '@/lib/task-completion'
 import { SmartListIcon } from '@/components/shared/SmartListIcon'
@@ -577,6 +578,7 @@ export function TaskList({
 
         {newTaskPlacement === 'after-children' && endOfList}
       </ReadingScroll>
+      <SelectionBar />
     </div>
   )
 }
