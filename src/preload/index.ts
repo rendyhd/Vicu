@@ -157,6 +157,14 @@ const api = {
   getHotkeyLauncherCommand: () =>
     ipcRenderer.invoke('get-hotkey-launcher-command') as Promise<{ quickEntry: string; quickView: string; kind: 'appimage' | 'packaged' | 'dev' }>,
 
+  // Locale and clock for dates (src/shared/date-display.ts); changes when the clock setting does.
+  getDateFormat: () => ipcRenderer.invoke('get-date-format'),
+  onDateFormatChanged: (callback: (format: { locale: string; hour12: boolean }) => void) => {
+    const handler = (_: unknown, format: { locale: string; hour12: boolean }) => callback(format)
+    ipcRenderer.on('date-format-changed', handler)
+    return () => { ipcRenderer.removeListener('date-format-changed', handler) }
+  },
+
   // The computer woke from sleep: timers and the clock may have jumped while it was asleep.
   onAppResumed: (callback: () => void) => {
     const handler = () => callback()

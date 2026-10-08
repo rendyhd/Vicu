@@ -512,6 +512,43 @@ export function SettingsView() {
               </p>
             </div>
 
+            <div>
+              <label className="mb-2 block text-xs text-[var(--text-secondary)]">Clock</label>
+              <div className="flex gap-3" role="radiogroup" aria-label="Clock">
+                {([
+                  { value: 'system' as const, label: 'System' },
+                  { value: '12h' as const, label: '12-hour' },
+                  { value: '24h' as const, label: '24-hour' },
+                ]).map((opt) => {
+                  const current = fullConfig?.clock_format ?? 'system'
+                  return (
+                    <label
+                      key={opt.value}
+                      className={cn(
+                        'flex cursor-pointer items-center gap-1.5 rounded-control border px-3 py-1.5 text-xs font-medium transition-colors',
+                        current === opt.value
+                          ? 'border-accent-blue bg-accent-blue/10 text-accent-blue'
+                          : 'border-[var(--border-color)] text-[var(--text-secondary)] hover:border-[var(--text-secondary)]'
+                      )}
+                    >
+                      <input
+                        type="radio"
+                        name="clock_format"
+                        value={opt.value}
+                        checked={current === opt.value}
+                        onChange={() => handleQuickEntryChange({ clock_format: opt.value })}
+                        className="sr-only"
+                      />
+                      {opt.label}
+                    </label>
+                  )
+                })}
+              </div>
+              <p className="mt-1.5 text-xs text-[var(--text-secondary)]">
+                System follows your region. Pick 12-hour or 24-hour if your system uses a custom time format. Applies to every Vicu window.
+              </p>
+            </div>
+
           </div>
         </div>
 

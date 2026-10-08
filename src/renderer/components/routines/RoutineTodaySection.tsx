@@ -1,8 +1,10 @@
 import { Bell, Check, Clock3, SkipForward, Undo2 } from 'lucide-react'
 import { useRoutines } from '@/hooks/use-routines'
-import { isFinished, timeLabel, type OccurrenceStatus, type RoutineOccurrence } from '@/lib/routines'
+import { isFinished, type OccurrenceStatus, type RoutineOccurrence } from '@/lib/routines'
 import type { Task } from '@/lib/vikunja-types'
 import { cn } from '@/lib/cn'
+import { formatMinutesOfDay } from '@/lib/date-utils'
+import { useDateFormat } from '@/hooks/use-date-format'
 
 function RoutineCheck({
   occurrence,
@@ -13,6 +15,7 @@ function RoutineCheck({
   disabled: boolean
   onStatus: (status: OccurrenceStatus) => void
 }) {
+  const dateFormat = useDateFormat()
   const completed = occurrence.status === 'COMPLETED'
   const skipped = occurrence.status === 'SKIPPED'
   const definition = occurrence.carrier.payload.definition
@@ -51,7 +54,7 @@ function RoutineCheck({
           {detail && <span>{detail}</span>}
           <span className="inline-flex items-center gap-1">
             <Clock3 className="h-3 w-3" />
-            {timeLabel(occurrence.slot.reminderMinutes)}
+            {formatMinutesOfDay(occurrence.slot.reminderMinutes, dateFormat)}
           </span>
           {occurrence.slot.reminderEnabled && <Bell className="h-3 w-3" />}
           {occurrence.overdue && <span className="font-medium text-status-overdue">Overdue</span>}

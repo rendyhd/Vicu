@@ -1,5 +1,7 @@
 import type { ParseResult, TokenType } from '@/lib/task-parser'
-import { formatClockTime } from '@/lib/date-utils'
+import { formatDateChip } from '@/lib/date-utils'
+import type { DateFormat } from '@/lib/date-display'
+import { getDateFormat } from '@/lib/date-format'
 
 // Match Quick Entry colors: green=date, red=priority, orange=label, blue=project, purple=recurrence
 const chipStyles: Record<string, string> = {
@@ -12,20 +14,6 @@ const chipStyles: Record<string, string> = {
 
 const priorityLabels = ['', 'Low', 'Medium', 'High', 'Urgent']
 
-function formatDateLabel(date: Date): string {
-  const now = new Date()
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-  const target = new Date(date.getFullYear(), date.getMonth(), date.getDate())
-  const diffDays = Math.round((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
-  if (diffDays === 0) return 'Today'
-  if (diffDays === 1) return 'Tomorrow'
-  if (diffDays === -1) return 'Yesterday'
-  if (diffDays > 1 && diffDays <= 7) {
-    return target.toLocaleDateString(undefined, { weekday: 'long' })
-  }
-  return target.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
-}
-
 export interface ChipData {
   type: TokenType
   label: string
@@ -33,12 +21,11 @@ export interface ChipData {
 }
 
 /** Convert a ParseResult into a flat array of chip descriptors. */
-export function buildChips(result: ParseResult): ChipData[] {
+export function buildChips(result: ParseResult, fmt: DateFormat = getDateFormat()): ChipData[] {
   const chips: ChipData[] = []
 
   if (result.dueDate) {
-    const day = formatDateLabel(result.dueDate)
-    chips.push({ type: 'date', label: result.dueHasTime ? `${day} ${formatClockTime(result.dueDate)}` : day, key: 'date' })
+    chips.push({ type: 'date', label: formatDateChip(result.dueDate, !result.dueHasTime, new Date(), fmt), key: 'date' })
   }
   if (result.priority !== null && result.priority > 0) {
     chips.push({

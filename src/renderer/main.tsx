@@ -7,6 +7,7 @@ import { router } from './router'
 import { IsDarkProvider } from './hooks/use-is-dark'
 import { preloadRichTextEditor } from './components/rich-text/LazyRichTextEditor'
 import { api } from './lib/api'
+import { initDateFormat } from './lib/date-format'
 import { ACCOUNT_CHANGED_EVENT } from './lib/account-events'
 import {
   PERSISTED_KEY_PREFIXES,
@@ -35,8 +36,12 @@ const withTimeout = <T,>(promise: Promise<T>, ms: number, fallback: T): Promise<
 async function start(): Promise<void> {
   // Show what the app showed last time right away (offline start-up, slow servers); the views
   // refetch as soon as they mount. Never let this hold up the first paint for long.
+  // Dates are phrased in the system locale and the Settings clock; ask main before the first paint.
+  const dateFormatReady = withTimeout(initDateFormat(window.api), 1_000, undefined)
   const server = await withTimeout(signedInServer(), 1_500, '')
   await withTimeout(restoreQueryCache(queryClient, indexedDbStore, server).catch(() => false), 1_500, false)
+
+  await dateFormatReady
 
   let serverAtSave = server
   let serverCheckedAt = 0

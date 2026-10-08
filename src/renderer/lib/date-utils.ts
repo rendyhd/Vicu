@@ -1,7 +1,12 @@
 import { NULL_DATE } from './constants'
 import {
+  formatAbsoluteDateTime as formatAbsolute,
+  formatDateDisplay,
+  type DateFormat,
+} from './date-display'
+import { getDateFormat } from './date-format'
+import {
   addLocalDays,
-  diffLocalDays,
   isDateOnly,
   localDateOf,
   nextWeekStart,
@@ -10,69 +15,53 @@ import {
 
 // The rules themselves (date-only due time, Today/Upcoming classification, week helpers) live
 // in ./due-dates and are shared with the main process. This file only holds what the UI needs
-// on top of them: null checks, labels and the date picker's quick picks.
+// on top of them: null checks, date labels (phrased by ./date-display) and the date picker's quick picks.
 
 export function isNullDate(date: string): boolean {
   return !date || date === NULL_DATE
 }
 
 /**
- * Relative label for the local date of a due date: Today, Tomorrow, Yesterday, a weekday within
- * the coming week, or "Oct 6" (with the year when it is not the current year).
+ * What a due date reads as in a task row (contract section 8): "Today", "Fri", "27 Sep", plus the
+ * time of day, in the locale and clock of the window. `context` is `row` by default; Today passes
+ * `row.inToday` and the day groups of Upcoming `row.inDayGroup`. Empty when there is nothing to show.
  */
-export function formatRelativeDate(date: string, now: Date = new Date()): string {
+export function formatDueDate(
+  date: string,
+  now: Date = new Date(),
+  fmt: DateFormat = getDateFormat(),
+  context: 'row' | 'row.inToday' | 'row.inDayGroup' = 'row'
+): string {
+  if (isNullDate(date)) return ''
+  return formatDateDisplay(context, new Date(date), now, isDateOnly(date), fmt)
+}
+
+/** The `chip` phrasing: always the weekday date ("Sat 10 Oct, 15:00"), never a relative word. */
+export function formatDateChip(
+  date: Date,
+  dateOnly: boolean,
+  now: Date = new Date(),
+  fmt: DateFormat = getDateFormat()
+): string {
+  return formatDateDisplay('chip', date, now, dateOnly, fmt)
+}
+
+/** Time of day in the window's clock ("15:00" or "3:00 PM"). */
+export function formatClockTime(d: Date, fmt: DateFormat = getDateFormat()): string {
+  return formatDateDisplay('logbook.time', d, d, false, fmt)
+}
+
+/** A time given as minutes after midnight (routine slots) in the window's clock. */
+export function formatMinutesOfDay(minutes: number, fmt: DateFormat = getDateFormat()): string {
+  return formatClockTime(new Date(2000, 0, 1, Math.floor(minutes / 60), minutes % 60), fmt)
+}
+
+/** A timestamp for details (created, updated, completed): the date with its year, then the time. */
+export function formatAbsoluteDateTime(date: string, fmt: DateFormat = getDateFormat()): string {
   if (isNullDate(date)) return ''
   const d = new Date(date)
-  const diffDays = diffLocalDays(toLocalDate(now), toLocalDate(d))
-
-  if (diffDays === 0) return 'Today'
-  if (diffDays === 1) return 'Tomorrow'
-  if (diffDays === -1) return 'Yesterday'
-
-  if (diffDays > 1 && diffDays < 7) {
-    return d.toLocaleDateString('en-US', { weekday: 'short' })
-  }
-
-  if (d.getFullYear() === now.getFullYear()) {
-    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-  }
-
-  return d.toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  })
-}
-
-/** Time of day in the viewer's 12/24-hour convention (locale defaults to the system's). */
-export function formatClockTime(d: Date, locale?: string): string {
-  return d.toLocaleTimeString(locale, { hour: 'numeric', minute: '2-digit' })
-}
-
-/**
- * Label for a due date: the relative date, plus the time of day when the value has an explicit
- * time. Date-only values (local 23:59:59, or legacy 00:00) show no time.
- */
-export function formatDueDate(date: string, now: Date = new Date(), locale?: string): string {
-  const base = formatRelativeDate(date, now)
-  if (!base || isDateOnly(date)) return base
-  return `${base} ${formatClockTime(new Date(date), locale)}`
-}
-
-export function formatAbsoluteDateTime(date: string): string {
-  if (isNullDate(date)) return ''
-  const d = new Date(date)
-  const datePart = d.toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  })
-  const timePart = d.toLocaleTimeString('en-US', {
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true,
-  })
-  return `${datePart} at ${timePart}`
+  if (Number.isNaN(d.getTime())) return ''
+  return formatAbsolute(d, fmt)
 }
 
 /** Value for a date input: the local calendar day of a stored instant, or '' when unset. */

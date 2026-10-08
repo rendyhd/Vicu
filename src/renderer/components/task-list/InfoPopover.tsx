@@ -1,6 +1,7 @@
 import type { RefObject } from 'react'
 import type { Task } from '@/lib/vikunja-types'
 import { formatAbsoluteDateTime, isNullDate } from '@/lib/date-utils'
+import { useDateFormat } from '@/hooks/use-date-format'
 import { Popover, type PopoverCloseReason } from '../overlay/Popover'
 
 interface InfoPopoverProps {
@@ -11,15 +12,16 @@ interface InfoPopoverProps {
 
 export function InfoPopover({ anchorRef, task, onClose }: InfoPopoverProps) {
   const identifier = task.identifier && task.identifier.length > 0 ? task.identifier : '—'
-  const created = formatAbsoluteDateTime(task.created) || '—'
-  const updated = formatAbsoluteDateTime(task.updated) || '—'
+  const fmt = useDateFormat()
+  const created = formatAbsoluteDateTime(task.created, fmt) || '—'
+  const updated = formatAbsoluteDateTime(task.updated, fmt) || '—'
 
   const creatorName =
     task.created_by && (task.created_by.name?.trim() || task.created_by.username)
   const showCreator = !!creatorName
 
   const showCompleted = task.done && !isNullDate(task.done_at)
-  const completed = showCompleted ? formatAbsoluteDateTime(task.done_at) : ''
+  const completed = showCompleted ? formatAbsoluteDateTime(task.done_at, fmt) : ''
 
   return (
     <Popover anchorRef={anchorRef} onClose={onClose} label="Task info" initialFocus="container" className="w-64 p-3">

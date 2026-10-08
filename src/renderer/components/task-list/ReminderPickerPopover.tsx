@@ -2,6 +2,9 @@ import { useState, type RefObject } from 'react'
 import { X } from 'lucide-react'
 import type { Task, TaskReminder } from '@/lib/vikunja-types'
 import { NULL_DATE } from '@/lib/constants'
+import { formatDateChip } from '@/lib/date-utils'
+import { formatDateDisplay } from '@/lib/date-display'
+import { useDateFormat } from '@/hooks/use-date-format'
 import { Popover, type PopoverCloseReason } from '../overlay/Popover'
 
 interface ReminderPickerPopoverProps {
@@ -22,6 +25,7 @@ const RELATIVE_PRESETS = [
 
 export function ReminderPickerPopover({ anchorRef, task, dueDate, reminders: controlledReminders, onReminderChange, onClose }: ReminderPickerPopoverProps) {
   const [customDateTime, setCustomDateTime] = useState('')
+  const dateFormat = useDateFormat()
 
   const reminders = controlledReminders ?? task?.reminders ?? []
   const effectiveDueDate = dueDate ?? task?.due_date ?? NULL_DATE
@@ -55,17 +59,17 @@ export function ReminderPickerPopover({ anchorRef, task, dueDate, reminders: con
 
   const now = new Date()
 
+  const tomorrowNineAm = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 9, 0, 0)
+
   const presets = [
     {
       label: 'In 1 hour',
       getDate: () => new Date(now.getTime() + 60 * 60 * 1000),
     },
     {
-      label: 'Tomorrow 9 AM',
-      getDate: () => {
-        const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 9, 0, 0)
-        return d
-      },
+      // "Tomorrow, 9:00 AM" or "Tomorrow, 09:00": the clock follows the setting.
+      label: formatDateDisplay('row', tomorrowNineAm, now, false, dateFormat),
+      getDate: () => tomorrowNineAm,
     },
     {
       label: 'In 3 days',
@@ -78,12 +82,7 @@ export function ReminderPickerPopover({ anchorRef, task, dueDate, reminders: con
       return formatRelativeReminder(r.relative_period, r.relative_to)
     }
     const d = new Date(r.reminder)
-    return d.toLocaleString(undefined, {
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    })
+    return formatDateChip(d, false, now, dateFormat)
   }
 
   return (

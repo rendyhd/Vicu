@@ -157,6 +157,12 @@ export interface AppConfig {
   inbox_project_id: number
   auth_method?: AuthMethod
   theme: 'light' | 'dark' | 'system'
+  /**
+   * The clock in dates and times: follow the system locale's hour cycle (the default), or force
+   * the 12-hour or 24-hour clock for an OS custom format the web engine cannot see. Missing
+   * means 'system'.
+   */
+  clock_format?: 'system' | '12h' | '24h'
   window_bounds?: { x: number; y: number; width: number; height: number }
   sidebar_width?: number
   custom_lists?: CustomList[]

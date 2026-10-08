@@ -38,7 +38,7 @@ const LOGO = 'data:image/png;base64,TESTLOGO'
 const NOW = new Date(2026, 5, 10) // June 10, 2026 (local time)
 
 function build(payload: PrintablePayload): string {
-  return buildPrintHtml(payload, { sanitize: identity, logoDataUrl: LOGO, now: NOW })
+  return buildPrintHtml(payload, { sanitize: identity, logoDataUrl: LOGO, now: NOW, dateFormat: { locale: 'en-US', hour12: true } })
 }
 
 describe('buildPrintHtml', () => {
@@ -141,7 +141,7 @@ describe('buildPrintHtml', () => {
     const sanitize = (h: string) => h.replace('raw', 'SANITIZED')
     const html = buildPrintHtml(
       { viewTitle: 'T', sections: [{ groups: [{ tasks: [makeTask({ description: '<p>raw note</p>' })] }] }] },
-      { sanitize, logoDataUrl: LOGO, now: NOW }
+      { sanitize, logoDataUrl: LOGO, now: NOW, dateFormat: { locale: 'en-US', hour12: true } }
     )
     expect(html).toContain('<p>SANITIZED note</p>')
   })

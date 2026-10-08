@@ -1,21 +1,30 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { Fragment, useEffect, useMemo, useRef } from 'react'
 import { useLogbookTasks } from '@/hooks/use-logbook-tasks'
 import { useProjects } from '@/hooks/use-projects'
 import { usePrintable } from '@/stores/print-store'
+import { useDayKey } from '@/stores/day-store'
 import { isNullDate } from '@/lib/date-utils'
+import { formatDateDisplay, type DateFormat } from '@/lib/date-display'
+import { useDateFormat } from '@/hooks/use-date-format'
 import { cn } from '@/lib/cn'
 import { TaskCheckbox } from '@/components/task-list/TaskCheckbox'
 import { Inbox } from 'lucide-react'
 import { EmptyState } from '@/components/shared/EmptyState'
 import type { Task } from '@/lib/vikunja-types'
 
-function formatCompletionDate(date: string): string {
+/** The group a completion belongs to ("Today", "Yesterday", "Mon 5 Oct", "September 2026"); '' without a time. */
+function completionGroup(date: string, now: Date, fmt: DateFormat): string {
   if (isNullDate(date)) return ''
-  const d = new Date(date)
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  return formatDateDisplay('logbook.group', new Date(date), now, false, fmt)
 }
 
-function LogbookRow({ task }: { task: Task }) {
+/** The time of the completion in the user's clock; the group heading above says the day. */
+function completionTime(date: string, now: Date, fmt: DateFormat): string {
+  if (isNullDate(date)) return ''
+  return formatDateDisplay('logbook.time', new Date(date), now, false, fmt)
+}
+
+function LogbookRow({ task, time }: { task: Task; time: string }) {
   return (
     <div className="flex h-10 items-center gap-3 border-b border-[var(--border-color)] px-4">
       <TaskCheckbox task={task} />
@@ -30,7 +39,7 @@ function LogbookRow({ task }: { task: Task }) {
         {task.title}
       </span>
       <span className="shrink-0 text-meta text-[var(--text-secondary)]">
-        {formatCompletionDate(task.done_at)}
+        {time}
       </span>
     </div>
   )
@@ -39,6 +48,10 @@ function LogbookRow({ task }: { task: Task }) {
 export function LogbookView() {
   const { tasks, isLoading, hasMore, isLoadingMore, moreError, loadMore, retryMore } = useLogbookTasks()
   const { data: projects } = useProjects()
+  const dateFormat = useDateFormat()
+  // Re-rendered when the local day rolls over, so "Today" becomes "Yesterday" at midnight.
+  useDayKey()
+  const now = new Date()
   const visibleTasks = useMemo(() => {
     const activeIds = new Set(projects?.flat.map((project) => project.id) ?? [])
     return tasks.filter((task) => activeIds.has(task.project_id))
@@ -81,7 +94,21 @@ export function LogbookView() {
         {visibleTasks.length === 0 && !hasMore && !isLoadingMore && !moreError ? (
           <EmptyState icon={Inbox} title="No completed tasks" subtitle="Completed tasks appear here" />
         ) : (
-          visibleTasks.map((task) => <LogbookRow key={task.id} task={task} />)
+          visibleTasks.map((task, index) => {
+            // Newest first: a heading wherever the day group changes.
+            const group = completionGroup(task.done_at, now, dateFormat)
+            const previous = index > 0 ? completionGroup(visibleTasks[index - 1].done_at, now, dateFormat) : null
+            return (
+              <Fragment key={task.id}>
+                {group !== '' && group !== previous && (
+                  <div className="px-6 pb-1 pt-3">
+                    <h2 className="text-caption font-semibold uppercase tracking-wider text-text-secondary">{group}</h2>
+                  </div>
+                )}
+                <LogbookRow task={task} time={completionTime(task.done_at, now, dateFormat)} />
+              </Fragment>
+            )
+          })
         )}
         {moreError ? (
           <div className="flex items-center justify-center gap-2 px-6 py-3 text-xs text-[var(--text-secondary)]">

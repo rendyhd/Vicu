@@ -4,22 +4,17 @@ import { useProjects } from '@/hooks/use-projects'
 import { useFilters } from '@/hooks/use-filters'
 import { usePrintable } from '@/stores/print-store'
 import { useDayKey } from '@/stores/day-store'
-import { diffLocalDays, isUpcoming, localDateOf, toLocalDate } from '@/lib/due-dates'
+import { isUpcoming, localDateOf } from '@/lib/due-dates'
 import { TaskList } from '@/components/task-list/TaskList'
 import { TaskRow } from '@/components/task-list/TaskRow'
+import { DueDateContextProvider } from '@/components/task-list/TaskDueBadge'
+import { useDateFormat } from '@/hooks/use-date-format'
+import { formatDateDisplay, type DateFormat } from '@/lib/date-display'
 import { api } from '@/lib/api'
 import type { Task } from '@/lib/vikunja-types'
 
-function formatDateHeader(dateStr: string): string {
-  const d = new Date(dateStr)
-  const diffDays = diffLocalDays(toLocalDate(new Date()), toLocalDate(d))
-
-  if (diffDays === 0) return 'Today'
-  if (diffDays === 1) return 'Tomorrow'
-  if (diffDays > 1 && diffDays <= 6) {
-    return d.toLocaleDateString('en-US', { weekday: 'long' })
-  }
-  return d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
+function formatDateHeader(dateStr: string, fmt: DateFormat): string {
+  return formatDateDisplay('header.day', new Date(dateStr), new Date(), true, fmt)
 }
 
 function getDateKey(date: string): string {
@@ -53,6 +48,7 @@ export function UpcomingView() {
   const params = useFilters({ view: 'upcoming' })
   // Recomputes the groups when the local day rolls over (Today / Tomorrow / weekday headings).
   const dayKey = useDayKey()
+  const dateFormat = useDateFormat()
   const { data: tasks = [], isLoading } = useTasks(params)
   const { data: projects } = useProjects()
   const [inboxProjectId, setInboxProjectId] = useState<number | undefined>()
@@ -77,14 +73,14 @@ export function UpcomingView() {
       if (!grouped.has(key)) {
         grouped.set(key, {
           key,
-          label: formatDateHeader(task.due_date),
+          label: formatDateHeader(task.due_date, dateFormat),
           tasks: [],
         })
       }
       grouped.get(key)!.tasks.push(task)
     }
     return Array.from(grouped.values()).sort((a, b) => a.key.localeCompare(b.key))
-  }, [tasks, projects?.flat, dayKey])
+  }, [tasks, projects?.flat, dayKey, dateFormat])
 
   usePrintable(
     useMemo(
@@ -111,38 +107,40 @@ export function UpcomingView() {
   }
 
   return (
-    <TaskList
-      title="Upcoming"
-      tasks={[]}
-      projectId={inboxProjectId}
-      showNewTask={!!inboxProjectId && projects?.flat.some((project) => project.id === inboxProjectId)}
-      emptyTitle="Nothing upcoming"
-      emptySubtitle="Tasks with future due dates appear here"
-    >
-      {groups.map((group) => {
-        const projectGroups = groupByProject(group.tasks, projects?.flat)
-        return (
-          <div key={group.key}>
-            <div className="px-6 pb-1 pt-3">
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
-                {group.label}
-              </span>
-            </div>
-            {projectGroups.map((pg) => (
-              <div key={pg.name}>
-                <div className="px-6 pb-0.5 pt-1.5">
-                  <span className="text-caption font-medium tracking-wide text-[var(--text-secondary)]">
-                    {pg.name}
-                  </span>
-                </div>
-                {pg.tasks.map((task) => (
-                  <TaskRow key={task.id} task={task} />
-                ))}
+    <DueDateContextProvider value="row.inDayGroup">
+      <TaskList
+        title="Upcoming"
+        tasks={[]}
+        projectId={inboxProjectId}
+        showNewTask={!!inboxProjectId && projects?.flat.some((project) => project.id === inboxProjectId)}
+        emptyTitle="Nothing upcoming"
+        emptySubtitle="Tasks with future due dates appear here"
+      >
+        {groups.map((group) => {
+          const projectGroups = groupByProject(group.tasks, projects?.flat)
+          return (
+            <div key={group.key}>
+              <div className="px-6 pb-1 pt-3">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
+                  {group.label}
+                </span>
               </div>
-            ))}
-          </div>
-        )
-      })}
-    </TaskList>
+              {projectGroups.map((pg) => (
+                <div key={pg.name}>
+                  <div className="px-6 pb-0.5 pt-1.5">
+                    <span className="text-caption font-medium tracking-wide text-[var(--text-secondary)]">
+                      {pg.name}
+                    </span>
+                  </div>
+                  {pg.tasks.map((task) => (
+                    <TaskRow key={task.id} task={task} />
+                  ))}
+                </div>
+              ))}
+            </div>
+          )
+        })}
+      </TaskList>
+    </DueDateContextProvider>
   )
 }

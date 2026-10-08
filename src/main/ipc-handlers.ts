@@ -37,6 +37,7 @@ import {
 import { loadFileForUpload } from './upload-file'
 import { getLaunchOnStartupSupport } from './launch-on-startup'
 import { startupEnv } from './startup-env'
+import { announceDateFormatIfChanged, dateFormatForWindow } from './date-format'
 import {
   applyConfigPatch,
   applyConnectionFields,
@@ -170,6 +171,8 @@ function persistConfig(config: AppConfig, announce = true): void {
     config.api_token = ''
   }
   saveConfig(config)
+  // The clock choice changes how every window phrases dates.
+  announceDateFormatIfChanged(config)
   // Sync native theme when config changes
   if (config.theme) {
     nativeTheme.themeSource = config.theme === 'system' ? 'system' : config.theme
@@ -337,6 +340,9 @@ export function registerIpcHandlers(): void {
   handleTrusted('get-config', () => {
     return loadConfig()
   })
+
+  // The locale and clock for dates; all three windows ask when they load and listen for changes.
+  handleTrusted('get-date-format', () => dateFormatForWindow())
 
   // The renderer never saves a whole config: its copy can be stale (main changes window bounds,
   // sidebar width, popup positions... on its own). Preferences go through save-config-patch and

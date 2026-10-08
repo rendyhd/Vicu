@@ -1,4 +1,6 @@
 import { useMemo, useState } from 'react'
+import { formatDateChip, formatMinutesOfDay } from '@/lib/date-utils'
+import { useDateFormat } from '@/hooks/use-date-format'
 import {
   Archive,
   Bell,
@@ -248,6 +250,7 @@ function RoutineEditor({
 }
 
 function HistoryDialog({ carrier, onClose }: { carrier: RoutineCarrier<Task>; onClose: () => void }) {
+  const dateFormat = useDateFormat()
   const { records, loadingArchive, archiveError } = useRoutineHistory(carrier)
   const logged = records.filter((record) => record.status !== 'PENDING')
   const completed = logged.filter((record) => record.status === 'COMPLETED').length
@@ -269,7 +272,7 @@ function HistoryDialog({ carrier, onClose }: { carrier: RoutineCarrier<Task>; on
                 <div className={cn('flex h-6 w-6 items-center justify-center rounded-full', record.status === 'COMPLETED' ? 'bg-status-done/15 text-status-done' : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)]')}>
                   {record.status === 'COMPLETED' ? <Check className="h-3.5 w-3.5" /> : <X className="h-3.5 w-3.5" />}
                 </div>
-                <div className="min-w-0 flex-1"><div className="text-sm text-[var(--text-primary)]">{new Date(`${record.scheduledDate}T12:00:00`).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}</div><div className="text-[11px] text-[var(--text-secondary)]">{timeLabel(record.scheduledMinutes)}</div></div>
+                <div className="min-w-0 flex-1"><div className="text-sm text-[var(--text-primary)]">{formatDateChip(new Date(`${record.scheduledDate}T12:00:00`), true, new Date(), dateFormat)}</div><div className="text-[11px] text-[var(--text-secondary)]">{formatMinutesOfDay(record.scheduledMinutes, dateFormat)}</div></div>
                 <span className="text-[11px] font-medium capitalize text-[var(--text-secondary)]">{record.status.toLowerCase().replace('_', ' ')}</span>
               </div>
             ))}

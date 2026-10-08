@@ -16,7 +16,10 @@ import { api } from '@/lib/api'
 import { NULL_DATE } from '@/lib/constants'
 import { replacePendingTokens } from '@/lib/image-tokens'
 import { parse, recurrenceToVikunja } from '@/lib/task-parser'
-import { dateOnlyDue, parsedDue, toLocalDate } from '@/lib/due-dates'
+import { dateOnlyDue, isDateOnly, parsedDue, toLocalDate } from '@/lib/due-dates'
+import { formatDateChip } from '@/lib/date-utils'
+import type { DateFormat } from '@/lib/date-display'
+import { useDateFormat } from '@/hooks/use-date-format'
 import { buildCreateExtras } from '@/lib/composer-queue'
 import { isTempTaskId } from '@/lib/pending-cache'
 import { useTaskParser } from '@/hooks/use-task-parser'
@@ -72,9 +75,10 @@ function dateOnlyIso(date: Date): string {
   return dateOnlyDue(toLocalDate(date))
 }
 
-function shortDate(value: string): string {
+/** The date button's label: the weekday date, plus the time when the due date has one. */
+function shortDate(value: string, fmt: DateFormat): string {
   if (!value || value === NULL_DATE) return 'Date'
-  return new Date(value).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+  return formatDateChip(new Date(value), isDateOnly(value), new Date(), fmt)
 }
 
 function ActionButton({ active, label, children, onClick, buttonRef, popup, expanded }: {
@@ -115,6 +119,7 @@ export function NewTaskComposer({
   className,
 }: NewTaskComposerProps) {
   const parser = useTaskParser()
+  const dateFormat = useDateFormat()
   const { data: labels = [] } = useLabels()
   const { data: projects } = useProjects()
   // The composer reports failures inline (and keeps what the user typed), so no global toast.
@@ -169,8 +174,8 @@ export function NewTaskComposer({
 
   const contextChips = useMemo<ChipData[]>(() => {
     if (!defaultDueDate || defaultDateDismissed || dateTouched || parser.parseResult?.dueDate) return []
-    return [{ type: 'date', label: shortDate(dateOnlyIso(defaultDueDate)), key: 'context-date' }]
-  }, [defaultDueDate, defaultDateDismissed, dateTouched, parser.parseResult?.dueDate])
+    return [{ type: 'date', label: shortDate(dateOnlyIso(defaultDueDate), dateFormat), key: 'context-date' }]
+  }, [defaultDueDate, defaultDateDismissed, dateTouched, parser.parseResult?.dueDate, dateFormat])
 
   const closeAndReset = () => {
     attachments.forEach((attachment) => { if (attachment.blobUrl) URL.revokeObjectURL(attachment.blobUrl) })
@@ -471,7 +476,7 @@ export function NewTaskComposer({
       <div className="flex flex-wrap items-center gap-0.5 pb-2 pl-[46px] pr-4">
         <div className="relative">
           <ActionButton buttonRef={dateButtonRef} popup="dialog" expanded={openPicker === 'date'} active={effectiveDueDate !== NULL_DATE || repeatAfter > 0} label="Date and repeat" onClick={() => setOpenPicker(openPicker === 'date' ? null : 'date')}>
-            <CalendarDays className="h-3.5 w-3.5" /> {shortDate(effectiveDueDate)}
+            <CalendarDays className="h-3.5 w-3.5" /> {shortDate(effectiveDueDate, dateFormat)}
           </ActionButton>
           {openPicker === 'date' && <DatePickerPopover anchorRef={dateButtonRef} currentDate={effectiveDueDate} onDateChange={(value) => { setDateTouched(true); setExplicitDueDate(value) }} repeatAfter={repeatAfter} repeatMode={repeatMode} onRecurrenceChange={(after, mode) => { setRecurrenceTouched(true); setRepeatAfter(after); setRepeatMode(mode) }} onClose={() => setOpenPicker(null)} />}
         </div>

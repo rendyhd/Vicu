@@ -6,6 +6,7 @@ import { TokenChip, buildChips } from './TokenChip'
 import { AutocompleteDropdown } from './AutocompleteDropdown'
 import type { AutocompleteHandle } from './AutocompleteDropdown'
 import { cn } from '@/lib/cn'
+import { useDateFormat } from '@/hooks/use-date-format'
 import type { ChipData } from './TokenChip'
 
 interface AutocompleteItem {
@@ -61,6 +62,7 @@ export function TaskInputParser({
   contextChips,
   onDismissContextChip,
 }: TaskInputParserProps) {
+  const dateFormat = useDateFormat()
   const autocompleteRef = useRef<AutocompleteHandle>(null)
   const internalInputRef = useRef<HTMLInputElement | HTMLTextAreaElement>(null)
   const [cursorPosition, setCursorPosition] = useState(0)
@@ -165,7 +167,7 @@ export function TaskInputParser({
     setCursorPosition((e.target as HTMLInputElement | HTMLTextAreaElement).selectionStart ?? 0)
   }, [])
 
-  const chips = parseResult ? buildChips(parseResult) : []
+  const chips = parseResult ? buildChips(parseResult, dateFormat) : []
   const hasTokens = enabled && parseResult && parseResult.tokens.length > 0
 
   return (

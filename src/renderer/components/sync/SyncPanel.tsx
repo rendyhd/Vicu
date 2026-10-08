@@ -5,6 +5,8 @@ import { api } from '@/lib/api'
 import { refreshTasks } from '@/lib/task-refresh'
 import { confirmDelete } from '@/lib/confirm-bridge'
 import { toast } from '@/stores/toast-store'
+import { formatAbsoluteDateTime } from '@/lib/date-utils'
+import { useDateFormat } from '@/hooks/use-date-format'
 import { useOfflineStore } from '@/stores/offline-store'
 import { useUIStore } from '@/stores/ui-store'
 import type { OfflineFailedItemView, OfflineFailureReason } from '../../../shared/offline-queue-types'
@@ -31,11 +33,6 @@ export function failureReasonLabel(reason: OfflineFailureReason): string {
   }
 }
 
-function formatWhen(iso: string): string {
-  const date = new Date(iso)
-  return Number.isNaN(date.getTime()) ? '' : date.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
-}
-
 function FailedRow({
   item,
   busy,
@@ -47,6 +44,7 @@ function FailedRow({
   onRetry: () => void
   onDiscard: () => void
 }) {
+  const fmt = useDateFormat()
   return (
     <li className="flex flex-col gap-1 border-b border-[var(--border-color)] px-4 py-2.5 last:border-b-0">
       <div className="flex items-start gap-2">
@@ -79,7 +77,7 @@ function FailedRow({
       {item.reason === 'other-account' && item.error && (
         <p className="break-words text-[11px] text-[var(--text-secondary)]">{item.error}</p>
       )}
-      <p className="text-caption text-[var(--text-secondary)] opacity-70">{formatWhen(item.failedAt)}</p>
+      <p className="text-caption text-[var(--text-secondary)] opacity-70">{formatAbsoluteDateTime(item.failedAt, fmt)}</p>
     </li>
   )
 }

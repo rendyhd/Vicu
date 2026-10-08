@@ -31,6 +31,7 @@ const DEFAULT_CONFIG: AppConfig = {
   api_token: '',
   inbox_project_id: 0,
   theme: 'system',
+  clock_format: 'system',
   subtask_display: 'inside_task',
   review: {
     enabled: true,
@@ -119,6 +120,7 @@ export function normalizeConfig(raw: Record<string, unknown>): AppConfig {
     theme: raw.theme === 'light' || raw.theme === 'dark' || raw.theme === 'system'
       ? raw.theme
       : DEFAULT_CONFIG.theme,
+    clock_format: raw.clock_format === '12h' || raw.clock_format === '24h' ? raw.clock_format : 'system',
     window_bounds: isWindowBounds(raw.window_bounds) ? raw.window_bounds : undefined,
     sidebar_width: typeof raw.sidebar_width === 'number' ? raw.sidebar_width : undefined,
     custom_lists: Array.isArray(raw.custom_lists) ? raw.custom_lists as AppConfig['custom_lists'] : undefined,

@@ -15,6 +15,9 @@ declare global {
       getPendingCount(): Promise<number>
       getQueueCounts(): Promise<{ pending: number; failed: number }>
       getConfig(): Promise<QuickViewConfig | null>
+      // The locale and clock dates are phrased with (system locale, Settings clock choice).
+      getDateFormat(): Promise<{ locale: string; hour12: boolean }>
+      onDateFormatChanged(callback: (format: { locale: string; hour12: boolean }) => void): void
       onShowWindow(callback: () => void): void
       onHideWindow(callback: () => void): void
       onSyncCompleted(callback: () => void): void
@@ -63,6 +66,8 @@ import { sanitizeTaskHtml } from '@/lib/sanitize-html'
 import { taskPatch, type TaskPatch } from '@/lib/merge-patches'
 import { diffLocalDays, dueToday, isDateOnly, isNoDueDate, toLocalDate } from '@/lib/due-dates'
 import { followColorScheme } from '@/lib/theme'
+import { formatDateDisplay } from '@/lib/date-display'
+import { getDateFormat, initDateFormat, subscribeDateFormat } from '@/lib/date-format'
 import {
   hasRichDescriptionBody,
   plainTextFromDescriptionLines,
@@ -180,7 +185,8 @@ function updateSelection(newIndex: number): void {
 }
 
 // Buckets follow the local calendar date (cross-app semantics v1): a task due at 08:00 today
-// is still "Today" at 10:00 and becomes overdue tomorrow. Date-only values show no time.
+// is still "Today" at 10:00 and becomes overdue tomorrow. The text is the `row` phrasing of the
+// contract (section 8): "Yesterday", "3 days ago", "Fri", "27 Sep", with the time when it has one.
 function formatDueDate(dueDateStr: string | null | undefined): { label: string; cssClass: string } | null {
   if (isNoDueDate(dueDateStr)) return null
 
@@ -188,33 +194,8 @@ function formatDueDate(dueDateStr: string | null | undefined): { label: string; 
   const now = new Date()
   const diffDays = diffLocalDays(toLocalDate(now), toLocalDate(due))
 
-  let label: string
-  let cssClass: string
-
-  if (diffDays < 0) {
-    label = diffDays === -1 ? 'Yesterday' : `${-diffDays} days overdue`
-    cssClass = 'overdue'
-  } else if (diffDays === 0) {
-    label = 'Today'
-    cssClass = 'today'
-  } else if (diffDays === 1) {
-    label = 'Tomorrow'
-    cssClass = 'upcoming'
-  } else {
-    if (diffDays <= 6) {
-      const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
-      label = days[due.getDay()]
-    } else {
-      const month = due.toLocaleString('default', { month: 'short' })
-      label = `${month} ${due.getDate()}`
-      if (due.getFullYear() !== now.getFullYear()) label += `, ${due.getFullYear()}`
-    }
-    cssClass = 'upcoming'
-  }
-
-  if (diffDays >= -1 && !isDateOnly(dueDateStr as string)) {
-    label += ` ${due.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}`
-  }
+  const label = formatDateDisplay('row', due, now, isDateOnly(dueDateStr as string), getDateFormat())
+  const cssClass = diffDays < 0 ? 'overdue' : diffDays === 0 ? 'today' : 'upcoming'
 
   return { label, cssClass }
 }
@@ -720,6 +701,13 @@ window.quickViewApi.onSyncCompleted(async () => {
 // When settings change in the main app, drop the cached fetch so the next
 // show fetches fresh tasks with the updated viewer_filter.
 window.quickViewApi.onConfigChanged(() => {
+  lastFetchTime = 0
+})
+
+// Dates follow the system locale and the Settings clock choice. A change drops the cached list so
+// the next show draws the due dates again with the new format.
+void initDateFormat(window.quickViewApi)
+subscribeDateFormat(() => {
   lastFetchTime = 0
 })
 

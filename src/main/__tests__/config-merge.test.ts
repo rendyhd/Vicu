@@ -67,6 +67,7 @@ function userConfig(overrides: Partial<AppConfig> = {}): AppConfig {
 
 const PREFERENCE_KEYS = [
   'theme',
+  'clock_format',
   'window_bounds',
   'sidebar_width',
   'quick_entry_enabled',
@@ -345,6 +346,13 @@ describe('applyConfigPatch (D-CFG-2)', () => {
     expect(off.routines_enabled).toBe(false)
     expect(off.routines_in_today).toBe(false)
     expect(normalizeConfig({ ...off }).routines_enabled).toBe(false)
+  })
+
+  it('keeps the clock choice, and anything else means the system clock', () => {
+    expect(normalizeConfig({}).clock_format).toBe('system')
+    expect(applyConfigPatch(userConfig(), { clock_format: '24h' }).clock_format).toBe('24h')
+    expect(applyConfigPatch(userConfig(), { clock_format: '12h' }).clock_format).toBe('12h')
+    expect(applyConfigPatch(userConfig({ clock_format: '24h' }), { clock_format: 'sundial' }).clock_format).toBe('system')
   })
 
   it('normalizes values (invalid types fall back to defaults)', () => {

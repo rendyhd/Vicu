@@ -17,6 +17,9 @@ declare global {
       fetchTaskAttachments(taskId: number): Promise<{ success: boolean; data?: Array<{ id: number }>; error?: string; statusCode?: number }>
       updateTask(taskId: number, task: Record<string, unknown>): Promise<{ success: boolean; error?: string; statusCode?: number; data?: unknown }>
       closeWindow(): Promise<void>
+      // The locale and clock dates are phrased with (system locale, Settings clock choice).
+      getDateFormat(): Promise<{ locale: string; hour12: boolean }>
+      onDateFormatChanged(callback: (format: { locale: string; hour12: boolean }) => void): void
       // The note's final link when saving with it linked; the uid is written into the note then.
       resolveObsidianLink(): Promise<{ deepLink: string; noteName: string; isUidBased: boolean } | null>
       setHeight(height: number): Promise<void>
@@ -62,7 +65,8 @@ interface QuickEntryConfig {
 import { parse, getParserConfig, recurrenceToVikunja, extractBangToday } from '../lib/task-parser'
 import { dueToday, parsedDue } from '../lib/due-dates'
 import { followColorScheme } from '../lib/theme'
-import { formatClockTime } from '../lib/date-utils'
+import { formatDateChip } from '../lib/date-utils'
+import { initDateFormat, subscribeDateFormat } from '../lib/date-format'
 import type { ParseResult, ParserConfig, ParsedToken, TokenType } from '../lib/task-parser'
 import { getClipboardImages, fileToUint8Array } from '../lib/clipboard-images'
 import { AutocompleteDropdown } from './autocomplete'
@@ -420,8 +424,7 @@ function renderParsePreview(result: ParseResult): void {
   const chips: string[] = []
 
   if (result.dueDate) {
-    const day = formatDateLabel(result.dueDate)
-    const label = result.dueHasTime ? `${day} ${formatClockTime(result.dueDate)}` : day
+    const label = formatDateChip(result.dueDate, !result.dueHasTime)
     chips.push(`<span class="parse-chip parse-chip-date">${escapeHtml(label)}<button class="parse-chip-dismiss" data-type="date">&times;</button></span>`)
   }
   if (result.priority !== null && result.priority > 0) {
@@ -449,20 +452,6 @@ function renderParsePreview(result: ParseResult): void {
     parsePreview.innerHTML = ''
     parsePreview.classList.add('hidden')
   }
-}
-
-function formatDateLabel(date: Date): string {
-  const now = new Date()
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-  const target = new Date(date.getFullYear(), date.getMonth(), date.getDate())
-  const diffDays = Math.round((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
-  if (diffDays === 0) return 'Today'
-  if (diffDays === 1) return 'Tomorrow'
-  if (diffDays === -1) return 'Yesterday'
-  if (diffDays > 1 && diffDays <= 7) {
-    return target.toLocaleDateString(undefined, { weekday: 'long' })
-  }
-  return target.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 }
 
 // --- Image staging ---
@@ -915,6 +904,12 @@ window.quickEntryApi.onBrowserContext((ctx) => {
   browserContext = { url: ctx.url, title: ctx.title, displayTitle: ctx.displayTitle }
   browserLinked = ctx.mode === 'always'
   updateBrowserUI()
+})
+
+// Dates follow the system locale and the Settings clock choice; main sends them and any change.
+void initDateFormat(window.quickEntryApi)
+subscribeDateFormat(() => {
+  if (lastParseResult) renderParsePreview(lastParseResult)
 })
 
 // Load config on startup

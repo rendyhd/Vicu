@@ -7,6 +7,9 @@ import { useDayKey } from '@/stores/day-store'
 import { splitTodayOverdue } from '@/lib/today-overdue'
 import { TaskList } from '@/components/task-list/TaskList'
 import { TaskRow } from '@/components/task-list/TaskRow'
+import { DueDateContextProvider } from '@/components/task-list/TaskDueBadge'
+import { useDateFormat } from '@/hooks/use-date-format'
+import { formatDateDisplay } from '@/lib/date-display'
 import { api } from '@/lib/api'
 import { showRoutinesInToday, type Task } from '@/lib/vikunja-types'
 import { useAppConfig } from '@/hooks/use-app-config'
@@ -84,11 +87,9 @@ export function TodayView() {
     )
   )
 
-  const dateStr = new Date().toLocaleDateString('en-US', {
-    weekday: 'long',
-    month: 'long',
-    day: 'numeric',
-  })
+  const dateFormat = useDateFormat()
+  const now = new Date()
+  const dateStr = formatDateDisplay('header.full', now, now, true, dateFormat)
 
   if (isLoading) {
     return (
@@ -99,62 +100,64 @@ export function TodayView() {
   }
 
   return (
-    <TaskList
-      title="Today"
-      tasks={[]}
-      projectId={inboxProjectId}
-      showNewTask={!!inboxProjectId && projects?.flat.some((project) => project.id === inboxProjectId)}
-      defaultDueDate={today}
-      headerContent={<p className="px-6 pb-3 text-xs text-[var(--text-secondary)]">{dateStr}</p>}
-      emptyTitle="All clear for today"
-      emptySubtitle="Tasks due today will appear here"
-    >
-      {routinesShown && <RoutineTodaySection hideFinished />}
-      {overdueTasks.length > 0 && (
-        <div>
-          <div className="px-6 pb-1 pt-2">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-status-overdue">
-              Overdue
-            </span>
-          </div>
-          {overdueGroups.map((group) => (
-            <div key={group.name}>
-              <div className="px-6 pb-0.5 pt-1.5">
-                <span className="text-caption font-medium tracking-wide text-[var(--text-secondary)]">
-                  {group.name}
-                </span>
-              </div>
-              {group.tasks.map((task) => (
-                <TaskRow key={task.id} task={task} />
-              ))}
-            </div>
-          ))}
-        </div>
-      )}
-
-      {todayTasks.length > 0 && (
-        <div>
-          {overdueTasks.length > 0 && (
-            <div className="px-6 pb-1 pt-3">
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
-                Today
+    <DueDateContextProvider value="row.inToday">
+      <TaskList
+        title="Today"
+        tasks={[]}
+        projectId={inboxProjectId}
+        showNewTask={!!inboxProjectId && projects?.flat.some((project) => project.id === inboxProjectId)}
+        defaultDueDate={today}
+        headerContent={<p className="px-6 pb-3 text-xs text-[var(--text-secondary)]">{dateStr}</p>}
+        emptyTitle="All clear for today"
+        emptySubtitle="Tasks due today will appear here"
+      >
+        {routinesShown && <RoutineTodaySection hideFinished />}
+        {overdueTasks.length > 0 && (
+          <div>
+            <div className="px-6 pb-1 pt-2">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-status-overdue">
+                Overdue
               </span>
             </div>
-          )}
-          {todayGroups.map((group) => (
-            <div key={group.name}>
-              <div className="px-6 pb-0.5 pt-1.5">
-                <span className="text-caption font-medium tracking-wide text-[var(--text-secondary)]">
-                  {group.name}
+            {overdueGroups.map((group) => (
+              <div key={group.name}>
+                <div className="px-6 pb-0.5 pt-1.5">
+                  <span className="text-caption font-medium tracking-wide text-[var(--text-secondary)]">
+                    {group.name}
+                  </span>
+                </div>
+                {group.tasks.map((task) => (
+                  <TaskRow key={task.id} task={task} />
+                ))}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {todayTasks.length > 0 && (
+          <div>
+            {overdueTasks.length > 0 && (
+              <div className="px-6 pb-1 pt-3">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
+                  Today
                 </span>
               </div>
-              {group.tasks.map((task) => (
-                <TaskRow key={task.id} task={task} />
-              ))}
-            </div>
-          ))}
-        </div>
-      )}
-    </TaskList>
+            )}
+            {todayGroups.map((group) => (
+              <div key={group.name}>
+                <div className="px-6 pb-0.5 pt-1.5">
+                  <span className="text-caption font-medium tracking-wide text-[var(--text-secondary)]">
+                    {group.name}
+                  </span>
+                </div>
+                {group.tasks.map((task) => (
+                  <TaskRow key={task.id} task={task} />
+                ))}
+              </div>
+            ))}
+          </div>
+        )}
+      </TaskList>
+    </DueDateContextProvider>
   )
 }

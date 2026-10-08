@@ -1,20 +1,8 @@
 import type { ParseResult, ParsedToken } from '@/lib/task-parser'
-import { formatClockTime } from '@/lib/date-utils'
+import { formatDateChip } from '@/lib/date-utils'
+import type { DateFormat } from '@/lib/date-display'
 import { useIsDark } from '@/hooks/use-is-dark'
-
-function formatDateLabel(date: Date): string {
-  const now = new Date()
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-  const target = new Date(date.getFullYear(), date.getMonth(), date.getDate())
-  const diffDays = Math.round((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
-  if (diffDays === 0) return 'Today'
-  if (diffDays === 1) return 'Tomorrow'
-  if (diffDays === -1) return 'Yesterday'
-  if (diffDays > 1 && diffDays <= 7) {
-    return target.toLocaleDateString(undefined, { weekday: 'long' })
-  }
-  return target.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
-}
+import { useDateFormat } from '@/hooks/use-date-format'
 
 const priorityLabels = ['', 'Low', 'Medium', 'High', 'Urgent']
 
@@ -48,13 +36,13 @@ interface NlpParsePreviewProps {
 }
 
 export function NlpParsePreview({ result }: NlpParsePreviewProps) {
+  const dateFormat = useDateFormat()
   const chips: Array<{ key: string; label: string; className: string }> = []
 
   if (result.dueDate) {
-    const day = formatDateLabel(result.dueDate)
     chips.push({
       key: 'date',
-      label: result.dueHasTime ? `${day} ${formatClockTime(result.dueDate)}` : day,
+      label: formatDateChip(result.dueDate, !result.dueHasTime, new Date(), dateFormat),
       className: chipStyles.date,
     })
   }
