@@ -14,6 +14,7 @@ import { useReviewNoticeStore } from '@/stores/review-notice-store'
 import { ProjectBranch } from '@/components/review/ProjectBranch'
 import { SmartListIcon } from '@/components/shared/SmartListIcon'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { ReadingScroll } from '@/components/layout/ReadingScroll'
 import type { Project } from '@/lib/vikunja-types'
 
 type Tab = 'due' | 'all'
@@ -244,6 +245,7 @@ export function ReviewView() {
           </span>
         }
       />
+      <div className="mx-auto w-full max-w-reading shrink-0 pr-[var(--scrollbar-size)]">
       <div className="px-6 pb-3.5" style={{ borderBottom: '1px solid var(--border-color)' }}>
         {/* Tabs */}
         <div style={{ display: 'flex', gap: 6, marginTop: 12 }} role="tablist">
@@ -272,13 +274,14 @@ export function ReviewView() {
           </span>
         </div>
       </div>
+      </div>
 
       {/* Tree list */}
-      <div className="custom-scrollbar" style={{ flex: 1, overflowY: 'auto', padding: '8px 16px 24px' }}>
+      <ReadingScroll columnClassName="flex flex-col px-4 pb-6 pt-2">
         {isLoading && <div className="px-2 py-4 text-sm text-[var(--text-secondary)]">Loading…</div>}
 
         {allCaughtUp && (
-          <div className="flex h-full flex-col items-center justify-center px-6 py-12 text-center">
+          <div className="flex flex-1 flex-col items-center justify-center px-6 py-12 text-center">
             <RefreshCw className="mb-3 h-12 w-12" style={{ color: 'var(--accent-green)' }} />
             <p style={{ fontSize: 20, fontWeight: 600, color: 'var(--text-primary)' }}>All reviewed</p>
             <p className="mt-1 max-w-sm" style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
@@ -288,7 +291,7 @@ export function ReviewView() {
         )}
 
         {!isLoading && !allCaughtUp && currentTree.length === 0 && (
-          <div className="flex h-full flex-col items-center justify-center px-6 py-12 text-center">
+          <div className="flex flex-1 flex-col items-center justify-center px-6 py-12 text-center">
             <p style={{ fontSize: 15, fontWeight: 500, color: 'var(--text-primary)' }}>No tracked projects</p>
             <p className="mt-1 max-w-sm" style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
               Projects appear here once review tracking is enabled in Settings.
@@ -310,7 +313,7 @@ export function ReviewView() {
               onFocus={setFocusedId}
             />
           ))}
-      </div>
+      </ReadingScroll>
 
       {/* Error notice: failed saves must not pass silently */}
       {errorNotice && (

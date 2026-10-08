@@ -11,6 +11,8 @@
  * them move to roles.
  */
 :root {
+  /* Width of the list scrollbar; a page header outside a scroll area keeps this much clear on its right so it lines up with the rows inside. */
+  --scrollbar-size: 6px;
   --bg-secondary: #F5F5F7;
   --bg-tertiary: #E8E8ED;
 }
@@ -80,7 +82,7 @@
 /* Thin overlay scrollbar — light mode */
 .custom-scrollbar::-webkit-scrollbar,
 .overflow-y-auto::-webkit-scrollbar {
-  width: 6px;
+  width: var(--scrollbar-size);
 }
 
 .custom-scrollbar::-webkit-scrollbar-track,

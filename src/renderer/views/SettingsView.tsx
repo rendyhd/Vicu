@@ -7,6 +7,7 @@ import { cn } from '@/lib/cn'
 import { Checkbox } from '@/components/shared/Checkbox'
 import { Button } from '@/components/shared/Button'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { ReadingScroll } from '@/components/layout/ReadingScroll'
 import { applyTheme } from '@/lib/theme'
 import { TokenPermissionsInfo } from '@/views/SetupView'
 import { QuickEntrySettings } from '@/components/settings/QuickEntrySettings'
@@ -215,8 +216,8 @@ export function SettingsView() {
   }
 
   return (
-    <div className="flex h-full flex-col overflow-y-auto bg-[var(--bg-primary)]">
-      <PageHeader title="Settings" />
+    <ReadingScroll className="bg-[var(--bg-primary)]" columnClassName="flex flex-col">
+      <PageHeader title="Settings" inScroll />
 
       {/* Tab bar */}
       <div className="flex gap-1 border-b border-[var(--border-color)] px-6">
@@ -708,6 +709,6 @@ export function SettingsView() {
         )}
       </div>
       ) : null}
-    </div>
+    </ReadingScroll>
   )
 }

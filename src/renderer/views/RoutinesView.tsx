@@ -21,6 +21,7 @@ import {
 import { RoutineTodaySection } from '@/components/routines/RoutineTodaySection'
 import { SmartListIcon } from '@/components/shared/SmartListIcon'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { ReadingScroll } from '@/components/layout/ReadingScroll'
 import { Button } from '@/components/shared/Button'
 import { useRoutineHistory, useRoutines, type RoutineDraft } from '@/hooks/use-routines'
 import {
@@ -345,7 +346,7 @@ function RoutinesContent() {
         }
       />
 
-      <div className="min-h-0 flex-1 overflow-y-auto pb-10">
+      <ReadingScroll columnClassName="pb-10">
         <div>
           <RoutineTodaySection showEmpty />
 
@@ -383,7 +384,7 @@ function RoutinesContent() {
           {exportError && <div className="mx-6 mt-5 rounded-card border border-danger/30 bg-danger/10 px-4 py-3 text-xs text-danger">{exportError}</div>}
           {routines.error && <div className="mx-6 mt-5 rounded-card border border-danger/30 bg-danger/10 px-4 py-3 text-xs text-danger">{routines.error instanceof Error ? routines.error.message : 'Could not update routines'}</div>}
         </div>
-      </div>
+      </ReadingScroll>
 
       {editor && <RoutineEditor carrier={editor === 'new' ? undefined : editor} busy={routines.isMutating} onClose={() => setEditor(null)} onSave={(draft) => editor === 'new' ? routines.createRoutine.mutate(draft, { onSuccess: () => setEditor(null) }) : routines.updateRoutine.mutate({ carrier: editor, draft }, { onSuccess: () => setEditor(null) })} />}
       {history && <HistoryDialog carrier={history} onClose={() => setHistory(null)} />}

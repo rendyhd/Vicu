@@ -21,6 +21,7 @@ import { NewTaskComposer } from './NewTaskComposer'
 import { taskDescendants, unfinishedDescendants } from '@/lib/task-hierarchy'
 import { confirmTaskCompletion } from '@/lib/task-completion'
 import { SmartListIcon } from '@/components/shared/SmartListIcon'
+import { ReadingScroll } from '@/components/layout/ReadingScroll'
 import type { SmartListId } from '@/lib/smart-list-identity'
 
 interface TaskListProps {
@@ -169,8 +170,9 @@ export function TaskList({
   const handleScrollAreaClick = useCallback(
     (e: React.MouseEvent) => {
       const target = e.target as HTMLElement
-      // Only collapse when clicking the scroll container itself (empty space below tasks)
-      if (target === e.currentTarget) {
+      // Only collapse when clicking empty space: the scroll container itself (beside the column) or
+      // the reading column inside it (below the tasks).
+      if (target === e.currentTarget || target.parentElement === e.currentTarget) {
         collapseAll()
         setFocusedTask(null)
         clearSelection()
@@ -490,11 +492,7 @@ export function TaskList({
         }
       />
 
-      <div
-        ref={listRef}
-        className="flex-1 overflow-y-auto"
-        onClick={handleScrollAreaClick}
-      >
+      <ReadingScroll ref={listRef} onClick={handleScrollAreaClick}>
         {headerContent}
 
         {isAdding && addPosition === 'top' && taskInputElement}
@@ -546,7 +544,7 @@ export function TaskList({
         {children}
 
         {newTaskPlacement === 'after-children' && endOfList}
-      </div>
+      </ReadingScroll>
     </div>
   )
 }
