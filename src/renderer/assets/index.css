@@ -29,6 +29,50 @@
   --bg-sidebar: rgba(255, 255, 255, 0.02);
 }
 
+/*
+ * Focus (card 1.5). One ring for every control a keyboard can reach: 2 px focus-ring, 2 px
+ * outside. Rows sit in a clipped list and touch their neighbours, so their ring goes inside.
+ * A control that draws its own focus state (a borderless text field inside a bar) says so with
+ * focus:outline-none; a bordered field takes the ring and has no focus border of its own.
+ */
+:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+[data-task-id]:focus-visible,
+[role="row"]:focus-visible,
+[role="option"]:focus-visible,
+[role="menuitem"]:focus-visible {
+  outline-offset: -2px;
+}
+
+/*
+ * Reduced motion base layer (card 1.5). Under prefers-reduced-motion: reduce nothing moves, grows
+ * or slides: transitions are limited to colour and opacity and last at most --dur-fade-fast, a
+ * spinner becomes a slow fade, and smooth scrolling is off. Transforms still apply, instantly.
+ */
+@keyframes vicu-fade-pulse {
+  50% {
+    opacity: 0.4;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, opacity !important;
+    transition-duration: var(--dur-fade-fast) !important;
+    transition-delay: 0s !important;
+    scroll-behavior: auto !important;
+  }
+
+  .animate-spin {
+    animation: vicu-fade-pulse 1.5s ease-in-out infinite;
+  }
+}
+
 /* Thin overlay scrollbar — light mode */
 .custom-scrollbar::-webkit-scrollbar,
 .overflow-y-auto::-webkit-scrollbar {

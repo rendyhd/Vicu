@@ -289,7 +289,7 @@ export function SettingsView() {
                   value={url}
                   onChange={(e) => setUrl(e.target.value)}
                   placeholder="https://vikunja.example.com"
-                  className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)] focus:border-accent-blue focus:outline-none"
+                  className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]"
                 />
               </div>
 
@@ -304,7 +304,7 @@ export function SettingsView() {
                     value={token}
                     onChange={(e) => setToken(e.target.value)}
                     placeholder="Enter your API token"
-                    className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 pr-16 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)] focus:border-accent-blue focus:outline-none"
+                    className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 pr-16 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]"
                   />
                   <button
                     type="button"
@@ -435,7 +435,7 @@ export function SettingsView() {
               <select
                 value={inboxProjectId}
                 onChange={(e) => { const id = Number(e.target.value); setInboxProjectId(id); handleQuickEntryChange({ inbox_project_id: id }) }}
-                className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] focus:border-accent-blue focus:outline-none"
+                className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)]"
               >
                 <option value={0}>Select a project...</option>
                 {projects.map((p) => (

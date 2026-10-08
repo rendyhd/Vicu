@@ -137,10 +137,10 @@ export function HotkeyRecorder({ value, onChange, defaultValue, warning }: Hotke
         readOnly
         value={recording ? '' : formatAcceleratorForDisplay(value)}
         placeholder={recording ? 'Press keys...' : undefined}
-        className={`flex-1 rounded-control border px-3 py-2 text-sm focus:outline-none ${
+        className={`flex-1 rounded-control border px-3 py-2 text-sm ${
           warning
             ? 'border-status-today bg-[var(--bg-secondary)] text-[var(--text-primary)]'
-            : 'border-[var(--border-color)] bg-[var(--bg-secondary)] text-[var(--text-primary)] focus:border-accent-blue'
+            : 'border-[var(--border-color)] bg-[var(--bg-secondary)] text-[var(--text-primary)]'
         }`}
       />
       <button

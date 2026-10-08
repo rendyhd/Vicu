@@ -619,7 +619,7 @@ function TaskRowInner({ task, nestedDepth = 0, parentProjectId, drag }: Omit<Tas
                 if (canExpandSubtasks) setSubtasksExpanded((expanded) => !expanded)
               }}
               className={cn(
-                'flex items-center gap-0.5 text-caption text-[var(--text-secondary)]',
+                'flex min-h-6 min-w-6 items-center justify-center gap-0.5 text-caption text-[var(--text-secondary)]',
                 canExpandSubtasks && 'rounded-control px-0.5 hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]',
               )}
               aria-label={`${progress.completed} of ${progress.total} subtasks complete`}
@@ -643,7 +643,8 @@ function TaskRowInner({ task, nestedDepth = 0, parentProjectId, drag }: Omit<Tas
                 toggleExpandedTask(task.id)
                 setActivePopover('attachment')
               }}
-              className="text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+              className="relative text-[var(--text-secondary)] after:absolute after:-inset-1.5 after:content-[''] hover:text-[var(--text-primary)]"
+              aria-label="Attachments"
             >
               <Paperclip className="h-3 w-3" />
             </button>
@@ -709,7 +710,7 @@ function TaskRowInner({ task, nestedDepth = 0, parentProjectId, drag }: Omit<Tas
             aria-haspopup="dialog"
             aria-expanded={activePopover === 'attachment'}
             onClick={() => togglePopover('attachment')}
-            className="shrink-0 text-[var(--text-secondary)]"
+            className="relative shrink-0 text-[var(--text-secondary)] after:absolute after:-inset-1.5 after:content-['']"
             title="Attachments"
           >
             <Paperclip className="h-3.5 w-3.5" />
@@ -784,7 +785,7 @@ function TaskRowInner({ task, nestedDepth = 0, parentProjectId, drag }: Omit<Tas
               aria-expanded={activePopover === 'date'}
               onClick={() => togglePopover('date')}
               className={cn(
-                'flex h-6 w-6 items-center justify-center rounded-control transition-colors',
+                'flex h-7 w-7 items-center justify-center rounded-control transition-colors',
                 activePopover === 'date'
                   ? 'bg-accent-blue/10 text-[var(--accent-blue)]'
                   : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]'
@@ -813,7 +814,7 @@ function TaskRowInner({ task, nestedDepth = 0, parentProjectId, drag }: Omit<Tas
               aria-expanded={activePopover === 'priority'}
               onClick={() => togglePopover('priority')}
               className={cn(
-                'flex h-6 w-6 items-center justify-center rounded-control transition-colors',
+                'flex h-7 w-7 items-center justify-center rounded-control transition-colors',
                 activePopover === 'priority'
                   ? 'bg-accent-blue/10 text-[var(--accent-blue)]'
                   : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]'
@@ -839,7 +840,7 @@ function TaskRowInner({ task, nestedDepth = 0, parentProjectId, drag }: Omit<Tas
               aria-expanded={activePopover === 'label'}
               onClick={() => togglePopover('label')}
               className={cn(
-                'flex h-6 w-6 items-center justify-center rounded-control transition-colors',
+                'flex h-7 w-7 items-center justify-center rounded-control transition-colors',
                 activePopover === 'label'
                   ? 'bg-accent-blue/10 text-[var(--accent-blue)]'
                   : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]'
@@ -860,7 +861,7 @@ function TaskRowInner({ task, nestedDepth = 0, parentProjectId, drag }: Omit<Tas
             type="button"
             onClick={() => togglePopover('subtasks')}
             className={cn(
-              'flex h-6 w-6 items-center justify-center rounded-control transition-colors',
+              'flex h-7 w-7 items-center justify-center rounded-control transition-colors',
               activePopover === 'subtasks'
                 ? 'bg-accent-blue/10 text-[var(--accent-blue)]'
                 : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]'
@@ -877,7 +878,7 @@ function TaskRowInner({ task, nestedDepth = 0, parentProjectId, drag }: Omit<Tas
               aria-expanded={activePopover === 'reminder'}
               onClick={() => togglePopover('reminder')}
               className={cn(
-                'flex h-6 w-6 items-center justify-center rounded-control transition-colors',
+                'flex h-7 w-7 items-center justify-center rounded-control transition-colors',
                 activePopover === 'reminder'
                   ? 'bg-accent-blue/10 text-[var(--accent-blue)]'
                   : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]'
@@ -903,7 +904,7 @@ function TaskRowInner({ task, nestedDepth = 0, parentProjectId, drag }: Omit<Tas
               aria-expanded={activePopover === 'attachment'}
               onClick={() => togglePopover('attachment')}
               className={cn(
-                'flex h-6 w-6 items-center justify-center rounded-control transition-colors',
+                'flex h-7 w-7 items-center justify-center rounded-control transition-colors',
                 activePopover === 'attachment' || (task.attachments?.length ?? 0) > 0
                   ? 'bg-accent-blue/10 text-[var(--accent-blue)]'
                   : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]'
@@ -929,7 +930,7 @@ function TaskRowInner({ task, nestedDepth = 0, parentProjectId, drag }: Omit<Tas
               aria-expanded={activePopover === 'project'}
               onClick={() => togglePopover('project')}
               className={cn(
-                'flex h-6 w-6 items-center justify-center rounded-control transition-colors',
+                'flex h-7 w-7 items-center justify-center rounded-control transition-colors',
                 activePopover === 'project'
                   ? 'bg-accent-blue/10 text-[var(--accent-blue)]'
                   : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]'
@@ -955,7 +956,7 @@ function TaskRowInner({ task, nestedDepth = 0, parentProjectId, drag }: Omit<Tas
               aria-expanded={activePopover === 'info'}
               onClick={() => togglePopover('info')}
               className={cn(
-                'flex h-6 w-6 items-center justify-center rounded-control transition-colors',
+                'flex h-7 w-7 items-center justify-center rounded-control transition-colors',
                 activePopover === 'info'
                   ? 'bg-accent-blue/10 text-[var(--accent-blue)]'
                   : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]'
@@ -985,7 +986,7 @@ function TaskRowInner({ task, nestedDepth = 0, parentProjectId, drag }: Omit<Tas
                 collapseAll()
               }
             }}
-            className="flex h-6 w-6 items-center justify-center rounded-control text-[var(--text-secondary)] transition-colors hover:bg-danger/10 hover:text-danger"
+            className="flex h-7 w-7 items-center justify-center rounded-control text-[var(--text-secondary)] transition-colors hover:bg-danger/10 hover:text-danger"
             title="Delete task"
           >
             <Trash2 className="h-3.5 w-3.5" />

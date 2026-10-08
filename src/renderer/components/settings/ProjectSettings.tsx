@@ -85,18 +85,18 @@ function ProjectEditor({
         <div className="space-y-4 p-5">
           <div>
             <label className="mb-1 block text-xs text-[var(--text-secondary)]">Name</label>
-            <input autoFocus value={title} onChange={(event) => setTitle(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') save() }} className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] focus:border-accent-blue focus:outline-none" />
+            <input autoFocus value={title} onChange={(event) => setTitle(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') save() }} className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)]" />
           </div>
           <div>
             <label className="mb-1 block text-xs text-[var(--text-secondary)]">Parent project</label>
-            <select value={parentId} onChange={(event) => setParentId(Number(event.target.value))} className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] focus:border-accent-blue focus:outline-none">
+            <select value={parentId} onChange={(event) => setParentId(Number(event.target.value))} className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)]">
               <option value={0}>None</option>
               {parentOptions.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}
             </select>
           </div>
           <div>
             <label className="mb-1 block text-xs text-[var(--text-secondary)]">Color</label>
-            <input value={hexColor} onChange={(event) => setHexColor(event.target.value)} placeholder="#3498db" className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] focus:border-accent-blue focus:outline-none" />
+            <input value={hexColor} onChange={(event) => setHexColor(event.target.value)} placeholder="#3498db" className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)]" />
           </div>
           {mutation.error && <p className="text-xs text-danger">{mutation.error.message}</p>}
         </div>

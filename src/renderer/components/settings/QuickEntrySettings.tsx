@@ -203,7 +203,7 @@ export function QuickEntrySettings({ config, projects, onChange, hotkeyWarnings 
                   <select
                     value={defaultProjectAvailable ? configuredDefaultProjectId : 0}
                     onChange={(e) => onChange({ quick_entry_default_project_id: Number(e.target.value) })}
-                    className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] focus:border-accent-blue focus:outline-none"
+                    className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)]"
                   >
                     <option value={0}>Select a project...</option>
                     {projects.map((p) => (
@@ -246,7 +246,7 @@ export function QuickEntrySettings({ config, projects, onChange, hotkeyWarnings 
                         if (e.target.value) addSecondaryProject(Number(e.target.value))
                         e.target.value = ''
                       }}
-                      className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-1.5 text-xs text-[var(--text-secondary)] focus:border-accent-blue focus:outline-none"
+                      className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-1.5 text-xs text-[var(--text-secondary)]"
                     >
                       <option value="">Add a project...</option>
                       {projects
@@ -342,7 +342,7 @@ export function QuickEntrySettings({ config, projects, onChange, hotkeyWarnings 
                         }
                       }
                     }}
-                    className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] focus:border-accent-blue focus:outline-none"
+                    className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)]"
                   >
                     <option value="0">All projects</option>
                     <optgroup label="Views">

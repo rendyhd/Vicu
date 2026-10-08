@@ -93,10 +93,8 @@ export function LinkDialog({
           placeholder="https://example.com"
           className={cn(
             'mb-1 w-full rounded-control border bg-[var(--bg-primary)] px-3 py-1.5 text-sm text-[var(--text-primary)]',
-            'placeholder:text-[var(--text-secondary)] focus:outline-none focus:ring-1',
-            error
-              ? 'border-danger focus:ring-danger'
-              : 'border-[var(--border-color)] focus:ring-[var(--accent-blue)]',
+            'placeholder:text-[var(--text-secondary)]',
+            error ? 'border-danger' : 'border-[var(--border-color)]',
           )}
         />
         {error && (

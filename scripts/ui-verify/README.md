@@ -104,7 +104,9 @@ real. E4 covers the popover primitive (card 1.3): the pickers stay inside the wi
 focus return, all nine pickers by mouse and keyboard, the nested Repeat panel, the composer and
 context-menu pickers, scrolling and transformed ancestors. E13 asserts behaviour the app fails until
 its card lands (offset highlights). The others are stubs that log `skip: not implemented yet` until
-their card fills them in.
+their card fills them in. `keyboard-tab` (id KT, card 1.5) Tabs through Today with the real keyboard and
+asserts the focus ring on every stop, the 20 px checkbox with its 24 px hit area (`elementFromPoint`
+11 px from the centre), 24 px row buttons, 28 px toolbar buttons and the reduced-motion base layer.
 Scenario code computes dates from the run day (`lib.mjs`: `localDate`, `comingWeekday`, `at`).
 
 The helpers on `h`:

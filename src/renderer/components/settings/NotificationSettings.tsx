@@ -82,7 +82,7 @@ export function NotificationSettings({ config, onChange }: NotificationSettingsP
                 type="time"
                 value={config.notifications_daily_reminder_time || '08:00'}
                 onChange={(e) => onChange({ notifications_daily_reminder_time: e.target.value })}
-                className="rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-2 py-1 text-sm text-[var(--text-primary)] focus:border-accent-blue focus:outline-none"
+                className="rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-2 py-1 text-sm text-[var(--text-primary)]"
               />
             </div>
           </div>
@@ -103,7 +103,7 @@ export function NotificationSettings({ config, onChange }: NotificationSettingsP
                 type="time"
                 value={config.notifications_secondary_reminder_time || '16:00'}
                 onChange={(e) => onChange({ notifications_secondary_reminder_time: e.target.value })}
-                className="rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-2 py-1 text-sm text-[var(--text-primary)] focus:border-accent-blue focus:outline-none"
+                className="rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-2 py-1 text-sm text-[var(--text-primary)]"
               />
             </div>
           </div>
@@ -210,7 +210,7 @@ export function NotificationSettings({ config, onChange }: NotificationSettingsP
               <select
                 value={offsetDropdownValue}
                 onChange={(e) => handleOffsetChange(Number(e.target.value))}
-                className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-2 py-1.5 text-sm text-[var(--text-primary)] focus:border-accent-blue focus:outline-none"
+                className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-2 py-1.5 text-sm text-[var(--text-primary)]"
               >
                 {OFFSET_OPTIONS.map((opt) => (
                   <option key={opt.value} value={opt.value}>
@@ -230,7 +230,7 @@ export function NotificationSettings({ config, onChange }: NotificationSettingsP
                         | 'end_date',
                     })
                   }
-                  className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-2 py-1.5 text-sm text-[var(--text-primary)] focus:border-accent-blue focus:outline-none"
+                  className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-2 py-1.5 text-sm text-[var(--text-primary)]"
                 >
                   <option value="due_date">Relative to due date</option>
                   <option value="start_date">Relative to start date</option>

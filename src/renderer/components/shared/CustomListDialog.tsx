@@ -150,7 +150,7 @@ export function CustomListDialog({ open, list, onSave, onClose }: CustomListDial
               onChange={(e) => setName(e.target.value)}
               placeholder="My List"
               autoFocus
-              className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)] focus:border-accent-blue focus:outline-none"
+              className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]"
               onKeyDown={(e) => {
                 if (e.key === 'Enter') handleSave()
               }}
@@ -162,7 +162,7 @@ export function CustomListDialog({ open, list, onSave, onClose }: CustomListDial
             <select
               value={icon}
               onChange={(event) => setIcon(event.target.value)}
-              className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)] focus:border-accent-blue focus:outline-none"
+              className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)]"
             >
               {ICON_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
             </select>
@@ -175,7 +175,7 @@ export function CustomListDialog({ open, list, onSave, onClose }: CustomListDial
               <select
                 value={filter.sort_by}
                 onChange={(e) => setFilter((f) => ({ ...f, sort_by: e.target.value }))}
-                className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] focus:border-accent-blue focus:outline-none"
+                className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)]"
               >
                 {SORT_OPTIONS.map((o) => (
                   <option key={o.value} value={o.value}>{o.label}</option>
@@ -187,7 +187,7 @@ export function CustomListDialog({ open, list, onSave, onClose }: CustomListDial
               <select
                 value={filter.order_by}
                 onChange={(e) => setFilter((f) => ({ ...f, order_by: e.target.value as 'asc' | 'desc' }))}
-                className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] focus:border-accent-blue focus:outline-none"
+                className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)]"
               >
                 <option value="asc">Ascending</option>
                 <option value="desc">Descending</option>
@@ -201,7 +201,7 @@ export function CustomListDialog({ open, list, onSave, onClose }: CustomListDial
             <select
               value={filter.due_date_filter}
               onChange={(e) => setFilter((f) => ({ ...f, due_date_filter: e.target.value as CustomListFilter['due_date_filter'] }))}
-              className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] focus:border-accent-blue focus:outline-none"
+              className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)]"
             >
               {DUE_DATE_OPTIONS.map((o) => (
                 <option key={o.value} value={o.value}>{o.label}</option>
@@ -279,7 +279,7 @@ export function CustomListDialog({ open, list, onSave, onClose }: CustomListDial
             <select
               value={filter.add_to_project_id ?? 0}
               onChange={(e) => setFilter((current) => ({ ...current, add_to_project_id: Number(e.target.value) }))}
-              className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] focus:border-accent-blue focus:outline-none"
+              className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)]"
             >
               <option value={0}>Inbox</option>
               {allProjects.map((project) => (

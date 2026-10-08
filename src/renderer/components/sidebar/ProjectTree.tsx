@@ -82,7 +82,7 @@ function ProjectDialog({
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Project name"
               autoFocus
-              className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)] focus:border-accent-blue focus:outline-none"
+              className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]"
               onKeyDown={(e) => {
                 if (e.key === 'Enter') handleSave()
               }}
@@ -115,7 +115,7 @@ function ProjectDialog({
                 value={hexColor}
                 onChange={(e) => setHexColor(e.target.value)}
                 placeholder="#hex"
-                className="flex-1 rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-1.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)] focus:border-accent-blue focus:outline-none"
+                className="flex-1 rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-1.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]"
               />
               {hexColor && (
                 <button

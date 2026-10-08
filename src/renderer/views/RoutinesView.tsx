@@ -32,7 +32,7 @@ import { isRoutinesEnabled, type Task } from '@/lib/vikunja-types'
 import { useAppConfig } from '@/hooks/use-app-config'
 import { cn } from '@/lib/cn'
 
-const FIELD = 'h-9 w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 text-sm text-[var(--text-primary)] outline-none transition focus:border-accent-blue'
+const FIELD = 'h-9 w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 text-sm text-[var(--text-primary)] transition'
 const LABEL = 'mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-[var(--text-secondary)]'
 const COLORS = ['#AF52DE', '#007AFF', '#34C759', '#FF9500', '#FF3B30', '#5AC8FA']
 const WEEKDAYS = [

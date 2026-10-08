@@ -303,7 +303,7 @@ export function SetupView({ onComplete }: SetupViewProps) {
                   value={url}
                   onChange={(e) => setUrl(e.target.value)}
                   placeholder="https://app.vikunja.cloud"
-                  className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-text-secondary/50 focus:border-accent-blue focus:outline-none"
+                  className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-text-secondary/50"
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && !discovering) handleUrlContinue()
                   }}
@@ -426,7 +426,7 @@ export function SetupView({ onComplete }: SetupViewProps) {
                   inputMode="numeric"
                   autoComplete="one-time-code"
                   autoFocus
-                  className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2 text-center text-lg tracking-widest text-[var(--text-primary)] placeholder:text-text-secondary/50 focus:border-accent-blue focus:outline-none"
+                  className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2 text-center text-lg tracking-widest text-[var(--text-primary)] placeholder:text-text-secondary/50"
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && totpCode.length === 6) {
                       handleOidcLogin(selectedOidcProvider, totpCode)
@@ -482,7 +482,7 @@ export function SetupView({ onComplete }: SetupViewProps) {
                   onChange={(e) => setUsername(e.target.value)}
                   placeholder="Enter your username or email"
                   autoComplete="username"
-                  className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-text-secondary/50 focus:border-accent-blue focus:outline-none"
+                  className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-text-secondary/50"
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && username && password) handlePasswordLogin()
                   }}
@@ -500,7 +500,7 @@ export function SetupView({ onComplete }: SetupViewProps) {
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="Enter your password"
                     autoComplete="current-password"
-                    className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2 pr-16 text-sm text-[var(--text-primary)] placeholder:text-text-secondary/50 focus:border-accent-blue focus:outline-none"
+                    className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2 pr-16 text-sm text-[var(--text-primary)] placeholder:text-text-secondary/50"
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' && username && password) handlePasswordLogin()
                     }}
@@ -559,7 +559,7 @@ export function SetupView({ onComplete }: SetupViewProps) {
                   placeholder="000000"
                   inputMode="numeric"
                   autoComplete="one-time-code"
-                  className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2 text-center text-lg tracking-widest text-[var(--text-primary)] placeholder:text-text-secondary/50 focus:border-accent-blue focus:outline-none"
+                  className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2 text-center text-lg tracking-widest text-[var(--text-primary)] placeholder:text-text-secondary/50"
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && totpCode.length === 6) handlePasswordLogin(totpCode)
                   }}
@@ -623,7 +623,7 @@ export function SetupView({ onComplete }: SetupViewProps) {
                     value={token}
                     onChange={(e) => setToken(e.target.value)}
                     placeholder="Enter your API token"
-                    className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2 pr-16 text-sm text-[var(--text-primary)] placeholder:text-text-secondary/50 focus:border-accent-blue focus:outline-none"
+                    className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2 pr-16 text-sm text-[var(--text-primary)] placeholder:text-text-secondary/50"
                   />
                   <button
                     type="button"
@@ -686,7 +686,7 @@ export function SetupView({ onComplete }: SetupViewProps) {
                 <select
                   value={inboxProjectId}
                   onChange={(e) => setInboxProjectId(Number(e.target.value))}
-                  className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)] focus:border-accent-blue focus:outline-none"
+                  className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)]"
                 >
                   <option value={0}>Select a project...</option>
                   {projects.map((p) => (

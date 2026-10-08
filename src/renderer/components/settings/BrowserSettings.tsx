@@ -59,7 +59,7 @@ export function BrowserSettings({ config, onChange, disabled }: BrowserSettingsP
             <select
               value={mode}
               onChange={(e) => onChange({ browser_link_mode: e.target.value as 'off' | 'ask' | 'always' })}
-              className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] focus:border-accent-blue focus:outline-none"
+              className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)]"
             >
               <option value="off">Off</option>
               <option value="ask">Ask ({window.api.platform === 'darwin' ? '\u2318L' : 'Ctrl+L'})</option>
@@ -76,7 +76,7 @@ export function BrowserSettings({ config, onChange, disabled }: BrowserSettingsP
                   value={config.browser_extension_id ?? ''}
                   onChange={(e) => onChange({ browser_extension_id: e.target.value })}
                   placeholder="For instant detection — leave blank to use auto-detect"
-                  className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)] focus:border-accent-blue focus:outline-none"
+                  className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]"
                 />
               </div>
 

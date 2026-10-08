@@ -361,7 +361,7 @@ function AddTaskInline({ projectId }: { projectId: number }) {
       onBlur={() => {
         if (!title.trim()) setAdding(false)
       }}
-      className="mt-1 w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-primary)] px-2.5 py-1.5 text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-secondary)] focus:outline-none"
+      className="mt-1 w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-primary)] px-2.5 py-1.5 text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]"
     />
   )
 }

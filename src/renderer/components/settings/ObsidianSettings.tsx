@@ -48,7 +48,7 @@ export function ObsidianSettings({ config, onChange, disabled }: ObsidianSetting
             <select
               value={mode}
               onChange={(e) => onChange({ obsidian_mode: e.target.value as 'off' | 'ask' | 'always' })}
-              className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] focus:border-accent-blue focus:outline-none"
+              className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)]"
             >
               <option value="off">Off</option>
               <option value="ask">Ask ({window.api.platform === 'darwin' ? '\u2318L' : 'Ctrl+L'})</option>
@@ -100,7 +100,7 @@ export function ObsidianSettings({ config, onChange, disabled }: ObsidianSetting
                     value={config.obsidian_api_key ?? ''}
                     onChange={(e) => onChange({ obsidian_api_key: e.target.value })}
                     placeholder="Obsidian > Settings > Local REST API > Copy API Key"
-                    className="flex-1 rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)] focus:border-accent-blue focus:outline-none"
+                    className="flex-1 rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]"
                   />
                   <button
                     type="button"
@@ -119,7 +119,7 @@ export function ObsidianSettings({ config, onChange, disabled }: ObsidianSetting
                   value={config.obsidian_vault_name ?? ''}
                   onChange={(e) => onChange({ obsidian_vault_name: e.target.value })}
                   placeholder="Shown in Obsidian's title bar"
-                  className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)] focus:border-accent-blue focus:outline-none"
+                  className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]"
                 />
               </div>
 
@@ -129,7 +129,7 @@ export function ObsidianSettings({ config, onChange, disabled }: ObsidianSetting
                   type="number"
                   value={config.obsidian_port ?? 27124}
                   onChange={(e) => onChange({ obsidian_port: Number(e.target.value) || 27124 })}
-                  className="w-32 rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] focus:border-accent-blue focus:outline-none"
+                  className="w-32 rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)]"
                 />
               </div>
 
