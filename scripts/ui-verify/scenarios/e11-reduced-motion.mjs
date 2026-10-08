@@ -1,7 +1,9 @@
-// E11 (card 4.2, completion half): with prefers-reduced-motion the completion hold keeps the same
-// timing, the checkbox and the strike only fade (no scale, no drawing, no overshoot) and the row closes
-// with a fade and no height animation.
+// E11: E1 and E7 with --motion reduce.
+// View half (card 4.6): changing views is a cross-fade only, no rise, no travelling pill.
+// Completion half (card 4.2): the completion hold keeps the same timing, the checkbox and the strike
+// only fade (no scale, no drawing, no overshoot) and the row closes with a fade and no height animation.
 import { HOLD_MS, checkboxOf, makeTasks, openToday, pointerAway, removeTasks, rowGoneAt, rowOf, readAnimations, recordAnimations } from './_completion.mjs'
+import { mouseSwitch } from './_view-switch.mjs'
 
 export const meta = {
   id: 'E11',
@@ -11,7 +13,12 @@ export const meta = {
 
 export default async function run(h) {
   await h.resize(1280, 820)
+  await h.setMotion('reduce')
+  await h.assert('prefers-reduced-motion is emulated as reduce', () => h.page.evaluate(() => matchMedia('(prefers-reduced-motion: reduce)').matches))
+  await mouseSwitch(h, h.page, { full: false })
+  await h.setMotion('full')
   await h.dismiss()
+
   const ids = await makeTasks(h, ['E11 reduce A'])
   try {
     const [a] = ids
