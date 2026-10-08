@@ -1,5 +1,5 @@
 import { Checkbox } from '@/components/shared/Checkbox'
-import { useMemo, useState } from 'react'
+import { useId, useMemo, useState } from 'react'
 import { formatDateChip, formatMinutesOfDay } from '@/lib/date-utils'
 import { useDateFormat } from '@/hooks/use-date-format'
 import { ListSectionHeader } from '@/components/task-list/ListSectionHeader'
@@ -23,6 +23,7 @@ import { SmartListIcon } from '@/components/shared/SmartListIcon'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { ReadingScroll } from '@/components/layout/ReadingScroll'
 import { Button } from '@/components/shared/Button'
+import { Dialog } from '@/components/overlay/Dialog'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { useRoutineHistory, useRoutines, type RoutineDraft } from '@/hooks/use-routines'
 import {
@@ -93,22 +94,21 @@ function draftFor(carrier: RoutineCarrier<Task>): RoutineDraft {
   }
 }
 
+/** A routine dialog on the Dialog primitive: modal, Escape and the backdrop close it, focus returns to the opener. */
 function DialogFrame({ title, children, onClose }: { title: string; children: React.ReactNode; onClose: () => void }) {
+  const titleId = useId()
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-6" onMouseDown={onClose}>
-      <div
-        className="flex max-h-[88vh] w-full max-w-xl flex-col overflow-hidden rounded-card border border-[var(--border-color)] bg-[var(--bg-primary)] shadow-2xl"
-        onMouseDown={(event) => event.stopPropagation()}
-      >
+    <Dialog open onClose={onClose} labelledBy={titleId} className="w-[calc(100%-3rem)] max-w-xl">
+      <div className="flex max-h-[88vh] flex-col overflow-hidden">
         <header className="flex h-14 shrink-0 items-center border-b border-[var(--border-color)] px-5">
-          <h2 className="flex-1 text-base font-semibold text-[var(--text-primary)]">{title}</h2>
-          <button type="button" onClick={onClose} className="rounded-control p-1.5 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]">
+          <h2 id={titleId} className="flex-1 text-base font-semibold text-[var(--text-primary)]">{title}</h2>
+          <button type="button" onClick={onClose} aria-label="Close" className="rounded-control p-1.5 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]">
             <X className="h-4 w-4" />
           </button>
         </header>
         {children}
       </div>
-    </div>
+    </Dialog>
   )
 }
 
@@ -156,7 +156,7 @@ function RoutineEditor({
 
           <div>
             <label className={LABEL}>Name</label>
-            <input autoFocus className={FIELD} value={draft.name} placeholder={draft.kind === 'HEALTH' ? 'Creatine' : 'Take out the trash'} onChange={(event) => setDraft({ ...draft, name: event.target.value })} />
+            <input data-autofocus className={FIELD} value={draft.name} placeholder={draft.kind === 'HEALTH' ? 'Creatine' : 'Take out the trash'} onChange={(event) => setDraft({ ...draft, name: event.target.value })} />
           </div>
 
           {draft.kind === 'HEALTH' && (

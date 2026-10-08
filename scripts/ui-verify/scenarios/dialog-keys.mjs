@@ -118,5 +118,35 @@ export default async function run(h) {
   await h.wait(250)
   await h.assert('Escape closes it', async () => (await modalState(page)).count === 0)
   await h.assert('focus returns to the New list button', async () => page.evaluate(() => document.activeElement?.getAttribute('aria-label') === 'New list'))
+
+  // ---- C. The project dialog (a former hand-rolled overlay) -----------------------------------
+  await h.dismiss()
+  await h.goto('/today')
+  const projectRow = page.locator('[role="button"][tabindex="0"]', { hasText: 'Personal' }).first()
+  if (await projectRow.count()) {
+    await projectRow.click({ button: 'right' })
+    await h.wait(300)
+    await page.locator('[role="menu"] [role="menuitem"]', { hasText: 'Edit' }).first().click()
+    await h.wait(350)
+    s = await modalState(page)
+    await h.assert('Edit on a sidebar project opens a modal dialog named "Edit Project"', { ok: s.count === 1 && /edit project/i.test(s.label ?? ''), detail: JSON.stringify(s) })
+    await h.assert('focus starts in the name field and the close button has a name', async () => {
+      const f = await page.evaluate(() => ({
+        tag: document.activeElement?.tagName,
+        ph: document.activeElement?.getAttribute('placeholder'),
+        close: !!document.querySelector('dialog[open] button[aria-label="Close"]'),
+      }))
+      return { ok: f.tag === 'INPUT' && f.ph === 'Project name' && f.close, detail: JSON.stringify(f) }
+    })
+    await h.capture('project-dialog')
+    await h.key('Escape')
+    await h.wait(250)
+    await h.assert('Escape closes it and focus returns to the project row', async () => {
+      const back = await page.evaluate(() => (document.activeElement?.textContent ?? '').includes('Personal'))
+      return { ok: (await modalState(page)).count === 0 && back }
+    })
+  } else {
+    h.emit({ t: 'skip', id: 'DK', message: 'no sidebar project row found for the project dialog check' })
+  }
   await page.evaluate(() => window.api.saveConfigPatch({ confirm_before_delete: false }))
 }

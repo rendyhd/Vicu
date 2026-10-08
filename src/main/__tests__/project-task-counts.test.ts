@@ -105,6 +105,28 @@ describe('project task counts', () => {
     expect(await counts.count(2, false)).toEqual({ success: true, data: 4 })
   })
 
+  it('does not let the carrier list asked for before a global invalidation join or replace a newer one', async () => {
+    const { counts, carrierCounts } = setup({ totals: { '1:true': 5, '2:true': 7 } })
+    const empty: ApiResult<ReadonlyMap<number, number>> = { success: true, data: new Map() }
+    const withNew: ApiResult<ReadonlyMap<number, number>> = { success: true, data: new Map([[1, 1], [2, 1]]) }
+    let releaseOld: () => void = () => {}
+    carrierCounts.mockImplementationOnce(() => new Promise((resolve) => { releaseOld = () => resolve(empty) }))
+    carrierCounts.mockImplementationOnce(async () => withNew)
+
+    const old = counts.count(1, true)
+    // A carrier was created: everything is dropped, including the carrier list that is on its way.
+    counts.invalidate()
+    expect(await counts.count(1, true)).toEqual({ success: true, data: 4 })
+    expect(carrierCounts).toHaveBeenCalledTimes(2)
+
+    // The old list arrives last. It answers its own caller but is not kept for later questions.
+    releaseOld()
+    expect(await old).toEqual({ success: true, data: 5 })
+    expect(await counts.count(2, true)).toEqual({ success: true, data: 6 })
+    expect(carrierCounts).toHaveBeenCalledTimes(2)
+    expect(await counts.count(1, true)).toEqual({ success: true, data: 4 })
+  })
+
   it('does not cache failures, and shows a count with unknown carriers without caching it', async () => {
     const { counts, fetchTotal } = setup({ totals: {} })
     expect((await counts.count(1, true)).success).toBe(false)

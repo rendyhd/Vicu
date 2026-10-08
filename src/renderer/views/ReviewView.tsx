@@ -230,7 +230,7 @@ export function ReviewView() {
               fontWeight: 600,
               padding: '2px 8px',
               borderRadius: 999,
-              background: 'rgba(175,82,222,0.15)',
+              background: 'rgb(var(--accent-purple-rgb) / 0.15)',
               color: 'var(--accent-purple)',
               fontVariantNumeric: 'tabular-nums',
             }}
@@ -312,7 +312,7 @@ export function ReviewView() {
       {errorNotice && (
         <div
           role="alert"
-          className="absolute left-1/2 -translate-x-1/2"
+          className="absolute left-1/2 -translate-x-1/2 shadow-lg"
           style={{
             bottom: 20,
             display: 'flex',
@@ -323,7 +323,6 @@ export function ReviewView() {
             borderRadius: 8,
             background: 'var(--bg-secondary)',
             border: '1px solid var(--accent-red)',
-            boxShadow: '0 8px 24px rgba(0,0,0,0.18)',
             fontSize: 13,
             color: 'var(--text-primary)',
             zIndex: 31,
@@ -363,7 +362,7 @@ function TabButton({
       className={cn('flex items-center gap-1.5 rounded-control px-3 py-1 text-section transition-colors')}
       style={
         active
-          ? { background: 'rgba(175,82,222,0.15)', color: 'var(--accent-purple)', fontWeight: 600 }
+          ? { background: 'rgb(var(--accent-purple-rgb) / 0.15)', color: 'var(--accent-purple)', fontWeight: 600 }
           : { background: 'transparent', color: 'var(--text-secondary)', fontWeight: 500 }
       }
     >

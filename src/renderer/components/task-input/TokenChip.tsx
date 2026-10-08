@@ -4,16 +4,12 @@ import { parseChips, type ChipData } from '@/lib/parse-chips'
 import { motionMs, motionSpringCurve, travelStart } from '@/lib/motion'
 import { readReducedMotion } from '@/hooks/use-reduced-motion'
 import { priorityMark } from '../../../shared/priority-mark-svg'
+import { TOKEN_CHIP_CLASSES } from '@/lib/token-chip-colors'
 
-// Match Quick Entry colors: green=date, orange=label, blue=project, purple=recurrence. A priority
-// chip takes the colour role of its level (the same as the priority mark and Quick Entry's chip).
-const chipStyles: Record<string, string> = {
-  date: 'bg-[rgba(34,197,94,0.12)] text-[#16a34a] dark:bg-[rgba(34,197,94,0.2)] dark:text-[#4ade80]',
-  priority: '',
-  label: 'bg-[rgba(249,115,22,0.12)] text-[#ea580c] dark:bg-[rgba(249,115,22,0.2)] dark:text-[#fb923c]',
-  project: 'bg-[rgba(59,130,246,0.12)] text-[#2563eb] dark:bg-[rgba(59,130,246,0.2)] dark:text-[#60a5fa]',
-  recurrence: 'bg-[rgba(168,85,247,0.12)] text-[#9333ea] dark:bg-[rgba(168,85,247,0.2)] dark:text-[#c084fc]',
-}
+// Green=date, orange=label, blue=project, purple=recurrence, as roles of the design tokens
+// (lib/token-chip-colors.ts). A priority chip takes the colour role of its level (the same as the
+// priority mark and Quick Entry's chip).
+const chipStyles: Record<string, string> = { ...TOKEN_CHIP_CLASSES, priority: '' }
 
 export type { ChipData }
 

@@ -179,8 +179,8 @@ export const AutocompleteDropdown = forwardRef<AutocompleteHandle, AutocompleteD
 
     const typeLabel = itemType === 'project' ? 'project' : 'label'
     const colorMap = {
-      project: 'bg-[rgba(59,130,246,0.08)] dark:bg-[rgba(59,130,246,0.15)]',
-      label: 'bg-[rgba(249,115,22,0.08)] dark:bg-[rgba(249,115,22,0.15)]',
+      project: 'bg-accent-blue/8 dark:bg-accent-blue/15',
+      label: 'bg-accent-orange/8 dark:bg-accent-orange/15',
     }
 
     // The anchor is an empty box at the start of the word, as tall as the input. A textarea (the

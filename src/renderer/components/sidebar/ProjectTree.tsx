@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useId, useMemo } from 'react'
 import { Archive, Pencil, Plus, Trash2, X } from 'lucide-react'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { useProjects, type ProjectTreeNode } from '@/hooks/use-projects'
@@ -12,6 +12,8 @@ import { useAppConfig } from '@/hooks/use-app-config'
 import { cn } from '@/lib/cn'
 import { focusTargetOf } from '@/lib/focus-target'
 import { api } from '@/lib/api'
+import { Dialog } from '@/components/overlay/Dialog'
+import { Menu, MenuItem } from '@/components/overlay/Menu'
 import { ProjectTreeItem } from './ProjectTreeItem'
 import type { Project } from '@/lib/vikunja-types'
 
@@ -27,6 +29,7 @@ function ProjectDialog({
   parentProject?: Project | null
   onClose: () => void
 }) {
+  const titleId = useId()
   const [title, setTitle] = useState('')
   const [hexColor, setHexColor] = useState('')
   const createProject = useCreateProject()
@@ -67,17 +70,16 @@ function ProjectDialog({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}>
-      <div
-        className="w-[360px] rounded-card border border-[var(--border-color)] bg-[var(--bg-primary)] shadow-xl"
-      >
+    <Dialog open onClose={onClose} labelledBy={titleId} className="w-[360px]">
+      <div>
         <div className="flex items-center justify-between border-b border-[var(--border-color)] px-5 py-3">
-          <h2 className="text-sm font-semibold text-[var(--text-primary)]">
+          <h2 id={titleId} className="text-sm font-semibold text-[var(--text-primary)]">
             {project ? 'Edit Project' : parentProject ? 'New Section' : 'New Project'}
           </h2>
           <button
             type="button"
             onClick={onClose}
+            aria-label="Close"
             className="rounded-control p-1 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
           >
             <X className="h-4 w-4" />
@@ -92,7 +94,7 @@ function ProjectDialog({
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder={parentProject ? 'Section name' : 'Project name'}
-              autoFocus
+              data-autofocus
               className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]"
               onKeyDown={(e) => {
                 if (e.key === 'Enter') handleSave()
@@ -163,7 +165,7 @@ function ProjectDialog({
           </button>
         </div>
       </div>
-    </div>
+    </Dialog>
   )
 }
 
@@ -196,14 +198,6 @@ export function ProjectTree() {
     () => (inboxProjectId ? data?.tree.filter((n) => n.id !== inboxProjectId) : data?.tree) ?? [],
     [data?.tree, inboxProjectId]
   )
-
-  // Close context menu on click outside
-  useEffect(() => {
-    if (!contextMenu) return
-    const handler = () => setContextMenu(null)
-    window.addEventListener('click', handler)
-    return () => window.removeEventListener('click', handler)
-  }, [contextMenu])
 
   const handleContextMenu = (e: React.MouseEvent, node: ProjectTreeNode) => {
     e.preventDefault()
@@ -258,70 +252,55 @@ export function ProjectTree() {
         </SortableContext>
       </div>
 
-      {/* Context Menu */}
+      {/* Context menu: the Menu primitive at the pointer (arrow keys, Escape, focus return, kept in the window). */}
       {contextMenu && (
-        <div
-          className="fixed z-50 min-w-[140px] rounded-popover border border-[var(--border-color)] bg-[var(--bg-primary)] py-1 shadow-lg"
-          style={{ left: contextMenu.x, top: contextMenu.y }}
+        <Menu
+          key={`${contextMenu.project.id}:${contextMenu.x}:${contextMenu.y}`}
+          anchorPoint={{ x: contextMenu.x, y: contextMenu.y }}
+          label={`${contextMenu.project.title} actions`}
+          onClose={() => setContextMenu(null)}
         >
-          <button
-            type="button"
-            onClick={() => {
+          <MenuItem
+            icon={<Pencil />}
+            onSelect={() => {
               setEditingProject(contextMenu.project)
               setProjectDialogOpen(true)
-              setContextMenu(null)
             }}
-            className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-[var(--text-primary)] hover:bg-[var(--bg-hover)]"
           >
-            <Pencil className="h-3.5 w-3.5" />
             Edit
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setSectionParent(contextMenu.project)
-              setContextMenu(null)
-            }}
-            className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-[var(--text-primary)] hover:bg-[var(--bg-hover)]"
-          >
-            <Plus className="h-3.5 w-3.5" />
+          </MenuItem>
+          <MenuItem icon={<Plus />} onSelect={() => setSectionParent(contextMenu.project)}>
             Add section
-          </button>
+          </MenuItem>
           {contextMenu.project.id !== inboxProjectId && (
             <>
-              <button
-                type="button"
-                onClick={() => {
+              <MenuItem
+                icon={<Archive />}
+                onSelect={() => {
                   setArchiveTarget(contextMenu.project)
                   setArchiveOpener(contextMenu.opener)
-                  setContextMenu(null)
                 }}
-                className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-[var(--text-primary)] hover:bg-[var(--bg-hover)]"
               >
-                <Archive className="h-3.5 w-3.5" />
                 Archive
-              </button>
-              <button
-                type="button"
-                onClick={async () => {
+              </MenuItem>
+              <MenuItem
+                icon={<Trash2 />}
+                danger
+                onSelect={async () => {
                   const project = contextMenu.project
-                  const opener = contextMenu.opener
-                  setContextMenu(null)
                   const ok = await confirmDelete('Delete this project? All tasks in it will be deleted. This cannot be undone.', {
-                    returnFocusTo: opener,
+                    returnFocusTo: contextMenu.opener,
                   })
                   if (ok) {
                     deleteProject.mutate(project.id)
                   }
                 }}
-                className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-danger hover:bg-[var(--bg-hover)]"
               >
-                <Trash2 className="h-3.5 w-3.5" />
                 Delete
-              </button>
+              </MenuItem>
             </>
           )}
-        </div>
+        </Menu>
       )}
 
       <ProjectDialog

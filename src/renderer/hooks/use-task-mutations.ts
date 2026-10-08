@@ -20,6 +20,7 @@ import {
 } from '@/lib/task-hierarchy'
 import { updateTaskDetailDone } from '@/lib/task-detail-cache'
 import { projectPatch, taskPatch } from '@/lib/merge-patches'
+import { rememberRepeatCompletion, repeatUndoPatch, takeRepeatSnapshot } from '@/lib/repeat-undo'
 import {
   addLabelOrQueue,
   createTaskOrQueue,
@@ -581,6 +582,8 @@ export async function completeTaskRequest(task: Task): Promise<Task> {
       completed.push({ task: child, queued: outcome.queued })
     }
     const outcome = await sendTaskPatch(task.id, { done: true }, task.title)
+    // A repeating task comes back open with its next dates: remember how it was, for Undo.
+    rememberRepeatCompletion(task, outcome.task)
     return outcome.task ?? { ...task, done: true }
   } catch (error) {
     await Promise.allSettled(completed.map((entry) => reverseDone(entry, false)))
@@ -601,6 +604,18 @@ export async function uncompleteTaskRequest(task: Task, autoCompleted: readonly 
       if (cancelled.success && cancelled.data) {
         restored.push({ task: item, queued: false })
         return null
+      }
+    }
+    // A repeating task that advanced when it was completed is open already: Undo puts its dates and
+    // reminders back instead (nothing when the user changed them since).
+    const snapshot = takeRepeatSnapshot(item.id)
+    if (snapshot) {
+      const current = await api.fetchTaskById(item.id)
+      if (current.success) {
+        const patch = repeatUndoPatch(snapshot, current.data)
+        if (Object.keys(patch).length === 0) return current.data
+        // Not added to `restored`: if a later step fails, completing this task again would advance it again.
+        return (await sendTaskPatch(item.id, patch, item.title)).task
       }
     }
     const outcome = await sendTaskPatch(item.id, { done: false }, item.title)

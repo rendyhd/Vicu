@@ -1,6 +1,6 @@
 import { Button } from '@/components/shared/Button'
 import { Checkbox } from '@/components/shared/Checkbox'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useId, useMemo, useState } from 'react'
 import { Archive, Folder, Pencil, Plus, RefreshCw, RotateCcw, Trash2, X } from 'lucide-react'
 import { useAppConfig } from '@/hooks/use-app-config'
 import { buildProjectTree, useProjects, type ProjectTreeNode } from '@/hooks/use-projects'
@@ -12,6 +12,7 @@ import {
 } from '@/hooks/use-task-mutations'
 import { useConfirmDelete } from '@/hooks/use-confirm-delete'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
+import { Dialog } from '@/components/overlay/Dialog'
 import { cn } from '@/lib/cn'
 import type { Project } from '@/lib/vikunja-types'
 
@@ -42,6 +43,7 @@ function ProjectEditor({
   projects: Project[]
   onClose: () => void
 }) {
+  const titleId = useId()
   const createProject = useCreateProject()
   const updateProject = useUpdateProject()
   const [title, setTitle] = useState(project?.title ?? '')
@@ -76,18 +78,18 @@ function ProjectEditor({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose() }}>
-      <div className="w-[380px] rounded-card border border-[var(--border-color)] bg-[var(--bg-primary)] shadow-xl">
+    <Dialog open onClose={onClose} labelledBy={titleId} className="w-[380px]">
+      <div>
         <div className="flex items-center justify-between border-b border-[var(--border-color)] px-5 py-3">
-          <h2 className="text-sm font-semibold text-[var(--text-primary)]">{project ? 'Edit Project' : 'New Project'}</h2>
-          <button type="button" onClick={onClose} className="rounded-control p-1 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]">
+          <h2 id={titleId} className="text-sm font-semibold text-[var(--text-primary)]">{project ? 'Edit Project' : 'New Project'}</h2>
+          <button type="button" onClick={onClose} aria-label="Close" className="rounded-control p-1 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]">
             <X className="h-4 w-4" />
           </button>
         </div>
         <div className="space-y-4 p-5">
           <div>
             <label className="mb-1 block text-xs text-[var(--text-secondary)]">Name</label>
-            <input autoFocus value={title} onChange={(event) => setTitle(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') save() }} className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)]" />
+            <input data-autofocus value={title} onChange={(event) => setTitle(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') save() }} className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)]" />
           </div>
           <div>
             <label className="mb-1 block text-xs text-[var(--text-secondary)]">Parent project</label>
@@ -107,7 +109,7 @@ function ProjectEditor({
           <Button variant="primary" onClick={save} disabled={!title.trim() || mutation.isPending}>{mutation.isPending ? 'Saving…' : project ? 'Save' : 'Create'}</Button>
         </div>
       </div>
-    </div>
+    </Dialog>
   )
 }
 

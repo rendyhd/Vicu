@@ -73,7 +73,7 @@ export function SmartListNav() {
               isActive
                 ? 'text-[var(--text-primary)]'
                 : 'text-[var(--text-primary)] hover:bg-[var(--bg-hover)]',
-              reviewActiveBorder && 'border border-[rgba(175,82,222,0.4)]'
+              reviewActiveBorder && 'border border-accent-purple/40'
             )}
           >
             <SmartListIcon list={item.id} className="h-4 w-4" />

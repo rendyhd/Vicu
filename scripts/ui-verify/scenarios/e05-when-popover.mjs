@@ -267,6 +267,30 @@ export default async function run(h) {
     await h.assert('with no date there is nothing to clear', async () => (await popover.getByRole('button', { name: 'Clear date' }).count()) === 0)
     await closeIt()
 
+    // ---- F2. the custom time is applied by Enter, never by leaving the popover ------------------
+    await open()
+    await popover.getByLabel('Custom time').click()
+    await h.type('5pm', { delay: 20 })
+    await h.key('Escape')
+    await h.wait(700)
+    await h.assert('Escape with an unconfirmed custom time closes the popover and saves nothing', async () => {
+      const due = await savedDue((value) => !isNull(value))
+      return { ok: (await popover.count()) === 0 && isNull(due), detail: due }
+    })
+    await open()
+    await popover.getByLabel('Custom time').click()
+    await h.type('5pm', { delay: 20 })
+    await h.key('Enter')
+    await h.wait(500)
+    await h.assert('Enter in the custom time saves the time and keeps the popover open', async () => {
+      const due = await savedDue((value) => !isNull(value))
+      return { ok: (await popover.count()) === 1 && !isNull(due) && parts(due).time === '17:00:00', detail: due }
+    })
+    await closeIt()
+    await open()
+    await popover.getByRole('button', { name: 'Clear date' }).click()
+    await h.wait(500)
+
     // ---- G. reminders --------------------------------------------------------------------------
     const remindersBtn = row.locator('button[data-prop="reminders"]').first()
     const reminders = page.locator(REMINDER_POP)
@@ -282,6 +306,10 @@ export default async function run(h) {
     const before = (await remindersOnServer()).length
     await reminders.locator('[role="group"][aria-label="Quick choices"] button', { hasText: 'Tomorrow' }).click()
     await h.wait(700)
+    await h.assert('after Add the new panel has focus on its text field (no fall to the document)', async () => {
+      const focused = await page.evaluate(() => document.activeElement?.getAttribute('aria-label'))
+      return { ok: focused === 'Date and time' && (await reminders.getByLabel('Date and time').evaluate((el) => el === document.activeElement)), detail: focused }
+    })
     await h.assert('a quick choice adds a reminder at once (one click)', async () => {
       let list = await remindersOnServer()
       for (let i = 0; i < 12 && list.length <= before; i++) {

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { SelectionPill } from './SelectionPill'
 import { useNavigate, useMatches } from '@tanstack/react-router'
 import {
@@ -12,6 +12,7 @@ import { useDndMonitor } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
 import { cn } from '@/lib/cn'
 import { CustomListDialog } from '@/components/shared/CustomListDialog'
+import { Menu, MenuItem } from '@/components/overlay/Menu'
 import type { CustomList } from '@/lib/vikunja-types'
 import {
   useCustomLists,
@@ -111,14 +112,6 @@ export function CustomListNav() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingList, setEditingList] = useState<CustomList | null>(null)
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; list: CustomList } | null>(null)
-
-  // Close context menu on click outside
-  useEffect(() => {
-    if (!contextMenu) return
-    const handler = () => setContextMenu(null)
-    window.addEventListener('click', handler)
-    return () => window.removeEventListener('click', handler)
-  }, [contextMenu])
 
   // Handle custom list reorder via dnd monitor
   useDndMonitor({
@@ -231,33 +224,27 @@ export function CustomListNav() {
         )}
       </nav>
 
-      {/* Context Menu */}
+      {/* Context menu: the Menu primitive at the pointer (arrow keys, Escape, focus return, kept in the window). */}
       {contextMenu && (
-        <div
-          className="fixed z-50 min-w-[140px] rounded-popover border border-[var(--border-color)] bg-[var(--bg-primary)] py-1 shadow-lg"
-          style={{ left: contextMenu.x, top: contextMenu.y }}
+        <Menu
+          key={`${contextMenu.list.id}:${contextMenu.x}:${contextMenu.y}`}
+          anchorPoint={{ x: contextMenu.x, y: contextMenu.y }}
+          label={`${contextMenu.list.name} actions`}
+          onClose={() => setContextMenu(null)}
         >
-          <button
-            type="button"
-            onClick={() => {
+          <MenuItem
+            icon={<Pencil />}
+            onSelect={() => {
               setEditingList(contextMenu.list)
               setDialogOpen(true)
-              setContextMenu(null)
             }}
-            className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-[var(--text-primary)] hover:bg-[var(--bg-hover)]"
           >
-            <Pencil className="h-3.5 w-3.5" />
             Edit
-          </button>
-          <button
-            type="button"
-            onClick={() => handleDelete(contextMenu.list.id)}
-            className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-danger hover:bg-[var(--bg-hover)]"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
+          </MenuItem>
+          <MenuItem icon={<Trash2 />} danger onSelect={() => void handleDelete(contextMenu.list.id)}>
             Delete
-          </button>
-        </div>
+          </MenuItem>
+        </Menu>
       )}
 
       <CustomListDialog

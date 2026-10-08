@@ -183,6 +183,33 @@ describe('completion hold store', () => {
       expect(completionHold.takeUndo()).toEqual([])
     })
 
+    it('survives a burst of other toasts while the pointer is on it, and still expires afterwards', () => {
+      complete(1)
+      vi.advanceTimersByTime(COMPLETION_HOLD_MS)
+      const id = toasts()[0].id
+      useToastStore.getState().engage(id, true)
+      for (let i = 0; i < 6; i++) useToastStore.getState().push('error', `Failure ${i}`)
+      expect(toasts().map((t) => t.message)).toContain('Completed')
+      useToastStore.getState().engage(id, false)
+      vi.advanceTimersByTime(COMPLETION_TOAST_MS)
+      expect(toasts().map((t) => t.message)).not.toContain('Completed')
+    })
+
+    it('an evicted completion toast releases the machine, so the next collapse starts a fresh toast', () => {
+      complete(1)
+      vi.advanceTimersByTime(COMPLETION_HOLD_MS)
+      const id = toasts()[0].id
+      useToastStore.getState().engage(id, true)
+      // Four toasts of the same kind of owner leave nothing else to drop: the oldest goes.
+      for (let i = 0; i < 4; i++) useToastStore.getState().push('info', `Owned ${i}`, { key: `owned-${i}`, durationMs: null })
+      expect(toasts().map((t) => t.message)).not.toContain('Completed')
+      vi.advanceTimersByTime(COMPLETION_TOAST_MS)
+      expect(useCompletionHoldStore.getState().toast).toBeNull()
+      complete(2)
+      vi.advanceTimersByTime(COMPLETION_HOLD_MS)
+      expect(toasts().map((t) => t.message)).toContain('Completed')
+    })
+
     it('a row reopened elsewhere takes the toast away when it was the only one', () => {
       complete(1)
       completionHold.navigate()

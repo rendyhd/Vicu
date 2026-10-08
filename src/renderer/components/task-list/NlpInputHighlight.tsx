@@ -1,22 +1,9 @@
 import type { ParsedToken } from '@/lib/task-parser'
 import { useIsDark } from '@/hooks/use-is-dark'
+import { tokenHighlightBackground } from '@/lib/token-chip-colors'
 
-// Token highlight colours match Quick Entry: green=date, red=priority, orange=label, blue=project, purple=recurrence
-const tokenBgColors: Record<string, string> = {
-  date: 'rgba(34, 197, 94, 0.15)',
-  priority: 'rgba(239, 68, 68, 0.15)',
-  label: 'rgba(249, 115, 22, 0.15)',
-  project: 'rgba(59, 130, 246, 0.15)',
-  recurrence: 'rgba(168, 85, 247, 0.15)',
-}
-
-const tokenBgColorsDark: Record<string, string> = {
-  date: 'rgba(34, 197, 94, 0.25)',
-  priority: 'rgba(239, 68, 68, 0.25)',
-  label: 'rgba(249, 115, 22, 0.25)',
-  project: 'rgba(59, 130, 246, 0.25)',
-  recurrence: 'rgba(168, 85, 247, 0.25)',
-}
+// Token highlight colours: green=date, red=priority, orange=label, blue=project, purple=recurrence,
+// as design token roles (lib/token-chip-colors.ts).
 
 function escapeHtml(str: string): string {
   return str
@@ -36,7 +23,6 @@ export function NlpInputHighlight({ value, tokens, multiline = false }: NlpInput
   const isDark = useIsDark()
   if (!tokens.length) return null
 
-  const colors = isDark ? tokenBgColorsDark : tokenBgColors
   const sorted = [...tokens].sort((a, b) => a.start - b.start)
   const parts: Array<{ text: string; bg?: string; type?: string }> = []
   let pos = 0
@@ -47,7 +33,7 @@ export function NlpInputHighlight({ value, tokens, multiline = false }: NlpInput
     }
     parts.push({
       text: value.slice(token.start, token.end),
-      bg: colors[token.type],
+      bg: tokenHighlightBackground(token.type, isDark),
       type: token.type,
     })
     pos = token.end

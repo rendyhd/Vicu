@@ -78,6 +78,15 @@ export function parseTimeText(text: string): string | null {
   return `${pad2(hour)}:${pad2(minute)}`
 }
 
+/**
+ * Whether a blur is focus moving to another control of the same panel. The custom time field
+ * applies what was typed only then (or on Enter): Escape and a press outside also blur the field,
+ * and they must discard the unconfirmed time instead of applying it.
+ */
+export function focusStaysInside(container: { contains(node: unknown): boolean } | null, next: unknown): boolean {
+  return container !== null && next !== null && next !== undefined && container.contains(next)
+}
+
 // --- Value and due date ---------------------------------------------------------------------
 
 /** What a stored due date reads as in the panel. No date, the null date or garbage: nothing picked. */

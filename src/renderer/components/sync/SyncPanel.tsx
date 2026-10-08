@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useId, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { AlertTriangle, LogIn, RefreshCw, X } from 'lucide-react'
 import { api } from '@/lib/api'
@@ -9,6 +9,7 @@ import { formatAbsoluteDateTime } from '@/lib/date-utils'
 import { useDateFormat } from '@/hooks/use-date-format'
 import { useOfflineStore } from '@/stores/offline-store'
 import { useUIStore } from '@/stores/ui-store'
+import { Dialog } from '@/components/overlay/Dialog'
 import type { OfflineFailedItemView, OfflineFailureReason } from '../../../shared/offline-queue-types'
 
 /** Why a change ended up in the failed log, in words the user can act on. */
@@ -94,16 +95,7 @@ export function SyncPanel({ onClose }: { onClose: () => void }) {
   const authProblem = useOfflineStore((s) => s.authProblem)
   const requestReauth = useUIStore((s) => s.requestReauth)
   const [busy, setBusy] = useState(false)
-  const closeRef = useRef<HTMLButtonElement>(null)
-
-  useEffect(() => {
-    closeRef.current?.focus()
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose()
-    }
-    document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
-  }, [onClose])
+  const titleId = useId()
 
   const failed = snapshot?.failed ?? []
   const pending = snapshot?.pending ?? []
@@ -136,17 +128,12 @@ export function SyncPanel({ onClose }: { onClose: () => void }) {
   const syncNow = () => run(() => api.offlineQueue.replayNow().then((r) => (r.success ? { success: true } : r)), 'Could not sync')
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
-      <div
-        role="dialog"
-        aria-label="Sync status"
-        className="mx-4 flex max-h-[80vh] w-full max-w-lg flex-col overflow-hidden rounded-card border border-[var(--border-color)] bg-[var(--bg-primary)] shadow-xl"
-        onClick={(event) => event.stopPropagation()}
-      >
+    <Dialog open onClose={onClose} labelledBy={titleId} className="w-[calc(100%-2rem)] max-w-lg">
+      <div className="flex max-h-[80vh] flex-col overflow-hidden">
         <div className="flex items-center gap-2 border-b border-[var(--border-color)] px-4 py-3">
-          <h2 className="flex-1 text-sm font-semibold text-[var(--text-primary)]">Sync status</h2>
+          <h2 id={titleId} className="flex-1 text-sm font-semibold text-[var(--text-primary)]">Sync status</h2>
           <button
-            ref={closeRef}
+            data-autofocus
             type="button"
             onClick={onClose}
             className="rounded-control p-1 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
@@ -245,6 +232,6 @@ export function SyncPanel({ onClose }: { onClose: () => void }) {
           )}
         </div>
       </div>
-    </div>
+    </Dialog>
   )
 }

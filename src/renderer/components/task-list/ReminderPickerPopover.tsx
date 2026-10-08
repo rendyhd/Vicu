@@ -1,4 +1,4 @@
-import { useState, type RefObject } from 'react'
+import { useEffect, useRef, useState, type RefObject } from 'react'
 import { X } from 'lucide-react'
 import type { Task, TaskReminder } from '@/lib/vikunja-types'
 import { NULL_DATE } from '@/lib/constants'
@@ -30,6 +30,14 @@ export function ReminderPickerPopover({ anchorRef, task, dueDate, reminders: con
   const [staged, setStaged] = useState<WhenValue>(EMPTY_WHEN)
   const [panelKey, setPanelKey] = useState(0)
   const dateFormat = useDateFormat()
+  const panelHost = useRef<HTMLDivElement>(null)
+
+  // Adding remounts the panel (it starts empty again), which destroys the focused control. The
+  // Popover only focuses on open, so put focus on the new panel's first field.
+  useEffect(() => {
+    if (panelKey === 0) return
+    panelHost.current?.querySelector<HTMLElement>('[data-autofocus]')?.focus()
+  }, [panelKey])
 
   const reminders = controlledReminders ?? task?.reminders ?? []
   const effectiveDueDate = dueDate ?? task?.due_date ?? NULL_DATE
@@ -124,11 +132,13 @@ export function ReminderPickerPopover({ anchorRef, task, dueDate, reminders: con
       )}
       {/* A quick choice or Enter in the text field adds the reminder; a day or time picked in the grid
           waits for the button, which is there as soon as a day is picked. */}
-      <WhenPanel
-        key={panelKey}
-        value={staged}
-        onChange={(value, { commit }) => (commit ? addPicked(value) : setStaged(value))}
-      />
+      <div ref={panelHost}>
+        <WhenPanel
+          key={panelKey}
+          value={staged}
+          onChange={(value, { commit }) => (commit ? addPicked(value) : setStaged(value))}
+        />
+      </div>
       {staged.date && (
         <Button
           variant="primary"

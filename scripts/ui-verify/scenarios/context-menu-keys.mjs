@@ -193,8 +193,23 @@ export default async function run(h) {
     }
     const name = ((await row.textContent()) ?? '').trim()
     await row.click({ button: 'right' })
-    await h.wait(200)
-    await page.locator('div.fixed.z-50 button', { hasText: 'Delete' }).first().click()
+    await h.wait(300)
+    s = await menuState(page)
+    await h.assert(`the sidebar ${kind} menu is a menu named for the row, inside the window, with focus on its first item`, {
+      ok: s.open && /actions$/.test(s.label ?? '') && s.inside && s.activeInMenu && s.activeRole === 'menuitem',
+      detail: JSON.stringify(s),
+    })
+    await h.key('ArrowDown')
+    s = await menuState(page)
+    await h.assert(`ArrowDown moves inside the sidebar ${kind} menu`, { ok: s.activeInMenu && s.activeName !== '' && s.activeName !== 'Edit', detail: JSON.stringify(s) })
+    await h.key('Escape')
+    await h.wait(300)
+    s = await menuState(page)
+    const afterEscape = await focusedLabel()
+    await h.assert(`Escape closes the sidebar ${kind} menu and focus returns to the row`, { ok: !s.open && !!afterEscape && afterEscape.includes(name.slice(0, 10)), detail: String(afterEscape) })
+    await row.click({ button: 'right' })
+    await h.wait(300)
+    await page.locator('[role="menu"] [role="menuitem"]', { hasText: 'Delete' }).first().click()
     await h.wait(300)
     const dialogOpen = await page.evaluate(() => !!document.querySelector('dialog[open][role="alertdialog"]'))
     await h.assert(`the sidebar ${kind} Delete opens a confirmation`, dialogOpen)
@@ -202,5 +217,6 @@ export default async function run(h) {
     await h.wait(300)
     const back = await focusedLabel()
     await h.assert(`cancelling it returns focus to the ${kind} row (${name})`, { ok: !!back && back.includes(name.slice(0, 10)), detail: String(back) })
-  }  await page.evaluate(() => window.api.saveConfigPatch({ confirm_before_delete: false }))
+  }
+  await page.evaluate(() => window.api.saveConfigPatch({ confirm_before_delete: false }))
 }

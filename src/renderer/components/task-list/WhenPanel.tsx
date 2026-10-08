@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from 'react'
+import { useEffect, useId, useMemo, useRef, useState, type FocusEvent, type KeyboardEvent } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { toLocalDate, startOfLocalDay, type LocalDate } from '@/lib/due-dates'
@@ -6,6 +6,7 @@ import { formatFullDateWithYear, formatMonthYear, formatWeekdayShort } from '@/l
 import { useDateFormat } from '@/hooks/use-date-format'
 import {
   TIME_CHOICES,
+  focusStaysInside,
   addMonths,
   monthGrid,
   monthStart,
@@ -57,6 +58,7 @@ export function WhenPanel({ value, onChange, now: nowProp }: WhenPanelProps) {
   const [viewMonth, setViewMonth] = useState(() => monthStart(value.date ?? today))
   const [focusDate, setFocusDate] = useState<LocalDate>(() => value.date ?? today)
   const gridRef = useRef<HTMLDivElement>(null)
+  const panelRef = useRef<HTMLDivElement>(null)
   const focusAfterRender = useRef(false)
 
   const [customTime, setCustomTime] = useState('')
@@ -114,6 +116,14 @@ export function WhenPanel({ value, onChange, now: nowProp }: WhenPanelProps) {
     setFocusDate(addMonths(focusDate, months))
   }
 
+  // Enter confirms the typed time. Leaving the field for another control of the same popover (Tab to
+  // Repeat, a click on a day) confirms it too; Escape and a press outside blur it with focus going
+  // elsewhere, and discard it.
+  const onCustomBlur = (event: FocusEvent<HTMLInputElement>) => {
+    const surface = panelRef.current?.closest('[popover]') ?? panelRef.current
+    if (focusStaysInside(surface, event.relatedTarget)) commitCustomTime()
+  }
+
   const commitCustomTime = () => {
     if (!customTime.trim()) {
       setCustomInvalid(false)
@@ -137,7 +147,7 @@ export function WhenPanel({ value, onChange, now: nowProp }: WhenPanelProps) {
   return (
     // Plain keys stay in the panel: the list behind it has window-level shortcuts (Enter opens a task,
     // the arrows move its focus) that would otherwise act on a key meant for the grid.
-    <div className="flex flex-col gap-2" onKeyDown={keepInPanel}>
+    <div ref={panelRef} className="flex flex-col gap-2" onKeyDown={keepInPanel}>
       <div>
         <input
           type="text"
@@ -264,7 +274,7 @@ export function WhenPanel({ value, onChange, now: nowProp }: WhenPanelProps) {
               e.preventDefault()
               commitCustomTime()
             }}
-            onBlur={commitCustomTime}
+            onBlur={onCustomBlur}
             autoComplete="off"
             spellCheck={false}
             className={cn(

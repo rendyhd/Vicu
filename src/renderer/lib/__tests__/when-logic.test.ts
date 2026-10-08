@@ -3,6 +3,7 @@ import {
   addMonths,
   comingSaturday,
   dueOfWhenValue,
+  focusStaysInside,
   monthGrid,
   monthStart,
   moveGridFocus,
@@ -207,5 +208,21 @@ describe('whenText and timeLabel', () => {
   it('labels a time in the window clock', () => {
     expect(timeLabel('09:00', GB)).toBe('09:00')
     expect(timeLabel('15:00', US)).toBe('3:00 PM')
+  })
+})
+
+describe('focusStaysInside', () => {
+  const inside = {}
+  const outside = {}
+  const panel = { contains: (node: unknown) => node === inside }
+
+  it('is true only when focus moves to a control of the panel', () => {
+    expect(focusStaysInside(panel, inside)).toBe(true)
+  })
+
+  it('is false for Escape and a press outside, where focus leaves the panel or goes nowhere', () => {
+    expect(focusStaysInside(panel, outside)).toBe(false)
+    expect(focusStaysInside(panel, null)).toBe(false)
+    expect(focusStaysInside(null, inside)).toBe(false)
   })
 })

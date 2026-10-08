@@ -45,13 +45,19 @@ export function createProjectCounts(deps: ProjectCountDeps): ProjectCounts {
   let carriers: { server: string; at: number; result: ApiResult<ReadonlyMap<number, number>> } | null = null
   let carriersInFlight: Promise<ApiResult<ReadonlyMap<number, number>>> | null = null
 
+  // Bumped by a global invalidate(): a carrier list asked for before it may lack a carrier created
+  // since, so it is neither stored nor shared with a count asked for afterwards.
+  let carrierGeneration = 0
+
   async function knownCarriers(server: string): Promise<ApiResult<ReadonlyMap<number, number>>> {
     if (carriers && carriers.server === server && carriers.result.success && deps.now() - carriers.at < ttl) return carriers.result
     if (!carriersInFlight) {
-      carriersInFlight = deps.carrierCounts().then((result) => {
-        if (result.success) carriers = { server, at: deps.now(), result }
+      const startedIn = carrierGeneration
+      const started: Promise<ApiResult<ReadonlyMap<number, number>>> = deps.carrierCounts().then((result) => {
+        if (result.success && startedIn === carrierGeneration) carriers = { server, at: deps.now(), result }
         return result
-      }).finally(() => { carriersInFlight = null })
+      }).finally(() => { if (carriersInFlight === started) carriersInFlight = null })
+      carriersInFlight = started
     }
     return carriersInFlight
   }
@@ -98,6 +104,8 @@ export function createProjectCounts(deps: ProjectCountDeps): ProjectCounts {
         cache.clear()
         inFlight.clear()
         carriers = null
+        carrierGeneration++
+        carriersInFlight = null
         return
       }
       const needle = `\n${projectId}\n`

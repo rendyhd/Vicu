@@ -108,4 +108,26 @@ describe('toast store', () => {
     vi.advanceTimersByTime(501)
     expect(onClose).toHaveBeenCalledTimes(2)
   })
+
+  describe('eviction', () => {
+    it('keeps a toast its owner closes itself while other toasts go', () => {
+      toast.success('Completed', { key: 'completion', durationMs: null })
+      for (let i = 0; i < 6; i++) toast.error(`Failure ${i}`)
+      const messages = useToastStore.getState().toasts.map((t) => t.message)
+      expect(messages).toHaveLength(4)
+      expect(messages[0]).toBe('Completed')
+      expect(messages[3]).toBe('Failure 5')
+    })
+
+    it('tells the owner of an evicted toast that the pointer has left it', () => {
+      const engaged: boolean[][] = [[], [], [], [], []]
+      for (let i = 0; i < 5; i++) {
+        toast.success(`Owned ${i}`, { key: `k${i}`, durationMs: null, onEngage: (on) => engaged[i].push(on) })
+      }
+      const shown = useToastStore.getState().toasts.map((t) => t.message)
+      expect(shown).toEqual(['Owned 1', 'Owned 2', 'Owned 3', 'Owned 4'])
+      expect(engaged[0]).toEqual([false])
+      expect(engaged[1]).toEqual([])
+    })
+  })
 })

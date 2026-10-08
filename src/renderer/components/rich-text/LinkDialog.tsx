@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useId, useState } from 'react'
 import { cn } from '@/lib/cn'
 import { normalizeEditableLink } from '@/lib/description-html'
+import { Dialog } from '@/components/overlay/Dialog'
 
 interface LinkDialogProps {
   open: boolean
@@ -19,7 +20,7 @@ export function LinkDialog({
   onRemove,
   onCancel,
 }: LinkDialogProps) {
-  const inputRef = useRef<HTMLInputElement>(null)
+  const titleId = useId()
   const [url, setUrl] = useState(initialUrl)
   const [error, setError] = useState<string | null>(null)
 
@@ -27,21 +28,7 @@ export function LinkDialog({
     if (!open) return
     setUrl(initialUrl)
     setError(null)
-    const id = requestAnimationFrame(() => inputRef.current?.focus())
-    return () => cancelAnimationFrame(id)
   }, [open, initialUrl])
-
-  useEffect(() => {
-    if (!open) return
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.stopPropagation()
-        onCancel()
-      }
-    }
-    document.addEventListener('keydown', handleKey, true)
-    return () => document.removeEventListener('keydown', handleKey, true)
-  }, [open, onCancel])
 
   if (!open) return null
 
@@ -64,20 +51,14 @@ export function LinkDialog({
   }
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
-      onClick={onCancel}
-    >
-      <div
-        className="mx-4 w-full max-w-sm rounded-card border border-[var(--border-color)] bg-[var(--bg-primary)] p-5 shadow-xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <h2 className="mb-3 text-sm font-medium text-[var(--text-primary)]">
+    <Dialog open onClose={onCancel} labelledBy={titleId} className="w-[calc(100%-2rem)] max-w-sm">
+      <div className="p-5">
+        <h2 id={titleId} className="mb-3 text-sm font-medium text-[var(--text-primary)]">
           {canRemove ? 'Edit link' : 'Add link'}
         </h2>
         <label className="mb-1 block text-xs text-[var(--text-secondary)]">URL</label>
         <input
-          ref={inputRef}
+          data-autofocus
           type="text"
           value={url}
           onChange={(e) => {
@@ -133,6 +114,6 @@ export function LinkDialog({
           </button>
         </div>
       </div>
-    </div>
+    </Dialog>
   )
 }

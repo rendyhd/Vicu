@@ -106,7 +106,7 @@ interface ProjectHeaderProps {
 
 function ProjectHeader({ node, depth, isOpen, isReviewed, isFocused, onToggle, onMarkReviewed }: ProjectHeaderProps) {
   const { project } = node
-  const dotColor = normalizeHex(project.hex_color) || '#8E8E93'
+  const dotColor = normalizeHex(project.hex_color) || 'var(--control-ring)'
   const subCount = node.children.length
 
   return (
@@ -174,7 +174,7 @@ function ProjectHeader({ node, depth, isOpen, isReviewed, isFocused, onToggle, o
             borderRadius: 'var(--radius-control)',
             background: 'transparent',
             color: 'var(--accent-purple)',
-            border: '1px solid rgba(175,82,222,0.4)',
+            border: '1px solid rgb(var(--accent-purple-rgb) / 0.4)',
             cursor: 'pointer',
             display: 'inline-flex',
             alignItems: 'center',

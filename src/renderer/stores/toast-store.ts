@@ -73,6 +73,33 @@ function clearClock(id: number) {
   timers.delete(id)
 }
 
+/**
+ * The toasts that stay when there are more than MAX_TOASTS: the newest ones, except that a toast its
+ * owner closes itself (a key and no duration, the completion toast) is only dropped when nothing else
+ * can go, so a burst of errors does not take an Undo away.
+ */
+function withoutEvicted(toasts: Toast[]): Toast[] {
+  let excess = toasts.length - MAX_TOASTS
+  if (excess <= 0) return toasts
+  const owned = (t: Toast) => t.key !== undefined && durations.get(t.id) === null
+  const dropped = new Set<number>()
+  for (const t of toasts) {
+    if (excess === 0) break
+    if (!owned(t)) {
+      dropped.add(t.id)
+      excess--
+    }
+  }
+  for (const t of toasts) {
+    if (excess === 0) break
+    if (!dropped.has(t.id)) {
+      dropped.add(t.id)
+      excess--
+    }
+  }
+  return toasts.filter((t) => !dropped.has(t.id))
+}
+
 export const useToastStore = create<ToastState>((set, get) => {
   const startClock = (id: number) => {
     clearClock(id)
@@ -116,11 +143,17 @@ export const useToastStore = create<ToastState>((set, get) => {
       const id = nextId++
       durations.set(id, durationMs)
       if (onClose) closers.set(id, onClose)
+      let evicted: Toast[] = []
       set((state) => {
         const next = [...state.toasts, { id, kind, message, key, action, onEngage }]
-        for (const gone of next.slice(0, Math.max(0, next.length - MAX_TOASTS))) forget(gone.id)
-        return { toasts: next.slice(-MAX_TOASTS) }
+        const kept = withoutEvicted(next)
+        evicted = next.filter((t) => !kept.includes(t))
+        for (const gone of evicted) forget(gone.id)
+        return { toasts: kept }
       })
+      // An owner that decides what hover means (the completion hold) must not be left believing the
+      // pointer is still on a toast that is gone: its leave event will never arrive.
+      for (const gone of evicted) gone.onEngage?.(false)
       startClock(id)
       return id
     },

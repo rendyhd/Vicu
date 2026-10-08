@@ -3,6 +3,7 @@ import { randomUUID } from 'crypto'
 import { createTask, deleteTask, fetchTaskById, updateTask } from './api-client'
 import { forgetDeletedTask, loadCustomListCarriers, rememberCreatedTask } from './carrier-service'
 import { loadConfig, saveConfig, type AppConfig } from './config'
+import { invalidateProjectCounts } from './project-counts-service'
 import {
   CUSTOM_LIST_CARRIER_TITLE,
   activeLists,
@@ -225,7 +226,7 @@ async function createCarrier(projectId: number, document: CustomListSyncDocument
   })
   if (!created.success) throw new Error(created.error)
   const task = created.data as CarrierTask
-  rememberCreatedTask(task)
+  if (rememberCreatedTask(task)) invalidateProjectCounts()
   if (task.done !== true) {
     await writeCarrier(task.id, document)
     return { id: task.id }

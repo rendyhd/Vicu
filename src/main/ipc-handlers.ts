@@ -141,7 +141,12 @@ function quickActionDeps(): QuickActionDeps {
   return {
     queue: getOfflineQueue(),
     api: { createTask, updateTask },
-    notifyMainWindow: () => notifyMainWindow(),
+    notifyMainWindow: () => {
+      // Every Quick Entry create and Quick View completion or reopening ends here on success, and
+      // each one moves a project's counts; the project is not known at this level.
+      invalidateProjectCounts()
+      notifyMainWindow()
+    },
     requestReplay,
   }
 }
@@ -219,8 +224,8 @@ export function registerIpcHandlers(): void {
     const result = await sendSerially(() => createTask(projectId, task))
     if (result.success) {
       notifyViewerSync()
-      rememberCreatedTask(result.data)
-      invalidateProjectCounts(projectId)
+      // A new routine or custom-list carrier changes what the counts subtract: everything is asked again.
+      invalidateProjectCounts(rememberCreatedTask(result.data) ? undefined : projectId)
     }
     return result
   })

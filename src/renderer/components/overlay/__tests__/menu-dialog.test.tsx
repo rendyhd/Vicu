@@ -1,5 +1,5 @@
-import { readFileSync } from 'node:fs'
-import { resolve } from 'node:path'
+import { readdirSync, readFileSync } from 'node:fs'
+import { join, relative, resolve } from 'node:path'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import { MenuHeading, MenuItem, MenuRadioItem, MenuSeparator } from '../Menu'
@@ -110,6 +110,93 @@ describe('the Dialog primitive', () => {
     expect(read('components/shared/ConfirmDialog.tsx')).toContain('label=')
     expect(read('components/shared/CustomListDialog.tsx')).toContain('labelledBy=')
   })
+})
+
+/** Every .tsx under the given folders (relative to src/renderer), as [path, source]. */
+function sourcesUnder(...folders: string[]): Array<[string, string]> {
+  const found: Array<[string, string]> = []
+  const walk = (dir: string) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const full = join(dir, entry.name)
+      if (entry.isDirectory()) {
+        if (entry.name !== '__tests__') walk(full)
+      } else if (entry.name.endsWith('.tsx')) {
+        found.push([relative(root, full).replace(/\\/g, '/'), readFileSync(full, 'utf-8')])
+      }
+    }
+  }
+  for (const folder of folders) walk(resolve(root, folder))
+  return found
+}
+
+// Modals are the Dialog primitive's job (top layer, inert page, Escape, focus return); a full-screen
+// fixed backdrop drawn by hand loses all of that. Files that may keep one, with the reason:
+const HAND_ROLLED_OVERLAY_ALLOWLIST: Record<string, string> = {
+  // Nothing needs one today: the toast host, the tooltip and the menu's invisible anchor are fixed
+  // but are not full-screen backdrops. Add a path here only for a non-modal overlay that must stay.
+}
+
+describe('modals are on the Dialog primitive', () => {
+  const files = sourcesUnder('components', 'views', 'quick-entry', 'quick-view')
+  const handRolled = /\bfixed\b[^"'`]*\binset-0\b|\binset-0\b[^"'`]*\bfixed\b/
+
+  it('has no hand-rolled full-screen overlay outside the allowlist', () => {
+    const offenders = files.filter(([path, source]) => handRolled.test(source) && !(path in HAND_ROLLED_OVERLAY_ALLOWLIST)).map(([path]) => path)
+    expect(offenders).toEqual([])
+  })
+
+  it('has no allowlist entry for a file that no longer has one', () => {
+    for (const path of Object.keys(HAND_ROLLED_OVERLAY_ALLOWLIST)) {
+      expect(files.some(([file, source]) => file === path && handRolled.test(source)), path).toBe(true)
+    }
+  })
+
+  it('draws no backdrop of its own: only the Dialog primitive styles the backdrop', () => {
+    const offenders = files.filter(([path, source]) => path !== 'components/overlay/Dialog.tsx' && /backdrop:|bg-black\/(?:40|45|50)/.test(source)).map(([path]) => path)
+    expect(offenders).toEqual([])
+  })
+
+  it('carries the former hand-rolled dialogs', () => {
+    const dialogs = [
+      'components/sync/SyncPanel.tsx',
+      'views/RoutinesView.tsx',
+      'components/settings/ProjectSettings.tsx',
+      'components/rich-text/LinkDialog.tsx',
+      'components/sidebar/ProjectTree.tsx',
+      'components/sidebar/TagList.tsx',
+    ]
+    for (const path of dialogs) {
+      const source = read(path)
+      expect(source, path).toContain("from '@/components/overlay/Dialog'")
+      expect(source, path).toMatch(/<Dialog[\s>]/)
+    }
+  })
+
+  it('names the close button of every dialog that has one (an icon alone has no name)', () => {
+    const unnamed: string[] = []
+    for (const [path, source] of files) {
+      if (!/<Dialog[\s>]/.test(source)) continue
+      for (const match of source.matchAll(/<button\b[^>]*>\s*<X\b/g)) {
+        if (!/aria-label=/.test(match[0])) unnamed.push(path)
+      }
+    }
+    expect(unnamed).toEqual([])
+  })
+})
+
+describe('the sidebar context menus', () => {
+  for (const file of ['ProjectTree', 'TagList', 'CustomListNav']) {
+    const source = read(`components/sidebar/${file}.tsx`)
+
+    it(`${file} is a Menu at the pointer, not a hand-placed div`, () => {
+      expect(source).toContain("from '@/components/overlay/Menu'")
+      expect(source).toMatch(/<Menu\s/)
+      expect(source).toContain('anchorPoint')
+      expect(source).toContain('<MenuItem')
+      expect(source).not.toContain('fixed z-50')
+      expect(source).not.toContain("addEventListener('click'")
+    })
+  }
 })
 
 describe('the task context menu', () => {
