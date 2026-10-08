@@ -107,6 +107,9 @@ its card lands (offset highlights). The others are stubs that log `skip: not imp
 their card fills them in. `keyboard-tab` (id KT, card 1.5) Tabs through Today with the real keyboard and
 asserts the focus ring on every stop, the 20 px checkbox with its 24 px hit area (`elementFromPoint`
 11 px from the centre), 24 px row buttons, 28 px toolbar buttons and the reduced-motion base layer.
+`motion-popover` (id MP, card 4.1) opens a popover, a menu and a tooltip with full motion and samples
+the enter frame by frame (opacity, scale from 0.96), freezes a mid-animation frame for a capture, checks the
+leaving copy, then repeats with `--motion reduce` and asserts no scale, transform or translate.
 Scenario code computes dates from the run day (`lib.mjs`: `localDate`, `comingWeekday`, `at`).
 
 The helpers on `h`:

@@ -2,6 +2,7 @@ import { useLayoutEffect, useRef, type KeyboardEvent, type ReactNode, type RefOb
 import type { Placement } from '@floating-ui/dom'
 import { cn } from '@/lib/cn'
 import { useFloatingPopover } from './use-floating-popover'
+import { leaveAsGhost } from './leave-ghost'
 import {
   OPTION_SELECTOR,
   TABBABLE_SELECTOR,
@@ -93,7 +94,11 @@ export function Popover({
 
     const onBeforeToggle = (event: Event) => {
       // Move focus out before the browser hides the popover; once hidden, focus would drop to <body>.
-      if ((event as ToggleEvent).newState === 'closed') restoreFocus(el, anchorRef.current)
+      if ((event as ToggleEvent).newState === 'closed') {
+        restoreFocus(el, anchorRef.current)
+        // The caller unmounts the popover right after the toggle event: leave a fading copy.
+        leaveAsGhost(el)
+      }
     }
     const onToggle = (event: Event) => {
       if ((event as ToggleEvent).newState === 'closed') onCloseRef.current('dismiss')
@@ -117,6 +122,8 @@ export function Popover({
       // Closed by the caller (a choice was made): focus goes back to the anchor while the
       // popover is still in the document.
       restoreFocus(el, anchorRef.current)
+      // Closed by the caller: still open here, so a fading copy takes its place (no-op after a dismissal).
+      leaveAsGhost(el)
     }
   }, [anchorRef])
 
@@ -175,7 +182,7 @@ export function Popover({
       className={cn(
         // The browser's popover styles centre the box and give it padding, border and colours of
         // its own; reset them so Floating UI's left/top decide.
-        'm-0 inset-auto overflow-y-auto overflow-x-hidden rounded-popover border border-[var(--border-color)] bg-[var(--bg-primary)] text-[var(--text-primary)] shadow-lg focus:outline-none',
+        'vicu-popover m-0 inset-auto overflow-y-auto overflow-x-hidden rounded-popover border border-[var(--border-color)] bg-[var(--bg-primary)] text-[var(--text-primary)] shadow-lg focus:outline-none',
         className,
       )}
     >

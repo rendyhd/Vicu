@@ -127,7 +127,7 @@ export default async function run(h) {
     await h.wait(350)
     const tip = await tooltip(page)
     await h.assert('C: the tooltip shows after about 400 ms with the name and the shortcut', { ok: !!tip && tip.open && /^Schedule/.test(tip.text) && /(Ctrl\+T|⌘T)/.test(tip.text), detail: JSON.stringify(tip) })
-    await h.assert('C: it fades (opacity over fade.fast) and does not take the pointer', { ok: !!tip && /opacity/.test(tip.property) && tip.duration === '0.15s' && tip.pointerEvents === 'none' && tip.opacity > 0, detail: JSON.stringify(tip) })
+    await h.assert('C: it fades (opacity over fade.fast) and does not take the pointer', { ok: !!tip && /opacity/.test(tip.property) && tip.duration.split(', ').every((d) => d === '0.15s') && tip.pointerEvents === 'none' && tip.opacity > 0, detail: JSON.stringify(tip) })
     await h.capture(`tooltip-${theme}`, { clip: { x: 0, y: 0, width: 1280, height: 820 } })
     const described = await btn.getAttribute('aria-describedby')
     await h.assert('C: the button is described by the tooltip', !!described)

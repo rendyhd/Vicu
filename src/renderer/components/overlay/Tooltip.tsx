@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { computePosition, flip, offset, shift } from '@floating-ui/dom'
 import { shortcutLabel } from '@/lib/shortcut-label'
+import { leaveAsGhost } from './leave-ghost'
 import { TOOLTIP_DELAY_MS, TOOLTIP_EDGE, TOOLTIP_GAP } from './tooltip-logic'
 
 interface TooltipProps {
@@ -18,7 +19,8 @@ let hideCurrent: (() => void) | null = null
 
 /**
  * A styled tooltip for the control inside it. It shows after the pointer has rested on the control
- * (or keyboard focus has been on it) for 400 ms, fades in, and goes on a press, Escape, leaving or
+ * (or keyboard focus has been on it) for 400 ms, grows in from the side of the control (the
+ * `vicu-popover` motion: scale and fade, opacity only when motion is reduced), and goes on a press, Escape, leaving or
  * blur. It sits in the top layer like the popovers (a manual native popover positioned by Floating
  * UI), so no card or list clips it, and ignores the pointer so it never covers what is under it.
  *
@@ -102,7 +104,6 @@ export function Tooltip({ label, shortcut, children }: TooltipProps) {
 
 function TooltipBubble({ id, anchor, label, shortcut }: { id: string; anchor: HTMLElement; label: string; shortcut?: string }) {
   const ref = useRef<HTMLDivElement>(null)
-  const [shown, setShown] = useState(false)
 
   useLayoutEffect(() => {
     const el = ref.current
@@ -114,16 +115,17 @@ function TooltipBubble({ id, anchor, label, shortcut }: { id: string; anchor: HT
       strategy: 'fixed',
       placement: 'top',
       middleware: [offset(TOOLTIP_GAP), flip(), shift({ padding: TOOLTIP_EDGE })],
-    }).then(({ x, y }) => {
+    }).then(({ x, y, placement }) => {
       if (!alive) return
       el.style.left = `${x}px`
       el.style.top = `${y}px`
+      el.dataset.placement = placement
       el.style.visibility = ''
-      // The next frame, so the transition has a start value.
-      requestAnimationFrame(() => alive && setShown(true))
     })
     return () => {
       alive = false
+      // Fades out as it goes (a no-op when it was never placed).
+      leaveAsGhost(el)
     }
   }, [anchor])
 
@@ -134,10 +136,7 @@ function TooltipBubble({ id, anchor, label, shortcut }: { id: string; anchor: HT
       popover="manual"
       role="tooltip"
       style={{ position: 'fixed' }}
-      className={
-        'pointer-events-none m-0 inset-auto flex items-center gap-2 overflow-visible whitespace-nowrap rounded-control border-0 bg-text px-2 py-1 text-meta text-bg-page transition-opacity duration-fade-fast ' +
-        (shown ? 'opacity-100' : 'opacity-0')
-      }
+      className="vicu-popover vicu-tooltip pointer-events-none m-0 inset-auto flex items-center gap-2 overflow-visible whitespace-nowrap rounded-control border-0 bg-text px-2 py-1 text-meta text-bg-page"
     >
       <span>{label}</span>
       {shortcut && <kbd className="font-sans text-caption opacity-70">{shortcutLabel(shortcut, isMac)}</kbd>}
