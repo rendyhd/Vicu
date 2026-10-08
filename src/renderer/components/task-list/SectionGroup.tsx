@@ -7,6 +7,7 @@ import { useReorderStore } from '@/stores/reorder-store'
 import { useSelectionStore } from '@/stores/selection-store'
 import type { Task, Project } from '@/lib/vikunja-types'
 import { TaskRow } from './TaskRow'
+import { TaskRowGroup } from './TaskRowGroup'
 import { SectionHeader } from './SectionHeader'
 import { AddTaskButton } from './AddTaskButton'
 import type { SectionData } from '@/hooks/use-project-sections'
@@ -111,22 +112,26 @@ export function SectionGroup({
         items={tasks.map((t) => `task-${t.id}`)}
         strategy={verticalListSortingStrategyForeignSafe}
       >
-        {tasks.map((task, i) => (
-          <Fragment key={task.id}>
-            {insertIndex === i && (
-              <div className="mx-4 flex items-center gap-1 py-0.5">
+        {tasks.length > 0 && (
+          <TaskRowGroup>
+            {tasks.map((task, i) => (
+              <Fragment key={task.id}>
+                {insertIndex === i && (
+                  <div aria-hidden="true" className="mx-4 flex items-center gap-1 py-0.5">
+                    <div className="h-1.5 w-1.5 rounded-full bg-[var(--accent-blue)]" />
+                    <div className="h-[2px] flex-1 rounded-full bg-[var(--accent-blue)]" />
+                  </div>
+                )}
+                <TaskRow task={task} sortable />
+              </Fragment>
+            ))}
+            {insertIndex != null && insertIndex >= tasks.length && (
+              <div aria-hidden="true" className="mx-4 flex items-center gap-1 py-0.5">
                 <div className="h-1.5 w-1.5 rounded-full bg-[var(--accent-blue)]" />
                 <div className="h-[2px] flex-1 rounded-full bg-[var(--accent-blue)]" />
               </div>
             )}
-            <TaskRow task={task} sortable />
-          </Fragment>
-        ))}
-        {insertIndex != null && insertIndex >= tasks.length && (
-          <div className="mx-4 flex items-center gap-1 py-0.5">
-            <div className="h-1.5 w-1.5 rounded-full bg-[var(--accent-blue)]" />
-            <div className="h-[2px] flex-1 rounded-full bg-[var(--accent-blue)]" />
-          </div>
+          </TaskRowGroup>
         )}
       </SortableContext>
 

@@ -103,7 +103,7 @@ export default async function run(h) {
   })
 
   // The checkbox of the first row, focused from the keyboard.
-  const firstCheckbox = page.locator('[data-task-id] button[aria-label="Mark as done"]').first()
+  const firstCheckbox = page.locator('[data-task-id] button[role="checkbox"][aria-checked="false"]').first()
   await firstCheckbox.focus()
   await h.key('Shift+Tab')
   await h.key('Tab')
@@ -129,7 +129,7 @@ export default async function run(h) {
         ([x, y]) => {
           const el = document.elementFromPoint(x, y)
           const button = el?.closest('button')
-          return { isCheckbox: !!button && /^Mark as (done|incomplete)$/.test(button.getAttribute('aria-label') ?? ''), tag: el?.tagName ?? null }
+          return { isCheckbox: !!button && button.getAttribute('role') === 'checkbox', tag: el?.tagName ?? null }
         },
         [cx + dx, cy + dy],
       )

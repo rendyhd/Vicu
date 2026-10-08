@@ -7,6 +7,7 @@ import { useSetReviewCadence, useExcludeFromReview, type ReviewTreeNode } from '
 import { useProjectTasks } from '@/hooks/use-project-tasks'
 import { useCreateTask } from '@/hooks/use-task-mutations'
 import { TaskRow } from '@/components/task-list/TaskRow'
+import { TaskRowGroup } from '@/components/task-list/TaskRowGroup'
 
 interface ProjectBranchProps {
   node: ReviewTreeNode
@@ -311,7 +312,9 @@ function ProjectReviewTasks({ projectId, depth }: { projectId: number; depth: nu
       {!isLoading && tasks.length === 0 && (
         <div className="px-2 py-1 text-xs text-[var(--text-secondary)]">No open tasks.</div>
       )}
-      {!isLoading && tasks.map((task) => <TaskRow key={task.id} task={task} />)}
+      {!isLoading && tasks.length > 0 && (
+        <TaskRowGroup>{tasks.map((task) => <TaskRow key={task.id} task={task} />)}</TaskRowGroup>
+      )}
       <AddTaskInline projectId={projectId} />
     </div>
   )

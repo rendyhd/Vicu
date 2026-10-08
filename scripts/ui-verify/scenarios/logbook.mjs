@@ -27,7 +27,7 @@ export default async function run(h) {
   try {
     await h.goto('/logbook')
     await h.wait(900)
-    const rowCount = () => page.locator('[aria-label="Mark as incomplete"]').count()
+    const rowCount = () => page.locator('[role="checkbox"][aria-checked="true"]').count()
     const first = await rowCount()
     await h.assert('first page: one page of rows, not the whole history', { ok: first > 0 && first <= 50, detail: first })
 
@@ -35,7 +35,7 @@ export default async function run(h) {
     await h.assert('a Today group heading', { ok: (await heading.count()) === 1, detail: await heading.count() })
     await h.assert('one heading for the one day', { ok: (await page.locator('h2').count()) === 1 })
 
-    const row = page.locator('[aria-label="Mark as incomplete"]').first().locator('xpath=..')
+    const row = page.locator('[role="checkbox"][aria-checked="true"]').first().locator('xpath=..')
     const rowText = await row.innerText()
     await h.assert('a row ends with the completion time', { ok: /\d{1,2}:\d{2}(\s?[AP]M)?\s*$/i.test(rowText.trim()), detail: JSON.stringify(rowText) })
     const titleStyle = await row.locator('span').first().evaluate((el) => {
@@ -53,7 +53,7 @@ export default async function run(h) {
     }
     const after = await rowCount()
     await h.assert('scrolling to the end loads older pages', { ok: after > first, detail: `${first} -> ${after}` })
-    await h.assert('no row is repeated', { ok: new Set(await page.locator('[aria-label="Mark as incomplete"]').evaluateAll((els) => els.map((e) => e.parentElement.innerText))).size === after })
+    await h.assert('no row is repeated', { ok: new Set(await page.locator('[role="checkbox"][aria-checked="true"]').evaluateAll((els) => els.map((e) => e.parentElement.innerText))).size === after })
     await h.capture('end')
 
     // The scrollbar sits at the window edge, the column inside it.

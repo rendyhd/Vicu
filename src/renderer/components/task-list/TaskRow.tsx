@@ -85,9 +85,12 @@ const sortableAnimateLayoutChanges: AnimateLayoutChanges = (args) => {
   return false
 }
 
-/** What a row takes from drag and drop, whichever hook provided it. */
+/**
+ * What a row takes from drag and drop, whichever hook provided it. The hooks' `attributes` (role
+ * "button", tabindex, aria-pressed) are left out on purpose: they made a row a button that holds
+ * buttons, and no keyboard sensor is registered, so they only added noise. Only the pointer starts a drag.
+ */
 interface DragBehavior {
-  attributes: ReturnType<typeof useDraggable>['attributes']
   listeners: ReturnType<typeof useDraggable>['listeners']
   setNodeRef: (node: HTMLElement | null) => void
   isDragging: boolean
@@ -106,7 +109,6 @@ function useSortableRow(task: Task): DragBehavior {
     animateLayoutChanges: sortableAnimateLayoutChanges,
   })
   return {
-    attributes: sortableHook.attributes,
     listeners: sortableHook.listeners,
     setNodeRef: sortableHook.setNodeRef,
     isDragging: sortableHook.isDragging,
@@ -123,7 +125,6 @@ function useDraggableRow(task: Task): DragBehavior {
     data: { type: 'task', task },
   })
   return {
-    attributes: draggable.attributes,
     listeners: draggable.listeners,
     setNodeRef: draggable.setNodeRef,
     isDragging: draggable.isDragging,
@@ -358,7 +359,7 @@ function TaskRowInner({ task, nestedDepth = 0, parentProjectId, projectMeta, dra
   const { data: appConfig } = useAppConfig()
   const rowView = useRowView()
 
-  const { attributes, listeners, setNodeRef, isDragging, style } = drag
+  const { listeners, setNodeRef, isDragging, style } = drag
   const isDark = useIsDark()
 
   const [editDescription, setEditDescription] = useState(stripPageLink(stripNoteLink(task.description)))
@@ -555,6 +556,13 @@ function TaskRowInner({ task, nestedDepth = 0, parentProjectId, projectMeta, dra
       <div
         ref={setNodeRef}
         data-task-id={task.id}
+        role="listitem"
+        // Roving tabindex: the row the keyboard selection is on is the one Tab stop of the list.
+        tabIndex={isFocused ? 0 : -1}
+        onFocus={(e) => {
+          // Keyboard focus anywhere in the row (the row itself, its checkbox) moves the keyboard selection here.
+          if (!isFocused && e.target.matches(':focus-visible')) setFocusedTask(task.id)
+        }}
         className={cn(
           'group grid cursor-default grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-x-3 border-b border-[var(--border-color)] px-4 py-2.5 transition-colors hover:bg-[var(--bg-hover)]',
           isSelected && 'bg-accent-blue/15 ring-1 ring-inset ring-accent-blue/40',
@@ -617,7 +625,6 @@ function TaskRowInner({ task, nestedDepth = 0, parentProjectId, projectMeta, dra
           setContextMenu({ x: e.clientX, y: e.clientY })
         }}
         {...listeners}
-        {...attributes}
       >
         <TaskCheckbox task={task} suppressTopLevelUndo={nestedDepth > 0} />
 
@@ -732,6 +739,7 @@ function TaskRowInner({ task, nestedDepth = 0, parentProjectId, projectMeta, dra
   return (
     <div
       data-task-id={task.id}
+      role="listitem"
       className={cn(
         // Two columns, the checkbox and the body: the notes, subtasks and action bar sit under the title.
         'mx-2 my-1 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 rounded-card border border-[var(--border-color)] bg-[var(--bg-primary)] px-4 shadow-md',

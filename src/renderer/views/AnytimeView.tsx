@@ -5,6 +5,7 @@ import { useProjects } from '@/hooks/use-projects'
 import { usePrintable } from '@/stores/print-store'
 import { TaskList } from '@/components/task-list/TaskList'
 import { TaskRow } from '@/components/task-list/TaskRow'
+import { TaskRowGroup } from '@/components/task-list/TaskRowGroup'
 import { ListSectionHeader } from '@/components/task-list/ListSectionHeader'
 import { ProjectTaskGroup } from '@/components/task-list/ProjectTaskGroup'
 import { openCount, showsGroupHeader } from '@/lib/list-sections'
@@ -112,16 +113,22 @@ export function AnytimeView() {
         const groupTasks = group.subGroups.flatMap((sub) => sub.tasks)
         // A project with a single open task gets no header: the project goes on the row's meta line.
         if (!showsGroupHeader(groupTasks)) {
-          return groupTasks.map((task) => (
-            <TaskRow key={task.id} task={task} projectMeta={{ title: group.projectName, color: group.color }} />
-          ))
+          return (
+            <TaskRowGroup key={group.projectId}>
+              {groupTasks.map((task) => (
+                <TaskRow key={task.id} task={task} projectMeta={{ title: group.projectName, color: group.color }} />
+              ))}
+            </TaskRowGroup>
+          )
         }
         return (
           <div key={group.projectId}>
             <ListSectionHeader level={1} title={group.projectName} count={openCount(groupTasks)} dotColor={group.color ?? ''} />
             {group.subGroups.map((sub) =>
               sub.projectId === group.projectId ? (
-                sub.tasks.map((task) => <TaskRow key={task.id} task={task} />)
+                <TaskRowGroup key={sub.projectId}>
+                  {sub.tasks.map((task) => <TaskRow key={task.id} task={task} />)}
+                </TaskRowGroup>
               ) : (
                 <ProjectTaskGroup key={sub.projectId} level={2} name={sub.projectName} color={sub.color} tasks={sub.tasks} />
               )

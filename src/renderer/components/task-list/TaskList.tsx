@@ -13,6 +13,7 @@ import { api } from '@/lib/api'
 import { dueToday } from '@/lib/due-dates'
 import type { Task } from '@/lib/vikunja-types'
 import { TaskRow } from './TaskRow'
+import { TaskRowGroup } from './TaskRowGroup'
 import { AddTaskButton } from './AddTaskButton'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { PageHeader } from '@/components/shared/PageHeader'
@@ -428,6 +429,12 @@ export function TaskList({
     const el = listRef.current.querySelector(`[data-task-id="${focusedTaskId}"]`)
     if (el) {
       el.scrollIntoView({ block: 'nearest' })
+      // The keyboard selection and DOM focus travel together (roving tabindex), unless the user is
+      // typing somewhere else.
+      const active = document.activeElement
+      if (el instanceof HTMLElement && el.tabIndex >= 0 && (!active || active === document.body || listRef.current.contains(active))) {
+        el.focus({ preventScroll: true })
+      }
     }
   }, [focusedTaskId])
 
@@ -517,26 +524,30 @@ export function TaskList({
             items={tasks.map((t) => `task-${t.id}`)}
             strategy={verticalListSortingStrategyForeignSafe}
           >
-            {tasks.map((task, i) => (
-              <Fragment key={task.id}>
-                {insertIndex === i && (
-                  <div className="mx-4 flex items-center gap-1 py-0.5">
+            {tasks.length > 0 && (
+              <TaskRowGroup>
+                {tasks.map((task, i) => (
+                  <Fragment key={task.id}>
+                    {insertIndex === i && (
+                      <div aria-hidden="true" className="mx-4 flex items-center gap-1 py-0.5">
+                        <div className="h-1.5 w-1.5 rounded-full bg-[var(--accent-blue)]" />
+                        <div className="h-[2px] flex-1 rounded-full bg-[var(--accent-blue)]" />
+                      </div>
+                    )}
+                    <TaskRow task={task} sortable />
+                  </Fragment>
+                ))}
+                {insertIndex != null && insertIndex >= tasks.length && (
+                  <div aria-hidden="true" className="mx-4 flex items-center gap-1 py-0.5">
                     <div className="h-1.5 w-1.5 rounded-full bg-[var(--accent-blue)]" />
                     <div className="h-[2px] flex-1 rounded-full bg-[var(--accent-blue)]" />
                   </div>
                 )}
-                <TaskRow task={task} sortable />
-              </Fragment>
-            ))}
-            {insertIndex != null && insertIndex >= tasks.length && (
-              <div className="mx-4 flex items-center gap-1 py-0.5">
-                <div className="h-1.5 w-1.5 rounded-full bg-[var(--accent-blue)]" />
-                <div className="h-[2px] flex-1 rounded-full bg-[var(--accent-blue)]" />
-              </div>
+              </TaskRowGroup>
             )}
           </SortableContext>
         ) : (
-          tasks.map((task) => <TaskRow key={task.id} task={task} />)
+          tasks.length > 0 && <TaskRowGroup>{tasks.map((task) => <TaskRow key={task.id} task={task} />)}</TaskRowGroup>
         )}
 
         {newTaskPlacement === 'after-tasks' && endOfList}

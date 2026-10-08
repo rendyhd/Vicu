@@ -2,6 +2,7 @@ import type { Task } from '@/lib/vikunja-types'
 import { openCount, showsGroupHeader } from '@/lib/list-sections'
 import { ListSectionHeader } from './ListSectionHeader'
 import { TaskRow } from './TaskRow'
+import { TaskRowGroup } from './TaskRowGroup'
 
 interface ProjectTaskGroupProps {
   level: 1 | 2
@@ -19,19 +20,21 @@ interface ProjectTaskGroupProps {
 export function ProjectTaskGroup({ level, name, color, tasks }: ProjectTaskGroupProps) {
   if (!showsGroupHeader(tasks)) {
     return (
-      <>
+      <TaskRowGroup>
         {tasks.map((task) => (
           <TaskRow key={task.id} task={task} projectMeta={{ title: name, color }} />
         ))}
-      </>
+      </TaskRowGroup>
     )
   }
   return (
     <div>
       <ListSectionHeader level={level} title={name} count={openCount(tasks)} dotColor={color ?? ''} />
-      {tasks.map((task) => (
-        <TaskRow key={task.id} task={task} />
-      ))}
+      <TaskRowGroup>
+        {tasks.map((task) => (
+          <TaskRow key={task.id} task={task} />
+        ))}
+      </TaskRowGroup>
     </div>
   )
 }

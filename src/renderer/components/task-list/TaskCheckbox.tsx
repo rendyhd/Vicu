@@ -16,6 +16,8 @@ export function TaskCheckbox({ task, className, suppressTopLevelUndo = false }: 
   return (
     <button
       type="button"
+      role="checkbox"
+      aria-checked={task.done}
       onClick={async (e) => {
         e.stopPropagation()
         if (task.done) {
@@ -33,7 +35,7 @@ export function TaskCheckbox({ task, className, suppressTopLevelUndo = false }: 
           : 'border-control-ring hover:border-accent-fill hover:bg-accent-fill/10',
         className
       )}
-      aria-label={task.done ? 'Mark as incomplete' : 'Mark as done'}
+      aria-label={`Complete ${task.title}`}
     >
       {task.done ? (
         <svg className="h-3 w-3 text-on-accent" viewBox="0 0 12 12" fill="none">
