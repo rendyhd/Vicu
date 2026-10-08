@@ -94,7 +94,7 @@ export function ReminderPickerPopover({ anchorRef, task, dueDate, reminders: con
           {reminders.map((r, i) => (
             <div
               key={`${r.reminder}-${i}`}
-              className="flex items-center justify-between rounded px-2 py-1 text-xs text-[var(--text-primary)] bg-[var(--bg-hover)]"
+              className="flex items-center justify-between rounded-control px-2 py-1 text-xs text-[var(--text-primary)] bg-[var(--bg-hover)]"
             >
               <span>{formatReminder(r)}</span>
               <button
@@ -102,7 +102,7 @@ export function ReminderPickerPopover({ anchorRef, task, dueDate, reminders: con
                 onClick={() => removeReminder(i)}
                 aria-label={`Remove reminder ${formatReminder(r)}`}
                 title="Remove reminder"
-                className="ml-2 text-[var(--text-secondary)] hover:text-red-500"
+                className="ml-2 text-[var(--text-secondary)] hover:text-danger"
               >
                 <X className="h-3 w-3" />
               </button>
@@ -114,7 +114,7 @@ export function ReminderPickerPopover({ anchorRef, task, dueDate, reminders: con
       {/* Relative presets (when task has a due date) */}
       {hasDueDate && (
         <div className="mb-2 flex flex-col gap-1">
-          <span className="px-2 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
+          <span className="px-2 text-caption font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
             Relative to due date
           </span>
           {RELATIVE_PRESETS.map((p) => (
@@ -122,7 +122,7 @@ export function ReminderPickerPopover({ anchorRef, task, dueDate, reminders: con
               key={p.label}
               type="button"
               onClick={() => addRelativeReminder(p.offset)}
-              className="rounded px-2 py-1.5 text-left text-xs text-[var(--text-primary)] hover:bg-[var(--bg-hover)]"
+              className="rounded-control px-2 py-1.5 text-left text-xs text-[var(--text-primary)] hover:bg-[var(--bg-hover)]"
             >
               {p.label}
             </button>
@@ -133,7 +133,7 @@ export function ReminderPickerPopover({ anchorRef, task, dueDate, reminders: con
       {/* Quick presets */}
       <div className="mb-2 flex flex-col gap-1">
         {hasDueDate && (
-          <span className="px-2 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
+          <span className="px-2 text-caption font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
             Absolute
           </span>
         )}
@@ -142,7 +142,7 @@ export function ReminderPickerPopover({ anchorRef, task, dueDate, reminders: con
             key={p.label}
             type="button"
             onClick={() => addReminder(p.getDate())}
-            className="rounded px-2 py-1.5 text-left text-xs text-[var(--text-primary)] hover:bg-[var(--bg-hover)]"
+            className="rounded-control px-2 py-1.5 text-left text-xs text-[var(--text-primary)] hover:bg-[var(--bg-hover)]"
           >
             {p.label}
           </button>
@@ -156,13 +156,13 @@ export function ReminderPickerPopover({ anchorRef, task, dueDate, reminders: con
           aria-label="Custom reminder time"
           value={customDateTime}
           onChange={(e) => setCustomDateTime(e.target.value)}
-          className="w-full rounded border border-[var(--border-color)] bg-[var(--bg-secondary)] px-2 py-1.5 text-xs text-[var(--text-primary)] focus:border-[var(--accent-blue)] focus:outline-none"
+          className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-2 py-1.5 text-xs text-[var(--text-primary)]"
         />
         <button
           type="button"
           onClick={handleAddCustom}
           disabled={!customDateTime}
-          className="mt-1 w-full rounded bg-[var(--accent-blue)] px-2 py-1.5 text-xs text-white hover:opacity-90 disabled:opacity-40"
+          className="mt-1 w-full rounded-control bg-accent-fill px-2 py-1.5 text-xs text-on-accent hover:opacity-90 disabled:opacity-40"
         >
           Add reminder
         </button>

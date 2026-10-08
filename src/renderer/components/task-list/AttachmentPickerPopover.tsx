@@ -54,7 +54,7 @@ export function AttachmentPickerPopover({ anchorRef, invokedBy, taskId, onClose 
             return (
               <div
                 key={att.id}
-                className="group/att flex items-center gap-2 rounded px-2 py-1.5 hover:bg-[var(--bg-hover)]"
+                className="group/att flex items-center gap-2 rounded-control px-2 py-1.5 hover:bg-[var(--bg-hover)]"
               >
                 <Icon className="h-4 w-4 shrink-0 text-[var(--text-secondary)]" />
                 <button
@@ -65,7 +65,7 @@ export function AttachmentPickerPopover({ anchorRef, invokedBy, taskId, onClose 
                   <div className="truncate text-xs text-[var(--text-primary)]">
                     {att.file.name}
                   </div>
-                  <div className="text-2xs text-[var(--text-secondary)]">
+                  <div className="text-caption text-[var(--text-secondary)]">
                     {formatFileSize(att.file.size)}
                   </div>
                 </button>
@@ -77,7 +77,7 @@ export function AttachmentPickerPopover({ anchorRef, invokedBy, taskId, onClose 
                   }}
                   aria-label={`Remove ${att.file.name}`}
                   title="Remove attachment"
-                  className="shrink-0 opacity-0 group-hover/att:opacity-100 focus-visible:opacity-100 text-[var(--text-secondary)] hover:text-red-500"
+                  className="shrink-0 opacity-0 group-hover/att:opacity-100 focus-visible:opacity-100 text-[var(--text-secondary)] hover:text-danger"
                 >
                   <X className="h-3 w-3" />
                 </button>
@@ -93,18 +93,18 @@ export function AttachmentPickerPopover({ anchorRef, invokedBy, taskId, onClose 
         type="button"
         onClick={handleBrowse}
         disabled={uploadAttachment.isPending}
-        className="w-full rounded bg-[var(--accent-blue)] px-2 py-1.5 text-xs text-white hover:opacity-90 disabled:opacity-40"
+        className="w-full rounded-control bg-accent-fill px-2 py-1.5 text-xs text-on-accent hover:opacity-90 disabled:opacity-40"
       >
         {uploadAttachment.isPending ? 'Uploading...' : 'Browse files'}
       </button>
 
       {uploadAttachment.isError && (
-        <p className="mt-1.5 text-2xs text-red-500">
+        <p className="mt-1.5 text-caption text-danger">
           {uploadAttachment.error?.message || 'Upload failed'}
         </p>
       )}
       {deleteAttachment.isError && (
-        <p className="mt-1.5 text-2xs text-red-500">
+        <p className="mt-1.5 text-caption text-danger">
           {deleteAttachment.error?.message || 'Delete failed'}
         </p>
       )}

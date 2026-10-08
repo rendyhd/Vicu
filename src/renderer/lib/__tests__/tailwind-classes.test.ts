@@ -13,10 +13,6 @@ import { loadTokens, tailwindTheme } from '../../../../scripts/gen-tokens.mjs'
 const renderer = resolve(__dirname, '..', '..')
 const root = resolve(__dirname, '..', '..', '..', '..')
 
-// Removed once card 1.3 lands. The picker popovers are rewritten in that card; until then their
-// remaining arbitrary var() opacities are not checked.
-const PENDING_POPOVER_FILES = ['components/task-list/RecurrencePickerPopover.tsx']
-
 // The named colour for each variable in the sweep table (section 2). --accent-red to --accent-teal
 // map by name, so only the others are listed.
 const NAMED_COLOUR: Record<string, string> = {
@@ -94,7 +90,6 @@ describe('Tailwind colour classes in src/renderer', () => {
 
   it('has no opacity on an arbitrary var(), on a raw colour or on an unconfigured step', () => {
     const findings = sourceFiles(renderer)
-      .filter((path) => !PENDING_POPOVER_FILES.includes(posix(path)))
       .flatMap((path) =>
         readFileSync(path, 'utf8')
           .split('\n')

@@ -73,7 +73,7 @@ export function RecurrencePickerPopover({
     <Popover anchorRef={anchorRef} onClose={onClose} placement="right-start" label="Repeat" className="w-60 p-3">
       {/* Current recurrence display */}
       {hasRecurrence && (
-        <div className="mb-2 flex items-center justify-between rounded bg-[var(--bg-hover)] px-2 py-1.5">
+        <div className="mb-2 flex items-center justify-between rounded-control bg-[var(--bg-hover)] px-2 py-1.5">
           <span className="text-xs font-medium text-[var(--text-primary)]">
             {formatRecurrenceLabel(repeatAfter, repeatMode)}
           </span>
@@ -82,7 +82,7 @@ export function RecurrencePickerPopover({
             onClick={clearRecurrence}
             aria-label="Clear repeat"
             title="Clear repeat"
-            className="text-[var(--text-secondary)] hover:text-red-500"
+            className="text-[var(--text-secondary)] hover:text-danger"
           >
             <X className="h-3 w-3" />
           </button>
@@ -97,9 +97,9 @@ export function RecurrencePickerPopover({
             type="button"
             onClick={() => applyPreset(key)}
             className={cn(
-              'rounded px-2 py-1.5 text-left text-xs transition-colors',
+              'rounded-control px-2 py-1.5 text-left text-xs transition-colors',
               activePreset === key
-                ? 'bg-[var(--accent-blue)]/10 font-medium text-[var(--accent-blue)]'
+                ? 'bg-accent-blue/10 font-medium text-[var(--accent-blue)]'
                 : 'text-[var(--text-primary)] hover:bg-[var(--bg-hover)]'
             )}
           >
@@ -110,9 +110,9 @@ export function RecurrencePickerPopover({
           type="button"
           onClick={() => setShowCustom(!showCustom)}
           className={cn(
-            'rounded px-2 py-1.5 text-left text-xs transition-colors',
+            'rounded-control px-2 py-1.5 text-left text-xs transition-colors',
             showCustom || activePreset === 'custom'
-              ? 'bg-[var(--accent-blue)]/10 font-medium text-[var(--accent-blue)]'
+              ? 'bg-accent-blue/10 font-medium text-[var(--accent-blue)]'
               : 'text-[var(--text-primary)] hover:bg-[var(--bg-hover)]'
           )}
         >
@@ -132,13 +132,13 @@ export function RecurrencePickerPopover({
               max={365}
               value={customValue}
               onChange={(e) => setCustomValue(Number(e.target.value))}
-              className="w-14 rounded border border-[var(--border-color)] bg-[var(--bg-secondary)] px-1.5 py-1 text-center text-xs text-[var(--text-primary)] focus:border-[var(--accent-blue)] focus:outline-none"
+              className="w-14 rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-1.5 py-1 text-center text-xs text-[var(--text-primary)]"
             />
             <select
               aria-label="Repeat unit"
               value={customUnit}
               onChange={(e) => setCustomUnit(e.target.value as CustomUnit)}
-              className="rounded border border-[var(--border-color)] bg-[var(--bg-secondary)] px-1.5 py-1 text-xs text-[var(--text-primary)] focus:border-[var(--accent-blue)] focus:outline-none"
+              className="rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-1.5 py-1 text-xs text-[var(--text-primary)]"
             >
               <option value="days">days</option>
               <option value="weeks">weeks</option>
@@ -150,15 +150,15 @@ export function RecurrencePickerPopover({
               type="checkbox"
               checked={fromCompletion}
               onChange={(e) => setFromCompletion(e.target.checked)}
-              className="h-3 w-3 rounded border-[var(--border-color)] accent-[var(--accent-blue)]"
+              className="h-3 w-3 rounded-control border-[var(--border-color)] accent-[var(--accent-blue)]"
             />
-            <span className="text-2xs text-[var(--text-secondary)]">From completion date</span>
+            <span className="text-caption text-[var(--text-secondary)]">From completion date</span>
           </label>
 
           <button
             type="button"
             onClick={applyCustom}
-            className="mt-2 w-full rounded bg-[var(--accent-blue)] px-2 py-1.5 text-xs text-white hover:opacity-90"
+            className="mt-2 w-full rounded-control bg-accent-fill px-2 py-1.5 text-xs text-on-accent hover:opacity-90"
           >
             Apply
           </button>

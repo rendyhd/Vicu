@@ -11,15 +11,6 @@ import { loadTokens, typeRoles } from '../../../../scripts/gen-tokens.mjs'
 
 const renderer = resolve(__dirname, '..', '..')
 
-// Removed once card 1.3 lands. The picker popovers are rewritten in that card; until then their
-// text-2xs and text-[10px] classes are not checked (see NOTES in the card 1.4 report).
-const PENDING_POPOVER_FILES = [
-  'components/task-list/AttachmentPickerPopover.tsx',
-  'components/task-list/DatePickerPopover.tsx',
-  'components/task-list/RecurrencePickerPopover.tsx',
-  'components/task-list/ReminderPickerPopover.tsx',
-]
-
 // Files that still use an arbitrary text-[Npx] of 11 px or more (11, 12 and 13 px have no weight in
 // the role classes yet, so moving them changes the weight too). Each entry leaves the list when its
 // last arbitrary size becomes a role class. A new entry needs a reason; prefer a role class.
@@ -101,7 +92,6 @@ const posix = (path: string) => relative(renderer, path).split(sep).join('/')
 
 function scanAll(allowlist: string[]): Finding[] {
   return sourceFiles(renderer)
-    .filter((path) => !PENDING_POPOVER_FILES.includes(posix(path)))
     .flatMap((path) =>
       readFileSync(path, 'utf8')
         .split('\n')

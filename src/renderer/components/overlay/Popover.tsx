@@ -122,7 +122,7 @@ export function Popover({
       className={cn(
         // The browser's popover styles centre the box and give it padding, border and colours of
         // its own; reset them so Floating UI's left/top decide.
-        'm-0 inset-auto overflow-y-auto overflow-x-hidden rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] text-[var(--text-primary)] shadow-lg focus:outline-none',
+        'm-0 inset-auto overflow-y-auto overflow-x-hidden rounded-popover border border-[var(--border-color)] bg-[var(--bg-primary)] text-[var(--text-primary)] shadow-lg focus:outline-none',
         className,
       )}
     >

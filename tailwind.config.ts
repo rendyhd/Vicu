@@ -14,10 +14,7 @@ const config: Config = {
   theme: {
     extend: {
       colors: tokenTheme.colors,
-      fontSize: {
-        '2xs': ['0.625rem', { lineHeight: '0.875rem' }],
-        ...tokenTheme.fontSize,
-      },
+      fontSize: tokenTheme.fontSize,
       borderRadius: tokenTheme.borderRadius,
       opacity: tokenTheme.opacity,
       typography: {

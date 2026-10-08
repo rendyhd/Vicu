@@ -12,25 +12,12 @@ import { loadTokens, radiusRoles } from '../../../../scripts/gen-tokens.mjs'
 
 const renderer = resolve(__dirname, '..', '..')
 
-// Removed once card 1.3 lands. The picker popovers are rewritten in that card; until then their
-// stock radii are not checked.
-const PENDING_POPOVER_FILES = [
-  'components/task-list/AttachmentPickerPopover.tsx',
-  'components/task-list/DatePickerPopover.tsx',
-  'components/task-list/DraftLabelPickerPopover.tsx',
-  'components/task-list/InfoPopover.tsx',
-  'components/task-list/LabelPickerPopover.tsx',
-  'components/task-list/PriorityPickerPopover.tsx',
-  'components/task-list/ProjectPickerPopover.tsx',
-  'components/task-list/RecurrencePickerPopover.tsx',
-  'components/task-list/ReminderPickerPopover.tsx',
-]
-
 const ROLES = new Set(Object.keys(radiusRoles(loadTokens())))
 const ALLOWED = new Set([...ROLES, 'full', 'none'])
 
 // [variant:]* rounded [-side] [-size]; the lookahead keeps `rounded-control` from matching bare.
-const RADIUS = /(?<![\w-])(?:[a-z-]+:)*rounded(?:-(?:tl|tr|bl|br|ss|se|es|ee|t|b|l|r|s|e))?(?:-(\[[^\]]+\]|[\w]+))?(?![\w-])/g
+// A `rounded:` followed by a colon is an object key (the tailwind-merge group in cn.ts), not a class.
+const RADIUS = /(?<![\w-])(?:[a-z-]+:)*rounded(?:-(?:tl|tr|bl|br|ss|se|es|ee|t|b|l|r|s|e))?(?:-(\[[^\]]+\]|[\w]+))?(?![\w:-])/g
 
 interface Finding {
   file: string
@@ -69,18 +56,12 @@ describe('radius roles in src/renderer', () => {
 
   it('has no arbitrary or stock-scale rounded class', () => {
     const findings = sourceFiles(renderer)
-      .filter((path) => !PENDING_POPOVER_FILES.includes(posix(path)))
       .flatMap((path) =>
         readFileSync(path, 'utf8')
           .split('\n')
           .flatMap((text, i) => scanLine(posix(path), i + 1, text)),
       )
     expect(findings.map((f) => `${f.file}:${f.line} ${f.cls}: ${f.why}`)).toEqual([])
-  })
-
-  it('lists only files that exist', () => {
-    const all = new Set(sourceFiles(renderer).map(posix))
-    expect(PENDING_POPOVER_FILES.filter((file) => !all.has(file))).toEqual([])
   })
 
   // The probe classes are built from parts: Tailwind's content scan includes this folder, and a
@@ -110,5 +91,6 @@ describe('radius roles in src/renderer', () => {
     expect(flagged(cls('rounded', 'none'))).toEqual([])
     expect(flagged(cls('border', 'rounded'))).toEqual([])
     expect(flagged('// keep the window height so rounded corners stay visible')).toEqual([])
+    expect(flagged(`{ ${cls('rounded')}: ['control'] }`)).toEqual([])
   })
 })

@@ -53,21 +53,21 @@ export function DatePickerPopover({
         <button
           type="button"
           onClick={() => applyDate(presets.today)}
-          className="rounded px-2 py-1.5 text-left text-xs text-[var(--text-primary)] hover:bg-[var(--bg-hover)]"
+          className="rounded-control px-2 py-1.5 text-left text-xs text-[var(--text-primary)] hover:bg-[var(--bg-hover)]"
         >
           Today
         </button>
         <button
           type="button"
           onClick={() => applyDate(presets.tomorrow)}
-          className="rounded px-2 py-1.5 text-left text-xs text-[var(--text-primary)] hover:bg-[var(--bg-hover)]"
+          className="rounded-control px-2 py-1.5 text-left text-xs text-[var(--text-primary)] hover:bg-[var(--bg-hover)]"
         >
           Tomorrow
         </button>
         <button
           type="button"
           onClick={() => applyDate(presets.nextWeek)}
-          className="rounded px-2 py-1.5 text-left text-xs text-[var(--text-primary)] hover:bg-[var(--bg-hover)]"
+          className="rounded-control px-2 py-1.5 text-left text-xs text-[var(--text-primary)] hover:bg-[var(--bg-hover)]"
         >
           Next Week
         </button>
@@ -82,7 +82,7 @@ export function DatePickerPopover({
             setDateValue(e.target.value)
             if (e.target.value) applyDate(e.target.value)
           }}
-          className="w-full rounded border border-[var(--border-color)] bg-[var(--bg-secondary)] px-2 py-1.5 text-xs text-[var(--text-primary)] focus:border-[var(--accent-blue)] focus:outline-none"
+          className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-2 py-1.5 text-xs text-[var(--text-primary)]"
         />
       </div>
 
@@ -90,7 +90,7 @@ export function DatePickerPopover({
         <button
           type="button"
           onClick={() => applyDate('')}
-          className="mt-2 flex w-full items-center gap-1 rounded px-2 py-1.5 text-xs text-red-500 hover:bg-red-500/10"
+          className="mt-2 flex w-full items-center gap-1 rounded-control px-2 py-1.5 text-xs text-danger hover:bg-danger/10"
         >
           <X className="h-3 w-3" />
           Clear date
@@ -106,12 +106,12 @@ export function DatePickerPopover({
             aria-haspopup="dialog"
             aria-expanded={showRecurrence}
             onClick={() => setShowRecurrence(!showRecurrence)}
-            className="flex w-full items-center gap-1.5 rounded px-2 py-1.5 text-left text-xs text-[var(--text-primary)] hover:bg-[var(--bg-hover)]"
+            className="flex w-full items-center gap-1.5 rounded-control px-2 py-1.5 text-left text-xs text-[var(--text-primary)] hover:bg-[var(--bg-hover)]"
           >
             <Repeat className="h-3 w-3 text-[var(--text-secondary)]" />
             <span className="flex-1">Repeat</span>
             {hasRecurrence && (
-              <span className="text-2xs font-medium text-[var(--accent-blue)]">
+              <span className="text-caption font-medium text-[var(--accent-blue)]">
                 {formatRecurrenceLabel(repeatAfter, repeatMode)}
               </span>
             )}
