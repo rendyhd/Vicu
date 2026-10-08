@@ -151,3 +151,16 @@ export function planSiblingMove(
   })
   return { position: movedPosition, renumbered }
 }
+
+/**
+ * A section made between two others: it is created last, so when it belongs earlier this plans the
+ * move from the end to `index` (null when it already is in place, or for an index at the end).
+ */
+export function planInsertedSibling(
+  siblings: readonly { id: number; position: number }[],
+  created: { id: number; position: number },
+  index: number,
+): SiblingMovePlan | null {
+  if (index >= siblings.length) return null
+  return planSiblingMove([...siblings, created], siblings.length, index)
+}

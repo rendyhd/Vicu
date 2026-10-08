@@ -40,6 +40,12 @@ interface TaskListProps {
   /** Content rendered inside the scroll area above the task input (e.g. date subtitle) */
   headerContent?: React.ReactNode
   onTaskCreated?: (task: Task) => void
+  /**
+   * Where the quiet "New task" row (and the composer it turns into) sits: after the list's own
+   * tasks and before `children` (a project, whose sections follow), or after the children, the end
+   * of the whole list (Today, Upcoming, Anytime: the tasks are all in the children). Default: the end.
+   */
+  newTaskPlacement?: 'after-tasks' | 'after-children'
 }
 
 export function TaskList({
@@ -58,6 +64,7 @@ export function TaskList({
   defaultDueDate,
   headerContent,
   onTaskCreated,
+  newTaskPlacement = 'after-children',
 }: TaskListProps) {
   const [isAdding, setIsAdding] = useState(false)
   const [addPosition, setAddPosition] = useState<'top' | 'bottom'>('top')
@@ -430,6 +437,21 @@ export function TaskList({
     </div>
   )
 
+  // The end of the list: the composer when it was opened there, else the quiet "New task" row.
+  const endOfList = (
+    <>
+      {isAdding && addPosition === 'bottom' && taskInputElement}
+      {showNewTask && projectId && !isAdding && (
+        <AddTaskButton
+          onClick={() => {
+            setAddPosition('bottom')
+            setIsAdding(true)
+          }}
+        />
+      )}
+    </>
+  )
+
   return (
     <div className={cn('flex h-full flex-col', className)} onClick={handleContainerClick}>
       <div
@@ -493,18 +515,11 @@ export function TaskList({
           tasks.map((task) => <TaskRow key={task.id} task={task} />)
         )}
 
-        {isAdding && addPosition === 'bottom' && taskInputElement}
-
-        {showNewTask && projectId && !isAdding && (
-          <AddTaskButton
-            onClick={() => {
-              setAddPosition('bottom')
-              setIsAdding(true)
-            }}
-          />
-        )}
+        {newTaskPlacement === 'after-tasks' && endOfList}
 
         {children}
+
+        {newTaskPlacement === 'after-children' && endOfList}
       </div>
     </div>
   )

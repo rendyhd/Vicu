@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 import { useParams } from '@tanstack/react-router'
 import { useDndMonitor } from '@dnd-kit/core'
 import { SortableContext } from '@dnd-kit/sortable'
@@ -209,6 +209,7 @@ export function ProjectView() {
       emptyTitle="No tasks in this project"
       emptySubtitle="Create a new task to get started"
       insertIndex={parentInsertIndex}
+      newTaskPlacement="after-tasks"
     >
       <div className="px-2">
         {hasSections && <ParentDropZone projectId={pid} />}
@@ -217,9 +218,10 @@ export function ProjectView() {
             items={sectionProjects.map((p) => `section-${p.id}`)}
             strategy={verticalListSortingStrategyForeignSafe}
           >
-            {sections.map((section) => (
+            {sections.map((section, i) => (
+              <Fragment key={section.project.id}>
+                {i > 0 && <AddSectionButton parentProjectId={pid} siblings={sectionProjects} index={i} />}
               <SectionGroup
-                key={section.project.id}
                 project={section.project}
                 tasks={section.tasks}
                 viewId={section.viewId}
@@ -228,10 +230,11 @@ export function ProjectView() {
                 depth={0}
                 insertIndicator={insertIndicator}
               />
+              </Fragment>
             ))}
           </SortableContext>
         )}
-        <AddSectionButton parentProjectId={pid} />
+        <AddSectionButton parentProjectId={pid} siblings={sectionProjects} index={sectionProjects.length} />
       </div>
     </TaskList>
     </RowViewProvider>

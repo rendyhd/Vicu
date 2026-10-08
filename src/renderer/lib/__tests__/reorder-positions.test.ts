@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { NULL_DATE } from '../constants'
 import { sortProjectTasks } from '../task-sort'
 import {
+  planInsertedSibling,
   MIN_POSITION_GAP,
   POSITION_STEP,
   applyPositionUpdates,
@@ -256,5 +257,32 @@ describe('sendPositionUpdates with any update shape', () => {
       [{ id: 2, position: 20 }, { id: 3, position: 30 }],
     )
     expect(sent).toEqual([2, 3, 1])
+  })
+})
+
+describe('planInsertedSibling', () => {
+  const sections = [
+    { id: 1, position: 65536 },
+    { id: 2, position: 131072 },
+    { id: 3, position: 196608 },
+  ]
+
+  it('leaves a section added at the end where the server put it', () => {
+    expect(planInsertedSibling(sections, { id: 9, position: 262144 }, 3)).toBeNull()
+  })
+
+  it('puts a section between two others at the middle of their positions', () => {
+    expect(planInsertedSibling(sections, { id: 9, position: 262144 }, 1)).toEqual({ position: 98304, renumbered: [] })
+  })
+
+  it('puts a section first before the first one', () => {
+    const plan = planInsertedSibling(sections, { id: 9, position: 262144 }, 0)
+    expect(plan?.position).toBe(32768)
+  })
+
+  it('spreads the siblings when there is no room between neighbours', () => {
+    const tight = [{ id: 1, position: 1 }, { id: 2, position: 1 }]
+    const plan = planInsertedSibling(tight, { id: 9, position: 5 }, 1)
+    expect(plan?.renumbered.length).toBeGreaterThan(0)
   })
 })

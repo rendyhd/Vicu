@@ -162,9 +162,16 @@ export function SectionGroup({
           items={childSections.map((c) => `section-${c.project.id}`)}
           strategy={verticalListSortingStrategyForeignSafe}
         >
-          {childSections.map((child) => (
+          {childSections.map((child, i) => (
+            <Fragment key={child.project.id}>
+              {i > 0 && (
+                <AddSectionButton
+                  parentProjectId={project.id}
+                  siblings={childSections.map((c) => c.project)}
+                  index={i}
+                />
+              )}
             <SectionGroup
-              key={child.project.id}
               project={child.project}
               tasks={child.tasks}
               viewId={child.viewId}
@@ -173,11 +180,16 @@ export function SectionGroup({
               depth={depth + 1}
               insertIndicator={insertIndicator}
             />
+            </Fragment>
           ))}
         </SortableContext>
       )}
 
-      <AddSectionButton parentProjectId={project.id} />
+      <AddSectionButton
+        parentProjectId={project.id}
+        siblings={childSections.map((c) => c.project)}
+        index={childSections.length}
+      />
     </div>
   )
 }

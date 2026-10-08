@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
-import { Archive, Pencil, Trash2, X } from 'lucide-react'
+import { Archive, Pencil, Plus, Trash2, X } from 'lucide-react'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { useProjects, type ProjectTreeNode } from '@/hooks/use-projects'
 import { useCreateProject, useUpdateProject, useDeleteProject, useSetProjectArchived } from '@/hooks/use-task-mutations'
@@ -14,10 +14,13 @@ import type { Project } from '@/lib/vikunja-types'
 function ProjectDialog({
   open,
   project,
+  parentProject = null,
   onClose,
 }: {
   open: boolean
   project: Project | null
+  /** Set (with no `project`) to add a section: a child project of this one. */
+  parentProject?: Project | null
   onClose: () => void
 }) {
   const [title, setTitle] = useState('')
@@ -49,7 +52,11 @@ function ProjectDialog({
       )
     } else {
       createProject.mutate(
-        { title: trimmed, hex_color: hexColor || undefined },
+        {
+          title: trimmed,
+          hex_color: hexColor || undefined,
+          ...(parentProject ? { parent_project_id: parentProject.id } : {}),
+        },
         { onSuccess: onClose }
       )
     }
@@ -62,7 +69,7 @@ function ProjectDialog({
       >
         <div className="flex items-center justify-between border-b border-[var(--border-color)] px-5 py-3">
           <h2 className="text-sm font-semibold text-[var(--text-primary)]">
-            {project ? 'Edit Project' : 'New Project'}
+            {project ? 'Edit Project' : parentProject ? 'New Section' : 'New Project'}
           </h2>
           <button
             type="button"
@@ -80,7 +87,7 @@ function ProjectDialog({
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="Project name"
+              placeholder={parentProject ? 'Section name' : 'Project name'}
               autoFocus
               className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]"
               onKeyDown={(e) => {
@@ -166,6 +173,7 @@ export function ProjectTree() {
   const [inboxProjectId, setInboxProjectId] = useState<number | undefined>()
   const [editingProject, setEditingProject] = useState<Project | null>(null)
   const [archiveTarget, setArchiveTarget] = useState<Project | null>(null)
+  const [sectionParent, setSectionParent] = useState<Project | null>(null)
   const [contextMenu, setContextMenu] = useState<{
     x: number
     y: number
@@ -254,6 +262,17 @@ export function ProjectTree() {
             <Pencil className="h-3.5 w-3.5" />
             Edit
           </button>
+          <button
+            type="button"
+            onClick={() => {
+              setSectionParent(contextMenu.project)
+              setContextMenu(null)
+            }}
+            className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-[var(--text-primary)] hover:bg-[var(--bg-hover)]"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Add section
+          </button>
           {contextMenu.project.id !== inboxProjectId && (
             <>
               <button
@@ -291,6 +310,12 @@ export function ProjectTree() {
         open={projectDialogOpen}
         project={editingProject}
         onClose={handleCloseDialog}
+      />
+      <ProjectDialog
+        open={sectionParent != null}
+        project={null}
+        parentProject={sectionParent}
+        onClose={() => setSectionParent(null)}
       />
       <ConfirmDialog {...deleteDialogProps} />
       <ConfirmDialog
