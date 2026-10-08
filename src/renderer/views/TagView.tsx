@@ -8,12 +8,15 @@ import { usePrintable } from '@/stores/print-store'
 import { withoutNestedSubtasks } from '@/lib/nested-subtasks'
 import { TaskList } from '@/components/task-list/TaskList'
 import { ProjectTaskGroup } from '@/components/task-list/ProjectTaskGroup'
+import { RowViewProvider } from '@/components/task-list/RowViewContext'
 
 export function TagView() {
   const { labelId } = useParams({ from: '/tag/$labelId' })
   const lid = Number(labelId)
   const { data: labels } = useLabels()
   const { data: projects } = useProjects()
+  // The rows are all about this tag: they do not repeat it as a chip.
+  const rowView = useMemo(() => ({ labelId: lid }), [lid])
   const labelName = labels?.find((l) => l.id === lid)?.title ?? 'Tag'
 
   const params = useFilters({ view: 'tag', labelId: lid })
@@ -65,15 +68,17 @@ export function TagView() {
   }
 
   return (
-    <TaskList
-      title={labelName}
-      tasks={[]}
-      showNewTask={false}
-      emptyTitle={`No tasks tagged "${labelName}"`}
-    >
-      {groups.map((group) => (
-        <ProjectTaskGroup key={group.name} level={1} name={group.name} color={group.color} tasks={group.tasks} />
-      ))}
-    </TaskList>
+    <RowViewProvider value={rowView}>
+      <TaskList
+        title={labelName}
+        tasks={[]}
+        showNewTask={false}
+        emptyTitle={`No tasks tagged "${labelName}"`}
+      >
+        {groups.map((group) => (
+          <ProjectTaskGroup key={group.name} level={1} name={group.name} color={group.color} tasks={group.tasks} />
+        ))}
+      </TaskList>
+    </RowViewProvider>
   )
 }

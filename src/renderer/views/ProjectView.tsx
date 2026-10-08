@@ -13,6 +13,7 @@ import { TaskList } from '@/components/task-list/TaskList'
 import { SectionGroup } from '@/components/task-list/SectionGroup'
 import { AddSectionButton } from '@/components/task-list/AddSectionButton'
 import { ParentDropZone } from '@/components/task-list/ParentDropZone'
+import { RowViewProvider } from '@/components/task-list/RowViewContext'
 
 function findSectionForTask(
   sections: SectionData[],
@@ -44,6 +45,8 @@ interface InsertIndicator {
 export function ProjectView() {
   const { projectId } = useParams({ from: '/project/$projectId' })
   const pid = Number(projectId)
+  // The rows are listed inside this project: none of them names it.
+  const rowView = useMemo(() => ({ projectId: pid }), [pid])
   const { data: projectData, isLoading: projectsLoading } = useProjects()
   const activeProject = projectData?.flat.find((p) => p.id === pid)
   const archivedProject = projectData?.archived.find((p) => p.id === pid)
@@ -196,6 +199,7 @@ export function ProjectView() {
     insertIndicator?.containerId === 'parent' ? insertIndicator.index : undefined
 
   return (
+    <RowViewProvider value={rowView}>
     <TaskList
       title={projectName}
       tasks={tasks}
@@ -230,5 +234,6 @@ export function ProjectView() {
         <AddSectionButton parentProjectId={pid} />
       </div>
     </TaskList>
+    </RowViewProvider>
   )
 }

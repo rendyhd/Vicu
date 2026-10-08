@@ -31,8 +31,6 @@ const ARBITRARY_SIZE_ALLOWLIST = [
   'components/task-list/NlpParsePreview.tsx',
   'components/task-list/ParentDropZone.tsx',
   'components/task-list/SectionDragOverlay.tsx',
-  'components/task-list/TaskDragOverlay.tsx',
-  'components/task-list/TaskRow.tsx',
   'views/ReviewView.tsx',
 ]
 

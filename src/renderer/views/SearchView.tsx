@@ -5,6 +5,10 @@ import { useProjects } from '@/hooks/use-projects'
 import { useMemo } from 'react'
 import { TaskList } from '@/components/task-list/TaskList'
 import { EmptyState } from '@/components/shared/EmptyState'
+import { RowViewProvider } from '@/components/task-list/RowViewContext'
+
+// Results come from every project and have no group headers, so each row names its project.
+const ROW_VIEW = { showProject: true }
 
 export function SearchView() {
   const { q } = useSearch({ from: '/search' })
@@ -29,12 +33,14 @@ export function SearchView() {
   }
 
   return (
-    <TaskList
-      title={`Search: "${q}"`}
-      tasks={visibleTasks}
-      showNewTask={false}
-      emptyTitle="No tasks found"
-      emptySubtitle={`No results for "${q}"`}
-    />
+    <RowViewProvider value={ROW_VIEW}>
+      <TaskList
+        title={`Search: "${q}"`}
+        tasks={visibleTasks}
+        showNewTask={false}
+        emptyTitle="No tasks found"
+        emptySubtitle={`No results for "${q}"`}
+      />
+    </RowViewProvider>
   )
 }

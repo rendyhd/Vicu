@@ -7,11 +7,15 @@ import { useAppConfig } from '@/hooks/use-app-config'
 import { usePrintable } from '@/stores/print-store'
 import { useDayKey } from '@/stores/day-store'
 import { TaskList } from '@/components/task-list/TaskList'
+import { RowViewProvider } from '@/components/task-list/RowViewContext'
 import { buildCustomListServerFilter, matchesCustomList } from '@/lib/custom-list-filter'
 import { serverSortParams, sortCustomListTasks } from '@/lib/custom-list-sort'
 import { toLocalDate } from '@/lib/due-dates'
 import { withoutNestedSubtasks } from '@/lib/nested-subtasks'
 import type { CustomList, Task, TaskQueryParams } from '@/lib/vikunja-types'
+
+// A custom list mixes projects without a header per project, so each row names its project.
+const ROW_VIEW = { showProject: true }
 
 /**
  * The server filter is only a superset built from local-day boundaries; the exact window is
@@ -86,6 +90,7 @@ export function CustomListView() {
   }
 
   return (
+    <RowViewProvider value={ROW_VIEW}>
     <TaskList
       title={customList?.name ?? 'List'}
       tasks={filteredTasks}
@@ -112,5 +117,6 @@ export function CustomListView() {
       emptyTitle="No matching tasks"
       emptySubtitle="Try adjusting the list filters"
     />
+    </RowViewProvider>
   )
 }

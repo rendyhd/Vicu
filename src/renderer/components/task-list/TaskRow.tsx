@@ -14,10 +14,13 @@ import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { isNullDate } from '@/lib/date-utils'
 import { dueToday, parsedDue } from '@/lib/due-dates'
 import { labelChipStyle } from '@/lib/label-style'
+import { normalizeHex } from '@/lib/constants'
+import { checklistLabel, rowLabels, rowProjectSource } from '@/lib/row-anatomy'
 import { useIsDark } from '@/hooks/use-is-dark'
 import type { Task, TaskReminder } from '@/lib/vikunja-types'
 import { TaskCheckbox } from './TaskCheckbox'
 import { TaskDueBadge } from './TaskDueBadge'
+import { useRowView } from './RowViewContext'
 import { PriorityMark } from '@/components/shared/PriorityMark'
 import { DatePickerPopover } from './DatePickerPopover'
 import { LabelPickerPopover } from './LabelPickerPopover'
@@ -55,9 +58,21 @@ interface TaskRowProps {
   parentProjectId?: number
   /**
    * Set by a list view when the task is alone in its project group (no group header): the project
-   * goes on the row's meta line. Rendered by the row anatomy card (2.6); until then it is carried only.
+   * goes on the row's meta line, unless the view is that project (`RowViewContext`).
    */
   projectMeta?: { title: string; color?: string }
+}
+
+/** `projectMeta` is a new object on every render of a group, so compare it by value to keep memo useful. */
+function sameRowProps(a: TaskRowProps, b: TaskRowProps): boolean {
+  return (
+    a.task === b.task &&
+    a.sortable === b.sortable &&
+    a.nestedDepth === b.nestedDepth &&
+    a.parentProjectId === b.parentProjectId &&
+    a.projectMeta?.title === b.projectMeta?.title &&
+    a.projectMeta?.color === b.projectMeta?.color
+  )
 }
 
 // Animate displacement during active drag, but never animate layout changes after drop.
@@ -298,7 +313,28 @@ const TaskTitleEditor = forwardRef<TaskTitleEditorHandle, TaskTitleEditorProps>(
   },
 )
 
-function TaskRowInner({ task, nestedDepth = 0, parentProjectId, drag }: Omit<TaskRowProps, 'sortable'> & { drag: DragBehavior }) {
+/** The project on a row's meta line: its colour dot and name. */
+function RowProject({ title, color }: { title: string; color?: string }) {
+  return (
+    <span className="flex min-w-0 shrink items-center gap-1">
+      <span
+        aria-hidden="true"
+        className="h-1.5 w-1.5 shrink-0 rounded-full"
+        style={{ backgroundColor: normalizeHex(color) ?? 'var(--text-tertiary)' }}
+      />
+      <span className="truncate">{title}</span>
+    </span>
+  )
+}
+
+/** The project of a row in a list that mixes projects without headers (Search, custom lists). */
+function RowProjectLookup({ projectId }: { projectId: number }) {
+  const { data } = useProjects()
+  const project = data?.flat.find((candidate) => candidate.id === projectId)
+  return project ? <RowProject title={project.title} color={project.hex_color} /> : null
+}
+
+function TaskRowInner({ task, nestedDepth = 0, parentProjectId, projectMeta, drag }: Omit<TaskRowProps, 'sortable'> & { drag: DragBehavior }) {
   // Per-field subscriptions: each row re-renders only when *its own* derived
   // state flips, not on every focus/selection change anywhere in the list.
   const isExpanded = useSelectionStore((s) => s.expandedTaskId === task.id)
@@ -320,6 +356,7 @@ function TaskRowInner({ task, nestedDepth = 0, parentProjectId, drag }: Omit<Tas
   const { confirmDelete, dialogProps } = useConfirmDelete()
   const uploadFromDrop = useUploadAttachmentFromDrop()
   const { data: appConfig } = useAppConfig()
+  const rowView = useRowView()
 
   const { attributes, listeners, setNodeRef, isDragging, style } = drag
   const isDark = useIsDark()
@@ -498,6 +535,18 @@ function TaskRowInner({ task, nestedDepth = 0, parentProjectId, drag }: Omit<Tas
   )
 
   const labels = task.labels ?? []
+  const metaLabels = rowLabels(labels, rowView)
+  const projectSource = rowProjectSource(task.project_id, rowView, projectMeta !== undefined)
+  const isRepeating = (task.repeat_after ?? 0) > 0 || (task.repeat_mode ?? 0) > 0
+  const hasMeta =
+    projectSource !== 'none' ||
+    metaLabels.length > 0 ||
+    subtaskCount > 0 ||
+    isRepeating ||
+    hasNotesContent(task.description) ||
+    (task.attachments?.length ?? 0) > 0 ||
+    (nestedDepth === 0 && !!parentTitle(task)) ||
+    (nestedDepth > 0 && parentProjectId !== undefined && parentProjectId !== task.project_id)
 
   // Collapsed row — entire row is draggable (PointerSensor distance:8 distinguishes click vs drag)
   if (!isExpanded) {
@@ -507,7 +556,7 @@ function TaskRowInner({ task, nestedDepth = 0, parentProjectId, drag }: Omit<Tas
         ref={setNodeRef}
         data-task-id={task.id}
         className={cn(
-          'group flex min-h-10 cursor-default items-center gap-3 border-b border-[var(--border-color)] px-4 py-2 transition-colors hover:bg-[var(--bg-hover)]',
+          'group grid cursor-default grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-x-3 border-b border-[var(--border-color)] px-4 py-2.5 transition-colors hover:bg-[var(--bg-hover)]',
           isSelected && 'bg-accent-blue/15 ring-1 ring-inset ring-accent-blue/40',
           isFocused && !isSelected && !isExpanded && 'bg-accent-blue/8 ring-1 ring-inset ring-accent-blue/30',
           isDragging && 'opacity-30',
@@ -572,92 +621,89 @@ function TaskRowInner({ task, nestedDepth = 0, parentProjectId, drag }: Omit<Tas
       >
         <TaskCheckbox task={task} suppressTopLevelUndo={nestedDepth > 0} />
 
-        {labels.length > 0 && (
-          <div className="flex shrink-0 items-center gap-1">
-            {labels.map((l) => (
-              <span
-                key={l.id}
-                className="rounded-chip px-2 py-px text-chip leading-tight"
-                style={labelChipStyle(l.hex_color, isDark)}
-              >
-                {l.title}
-              </span>
-            ))}
-          </div>
-        )}
-
-        <div className="min-w-0 flex-1">
+        {/* Line 1 is the title, level with the checkbox; line 2 is the meta line, when there is one. */}
+        <div className="min-w-0">
           <span
             className={cn(
-              'block break-words text-[13px] text-[var(--text-primary)]',
-              task.done && 'text-[var(--text-secondary)] line-through'
+              'block truncate text-task-title',
+              task.done ? 'text-text-secondary line-through' : 'text-text'
             )}
           >
             {dropError ? <span className="text-danger">{dropError}</span> : task.title}
           </span>
-          {nestedDepth === 0 && parentTitle(task) && (
-            <span className="block truncate text-caption text-[var(--text-secondary)]">
-              Subtask of {parentTitle(task)}
-            </span>
-          )}
-          {nestedDepth > 0 && parentProjectId !== undefined && parentProjectId !== task.project_id && (
-            <span className="block text-caption text-[var(--text-secondary)]">Different project</span>
+          {hasMeta && (
+            <div className="mt-0.5 flex min-w-0 items-center gap-x-2 overflow-hidden whitespace-nowrap text-meta text-text-secondary">
+              {projectSource === 'group' && projectMeta && (
+                <RowProject title={projectMeta.title} color={projectMeta.color} />
+              )}
+              {projectSource === 'lookup' && <RowProjectLookup projectId={task.project_id} />}
+              {metaLabels.map((l) => (
+                <span
+                  key={l.id}
+                  className="shrink-0 rounded-chip px-2 py-px text-chip leading-tight"
+                  style={labelChipStyle(l.hex_color, isDark)}
+                >
+                  {l.title}
+                </span>
+              ))}
+              {nestedDepth === 0 && parentTitle(task) && (
+                <span className="min-w-0 truncate">Subtask of {parentTitle(task)}</span>
+              )}
+              {nestedDepth > 0 && parentProjectId !== undefined && parentProjectId !== task.project_id && (
+                <span className="shrink-0">Different project</span>
+              )}
+              {subtaskCount > 0 && (
+                <button
+                  type="button"
+                  disabled={!canExpandSubtasks}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    if (canExpandSubtasks) setSubtasksExpanded((expanded) => !expanded)
+                  }}
+                  className={cn(
+                    'flex min-h-6 shrink-0 items-center justify-center gap-0.5',
+                    canExpandSubtasks && 'rounded-control px-0.5 hover:bg-bg-hover hover:text-text',
+                  )}
+                  aria-label={`${checklistLabel(progress.completed, progress.total)} subtasks complete`}
+                  aria-expanded={canExpandSubtasks ? subtasksExpanded : undefined}
+                >
+                  {canExpandSubtasks && (
+                    <ChevronRight className={cn('h-3 w-3 transition-transform duration-fade-fast', subtasksExpanded && 'rotate-90')} />
+                  )}
+                  <ListChecks className="h-3 w-3" />
+                  <span>{checklistLabel(progress.completed, progress.total)}</span>
+                </button>
+              )}
+              {hasNotesContent(task.description) && (
+                <AlignLeft className="h-3 w-3 shrink-0" aria-label="Has notes" />
+              )}
+              {isRepeating && <Repeat className="h-3 w-3 shrink-0" aria-label="Repeats" />}
+              {(task.attachments?.length ?? 0) > 0 && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    toggleExpandedTask(task.id)
+                    setActivePopover('attachment')
+                  }}
+                  className="relative shrink-0 after:absolute after:-inset-1.5 after:content-[''] hover:text-text"
+                  aria-label="Attachments"
+                >
+                  <Paperclip className="h-3 w-3" />
+                </button>
+              )}
+            </div>
           )}
         </div>
 
-        <TaskSyncIcon taskId={task.id} />
-        <TaskLinkIcon description={task.description} />
-
-        <div className="flex items-center gap-2">
-          {hasNotesContent(task.description) && (
-            <AlignLeft
-              className="h-3 w-3 text-[var(--text-secondary)]"
-              aria-label="Has notes"
-            />
-          )}
-          {subtaskCount > 0 && (
-            <button
-              type="button"
-              disabled={!canExpandSubtasks}
-              onClick={(e) => {
-                e.stopPropagation()
-                if (canExpandSubtasks) setSubtasksExpanded((expanded) => !expanded)
-              }}
-              className={cn(
-                'flex min-h-6 min-w-6 items-center justify-center gap-0.5 text-caption text-[var(--text-secondary)]',
-                canExpandSubtasks && 'rounded-control px-0.5 hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]',
-              )}
-              aria-label={`${progress.completed} of ${progress.total} subtasks complete`}
-              aria-expanded={canExpandSubtasks ? subtasksExpanded : undefined}
-            >
-              {canExpandSubtasks && (
-                <ChevronRight className={cn('h-3 w-3 transition-transform', subtasksExpanded && 'rotate-90')} />
-              )}
-              <ListChecks className="h-3 w-3" />
-              <span>{progress.completed}/{progress.total}</span>
-            </button>
-          )}
-          {(task.repeat_after ?? 0) > 0 || (task.repeat_mode ?? 0) > 0 ? (
-            <Repeat className="h-3 w-3 text-[var(--text-secondary)]" />
-          ) : null}
-          {(task.attachments?.length ?? 0) > 0 && (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation()
-                toggleExpandedTask(task.id)
-                setActivePopover('attachment')
-              }}
-              className="relative text-[var(--text-secondary)] after:absolute after:-inset-1.5 after:content-[''] hover:text-[var(--text-primary)]"
-              aria-label="Attachments"
-            >
-              <Paperclip className="h-3 w-3" />
-            </button>
-          )}
-          {(task.reminders?.length ?? 0) > 0 && (
-            <Bell className="h-3 w-3 text-[var(--text-secondary)]" />
-          )}
+        {/* Trailing cluster, level with the title: the due phrase, the reminder bell, the priority last. */}
+        <div className="flex h-5 shrink-0 items-center gap-2">
+          <TaskSyncIcon taskId={task.id} />
+          <TaskLinkIcon description={task.description} />
           <TaskDueBadge dueDate={task.due_date} />
+          {(task.reminders?.length ?? 0) > 0 && (
+            <Bell className="h-3 w-3 text-text-secondary" aria-label="Has a reminder" />
+          )}
           <PriorityMark priority={task.priority} />
         </div>
       </div>
@@ -687,7 +733,8 @@ function TaskRowInner({ task, nestedDepth = 0, parentProjectId, drag }: Omit<Tas
     <div
       data-task-id={task.id}
       className={cn(
-        'mx-2 my-1 rounded-card border border-[var(--border-color)] bg-[var(--bg-primary)] shadow-md',
+        // Two columns, the checkbox and the body: the notes, subtasks and action bar sit under the title.
+        'mx-2 my-1 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 rounded-card border border-[var(--border-color)] bg-[var(--bg-primary)] px-4 shadow-md',
         isDragOver && 'ring-2 ring-[var(--accent-blue)] bg-accent-blue/5',
         dropError && 'ring-2 ring-danger bg-danger/5'
       )}
@@ -697,8 +744,8 @@ function TaskRowInner({ task, nestedDepth = 0, parentProjectId, drag }: Omit<Tas
       onDrop={handleFileDrop}
     >
       {/* Title row */}
-      <div className="flex items-start gap-3 px-4 pt-3">
-        <TaskCheckbox task={task} className="mt-0.5" suppressTopLevelUndo={nestedDepth > 0} />
+      <TaskCheckbox task={task} className="mt-3.5" suppressTopLevelUndo={nestedDepth > 0} />
+      <div className="flex min-w-0 items-start gap-3 pt-3">
         <TaskTitleEditor
           ref={titleEditorRef}
           task={task}
@@ -724,7 +771,7 @@ function TaskRowInner({ task, nestedDepth = 0, parentProjectId, drag }: Omit<Tas
       </div>
 
       {/* Description */}
-      <div className="px-4 pt-2 pl-[43px]">
+      <div className="col-start-2 pt-2">
         <TaskDescription
           taskId={task.id}
           value={editDescription}
@@ -751,12 +798,12 @@ function TaskRowInner({ task, nestedDepth = 0, parentProjectId, drag }: Omit<Tas
       </div>
 
       {/* Existing subtasks stay visible; the action button toggles the add input. */}
-      <div className="px-4 pl-[43px]">
+      <div className="col-start-2">
         <SubtaskList parentTask={task} showInput={activePopover === 'subtasks'} />
       </div>
 
       {/* Action bar */}
-      <div className="flex items-center justify-between px-4 pb-3 pt-2 pl-[43px]">
+      <div className="col-start-2 flex items-center justify-between pb-3 pt-2">
         {/* Labels */}
         <div className="flex flex-1 flex-wrap items-center gap-1">
           {labels.map((l) => (
@@ -998,6 +1045,7 @@ function TaskRowInner({ task, nestedDepth = 0, parentProjectId, drag }: Omit<Tas
           </button>
         </div>
       </div>
+      <div className="col-span-2">
       <ConfirmDialog {...dialogProps} />
       <ConfirmDialog
         open={structuralDeleteOpen}
@@ -1016,21 +1064,22 @@ function TaskRowInner({ task, nestedDepth = 0, parentProjectId, drag }: Omit<Tas
         }}
         onCancel={() => setStructuralDeleteOpen(false)}
       />
+      </div>
     </div>
   )
 }
 
 const SortableTaskRow = memo(function SortableTaskRow(props: TaskRowProps) {
   const drag = useSortableRow(props.task)
-  return <TaskRowInner task={props.task} nestedDepth={props.nestedDepth} parentProjectId={props.parentProjectId} drag={drag} />
-})
+  return <TaskRowInner task={props.task} nestedDepth={props.nestedDepth} parentProjectId={props.parentProjectId} projectMeta={props.projectMeta} drag={drag} />
+}, sameRowProps)
 
 const DraggableTaskRow = memo(function DraggableTaskRow(props: TaskRowProps) {
   const drag = useDraggableRow(props.task)
-  return <TaskRowInner task={props.task} nestedDepth={props.nestedDepth} parentProjectId={props.parentProjectId} drag={drag} />
-})
+  return <TaskRowInner task={props.task} nestedDepth={props.nestedDepth} parentProjectId={props.parentProjectId} projectMeta={props.projectMeta} drag={drag} />
+}, sameRowProps)
 
 export const TaskRow = memo(function TaskRow(props: TaskRowProps) {
   // `sortable` is fixed by the list a row belongs to, so a row never switches between the two.
   return props.sortable ? <SortableTaskRow {...props} /> : <DraggableTaskRow {...props} />
-})
+}, sameRowProps)
