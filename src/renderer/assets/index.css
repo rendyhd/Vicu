@@ -45,7 +45,8 @@
 [data-task-id]:focus-visible,
 [role="row"]:focus-visible,
 [role="option"]:focus-visible,
-[role="menuitem"]:focus-visible {
+[role="menuitem"]:focus-visible,
+[role="menuitemradio"]:focus-visible {
   outline-offset: -2px;
 }
 

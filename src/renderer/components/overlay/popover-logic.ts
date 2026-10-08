@@ -37,7 +37,13 @@ export function nextOptionIndex(current: number, count: number, key: string): nu
 }
 
 /** Selector for the options that arrow keys move between. */
-export const OPTION_SELECTOR = '[role="option"],[role="menuitem"]'
+export const OPTION_SELECTOR =
+  '[role="option"],[role="menuitem"],[role="menuitemradio"],[role="menuitemcheckbox"]'
+
+/** The text a typeahead search matches an option against. */
+export function optionLabel(option: { dataset: Record<string, string | undefined>; textContent: string | null }): string {
+  return (option.dataset.typeahead ?? option.textContent ?? '').trim()
+}
 
 /** Selector for elements that can take keyboard focus. */
 export const TABBABLE_SELECTOR =

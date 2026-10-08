@@ -1,5 +1,6 @@
-import { useEffect, useRef } from 'react'
+import { useId } from 'react'
 import { cn } from '@/lib/cn'
+import { Dialog } from '@/components/overlay/Dialog'
 
 interface ConfirmDialogProps {
   open: boolean
@@ -24,39 +25,22 @@ export function ConfirmDialog({
   onSecondary,
   secondaryDestructive = false,
 }: ConfirmDialogProps) {
-  const cancelRef = useRef<HTMLButtonElement>(null)
-
-  useEffect(() => {
-    if (open) cancelRef.current?.focus()
-  }, [open])
-
-  useEffect(() => {
-    if (!open) return
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.stopPropagation()
-        onCancel()
-      }
-    }
-    document.addEventListener('keydown', handleKey, true)
-    return () => document.removeEventListener('keydown', handleKey, true)
-  }, [open, onCancel])
-
-  if (!open) return null
+  const messageId = useId()
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
-      onClick={onCancel}
+    <Dialog
+      open={open}
+      onClose={onCancel}
+      role="alertdialog"
+      label={`Confirm ${confirmLabel.toLowerCase()}`}
+      describedBy={messageId}
+      className="w-[calc(100%-2rem)] max-w-sm"
     >
-      <div
-        className="mx-4 w-full max-w-sm rounded-card border border-[var(--border-color)] bg-[var(--bg-primary)] p-5 shadow-xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <p className="mb-4 whitespace-pre-line text-sm text-[var(--text-primary)]">{message}</p>
+      <div className="p-5">
+        <p id={messageId} className="mb-4 whitespace-pre-line text-sm text-[var(--text-primary)]">{message}</p>
         <div className="flex justify-end gap-2">
           <button
-            ref={cancelRef}
+            data-autofocus
             type="button"
             onClick={onCancel}
             className={cn(
@@ -94,6 +78,6 @@ export function ConfirmDialog({
           </button>
         </div>
       </div>
-    </div>
+    </Dialog>
   )
 }

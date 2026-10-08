@@ -2,7 +2,20 @@ import { useLayoutEffect, useRef, type KeyboardEvent, type ReactNode, type RefOb
 import type { Placement } from '@floating-ui/dom'
 import { cn } from '@/lib/cn'
 import { useFloatingPopover } from './use-floating-popover'
-import { OPTION_SELECTOR, TABBABLE_SELECTOR, nextOptionIndex, type PopoverInitialFocus } from './popover-logic'
+import {
+  OPTION_SELECTOR,
+  TABBABLE_SELECTOR,
+  nextOptionIndex,
+  optionLabel,
+  type PopoverInitialFocus,
+} from './popover-logic'
+import {
+  EMPTY_TYPEAHEAD,
+  isTypeaheadKey,
+  typeaheadAppend,
+  typeaheadMatch,
+  type TypeaheadState,
+} from './typeahead'
 
 export type PopoverRole = 'dialog' | 'listbox' | 'menu'
 
@@ -25,6 +38,11 @@ export interface PopoverProps {
   placement?: Placement
   /** Where focus goes on open: the first control (default), the popover itself, nowhere, or a selector. */
   initialFocus?: PopoverInitialFocus
+  /**
+   * Called first for every key pressed inside, including keys from popovers nested in it. Calling
+   * `preventDefault()` keeps the built-in option navigation from also acting on the key.
+   */
+  onKeyDown?: (event: KeyboardEvent<HTMLDivElement>) => void
   /** Width, padding and the like. Colours and the border come from the primitive. */
   className?: string
   children: ReactNode
@@ -36,7 +54,8 @@ export interface PopoverProps {
  * Floating UI (`useFloatingPopover`). Mounting opens it; render it only while it should be open.
  *
  * Focus moves into it on open and returns to the anchor on close. Listboxes and menus move
- * between their `role="option"` / `role="menuitem"` children with the arrow keys, Home and End.
+ * between their `role="option"` / `role="menuitem"` children with the arrow keys, Home, End and by
+ * typing the start of a name; Tab closes a menu.
  */
 export function Popover({
   anchorRef,
@@ -46,6 +65,7 @@ export function Popover({
   role = 'dialog',
   placement = 'bottom-start',
   initialFocus = 'first',
+  onKeyDown: onKeyDownProp,
   className,
   children,
 }: PopoverProps) {
@@ -97,14 +117,34 @@ export function Popover({
     }
   }, [anchorRef])
 
+  const typeahead = useRef<TypeaheadState>(EMPTY_TYPEAHEAD)
+
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (role === 'dialog') return
+    onKeyDownProp?.(event)
+    if (event.defaultPrevented || role === 'dialog') return
     const el = ref.current
-    if (!el) return
+    // A key typed in a popover nested inside this one belongs to that popover.
+    if (!el || (event.target as HTMLElement).closest('[popover]') !== el) return
+
+    // Tab leaves a menu: it closes, and focus goes back where it came from.
+    if (role === 'menu' && event.key === 'Tab') {
+      event.preventDefault()
+      el.hidePopover()
+      return
+    }
+
     const options = Array.from(el.querySelectorAll<HTMLElement>(OPTION_SELECTOR)).filter(
-      (option) => !option.hasAttribute('disabled'),
+      (option) => !option.hasAttribute('disabled') && option.getAttribute('aria-disabled') !== 'true',
     )
-    const next = nextOptionIndex(options.indexOf(document.activeElement as HTMLElement), options.length, event.key)
+    const current = options.indexOf(document.activeElement as HTMLElement)
+    let next = nextOptionIndex(current, options.length, event.key)
+
+    // Typing a letter jumps to the option that starts with it (only while an option has focus, so
+    // a search field inside the popover keeps its keys).
+    if (next === null && current >= 0 && isTypeaheadKey(event.nativeEvent, typeahead.current.buffer)) {
+      typeahead.current = typeaheadAppend(typeahead.current, event.key, Date.now())
+      next = typeaheadMatch(options.map(optionLabel), current, typeahead.current.buffer)
+    }
     if (next === null) return
     event.preventDefault()
     event.stopPropagation()
