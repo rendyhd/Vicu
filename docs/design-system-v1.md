@@ -151,7 +151,17 @@ generated `linear()` curve, so the same spring feels the same on both.
 | check draw, strike draw | 220 ms, 240 ms | completing a task |
 
 `android.motionScheme` gives the six Compose slots (`fastSpatial` = pop, `defaultSpatial` =
-move, `slowSpatial`, `fastEffects`, `defaultEffects`, `slowEffects`) for the custom `MotionScheme`.
+move, `slowSpatial`, `fastEffects`, `defaultEffects`, `slowEffects`). Compose Multiplatform
+material3 1.9.0 keeps `MotionScheme` internal, so Android carries them in `VicuMotion`, which
+components read directly.
+
+Material 3 Expressive is deferred (checked 2026-10-08). The newest stable Compose Multiplatform
+material3 (1.9.0) and androidx material3 (1.4.0) keep `MotionScheme.expressive()` and the
+Expressive opt-in internal, and have no public `FloatingActionButtonMenu`,
+`HorizontalFloatingToolbar`, connected `ButtonGroup` or `LoadingIndicator`; they first appear in
+androidx 1.5.0-beta01, experimental and without a stable multiplatform build. Revisit when a stable
+multiplatform material3 exposes them: then add the FAB menu, a floating toolbar for selection, connected
+buttons for the When sheet quick choices and the loading indicator for pull to refresh.
 
 Motion moments:
 
