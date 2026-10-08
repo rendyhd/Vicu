@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { Button } from '@/components/shared/Button'
 import { api, type OIDCProvider, type ServerAuthInfo } from '@/lib/api'
 import { cn } from '@/lib/cn'
 import type { Project } from '@/lib/vikunja-types'
@@ -92,6 +93,19 @@ export function SetupView({ onComplete }: SetupViewProps) {
   const [token, setToken] = useState('')
   const [showToken, setShowToken] = useState(false)
   const [inboxProjectId, setInboxProjectId] = useState(0)
+  // The logo is a 90 KB data URL. It is loaded here rather than imported, because SettingsView
+  // imports TokenPermissionsInfo from this file and a static import would grow its chunk too.
+  const [logoUrl, setLogoUrl] = useState('')
+
+  useEffect(() => {
+    let cancelled = false
+    import('@/assets/vicu-logo').then(({ VICU_LOGO_DATA_URL }) => {
+      if (!cancelled) setLogoUrl(VICU_LOGO_DATA_URL)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const [serverAuth, setServerAuth] = useState<ServerAuthInfo | null>(null)
   const [oidcProviders, setOidcProviders] = useState<OIDCProvider[]>([])
@@ -275,12 +289,15 @@ export function SetupView({ onComplete }: SetupViewProps) {
         className="absolute inset-x-0 top-0 z-50 h-8"
         style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
       />
-      <div className="w-full max-w-md rounded-card border border-[var(--border-color)] bg-[var(--bg-secondary)] p-8 shadow-lg">
-        <h1 className="mb-1 text-xl font-bold text-[var(--text-primary)]">
-          Connect to Vikunja
+      <div className="w-full max-w-md rounded-card border border-[var(--border-color)] bg-bg-card p-8 shadow-lg">
+        <div className="mb-4 h-12 w-12">
+          {logoUrl && <img src={logoUrl} alt="" className="h-12 w-12" />}
+        </div>
+        <h1 className="mb-1 text-page-title text-[var(--text-primary)]">
+          Welcome to Vicu
         </h1>
-        <p className="mb-6 text-sm text-[var(--text-secondary)]">
-          {step === 'url' && 'Enter your server URL to get started.'}
+        <p className="mb-6 text-sm text-text-secondary">
+          {step === 'url' && 'Enter your Vikunja server URL to get started.'}
           {step === 'auth-method' && 'Choose how to sign in.'}
           {step === 'oidc-login' && 'Complete sign-in in your browser.'}
           {step === 'oidc-totp' && 'Enter your two-factor code to complete SSO.'}
@@ -310,18 +327,14 @@ export function SetupView({ onComplete }: SetupViewProps) {
                 />
               </div>
 
-              <button
-                type="button"
+              <Button
+                variant="primary"
                 onClick={handleUrlContinue}
                 disabled={discovering}
-                className={cn(
-                  'w-full rounded-control px-4 py-2 text-sm font-medium transition-colors',
-                  'bg-accent-fill text-on-accent hover:bg-accent-fill/90',
-                  'disabled:cursor-not-allowed disabled:opacity-50'
-                )}
+                className="w-full"
               >
                 {discovering ? 'Checking...' : 'Continue'}
-              </button>
+              </Button>
 
               <p className="text-center text-xs text-[var(--text-secondary)]">
                 Don't have an account?{' '}
@@ -340,19 +353,15 @@ export function SetupView({ onComplete }: SetupViewProps) {
           {step === 'auth-method' && (
             <>
               {oidcProviders.map((provider) => (
-                <button
+                <Button
                   key={provider.key}
-                  type="button"
+                  variant="primary"
                   onClick={() => handleOidcLogin(provider)}
                   disabled={oidcLogging}
-                  className={cn(
-                    'w-full rounded-control px-4 py-2.5 text-sm font-medium transition-colors',
-                    'bg-accent-fill text-on-accent hover:bg-accent-fill/90',
-                    'disabled:cursor-not-allowed disabled:opacity-50'
-                  )}
+                  className="w-full"
                 >
                   {oidcLogging ? 'Waiting for browser...' : `Sign in with ${provider.name}`}
-                </button>
+                </Button>
               ))}
 
               {serverAuth?.local_enabled && (
@@ -365,21 +374,16 @@ export function SetupView({ onComplete }: SetupViewProps) {
                     </div>
                   )}
 
-                  <button
-                    type="button"
+                  <Button
+                    variant={oidcProviders.length > 0 ? 'secondary' : 'primary'}
                     onClick={() => {
                       setPasswordError('')
                       setStep('password-login')
                     }}
-                    className={cn(
-                      'w-full rounded-control px-4 py-2.5 text-sm font-medium transition-colors',
-                      oidcProviders.length > 0
-                        ? 'border border-[var(--border-color)] text-[var(--text-primary)] hover:bg-[var(--bg-primary)]'
-                        : 'bg-accent-fill text-on-accent hover:bg-accent-fill/90'
-                    )}
+                    className="w-full"
                   >
                     Sign in with username & password
-                  </button>
+                  </Button>
                 </>
               )}
 
@@ -393,21 +397,13 @@ export function SetupView({ onComplete }: SetupViewProps) {
                 <div className="h-px flex-1 bg-[var(--border-color)]" />
               </div>
 
-              <button
-                type="button"
-                onClick={() => setStep('api-token')}
-                className="w-full rounded-control border border-[var(--border-color)] px-4 py-2 text-sm font-medium text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-primary)] hover:text-[var(--text-primary)]"
-              >
+              <Button variant="secondary" onClick={() => setStep('api-token')} className="w-full">
                 Use API Token instead
-              </button>
+              </Button>
 
-              <button
-                type="button"
-                onClick={() => setStep('url')}
-                className="w-full text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-              >
+              <Button variant="quiet" onClick={() => setStep('url')} className="w-full">
                 Back
-              </button>
+              </Button>
             </>
           )}
 
@@ -438,34 +434,30 @@ export function SetupView({ onComplete }: SetupViewProps) {
                 </p>
               </div>
 
-              <button
-                type="button"
+              <Button
+                variant="primary"
                 onClick={() => handleOidcLogin(selectedOidcProvider, totpCode)}
                 disabled={totpCode.length !== 6 || oidcLogging}
-                className={cn(
-                  'w-full rounded-control px-4 py-2 text-sm font-medium transition-colors',
-                  'bg-accent-fill text-on-accent hover:bg-accent-fill/90',
-                  'disabled:cursor-not-allowed disabled:opacity-50'
-                )}
+                className="w-full"
               >
                 {oidcLogging ? 'Waiting for browser...' : 'Continue with SSO'}
-              </button>
+              </Button>
 
               {oidcError && (
                 <p className="text-xs text-danger">{oidcError}</p>
               )}
 
-              <button
-                type="button"
+              <Button
+                variant="quiet"
                 onClick={() => {
                   setTotpCode('')
                   setOidcError('')
                   setStep('auth-method')
                 }}
-                className="w-full text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                className="w-full"
               >
                 Back
-              </button>
+              </Button>
             </>
           )}
 
@@ -515,33 +507,29 @@ export function SetupView({ onComplete }: SetupViewProps) {
                 </div>
               </div>
 
-              <button
-                type="button"
+              <Button
+                variant="primary"
                 onClick={() => handlePasswordLogin()}
                 disabled={!username || !password || passwordLogging}
-                className={cn(
-                  'w-full rounded-control px-4 py-2 text-sm font-medium transition-colors',
-                  'bg-accent-fill text-on-accent hover:bg-accent-fill/90',
-                  'disabled:cursor-not-allowed disabled:opacity-50'
-                )}
+                className="w-full"
               >
                 {passwordLogging ? 'Signing in...' : 'Sign In'}
-              </button>
+              </Button>
 
               {passwordError && (
                 <p className="text-xs text-danger">{passwordError}</p>
               )}
 
-              <button
-                type="button"
+              <Button
+                variant="quiet"
                 onClick={() => {
                   setPasswordError('')
                   setStep(serverAuth?.oidc_enabled ? 'auth-method' : 'url')
                 }}
-                className="w-full text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                className="w-full"
               >
                 Back
-              </button>
+              </Button>
             </>
           )}
 
@@ -569,34 +557,30 @@ export function SetupView({ onComplete }: SetupViewProps) {
                 </p>
               </div>
 
-              <button
-                type="button"
+              <Button
+                variant="primary"
                 onClick={() => handlePasswordLogin(totpCode)}
                 disabled={totpCode.length !== 6 || passwordLogging}
-                className={cn(
-                  'w-full rounded-control px-4 py-2 text-sm font-medium transition-colors',
-                  'bg-accent-fill text-on-accent hover:bg-accent-fill/90',
-                  'disabled:cursor-not-allowed disabled:opacity-50'
-                )}
+                className="w-full"
               >
                 {passwordLogging ? 'Verifying...' : 'Verify'}
-              </button>
+              </Button>
 
               {passwordError && (
                 <p className="text-xs text-danger">{passwordError}</p>
               )}
 
-              <button
-                type="button"
+              <Button
+                variant="quiet"
                 onClick={() => {
                   setTotpCode('')
                   setPasswordError('')
                   setStep('password-login')
                 }}
-                className="w-full text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                className="w-full"
               >
                 Back
-              </button>
+              </Button>
             </>
           )}
 
@@ -635,34 +619,30 @@ export function SetupView({ onComplete }: SetupViewProps) {
                 </div>
               </div>
 
-              <button
-                type="button"
+              <Button
+                variant="primary"
                 onClick={handleTestConnection}
                 disabled={!token || testStatus === 'testing'}
-                className={cn(
-                  'w-full rounded-control px-4 py-2 text-sm font-medium transition-colors',
-                  'bg-accent-fill text-on-accent hover:bg-accent-fill/90',
-                  'disabled:cursor-not-allowed disabled:opacity-50'
-                )}
+                className="w-full"
               >
                 {testStatus === 'testing' ? 'Testing...' : 'Test Connection'}
-              </button>
+              </Button>
 
               {testStatus === 'error' && (
                 <p className="text-xs text-danger">{testError || 'Connection failed'}</p>
               )}
 
-              <button
-                type="button"
+              <Button
+                variant="quiet"
                 onClick={() => {
                   setTestStatus('idle')
                   setTestError('')
                   setStep(serverAuth ? 'auth-method' : 'url')
                 }}
-                className="w-full text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                className="w-full"
               >
                 Back
-              </button>
+              </Button>
             </>
           )}
 
@@ -695,18 +675,14 @@ export function SetupView({ onComplete }: SetupViewProps) {
                 </select>
               </div>
 
-              <button
-                type="button"
+              <Button
+                variant="primary"
                 onClick={handleSave}
                 disabled={!inboxProjectId || saving}
-                className={cn(
-                  'w-full rounded-control px-4 py-2 text-sm font-medium transition-colors',
-                  'bg-accent-fill text-on-accent hover:bg-accent-fill/90',
-                  'disabled:cursor-not-allowed disabled:opacity-50'
-                )}
+                className="w-full"
               >
                 {saving ? 'Saving...' : 'Save & Continue'}
-              </button>
+              </Button>
             </>
           )}
         </div>
