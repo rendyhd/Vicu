@@ -11,6 +11,7 @@
 //   E. The context menu: its Schedule picker opens beside the menu, Escape closes one layer.
 //   F. A picker follows its button when the list scrolls.
 //
+// (Task info moved under More with card 3.3; the card-toolbar scenario covers it.)
 // Written against behaviour only: the popover is found through the platform's own `popover`
 // attribute and `:popover-open`, plus the role and the accessible name.
 export const meta = {
@@ -26,20 +27,19 @@ const SIZES = [
 
 /** The pickers that sit in the toolbar of an open card. */
 const CARD_PICKERS = [
-  { key: 'date', title: 'Schedule', role: 'dialog', label: 'Schedule' },
-  { key: 'priority', title: 'Priority', role: 'listbox', label: 'Priority' },
-  { key: 'labels', title: 'Labels', role: 'dialog', label: 'Labels' },
-  { key: 'reminder', title: 'Reminders', role: 'dialog', label: 'Reminders' },
-  { key: 'attachment', title: 'Attachments', role: 'dialog', label: 'Attachments' },
-  { key: 'project', title: 'Move to project', role: 'listbox', label: 'Move to project' },
-  { key: 'info', title: 'Task info', role: 'dialog', label: 'Task info' },
+  { key: 'date', title: 'Schedule', prop: 'schedule', role: 'dialog', label: 'Schedule' },
+  { key: 'priority', title: 'Priority', prop: 'priority', role: 'listbox', label: 'Priority' },
+  { key: 'labels', title: 'Labels', prop: 'labels', role: 'dialog', label: 'Labels' },
+  { key: 'reminder', title: 'Reminders', prop: 'reminders', role: 'dialog', label: 'Reminders' },
+  { key: 'attachment', title: 'Attachments', prop: 'attachments', role: 'dialog', label: 'Attachments' },
+  { key: 'project', title: 'Move to project', prop: 'project', role: 'listbox', label: 'Move to project' },
 ]
 
 /** Every open popover (box, scroll state, role, name, whether focus is inside) and the focused element. */
 async function readState(page) {
   return page.evaluate(() => {
     const active = document.activeElement
-    const popovers = [...document.querySelectorAll('[popover]')]
+    const popovers = [...document.querySelectorAll('[popover]:not([role="tooltip"])')]
       .filter((el) => el.matches(':popover-open'))
       .map((el) => {
         const r = el.getBoundingClientRect()
@@ -68,7 +68,7 @@ async function readState(page) {
       active: active
         ? {
             tag: active.tagName.toLowerCase(),
-            title: active.getAttribute('title'),
+            title: active.getAttribute('title') ?? ({ schedule: 'Schedule', priority: 'Priority', labels: 'Labels', reminders: 'Reminders', attachments: 'Attachments', project: 'Move to project' })[active.getAttribute('data-prop')] ?? null,
             name: active.getAttribute('aria-label') || active.textContent?.trim().slice(0, 24) || '',
             expanded: active.getAttribute('aria-expanded'),
           }
@@ -101,7 +101,7 @@ export default async function run(h) {
 
     // ---- A. Schedule on the last Today row -------------------------------------------------
     const id = await openLastCard(h, page, w, hgt)
-    const trigger = page.locator(`[data-task-id="${id}"] button[title="Schedule"]`)
+    const trigger = page.locator(`[data-task-id="${id}"] button[data-prop="schedule"]`)
     await trigger.scrollIntoViewIfNeeded()
     await trigger.click()
     await h.wait(500)
@@ -136,7 +136,7 @@ export default async function run(h) {
       // itself (a spacer is added to the open popover, so the check does not depend on how tall
       // the real content happens to be).
       await page.evaluate(() => {
-        const el = [...document.querySelectorAll('[popover]')].find((x) => x.matches(':popover-open'))
+        const el = [...document.querySelectorAll('[popover]:not([role="tooltip"])')].find((x) => x.matches(':popover-open'))
         const spacer = document.createElement('div')
         spacer.setAttribute('data-test-spacer', '')
         spacer.style.height = '1400px'
@@ -154,7 +154,7 @@ export default async function run(h) {
         detail: `height ${Math.round(tall.height)}, content ${tall.scrollHeight}, overflow-y ${tall.overflowY}`,
       })
       const scrolled = await page.evaluate(() => {
-        const el = [...document.querySelectorAll('[popover]')].find((x) => x.matches(':popover-open'))
+        const el = [...document.querySelectorAll('[popover]:not([role="tooltip"])')].find((x) => x.matches(':popover-open'))
         el.scrollTop = el.scrollHeight
         return el.scrollTop
       })
@@ -192,7 +192,7 @@ export default async function run(h) {
     // ---- B. All pickers of the card, mouse and keyboard ------------------------------------
     for (const picker of CARD_PICKERS) {
       const t = `${tag} ${picker.key}`
-      const btn = page.locator(`[data-task-id="${id}"] button[title="${picker.title}"]`).last()
+      const btn = page.locator(`[data-task-id="${id}"] button[data-prop="${picker.prop}"]`).last()
       if ((await btn.count()) === 0) {
         await h.assert(`${t}: the toolbar button exists`, false)
         continue
@@ -221,7 +221,7 @@ export default async function run(h) {
       // Accessibility of the open popover: no serious axe violation other than colour contrast
       // (the colours belong to the token work), and the popover has a name.
       if (tag === '1280x820') {
-        const found = await h.axe('[popover]:popover-open', { label: `${picker.key} popover` })
+        const found = await h.axe('[popover]:popover-open:not([role="tooltip"])', { label: `${picker.key} popover` })
         const serious = found.filter((v) => ['serious', 'critical'].includes(v.impact) && v.id !== 'color-contrast')
         await h.assert(`${t}: no serious axe violation (colour contrast aside)`, {
           ok: serious.length === 0,
@@ -251,7 +251,7 @@ export default async function run(h) {
       if (state.popovers.length === 1) {
         const card = await page.locator(`[data-task-id="${id}"]`).first().boundingBox()
         const tb = await btn.boundingBox()
-        await page.mouse.click(card.x + 60, tb.y + tb.height / 2)
+        await page.mouse.click(card.x + 8, tb.y + tb.height / 2)
         await h.wait(350)
         state = await readState(page)
         await h.assert(`${t}: a press outside closes it`, state.popovers.length === 0)
@@ -306,7 +306,7 @@ export default async function run(h) {
     // ---- C. Repeat, nested in Schedule -----------------------------------------------------
     {
       const t = `${tag} recurrence`
-      const dateBtn = page.locator(`[data-task-id="${id}"] button[title="Schedule"]`)
+      const dateBtn = page.locator(`[data-task-id="${id}"] button[data-prop="schedule"]`)
       await dateBtn.scrollIntoViewIfNeeded()
       await dateBtn.click()
       await h.wait(450)
@@ -450,7 +450,7 @@ export default async function run(h) {
     {
       const t = `${tag} scrolling`
       const sid = await openLastCard(h, page, w, hgt)
-      const btn = page.locator(`[data-task-id="${sid}"] button[title="Schedule"]`)
+      const btn = page.locator(`[data-task-id="${sid}"] button[data-prop="schedule"]`)
       await btn.scrollIntoViewIfNeeded()
       await btn.click()
       await h.wait(450)
@@ -487,7 +487,7 @@ export default async function run(h) {
     {
       const t = `${tag} transformed ancestors`
       const gid = await openLastCard(h, page, w, hgt)
-      const btn = page.locator(`[data-task-id="${gid}"] button[title="Schedule"]`)
+      const btn = page.locator(`[data-task-id="${gid}"] button[data-prop="schedule"]`)
       await btn.scrollIntoViewIfNeeded()
       await page.evaluate((taskId) => {
         let el = document.querySelector(`[data-task-id="${taskId}"]`)

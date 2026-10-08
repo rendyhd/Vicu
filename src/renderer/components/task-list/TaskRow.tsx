@@ -1,5 +1,5 @@
 import { forwardRef, memo, useState, useRef, useEffect, useCallback, useImperativeHandle, useMemo } from 'react'
-import { Calendar, Tag, ListChecks, FolderOpen, Trash2, Bell, Repeat, Paperclip, Info, Flag, AlignLeft, ChevronRight } from 'lucide-react'
+import { ListChecks, Bell, Repeat, Paperclip, AlignLeft, ChevronRight } from 'lucide-react'
 import type { Editor } from '@tiptap/react'
 import { useDraggable } from '@dnd-kit/core'
 import { useSortable, defaultAnimateLayoutChanges } from '@dnd-kit/sortable'
@@ -11,7 +11,6 @@ import { orderedTaskIds } from '@/lib/task-selection'
 import { useUpdateTask, useCompleteTask, useDeleteTask, useUploadAttachmentFromDrop, useAddLabel, useCreateLabel } from '@/hooks/use-task-mutations'
 import { useConfirmDelete } from '@/hooks/use-confirm-delete'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
-import { isNullDate } from '@/lib/date-utils'
 import { dueToday, parsedDue } from '@/lib/due-dates'
 import { labelChipStyle } from '@/lib/label-style'
 import { normalizeHex } from '@/lib/constants'
@@ -19,23 +18,16 @@ import { checklistLabel, rowLabels, rowProjectSource } from '@/lib/row-anatomy'
 import { useIsDark } from '@/hooks/use-is-dark'
 import type { Task, TaskReminder } from '@/lib/vikunja-types'
 import { TaskCheckbox } from './TaskCheckbox'
+import { TaskCardBar, type CardPopover } from './TaskCardBar'
 import { TaskDueBadge } from './TaskDueBadge'
 import { useRowView } from './RowViewContext'
 import { PriorityMark } from '@/components/shared/PriorityMark'
-import { DatePickerPopover } from './DatePickerPopover'
-import { LabelPickerPopover } from './LabelPickerPopover'
 import { SubtaskList } from './SubtaskList'
 import { TaskDescription } from './TaskDescription'
-import { ProjectPickerPopover } from './ProjectPickerPopover'
-import { ReminderPickerPopover } from './ReminderPickerPopover'
-import { AttachmentPickerPopover } from './AttachmentPickerPopover'
-import { PriorityPickerPopover } from './PriorityPickerPopover'
 import { TaskContextMenu } from './TaskContextMenu'
-import { InfoPopover } from './InfoPopover'
 import { TaskLinkIcon } from '@/components/TaskLinkIcon'
 import { TaskSyncIcon } from '@/components/task-list/TaskSyncIcon'
 import { stripNoteLink, stripPageLink, extractNoteLinkHtml, extractPageLinkHtml, hasNotesContent } from '@/lib/note-link'
-import { formatRecurrenceLabel } from '@/lib/recurrence'
 import { useTaskParser } from '@/hooks/use-task-parser'
 import { useLabels } from '@/hooks/use-labels'
 import { useProjects } from '@/hooks/use-projects'
@@ -49,7 +41,6 @@ import {
 } from '@/lib/task-hierarchy'
 import { confirmTaskCompletion } from '@/lib/task-completion'
 
-type PopoverType = 'date' | 'label' | 'project' | 'subtasks' | 'reminder' | 'attachment' | 'info' | 'priority' | null
 
 interface TaskRowProps {
   task: Task
@@ -372,18 +363,11 @@ function TaskRowInner({ task, nestedDepth = 0, parentProjectId, projectMeta, dra
   const canExpandSubtasks = appConfig?.subtask_display === 'expandable' && directSubtasks.length > 0
   const [subtasksExpanded, setSubtasksExpanded] = useState(false)
   const [structuralDeleteOpen, setStructuralDeleteOpen] = useState(false)
-  const [activePopover, setActivePopover] = useState<PopoverType>(null)
+  const [activePopover, setActivePopover] = useState<CardPopover>(null)
   // The toolbar buttons that open the pickers: each picker sits next to its button and gives
   // focus back to it when it closes.
-  const dateButtonRef = useRef<HTMLButtonElement>(null)
-  const priorityButtonRef = useRef<HTMLButtonElement>(null)
-  const labelButtonRef = useRef<HTMLButtonElement>(null)
-  const reminderButtonRef = useRef<HTMLButtonElement>(null)
-  const attachmentButtonRef = useRef<HTMLButtonElement>(null)
   const headerAttachmentButtonRef = useRef<HTMLButtonElement>(null)
   const attachmentInvokers = useMemo(() => [headerAttachmentButtonRef], [])
-  const projectButtonRef = useRef<HTMLButtonElement>(null)
-  const infoButtonRef = useRef<HTMLButtonElement>(null)
   useEffect(() => {
     if (isOpenRequested) useSelectionStore.getState().openRequestedTask(task.id)
   }, [isOpenRequested, task.id])
@@ -461,7 +445,7 @@ function TaskRowInner({ task, nestedDepth = 0, parentProjectId, projectMeta, dra
     updateTask.mutate({ id: task.id, changes: { due_date: dueToday() }, original: task })
   }, [task, updateTask])
 
-  const togglePopover = (popover: PopoverType) => {
+  const togglePopover = (popover: Exclude<CardPopover, null>) => {
     setActivePopover((prev) => (prev === popover ? null : popover))
   }
 
@@ -741,8 +725,9 @@ function TaskRowInner({ task, nestedDepth = 0, parentProjectId, projectMeta, dra
       data-task-id={task.id}
       role="listitem"
       className={cn(
-        // Two columns, the checkbox and the body: the notes, subtasks and action bar sit under the title.
-        'mx-2 my-1 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 rounded-card border border-[var(--border-color)] bg-[var(--bg-primary)] px-4 shadow-md',
+        // Two columns, the checkbox and the body: the notes, subtasks and property bar sit under the title.
+        // The surface is bg.card; in dark it is lifted by a 1 px white-at-8% edge instead of a shadow.
+        'mx-2 my-1 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 rounded-card border border-[var(--border-color)] bg-bg-card px-4 shadow-md dark:border-white/8 dark:shadow-none',
         isDragOver && 'ring-2 ring-[var(--accent-blue)] bg-accent-blue/5',
         dropError && 'ring-2 ring-danger bg-danger/5'
       )}
@@ -810,249 +795,32 @@ function TaskRowInner({ task, nestedDepth = 0, parentProjectId, projectMeta, dra
         <SubtaskList parentTask={task} showInput={activePopover === 'subtasks'} />
       </div>
 
-      {/* Action bar */}
-      <div className="col-start-2 flex items-center justify-between pb-3 pt-2">
-        {/* Labels */}
-        <div className="flex flex-1 flex-wrap items-center gap-1">
-          {labels.map((l) => (
-            <span
-              key={l.id}
-              className="rounded-chip px-2 py-0.5 text-chip"
-              style={labelChipStyle(l.hex_color, isDark)}
-            >
-              {l.title}
-            </span>
-          ))}
-          {!isNullDate(task.due_date) && (
-            <TaskDueBadge dueDate={task.due_date} />
-          )}
-          {((task.repeat_after ?? 0) > 0 || (task.repeat_mode ?? 0) > 0) && (
-            <span className="flex items-center gap-0.5 text-caption text-[var(--text-secondary)]">
-              <Repeat className="h-3 w-3" />
-              {formatRecurrenceLabel(task.repeat_after ?? 0, task.repeat_mode ?? 0)}
-            </span>
-          )}
-          <PriorityMark priority={task.priority} />
-        </div>
-
-        {/* Action buttons */}
-        <div className="flex items-center gap-1">
-          <div className="relative">
-            <button
-              ref={dateButtonRef}
-              type="button"
-              aria-haspopup="dialog"
-              aria-expanded={activePopover === 'date'}
-              onClick={() => togglePopover('date')}
-              className={cn(
-                'flex h-7 w-7 items-center justify-center rounded-control transition-colors',
-                activePopover === 'date'
-                  ? 'bg-accent-blue/10 text-[var(--accent-blue)]'
-                  : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]'
-              )}
-              title="Schedule"
-            >
-              <Calendar className="h-3.5 w-3.5" />
-            </button>
-            {activePopover === 'date' && (
-              <DatePickerPopover
-                anchorRef={dateButtonRef}
-                currentDate={task.due_date}
-                onDateChange={handleDateChange}
-                onClose={() => setActivePopover(null)}
-                repeatAfter={task.repeat_after ?? 0}
-                repeatMode={task.repeat_mode ?? 0}
-                onRecurrenceChange={handleRecurrenceChange}
-              />
-            )}
-          </div>
-          <div className="relative">
-            <button
-              ref={priorityButtonRef}
-              type="button"
-              aria-haspopup="listbox"
-              aria-expanded={activePopover === 'priority'}
-              onClick={() => togglePopover('priority')}
-              className={cn(
-                'flex h-7 w-7 items-center justify-center rounded-control transition-colors',
-                activePopover === 'priority'
-                  ? 'bg-accent-blue/10 text-[var(--accent-blue)]'
-                  : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]'
-              )}
-              title="Priority"
-            >
-              <Flag className="h-3.5 w-3.5" />
-            </button>
-            {activePopover === 'priority' && (
-              <PriorityPickerPopover
-                anchorRef={priorityButtonRef}
-                currentPriority={task.priority}
-                onPriorityChange={handlePriorityChange}
-                onClose={() => setActivePopover(null)}
-              />
-            )}
-          </div>
-          <div className="relative">
-            <button
-              ref={labelButtonRef}
-              type="button"
-              aria-haspopup="dialog"
-              aria-expanded={activePopover === 'label'}
-              onClick={() => togglePopover('label')}
-              className={cn(
-                'flex h-7 w-7 items-center justify-center rounded-control transition-colors',
-                activePopover === 'label'
-                  ? 'bg-accent-blue/10 text-[var(--accent-blue)]'
-                  : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]'
-              )}
-              title="Labels"
-            >
-              <Tag className="h-3.5 w-3.5" />
-            </button>
-            {activePopover === 'label' && (
-              <LabelPickerPopover
-                anchorRef={labelButtonRef}
-                tasks={[task]}
-                onClose={() => setActivePopover(null)}
-              />
-            )}
-          </div>
-          <button
-            type="button"
-            onClick={() => togglePopover('subtasks')}
-            className={cn(
-              'flex h-7 w-7 items-center justify-center rounded-control transition-colors',
-              activePopover === 'subtasks'
-                ? 'bg-accent-blue/10 text-[var(--accent-blue)]'
-                : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]'
-            )}
-            title={activePopover === 'subtasks' ? 'Hide add subtask' : 'Add subtask'}
-          >
-            <ListChecks className="h-3.5 w-3.5" />
-          </button>
-          <div className="relative">
-            <button
-              ref={reminderButtonRef}
-              type="button"
-              aria-haspopup="dialog"
-              aria-expanded={activePopover === 'reminder'}
-              onClick={() => togglePopover('reminder')}
-              className={cn(
-                'flex h-7 w-7 items-center justify-center rounded-control transition-colors',
-                activePopover === 'reminder'
-                  ? 'bg-accent-blue/10 text-[var(--accent-blue)]'
-                  : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]'
-              )}
-              title="Reminders"
-            >
-              <Bell className="h-3.5 w-3.5" />
-            </button>
-            {activePopover === 'reminder' && (
-              <ReminderPickerPopover
-                anchorRef={reminderButtonRef}
-                task={task}
-                onReminderChange={handleReminderChange}
-                onClose={() => setActivePopover(null)}
-              />
-            )}
-          </div>
-          <div className="relative">
-            <button
-              ref={attachmentButtonRef}
-              type="button"
-              aria-haspopup="dialog"
-              aria-expanded={activePopover === 'attachment'}
-              onClick={() => togglePopover('attachment')}
-              className={cn(
-                'flex h-7 w-7 items-center justify-center rounded-control transition-colors',
-                activePopover === 'attachment' || (task.attachments?.length ?? 0) > 0
-                  ? 'bg-accent-blue/10 text-[var(--accent-blue)]'
-                  : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]'
-              )}
-              title="Attachments"
-            >
-              <Paperclip className="h-3.5 w-3.5" />
-            </button>
-            {activePopover === 'attachment' && (
-              <AttachmentPickerPopover
-                anchorRef={attachmentButtonRef}
-                invokedBy={attachmentInvokers}
-                taskId={task.id}
-                onClose={() => setActivePopover(null)}
-              />
-            )}
-          </div>
-          <div className="relative">
-            <button
-              ref={projectButtonRef}
-              type="button"
-              aria-haspopup="listbox"
-              aria-expanded={activePopover === 'project'}
-              onClick={() => togglePopover('project')}
-              className={cn(
-                'flex h-7 w-7 items-center justify-center rounded-control transition-colors',
-                activePopover === 'project'
-                  ? 'bg-accent-blue/10 text-[var(--accent-blue)]'
-                  : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]'
-              )}
-              title="Move to project"
-            >
-              <FolderOpen className="h-3.5 w-3.5" />
-            </button>
-            {activePopover === 'project' && (
-              <ProjectPickerPopover
-                anchorRef={projectButtonRef}
-                currentProjectId={task.project_id}
-                onSelect={(pid) => updateTask.mutate({ id: task.id, changes: { project_id: pid }, original: task })}
-                onClose={() => setActivePopover(null)}
-              />
-            )}
-          </div>
-          <div className="relative">
-            <button
-              ref={infoButtonRef}
-              type="button"
-              aria-haspopup="dialog"
-              aria-expanded={activePopover === 'info'}
-              onClick={() => togglePopover('info')}
-              className={cn(
-                'flex h-7 w-7 items-center justify-center rounded-control transition-colors',
-                activePopover === 'info'
-                  ? 'bg-accent-blue/10 text-[var(--accent-blue)]'
-                  : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]'
-              )}
-              title="Task info"
-            >
-              <Info className="h-3.5 w-3.5" />
-            </button>
-            {activePopover === 'info' && (
-              <InfoPopover
-                anchorRef={infoButtonRef}
-                task={task}
-                onClose={() => setActivePopover(null)}
-              />
-            )}
-          </div>
-          <button
-            type="button"
-            onClick={async () => {
-              if (taskDescendants(task).length > 0) {
-                setStructuralDeleteOpen(true)
-                return
-              }
-              const ok = await confirmDelete('Delete this task? This cannot be undone.')
-              if (ok) {
-                deleteTask.mutate({ task })
-                collapseAll()
-              }
-            }}
-            className="flex h-7 w-7 items-center justify-center rounded-control text-[var(--text-secondary)] transition-colors hover:bg-danger/10 hover:text-danger"
-            title="Delete task"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </button>
-        </div>
-      </div>
+      {/* Properties: chips for what is set, quiet "+" buttons for what is not; Info and Delete under More. */}
+      <TaskCardBar
+        task={task}
+        active={activePopover}
+        onToggle={togglePopover}
+        onOpen={setActivePopover}
+        onClose={() => setActivePopover(null)}
+        attachmentInvokers={attachmentInvokers}
+        onDateChange={handleDateChange}
+        onRecurrenceChange={handleRecurrenceChange}
+        onPriorityChange={handlePriorityChange}
+        onReminderChange={handleReminderChange}
+        onProjectChange={(pid) => updateTask.mutate({ id: task.id, changes: { project_id: pid }, original: task })}
+        onDelete={async () => {
+          setActivePopover(null)
+          if (taskDescendants(task).length > 0) {
+            setStructuralDeleteOpen(true)
+            return
+          }
+          const ok = await confirmDelete('Delete this task? This cannot be undone.')
+          if (ok) {
+            deleteTask.mutate({ task })
+            collapseAll()
+          }
+        }}
+      />
       <div className="col-span-2">
       <ConfirmDialog {...dialogProps} />
       <ConfirmDialog

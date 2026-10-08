@@ -61,7 +61,7 @@ export default async function run(h) {
     await row.scrollIntoViewIfNeeded()
     await row.click({ position: { x: 180, y: 12 } })
     await h.wait(700)
-    const trigger = row.locator('button[title="Schedule"]').first()
+    const trigger = row.locator('button[data-prop="schedule"]').first()
     const popover = page.locator(POP)
     const input = popover.getByLabel('Date and time')
 
@@ -231,8 +231,8 @@ export default async function run(h) {
     await h.assert('Escape closes the popover and focus returns to the Schedule button', async () => {
       await h.key('Escape')
       await h.wait(400)
-      const active = await page.evaluate(() => document.activeElement?.getAttribute('title'))
-      return { ok: (await popover.count()) === 0 && active === 'Schedule', detail: active }
+      const active = await page.evaluate(() => document.activeElement?.getAttribute('data-prop'))
+      return { ok: (await popover.count()) === 0 && active === 'schedule', detail: active }
     })
 
     // ---- axe on the open popover ---------------------------------------------------------------
@@ -268,7 +268,7 @@ export default async function run(h) {
     await closeIt()
 
     // ---- G. reminders --------------------------------------------------------------------------
-    const remindersBtn = row.locator('button[title="Reminders"]').first()
+    const remindersBtn = row.locator('button[data-prop="reminders"]').first()
     const reminders = page.locator(REMINDER_POP)
     const remindersOnServer = async () => (await h.api('GET', `/tasks/${id}`)).reminders ?? []
     await remindersBtn.click()

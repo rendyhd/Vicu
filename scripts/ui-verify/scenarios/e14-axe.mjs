@@ -37,7 +37,7 @@ export default async function run(h) {
         await h.rows().first().click({ position: { x: 180, y: 12 } })
         await h.wait(700)
       },
-      ready: () => h.page.evaluate(() => !!document.querySelector('[data-task-id] button[title="Schedule"]')),
+      ready: () => h.page.evaluate(() => !!document.querySelector('[data-task-id] button[data-prop="schedule"]')),
     },
   ]
 
@@ -109,7 +109,7 @@ export default async function run(h) {
     await parent.click({ position: { x: 180, y: 12 } })
     await h.wait(900)
     const subs = await h.page.evaluate(() => {
-      const card = document.querySelector('[data-task-id] button[title="Schedule"]')?.closest('[data-task-id]')
+      const card = document.querySelector('[data-task-id] button[data-prop="schedule"]')?.closest('[data-task-id]')
       return [...(card?.querySelectorAll('[role="checkbox"]') ?? [])].slice(1).map((b) => ({ checked: b.getAttribute('aria-checked'), name: b.getAttribute('aria-label') }))
     })
     await h.assert('every subtask checkbox of the card has aria-checked and a "Complete <title>" name', {

@@ -48,8 +48,9 @@ describe('picker popovers', () => {
   })
 
   it('gives every anchor to its picker', () => {
-    const row = read('components/task-list/TaskRow.tsx')
-    for (const picker of ['DatePickerPopover', 'PriorityPickerPopover', 'LabelPickerPopover', 'ReminderPickerPopover', 'AttachmentPickerPopover', 'ProjectPickerPopover', 'InfoPopover']) {
+    // The open card's property bar (card 3.3) holds the pickers' anchors.
+    const row = read('components/task-list/TaskCardBar.tsx')
+    for (const picker of ['WhenPopover', 'PriorityPickerPopover', 'LabelPickerPopover', 'ReminderPickerPopover', 'AttachmentPickerPopover', 'ProjectPickerPopover', 'RecurrencePickerPopover', 'InfoPopover']) {
       expect(row, picker).toMatch(new RegExp(`<${picker}\\s+anchorRef=`))
     }
     const composer = read('components/task-list/NewTaskComposer.tsx')

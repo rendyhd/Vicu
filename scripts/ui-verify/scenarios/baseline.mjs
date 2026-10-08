@@ -41,7 +41,7 @@ export default async function run(h) {
   const taskId = await last.getAttribute('data-task-id')
   await last.click({ position: { x: 180, y: 12 } })
   await h.wait(700)
-  await h.click(`[data-task-id="${taskId}"] button[title="Schedule"]`)
+  await h.click(`[data-task-id="${taskId}"] button[data-prop="schedule"]`)
   await h.wait(500)
   await shot('date-popover')
   await h.dismiss()

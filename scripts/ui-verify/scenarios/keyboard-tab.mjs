@@ -174,11 +174,11 @@ export default async function run(h) {
   await row.click({ position: { x: 180, y: 12 } })
   await h.wait(700)
   const toolbar = await page.evaluate(() => {
-    const card = document.querySelector('[data-task-id] button[title="Schedule"]')?.closest('[data-task-id]')
+    const card = document.querySelector('[data-task-id] button[data-prop="schedule"]')?.closest('[data-task-id]')
     if (!card) return null
-    return [...card.querySelectorAll('button[title]')].map((b) => {
+    return [...card.querySelectorAll('button[data-prop]')].map((b) => {
       const r = b.getBoundingClientRect()
-      return { title: b.getAttribute('title'), w: r.width, h: r.height }
+      return { title: b.getAttribute('data-prop'), w: r.width, h: r.height }
     })
   })
   if (!toolbar || toolbar.length === 0) {
