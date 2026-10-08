@@ -541,7 +541,7 @@ for (const s of selected) {
 }
 
 currentScenario = '-'
-emit({ t: 'summary', run: runName, captures: tally.captures, pass: tally.pass, fail: tally.fail, errors: tally.errors, axeViolations: tally.axe, folder: RUN_DIR })
+emit({ t: 'summary', ok: tally.errors === 0 && tally.fail === 0, run: runName, captures: tally.captures, pass: tally.pass, fail: tally.fail, errors: tally.errors, axeViolations: tally.axe, folder: RUN_DIR })
 
 await shutdown()
 process.exit(tally.errors > 0 || tally.fail > 0 ? 1 : 0)

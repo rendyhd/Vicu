@@ -341,7 +341,7 @@ export default async function run(h) {
       const t = `${tag} composer labels`
       await h.dismiss()
       await h.goto('/today')
-      await h.click('Add Task')
+      await h.click('button[aria-label="New task"]')
       await h.wait(500)
       const btn = page.locator('button[title="Labels"]').first()
       await btn.click()

@@ -256,7 +256,7 @@ export function SettingsView() {
           />
         )
       ) : activeTab === 'general' ? (
-      <div className="mx-6 max-w-lg space-y-6 pb-8 pt-4">
+      <div className="mx-6 space-y-6 pb-8 pt-4">
         <div className="rounded-card border border-[var(--border-color)] bg-[var(--bg-primary)] p-5">
           <h2 className="mb-4 text-sm font-semibold text-[var(--text-primary)]">Connection</h2>
 
@@ -669,7 +669,7 @@ export function SettingsView() {
         )}
       </div>
       ) : activeTab === 'integrations' ? (
-      <div className="mx-6 max-w-lg space-y-6 pb-8 pt-4">
+      <div className="mx-6 space-y-6 pb-8 pt-4">
         {fullConfig && (
           <QuickEntrySettings
             config={fullConfig}

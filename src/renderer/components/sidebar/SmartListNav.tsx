@@ -36,7 +36,7 @@ export function SmartListNav() {
     (i.id !== 'review' || reviewEnabled) && (i.id !== 'routines' || routinesEnabled))
 
   return (
-    <nav className="flex flex-col gap-0.5 px-2 py-2">
+    <nav aria-label="Lists" className="flex flex-col gap-0.5 px-2 py-2">
       {items.map((item) => {
         const isActive = currentPath === item.path
         const isReview = item.id === 'review'

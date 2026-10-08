@@ -204,7 +204,7 @@ export function CustomListNav() {
         </div>
       </div>
 
-      <nav className="flex flex-col gap-0.5 px-2 pb-2">
+      <nav aria-label="Custom lists" className="flex flex-col gap-0.5 px-2 pb-2">
         <SortableContext items={sortableIds} strategy={verticalListSortingStrategy}>
           {lists.map((item) => {
             const path = `/list/${item.id}`

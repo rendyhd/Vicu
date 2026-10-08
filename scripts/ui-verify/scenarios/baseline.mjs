@@ -48,7 +48,7 @@ export default async function run(h) {
 
   // The composer with a parsed title (Vikunja syntax: *label, !priority)
   await h.goto('/today')
-  await h.click('Add Task')
+  await h.click('button[aria-label="New task"]')
   await h.wait(400)
   await h.type('Call Ana about the weekend tomorrow at 3pm *call !3')
   await h.wait(900)

@@ -29,7 +29,6 @@ const ARBITRARY_SIZE_ALLOWLIST = [
   'components/task-list/NlpParsePreview.tsx',
   'components/task-list/ParentDropZone.tsx',
   'components/task-list/SectionDragOverlay.tsx',
-  'views/ReviewView.tsx',
 ]
 
 // Built from parts so this file does not carry literal classes into the Tailwind content scan.

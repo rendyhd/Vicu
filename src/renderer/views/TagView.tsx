@@ -4,6 +4,8 @@ import { useTasks } from '@/hooks/use-tasks'
 import { useLabels } from '@/hooks/use-labels'
 import { useProjects } from '@/hooks/use-projects'
 import { useFilters } from '@/hooks/use-filters'
+import { useAppConfig } from '@/hooks/use-app-config'
+import { useAddLabel } from '@/hooks/use-task-mutations'
 import { usePrintable } from '@/stores/print-store'
 import { withoutNestedSubtasks } from '@/lib/nested-subtasks'
 import { TaskList } from '@/components/task-list/TaskList'
@@ -15,6 +17,10 @@ export function TagView() {
   const lid = Number(labelId)
   const { data: labels } = useLabels()
   const { data: projects } = useProjects()
+  const { data: config } = useAppConfig()
+  const addLabel = useAddLabel()
+  // A task added here goes to the Inbox (like Today) and gets this tag.
+  const inboxProjectId = config?.inbox_project_id
   // The rows are all about this tag: they do not repeat it as a chip.
   const rowView = useMemo(() => ({ labelId: lid }), [lid])
   const labelName = labels?.find((l) => l.id === lid)?.title ?? 'Tag'
@@ -72,7 +78,11 @@ export function TagView() {
       <TaskList
         title={labelName}
         tasks={[]}
-        showNewTask={false}
+        projectId={inboxProjectId}
+        showNewTask={!!inboxProjectId && !!projects?.flat.some((project) => project.id === inboxProjectId)}
+        onTaskCreated={(task) => {
+          if (!task.labels?.some((l) => l.id === lid)) addLabel.mutate({ taskId: task.id, labelId: lid })
+        }}
         emptyTitle={`No tasks tagged "${labelName}"`}
       >
         {groups.map((group) => (

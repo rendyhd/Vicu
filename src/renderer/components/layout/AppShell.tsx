@@ -646,7 +646,7 @@ export function AppShell() {
     <DndContext sensors={sensors} collisionDetection={collisionDetection} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
       <div className="relative flex h-screen w-screen overflow-hidden bg-[var(--bg-primary)]">
         {/* Window drag region overlay */}
-        <div
+        <header
           className="absolute inset-x-0 top-0 z-30 flex h-8"
           style={{
             WebkitAppRegion: 'drag',
@@ -656,10 +656,11 @@ export function AppShell() {
           <div className="flex-1" />
           <SearchBar />
           <WindowControls />
-        </div>
+        </header>
 
         {/* Sidebar — bg extends behind drag region */}
-        <div
+        <aside
+          aria-label="Sidebar"
           ref={sidebarRef}
           className="flex shrink-0 flex-col overflow-hidden border-r border-[var(--border-color)] bg-[var(--bg-sidebar)]"
           style={{ width: sidebarWidth }}
@@ -668,7 +669,7 @@ export function AppShell() {
           <div className="flex-1 overflow-hidden">
             <Sidebar />
           </div>
-        </div>
+        </aside>
 
         <div
           className="w-1 shrink-0 cursor-col-resize bg-transparent transition-colors hover:bg-accent-blue/20"

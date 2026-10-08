@@ -8,6 +8,7 @@ export const meta = {
 }
 
 const blocking = (violations) => violations.filter((v) => v.impact === 'serious' || v.impact === 'critical')
+const LANDMARK_RULES = ['landmark-one-main', 'landmark-unique', 'region']
 const describe = (violations) => violations.map((v) => `${v.id} (${v.impact}, ${v.nodes}): ${v.targets.join(' | ')}`).join('; ')
 
 export default async function run(h) {
@@ -47,6 +48,8 @@ export default async function run(h) {
     const violations = await h.axe(undefined, { label: surface.name })
     const bad = blocking(violations)
     await h.assert(`${surface.name}: no serious or critical axe violations`, { ok: bad.length === 0, detail: describe(bad) })
+    const landmarks = violations.filter((v) => LANDMARK_RULES.includes(v.id))
+    await h.assert(`${surface.name}: one main landmark, unique labelled landmarks, no content outside them`, { ok: landmarks.length === 0, detail: describe(landmarks) })
     await h.dismiss()
   }
 
@@ -72,20 +75,49 @@ export default async function run(h) {
     detail: `${semantics.checkboxTag} ${semantics.checked} "${semantics.name}" vs "${semantics.title}"`,
   })
 
-  // Roving tabindex: arrow keys move the keyboard selection and DOM focus with it; one row is a Tab stop.
-  // (Today passes its rows as children, so only a list with its own tasks handles the arrows.)
-  await h.goto('/inbox')
+  // Roving tabindex: arrow keys move the keyboard selection and DOM focus with it; one row is a Tab
+  // stop. Today, Upcoming and Anytime hand their rows over as children, a project has its own tasks.
+  for (const route of ['/today', '/upcoming', '/anytime', '/inbox']) {
+    await h.goto(route)
+    await h.dismiss()
+    await h.page.locator('h1').first().click({ position: { x: 4, y: 4 } })
+    await h.key('ArrowDown')
+    await h.key('ArrowDown')
+    await h.wait(150)
+    const roving = await h.page.evaluate(() => {
+      const rows = [...document.querySelectorAll('[data-task-id]')]
+      return {
+        rows: rows.length,
+        stops: rows.filter((r) => r.tabIndex === 0).length,
+        focusedIndex: rows.indexOf(document.activeElement),
+      }
+    })
+    await h.assert(`${route}: two ArrowDown presses focus the second row; it is the only row Tab stop`, { ok: roving.rows >= 2 && roving.focusedIndex === 1 && roving.stops === 1, detail: JSON.stringify(roving) })
+    await h.key('ArrowUp')
+    await h.wait(100)
+    const up = await h.page.evaluate(() => [...document.querySelectorAll('[data-task-id]')].indexOf(document.activeElement))
+    await h.assert(`${route}: ArrowUp moves back to the first row`, { ok: up === 0, detail: up })
+  }
+
+  // Subtask checkboxes of an open card carry role, state and name too.
+  await h.goto('/anytime')
   await h.dismiss()
-  await h.page.locator('h1').first().click({ position: { x: 4, y: 4 } })
-  await h.key('ArrowDown')
-  await h.key('ArrowDown')
-  await h.wait(150)
-  const roving = await h.page.evaluate(() => {
-    const rows = [...document.querySelectorAll('[data-task-id]')]
-    return {
-      stops: rows.filter((r) => r.tabIndex === 0).length,
-      focusedIndex: rows.indexOf(document.activeElement),
-    }
-  })
-  await h.assert('two ArrowDown presses focus the second row; it is the only row Tab stop', { ok: roving.focusedIndex === 1 && roving.stops === 1, detail: JSON.stringify(roving) })
+  const parent = h.page.locator('[data-task-id]:has(button[aria-label$="subtasks complete"])').first()
+  if ((await parent.count()) === 0) {
+    h.emit({ t: 'skip', id: meta.id, message: 'no task with subtasks in the seed' })
+  } else {
+    await parent.click({ position: { x: 180, y: 12 } })
+    await h.wait(900)
+    const subs = await h.page.evaluate(() => {
+      const card = document.querySelector('[data-task-id] button[title="Schedule"]')?.closest('[data-task-id]')
+      return [...(card?.querySelectorAll('[role="checkbox"]') ?? [])].slice(1).map((b) => ({ checked: b.getAttribute('aria-checked'), name: b.getAttribute('aria-label') }))
+    })
+    await h.assert('every subtask checkbox of the card has aria-checked and a "Complete <title>" name', {
+      ok: subs.length > 0 && subs.every((b) => (b.checked === 'true' || b.checked === 'false') && /^Complete .+/.test(b.name ?? '')),
+      detail: JSON.stringify(subs),
+    })
+    const violations = await h.axe(undefined, { label: 'card with subtasks' })
+    await h.assert('card with subtasks: no serious or critical axe violations', { ok: blocking(violations).length === 0, detail: describe(blocking(violations)) })
+    await h.dismiss()
+  }
 }

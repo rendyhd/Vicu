@@ -14,6 +14,7 @@ import { useReviewNoticeStore } from '@/stores/review-notice-store'
 import { ProjectBranch } from '@/components/review/ProjectBranch'
 import { SmartListIcon } from '@/components/shared/SmartListIcon'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { EmptyState } from '@/components/shared/EmptyState'
 import { ReadingScroll } from '@/components/layout/ReadingScroll'
 import type { Project } from '@/lib/vikunja-types'
 
@@ -281,22 +282,21 @@ export function ReviewView() {
         {isLoading && <div className="px-2 py-4 text-sm text-[var(--text-secondary)]">Loading…</div>}
 
         {allCaughtUp && (
-          <div className="flex flex-1 flex-col items-center justify-center px-6 py-12 text-center">
-            <RefreshCw className="mb-3 h-12 w-12" style={{ color: 'var(--accent-green)' }} />
-            <p style={{ fontSize: 20, fontWeight: 600, color: 'var(--text-primary)' }}>All reviewed</p>
-            <p className="mt-1 max-w-sm" style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
-              You&apos;re caught up. Next review available in {defaultCadence} days.
-            </p>
-          </div>
+          <EmptyState
+            icon={RefreshCw}
+            identity="review"
+            title="All reviewed"
+            subtitle={`You're caught up. Next review available in ${defaultCadence} days.`}
+          />
         )}
 
         {!isLoading && !allCaughtUp && currentTree.length === 0 && (
-          <div className="flex flex-1 flex-col items-center justify-center px-6 py-12 text-center">
-            <p style={{ fontSize: 15, fontWeight: 500, color: 'var(--text-primary)' }}>No tracked projects</p>
-            <p className="mt-1 max-w-sm" style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
-              Projects appear here once review tracking is enabled in Settings.
-            </p>
-          </div>
+          <EmptyState
+            icon={RefreshCw}
+            identity="review"
+            title="No tracked projects"
+            subtitle="Projects appear here once review tracking is enabled in Settings."
+          />
         )}
 
         {!isLoading &&
@@ -399,7 +399,7 @@ function TabButton({
       role="tab"
       aria-selected={active}
       onClick={onClick}
-      className={cn('flex items-center gap-1.5 rounded-control px-3 py-1 text-[13px] transition-colors')}
+      className={cn('flex items-center gap-1.5 rounded-control px-3 py-1 text-section transition-colors')}
       style={
         active
           ? { background: 'rgba(175,82,222,0.15)', color: 'var(--accent-purple)', fontWeight: 600 }

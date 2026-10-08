@@ -23,6 +23,7 @@ import { SmartListIcon } from '@/components/shared/SmartListIcon'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { ReadingScroll } from '@/components/layout/ReadingScroll'
 import { Button } from '@/components/shared/Button'
+import { EmptyState } from '@/components/shared/EmptyState'
 import { useRoutineHistory, useRoutines, type RoutineDraft } from '@/hooks/use-routines'
 import {
   csvForRoutines,
@@ -354,7 +355,14 @@ function RoutinesContent() {
             <ListSectionHeader level={1} title="Your routines" count={active.length} sticky={false} className="mb-3 px-0" />
             {routines.isLoading && <div className="rounded-card border border-[var(--border-color)] p-8 text-center text-sm text-[var(--text-secondary)]">Loading routines...</div>}
             {!routines.isLoading && active.length === 0 && (
-              <button type="button" onClick={() => setEditor('new')} className="flex w-full flex-col items-center rounded-card border border-dashed border-[var(--border-color)] px-6 py-10 text-center hover:bg-[var(--bg-hover)]"><div className="mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-accent-purple/15 text-accent-purple"><Plus className="h-5 w-5" /></div><span className="text-sm font-semibold text-[var(--text-primary)]">Create your first routine</span><span className="mt-1 max-w-sm text-xs leading-5 text-[var(--text-secondary)]">Track supplements, medication, or chores without turning them into an endless pile of recurring tasks.</span></button>
+              <EmptyState
+                icon={Plus}
+                identity="routines"
+                title="Create your first routine"
+                subtitle="Track supplements, medication, or chores without turning them into an endless pile of recurring tasks."
+                className="py-10"
+                action={<Button variant="secondary" onClick={() => setEditor('new')}><Plus className="h-4 w-4" /> Create routine</Button>}
+              />
             )}
             <div className="space-y-2">
               {active.map((carrier) => {

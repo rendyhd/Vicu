@@ -195,8 +195,6 @@ export function TaskList({
       // of subscribing the whole list to selection/expansion changes.
       const { expandedTaskId, selectedTaskIds } = useSelectionStore.getState()
 
-      const taskCount = tasks.length
-
       // --- Multi-selection shortcuts (work even when this list's own `tasks`
       // prop is empty, e.g. a project whose tasks all live in sections) ---
 
@@ -292,32 +290,42 @@ export function TaskList({
         return
       }
 
+      // The rows on screen in reading order. A view may hand its rows over as children (Today,
+      // Upcoming, Anytime, a project's sections), so the `tasks` prop is not the whole list.
+      const visibleIds = orderedTaskIds()
+      const taskCount = visibleIds.length
       if (taskCount === 0) return
 
-      const currentIndex = focusedTaskId
-        ? tasks.findIndex((t) => t.id === focusedTaskId)
-        : -1
+      const currentIndex = focusedTaskId ? visibleIds.indexOf(focusedTaskId) : -1
+
+      // Arrows belong to the list only while focus is on the page itself or in the list, and not in
+      // a menu, dialog or listbox (those use the arrows for their own items).
+      const arrowsForList =
+        !active ||
+        active === document.body ||
+        (!!listRef.current?.contains(active) && !active.closest('[role="menu"], [role="dialog"], [role="listbox"]'))
 
       // Arrow Up
-      if (e.key === 'ArrowUp') {
+      if (e.key === 'ArrowUp' && arrowsForList) {
         e.preventDefault()
         if (expandedTaskId) return // don't navigate while editing
         const newIndex = currentIndex <= 0 ? 0 : currentIndex - 1
-        setFocusedTask(tasks[newIndex].id)
+        setFocusedTask(visibleIds[newIndex])
         return
       }
 
       // Arrow Down
-      if (e.key === 'ArrowDown') {
+      if (e.key === 'ArrowDown' && arrowsForList) {
         e.preventDefault()
         if (expandedTaskId) return // don't navigate while editing
         const newIndex = currentIndex >= taskCount - 1 ? taskCount - 1 : currentIndex + 1
-        setFocusedTask(tasks[newIndex].id)
+        setFocusedTask(visibleIds[newIndex])
         return
       }
 
-      // Enter: expand focused task
-      if (e.key === 'Enter' && !e.ctrlKey && !e.metaKey) {
+      // Enter: expand focused task. Only when focus is on the page or the row itself: on a button
+      // (a toolbar button, a checkbox) Enter must keep activating it.
+      if (e.key === 'Enter' && !e.ctrlKey && !e.metaKey && (!active || active === document.body || active.hasAttribute('data-task-id'))) {
         e.preventDefault()
         if (focusedTaskId && !expandedTaskId) {
           toggleExpandedTask(focusedTaskId)
@@ -353,11 +361,11 @@ export function TaskList({
             )
             collapseAll()
             // Move focus to the next top-level task; nested rows simply clear focus.
-            const idx = tasks.findIndex((item) => item.id === targetId)
+            const idx = visibleIds.indexOf(targetId)
             if (idx >= 0 && idx < taskCount - 1) {
-              setFocusedTask(tasks[idx + 1].id)
+              setFocusedTask(visibleIds[idx + 1])
             } else if (idx > 0) {
-              setFocusedTask(tasks[idx - 1].id)
+              setFocusedTask(visibleIds[idx - 1])
             } else {
               setFocusedTask(null)
             }
@@ -373,6 +381,7 @@ export function TaskList({
         const targetId = expandedTaskId || focusedTaskId
         if (!targetId) return
         const task = tasks.find((t) => t.id === targetId)
+          ?? resolveSelectedTasks(qc, new Set([targetId]))[0]
         if (task) {
           updateTask.mutate({ id: task.id, changes: { due_date: dueToday() }, original: task })
         }
