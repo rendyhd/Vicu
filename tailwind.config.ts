@@ -1,28 +1,25 @@
 import type { Config } from 'tailwindcss'
 import typography from '@tailwindcss/typography'
+import { loadTokens, tailwindTheme } from './scripts/gen-tokens.mjs'
+
+// Colours, type sizes and radii come from the design token contract
+// (test-fixtures/design-tokens-v1.json) through scripts/gen-tokens.mjs, the same module that
+// writes src/renderer/assets/tokens.css. Colours are rgb(var(--x-rgb) / <alpha-value>), so
+// opacity classes such as bg-accent-blue/15 work; bg-sidebar stays a raw var() (no opacity).
+const tokenTheme = tailwindTheme(loadTokens())
 
 const config: Config = {
   content: ['./src/renderer/**/*.{ts,tsx,html}'],
   darkMode: 'class',
   theme: {
     extend: {
-      colors: {
-        sidebar: {
-          DEFAULT: 'var(--bg-sidebar)',
-        },
-        accent: {
-          blue: 'var(--accent-blue)',
-          red: 'var(--accent-red)',
-          orange: 'var(--accent-orange)',
-          yellow: 'var(--accent-yellow)',
-          green: 'var(--accent-green)',
-          purple: 'var(--accent-purple)',
-          teal: 'var(--accent-teal)',
-        },
-      },
+      colors: tokenTheme.colors,
       fontSize: {
         '2xs': ['0.625rem', { lineHeight: '0.875rem' }],
+        ...tokenTheme.fontSize,
       },
+      borderRadius: tokenTheme.borderRadius,
+      opacity: tokenTheme.opacity,
       typography: {
         DEFAULT: {
           css: {
