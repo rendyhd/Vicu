@@ -19,13 +19,13 @@ export function ToastHost() {
           role={t.kind === 'error' ? 'alert' : 'status'}
           className={cn(
             'pointer-events-auto flex items-start gap-2 rounded-md border bg-[var(--bg-primary)] px-3 py-2 text-xs text-[var(--text-primary)] shadow-lg',
-            t.kind === 'error' ? 'border-accent-red/60' : 'border-[var(--border-color)]',
+            t.kind === 'error' ? 'border-danger/60' : 'border-[var(--border-color)]',
           )}
         >
           <span
             className={cn(
               'mt-1 h-1.5 w-1.5 shrink-0 rounded-full',
-              t.kind === 'error' ? 'bg-accent-red' : 'bg-[var(--accent-blue)]',
+              t.kind === 'error' ? 'bg-danger' : 'bg-[var(--accent-blue)]',
             )}
             aria-hidden="true"
           />

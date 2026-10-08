@@ -496,7 +496,7 @@ function TaskRowInner({ task, nestedDepth = 0, parentProjectId, drag }: Omit<Tas
           isFocused && !isSelected && !isExpanded && 'bg-accent-blue/8 ring-1 ring-inset ring-accent-blue/30',
           isDragging && 'opacity-30',
           isDragOver && 'ring-2 ring-inset ring-[var(--accent-blue)] bg-accent-blue/5',
-          dropError && 'ring-2 ring-inset ring-red-500 bg-red-500/5'
+          dropError && 'ring-2 ring-inset ring-danger bg-danger/5'
         )}
         style={{
           ...style,
@@ -577,7 +577,7 @@ function TaskRowInner({ task, nestedDepth = 0, parentProjectId, drag }: Omit<Tas
               task.done && 'text-[var(--text-secondary)] line-through'
             )}
           >
-            {dropError ? <span className="text-red-500">{dropError}</span> : task.title}
+            {dropError ? <span className="text-danger">{dropError}</span> : task.title}
           </span>
           {nestedDepth === 0 && parentTitle(task) && (
             <span className="block truncate text-[10px] text-[var(--text-secondary)]">
@@ -672,7 +672,7 @@ function TaskRowInner({ task, nestedDepth = 0, parentProjectId, drag }: Omit<Tas
       className={cn(
         'mx-2 my-1 rounded-xl border border-[var(--border-color)] bg-[var(--bg-primary)] shadow-md',
         isDragOver && 'ring-2 ring-[var(--accent-blue)] bg-accent-blue/5',
-        dropError && 'ring-2 ring-red-500 bg-red-500/5'
+        dropError && 'ring-2 ring-danger bg-danger/5'
       )}
       onKeyDown={handleExpandedKeyDown}
       onDragOver={handleFileDragOver}
@@ -942,7 +942,7 @@ function TaskRowInner({ task, nestedDepth = 0, parentProjectId, drag }: Omit<Tas
                 collapseAll()
               }
             }}
-            className="flex h-6 w-6 items-center justify-center rounded text-[var(--text-secondary)] transition-colors hover:bg-accent-red/10 hover:text-accent-red"
+            className="flex h-6 w-6 items-center justify-center rounded text-[var(--text-secondary)] transition-colors hover:bg-danger/10 hover:text-danger"
             title="Delete task"
           >
             <Trash2 className="h-3.5 w-3.5" />

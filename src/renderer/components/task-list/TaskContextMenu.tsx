@@ -276,7 +276,7 @@ export function TaskContextMenu({ fallbackTask, x, y, onClose }: TaskContextMenu
       )}
       <button
         type="button"
-        className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-accent-red hover:bg-accent-red/10"
+        className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-danger hover:bg-danger/10"
         onClick={() => {
           onClose()
           actions.deleteAll()

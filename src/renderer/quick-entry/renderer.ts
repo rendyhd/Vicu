@@ -61,6 +61,7 @@ interface QuickEntryConfig {
 
 import { parse, getParserConfig, recurrenceToVikunja, extractBangToday } from '../lib/task-parser'
 import { dueToday, parsedDue } from '../lib/due-dates'
+import { followColorScheme } from '../lib/theme'
 import { formatClockTime } from '../lib/date-utils'
 import type { ParseResult, ParserConfig, ParsedToken, TokenType } from '../lib/task-parser'
 import { getClipboardImages, fileToUint8Array } from '../lib/clipboard-images'
@@ -68,6 +69,8 @@ import { AutocompleteDropdown } from './autocomplete'
 import { cache } from './vikunja-cache'
 import { applyQuickEntryFollowUps } from '../lib/quick-entry-follow-ups'
 import { escapeHtml, plainTextToDescriptionHtml } from '../lib/description-html'
+
+followColorScheme()
 
 const input = document.getElementById('task-input') as HTMLInputElement
 const descriptionHint = document.getElementById('description-hint')!

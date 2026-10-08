@@ -406,7 +406,7 @@ export function NewTaskComposer({
       }}
     >
       <div className="flex items-start gap-3 px-4 py-2.5">
-        <div className="mt-[7px] h-[18px] w-[18px] shrink-0 rounded-full border border-[var(--border-color)]" />
+        <div className="mt-[7px] h-[18px] w-[18px] shrink-0 rounded-full border border-control-ring" />
         <TaskInputParser
           value={parser.inputValue}
           onChange={parser.setInputValue}
@@ -427,7 +427,7 @@ export function NewTaskComposer({
           contextChips={contextChips}
           onDismissContextChip={() => setDefaultDateDismissed(true)}
         />
-        <button type="button" onClick={() => { void submit() }} disabled={submitting || !parser.inputValue.trim()} className="mt-0.5 flex h-7 w-7 items-center justify-center rounded-md bg-[var(--accent-blue)] text-white disabled:opacity-40" aria-label="Create task">
+        <button type="button" onClick={() => { void submit() }} disabled={submitting || !parser.inputValue.trim()} className="mt-0.5 flex h-7 w-7 items-center justify-center rounded-md bg-accent-fill text-on-accent disabled:opacity-40" aria-label="Create task">
           {submitting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
         </button>
       </div>
@@ -508,7 +508,7 @@ export function NewTaskComposer({
       )}
 
       {(error || partialFailure) && (
-        <div className="flex items-center justify-between gap-2 px-4 pb-2 pl-[46px] text-[11px] text-accent-red">
+        <div className="flex items-center justify-between gap-2 px-4 pb-2 pl-[46px] text-[11px] text-danger">
           <span>{error}</span>
           {partialFailure && <button type="button" onClick={() => { void retryPartial() }} disabled={submitting} className="rounded border border-current px-2 py-1 font-medium">Retry</button>}
         </div>

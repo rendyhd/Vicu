@@ -118,7 +118,7 @@ export function CompletionSoundSettings({ config, onChange }: Props) {
             </button>
           </div>
 
-          {error && <p className="text-xs text-accent-red">{error}</p>}
+          {error && <p className="text-xs text-danger">{error}</p>}
 
           <p className="text-xs text-[var(--text-secondary)]">
             Supported: MP3, WAV, OGG, M4A, AAC, FLAC (max 10MB)

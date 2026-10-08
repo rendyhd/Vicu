@@ -261,8 +261,8 @@ export function SettingsView() {
               </div>
 
               <div className="flex items-center gap-2">
-                <span className="inline-block h-2 w-2 rounded-full bg-accent-green" />
-                <span className="text-xs text-accent-green">
+                <span className="inline-block h-2 w-2 rounded-full bg-status-done" />
+                <span className="text-xs text-status-done">
                   {authMethod === 'oidc'
                     ? 'Signed in via SSO'
                     : currentUser
@@ -275,7 +275,7 @@ export function SettingsView() {
                 type="button"
                 onClick={handleLogout}
                 disabled={signingOut}
-                className="rounded-md border border-accent-red/30 px-4 py-2 text-sm font-medium text-accent-red transition-colors hover:bg-accent-red/10 disabled:cursor-wait disabled:opacity-60"
+                className="rounded-md border border-danger/30 px-4 py-2 text-sm font-medium text-danger transition-colors hover:bg-danger/10 disabled:cursor-wait disabled:opacity-60"
               >
                 {signingOut ? 'Syncing...' : 'Sign Out'}
               </button>
@@ -322,7 +322,7 @@ export function SettingsView() {
                 disabled={!url || !token || testStatus === 'testing'}
                 className={cn(
                   'rounded-md px-4 py-2 text-sm font-medium transition-colors',
-                  'bg-accent-blue text-white hover:bg-accent-blue/90',
+                  'bg-accent-fill text-on-accent hover:bg-accent-fill/90',
                   'disabled:cursor-not-allowed disabled:opacity-50'
                 )}
               >
@@ -330,10 +330,10 @@ export function SettingsView() {
               </button>
 
               {testStatus === 'success' && (
-                <p className="text-xs text-accent-green">Connected successfully</p>
+                <p className="text-xs text-status-done">Connected successfully</p>
               )}
               {testStatus === 'error' && (
-                <p className="text-xs text-accent-red">{testError || 'Connection failed'}</p>
+                <p className="text-xs text-danger">{testError || 'Connection failed'}</p>
               )}
 
               <div className="border-t border-[var(--border-color)] pt-3">
@@ -341,7 +341,7 @@ export function SettingsView() {
                   type="button"
                   onClick={handleLogout}
                   disabled={signingOut}
-                  className="rounded-md border border-accent-red/30 px-4 py-2 text-sm font-medium text-accent-red transition-colors hover:bg-accent-red/10 disabled:cursor-wait disabled:opacity-60"
+                  className="rounded-md border border-danger/30 px-4 py-2 text-sm font-medium text-danger transition-colors hover:bg-danger/10 disabled:cursor-wait disabled:opacity-60"
                 >
                   {signingOut ? 'Syncing...' : 'Disconnect'}
                 </button>
@@ -443,7 +443,7 @@ export function SettingsView() {
                 ))}
               </select>
               {inboxProjectId !== 0 && !projects.some((project) => project.id === inboxProjectId) && (
-                <p className="mt-1 text-xs text-accent-red">
+                <p className="mt-1 text-xs text-danger">
                   The configured Inbox project is archived or unavailable. Select an active project.
                 </p>
               )}
@@ -584,7 +584,7 @@ export function SettingsView() {
                       <p className="mt-1.5 font-mono text-xs">
                         <code className="text-blue-500">#project</code>{' '}
                         <code className="text-orange-500">@label</code>{' '}
-                        <code className="text-red-500">p1-p4</code>
+                        <code className="text-danger">p1-p4</code>
                       </p>
                     </button>
                     <button
@@ -606,7 +606,7 @@ export function SettingsView() {
                       <p className="mt-1.5 font-mono text-xs">
                         <code className="text-blue-500">+project</code>{' '}
                         <code className="text-orange-500">*label</code>{' '}
-                        <code className="text-red-500">!1-!4</code>
+                        <code className="text-danger">!1-!4</code>
                       </p>
                     </button>
                   </div>
@@ -638,10 +638,10 @@ export function SettingsView() {
           <p className="text-xs text-[var(--text-secondary)]">Saving...</p>
         )}
         {saveStatus === 'saved' && (
-          <p className="text-xs text-accent-green">Settings saved</p>
+          <p className="text-xs text-status-done">Settings saved</p>
         )}
         {saveStatus === 'error' && (
-          <p className="text-xs text-accent-red">Settings could not be saved. Your changes are kept and are saved again with the next change.</p>
+          <p className="text-xs text-danger">Settings could not be saved. Your changes are kept and are saved again with the next change.</p>
         )}
       </div>
       ) : activeTab === 'integrations' ? (
@@ -678,10 +678,10 @@ export function SettingsView() {
           <p className="text-xs text-[var(--text-secondary)]">Saving...</p>
         )}
         {saveStatus === 'saved' && (
-          <p className="text-xs text-accent-green">Settings saved</p>
+          <p className="text-xs text-status-done">Settings saved</p>
         )}
         {saveStatus === 'error' && (
-          <p className="text-xs text-accent-red">Settings could not be saved. Your changes are kept and are saved again with the next change.</p>
+          <p className="text-xs text-danger">Settings could not be saved. Your changes are kept and are saved again with the next change.</p>
         )}
       </div>
       ) : null}

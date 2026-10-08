@@ -66,7 +66,7 @@ function FailedRow({
             type="button"
             disabled={busy}
             onClick={onDiscard}
-            className="rounded border border-[var(--border-color)] px-2 py-0.5 text-[11px] text-accent-red hover:bg-[var(--bg-hover)] disabled:opacity-50"
+            className="rounded border border-[var(--border-color)] px-2 py-0.5 text-[11px] text-danger hover:bg-[var(--bg-hover)] disabled:opacity-50"
           >
             Discard
           </button>
@@ -160,8 +160,8 @@ export function SyncPanel({ onClose }: { onClose: () => void }) {
 
         <div className="min-h-0 flex-1 overflow-y-auto">
           {authProblem && (
-            <div className="flex items-start gap-3 border-b border-[var(--border-color)] bg-accent-red/10 px-4 py-3">
-              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-accent-red" />
+            <div className="flex items-start gap-3 border-b border-[var(--border-color)] bg-danger/10 px-4 py-3">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-danger" />
               <div className="min-w-0 flex-1">
                 <p className="text-[13px] font-medium text-[var(--text-primary)]">Sign in again to sync your changes</p>
                 <p className="mt-0.5 break-words text-[11px] text-[var(--text-secondary)]">
@@ -174,7 +174,7 @@ export function SyncPanel({ onClose }: { onClose: () => void }) {
                   onClose()
                   requestReauth()
                 }}
-                className="flex shrink-0 items-center gap-1 rounded bg-[var(--accent-blue)] px-2.5 py-1 text-[11px] font-medium text-white"
+                className="flex shrink-0 items-center gap-1 rounded bg-accent-fill px-2.5 py-1 text-[11px] font-medium text-on-accent"
               >
                 <LogIn className="h-3 w-3" /> Sign in
               </button>
@@ -208,7 +208,7 @@ export function SyncPanel({ onClose }: { onClose: () => void }) {
           {failed.length > 0 && (
             <section>
               <div className="flex items-center gap-2 px-4 pb-1 pt-3">
-                <h3 className="flex-1 text-[11px] font-semibold uppercase tracking-wider text-accent-red">
+                <h3 className="flex-1 text-[11px] font-semibold uppercase tracking-wider text-danger">
                   Failed ({failed.length})
                 </h3>
                 <button
@@ -223,7 +223,7 @@ export function SyncPanel({ onClose }: { onClose: () => void }) {
                   type="button"
                   disabled={busy}
                   onClick={() => void discardAll()}
-                  className="rounded border border-[var(--border-color)] px-2 py-0.5 text-[11px] text-accent-red hover:bg-[var(--bg-hover)] disabled:opacity-50"
+                  className="rounded border border-[var(--border-color)] px-2 py-0.5 text-[11px] text-danger hover:bg-[var(--bg-hover)] disabled:opacity-50"
                 >
                   Discard all
                 </button>

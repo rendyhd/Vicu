@@ -84,12 +84,12 @@ export function BrowserSettings({ config, onChange, disabled }: BrowserSettingsP
                 <div className="flex items-center gap-3 text-xs text-[var(--text-secondary)]">
                   {config.browser_extension_id && (
                     <span className="flex items-center gap-1">
-                      <span className={`inline-block h-2 w-2 rounded-full ${regStatus.chrome ? 'bg-accent-green' : 'bg-[var(--text-secondary)]'}`} />
+                      <span className={`inline-block h-2 w-2 rounded-full ${regStatus.chrome ? 'bg-status-done' : 'bg-[var(--text-secondary)]'}`} />
                       Chrome bridge: {regStatus.chrome ? 'Registered' : 'Not registered'}
                     </span>
                   )}
                   <span className="flex items-center gap-1">
-                    <span className={`inline-block h-2 w-2 rounded-full ${regStatus.firefox ? 'bg-accent-green' : 'bg-[var(--text-secondary)]'}`} />
+                    <span className={`inline-block h-2 w-2 rounded-full ${regStatus.firefox ? 'bg-status-done' : 'bg-[var(--text-secondary)]'}`} />
                     Firefox bridge: {regStatus.firefox ? 'Registered' : 'Not registered'}
                   </span>
                 </div>

@@ -95,12 +95,12 @@ export function LinkDialog({
             'mb-1 w-full rounded-md border bg-[var(--bg-primary)] px-3 py-1.5 text-sm text-[var(--text-primary)]',
             'placeholder:text-[var(--text-secondary)] focus:outline-none focus:ring-1',
             error
-              ? 'border-[var(--accent-red)] focus:ring-[var(--accent-red)]'
+              ? 'border-danger focus:ring-danger'
               : 'border-[var(--border-color)] focus:ring-[var(--accent-blue)]',
           )}
         />
         {error && (
-          <p className="mb-3 text-xs text-[var(--accent-red)]">{error}</p>
+          <p className="mb-3 text-xs text-danger">{error}</p>
         )}
         {!error && <div className="mb-3" />}
         <div className="flex justify-end gap-2">
@@ -129,7 +129,7 @@ export function LinkDialog({
           <button
             type="button"
             onClick={handleApply}
-            className="rounded-md bg-accent-blue px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-accent-blue/90"
+            className="rounded-md bg-accent-fill px-4 py-1.5 text-sm font-medium text-on-accent transition-colors hover:bg-accent-fill/90"
           >
             Apply
           </button>

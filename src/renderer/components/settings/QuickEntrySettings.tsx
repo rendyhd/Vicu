@@ -88,8 +88,8 @@ export function QuickEntrySettings({ config, projects, onChange, hotkeyWarnings 
 
       <div className="mt-4 space-y-4">
         {hotkeyWarnings?.waylandLimited && (entryEnabled || viewEnabled) && (
-          <div className="rounded-md border border-accent-orange/40 bg-accent-orange/10 px-3 py-3 text-xs text-[var(--text-primary)]">
-            <p className="mb-2 font-semibold text-accent-orange">
+          <div className="rounded-md border border-status-today/40 bg-status-today/10 px-3 py-3 text-xs text-[var(--text-primary)]">
+            <p className="mb-2 font-semibold text-status-today">
               Wayland: global hotkey registration failed
             </p>
             <p className="mb-2 text-[var(--text-secondary)]">
@@ -192,7 +192,7 @@ export function QuickEntrySettings({ config, projects, onChange, hotkeyWarnings 
                     warning={hotkeyWarnings?.entry === false}
                   />
                   {hotkeyWarnings?.entry === false && (
-                    <p className="mt-1 text-xs text-accent-orange">
+                    <p className="mt-1 text-xs text-status-today">
                       {HOTKEY_FAILURE_COPY}
                     </p>
                   )}
@@ -211,7 +211,7 @@ export function QuickEntrySettings({ config, projects, onChange, hotkeyWarnings 
                     ))}
                   </select>
                   {!defaultProjectAvailable && (
-                    <p className="mt-1 text-xs text-accent-orange">
+                    <p className="mt-1 text-xs text-status-today">
                       The saved default project is archived. Quick Entry will use an active fallback until you choose another project.
                     </p>
                   )}
@@ -229,14 +229,14 @@ export function QuickEntrySettings({ config, projects, onChange, hotkeyWarnings 
                         <button
                           type="button"
                           onClick={() => removeSecondaryProject(sp.id)}
-                          className="text-xs text-accent-red hover:text-accent-red/80"
+                          className="text-xs text-danger hover:text-danger/80"
                         >
                           Remove
                         </button>
                       </div>
                     ))}
                     {unavailableSecondaryProjectCount > 0 && (
-                      <p className="text-xs text-accent-orange">
+                      <p className="text-xs text-status-today">
                         {unavailableSecondaryProjectCount} archived project{unavailableSecondaryProjectCount === 1 ? '' : 's'} hidden from the project cycle.
                       </p>
                     )}
@@ -313,7 +313,7 @@ export function QuickEntrySettings({ config, projects, onChange, hotkeyWarnings 
                     warning={hotkeyWarnings?.viewer === false}
                   />
                   {hotkeyWarnings?.viewer === false && (
-                    <p className="mt-1 text-xs text-accent-orange">
+                    <p className="mt-1 text-xs text-status-today">
                       {HOTKEY_FAILURE_COPY}
                     </p>
                   )}
@@ -364,7 +364,7 @@ export function QuickEntrySettings({ config, projects, onChange, hotkeyWarnings 
                     )}
                   </select>
                   {!viewerProjectAvailable && (
-                    <p className="mt-1 text-xs text-accent-orange">
+                    <p className="mt-1 text-xs text-status-today">
                       The saved project is archived. Quick View will omit it until you select an active project or restore it.
                     </p>
                   )}

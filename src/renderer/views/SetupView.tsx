@@ -14,7 +14,7 @@ function TokenPermissionsInfo() {
         className={cn(
           'inline-flex h-4 w-4 items-center justify-center rounded-full text-[10px] font-bold leading-none transition-colors',
           open
-            ? 'bg-accent-blue text-white'
+            ? 'bg-accent-fill text-on-accent'
             : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:bg-accent-blue/20 hover:text-accent-blue'
         )}
         aria-label="Token permissions info"
@@ -316,7 +316,7 @@ export function SetupView({ onComplete }: SetupViewProps) {
                 disabled={discovering}
                 className={cn(
                   'w-full rounded-md px-4 py-2 text-sm font-medium transition-colors',
-                  'bg-accent-blue text-white hover:bg-accent-blue/90',
+                  'bg-accent-fill text-on-accent hover:bg-accent-fill/90',
                   'disabled:cursor-not-allowed disabled:opacity-50'
                 )}
               >
@@ -347,7 +347,7 @@ export function SetupView({ onComplete }: SetupViewProps) {
                   disabled={oidcLogging}
                   className={cn(
                     'w-full rounded-md px-4 py-2.5 text-sm font-medium transition-colors',
-                    'bg-accent-blue text-white hover:bg-accent-blue/90',
+                    'bg-accent-fill text-on-accent hover:bg-accent-fill/90',
                     'disabled:cursor-not-allowed disabled:opacity-50'
                   )}
                 >
@@ -375,7 +375,7 @@ export function SetupView({ onComplete }: SetupViewProps) {
                       'w-full rounded-md px-4 py-2.5 text-sm font-medium transition-colors',
                       oidcProviders.length > 0
                         ? 'border border-[var(--border-color)] text-[var(--text-primary)] hover:bg-[var(--bg-primary)]'
-                        : 'bg-accent-blue text-white hover:bg-accent-blue/90'
+                        : 'bg-accent-fill text-on-accent hover:bg-accent-fill/90'
                     )}
                   >
                     Sign in with username & password
@@ -384,7 +384,7 @@ export function SetupView({ onComplete }: SetupViewProps) {
               )}
 
               {oidcError && (
-                <p className="text-xs text-accent-red">{oidcError}</p>
+                <p className="text-xs text-danger">{oidcError}</p>
               )}
 
               <div className="flex items-center gap-3">
@@ -444,7 +444,7 @@ export function SetupView({ onComplete }: SetupViewProps) {
                 disabled={totpCode.length !== 6 || oidcLogging}
                 className={cn(
                   'w-full rounded-md px-4 py-2 text-sm font-medium transition-colors',
-                  'bg-accent-blue text-white hover:bg-accent-blue/90',
+                  'bg-accent-fill text-on-accent hover:bg-accent-fill/90',
                   'disabled:cursor-not-allowed disabled:opacity-50'
                 )}
               >
@@ -452,7 +452,7 @@ export function SetupView({ onComplete }: SetupViewProps) {
               </button>
 
               {oidcError && (
-                <p className="text-xs text-accent-red">{oidcError}</p>
+                <p className="text-xs text-danger">{oidcError}</p>
               )}
 
               <button
@@ -521,7 +521,7 @@ export function SetupView({ onComplete }: SetupViewProps) {
                 disabled={!username || !password || passwordLogging}
                 className={cn(
                   'w-full rounded-md px-4 py-2 text-sm font-medium transition-colors',
-                  'bg-accent-blue text-white hover:bg-accent-blue/90',
+                  'bg-accent-fill text-on-accent hover:bg-accent-fill/90',
                   'disabled:cursor-not-allowed disabled:opacity-50'
                 )}
               >
@@ -529,7 +529,7 @@ export function SetupView({ onComplete }: SetupViewProps) {
               </button>
 
               {passwordError && (
-                <p className="text-xs text-accent-red">{passwordError}</p>
+                <p className="text-xs text-danger">{passwordError}</p>
               )}
 
               <button
@@ -575,7 +575,7 @@ export function SetupView({ onComplete }: SetupViewProps) {
                 disabled={totpCode.length !== 6 || passwordLogging}
                 className={cn(
                   'w-full rounded-md px-4 py-2 text-sm font-medium transition-colors',
-                  'bg-accent-blue text-white hover:bg-accent-blue/90',
+                  'bg-accent-fill text-on-accent hover:bg-accent-fill/90',
                   'disabled:cursor-not-allowed disabled:opacity-50'
                 )}
               >
@@ -583,7 +583,7 @@ export function SetupView({ onComplete }: SetupViewProps) {
               </button>
 
               {passwordError && (
-                <p className="text-xs text-accent-red">{passwordError}</p>
+                <p className="text-xs text-danger">{passwordError}</p>
               )}
 
               <button
@@ -641,7 +641,7 @@ export function SetupView({ onComplete }: SetupViewProps) {
                 disabled={!token || testStatus === 'testing'}
                 className={cn(
                   'w-full rounded-md px-4 py-2 text-sm font-medium transition-colors',
-                  'bg-accent-blue text-white hover:bg-accent-blue/90',
+                  'bg-accent-fill text-on-accent hover:bg-accent-fill/90',
                   'disabled:cursor-not-allowed disabled:opacity-50'
                 )}
               >
@@ -649,7 +649,7 @@ export function SetupView({ onComplete }: SetupViewProps) {
               </button>
 
               {testStatus === 'error' && (
-                <p className="text-xs text-accent-red">{testError || 'Connection failed'}</p>
+                <p className="text-xs text-danger">{testError || 'Connection failed'}</p>
               )}
 
               <button
@@ -670,13 +670,13 @@ export function SetupView({ onComplete }: SetupViewProps) {
           {step === 'project' && (
             <>
               {authMethod === 'oidc' && (
-                <p className="text-xs text-accent-green">Signed in via SSO</p>
+                <p className="text-xs text-status-done">Signed in via SSO</p>
               )}
               {authMethod === 'password' && (
-                <p className="text-xs text-accent-green">Signed in successfully</p>
+                <p className="text-xs text-status-done">Signed in successfully</p>
               )}
               {authMethod === 'api_token' && (
-                <p className="text-xs text-accent-green">Connected successfully</p>
+                <p className="text-xs text-status-done">Connected successfully</p>
               )}
 
               <div>
@@ -701,7 +701,7 @@ export function SetupView({ onComplete }: SetupViewProps) {
                 disabled={!inboxProjectId || saving}
                 className={cn(
                   'w-full rounded-md px-4 py-2 text-sm font-medium transition-colors',
-                  'bg-accent-blue text-white hover:bg-accent-blue/90',
+                  'bg-accent-fill text-on-accent hover:bg-accent-fill/90',
                   'disabled:cursor-not-allowed disabled:opacity-50'
                 )}
               >

@@ -113,7 +113,7 @@ export function TodayView() {
       {overdueTasks.length > 0 && (
         <div>
           <div className="px-6 pb-1 pt-2">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-accent-red">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-status-overdue">
               Overdue
             </span>
           </div>

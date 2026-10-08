@@ -191,7 +191,7 @@ function RoutineEditor({
                   {WEEKDAYS.map((day) => {
                     const selected = calendar.weekdays.includes(day.id)
                     return (
-                      <button key={day.id} type="button" onClick={() => setDraft({ ...draft, schedule: { ...calendar, weekdays: selected ? calendar.weekdays.filter((id) => id !== day.id) : [...calendar.weekdays, day.id].sort() } })} className={cn('h-8 w-8 rounded-full text-xs font-semibold', selected ? 'bg-accent-blue text-white' : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)]')}>{day.label}</button>
+                      <button key={day.id} type="button" onClick={() => setDraft({ ...draft, schedule: { ...calendar, weekdays: selected ? calendar.weekdays.filter((id) => id !== day.id) : [...calendar.weekdays, day.id].sort() } })} className={cn('h-8 w-8 rounded-full text-xs font-semibold', selected ? 'bg-accent-fill text-on-accent' : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)]')}>{day.label}</button>
                     )
                   })}
                   <button type="button" onClick={() => setDraft({ ...draft, schedule: { ...calendar, weekdays: [] } })} className={cn('ml-1 rounded-md px-2 text-xs', calendar.weekdays.length === 0 ? 'bg-accent-blue/10 text-accent-blue' : 'text-[var(--text-secondary)]')}>Daily</button>
@@ -226,7 +226,7 @@ function RoutineEditor({
                   <div className="flex items-center gap-2">
                     <input className="h-8 min-w-0 flex-1 rounded-md border border-[var(--border-color)] bg-[var(--bg-primary)] px-2 text-xs text-[var(--text-primary)]" value={slot.label} onChange={(event) => updateSlot(slot.id, { label: event.target.value })} />
                     <input type="time" className="h-8 rounded-md border border-[var(--border-color)] bg-[var(--bg-primary)] px-2 text-xs text-[var(--text-primary)]" value={timeLabel(slot.reminderMinutes)} onChange={(event) => { const [hours, minutes] = event.target.value.split(':').map(Number); updateSlot(slot.id, { reminderMinutes: hours * 60 + minutes }) }} />
-                    {draft.slots.length > 1 && <button type="button" onClick={() => setDraft({ ...draft, slots: draft.slots.filter((item) => item.id !== slot.id) })} className="p-1 text-[var(--text-secondary)] hover:text-accent-red"><X className="h-4 w-4" /></button>}
+                    {draft.slots.length > 1 && <button type="button" onClick={() => setDraft({ ...draft, slots: draft.slots.filter((item) => item.id !== slot.id) })} className="p-1 text-[var(--text-secondary)] hover:text-danger"><X className="h-4 w-4" /></button>}
                   </div>
                   <div className="mt-2 flex items-center gap-4">
                     <label className="flex items-center gap-2 text-xs text-[var(--text-secondary)]"><input type="checkbox" checked={slot.reminderEnabled} onChange={(event) => updateSlot(slot.id, { reminderEnabled: event.target.checked })} /><Bell className="h-3.5 w-3.5" /> Remind me</label>
@@ -240,7 +240,7 @@ function RoutineEditor({
 
         <footer className="sticky bottom-0 flex justify-end gap-2 border-t border-[var(--border-color)] bg-[var(--bg-primary)] p-4">
           <button type="button" onClick={onClose} className="rounded-md border border-[var(--border-color)] px-4 py-2 text-sm font-medium text-[var(--text-primary)] hover:bg-[var(--bg-hover)]">Cancel</button>
-          <button type="submit" disabled={busy || !draft.name.trim() || draft.slots.length === 0} className="rounded-md bg-accent-blue px-4 py-2 text-sm font-medium text-white disabled:opacity-50">{busy ? 'Saving...' : carrier ? 'Save changes' : 'Create routine'}</button>
+          <button type="submit" disabled={busy || !draft.name.trim() || draft.slots.length === 0} className="rounded-md bg-accent-fill px-4 py-2 text-sm font-medium text-on-accent disabled:opacity-50">{busy ? 'Saving...' : carrier ? 'Save changes' : 'Create routine'}</button>
         </footer>
       </form>
     </DialogFrame>
@@ -261,12 +261,12 @@ function HistoryDialog({ carrier, onClose }: { carrier: RoutineCarrier<Task>; on
         </div>
         <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-secondary)]">History</h3>
         {loadingArchive && <p className="mb-2 text-xs text-[var(--text-secondary)]">Loading earlier history...</p>}
-        {archiveError && <p className="mb-2 text-xs text-accent-red">Could not load earlier history: {archiveError}</p>}
+        {archiveError && <p className="mb-2 text-xs text-danger">Could not load earlier history: {archiveError}</p>}
         {records.length === 0 ? <p className="py-8 text-center text-sm text-[var(--text-secondary)]">No check-ins yet.</p> : (
           <div className="divide-y divide-[var(--border-color)]">
             {records.slice(0, 100).map((record) => (
               <div key={record.key} className="flex items-center gap-3 py-2.5">
-                <div className={cn('flex h-6 w-6 items-center justify-center rounded-full', record.status === 'COMPLETED' ? 'bg-accent-green/15 text-accent-green' : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)]')}>
+                <div className={cn('flex h-6 w-6 items-center justify-center rounded-full', record.status === 'COMPLETED' ? 'bg-status-done/15 text-status-done' : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)]')}>
                   {record.status === 'COMPLETED' ? <Check className="h-3.5 w-3.5" /> : <X className="h-3.5 w-3.5" />}
                 </div>
                 <div className="min-w-0 flex-1"><div className="text-sm text-[var(--text-primary)]">{new Date(`${record.scheduledDate}T12:00:00`).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}</div><div className="text-[11px] text-[var(--text-secondary)]">{timeLabel(record.scheduledMinutes)}</div></div>
@@ -327,7 +327,7 @@ function RoutinesContent() {
         <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-accent-purple/15 text-accent-purple"><HeartPulse className="h-5 w-5" /></div>
         <div className="min-w-0 flex-1"><h1 className="text-xl font-semibold text-[var(--text-primary)]">Routines</h1><p className="text-xs text-[var(--text-secondary)]">Daily health and recurring home rhythms</p></div>
         <button type="button" onClick={exportCsv} disabled={routines.carriers.length === 0} className="flex h-9 items-center gap-2 rounded-md border border-[var(--border-color)] px-3 text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--bg-hover)] disabled:opacity-40"><Download className="h-4 w-4" /> Export</button>
-        <button type="button" onClick={() => setEditor('new')} className="flex h-9 items-center gap-2 rounded-md bg-accent-blue px-3 text-xs font-semibold text-white"><Plus className="h-4 w-4" /> New routine</button>
+        <button type="button" onClick={() => setEditor('new')} className="flex h-9 items-center gap-2 rounded-md bg-accent-fill px-3 text-xs font-semibold text-on-accent"><Plus className="h-4 w-4" /> New routine</button>
       </header>
 
       <div className="min-h-0 flex-1 overflow-y-auto pb-10">
@@ -360,13 +360,13 @@ function RoutinesContent() {
           {routines.archived.length > 0 && (
             <section className="px-6 pt-7">
               <button type="button" onClick={() => setShowArchived(!showArchived)} className="mb-3 flex w-full items-center text-left text-[11px] font-semibold uppercase tracking-wider text-[var(--text-secondary)]"><span className="flex-1">Archived</span><span>{routines.archived.length}</span></button>
-              {showArchived && <div className="space-y-2">{routines.archived.map((carrier) => <div key={carrier.payload.definition.id} className="flex items-center gap-3 rounded-lg border border-[var(--border-color)] px-3 py-2.5"><Archive className="h-4 w-4 text-[var(--text-secondary)]" /><span className="flex-1 text-sm text-[var(--text-primary)]">{carrier.payload.definition.name}</span><button type="button" onClick={() => routines.archiveRoutine.mutate({ carrier, archived: false })} className="flex items-center gap-1 text-xs font-medium text-accent-blue"><Undo2 className="h-3.5 w-3.5" /> Restore</button><button type="button" onClick={() => { if (window.confirm(`Permanently delete "${carrier.payload.definition.name}" and its history?`)) routines.deleteRoutine.mutate(carrier) }} className="rounded-md p-1.5 text-[var(--text-secondary)] hover:bg-accent-red/10 hover:text-accent-red"><Trash2 className="h-4 w-4" /></button></div>)}</div>}
+              {showArchived && <div className="space-y-2">{routines.archived.map((carrier) => <div key={carrier.payload.definition.id} className="flex items-center gap-3 rounded-lg border border-[var(--border-color)] px-3 py-2.5"><Archive className="h-4 w-4 text-[var(--text-secondary)]" /><span className="flex-1 text-sm text-[var(--text-primary)]">{carrier.payload.definition.name}</span><button type="button" onClick={() => routines.archiveRoutine.mutate({ carrier, archived: false })} className="flex items-center gap-1 text-xs font-medium text-accent-blue"><Undo2 className="h-3.5 w-3.5" /> Restore</button><button type="button" onClick={() => { if (window.confirm(`Permanently delete "${carrier.payload.definition.name}" and its history?`)) routines.deleteRoutine.mutate(carrier) }} className="rounded-md p-1.5 text-[var(--text-secondary)] hover:bg-danger/10 hover:text-danger"><Trash2 className="h-4 w-4" /></button></div>)}</div>}
             </section>
           )}
 
-          {routines.archiveWarning && <div className="mx-6 mt-5 rounded-lg border border-accent-orange/30 bg-accent-orange/10 px-4 py-3 text-xs text-accent-orange">Older history could not be archived yet and stays in the routine for now: {routines.archiveWarning}</div>}
-          {exportError && <div className="mx-6 mt-5 rounded-lg border border-accent-red/30 bg-accent-red/10 px-4 py-3 text-xs text-accent-red">{exportError}</div>}
-          {routines.error && <div className="mx-6 mt-5 rounded-lg border border-accent-red/30 bg-accent-red/10 px-4 py-3 text-xs text-accent-red">{routines.error instanceof Error ? routines.error.message : 'Could not update routines'}</div>}
+          {routines.archiveWarning && <div className="mx-6 mt-5 rounded-lg border border-status-today/30 bg-status-today/10 px-4 py-3 text-xs text-status-today">Older history could not be archived yet and stays in the routine for now: {routines.archiveWarning}</div>}
+          {exportError && <div className="mx-6 mt-5 rounded-lg border border-danger/30 bg-danger/10 px-4 py-3 text-xs text-danger">{exportError}</div>}
+          {routines.error && <div className="mx-6 mt-5 rounded-lg border border-danger/30 bg-danger/10 px-4 py-3 text-xs text-danger">{routines.error instanceof Error ? routines.error.message : 'Could not update routines'}</div>}
         </div>
       </div>
 

@@ -20,9 +20,9 @@ export function SecretStorageNotice() {
   return (
     <div
       role="note"
-      className="mt-4 rounded-md border border-accent-orange/40 bg-accent-orange/10 px-3 py-2 text-xs text-[var(--text-secondary)]"
+      className="mt-4 rounded-md border border-status-today/40 bg-status-today/10 px-3 py-2 text-xs text-[var(--text-secondary)]"
     >
-      <p className="mb-1 font-semibold text-accent-orange">
+      <p className="mb-1 font-semibold text-status-today">
         {level === 'plaintext' ? 'Sign-in token is not encrypted' : 'Sign-in token is obfuscated, not encrypted'}
       </p>
       {level === 'plaintext' ? (

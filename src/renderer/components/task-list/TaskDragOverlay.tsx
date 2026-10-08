@@ -17,10 +17,10 @@ export function TaskDragOverlay({ task, count = 1 }: TaskDragOverlayProps) {
         </>
       )}
       <div className="relative flex h-10 items-center gap-3 rounded-lg border-2 border-[var(--accent-blue)] bg-[var(--bg-primary)] px-4 shadow-lg">
-        <div className="h-[18px] w-[18px] shrink-0 rounded-full border border-[var(--border-color)]" />
+        <div className="h-[18px] w-[18px] shrink-0 rounded-full border border-control-ring" />
         <span className="truncate text-[13px] text-[var(--text-primary)]">{task.title}</span>
         {multi && (
-          <span className="ml-auto flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-[var(--accent-blue)] px-1.5 text-[11px] font-semibold text-white">
+          <span className="ml-auto flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-accent-fill px-1.5 text-[11px] font-semibold text-on-accent">
             {count}
           </span>
         )}

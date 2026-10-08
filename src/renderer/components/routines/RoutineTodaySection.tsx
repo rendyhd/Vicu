@@ -31,8 +31,8 @@ function RoutineCheck({
         className={cn(
           'flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 transition-all',
           completed
-            ? 'border-accent-green bg-accent-green text-white'
-            : 'border-[var(--text-tertiary)] text-transparent hover:border-accent-green hover:text-accent-green',
+            ? 'border-status-done bg-status-done text-on-accent dark:text-bg-page'
+            : 'border-[var(--text-tertiary)] text-transparent hover:border-status-done hover:text-status-done',
         )}
       >
         {completed ? <Check className="h-3.5 w-3.5" strokeWidth={3} /> : <Check className="h-3 w-3" />}
@@ -54,7 +54,7 @@ function RoutineCheck({
             {timeLabel(occurrence.slot.reminderMinutes)}
           </span>
           {occurrence.slot.reminderEnabled && <Bell className="h-3 w-3" />}
-          {occurrence.overdue && <span className="font-medium text-accent-red">Overdue</span>}
+          {occurrence.overdue && <span className="font-medium text-status-overdue">Overdue</span>}
           {occurrence.status === 'NOT_LOGGED' && <span>Not logged</span>}
           {skipped && <span>Skipped</span>}
         </div>

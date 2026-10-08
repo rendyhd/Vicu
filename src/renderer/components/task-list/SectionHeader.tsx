@@ -186,7 +186,7 @@ export function SectionHeader({ project, siblings, onAddTask }: SectionHeaderPro
                   e.stopPropagation()
                   handleDelete()
                 }}
-                className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-accent-red hover:bg-[var(--bg-hover)]"
+                className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-danger hover:bg-[var(--bg-hover)]"
               >
                 <Trash2 className="h-3 w-3" />
                 Delete

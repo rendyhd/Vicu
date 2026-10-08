@@ -1,3 +1,5 @@
+@import '../assets/tokens.css';
+
 .hidden {
   display: none;
 }
@@ -75,21 +77,21 @@ html, body {
 }
 
 .status-bar.offline {
-  color: #b7791f;
+  color: var(--status-today);
   background: rgba(183, 121, 31, 0.06);
 }
 
 .status-bar.pending {
-  color: #888;
+  color: var(--text-secondary);
 }
 
 .status-bar.failed {
-  color: #c53030;
+  color: var(--danger);
   background: rgba(197, 48, 48, 0.06);
 }
 
 .status-bar.standalone {
-  color: #4a90d9;
+  color: var(--accent-blue);
   background: rgba(74, 144, 217, 0.06);
 }
 
@@ -105,14 +107,14 @@ html, body {
 .loading {
   padding: 16px 20px;
   font-size: 14px;
-  color: #999;
+  color: var(--text-secondary);
 }
 
 /* Empty state */
 .empty-state {
   padding: 24px 20px;
   font-size: 14px;
-  color: #999;
+  color: var(--text-secondary);
   text-align: center;
 }
 
@@ -141,7 +143,7 @@ html, body {
   width: 18px;
   height: 18px;
   margin-top: 1px;
-  border: 2px solid #ccc;
+  border: 2px solid var(--control-ring);
   border-radius: 4px;
   cursor: pointer;
   appearance: none;
@@ -152,12 +154,12 @@ html, body {
 }
 
 .task-checkbox:hover {
-  border-color: #4a90d9;
+  border-color: var(--accent-fill);
 }
 
 .task-checkbox:checked {
-  background: #4a90d9;
-  border-color: #4a90d9;
+  background: var(--accent-fill);
+  border-color: var(--accent-fill);
 }
 
 .task-checkbox:checked::after {
@@ -167,7 +169,7 @@ html, body {
   top: 1px;
   width: 5px;
   height: 9px;
-  border: solid #fff;
+  border: solid var(--on-accent);
   border-width: 0 2px 2px 0;
   transform: rotate(45deg);
 }
@@ -197,7 +199,7 @@ html, body {
 .task-title {
   -webkit-app-region: no-drag;
   font-size: 14px;
-  color: #1a1a1a;
+  color: var(--text-primary);
   line-height: 1.4;
   word-wrap: break-word;
   overflow-wrap: break-word;
@@ -217,7 +219,7 @@ html, body {
   min-height: 20px;
   font-size: 14px;
   line-height: 1.4;
-  color: #aaa;
+  color: var(--text-secondary);
   cursor: pointer;
   opacity: 0.6;
   transition: opacity 150ms;
@@ -226,12 +228,12 @@ html, body {
 
 .description-icon:hover {
   opacity: 1;
-  color: #4a90d9;
+  color: var(--accent-blue);
 }
 
 .task-title:hover {
   text-decoration: underline;
-  color: #4a90d9;
+  color: var(--accent-blue);
 }
 
 .task-title.standalone {
@@ -240,7 +242,7 @@ html, body {
 
 .task-title.standalone:hover {
   text-decoration: none;
-  color: #1a1a1a;
+  color: var(--text-primary);
 }
 
 .task-item.completing .task-title,
@@ -253,7 +255,7 @@ html, body {
 .task-description {
   -webkit-app-region: no-drag;
   font-size: 12px;
-  color: #666;
+  color: var(--text-secondary);
   line-height: 1.4;
   margin-top: 4px;
   padding: 6px 8px;
@@ -283,7 +285,7 @@ html, body {
 .task-description-rich strong { font-weight: 600; color: inherit; }
 .task-description-rich em { font-style: italic; }
 .task-description-rich s { text-decoration: line-through; }
-.task-description-rich a { color: #4a90d9; text-decoration: underline; }
+.task-description-rich a { color: var(--accent-blue); text-decoration: underline; }
 .task-description-rich code {
   background: rgba(0, 0, 0, 0.06);
   padding: 0.1em 0.3em;
@@ -301,7 +303,7 @@ html, body {
   border-left: 2px solid rgba(0, 0, 0, 0.15);
   padding-left: 0.6em;
   margin: 0.3em 0;
-  color: #888;
+  color: var(--text-secondary);
 }
 .task-description-rich ul[data-type="taskList"] {
   list-style: none;
@@ -324,22 +326,22 @@ html, body {
 /* Due date */
 .task-due {
   font-size: 11px;
-  color: #888;
+  color: var(--text-secondary);
   line-height: 1.3;
 }
 
 .task-due.overdue {
-  color: #e53e3e;
+  color: var(--status-overdue);
   font-weight: 500;
 }
 
 .task-due.today {
-  color: #d69e2e;
+  color: var(--status-today);
   font-weight: 500;
 }
 
 .task-due.upcoming {
-  color: #38a169;
+  color: var(--text-secondary);
 }
 
 /* Priority indicator */
@@ -353,11 +355,11 @@ html, body {
   margin-top: 6px;
 }
 
-.task-priority.priority-1 { background: #63b3ed; }
-.task-priority.priority-2 { background: #f6e05e; }
-.task-priority.priority-3 { background: #ed8936; }
-.task-priority.priority-4 { background: #fc8181; }
-.task-priority.priority-5 { background: #e53e3e; }
+.task-priority.priority-1 { background: var(--priority-low); }
+.task-priority.priority-2 { background: var(--priority-medium); }
+.task-priority.priority-3 { background: var(--priority-high); }
+.task-priority.priority-4 { background: var(--priority-urgent); }
+.task-priority.priority-5 { background: var(--priority-urgent); }
 
 /* Selected task */
 .task-item.selected {
@@ -366,7 +368,7 @@ html, body {
 
 /* Inline edit mode */
 .task-item.editing {
-  border-left: 3px solid #4a90d9;
+  border-left: 3px solid var(--accent-blue);
   padding-left: 13px;
 }
 
@@ -381,7 +383,7 @@ html, body {
 .task-edit-title {
   font-size: 14px;
   font-family: inherit;
-  color: #1a1a1a;
+  color: var(--text-primary);
   background: transparent;
   border: 1px solid rgba(0, 0, 0, 0.12);
   border-radius: 4px;
@@ -391,13 +393,13 @@ html, body {
 }
 
 .task-edit-title:focus {
-  border-color: #4a90d9;
+  border-color: var(--accent-blue);
 }
 
 .task-edit-description {
   font-size: 12px;
   font-family: inherit;
-  color: #666;
+  color: var(--text-secondary);
   background: rgba(0, 0, 0, 0.03);
   border: 1px solid rgba(0, 0, 0, 0.08);
   border-radius: 4px;
@@ -411,12 +413,12 @@ html, body {
 }
 
 .task-edit-description:focus {
-  border-color: #4a90d9;
+  border-color: var(--accent-blue);
 }
 
 .task-edit-hint {
   font-size: 10px;
-  color: #aaa;
+  color: var(--text-secondary);
   text-align: right;
 }
 
@@ -427,7 +429,7 @@ html, body {
 
 .task-item.completed-undo .completed-message {
   font-size: 13px;
-  color: #888;
+  color: var(--text-secondary);
   font-style: italic;
 }
 
@@ -435,7 +437,7 @@ html, body {
 .error-message {
   padding: 8px 16px;
   font-size: 13px;
-  color: #e53e3e;
+  color: var(--danger);
   opacity: 0;
   transition: opacity 200ms ease;
 }
@@ -513,14 +515,6 @@ html, body {
     box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4), 0 1px 4px rgba(0, 0, 0, 0.2);
   }
 
-  .loading {
-    color: #666;
-  }
-
-  .empty-state {
-    color: #666;
-  }
-
   .task-item {
     border-bottom-color: rgba(255, 255, 255, 0.06);
   }
@@ -530,61 +524,11 @@ html, body {
   }
 
   .task-checkbox {
-    border-color: #555;
-  }
-
-  .task-checkbox:hover {
-    border-color: #5a9be6;
-  }
-
-  .task-checkbox:checked {
-    background: #5a9be6;
-    border-color: #5a9be6;
-  }
-
-  .task-title {
-    color: #f0f0f0;
-  }
-
-  .task-title:hover {
-    color: #5a9be6;
-  }
-
-  .task-title.standalone:hover {
-    color: #f0f0f0;
-  }
-
-  .task-due {
-    color: #777;
-  }
-
-  .task-due.overdue {
-    color: #fc8181;
-  }
-
-  .task-due.today {
-    color: #ecc94b;
-  }
-
-  .task-due.upcoming {
-    color: #68d391;
+    border-color: var(--control-ring);
   }
 
   .task-item.selected {
     background: rgba(90, 155, 230, 0.15);
-  }
-
-  .task-item.completed-undo .completed-message {
-    color: #777;
-  }
-
-  .error-message {
-    color: #fc8181;
-  }
-
-  .task-list::-webkit-scrollbar-thumb {
-    background: transparent;
-    transition: background 0.3s;
   }
 
   .task-list:hover::-webkit-scrollbar-thumb {
@@ -600,74 +544,42 @@ html, body {
   }
 
   .status-bar.offline {
-    color: #ecc94b;
     background: rgba(236, 201, 75, 0.08);
   }
 
-  .status-bar.pending {
-    color: #777;
-  }
-
   .status-bar.failed {
-    color: #fc8181;
     background: rgba(252, 129, 129, 0.08);
   }
 
   .status-bar.standalone {
-    color: #5a9be6;
     background: rgba(90, 155, 230, 0.08);
   }
 
   .task-description {
-    color: #999;
     background: rgba(255, 255, 255, 0.04);
   }
 
   .task-description:hover {
     background: rgba(255, 255, 255, 0.08);
   }
-
-  .task-description-rich a { color: #5a9be6; }
   .task-description-rich code,
   .task-description-rich pre { background: rgba(255, 255, 255, 0.08); }
+
   .task-description-rich blockquote {
     border-left-color: rgba(255, 255, 255, 0.2);
-    color: #888;
-  }
-
-  .description-icon {
-    color: #666;
-  }
-
-  .description-icon:hover {
-    color: #5a9be6;
   }
 
   .task-item.editing {
-    border-left-color: #5a9be6;
+    border-left-color: var(--accent-blue);
   }
 
   .task-edit-title {
-    color: #f0f0f0;
     border-color: rgba(255, 255, 255, 0.12);
   }
 
-  .task-edit-title:focus {
-    border-color: #5a9be6;
-  }
-
   .task-edit-description {
-    color: #999;
     background: rgba(255, 255, 255, 0.04);
     border-color: rgba(255, 255, 255, 0.08);
-  }
-
-  .task-edit-description:focus {
-    border-color: #5a9be6;
-  }
-
-  .task-edit-hint {
-    color: #555;
   }
 
   .browser-link-btn { color: #60a5fa; }

@@ -259,7 +259,7 @@ function ProjectRowMenu({ node }: { node: ReviewTreeNode }) {
           </button>
           <button
             type="button"
-            className="w-full px-3 py-1.5 text-left text-sm text-[var(--accent-red)] hover:bg-[var(--bg-hover)]"
+            className="w-full px-3 py-1.5 text-left text-sm text-danger hover:bg-[var(--bg-hover)]"
             onClick={() => {
               setOpen(false)
               exclude.mutate({ project: node.project, excluded: true })
@@ -283,7 +283,7 @@ function ProjectRowMenu({ node }: { node: ReviewTreeNode }) {
           <div className="flex gap-2">
             <button
               type="button"
-              className="flex-1 rounded bg-[var(--accent-blue)] px-2 py-1 text-sm text-white"
+              className="flex-1 rounded bg-accent-fill px-2 py-1 text-sm text-on-accent"
               onClick={() => {
                 const n = cadenceInput === '' ? null : parseInt(cadenceInput, 10)
                 setCadence.mutate({ project: node.project, cadenceDays: Number.isFinite(n ?? NaN) ? n : null })

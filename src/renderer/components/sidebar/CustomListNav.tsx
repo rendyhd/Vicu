@@ -178,7 +178,7 @@ export function CustomListNav() {
                 className={cn(
                   'flex h-5 w-5 items-center justify-center rounded transition-colors hover:bg-[var(--bg-hover)]',
                   syncStatus.state === 'error' || syncStatus.state === 'update_required'
-                    ? 'text-accent-red'
+                    ? 'text-danger'
                     : 'text-[var(--text-secondary)]',
                 )}
                 title={'message' in syncStatus ? syncStatus.message : syncStatus.state === 'pending' ? 'Custom-list sync pending' : 'Syncing custom lists'}
@@ -249,7 +249,7 @@ export function CustomListNav() {
           <button
             type="button"
             onClick={() => handleDelete(contextMenu.list.id)}
-            className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-accent-red hover:bg-[var(--bg-hover)]"
+            className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-danger hover:bg-[var(--bg-hover)]"
           >
             <Trash2 className="h-3.5 w-3.5" />
             Delete

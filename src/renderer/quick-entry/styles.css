@@ -1,3 +1,5 @@
+@import '../assets/tokens.css';
+
 .hidden {
   display: none;
 }
@@ -130,7 +132,7 @@ body {
   padding: 16px 20px;
   font-size: 18px;
   font-weight: 400;
-  color: #1a1a1a;
+  color: var(--text-primary);
   background: transparent;
   border: none;
   outline: none;
@@ -138,7 +140,7 @@ body {
 }
 
 #task-input::placeholder {
-  color: #999;
+  color: var(--text-secondary);
   font-weight: 300;
 }
 
@@ -161,7 +163,7 @@ body {
   padding: 6px 20px;
   font-size: 13px;
   cursor: pointer;
-  color: #1a1a1a;
+  color: var(--text-primary);
 }
 
 .autocomplete-item.active {
@@ -205,13 +207,13 @@ body {
 /* Description hint */
 .description-hint {
   font-size: 12px;
-  color: #999;
+  color: var(--text-secondary);
 }
 
 /* Today scheduling hint */
 .today-hint {
   font-size: 12px;
-  color: #999;
+  color: var(--text-secondary);
   font-style: italic;
 }
 
@@ -227,7 +229,7 @@ body {
   padding: 8px 20px 12px;
   font-size: 14px;
   font-family: inherit;
-  color: #1a1a1a;
+  color: var(--text-primary);
   background: transparent;
   border: none;
   border-top: 1px solid rgba(0, 0, 0, 0.06);
@@ -236,7 +238,7 @@ body {
 }
 
 .description-input::placeholder {
-  color: #999;
+  color: var(--text-secondary);
 }
 
 /* Image gallery — staged paste images shown below description */
@@ -300,7 +302,7 @@ body {
 .error-message {
   padding: 6px 20px 12px;
   font-size: 13px;
-  color: #e53e3e;
+  color: var(--danger);
   opacity: 0;
   transition: opacity 200ms ease;
 }
@@ -311,18 +313,18 @@ body {
 
 /* Offline saved message (amber instead of red) */
 .error-message.offline {
-  color: #b7791f;
+  color: var(--status-today);
 }
 
 /* Pending sync indicator */
 .pending-indicator {
   padding: 4px 20px 8px;
   font-size: 11px;
-  color: #b7791f;
+  color: var(--status-today);
   font-style: italic;
 }
 .pending-indicator.has-failed {
-  color: #c53030;
+  color: var(--danger);
 }
 
 /* Obsidian hint */
@@ -479,53 +481,16 @@ body {
     box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4), 0 1px 4px rgba(0, 0, 0, 0.2);
   }
 
-  #task-input {
-    color: #f0f0f0;
-  }
-
-  #task-input::placeholder {
-    color: #666;
-  }
-
   .project-hint {
     color: #b0a0d0;
   }
 
-  .description-hint {
-    color: #666;
-  }
-
-  .today-hint {
-    color: #666;
-  }
-
   .description-input {
-    color: #f0f0f0;
     border-top-color: rgba(255, 255, 255, 0.06);
-  }
-
-  .description-input::placeholder {
-    color: #666;
   }
 
   .image-gallery-item img {
     border-color: rgba(255, 255, 255, 0.08);
-  }
-
-  .error-message {
-    color: #fc8181;
-  }
-
-  .error-message.offline {
-    color: #ecc94b;
-  }
-
-  .pending-indicator {
-    color: #ecc94b;
-  }
-
-  .pending-indicator.has-failed {
-    color: #fc8181;
   }
 
   .obsidian-hint { color: #a78bfa; }
@@ -549,7 +514,6 @@ body {
   .parse-chip-recurrence { background: rgba(168, 85, 247, 0.2); color: #c084fc; }
 
   .autocomplete-container { border-top-color: rgba(255, 255, 255, 0.06); }
-  .autocomplete-item { color: #f0f0f0; }
   .autocomplete-item.active { background: rgba(59, 130, 246, 0.20); }
   .autocomplete-item:hover { background: rgba(59, 130, 246, 0.12); }
   .autocomplete-item-project::before { background: rgba(59, 130, 246, 0.7); }

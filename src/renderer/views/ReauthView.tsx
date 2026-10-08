@@ -97,7 +97,7 @@ export function ReauthView({
               disabled={loading}
               className={cn(
                 'w-full rounded-md px-4 py-2.5 text-sm font-medium transition-colors',
-                'bg-accent-blue text-white hover:bg-accent-blue/90',
+                'bg-accent-fill text-on-accent hover:bg-accent-fill/90',
                 'disabled:cursor-not-allowed disabled:opacity-50'
               )}
             >
@@ -135,7 +135,7 @@ export function ReauthView({
                 disabled={totpCode.length !== 6 || loading}
                 className={cn(
                   'w-full rounded-md px-4 py-2 text-sm font-medium transition-colors',
-                  'bg-accent-blue text-white hover:bg-accent-blue/90',
+                  'bg-accent-fill text-on-accent hover:bg-accent-fill/90',
                   'disabled:cursor-not-allowed disabled:opacity-50'
                 )}
               >
@@ -207,7 +207,7 @@ export function ReauthView({
                 disabled={!username || !password || loading}
                 className={cn(
                   'w-full rounded-md px-4 py-2 text-sm font-medium transition-colors',
-                  'bg-accent-blue text-white hover:bg-accent-blue/90',
+                  'bg-accent-fill text-on-accent hover:bg-accent-fill/90',
                   'disabled:cursor-not-allowed disabled:opacity-50'
                 )}
               >
@@ -245,7 +245,7 @@ export function ReauthView({
                 disabled={totpCode.length !== 6 || loading}
                 className={cn(
                   'w-full rounded-md px-4 py-2 text-sm font-medium transition-colors',
-                  'bg-accent-blue text-white hover:bg-accent-blue/90',
+                  'bg-accent-fill text-on-accent hover:bg-accent-fill/90',
                   'disabled:cursor-not-allowed disabled:opacity-50'
                 )}
               >
@@ -267,7 +267,7 @@ export function ReauthView({
           )}
 
           {error && (
-            <p className="text-xs text-accent-red">{error}</p>
+            <p className="text-xs text-danger">{error}</p>
           )}
 
           <button

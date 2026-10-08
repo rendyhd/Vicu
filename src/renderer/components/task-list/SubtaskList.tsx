@@ -54,12 +54,12 @@ export function SubtaskList({ parentTask, showInput = false }: SubtaskListProps)
                 className={cn(
                   'flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded border transition-colors',
                   st.done
-                    ? 'border-[var(--text-secondary)] bg-[var(--text-secondary)]'
-                    : 'border-[var(--border-color)] hover:border-[var(--accent-blue)]'
+                    ? 'border-accent-fill bg-accent-fill'
+                    : 'border-control-ring hover:border-accent-fill'
                 )}
               >
                 {st.done && (
-                  <svg className="h-2 w-2 text-white" viewBox="0 0 12 12" fill="none">
+                  <svg className="h-2 w-2 text-on-accent" viewBox="0 0 12 12" fill="none">
                     <path d="M2.5 6L5 8.5L9.5 3.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
                 )}
@@ -77,7 +77,7 @@ export function SubtaskList({ parentTask, showInput = false }: SubtaskListProps)
         </div>
       )}
       {completeTask.isError && (
-        <div role="alert" className="mb-1 text-2xs text-red-500">
+        <div role="alert" className="mb-1 text-2xs text-danger">
           Could not complete subtask: {completeTask.error.message}
         </div>
       )}

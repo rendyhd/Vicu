@@ -73,7 +73,7 @@ export function ConfirmDialog({
               className={cn(
                 'rounded-md px-4 py-1.5 text-sm font-medium transition-colors',
                 secondaryDestructive
-                  ? 'bg-accent-red text-white hover:bg-accent-red/90'
+                  ? 'bg-danger text-on-accent dark:text-bg-page hover:bg-danger/90'
                   : 'border border-[var(--border-color)] text-[var(--text-primary)] hover:bg-[var(--bg-hover)]'
               )}
             >
@@ -86,8 +86,8 @@ export function ConfirmDialog({
             className={cn(
               'rounded-md px-4 py-1.5 text-sm font-medium',
               destructive
-                ? 'bg-accent-red text-white transition-colors hover:bg-accent-red/90'
-                : 'bg-accent-blue text-white transition-colors hover:bg-accent-blue/90'
+                ? 'bg-danger text-on-accent dark:text-bg-page transition-colors hover:bg-danger/90'
+                : 'bg-accent-fill text-on-accent transition-colors hover:bg-accent-fill/90'
             )}
           >
             {confirmLabel}

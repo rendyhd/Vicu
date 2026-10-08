@@ -62,6 +62,7 @@ import { extractTaskLink, stripNoteLink, stripPageLink, extractNoteLinkHtml, ext
 import { sanitizeTaskHtml } from '@/lib/sanitize-html'
 import { taskPatch, type TaskPatch } from '@/lib/merge-patches'
 import { diffLocalDays, dueToday, isDateOnly, isNoDueDate, toLocalDate } from '@/lib/due-dates'
+import { followColorScheme } from '@/lib/theme'
 import {
   hasRichDescriptionBody,
   plainTextFromDescriptionLines,
@@ -77,6 +78,8 @@ function plainTextFromHtml(html: string): string {
   tmp.innerHTML = sanitizeTaskHtml(withLineBreaksAsNewlines(html))
   return plainTextFromDescriptionLines(tmp.textContent ?? '')
 }
+
+followColorScheme()
 
 const container = document.getElementById('container')!
 const taskList = document.getElementById('task-list')!

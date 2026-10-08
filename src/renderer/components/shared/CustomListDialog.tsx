@@ -243,7 +243,7 @@ export function CustomListDialog({ open, list, onSave, onClose }: CustomListDial
                     className={cn(
                       'px-2.5 py-0.5 text-[10px] font-medium capitalize transition-colors',
                       (filter.project_filter_mode ?? 'include') === mode
-                        ? 'bg-accent-blue text-white'
+                        ? 'bg-accent-fill text-on-accent'
                         : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'
                     )}
                   >
@@ -378,7 +378,7 @@ export function CustomListDialog({ open, list, onSave, onClose }: CustomListDial
             disabled={!name.trim()}
             className={cn(
               'rounded-md px-4 py-1.5 text-xs font-medium transition-colors',
-              'bg-accent-blue text-white hover:bg-accent-blue/90',
+              'bg-accent-fill text-on-accent hover:bg-accent-fill/90',
               'disabled:cursor-not-allowed disabled:opacity-50'
             )}
           >

@@ -140,7 +140,7 @@ function LabelDialog({
             disabled={!title.trim()}
             className={cn(
               'rounded-md px-4 py-1.5 text-xs font-medium transition-colors',
-              'bg-accent-blue text-white hover:bg-accent-blue/90',
+              'bg-accent-fill text-on-accent hover:bg-accent-fill/90',
               'disabled:cursor-not-allowed disabled:opacity-50'
             )}
           >
@@ -263,7 +263,7 @@ export function TagList() {
                 deleteLabel.mutate(label.id)
               }
             }}
-            className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-accent-red hover:bg-[var(--bg-hover)]"
+            className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-danger hover:bg-[var(--bg-hover)]"
           >
             <Trash2 className="h-3.5 w-3.5" />
             Delete

@@ -143,10 +143,10 @@ export function ObsidianSettings({ config, onChange, disabled }: ObsidianSetting
                   {testStatus.type === 'loading' ? 'Testing...' : 'Test Connection'}
                 </button>
                 {testStatus.type === 'success' && (
-                  <span className="ml-2 text-xs text-green-600 dark:text-green-400">{testStatus.message}</span>
+                  <span className="ml-2 text-xs text-status-done">{testStatus.message}</span>
                 )}
                 {testStatus.type === 'error' && (
-                  <span className="ml-2 text-xs text-accent-red">{testStatus.message}</span>
+                  <span className="ml-2 text-xs text-danger">{testStatus.message}</span>
                 )}
               </div>
             </>

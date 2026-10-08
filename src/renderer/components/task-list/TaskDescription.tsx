@@ -203,7 +203,7 @@ export function TaskDescription({
           Uploading image…
         </div>
       )}
-      {uploadError && <div className="text-2xs text-red-500">{uploadError}</div>}
+      {uploadError && <div className="text-2xs text-danger">{uploadError}</div>}
     </div>
   )
 }
@@ -258,7 +258,7 @@ function AttachmentThumb({
           setDecodeError(false)
           void retry()
         }}
-        className="rounded border border-red-500/30 bg-red-500/10 px-2 py-1 text-2xs text-red-500 hover:bg-red-500/15"
+        className="rounded border border-danger/30 bg-danger/10 px-2 py-1 text-2xs text-danger hover:bg-danger/15"
       >
         Retry image
       </button>

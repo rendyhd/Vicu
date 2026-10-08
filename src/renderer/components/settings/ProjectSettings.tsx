@@ -98,11 +98,11 @@ function ProjectEditor({
             <label className="mb-1 block text-xs text-[var(--text-secondary)]">Color</label>
             <input value={hexColor} onChange={(event) => setHexColor(event.target.value)} placeholder="#3498db" className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] focus:border-accent-blue focus:outline-none" />
           </div>
-          {mutation.error && <p className="text-xs text-accent-red">{mutation.error.message}</p>}
+          {mutation.error && <p className="text-xs text-danger">{mutation.error.message}</p>}
         </div>
         <div className="flex justify-end gap-2 border-t border-[var(--border-color)] px-5 py-3">
           <button type="button" onClick={onClose} className="rounded-md border border-[var(--border-color)] px-4 py-1.5 text-xs text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]">Cancel</button>
-          <button type="button" onClick={save} disabled={!title.trim() || mutation.isPending} className="rounded-md bg-accent-blue px-4 py-1.5 text-xs font-medium text-white disabled:opacity-50">{mutation.isPending ? 'Saving…' : project ? 'Save' : 'Create'}</button>
+          <button type="button" onClick={save} disabled={!title.trim() || mutation.isPending} className="rounded-md bg-accent-fill px-4 py-1.5 text-xs font-medium text-on-accent disabled:opacity-50">{mutation.isPending ? 'Saving…' : project ? 'Save' : 'Create'}</button>
         </div>
       </div>
     </div>
@@ -144,7 +144,7 @@ function ProjectRows({
           ) : (
             <button type="button" title={isInbox ? 'Select another Inbox before archiving' : 'Archive'} disabled={isInbox} onClick={() => onArchive(node)} className="rounded p-1.5 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] disabled:cursor-not-allowed disabled:opacity-30"><Archive className="h-3.5 w-3.5" /></button>
           )}
-          {!isInbox && <button type="button" title="Delete" onClick={() => onDelete(node)} className="rounded p-1.5 text-accent-red hover:bg-accent-red/10"><Trash2 className="h-3.5 w-3.5" /></button>}
+          {!isInbox && <button type="button" title="Delete" onClick={() => onDelete(node)} className="rounded p-1.5 text-danger hover:bg-danger/10"><Trash2 className="h-3.5 w-3.5" /></button>}
         </div>
         {node.children.length > 0 && <ProjectRows nodes={node.children} archived={archived} inboxId={inboxId} onEdit={onEdit} onArchive={onArchive} onRestore={onRestore} onDelete={onDelete} depth={depth + 1} />}
       </div>
@@ -182,21 +182,21 @@ export function ProjectSettings() {
             <p className="text-xs text-[var(--text-secondary)]">Archive projects without deleting their tasks.</p>
           </div>
           <button type="button" title="Refresh projects" onClick={() => refetch()} disabled={isFetching} className="rounded p-2 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] disabled:opacity-50"><RefreshCw className={cn('h-4 w-4', isFetching && 'animate-spin')} /></button>
-          <button type="button" onClick={() => setEditing(null)} className="flex items-center gap-1.5 rounded-md bg-accent-blue px-3 py-1.5 text-xs font-medium text-white hover:bg-accent-blue/90"><Plus className="h-3.5 w-3.5" />New project</button>
+          <button type="button" onClick={() => setEditing(null)} className="flex items-center gap-1.5 rounded-md bg-accent-fill px-3 py-1.5 text-xs font-medium text-on-accent hover:bg-accent-fill/90"><Plus className="h-3.5 w-3.5" />New project</button>
         </div>
         <label className="flex cursor-pointer items-center gap-2 border-b border-[var(--border-color)] px-4 py-2.5">
           <input type="checkbox" checked={showArchived} onChange={(event) => setShowArchived(event.target.checked)} className="h-4 w-4 rounded border-[var(--border-color)] accent-accent-blue" />
           <span className="text-sm text-[var(--text-primary)]">Show archived projects</span>
           <span className="text-xs text-[var(--text-secondary)]">({data?.archived.length ?? 0})</span>
         </label>
-        {isLoading ? <p className="px-4 py-5 text-sm text-[var(--text-secondary)]">Loading projects…</p> : error ? <p className="px-4 py-5 text-sm text-accent-red">{error.message}</p> : data?.tree.length ? <ProjectRows nodes={data.tree} archived={false} inboxId={inboxId} onEdit={setEditing} onArchive={setArchiveTarget} onRestore={(project) => setArchived.mutate({ project, archived: false })} onDelete={remove} /> : <p className="px-4 py-5 text-sm text-[var(--text-secondary)]">No active projects</p>}
+        {isLoading ? <p className="px-4 py-5 text-sm text-[var(--text-secondary)]">Loading projects…</p> : error ? <p className="px-4 py-5 text-sm text-danger">{error.message}</p> : data?.tree.length ? <ProjectRows nodes={data.tree} archived={false} inboxId={inboxId} onEdit={setEditing} onArchive={setArchiveTarget} onRestore={(project) => setArchived.mutate({ project, archived: false })} onDelete={remove} /> : <p className="px-4 py-5 text-sm text-[var(--text-secondary)]">No active projects</p>}
         {showArchived && (
           <div>
             <div className="border-y border-[var(--border-color)] bg-[var(--bg-secondary)] px-4 py-2 text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">Archived</div>
             {archivedTree.length ? <ProjectRows nodes={archivedTree} archived inboxId={inboxId} onEdit={setEditing} onArchive={setArchiveTarget} onRestore={(project) => setArchived.mutate({ project, archived: false })} onDelete={remove} /> : <p className="px-4 py-5 text-sm text-[var(--text-secondary)]">No archived projects</p>}
           </div>
         )}
-        {(setArchived.error || deleteProject.error) && <p className="border-t border-[var(--border-color)] px-4 py-3 text-xs text-accent-red">{setArchived.error?.message ?? deleteProject.error?.message}</p>}
+        {(setArchived.error || deleteProject.error) && <p className="border-t border-[var(--border-color)] px-4 py-3 text-xs text-danger">{setArchived.error?.message ?? deleteProject.error?.message}</p>}
       </div>
       {editing !== undefined && <ProjectEditor project={editing} projects={data?.flat ?? []} onClose={() => setEditing(undefined)} />}
       <ConfirmDialog {...dialogProps} />

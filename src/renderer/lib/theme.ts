@@ -11,3 +11,14 @@ export function applyTheme(theme: ThemeOption): void {
     root.classList.toggle('dark', prefersDark)
   }
 }
+
+/**
+ * For the Quick Entry and Quick View windows: they follow the window's colour scheme (the main
+ * process sets nativeTheme from the app theme), so the token colours in `.dark` switch with it.
+ */
+export function followColorScheme(): void {
+  const query = window.matchMedia('(prefers-color-scheme: dark)')
+  const apply = () => document.documentElement.classList.toggle('dark', query.matches)
+  apply()
+  query.addEventListener('change', apply)
+}

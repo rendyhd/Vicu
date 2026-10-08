@@ -256,7 +256,7 @@ export function NotificationSettings({ config, onChange }: NotificationSettingsP
           Test Notification
         </button>
         {testStatus === 'sent' && (
-          <span className="text-xs text-accent-green">Notification sent</span>
+          <span className="text-xs text-status-done">Notification sent</span>
         )}
       </div>
     </div>

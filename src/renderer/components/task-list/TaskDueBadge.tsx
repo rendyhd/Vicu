@@ -19,9 +19,9 @@ export function TaskDueBadge({ dueDate, className }: TaskDueBadgeProps) {
     <span
       className={cn(
         'shrink-0 rounded px-1.5 py-0.5 text-2xs font-medium',
-        overdue && 'bg-accent-red/10 text-accent-red',
-        today && !overdue && 'bg-accent-orange/10 text-accent-orange',
-        !overdue && !today && 'text-[var(--text-secondary)]',
+        overdue && 'bg-status-overdue/8 text-status-overdue',
+        today && !overdue && 'text-status-today',
+        !overdue && !today && 'text-text-secondary',
         className
       )}
     >
