@@ -15,7 +15,7 @@ html, body {
   height: 100%;
   background: transparent;
   overflow: hidden;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI Variable Text', 'Segoe UI', Roboto, sans-serif;
 }
 
 /* Form controls take the page font, so they match the rest of the window (D-11). */

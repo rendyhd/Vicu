@@ -139,9 +139,10 @@ describe('index.css', () => {
       [...generateTokensCss(tokens).matchAll(/^ {2}(--[a-z0-9-]+):/gm)].map((m) => m[1]),
     )
     const defined = [...index.matchAll(/^ {2}(--[a-z0-9-]+):/gm)].map((m) => m[1])
-    // --bg-sidebar is replaced on macOS (translucent, for vibrancy); the rest must be new names.
+    // --bg-sidebar is replaced where the window material shows through the sidebar (macOS vibrancy,
+    // Windows 11 Mica), light and dark each; the rest must be new names.
     const repeated = defined.filter((name) => generated.has(name))
-    expect(repeated).toEqual(['--bg-sidebar', '--bg-sidebar'])
+    expect(repeated).toEqual(['--bg-sidebar', '--bg-sidebar', '--bg-sidebar', '--bg-sidebar'])
   })
 })
 

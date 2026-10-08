@@ -9,6 +9,8 @@ import type {
 
 const api = {
   platform: process.platform as 'darwin' | 'win32' | 'linux',
+  /** 'mica' when the main window has Mica behind it (Windows 11 22H2+; set by main, window-chrome.ts). */
+  windowMaterial: (process.argv.includes('--vicu-window-material=mica') ? 'mica' : 'none') as 'mica' | 'none',
 
   // Tasks
   fetchTasks: (params: Record<string, unknown>) =>

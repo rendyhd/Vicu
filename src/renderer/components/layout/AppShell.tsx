@@ -663,7 +663,8 @@ export function AppShell() {
 
   return (
     <DndContext sensors={sensors} collisionDetection={collisionDetection} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-      <div className="relative flex h-screen w-screen overflow-hidden bg-[var(--bg-primary)]">
+      {/* With Mica behind the window the root stays clear so the translucent sidebar shows it; the content column and the splitter carry the page colour themselves. */}
+      <div className={`relative flex h-screen w-screen overflow-hidden${window.api.windowMaterial === 'mica' ? '' : ' bg-[var(--bg-primary)]'}`}>
         {/* Window drag region overlay */}
         <header
           className="absolute inset-x-0 top-0 z-30 flex h-8"
@@ -690,13 +691,13 @@ export function AppShell() {
         </aside>
 
         <div
-          className="w-1 shrink-0 cursor-col-resize bg-transparent transition-colors hover:bg-accent-blue/20"
+          className="w-1 shrink-0 cursor-col-resize bg-[var(--bg-primary)] transition-colors hover:bg-accent-blue/20"
           onMouseDown={handleMouseDown}
           role="separator"
           aria-orientation="vertical"
         />
 
-        <div className="flex flex-1 flex-col overflow-hidden">
+        <div className="flex flex-1 flex-col overflow-hidden bg-[var(--bg-primary)]">
           <div className="h-8 shrink-0" />
           <UpdateBanner />
           <ContentArea>

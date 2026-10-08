@@ -32,6 +32,37 @@
 }
 
 /*
+ * Windows 11 (22H2+): Mica shows through the sidebar, the content stays opaque (AppShell). Windows
+ * 10 and 11 21H2 have no data-material and keep the opaque bg.sidebar of the token contract.
+ */
+[data-platform="win32"][data-material="mica"] {
+  --bg-sidebar: rgba(0, 0, 0, 0.02);
+}
+
+.dark[data-platform="win32"][data-material="mica"] {
+  --bg-sidebar: rgba(255, 255, 255, 0.02);
+}
+
+/*
+ * Windows type: Segoe UI Variable Text for reading text, Segoe UI Variable Display for page
+ * titles (Windows 11; Windows 10 falls back to Segoe UI). font-sans is the Tailwind class the
+ * keyboard hints use.
+ */
+[data-platform="win32"] {
+  --font-text: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --font-display: "Segoe UI Variable Display", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+}
+
+html[data-platform="win32"],
+[data-platform="win32"] .font-sans {
+  font-family: var(--font-text);
+}
+
+[data-platform="win32"] .text-page-title {
+  font-family: var(--font-display);
+}
+
+/*
  * Focus (card 1.5). One ring for every control a keyboard can reach: 2 px focus-ring, 2 px
  * outside. Rows sit in a clipped list and touch their neighbours, so their ring goes inside.
  * A control that draws its own focus state (a borderless text field inside a bar) says so with

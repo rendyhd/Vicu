@@ -1,9 +1,15 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api } from '@/lib/api'
 
+/**
+ * Window buttons drawn by the app, on Linux only. macOS has its traffic lights and Windows the
+ * system's caption buttons over the title band (titleBarOverlay, src/main/window-chrome.ts).
+ */
 export function WindowControls() {
-  if (window.api.platform === 'darwin') return null
+  return window.api.platform === 'linux' ? <LinuxWindowControls /> : null
+}
 
+function LinuxWindowControls() {
   const [maximized, setMaximized] = useState(false)
 
   useEffect(() => {
@@ -54,7 +60,7 @@ export function WindowControls() {
 
       <button
         type="button"
-        className={`${btnBase} hover:bg-red-500 hover:text-white`}
+        className={`${btnBase} hover:bg-danger hover:text-[var(--bg-primary)]`}
         onClick={handleClose}
         aria-label="Close"
       >

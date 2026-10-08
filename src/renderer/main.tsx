@@ -19,6 +19,8 @@ import './assets/index.css'
 
 // Set platform data attribute for CSS targeting (e.g., macOS vibrancy)
 document.documentElement.dataset.platform = window.api.platform
+// Windows 11 with Mica behind the window: the sidebar turns translucent (index.css)
+if (window.api.windowMaterial === 'mica') document.documentElement.dataset.material = 'mica'
 
 /** The signed-in server, or '' (signed out, standalone mode, or the main process did not answer). */
 async function signedInServer(): Promise<string> {

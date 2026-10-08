@@ -528,6 +528,9 @@ async function reset() {
 
 currentScenario = '_env'
 await settle(page, 1200)
+// capturePage paints web content only, never the Mica behind a translucent sidebar (it would come out
+// white, even in the dark theme). Captures show the opaque sidebar of Windows 10 instead.
+await page.evaluate(() => { delete document.documentElement.dataset.material }).catch(() => {})
 const env = await page.evaluate(() => ({
   dpr: window.devicePixelRatio,
   reducedMotion: matchMedia('(prefers-reduced-motion: reduce)').matches,

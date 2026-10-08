@@ -1,7 +1,16 @@
-import { BrowserWindow, screen, session } from 'electron'
+import { BrowserWindow, nativeTheme, screen, session } from 'electron'
+import { release } from 'os'
 import { join } from 'path'
 import type { AppConfig } from './config'
-import { isMac, isLinux } from './platform'
+import { isMac, isLinux, isWindows } from './platform'
+import {
+  isDarkChrome,
+  titleBandOverlay,
+  windowChromeOptions,
+  windowMaterialFor,
+  windowsBuildFromRelease,
+  type ChromePlatform,
+} from './window-chrome'
 
 const SHADOW_PADDING = 20
 const DRAG_HANDLE_HEIGHT = 14
@@ -33,6 +42,10 @@ export function createMainWindow(config: AppConfig | null, options: { startHidde
   const fallbackX = bounds?.x ?? centeredX
   const fallbackY = bounds?.y ?? centeredY
 
+  const chromePlatform: ChromePlatform = isMac ? 'darwin' : isWindows ? 'win32' : 'linux'
+  const windowsBuild = isWindows ? windowsBuildFromRelease(release()) : 0
+  const material = windowMaterialFor(chromePlatform, windowsBuild)
+
   const win = new BrowserWindow({
     width: defaultWidth,
     height: defaultHeight,
@@ -40,26 +53,28 @@ export function createMainWindow(config: AppConfig | null, options: { startHidde
     y: fallbackY,
     minWidth: 800,
     minHeight: 500,
-    ...(isMac
-      ? {
-          titleBarStyle: 'hiddenInset' as const,
-          trafficLightPosition: { x: 16, y: 14 },
-          vibrancy: 'sidebar' as const,
-          visualEffectState: 'followWindow' as const,
-          backgroundColor: '#00000000',
-          acceptFirstMouse: true,
-        }
-      : {
-          frame: false,
-        }),
+    ...windowChromeOptions({ platform: chromePlatform, windowsBuild, dark: isDarkChrome(config?.theme, nativeTheme.shouldUseDarkColors) }),
     show: false,
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      // The renderer makes its sidebar translucent only when the window has Mica behind it.
+      additionalArguments: [`--vicu-window-material=${material}`],
     },
   })
+
+  // The native caption buttons follow the theme (a chosen theme or the system's): the colours of
+  // the title band are the page background and secondary text of the token contract.
+  if (isWindows) {
+    const updateOverlay = (): void => {
+      if (win.isDestroyed()) return
+      win.setTitleBarOverlay(titleBandOverlay(nativeTheme.shouldUseDarkColors))
+    }
+    nativeTheme.on('updated', updateOverlay)
+    win.once('closed', () => nativeTheme.removeListener('updated', updateOverlay))
+  }
 
   // Set CSP header (relaxed in dev for Vite HMR)
   const isDev = !!process.env.ELECTRON_RENDERER_URL

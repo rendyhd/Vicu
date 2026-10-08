@@ -50,6 +50,8 @@ export interface UpdateStatus {
 
 export interface ElectronAPI {
   platform: 'darwin' | 'win32' | 'linux'
+  /** 'mica' when the main window has Mica behind it (Windows 11 22H2+). */
+  windowMaterial: 'mica' | 'none'
 
   // Tasks
   fetchTasks(params: TaskQueryParams): Promise<ApiResult<Task[]>>
