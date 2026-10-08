@@ -138,7 +138,7 @@ export function RichTextEditor({
     <>
       <BubbleMenu
         editor={editor}
-        className="flex items-center gap-0.5 rounded-md border border-[var(--border-color)] bg-[var(--bg-primary)] p-1 shadow-md"
+        className="flex items-center gap-0.5 rounded-popover border border-[var(--border-color)] bg-[var(--bg-primary)] p-1 shadow-md"
       >
         <ToolbarButton
           onClick={() => editor.chain().focus().toggleBold().run()}
@@ -245,7 +245,7 @@ function ToolbarButton({ onClick, active, title, children }: ToolbarButtonProps)
       }}
       title={title}
       className={cn(
-        'flex h-6 w-6 items-center justify-center rounded transition-colors',
+        'flex h-6 w-6 items-center justify-center rounded-control transition-colors',
         active
           ? 'bg-accent-blue/15 text-[var(--accent-blue)]'
           : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]',

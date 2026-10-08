@@ -53,7 +53,7 @@ export function UpdateBanner() {
           e.preventDefault()
           window.api.openDeepLink(update.releaseUrl)
         }}
-        className="flex items-center gap-1 rounded px-2 py-1 text-xs font-medium text-[var(--accent-blue)] transition-colors hover:bg-accent-blue/20"
+        className="flex items-center gap-1 rounded-control px-2 py-1 text-xs font-medium text-[var(--accent-blue)] transition-colors hover:bg-accent-blue/20"
       >
         <Download className="h-3 w-3" />
         Download
@@ -64,7 +64,7 @@ export function UpdateBanner() {
           setDismissed(true)
           api.dismissUpdate(update.latestVersion)
         }}
-        className="flex h-5 w-5 items-center justify-center rounded text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
+        className="flex h-5 w-5 items-center justify-center rounded-control text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
         aria-label="Dismiss update"
       >
         <X className="h-3 w-3" />

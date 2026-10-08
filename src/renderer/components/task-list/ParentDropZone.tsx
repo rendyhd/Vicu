@@ -23,7 +23,7 @@ export function ParentDropZone({ projectId }: ParentDropZoneProps) {
     <div
       ref={setNodeRef}
       className={cn(
-        'mx-4 mb-1 rounded-md border-2 border-dashed py-1.5 text-center text-[11px] transition-colors',
+        'mx-4 mb-1 rounded-control border-2 border-dashed py-1.5 text-center text-[11px] transition-colors',
         isOver
           ? 'border-[var(--accent-blue)] bg-accent-blue/10 text-[var(--text-primary)]'
           : 'border-[var(--border-color)] text-[var(--text-secondary)]'

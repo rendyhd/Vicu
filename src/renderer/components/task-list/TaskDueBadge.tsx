@@ -18,7 +18,7 @@ export function TaskDueBadge({ dueDate, className }: TaskDueBadgeProps) {
   return (
     <span
       className={cn(
-        'shrink-0 rounded px-1.5 py-0.5 text-meta font-medium',
+        'shrink-0 rounded-control px-1.5 py-0.5 text-meta font-medium',
         overdue && 'bg-status-overdue/8 text-status-overdue',
         today && !overdue && 'text-status-today',
         !overdue && !today && 'text-text-secondary',

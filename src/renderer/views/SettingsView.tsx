@@ -248,14 +248,14 @@ export function SettingsView() {
         )
       ) : activeTab === 'general' ? (
       <div className="mx-6 max-w-lg space-y-6 pb-8 pt-4">
-        <div className="rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] p-5">
+        <div className="rounded-card border border-[var(--border-color)] bg-[var(--bg-primary)] p-5">
           <h2 className="mb-4 text-sm font-semibold text-[var(--text-primary)]">Connection</h2>
 
           {authMethod === 'oidc' || authMethod === 'password' ? (
             <div className="space-y-3">
               <div>
                 <label className="mb-1 block text-xs text-[var(--text-secondary)]">Vikunja URL</label>
-                <div className="rounded-md border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-secondary)]">
+                <div className="rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-secondary)]">
                   {url}
                 </div>
               </div>
@@ -275,7 +275,7 @@ export function SettingsView() {
                 type="button"
                 onClick={handleLogout}
                 disabled={signingOut}
-                className="rounded-md border border-danger/30 px-4 py-2 text-sm font-medium text-danger transition-colors hover:bg-danger/10 disabled:cursor-wait disabled:opacity-60"
+                className="rounded-control border border-danger/30 px-4 py-2 text-sm font-medium text-danger transition-colors hover:bg-danger/10 disabled:cursor-wait disabled:opacity-60"
               >
                 {signingOut ? 'Syncing...' : 'Sign Out'}
               </button>
@@ -289,7 +289,7 @@ export function SettingsView() {
                   value={url}
                   onChange={(e) => setUrl(e.target.value)}
                   placeholder="https://vikunja.example.com"
-                  className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)] focus:border-accent-blue focus:outline-none"
+                  className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)] focus:border-accent-blue focus:outline-none"
                 />
               </div>
 
@@ -304,12 +304,12 @@ export function SettingsView() {
                     value={token}
                     onChange={(e) => setToken(e.target.value)}
                     placeholder="Enter your API token"
-                    className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 pr-16 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)] focus:border-accent-blue focus:outline-none"
+                    className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 pr-16 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)] focus:border-accent-blue focus:outline-none"
                   />
                   <button
                     type="button"
                     onClick={() => setShowToken(!showToken)}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded px-2 py-0.5 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded-control px-2 py-0.5 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                   >
                     {showToken ? 'Hide' : 'Show'}
                   </button>
@@ -321,7 +321,7 @@ export function SettingsView() {
                 onClick={handleTestConnection}
                 disabled={!url || !token || testStatus === 'testing'}
                 className={cn(
-                  'rounded-md px-4 py-2 text-sm font-medium transition-colors',
+                  'rounded-control px-4 py-2 text-sm font-medium transition-colors',
                   'bg-accent-fill text-on-accent hover:bg-accent-fill/90',
                   'disabled:cursor-not-allowed disabled:opacity-50'
                 )}
@@ -341,7 +341,7 @@ export function SettingsView() {
                   type="button"
                   onClick={handleLogout}
                   disabled={signingOut}
-                  className="rounded-md border border-danger/30 px-4 py-2 text-sm font-medium text-danger transition-colors hover:bg-danger/10 disabled:cursor-wait disabled:opacity-60"
+                  className="rounded-control border border-danger/30 px-4 py-2 text-sm font-medium text-danger transition-colors hover:bg-danger/10 disabled:cursor-wait disabled:opacity-60"
                 >
                   {signingOut ? 'Syncing...' : 'Disconnect'}
                 </button>
@@ -351,7 +351,7 @@ export function SettingsView() {
           <SecretStorageNotice />
         </div>
 
-        <div className="rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] p-5">
+        <div className="rounded-card border border-[var(--border-color)] bg-[var(--bg-primary)] p-5">
           <h2 className="mb-4 text-sm font-semibold text-[var(--text-primary)]">Preferences</h2>
 
           <div className="space-y-3">
@@ -362,7 +362,7 @@ export function SettingsView() {
                     type="checkbox"
                     checked={fullConfig?.launch_on_startup ?? false}
                     onChange={(e) => handleQuickEntryChange({ launch_on_startup: e.target.checked })}
-                    className="h-4 w-4 rounded border-[var(--border-color)] accent-accent-blue"
+                    className="h-4 w-4 rounded-control border-[var(--border-color)] accent-accent-blue"
                   />
                   <span className="text-sm text-[var(--text-primary)]">
                     Launch on startup
@@ -376,7 +376,7 @@ export function SettingsView() {
                       type="checkbox"
                       checked={fullConfig?.start_hidden ?? false}
                       onChange={(e) => handleQuickEntryChange({ start_hidden: e.target.checked })}
-                      className="h-4 w-4 rounded border-[var(--border-color)] accent-accent-blue"
+                      className="h-4 w-4 rounded-control border-[var(--border-color)] accent-accent-blue"
                     />
                     <span className="text-sm text-[var(--text-primary)]">
                       Start hidden
@@ -392,7 +392,7 @@ export function SettingsView() {
                 type="checkbox"
                 checked={fullConfig?.confirm_before_delete !== false}
                 onChange={(e) => handleQuickEntryChange({ confirm_before_delete: e.target.checked })}
-                className="h-4 w-4 rounded border-[var(--border-color)] accent-accent-blue"
+                className="h-4 w-4 rounded-control border-[var(--border-color)] accent-accent-blue"
               />
               <span className="text-sm text-[var(--text-primary)]">
                 Confirm before deleting
@@ -411,7 +411,7 @@ export function SettingsView() {
                 onChange={(e) => handleQuickEntryChange({
                   subtask_display: e.target.value as 'inside_task' | 'expandable',
                 })}
-                className="rounded-md border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-1.5 text-sm text-[var(--text-primary)]"
+                className="rounded-control border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-1.5 text-sm text-[var(--text-primary)]"
               >
                 <option value="inside_task">Inside task</option>
                 <option value="expandable">Expandable</option>
@@ -423,7 +423,7 @@ export function SettingsView() {
                 type="checkbox"
                 checked={fullConfig?.show_today_overdue_badge === true}
                 onChange={(e) => handleQuickEntryChange({ show_today_overdue_badge: e.target.checked })}
-                className="h-4 w-4 rounded border-[var(--border-color)] accent-accent-blue"
+                className="h-4 w-4 rounded-control border-[var(--border-color)] accent-accent-blue"
               />
               <span className="text-sm text-[var(--text-primary)]">
                 Show today &amp; overdue count on app icon
@@ -435,7 +435,7 @@ export function SettingsView() {
               <select
                 value={inboxProjectId}
                 onChange={(e) => { const id = Number(e.target.value); setInboxProjectId(id); handleQuickEntryChange({ inbox_project_id: id }) }}
-                className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] focus:border-accent-blue focus:outline-none"
+                className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] focus:border-accent-blue focus:outline-none"
               >
                 <option value={0}>Select a project...</option>
                 {projects.map((p) => (
@@ -456,7 +456,7 @@ export function SettingsView() {
                   <label
                     key={opt}
                     className={cn(
-                      'flex cursor-pointer items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium transition-colors',
+                      'flex cursor-pointer items-center gap-1.5 rounded-control border px-3 py-1.5 text-xs font-medium transition-colors',
                       theme === opt
                         ? 'border-accent-blue bg-accent-blue/10 text-accent-blue'
                         : 'border-[var(--border-color)] text-[var(--text-secondary)] hover:border-[var(--text-secondary)]'
@@ -488,7 +488,7 @@ export function SettingsView() {
                     <label
                       key={opt.value}
                       className={cn(
-                        'flex cursor-pointer items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium transition-colors',
+                        'flex cursor-pointer items-center gap-1.5 rounded-control border px-3 py-1.5 text-xs font-medium transition-colors',
                         current === opt.value
                           ? 'border-accent-blue bg-accent-blue/10 text-accent-blue'
                           : 'border-[var(--border-color)] text-[var(--text-secondary)] hover:border-[var(--text-secondary)]'
@@ -537,7 +537,7 @@ export function SettingsView() {
         )}
 
         {/* Task Parser */}
-        <div className="rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] p-5">
+        <div className="rounded-card border border-[var(--border-color)] bg-[var(--bg-primary)] p-5">
           <h2 className="mb-4 text-sm font-semibold text-[var(--text-primary)]">Task Parser</h2>
 
           <div className="space-y-3">
@@ -546,7 +546,7 @@ export function SettingsView() {
                 type="checkbox"
                 checked={fullConfig?.nlp_enabled !== false}
                 onChange={(e) => handleQuickEntryChange({ nlp_enabled: e.target.checked })}
-                className="h-4 w-4 rounded border-[var(--border-color)] accent-accent-blue"
+                className="h-4 w-4 rounded-control border-[var(--border-color)] accent-accent-blue"
               />
               <div>
                 <span className="text-sm text-[var(--text-primary)]">
@@ -571,7 +571,7 @@ export function SettingsView() {
                       aria-checked={(fullConfig?.nlp_syntax_mode || 'todoist') === 'todoist'}
                       onClick={() => handleQuickEntryChange({ nlp_syntax_mode: 'todoist' })}
                       className={cn(
-                        'cursor-pointer rounded-lg border p-3 text-left transition-colors',
+                        'cursor-pointer rounded-card border p-3 text-left transition-colors',
                         (fullConfig?.nlp_syntax_mode || 'todoist') === 'todoist'
                           ? 'border-accent-blue bg-accent-blue/5'
                           : 'border-[var(--border-color)]'
@@ -593,7 +593,7 @@ export function SettingsView() {
                       aria-checked={fullConfig?.nlp_syntax_mode === 'vikunja'}
                       onClick={() => handleQuickEntryChange({ nlp_syntax_mode: 'vikunja' })}
                       className={cn(
-                        'cursor-pointer rounded-lg border p-3 text-left transition-colors',
+                        'cursor-pointer rounded-card border p-3 text-left transition-colors',
                         fullConfig?.nlp_syntax_mode === 'vikunja'
                           ? 'border-accent-blue bg-accent-blue/5'
                           : 'border-[var(--border-color)]'
@@ -618,11 +618,11 @@ export function SettingsView() {
                     type="checkbox"
                     checked={fullConfig?.exclamation_today !== false}
                     onChange={(e) => handleQuickEntryChange({ exclamation_today: e.target.checked })}
-                    className="h-4 w-4 rounded border-[var(--border-color)] accent-accent-blue"
+                    className="h-4 w-4 rounded-control border-[var(--border-color)] accent-accent-blue"
                   />
                   <div>
                     <span className="text-sm text-[var(--text-primary)]">
-                      <code className="rounded bg-[var(--bg-secondary)] px-1 py-0.5 text-xs font-mono text-green-600">!</code> in task title sets due date to today
+                      <code className="rounded-control bg-[var(--bg-secondary)] px-1 py-0.5 text-xs font-mono text-green-600">!</code> in task title sets due date to today
                     </span>
                     <p className="text-xs text-[var(--text-secondary)]">
                       Add ! before or after a task title to set it due today (e.g. "buy groceries !" or "! buy groceries")

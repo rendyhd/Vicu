@@ -69,7 +69,7 @@ export function LinkDialog({
       onClick={onCancel}
     >
       <div
-        className="mx-4 w-full max-w-sm rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] p-5 shadow-xl"
+        className="mx-4 w-full max-w-sm rounded-card border border-[var(--border-color)] bg-[var(--bg-primary)] p-5 shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
         <h2 className="mb-3 text-sm font-medium text-[var(--text-primary)]">
@@ -92,7 +92,7 @@ export function LinkDialog({
           }}
           placeholder="https://example.com"
           className={cn(
-            'mb-1 w-full rounded-md border bg-[var(--bg-primary)] px-3 py-1.5 text-sm text-[var(--text-primary)]',
+            'mb-1 w-full rounded-control border bg-[var(--bg-primary)] px-3 py-1.5 text-sm text-[var(--text-primary)]',
             'placeholder:text-[var(--text-secondary)] focus:outline-none focus:ring-1',
             error
               ? 'border-danger focus:ring-danger'
@@ -108,7 +108,7 @@ export function LinkDialog({
             type="button"
             onClick={onCancel}
             className={cn(
-              'rounded-md border border-[var(--border-color)] px-4 py-1.5 text-sm font-medium',
+              'rounded-control border border-[var(--border-color)] px-4 py-1.5 text-sm font-medium',
               'text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-hover)]',
             )}
           >
@@ -119,7 +119,7 @@ export function LinkDialog({
               type="button"
               onClick={onRemove}
               className={cn(
-                'rounded-md border border-[var(--border-color)] px-4 py-1.5 text-sm font-medium',
+                'rounded-control border border-[var(--border-color)] px-4 py-1.5 text-sm font-medium',
                 'text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-hover)]',
               )}
             >
@@ -129,7 +129,7 @@ export function LinkDialog({
           <button
             type="button"
             onClick={handleApply}
-            className="rounded-md bg-accent-fill px-4 py-1.5 text-sm font-medium text-on-accent transition-colors hover:bg-accent-fill/90"
+            className="rounded-control bg-accent-fill px-4 py-1.5 text-sm font-medium text-on-accent transition-colors hover:bg-accent-fill/90"
           >
             Apply
           </button>

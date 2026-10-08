@@ -64,7 +64,7 @@ function RoutineCheck({
         type="button"
         disabled={disabled}
         onClick={() => onStatus(skipped ? 'PENDING' : 'SKIPPED')}
-        className="flex h-7 items-center gap-1 rounded-md px-2 text-[11px] font-medium text-[var(--text-secondary)] opacity-0 transition hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)] group-hover:opacity-100 focus:opacity-100"
+        className="flex h-7 items-center gap-1 rounded-control px-2 text-[11px] font-medium text-[var(--text-secondary)] opacity-0 transition hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)] group-hover:opacity-100 focus:opacity-100"
         aria-label={skipped ? `Undo skip for ${definition.name}` : `Skip ${definition.name}`}
       >
         {skipped ? <Undo2 className="h-3.5 w-3.5" /> : <SkipForward className="h-3.5 w-3.5" />}

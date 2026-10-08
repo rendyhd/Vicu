@@ -124,7 +124,7 @@ export function CustomListDialog({ open, list, onSave, onClose }: CustomListDial
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
       <div
-        className="w-[440px] max-h-[80vh] overflow-y-auto rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] shadow-xl"
+        className="w-[440px] max-h-[80vh] overflow-y-auto rounded-card border border-[var(--border-color)] bg-[var(--bg-primary)] shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-[var(--border-color)] px-5 py-3">
@@ -134,7 +134,7 @@ export function CustomListDialog({ open, list, onSave, onClose }: CustomListDial
           <button
             type="button"
             onClick={onClose}
-            className="rounded p-1 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
+            className="rounded-control p-1 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
           >
             <X className="h-4 w-4" />
           </button>
@@ -150,7 +150,7 @@ export function CustomListDialog({ open, list, onSave, onClose }: CustomListDial
               onChange={(e) => setName(e.target.value)}
               placeholder="My List"
               autoFocus
-              className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)] focus:border-accent-blue focus:outline-none"
+              className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)] focus:border-accent-blue focus:outline-none"
               onKeyDown={(e) => {
                 if (e.key === 'Enter') handleSave()
               }}
@@ -162,7 +162,7 @@ export function CustomListDialog({ open, list, onSave, onClose }: CustomListDial
             <select
               value={icon}
               onChange={(event) => setIcon(event.target.value)}
-              className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)] focus:border-accent-blue focus:outline-none"
+              className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)] focus:border-accent-blue focus:outline-none"
             >
               {ICON_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
             </select>
@@ -175,7 +175,7 @@ export function CustomListDialog({ open, list, onSave, onClose }: CustomListDial
               <select
                 value={filter.sort_by}
                 onChange={(e) => setFilter((f) => ({ ...f, sort_by: e.target.value }))}
-                className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] focus:border-accent-blue focus:outline-none"
+                className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] focus:border-accent-blue focus:outline-none"
               >
                 {SORT_OPTIONS.map((o) => (
                   <option key={o.value} value={o.value}>{o.label}</option>
@@ -187,7 +187,7 @@ export function CustomListDialog({ open, list, onSave, onClose }: CustomListDial
               <select
                 value={filter.order_by}
                 onChange={(e) => setFilter((f) => ({ ...f, order_by: e.target.value as 'asc' | 'desc' }))}
-                className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] focus:border-accent-blue focus:outline-none"
+                className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] focus:border-accent-blue focus:outline-none"
               >
                 <option value="asc">Ascending</option>
                 <option value="desc">Descending</option>
@@ -201,7 +201,7 @@ export function CustomListDialog({ open, list, onSave, onClose }: CustomListDial
             <select
               value={filter.due_date_filter}
               onChange={(e) => setFilter((f) => ({ ...f, due_date_filter: e.target.value as CustomListFilter['due_date_filter'] }))}
-              className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] focus:border-accent-blue focus:outline-none"
+              className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] focus:border-accent-blue focus:outline-none"
             >
               {DUE_DATE_OPTIONS.map((o) => (
                 <option key={o.value} value={o.value}>{o.label}</option>
@@ -234,7 +234,7 @@ export function CustomListDialog({ open, list, onSave, onClose }: CustomListDial
                   <span className="text-[var(--text-secondary)]">({filter.project_ids.length} excluded)</span>
                 )}
               </label>
-              <div className="flex overflow-hidden rounded-md border border-[var(--border-color)]">
+              <div className="flex overflow-hidden rounded-control border border-[var(--border-color)]">
                 {(['include', 'exclude'] as const).map((mode) => (
                   <button
                     key={mode}
@@ -252,11 +252,11 @@ export function CustomListDialog({ open, list, onSave, onClose }: CustomListDial
                 ))}
               </div>
             </div>
-            <div className="max-h-32 overflow-y-auto rounded-md border border-[var(--border-color)] bg-[var(--bg-secondary)] p-2">
+            <div className="max-h-32 overflow-y-auto rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] p-2">
               {allProjects.map((p) => (
                 <label
                   key={p.id}
-                  className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-xs text-[var(--text-primary)] hover:bg-[var(--bg-hover)]"
+                  className="flex cursor-pointer items-center gap-2 rounded-control px-2 py-1 text-xs text-[var(--text-primary)] hover:bg-[var(--bg-hover)]"
                 >
                   <input
                     type="checkbox"
@@ -279,7 +279,7 @@ export function CustomListDialog({ open, list, onSave, onClose }: CustomListDial
             <select
               value={filter.add_to_project_id ?? 0}
               onChange={(e) => setFilter((current) => ({ ...current, add_to_project_id: Number(e.target.value) }))}
-              className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] focus:border-accent-blue focus:outline-none"
+              className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] focus:border-accent-blue focus:outline-none"
             >
               <option value={0}>Inbox</option>
               {allProjects.map((project) => (
@@ -303,7 +303,7 @@ export function CustomListDialog({ open, list, onSave, onClose }: CustomListDial
                   type="button"
                   onClick={() => togglePriority(p.value)}
                   className={cn(
-                    'rounded-md border px-3 py-1 text-xs font-medium transition-colors',
+                    'rounded-control border px-3 py-1 text-xs font-medium transition-colors',
                     filter.priority_filter?.includes(p.value)
                       ? 'border-accent-blue bg-accent-blue/10 text-accent-blue'
                       : 'border-[var(--border-color)] text-[var(--text-secondary)] hover:border-[var(--text-secondary)]'
@@ -321,11 +321,11 @@ export function CustomListDialog({ open, list, onSave, onClose }: CustomListDial
               <label className="mb-1 block text-xs text-[var(--text-secondary)]">
                 Labels {!filter.label_ids?.length && <span className="text-[var(--text-secondary)]">(any)</span>}
               </label>
-              <div className="max-h-32 overflow-y-auto rounded-md border border-[var(--border-color)] bg-[var(--bg-secondary)] p-2">
+              <div className="max-h-32 overflow-y-auto rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] p-2">
                 {labels.map((l) => (
                   <label
                     key={l.id}
-                    className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-xs text-[var(--text-primary)] hover:bg-[var(--bg-hover)]"
+                    className="flex cursor-pointer items-center gap-2 rounded-control px-2 py-1 text-xs text-[var(--text-primary)] hover:bg-[var(--bg-hover)]"
                   >
                     <input
                       type="checkbox"
@@ -368,7 +368,7 @@ export function CustomListDialog({ open, list, onSave, onClose }: CustomListDial
           <button
             type="button"
             onClick={onClose}
-            className="rounded-md border border-[var(--border-color)] px-4 py-1.5 text-xs font-medium text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-hover)]"
+            className="rounded-control border border-[var(--border-color)] px-4 py-1.5 text-xs font-medium text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-hover)]"
           >
             Cancel
           </button>
@@ -377,7 +377,7 @@ export function CustomListDialog({ open, list, onSave, onClose }: CustomListDial
             onClick={handleSave}
             disabled={!name.trim()}
             className={cn(
-              'rounded-md px-4 py-1.5 text-xs font-medium transition-colors',
+              'rounded-control px-4 py-1.5 text-xs font-medium transition-colors',
               'bg-accent-fill text-on-accent hover:bg-accent-fill/90',
               'disabled:cursor-not-allowed disabled:opacity-50'
             )}

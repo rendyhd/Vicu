@@ -57,7 +57,7 @@ function FailedRow({
               type="button"
               disabled={busy}
               onClick={onRetry}
-              className="rounded border border-[var(--border-color)] px-2 py-0.5 text-[11px] text-[var(--text-primary)] hover:bg-[var(--bg-hover)] disabled:opacity-50"
+              className="rounded-control border border-[var(--border-color)] px-2 py-0.5 text-[11px] text-[var(--text-primary)] hover:bg-[var(--bg-hover)] disabled:opacity-50"
             >
               Retry
             </button>
@@ -66,7 +66,7 @@ function FailedRow({
             type="button"
             disabled={busy}
             onClick={onDiscard}
-            className="rounded border border-[var(--border-color)] px-2 py-0.5 text-[11px] text-danger hover:bg-[var(--bg-hover)] disabled:opacity-50"
+            className="rounded-control border border-[var(--border-color)] px-2 py-0.5 text-[11px] text-danger hover:bg-[var(--bg-hover)] disabled:opacity-50"
           >
             Discard
           </button>
@@ -142,7 +142,7 @@ export function SyncPanel({ onClose }: { onClose: () => void }) {
       <div
         role="dialog"
         aria-label="Sync status"
-        className="mx-4 flex max-h-[80vh] w-full max-w-lg flex-col overflow-hidden rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] shadow-xl"
+        className="mx-4 flex max-h-[80vh] w-full max-w-lg flex-col overflow-hidden rounded-card border border-[var(--border-color)] bg-[var(--bg-primary)] shadow-xl"
         onClick={(event) => event.stopPropagation()}
       >
         <div className="flex items-center gap-2 border-b border-[var(--border-color)] px-4 py-3">
@@ -151,7 +151,7 @@ export function SyncPanel({ onClose }: { onClose: () => void }) {
             ref={closeRef}
             type="button"
             onClick={onClose}
-            className="rounded p-1 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
+            className="rounded-control p-1 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
             aria-label="Close"
           >
             <X className="h-4 w-4" />
@@ -174,7 +174,7 @@ export function SyncPanel({ onClose }: { onClose: () => void }) {
                   onClose()
                   requestReauth()
                 }}
-                className="flex shrink-0 items-center gap-1 rounded bg-accent-fill px-2.5 py-1 text-[11px] font-medium text-on-accent"
+                className="flex shrink-0 items-center gap-1 rounded-control bg-accent-fill px-2.5 py-1 text-[11px] font-medium text-on-accent"
               >
                 <LogIn className="h-3 w-3" /> Sign in
               </button>
@@ -191,7 +191,7 @@ export function SyncPanel({ onClose }: { onClose: () => void }) {
                   type="button"
                   disabled={busy || replaying}
                   onClick={() => void syncNow()}
-                  className="flex items-center gap-1 rounded border border-[var(--border-color)] px-2 py-0.5 text-[11px] text-[var(--text-primary)] hover:bg-[var(--bg-hover)] disabled:opacity-50"
+                  className="flex items-center gap-1 rounded-control border border-[var(--border-color)] px-2 py-0.5 text-[11px] text-[var(--text-primary)] hover:bg-[var(--bg-hover)] disabled:opacity-50"
                 >
                   <RefreshCw className={replaying ? 'h-3 w-3 animate-spin' : 'h-3 w-3'} /> {replaying ? 'Syncing' : 'Sync now'}
                 </button>
@@ -215,7 +215,7 @@ export function SyncPanel({ onClose }: { onClose: () => void }) {
                   type="button"
                   disabled={busy}
                   onClick={() => void retry()}
-                  className="rounded border border-[var(--border-color)] px-2 py-0.5 text-[11px] text-[var(--text-primary)] hover:bg-[var(--bg-hover)] disabled:opacity-50"
+                  className="rounded-control border border-[var(--border-color)] px-2 py-0.5 text-[11px] text-[var(--text-primary)] hover:bg-[var(--bg-hover)] disabled:opacity-50"
                 >
                   Retry all
                 </button>
@@ -223,7 +223,7 @@ export function SyncPanel({ onClose }: { onClose: () => void }) {
                   type="button"
                   disabled={busy}
                   onClick={() => void discardAll()}
-                  className="rounded border border-[var(--border-color)] px-2 py-0.5 text-[11px] text-danger hover:bg-[var(--bg-hover)] disabled:opacity-50"
+                  className="rounded-control border border-[var(--border-color)] px-2 py-0.5 text-[11px] text-danger hover:bg-[var(--bg-hover)] disabled:opacity-50"
                 >
                   Discard all
                 </button>

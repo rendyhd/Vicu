@@ -18,7 +18,7 @@ export function ToastHost() {
           key={t.id}
           role={t.kind === 'error' ? 'alert' : 'status'}
           className={cn(
-            'pointer-events-auto flex items-start gap-2 rounded-md border bg-[var(--bg-primary)] px-3 py-2 text-xs text-[var(--text-primary)] shadow-lg',
+            'pointer-events-auto flex items-start gap-2 rounded-popover border bg-[var(--bg-primary)] px-3 py-2 text-xs text-[var(--text-primary)] shadow-lg',
             t.kind === 'error' ? 'border-danger/60' : 'border-[var(--border-color)]',
           )}
         >
@@ -33,7 +33,7 @@ export function ToastHost() {
           <button
             type="button"
             onClick={() => dismiss(t.id)}
-            className="shrink-0 rounded p-0.5 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
+            className="shrink-0 rounded-control p-0.5 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
             aria-label="Dismiss"
           >
             <X className="h-3 w-3" />

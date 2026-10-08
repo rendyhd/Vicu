@@ -105,7 +105,7 @@ export function CustomListView() {
         setTimeout(() => setCreationNotice(null), 6000)
       }}
       headerContent={creationNotice ? (
-        <div className="mx-4 mb-2 rounded-md bg-[var(--bg-hover)] px-3 py-2 text-xs text-[var(--text-secondary)]">
+        <div className="mx-4 mb-2 rounded-control bg-[var(--bg-hover)] px-3 py-2 text-xs text-[var(--text-secondary)]">
           {creationNotice}
         </div>
       ) : undefined}

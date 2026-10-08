@@ -83,12 +83,12 @@ export function QuickEntrySettings({ config, projects, onChange, hotkeyWarnings 
   }
 
   return (
-    <div className="rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] p-5">
+    <div className="rounded-card border border-[var(--border-color)] bg-[var(--bg-primary)] p-5">
       <h2 className="text-sm font-semibold text-[var(--text-primary)]">Quick Entry & Quick View</h2>
 
       <div className="mt-4 space-y-4">
         {hotkeyWarnings?.waylandLimited && (entryEnabled || viewEnabled) && (
-          <div className="rounded-md border border-status-today/40 bg-status-today/10 px-3 py-3 text-xs text-[var(--text-primary)]">
+          <div className="rounded-control border border-status-today/40 bg-status-today/10 px-3 py-3 text-xs text-[var(--text-primary)]">
             <p className="mb-2 font-semibold text-status-today">
               Wayland: global hotkey registration failed
             </p>
@@ -98,14 +98,14 @@ export function QuickEntrySettings({ config, projects, onChange, hotkeyWarnings 
             <ol className="mb-3 list-decimal space-y-1 pl-5 text-[var(--text-secondary)]">
               <li>Open <strong className="text-[var(--text-primary)]">Settings → Keyboard → Custom Shortcuts</strong> (GNOME) or <strong className="text-[var(--text-primary)]">System Settings → Shortcuts → Custom Shortcuts</strong> (KDE).</li>
               <li>Add a new shortcut. Paste the command below as the <em>Command</em>.</li>
-              <li>Set the key combo (e.g. <code className="rounded bg-[var(--bg-tertiary)] px-1">Alt+Shift+V</code>).</li>
+              <li>Set the key combo (e.g. <code className="rounded-control bg-[var(--bg-tertiary)] px-1">Alt+Shift+V</code>).</li>
               <li>Keep Vicu running in the tray — the shortcut wakes the running instance.</li>
             </ol>
             {!launcherCmd && (
               <div className="text-[var(--text-secondary)]">Loading command…</div>
             )}
             {launcherCmd?.kind === 'dev' && (
-              <div className="mb-2 rounded border border-yellow-500/40 bg-yellow-500/10 px-2 py-1.5 text-[11px] text-yellow-600 dark:text-yellow-400">
+              <div className="mb-2 rounded-control border border-yellow-500/40 bg-yellow-500/10 px-2 py-1.5 text-[11px] text-yellow-600 dark:text-yellow-400">
                 <strong>Dev build notice:</strong> the command below points at the unpackaged source tree and won't work outside this dev session. Use this feature from the installed AppImage for real keybinds.
               </div>
             )}
@@ -115,13 +115,13 @@ export function QuickEntrySettings({ config, projects, onChange, hotkeyWarnings 
                   <div>
                     <div className="mb-1 text-[var(--text-secondary)]">Quick Entry command:</div>
                     <div className="flex items-center gap-2">
-                      <code className="flex-1 overflow-x-auto whitespace-nowrap rounded border border-[var(--border-color)] bg-[var(--bg-tertiary)] px-2 py-1 font-mono text-[11px] text-[var(--text-primary)]">
+                      <code className="flex-1 overflow-x-auto whitespace-nowrap rounded-control border border-[var(--border-color)] bg-[var(--bg-tertiary)] px-2 py-1 font-mono text-[11px] text-[var(--text-primary)]">
                         {launcherCmd.quickEntry}
                       </code>
                       <button
                         type="button"
                         onClick={() => copy(launcherCmd.quickEntry, 'entry')}
-                        className="shrink-0 rounded border border-[var(--border-color)] bg-[var(--bg-secondary)] px-2 py-1 text-[11px] font-medium text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]"
+                        className="shrink-0 rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-2 py-1 text-[11px] font-medium text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]"
                       >
                         {copied === 'entry' ? 'Copied' : 'Copy'}
                       </button>
@@ -132,13 +132,13 @@ export function QuickEntrySettings({ config, projects, onChange, hotkeyWarnings 
                   <div>
                     <div className="mb-1 text-[var(--text-secondary)]">Quick View command:</div>
                     <div className="flex items-center gap-2">
-                      <code className="flex-1 overflow-x-auto whitespace-nowrap rounded border border-[var(--border-color)] bg-[var(--bg-tertiary)] px-2 py-1 font-mono text-[11px] text-[var(--text-primary)]">
+                      <code className="flex-1 overflow-x-auto whitespace-nowrap rounded-control border border-[var(--border-color)] bg-[var(--bg-tertiary)] px-2 py-1 font-mono text-[11px] text-[var(--text-primary)]">
                         {launcherCmd.quickView}
                       </code>
                       <button
                         type="button"
                         onClick={() => copy(launcherCmd.quickView, 'view')}
-                        className="shrink-0 rounded border border-[var(--border-color)] bg-[var(--bg-secondary)] px-2 py-1 text-[11px] font-medium text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]"
+                        className="shrink-0 rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-2 py-1 text-[11px] font-medium text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]"
                       >
                         {copied === 'view' ? 'Copied' : 'Copy'}
                       </button>
@@ -156,7 +156,7 @@ export function QuickEntrySettings({ config, projects, onChange, hotkeyWarnings 
               type="checkbox"
               checked={entryEnabled}
               onChange={(e) => onChange({ quick_entry_enabled: e.target.checked })}
-              className="h-4 w-4 rounded border-[var(--border-color)] accent-accent-blue"
+              className="h-4 w-4 rounded-control border-[var(--border-color)] accent-accent-blue"
             />
             <span className="text-sm text-[var(--text-primary)]">
               Enable Quick Entry
@@ -167,7 +167,7 @@ export function QuickEntrySettings({ config, projects, onChange, hotkeyWarnings 
               type="checkbox"
               checked={viewEnabled}
               onChange={(e) => onChange({ quick_view_enabled: e.target.checked })}
-              className="h-4 w-4 rounded border-[var(--border-color)] accent-accent-blue"
+              className="h-4 w-4 rounded-control border-[var(--border-color)] accent-accent-blue"
             />
             <span className="text-sm text-[var(--text-primary)]">
               Enable Quick View
@@ -203,7 +203,7 @@ export function QuickEntrySettings({ config, projects, onChange, hotkeyWarnings 
                   <select
                     value={defaultProjectAvailable ? configuredDefaultProjectId : 0}
                     onChange={(e) => onChange({ quick_entry_default_project_id: Number(e.target.value) })}
-                    className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] focus:border-accent-blue focus:outline-none"
+                    className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] focus:border-accent-blue focus:outline-none"
                   >
                     <option value={0}>Select a project...</option>
                     {projects.map((p) => (
@@ -246,7 +246,7 @@ export function QuickEntrySettings({ config, projects, onChange, hotkeyWarnings 
                         if (e.target.value) addSecondaryProject(Number(e.target.value))
                         e.target.value = ''
                       }}
-                      className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-1.5 text-xs text-[var(--text-secondary)] focus:border-accent-blue focus:outline-none"
+                      className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-1.5 text-xs text-[var(--text-secondary)] focus:border-accent-blue focus:outline-none"
                     >
                       <option value="">Add a project...</option>
                       {projects
@@ -268,7 +268,7 @@ export function QuickEntrySettings({ config, projects, onChange, hotkeyWarnings 
                       <label
                         key={mod}
                         className={cn(
-                          'flex cursor-pointer items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium transition-colors',
+                          'flex cursor-pointer items-center gap-1.5 rounded-control border px-3 py-1.5 text-xs font-medium transition-colors',
                           config.project_cycle_modifier === mod
                             ? 'border-accent-blue bg-accent-blue/10 text-accent-blue'
                             : 'border-[var(--border-color)] text-[var(--text-secondary)] hover:border-[var(--text-secondary)]'
@@ -342,7 +342,7 @@ export function QuickEntrySettings({ config, projects, onChange, hotkeyWarnings 
                         }
                       }
                     }}
-                    className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] focus:border-accent-blue focus:outline-none"
+                    className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] focus:border-accent-blue focus:outline-none"
                   >
                     <option value="0">All projects</option>
                     <optgroup label="Views">
@@ -376,7 +376,7 @@ export function QuickEntrySettings({ config, projects, onChange, hotkeyWarnings 
                     type="checkbox"
                     checked={viewerFilter.include_today_all_projects ?? false}
                     onChange={(e) => updateViewerFilter({ include_today_all_projects: e.target.checked })}
-                    className="h-4 w-4 rounded border-[var(--border-color)] accent-accent-blue"
+                    className="h-4 w-4 rounded-control border-[var(--border-color)] accent-accent-blue"
                   />
                   <span className="text-sm text-[var(--text-primary)]">
                     Include tasks due today from all projects

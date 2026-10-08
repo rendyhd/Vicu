@@ -107,7 +107,7 @@ export function SectionHeader({ project, siblings, onAddTask }: SectionHeaderPro
       {...attributes}
       {...listeners}
       className={cn(
-        'group flex h-9 cursor-grab items-center gap-2 px-4 pt-4 pb-1 rounded-md',
+        'group flex h-9 cursor-grab items-center gap-2 px-4 pt-4 pb-1 rounded-control',
         isDragging && 'cursor-grabbing',
         isTaskDragOver && 'bg-accent-blue/10'
       )}
@@ -142,7 +142,7 @@ export function SectionHeader({ project, siblings, onAddTask }: SectionHeaderPro
             e.stopPropagation()
             onAddTask()
           }}
-          className="flex h-5 w-5 items-center justify-center rounded text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--accent-blue)]"
+          className="flex h-5 w-5 items-center justify-center rounded-control text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--accent-blue)]"
           aria-label="Add task to section"
         >
           <Plus className="h-3.5 w-3.5" />
@@ -156,7 +156,7 @@ export function SectionHeader({ project, siblings, onAddTask }: SectionHeaderPro
               e.stopPropagation()
               setShowMenu((s) => !s)
             }}
-            className="flex h-5 w-5 items-center justify-center rounded text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
+            className="flex h-5 w-5 items-center justify-center rounded-control text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
             aria-label="Section menu"
           >
             <MoreHorizontal className="h-3.5 w-3.5" />
@@ -165,7 +165,7 @@ export function SectionHeader({ project, siblings, onAddTask }: SectionHeaderPro
           {showMenu && (
             <div
               ref={menuRef}
-              className="absolute right-0 top-6 z-50 min-w-[120px] rounded-md border border-[var(--border-color)] bg-[var(--bg-primary)] py-1 shadow-lg"
+              className="absolute right-0 top-6 z-50 min-w-[120px] rounded-popover border border-[var(--border-color)] bg-[var(--bg-primary)] py-1 shadow-lg"
             >
               <button
                 type="button"

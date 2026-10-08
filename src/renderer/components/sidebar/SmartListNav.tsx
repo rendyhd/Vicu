@@ -48,7 +48,7 @@ export function SmartListNav() {
             type="button"
             onClick={() => navigate({ to: item.path })}
             className={cn(
-              'flex h-8 items-center gap-2.5 rounded-md px-2.5 text-[13px] font-medium transition-colors',
+              'flex h-8 items-center gap-2.5 rounded-control px-2.5 text-[13px] font-medium transition-colors',
               isActive
                 ? 'bg-[var(--bg-selected)] text-[var(--text-primary)]'
                 : 'text-[var(--text-primary)] hover:bg-[var(--bg-hover)]',

@@ -62,7 +62,7 @@ export function CompletionSoundSettings({ config, onChange }: Props) {
   }
 
   return (
-    <div className="rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] p-5">
+    <div className="rounded-card border border-[var(--border-color)] bg-[var(--bg-primary)] p-5">
       <h2 className="mb-4 text-sm font-semibold text-[var(--text-primary)]">Task Completion Sound</h2>
 
       <div className="space-y-3">
@@ -71,7 +71,7 @@ export function CompletionSoundSettings({ config, onChange }: Props) {
             type="checkbox"
             checked={enabled}
             onChange={(e) => onChange({ task_completion_sound_enabled: e.target.checked })}
-            className="h-4 w-4 rounded border-[var(--border-color)] accent-accent-blue"
+            className="h-4 w-4 rounded-control border-[var(--border-color)] accent-accent-blue"
           />
           <span className="text-sm text-[var(--text-primary)]">
             Play a sound when completing a task
@@ -94,7 +94,7 @@ export function CompletionSoundSettings({ config, onChange }: Props) {
               type="button"
               onClick={handleChooseFile}
               disabled={busy}
-              className="rounded-md border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-1.5 text-xs font-medium text-[var(--text-primary)] transition-colors hover:border-accent-blue hover:text-accent-blue disabled:opacity-50"
+              className="rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-1.5 text-xs font-medium text-[var(--text-primary)] transition-colors hover:border-accent-blue hover:text-accent-blue disabled:opacity-50"
             >
               Choose file...
             </button>
@@ -103,7 +103,7 @@ export function CompletionSoundSettings({ config, onChange }: Props) {
                 type="button"
                 onClick={handleReset}
                 disabled={busy}
-                className="rounded-md border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-1.5 text-xs font-medium text-[var(--text-primary)] transition-colors hover:border-accent-blue hover:text-accent-blue disabled:opacity-50"
+                className="rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-1.5 text-xs font-medium text-[var(--text-primary)] transition-colors hover:border-accent-blue hover:text-accent-blue disabled:opacity-50"
               >
                 Reset to default
               </button>
@@ -112,7 +112,7 @@ export function CompletionSoundSettings({ config, onChange }: Props) {
               type="button"
               onClick={handleTest}
               disabled={busy}
-              className="rounded-md border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-1.5 text-xs font-medium text-[var(--text-primary)] transition-colors hover:border-accent-blue hover:text-accent-blue disabled:opacity-50"
+              className="rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-1.5 text-xs font-medium text-[var(--text-primary)] transition-colors hover:border-accent-blue hover:text-accent-blue disabled:opacity-50"
             >
               Test
             </button>

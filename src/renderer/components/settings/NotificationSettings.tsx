@@ -38,13 +38,13 @@ export function NotificationSettings({ config, onChange }: NotificationSettingsP
   return (
     <div className="mx-6 max-w-lg space-y-4 pb-8 pt-4">
       {/* Master toggle */}
-      <div className="rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] p-5">
+      <div className="rounded-card border border-[var(--border-color)] bg-[var(--bg-primary)] p-5">
         <label className="flex cursor-pointer items-center gap-2">
           <input
             type="checkbox"
             checked={enabled}
             onChange={(e) => onChange({ notifications_enabled: e.target.checked })}
-            className="h-4 w-4 rounded border-[var(--border-color)] accent-accent-blue"
+            className="h-4 w-4 rounded-control border-[var(--border-color)] accent-accent-blue"
           />
           <span className="text-sm font-semibold text-[var(--text-primary)]">Enable desktop notifications</span>
         </label>
@@ -57,7 +57,7 @@ export function NotificationSettings({ config, onChange }: NotificationSettingsP
 
       {/* ── Scheduled Reminders ── */}
       <div className={cn(
-        'rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] p-5',
+        'rounded-card border border-[var(--border-color)] bg-[var(--bg-primary)] p-5',
         !enabled && 'pointer-events-none opacity-40'
       )}>
         <h2 className="text-sm font-semibold text-[var(--text-primary)]">Scheduled Reminders</h2>
@@ -73,7 +73,7 @@ export function NotificationSettings({ config, onChange }: NotificationSettingsP
                 type="checkbox"
                 checked={config.notifications_daily_reminder_enabled !== false}
                 onChange={(e) => onChange({ notifications_daily_reminder_enabled: e.target.checked })}
-                className="h-4 w-4 rounded border-[var(--border-color)] accent-accent-blue"
+                className="h-4 w-4 rounded-control border-[var(--border-color)] accent-accent-blue"
               />
               <span className="text-sm text-[var(--text-primary)]">Morning reminder</span>
             </label>
@@ -82,7 +82,7 @@ export function NotificationSettings({ config, onChange }: NotificationSettingsP
                 type="time"
                 value={config.notifications_daily_reminder_time || '08:00'}
                 onChange={(e) => onChange({ notifications_daily_reminder_time: e.target.value })}
-                className="rounded-md border border-[var(--border-color)] bg-[var(--bg-secondary)] px-2 py-1 text-sm text-[var(--text-primary)] focus:border-accent-blue focus:outline-none"
+                className="rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-2 py-1 text-sm text-[var(--text-primary)] focus:border-accent-blue focus:outline-none"
               />
             </div>
           </div>
@@ -94,7 +94,7 @@ export function NotificationSettings({ config, onChange }: NotificationSettingsP
                 type="checkbox"
                 checked={config.notifications_secondary_reminder_enabled ?? false}
                 onChange={(e) => onChange({ notifications_secondary_reminder_enabled: e.target.checked })}
-                className="h-4 w-4 rounded border-[var(--border-color)] accent-accent-blue"
+                className="h-4 w-4 rounded-control border-[var(--border-color)] accent-accent-blue"
               />
               <span className="text-sm text-[var(--text-primary)]">Afternoon reminder</span>
             </label>
@@ -103,7 +103,7 @@ export function NotificationSettings({ config, onChange }: NotificationSettingsP
                 type="time"
                 value={config.notifications_secondary_reminder_time || '16:00'}
                 onChange={(e) => onChange({ notifications_secondary_reminder_time: e.target.value })}
-                className="rounded-md border border-[var(--border-color)] bg-[var(--bg-secondary)] px-2 py-1 text-sm text-[var(--text-primary)] focus:border-accent-blue focus:outline-none"
+                className="rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-2 py-1 text-sm text-[var(--text-primary)] focus:border-accent-blue focus:outline-none"
               />
             </div>
           </div>
@@ -117,7 +117,7 @@ export function NotificationSettings({ config, onChange }: NotificationSettingsP
                   type="checkbox"
                   checked={config.notifications_overdue_enabled !== false}
                   onChange={(e) => onChange({ notifications_overdue_enabled: e.target.checked })}
-                  className="h-4 w-4 rounded border-[var(--border-color)] accent-accent-blue"
+                  className="h-4 w-4 rounded-control border-[var(--border-color)] accent-accent-blue"
                 />
                 <span className="text-sm text-[var(--text-primary)]">Overdue tasks</span>
               </label>
@@ -126,7 +126,7 @@ export function NotificationSettings({ config, onChange }: NotificationSettingsP
                   type="checkbox"
                   checked={config.notifications_due_today_enabled !== false}
                   onChange={(e) => onChange({ notifications_due_today_enabled: e.target.checked })}
-                  className="h-4 w-4 rounded border-[var(--border-color)] accent-accent-blue"
+                  className="h-4 w-4 rounded-control border-[var(--border-color)] accent-accent-blue"
                 />
                 <span className="text-sm text-[var(--text-primary)]">Tasks due today</span>
               </label>
@@ -135,7 +135,7 @@ export function NotificationSettings({ config, onChange }: NotificationSettingsP
                   type="checkbox"
                   checked={config.notifications_upcoming_enabled ?? false}
                   onChange={(e) => onChange({ notifications_upcoming_enabled: e.target.checked })}
-                  className="h-4 w-4 rounded border-[var(--border-color)] accent-accent-blue"
+                  className="h-4 w-4 rounded-control border-[var(--border-color)] accent-accent-blue"
                 />
                 <span className="text-sm text-[var(--text-primary)]">Tasks due tomorrow</span>
               </label>
@@ -150,7 +150,7 @@ export function NotificationSettings({ config, onChange }: NotificationSettingsP
                   type="checkbox"
                   checked={config.notifications_sound !== false}
                   onChange={(e) => onChange({ notifications_sound: e.target.checked })}
-                  className="h-4 w-4 rounded border-[var(--border-color)] accent-accent-blue"
+                  className="h-4 w-4 rounded-control border-[var(--border-color)] accent-accent-blue"
                 />
                 <span className="text-sm text-[var(--text-primary)]">Play sound</span>
               </label>
@@ -159,7 +159,7 @@ export function NotificationSettings({ config, onChange }: NotificationSettingsP
                   type="checkbox"
                   checked={config.notifications_persistent ?? false}
                   onChange={(e) => onChange({ notifications_persistent: e.target.checked })}
-                  className="h-4 w-4 rounded border-[var(--border-color)] accent-accent-blue"
+                  className="h-4 w-4 rounded-control border-[var(--border-color)] accent-accent-blue"
                 />
                 <span className="text-sm text-[var(--text-primary)]">Stay until dismissed</span>
               </label>
@@ -170,7 +170,7 @@ export function NotificationSettings({ config, onChange }: NotificationSettingsP
 
       {/* ── Task Reminders ── */}
       <div className={cn(
-        'rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] p-5',
+        'rounded-card border border-[var(--border-color)] bg-[var(--bg-primary)] p-5',
         !enabled && 'pointer-events-none opacity-40'
       )}>
         <h2 className="text-sm font-semibold text-[var(--text-primary)]">Task Reminders</h2>
@@ -185,7 +185,7 @@ export function NotificationSettings({ config, onChange }: NotificationSettingsP
                 type="checkbox"
                 checked={config.notifications_task_reminder_sound !== false}
                 onChange={(e) => onChange({ notifications_task_reminder_sound: e.target.checked })}
-                className="h-4 w-4 rounded border-[var(--border-color)] accent-accent-blue"
+                className="h-4 w-4 rounded-control border-[var(--border-color)] accent-accent-blue"
               />
               <span className="text-sm text-[var(--text-primary)]">Play sound</span>
             </label>
@@ -194,7 +194,7 @@ export function NotificationSettings({ config, onChange }: NotificationSettingsP
                 type="checkbox"
                 checked={config.notifications_task_reminder_persistent ?? false}
                 onChange={(e) => onChange({ notifications_task_reminder_persistent: e.target.checked })}
-                className="h-4 w-4 rounded border-[var(--border-color)] accent-accent-blue"
+                className="h-4 w-4 rounded-control border-[var(--border-color)] accent-accent-blue"
               />
               <span className="text-sm text-[var(--text-primary)]">Stay until dismissed</span>
             </label>
@@ -210,7 +210,7 @@ export function NotificationSettings({ config, onChange }: NotificationSettingsP
               <select
                 value={offsetDropdownValue}
                 onChange={(e) => handleOffsetChange(Number(e.target.value))}
-                className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-secondary)] px-2 py-1.5 text-sm text-[var(--text-primary)] focus:border-accent-blue focus:outline-none"
+                className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-2 py-1.5 text-sm text-[var(--text-primary)] focus:border-accent-blue focus:outline-none"
               >
                 {OFFSET_OPTIONS.map((opt) => (
                   <option key={opt.value} value={opt.value}>
@@ -230,7 +230,7 @@ export function NotificationSettings({ config, onChange }: NotificationSettingsP
                         | 'end_date',
                     })
                   }
-                  className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-secondary)] px-2 py-1.5 text-sm text-[var(--text-primary)] focus:border-accent-blue focus:outline-none"
+                  className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-2 py-1.5 text-sm text-[var(--text-primary)] focus:border-accent-blue focus:outline-none"
                 >
                   <option value="due_date">Relative to due date</option>
                   <option value="start_date">Relative to start date</option>
@@ -248,7 +248,7 @@ export function NotificationSettings({ config, onChange }: NotificationSettingsP
           type="button"
           onClick={handleTestNotification}
           className={cn(
-            'rounded-md px-4 py-2 text-sm font-medium transition-colors',
+            'rounded-control px-4 py-2 text-sm font-medium transition-colors',
             'border border-[var(--border-color)] text-[var(--text-primary)]',
             'hover:bg-[var(--bg-secondary)]'
           )}

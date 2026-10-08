@@ -248,7 +248,7 @@ function AttachmentThumb({
   const { url, isLoading, error, retry } = useAttachmentBlobUrl(taskId, attachmentId, mime)
 
   if (isLoading) {
-    return <div className="h-20 w-32 animate-pulse rounded bg-[var(--bg-hover)]" />
+    return <div className="h-20 w-32 animate-pulse rounded-control bg-[var(--bg-hover)]" />
   }
   if (error || decodeError) {
     return (
@@ -258,14 +258,14 @@ function AttachmentThumb({
           setDecodeError(false)
           void retry()
         }}
-        className="rounded border border-danger/30 bg-danger/10 px-2 py-1 text-caption text-danger hover:bg-danger/15"
+        className="rounded-control border border-danger/30 bg-danger/10 px-2 py-1 text-caption text-danger hover:bg-danger/15"
       >
         Retry image
       </button>
     )
   }
   if (!url) {
-    return <div className="h-20 w-32 animate-pulse rounded bg-[var(--bg-hover)]" />
+    return <div className="h-20 w-32 animate-pulse rounded-control bg-[var(--bg-hover)]" />
   }
   return (
     <Thumb
@@ -295,7 +295,7 @@ function Thumb({
         alt={alt}
         draggable={false}
         onError={onError}
-        className="block h-auto max-h-40 w-auto max-w-md rounded border border-[var(--border-color)] object-contain"
+        className="block h-auto max-h-40 w-auto max-w-md rounded-control border border-[var(--border-color)] object-contain"
       />
       <button
         type="button"

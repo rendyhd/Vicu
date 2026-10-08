@@ -393,7 +393,7 @@ function TabButton({
       role="tab"
       aria-selected={active}
       onClick={onClick}
-      className={cn('flex items-center gap-1.5 rounded-md px-3 py-1 text-[13px] transition-colors')}
+      className={cn('flex items-center gap-1.5 rounded-control px-3 py-1 text-[13px] transition-colors')}
       style={
         active
           ? { background: 'rgba(175,82,222,0.15)', color: 'var(--accent-purple)', fontWeight: 600 }
@@ -406,7 +406,7 @@ function TabButton({
           fontSize: 11,
           fontWeight: 600,
           fontVariantNumeric: 'tabular-nums',
-          color: active ? 'var(--accent-purple)' : 'var(--text-tertiary)',
+          color: active ? 'var(--accent-purple)' : 'var(--text-secondary)',
         }}
       >
         {count}

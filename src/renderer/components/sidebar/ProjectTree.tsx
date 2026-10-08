@@ -58,7 +58,7 @@ function ProjectDialog({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}>
       <div
-        className="w-[360px] rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] shadow-xl"
+        className="w-[360px] rounded-card border border-[var(--border-color)] bg-[var(--bg-primary)] shadow-xl"
       >
         <div className="flex items-center justify-between border-b border-[var(--border-color)] px-5 py-3">
           <h2 className="text-sm font-semibold text-[var(--text-primary)]">
@@ -67,7 +67,7 @@ function ProjectDialog({
           <button
             type="button"
             onClick={onClose}
-            className="rounded p-1 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
+            className="rounded-control p-1 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
           >
             <X className="h-4 w-4" />
           </button>
@@ -82,7 +82,7 @@ function ProjectDialog({
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Project name"
               autoFocus
-              className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)] focus:border-accent-blue focus:outline-none"
+              className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)] focus:border-accent-blue focus:outline-none"
               onKeyDown={(e) => {
                 if (e.key === 'Enter') handleSave()
               }}
@@ -115,7 +115,7 @@ function ProjectDialog({
                 value={hexColor}
                 onChange={(e) => setHexColor(e.target.value)}
                 placeholder="#hex"
-                className="flex-1 rounded-md border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-1.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)] focus:border-accent-blue focus:outline-none"
+                className="flex-1 rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-1.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)] focus:border-accent-blue focus:outline-none"
               />
               {hexColor && (
                 <button
@@ -134,7 +134,7 @@ function ProjectDialog({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-md border border-[var(--border-color)] px-4 py-1.5 text-xs font-medium text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-hover)]"
+            className="rounded-control border border-[var(--border-color)] px-4 py-1.5 text-xs font-medium text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-hover)]"
           >
             Cancel
           </button>
@@ -143,7 +143,7 @@ function ProjectDialog({
             onClick={handleSave}
             disabled={!title.trim()}
             className={cn(
-              'rounded-md px-4 py-1.5 text-xs font-medium transition-colors',
+              'rounded-control px-4 py-1.5 text-xs font-medium transition-colors',
               'bg-accent-fill text-on-accent hover:bg-accent-fill/90',
               'disabled:cursor-not-allowed disabled:opacity-50'
             )}
@@ -239,7 +239,7 @@ export function ProjectTree() {
       {/* Context Menu */}
       {contextMenu && (
         <div
-          className="fixed z-50 min-w-[140px] rounded-md border border-[var(--border-color)] bg-[var(--bg-primary)] py-1 shadow-lg"
+          className="fixed z-50 min-w-[140px] rounded-popover border border-[var(--border-color)] bg-[var(--bg-primary)] py-1 shadow-lg"
           style={{ left: contextMenu.x, top: contextMenu.y }}
         >
           <button

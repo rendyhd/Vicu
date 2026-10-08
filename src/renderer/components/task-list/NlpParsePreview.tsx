@@ -100,7 +100,7 @@ export function NlpParsePreview({ result }: NlpParsePreviewProps) {
       {chips.map((chip) => (
         <span
           key={chip.key}
-          className={`inline-flex items-center rounded-[10px] px-2 py-0.5 text-[11px] font-medium leading-snug ${chip.className}`}
+          className={`inline-flex items-center rounded-chip px-2 py-0.5 text-[11px] font-medium leading-snug ${chip.className}`}
         >
           {chip.label}
         </span>

@@ -88,7 +88,7 @@ function ActionButton({ active, label, children, onClick }: {
       type="button"
       onClick={onClick}
       className={cn(
-        'flex h-7 items-center gap-1 rounded-md px-2 text-[11px] transition-colors hover:bg-[var(--bg-hover)]',
+        'flex h-7 items-center gap-1 rounded-control px-2 text-[11px] transition-colors hover:bg-[var(--bg-hover)]',
         active ? 'bg-[var(--bg-selected)] text-[var(--accent-blue)]' : 'text-[var(--text-secondary)]',
       )}
       title={label}
@@ -427,7 +427,7 @@ export function NewTaskComposer({
           contextChips={contextChips}
           onDismissContextChip={() => setDefaultDateDismissed(true)}
         />
-        <button type="button" onClick={() => { void submit() }} disabled={submitting || !parser.inputValue.trim()} className="mt-0.5 flex h-7 w-7 items-center justify-center rounded-md bg-accent-fill text-on-accent disabled:opacity-40" aria-label="Create task">
+        <button type="button" onClick={() => { void submit() }} disabled={submitting || !parser.inputValue.trim()} className="mt-0.5 flex h-7 w-7 items-center justify-center rounded-control bg-accent-fill text-on-accent disabled:opacity-40" aria-label="Create task">
           {submitting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
         </button>
       </div>
@@ -499,7 +499,7 @@ export function NewTaskComposer({
       {attachments.length > 0 && (
         <div className="flex flex-wrap gap-1 pb-2 pl-[46px] pr-4">
           {attachments.map((attachment) => (
-            <span key={attachment.id} className="flex max-w-48 items-center gap-1 rounded bg-[var(--bg-hover)] px-2 py-1 text-caption text-[var(--text-secondary)]">
+            <span key={attachment.id} className="flex max-w-48 items-center gap-1 rounded-control bg-[var(--bg-hover)] px-2 py-1 text-caption text-[var(--text-secondary)]">
               <span className="truncate">{attachment.name}</span>
               <button type="button" onClick={() => removeAttachment(attachment.id)} aria-label={`Remove ${attachment.name}`}><X className="h-3 w-3" /></button>
             </span>
@@ -510,7 +510,7 @@ export function NewTaskComposer({
       {(error || partialFailure) && (
         <div className="flex items-center justify-between gap-2 px-4 pb-2 pl-[46px] text-[11px] text-danger">
           <span>{error}</span>
-          {partialFailure && <button type="button" onClick={() => { void retryPartial() }} disabled={submitting} className="rounded border border-current px-2 py-1 font-medium">Retry</button>}
+          {partialFailure && <button type="button" onClick={() => { void retryPartial() }} disabled={submitting} className="rounded-control border border-current px-2 py-1 font-medium">Retry</button>}
         </div>
       )}
     </div>

@@ -439,7 +439,7 @@ export function TaskList({
               setAddPosition('top')
               setIsAdding(true)
             }}
-            className="flex h-7 w-7 items-center justify-center rounded-md text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--accent-blue)]"
+            className="flex h-7 w-7 items-center justify-center rounded-control text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--accent-blue)]"
             aria-label="New task"
           >
             <Plus className="h-4 w-4" />

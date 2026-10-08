@@ -120,7 +120,7 @@ export function TaskContextMenu({ fallbackTask, x, y, onClose }: TaskContextMenu
   return (
     <div
       ref={menuRef}
-      className="fixed z-50 min-w-[200px] rounded-md border border-[var(--border-color)] bg-[var(--bg-primary)] py-1 shadow-lg"
+      className="fixed z-50 min-w-[200px] rounded-popover border border-[var(--border-color)] bg-[var(--bg-primary)] py-1 shadow-lg"
       style={{ left: pos.left, top: pos.top, visibility: measured ? 'visible' : 'hidden' }}
       onContextMenu={(e) => e.preventDefault()}
     >

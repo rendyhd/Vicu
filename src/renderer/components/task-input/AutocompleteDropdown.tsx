@@ -148,7 +148,7 @@ export const AutocompleteDropdown = forwardRef<AutocompleteHandle, AutocompleteD
     }
 
     return (
-      <div className="absolute left-0 right-0 top-full z-50 mt-1 overflow-hidden rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] shadow-lg">
+      <div className="absolute left-0 right-0 top-full z-50 mt-1 overflow-hidden rounded-popover border border-[var(--border-color)] bg-[var(--bg-primary)] shadow-lg">
         {items.map((item, i) => (
           <div
             key={item.id}

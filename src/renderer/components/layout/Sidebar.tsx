@@ -24,7 +24,7 @@ export function Sidebar() {
             <button
               type="button"
               onClick={() => openProjectDialog()}
-              className="flex h-5 w-5 items-center justify-center rounded text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
+              className="flex h-5 w-5 items-center justify-center rounded-control text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
               aria-label="New project"
             >
               <Plus className="h-3.5 w-3.5" />
@@ -47,7 +47,7 @@ export function Sidebar() {
             <button
               type="button"
               onClick={() => openLabelDialog()}
-              className="flex h-5 w-5 items-center justify-center rounded text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
+              className="flex h-5 w-5 items-center justify-center rounded-control text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
               aria-label="New label"
             >
               <Plus className="h-3.5 w-3.5" />

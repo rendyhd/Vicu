@@ -10,7 +10,7 @@ export function RoutinesSettingsPanel({ config, onChange }: RoutinesSettingsPane
   const inToday = config.routines_in_today !== false
 
   return (
-    <div className="rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] p-5">
+    <div className="rounded-card border border-[var(--border-color)] bg-[var(--bg-primary)] p-5">
       <h2 className="mb-1 text-sm font-semibold text-[var(--text-primary)]">Routines</h2>
       <p className="mb-4 text-xs text-[var(--text-secondary)]">
         Daily health and home routines. Turning them off hides them and stops their reminders; your routines and their history are kept.
@@ -22,7 +22,7 @@ export function RoutinesSettingsPanel({ config, onChange }: RoutinesSettingsPane
             type="checkbox"
             checked={enabled}
             onChange={(e) => onChange({ routines_enabled: e.target.checked })}
-            className="h-4 w-4 rounded border-[var(--border-color)] accent-accent-blue"
+            className="h-4 w-4 rounded-control border-[var(--border-color)] accent-accent-blue"
           />
           <span className="text-sm text-[var(--text-primary)]">Enable routines</span>
         </label>
@@ -33,7 +33,7 @@ export function RoutinesSettingsPanel({ config, onChange }: RoutinesSettingsPane
             checked={inToday}
             disabled={!enabled}
             onChange={(e) => onChange({ routines_in_today: e.target.checked })}
-            className="mt-0.5 h-4 w-4 rounded border-[var(--border-color)] accent-accent-blue disabled:opacity-50"
+            className="mt-0.5 h-4 w-4 rounded-control border-[var(--border-color)] accent-accent-blue disabled:opacity-50"
           />
           <div>
             <div className="text-sm text-[var(--text-primary)]">Show routines in Today</div>

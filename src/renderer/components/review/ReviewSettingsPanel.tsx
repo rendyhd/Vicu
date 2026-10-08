@@ -15,7 +15,7 @@ export function ReviewSettingsPanel({ config, onChange }: ReviewSettingsPanelPro
   }
 
   return (
-    <div className="rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] p-5">
+    <div className="rounded-card border border-[var(--border-color)] bg-[var(--bg-primary)] p-5">
       <h2 className="mb-1 text-sm font-semibold text-[var(--text-primary)]">Review</h2>
       <p className="mb-4 text-xs text-[var(--text-secondary)]">
         Periodic project review, GTD-style. Marker is stored in each project&apos;s description so it syncs across clients.
@@ -27,7 +27,7 @@ export function ReviewSettingsPanel({ config, onChange }: ReviewSettingsPanelPro
             type="checkbox"
             checked={review.enabled}
             onChange={(e) => update({ enabled: e.target.checked })}
-            className="h-4 w-4 rounded border-[var(--border-color)] accent-accent-blue"
+            className="h-4 w-4 rounded-control border-[var(--border-color)] accent-accent-blue"
           />
           <span className="text-sm text-[var(--text-primary)]">Enable project review tracking</span>
         </label>
@@ -49,7 +49,7 @@ export function ReviewSettingsPanel({ config, onChange }: ReviewSettingsPanelPro
               update({ default_cadence_days: Number.isFinite(n) ? Math.min(365, Math.max(1, n)) : 14 })
             }}
             disabled={!review.enabled}
-            className="w-20 rounded border border-[var(--border-color)] bg-[var(--bg-secondary)] px-2 py-1 text-sm text-[var(--text-primary)] disabled:opacity-50"
+            className="w-20 rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-2 py-1 text-sm text-[var(--text-primary)] disabled:opacity-50"
           />
         </div>
 
@@ -59,7 +59,7 @@ export function ReviewSettingsPanel({ config, onChange }: ReviewSettingsPanelPro
             checked={review.exclude_inbox}
             disabled={!review.enabled}
             onChange={(e) => update({ exclude_inbox: e.target.checked })}
-            className="mt-0.5 h-4 w-4 rounded border-[var(--border-color)] accent-accent-blue disabled:opacity-50"
+            className="mt-0.5 h-4 w-4 rounded-control border-[var(--border-color)] accent-accent-blue disabled:opacity-50"
           />
           <div>
             <div className="text-sm text-[var(--text-primary)]">Exclude Inbox from review list</div>

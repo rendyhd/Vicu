@@ -82,7 +82,7 @@ function CustomListItem({
       onClick={onNavigate}
       onContextMenu={onContextMenu}
       className={cn(
-        'flex h-8 items-center gap-2.5 rounded-md px-2.5 text-[13px] font-medium transition-colors',
+        'flex h-8 items-center gap-2.5 rounded-control px-2.5 text-[13px] font-medium transition-colors',
         isActive
           ? 'bg-[var(--bg-selected)] text-[var(--text-primary)]'
           : 'text-[var(--text-primary)] hover:bg-[var(--bg-hover)]'
@@ -176,7 +176,7 @@ export function CustomListNav() {
                 onClick={() => syncLists.mutate()}
                 disabled={syncStatus.state === 'syncing'}
                 className={cn(
-                  'flex h-5 w-5 items-center justify-center rounded transition-colors hover:bg-[var(--bg-hover)]',
+                  'flex h-5 w-5 items-center justify-center rounded-control transition-colors hover:bg-[var(--bg-hover)]',
                   syncStatus.state === 'error' || syncStatus.state === 'update_required'
                     ? 'text-danger'
                     : 'text-[var(--text-secondary)]',
@@ -195,7 +195,7 @@ export function CustomListNav() {
                 setEditingList(null)
                 setDialogOpen(true)
               }}
-              className="flex h-5 w-5 items-center justify-center rounded text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
+              className="flex h-5 w-5 items-center justify-center rounded-control text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
               aria-label="New list"
             >
               <Plus className="h-3.5 w-3.5" />
@@ -231,7 +231,7 @@ export function CustomListNav() {
       {/* Context Menu */}
       {contextMenu && (
         <div
-          className="fixed z-50 min-w-[140px] rounded-md border border-[var(--border-color)] bg-[var(--bg-primary)] py-1 shadow-lg"
+          className="fixed z-50 min-w-[140px] rounded-popover border border-[var(--border-color)] bg-[var(--bg-primary)] py-1 shadow-lg"
           style={{ left: contextMenu.x, top: contextMenu.y }}
         >
           <button

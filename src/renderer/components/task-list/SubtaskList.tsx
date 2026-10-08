@@ -52,7 +52,7 @@ export function SubtaskList({ parentTask, showInput = false }: SubtaskListProps)
                   }
                 }}
                 className={cn(
-                  'flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded border transition-colors',
+                  'flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-control border transition-colors',
                   st.done
                     ? 'border-accent-fill bg-accent-fill'
                     : 'border-control-ring hover:border-accent-fill'
@@ -84,7 +84,7 @@ export function SubtaskList({ parentTask, showInput = false }: SubtaskListProps)
 
       {showInput && (
         <div className="flex items-center gap-2">
-          <div className="h-3.5 w-3.5 shrink-0 rounded border border-dashed border-[var(--border-color)]" />
+          <div className="h-3.5 w-3.5 shrink-0 rounded-control border border-dashed border-[var(--border-color)]" />
           <input
             ref={inputRef}
             type="text"

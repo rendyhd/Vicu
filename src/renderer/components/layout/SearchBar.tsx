@@ -44,7 +44,7 @@ export function SearchBar() {
     <div style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties} className="flex items-center mr-1">
       <div
         className={cn(
-          'flex items-center transition-all duration-200 overflow-hidden rounded',
+          'flex items-center transition-all duration-200 overflow-hidden rounded-control',
           open
             ? 'w-60 bg-[var(--bg-secondary)] border border-[var(--border-color)]'
             : 'w-7'
@@ -53,7 +53,7 @@ export function SearchBar() {
         <button
           onClick={() => setOpen(!open)}
           className={cn(
-            'flex shrink-0 items-center justify-center rounded',
+            'flex shrink-0 items-center justify-center rounded-control',
             open ? 'h-6 w-7' : 'h-7 w-7 hover:bg-[var(--bg-secondary)]'
           )}
           title={`Search tasks (${window.api.platform === 'darwin' ? '\u2318F' : 'Ctrl+F'})`}

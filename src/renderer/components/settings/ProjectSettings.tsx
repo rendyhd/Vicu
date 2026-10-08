@@ -75,34 +75,34 @@ function ProjectEditor({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose() }}>
-      <div className="w-[380px] rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] shadow-xl">
+      <div className="w-[380px] rounded-card border border-[var(--border-color)] bg-[var(--bg-primary)] shadow-xl">
         <div className="flex items-center justify-between border-b border-[var(--border-color)] px-5 py-3">
           <h2 className="text-sm font-semibold text-[var(--text-primary)]">{project ? 'Edit Project' : 'New Project'}</h2>
-          <button type="button" onClick={onClose} className="rounded p-1 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]">
+          <button type="button" onClick={onClose} className="rounded-control p-1 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]">
             <X className="h-4 w-4" />
           </button>
         </div>
         <div className="space-y-4 p-5">
           <div>
             <label className="mb-1 block text-xs text-[var(--text-secondary)]">Name</label>
-            <input autoFocus value={title} onChange={(event) => setTitle(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') save() }} className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] focus:border-accent-blue focus:outline-none" />
+            <input autoFocus value={title} onChange={(event) => setTitle(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') save() }} className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] focus:border-accent-blue focus:outline-none" />
           </div>
           <div>
             <label className="mb-1 block text-xs text-[var(--text-secondary)]">Parent project</label>
-            <select value={parentId} onChange={(event) => setParentId(Number(event.target.value))} className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] focus:border-accent-blue focus:outline-none">
+            <select value={parentId} onChange={(event) => setParentId(Number(event.target.value))} className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] focus:border-accent-blue focus:outline-none">
               <option value={0}>None</option>
               {parentOptions.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}
             </select>
           </div>
           <div>
             <label className="mb-1 block text-xs text-[var(--text-secondary)]">Color</label>
-            <input value={hexColor} onChange={(event) => setHexColor(event.target.value)} placeholder="#3498db" className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] focus:border-accent-blue focus:outline-none" />
+            <input value={hexColor} onChange={(event) => setHexColor(event.target.value)} placeholder="#3498db" className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] focus:border-accent-blue focus:outline-none" />
           </div>
           {mutation.error && <p className="text-xs text-danger">{mutation.error.message}</p>}
         </div>
         <div className="flex justify-end gap-2 border-t border-[var(--border-color)] px-5 py-3">
-          <button type="button" onClick={onClose} className="rounded-md border border-[var(--border-color)] px-4 py-1.5 text-xs text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]">Cancel</button>
-          <button type="button" onClick={save} disabled={!title.trim() || mutation.isPending} className="rounded-md bg-accent-fill px-4 py-1.5 text-xs font-medium text-on-accent disabled:opacity-50">{mutation.isPending ? 'Saving…' : project ? 'Save' : 'Create'}</button>
+          <button type="button" onClick={onClose} className="rounded-control border border-[var(--border-color)] px-4 py-1.5 text-xs text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]">Cancel</button>
+          <button type="button" onClick={save} disabled={!title.trim() || mutation.isPending} className="rounded-control bg-accent-fill px-4 py-1.5 text-xs font-medium text-on-accent disabled:opacity-50">{mutation.isPending ? 'Saving…' : project ? 'Save' : 'Create'}</button>
         </div>
       </div>
     </div>
@@ -135,16 +135,16 @@ function ProjectRows({
         <div className="flex min-h-10 items-center gap-2 border-b border-border/60 py-1 pr-2" style={{ paddingLeft: `${12 + depth * 20}px` }}>
           <Folder className="h-4 w-4 shrink-0" style={{ color: node.hex_color || 'var(--text-secondary)' }} />
           <span className={cn('min-w-0 flex-1 truncate text-sm', archived ? 'text-[var(--text-secondary)]' : 'text-[var(--text-primary)]')}>{node.title}</span>
-          {isInbox && <span className="rounded bg-[var(--bg-secondary)] px-1.5 py-0.5 text-caption text-[var(--text-secondary)]">Inbox</span>}
+          {isInbox && <span className="rounded-chip bg-[var(--bg-secondary)] px-1.5 py-0.5 text-caption text-[var(--text-secondary)]">Inbox</span>}
           {!archived && (
-            <button type="button" title="Edit" onClick={() => onEdit(node)} className="rounded p-1.5 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"><Pencil className="h-3.5 w-3.5" /></button>
+            <button type="button" title="Edit" onClick={() => onEdit(node)} className="rounded-control p-1.5 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"><Pencil className="h-3.5 w-3.5" /></button>
           )}
           {archived ? (
-            <button type="button" title="Restore" onClick={() => onRestore(node)} className="rounded p-1.5 text-accent-blue hover:bg-accent-blue/10"><RotateCcw className="h-3.5 w-3.5" /></button>
+            <button type="button" title="Restore" onClick={() => onRestore(node)} className="rounded-control p-1.5 text-accent-blue hover:bg-accent-blue/10"><RotateCcw className="h-3.5 w-3.5" /></button>
           ) : (
-            <button type="button" title={isInbox ? 'Select another Inbox before archiving' : 'Archive'} disabled={isInbox} onClick={() => onArchive(node)} className="rounded p-1.5 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] disabled:cursor-not-allowed disabled:opacity-30"><Archive className="h-3.5 w-3.5" /></button>
+            <button type="button" title={isInbox ? 'Select another Inbox before archiving' : 'Archive'} disabled={isInbox} onClick={() => onArchive(node)} className="rounded-control p-1.5 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] disabled:cursor-not-allowed disabled:opacity-30"><Archive className="h-3.5 w-3.5" /></button>
           )}
-          {!isInbox && <button type="button" title="Delete" onClick={() => onDelete(node)} className="rounded p-1.5 text-danger hover:bg-danger/10"><Trash2 className="h-3.5 w-3.5" /></button>}
+          {!isInbox && <button type="button" title="Delete" onClick={() => onDelete(node)} className="rounded-control p-1.5 text-danger hover:bg-danger/10"><Trash2 className="h-3.5 w-3.5" /></button>}
         </div>
         {node.children.length > 0 && <ProjectRows nodes={node.children} archived={archived} inboxId={inboxId} onEdit={onEdit} onArchive={onArchive} onRestore={onRestore} onDelete={onDelete} depth={depth + 1} />}
       </div>
@@ -175,17 +175,17 @@ export function ProjectSettings() {
 
   return (
     <div className="mx-6 max-w-2xl space-y-4 pb-8 pt-4">
-      <div className="rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)]">
+      <div className="rounded-card border border-[var(--border-color)] bg-[var(--bg-primary)]">
         <div className="flex items-center gap-2 border-b border-[var(--border-color)] px-4 py-3">
           <div className="min-w-0 flex-1">
             <h2 className="text-sm font-semibold text-[var(--text-primary)]">Projects</h2>
             <p className="text-xs text-[var(--text-secondary)]">Archive projects without deleting their tasks.</p>
           </div>
-          <button type="button" title="Refresh projects" onClick={() => refetch()} disabled={isFetching} className="rounded p-2 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] disabled:opacity-50"><RefreshCw className={cn('h-4 w-4', isFetching && 'animate-spin')} /></button>
-          <button type="button" onClick={() => setEditing(null)} className="flex items-center gap-1.5 rounded-md bg-accent-fill px-3 py-1.5 text-xs font-medium text-on-accent hover:bg-accent-fill/90"><Plus className="h-3.5 w-3.5" />New project</button>
+          <button type="button" title="Refresh projects" onClick={() => refetch()} disabled={isFetching} className="rounded-control p-2 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] disabled:opacity-50"><RefreshCw className={cn('h-4 w-4', isFetching && 'animate-spin')} /></button>
+          <button type="button" onClick={() => setEditing(null)} className="flex items-center gap-1.5 rounded-control bg-accent-fill px-3 py-1.5 text-xs font-medium text-on-accent hover:bg-accent-fill/90"><Plus className="h-3.5 w-3.5" />New project</button>
         </div>
         <label className="flex cursor-pointer items-center gap-2 border-b border-[var(--border-color)] px-4 py-2.5">
-          <input type="checkbox" checked={showArchived} onChange={(event) => setShowArchived(event.target.checked)} className="h-4 w-4 rounded border-[var(--border-color)] accent-accent-blue" />
+          <input type="checkbox" checked={showArchived} onChange={(event) => setShowArchived(event.target.checked)} className="h-4 w-4 rounded-control border-[var(--border-color)] accent-accent-blue" />
           <span className="text-sm text-[var(--text-primary)]">Show archived projects</span>
           <span className="text-xs text-[var(--text-secondary)]">({data?.archived.length ?? 0})</span>
         </label>

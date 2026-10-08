@@ -50,7 +50,7 @@ export function ConfirmDialog({
       onClick={onCancel}
     >
       <div
-        className="mx-4 w-full max-w-sm rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] p-5 shadow-xl"
+        className="mx-4 w-full max-w-sm rounded-card border border-[var(--border-color)] bg-[var(--bg-primary)] p-5 shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
         <p className="mb-4 whitespace-pre-line text-sm text-[var(--text-primary)]">{message}</p>
@@ -60,7 +60,7 @@ export function ConfirmDialog({
             type="button"
             onClick={onCancel}
             className={cn(
-              'rounded-md border border-[var(--border-color)] px-4 py-1.5 text-sm font-medium',
+              'rounded-control border border-[var(--border-color)] px-4 py-1.5 text-sm font-medium',
               'text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-hover)]'
             )}
           >
@@ -71,7 +71,7 @@ export function ConfirmDialog({
               type="button"
               onClick={onSecondary}
               className={cn(
-                'rounded-md px-4 py-1.5 text-sm font-medium transition-colors',
+                'rounded-control px-4 py-1.5 text-sm font-medium transition-colors',
                 secondaryDestructive
                   ? 'bg-danger text-on-accent dark:text-bg-page hover:bg-danger/90'
                   : 'border border-[var(--border-color)] text-[var(--text-primary)] hover:bg-[var(--bg-hover)]'
@@ -84,7 +84,7 @@ export function ConfirmDialog({
             type="button"
             onClick={onConfirm}
             className={cn(
-              'rounded-md px-4 py-1.5 text-sm font-medium',
+              'rounded-control px-4 py-1.5 text-sm font-medium',
               destructive
                 ? 'bg-danger text-on-accent dark:text-bg-page transition-colors hover:bg-danger/90'
                 : 'bg-accent-fill text-on-accent transition-colors hover:bg-accent-fill/90'
