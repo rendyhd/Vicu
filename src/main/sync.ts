@@ -18,17 +18,20 @@ import { authManager } from './auth/auth-manager'
 import { getAPIToken } from './auth/token-store'
 import { matchesQueuedCreate } from './offline/duplicate-match'
 import { createReplayRunner, replayQueue, type ReplayApi } from './offline/replay'
+import { sendSerially } from './offline/task-writes'
+import { createReplayRetry } from './offline/replay-retry'
 import { KEEP_NESTED_SUBTASKS_PARAM } from './api-v2'
 import { invalidateViewerCaches } from './quick-entry/viewer-caches'
 import { getMainWindow, getQuickEntryWindow, getQuickViewWindow } from './quick-entry-state'
 import type { OfflineReplayEvent } from '../shared/offline-queue-types'
 
+// The replay's writes wait for the app's own task writes and the other way round (see sendSerially).
 const api: ReplayApi = {
-  createTask,
-  updateTask,
-  deleteTask,
-  addLabelToTask,
-  removeLabelFromTask,
+  createTask: (projectId, payload) => sendSerially(() => createTask(projectId, payload)),
+  updateTask: (id, patch) => sendSerially(() => updateTask(id, patch)),
+  deleteTask: (id) => sendSerially(() => deleteTask(id)),
+  addLabelToTask: (taskId, labelId) => sendSerially(() => addLabelToTask(taskId, labelId)),
+  removeLabelFromTask: (taskId, labelId) => sendSerially(() => removeLabelFromTask(taskId, labelId)),
   fetchLabels,
   createLabel,
   uploadTaskAttachment,
@@ -41,6 +44,12 @@ const api: ReplayApi = {
     return { success: true, data: found.data.find((t) => matchesQueuedCreate(t, projectId, fields, since)) as { id: number } | undefined ?? null }
   },
 }
+
+// After a replay stopped on a server or network problem, try again soon instead of waiting for the
+// next trigger (the five minute timer, a window resume or another write that got through).
+const retry = createReplayRetry(() => {
+  void replayPendingActions()
+})
 
 const runReplay = createReplayRunner(async () => {
   const event = await replayQueue(getOfflineQueue(), api)
@@ -90,9 +99,14 @@ export async function replayPendingActions(): Promise<OfflineReplayEvent | null>
   // After a logout or server switch, changes queued for the old account stop here, whatever
   // triggered this call.
   await queue.failForeign()
-  if (queue.counts().pending === 0) return null
+  if (queue.counts().pending === 0) {
+    retry.afterReplay(null)
+    return null
+  }
   try {
-    return await runReplay()
+    const event = await runReplay()
+    retry.afterReplay(event)
+    return event
   } catch (err) {
     // Callers fire this and forget it; a failure here must not become an unhandled rejection.
     console.warn('[sync] replay failed:', err instanceof Error ? err.message : err)

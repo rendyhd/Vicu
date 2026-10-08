@@ -105,6 +105,27 @@ export const taskWrites = {
   },
 }
 
+// Requests that change tasks leave one at a time, whatever task they are for. Vikunja's default
+// database is SQLite, which answers parallel writes with "database is locked" (a 500). A bulk change
+// from the selection bar or the context menu used to send one request per task at once and lost
+// some of them to the offline queue. The renderer still updates its caches optimistically; only the
+// requests wait for each other.
+let sending = false
+const sendWaiting: Array<() => void> = []
+
+/** Run a request after every earlier one has finished (successfully or not). It starts at once when none is running. */
+export async function sendSerially<T>(send: () => Promise<T>): Promise<T> {
+  if (sending) await new Promise<void>((resolve) => sendWaiting.push(resolve))
+  else sending = true
+  try {
+    return await send()
+  } finally {
+    const next = sendWaiting.shift()
+    if (next) next()
+    else sending = false
+  }
+}
+
 // One chain of pending writes per task and queue. Entries remove themselves when the chain drains.
 const chains = new WeakMap<OfflineQueue, Map<number, Promise<void>>>()
 
@@ -160,7 +181,7 @@ export function writeTask(deps: TaskWriteDeps, spec: TaskWriteSpec, options: Pic
 
     let result: ApiResult<unknown>
     try {
-      result = await spec.send()
+      result = await sendSerially(spec.send)
     } catch (err) {
       result = { success: false, error: err instanceof Error ? err.message : String(err) }
     }

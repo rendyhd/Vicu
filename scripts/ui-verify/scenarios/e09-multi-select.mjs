@@ -20,10 +20,9 @@ const pad = (n) => String(n).padStart(2, '0')
 const ymd = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 
 /**
- * Waits for the three tasks to satisfy `ok` on the server. The throwaway server keeps its data in
- * SQLite, which answers parallel writes with 500 "database is locked"; the app then queues that
- * change (sidebar: "N waiting") and sends it again later. So a task that is not there yet is fine
- * while the queue still holds that many changes, and the scenario says how many were waiting.
+ * Waits (up to 6 s) for the three tasks to satisfy `ok` on the server. The app sends a bulk change
+ * one request at a time, because the throwaway server keeps its data in SQLite and answers parallel
+ * writes with 500 "database is locked"; so nothing may be left in the offline queue ("N waiting").
  */
 async function settle(h, page, ids, ok) {
   let satisfied = []
@@ -36,7 +35,7 @@ async function settle(h, page, ids, ok) {
   const missing = satisfied.filter((x) => !x).length
   const text = await page.locator('aside').innerText().catch(() => '')
   const waiting = Number(/(\d+) waiting/.exec(text)?.[1] ?? 0)
-  return { satisfied, missing, waiting }
+  return { missing, waiting }
 }
 
 export default async function run(h) {
@@ -115,11 +114,10 @@ export default async function run(h) {
       return !!d && ymd(d) === ymd(tomorrow) && d.getHours() === 23 && d.getMinutes() === 59
     }
     const due = await settle(h, page, ids, isTomorrow)
-    await h.assert('all three tasks are due tomorrow, date-only (sent, or waiting in the offline queue)', {
-      ok: due.missing <= due.waiting,
+    await h.assert('all three tasks are due tomorrow, date-only on the server, none waiting in the offline queue', {
+      ok: due.missing === 0 && due.waiting === 0,
       detail: `${3 - due.missing} on the server, ${due.waiting} waiting`,
     })
-    if (due.missing > 0) h.emit({ t: 'warn', scenario: meta.id, message: `${due.missing} of 3 schedule changes were queued (test server: database is locked)` })
 
     // ---- C. Move and Tag --------------------------------------------------------------------
     for (const [name, role] of [
@@ -156,11 +154,10 @@ export default async function run(h) {
     await h.wait(1200)
     await h.capture('after-complete')
     const done = await settle(h, page, ids, (t) => t.done === true)
-    await h.assert('all three tasks are done (sent, or waiting in the offline queue)', {
-      ok: done.missing <= done.waiting,
+    await h.assert('all three tasks are done on the server, none waiting in the offline queue', {
+      ok: done.missing === 0 && done.waiting === 0,
       detail: `${3 - done.missing} on the server, ${done.waiting} waiting`,
     })
-    if (done.missing > 0) h.emit({ t: 'warn', scenario: meta.id, message: `${done.missing} of 3 completions were queued (test server: database is locked)` })
     await h.assert('every row shows as done', async () => {
       const states = await page.evaluate((list) => list.map((id) => !!document.querySelector(`[data-task-id="${id}"] [role="checkbox"][aria-checked="true"], [data-task-id="${id}"] .line-through`)), ids)
       return { ok: states.every(Boolean), detail: states.join(',') }

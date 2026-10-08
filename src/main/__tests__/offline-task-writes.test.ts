@@ -7,6 +7,7 @@ import { replayQueue, type ReplayApi } from '../offline/replay'
 import {
   WAITING_TO_SYNC_ERROR,
   parseTaskWriteOptions,
+  sendSerially,
   taskWriteReply,
   taskWrites,
   writeTask,
@@ -225,20 +226,27 @@ describe('writeTask: a change never goes around the queue (F1)', () => {
       expect(order).toEqual(['start EDIT1', 'end EDIT1', 'start EDIT2', 'end EDIT2'])
     })
 
-    it('does not make writes to different tasks wait for each other', async () => {
+    it('sends a change to another task after the one in flight (one request at a time), without queueing it', async () => {
+      const order: string[] = []
       let finish: () => void = () => undefined
       const hung = new Promise<void>((resolve) => { finish = resolve })
       const api = {
         updateTask: async (id: number) => {
+          order.push(`start ${id}`)
           if (id === 5) await hung
+          order.push(`end ${id}`)
           return ok({ id })
         },
       }
       const slow = writeTask(deps(), taskWrites.update(queue, api, 5, { title: 'a' }), { queue: true })
-      const other = await writeTask(deps(), taskWrites.update(queue, api, 6, { title: 'b' }), { queue: true })
-      expect(other).toMatchObject({ kind: 'sent' })
+      const other = writeTask(deps(), taskWrites.update(queue, api, 6, { title: 'b' }), { queue: true })
+      await new Promise((resolve) => setTimeout(resolve, 5))
+      expect(order).toEqual(['start 5'])
       finish()
-      await slow
+      expect(await slow).toMatchObject({ kind: 'sent' })
+      expect(await other).toMatchObject({ kind: 'sent' })
+      expect(order).toEqual(['start 5', 'end 5', 'start 6', 'end 6'])
+      expect(queue.getPending()).toHaveLength(0)
     })
 
     it('keeps working after a write threw', async () => {
@@ -411,5 +419,61 @@ describe('taskWriteReply and parseTaskWriteOptions', () => {
       title: 'Pay rent',
       labelTitle: 'home',
     })
+  })
+})
+
+describe('sendSerially: changes to different tasks leave one at a time', () => {
+  it('never has two requests in flight, and keeps the order they were asked in', async () => {
+    let inFlight = 0
+    let peak = 0
+    const order: number[] = []
+    const send = (id: number) => async (): Promise<ApiResult<unknown>> => {
+      inFlight++
+      peak = Math.max(peak, inFlight)
+      await new Promise((resolve) => setTimeout(resolve, 5 - (id % 3)))
+      order.push(id)
+      inFlight--
+      return ok({ id })
+    }
+    await Promise.all([1, 2, 3, 4, 5, 6].map((id) => sendSerially(send(id))))
+    expect(peak).toBe(1)
+    expect(order).toEqual([1, 2, 3, 4, 5, 6])
+  })
+
+  it('goes on after a request that failed or threw', async () => {
+    const results = await Promise.allSettled([
+      sendSerially(async () => {
+        throw new Error('boom')
+      }),
+      sendSerially(async () => 'second'),
+    ])
+    expect(results[0].status).toBe('rejected')
+    expect(results[1]).toEqual({ status: 'fulfilled', value: 'second' })
+  })
+
+  it('writeTask sends the changes of a bulk edit one after the other', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'vicu-task-writes-serial-'))
+    try {
+      const queue = new OfflineQueue({ queuePath: join(dir, 'q.json'), attachmentsDir: join(dir, 'a') })
+      queue.load()
+      let inFlight = 0
+      let peak = 0
+      const api = {
+        async updateTask(id: number): Promise<ApiResult<unknown>> {
+          inFlight++
+          peak = Math.max(peak, inFlight)
+          await new Promise((resolve) => setTimeout(resolve, 3))
+          inFlight--
+          return ok({ id })
+        },
+      }
+      const outcomes = await Promise.all(
+        [10, 11, 12].map((id) => writeTask({ queue }, taskWrites.update(queue, api, id, { done: true }), { queue: true }))
+      )
+      expect(outcomes.map((o) => o.kind)).toEqual(['sent', 'sent', 'sent'])
+      expect(peak).toBe(1)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
   })
 })
