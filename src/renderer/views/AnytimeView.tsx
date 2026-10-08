@@ -11,6 +11,7 @@ import { ProjectTaskGroup } from '@/components/task-list/ProjectTaskGroup'
 import { openCount, showsGroupHeader } from '@/lib/list-sections'
 import { api } from '@/lib/api'
 import type { Task } from '@/lib/vikunja-types'
+import { ListSkeleton } from '@/components/shared/ListSkeleton'
 
 export function AnytimeView() {
   const params = useFilters({ view: 'anytime' })
@@ -92,11 +93,7 @@ export function AnytimeView() {
   )
 
   if (isLoading || projectsLoading) {
-    return (
-      <div className="flex flex-1 items-center justify-center text-sm text-[var(--text-secondary)]">
-        Loading...
-      </div>
-    )
+    return <ListSkeleton title="Anytime" identity="anytime" />
   }
 
   return (

@@ -14,6 +14,7 @@ import { SectionGroup } from '@/components/task-list/SectionGroup'
 import { AddSectionButton } from '@/components/task-list/AddSectionButton'
 import { ParentDropZone } from '@/components/task-list/ParentDropZone'
 import { RowViewProvider } from '@/components/task-list/RowViewContext'
+import { ListSkeleton } from '@/components/shared/ListSkeleton'
 
 function findSectionForTask(
   sections: SectionData[],
@@ -172,11 +173,7 @@ export function ProjectView() {
   const isLoading = projectsLoading || tasksLoading || sectionsLoading
 
   if (isLoading) {
-    return (
-      <div className="flex flex-1 items-center justify-center text-sm text-[var(--text-secondary)]">
-        Loading...
-      </div>
-    )
+    return <ListSkeleton title={projectName} />
   }
 
   if (projectData && !activeProject) {

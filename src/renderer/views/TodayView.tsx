@@ -18,6 +18,7 @@ import { useAppConfig } from '@/hooks/use-app-config'
 import { RoutineTodaySection } from '@/components/routines/RoutineTodaySection'
 import { useRoutines } from '@/hooks/use-routines'
 import { isFinished } from '@/lib/routines'
+import { ListSkeleton } from '@/components/shared/ListSkeleton'
 
 function groupByProject(tasks: Task[], projectsFlat?: { id: number; title: string; hex_color?: string }[]) {
   const activeIds = new Set(projectsFlat?.map((project) => project.id) ?? [])
@@ -100,11 +101,7 @@ export function TodayView() {
   const dateStr = formatDateDisplay('header.full', now, now, true, dateFormat)
 
   if (isLoading) {
-    return (
-      <div className="flex flex-1 items-center justify-center text-sm text-[var(--text-secondary)]">
-        Loading...
-      </div>
-    )
+    return <ListSkeleton title="Today" identity="today" subtitle={dateStr} />
   }
 
   return (

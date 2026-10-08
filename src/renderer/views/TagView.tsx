@@ -11,6 +11,7 @@ import { withoutNestedSubtasks } from '@/lib/nested-subtasks'
 import { TaskList } from '@/components/task-list/TaskList'
 import { ProjectTaskGroup } from '@/components/task-list/ProjectTaskGroup'
 import { RowViewProvider } from '@/components/task-list/RowViewContext'
+import { ListSkeleton } from '@/components/shared/ListSkeleton'
 
 export function TagView() {
   const { labelId } = useParams({ from: '/tag/$labelId' })
@@ -66,11 +67,7 @@ export function TagView() {
   )
 
   if (isLoading) {
-    return (
-      <div className="flex flex-1 items-center justify-center text-sm text-[var(--text-secondary)]">
-        Loading...
-      </div>
-    )
+    return <ListSkeleton title={labelName} />
   }
 
   return (

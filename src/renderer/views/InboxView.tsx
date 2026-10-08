@@ -6,6 +6,7 @@ import { usePrintable } from '@/stores/print-store'
 import { api } from '@/lib/api'
 import { TaskList } from '@/components/task-list/TaskList'
 import { RowViewProvider } from '@/components/task-list/RowViewContext'
+import { ListSkeleton } from '@/components/shared/ListSkeleton'
 
 export function InboxView() {
   const [inboxProjectId, setInboxProjectId] = useState<number | undefined>()
@@ -35,11 +36,7 @@ export function InboxView() {
   )
 
   if (isLoading || projectsLoading) {
-    return (
-      <div className="flex flex-1 items-center justify-center text-sm text-[var(--text-secondary)]">
-        Loading...
-      </div>
-    )
+    return <ListSkeleton title="Inbox" identity="inbox" />
   }
 
   return (

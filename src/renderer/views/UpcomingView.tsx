@@ -14,6 +14,7 @@ import { useDateFormat } from '@/hooks/use-date-format'
 import { formatDateDisplay, type DateFormat } from '@/lib/date-display'
 import { api } from '@/lib/api'
 import type { Task } from '@/lib/vikunja-types'
+import { ListSkeleton } from '@/components/shared/ListSkeleton'
 
 function formatDateHeader(dateStr: string, fmt: DateFormat): string {
   return formatDateDisplay('header.day', new Date(dateStr), new Date(), true, fmt)
@@ -102,11 +103,7 @@ export function UpcomingView() {
   )
 
   if (isLoading) {
-    return (
-      <div className="flex flex-1 items-center justify-center text-sm text-[var(--text-secondary)]">
-        Loading...
-      </div>
-    )
+    return <ListSkeleton title="Upcoming" identity="upcoming" />
   }
 
   return (
