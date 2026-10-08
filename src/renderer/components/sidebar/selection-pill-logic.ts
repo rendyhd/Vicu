@@ -7,7 +7,11 @@ export interface PillBox {
   height: number
 }
 
-/** How long a pill that went away is remembered as the start of the next one. */
+/**
+ * How long a pill that went away is remembered as the start of the next one. Not a motion: the old
+ * pill unmounts and the new one mounts in the same commit, so anything older than this is a different
+ * navigation and does not slide.
+ */
 export const PILL_REMEMBER_MS = 300
 
 /**

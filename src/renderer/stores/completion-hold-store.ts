@@ -32,7 +32,11 @@ interface CompletionHoldState {
   toast: CompletionToastState | null
 }
 
-/** If no row reports that it finished closing (it is not on screen), the entry goes after this. */
+/**
+ * If no row reports that it finished closing (it is not on screen), the entry goes after this. A plain
+ * limit, not a motion: it only has to stay above the row close (--dur-move, 320 ms) so a visible row
+ * always finishes first; a row that is not on screen has no animation to wait for.
+ */
 export const COLLAPSE_LIMIT_MS = 600
 
 const EMPTY: ReadonlySet<number> = new Set()

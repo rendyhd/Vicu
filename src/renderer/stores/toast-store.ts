@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { COMPLETION_TOAST_MS } from '../../shared/completion-hold'
 
 export type ToastKind = 'error' | 'info' | 'success'
 
@@ -54,6 +55,8 @@ interface ToastState {
 
 /** How long a toast stays when nothing dismisses it. */
 export const TOAST_LIFETIME_MS = 7_000
+/** How long a toast with an Undo stays (the completion toast and the review toast), same engagement rule. */
+export const UNDO_TOAST_MS = COMPLETION_TOAST_MS
 /** An identical toast inside this window is dropped (a burst of failures from one outage). */
 export const TOAST_DEDUPE_MS = 3_000
 const MAX_TOASTS = 4

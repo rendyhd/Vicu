@@ -88,9 +88,13 @@ export function runTaskTransition(ids: readonly number[], update: () => void): v
     nameElements(ids)
   })
   running = transition
-  // A skipped or failed transition rejects these; the state change itself is not affected.
+  // A skipped or failed transition rejects these; a skip leaves the state change as it is.
   transition.ready.catch(() => undefined)
-  transition.updateCallbackDone.catch(() => undefined)
+  // The callback throws when the state change does (flushSync passes the error on); the browser then skips
+  // the transition to its end state and `finished` below clears the names and the attribute. Say so.
+  transition.updateCallbackDone.catch((error: unknown) => {
+    console.error('[task-transition] the state change failed inside the view transition', { ids, error })
+  })
   void transition.finished
     .catch(() => undefined)
     .then(() => {

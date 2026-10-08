@@ -17,6 +17,12 @@ import { playRowClose, playRowOpen } from '@/lib/row-close'
 /** More rows than this and the list is not tracked: measuring them all costs more than it is worth. */
 const MAX_ROWS = 200
 
+/**
+ * How long to wait before measuring again while dnd-kit still has a transform on a row: its own sort
+ * transition (250 ms by default) plus a margin. It is the library's animation, not one of the motion tokens.
+ */
+const SORT_SETTLE_MS = 300
+
 /** Our translate animations, so a later pass can take them off before it measures. */
 const MOVES = new WeakSet<Animation>()
 
@@ -94,7 +100,7 @@ export function useListMotion(rootRef: RefObject<HTMLElement | null>): void {
         previous = null
         if (rows.length > 0 && rows.length <= MAX_ROWS) {
           clearTimeout(recordTimer)
-          recordTimer = setTimeout(pass, 300)
+          recordTimer = setTimeout(pass, SORT_SETTLE_MS)
         }
         return
       }

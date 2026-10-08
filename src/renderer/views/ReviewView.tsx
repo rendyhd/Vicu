@@ -11,7 +11,7 @@ import {
 import { useAppConfig } from '@/hooks/use-app-config'
 import { useSelectionStore } from '@/stores/selection-store'
 import { useReviewNoticeStore } from '@/stores/review-notice-store'
-import { toast, useToastStore } from '@/stores/toast-store'
+import { toast, UNDO_TOAST_MS, useToastStore } from '@/stores/toast-store'
 import { ProjectBranch } from '@/components/review/ProjectBranch'
 import { SmartListIcon } from '@/components/shared/SmartListIcon'
 import { PageHeader } from '@/components/shared/PageHeader'
@@ -70,11 +70,11 @@ export function ReviewView() {
     })
   }
 
-  // "Marked X reviewed, Undo" is an app toast (6 s, paused while the pointer or focus is on it).
+  // "Marked X reviewed, Undo" is an app toast (UNDO_TOAST_MS, paused while the pointer or focus is on it).
   const showReviewedToast = (prevProject: Project) => {
     toast.success(`Marked ${prevProject.title} reviewed`, {
       key: REVIEW_TOAST_KEY,
-      durationMs: 6000,
+      durationMs: UNDO_TOAST_MS,
       action: { label: 'Undo', onAction: () => handleUndo(prevProject) },
     })
   }

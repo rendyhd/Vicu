@@ -16,8 +16,31 @@ function token(name: string): string {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim()
 }
 
+/**
+ * A closing row is not there any more: no click, focus or screen reader reaches it for the length of the
+ * close. Returns the undo for a close that is cancelled (an Undo while it closes); what was set before
+ * (the list motion marks its removed rows the same way) is left as it was.
+ */
+function makeInert(el: HTMLElement): () => void {
+  const hadInert = el.hasAttribute('inert')
+  const pointerEvents = el.style.pointerEvents
+  el.setAttribute('inert', '')
+  el.style.pointerEvents = 'none'
+  return () => {
+    if (!hadInert) el.removeAttribute('inert')
+    el.style.pointerEvents = pointerEvents
+  }
+}
+
 /** Plays the close on the row element and returns the animation; the caller takes the row out when it finishes. */
 export function playRowClose(el: HTMLElement, reduced: boolean): Animation {
+  const animation = closeAnimation(el, reduced)
+  const restore = makeInert(el)
+  animation.addEventListener('cancel', restore, { once: true })
+  return animation
+}
+
+function closeAnimation(el: HTMLElement, reduced: boolean): Animation {
   if (reduced) {
     return el.animate([{ opacity: 1 }, { opacity: 0 }], {
       duration: parseCssMs(token('--dur-fade-fast'), 150),

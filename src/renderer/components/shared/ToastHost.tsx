@@ -10,6 +10,7 @@ import type { Toast } from '@/stores/toast-store'
 
 /** A toast that left the store stays here while it fades out; the animation end (or this limit) drops it. */
 type Shown = Toast & { leaving: boolean }
+/** A plain limit above the toast fade-out, for a toast whose animation never ends (reduced motion, hidden window). */
 const LEAVE_LIMIT_MS = 600
 
 /** Transient messages in the bottom-right corner: failed changes, "saved offline" notes, "Completed, Undo". */
@@ -32,7 +33,9 @@ export function ToastHost() {
 
   const drop = (id: number) => setShown((previous) => previous.filter((t) => t.id !== id))
 
-  // The live regions are always mounted so screen readers pick up the first message added to them.
+  // The container is the one live region of the toasts, always mounted so the first message is picked up; a
+  // toast inside it has no live role of its own (status or alert nested in it would be read twice, an error
+  // included: it is polite like the rest, and its red mark and the name of its kind say what it is).
   return (
     <>
       <Announcer />
@@ -92,7 +95,6 @@ function ToastItem({ toast, onGone }: { toast: Shown; onGone: () => void }) {
   const isError = toast.kind === 'error'
   return (
     <div
-      role={isError ? 'alert' : 'status'}
       data-toast-kind={toast.kind}
       onAnimationEnd={() => {
         if (toast.leaving) onGone()

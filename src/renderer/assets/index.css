@@ -730,6 +730,24 @@ html:active-view-transition-type(page) main {
     outline-offset: -1px;
   }
 
+  /* The stuck header's hairline is a background and vanishes: draw it as a border. */
+  .vicu-hairline {
+    background: none;
+    border-bottom: 1px solid CanvasText;
+  }
+
+  /* A dragged row lifts on a shadow alone: give the overlay an edge while it is dragged. */
+  .vicu-lift {
+    outline: 1px solid CanvasText;
+    outline-offset: -1px;
+  }
+
+  /* The Next up offer is a borderless button with no name attribute, so the rule below misses it. */
+  [data-next-upcoming]:not(:focus-visible) {
+    outline: 1px solid ButtonBorder;
+    outline-offset: -1px;
+  }
+
   /* Borderless buttons are text on a hover tint: outline them so a control looks like one. Icon-only
      buttons (they have a name), the toolbar and toast buttons, and the quiet buttons (vicu-edge). */
   :is(button[aria-label]:not([role], [data-date], [class*='border']), .vicu-edge, [role='toolbar'] button, .vicu-toast-in button, [role='group'][aria-label='Quick choices'] button):not(:focus-visible) {
