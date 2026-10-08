@@ -83,19 +83,26 @@ export function createProjectCounts(deps: ProjectCountDeps): ProjectCounts {
       if (cached && deps.now() - cached.at < ttl) return Promise.resolve({ success: true, data: cached.value })
       const running = inFlight.get(key)
       if (running) return running
-      const started = ask(server, key, projectId, done).finally(() => { inFlight.delete(key) })
+      const started: Promise<ApiResult<number>> = ask(server, key, projectId, done).finally(() => {
+        // An invalidation may have replaced this entry already: only remove our own.
+        if (inFlight.get(key) === started) inFlight.delete(key)
+      })
       inFlight.set(key, started)
       return started
     },
     invalidate(projectId) {
       generation++
+      // A request that is still running was asked for before the change: a count requested now must
+      // not join it and get the older number, so it is no longer shared (its own answer is not cached).
       if (projectId === undefined) {
         cache.clear()
+        inFlight.clear()
         carriers = null
         return
       }
       const needle = `\n${projectId}\n`
       for (const key of [...cache.keys()]) if (key.includes(needle)) cache.delete(key)
+      for (const key of [...inFlight.keys()]) if (key.includes(needle)) inFlight.delete(key)
     },
   }
 }

@@ -12,6 +12,8 @@ interface ConfirmDialogProps {
   secondaryLabel?: string
   onSecondary?: () => void
   secondaryDestructive?: boolean
+  /** Where focus goes on close when the dialog was opened from a menu item (see Dialog). */
+  returnFocusTo?: HTMLElement | null
 }
 
 export function ConfirmDialog({
@@ -24,6 +26,7 @@ export function ConfirmDialog({
   secondaryLabel,
   onSecondary,
   secondaryDestructive = false,
+  returnFocusTo,
 }: ConfirmDialogProps) {
   const messageId = useId()
 
@@ -34,6 +37,7 @@ export function ConfirmDialog({
       role="alertdialog"
       label={`Confirm ${confirmLabel.toLowerCase()}`}
       describedBy={messageId}
+      returnFocusTo={returnFocusTo}
       className="w-[calc(100%-2rem)] max-w-sm"
     >
       <div className="p-5">

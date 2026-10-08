@@ -17,6 +17,11 @@ describe('collectCachedTasks', () => {
     expect(collectCachedTasks([[hidden, task(1, 'Real')]]).map((t) => t.id)).toEqual([1])
   })
 
+  it('leaves out pending creates (negative temp ids) and tasks with a delete waiting', () => {
+    const found = collectCachedTasks([[task(-3, 'Offline draft'), task(4, 'Deleted offline'), task(5, 'Kept')]], new Set([4]))
+    expect(found.map((t) => t.id)).toEqual([5])
+  })
+
   it('ignores things that only look like tasks', () => {
     expect(collectCachedTasks([[{ id: 'x', title: 'no' }, { id: 1 }], { id: 1, title: 'a', project_id: 1 }])).toEqual([])
   })
@@ -45,5 +50,19 @@ describe('quickFindTasks', () => {
   it('stops at the limit', () => {
     const many = Array.from({ length: 20 }, (_, i) => task(i + 1, `Plumber ${i}`))
     expect(quickFindTasks('plumber', many, [], 5)).toHaveLength(5)
+  })
+
+  it('drops cached-only tasks once the server has answered', () => {
+    const deletedElsewhere = task(7, 'Plumber visit')
+    const onServer = task(1, 'Call the plumber')
+    expect(quickFindTasks('plumb', [deletedElsewhere, onServer], [], 8).map((t) => t.id).sort()).toEqual([1, 7])
+    const answered = quickFindTasks('plumb', [deletedElsewhere, onServer], [onServer], 8, { serverAnswered: true })
+    expect(answered.map((t) => t.id)).toEqual([1])
+    expect(quickFindTasks('plumb', [deletedElsewhere], [], 8, { serverAnswered: true })).toEqual([])
+  })
+
+  it('never lists temp ids or tasks excluded because their delete waits to sync, even from the server', () => {
+    const result = quickFindTasks('plumb', [task(-2, 'Plumber draft')], [plumber, task(3, 'Plumbing quote')], 8, { exclude: new Set([3]) })
+    expect(result.map((t) => t.id)).toEqual([1])
   })
 })

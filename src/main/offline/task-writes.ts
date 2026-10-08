@@ -1,4 +1,4 @@
-import { isQueueableFailure } from '../../shared/error-classify'
+import { isQueueableFailure, isRetriableError } from '../../shared/error-classify'
 import type { QueuedWriteReply, TaskWriteOptions } from '../../shared/offline-queue-types'
 import type { ApiError, ApiResult, ApiSuccess } from '../api-result'
 import type { OfflineQueue } from './queue'
@@ -110,19 +110,57 @@ export const taskWrites = {
 // from the selection bar or the context menu used to send one request per task at once and lost
 // some of them to the offline queue. The renderer still updates its caches optimistically; only the
 // requests wait for each other.
+//
+// When the server cannot be reached the request in front fails only after the network timeout
+// (about 10 s). The requests behind it would each wait their own timeout in turn, so a bulk change
+// of 30 tasks would hang for minutes before the last one reached the offline queue. A network
+// failure therefore fails every waiting request at once, without sending it, with an error the
+// callers classify as queueable. A request that arrives later tries the network again.
 let sending = false
-const sendWaiting: Array<() => void> = []
+const sendWaiting: Array<(skipped: ApiError | null) => void> = []
 
-/** Run a request after every earlier one has finished (successfully or not). It starts at once when none is running. */
+/**
+ * What a request that was never sent answers after an earlier one failed on the network. It reads as
+ * a connection error: nothing reached the server, so even a create may be queued safely.
+ */
+export const NOT_SENT_AFTER_NETWORK_FAILURE: ApiError = {
+  success: false,
+  error: 'Network error: the server could not be reached, so this change was not sent (ENETUNREACH)',
+}
+
+/** Whether a result is a failure to reach the server (no HTTP status, a retriable error text). */
+function isNetworkFailure(result: unknown): boolean {
+  if (!result || typeof result !== 'object') return false
+  const r = result as { success?: unknown; error?: unknown; statusCode?: unknown }
+  return r.success === false && typeof r.error === 'string' && r.statusCode === undefined && isRetriableError(r.error)
+}
+
+/**
+ * Run a request after every earlier one has finished (successfully or not). It starts at once when
+ * none is running. If the request in front fails on the network, this one is not sent and answers
+ * `NOT_SENT_AFTER_NETWORK_FAILURE` (every caller passes API results, which have that shape).
+ */
 export async function sendSerially<T>(send: () => Promise<T>): Promise<T> {
-  if (sending) await new Promise<void>((resolve) => sendWaiting.push(resolve))
-  else sending = true
+  if (sending) {
+    const skipped = await new Promise<ApiError | null>((resolve) => sendWaiting.push(resolve))
+    if (skipped) return skipped as unknown as T
+  } else {
+    sending = true
+  }
+  let unreachable = false
   try {
-    return await send()
+    const result = await send()
+    unreachable = isNetworkFailure(result)
+    return result
   } finally {
-    const next = sendWaiting.shift()
-    if (next) next()
-    else sending = false
+    if (unreachable && sendWaiting.length > 0) {
+      for (const waiting of sendWaiting.splice(0)) waiting(NOT_SENT_AFTER_NETWORK_FAILURE)
+      sending = false
+    } else {
+      const next = sendWaiting.shift()
+      if (next) next(null)
+      else sending = false
+    }
   }
 }
 

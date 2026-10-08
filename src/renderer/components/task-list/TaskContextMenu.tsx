@@ -59,7 +59,12 @@ export function TaskContextMenu({ fallbackTask, x, y, onClose }: TaskContextMenu
     return resolved.length > 0 ? resolved : [fallbackTask]
   }, [qc, selectedTaskIds, fallbackTask])
 
-  const actions = useTaskActions(tasks)
+  // Where the menu was opened from (the row): a confirmation a menu entry opens gives focus back
+  // there, since the entry itself is gone by then.
+  const [opener] = useState<Element | null>(() => document.activeElement)
+  const actions = useTaskActions(tasks, {
+    returnFocusTo: opener instanceof HTMLElement && opener !== document.body ? opener : null,
+  })
 
   const [sub, setSub] = useState<SubMenu>(null)
 

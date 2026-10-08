@@ -22,6 +22,7 @@ import { sendSerially } from './offline/task-writes'
 import { createReplayRetry } from './offline/replay-retry'
 import { KEEP_NESTED_SUBTASKS_PARAM } from './api-v2'
 import { invalidateViewerCaches } from './quick-entry/viewer-caches'
+import { invalidateProjectCounts } from './project-counts-service'
 import { getMainWindow, getQuickEntryWindow, getQuickViewWindow } from './quick-entry-state'
 import type { OfflineReplayEvent } from '../shared/offline-queue-types'
 
@@ -114,11 +115,15 @@ export async function replayPendingActions(): Promise<OfflineReplayEvent | null>
   }
 }
 
-function announce(event: OfflineReplayEvent): void {
+export function announce(event: OfflineReplayEvent): void {
   sendToAppWindows(OFFLINE_EVENTS.replayed, event)
   if (event.stopped === 'auth') sendToAppWindows(OFFLINE_EVENTS.authProblem, { error: event.error ?? 'Sign in again to sync your changes' })
 
   if (event.applied === 0 && event.failed === 0) return
+  // Applied changes created, completed, moved or deleted tasks: the sidebar rings must count again
+  // (the main window refetches its counts on 'tasks-changed' below, and would otherwise be served
+  // the numbers cached before the offline period).
+  if (event.applied > 0) invalidateProjectCounts()
   try {
     const win = getMainWindow()
     if (win && !win.isDestroyed() && event.applied > 0) win.webContents.send('tasks-changed')

@@ -24,7 +24,8 @@ import { taskDescendants, unfinishedDescendants } from '@/lib/task-hierarchy'
  * Bulk operations loop per task, letting each mutation reconcile its caches.
  * The `record*` helpers persist the most recent project/label for one-click reuse.
  */
-export function useTaskActions(tasks: Task[]) {
+export function useTaskActions(tasks: Task[], options: { returnFocusTo?: HTMLElement | null } = {}) {
+  const { returnFocusTo } = options
   const qc = useQueryClient()
   const updateTask = useUpdateTask()
   const addLabel = useAddLabel()
@@ -95,7 +96,7 @@ export function useTaskActions(tasks: Task[]) {
     if (descendantCount > 0) {
       const ok = await confirmDelete(
         `Complete ${targets.length} ${targets.length === 1 ? 'task' : 'tasks'} and ${descendantCount} unfinished ${descendantCount === 1 ? 'subtask' : 'subtasks'}?`,
-        { force: true, confirmLabel: 'Complete all', destructive: false },
+        { force: true, confirmLabel: 'Complete all', destructive: false, returnFocusTo },
       )
       if (!ok) return
     }
@@ -107,7 +108,7 @@ export function useTaskActions(tasks: Task[]) {
       }
     })
     clearSelection()
-  }, [tasks, completeTask, clearSelection])
+  }, [tasks, completeTask, clearSelection, returnFocusTo])
 
   const deleteAll = useCallback(async () => {
     if (tasks.length === 0) return
@@ -118,7 +119,7 @@ export function useTaskActions(tasks: Task[]) {
       const count = taskDescendants(structuralTask).length
       const deleteChildren = await confirmDelete(
         `Delete this task and ${count} ${count === 1 ? 'subtask' : 'subtasks'}?`,
-        { force: true, confirmLabel: 'Delete all', destructive: true },
+        { force: true, confirmLabel: 'Delete all', destructive: true, returnFocusTo },
       )
       if (deleteChildren) {
         deleteTask.mutate({ task: structuralTask, deleteSubtasks: true })
@@ -127,7 +128,7 @@ export function useTaskActions(tasks: Task[]) {
       }
       const keepChildren = await confirmDelete(
         `Keep ${count === 1 ? 'the subtask' : 'the subtasks'} as standalone tasks and delete only the parent?`,
-        { force: true, confirmLabel: 'Keep subtasks', destructive: false },
+        { force: true, confirmLabel: 'Keep subtasks', destructive: false, returnFocusTo },
       )
       if (keepChildren) {
         deleteTask.mutate({ task: structuralTask, deleteSubtasks: false })
@@ -138,7 +139,7 @@ export function useTaskActions(tasks: Task[]) {
     if (tasks.some((task) => taskDescendants(task).length > 0)) {
       await confirmDelete(
         'This selection includes a parent task. Open that parent to choose whether its subtasks should be deleted or kept.',
-        { force: true, confirmLabel: 'Close', destructive: false },
+        { force: true, confirmLabel: 'Close', destructive: false, returnFocusTo },
       )
       return
     }
@@ -146,11 +147,11 @@ export function useTaskActions(tasks: Task[]) {
       tasks.length > 1
         ? `Delete ${tasks.length} tasks? This cannot be undone.`
         : 'Delete this task? This cannot be undone.'
-    const ok = await confirmDelete(message)
+    const ok = await confirmDelete(message, { returnFocusTo })
     if (!ok) return
     tasks.forEach((t) => deleteTask.mutate({ task: t }))
     clearSelection()
-  }, [tasks, deleteTask, clearSelection])
+  }, [tasks, deleteTask, clearSelection, returnFocusTo])
 
   const copyAll = useCallback(
     () => copySelectedTitles(qc, new Set(tasks.map((t) => t.id))),

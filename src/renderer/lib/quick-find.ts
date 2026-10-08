@@ -20,9 +20,11 @@ function isTask(value: unknown): value is Task {
 
 /**
  * Every task found in the data of cached queries, whatever the shape (a list, pages of lists, a
- * list in a field). Each task once, the first copy seen; hidden metadata tasks left out.
+ * list in a field). Each task once, the first copy seen; hidden metadata tasks left out, and so are
+ * tasks that only exist as a pending create (negative temp ids: opening one would ask the server
+ * for a task it does not have yet) and the ids in `exclude` (tasks with a delete waiting to sync).
  */
-export function collectCachedTasks(cachedData: readonly unknown[]): Task[] {
+export function collectCachedTasks(cachedData: readonly unknown[], exclude: ReadonlySet<number> = new Set()): Task[] {
   const seen = new Set<number>()
   const found: Task[] = []
   const visit = (value: unknown, depth: number) => {
@@ -30,7 +32,7 @@ export function collectCachedTasks(cachedData: readonly unknown[]): Task[] {
     if (Array.isArray(value)) {
       for (const entry of value) {
         if (isTask(entry)) {
-          if (!seen.has(entry.id) && !hasVicuMetadataMarker(entry.description)) {
+          if (entry.id > 0 && !exclude.has(entry.id) && !seen.has(entry.id) && !hasVicuMetadataMarker(entry.description)) {
             seen.add(entry.id)
             found.push(entry)
           }
@@ -47,14 +49,29 @@ export function collectCachedTasks(cachedData: readonly unknown[]): Task[] {
   return found
 }
 
+export interface QuickFindOptions {
+  /** The server has answered for this very query: its list is complete, so cached-only tasks (deleted elsewhere, stale) are dropped. */
+  serverAnswered?: boolean
+  /** Tasks never shown (a delete is waiting to sync). */
+  exclude?: ReadonlySet<number>
+}
+
 /**
- * The tasks for a query: the cached ones and the server's, each task once (the server's copy wins
- * as the fresher), ranked together. An empty query lists nothing.
+ * The tasks for a query: before the server has answered, the cached ones; after, the server's list
+ * (it is the whole answer, ranked the same way), each task once. An empty query lists nothing.
  */
-export function quickFindTasks(query: string, cached: readonly Task[], server: readonly Task[], limit = QUICK_FIND_LIMIT): Task[] {
+export function quickFindTasks(
+  query: string,
+  cached: readonly Task[],
+  server: readonly Task[],
+  limit = QUICK_FIND_LIMIT,
+  options: QuickFindOptions = {},
+): Task[] {
   if (query.trim() === '') return []
+  const exclude = options.exclude
   const byId = new Map<number, Task>()
-  for (const task of cached) byId.set(task.id, task)
+  if (!options.serverAnswered) for (const task of cached) byId.set(task.id, task)
   for (const task of server) byId.set(task.id, task)
-  return rankTasks([...byId.values()], query).slice(0, limit)
+  const candidates = [...byId.values()].filter((task) => task.id > 0 && !exclude?.has(task.id))
+  return rankTasks(candidates, query).slice(0, limit)
 }

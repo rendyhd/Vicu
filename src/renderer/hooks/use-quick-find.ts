@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useSearchTasks } from '@/hooks/use-search-tasks'
+import { useOfflineStore } from '@/stores/offline-store'
 import { QUICK_FIND_DEBOUNCE_MS, QUICK_FIND_LIMIT, collectCachedTasks, quickFindTasks } from '@/lib/quick-find'
 import type { Task } from '@/lib/vikunja-types'
 
@@ -24,14 +25,22 @@ export function useQuickFindTasks(query: string, limit = QUICK_FIND_LIMIT): { ta
   const qc = useQueryClient()
   const settled = useDebounced(trimmed, QUICK_FIND_DEBOUNCE_MS)
   const server = useSearchTasks(settled)
+  const pendingItems = useOfflineStore((s) => s.snapshot?.pending)
+  // Tasks whose delete is still waiting to sync: the server still has them, but the user removed them.
+  const deleting = useMemo(() => {
+    const ids = new Set<number>()
+    for (const item of pendingItems ?? []) if (item.type === 'delete' && item.taskId !== undefined) ids.add(item.taskId)
+    return ids
+  }, [pendingItems])
 
   // The cache is read whenever the query changes or the server's answer lands (which also fills it).
   const serverTasks = server.data
   const tasks = useMemo(() => {
     if (trimmed === '') return []
-    const cached = collectCachedTasks(qc.getQueryCache().findAll({ queryKey: ['tasks'] }).map((entry) => entry.state.data))
-    return quickFindTasks(trimmed, cached, settled === trimmed && serverTasks ? serverTasks : [], limit)
-  }, [qc, trimmed, settled, serverTasks, limit])
+    const cached = collectCachedTasks(qc.getQueryCache().findAll({ queryKey: ['tasks'] }).map((entry) => entry.state.data), deleting)
+    const serverAnswered = settled === trimmed && serverTasks !== undefined
+    return quickFindTasks(trimmed, cached, serverAnswered ? serverTasks : [], limit, { serverAnswered, exclude: deleting })
+  }, [qc, trimmed, settled, serverTasks, limit, deleting])
 
   return { tasks, pending: trimmed !== '' && (settled !== trimmed || server.isFetching) }
 }

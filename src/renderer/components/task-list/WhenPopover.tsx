@@ -19,6 +19,11 @@ interface WhenPopoverProps {
   repeatAfter?: number
   repeatMode?: number
   onRecurrenceChange?: (repeatAfter: number, repeatMode: number) => void
+  /**
+   * Show "Clear date" even though no date is picked here. A bulk edit opens with no date (the tasks
+   * have different ones) and must still be able to clear them all.
+   */
+  allowClear?: boolean
 }
 
 /**
@@ -35,6 +40,7 @@ export function WhenPopover({
   repeatAfter = 0,
   repeatMode = 0,
   onRecurrenceChange,
+  allowClear = false,
 }: WhenPopoverProps) {
   const repeatButtonRef = useRef<HTMLButtonElement>(null)
   const [value, setValue] = useState<WhenValue>(() => whenValueOfDue(currentDate))
@@ -59,7 +65,7 @@ export function WhenPopover({
     <Popover anchorRef={anchorRef} onClose={onClose} placement={placement} label="Schedule" className="w-72 p-3">
       <WhenPanel value={value} onChange={change} />
 
-      {(hasDate || onRecurrenceChange) && (
+      {(hasDate || allowClear || onRecurrenceChange) && (
         <div className="relative mt-2 flex items-center justify-between gap-1 border-t border-[var(--border-color)] pt-2">
           {onRecurrenceChange ? (
             <Button
@@ -79,7 +85,7 @@ export function WhenPopover({
           ) : (
             <span />
           )}
-          {hasDate && (
+          {(hasDate || allowClear) && (
             <Button variant="quiet" danger onClick={clear} className="px-2">
               <X className="h-3.5 w-3.5" />
               Clear date

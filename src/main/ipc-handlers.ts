@@ -109,7 +109,7 @@ import {
   quickViewReopen,
   type QuickActionDeps,
 } from './offline/quick-actions'
-import { parseTaskWriteOptions, taskWriteReply, taskWrites, writeTask } from './offline/task-writes'
+import { parseTaskWriteOptions, sendSerially, taskWriteReply, taskWrites, writeTask } from './offline/task-writes'
 import {
   setCachedTasks,
   getCachedTasks,
@@ -216,7 +216,7 @@ export function registerIpcHandlers(): void {
   })
 
   handleTrusted('create-task', async (_event, projectId: number, task: Record<string, unknown>) => {
-    const result = await createTask(projectId, task)
+    const result = await sendSerially(() => createTask(projectId, task))
     if (result.success) {
       notifyViewerSync()
       rememberCreatedTask(result.data)
@@ -268,11 +268,11 @@ export function registerIpcHandlers(): void {
   // block completing, label filters, hidden projects), so each successful change refreshes it the
   // same way a task change does (D-IPC-4).
   handleTrusted('create-task-relation', async (_event, taskId: number, otherTaskId: number, relationKind: string) => {
-    return refreshViewerOnSuccess(await createTaskRelation(taskId, otherTaskId, relationKind))
+    return refreshViewerOnSuccess(await sendSerially(() => createTaskRelation(taskId, otherTaskId, relationKind)))
   })
 
   handleTrusted('delete-task-relation', async (_event, taskId: number, relationKind: string, otherTaskId: number) => {
-    return refreshViewerOnSuccess(await deleteTaskRelation(taskId, relationKind, otherTaskId))
+    return refreshViewerOnSuccess(await sendSerially(() => deleteTaskRelation(taskId, relationKind, otherTaskId)))
   })
 
   // Sidebar progress rings: how many tasks of a project are (not) done, from one one-task page
@@ -357,7 +357,7 @@ export function registerIpcHandlers(): void {
   })
 
   handleTrusted('update-task-position', (_event, taskId: number, viewId: number, position: number) => {
-    return updateTaskPosition(taskId, viewId, position)
+    return sendSerially(() => updateTaskPosition(taskId, viewId, position))
   })
 
   // Config

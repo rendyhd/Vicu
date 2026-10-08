@@ -5,6 +5,7 @@ import { useSelectedTasks } from '@/hooks/use-selected-tasks'
 import { useTaskActions } from '@/hooks/use-task-actions'
 import { NULL_DATE } from '@/lib/constants'
 import { cn } from '@/lib/cn'
+import { nextRowAfterRemoval, visibleRowIds } from '@/lib/row-focus'
 import { WhenPopover } from './WhenPopover'
 import { ProjectPickerPopover } from './ProjectPickerPopover'
 import { LabelPickerPopover } from './LabelPickerPopover'
@@ -29,8 +30,30 @@ export function SelectionBar() {
   const projectRef = useRef<HTMLButtonElement>(null)
   const labelRef = useRef<HTMLButtonElement>(null)
 
+  const setFocusedTask = useSelectionStore((s) => s.setFocusedTask)
+
   const count = selectedTaskIds.size
   if (count < 2) return null
+
+  // The bar and its Delete button vanish with the selection, which would leave focus on the page
+  // body. Work out where focus goes before the rows go, and put it there once the delete went through
+  // (a cancelled confirmation leaves the selection, and focus stays on the button).
+  const deleteSelected = async () => {
+    const removed = new Set(selectedTaskIds)
+    const next = nextRowAfterRemoval(visibleRowIds(), removed)
+    const listEl = document.querySelector('[data-task-id]')?.closest<HTMLElement>('[role="list"]') ?? null
+    await actions.deleteAll()
+    if (useSelectionStore.getState().selectedTaskIds.size >= 2) return
+    if (next !== null) {
+      setFocusedTask(next)
+      requestAnimationFrame(() => {
+        document.querySelector<HTMLElement>(`[data-task-id="${next}"]`)?.focus({ preventScroll: true })
+      })
+    } else if (listEl) {
+      listEl.setAttribute('tabindex', '-1')
+      listEl.focus({ preventScroll: true })
+    }
+  }
 
   const toggle = (next: Exclude<Picker, null>) => setPicker((p) => (p === next ? null : next))
   const allSameProject = tasks.length > 0 && tasks.every((t) => t.project_id === tasks[0].project_id)
@@ -48,7 +71,7 @@ export function SelectionBar() {
           Schedule
         </button>
         {picker === 'date' && (
-          <WhenPopover anchorRef={dateRef} currentDate={NULL_DATE} onDateChange={actions.setDueDateIso} onClose={() => setPicker(null)} />
+          <WhenPopover anchorRef={dateRef} currentDate={NULL_DATE} allowClear onDateChange={actions.setDueDateIso} onClose={() => setPicker(null)} />
         )}
 
         <button type="button" className={BUTTON} disabled={!anyNotDone} onClick={() => void actions.completeAll()}>
@@ -80,7 +103,7 @@ export function SelectionBar() {
           <LabelPickerPopover anchorRef={labelRef} tasks={tasks} onApplied={(label) => void actions.recordLastLabel(label)} onClose={() => setPicker(null)} />
         )}
 
-        <button type="button" className={cn(BUTTON, 'text-danger hover:bg-danger/10')} onClick={() => void actions.deleteAll()}>
+        <button type="button" className={cn(BUTTON, 'text-danger hover:bg-danger/10')} onClick={() => void deleteSelected()}>
           <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
           Delete
         </button>

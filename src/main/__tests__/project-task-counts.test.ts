@@ -75,6 +75,36 @@ describe('project task counts', () => {
     expect(fetchTotal).toHaveBeenCalledTimes(2)
   })
 
+  it('does not let a count asked after an invalidation join a request that started before it', async () => {
+    const { counts, fetchTotal } = setup()
+    let releaseOld: () => void = () => {}
+    fetchTotal.mockImplementationOnce(() => new Promise((resolve) => { releaseOld = () => resolve({ success: true, data: 5 }) }))
+    fetchTotal.mockImplementationOnce(async () => ({ success: true, data: 4 }))
+    const before = counts.count(1, false)
+    counts.invalidate(1)
+    // The task was completed: the new question must get the new number, not the old request's answer.
+    expect(await counts.count(1, false)).toEqual({ success: true, data: 4 })
+    releaseOld()
+    expect(await before).toEqual({ success: true, data: 5 })
+    expect(fetchTotal).toHaveBeenCalledTimes(2)
+    // The old request finishing later did not take the new request's place or poison the cache.
+    expect(await counts.count(1, false)).toEqual({ success: true, data: 4 })
+    expect(fetchTotal).toHaveBeenCalledTimes(2)
+  })
+
+  it('also separates requests after invalidating everything', async () => {
+    const { counts, fetchTotal } = setup()
+    let releaseOld: () => void = () => {}
+    fetchTotal.mockImplementationOnce(() => new Promise((resolve) => { releaseOld = () => resolve({ success: true, data: 5 }) }))
+    fetchTotal.mockImplementationOnce(async () => ({ success: true, data: 4 }))
+    const before = counts.count(2, false)
+    counts.invalidate()
+    expect(await counts.count(2, false)).toEqual({ success: true, data: 4 })
+    releaseOld()
+    await before
+    expect(await counts.count(2, false)).toEqual({ success: true, data: 4 })
+  })
+
   it('does not cache failures, and shows a count with unknown carriers without caching it', async () => {
     const { counts, fetchTotal } = setup({ totals: {} })
     expect((await counts.count(1, true)).success).toBe(false)

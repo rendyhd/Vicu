@@ -7,12 +7,14 @@ import { replayQueue, type ReplayApi } from '../offline/replay'
 import {
   WAITING_TO_SYNC_ERROR,
   parseTaskWriteOptions,
+  NOT_SENT_AFTER_NETWORK_FAILURE,
   sendSerially,
   taskWriteReply,
   taskWrites,
   writeTask,
 } from '../offline/task-writes'
 import type { ApiResult } from '../api-result'
+import { isQueueableFailure } from '../../shared/error-classify'
 
 const ok = <T>(data: T): ApiResult<T> => ({ success: true, data })
 const err = (error: string, statusCode?: number): ApiResult<never> => ({ success: false, error, statusCode })
@@ -449,6 +451,89 @@ describe('sendSerially: changes to different tasks leave one at a time', () => {
     ])
     expect(results[0].status).toBe('rejected')
     expect(results[1]).toEqual({ status: 'fulfilled', value: 'second' })
+  })
+
+  describe('when the server cannot be reached', () => {
+    afterEach(() => {
+      vi.useRealTimers()
+    })
+
+    const timeout = (ms: number, error: string, calls: number[], id: number) => async (): Promise<ApiResult<unknown>> => {
+      calls.push(id)
+      await new Promise((resolve) => setTimeout(resolve, ms))
+      return err(error)
+    }
+
+    it('fails the waiting requests at once instead of letting each wait its own timeout', async () => {
+      vi.useFakeTimers()
+      const calls: number[] = []
+      const results = [1, 2, 3, 4].map((id) => sendSerially(timeout(10_000, 'Request timed out', calls, id)))
+      const settled = Promise.all(results)
+      await vi.advanceTimersByTimeAsync(10_000)
+      const all = await settled
+      // Only the first went to the network; the others failed in the same instant, not 10 s apart.
+      expect(calls).toEqual([1])
+      expect(all[0]).toEqual(err('Request timed out'))
+      for (const result of all.slice(1)) expect(result).toEqual(NOT_SENT_AFTER_NETWORK_FAILURE)
+      // The skipped answer is a failure the gate queues (and a create may be queued too: nothing was sent).
+      expect(isQueueableFailure(NOT_SENT_AFTER_NETWORK_FAILURE as { error: string }, 'change')).toBe(true)
+      expect(isQueueableFailure(NOT_SENT_AFTER_NETWORK_FAILURE as { error: string }, 'create')).toBe(true)
+    })
+
+    it('tries the network again for a request that arrives after the failure', async () => {
+      vi.useFakeTimers()
+      const calls: number[] = []
+      const first = sendSerially(timeout(10_000, 'net::ERR_INTERNET_DISCONNECTED', calls, 1))
+      await vi.advanceTimersByTimeAsync(10_000)
+      await first
+      const later = await sendSerially(async () => {
+        calls.push(2)
+        return ok('back online')
+      })
+      expect(later).toEqual(ok('back online'))
+      expect(calls).toEqual([1, 2])
+    })
+
+    it('keeps sending the waiting requests when the server answered with an error status', async () => {
+      const calls: number[] = []
+      const send = (id: number, result: ApiResult<unknown>) => async () => {
+        calls.push(id)
+        return result
+      }
+      const results = await Promise.all([
+        sendSerially(send(1, err('Internal Server Error', 500))),
+        sendSerially(send(2, err('Not found', 404))),
+        sendSerially(send(3, ok('fine'))),
+      ])
+      expect(calls).toEqual([1, 2, 3])
+      expect(results[2]).toEqual(ok('fine'))
+    })
+
+    it('moves every change of a bulk edit to the offline queue after one timeout', async () => {
+      vi.useFakeTimers()
+      const dir = mkdtempSync(join(tmpdir(), 'vicu-task-writes-outage-'))
+      try {
+        const queue = new OfflineQueue({ queuePath: join(dir, 'q.json'), attachmentsDir: join(dir, 'a') })
+        queue.load()
+        const sent: number[] = []
+        const api = {
+          async updateTask(id: number): Promise<ApiResult<unknown>> {
+            sent.push(id)
+            await new Promise((resolve) => setTimeout(resolve, 10_000))
+            return err('Request timed out')
+          },
+        }
+        const outcomes = Promise.all(
+          [20, 21, 22, 23].map((id) => writeTask({ queue }, taskWrites.update(queue, api, id, { done: true }), { queue: true }))
+        )
+        await vi.advanceTimersByTimeAsync(10_000)
+        expect((await outcomes).map((o) => o.kind)).toEqual(['queued', 'queued', 'queued', 'queued'])
+        expect(sent).toEqual([20])
+        expect(queue.counts().pending).toBe(4)
+      } finally {
+        rmSync(dir, { recursive: true, force: true })
+      }
+    })
   })
 
   it('writeTask sends the changes of a bulk edit one after the other', async () => {
