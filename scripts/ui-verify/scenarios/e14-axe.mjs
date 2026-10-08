@@ -53,6 +53,41 @@ export default async function run(h) {
     await h.dismiss()
   }
 
+  // Windows 11 Mica: the sidebar is translucent over the native material, which follows the app theme
+  // (nativeTheme.themeSource), so the page background colour stands in for it. The harness strips
+  // data-material (capturePage and axe cannot see Mica); here it is put back for one measurement.
+  await h.goto('/today')
+  await h.dismiss()
+  const mica = await h.page.evaluate(() => {
+    window.__vicuKeepMaterial = true
+    const root = document.documentElement
+    root.dataset.material = 'mica'
+    if (root.dataset.platform !== 'win32') throw new Error('Mica applies on Windows only')
+    try {
+      const parse = (c) => (c.match(/[\d.]+/g) ?? []).map(Number)
+      const lum = ([r, g, b]) => {
+        const f = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4 }
+        return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b)
+      }
+      const el = document.querySelector('nav .text-left.flex-1')
+      const backdrop = parse(getComputedStyle(document.body).getPropertyValue('--bg-primary-rgb'))
+      const text = parse(getComputedStyle(el).color)
+      let bg = null
+      for (let n = el; n && !bg; n = n.parentElement) {
+        const c = parse(getComputedStyle(n).backgroundColor)
+        if (c.length >= 3 && (c[3] ?? 1) > 0) bg = c
+      }
+      const a = bg ? (bg[3] ?? 1) : 0
+      const flat = bg ? [0, 1, 2].map((i) => bg[i] * a + backdrop[i] * (1 - a)) : backdrop
+      const [l1, l2] = [lum(text), lum(flat)].sort((x, y) => y - x)
+      return { ratio: (l1 + 0.05) / (l2 + 0.05), text, bg, backdrop }
+    } finally {
+      window.__vicuKeepMaterial = false
+      delete root.dataset.material
+    }
+  })
+  await h.assert('Mica: sidebar text on the translucent sidebar over the theme backdrop has contrast of at least 4.5', { ok: mica.ratio >= 4.5, detail: JSON.stringify(mica) })
+
   // Row, checkbox and list semantics (card 3.1).
   await h.goto('/today')
   await h.dismiss()

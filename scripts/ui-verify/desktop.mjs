@@ -268,6 +268,20 @@ if (!page) {
 await page.waitForLoadState('domcontentloaded')
 await applyMedia(page)
 
+// capturePage paints web content only, never the Mica behind a translucent sidebar, and axe measures
+// text against a transparent sidebar as if it sat on white. The app sets data-material (index.css makes
+// the sidebar translucent) every time the page loads, and scenarios reload it, so the attribute is dropped
+// again whenever it appears. A scenario that wants to measure the translucent sidebar sets
+// window.__vicuKeepMaterial = true first (e14-axe does).
+const DROP_MATERIAL = () => {
+  // An init script runs before the document element exists after a reload, so watch the document.
+  const drop = () => { if (!window.__vicuKeepMaterial) delete document.documentElement?.dataset.material }
+  drop()
+  new MutationObserver(drop).observe(document, { attributes: true, attributeFilter: ['data-material'], subtree: true })
+}
+await page.addInitScript(DROP_MATERIAL)
+await page.evaluate(DROP_MATERIAL).catch(() => {})
+
 async function setSize(width, height) {
   await app.evaluate(({ BrowserWindow }, [w, h]) => {
     const win = BrowserWindow.getAllWindows().find((x) => x.webContents.getURL().includes('/renderer/index.html'))
@@ -554,9 +568,7 @@ async function reset() {
 
 currentScenario = '_env'
 await settle(page, 1200)
-// capturePage paints web content only, never the Mica behind a translucent sidebar (it would come out
-// white, even in the dark theme). Captures show the opaque sidebar of Windows 10 instead.
-await page.evaluate(() => { delete document.documentElement.dataset.material }).catch(() => {})
+// Captures and axe show the opaque sidebar of Windows 10 (see DROP_MATERIAL above).
 const env = await page.evaluate(() => ({
   dpr: window.devicePixelRatio,
   reducedMotion: matchMedia('(prefers-reduced-motion: reduce)').matches,
