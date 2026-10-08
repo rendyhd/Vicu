@@ -213,6 +213,84 @@
   }
 }
 
+/*
+ * Opening and closing a task (card 4.4, lib/task-transition.ts). The row and the card of a task share
+ * a view-transition-name for the length of the transition; their group moves and resizes with the
+ * move spring, and the card's content fades in one item after another (--stagger apart). The page
+ * itself (root) does not animate. Reduced motion: no morph, the new row or card fades in over
+ * fade.fast.
+ */
+::view-transition-group(*) {
+  animation-duration: var(--dur-move);
+  animation-timing-function: var(--spring-move);
+}
+
+::view-transition-old(*),
+::view-transition-new(*) {
+  animation-duration: var(--dur-fade-fast);
+  animation-timing-function: var(--ease-standard);
+}
+
+::view-transition-group(root) {
+  animation: none;
+}
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+::view-transition-old(root) {
+  display: none;
+}
+
+html[data-task-transition='morph'] .vicu-card > :nth-child(n + 2) {
+  animation: vicu-bar-fade var(--dur-fade-fast) var(--ease-enter) both;
+}
+html[data-task-transition='morph'] .vicu-card > :nth-child(3) { animation-delay: var(--stagger); }
+html[data-task-transition='morph'] .vicu-card > :nth-child(4) { animation-delay: calc(var(--stagger) * 2); }
+html[data-task-transition='morph'] .vicu-card > :nth-child(5) { animation-delay: calc(var(--stagger) * 3); }
+html[data-task-transition='morph'] .vicu-card > :nth-child(n + 6) { animation-delay: calc(var(--stagger) * 4); }
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-task-transition='fade'] .vicu-task-fade {
+    animation: vicu-bar-fade var(--dur-fade-fast) var(--ease-standard);
+  }
+}
+
+/*
+ * Dialogs (card 4.4): a small entrance, scale 0.98 to 1 with a fade of fade.base, the backdrop
+ * fades with it. Reduced motion: opacity only. No exit animation (the dialog is removed when it closes).
+ */
+.vicu-dialog {
+  transition:
+    opacity var(--dur-fade-base) var(--ease-enter),
+    scale var(--dur-fade-base) var(--ease-enter);
+}
+
+.vicu-dialog::backdrop {
+  transition: opacity var(--dur-fade-base) var(--ease-enter);
+}
+
+@starting-style {
+  .vicu-dialog[open] {
+    opacity: 0;
+  }
+
+  .vicu-dialog[open]::backdrop {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  @starting-style {
+    .vicu-dialog[open] {
+      scale: 0.98;
+    }
+  }
+}
+
 /* Thin overlay scrollbar — light mode */
 .custom-scrollbar::-webkit-scrollbar,
 .overflow-y-auto::-webkit-scrollbar {

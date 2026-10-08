@@ -100,7 +100,7 @@ function OpenDialog({
         pressedOn.current = null
       }}
       className={cn(
-        'm-auto max-h-[calc(100vh-2rem)] max-w-[calc(100vw-2rem)] overflow-y-auto rounded-card border border-[var(--border-color)] bg-[var(--bg-primary)] p-0 text-[var(--text-primary)] shadow-xl',
+        'vicu-dialog m-auto max-h-[calc(100vh-2rem)] max-w-[calc(100vw-2rem)] overflow-y-auto rounded-card border border-[var(--border-color)] bg-[var(--bg-primary)] p-0 text-[var(--text-primary)] shadow-xl',
         'backdrop:bg-black/50',
         className,
       )}

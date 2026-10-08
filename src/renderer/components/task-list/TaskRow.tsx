@@ -548,7 +548,7 @@ function TaskRowInner({ task, nestedDepth = 0, parentProjectId, projectMeta, dra
           if (!isFocused && e.target.matches(':focus-visible')) setFocusedTask(task.id)
         }}
         className={cn(
-          'group grid cursor-default grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-x-3 border-b border-[var(--border-color)] px-4 py-2.5 transition-colors hover:bg-[var(--bg-hover)]',
+          'vicu-task-fade group grid cursor-default grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-x-3 border-b border-[var(--border-color)] px-4 py-2.5 transition-colors hover:bg-[var(--bg-hover)]',
           isSelected && 'bg-bg-selected ring-1 ring-inset ring-accent-blue/40',
           isFocused && !isSelected && !isExpanded && 'bg-accent-blue/8 ring-1 ring-inset ring-accent-blue/30',
           isDragging && 'opacity-30',
@@ -727,7 +727,7 @@ function TaskRowInner({ task, nestedDepth = 0, parentProjectId, projectMeta, dra
       className={cn(
         // Two columns, the checkbox and the body: the notes, subtasks and property bar sit under the title.
         // The surface is bg.card; in dark it is lifted by a 1 px white-at-8% edge instead of a shadow.
-        'mx-2 my-1 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 rounded-card border border-[var(--border-color)] bg-bg-card px-4 shadow-md dark:border-white/8 dark:shadow-none',
+        'vicu-task-fade vicu-card mx-2 my-1 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 rounded-card border border-[var(--border-color)] bg-bg-card px-4 shadow-md dark:border-white/8 dark:shadow-none',
         isDragOver && 'ring-2 ring-[var(--accent-blue)] bg-accent-blue/5',
         dropError && 'ring-2 ring-danger bg-danger/5'
       )}
