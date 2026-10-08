@@ -17,6 +17,7 @@ import {
   X,
 } from 'lucide-react'
 import { RoutineTodaySection } from '@/components/routines/RoutineTodaySection'
+import { SmartListIcon } from '@/components/shared/SmartListIcon'
 import { useRoutineHistory, useRoutines, type RoutineDraft } from '@/hooks/use-routines'
 import {
   csvForRoutines,
@@ -329,7 +330,7 @@ function RoutinesContent() {
   return (
     <div className="flex h-full min-w-0 flex-1 flex-col bg-[var(--bg-primary)]">
       <header className="flex h-16 shrink-0 items-center gap-3 border-b border-[var(--border-color)] px-6">
-        <div className="flex h-9 w-9 items-center justify-center rounded-card bg-accent-purple/15 text-accent-purple"><HeartPulse className="h-5 w-5" /></div>
+        <div className="flex h-9 w-9 items-center justify-center rounded-card bg-[var(--bg-hover)]"><SmartListIcon list="routines" className="h-5 w-5" /></div>
         <div className="min-w-0 flex-1"><h1 className="text-xl font-semibold text-[var(--text-primary)]">Routines</h1><p className="text-xs text-[var(--text-secondary)]">Daily health and recurring home rhythms</p></div>
         <button type="button" onClick={exportCsv} disabled={routines.carriers.length === 0} className="flex h-9 items-center gap-2 rounded-control border border-[var(--border-color)] px-3 text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--bg-hover)] disabled:opacity-40"><Download className="h-4 w-4" /> Export</button>
         <button type="button" onClick={() => setEditor('new')} className="flex h-9 items-center gap-2 rounded-control bg-accent-fill px-3 text-xs font-semibold text-on-accent"><Plus className="h-4 w-4" /> New routine</button>

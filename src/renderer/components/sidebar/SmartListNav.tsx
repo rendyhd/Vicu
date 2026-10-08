@@ -1,27 +1,26 @@
 import { useNavigate, useMatches } from '@tanstack/react-router'
-import { Inbox, Sun, Calendar, Layers, BookOpen, RefreshCw, HeartPulse } from 'lucide-react'
 import { cn } from '@/lib/cn'
-import type { LucideIcon } from 'lucide-react'
+import { SmartListIcon } from '@/components/shared/SmartListIcon'
+import type { SmartListId } from '@/lib/smart-list-identity'
 import { useReviewBadgeCount, useReviewFeatureEnabled } from '@/hooks/use-review'
 import { useAppConfig } from '@/hooks/use-app-config'
 import { isRoutinesEnabled } from '@/lib/vikunja-types'
 
 interface SmartListItem {
-  id: string
+  id: SmartListId
   label: string
-  icon: LucideIcon
   path: string
-  iconColor: string
 }
 
+// Icon and colour of each list come from the identity table (lib/smart-list-identity.ts).
 const ALL_SMART_LISTS: SmartListItem[] = [
-  { id: 'inbox', label: 'Inbox', icon: Inbox, path: '/inbox', iconColor: 'text-accent-blue' },
-  { id: 'today', label: 'Today', icon: Sun, path: '/today', iconColor: 'text-accent-red' },
-  { id: 'routines', label: 'Routines', icon: HeartPulse, path: '/routines', iconColor: 'text-accent-purple' },
-  { id: 'upcoming', label: 'Upcoming', icon: Calendar, path: '/upcoming', iconColor: 'text-accent-orange' },
-  { id: 'anytime', label: 'Anytime', icon: Layers, path: '/anytime', iconColor: 'text-accent-teal' },
-  { id: 'review', label: 'Review', icon: RefreshCw, path: '/review', iconColor: 'text-accent-purple' },
-  { id: 'logbook', label: 'Logbook', icon: BookOpen, path: '/logbook', iconColor: 'text-accent-green' },
+  { id: 'inbox', label: 'Inbox', path: '/inbox' },
+  { id: 'today', label: 'Today', path: '/today' },
+  { id: 'routines', label: 'Routines', path: '/routines' },
+  { id: 'upcoming', label: 'Upcoming', path: '/upcoming' },
+  { id: 'anytime', label: 'Anytime', path: '/anytime' },
+  { id: 'review', label: 'Review', path: '/review' },
+  { id: 'logbook', label: 'Logbook', path: '/logbook' },
 ]
 
 export function SmartListNav() {
@@ -55,13 +54,10 @@ export function SmartListNav() {
               reviewActiveBorder && 'border border-[rgba(175,82,222,0.4)]'
             )}
           >
-            <item.icon className={cn('h-4 w-4 shrink-0', item.iconColor)} strokeWidth={1.8} />
+            <SmartListIcon list={item.id} className="h-4 w-4" />
             <span className="flex-1 text-left">{item.label}</span>
             {isReview && reviewCount > 0 && (
-              <span
-                className="text-[11px] font-semibold tabular-nums"
-                style={{ color: 'var(--accent-purple)' }}
-              >
+              <span className="text-[11px] font-semibold tabular-nums text-[var(--text-secondary)]">
                 {reviewCount}
               </span>
             )}

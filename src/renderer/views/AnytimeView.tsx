@@ -94,6 +94,7 @@ export function AnytimeView() {
   return (
     <TaskList
       title="Anytime"
+      identity="anytime"
       tasks={[]}
       projectId={inboxProjectId}
       showNewTask={!!inboxProjectId && projectData?.flat.some((project) => project.id === inboxProjectId)}

@@ -10,6 +10,7 @@ import { cn } from '@/lib/cn'
 import { TaskCheckbox } from '@/components/task-list/TaskCheckbox'
 import { Inbox } from 'lucide-react'
 import { EmptyState } from '@/components/shared/EmptyState'
+import { SmartListIcon } from '@/components/shared/SmartListIcon'
 import type { Task } from '@/lib/vikunja-types'
 
 /** The group a completion belongs to ("Today", "Yesterday", "Mon 5 Oct", "September 2026"); '' without a time. */
@@ -86,7 +87,8 @@ export function LogbookView() {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="px-6 pb-2 pt-6">
+      <div className="flex items-center gap-2.5 px-6 pb-2 pt-6">
+        <SmartListIcon list="logbook" className="h-5 w-5" />
         <h1 className="text-xl font-bold text-[var(--text-primary)]">Logbook</h1>
       </div>
 

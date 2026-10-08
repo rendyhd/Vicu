@@ -43,6 +43,7 @@ export function InboxView() {
   return (
     <TaskList
       title="Inbox"
+      identity="inbox"
       tasks={tasks}
       projectId={activeInboxId}
       sortable

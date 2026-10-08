@@ -18,9 +18,13 @@ import { EmptyState } from '@/components/shared/EmptyState'
 import { NewTaskComposer } from './NewTaskComposer'
 import { taskDescendants, unfinishedDescendants } from '@/lib/task-hierarchy'
 import { confirmTaskCompletion } from '@/lib/task-completion'
+import { SmartListIcon } from '@/components/shared/SmartListIcon'
+import type { SmartListId } from '@/lib/smart-list-identity'
 
 interface TaskListProps {
   title: string
+  /** A smart list: its identity icon shows before the title. */
+  identity?: SmartListId
   tasks: Task[]
   projectId?: number
   emptyTitle?: string
@@ -40,6 +44,7 @@ interface TaskListProps {
 
 export function TaskList({
   title,
+  identity,
   tasks,
   projectId,
   emptyTitle = 'No tasks',
@@ -431,7 +436,10 @@ export function TaskList({
         className="flex items-center justify-between px-6 pb-2 pt-6"
         onClick={handleHeaderClick}
       >
-        <h1 className="text-xl font-bold text-[var(--text-primary)]">{title}</h1>
+        <div className="flex min-w-0 items-center gap-2.5">
+          {identity && <SmartListIcon list={identity} className="h-5 w-5" />}
+          <h1 className="text-xl font-bold text-[var(--text-primary)]">{title}</h1>
+        </div>
         {showNewTask && projectId && (
           <button
             type="button"

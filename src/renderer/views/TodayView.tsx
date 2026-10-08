@@ -103,6 +103,7 @@ export function TodayView() {
     <DueDateContextProvider value="row.inToday">
       <TaskList
         title="Today"
+        identity="today"
         tasks={[]}
         projectId={inboxProjectId}
         showNewTask={!!inboxProjectId && projects?.flat.some((project) => project.id === inboxProjectId)}

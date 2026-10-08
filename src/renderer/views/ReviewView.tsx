@@ -12,6 +12,7 @@ import { useAppConfig } from '@/hooks/use-app-config'
 import { useSelectionStore } from '@/stores/selection-store'
 import { useReviewNoticeStore } from '@/stores/review-notice-store'
 import { ProjectBranch } from '@/components/review/ProjectBranch'
+import { SmartListIcon } from '@/components/shared/SmartListIcon'
 import type { Project } from '@/lib/vikunja-types'
 
 type Tab = 'due' | 'all'
@@ -207,7 +208,7 @@ export function ReviewView() {
       {/* Header */}
       <div style={{ padding: '20px 28px 14px', borderBottom: '1px solid var(--border-color)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
-          <RefreshCw width={20} height={20} style={{ color: 'var(--accent-purple)' }} />
+          <SmartListIcon list="review" className="h-5 w-5" />
           <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, letterSpacing: '-0.01em', color: 'var(--text-primary)' }}>
             Review
           </h1>

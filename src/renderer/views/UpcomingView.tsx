@@ -110,6 +110,7 @@ export function UpcomingView() {
     <DueDateContextProvider value="row.inDayGroup">
       <TaskList
         title="Upcoming"
+        identity="upcoming"
         tasks={[]}
         projectId={inboxProjectId}
         showNewTask={!!inboxProjectId && projects?.flat.some((project) => project.id === inboxProjectId)}
