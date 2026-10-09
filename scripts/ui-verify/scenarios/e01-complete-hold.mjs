@@ -20,6 +20,8 @@ export default async function run(h) {
 
     // ---- A. A real click, the pointer rests on the row ---------------------------------------
     await h.capture('before')
+    const rowOrder = () => page.evaluate(() => [...document.querySelectorAll('[data-task-id]')].map((row) => Number(row.dataset.taskId)))
+    const orderBefore = await rowOrder()
     await recordAnimations(h, a)
     await checkboxOf(h, a).click()
     await h.wait(60)
@@ -39,8 +41,22 @@ export default async function run(h) {
     await h.assert('the completion is on the server at once', { ok: await serverDone(h, a) })
     await h.capture('held-hovered')
 
+    // A refetch during the hold (here the window-focus one) no longer returns the done task: its row
+    // must stay where it is, not move to the end of the list from under the pointer (which ended the hold).
+    const beforeFocus = h.requests().length
+    await page.evaluate(() => window.dispatchEvent(new Event('focus')))
+    await h.wait(400)
+    await h.assert('a window focus during the hold refetches the open tasks', {
+      ok: h.requests(beforeFocus).some((r) => r.method === 'GET' && /\/tasks\?.*done\+%3D\+false/.test(r.url)),
+      detail: h.requests(beforeFocus).map((r) => `${r.method} ${r.url.split('?')[0]}`).join(', '),
+    })
+    await h.assert('the held row keeps its place in the list after the refetch', async () => {
+      const order = await rowOrder()
+      return { ok: JSON.stringify(order) === JSON.stringify(orderBefore), detail: `before ${JSON.stringify(orderBefore)}, after ${JSON.stringify(order)}` }
+    })
+
     // The pointer is still on the row (it was just clicked): well past 5 s the row is still there.
-    await h.wait(HOLD_MS + 1500 - 400)
+    await h.wait(HOLD_MS + 1500 - 800)
     await h.assert('the row is still listed more than 6 s after the click while the pointer rests on it', {
       ok: (await rowOf(h, a).count()) === 1,
       detail: `${Math.round((await pageNow(h)) - clicked)} ms after the click`,

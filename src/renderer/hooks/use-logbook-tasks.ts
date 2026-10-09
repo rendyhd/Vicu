@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import { useQueries, type UseQueryResult } from '@tanstack/react-query'
 import { useMatches } from '@tanstack/react-router'
 import { api } from '@/lib/api'
@@ -46,11 +46,14 @@ export function useLogbookTasks() {
     combine: combinePages,
   })
 
-  const tasks = useMemo(
-    // Tasks reopened here stay visible, without strikethrough, until the user navigates away.
-    () => mergeSmartListUndoWindow(logbookTasks(pages), completedTasks, pathname),
-    [pages, completedTasks, pathname]
-  )
+  // Tasks reopened here stay visible, without strikethrough, until the user navigates away, in their
+  // place in the last result.
+  const previous = useRef<Task[]>([])
+  const tasks = useMemo(() => {
+    const merged = mergeSmartListUndoWindow(logbookTasks(pages), completedTasks, pathname, previous.current)
+    previous.current = merged
+    return merged
+  }, [pages, completedTasks, pathname])
 
   const hasMore = logbookHasMore(pages)
   const loadMore = useCallback(() => {

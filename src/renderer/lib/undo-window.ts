@@ -142,13 +142,18 @@ export function mergeSectionUndoWindow<
 /**
  * Apply the undo window to a smart list (Today, Upcoming, Anytime, Tag, Logbook, search): the
  * tasks toggled on THIS path that the server no longer returns (completed ones leave an open list,
- * reopened ones leave the Logbook) are appended, so they stay visible until the user navigates away.
+ * reopened ones leave the Logbook) are merged back, so they stay visible until the user navigates away.
  * Implementation-detail tasks never show. Returns `tasks` itself when nothing is added.
+ *
+ * `previous` is the list this function returned last time. A task that was in it goes back right
+ * after the nearest row that was above it (a refetch must not move a held row out from under the
+ * pointer: the pointer leaving is what ends the hold); a task that was not in it is appended.
  */
 export function mergeSmartListUndoWindow(
   tasks: Task[],
   completed: Map<number, CompletedTaskEntry>,
-  pathname: string
+  pathname: string,
+  previous: readonly Task[] = []
 ): Task[] {
   const serverIds = new Set(tasks.map((t) => t.id))
   const extras = Array.from(completed.values())
@@ -160,5 +165,23 @@ export function mergeSmartListUndoWindow(
         !hasVicuMetadataMarker(entry.task.description)
     )
     .map((entry) => entry.task)
-  return extras.length === 0 ? tasks : [...tasks, ...extras]
+  if (extras.length === 0) return tasks
+
+  const previousIndex = new Map(previous.map((t, i) => [t.id, i]))
+  const placed = extras.filter((t) => previousIndex.has(t.id)).sort((a, b) => previousIndex.get(a.id)! - previousIndex.get(b.id)!)
+  const appended = extras.filter((t) => !previousIndex.has(t.id))
+  const merged = [...tasks]
+  for (const extra of placed) {
+    // Walk up the previous list to the nearest row that is in the merged list, and go after it.
+    let at = 0
+    for (let i = previousIndex.get(extra.id)! - 1; i >= 0; i--) {
+      const above = merged.findIndex((t) => t.id === previous[i].id)
+      if (above >= 0) {
+        at = above + 1
+        break
+      }
+    }
+    merged.splice(at, 0, extra)
+  }
+  return [...merged, ...appended]
 }

@@ -163,6 +163,39 @@ describe('mergeSmartListUndoWindow', () => {
     const carrier = { ...task(5), description: '<!-- vicu-routine:v1:e30 -->' } as Task
     expect(mergeSmartListUndoWindow([], store([{ task: carrier, path: '/logbook' }]), '/logbook')).toEqual([])
   })
+
+  // A refetch of Today no longer returns a held completion. Appending it moved the row out from
+  // under the pointer, which ended the hold (pointerleave) while the user was still on it.
+  it('puts a held task back after the row that was above it, not at the end, when a refetch drops it', () => {
+    const [a, b, c, d] = [task(1), task(2), task(3), task(4)]
+    const held = task(2, true)
+    const completed = store([{ task: held, path: '/today' }])
+    const previous = [a, held, c, d]
+
+    expect(mergeSmartListUndoWindow([a, c, d], completed, '/today', previous).map((t) => t.id)).toEqual([1, 2, 3, 4])
+  })
+
+  it('keeps a held first row first and skips rows that left the list since', () => {
+    const completed = store([
+      { task: task(1, true), path: '/today' },
+      { task: task(4, true), path: '/today' },
+    ])
+    const previous = [task(1, true), task(2), task(3), task(4, true), task(5)]
+
+    // Row 3 is gone too: 4 goes after 2, the nearest row above it that is still listed.
+    expect(mergeSmartListUndoWindow([task(2), task(5)], completed, '/today', previous).map((t) => t.id)).toEqual([1, 2, 4, 5])
+  })
+
+  it('keeps the order of consecutive held rows and appends one the previous list did not have', () => {
+    const completed = store([
+      { task: task(3, true), path: '/today' },
+      { task: task(2, true), path: '/today' },
+      { task: task(9, true), path: '/today' },
+    ])
+    const previous = [task(1), task(2, true), task(3, true), task(4)]
+
+    expect(mergeSmartListUndoWindow([task(1), task(4)], completed, '/today', previous).map((t) => t.id)).toEqual([1, 2, 3, 4, 9])
+  })
 })
 
 describe('dropReleasedCompletions', () => {
