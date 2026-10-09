@@ -17,8 +17,11 @@ jobs:
   #
   # Whether a release is a pre-release comes from the tag alone: a plain
   # vX.Y.Z tag is stable, anything else (v1.9.0-beta.1, v2.0.0-rc.1, ...) is
-  # a pre-release. The "kind" step is the only place that decides this; the
-  # publish-release job reads its result.
+  # a pre-release. A plain tag can still ask for a pre-release when it is an
+  # annotated tag whose message contains [prerelease]; that keeps the version
+  # in package.json and the tag equal, which electron-builder needs. The "kind"
+  # step is the only place that decides this; the publish-release job reads
+  # its result.
   create-release:
     runs-on: ubuntu-latest
     outputs:
@@ -29,10 +32,25 @@ jobs:
       - name: Decide stable or pre-release from the tag
         id: kind
         env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ github.ref_name }}
+          REPO: ${{ github.repository }}
         run: |
           if [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+            # actions/checkout turns an annotated tag into a lightweight one,
+            # so read the tag message from the API. A failed lookup fails the
+            # job (bash -e) instead of publishing a stable release by mistake.
+            REF=$(gh api "repos/$REPO/git/ref/tags/$TAG" --jq '.object.type + " " + .object.sha')
+            read -r TYPE SHA <<< "$REF"
+            MESSAGE=
+            if [[ "$TYPE" == "tag" ]]; then
+              MESSAGE=$(gh api "repos/$REPO/git/tags/$SHA" --jq .message)
+            fi
+            if [[ "$MESSAGE" == *"[prerelease]"* ]]; then
+              echo "prerelease=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "prerelease=false" >> "$GITHUB_OUTPUT"
+            fi
           else
             echo "prerelease=true" >> "$GITHUB_OUTPUT"
           fi
@@ -222,8 +240,8 @@ jobs:
   # release as the draft that create-release made, so nothing publishes it on its
   # own. This flips it to published only after all builds succeed — a failed
   # build leaves the release as a draft instead of shipping a partial release.
-  # Stable tags become the "Latest" release; suffix tags publish with the
-  # pre-release flag (see the "kind" step in create-release).
+  # Stable tags become the "Latest" release; suffix tags and [prerelease] tags
+  # publish with the pre-release flag (see the "kind" step in create-release).
   publish-release:
     needs: [create-release, build-windows, build-macos, build-linux]
     runs-on: ubuntu-latest
