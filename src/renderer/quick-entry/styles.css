@@ -1,3 +1,5 @@
+@import '../assets/tokens.css';
+
 .hidden {
   display: none;
 }
@@ -13,7 +15,15 @@ html, body {
   height: 100%;
   background: transparent;
   overflow: hidden;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI Variable Text', 'Segoe UI', Roboto, sans-serif;
+}
+
+/* Form controls take the page font, so the input and its highlight layer line up (D-11). */
+button,
+input,
+select,
+textarea {
+  font: inherit;
 }
 
 body {
@@ -39,7 +49,7 @@ body {
   border-radius: 2px;
   background: rgba(0, 0, 0, 0.15);
   opacity: 0;
-  transition: opacity 200ms ease;
+  transition: opacity var(--dur-fade-base) var(--ease-standard);
   pointer-events: none;
 }
 
@@ -58,7 +68,7 @@ body {
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12), 0 1px 4px rgba(0, 0, 0, 0.08);
   opacity: 0;
   transform: translateY(-4px);
-  transition: opacity 150ms ease, transform 150ms ease;
+  transition: opacity var(--dur-fade-fast) var(--ease-standard), transform var(--dur-fade-fast) var(--ease-standard);
   overflow: hidden;
 }
 
@@ -93,7 +103,7 @@ body {
   padding: 16px 20px;
   font-size: 18px;
   font-weight: 400;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI Variable Text', 'Segoe UI', Roboto, sans-serif;
   letter-spacing: -0.01em;
   color: transparent;
   white-space: pre;
@@ -130,7 +140,7 @@ body {
   padding: 16px 20px;
   font-size: 18px;
   font-weight: 400;
-  color: #1a1a1a;
+  color: var(--text-primary);
   background: transparent;
   border: none;
   outline: none;
@@ -138,7 +148,7 @@ body {
 }
 
 #task-input::placeholder {
-  color: #999;
+  color: var(--text-secondary);
   font-weight: 300;
 }
 
@@ -161,7 +171,7 @@ body {
   padding: 6px 20px;
   font-size: 13px;
   cursor: pointer;
-  color: #1a1a1a;
+  color: var(--text-primary);
 }
 
 .autocomplete-item.active {
@@ -205,13 +215,13 @@ body {
 /* Description hint */
 .description-hint {
   font-size: 12px;
-  color: #999;
+  color: var(--text-secondary);
 }
 
 /* Today scheduling hint */
 .today-hint {
   font-size: 12px;
-  color: #999;
+  color: var(--text-secondary);
   font-style: italic;
 }
 
@@ -227,7 +237,7 @@ body {
   padding: 8px 20px 12px;
   font-size: 14px;
   font-family: inherit;
-  color: #1a1a1a;
+  color: var(--text-primary);
   background: transparent;
   border: none;
   border-top: 1px solid rgba(0, 0, 0, 0.06);
@@ -236,7 +246,7 @@ body {
 }
 
 .description-input::placeholder {
-  color: #999;
+  color: var(--text-secondary);
 }
 
 /* Image gallery — staged paste images shown below description */
@@ -285,7 +295,7 @@ body {
   font-size: 14px;
   line-height: 1;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
-  transition: background-color 120ms ease;
+  transition: background-color var(--dur-fade-fast) var(--ease-standard);
 }
 
 .image-gallery-delete:hover {
@@ -300,9 +310,9 @@ body {
 .error-message {
   padding: 6px 20px 12px;
   font-size: 13px;
-  color: #e53e3e;
+  color: var(--danger);
   opacity: 0;
-  transition: opacity 200ms ease;
+  transition: opacity var(--dur-fade-base) var(--ease-standard);
 }
 
 .error-message.show {
@@ -311,18 +321,18 @@ body {
 
 /* Offline saved message (amber instead of red) */
 .error-message.offline {
-  color: #b7791f;
+  color: var(--status-today);
 }
 
 /* Pending sync indicator */
 .pending-indicator {
   padding: 4px 20px 8px;
   font-size: 11px;
-  color: #b7791f;
+  color: var(--status-today);
   font-style: italic;
 }
 .pending-indicator.has-failed {
-  color: #c53030;
+  color: var(--danger);
 }
 
 /* Obsidian hint */
@@ -338,7 +348,7 @@ body {
   background: rgba(124, 58, 237, 0.1);
   padding: 1px 4px;
   border-radius: 3px;
-  font-size: 10px;
+  font-size: var(--type-caption-size);
 }
 
 /* Obsidian badge */
@@ -382,7 +392,7 @@ body {
   background: rgba(37, 99, 235, 0.1);
   padding: 1px 4px;
   border-radius: 3px;
-  font-size: 10px;
+  font-size: var(--type-caption-size);
 }
 
 /* Browser badge */
@@ -435,10 +445,11 @@ body {
   background: rgba(34, 197, 94, 0.12);
   color: #16a34a;
 }
-.parse-chip-priority {
-  background: rgba(239, 68, 68, 0.12);
-  color: #dc2626;
-}
+/* The chip takes the colour role of the parsed priority (the token highlight above keeps the parser's type colour) */
+.parse-chip-priority { background: rgb(var(--priority-urgent-rgb) / 0.12); color: var(--priority-urgent); }
+.parse-chip-priority.priority-1 { background: rgb(var(--priority-low-rgb) / 0.12); color: var(--priority-low); }
+.parse-chip-priority.priority-2 { background: rgb(var(--priority-medium-rgb) / 0.12); color: var(--priority-medium); }
+.parse-chip-priority.priority-3 { background: rgb(var(--priority-high-rgb) / 0.12); color: var(--priority-high); }
 .parse-chip-label {
   background: rgba(249, 115, 22, 0.12);
   color: #ea580c;
@@ -461,10 +472,24 @@ body {
   line-height: 1;
   padding: 0 0 0 4px;
   opacity: 0.5;
-  transition: opacity 120ms ease;
+  transition: opacity var(--dur-fade-fast) var(--ease-standard);
 }
 .parse-chip-dismiss:hover {
   opacity: 1;
+}
+
+/* Focus (card 1.5): the ring the main window draws. Buttons get it outside. The input and the
+ * description field are borderless and run to the card edge, so their ring is drawn inside, where
+ * the card's overflow clip cannot cut it. */
+button:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+#task-input:focus-visible,
+.description-input:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
 }
 
 /* Dark mode */
@@ -479,53 +504,16 @@ body {
     box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4), 0 1px 4px rgba(0, 0, 0, 0.2);
   }
 
-  #task-input {
-    color: #f0f0f0;
-  }
-
-  #task-input::placeholder {
-    color: #666;
-  }
-
   .project-hint {
     color: #b0a0d0;
   }
 
-  .description-hint {
-    color: #666;
-  }
-
-  .today-hint {
-    color: #666;
-  }
-
   .description-input {
-    color: #f0f0f0;
     border-top-color: rgba(255, 255, 255, 0.06);
-  }
-
-  .description-input::placeholder {
-    color: #666;
   }
 
   .image-gallery-item img {
     border-color: rgba(255, 255, 255, 0.08);
-  }
-
-  .error-message {
-    color: #fc8181;
-  }
-
-  .error-message.offline {
-    color: #ecc94b;
-  }
-
-  .pending-indicator {
-    color: #ecc94b;
-  }
-
-  .pending-indicator.has-failed {
-    color: #fc8181;
   }
 
   .obsidian-hint { color: #a78bfa; }
@@ -543,15 +531,110 @@ body {
   .token-recurrence { background: rgba(168, 85, 247, 0.25); }
 
   .parse-chip-date { background: rgba(34, 197, 94, 0.2); color: #4ade80; }
-  .parse-chip-priority { background: rgba(239, 68, 68, 0.2); color: #f87171; }
   .parse-chip-label { background: rgba(249, 115, 22, 0.2); color: #fb923c; }
   .parse-chip-project { background: rgba(59, 130, 246, 0.2); color: #60a5fa; }
   .parse-chip-recurrence { background: rgba(168, 85, 247, 0.2); color: #c084fc; }
 
   .autocomplete-container { border-top-color: rgba(255, 255, 255, 0.06); }
-  .autocomplete-item { color: #f0f0f0; }
   .autocomplete-item.active { background: rgba(59, 130, 246, 0.20); }
   .autocomplete-item:hover { background: rgba(59, 130, 246, 0.12); }
   .autocomplete-item-project::before { background: rgba(59, 130, 246, 0.7); }
   .autocomplete-item-label::before { background: rgba(249, 115, 22, 0.7); }
+}
+
+/* Reduced motion (card 1.5): the rules of the base layer in assets/index.css, which this window does
+ * not load. Colour and opacity only, at most fade.fast; transforms still apply, instantly. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, opacity !important;
+    transition-duration: var(--dur-fade-fast) !important;
+    transition-delay: 0s !important;
+    scroll-behavior: auto !important;
+  }
+
+  /* The window appears with a fade only, not from 4 px above. */
+  .container,
+  .container.visible {
+    transform: none;
+  }
+}
+
+/*
+ * Forced colours (card 5.2): system colours replace the tints and the translucent card. The card keeps an
+ * edge, chips are outlined shapes, the typed-text highlight becomes an underline, and the focus ring is
+ * the highlight colour.
+ */
+@media (forced-colors: active) {
+  :focus-visible {
+    outline-color: Highlight;
+  }
+
+  .container {
+    background: Canvas;
+    border: 1px solid CanvasText;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  /* The highlight layer is transparent text drawn under the input; only the underline of a token shows. */
+  .input-highlight {
+    forced-color-adjust: none;
+  }
+
+  .input-highlight [class^='token-'] {
+    background: transparent;
+    text-decoration: underline 2px Highlight;
+    text-underline-offset: 3px;
+  }
+
+  .parse-chip,
+  .obsidian-badge,
+  .browser-badge {
+    outline: 1px solid currentColor;
+    outline-offset: -1px;
+  }
+
+  .autocomplete-item.active,
+  .autocomplete-item:hover {
+    background: Highlight;
+    color: HighlightText;
+    forced-color-adjust: none;
+  }
+
+  .autocomplete-item.active *,
+  .autocomplete-item:hover * {
+    color: HighlightText;
+  }
+
+  .autocomplete-item-project::before,
+  .autocomplete-item-label::before {
+    background: currentColor;
+  }
+
+  .image-gallery-delete {
+    border: 1px solid ButtonText;
+  }
+
+  /* The input sits over the highlight layer; its own Canvas fill would hide the token underlines. */
+  #task-input {
+    forced-color-adjust: none;
+    background: transparent;
+    color: CanvasText;
+  }
+
+  #task-input::placeholder {
+    color: GrayText;
+  }
+
+  #task-input:focus-visible,
+  .description-input:focus-visible {
+    outline-color: Highlight;
+  }
+
+  #task-input:disabled {
+    opacity: 1;
+    color: GrayText;
+  }
 }

@@ -47,6 +47,34 @@ export function evictForeignCompletions(
   return filtered.length === tasks.length ? tasks : filtered
 }
 
+/** True when a task query filter asks for open tasks only: `done = false`, alone or in a conjunction. */
+export function asksForOpenTasksOnly(filter: string | undefined): boolean {
+  return /(^|&&\s*)done\s*=\s*false\s*(&&|$)/.test(filter ?? '')
+}
+
+/**
+ * The leaked optimistic completions of an open-only smart list (a query with `done = false`: Today,
+ * Upcoming, Anytime, Tag, custom lists, Inbox). A completion marks the task `done: true` in every
+ * cached list and skips the refetch, so the row stays until the completion hold ends: while the
+ * completed-tasks store holds it for THIS path the row is kept, afterwards it is dropped. A subtask
+ * the parent's completion finished along with it (`autoCompletedSubtasks`) is kept as long as the
+ * parent is. Returns `tasks` itself when nothing is dropped.
+ */
+export function dropReleasedCompletions(
+  tasks: Task[],
+  completed: Map<number, CompletedTaskEntry>,
+  pathname: string
+): Task[] {
+  const keep = new Set<number>()
+  for (const entry of completed.values()) {
+    if (entry.path !== pathname) continue
+    keep.add(entry.task.id)
+    for (const child of entry.autoCompletedSubtasks ?? []) keep.add(child.id)
+  }
+  const visible = tasks.filter((t) => !t.done || keep.has(t.id))
+  return visible.length === tasks.length ? tasks : visible
+}
+
 /**
  * Apply the undo window to a project page's own task list. The top list belongs
  * only to the current project; child-project tasks are rendered by

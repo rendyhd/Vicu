@@ -82,9 +82,11 @@ interface HotkeyRecorderProps {
   onChange: (value: string) => void
   defaultValue: string
   warning?: boolean
+  /** The accessible name of the field. */
+  label?: string
 }
 
-export function HotkeyRecorder({ value, onChange, defaultValue, warning }: HotkeyRecorderProps) {
+export function HotkeyRecorder({ value, onChange, defaultValue, warning, label = 'Hotkey' }: HotkeyRecorderProps) {
   const [recording, setRecording] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const prevValueRef = useRef(value)
@@ -134,21 +136,22 @@ export function HotkeyRecorder({ value, onChange, defaultValue, warning }: Hotke
       <input
         ref={inputRef}
         type="text"
+        aria-label={label}
         readOnly
         value={recording ? '' : formatAcceleratorForDisplay(value)}
         placeholder={recording ? 'Press keys...' : undefined}
-        className={`flex-1 rounded-md border px-3 py-2 text-sm focus:outline-none ${
+        className={`flex-1 rounded-control border px-3 py-2 text-sm ${
           warning
-            ? 'border-accent-orange bg-[var(--bg-secondary)] text-[var(--text-primary)]'
-            : 'border-[var(--border-color)] bg-[var(--bg-secondary)] text-[var(--text-primary)] focus:border-accent-blue'
+            ? 'border-status-today bg-[var(--bg-secondary)] text-[var(--text-primary)]'
+            : 'border-[var(--border-color)] bg-[var(--bg-secondary)] text-[var(--text-primary)]'
         }`}
       />
       <button
         type="button"
         onClick={startRecording}
-        className={`shrink-0 rounded-md border px-3 py-2 text-xs font-medium transition-colors ${
+        className={`shrink-0 rounded-control border px-3 py-2 text-xs font-medium transition-colors ${
           recording
-            ? 'border-accent-blue bg-accent-blue text-white'
+            ? 'border-accent-fill bg-accent-fill text-on-accent'
             : 'border-[var(--border-color)] bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]'
         }`}
       >

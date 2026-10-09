@@ -4,6 +4,10 @@ import { useNavigate, useRouter } from '@tanstack/react-router'
 import { api, type VikunjaUser } from '@/lib/api'
 import { APP_CONFIG_QUERY_KEY } from '@/hooks/use-app-config'
 import { cn } from '@/lib/cn'
+import { Checkbox } from '@/components/shared/Checkbox'
+import { Button } from '@/components/shared/Button'
+import { PageHeader } from '@/components/shared/PageHeader'
+import { ReadingScroll } from '@/components/layout/ReadingScroll'
 import { applyTheme } from '@/lib/theme'
 import { TokenPermissionsInfo } from '@/views/SetupView'
 import { QuickEntrySettings } from '@/components/settings/QuickEntrySettings'
@@ -14,6 +18,7 @@ import { KeyboardShortcuts } from '@/components/settings/KeyboardShortcuts'
 import { NotificationSettings } from '@/components/settings/NotificationSettings'
 import { CompletionSoundSettings } from '@/components/settings/CompletionSoundSettings'
 import { ReviewSettingsPanel } from '@/components/review/ReviewSettingsPanel'
+import { RoutinesSettingsPanel } from '@/components/routines/RoutinesSettingsPanel'
 import { ProjectSettings } from '@/components/settings/ProjectSettings'
 import { useProjects } from '@/hooks/use-projects'
 import { toast } from '@/stores/toast-store'
@@ -33,6 +38,8 @@ export function SettingsView() {
   const [activeTab, setActiveTab] = useState<SettingsTab>('general')
   const [url, setUrl] = useState('')
   const [token, setToken] = useState('')
+  // The token itself never reaches this page: only whether one is saved, so Test Connection can use it.
+  const [hasSavedToken, setHasSavedToken] = useState(false)
   const [showToken, setShowToken] = useState(false)
   const [inboxProjectId, setInboxProjectId] = useState(0)
   const [theme, setTheme] = useState<ThemeOption>('system')
@@ -86,6 +93,9 @@ export function SettingsView() {
         setInboxProjectId(config.inbox_project_id || 0)
         setTheme(config.theme || 'system')
         setAuthMethod(config.auth_method || 'api_token')
+        if (!config.auth_method || config.auth_method === 'api_token') {
+          api.checkAuth().then((auth) => setHasSavedToken(auth.status === 'authenticated')).catch(() => {})
+        }
 
         if (config.auth_method === 'password' || config.auth_method === 'oidc') {
           api.getUser().then((user) => {
@@ -119,6 +129,8 @@ export function SettingsView() {
     if (result.success) {
       setTestStatus('success')
       setProjects(result.data)
+      // Nothing was typed: the saved token passed, so the connection is already what is saved.
+      if (!token) return
       // Save the connection after a successful test. A new URL or token can be another account,
       // so it goes through saveConnectionConfig (which also resets what belonged to the previous
       // account), not through the preference patch.
@@ -204,10 +216,8 @@ export function SettingsView() {
   }
 
   return (
-    <div className="flex h-full flex-col overflow-y-auto bg-[var(--bg-secondary)]">
-      <div className="px-6 pb-2 pt-6">
-        <h1 className="text-xl font-bold text-[var(--text-primary)]">Settings</h1>
-      </div>
+    <ReadingScroll className="bg-[var(--bg-primary)]" columnClassName="flex flex-col">
+      <PageHeader title="Settings" inScroll />
 
       {/* Tab bar */}
       <div className="flex gap-1 border-b border-[var(--border-color)] px-6">
@@ -246,22 +256,22 @@ export function SettingsView() {
           />
         )
       ) : activeTab === 'general' ? (
-      <div className="mx-6 max-w-lg space-y-6 pb-8 pt-4">
-        <div className="rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] p-5">
+      <div className="mx-6 space-y-6 pb-8 pt-4">
+        <div className="rounded-card border border-[var(--border-color)] bg-[var(--bg-primary)] p-5">
           <h2 className="mb-4 text-sm font-semibold text-[var(--text-primary)]">Connection</h2>
 
           {authMethod === 'oidc' || authMethod === 'password' ? (
             <div className="space-y-3">
               <div>
                 <label className="mb-1 block text-xs text-[var(--text-secondary)]">Vikunja URL</label>
-                <div className="rounded-md border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-secondary)]">
+                <div className="rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-secondary)]">
                   {url}
                 </div>
               </div>
 
               <div className="flex items-center gap-2">
-                <span className="inline-block h-2 w-2 rounded-full bg-accent-green" />
-                <span className="text-xs text-accent-green">
+                <span className="inline-block h-2 w-2 rounded-full bg-status-done" />
+                <span className="text-xs text-status-done">
                   {authMethod === 'oidc'
                     ? 'Signed in via SSO'
                     : currentUser
@@ -270,14 +280,9 @@ export function SettingsView() {
                 </span>
               </div>
 
-              <button
-                type="button"
-                onClick={handleLogout}
-                disabled={signingOut}
-                className="rounded-md border border-accent-red/30 px-4 py-2 text-sm font-medium text-accent-red transition-colors hover:bg-accent-red/10 disabled:cursor-wait disabled:opacity-60"
-              >
+              <Button variant="secondary" danger onClick={handleLogout} disabled={signingOut}>
                 {signingOut ? 'Syncing...' : 'Sign Out'}
-              </button>
+              </Button>
             </div>
           ) : (
             <div className="space-y-3">
@@ -288,7 +293,7 @@ export function SettingsView() {
                   value={url}
                   onChange={(e) => setUrl(e.target.value)}
                   placeholder="https://vikunja.example.com"
-                  className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)] focus:border-accent-blue focus:outline-none"
+                  className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]"
                 />
               </div>
 
@@ -303,65 +308,58 @@ export function SettingsView() {
                     value={token}
                     onChange={(e) => setToken(e.target.value)}
                     placeholder="Enter your API token"
-                    className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 pr-16 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)] focus:border-accent-blue focus:outline-none"
+                    className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 pr-16 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]"
                   />
                   <button
                     type="button"
                     onClick={() => setShowToken(!showToken)}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded px-2 py-0.5 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                    className="absolute right-2 top-1/2 inline-flex min-h-6 -translate-y-1/2 items-center rounded-control px-2 py-0.5 text-meta text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                   >
                     {showToken ? 'Hide' : 'Show'}
                   </button>
                 </div>
+                {hasSavedToken && (
+                  <p className="mt-1 text-meta text-[var(--text-secondary)]">
+                    Uses the saved token. Paste a new one to replace it.
+                  </p>
+                )}
               </div>
 
-              <button
-                type="button"
+              <Button
+                variant="primary"
                 onClick={handleTestConnection}
-                disabled={!url || !token || testStatus === 'testing'}
-                className={cn(
-                  'rounded-md px-4 py-2 text-sm font-medium transition-colors',
-                  'bg-accent-blue text-white hover:bg-accent-blue/90',
-                  'disabled:cursor-not-allowed disabled:opacity-50'
-                )}
+                disabled={!url || (!token && !hasSavedToken) || testStatus === 'testing'}
               >
                 {testStatus === 'testing' ? 'Testing...' : 'Test Connection'}
-              </button>
+              </Button>
 
               {testStatus === 'success' && (
-                <p className="text-xs text-accent-green">Connected successfully</p>
+                <p className="text-xs text-status-done">Connected successfully</p>
               )}
               {testStatus === 'error' && (
-                <p className="text-xs text-accent-red">{testError || 'Connection failed'}</p>
+                <p className="text-xs text-danger">{testError || 'Connection failed'}</p>
               )}
 
               <div className="border-t border-[var(--border-color)] pt-3">
-                <button
-                  type="button"
-                  onClick={handleLogout}
-                  disabled={signingOut}
-                  className="rounded-md border border-accent-red/30 px-4 py-2 text-sm font-medium text-accent-red transition-colors hover:bg-accent-red/10 disabled:cursor-wait disabled:opacity-60"
-                >
+                <Button variant="secondary" danger onClick={handleLogout} disabled={signingOut}>
                   {signingOut ? 'Syncing...' : 'Disconnect'}
-                </button>
+                </Button>
               </div>
             </div>
           )}
           <SecretStorageNotice />
         </div>
 
-        <div className="rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] p-5">
+        <div className="rounded-card border border-[var(--border-color)] bg-[var(--bg-primary)] p-5">
           <h2 className="mb-4 text-sm font-semibold text-[var(--text-primary)]">Preferences</h2>
 
           <div className="space-y-3">
             {launchOnStartupSupported && (
               <>
                 <label className="flex cursor-pointer items-center gap-2">
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     checked={fullConfig?.launch_on_startup ?? false}
                     onChange={(e) => handleQuickEntryChange({ launch_on_startup: e.target.checked })}
-                    className="h-4 w-4 rounded border-[var(--border-color)] accent-accent-blue"
                   />
                   <span className="text-sm text-[var(--text-primary)]">
                     Launch on startup
@@ -371,11 +369,9 @@ export function SettingsView() {
 
                 {fullConfig?.launch_on_startup === true && (
                   <label className="ml-6 flex cursor-pointer items-center gap-2">
-                    <input
-                      type="checkbox"
+                    <Checkbox
                       checked={fullConfig?.start_hidden ?? false}
                       onChange={(e) => handleQuickEntryChange({ start_hidden: e.target.checked })}
-                      className="h-4 w-4 rounded border-[var(--border-color)] accent-accent-blue"
                     />
                     <span className="text-sm text-[var(--text-primary)]">
                       Start hidden
@@ -387,11 +383,9 @@ export function SettingsView() {
             )}
 
             <label className="flex cursor-pointer items-center gap-2">
-              <input
-                type="checkbox"
+              <Checkbox
                 checked={fullConfig?.confirm_before_delete !== false}
                 onChange={(e) => handleQuickEntryChange({ confirm_before_delete: e.target.checked })}
-                className="h-4 w-4 rounded border-[var(--border-color)] accent-accent-blue"
               />
               <span className="text-sm text-[var(--text-primary)]">
                 Confirm before deleting
@@ -410,7 +404,7 @@ export function SettingsView() {
                 onChange={(e) => handleQuickEntryChange({
                   subtask_display: e.target.value as 'inside_task' | 'expandable',
                 })}
-                className="rounded-md border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-1.5 text-sm text-[var(--text-primary)]"
+                className="rounded-control border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-1.5 text-sm text-[var(--text-primary)]"
               >
                 <option value="inside_task">Inside task</option>
                 <option value="expandable">Expandable</option>
@@ -418,11 +412,9 @@ export function SettingsView() {
             </label>
 
             <label className="flex cursor-pointer items-center gap-2">
-              <input
-                type="checkbox"
+              <Checkbox
                 checked={fullConfig?.show_today_overdue_badge === true}
                 onChange={(e) => handleQuickEntryChange({ show_today_overdue_badge: e.target.checked })}
-                className="h-4 w-4 rounded border-[var(--border-color)] accent-accent-blue"
               />
               <span className="text-sm text-[var(--text-primary)]">
                 Show today &amp; overdue count on app icon
@@ -430,11 +422,12 @@ export function SettingsView() {
             </label>
 
             <div>
-              <label className="mb-1 block text-xs text-[var(--text-secondary)]">Inbox Project</label>
+              <label htmlFor="settings-inbox-project" className="mb-1 block text-xs text-[var(--text-secondary)]">Inbox Project</label>
               <select
+                id="settings-inbox-project"
                 value={inboxProjectId}
                 onChange={(e) => { const id = Number(e.target.value); setInboxProjectId(id); handleQuickEntryChange({ inbox_project_id: id }) }}
-                className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] focus:border-accent-blue focus:outline-none"
+                className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)]"
               >
                 <option value={0}>Select a project...</option>
                 {projects.map((p) => (
@@ -442,7 +435,7 @@ export function SettingsView() {
                 ))}
               </select>
               {inboxProjectId !== 0 && !projects.some((project) => project.id === inboxProjectId) && (
-                <p className="mt-1 text-xs text-accent-red">
+                <p className="mt-1 text-xs text-danger">
                   The configured Inbox project is archived or unavailable. Select an active project.
                 </p>
               )}
@@ -455,7 +448,7 @@ export function SettingsView() {
                   <label
                     key={opt}
                     className={cn(
-                      'flex cursor-pointer items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium transition-colors',
+                      'flex cursor-pointer items-center gap-1.5 rounded-control border px-3 py-1.5 text-xs font-medium transition-colors',
                       theme === opt
                         ? 'border-accent-blue bg-accent-blue/10 text-accent-blue'
                         : 'border-[var(--border-color)] text-[var(--text-secondary)] hover:border-[var(--text-secondary)]'
@@ -487,7 +480,7 @@ export function SettingsView() {
                     <label
                       key={opt.value}
                       className={cn(
-                        'flex cursor-pointer items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium transition-colors',
+                        'flex cursor-pointer items-center gap-1.5 rounded-control border px-3 py-1.5 text-xs font-medium transition-colors',
                         current === opt.value
                           ? 'border-accent-blue bg-accent-blue/10 text-accent-blue'
                           : 'border-[var(--border-color)] text-[var(--text-secondary)] hover:border-[var(--text-secondary)]'
@@ -511,6 +504,43 @@ export function SettingsView() {
               </p>
             </div>
 
+            <div>
+              <label className="mb-2 block text-xs text-[var(--text-secondary)]">Clock</label>
+              <div className="flex gap-3" role="radiogroup" aria-label="Clock">
+                {([
+                  { value: 'system' as const, label: 'System' },
+                  { value: '12h' as const, label: '12-hour' },
+                  { value: '24h' as const, label: '24-hour' },
+                ]).map((opt) => {
+                  const current = fullConfig?.clock_format ?? 'system'
+                  return (
+                    <label
+                      key={opt.value}
+                      className={cn(
+                        'flex cursor-pointer items-center gap-1.5 rounded-control border px-3 py-1.5 text-xs font-medium transition-colors',
+                        current === opt.value
+                          ? 'border-accent-blue bg-accent-blue/10 text-accent-blue'
+                          : 'border-[var(--border-color)] text-[var(--text-secondary)] hover:border-[var(--text-secondary)]'
+                      )}
+                    >
+                      <input
+                        type="radio"
+                        name="clock_format"
+                        value={opt.value}
+                        checked={current === opt.value}
+                        onChange={() => handleQuickEntryChange({ clock_format: opt.value })}
+                        className="sr-only"
+                      />
+                      {opt.label}
+                    </label>
+                  )
+                })}
+              </div>
+              <p className="mt-1.5 text-xs text-[var(--text-secondary)]">
+                System follows your region. Pick 12-hour or 24-hour if your system uses a custom time format. Applies to every Vicu window.
+              </p>
+            </div>
+
           </div>
         </div>
 
@@ -528,17 +558,22 @@ export function SettingsView() {
           />
         )}
 
+        {fullConfig && (
+          <RoutinesSettingsPanel
+            config={fullConfig}
+            onChange={handleQuickEntryChange}
+          />
+        )}
+
         {/* Task Parser */}
-        <div className="rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] p-5">
+        <div className="rounded-card border border-[var(--border-color)] bg-[var(--bg-primary)] p-5">
           <h2 className="mb-4 text-sm font-semibold text-[var(--text-primary)]">Task Parser</h2>
 
           <div className="space-y-3">
             <label className="flex cursor-pointer items-center gap-2">
-              <input
-                type="checkbox"
+              <Checkbox
                 checked={fullConfig?.nlp_enabled !== false}
                 onChange={(e) => handleQuickEntryChange({ nlp_enabled: e.target.checked })}
-                className="h-4 w-4 rounded border-[var(--border-color)] accent-accent-blue"
               />
               <div>
                 <span className="text-sm text-[var(--text-primary)]">
@@ -563,7 +598,7 @@ export function SettingsView() {
                       aria-checked={(fullConfig?.nlp_syntax_mode || 'todoist') === 'todoist'}
                       onClick={() => handleQuickEntryChange({ nlp_syntax_mode: 'todoist' })}
                       className={cn(
-                        'cursor-pointer rounded-lg border p-3 text-left transition-colors',
+                        'cursor-pointer rounded-card border p-3 text-left transition-colors',
                         (fullConfig?.nlp_syntax_mode || 'todoist') === 'todoist'
                           ? 'border-accent-blue bg-accent-blue/5'
                           : 'border-[var(--border-color)]'
@@ -576,7 +611,7 @@ export function SettingsView() {
                       <p className="mt-1.5 font-mono text-xs">
                         <code className="text-blue-500">#project</code>{' '}
                         <code className="text-orange-500">@label</code>{' '}
-                        <code className="text-red-500">p1-p4</code>
+                        <code className="text-danger">p1-p4</code>
                       </p>
                     </button>
                     <button
@@ -585,7 +620,7 @@ export function SettingsView() {
                       aria-checked={fullConfig?.nlp_syntax_mode === 'vikunja'}
                       onClick={() => handleQuickEntryChange({ nlp_syntax_mode: 'vikunja' })}
                       className={cn(
-                        'cursor-pointer rounded-lg border p-3 text-left transition-colors',
+                        'cursor-pointer rounded-card border p-3 text-left transition-colors',
                         fullConfig?.nlp_syntax_mode === 'vikunja'
                           ? 'border-accent-blue bg-accent-blue/5'
                           : 'border-[var(--border-color)]'
@@ -598,7 +633,7 @@ export function SettingsView() {
                       <p className="mt-1.5 font-mono text-xs">
                         <code className="text-blue-500">+project</code>{' '}
                         <code className="text-orange-500">*label</code>{' '}
-                        <code className="text-red-500">!1-!4</code>
+                        <code className="text-danger">!1-!4</code>
                       </p>
                     </button>
                   </div>
@@ -606,15 +641,13 @@ export function SettingsView() {
 
                 {/* ! → today shortcut */}
                 <label className="flex cursor-pointer items-center gap-2">
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     checked={fullConfig?.exclamation_today !== false}
                     onChange={(e) => handleQuickEntryChange({ exclamation_today: e.target.checked })}
-                    className="h-4 w-4 rounded border-[var(--border-color)] accent-accent-blue"
                   />
                   <div>
                     <span className="text-sm text-[var(--text-primary)]">
-                      <code className="rounded bg-[var(--bg-secondary)] px-1 py-0.5 text-xs font-mono text-green-600">!</code> in task title sets due date to today
+                      <code className="rounded-control bg-[var(--bg-secondary)] px-1 py-0.5 text-xs font-mono text-green-600">!</code> in task title sets due date to today
                     </span>
                     <p className="text-xs text-[var(--text-secondary)]">
                       Add ! before or after a task title to set it due today (e.g. "buy groceries !" or "! buy groceries")
@@ -630,14 +663,14 @@ export function SettingsView() {
           <p className="text-xs text-[var(--text-secondary)]">Saving...</p>
         )}
         {saveStatus === 'saved' && (
-          <p className="text-xs text-accent-green">Settings saved</p>
+          <p className="text-xs text-status-done">Settings saved</p>
         )}
         {saveStatus === 'error' && (
-          <p className="text-xs text-accent-red">Settings could not be saved. Your changes are kept and are saved again with the next change.</p>
+          <p className="text-xs text-danger">Settings could not be saved. Your changes are kept and are saved again with the next change.</p>
         )}
       </div>
       ) : activeTab === 'integrations' ? (
-      <div className="mx-6 max-w-lg space-y-6 pb-8 pt-4">
+      <div className="mx-6 space-y-6 pb-8 pt-4">
         {fullConfig && (
           <QuickEntrySettings
             config={fullConfig}
@@ -670,13 +703,13 @@ export function SettingsView() {
           <p className="text-xs text-[var(--text-secondary)]">Saving...</p>
         )}
         {saveStatus === 'saved' && (
-          <p className="text-xs text-accent-green">Settings saved</p>
+          <p className="text-xs text-status-done">Settings saved</p>
         )}
         {saveStatus === 'error' && (
-          <p className="text-xs text-accent-red">Settings could not be saved. Your changes are kept and are saved again with the next change.</p>
+          <p className="text-xs text-danger">Settings could not be saved. Your changes are kept and are saved again with the next change.</p>
         )}
       </div>
       ) : null}
-    </div>
+    </ReadingScroll>
   )
 }

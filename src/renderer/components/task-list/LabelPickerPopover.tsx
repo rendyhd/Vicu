@@ -1,21 +1,22 @@
-import { useRef, useEffect, useState } from 'react'
+import { useState, type RefObject } from 'react'
 import { Check, Plus } from 'lucide-react'
 import { useLabels } from '@/hooks/use-labels'
 import { useAddLabel, useRemoveLabel, useCreateLabel } from '@/hooks/use-task-mutations'
 import type { Label, Task } from '@/lib/vikunja-types'
 import { normalizeHex } from '@/lib/constants'
-import { usePopoverAlignment } from './use-popover-alignment'
+import { Popover, type PopoverCloseReason } from '../overlay/Popover'
 
 interface LabelPickerPopoverProps {
+  anchorRef: RefObject<HTMLElement | null>
+  /** Where it opens relative to the anchor; a menu entry opens it beside the menu. */
+  placement?: 'bottom-start' | 'right-start'
   /** Tasks to apply labels to. One for the expanded card; many for a multi-selection. */
   tasks: Task[]
-  onClose: () => void
+  onClose: (reason?: PopoverCloseReason) => void
   onApplied?: (label: Label) => void
 }
 
-export function LabelPickerPopover({ tasks, onClose, onApplied }: LabelPickerPopoverProps) {
-  const ref = useRef<HTMLDivElement>(null)
-  const align = usePopoverAlignment(ref)
+export function LabelPickerPopover({ anchorRef, placement = 'bottom-start', tasks, onClose, onApplied }: LabelPickerPopoverProps) {
   const { data: allLabels } = useLabels()
   const addLabel = useAddLabel()
   const removeLabel = useRemoveLabel()
@@ -34,16 +35,6 @@ export function LabelPickerPopover({ tasks, onClose, onApplied }: LabelPickerPop
       }
     }
   }
-
-  useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        onClose()
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [onClose])
 
   const toggle = (label: Label) => {
     if (commonIds.has(label.id)) {
@@ -81,18 +72,16 @@ export function LabelPickerPopover({ tasks, onClose, onApplied }: LabelPickerPop
   )
 
   return (
-    <div
-      ref={ref}
-      className={`absolute ${align} top-full z-50 mt-1 w-52 rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] shadow-lg`}
-    >
+    <Popover anchorRef={anchorRef} onClose={onClose} placement={placement} label="Labels" className="w-52">
       {/* Search field */}
       <div className="border-b border-[var(--border-color)] px-3 py-2">
         <input
           type="text"
+          aria-label="Search labels"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           placeholder="Search labels..."
-          autoFocus
+          data-autofocus
           className="w-full bg-transparent text-xs text-[var(--text-primary)] placeholder:text-[var(--text-secondary)] focus:outline-none"
           onKeyDown={(e) => {
             if (e.key === 'Enter' && trimmedQuery && !exactMatch) {
@@ -102,15 +91,18 @@ export function LabelPickerPopover({ tasks, onClose, onApplied }: LabelPickerPop
         />
       </div>
 
-      <div className="max-h-60 overflow-y-auto py-1">
-        {filteredLabels.length === 0 && !trimmedQuery && (
-          <div className="px-3 py-2 text-xs text-[var(--text-secondary)]">No labels</div>
-        )}
+      {filteredLabels.length === 0 && !trimmedQuery && (
+        <div className="px-3 py-2 text-xs text-[var(--text-secondary)]">No labels</div>
+      )}
 
+      <div role="listbox" aria-label="Labels" aria-multiselectable="true" className="max-h-60 overflow-y-auto py-1">
         {filteredLabels.map((label) => (
           <button
             key={label.id}
             type="button"
+            role="option"
+            tabIndex={-1}
+            aria-selected={commonIds.has(label.id)}
             onClick={() => toggle(label)}
             className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-[var(--text-primary)] hover:bg-[var(--bg-hover)]"
           >
@@ -129,6 +121,9 @@ export function LabelPickerPopover({ tasks, onClose, onApplied }: LabelPickerPop
         {trimmedQuery && !exactMatch && (
           <button
             type="button"
+            role="option"
+            tabIndex={-1}
+            aria-selected={false}
             onClick={() => handleCreateAndAssign(trimmedQuery)}
             className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs italic text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
           >
@@ -139,6 +134,6 @@ export function LabelPickerPopover({ tasks, onClose, onApplied }: LabelPickerPop
           </button>
         )}
       </div>
-    </div>
+    </Popover>
   )
 }

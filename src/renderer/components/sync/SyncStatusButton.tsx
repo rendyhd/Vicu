@@ -33,8 +33,8 @@ export function SyncStatusButton() {
           type="button"
           onClick={() => setOpen(true)}
           className={cn(
-            'mb-1 flex h-7 w-full items-center gap-2 rounded-md px-2.5 text-xs transition-colors hover:bg-[var(--bg-hover)]',
-            needsAttention ? 'text-accent-red' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]',
+            'mb-1 flex h-7 w-full items-center gap-2 rounded-control px-2.5 text-xs transition-colors hover:bg-[var(--bg-hover)]',
+            needsAttention ? 'text-danger' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]',
           )}
           title="Offline changes: click to review"
         >

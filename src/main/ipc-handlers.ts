@@ -1,5 +1,6 @@
 import { shell, dialog, app, nativeTheme } from 'electron'
 import { handleTrusted } from './secure-ipc'
+import { tokenForConnectionTest } from './connection-test-token'
 import { isExternalAllowed } from './web-security-policy'
 import { isRiskyAttachment, sanitizeAttachmentFileName } from './attachment-safety'
 import { ensureAttachmentTempDir } from './attachment-temp'
@@ -37,6 +38,7 @@ import {
 import { loadFileForUpload } from './upload-file'
 import { getLaunchOnStartupSupport } from './launch-on-startup'
 import { startupEnv } from './startup-env'
+import { announceDateFormatIfChanged, dateFormatForWindow } from './date-format'
 import {
   applyConfigPatch,
   applyConnectionFields,
@@ -63,6 +65,7 @@ import { authManager } from './auth/auth-manager'
 import { OidcTotpRequiredError } from './auth/oidc-login'
 import { buildViewerFilterParams } from './quick-entry/filter-builder'
 import { forgetDeletedTask, loadRoutineCarriers, rememberCreatedTask } from './carrier-service'
+import { countProjectTasks, invalidateProjectCounts } from './project-counts-service'
 import { dueToday } from '../shared/due-dates'
 import { KEEP_NESTED_SUBTASKS_PARAM } from './api-v2'
 import { fetchPositionSortedTasks } from './quick-entry/position-sort'
@@ -106,7 +109,7 @@ import {
   quickViewReopen,
   type QuickActionDeps,
 } from './offline/quick-actions'
-import { parseTaskWriteOptions, taskWriteReply, taskWrites, writeTask } from './offline/task-writes'
+import { parseTaskWriteOptions, sendSerially, taskWriteReply, taskWrites, writeTask } from './offline/task-writes'
 import {
   setCachedTasks,
   getCachedTasks,
@@ -138,7 +141,12 @@ function quickActionDeps(): QuickActionDeps {
   return {
     queue: getOfflineQueue(),
     api: { createTask, updateTask },
-    notifyMainWindow: () => notifyMainWindow(),
+    notifyMainWindow: () => {
+      // Every Quick Entry create and Quick View completion or reopening ends here on success, and
+      // each one moves a project's counts; the project is not known at this level.
+      invalidateProjectCounts()
+      notifyMainWindow()
+    },
     requestReplay,
   }
 }
@@ -152,6 +160,7 @@ function taskWriteDeps() {
 // Quick View refresh or custom list sync.
 const QUIET_PATCH_KEYS: ReadonlySet<string> = new Set([
   'sidebar_width',
+  'sidebar_collapsed_projects',
   'window_bounds',
   'last_used_project_id',
   'last_used_label_id',
@@ -170,6 +179,8 @@ function persistConfig(config: AppConfig, announce = true): void {
     config.api_token = ''
   }
   saveConfig(config)
+  // The clock choice changes how every window phrases dates.
+  announceDateFormatIfChanged(config)
   // Sync native theme when config changes
   if (config.theme) {
     nativeTheme.themeSource = config.theme === 'system' ? 'system' : config.theme
@@ -189,6 +200,12 @@ function persistConfig(config: AppConfig, announce = true): void {
   if (config.custom_lists?.length || config.custom_lists_sync?.dirty) void syncCustomLists()
 }
 
+/** The project of a task as the server returned it, or undefined (then every project is asked again). */
+function projectIdOf(task: unknown): number | undefined {
+  const id = (task as { project_id?: unknown } | null)?.project_id
+  return typeof id === 'number' && Number.isInteger(id) && id > 0 ? id : undefined
+}
+
 export function registerIpcHandlers(): void {
   registerOfflineQueueIpc()
 
@@ -204,10 +221,11 @@ export function registerIpcHandlers(): void {
   })
 
   handleTrusted('create-task', async (_event, projectId: number, task: Record<string, unknown>) => {
-    const result = await createTask(projectId, task)
+    const result = await sendSerially(() => createTask(projectId, task))
     if (result.success) {
       notifyViewerSync()
-      rememberCreatedTask(result.data)
+      // A new routine or custom-list carrier changes what the counts subtract: everything is asked again.
+      invalidateProjectCounts(rememberCreatedTask(result.data) ? undefined : projectId)
     }
     return result
   })
@@ -224,6 +242,10 @@ export function registerIpcHandlers(): void {
     if (outcome.kind === 'sent') {
       notifyViewerSync()
       notifyMainWindow(event.sender.id)
+      // A completion, a reopening or a move changes the progress of the task's project (both
+      // projects after a move, which the response does not tell: everything is asked again).
+      if ('project_id' in patch) invalidateProjectCounts()
+      else if ('done' in patch) invalidateProjectCounts(projectIdOf(outcome.result.data))
     }
     return taskWriteReply(outcome)
   })
@@ -235,6 +257,7 @@ export function registerIpcHandlers(): void {
     if (outcome.kind === 'sent') {
       notifyViewerSync()
       forgetDeletedTask(id)
+      invalidateProjectCounts()
     }
     return taskWriteReply(outcome)
   })
@@ -250,11 +273,20 @@ export function registerIpcHandlers(): void {
   // block completing, label filters, hidden projects), so each successful change refreshes it the
   // same way a task change does (D-IPC-4).
   handleTrusted('create-task-relation', async (_event, taskId: number, otherTaskId: number, relationKind: string) => {
-    return refreshViewerOnSuccess(await createTaskRelation(taskId, otherTaskId, relationKind))
+    return refreshViewerOnSuccess(await sendSerially(() => createTaskRelation(taskId, otherTaskId, relationKind)))
   })
 
   handleTrusted('delete-task-relation', async (_event, taskId: number, relationKind: string, otherTaskId: number) => {
-    return refreshViewerOnSuccess(await deleteTaskRelation(taskId, relationKind, otherTaskId))
+    return refreshViewerOnSuccess(await sendSerially(() => deleteTaskRelation(taskId, relationKind, otherTaskId)))
+  })
+
+  // Sidebar progress rings: how many tasks of a project are (not) done, from one one-task page
+  // (the envelope's `total`), minus the known hidden carrier tasks; cached for ten minutes.
+  handleTrusted('count-project-tasks', (_event, projectId: unknown, done: unknown) => {
+    if (typeof projectId !== 'number' || !Number.isInteger(projectId) || projectId <= 0 || typeof done !== 'boolean') {
+      return { success: false as const, error: 'Invalid project count request' }
+    }
+    return countProjectTasks(projectId, done)
   })
 
   // Projects
@@ -330,13 +362,16 @@ export function registerIpcHandlers(): void {
   })
 
   handleTrusted('update-task-position', (_event, taskId: number, viewId: number, position: number) => {
-    return updateTaskPosition(taskId, viewId, position)
+    return sendSerially(() => updateTaskPosition(taskId, viewId, position))
   })
 
   // Config
   handleTrusted('get-config', () => {
     return loadConfig()
   })
+
+  // The locale and clock for dates; all three windows ask when they load and listen for changes.
+  handleTrusted('get-date-format', () => dateFormatForWindow())
 
   // The renderer never saves a whole config: its copy can be stale (main changes window bounds,
   // sidebar width, popup positions... on its own). Preferences go through save-config-patch and
@@ -388,7 +423,9 @@ export function registerIpcHandlers(): void {
 
   // Connection test
   handleTrusted('test-connection', (_event, url: string, token: string) => {
-    return testConnection(url, token)
+    const config = loadConfig()
+    const saved = config?.auth_method === 'api_token' ? (getAPIToken() || config.api_token) : null
+    return testConnection(url, tokenForConnectionTest(url, token, config?.vikunja_url ?? '', saved))
   })
 
   // Auth
@@ -708,6 +745,7 @@ export function registerIpcHandlers(): void {
     if (!config) return null
     return {
       standalone_mode: config.standalone_mode === true,
+      theme: config.theme,
     }
   })
 

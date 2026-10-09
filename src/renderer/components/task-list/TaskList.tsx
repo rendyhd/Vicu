@@ -6,53 +6,83 @@ import { cn } from '@/lib/cn'
 import { verticalListSortingStrategyForeignSafe } from '@/lib/sortable-strategy'
 import { useCompleteTask, useUpdateTask, useDeleteTask } from '@/hooks/use-task-mutations'
 import { usePasteTasks } from '@/hooks/use-paste-tasks'
-import { useSelectionStore } from '@/stores/selection-store'
+import { currentExpandedTaskId, useSelectionStore } from '@/stores/selection-store'
+import { useNewTaskRequestStore } from '@/stores/new-task-request-store'
 import { orderedTaskIds, resolveSelectedTasks, copySelectedTitles, isTaskNestedInCurrentList } from '@/lib/task-selection'
 import { confirmDelete } from '@/lib/confirm-bridge'
 import { api } from '@/lib/api'
 import { dueToday } from '@/lib/due-dates'
 import type { Task } from '@/lib/vikunja-types'
 import { TaskRow } from './TaskRow'
+import { TaskRowGroup } from './TaskRowGroup'
 import { AddTaskButton } from './AddTaskButton'
 import { EmptyState } from '@/components/shared/EmptyState'
+import { PageHeader } from '@/components/shared/PageHeader'
+import { Button } from '@/components/shared/Button'
 import { NewTaskComposer } from './NewTaskComposer'
+import { SelectionBar } from './SelectionBar'
 import { taskDescendants, unfinishedDescendants } from '@/lib/task-hierarchy'
 import { confirmTaskCompletion } from '@/lib/task-completion'
+import { SmartListIcon } from '@/components/shared/SmartListIcon'
+import { ReadingScroll } from '@/components/layout/ReadingScroll'
+import type { SmartListId } from '@/lib/smart-list-identity'
 
 interface TaskListProps {
   title: string
+  /** A smart list: its identity icon shows before the title. */
+  identity?: SmartListId
+  /** One line under the title (Today's full date). */
+  subtitle?: React.ReactNode
   tasks: Task[]
   projectId?: number
   emptyTitle?: string
   emptySubtitle?: string
+  /** The list has just been emptied: the empty state warms in (Today's All clear). */
+  emptyWarm?: boolean
+  /** Under the empty state's title (the next upcoming task). */
+  emptyExtra?: React.ReactNode
   showNewTask?: boolean
   sortable?: boolean
   viewId?: number
   className?: string
   children?: React.ReactNode
+  /** Overrides the guess that the list is empty (no tasks and no children); a view that fills the list through children says so. */
+  empty?: boolean
   insertIndex?: number
   /** When set, new tasks get this due date by default. Shown as a dismissible chip. */
   defaultDueDate?: Date
   /** Content rendered inside the scroll area above the task input (e.g. date subtitle) */
   headerContent?: React.ReactNode
   onTaskCreated?: (task: Task) => void
+  /**
+   * Where the quiet "New task" row (and the composer it turns into) sits: after the list's own
+   * tasks and before `children` (a project, whose sections follow), or after the children, the end
+   * of the whole list (Today, Upcoming, Anytime: the tasks are all in the children). Default: the end.
+   */
+  newTaskPlacement?: 'after-tasks' | 'after-children'
 }
 
 export function TaskList({
   title,
+  identity,
+  subtitle,
   tasks,
   projectId,
   emptyTitle = 'No tasks',
   emptySubtitle,
+  emptyWarm,
+  emptyExtra,
   showNewTask = true,
   sortable = false,
   viewId,
   className,
   children,
+  empty,
   insertIndex,
   defaultDueDate,
   headerContent,
   onTaskCreated,
+  newTaskPlacement = 'after-children',
 }: TaskListProps) {
   const [isAdding, setIsAdding] = useState(false)
   const [addPosition, setAddPosition] = useState<'top' | 'bottom'>('top')
@@ -71,7 +101,6 @@ export function TaskList({
   const focusedTaskId = useSelectionStore((s) => s.focusedTaskId)
   const setFocusedTask = useSelectionStore((s) => s.setFocusedTask)
   const setExpandedTask = useSelectionStore((s) => s.setExpandedTask)
-  const toggleExpandedTask = useSelectionStore((s) => s.toggleExpandedTask)
   const collapseAll = useSelectionStore((s) => s.collapseAll)
   const setSelectedRange = useSelectionStore((s) => s.setSelectedRange)
   const clearSelection = useSelectionStore((s) => s.clearSelection)
@@ -125,6 +154,15 @@ export function TaskList({
     [collapseAll, setFocusedTask, clearSelection]
   )
 
+  // The empty state has its own "Add task" button, so the list shows no second one under it.
+  const isEmpty = empty ?? (tasks.length === 0 && !children)
+
+  // The header's + button and the empty state's "Add task" open the composer at the top.
+  const startAdding = useCallback(() => {
+    setAddPosition('top')
+    setIsAdding(true)
+  }, [])
+
   const handleHeaderClick = useCallback(
     (e: React.MouseEvent) => {
       const target = e.target as HTMLElement
@@ -140,8 +178,9 @@ export function TaskList({
   const handleScrollAreaClick = useCallback(
     (e: React.MouseEvent) => {
       const target = e.target as HTMLElement
-      // Only collapse when clicking the scroll container itself (empty space below tasks)
-      if (target === e.currentTarget) {
+      // Only collapse when clicking empty space: the scroll container itself (beside the column) or
+      // the reading column inside it (below the tasks).
+      if (target === e.currentTarget || target.parentElement === e.currentTarget) {
         collapseAll()
         setFocusedTask(null)
         clearSelection()
@@ -161,9 +200,8 @@ export function TaskList({
 
       // Handler wants current-at-keypress values — read imperatively instead
       // of subscribing the whole list to selection/expansion changes.
-      const { expandedTaskId, selectedTaskIds } = useSelectionStore.getState()
-
-      const taskCount = tasks.length
+      const { selectedTaskIds } = useSelectionStore.getState()
+      const expandedTaskId = currentExpandedTaskId()
 
       // --- Multi-selection shortcuts (work even when this list's own `tasks`
       // prop is empty, e.g. a project whose tasks all live in sections) ---
@@ -260,35 +298,47 @@ export function TaskList({
         return
       }
 
+      // The rows on screen in reading order. A view may hand its rows over as children (Today,
+      // Upcoming, Anytime, a project's sections), so the `tasks` prop is not the whole list.
+      const visibleIds = orderedTaskIds()
+      const taskCount = visibleIds.length
       if (taskCount === 0) return
 
-      const currentIndex = focusedTaskId
-        ? tasks.findIndex((t) => t.id === focusedTaskId)
-        : -1
+      const currentIndex = focusedTaskId ? visibleIds.indexOf(focusedTaskId) : -1
+
+      // Arrows belong to the list only while focus is on the page itself or in the list, and not in
+      // a menu, dialog or listbox (those use the arrows for their own items).
+      const arrowsForList =
+        !active ||
+        active === document.body ||
+        (!!listRef.current?.contains(active) && !active.closest('[role="menu"], [role="dialog"], [role="listbox"]'))
 
       // Arrow Up
-      if (e.key === 'ArrowUp') {
+      if (e.key === 'ArrowUp' && arrowsForList) {
         e.preventDefault()
         if (expandedTaskId) return // don't navigate while editing
         const newIndex = currentIndex <= 0 ? 0 : currentIndex - 1
-        setFocusedTask(tasks[newIndex].id)
+        setFocusedTask(visibleIds[newIndex])
         return
       }
 
       // Arrow Down
-      if (e.key === 'ArrowDown') {
+      if (e.key === 'ArrowDown' && arrowsForList) {
         e.preventDefault()
         if (expandedTaskId) return // don't navigate while editing
         const newIndex = currentIndex >= taskCount - 1 ? taskCount - 1 : currentIndex + 1
-        setFocusedTask(tasks[newIndex].id)
+        setFocusedTask(visibleIds[newIndex])
         return
       }
 
-      // Enter: expand focused task
-      if (e.key === 'Enter' && !e.ctrlKey && !e.metaKey) {
+      // Enter: expand focused task. Only when focus is on the page or the row itself: on a button
+      // (a toolbar button, a checkbox) Enter must keep activating it.
+      if (e.key === 'Enter' && !e.ctrlKey && !e.metaKey && (!active || active === document.body || active.hasAttribute('data-task-id'))) {
         e.preventDefault()
         if (focusedTaskId && !expandedTaskId) {
-          toggleExpandedTask(focusedTaskId)
+          // Not a toggle: the row's own Enter handler has just asked for the same task, and an open/close
+          // transition applies the change a moment later, so a second toggle would close it again.
+          setExpandedTask(focusedTaskId)
         }
         return
       }
@@ -321,11 +371,11 @@ export function TaskList({
             )
             collapseAll()
             // Move focus to the next top-level task; nested rows simply clear focus.
-            const idx = tasks.findIndex((item) => item.id === targetId)
+            const idx = visibleIds.indexOf(targetId)
             if (idx >= 0 && idx < taskCount - 1) {
-              setFocusedTask(tasks[idx + 1].id)
+              setFocusedTask(visibleIds[idx + 1])
             } else if (idx > 0) {
-              setFocusedTask(tasks[idx - 1].id)
+              setFocusedTask(visibleIds[idx - 1])
             } else {
               setFocusedTask(null)
             }
@@ -341,6 +391,7 @@ export function TaskList({
         const targetId = expandedTaskId || focusedTaskId
         if (!targetId) return
         const task = tasks.find((t) => t.id === targetId)
+          ?? resolveSelectedTasks(qc, new Set([targetId]))[0]
         if (task) {
           updateTask.mutate({ id: task.id, changes: { due_date: dueToday() }, original: task })
         }
@@ -366,7 +417,6 @@ export function TaskList({
       updateTask,
       deleteTask,
       setFocusedTask,
-      toggleExpandedTask,
       collapseAll,
       setIsAdding,
       qc,
@@ -391,12 +441,31 @@ export function TaskList({
     })
   }, [showNewTask, projectId])
 
+  // The command palette's "New task" asks the list on screen; the first list that can add a task
+  // takes the request (also one that mounts after the palette navigated to Inbox).
+  const newTaskRequestedAt = useNewTaskRequestStore((s) => s.requestedAt)
+  useEffect(() => {
+    if (newTaskRequestedAt === null || !showNewTask || !projectId) return
+    if (useNewTaskRequestStore.getState().take()) {
+      setAddPosition('top')
+      setIsAdding(true)
+    }
+  }, [newTaskRequestedAt, showNewTask, projectId])
+
   // Scroll focused task into view
   useEffect(() => {
     if (!focusedTaskId || !listRef.current) return
     const el = listRef.current.querySelector(`[data-task-id="${focusedTaskId}"]`)
     if (el) {
       el.scrollIntoView({ block: 'nearest' })
+      // The keyboard selection and DOM focus travel together (roving tabindex), unless the user is
+      // typing somewhere else.
+      const active = document.activeElement
+      // Focus already inside the row (its checkbox, after a completion by keyboard) stays where it is.
+      const insideRow = el instanceof HTMLElement && active !== null && el.contains(active)
+      if (el instanceof HTMLElement && el.tabIndex >= 0 && !insideRow && (!active || active === document.body || listRef.current.contains(active))) {
+        el.focus({ preventScroll: true })
+      }
     }
   }, [focusedTaskId])
 
@@ -425,79 +494,102 @@ export function TaskList({
     </div>
   )
 
+  // The end of the list: the composer when it was opened there, else the quiet "New task" row.
+  const endOfList = (
+    <>
+      {isAdding && addPosition === 'bottom' && taskInputElement}
+      {showNewTask && projectId && !isAdding && !isEmpty && (
+        <AddTaskButton
+          onClick={() => {
+            setAddPosition('bottom')
+            setIsAdding(true)
+          }}
+        />
+      )}
+    </>
+  )
+
   return (
     <div className={cn('flex h-full flex-col', className)} onClick={handleContainerClick}>
-      <div
-        className="flex items-center justify-between px-6 pb-2 pt-6"
+      <PageHeader
+        title={title}
+        subtitle={subtitle}
+        icon={identity && <SmartListIcon list={identity} className="h-5 w-5" />}
         onClick={handleHeaderClick}
-      >
-        <h1 className="text-xl font-bold text-[var(--text-primary)]">{title}</h1>
-        {showNewTask && projectId && (
-          <button
-            type="button"
-            onClick={() => {
-              setAddPosition('top')
-              setIsAdding(true)
-            }}
-            className="flex h-7 w-7 items-center justify-center rounded-md text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--accent-blue)]"
-            aria-label="New task"
-          >
-            <Plus className="h-4 w-4" />
-          </button>
-        )}
-      </div>
+        actions={
+          showNewTask && projectId ? (
+            <button
+              type="button"
+              onClick={startAdding}
+              className="flex h-7 w-7 items-center justify-center rounded-control text-[var(--text-secondary)] transition-colors duration-fade-fast hover:bg-[var(--bg-hover)] hover:text-[var(--accent-blue)]"
+              aria-label="New task"
+            >
+              <Plus className="h-4 w-4" />
+            </button>
+          ) : undefined
+        }
+      />
 
-      <div
-        ref={listRef}
-        className="flex-1 overflow-y-auto"
-        onClick={handleScrollAreaClick}
-      >
+      <ReadingScroll ref={listRef} onClick={handleScrollAreaClick}>
         {headerContent}
 
         {isAdding && addPosition === 'top' && taskInputElement}
 
-        {tasks.length === 0 && !isAdding && !children ? (
-          <EmptyState icon={Inbox} title={emptyTitle} subtitle={emptySubtitle} />
+        {isEmpty && !isAdding ? (
+          <EmptyState
+            icon={Inbox}
+            identity={identity}
+            title={emptyTitle}
+            subtitle={emptySubtitle}
+            warm={emptyWarm}
+            extra={emptyExtra}
+            action={
+              showNewTask && projectId ? (
+                <Button variant="secondary" onClick={startAdding}>
+                  <Plus className="h-4 w-4" />
+                  Add task
+                </Button>
+              ) : undefined
+            }
+          />
         ) : sortable ? (
           <SortableContext
             items={tasks.map((t) => `task-${t.id}`)}
             strategy={verticalListSortingStrategyForeignSafe}
           >
-            {tasks.map((task, i) => (
-              <Fragment key={task.id}>
-                {insertIndex === i && (
-                  <div className="mx-4 flex items-center gap-1 py-0.5">
+            {tasks.length > 0 && (
+              <TaskRowGroup>
+                {tasks.map((task, i) => (
+                  <Fragment key={task.id}>
+                    {insertIndex === i && (
+                      <div aria-hidden="true" className="mx-4 flex items-center gap-1 py-0.5">
+                        <div className="h-1.5 w-1.5 rounded-full bg-[var(--accent-blue)]" />
+                        <div className="h-[2px] flex-1 rounded-full bg-[var(--accent-blue)]" />
+                      </div>
+                    )}
+                    <TaskRow task={task} sortable />
+                  </Fragment>
+                ))}
+                {insertIndex != null && insertIndex >= tasks.length && (
+                  <div aria-hidden="true" className="mx-4 flex items-center gap-1 py-0.5">
                     <div className="h-1.5 w-1.5 rounded-full bg-[var(--accent-blue)]" />
                     <div className="h-[2px] flex-1 rounded-full bg-[var(--accent-blue)]" />
                   </div>
                 )}
-                <TaskRow task={task} sortable />
-              </Fragment>
-            ))}
-            {insertIndex != null && insertIndex >= tasks.length && (
-              <div className="mx-4 flex items-center gap-1 py-0.5">
-                <div className="h-1.5 w-1.5 rounded-full bg-[var(--accent-blue)]" />
-                <div className="h-[2px] flex-1 rounded-full bg-[var(--accent-blue)]" />
-              </div>
+              </TaskRowGroup>
             )}
           </SortableContext>
         ) : (
-          tasks.map((task) => <TaskRow key={task.id} task={task} />)
+          tasks.length > 0 && <TaskRowGroup>{tasks.map((task) => <TaskRow key={task.id} task={task} />)}</TaskRowGroup>
         )}
 
-        {isAdding && addPosition === 'bottom' && taskInputElement}
-
-        {showNewTask && projectId && !isAdding && (
-          <AddTaskButton
-            onClick={() => {
-              setAddPosition('bottom')
-              setIsAdding(true)
-            }}
-          />
-        )}
+        {newTaskPlacement === 'after-tasks' && endOfList}
 
         {children}
-      </div>
+
+        {newTaskPlacement === 'after-children' && endOfList}
+      </ReadingScroll>
+      <SelectionBar />
     </div>
   )
 }

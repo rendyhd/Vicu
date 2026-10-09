@@ -40,7 +40,7 @@ vi.mock('../secure-ipc', () => ({
   },
 }))
 vi.mock('../api-client', () => {
-  const entries = Object.fromEntries(['updateTask', 'deleteTask', 'addLabelToTask', 'removeLabelFromTask'].map((name) => {
+  const entries = Object.fromEntries(['updateTask', 'deleteTask', 'addLabelToTask', 'removeLabelFromTask', 'createTask', 'updateTaskPosition', 'createTaskRelation', 'deleteTaskRelation'].map((name) => {
     const fn = vi.fn(async (..._args: unknown[]): Promise<unknown> => ({ success: true, data: { id: 5 } }))
     hoisted.api[name] = fn
     return [name, fn]
@@ -225,6 +225,38 @@ describe('task writes go through the write gate', () => {
       hoisted.queue.waiting = true
       expect(await call('add-label-to-task', 5, 3)).toMatchObject({ success: false })
       expect(hoisted.api.addLabelToTask).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('writes without the gate still leave one at a time', () => {
+    it('create-task, update-task-position and relations wait for the request in front', async () => {
+      let inFlight = 0
+      let peak = 0
+      const slow = async (): Promise<unknown> => {
+        inFlight++
+        peak = Math.max(peak, inFlight)
+        await new Promise((resolve) => setTimeout(resolve, 5))
+        inFlight--
+        return { success: true, data: { id: 5 } }
+      }
+      hoisted.api.createTask.mockImplementationOnce(slow)
+      hoisted.api.updateTaskPosition.mockImplementationOnce(slow)
+      hoisted.api.createTaskRelation.mockImplementationOnce(slow)
+      hoisted.api.deleteTaskRelation.mockImplementationOnce(slow)
+      hoisted.api.updateTask.mockImplementationOnce(slow)
+
+      await Promise.all([
+        call('create-task', 1, { title: 'A' }),
+        call('update-task-position', 5, 2, 10),
+        call('create-task-relation', 5, 6, 'subtask'),
+        call('delete-task-relation', 5, 'subtask', 6),
+        call('update-task', 5, { done: true }, { queue: true }),
+      ])
+
+      expect(peak).toBe(1)
+      for (const name of ['createTask', 'updateTaskPosition', 'createTaskRelation', 'deleteTaskRelation', 'updateTask']) {
+        expect(hoisted.api[name]).toHaveBeenCalledTimes(1)
+      }
     })
   })
 })

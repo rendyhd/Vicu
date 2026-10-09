@@ -202,6 +202,100 @@ describe('uncompleteTaskRequest', () => {
   })
 })
 
+describe('undoing the completion of a repeating task', () => {
+  const BEFORE = '2026-10-10T09:00:00Z'
+  const AFTER = '2026-10-17T09:00:00Z'
+  const repeating = (id: number, overrides: Partial<Task> = {}) =>
+    task(id, { due_date: BEFORE, repeat_after: 604_800, reminders: [{ reminder: '2026-10-10T08:00:00Z' }], ...overrides })
+  /** What the server answers to the completion: open again, a week on. */
+  const advanced = (id: number, overrides: Partial<Task> = {}) =>
+    task(id, { due_date: AFTER, repeat_after: 604_800, reminders: [{ reminder: '2026-10-17T08:00:00Z' }], ...overrides })
+  let fetchTaskById: ReturnType<typeof vi.fn>
+
+  beforeEach(() => {
+    fetchTaskById = vi.fn(async (id: number) => ok(advanced(id)))
+    vi.stubGlobal('window', { api: { updateTask, updateProject, fetchTaskById } })
+    useOfflineStore.setState({ counts: { pending: 0, failed: 0 } })
+  })
+
+  it('puts the dates and reminders back with a merge patch, not a done flag the task already has', async () => {
+    const before = repeating(10)
+    updateTask.mockResolvedValueOnce(ok(advanced(10)))
+
+    await completeTaskRequest(before)
+    updateTask.mockClear()
+    await uncompleteTaskRequest(before, [])
+
+    expect(fetchTaskById).toHaveBeenCalledWith(10)
+    expect(patchCalls()).toEqual([[10, { due_date: BEFORE, reminders: [{ reminder: '2026-10-10T08:00:00Z' }] }]])
+  })
+
+  it('leaves a task alone that the user edited since the completion', async () => {
+    const before = repeating(10)
+    updateTask.mockResolvedValueOnce(ok(advanced(10)))
+    await completeTaskRequest(before)
+    updateTask.mockClear()
+    fetchTaskById.mockResolvedValueOnce(ok(advanced(10, { due_date: '2026-10-20T09:00:00Z' })))
+
+    await uncompleteTaskRequest(before, [])
+
+    expect(updateTask).not.toHaveBeenCalled()
+  })
+
+  it('also reopens a task that is somehow still done', async () => {
+    const before = repeating(10)
+    updateTask.mockResolvedValueOnce(ok(advanced(10)))
+    await completeTaskRequest(before)
+    updateTask.mockClear()
+    fetchTaskById.mockResolvedValueOnce(ok(advanced(10, { done: true })))
+
+    await uncompleteTaskRequest(before, [])
+
+    expect(patchCalls()).toEqual([[10, { due_date: BEFORE, reminders: [{ reminder: '2026-10-10T08:00:00Z' }], done: false }]])
+  })
+
+  it('restores each task of a bulk completion, and only once', async () => {
+    const [a, b] = [repeating(10), repeating(11)]
+    updateTask.mockResolvedValueOnce(ok(advanced(10))).mockResolvedValueOnce(ok(advanced(11)))
+    await completeTaskRequest(a)
+    await completeTaskRequest(b)
+    updateTask.mockClear()
+
+    await uncompleteTaskRequest(a, [])
+    await uncompleteTaskRequest(b, [])
+    expect(patchCalls().map(([id]) => id)).toEqual([10, 11])
+
+    // The snapshot was used up: a second Undo is the plain reopen.
+    updateTask.mockClear()
+    await uncompleteTaskRequest(a, [])
+    expect(patchCalls()).toEqual([[10, { done: false }]])
+  })
+
+  it('does nothing special for a task that really finished', async () => {
+    const plain = task(10, { due_date: BEFORE })
+    updateTask.mockResolvedValueOnce(ok({ ...plain, done: true }))
+    await completeTaskRequest(plain)
+    updateTask.mockClear()
+
+    await uncompleteTaskRequest(plain, [])
+
+    expect(fetchTaskById).not.toHaveBeenCalled()
+    expect(patchCalls()).toEqual([[10, { done: false }]])
+  })
+
+  it('falls back to the plain reopen when the task cannot be read', async () => {
+    const before = repeating(10)
+    updateTask.mockResolvedValueOnce(ok(advanced(10)))
+    await completeTaskRequest(before)
+    updateTask.mockClear()
+    fetchTaskById.mockResolvedValueOnce({ success: false, error: 'offline' })
+
+    await uncompleteTaskRequest(before, [])
+
+    expect(patchCalls()).toEqual([[10, { done: false }]])
+  })
+})
+
 describe('updateProjectRequest', () => {
   it('rename sends only the title', async () => {
     const original = project(5)

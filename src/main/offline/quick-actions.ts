@@ -2,7 +2,7 @@ import { isQueueableFailure, maybeCreatedMessage } from '../../shared/error-clas
 import type { ApiResult } from '../api-result'
 import type { OfflineQueue } from './queue'
 import { parseQueuedImages, parseQueuedLabels } from './parse-input'
-import { taskWrites, writeTask } from './task-writes'
+import { sendSerially, taskWrites, writeTask } from './task-writes'
 
 // What Quick Entry and Quick View do when the server cannot be reached. The IPC handlers in
 // ipc-handlers.ts stay thin (standalone mode, argument shapes, window notifications) and call into
@@ -47,7 +47,7 @@ export async function createFromQuickEntry(
   payload: Record<string, unknown>,
   extras?: { labels?: unknown; images?: unknown }
 ): Promise<QuickActionResult> {
-  const result = await deps.api.createTask(projectId, payload)
+  const result = await sendSerially(() => deps.api.createTask(projectId, payload))
   if (result.success) {
     deps.notifyMainWindow()
     return result

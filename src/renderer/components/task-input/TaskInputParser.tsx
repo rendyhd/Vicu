@@ -1,12 +1,13 @@
 import { useRef, useState, useCallback, useEffect } from 'react'
 import { extractBangToday } from '@/lib/task-parser'
 import type { ParseResult, ParserConfig, TokenType, SyntaxPrefixes } from '@/lib/task-parser'
-import { NlpInputHighlight } from '@/components/task-list/NlpParsePreview'
-import { TokenChip, buildChips } from './TokenChip'
+import { NlpInputHighlight } from '@/components/task-list/NlpInputHighlight'
+import { TokenChip } from './TokenChip'
+import { parseChips, type ChipData } from '@/lib/parse-chips'
 import { AutocompleteDropdown } from './AutocompleteDropdown'
-import type { AutocompleteHandle } from './AutocompleteDropdown'
+import type { AutocompleteAria, AutocompleteHandle } from './AutocompleteDropdown'
 import { cn } from '@/lib/cn'
-import type { ChipData } from './TokenChip'
+import { useDateFormat } from '@/hooks/use-date-format'
 
 interface AutocompleteItem {
   id: number
@@ -35,6 +36,10 @@ interface TaskInputParserProps {
   multiline?: boolean
   /** Extra chips injected by the parent (e.g. context-based "Today" default). */
   contextChips?: ChipData[]
+  /** Chips to show instead of the ones read from the parse (the composer shows what it will save). */
+  chips?: ChipData[]
+  /** Dismiss of a chip passed in `chips`; without it the chip is dismissed by suppressing its type. */
+  onDismissChip?: (chip: ChipData) => void
   onDismissContextChip?: (key: string) => void
 }
 
@@ -59,10 +64,15 @@ export function TaskInputParser({
   inputClassName,
   multiline = false,
   contextChips,
+  chips: chipsOverride,
+  onDismissChip,
   onDismissContextChip,
 }: TaskInputParserProps) {
+  const dateFormat = useDateFormat()
   const autocompleteRef = useRef<AutocompleteHandle>(null)
   const internalInputRef = useRef<HTMLInputElement | HTMLTextAreaElement>(null)
+  const [inputElement, setInputElement] = useState<HTMLInputElement | HTMLTextAreaElement | null>(null)
+  const [listAria, setListAria] = useState<AutocompleteAria | null>(null)
   const [cursorPosition, setCursorPosition] = useState(0)
   const [isComposing, setIsComposing] = useState(false)
   const pendingSubmitRef = useRef(false)
@@ -82,6 +92,7 @@ export function TaskInputParser({
   const setRefs = useCallback(
     (el: HTMLInputElement | HTMLTextAreaElement | null) => {
       ;(internalInputRef as React.MutableRefObject<HTMLInputElement | HTMLTextAreaElement | null>).current = el
+      setInputElement(el)
       if (typeof inputRef === 'function') {
         inputRef(el)
       } else if (inputRef && typeof inputRef === 'object') {
@@ -165,11 +176,21 @@ export function TaskInputParser({
     setCursorPosition((e.target as HTMLInputElement | HTMLTextAreaElement).selectionStart ?? 0)
   }, [])
 
-  const chips = parseResult ? buildChips(parseResult) : []
+  const chips = chipsOverride ?? (parseResult ? parseChips(parseResult, dateFormat) : [])
+  // The input is the combobox of the suggestion list: it owns the listbox and points at the highlighted option.
+  const comboboxProps = enabled
+    ? {
+        role: 'combobox' as const,
+        'aria-autocomplete': 'list' as const,
+        'aria-expanded': !!listAria,
+        'aria-controls': listAria?.listboxId,
+        'aria-activedescendant': listAria?.activeId,
+      }
+    : {}
   const hasTokens = enabled && parseResult && parseResult.tokens.length > 0
 
   return (
-    <div className={cn('relative', className)}>
+    <div data-token-scope className={cn('relative', className)}>
       {/* Input wrapper with highlight overlay */}
       <div className="relative">
         {hasTokens && (
@@ -184,6 +205,7 @@ export function TaskInputParser({
             onKeyDown={handleKeyDown}
             onSelect={handleSelect}
             onBlur={onBlur}
+            {...comboboxProps}
             onCompositionStart={() => setIsComposing(true)}
             onCompositionEnd={() => {
               setIsComposing(false)
@@ -205,6 +227,7 @@ export function TaskInputParser({
             onKeyDown={handleKeyDown}
             onSelect={handleSelect}
             onBlur={onBlur}
+            {...comboboxProps}
             onCompositionStart={() => setIsComposing(true)}
             onCompositionEnd={() => {
               setIsComposing(false)
@@ -231,6 +254,8 @@ export function TaskInputParser({
             labels={labels}
             onSelect={handleAutocompleteSelect}
             enabled={enabled}
+            inputElement={inputElement}
+            onAriaChange={setListAria}
           />
         )}
       </div>
@@ -250,7 +275,9 @@ export function TaskInputParser({
               key={chip.key}
               type={chip.type}
               label={chip.label}
-              onDismiss={() => onSuppressType(chip.type)}
+              source={chip.source}
+              priority={chip.priority}
+              onDismiss={() => (onDismissChip ? onDismissChip(chip) : onSuppressType(chip.type))}
             />
           ))}
           {contextChips?.map((chip) => (

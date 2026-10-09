@@ -70,9 +70,10 @@ function writeCarrier(
     })
 }
 
-export function useRoutines() {
+/** `enabled: false` reads the cache without fetching (a view that only asks while routines are switched on). */
+export function useRoutines({ enabled = true }: { enabled?: boolean } = {}) {
   const queryClient = useQueryClient()
-  const query = useQuery({ queryKey: ['routines'], queryFn: fetchCarriers, staleTime: 30_000 })
+  const query = useQuery({ queryKey: ['routines'], queryFn: fetchCarriers, staleTime: 30_000, enabled })
 
   useEffect(() => {
     if (query.data) void api.refreshRoutineReminders()

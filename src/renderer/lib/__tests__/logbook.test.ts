@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   LOGBOOK_PAGE_SIZE,
+  groupLogbookTasks,
   logbookHasMore,
   logbookPageParams,
   logbookTasks,
@@ -68,5 +69,52 @@ describe('Logbook paging (D-PERF-2, X-10)', () => {
     expect(logbookTasks([[child]]).map((t) => t.id)).toEqual([])
     // A completed child of a reopened parent is a Logbook row of its own.
     expect(logbookTasks([[lone]]).map((t) => t.id)).toEqual([3])
+  })
+})
+
+describe('Logbook day groups (card 2.9, logbook.group and logbook.time)', () => {
+  const en = { locale: 'en-US', hour12: false }
+  // Local wall-clock times, so the test holds in any time zone.
+  const now = new Date(2026, 9, 8, 12, 0)
+  const doneAt = (id: number, y: number, m: number, d: number, h: number, min: number) =>
+    task(id, { done_at: new Date(y, m, d, h, min).toISOString() })
+
+  it('groups neighbours by the completion day phrase and gives each row its completion time', () => {
+    const groups = groupLogbookTasks(
+      [
+        doneAt(1, 2026, 9, 8, 9, 5),
+        doneAt(2, 2026, 9, 8, 8, 0),
+        doneAt(3, 2026, 9, 7, 17, 30),
+        doneAt(4, 2026, 9, 5, 10, 0),
+        doneAt(5, 2026, 8, 30, 10, 0),
+        doneAt(6, 2026, 8, 2, 10, 0),
+      ],
+      now,
+      en,
+    )
+    expect(groups.map((g) => g.title)).toEqual(['Today', 'Yesterday', 'Mon, Oct 5', 'September 2026'])
+    expect(groups[0].rows.map((r) => [r.task.id, r.time])).toEqual([[1, '09:05'], [2, '08:00']])
+    expect(groups[3].rows.map((r) => r.task.id)).toEqual([5, 6])
+  })
+
+  it('uses the 12-hour clock and counts a completion ahead of the clock as today', () => {
+    const groups = groupLogbookTasks([doneAt(1, 2026, 9, 8, 15, 0)], new Date(2026, 9, 8, 14, 0), { locale: 'en-US', hour12: true })
+    expect(groups).toHaveLength(1)
+    expect(groups[0].title).toBe('Today')
+    expect(groups[0].rows[0].time).toBe('3:00 PM')
+  })
+
+  it('keeps a task without a completion time in the group it sits in, without a time', () => {
+    const nullDone = { done_at: '0001-01-01T00:00:00Z' }
+    const inside = groupLogbookTasks([doneAt(1, 2026, 9, 8, 9, 0), task(2, nullDone), doneAt(3, 2026, 9, 8, 8, 0)], now, en)
+    expect(inside.map((g) => g.title)).toEqual(['Today'])
+    expect(inside[0].rows.map((r) => r.time)).toEqual(['09:00', '', '08:00'])
+
+    const first = groupLogbookTasks([task(1, nullDone), doneAt(2, 2026, 9, 8, 9, 0)], now, en)
+    expect(first.map((g) => g.title)).toEqual(['', 'Today'])
+  })
+
+  it('is empty for no tasks', () => {
+    expect(groupLogbookTasks([], now, en)).toEqual([])
   })
 })

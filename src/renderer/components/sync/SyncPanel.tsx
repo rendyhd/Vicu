@@ -1,12 +1,15 @@
-import { useEffect, useRef, useState } from 'react'
+import { useId, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { AlertTriangle, LogIn, RefreshCw, X } from 'lucide-react'
 import { api } from '@/lib/api'
 import { refreshTasks } from '@/lib/task-refresh'
 import { confirmDelete } from '@/lib/confirm-bridge'
 import { toast } from '@/stores/toast-store'
+import { formatAbsoluteDateTime } from '@/lib/date-utils'
+import { useDateFormat } from '@/hooks/use-date-format'
 import { useOfflineStore } from '@/stores/offline-store'
 import { useUIStore } from '@/stores/ui-store'
+import { Dialog } from '@/components/overlay/Dialog'
 import type { OfflineFailedItemView, OfflineFailureReason } from '../../../shared/offline-queue-types'
 
 /** Why a change ended up in the failed log, in words the user can act on. */
@@ -31,11 +34,6 @@ export function failureReasonLabel(reason: OfflineFailureReason): string {
   }
 }
 
-function formatWhen(iso: string): string {
-  const date = new Date(iso)
-  return Number.isNaN(date.getTime()) ? '' : date.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
-}
-
 function FailedRow({
   item,
   busy,
@@ -47,6 +45,7 @@ function FailedRow({
   onRetry: () => void
   onDiscard: () => void
 }) {
+  const fmt = useDateFormat()
   return (
     <li className="flex flex-col gap-1 border-b border-[var(--border-color)] px-4 py-2.5 last:border-b-0">
       <div className="flex items-start gap-2">
@@ -57,7 +56,7 @@ function FailedRow({
               type="button"
               disabled={busy}
               onClick={onRetry}
-              className="rounded border border-[var(--border-color)] px-2 py-0.5 text-[11px] text-[var(--text-primary)] hover:bg-[var(--bg-hover)] disabled:opacity-50"
+              className="rounded-control border border-[var(--border-color)] px-2 py-0.5 text-[11px] text-[var(--text-primary)] hover:bg-[var(--bg-hover)] disabled:opacity-50"
             >
               Retry
             </button>
@@ -66,7 +65,7 @@ function FailedRow({
             type="button"
             disabled={busy}
             onClick={onDiscard}
-            className="rounded border border-[var(--border-color)] px-2 py-0.5 text-[11px] text-accent-red hover:bg-[var(--bg-hover)] disabled:opacity-50"
+            className="rounded-control border border-[var(--border-color)] px-2 py-0.5 text-[11px] text-danger hover:bg-[var(--bg-hover)] disabled:opacity-50"
           >
             Discard
           </button>
@@ -79,7 +78,7 @@ function FailedRow({
       {item.reason === 'other-account' && item.error && (
         <p className="break-words text-[11px] text-[var(--text-secondary)]">{item.error}</p>
       )}
-      <p className="text-[10px] text-[var(--text-secondary)] opacity-70">{formatWhen(item.failedAt)}</p>
+      <p className="text-caption text-[var(--text-secondary)] opacity-70">{formatAbsoluteDateTime(item.failedAt, fmt)}</p>
     </li>
   )
 }
@@ -96,16 +95,7 @@ export function SyncPanel({ onClose }: { onClose: () => void }) {
   const authProblem = useOfflineStore((s) => s.authProblem)
   const requestReauth = useUIStore((s) => s.requestReauth)
   const [busy, setBusy] = useState(false)
-  const closeRef = useRef<HTMLButtonElement>(null)
-
-  useEffect(() => {
-    closeRef.current?.focus()
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose()
-    }
-    document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
-  }, [onClose])
+  const titleId = useId()
 
   const failed = snapshot?.failed ?? []
   const pending = snapshot?.pending ?? []
@@ -138,20 +128,15 @@ export function SyncPanel({ onClose }: { onClose: () => void }) {
   const syncNow = () => run(() => api.offlineQueue.replayNow().then((r) => (r.success ? { success: true } : r)), 'Could not sync')
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
-      <div
-        role="dialog"
-        aria-label="Sync status"
-        className="mx-4 flex max-h-[80vh] w-full max-w-lg flex-col overflow-hidden rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] shadow-xl"
-        onClick={(event) => event.stopPropagation()}
-      >
+    <Dialog open onClose={onClose} labelledBy={titleId} className="w-[calc(100%-2rem)] max-w-lg">
+      <div className="flex max-h-[80vh] flex-col overflow-hidden">
         <div className="flex items-center gap-2 border-b border-[var(--border-color)] px-4 py-3">
-          <h2 className="flex-1 text-sm font-semibold text-[var(--text-primary)]">Sync status</h2>
+          <h2 id={titleId} className="flex-1 text-sm font-semibold text-[var(--text-primary)]">Sync status</h2>
           <button
-            ref={closeRef}
+            data-autofocus
             type="button"
             onClick={onClose}
-            className="rounded p-1 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
+            className="rounded-control p-1 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
             aria-label="Close"
           >
             <X className="h-4 w-4" />
@@ -160,8 +145,8 @@ export function SyncPanel({ onClose }: { onClose: () => void }) {
 
         <div className="min-h-0 flex-1 overflow-y-auto">
           {authProblem && (
-            <div className="flex items-start gap-3 border-b border-[var(--border-color)] bg-accent-red/10 px-4 py-3">
-              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-accent-red" />
+            <div className="flex items-start gap-3 border-b border-[var(--border-color)] bg-danger/10 px-4 py-3">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-danger" />
               <div className="min-w-0 flex-1">
                 <p className="text-[13px] font-medium text-[var(--text-primary)]">Sign in again to sync your changes</p>
                 <p className="mt-0.5 break-words text-[11px] text-[var(--text-secondary)]">
@@ -174,7 +159,7 @@ export function SyncPanel({ onClose }: { onClose: () => void }) {
                   onClose()
                   requestReauth()
                 }}
-                className="flex shrink-0 items-center gap-1 rounded bg-[var(--accent-blue)] px-2.5 py-1 text-[11px] font-medium text-white"
+                className="flex shrink-0 items-center gap-1 rounded-control bg-accent-fill px-2.5 py-1 text-[11px] font-medium text-on-accent"
               >
                 <LogIn className="h-3 w-3" /> Sign in
               </button>
@@ -191,7 +176,7 @@ export function SyncPanel({ onClose }: { onClose: () => void }) {
                   type="button"
                   disabled={busy || replaying}
                   onClick={() => void syncNow()}
-                  className="flex items-center gap-1 rounded border border-[var(--border-color)] px-2 py-0.5 text-[11px] text-[var(--text-primary)] hover:bg-[var(--bg-hover)] disabled:opacity-50"
+                  className="flex items-center gap-1 rounded-control border border-[var(--border-color)] px-2 py-0.5 text-[11px] text-[var(--text-primary)] hover:bg-[var(--bg-hover)] disabled:opacity-50"
                 >
                   <RefreshCw className={replaying ? 'h-3 w-3 animate-spin' : 'h-3 w-3'} /> {replaying ? 'Syncing' : 'Sync now'}
                 </button>
@@ -208,14 +193,14 @@ export function SyncPanel({ onClose }: { onClose: () => void }) {
           {failed.length > 0 && (
             <section>
               <div className="flex items-center gap-2 px-4 pb-1 pt-3">
-                <h3 className="flex-1 text-[11px] font-semibold uppercase tracking-wider text-accent-red">
+                <h3 className="flex-1 text-[11px] font-semibold uppercase tracking-wider text-danger">
                   Failed ({failed.length})
                 </h3>
                 <button
                   type="button"
                   disabled={busy}
                   onClick={() => void retry()}
-                  className="rounded border border-[var(--border-color)] px-2 py-0.5 text-[11px] text-[var(--text-primary)] hover:bg-[var(--bg-hover)] disabled:opacity-50"
+                  className="rounded-control border border-[var(--border-color)] px-2 py-0.5 text-[11px] text-[var(--text-primary)] hover:bg-[var(--bg-hover)] disabled:opacity-50"
                 >
                   Retry all
                 </button>
@@ -223,7 +208,7 @@ export function SyncPanel({ onClose }: { onClose: () => void }) {
                   type="button"
                   disabled={busy}
                   onClick={() => void discardAll()}
-                  className="rounded border border-[var(--border-color)] px-2 py-0.5 text-[11px] text-accent-red hover:bg-[var(--bg-hover)] disabled:opacity-50"
+                  className="rounded-control border border-[var(--border-color)] px-2 py-0.5 text-[11px] text-danger hover:bg-[var(--bg-hover)] disabled:opacity-50"
                 >
                   Discard all
                 </button>
@@ -247,6 +232,6 @@ export function SyncPanel({ onClose }: { onClose: () => void }) {
           )}
         </div>
       </div>
-    </div>
+    </Dialog>
   )
 }

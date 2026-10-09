@@ -1,5 +1,6 @@
-import { useEffect, useRef } from 'react'
+import { useId } from 'react'
 import { cn } from '@/lib/cn'
+import { Dialog } from '@/components/overlay/Dialog'
 
 interface ConfirmDialogProps {
   open: boolean
@@ -11,6 +12,8 @@ interface ConfirmDialogProps {
   secondaryLabel?: string
   onSecondary?: () => void
   secondaryDestructive?: boolean
+  /** Where focus goes on close when the dialog was opened from a menu item (see Dialog). */
+  returnFocusTo?: HTMLElement | null
 }
 
 export function ConfirmDialog({
@@ -23,44 +26,29 @@ export function ConfirmDialog({
   secondaryLabel,
   onSecondary,
   secondaryDestructive = false,
+  returnFocusTo,
 }: ConfirmDialogProps) {
-  const cancelRef = useRef<HTMLButtonElement>(null)
-
-  useEffect(() => {
-    if (open) cancelRef.current?.focus()
-  }, [open])
-
-  useEffect(() => {
-    if (!open) return
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.stopPropagation()
-        onCancel()
-      }
-    }
-    document.addEventListener('keydown', handleKey, true)
-    return () => document.removeEventListener('keydown', handleKey, true)
-  }, [open, onCancel])
-
-  if (!open) return null
+  const messageId = useId()
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
-      onClick={onCancel}
+    <Dialog
+      open={open}
+      onClose={onCancel}
+      role="alertdialog"
+      label={`Confirm ${confirmLabel.toLowerCase()}`}
+      describedBy={messageId}
+      returnFocusTo={returnFocusTo}
+      className="w-[calc(100%-2rem)] max-w-sm"
     >
-      <div
-        className="mx-4 w-full max-w-sm rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] p-5 shadow-xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <p className="mb-4 whitespace-pre-line text-sm text-[var(--text-primary)]">{message}</p>
+      <div className="p-5">
+        <p id={messageId} className="mb-4 whitespace-pre-line text-sm text-[var(--text-primary)]">{message}</p>
         <div className="flex justify-end gap-2">
           <button
-            ref={cancelRef}
+            data-autofocus
             type="button"
             onClick={onCancel}
             className={cn(
-              'rounded-md border border-[var(--border-color)] px-4 py-1.5 text-sm font-medium',
+              'rounded-control border border-[var(--border-color)] px-4 py-1.5 text-sm font-medium',
               'text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-hover)]'
             )}
           >
@@ -71,9 +59,9 @@ export function ConfirmDialog({
               type="button"
               onClick={onSecondary}
               className={cn(
-                'rounded-md px-4 py-1.5 text-sm font-medium transition-colors',
+                'rounded-control px-4 py-1.5 text-sm font-medium transition-colors',
                 secondaryDestructive
-                  ? 'bg-accent-red text-white hover:bg-accent-red/90'
+                  ? 'bg-danger text-on-accent dark:text-bg-page hover:bg-danger/90'
                   : 'border border-[var(--border-color)] text-[var(--text-primary)] hover:bg-[var(--bg-hover)]'
               )}
             >
@@ -84,16 +72,16 @@ export function ConfirmDialog({
             type="button"
             onClick={onConfirm}
             className={cn(
-              'rounded-md px-4 py-1.5 text-sm font-medium',
+              'rounded-control px-4 py-1.5 text-sm font-medium',
               destructive
-                ? 'bg-accent-red text-white transition-colors hover:bg-accent-red/90'
-                : 'bg-accent-blue text-white transition-colors hover:bg-accent-blue/90'
+                ? 'bg-danger text-on-accent dark:text-bg-page transition-colors hover:bg-danger/90'
+                : 'bg-accent-fill text-on-accent transition-colors hover:bg-accent-fill/90'
             )}
           >
             {confirmLabel}
           </button>
         </div>
       </div>
-    </div>
+    </Dialog>
   )
 }

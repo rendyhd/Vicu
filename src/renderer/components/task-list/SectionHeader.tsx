@@ -8,6 +8,7 @@ import { cn } from '@/lib/cn'
 import { useUpdateProject, useDeleteProject } from '@/hooks/use-task-mutations'
 import { useConfirmDelete } from '@/hooks/use-confirm-delete'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
+import { normalizeHex } from '@/lib/constants'
 import type { Project } from '@/lib/vikunja-types'
 
 interface SectionHeaderProps {
@@ -107,12 +108,17 @@ export function SectionHeader({ project, siblings, onAddTask }: SectionHeaderPro
       {...attributes}
       {...listeners}
       className={cn(
-        'group flex h-9 cursor-grab items-center gap-2 px-4 pt-4 pb-1 rounded-md',
+        'group flex h-9 cursor-grab items-center gap-2 px-4 pt-4 pb-1 rounded-control',
         isDragging && 'cursor-grabbing',
-        isTaskDragOver && 'bg-[var(--accent-blue)]/10'
+        isTaskDragOver && 'bg-accent-blue/10'
       )}
       style={style}
     >
+      <span
+        aria-hidden="true"
+        className="h-2 w-2 shrink-0 rounded-full"
+        style={{ backgroundColor: normalizeHex(project.hex_color) ?? 'var(--text-tertiary)' }}
+      />
       {isRenaming ? (
         <input
           ref={renameRef}
@@ -127,10 +133,10 @@ export function SectionHeader({ project, siblings, onAddTask }: SectionHeaderPro
             }
           }}
           onBlur={handleRenameSubmit}
-          className="flex-1 bg-transparent text-[13px] font-bold text-[var(--text-primary)] focus:outline-none"
+          className="flex-1 bg-transparent text-group text-text-secondary focus:outline-none"
         />
       ) : (
-        <span className="flex-1 truncate text-[13px] font-bold text-[var(--text-primary)]">
+        <span className="flex-1 truncate text-group text-text-secondary">
           {project.title}
         </span>
       )}
@@ -142,7 +148,7 @@ export function SectionHeader({ project, siblings, onAddTask }: SectionHeaderPro
             e.stopPropagation()
             onAddTask()
           }}
-          className="flex h-5 w-5 items-center justify-center rounded text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--accent-blue)]"
+          className="flex h-5 w-5 items-center justify-center rounded-control text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--accent-blue)]"
           aria-label="Add task to section"
         >
           <Plus className="h-3.5 w-3.5" />
@@ -156,7 +162,7 @@ export function SectionHeader({ project, siblings, onAddTask }: SectionHeaderPro
               e.stopPropagation()
               setShowMenu((s) => !s)
             }}
-            className="flex h-5 w-5 items-center justify-center rounded text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
+            className="flex h-5 w-5 items-center justify-center rounded-control text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
             aria-label="Section menu"
           >
             <MoreHorizontal className="h-3.5 w-3.5" />
@@ -165,7 +171,7 @@ export function SectionHeader({ project, siblings, onAddTask }: SectionHeaderPro
           {showMenu && (
             <div
               ref={menuRef}
-              className="absolute right-0 top-6 z-50 min-w-[120px] rounded-md border border-[var(--border-color)] bg-[var(--bg-primary)] py-1 shadow-lg"
+              className="absolute right-0 top-6 z-50 min-w-[120px] rounded-popover border border-[var(--border-color)] bg-[var(--bg-primary)] py-1 shadow-lg"
             >
               <button
                 type="button"
@@ -186,7 +192,7 @@ export function SectionHeader({ project, siblings, onAddTask }: SectionHeaderPro
                   e.stopPropagation()
                   handleDelete()
                 }}
-                className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-accent-red hover:bg-[var(--bg-hover)]"
+                className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-danger hover:bg-[var(--bg-hover)]"
               >
                 <Trash2 className="h-3 w-3" />
                 Delete

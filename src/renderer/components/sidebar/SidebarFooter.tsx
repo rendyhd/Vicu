@@ -46,7 +46,7 @@ export function SidebarFooter() {
         <button
           type="button"
           onClick={() => navigate({ to: '/settings' })}
-          className="flex h-7 flex-1 items-center gap-2 rounded-md px-2.5 text-xs text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
+          className="flex h-7 flex-1 items-center gap-2 rounded-control px-2.5 text-xs text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
         >
           <Settings className="h-3.5 w-3.5" strokeWidth={1.8} />
           <span>Settings</span>
@@ -67,7 +67,7 @@ export function SidebarFooter() {
               }
             }
           }}
-          className="relative flex h-7 items-center rounded-md px-2 text-[10px] text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
+          className="relative flex h-7 items-center rounded-control px-2 text-caption text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
           title={updateAvailable ? `v${latestVersion} available — click to download` : 'Click to check for updates'}
         >
           {checking ? 'checking…' : `v${__APP_VERSION__}`}

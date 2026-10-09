@@ -50,6 +50,8 @@ export interface UpdateStatus {
 
 export interface ElectronAPI {
   platform: 'darwin' | 'win32' | 'linux'
+  /** 'mica' when the main window has Mica behind it (Windows 11 22H2+). */
+  windowMaterial: 'mica' | 'none'
 
   // Tasks
   fetchTasks(params: TaskQueryParams): Promise<ApiResult<Task[]>>
@@ -69,6 +71,7 @@ export interface ElectronAPI {
   updateTaskPosition(taskId: number, viewId: number, position: number): Promise<ApiResult<unknown>>
 
   // Projects
+  countProjectTasks(projectId: number, done: boolean): Promise<ApiResult<number>>
   fetchProjects(includeArchived?: boolean): Promise<ApiResult<Project[]>>
   fetchProject(id: number): Promise<ApiResult<Project>>
   createProject(project: CreateProjectPayload): Promise<ApiResult<Project>>
@@ -191,6 +194,9 @@ export interface ElectronAPI {
   onNavigateToTask(cb: (taskId: number) => void): () => void
   onNewTask(cb: () => void): () => void
   onAppResumed(cb: () => void): () => void
+  /** The locale and clock dates are phrased with (system locale, clock setting). */
+  getDateFormat(): Promise<{ locale: string; hour12: boolean }>
+  onDateFormatChanged(cb: (format: { locale: string; hour12: boolean }) => void): () => void
   // Print
   printHtml(html: string): Promise<{ success: true } | { success: false; error: string }>
   onPrintView(cb: () => void): () => void

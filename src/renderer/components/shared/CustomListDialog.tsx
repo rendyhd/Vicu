@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useId, useState } from 'react'
 import { X } from 'lucide-react'
 import { cn } from '@/lib/cn'
+import { Dialog } from '@/components/overlay/Dialog'
 import { useProjects } from '@/hooks/use-projects'
 import { useLabels } from '@/hooks/use-labels'
 import { windowHonorsIncludeOverdue } from '@/lib/custom-list-filter'
@@ -58,6 +59,7 @@ const DEFAULT_FILTER: CustomListFilter = {
 }
 
 export function CustomListDialog({ open, list, onSave, onClose }: CustomListDialogProps) {
+  const titleId = useId()
   const [name, setName] = useState('')
   const [icon, setIcon] = useState('filter_list')
   const [filter, setFilter] = useState<CustomListFilter>(DEFAULT_FILTER)
@@ -122,270 +124,271 @@ export function CustomListDialog({ open, list, onSave, onClose }: CustomListDial
   const allProjects = projectData?.flat ?? []
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
-      <div
-        className="w-[440px] max-h-[80vh] overflow-y-auto rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] shadow-xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between border-b border-[var(--border-color)] px-5 py-3">
-          <h2 className="text-sm font-semibold text-[var(--text-primary)]">
-            {list ? 'Edit List' : 'New List'}
-          </h2>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded p-1 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
-          >
-            <X className="h-4 w-4" />
-          </button>
+    <Dialog open onClose={onClose} labelledBy={titleId} className="w-[440px]">
+      <div className="flex items-center justify-between border-b border-[var(--border-color)] px-5 py-3">
+        <h2 id={titleId} className="text-sm font-semibold text-[var(--text-primary)]">
+          {list ? 'Edit List' : 'New List'}
+        </h2>
+        <button
+          type="button"
+          aria-label="Close"
+          onClick={onClose}
+          className="rounded-control p-1 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+
+      <div className="space-y-4 p-5">
+        {/* Name */}
+        <div>
+          <label htmlFor={`${titleId}-name`} className="mb-1 block text-xs text-[var(--text-secondary)]">Name</label>
+          <input
+            id={`${titleId}-name`}
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="My List"
+            data-autofocus
+            className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') handleSave()
+            }}
+          />
         </div>
 
-        <div className="space-y-4 p-5">
-          {/* Name */}
-          <div>
-            <label className="mb-1 block text-xs text-[var(--text-secondary)]">Name</label>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="My List"
-              autoFocus
-              className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)] focus:border-accent-blue focus:outline-none"
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') handleSave()
-              }}
-            />
-          </div>
+        <label className="block">
+          <span className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">Icon</span>
+          <select
+            value={icon}
+            onChange={(event) => setIcon(event.target.value)}
+            className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)]"
+          >
+            {ICON_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+          </select>
+        </label>
 
-          <label className="block">
-            <span className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">Icon</span>
+        {/* Sort + Order */}
+        <div className="flex gap-3">
+          <div className="flex-1">
+            <label htmlFor={`${titleId}-sort`} className="mb-1 block text-xs text-[var(--text-secondary)]">Sort By</label>
             <select
-              value={icon}
-              onChange={(event) => setIcon(event.target.value)}
-              className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)] focus:border-accent-blue focus:outline-none"
+              id={`${titleId}-sort`}
+              value={filter.sort_by}
+              onChange={(e) => setFilter((f) => ({ ...f, sort_by: e.target.value }))}
+              className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)]"
             >
-              {ICON_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-            </select>
-          </label>
-
-          {/* Sort + Order */}
-          <div className="flex gap-3">
-            <div className="flex-1">
-              <label className="mb-1 block text-xs text-[var(--text-secondary)]">Sort By</label>
-              <select
-                value={filter.sort_by}
-                onChange={(e) => setFilter((f) => ({ ...f, sort_by: e.target.value }))}
-                className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] focus:border-accent-blue focus:outline-none"
-              >
-                {SORT_OPTIONS.map((o) => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
-                ))}
-              </select>
-            </div>
-            <div className="flex-1">
-              <label className="mb-1 block text-xs text-[var(--text-secondary)]">Order</label>
-              <select
-                value={filter.order_by}
-                onChange={(e) => setFilter((f) => ({ ...f, order_by: e.target.value as 'asc' | 'desc' }))}
-                className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] focus:border-accent-blue focus:outline-none"
-              >
-                <option value="asc">Ascending</option>
-                <option value="desc">Descending</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Due Date Filter */}
-          <div>
-            <label className="mb-1 block text-xs text-[var(--text-secondary)]">Due Date</label>
-            <select
-              value={filter.due_date_filter}
-              onChange={(e) => setFilter((f) => ({ ...f, due_date_filter: e.target.value as CustomListFilter['due_date_filter'] }))}
-              className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] focus:border-accent-blue focus:outline-none"
-            >
-              {DUE_DATE_OPTIONS.map((o) => (
+              {SORT_OPTIONS.map((o) => (
                 <option key={o.value} value={o.value}>{o.label}</option>
               ))}
             </select>
-            {windowHonorsIncludeOverdue(filter.due_date_filter) && (
-              <label className="mt-2 flex cursor-pointer items-center gap-2 text-xs text-[var(--text-primary)]">
-                <input
-                  type="checkbox"
-                  checked={filter.include_overdue !== false}
-                  onChange={(e) => setFilter((f) => ({ ...f, include_overdue: e.target.checked ? undefined : false }))}
-                  className="accent-accent-blue"
-                />
-                Include overdue tasks
-              </label>
-            )}
           </div>
-
-          {/* Projects */}
-          <div>
-            <div className="mb-1 flex items-center justify-between">
-              <label className="text-xs text-[var(--text-secondary)]">
-                Projects{' '}
-                {filter.project_ids.length === 0 && (
-                  <span className="text-[var(--text-secondary)]">
-                    {(filter.project_filter_mode ?? 'include') === 'include' ? '(all)' : '(none excluded)'}
-                  </span>
-                )}
-                {filter.project_ids.length > 0 && (filter.project_filter_mode ?? 'include') === 'exclude' && (
-                  <span className="text-[var(--text-secondary)]">({filter.project_ids.length} excluded)</span>
-                )}
-              </label>
-              <div className="flex overflow-hidden rounded-md border border-[var(--border-color)]">
-                {(['include', 'exclude'] as const).map((mode) => (
-                  <button
-                    key={mode}
-                    type="button"
-                    onClick={() => setFilter((f) => ({ ...f, project_filter_mode: mode, project_ids: [] }))}
-                    className={cn(
-                      'px-2.5 py-0.5 text-[10px] font-medium capitalize transition-colors',
-                      (filter.project_filter_mode ?? 'include') === mode
-                        ? 'bg-accent-blue text-white'
-                        : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'
-                    )}
-                  >
-                    {mode}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="max-h-32 overflow-y-auto rounded-md border border-[var(--border-color)] bg-[var(--bg-secondary)] p-2">
-              {allProjects.map((p) => (
-                <label
-                  key={p.id}
-                  className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-xs text-[var(--text-primary)] hover:bg-[var(--bg-hover)]"
-                >
-                  <input
-                    type="checkbox"
-                    checked={filter.project_ids.includes(p.id)}
-                    onChange={() => toggleProjectId(p.id)}
-                    className="accent-accent-blue"
-                  />
-                  {p.title}
-                </label>
-              ))}
-              {allProjects.length === 0 && (
-                <p className="px-2 py-1 text-xs text-[var(--text-secondary)]">No projects found</p>
-              )}
-            </div>
-          </div>
-
-          {/* New-task destination */}
-          <div>
-            <label className="mb-1 block text-xs text-[var(--text-secondary)]">Add tasks to</label>
+          <div className="flex-1">
+            <label htmlFor={`${titleId}-order`} className="mb-1 block text-xs text-[var(--text-secondary)]">Order</label>
             <select
-              value={filter.add_to_project_id ?? 0}
-              onChange={(e) => setFilter((current) => ({ ...current, add_to_project_id: Number(e.target.value) }))}
-              className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] focus:border-accent-blue focus:outline-none"
+              id={`${titleId}-order`}
+              value={filter.order_by}
+              onChange={(e) => setFilter((f) => ({ ...f, order_by: e.target.value as 'asc' | 'desc' }))}
+              className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)]"
             >
-              <option value={0}>Inbox</option>
-              {allProjects.map((project) => (
-                <option key={project.id} value={project.id}>{project.title}</option>
-              ))}
-              {(filter.add_to_project_id ?? 0) > 0 && !allProjects.some((project) => project.id === filter.add_to_project_id) && (
-                <option value={filter.add_to_project_id}>Unavailable project (uses Inbox)</option>
-              )}
+              <option value="asc">Ascending</option>
+              <option value="desc">Descending</option>
             </select>
           </div>
+        </div>
 
-          {/* Priority */}
-          <div>
-            <label className="mb-1 block text-xs text-[var(--text-secondary)]">
-              Priority {!filter.priority_filter?.length && <span className="text-[var(--text-secondary)]">(any)</span>}
+        {/* Due Date Filter */}
+        <div>
+          <label htmlFor={`${titleId}-due`} className="mb-1 block text-xs text-[var(--text-secondary)]">Due Date</label>
+          <select
+            id={`${titleId}-due`}
+            value={filter.due_date_filter}
+            onChange={(e) => setFilter((f) => ({ ...f, due_date_filter: e.target.value as CustomListFilter['due_date_filter'] }))}
+            className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)]"
+          >
+            {DUE_DATE_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </select>
+          {windowHonorsIncludeOverdue(filter.due_date_filter) && (
+            <label className="mt-2 flex cursor-pointer items-center gap-2 text-xs text-[var(--text-primary)]">
+              <input
+                type="checkbox"
+                checked={filter.include_overdue !== false}
+                onChange={(e) => setFilter((f) => ({ ...f, include_overdue: e.target.checked ? undefined : false }))}
+                className="accent-accent-blue"
+              />
+              Include overdue tasks
             </label>
-            <div className="flex flex-wrap gap-2">
-              {PRIORITY_OPTIONS.map((p) => (
+          )}
+        </div>
+
+        {/* Projects */}
+        <div>
+          <div className="mb-1 flex items-center justify-between">
+            <label className="text-xs text-[var(--text-secondary)]">
+              Projects{' '}
+              {filter.project_ids.length === 0 && (
+                <span className="text-[var(--text-secondary)]">
+                  {(filter.project_filter_mode ?? 'include') === 'include' ? '(all)' : '(none excluded)'}
+                </span>
+              )}
+              {filter.project_ids.length > 0 && (filter.project_filter_mode ?? 'include') === 'exclude' && (
+                <span className="text-[var(--text-secondary)]">({filter.project_ids.length} excluded)</span>
+              )}
+            </label>
+            <div className="flex overflow-hidden rounded-control border border-[var(--border-color)]">
+              {(['include', 'exclude'] as const).map((mode) => (
                 <button
-                  key={p.value}
+                  key={mode}
                   type="button"
-                  onClick={() => togglePriority(p.value)}
+                  onClick={() => setFilter((f) => ({ ...f, project_filter_mode: mode, project_ids: [] }))}
                   className={cn(
-                    'rounded-md border px-3 py-1 text-xs font-medium transition-colors',
-                    filter.priority_filter?.includes(p.value)
-                      ? 'border-accent-blue bg-accent-blue/10 text-accent-blue'
-                      : 'border-[var(--border-color)] text-[var(--text-secondary)] hover:border-[var(--text-secondary)]'
+                    'px-2.5 py-0.5 text-caption font-medium capitalize transition-colors',
+                    (filter.project_filter_mode ?? 'include') === mode
+                      ? 'bg-accent-fill text-on-accent'
+                      : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'
                   )}
                 >
-                  {p.label}
+                  {mode}
                 </button>
               ))}
             </div>
           </div>
-
-          {/* Labels */}
-          {labels && labels.length > 0 && (
-            <div>
-              <label className="mb-1 block text-xs text-[var(--text-secondary)]">
-                Labels {!filter.label_ids?.length && <span className="text-[var(--text-secondary)]">(any)</span>}
+          <div className="max-h-32 overflow-y-auto rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] p-2">
+            {allProjects.map((p) => (
+              <label
+                key={p.id}
+                className="flex cursor-pointer items-center gap-2 rounded-control px-2 py-1 text-xs text-[var(--text-primary)] hover:bg-[var(--bg-hover)]"
+              >
+                <input
+                  type="checkbox"
+                  checked={filter.project_ids.includes(p.id)}
+                  onChange={() => toggleProjectId(p.id)}
+                  className="accent-accent-blue"
+                />
+                {p.title}
               </label>
-              <div className="max-h-32 overflow-y-auto rounded-md border border-[var(--border-color)] bg-[var(--bg-secondary)] p-2">
-                {labels.map((l) => (
-                  <label
-                    key={l.id}
-                    className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-xs text-[var(--text-primary)] hover:bg-[var(--bg-hover)]"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={filter.label_ids?.includes(l.id) ?? false}
-                      onChange={() => toggleLabel(l.id)}
-                      className="accent-accent-blue"
-                    />
-                    {l.title}
-                  </label>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Include Done */}
-          <label className="flex cursor-pointer items-center gap-2 text-xs text-[var(--text-primary)]">
-            <input
-              type="checkbox"
-              checked={filter.include_done ?? false}
-              onChange={(e) => setFilter((f) => ({ ...f, include_done: e.target.checked || undefined }))}
-              className="accent-accent-blue"
-            />
-            Include completed tasks
-          </label>
-
-          {/* Include today from all projects */}
-          <label className="flex cursor-pointer items-center gap-2 text-xs text-[var(--text-primary)]">
-            <input
-              type="checkbox"
-              checked={filter.include_today_all_projects ?? false}
-              onChange={(e) => setFilter((f) => ({ ...f, include_today_all_projects: e.target.checked || undefined }))}
-              className="accent-accent-blue"
-            />
-            Include tasks due today from all projects
-          </label>
-        </div>
-
-        {/* Footer */}
-        <div className="flex justify-end gap-2 border-t border-[var(--border-color)] px-5 py-3">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-md border border-[var(--border-color)] px-4 py-1.5 text-xs font-medium text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-hover)]"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={handleSave}
-            disabled={!name.trim()}
-            className={cn(
-              'rounded-md px-4 py-1.5 text-xs font-medium transition-colors',
-              'bg-accent-blue text-white hover:bg-accent-blue/90',
-              'disabled:cursor-not-allowed disabled:opacity-50'
+            ))}
+            {allProjects.length === 0 && (
+              <p className="px-2 py-1 text-xs text-[var(--text-secondary)]">No projects found</p>
             )}
-          >
-            {list ? 'Save' : 'Create'}
-          </button>
+          </div>
         </div>
+
+        {/* New-task destination */}
+        <div>
+          <label htmlFor={`${titleId}-destination`} className="mb-1 block text-xs text-[var(--text-secondary)]">Add tasks to</label>
+          <select
+            id={`${titleId}-destination`}
+            value={filter.add_to_project_id ?? 0}
+            onChange={(e) => setFilter((current) => ({ ...current, add_to_project_id: Number(e.target.value) }))}
+            className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)]"
+          >
+            <option value={0}>Inbox</option>
+            {allProjects.map((project) => (
+              <option key={project.id} value={project.id}>{project.title}</option>
+            ))}
+            {(filter.add_to_project_id ?? 0) > 0 && !allProjects.some((project) => project.id === filter.add_to_project_id) && (
+              <option value={filter.add_to_project_id}>Unavailable project (uses Inbox)</option>
+            )}
+          </select>
+        </div>
+
+        {/* Priority */}
+        <div>
+          <label className="mb-1 block text-xs text-[var(--text-secondary)]">
+            Priority {!filter.priority_filter?.length && <span className="text-[var(--text-secondary)]">(any)</span>}
+          </label>
+          <div className="flex flex-wrap gap-2">
+            {PRIORITY_OPTIONS.map((p) => (
+              <button
+                key={p.value}
+                type="button"
+                onClick={() => togglePriority(p.value)}
+                className={cn(
+                  'rounded-control border px-3 py-1 text-xs font-medium transition-colors',
+                  filter.priority_filter?.includes(p.value)
+                    ? 'border-accent-blue bg-accent-blue/10 text-accent-blue'
+                    : 'border-[var(--border-color)] text-[var(--text-secondary)] hover:border-[var(--text-secondary)]'
+                )}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Labels */}
+        {labels && labels.length > 0 && (
+          <div>
+            <label className="mb-1 block text-xs text-[var(--text-secondary)]">
+              Labels {!filter.label_ids?.length && <span className="text-[var(--text-secondary)]">(any)</span>}
+            </label>
+            <div className="max-h-32 overflow-y-auto rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] p-2">
+              {labels.map((l) => (
+                <label
+                  key={l.id}
+                  className="flex cursor-pointer items-center gap-2 rounded-control px-2 py-1 text-xs text-[var(--text-primary)] hover:bg-[var(--bg-hover)]"
+                >
+                  <input
+                    type="checkbox"
+                    checked={filter.label_ids?.includes(l.id) ?? false}
+                    onChange={() => toggleLabel(l.id)}
+                    className="accent-accent-blue"
+                  />
+                  {l.title}
+                </label>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Include Done */}
+        <label className="flex cursor-pointer items-center gap-2 text-xs text-[var(--text-primary)]">
+          <input
+            type="checkbox"
+            checked={filter.include_done ?? false}
+            onChange={(e) => setFilter((f) => ({ ...f, include_done: e.target.checked || undefined }))}
+            className="accent-accent-blue"
+          />
+          Include completed tasks
+        </label>
+
+        {/* Include today from all projects */}
+        <label className="flex cursor-pointer items-center gap-2 text-xs text-[var(--text-primary)]">
+          <input
+            type="checkbox"
+            checked={filter.include_today_all_projects ?? false}
+            onChange={(e) => setFilter((f) => ({ ...f, include_today_all_projects: e.target.checked || undefined }))}
+            className="accent-accent-blue"
+          />
+          Include tasks due today from all projects
+        </label>
       </div>
-    </div>
+
+      {/* Footer */}
+      <div className="flex justify-end gap-2 border-t border-[var(--border-color)] px-5 py-3">
+        <button
+          type="button"
+          onClick={onClose}
+          className="rounded-control border border-[var(--border-color)] px-4 py-1.5 text-xs font-medium text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-hover)]"
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          onClick={handleSave}
+          disabled={!name.trim()}
+          className={cn(
+            'rounded-control px-4 py-1.5 text-xs font-medium transition-colors',
+            'bg-accent-fill text-on-accent hover:bg-accent-fill/90',
+            'disabled:cursor-not-allowed disabled:opacity-50'
+          )}
+        >
+          {list ? 'Save' : 'Create'}
+        </button>
+      </div>
+    </Dialog>
   )
 }

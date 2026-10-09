@@ -17,6 +17,9 @@ declare global {
       fetchTaskAttachments(taskId: number): Promise<{ success: boolean; data?: Array<{ id: number }>; error?: string; statusCode?: number }>
       updateTask(taskId: number, task: Record<string, unknown>): Promise<{ success: boolean; error?: string; statusCode?: number; data?: unknown }>
       closeWindow(): Promise<void>
+      // The locale and clock dates are phrased with (system locale, Settings clock choice).
+      getDateFormat(): Promise<{ locale: string; hour12: boolean }>
+      onDateFormatChanged(callback: (format: { locale: string; hour12: boolean }) => void): void
       // The note's final link when saving with it linked; the uid is written into the note then.
       resolveObsidianLink(): Promise<{ deepLink: string; noteName: string; isUidBased: boolean } | null>
       setHeight(height: number): Promise<void>
@@ -61,13 +64,18 @@ interface QuickEntryConfig {
 
 import { parse, getParserConfig, recurrenceToVikunja, extractBangToday } from '../lib/task-parser'
 import { dueToday, parsedDue } from '../lib/due-dates'
-import { formatClockTime } from '../lib/date-utils'
+import { followColorScheme } from '../lib/theme'
+import { parseChips } from '../lib/parse-chips'
+import { motionMs, motionSpringCurve, travelStart } from '../lib/motion'
+import { initDateFormat, subscribeDateFormat } from '../lib/date-format'
 import type { ParseResult, ParserConfig, ParsedToken, TokenType } from '../lib/task-parser'
 import { getClipboardImages, fileToUint8Array } from '../lib/clipboard-images'
 import { AutocompleteDropdown } from './autocomplete'
 import { cache } from './vikunja-cache'
 import { applyQuickEntryFollowUps } from '../lib/quick-entry-follow-ups'
 import { escapeHtml, plainTextToDescriptionHtml } from '../lib/description-html'
+
+followColorScheme()
 
 const input = document.getElementById('task-input') as HTMLInputElement
 const descriptionHint = document.getElementById('description-hint')!
@@ -396,7 +404,7 @@ function renderHighlights(inputValue: string, tokens: ParsedToken[]): void {
     if (token.start > pos) {
       html += escapeHighlightText(inputValue.slice(pos, token.start))
     }
-    html += `<span class="token-${token.type}">${escapeHighlightText(inputValue.slice(token.start, token.end))}</span>`
+    html += `<span class="token-${token.type}" data-token-type="${token.type}">${escapeHighlightText(inputValue.slice(token.start, token.end))}</span>`
     pos = token.end
   }
   if (pos < inputValue.length) {
@@ -413,53 +421,76 @@ function escapeHighlightText(text: string): string {
     .replace(/ /g, '\u00a0')
 }
 
-function renderParsePreview(result: ParseResult): void {
-  const chips: string[] = []
+/** Keys of the chips on screen: a chip travels out of its token only the first time it appears. */
+let shownChipKeys = new Set<string>()
 
-  if (result.dueDate) {
-    const day = formatDateLabel(result.dueDate)
-    const label = result.dueHasTime ? `${day} ${formatClockTime(result.dueDate)}` : day
-    chips.push(`<span class="parse-chip parse-chip-date">${escapeHtml(label)}<button class="parse-chip-dismiss" data-type="date">&times;</button></span>`)
+/**
+ * A chip read from the typed text travels out of the highlighted token it came from, like the main
+ * window's composer (card 4.11a, lib/motion.ts travelStart). Under reduced motion it fades in.
+ */
+function animateChipIn(chip: HTMLElement, type: string): void {
+  if (typeof chip.animate !== 'function') return
+  const fade = (): void => {
+    chip.animate([{ opacity: 0 }, { opacity: 1 }], { duration: motionMs('fade-fast'), easing: 'linear' })
   }
-  if (result.priority !== null && result.priority > 0) {
-    const labels = ['', 'Low', 'Medium', 'High', 'Urgent']
-    const label = labels[result.priority] || `P${result.priority}`
-    chips.push(`<span class="parse-chip parse-chip-priority">${escapeHtml(label)}<button class="parse-chip-dismiss" data-type="priority">&times;</button></span>`)
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    fade()
+    return
   }
-  for (const lbl of result.labels) {
-    chips.push(`<span class="parse-chip parse-chip-label">${escapeHtml(lbl)}<button class="parse-chip-dismiss" data-type="label">&times;</button></span>`)
+  const token = inputHighlight.querySelector<HTMLElement>(`[data-token-type="${type}"]`)
+  if (!token) {
+    fade()
+    return
   }
-  if (result.project) {
-    chips.push(`<span class="parse-chip parse-chip-project">${escapeHtml(result.project)}<button class="parse-chip-dismiss" data-type="project">&times;</button></span>`)
-  }
-  if (result.recurrence) {
-    const unit = result.recurrence.unit
-    const interval = result.recurrence.interval
-    const label = interval === 1 ? `Every ${unit}` : `Every ${interval} ${unit}s`
-    chips.push(`<span class="parse-chip parse-chip-recurrence">${escapeHtml(label)}<button class="parse-chip-dismiss" data-type="recurrence">&times;</button></span>`)
-  }
-
-  if (chips.length > 0) {
-    parsePreview.innerHTML = chips.join('')
-    parsePreview.classList.remove('hidden')
-  } else {
-    parsePreview.innerHTML = ''
-    parsePreview.classList.add('hidden')
-  }
+  const from = travelStart(token.getBoundingClientRect(), chip.getBoundingClientRect())
+  chip.animate(
+    [
+      { transform: `translate(${from.dx}px, ${from.dy}px) scale(${from.scale})`, opacity: 0.4 },
+      { transform: 'none', opacity: 1 },
+    ],
+    { duration: motionMs('move'), easing: motionSpringCurve('move') },
+  )
 }
 
-function formatDateLabel(date: Date): string {
-  const now = new Date()
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-  const target = new Date(date.getFullYear(), date.getMonth(), date.getDate())
-  const diffDays = Math.round((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
-  if (diffDays === 0) return 'Today'
-  if (diffDays === 1) return 'Tomorrow'
-  if (diffDays === -1) return 'Yesterday'
-  if (diffDays > 1 && diffDays <= 7) {
-    return target.toLocaleDateString(undefined, { weekday: 'long' })
+function renderParsePreview(result: ParseResult): void {
+  // The same chips, in the same words, as the main window's composer (lib/parse-chips.ts).
+  const chips = parseChips(result)
+
+  if (chips.length === 0) {
+    parsePreview.innerHTML = ''
+    parsePreview.classList.add('hidden')
+    shownChipKeys = new Set()
+    return
   }
-  return target.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+
+  // Chips that are unchanged keep their element (a travel in progress is not cut by the next key);
+  // changed ones are rebuilt; new ones are animated in once the container is visible.
+  const existing = new Map<string, HTMLElement>()
+  for (const el of parsePreview.querySelectorAll<HTMLElement>('.parse-chip')) existing.set(el.dataset.chipKey ?? '', el)
+  const entering: Array<{ el: HTMLElement; type: string }> = []
+  const next: HTMLElement[] = []
+  const nextKeys = new Set<string>()
+  for (const chip of chips) {
+    const level = chip.type === 'priority' ? ` priority-${Math.min(Math.max(chip.priority ?? 1, 1), 5)}` : ''
+    const source = chip.source ?? 'text'
+    const signature = `${chip.label}|${chip.priority ?? ''}|${source}`
+    const html = `<span class="parse-chip parse-chip-${chip.type}${level}" data-chip-key="${escapeHtml(chip.key)}" data-chip-sig="${escapeHtml(signature)}" data-chip-type="${chip.type}" data-chip-source="${source}">${escapeHtml(chip.label)}<button class="parse-chip-dismiss" data-type="${chip.type}" aria-label="Dismiss ${chip.type}">&times;</button></span>`
+    const kept = existing.get(chip.key)
+    if (kept && kept.dataset.chipSig === signature) {
+      next.push(kept)
+    } else {
+      const holder = document.createElement('template')
+      holder.innerHTML = html
+      const el = holder.content.firstElementChild as HTMLElement
+      next.push(el)
+      if (!shownChipKeys.has(chip.key) && source === 'text') entering.push({ el, type: chip.type })
+    }
+    nextKeys.add(chip.key)
+  }
+  parsePreview.replaceChildren(...next)
+  parsePreview.classList.remove('hidden')
+  shownChipKeys = nextKeys
+  for (const { el, type } of entering) animateChipIn(el, type)
 }
 
 // --- Image staging ---
@@ -521,6 +552,7 @@ function clearPendingImages(): void {
 function clearNlpState(): void {
   inputHighlight.innerHTML = ''
   parsePreview.innerHTML = ''
+  shownChipKeys = new Set()
   parsePreview.classList.add('hidden')
   lastParseResult = null
   suppressedTypes = new Map()
@@ -912,6 +944,12 @@ window.quickEntryApi.onBrowserContext((ctx) => {
   browserContext = { url: ctx.url, title: ctx.title, displayTitle: ctx.displayTitle }
   browserLinked = ctx.mode === 'always'
   updateBrowserUI()
+})
+
+// Dates follow the system locale and the Settings clock choice; main sends them and any change.
+void initDateFormat(window.quickEntryApi)
+subscribeDateFormat(() => {
+  if (lastParseResult) renderParsePreview(lastParseResult)
 })
 
 // Load config on startup

@@ -1,8 +1,11 @@
 import { Bell, Check, Clock3, SkipForward, Undo2 } from 'lucide-react'
 import { useRoutines } from '@/hooks/use-routines'
-import { timeLabel, type OccurrenceStatus, type RoutineOccurrence } from '@/lib/routines'
+import { isFinished, type OccurrenceStatus, type RoutineOccurrence } from '@/lib/routines'
 import type { Task } from '@/lib/vikunja-types'
 import { cn } from '@/lib/cn'
+import { ListSectionHeader } from '@/components/task-list/ListSectionHeader'
+import { formatMinutesOfDay } from '@/lib/date-utils'
+import { useDateFormat } from '@/hooks/use-date-format'
 
 function RoutineCheck({
   occurrence,
@@ -13,6 +16,7 @@ function RoutineCheck({
   disabled: boolean
   onStatus: (status: OccurrenceStatus) => void
 }) {
+  const dateFormat = useDateFormat()
   const completed = occurrence.status === 'COMPLETED'
   const skipped = occurrence.status === 'SKIPPED'
   const definition = occurrence.carrier.payload.definition
@@ -31,8 +35,8 @@ function RoutineCheck({
         className={cn(
           'flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 transition-all',
           completed
-            ? 'border-accent-green bg-accent-green text-white'
-            : 'border-[var(--text-tertiary)] text-transparent hover:border-accent-green hover:text-accent-green',
+            ? 'border-status-done bg-status-done text-on-accent dark:text-bg-page'
+            : 'border-[var(--text-tertiary)] text-transparent hover:border-status-done hover:text-status-done',
         )}
       >
         {completed ? <Check className="h-3.5 w-3.5" strokeWidth={3} /> : <Check className="h-3 w-3" />}
@@ -40,21 +44,21 @@ function RoutineCheck({
 
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline gap-2">
-          <span className={cn('truncate text-[13px] font-medium text-[var(--text-primary)]', completed && 'line-through')}>
+          <span className={cn('truncate text-section text-[var(--text-primary)]', completed && 'line-through')}>
             {definition.name}
           </span>
           {definition.slots.length > 1 && (
-            <span className="shrink-0 text-[11px] text-[var(--text-secondary)]">{occurrence.slot.label}</span>
+            <span className="shrink-0 text-meta text-[var(--text-secondary)]">{occurrence.slot.label}</span>
           )}
         </div>
-        <div className="mt-0.5 flex items-center gap-2 text-[11px] text-[var(--text-secondary)]">
+        <div className="mt-0.5 flex items-center gap-2 text-meta text-[var(--text-secondary)]">
           {detail && <span>{detail}</span>}
           <span className="inline-flex items-center gap-1">
             <Clock3 className="h-3 w-3" />
-            {timeLabel(occurrence.slot.reminderMinutes)}
+            {formatMinutesOfDay(occurrence.slot.reminderMinutes, dateFormat)}
           </span>
           {occurrence.slot.reminderEnabled && <Bell className="h-3 w-3" />}
-          {occurrence.overdue && <span className="font-medium text-accent-red">Overdue</span>}
+          {occurrence.overdue && <span className="font-medium text-status-overdue">Overdue</span>}
           {occurrence.status === 'NOT_LOGGED' && <span>Not logged</span>}
           {skipped && <span>Skipped</span>}
         </div>
@@ -64,7 +68,7 @@ function RoutineCheck({
         type="button"
         disabled={disabled}
         onClick={() => onStatus(skipped ? 'PENDING' : 'SKIPPED')}
-        className="flex h-7 items-center gap-1 rounded-md px-2 text-[11px] font-medium text-[var(--text-secondary)] opacity-0 transition hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)] group-hover:opacity-100 focus:opacity-100"
+        className="flex h-7 items-center gap-1 rounded-control px-2 text-meta text-[var(--text-secondary)] opacity-0 transition hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)] group-hover:opacity-100 focus:opacity-100"
         aria-label={skipped ? `Undo skip for ${definition.name}` : `Skip ${definition.name}`}
       >
         {skipped ? <Undo2 className="h-3.5 w-3.5" /> : <SkipForward className="h-3.5 w-3.5" />}
@@ -74,17 +78,24 @@ function RoutineCheck({
   )
 }
 
-export function RoutineTodaySection({ showEmpty = false }: { showEmpty?: boolean }) {
+export function RoutineTodaySection({
+  showEmpty = false,
+  hideFinished = false,
+}: {
+  showEmpty?: boolean
+  /** Leave out what is done for the day (completed or skipped); the Today view lists only what is left. */
+  hideFinished?: boolean
+}) {
   const routines = useRoutines()
   const completed = routines.today.filter((occurrence) => occurrence.status === 'COMPLETED').length
   const total = routines.today.length
+  const shown = hideFinished ? routines.today.filter((occurrence) => !isFinished(occurrence.status)) : routines.today
 
-  if (!routines.isLoading && total === 0 && !showEmpty) return null
+  if (!routines.isLoading && shown.length === 0 && !showEmpty) return null
 
   return (
     <section className="border-b border-[var(--border-color)] pb-2">
-      <div className="flex items-center gap-3 px-6 pb-1.5 pt-2">
-        <span className="text-[11px] font-semibold uppercase tracking-wider text-accent-purple">Routines</span>
+      <ListSectionHeader level={1} title="Routines" tone="routines" className="gap-3">
         {total > 0 && (
           <>
             <div className="h-1.5 min-w-16 flex-1 overflow-hidden rounded-full bg-[var(--bg-tertiary)]">
@@ -93,10 +104,10 @@ export function RoutineTodaySection({ showEmpty = false }: { showEmpty?: boolean
                 style={{ width: `${Math.round((completed / total) * 100)}%` }}
               />
             </div>
-            <span className="text-[11px] tabular-nums text-[var(--text-secondary)]">{completed}/{total}</span>
+            <span className="text-meta font-medium tabular-nums text-text-secondary">{completed}/{total}</span>
           </>
         )}
-      </div>
+      </ListSectionHeader>
 
       {routines.isLoading && (
         <div className="px-6 py-3 text-xs text-[var(--text-secondary)]">Loading routines...</div>
@@ -104,7 +115,7 @@ export function RoutineTodaySection({ showEmpty = false }: { showEmpty?: boolean
       {!routines.isLoading && total === 0 && (
         <div className="px-6 py-3 text-xs text-[var(--text-secondary)]">Nothing scheduled for today.</div>
       )}
-      {routines.today.map((occurrence) => (
+      {shown.map((occurrence) => (
         <RoutineCheck
           key={occurrence.key}
           occurrence={occurrence}

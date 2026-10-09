@@ -9,6 +9,8 @@ import type {
 
 const api = {
   platform: process.platform as 'darwin' | 'win32' | 'linux',
+  /** 'mica' when the main window has Mica behind it (Windows 11 22H2+; set by main, window-chrome.ts). */
+  windowMaterial: (process.argv.includes('--vicu-window-material=mica') ? 'mica' : 'none') as 'mica' | 'none',
 
   // Tasks
   fetchTasks: (params: Record<string, unknown>) =>
@@ -31,6 +33,8 @@ const api = {
     ipcRenderer.invoke('delete-task-relation', taskId, relationKind, otherTaskId),
 
   // Projects
+  countProjectTasks: (projectId: number, done: boolean) =>
+    ipcRenderer.invoke('count-project-tasks', projectId, done),
   fetchProjects: (includeArchived = false) =>
     ipcRenderer.invoke('fetch-projects', includeArchived),
   fetchProject: (id: number) =>
@@ -156,6 +160,14 @@ const api = {
     ipcRenderer.invoke('get-launch-on-startup-support') as Promise<{ supported: boolean }>,
   getHotkeyLauncherCommand: () =>
     ipcRenderer.invoke('get-hotkey-launcher-command') as Promise<{ quickEntry: string; quickView: string; kind: 'appimage' | 'packaged' | 'dev' }>,
+
+  // Locale and clock for dates (src/shared/date-display.ts); changes when the clock setting does.
+  getDateFormat: () => ipcRenderer.invoke('get-date-format'),
+  onDateFormatChanged: (callback: (format: { locale: string; hour12: boolean }) => void) => {
+    const handler = (_: unknown, format: { locale: string; hour12: boolean }) => callback(format)
+    ipcRenderer.on('date-format-changed', handler)
+    return () => { ipcRenderer.removeListener('date-format-changed', handler) }
+  },
 
   // The computer woke from sleep: timers and the clock may have jumped while it was asleep.
   onAppResumed: (callback: () => void) => {

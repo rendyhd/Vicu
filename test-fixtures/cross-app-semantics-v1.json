@@ -96,5 +96,1284 @@
     { "name": "cadence override", "today": "2026-10-06", "defaultCadence": 14, "meta": { "state": "reviewed", "lastReviewedAt": "2026-10-01", "cadenceDaysOverride": 7 }, "expect": { "isOverdue": false, "daysSince": 5, "daysUntil": 2, "next": "2026-10-08" } },
     { "name": "across the EU DST change", "today": "2026-11-03", "defaultCadence": 14, "meta": { "state": "reviewed", "lastReviewedAt": "2026-10-20" }, "expect": { "isOverdue": false, "daysSince": 14, "daysUntil": 0, "next": "2026-11-03" } },
     { "name": "across the year end", "today": "2027-01-08", "defaultCadence": 14, "meta": { "state": "reviewed", "lastReviewedAt": "2026-12-25" }, "expect": { "isOverdue": false, "daysSince": 14, "daysUntil": 0, "next": "2027-01-08" } }
-  ]
+  ],
+  "completion": {
+    "about": "Vectors for the completion hold of docs/cross-app-semantics-v1.md section 7. Times are milliseconds from the start of the sequence. Events: complete, hoverStart, hoverEnd, focusIn, focusOut (a row id in \"row\", or \"target\": \"toast\"), navigate, and undo (\"via\": \"row\" with a row id, or \"via\": \"toast\"). Each expect entry is the state after every event up to and including that time, with timers due at that time already fired (a timer fires before an event at the same instant). held and collapsed are row ids in ascending order.",
+    "holdMs": 5000,
+    "toastMs": 6000,
+    "toast": { "single": "Completed", "many": "{n} completed", "action": "Undo" },
+    "vectors": [
+      {
+        "name": "plain completion",
+        "events": [{ "at": 0, "type": "complete", "row": 1 }],
+        "expect": [
+          { "at": 0, "held": [1], "collapsed": [], "toast": null },
+          { "at": 4999, "held": [1], "collapsed": [], "toast": null },
+          { "at": 5000, "held": [], "collapsed": [1], "toast": "Completed" },
+          { "at": 10999, "held": [], "collapsed": [1], "toast": "Completed" },
+          { "at": 11000, "held": [], "collapsed": [1], "toast": null }
+        ]
+      },
+      {
+        "name": "pointer on the row extends the hold",
+        "events": [{ "at": 0, "type": "hoverStart", "row": 1 }, { "at": 100, "type": "complete", "row": 1 }, { "at": 7000, "type": "hoverEnd", "row": 1 }],
+        "expect": [
+          { "at": 100, "held": [1], "collapsed": [], "toast": null },
+          { "at": 6999, "held": [1], "collapsed": [], "toast": null },
+          { "at": 7000, "held": [1], "collapsed": [], "toast": null },
+          { "at": 11999, "held": [1], "collapsed": [], "toast": null },
+          { "at": 12000, "held": [], "collapsed": [1], "toast": "Completed" },
+          { "at": 17999, "held": [], "collapsed": [1], "toast": "Completed" },
+          { "at": 18000, "held": [], "collapsed": [1], "toast": null }
+        ]
+      },
+      {
+        "name": "keyboard focus on the row extends the hold",
+        "events": [{ "at": 0, "type": "focusIn", "row": 1 }, { "at": 0, "type": "complete", "row": 1 }, { "at": 3000, "type": "focusOut", "row": 1 }],
+        "expect": [
+          { "at": 0, "held": [1], "collapsed": [], "toast": null },
+          { "at": 2999, "held": [1], "collapsed": [], "toast": null },
+          { "at": 3000, "held": [1], "collapsed": [], "toast": null },
+          { "at": 7999, "held": [1], "collapsed": [], "toast": null },
+          { "at": 8000, "held": [], "collapsed": [1], "toast": "Completed" }
+        ]
+      },
+      {
+        "name": "pointer and focus both keep the row",
+        "events": [{ "at": 0, "type": "hoverStart", "row": 1 }, { "at": 0, "type": "focusIn", "row": 1 }, { "at": 10, "type": "complete", "row": 1 }, { "at": 2000, "type": "hoverEnd", "row": 1 }, { "at": 4000, "type": "focusOut", "row": 1 }],
+        "expect": [
+          { "at": 10, "held": [1], "collapsed": [], "toast": null },
+          { "at": 2000, "held": [1], "collapsed": [], "toast": null },
+          { "at": 4000, "held": [1], "collapsed": [], "toast": null },
+          { "at": 8999, "held": [1], "collapsed": [], "toast": null },
+          { "at": 9000, "held": [], "collapsed": [1], "toast": "Completed" }
+        ]
+      },
+      {
+        "name": "engagement that starts during the hold restarts it",
+        "events": [{ "at": 0, "type": "complete", "row": 1 }, { "at": 3000, "type": "hoverStart", "row": 1 }, { "at": 4000, "type": "hoverEnd", "row": 1 }],
+        "expect": [
+          { "at": 2999, "held": [1], "collapsed": [], "toast": null },
+          { "at": 3000, "held": [1], "collapsed": [], "toast": null },
+          { "at": 5000, "held": [1], "collapsed": [], "toast": null },
+          { "at": 8999, "held": [1], "collapsed": [], "toast": null },
+          { "at": 9000, "held": [], "collapsed": [1], "toast": "Completed" }
+        ]
+      },
+      {
+        "name": "leaving the view ends every hold early",
+        "events": [{ "at": 0, "type": "complete", "row": 1 }, { "at": 1000, "type": "complete", "row": 2 }, { "at": 1500, "type": "hoverStart", "row": 2 }, { "at": 2000, "type": "navigate" }],
+        "expect": [
+          { "at": 1999, "held": [1, 2], "collapsed": [], "toast": null },
+          { "at": 2000, "held": [], "collapsed": [1, 2], "toast": "2 completed" },
+          { "at": 7999, "held": [], "collapsed": [1, 2], "toast": "2 completed" },
+          { "at": 8000, "held": [], "collapsed": [1, 2], "toast": null }
+        ]
+      },
+      {
+        "name": "navigating with nothing held changes nothing",
+        "events": [{ "at": 100, "type": "navigate" }],
+        "expect": [
+          { "at": 0, "held": [], "collapsed": [], "toast": null },
+          { "at": 100, "held": [], "collapsed": [], "toast": null },
+          { "at": 200, "held": [], "collapsed": [], "toast": null }
+        ]
+      },
+      {
+        "name": "completions merge into one toast and restart its clock",
+        "events": [{ "at": 0, "type": "complete", "row": 1 }, { "at": 2000, "type": "complete", "row": 2 }, { "at": 3000, "type": "complete", "row": 3 }],
+        "expect": [
+          { "at": 4999, "held": [1, 2, 3], "collapsed": [], "toast": null },
+          { "at": 5000, "held": [2, 3], "collapsed": [1], "toast": "Completed" },
+          { "at": 6999, "held": [2, 3], "collapsed": [1], "toast": "Completed" },
+          { "at": 7000, "held": [3], "collapsed": [1, 2], "toast": "2 completed" },
+          { "at": 7999, "held": [3], "collapsed": [1, 2], "toast": "2 completed" },
+          { "at": 8000, "held": [], "collapsed": [1, 2, 3], "toast": "3 completed" },
+          { "at": 13999, "held": [], "collapsed": [1, 2, 3], "toast": "3 completed" },
+          { "at": 14000, "held": [], "collapsed": [1, 2, 3], "toast": null }
+        ]
+      },
+      {
+        "name": "undo from the toast reopens what the toast covers",
+        "events": [{ "at": 0, "type": "complete", "row": 1 }, { "at": 1000, "type": "complete", "row": 2 }, { "at": 7000, "type": "undo", "via": "toast" }],
+        "expect": [
+          { "at": 5000, "held": [2], "collapsed": [1], "toast": "Completed" },
+          { "at": 6000, "held": [], "collapsed": [1, 2], "toast": "2 completed" },
+          { "at": 6999, "held": [], "collapsed": [1, 2], "toast": "2 completed" },
+          { "at": 7000, "held": [], "collapsed": [], "toast": null },
+          { "at": 20000, "held": [], "collapsed": [], "toast": null }
+        ]
+      },
+      {
+        "name": "undo from the toast leaves a row that is still held alone",
+        "events": [{ "at": 0, "type": "complete", "row": 1 }, { "at": 4000, "type": "complete", "row": 2 }, { "at": 6000, "type": "undo", "via": "toast" }],
+        "expect": [
+          { "at": 5999, "held": [2], "collapsed": [1], "toast": "Completed" },
+          { "at": 6000, "held": [2], "collapsed": [], "toast": null },
+          { "at": 8999, "held": [2], "collapsed": [], "toast": null },
+          { "at": 9000, "held": [], "collapsed": [2], "toast": "Completed" },
+          { "at": 14999, "held": [], "collapsed": [2], "toast": "Completed" },
+          { "at": 15000, "held": [], "collapsed": [2], "toast": null }
+        ]
+      },
+      {
+        "name": "undo of a held row cancels it without a toast",
+        "events": [{ "at": 0, "type": "complete", "row": 1 }, { "at": 2000, "type": "undo", "via": "row", "row": 1 }],
+        "expect": [
+          { "at": 1999, "held": [1], "collapsed": [], "toast": null },
+          { "at": 2000, "held": [], "collapsed": [], "toast": null },
+          { "at": 5000, "held": [], "collapsed": [], "toast": null },
+          { "at": 20000, "held": [], "collapsed": [], "toast": null }
+        ]
+      },
+      {
+        "name": "completing a held row again keeps the first deadline",
+        "events": [{ "at": 0, "type": "complete", "row": 1 }, { "at": 3000, "type": "complete", "row": 1 }],
+        "expect": [
+          { "at": 4999, "held": [1], "collapsed": [], "toast": null },
+          { "at": 5000, "held": [], "collapsed": [1], "toast": "Completed" }
+        ]
+      },
+      {
+        "name": "completing again after an undo starts a new hold",
+        "events": [{ "at": 0, "type": "complete", "row": 1 }, { "at": 1000, "type": "undo", "via": "row", "row": 1 }, { "at": 2000, "type": "complete", "row": 1 }],
+        "expect": [
+          { "at": 1500, "held": [], "collapsed": [], "toast": null },
+          { "at": 6999, "held": [1], "collapsed": [], "toast": null },
+          { "at": 7000, "held": [], "collapsed": [1], "toast": "Completed" }
+        ]
+      },
+      {
+        "name": "pointer on the toast keeps it",
+        "events": [{ "at": 0, "type": "complete", "row": 1 }, { "at": 10000, "type": "hoverStart", "target": "toast" }, { "at": 30000, "type": "hoverEnd", "target": "toast" }],
+        "expect": [
+          { "at": 5000, "held": [], "collapsed": [1], "toast": "Completed" },
+          { "at": 10999, "held": [], "collapsed": [1], "toast": "Completed" },
+          { "at": 11000, "held": [], "collapsed": [1], "toast": "Completed" },
+          { "at": 29999, "held": [], "collapsed": [1], "toast": "Completed" },
+          { "at": 30000, "held": [], "collapsed": [1], "toast": "Completed" },
+          { "at": 35999, "held": [], "collapsed": [1], "toast": "Completed" },
+          { "at": 36000, "held": [], "collapsed": [1], "toast": null }
+        ]
+      },
+      {
+        "name": "keyboard focus on the toast keeps it",
+        "events": [{ "at": 0, "type": "complete", "row": 1 }, { "at": 8000, "type": "focusIn", "target": "toast" }, { "at": 9000, "type": "focusOut", "target": "toast" }],
+        "expect": [
+          { "at": 5000, "held": [], "collapsed": [1], "toast": "Completed" },
+          { "at": 11000, "held": [], "collapsed": [1], "toast": "Completed" },
+          { "at": 14999, "held": [], "collapsed": [1], "toast": "Completed" },
+          { "at": 15000, "held": [], "collapsed": [1], "toast": null }
+        ]
+      },
+      {
+        "name": "a completion that collapses while the toast is hovered joins it",
+        "events": [{ "at": 0, "type": "complete", "row": 1 }, { "at": 4000, "type": "complete", "row": 2 }, { "at": 5500, "type": "hoverStart", "target": "toast" }, { "at": 12000, "type": "hoverEnd", "target": "toast" }],
+        "expect": [
+          { "at": 5000, "held": [2], "collapsed": [1], "toast": "Completed" },
+          { "at": 8999, "held": [2], "collapsed": [1], "toast": "Completed" },
+          { "at": 9000, "held": [], "collapsed": [1, 2], "toast": "2 completed" },
+          { "at": 11999, "held": [], "collapsed": [1, 2], "toast": "2 completed" },
+          { "at": 17999, "held": [], "collapsed": [1, 2], "toast": "2 completed" },
+          { "at": 18000, "held": [], "collapsed": [1, 2], "toast": null }
+        ]
+      },
+      {
+        "name": "a completion after the toast is gone starts a new toast",
+        "events": [{ "at": 0, "type": "complete", "row": 1 }, { "at": 12000, "type": "complete", "row": 2 }],
+        "expect": [
+          { "at": 11000, "held": [], "collapsed": [1], "toast": null },
+          { "at": 16999, "held": [2], "collapsed": [1], "toast": null },
+          { "at": 17000, "held": [], "collapsed": [1, 2], "toast": "Completed" },
+          { "at": 22999, "held": [], "collapsed": [1, 2], "toast": "Completed" },
+          { "at": 23000, "held": [], "collapsed": [1, 2], "toast": null }
+        ]
+      },
+      {
+        "name": "undo after the toast is gone changes nothing",
+        "events": [{ "at": 0, "type": "complete", "row": 1 }, { "at": 12000, "type": "undo", "via": "toast" }],
+        "expect": [
+          { "at": 11000, "held": [], "collapsed": [1], "toast": null },
+          { "at": 12000, "held": [], "collapsed": [1], "toast": null },
+          { "at": 13000, "held": [], "collapsed": [1], "toast": null }
+        ]
+      },
+      {
+        "name": "a row held while another collapses stays held",
+        "events": [{ "at": 0, "type": "complete", "row": 1 }, { "at": 0, "type": "complete", "row": 2 }, { "at": 500, "type": "hoverStart", "row": 2 }, { "at": 1000, "type": "hoverEnd", "row": 2 }],
+        "expect": [
+          { "at": 4999, "held": [1, 2], "collapsed": [], "toast": null },
+          { "at": 5000, "held": [2], "collapsed": [1], "toast": "Completed" },
+          { "at": 5999, "held": [2], "collapsed": [1], "toast": "Completed" },
+          { "at": 6000, "held": [], "collapsed": [1, 2], "toast": "2 completed" }
+        ]
+      },
+      {
+        "name": "a timer ends before an event at the same instant",
+        "events": [{ "at": 0, "type": "complete", "row": 1 }, { "at": 5000, "type": "hoverStart", "row": 1 }],
+        "expect": [
+          { "at": 4999, "held": [1], "collapsed": [], "toast": null },
+          { "at": 5000, "held": [], "collapsed": [1], "toast": "Completed" }
+        ]
+      }
+    ]
+  },
+  "dateDisplay": {
+    "about": "Vectors for the date display rules of docs/cross-app-semantics-v1.md section 8. now and due are local wall-clock times in zone; for the logbook contexts due is the completion time and dateOnly is false. Expected strings are built from names and patterns (never from platform locale data): they use plain ASCII spaces, Sep for September, am/pm in lower case in en-GB and AM/PM in en-US.",
+    "names": {
+      "weekdaysShort": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+      "weekdaysLong": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
+      "monthsShort": ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
+      "monthsLong": ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
+    },
+    "words": { "today": "Today", "yesterday": "Yesterday", "tomorrow": "Tomorrow", "daysAgo": "{n} days ago" },
+    "patterns": {
+      "en-US": {
+        "dayMonth": "{MMM} {d}",
+        "dayMonthYear": "{MMM} {d}, {yyyy}",
+        "weekdayDayMonth": "{EEE}, {MMM} {d}",
+        "weekdayDayMonthYear": "{EEE}, {MMM} {d}, {yyyy}",
+        "weekdayDay": "{EEE} {d}",
+        "fullDate": "{EEEE}, {MMMM} {d}",
+        "fullDateYear": "{EEEE}, {MMMM} {d}, {yyyy}",
+        "monthYear": "{MMMM} {yyyy}",
+        "time12": "{h}:{mm} {AMPM}",
+        "time24": "{HH}:{mm}",
+        "am": "AM",
+        "pm": "PM"
+      },
+      "en-GB": {
+        "dayMonth": "{d} {MMM}",
+        "dayMonthYear": "{d} {MMM} {yyyy}",
+        "weekdayDayMonth": "{EEE} {d} {MMM}",
+        "weekdayDayMonthYear": "{EEE} {d} {MMM} {yyyy}",
+        "weekdayDay": "{EEE} {d}",
+        "fullDate": "{EEEE} {d} {MMMM}",
+        "fullDateYear": "{EEEE} {d} {MMMM} {yyyy}",
+        "monthYear": "{MMMM} {yyyy}",
+        "time12": "{h}:{mm} {AMPM}",
+        "time24": "{HH}:{mm}",
+        "am": "am",
+        "pm": "pm"
+      }
+    },
+    "vectors": [
+      { "name": "row, 10 days ago, date only, en-GB", "context": "row", "locale": "en-GB", "hour12": false, "zone": "Pacific/Auckland", "now": "2026-10-07T09:30:00", "due": "2026-09-27T23:59:59", "dateOnly": true, "expect": "27 Sep" },
+      { "name": "row, 10 days ago, 15:00, en-GB", "context": "row", "locale": "en-GB", "hour12": false, "zone": "Pacific/Auckland", "now": "2026-10-07T09:30:00", "due": "2026-09-27T15:00:00", "dateOnly": false, "expect": "27 Sep, 15:00" },
+      { "name": "row, 7 days ago, date only, en-GB", "context": "row", "locale": "en-GB", "hour12": false, "zone": "Pacific/Auckland", "now": "2026-10-07T09:30:00", "due": "2026-09-30T23:59:59", "dateOnly": true, "expect": "30 Sep" },
+      { "name": "row, 7 days ago, 15:00, en-GB", "context": "row", "locale": "en-GB", "hour12": false, "zone": "Pacific/Auckland", "now": "2026-10-07T09:30:00", "due": "2026-09-30T15:00:00", "dateOnly": false, "expect": "30 Sep, 15:00" },
+      { "name": "row, 6 days ago, date only, en-GB", "context": "row", "locale": "en-GB", "hour12": false, "zone": "Pacific/Auckland", "now": "2026-10-07T09:30:00", "due": "2026-10-01T23:59:59", "dateOnly": true, "expect": "6 days ago" },
+      { "name": "row, 6 days ago, 15:00, en-GB", "context": "row", "locale": "en-GB", "hour12": false, "zone": "Pacific/Auckland", "now": "2026-10-07T09:30:00", "due": "2026-10-01T15:00:00", "dateOnly": false, "expect": "6 days ago, 15:00" },
+      { "name": "row, 3 days ago, date only, en-GB", "context": "row", "locale": "en-GB", "hour12": false, "zone": "Pacific/Auckland", "now": "2026-10-07T09:30:00", "due": "2026-10-04T23:59:59", "dateOnly": true, "expect": "3 days ago" },
+      { "name": "row, 3 days ago, 15:00, en-GB", "context": "row", "locale": "en-GB", "hour12": false, "zone": "Pacific/Auckland", "now": "2026-10-07T09:30:00", "due": "2026-10-04T15:00:00", "dateOnly": false, "expect": "3 days ago, 15:00" },
+      { "name": "row, 2 days ago, date only, en-GB", "context": "row", "locale": "en-GB", "hour12": false, "zone": "Pacific/Auckland", "now": "2026-10-07T09:30:00", "due": "2026-10-05T23:59:59", "dateOnly": true, "expect": "2 days ago" },
+      { "name": "row, 2 days ago, 15:00, en-GB", "context": "row", "locale": "en-GB", "hour12": false, "zone": "Pacific/Auckland", "now": "2026-10-07T09:30:00", "due": "2026-10-05T15:00:00", "dateOnly": false, "expect": "2 days ago, 15:00" },
+      { "name": "row, yesterday, date only, en-GB", "context": "row", "locale": "en-GB", "hour12": false, "zone": "Pacific/Auckland", "now": "2026-10-07T09:30:00", "due": "2026-10-06T23:59:59", "dateOnly": true, "expect": "Yesterday" },
+      { "name": "row, yesterday, 15:00, en-GB", "context": "row", "locale": "en-GB", "hour12": false, "zone": "Pacific/Auckland", "now": "2026-10-07T09:30:00", "due": "2026-10-06T15:00:00", "dateOnly": false, "expect": "Yesterday, 15:00" },
+      { "name": "row, today, date only, en-GB", "context": "row", "locale": "en-GB", "hour12": false, "zone": "Pacific/Auckland", "now": "2026-10-07T09:30:00", "due": "2026-10-07T23:59:59", "dateOnly": true, "expect": "Today" },
+      { "name": "row, today, 15:00, en-GB", "context": "row", "locale": "en-GB", "hour12": false, "zone": "Pacific/Auckland", "now": "2026-10-07T09:30:00", "due": "2026-10-07T15:00:00", "dateOnly": false, "expect": "Today, 15:00" },
+      { "name": "row, tomorrow, date only, en-GB", "context": "row", "locale": "en-GB", "hour12": false, "zone": "Pacific/Auckland", "now": "2026-10-07T09:30:00", "due": "2026-10-08T23:59:59", "dateOnly": true, "expect": "Tomorrow" },
+      { "name": "row, tomorrow, 15:00, en-GB", "context": "row", "locale": "en-GB", "hour12": false, "zone": "Pacific/Auckland", "now": "2026-10-07T09:30:00", "due": "2026-10-08T15:00:00", "dateOnly": false, "expect": "Tomorrow, 15:00" },
+      { "name": "row, in 2 days, date only, en-GB", "context": "row", "locale": "en-GB", "hour12": false, "zone": "Pacific/Auckland", "now": "2026-10-07T09:30:00", "due": "2026-10-09T23:59:59", "dateOnly": true, "expect": "Fri" },
+      { "name": "row, in 2 days, 15:00, en-GB", "context": "row", "locale": "en-GB", "hour12": false, "zone": "Pacific/Auckland", "now": "2026-10-07T09:30:00", "due": "2026-10-09T15:00:00", "dateOnly": false, "expect": "Fri, 15:00" },
+      { "name": "row, in 6 days, date only, en-GB", "context": "row", "locale": "en-GB", "hour12": false, "zone": "Pacific/Auckland", "now": "2026-10-07T09:30:00", "due": "2026-10-13T23:59:59", "dateOnly": true, "expect": "Tue" },
+      { "name": "row, in 6 days, 15:00, en-GB", "context": "row", "locale": "en-GB", "hour12": false, "zone": "Pacific/Auckland", "now": "2026-10-07T09:30:00", "due": "2026-10-13T15:00:00", "dateOnly": false, "expect": "Tue, 15:00" },
+      { "name": "row, in 7 days, date only, en-GB", "context": "row", "locale": "en-GB", "hour12": false, "zone": "Pacific/Auckland", "now": "2026-10-07T09:30:00", "due": "2026-10-14T23:59:59", "dateOnly": true, "expect": "14 Oct" },
+      { "name": "row, in 7 days, 15:00, en-GB", "context": "row", "locale": "en-GB", "hour12": false, "zone": "Pacific/Auckland", "now": "2026-10-07T09:30:00", "due": "2026-10-14T15:00:00", "dateOnly": false, "expect": "14 Oct, 15:00" },
+      { "name": "row, in 20 days, date only, en-GB", "context": "row", "locale": "en-GB", "hour12": false, "zone": "Pacific/Auckland", "now": "2026-10-07T09:30:00", "due": "2026-10-27T23:59:59", "dateOnly": true, "expect": "27 Oct" },
+      { "name": "row, in 20 days, 15:00, en-GB", "context": "row", "locale": "en-GB", "hour12": false, "zone": "Pacific/Auckland", "now": "2026-10-07T09:30:00", "due": "2026-10-27T15:00:00", "dateOnly": false, "expect": "27 Oct, 15:00" },
+      { "name": "row, 10 days ago, date only, en-US", "context": "row", "locale": "en-US", "hour12": true, "zone": "America/New_York", "now": "2026-10-07T09:30:00", "due": "2026-09-27T23:59:59", "dateOnly": true, "expect": "Sep 27" },
+      { "name": "row, 10 days ago, 15:00, en-US", "context": "row", "locale": "en-US", "hour12": true, "zone": "America/New_York", "now": "2026-10-07T09:30:00", "due": "2026-09-27T15:00:00", "dateOnly": false, "expect": "Sep 27, 3:00 PM" },
+      { "name": "row, 7 days ago, date only, en-US", "context": "row", "locale": "en-US", "hour12": true, "zone": "America/New_York", "now": "2026-10-07T09:30:00", "due": "2026-09-30T23:59:59", "dateOnly": true, "expect": "Sep 30" },
+      { "name": "row, 7 days ago, 15:00, en-US", "context": "row", "locale": "en-US", "hour12": true, "zone": "America/New_York", "now": "2026-10-07T09:30:00", "due": "2026-09-30T15:00:00", "dateOnly": false, "expect": "Sep 30, 3:00 PM" },
+      { "name": "row, 6 days ago, date only, en-US", "context": "row", "locale": "en-US", "hour12": true, "zone": "America/New_York", "now": "2026-10-07T09:30:00", "due": "2026-10-01T23:59:59", "dateOnly": true, "expect": "6 days ago" },
+      { "name": "row, 6 days ago, 15:00, en-US", "context": "row", "locale": "en-US", "hour12": true, "zone": "America/New_York", "now": "2026-10-07T09:30:00", "due": "2026-10-01T15:00:00", "dateOnly": false, "expect": "6 days ago, 3:00 PM" },
+      { "name": "row, 3 days ago, date only, en-US", "context": "row", "locale": "en-US", "hour12": true, "zone": "America/New_York", "now": "2026-10-07T09:30:00", "due": "2026-10-04T23:59:59", "dateOnly": true, "expect": "3 days ago" },
+      { "name": "row, 3 days ago, 15:00, en-US", "context": "row", "locale": "en-US", "hour12": true, "zone": "America/New_York", "now": "2026-10-07T09:30:00", "due": "2026-10-04T15:00:00", "dateOnly": false, "expect": "3 days ago, 3:00 PM" },
+      { "name": "row, 2 days ago, date only, en-US", "context": "row", "locale": "en-US", "hour12": true, "zone": "America/New_York", "now": "2026-10-07T09:30:00", "due": "2026-10-05T23:59:59", "dateOnly": true, "expect": "2 days ago" },
+      { "name": "row, 2 days ago, 15:00, en-US", "context": "row", "locale": "en-US", "hour12": true, "zone": "America/New_York", "now": "2026-10-07T09:30:00", "due": "2026-10-05T15:00:00", "dateOnly": false, "expect": "2 days ago, 3:00 PM" },
+      { "name": "row, yesterday, date only, en-US", "context": "row", "locale": "en-US", "hour12": true, "zone": "America/New_York", "now": "2026-10-07T09:30:00", "due": "2026-10-06T23:59:59", "dateOnly": true, "expect": "Yesterday" },
+      { "name": "row, yesterday, 15:00, en-US", "context": "row", "locale": "en-US", "hour12": true, "zone": "America/New_York", "now": "2026-10-07T09:30:00", "due": "2026-10-06T15:00:00", "dateOnly": false, "expect": "Yesterday, 3:00 PM" },
+      { "name": "row, today, date only, en-US", "context": "row", "locale": "en-US", "hour12": true, "zone": "America/New_York", "now": "2026-10-07T09:30:00", "due": "2026-10-07T23:59:59", "dateOnly": true, "expect": "Today" },
+      { "name": "row, today, 15:00, en-US", "context": "row", "locale": "en-US", "hour12": true, "zone": "America/New_York", "now": "2026-10-07T09:30:00", "due": "2026-10-07T15:00:00", "dateOnly": false, "expect": "Today, 3:00 PM" },
+      { "name": "row, tomorrow, date only, en-US", "context": "row", "locale": "en-US", "hour12": true, "zone": "America/New_York", "now": "2026-10-07T09:30:00", "due": "2026-10-08T23:59:59", "dateOnly": true, "expect": "Tomorrow" },
+      { "name": "row, tomorrow, 15:00, en-US", "context": "row", "locale": "en-US", "hour12": true, "zone": "America/New_York", "now": "2026-10-07T09:30:00", "due": "2026-10-08T15:00:00", "dateOnly": false, "expect": "Tomorrow, 3:00 PM" },
+      { "name": "row, in 2 days, date only, en-US", "context": "row", "locale": "en-US", "hour12": true, "zone": "America/New_York", "now": "2026-10-07T09:30:00", "due": "2026-10-09T23:59:59", "dateOnly": true, "expect": "Fri" },
+      { "name": "row, in 2 days, 15:00, en-US", "context": "row", "locale": "en-US", "hour12": true, "zone": "America/New_York", "now": "2026-10-07T09:30:00", "due": "2026-10-09T15:00:00", "dateOnly": false, "expect": "Fri, 3:00 PM" },
+      { "name": "row, in 6 days, date only, en-US", "context": "row", "locale": "en-US", "hour12": true, "zone": "America/New_York", "now": "2026-10-07T09:30:00", "due": "2026-10-13T23:59:59", "dateOnly": true, "expect": "Tue" },
+      { "name": "row, in 6 days, 15:00, en-US", "context": "row", "locale": "en-US", "hour12": true, "zone": "America/New_York", "now": "2026-10-07T09:30:00", "due": "2026-10-13T15:00:00", "dateOnly": false, "expect": "Tue, 3:00 PM" },
+      { "name": "row, in 7 days, date only, en-US", "context": "row", "locale": "en-US", "hour12": true, "zone": "America/New_York", "now": "2026-10-07T09:30:00", "due": "2026-10-14T23:59:59", "dateOnly": true, "expect": "Oct 14" },
+      { "name": "row, in 7 days, 15:00, en-US", "context": "row", "locale": "en-US", "hour12": true, "zone": "America/New_York", "now": "2026-10-07T09:30:00", "due": "2026-10-14T15:00:00", "dateOnly": false, "expect": "Oct 14, 3:00 PM" },
+      { "name": "row, in 20 days, date only, en-US", "context": "row", "locale": "en-US", "hour12": true, "zone": "America/New_York", "now": "2026-10-07T09:30:00", "due": "2026-10-27T23:59:59", "dateOnly": true, "expect": "Oct 27" },
+      { "name": "row, in 20 days, 15:00, en-US", "context": "row", "locale": "en-US", "hour12": true, "zone": "America/New_York", "now": "2026-10-07T09:30:00", "due": "2026-10-27T15:00:00", "dateOnly": false, "expect": "Oct 27, 3:00 PM" },
+      { "name": "row, tomorrow, legacy midnight, en-GB", "context": "row", "locale": "en-GB", "hour12": false, "zone": "Pacific/Auckland", "now": "2026-10-07T09:30:00", "due": "2026-10-08T00:00:00", "dateOnly": true, "expect": "Tomorrow" },
+      {
+        "name": "row, tomorrow, 23:59:00 is a time, en-GB",
+        "context": "row",
+        "locale": "en-GB",
+        "hour12": false,
+        "zone": "Pacific/Auckland",
+        "now": "2026-10-07T09:30:00",
+        "due": "2026-10-08T23:59:00",
+        "dateOnly": false,
+        "expect": "Tomorrow, 23:59"
+      },
+      {
+        "name": "row, tomorrow, 23:59:00 is a time, en-US",
+        "context": "row",
+        "locale": "en-US",
+        "hour12": true,
+        "zone": "America/New_York",
+        "now": "2026-10-07T09:30:00",
+        "due": "2026-10-08T23:59:00",
+        "dateOnly": false,
+        "expect": "Tomorrow, 11:59 PM"
+      },
+      {
+        "name": "row, friday, 15:00, en-GB with a 12-hour clock",
+        "context": "row",
+        "locale": "en-GB",
+        "hour12": true,
+        "zone": "Pacific/Auckland",
+        "now": "2026-10-07T09:30:00",
+        "due": "2026-10-09T15:00:00",
+        "dateOnly": false,
+        "expect": "Fri, 3:00 pm"
+      },
+      {
+        "name": "row, friday, 15:00, en-US with a 24-hour clock",
+        "context": "row",
+        "locale": "en-US",
+        "hour12": false,
+        "zone": "America/New_York",
+        "now": "2026-10-07T09:30:00",
+        "due": "2026-10-09T15:00:00",
+        "dateOnly": false,
+        "expect": "Fri, 15:00"
+      },
+      {
+        "name": "row, 18 October, 09:05, en-GB with a 12-hour clock",
+        "context": "row",
+        "locale": "en-GB",
+        "hour12": true,
+        "zone": "Pacific/Auckland",
+        "now": "2026-10-07T09:30:00",
+        "due": "2026-10-18T09:05:00",
+        "dateOnly": false,
+        "expect": "18 Oct, 9:05 am"
+      },
+      {
+        "name": "row, 18 October, 09:05, en-US with a 24-hour clock",
+        "context": "row",
+        "locale": "en-US",
+        "hour12": false,
+        "zone": "America/New_York",
+        "now": "2026-10-07T09:30:00",
+        "due": "2026-10-18T09:05:00",
+        "dateOnly": false,
+        "expect": "Oct 18, 09:05"
+      },
+      { "name": "row, September date, en-GB", "context": "row", "locale": "en-GB", "hour12": false, "zone": "Pacific/Auckland", "now": "2026-10-20T09:30:00", "due": "2026-09-03T23:59:59", "dateOnly": true, "expect": "3 Sep" },
+      { "name": "row, September date, en-US", "context": "row", "locale": "en-US", "hour12": true, "zone": "America/New_York", "now": "2026-10-20T09:30:00", "due": "2026-09-03T23:59:59", "dateOnly": true, "expect": "Sep 3" },
+      {
+        "name": "row.inToday, overdue 10 days, date only, en-GB",
+        "context": "row.inToday",
+        "locale": "en-GB",
+        "hour12": false,
+        "zone": "Pacific/Auckland",
+        "now": "2026-10-07T09:30:00",
+        "due": "2026-09-27T23:59:59",
+        "dateOnly": true,
+        "expect": "27 Sep"
+      },
+      {
+        "name": "row.inToday, overdue 3 days, 08:00, en-GB",
+        "context": "row.inToday",
+        "locale": "en-GB",
+        "hour12": false,
+        "zone": "Pacific/Auckland",
+        "now": "2026-10-07T09:30:00",
+        "due": "2026-10-04T08:00:00",
+        "dateOnly": false,
+        "expect": "3 days ago, 08:00"
+      },
+      {
+        "name": "row.inToday, yesterday, date only, en-GB",
+        "context": "row.inToday",
+        "locale": "en-GB",
+        "hour12": false,
+        "zone": "Pacific/Auckland",
+        "now": "2026-10-07T09:30:00",
+        "due": "2026-10-06T23:59:59",
+        "dateOnly": true,
+        "expect": "Yesterday"
+      },
+      { "name": "row.inToday, today, date only, en-GB", "context": "row.inToday", "locale": "en-GB", "hour12": false, "zone": "Pacific/Auckland", "now": "2026-10-07T09:30:00", "due": "2026-10-07T23:59:59", "dateOnly": true, "expect": "" },
+      { "name": "row.inToday, today, legacy midnight, en-GB", "context": "row.inToday", "locale": "en-GB", "hour12": false, "zone": "Pacific/Auckland", "now": "2026-10-07T09:30:00", "due": "2026-10-07T00:00:00", "dateOnly": true, "expect": "" },
+      {
+        "name": "row.inToday, today, 08:00 (earlier than now), en-GB",
+        "context": "row.inToday",
+        "locale": "en-GB",
+        "hour12": false,
+        "zone": "Pacific/Auckland",
+        "now": "2026-10-07T09:30:00",
+        "due": "2026-10-07T08:00:00",
+        "dateOnly": false,
+        "expect": "08:00"
+      },
+      { "name": "row.inToday, today, 15:00, en-GB", "context": "row.inToday", "locale": "en-GB", "hour12": false, "zone": "Pacific/Auckland", "now": "2026-10-07T09:30:00", "due": "2026-10-07T15:00:00", "dateOnly": false, "expect": "15:00" },
+      {
+        "name": "row.inToday, overdue 10 days, date only, en-US",
+        "context": "row.inToday",
+        "locale": "en-US",
+        "hour12": true,
+        "zone": "America/New_York",
+        "now": "2026-10-07T09:30:00",
+        "due": "2026-09-27T23:59:59",
+        "dateOnly": true,
+        "expect": "Sep 27"
+      },
+      {
+        "name": "row.inToday, overdue 3 days, 08:00, en-US",
+        "context": "row.inToday",
+        "locale": "en-US",
+        "hour12": true,
+        "zone": "America/New_York",
+        "now": "2026-10-07T09:30:00",
+        "due": "2026-10-04T08:00:00",
+        "dateOnly": false,
+        "expect": "3 days ago, 8:00 AM"
+      },
+      {
+        "name": "row.inToday, yesterday, date only, en-US",
+        "context": "row.inToday",
+        "locale": "en-US",
+        "hour12": true,
+        "zone": "America/New_York",
+        "now": "2026-10-07T09:30:00",
+        "due": "2026-10-06T23:59:59",
+        "dateOnly": true,
+        "expect": "Yesterday"
+      },
+      { "name": "row.inToday, today, date only, en-US", "context": "row.inToday", "locale": "en-US", "hour12": true, "zone": "America/New_York", "now": "2026-10-07T09:30:00", "due": "2026-10-07T23:59:59", "dateOnly": true, "expect": "" },
+      { "name": "row.inToday, today, legacy midnight, en-US", "context": "row.inToday", "locale": "en-US", "hour12": true, "zone": "America/New_York", "now": "2026-10-07T09:30:00", "due": "2026-10-07T00:00:00", "dateOnly": true, "expect": "" },
+      {
+        "name": "row.inToday, today, 08:00 (earlier than now), en-US",
+        "context": "row.inToday",
+        "locale": "en-US",
+        "hour12": true,
+        "zone": "America/New_York",
+        "now": "2026-10-07T09:30:00",
+        "due": "2026-10-07T08:00:00",
+        "dateOnly": false,
+        "expect": "8:00 AM"
+      },
+      { "name": "row.inToday, today, 15:00, en-US", "context": "row.inToday", "locale": "en-US", "hour12": true, "zone": "America/New_York", "now": "2026-10-07T09:30:00", "due": "2026-10-07T15:00:00", "dateOnly": false, "expect": "3:00 PM" },
+      { "name": "row.inDayGroup, 00:05, en-GB 24-hour", "context": "row.inDayGroup", "locale": "en-GB", "hour12": false, "zone": "Pacific/Auckland", "now": "2026-10-07T09:30:00", "due": "2026-10-09T00:05:00", "dateOnly": false, "expect": "00:05" },
+      { "name": "row.inDayGroup, 09:05, en-GB 24-hour", "context": "row.inDayGroup", "locale": "en-GB", "hour12": false, "zone": "Pacific/Auckland", "now": "2026-10-07T09:30:00", "due": "2026-10-09T09:05:00", "dateOnly": false, "expect": "09:05" },
+      { "name": "row.inDayGroup, 12:00, en-GB 24-hour", "context": "row.inDayGroup", "locale": "en-GB", "hour12": false, "zone": "Pacific/Auckland", "now": "2026-10-07T09:30:00", "due": "2026-10-09T12:00:00", "dateOnly": false, "expect": "12:00" },
+      { "name": "row.inDayGroup, 12:30, en-GB 24-hour", "context": "row.inDayGroup", "locale": "en-GB", "hour12": false, "zone": "Pacific/Auckland", "now": "2026-10-07T09:30:00", "due": "2026-10-09T12:30:00", "dateOnly": false, "expect": "12:30" },
+      { "name": "row.inDayGroup, 15:00, en-GB 24-hour", "context": "row.inDayGroup", "locale": "en-GB", "hour12": false, "zone": "Pacific/Auckland", "now": "2026-10-07T09:30:00", "due": "2026-10-09T15:00:00", "dateOnly": false, "expect": "15:00" },
+      { "name": "row.inDayGroup, 23:59, en-GB 24-hour", "context": "row.inDayGroup", "locale": "en-GB", "hour12": false, "zone": "Pacific/Auckland", "now": "2026-10-07T09:30:00", "due": "2026-10-09T23:59:00", "dateOnly": false, "expect": "23:59" },
+      { "name": "row.inDayGroup, date only, en-GB 24-hour", "context": "row.inDayGroup", "locale": "en-GB", "hour12": false, "zone": "Pacific/Auckland", "now": "2026-10-07T09:30:00", "due": "2026-10-09T23:59:59", "dateOnly": true, "expect": "" },
+      {
+        "name": "row.inDayGroup, 00:05, en-GB 12-hour",
+        "context": "row.inDayGroup",
+        "locale": "en-GB",
+        "hour12": true,
+        "zone": "Pacific/Auckland",
+        "now": "2026-10-07T09:30:00",
+        "due": "2026-10-09T00:05:00",
+        "dateOnly": false,
+        "expect": "12:05 am"
+      },
+      { "name": "row.inDayGroup, 09:05, en-GB 12-hour", "context": "row.inDayGroup", "locale": "en-GB", "hour12": true, "zone": "Pacific/Auckland", "now": "2026-10-07T09:30:00", "due": "2026-10-09T09:05:00", "dateOnly": false, "expect": "9:05 am" },
+      {
+        "name": "row.inDayGroup, 12:00, en-GB 12-hour",
+        "context": "row.inDayGroup",
+        "locale": "en-GB",
+        "hour12": true,
+        "zone": "Pacific/Auckland",
+        "now": "2026-10-07T09:30:00",
+        "due": "2026-10-09T12:00:00",
+        "dateOnly": false,
+        "expect": "12:00 pm"
+      },
+      {
+        "name": "row.inDayGroup, 12:30, en-GB 12-hour",
+        "context": "row.inDayGroup",
+        "locale": "en-GB",
+        "hour12": true,
+        "zone": "Pacific/Auckland",
+        "now": "2026-10-07T09:30:00",
+        "due": "2026-10-09T12:30:00",
+        "dateOnly": false,
+        "expect": "12:30 pm"
+      },
+      { "name": "row.inDayGroup, 15:00, en-GB 12-hour", "context": "row.inDayGroup", "locale": "en-GB", "hour12": true, "zone": "Pacific/Auckland", "now": "2026-10-07T09:30:00", "due": "2026-10-09T15:00:00", "dateOnly": false, "expect": "3:00 pm" },
+      {
+        "name": "row.inDayGroup, 23:59, en-GB 12-hour",
+        "context": "row.inDayGroup",
+        "locale": "en-GB",
+        "hour12": true,
+        "zone": "Pacific/Auckland",
+        "now": "2026-10-07T09:30:00",
+        "due": "2026-10-09T23:59:00",
+        "dateOnly": false,
+        "expect": "11:59 pm"
+      },
+      { "name": "row.inDayGroup, date only, en-GB 12-hour", "context": "row.inDayGroup", "locale": "en-GB", "hour12": true, "zone": "Pacific/Auckland", "now": "2026-10-07T09:30:00", "due": "2026-10-09T23:59:59", "dateOnly": true, "expect": "" },
+      {
+        "name": "row.inDayGroup, 00:05, en-US 12-hour",
+        "context": "row.inDayGroup",
+        "locale": "en-US",
+        "hour12": true,
+        "zone": "America/New_York",
+        "now": "2026-10-07T09:30:00",
+        "due": "2026-10-09T00:05:00",
+        "dateOnly": false,
+        "expect": "12:05 AM"
+      },
+      { "name": "row.inDayGroup, 09:05, en-US 12-hour", "context": "row.inDayGroup", "locale": "en-US", "hour12": true, "zone": "America/New_York", "now": "2026-10-07T09:30:00", "due": "2026-10-09T09:05:00", "dateOnly": false, "expect": "9:05 AM" },
+      {
+        "name": "row.inDayGroup, 12:00, en-US 12-hour",
+        "context": "row.inDayGroup",
+        "locale": "en-US",
+        "hour12": true,
+        "zone": "America/New_York",
+        "now": "2026-10-07T09:30:00",
+        "due": "2026-10-09T12:00:00",
+        "dateOnly": false,
+        "expect": "12:00 PM"
+      },
+      {
+        "name": "row.inDayGroup, 12:30, en-US 12-hour",
+        "context": "row.inDayGroup",
+        "locale": "en-US",
+        "hour12": true,
+        "zone": "America/New_York",
+        "now": "2026-10-07T09:30:00",
+        "due": "2026-10-09T12:30:00",
+        "dateOnly": false,
+        "expect": "12:30 PM"
+      },
+      { "name": "row.inDayGroup, 15:00, en-US 12-hour", "context": "row.inDayGroup", "locale": "en-US", "hour12": true, "zone": "America/New_York", "now": "2026-10-07T09:30:00", "due": "2026-10-09T15:00:00", "dateOnly": false, "expect": "3:00 PM" },
+      {
+        "name": "row.inDayGroup, 23:59, en-US 12-hour",
+        "context": "row.inDayGroup",
+        "locale": "en-US",
+        "hour12": true,
+        "zone": "America/New_York",
+        "now": "2026-10-07T09:30:00",
+        "due": "2026-10-09T23:59:00",
+        "dateOnly": false,
+        "expect": "11:59 PM"
+      },
+      { "name": "row.inDayGroup, date only, en-US 12-hour", "context": "row.inDayGroup", "locale": "en-US", "hour12": true, "zone": "America/New_York", "now": "2026-10-07T09:30:00", "due": "2026-10-09T23:59:59", "dateOnly": true, "expect": "" },
+      { "name": "row.inDayGroup, 00:05, en-US 24-hour", "context": "row.inDayGroup", "locale": "en-US", "hour12": false, "zone": "America/New_York", "now": "2026-10-07T09:30:00", "due": "2026-10-09T00:05:00", "dateOnly": false, "expect": "00:05" },
+      { "name": "row.inDayGroup, 09:05, en-US 24-hour", "context": "row.inDayGroup", "locale": "en-US", "hour12": false, "zone": "America/New_York", "now": "2026-10-07T09:30:00", "due": "2026-10-09T09:05:00", "dateOnly": false, "expect": "09:05" },
+      { "name": "row.inDayGroup, 12:00, en-US 24-hour", "context": "row.inDayGroup", "locale": "en-US", "hour12": false, "zone": "America/New_York", "now": "2026-10-07T09:30:00", "due": "2026-10-09T12:00:00", "dateOnly": false, "expect": "12:00" },
+      { "name": "row.inDayGroup, 12:30, en-US 24-hour", "context": "row.inDayGroup", "locale": "en-US", "hour12": false, "zone": "America/New_York", "now": "2026-10-07T09:30:00", "due": "2026-10-09T12:30:00", "dateOnly": false, "expect": "12:30" },
+      { "name": "row.inDayGroup, 15:00, en-US 24-hour", "context": "row.inDayGroup", "locale": "en-US", "hour12": false, "zone": "America/New_York", "now": "2026-10-07T09:30:00", "due": "2026-10-09T15:00:00", "dateOnly": false, "expect": "15:00" },
+      { "name": "row.inDayGroup, 23:59, en-US 24-hour", "context": "row.inDayGroup", "locale": "en-US", "hour12": false, "zone": "America/New_York", "now": "2026-10-07T09:30:00", "due": "2026-10-09T23:59:00", "dateOnly": false, "expect": "23:59" },
+      { "name": "row.inDayGroup, date only, en-US 24-hour", "context": "row.inDayGroup", "locale": "en-US", "hour12": false, "zone": "America/New_York", "now": "2026-10-07T09:30:00", "due": "2026-10-09T23:59:59", "dateOnly": true, "expect": "" },
+      { "name": "chip, 3 days ago, with a time, en-GB", "context": "chip", "locale": "en-GB", "hour12": false, "zone": "Pacific/Auckland", "now": "2026-10-07T09:30:00", "due": "2026-10-04T14:30:00", "dateOnly": false, "expect": "Sun 4 Oct, 14:30" },
+      { "name": "chip, today, with a time, en-GB", "context": "chip", "locale": "en-GB", "hour12": false, "zone": "Pacific/Auckland", "now": "2026-10-07T09:30:00", "due": "2026-10-07T15:00:00", "dateOnly": false, "expect": "Wed 7 Oct, 15:00" },
+      { "name": "chip, tomorrow, with a time, en-GB", "context": "chip", "locale": "en-GB", "hour12": false, "zone": "Pacific/Auckland", "now": "2026-10-07T09:30:00", "due": "2026-10-08T09:00:00", "dateOnly": false, "expect": "Thu 8 Oct, 09:00" },
+      { "name": "chip, saturday, with a time, en-GB", "context": "chip", "locale": "en-GB", "hour12": false, "zone": "Pacific/Auckland", "now": "2026-10-07T09:30:00", "due": "2026-10-10T15:00:00", "dateOnly": false, "expect": "Sat 10 Oct, 15:00" },
+      {
+        "name": "chip, in 20 days, with a time, en-GB",
+        "context": "chip",
+        "locale": "en-GB",
+        "hour12": false,
+        "zone": "Pacific/Auckland",
+        "now": "2026-10-07T09:30:00",
+        "due": "2026-10-27T18:45:00",
+        "dateOnly": false,
+        "expect": "Tue 27 Oct, 18:45"
+      },
+      { "name": "chip, today, date only, en-GB", "context": "chip", "locale": "en-GB", "hour12": false, "zone": "Pacific/Auckland", "now": "2026-10-07T09:30:00", "due": "2026-10-07T23:59:59", "dateOnly": true, "expect": "Wed 7 Oct" },
+      { "name": "chip, saturday, date only, en-GB", "context": "chip", "locale": "en-GB", "hour12": false, "zone": "Pacific/Auckland", "now": "2026-10-07T09:30:00", "due": "2026-10-10T23:59:59", "dateOnly": true, "expect": "Sat 10 Oct" },
+      {
+        "name": "chip, legacy midnight saturday, date only, en-GB",
+        "context": "chip",
+        "locale": "en-GB",
+        "hour12": false,
+        "zone": "Pacific/Auckland",
+        "now": "2026-10-07T09:30:00",
+        "due": "2026-10-10T00:00:00",
+        "dateOnly": true,
+        "expect": "Sat 10 Oct"
+      },
+      {
+        "name": "chip, 3 days ago, with a time, en-US",
+        "context": "chip",
+        "locale": "en-US",
+        "hour12": true,
+        "zone": "America/New_York",
+        "now": "2026-10-07T09:30:00",
+        "due": "2026-10-04T14:30:00",
+        "dateOnly": false,
+        "expect": "Sun, Oct 4, 2:30 PM"
+      },
+      { "name": "chip, today, with a time, en-US", "context": "chip", "locale": "en-US", "hour12": true, "zone": "America/New_York", "now": "2026-10-07T09:30:00", "due": "2026-10-07T15:00:00", "dateOnly": false, "expect": "Wed, Oct 7, 3:00 PM" },
+      { "name": "chip, tomorrow, with a time, en-US", "context": "chip", "locale": "en-US", "hour12": true, "zone": "America/New_York", "now": "2026-10-07T09:30:00", "due": "2026-10-08T09:00:00", "dateOnly": false, "expect": "Thu, Oct 8, 9:00 AM" },
+      {
+        "name": "chip, saturday, with a time, en-US",
+        "context": "chip",
+        "locale": "en-US",
+        "hour12": true,
+        "zone": "America/New_York",
+        "now": "2026-10-07T09:30:00",
+        "due": "2026-10-10T15:00:00",
+        "dateOnly": false,
+        "expect": "Sat, Oct 10, 3:00 PM"
+      },
+      {
+        "name": "chip, in 20 days, with a time, en-US",
+        "context": "chip",
+        "locale": "en-US",
+        "hour12": true,
+        "zone": "America/New_York",
+        "now": "2026-10-07T09:30:00",
+        "due": "2026-10-27T18:45:00",
+        "dateOnly": false,
+        "expect": "Tue, Oct 27, 6:45 PM"
+      },
+      { "name": "chip, today, date only, en-US", "context": "chip", "locale": "en-US", "hour12": true, "zone": "America/New_York", "now": "2026-10-07T09:30:00", "due": "2026-10-07T23:59:59", "dateOnly": true, "expect": "Wed, Oct 7" },
+      { "name": "chip, saturday, date only, en-US", "context": "chip", "locale": "en-US", "hour12": true, "zone": "America/New_York", "now": "2026-10-07T09:30:00", "due": "2026-10-10T23:59:59", "dateOnly": true, "expect": "Sat, Oct 10" },
+      {
+        "name": "chip, legacy midnight saturday, date only, en-US",
+        "context": "chip",
+        "locale": "en-US",
+        "hour12": true,
+        "zone": "America/New_York",
+        "now": "2026-10-07T09:30:00",
+        "due": "2026-10-10T00:00:00",
+        "dateOnly": true,
+        "expect": "Sat, Oct 10"
+      },
+      { "name": "header.day, today, en-GB", "context": "header.day", "locale": "en-GB", "hour12": false, "zone": "Pacific/Auckland", "now": "2026-10-07T09:30:00", "due": "2026-10-07T23:59:59", "dateOnly": true, "expect": "Today" },
+      { "name": "header.day, tomorrow, en-GB", "context": "header.day", "locale": "en-GB", "hour12": false, "zone": "Pacific/Auckland", "now": "2026-10-07T09:30:00", "due": "2026-10-08T23:59:59", "dateOnly": true, "expect": "Tomorrow" },
+      { "name": "header.day, in 2 days, en-GB", "context": "header.day", "locale": "en-GB", "hour12": false, "zone": "Pacific/Auckland", "now": "2026-10-07T09:30:00", "due": "2026-10-09T23:59:59", "dateOnly": true, "expect": "Fri 9" },
+      { "name": "header.day, in 6 days, en-GB", "context": "header.day", "locale": "en-GB", "hour12": false, "zone": "Pacific/Auckland", "now": "2026-10-07T09:30:00", "due": "2026-10-13T23:59:59", "dateOnly": true, "expect": "Tue 13" },
+      { "name": "header.day, in 7 days, en-GB", "context": "header.day", "locale": "en-GB", "hour12": false, "zone": "Pacific/Auckland", "now": "2026-10-07T09:30:00", "due": "2026-10-14T23:59:59", "dateOnly": true, "expect": "Wed 14 Oct" },
+      { "name": "header.day, in 20 days, en-GB", "context": "header.day", "locale": "en-GB", "hour12": false, "zone": "Pacific/Auckland", "now": "2026-10-07T09:30:00", "due": "2026-10-27T23:59:59", "dateOnly": true, "expect": "Tue 27 Oct" },
+      { "name": "header.day, today, en-US", "context": "header.day", "locale": "en-US", "hour12": true, "zone": "America/New_York", "now": "2026-10-07T09:30:00", "due": "2026-10-07T23:59:59", "dateOnly": true, "expect": "Today" },
+      { "name": "header.day, tomorrow, en-US", "context": "header.day", "locale": "en-US", "hour12": true, "zone": "America/New_York", "now": "2026-10-07T09:30:00", "due": "2026-10-08T23:59:59", "dateOnly": true, "expect": "Tomorrow" },
+      { "name": "header.day, in 2 days, en-US", "context": "header.day", "locale": "en-US", "hour12": true, "zone": "America/New_York", "now": "2026-10-07T09:30:00", "due": "2026-10-09T23:59:59", "dateOnly": true, "expect": "Fri 9" },
+      { "name": "header.day, in 6 days, en-US", "context": "header.day", "locale": "en-US", "hour12": true, "zone": "America/New_York", "now": "2026-10-07T09:30:00", "due": "2026-10-13T23:59:59", "dateOnly": true, "expect": "Tue 13" },
+      { "name": "header.day, in 7 days, en-US", "context": "header.day", "locale": "en-US", "hour12": true, "zone": "America/New_York", "now": "2026-10-07T09:30:00", "due": "2026-10-14T23:59:59", "dateOnly": true, "expect": "Wed, Oct 14" },
+      { "name": "header.day, in 20 days, en-US", "context": "header.day", "locale": "en-US", "hour12": true, "zone": "America/New_York", "now": "2026-10-07T09:30:00", "due": "2026-10-27T23:59:59", "dateOnly": true, "expect": "Tue, Oct 27" },
+      { "name": "header.full, today, en-GB", "context": "header.full", "locale": "en-GB", "hour12": false, "zone": "Pacific/Auckland", "now": "2026-10-07T09:30:00", "due": "2026-10-07T23:59:59", "dateOnly": true, "expect": "Wednesday 7 October" },
+      {
+        "name": "header.full, next month, en-GB",
+        "context": "header.full",
+        "locale": "en-GB",
+        "hour12": false,
+        "zone": "Pacific/Auckland",
+        "now": "2026-10-07T09:30:00",
+        "due": "2026-11-02T23:59:59",
+        "dateOnly": true,
+        "expect": "Monday 2 November"
+      },
+      {
+        "name": "header.full, next year, en-GB",
+        "context": "header.full",
+        "locale": "en-GB",
+        "hour12": false,
+        "zone": "Pacific/Auckland",
+        "now": "2026-10-07T09:30:00",
+        "due": "2027-02-01T23:59:59",
+        "dateOnly": true,
+        "expect": "Monday 1 February 2027"
+      },
+      { "name": "header.full, today, en-US", "context": "header.full", "locale": "en-US", "hour12": true, "zone": "America/New_York", "now": "2026-10-07T09:30:00", "due": "2026-10-07T23:59:59", "dateOnly": true, "expect": "Wednesday, October 7" },
+      {
+        "name": "header.full, next month, en-US",
+        "context": "header.full",
+        "locale": "en-US",
+        "hour12": true,
+        "zone": "America/New_York",
+        "now": "2026-10-07T09:30:00",
+        "due": "2026-11-02T23:59:59",
+        "dateOnly": true,
+        "expect": "Monday, November 2"
+      },
+      {
+        "name": "header.full, next year, en-US",
+        "context": "header.full",
+        "locale": "en-US",
+        "hour12": true,
+        "zone": "America/New_York",
+        "now": "2026-10-07T09:30:00",
+        "due": "2027-02-01T23:59:59",
+        "dateOnly": true,
+        "expect": "Monday, February 1, 2027"
+      },
+      { "name": "logbook.group, now, en-GB", "context": "logbook.group", "locale": "en-GB", "hour12": false, "zone": "Pacific/Auckland", "now": "2026-10-07T09:30:00", "due": "2026-10-07T09:00:00", "dateOnly": false, "expect": "Today" },
+      { "name": "logbook.group, earlier today, en-GB", "context": "logbook.group", "locale": "en-GB", "hour12": false, "zone": "Pacific/Auckland", "now": "2026-10-07T09:30:00", "due": "2026-10-07T00:10:00", "dateOnly": false, "expect": "Today" },
+      {
+        "name": "logbook.group, a clock a little ahead, en-GB",
+        "context": "logbook.group",
+        "locale": "en-GB",
+        "hour12": false,
+        "zone": "Pacific/Auckland",
+        "now": "2026-10-07T09:30:00",
+        "due": "2026-10-07T09:45:00",
+        "dateOnly": false,
+        "expect": "Today"
+      },
+      { "name": "logbook.group, yesterday, en-GB", "context": "logbook.group", "locale": "en-GB", "hour12": false, "zone": "Pacific/Auckland", "now": "2026-10-07T09:30:00", "due": "2026-10-06T22:15:00", "dateOnly": false, "expect": "Yesterday" },
+      { "name": "logbook.group, 2 days ago, en-GB", "context": "logbook.group", "locale": "en-GB", "hour12": false, "zone": "Pacific/Auckland", "now": "2026-10-07T09:30:00", "due": "2026-10-05T10:00:00", "dateOnly": false, "expect": "Mon 5 Oct" },
+      { "name": "logbook.group, 6 days ago, en-GB", "context": "logbook.group", "locale": "en-GB", "hour12": false, "zone": "Pacific/Auckland", "now": "2026-10-07T09:30:00", "due": "2026-10-01T10:00:00", "dateOnly": false, "expect": "Thu 1 Oct" },
+      {
+        "name": "logbook.group, 7 days ago, en-GB",
+        "context": "logbook.group",
+        "locale": "en-GB",
+        "hour12": false,
+        "zone": "Pacific/Auckland",
+        "now": "2026-10-07T09:30:00",
+        "due": "2026-09-30T10:00:00",
+        "dateOnly": false,
+        "expect": "September 2026"
+      },
+      {
+        "name": "logbook.group, 40 days ago, en-GB",
+        "context": "logbook.group",
+        "locale": "en-GB",
+        "hour12": false,
+        "zone": "Pacific/Auckland",
+        "now": "2026-10-07T09:30:00",
+        "due": "2026-08-28T10:00:00",
+        "dateOnly": false,
+        "expect": "August 2026"
+      },
+      {
+        "name": "logbook.group, last year, en-GB",
+        "context": "logbook.group",
+        "locale": "en-GB",
+        "hour12": false,
+        "zone": "Pacific/Auckland",
+        "now": "2026-10-07T09:30:00",
+        "due": "2025-12-31T10:00:00",
+        "dateOnly": false,
+        "expect": "December 2025"
+      },
+      { "name": "logbook.time, 09:00, en-GB", "context": "logbook.time", "locale": "en-GB", "hour12": false, "zone": "Pacific/Auckland", "now": "2026-10-07T09:30:00", "due": "2026-10-07T09:00:00", "dateOnly": false, "expect": "09:00" },
+      { "name": "logbook.time, 00:05, en-GB", "context": "logbook.time", "locale": "en-GB", "hour12": false, "zone": "Pacific/Auckland", "now": "2026-10-07T09:30:00", "due": "2026-10-06T00:05:00", "dateOnly": false, "expect": "00:05" },
+      { "name": "logbook.time, 23:59, en-GB", "context": "logbook.time", "locale": "en-GB", "hour12": false, "zone": "Pacific/Auckland", "now": "2026-10-07T09:30:00", "due": "2026-10-05T23:59:00", "dateOnly": false, "expect": "23:59" },
+      { "name": "logbook.time, 12:00, en-GB", "context": "logbook.time", "locale": "en-GB", "hour12": false, "zone": "Pacific/Auckland", "now": "2026-10-07T09:30:00", "due": "2026-10-05T12:00:00", "dateOnly": false, "expect": "12:00" },
+      { "name": "logbook.group, now, en-US", "context": "logbook.group", "locale": "en-US", "hour12": true, "zone": "America/New_York", "now": "2026-10-07T09:30:00", "due": "2026-10-07T09:00:00", "dateOnly": false, "expect": "Today" },
+      { "name": "logbook.group, earlier today, en-US", "context": "logbook.group", "locale": "en-US", "hour12": true, "zone": "America/New_York", "now": "2026-10-07T09:30:00", "due": "2026-10-07T00:10:00", "dateOnly": false, "expect": "Today" },
+      {
+        "name": "logbook.group, a clock a little ahead, en-US",
+        "context": "logbook.group",
+        "locale": "en-US",
+        "hour12": true,
+        "zone": "America/New_York",
+        "now": "2026-10-07T09:30:00",
+        "due": "2026-10-07T09:45:00",
+        "dateOnly": false,
+        "expect": "Today"
+      },
+      { "name": "logbook.group, yesterday, en-US", "context": "logbook.group", "locale": "en-US", "hour12": true, "zone": "America/New_York", "now": "2026-10-07T09:30:00", "due": "2026-10-06T22:15:00", "dateOnly": false, "expect": "Yesterday" },
+      { "name": "logbook.group, 2 days ago, en-US", "context": "logbook.group", "locale": "en-US", "hour12": true, "zone": "America/New_York", "now": "2026-10-07T09:30:00", "due": "2026-10-05T10:00:00", "dateOnly": false, "expect": "Mon, Oct 5" },
+      { "name": "logbook.group, 6 days ago, en-US", "context": "logbook.group", "locale": "en-US", "hour12": true, "zone": "America/New_York", "now": "2026-10-07T09:30:00", "due": "2026-10-01T10:00:00", "dateOnly": false, "expect": "Thu, Oct 1" },
+      {
+        "name": "logbook.group, 7 days ago, en-US",
+        "context": "logbook.group",
+        "locale": "en-US",
+        "hour12": true,
+        "zone": "America/New_York",
+        "now": "2026-10-07T09:30:00",
+        "due": "2026-09-30T10:00:00",
+        "dateOnly": false,
+        "expect": "September 2026"
+      },
+      { "name": "logbook.group, 40 days ago, en-US", "context": "logbook.group", "locale": "en-US", "hour12": true, "zone": "America/New_York", "now": "2026-10-07T09:30:00", "due": "2026-08-28T10:00:00", "dateOnly": false, "expect": "August 2026" },
+      { "name": "logbook.group, last year, en-US", "context": "logbook.group", "locale": "en-US", "hour12": true, "zone": "America/New_York", "now": "2026-10-07T09:30:00", "due": "2025-12-31T10:00:00", "dateOnly": false, "expect": "December 2025" },
+      { "name": "logbook.time, 09:00, en-US", "context": "logbook.time", "locale": "en-US", "hour12": true, "zone": "America/New_York", "now": "2026-10-07T09:30:00", "due": "2026-10-07T09:00:00", "dateOnly": false, "expect": "9:00 AM" },
+      { "name": "logbook.time, 00:05, en-US", "context": "logbook.time", "locale": "en-US", "hour12": true, "zone": "America/New_York", "now": "2026-10-07T09:30:00", "due": "2026-10-06T00:05:00", "dateOnly": false, "expect": "12:05 AM" },
+      { "name": "logbook.time, 23:59, en-US", "context": "logbook.time", "locale": "en-US", "hour12": true, "zone": "America/New_York", "now": "2026-10-07T09:30:00", "due": "2026-10-05T23:59:00", "dateOnly": false, "expect": "11:59 PM" },
+      { "name": "logbook.time, 12:00, en-US", "context": "logbook.time", "locale": "en-US", "hour12": true, "zone": "America/New_York", "now": "2026-10-07T09:30:00", "due": "2026-10-05T12:00:00", "dateOnly": false, "expect": "12:00 PM" },
+      { "name": "year end: row, saturday after new year, en-GB", "context": "row", "locale": "en-GB", "hour12": false, "zone": "Pacific/Auckland", "now": "2026-12-30T10:00:00", "due": "2027-01-02T23:59:59", "dateOnly": true, "expect": "Sat" },
+      {
+        "name": "year end: row, 6 days ahead stays a weekday, en-GB",
+        "context": "row",
+        "locale": "en-GB",
+        "hour12": false,
+        "zone": "Pacific/Auckland",
+        "now": "2026-12-30T10:00:00",
+        "due": "2027-01-05T15:00:00",
+        "dateOnly": false,
+        "expect": "Tue, 15:00"
+      },
+      {
+        "name": "year end: row, 7 days ahead shows the year, en-GB",
+        "context": "row",
+        "locale": "en-GB",
+        "hour12": false,
+        "zone": "Pacific/Auckland",
+        "now": "2026-12-30T10:00:00",
+        "due": "2027-01-06T23:59:59",
+        "dateOnly": true,
+        "expect": "6 Jan 2027"
+      },
+      {
+        "name": "year end: chip across the year, en-GB",
+        "context": "chip",
+        "locale": "en-GB",
+        "hour12": false,
+        "zone": "Pacific/Auckland",
+        "now": "2026-12-30T10:00:00",
+        "due": "2027-01-02T09:00:00",
+        "dateOnly": false,
+        "expect": "Sat 2 Jan 2027, 09:00"
+      },
+      {
+        "name": "year end: chip in the same year, en-GB",
+        "context": "chip",
+        "locale": "en-GB",
+        "hour12": false,
+        "zone": "Pacific/Auckland",
+        "now": "2026-12-30T10:00:00",
+        "due": "2026-12-31T09:00:00",
+        "dateOnly": false,
+        "expect": "Thu 31 Dec, 09:00"
+      },
+      {
+        "name": "year end: header.day, 3 days ahead across the year, en-GB",
+        "context": "header.day",
+        "locale": "en-GB",
+        "hour12": false,
+        "zone": "Pacific/Auckland",
+        "now": "2026-12-30T10:00:00",
+        "due": "2027-01-02T23:59:59",
+        "dateOnly": true,
+        "expect": "Sat 2"
+      },
+      {
+        "name": "year end: header.day, 7 days ahead across the year, en-GB",
+        "context": "header.day",
+        "locale": "en-GB",
+        "hour12": false,
+        "zone": "Pacific/Auckland",
+        "now": "2026-12-30T10:00:00",
+        "due": "2027-01-06T23:59:59",
+        "dateOnly": true,
+        "expect": "Wed 6 Jan 2027"
+      },
+      {
+        "name": "year end: header.full, new year, en-GB",
+        "context": "header.full",
+        "locale": "en-GB",
+        "hour12": false,
+        "zone": "Pacific/Auckland",
+        "now": "2026-12-30T10:00:00",
+        "due": "2027-01-01T23:59:59",
+        "dateOnly": true,
+        "expect": "Friday 1 January 2027"
+      },
+      {
+        "name": "year end: tomorrow across midnight at 23:30, en-GB",
+        "context": "row",
+        "locale": "en-GB",
+        "hour12": false,
+        "zone": "Pacific/Auckland",
+        "now": "2026-12-31T23:30:00",
+        "due": "2027-01-01T09:00:00",
+        "dateOnly": false,
+        "expect": "Tomorrow, 09:00"
+      },
+      { "name": "year end: row, saturday after new year, en-US", "context": "row", "locale": "en-US", "hour12": true, "zone": "America/New_York", "now": "2026-12-30T10:00:00", "due": "2027-01-02T23:59:59", "dateOnly": true, "expect": "Sat" },
+      {
+        "name": "year end: row, 6 days ahead stays a weekday, en-US",
+        "context": "row",
+        "locale": "en-US",
+        "hour12": true,
+        "zone": "America/New_York",
+        "now": "2026-12-30T10:00:00",
+        "due": "2027-01-05T15:00:00",
+        "dateOnly": false,
+        "expect": "Tue, 3:00 PM"
+      },
+      {
+        "name": "year end: row, 7 days ahead shows the year, en-US",
+        "context": "row",
+        "locale": "en-US",
+        "hour12": true,
+        "zone": "America/New_York",
+        "now": "2026-12-30T10:00:00",
+        "due": "2027-01-06T23:59:59",
+        "dateOnly": true,
+        "expect": "Jan 6, 2027"
+      },
+      {
+        "name": "year end: chip across the year, en-US",
+        "context": "chip",
+        "locale": "en-US",
+        "hour12": true,
+        "zone": "America/New_York",
+        "now": "2026-12-30T10:00:00",
+        "due": "2027-01-02T09:00:00",
+        "dateOnly": false,
+        "expect": "Sat, Jan 2, 2027, 9:00 AM"
+      },
+      {
+        "name": "year end: chip in the same year, en-US",
+        "context": "chip",
+        "locale": "en-US",
+        "hour12": true,
+        "zone": "America/New_York",
+        "now": "2026-12-30T10:00:00",
+        "due": "2026-12-31T09:00:00",
+        "dateOnly": false,
+        "expect": "Thu, Dec 31, 9:00 AM"
+      },
+      {
+        "name": "year end: header.day, 3 days ahead across the year, en-US",
+        "context": "header.day",
+        "locale": "en-US",
+        "hour12": true,
+        "zone": "America/New_York",
+        "now": "2026-12-30T10:00:00",
+        "due": "2027-01-02T23:59:59",
+        "dateOnly": true,
+        "expect": "Sat 2"
+      },
+      {
+        "name": "year end: header.day, 7 days ahead across the year, en-US",
+        "context": "header.day",
+        "locale": "en-US",
+        "hour12": true,
+        "zone": "America/New_York",
+        "now": "2026-12-30T10:00:00",
+        "due": "2027-01-06T23:59:59",
+        "dateOnly": true,
+        "expect": "Wed, Jan 6, 2027"
+      },
+      {
+        "name": "year end: header.full, new year, en-US",
+        "context": "header.full",
+        "locale": "en-US",
+        "hour12": true,
+        "zone": "America/New_York",
+        "now": "2026-12-30T10:00:00",
+        "due": "2027-01-01T23:59:59",
+        "dateOnly": true,
+        "expect": "Friday, January 1, 2027"
+      },
+      {
+        "name": "year end: tomorrow across midnight at 23:30, en-US",
+        "context": "row",
+        "locale": "en-US",
+        "hour12": true,
+        "zone": "America/New_York",
+        "now": "2026-12-31T23:30:00",
+        "due": "2027-01-01T09:00:00",
+        "dateOnly": false,
+        "expect": "Tomorrow, 9:00 AM"
+      },
+      {
+        "name": "new year: row, 3 days ago across the year, en-GB",
+        "context": "row",
+        "locale": "en-GB",
+        "hour12": false,
+        "zone": "Pacific/Auckland",
+        "now": "2027-01-02T10:00:00",
+        "due": "2026-12-30T23:59:59",
+        "dateOnly": true,
+        "expect": "3 days ago"
+      },
+      {
+        "name": "new year: row, 13 days ago shows the year, en-GB",
+        "context": "row",
+        "locale": "en-GB",
+        "hour12": false,
+        "zone": "Pacific/Auckland",
+        "now": "2027-01-02T10:00:00",
+        "due": "2026-12-20T23:59:59",
+        "dateOnly": true,
+        "expect": "20 Dec 2026"
+      },
+      { "name": "new year: row, same year 20 days ahead, en-GB", "context": "row", "locale": "en-GB", "hour12": false, "zone": "Pacific/Auckland", "now": "2027-01-02T10:00:00", "due": "2027-01-22T23:59:59", "dateOnly": true, "expect": "22 Jan" },
+      {
+        "name": "new year: logbook.group, 4 days ago across the year, en-GB",
+        "context": "logbook.group",
+        "locale": "en-GB",
+        "hour12": false,
+        "zone": "Pacific/Auckland",
+        "now": "2027-01-02T10:00:00",
+        "due": "2026-12-29T10:00:00",
+        "dateOnly": false,
+        "expect": "Tue 29 Dec 2026"
+      },
+      {
+        "name": "new year: logbook.group, over a year ago, en-GB",
+        "context": "logbook.group",
+        "locale": "en-GB",
+        "hour12": false,
+        "zone": "Pacific/Auckland",
+        "now": "2027-01-02T10:00:00",
+        "due": "2025-12-26T10:00:00",
+        "dateOnly": false,
+        "expect": "December 2025"
+      },
+      {
+        "name": "new year: logbook.group, 7 days ago in the old year, en-GB",
+        "context": "logbook.group",
+        "locale": "en-GB",
+        "hour12": false,
+        "zone": "Pacific/Auckland",
+        "now": "2027-01-02T10:00:00",
+        "due": "2026-12-26T10:00:00",
+        "dateOnly": false,
+        "expect": "December 2026"
+      },
+      {
+        "name": "new year: logbook.group, same year, en-GB",
+        "context": "logbook.group",
+        "locale": "en-GB",
+        "hour12": false,
+        "zone": "Pacific/Auckland",
+        "now": "2027-01-02T10:00:00",
+        "due": "2027-01-01T10:00:00",
+        "dateOnly": false,
+        "expect": "Yesterday"
+      },
+      {
+        "name": "new year: row, 3 days ago across the year, en-US",
+        "context": "row",
+        "locale": "en-US",
+        "hour12": true,
+        "zone": "America/New_York",
+        "now": "2027-01-02T10:00:00",
+        "due": "2026-12-30T23:59:59",
+        "dateOnly": true,
+        "expect": "3 days ago"
+      },
+      {
+        "name": "new year: row, 13 days ago shows the year, en-US",
+        "context": "row",
+        "locale": "en-US",
+        "hour12": true,
+        "zone": "America/New_York",
+        "now": "2027-01-02T10:00:00",
+        "due": "2026-12-20T23:59:59",
+        "dateOnly": true,
+        "expect": "Dec 20, 2026"
+      },
+      { "name": "new year: row, same year 20 days ahead, en-US", "context": "row", "locale": "en-US", "hour12": true, "zone": "America/New_York", "now": "2027-01-02T10:00:00", "due": "2027-01-22T23:59:59", "dateOnly": true, "expect": "Jan 22" },
+      {
+        "name": "new year: logbook.group, 4 days ago across the year, en-US",
+        "context": "logbook.group",
+        "locale": "en-US",
+        "hour12": true,
+        "zone": "America/New_York",
+        "now": "2027-01-02T10:00:00",
+        "due": "2026-12-29T10:00:00",
+        "dateOnly": false,
+        "expect": "Tue, Dec 29, 2026"
+      },
+      {
+        "name": "new year: logbook.group, over a year ago, en-US",
+        "context": "logbook.group",
+        "locale": "en-US",
+        "hour12": true,
+        "zone": "America/New_York",
+        "now": "2027-01-02T10:00:00",
+        "due": "2025-12-26T10:00:00",
+        "dateOnly": false,
+        "expect": "December 2025"
+      },
+      {
+        "name": "new year: logbook.group, 7 days ago in the old year, en-US",
+        "context": "logbook.group",
+        "locale": "en-US",
+        "hour12": true,
+        "zone": "America/New_York",
+        "now": "2027-01-02T10:00:00",
+        "due": "2026-12-26T10:00:00",
+        "dateOnly": false,
+        "expect": "December 2026"
+      },
+      {
+        "name": "new year: logbook.group, same year, en-US",
+        "context": "logbook.group",
+        "locale": "en-US",
+        "hour12": true,
+        "zone": "America/New_York",
+        "now": "2027-01-02T10:00:00",
+        "due": "2027-01-01T10:00:00",
+        "dateOnly": false,
+        "expect": "Yesterday"
+      },
+      {
+        "name": "DST: Auckland spring forward day, 23 hours to the same time tomorrow, en-GB",
+        "context": "row",
+        "locale": "en-GB",
+        "hour12": false,
+        "zone": "Pacific/Auckland",
+        "now": "2026-09-27T00:30:00",
+        "due": "2026-09-28T00:30:00",
+        "dateOnly": false,
+        "expect": "Tomorrow, 00:30"
+      },
+      {
+        "name": "DST: Auckland spring forward day, date only tomorrow, en-GB",
+        "context": "row",
+        "locale": "en-GB",
+        "hour12": false,
+        "zone": "Pacific/Auckland",
+        "now": "2026-09-27T00:30:00",
+        "due": "2026-09-28T23:59:59",
+        "dateOnly": true,
+        "expect": "Tomorrow"
+      },
+      {
+        "name": "DST: Auckland spring forward, the evening of the same day, en-GB",
+        "context": "row",
+        "locale": "en-GB",
+        "hour12": false,
+        "zone": "Pacific/Auckland",
+        "now": "2026-09-27T00:30:00",
+        "due": "2026-09-27T23:30:00",
+        "dateOnly": false,
+        "expect": "Today, 23:30"
+      },
+      {
+        "name": "DST: Auckland spring forward, chip, en-GB",
+        "context": "chip",
+        "locale": "en-GB",
+        "hour12": false,
+        "zone": "Pacific/Auckland",
+        "now": "2026-09-26T23:30:00",
+        "due": "2026-09-27T09:00:00",
+        "dateOnly": false,
+        "expect": "Sun 27 Sep, 09:00"
+      },
+      {
+        "name": "DST: Auckland spring forward, 6 days ahead, en-GB",
+        "context": "row",
+        "locale": "en-GB",
+        "hour12": false,
+        "zone": "Pacific/Auckland",
+        "now": "2026-09-26T12:00:00",
+        "due": "2026-10-02T12:00:00",
+        "dateOnly": false,
+        "expect": "Fri, 12:00"
+      },
+      {
+        "name": "DST: Auckland spring forward, 7 days ahead, en-GB",
+        "context": "row",
+        "locale": "en-GB",
+        "hour12": false,
+        "zone": "Pacific/Auckland",
+        "now": "2026-09-26T12:00:00",
+        "due": "2026-10-03T12:00:00",
+        "dateOnly": false,
+        "expect": "3 Oct, 12:00"
+      },
+      {
+        "name": "DST: New York fall back day, same evening is today, en-US",
+        "context": "row",
+        "locale": "en-US",
+        "hour12": true,
+        "zone": "America/New_York",
+        "now": "2026-11-01T00:30:00",
+        "due": "2026-11-01T23:30:00",
+        "dateOnly": false,
+        "expect": "Today, 11:30 PM"
+      },
+      {
+        "name": "DST: New York fall back day, tomorrow, en-US",
+        "context": "row",
+        "locale": "en-US",
+        "hour12": true,
+        "zone": "America/New_York",
+        "now": "2026-11-01T00:30:00",
+        "due": "2026-11-02T00:30:00",
+        "dateOnly": false,
+        "expect": "Tomorrow, 12:30 AM"
+      },
+      {
+        "name": "DST: New York fall back day, 25 hours later is still today in the logbook, en-US",
+        "context": "logbook.group",
+        "locale": "en-US",
+        "hour12": true,
+        "zone": "America/New_York",
+        "now": "2026-11-01T23:45:00",
+        "due": "2026-11-01T00:15:00",
+        "dateOnly": false,
+        "expect": "Today"
+      },
+      {
+        "name": "DST: New York fall back, 7 days ahead, en-US",
+        "context": "row",
+        "locale": "en-US",
+        "hour12": true,
+        "zone": "America/New_York",
+        "now": "2026-10-31T12:00:00",
+        "due": "2026-11-07T12:00:00",
+        "dateOnly": false,
+        "expect": "Nov 7, 12:00 PM"
+      },
+      {
+        "name": "DST: New York fall back, 6 days ahead, en-US",
+        "context": "row",
+        "locale": "en-US",
+        "hour12": true,
+        "zone": "America/New_York",
+        "now": "2026-10-31T12:00:00",
+        "due": "2026-11-06T12:00:00",
+        "dateOnly": false,
+        "expect": "Fri, 12:00 PM"
+      },
+      {
+        "name": "DST: Auckland fall back day, same evening is today, en-GB",
+        "context": "row",
+        "locale": "en-GB",
+        "hour12": false,
+        "zone": "Pacific/Auckland",
+        "now": "2027-04-04T00:30:00",
+        "due": "2027-04-04T23:30:00",
+        "dateOnly": false,
+        "expect": "Today, 23:30"
+      },
+      {
+        "name": "DST: Auckland fall back day, yesterday across the change, en-GB",
+        "context": "row",
+        "locale": "en-GB",
+        "hour12": false,
+        "zone": "Pacific/Auckland",
+        "now": "2027-04-05T00:30:00",
+        "due": "2027-04-04T23:59:59",
+        "dateOnly": true,
+        "expect": "Yesterday"
+      },
+      {
+        "name": "DST: New York spring forward day, tomorrow, en-US",
+        "context": "row",
+        "locale": "en-US",
+        "hour12": true,
+        "zone": "America/New_York",
+        "now": "2027-03-14T00:30:00",
+        "due": "2027-03-15T00:30:00",
+        "dateOnly": false,
+        "expect": "Tomorrow, 12:30 AM"
+      },
+      {
+        "name": "DST: New York spring forward, header.day, en-US",
+        "context": "header.day",
+        "locale": "en-US",
+        "hour12": true,
+        "zone": "America/New_York",
+        "now": "2027-03-13T22:00:00",
+        "due": "2027-03-14T23:59:59",
+        "dateOnly": true,
+        "expect": "Tomorrow"
+      }
+    ]
+  }
 }

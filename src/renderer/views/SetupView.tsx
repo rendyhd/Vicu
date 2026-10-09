@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { Button } from '@/components/shared/Button'
 import { api, type OIDCProvider, type ServerAuthInfo } from '@/lib/api'
 import { cn } from '@/lib/cn'
 import type { Project } from '@/lib/vikunja-types'
@@ -12,9 +13,9 @@ function TokenPermissionsInfo() {
         type="button"
         onClick={() => setOpen(!open)}
         className={cn(
-          'inline-flex h-4 w-4 items-center justify-center rounded-full text-[10px] font-bold leading-none transition-colors',
+          'inline-flex h-4 w-4 items-center justify-center rounded-full text-caption font-bold leading-none transition-colors',
           open
-            ? 'bg-accent-blue text-white'
+            ? 'bg-accent-fill text-on-accent'
             : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:bg-accent-blue/20 hover:text-accent-blue'
         )}
         aria-label="Token permissions info"
@@ -22,7 +23,7 @@ function TokenPermissionsInfo() {
         i
       </button>
       {open && (
-        <div className="absolute left-0 top-6 z-10 w-80 rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] p-3 shadow-lg">
+        <div className="absolute left-0 top-6 z-10 w-80 rounded-popover border border-[var(--border-color)] bg-[var(--bg-primary)] p-3 shadow-lg">
           <p className="mb-2 text-xs text-[var(--text-secondary)]">
             Your API token needs these permissions:
           </p>
@@ -35,38 +36,38 @@ function TokenPermissionsInfo() {
               </tr>
             </thead>
             <tbody className="text-[var(--text-primary)]">
-              <tr className="border-b border-[var(--border-color)]/50">
-                <td className="py-1.5 pr-2 font-mono text-[10px]">tasks</td>
+              <tr className="border-b border-border/50">
+                <td className="py-1.5 pr-2 font-mono text-caption">tasks</td>
                 <td className="py-1.5 pr-2">read_all, create, update, delete</td>
                 <td className="py-1.5">Task CRUD</td>
               </tr>
-              <tr className="border-b border-[var(--border-color)]/50">
-                <td className="py-1.5 pr-2 font-mono text-[10px]">projects</td>
+              <tr className="border-b border-border/50">
+                <td className="py-1.5 pr-2 font-mono text-caption">projects</td>
                 <td className="py-1.5 pr-2">read_all, create, update, delete</td>
                 <td className="py-1.5">Project CRUD</td>
               </tr>
-              <tr className="border-b border-[var(--border-color)]/50">
-                <td className="py-1.5 pr-2 font-mono text-[10px]">labels</td>
+              <tr className="border-b border-border/50">
+                <td className="py-1.5 pr-2 font-mono text-caption">labels</td>
                 <td className="py-1.5 pr-2">read_all, create, update, delete</td>
                 <td className="py-1.5">Label CRUD</td>
               </tr>
-              <tr className="border-b border-[var(--border-color)]/50">
-                <td className="py-1.5 pr-2 font-mono text-[10px]">task_labels</td>
+              <tr className="border-b border-border/50">
+                <td className="py-1.5 pr-2 font-mono text-caption">task_labels</td>
                 <td className="py-1.5 pr-2">create, delete</td>
                 <td className="py-1.5">Adding/removing labels</td>
               </tr>
-              <tr className="border-b border-[var(--border-color)]/50">
-                <td className="py-1.5 pr-2 font-mono text-[10px]">task_relations</td>
+              <tr className="border-b border-border/50">
+                <td className="py-1.5 pr-2 font-mono text-caption">task_relations</td>
                 <td className="py-1.5 pr-2">create, delete</td>
                 <td className="py-1.5">Subtasks & relations</td>
               </tr>
-              <tr className="border-b border-[var(--border-color)]/50">
-                <td className="py-1.5 pr-2 font-mono text-[10px]">task_attachments</td>
+              <tr className="border-b border-border/50">
+                <td className="py-1.5 pr-2 font-mono text-caption">task_attachments</td>
                 <td className="py-1.5 pr-2">read_all, create, delete</td>
                 <td className="py-1.5">File attachments</td>
               </tr>
               <tr>
-                <td className="py-1.5 pr-2 font-mono text-[10px]">project_views</td>
+                <td className="py-1.5 pr-2 font-mono text-caption">project_views</td>
                 <td className="py-1.5 pr-2">read_all</td>
                 <td className="py-1.5">Position sorting</td>
               </tr>
@@ -82,16 +83,37 @@ export { TokenPermissionsInfo }
 
 type Step = 'url' | 'auth-method' | 'oidc-login' | 'oidc-totp' | 'password-login' | 'totp' | 'api-token' | 'project'
 
+// The order the steps are reached in; a step later in it slides in from the right, an earlier one from the left.
+const STEP_ORDER: Step[] = ['url', 'auth-method', 'oidc-login', 'oidc-totp', 'password-login', 'totp', 'api-token', 'project']
+
 interface SetupViewProps {
   onComplete: () => void
 }
 
 export function SetupView({ onComplete }: SetupViewProps) {
   const [step, setStep] = useState<Step>('url')
+  // Which way the step slid (card 4.11a), read while rendering so the new step starts sliding in its first frame.
+  const shown = useRef<{ step: Step; direction: 'forward' | 'back' | null }>({ step: 'url', direction: null })
+  if (shown.current.step !== step) {
+    shown.current = { step, direction: STEP_ORDER.indexOf(step) >= STEP_ORDER.indexOf(shown.current.step) ? 'forward' : 'back' }
+  }
   const [url, setUrl] = useState('')
   const [token, setToken] = useState('')
   const [showToken, setShowToken] = useState(false)
   const [inboxProjectId, setInboxProjectId] = useState(0)
+  // The logo is a 90 KB data URL. It is loaded here rather than imported, because SettingsView
+  // imports TokenPermissionsInfo from this file and a static import would grow its chunk too.
+  const [logoUrl, setLogoUrl] = useState('')
+
+  useEffect(() => {
+    let cancelled = false
+    import('@/assets/vicu-logo').then(({ VICU_LOGO_DATA_URL }) => {
+      if (!cancelled) setLogoUrl(VICU_LOGO_DATA_URL)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const [serverAuth, setServerAuth] = useState<ServerAuthInfo | null>(null)
   const [oidcProviders, setOidcProviders] = useState<OIDCProvider[]>([])
@@ -275,12 +297,15 @@ export function SetupView({ onComplete }: SetupViewProps) {
         className="absolute inset-x-0 top-0 z-50 h-8"
         style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
       />
-      <div className="w-full max-w-md rounded-xl border border-[var(--border-color)] bg-[var(--bg-secondary)] p-8 shadow-lg">
-        <h1 className="mb-1 text-xl font-bold text-[var(--text-primary)]">
-          Connect to Vikunja
+      <div className="w-full max-w-md rounded-card border border-[var(--border-color)] bg-bg-card p-8 shadow-lg">
+        <div className="mb-4 h-12 w-12">
+          {logoUrl && <img src={logoUrl} alt="" className="h-12 w-12" />}
+        </div>
+        <h1 className="mb-1 text-page-title text-[var(--text-primary)]">
+          Welcome to Vicu
         </h1>
-        <p className="mb-6 text-sm text-[var(--text-secondary)]">
-          {step === 'url' && 'Enter your server URL to get started.'}
+        <p className="mb-6 text-sm text-text-secondary">
+          {step === 'url' && 'Enter your Vikunja server URL to get started.'}
           {step === 'auth-method' && 'Choose how to sign in.'}
           {step === 'oidc-login' && 'Complete sign-in in your browser.'}
           {step === 'oidc-totp' && 'Enter your two-factor code to complete SSO.'}
@@ -290,7 +315,7 @@ export function SetupView({ onComplete }: SetupViewProps) {
           {step === 'project' && 'Choose your inbox project.'}
         </p>
 
-        <div className="space-y-4">
+        <div key={step} data-step={step} data-step-direction={shown.current.direction ?? undefined} className={cn('space-y-4', shown.current.direction === 'forward' && 'vicu-step-forward', shown.current.direction === 'back' && 'vicu-step-back')}>
           {/* Step 1: URL Input */}
           {step === 'url' && (
             <>
@@ -303,25 +328,21 @@ export function SetupView({ onComplete }: SetupViewProps) {
                   value={url}
                   onChange={(e) => setUrl(e.target.value)}
                   placeholder="https://app.vikunja.cloud"
-                  className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-accent-blue focus:outline-none"
+                  className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-text-secondary/50"
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && !discovering) handleUrlContinue()
                   }}
                 />
               </div>
 
-              <button
-                type="button"
+              <Button
+                variant="primary"
                 onClick={handleUrlContinue}
                 disabled={discovering}
-                className={cn(
-                  'w-full rounded-md px-4 py-2 text-sm font-medium transition-colors',
-                  'bg-accent-blue text-white hover:bg-accent-blue/90',
-                  'disabled:cursor-not-allowed disabled:opacity-50'
-                )}
+                className="w-full"
               >
                 {discovering ? 'Checking...' : 'Continue'}
-              </button>
+              </Button>
 
               <p className="text-center text-xs text-[var(--text-secondary)]">
                 Don't have an account?{' '}
@@ -340,19 +361,15 @@ export function SetupView({ onComplete }: SetupViewProps) {
           {step === 'auth-method' && (
             <>
               {oidcProviders.map((provider) => (
-                <button
+                <Button
                   key={provider.key}
-                  type="button"
+                  variant="primary"
                   onClick={() => handleOidcLogin(provider)}
                   disabled={oidcLogging}
-                  className={cn(
-                    'w-full rounded-md px-4 py-2.5 text-sm font-medium transition-colors',
-                    'bg-accent-blue text-white hover:bg-accent-blue/90',
-                    'disabled:cursor-not-allowed disabled:opacity-50'
-                  )}
+                  className="w-full"
                 >
                   {oidcLogging ? 'Waiting for browser...' : `Sign in with ${provider.name}`}
-                </button>
+                </Button>
               ))}
 
               {serverAuth?.local_enabled && (
@@ -365,26 +382,21 @@ export function SetupView({ onComplete }: SetupViewProps) {
                     </div>
                   )}
 
-                  <button
-                    type="button"
+                  <Button
+                    variant={oidcProviders.length > 0 ? 'secondary' : 'primary'}
                     onClick={() => {
                       setPasswordError('')
                       setStep('password-login')
                     }}
-                    className={cn(
-                      'w-full rounded-md px-4 py-2.5 text-sm font-medium transition-colors',
-                      oidcProviders.length > 0
-                        ? 'border border-[var(--border-color)] text-[var(--text-primary)] hover:bg-[var(--bg-primary)]'
-                        : 'bg-accent-blue text-white hover:bg-accent-blue/90'
-                    )}
+                    className="w-full"
                   >
                     Sign in with username & password
-                  </button>
+                  </Button>
                 </>
               )}
 
               {oidcError && (
-                <p className="text-xs text-accent-red">{oidcError}</p>
+                <p className="text-xs text-danger">{oidcError}</p>
               )}
 
               <div className="flex items-center gap-3">
@@ -393,21 +405,13 @@ export function SetupView({ onComplete }: SetupViewProps) {
                 <div className="h-px flex-1 bg-[var(--border-color)]" />
               </div>
 
-              <button
-                type="button"
-                onClick={() => setStep('api-token')}
-                className="w-full rounded-md border border-[var(--border-color)] px-4 py-2 text-sm font-medium text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-primary)] hover:text-[var(--text-primary)]"
-              >
+              <Button variant="secondary" onClick={() => setStep('api-token')} className="w-full">
                 Use API Token instead
-              </button>
+              </Button>
 
-              <button
-                type="button"
-                onClick={() => setStep('url')}
-                className="w-full text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-              >
+              <Button variant="quiet" onClick={() => setStep('url')} className="w-full">
                 Back
-              </button>
+              </Button>
             </>
           )}
 
@@ -426,7 +430,7 @@ export function SetupView({ onComplete }: SetupViewProps) {
                   inputMode="numeric"
                   autoComplete="one-time-code"
                   autoFocus
-                  className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2 text-center text-lg tracking-widest text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-accent-blue focus:outline-none"
+                  className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2 text-center text-lg tracking-widest text-[var(--text-primary)] placeholder:text-text-secondary/50"
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && totpCode.length === 6) {
                       handleOidcLogin(selectedOidcProvider, totpCode)
@@ -438,34 +442,30 @@ export function SetupView({ onComplete }: SetupViewProps) {
                 </p>
               </div>
 
-              <button
-                type="button"
+              <Button
+                variant="primary"
                 onClick={() => handleOidcLogin(selectedOidcProvider, totpCode)}
                 disabled={totpCode.length !== 6 || oidcLogging}
-                className={cn(
-                  'w-full rounded-md px-4 py-2 text-sm font-medium transition-colors',
-                  'bg-accent-blue text-white hover:bg-accent-blue/90',
-                  'disabled:cursor-not-allowed disabled:opacity-50'
-                )}
+                className="w-full"
               >
                 {oidcLogging ? 'Waiting for browser...' : 'Continue with SSO'}
-              </button>
+              </Button>
 
               {oidcError && (
-                <p className="text-xs text-accent-red">{oidcError}</p>
+                <p className="text-xs text-danger">{oidcError}</p>
               )}
 
-              <button
-                type="button"
+              <Button
+                variant="quiet"
                 onClick={() => {
                   setTotpCode('')
                   setOidcError('')
                   setStep('auth-method')
                 }}
-                className="w-full text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                className="w-full"
               >
                 Back
-              </button>
+              </Button>
             </>
           )}
 
@@ -482,7 +482,7 @@ export function SetupView({ onComplete }: SetupViewProps) {
                   onChange={(e) => setUsername(e.target.value)}
                   placeholder="Enter your username or email"
                   autoComplete="username"
-                  className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-accent-blue focus:outline-none"
+                  className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-text-secondary/50"
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && username && password) handlePasswordLogin()
                   }}
@@ -500,7 +500,7 @@ export function SetupView({ onComplete }: SetupViewProps) {
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="Enter your password"
                     autoComplete="current-password"
-                    className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2 pr-16 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-accent-blue focus:outline-none"
+                    className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2 pr-16 text-sm text-[var(--text-primary)] placeholder:text-text-secondary/50"
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' && username && password) handlePasswordLogin()
                     }}
@@ -508,40 +508,36 @@ export function SetupView({ onComplete }: SetupViewProps) {
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded px-2 py-0.5 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded-control px-2 py-0.5 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                   >
                     {showPassword ? 'Hide' : 'Show'}
                   </button>
                 </div>
               </div>
 
-              <button
-                type="button"
+              <Button
+                variant="primary"
                 onClick={() => handlePasswordLogin()}
                 disabled={!username || !password || passwordLogging}
-                className={cn(
-                  'w-full rounded-md px-4 py-2 text-sm font-medium transition-colors',
-                  'bg-accent-blue text-white hover:bg-accent-blue/90',
-                  'disabled:cursor-not-allowed disabled:opacity-50'
-                )}
+                className="w-full"
               >
                 {passwordLogging ? 'Signing in...' : 'Sign In'}
-              </button>
+              </Button>
 
               {passwordError && (
-                <p className="text-xs text-accent-red">{passwordError}</p>
+                <p className="text-xs text-danger">{passwordError}</p>
               )}
 
-              <button
-                type="button"
+              <Button
+                variant="quiet"
                 onClick={() => {
                   setPasswordError('')
                   setStep(serverAuth?.oidc_enabled ? 'auth-method' : 'url')
                 }}
-                className="w-full text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                className="w-full"
               >
                 Back
-              </button>
+              </Button>
             </>
           )}
 
@@ -559,7 +555,7 @@ export function SetupView({ onComplete }: SetupViewProps) {
                   placeholder="000000"
                   inputMode="numeric"
                   autoComplete="one-time-code"
-                  className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2 text-center text-lg tracking-widest text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-accent-blue focus:outline-none"
+                  className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2 text-center text-lg tracking-widest text-[var(--text-primary)] placeholder:text-text-secondary/50"
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && totpCode.length === 6) handlePasswordLogin(totpCode)
                   }}
@@ -569,34 +565,30 @@ export function SetupView({ onComplete }: SetupViewProps) {
                 </p>
               </div>
 
-              <button
-                type="button"
+              <Button
+                variant="primary"
                 onClick={() => handlePasswordLogin(totpCode)}
                 disabled={totpCode.length !== 6 || passwordLogging}
-                className={cn(
-                  'w-full rounded-md px-4 py-2 text-sm font-medium transition-colors',
-                  'bg-accent-blue text-white hover:bg-accent-blue/90',
-                  'disabled:cursor-not-allowed disabled:opacity-50'
-                )}
+                className="w-full"
               >
                 {passwordLogging ? 'Verifying...' : 'Verify'}
-              </button>
+              </Button>
 
               {passwordError && (
-                <p className="text-xs text-accent-red">{passwordError}</p>
+                <p className="text-xs text-danger">{passwordError}</p>
               )}
 
-              <button
-                type="button"
+              <Button
+                variant="quiet"
                 onClick={() => {
                   setTotpCode('')
                   setPasswordError('')
                   setStep('password-login')
                 }}
-                className="w-full text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                className="w-full"
               >
                 Back
-              </button>
+              </Button>
             </>
           )}
 
@@ -607,7 +599,7 @@ export function SetupView({ onComplete }: SetupViewProps) {
                 <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">
                   Server URL
                 </label>
-                <div className="rounded-md border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-secondary)]">
+                <div className="rounded-control border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-secondary)]">
                   {url}
                 </div>
               </div>
@@ -623,46 +615,42 @@ export function SetupView({ onComplete }: SetupViewProps) {
                     value={token}
                     onChange={(e) => setToken(e.target.value)}
                     placeholder="Enter your API token"
-                    className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2 pr-16 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-accent-blue focus:outline-none"
+                    className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2 pr-16 text-sm text-[var(--text-primary)] placeholder:text-text-secondary/50"
                   />
                   <button
                     type="button"
                     onClick={() => setShowToken(!showToken)}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded px-2 py-0.5 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded-control px-2 py-0.5 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                   >
                     {showToken ? 'Hide' : 'Show'}
                   </button>
                 </div>
               </div>
 
-              <button
-                type="button"
+              <Button
+                variant="primary"
                 onClick={handleTestConnection}
                 disabled={!token || testStatus === 'testing'}
-                className={cn(
-                  'w-full rounded-md px-4 py-2 text-sm font-medium transition-colors',
-                  'bg-accent-blue text-white hover:bg-accent-blue/90',
-                  'disabled:cursor-not-allowed disabled:opacity-50'
-                )}
+                className="w-full"
               >
                 {testStatus === 'testing' ? 'Testing...' : 'Test Connection'}
-              </button>
+              </Button>
 
               {testStatus === 'error' && (
-                <p className="text-xs text-accent-red">{testError || 'Connection failed'}</p>
+                <p className="text-xs text-danger">{testError || 'Connection failed'}</p>
               )}
 
-              <button
-                type="button"
+              <Button
+                variant="quiet"
                 onClick={() => {
                   setTestStatus('idle')
                   setTestError('')
                   setStep(serverAuth ? 'auth-method' : 'url')
                 }}
-                className="w-full text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                className="w-full"
               >
                 Back
-              </button>
+              </Button>
             </>
           )}
 
@@ -670,13 +658,13 @@ export function SetupView({ onComplete }: SetupViewProps) {
           {step === 'project' && (
             <>
               {authMethod === 'oidc' && (
-                <p className="text-xs text-accent-green">Signed in via SSO</p>
+                <p className="text-xs text-status-done">Signed in via SSO</p>
               )}
               {authMethod === 'password' && (
-                <p className="text-xs text-accent-green">Signed in successfully</p>
+                <p className="text-xs text-status-done">Signed in successfully</p>
               )}
               {authMethod === 'api_token' && (
-                <p className="text-xs text-accent-green">Connected successfully</p>
+                <p className="text-xs text-status-done">Connected successfully</p>
               )}
 
               <div>
@@ -686,7 +674,7 @@ export function SetupView({ onComplete }: SetupViewProps) {
                 <select
                   value={inboxProjectId}
                   onChange={(e) => setInboxProjectId(Number(e.target.value))}
-                  className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)] focus:border-accent-blue focus:outline-none"
+                  className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)]"
                 >
                   <option value={0}>Select a project...</option>
                   {projects.map((p) => (
@@ -695,18 +683,14 @@ export function SetupView({ onComplete }: SetupViewProps) {
                 </select>
               </div>
 
-              <button
-                type="button"
+              <Button
+                variant="primary"
                 onClick={handleSave}
                 disabled={!inboxProjectId || saving}
-                className={cn(
-                  'w-full rounded-md px-4 py-2 text-sm font-medium transition-colors',
-                  'bg-accent-blue text-white hover:bg-accent-blue/90',
-                  'disabled:cursor-not-allowed disabled:opacity-50'
-                )}
+                className="w-full"
               >
                 {saving ? 'Saving...' : 'Save & Continue'}
-              </button>
+              </Button>
             </>
           )}
         </div>

@@ -20,6 +20,23 @@ export function clampPageSize(value: unknown): number | null {
   return Math.min(n, MAX_PAGE_SIZE)
 }
 
+/**
+ * The request behind a project's task count: a page of one task whose envelope carries the
+ * `total` of the whole filter (sidebar progress rings). Never a listing.
+ */
+export function buildProjectTaskCountUrl(baseUrl: string, projectId: number, done: boolean): string {
+  const url = new URL(`${baseUrl.replace(/\/+$/, '')}/api/v2/projects/${projectId}/tasks`)
+  url.searchParams.set('filter', done ? 'done = true' : 'done = false')
+  url.searchParams.set('per_page', '1')
+  return url.toString()
+}
+
+/** The `total` of an API v2 list envelope, or null when the response carries no usable one. */
+export function readEnvelopeTotal(body: unknown): number | null {
+  const total = (body as { total?: unknown } | null)?.total
+  return typeof total === 'number' && Number.isFinite(total) && total >= 0 ? Math.floor(total) : null
+}
+
 export function buildProjectCollectionUrl(baseUrl: string, includeArchived = false): string {
   const url = new URL(`${baseUrl.replace(/\/+$/, '')}/api/v2/projects`)
   if (includeArchived) url.searchParams.set('is_archived', 'true')

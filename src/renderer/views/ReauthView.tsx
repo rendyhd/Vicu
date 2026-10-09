@@ -78,7 +78,7 @@ export function ReauthView({
 
   return (
     <div className="flex h-screen w-screen items-center justify-center bg-[var(--bg-primary)]">
-      <div className="w-full max-w-md rounded-xl border border-[var(--border-color)] bg-[var(--bg-secondary)] p-8 shadow-lg">
+      <div className="w-full max-w-md rounded-card border border-[var(--border-color)] bg-[var(--bg-secondary)] p-8 shadow-lg">
         <h1 className="mb-1 text-xl font-bold text-[var(--text-primary)]">
           Session Expired
         </h1>
@@ -96,8 +96,8 @@ export function ReauthView({
               onClick={() => handleOidcLogin()}
               disabled={loading}
               className={cn(
-                'w-full rounded-md px-4 py-2.5 text-sm font-medium transition-colors',
-                'bg-accent-blue text-white hover:bg-accent-blue/90',
+                'w-full rounded-control px-4 py-2.5 text-sm font-medium transition-colors',
+                'bg-accent-fill text-on-accent hover:bg-accent-fill/90',
                 'disabled:cursor-not-allowed disabled:opacity-50'
               )}
             >
@@ -119,7 +119,7 @@ export function ReauthView({
                   inputMode="numeric"
                   autoComplete="one-time-code"
                   autoFocus
-                  className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2 text-center text-lg tracking-widest text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-accent-blue focus:outline-none"
+                  className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2 text-center text-lg tracking-widest text-[var(--text-primary)] placeholder:text-text-secondary/50"
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && totpCode.length === 6) handleOidcLogin(totpCode)
                   }}
@@ -134,8 +134,8 @@ export function ReauthView({
                 onClick={() => handleOidcLogin(totpCode)}
                 disabled={totpCode.length !== 6 || loading}
                 className={cn(
-                  'w-full rounded-md px-4 py-2 text-sm font-medium transition-colors',
-                  'bg-accent-blue text-white hover:bg-accent-blue/90',
+                  'w-full rounded-control px-4 py-2 text-sm font-medium transition-colors',
+                  'bg-accent-fill text-on-accent hover:bg-accent-fill/90',
                   'disabled:cursor-not-allowed disabled:opacity-50'
                 )}
               >
@@ -168,7 +168,7 @@ export function ReauthView({
                   onChange={(e) => setUsername(e.target.value)}
                   placeholder="Enter your username or email"
                   autoComplete="username"
-                  className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-accent-blue focus:outline-none"
+                  className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-text-secondary/50"
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && username && password) handlePasswordLogin()
                   }}
@@ -186,7 +186,7 @@ export function ReauthView({
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="Enter your password"
                     autoComplete="current-password"
-                    className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2 pr-16 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-accent-blue focus:outline-none"
+                    className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2 pr-16 text-sm text-[var(--text-primary)] placeholder:text-text-secondary/50"
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' && username && password) handlePasswordLogin()
                     }}
@@ -194,7 +194,7 @@ export function ReauthView({
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded px-2 py-0.5 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded-control px-2 py-0.5 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                   >
                     {showPassword ? 'Hide' : 'Show'}
                   </button>
@@ -206,8 +206,8 @@ export function ReauthView({
                 onClick={() => handlePasswordLogin()}
                 disabled={!username || !password || loading}
                 className={cn(
-                  'w-full rounded-md px-4 py-2 text-sm font-medium transition-colors',
-                  'bg-accent-blue text-white hover:bg-accent-blue/90',
+                  'w-full rounded-control px-4 py-2 text-sm font-medium transition-colors',
+                  'bg-accent-fill text-on-accent hover:bg-accent-fill/90',
                   'disabled:cursor-not-allowed disabled:opacity-50'
                 )}
               >
@@ -229,7 +229,7 @@ export function ReauthView({
                   placeholder="000000"
                   inputMode="numeric"
                   autoComplete="one-time-code"
-                  className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2 text-center text-lg tracking-widest text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 focus:border-accent-blue focus:outline-none"
+                  className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2 text-center text-lg tracking-widest text-[var(--text-primary)] placeholder:text-text-secondary/50"
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && totpCode.length === 6) handlePasswordLogin(totpCode)
                   }}
@@ -244,8 +244,8 @@ export function ReauthView({
                 onClick={() => handlePasswordLogin(totpCode)}
                 disabled={totpCode.length !== 6 || loading}
                 className={cn(
-                  'w-full rounded-md px-4 py-2 text-sm font-medium transition-colors',
-                  'bg-accent-blue text-white hover:bg-accent-blue/90',
+                  'w-full rounded-control px-4 py-2 text-sm font-medium transition-colors',
+                  'bg-accent-fill text-on-accent hover:bg-accent-fill/90',
                   'disabled:cursor-not-allowed disabled:opacity-50'
                 )}
               >
@@ -267,7 +267,7 @@ export function ReauthView({
           )}
 
           {error && (
-            <p className="text-xs text-accent-red">{error}</p>
+            <p className="text-xs text-danger">{error}</p>
           )}
 
           <button

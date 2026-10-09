@@ -1,45 +1,25 @@
+@import './tokens.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * Colours, type, radii and motion are generated into tokens.css from the design token contract
+ * (test-fixtures/design-tokens-v1.json); do not define them again here. These two surface names
+ * are older than the contract and are not roles of it, so they stay until the components that use
+ * them move to roles.
+ */
 :root {
-  --bg-primary: #FFFFFF;
+  /* Width of the list scrollbar; a page header outside a scroll area keeps this much clear on its right so it lines up with the rows inside. */
+  --scrollbar-size: 6px;
   --bg-secondary: #F5F5F7;
   --bg-tertiary: #E8E8ED;
-  --bg-sidebar: #F5F5F7;
-  --text-primary: #1D1D1F;
-  --text-secondary: #86868B;
-  --text-tertiary: #AEAEB2;
-  --accent-blue: #007AFF;
-  --accent-red: #FF3B30;
-  --accent-orange: #FF9500;
-  --accent-yellow: #FFCC00;
-  --accent-green: #34C759;
-  --accent-purple: #AF52DE;
-  --accent-teal: #5AC8FA;
-  --border-color: #E5E5EA;
-  --bg-hover: #F2F2F7;
-  --bg-selected: #E8F0FE;
 }
 
 .dark {
-  --bg-primary: #1C1C1E;
   --bg-secondary: #2C2C2E;
   --bg-tertiary: #3A3A3C;
-  --bg-sidebar: #2C2C2E;
-  --text-primary: #F5F5F7;
-  --text-secondary: #98989D;
-  --text-tertiary: #636366;
-  --accent-blue: #0A84FF;
-  --accent-red: #FF453A;
-  --accent-orange: #FF9F0A;
-  --accent-yellow: #FFD60A;
-  --accent-green: #30D158;
-  --accent-purple: #BF5AF2;
-  --accent-teal: #64D2FF;
-  --border-color: #38383A;
-  --bg-hover: #3A3A3C;
-  --bg-selected: #1C3049;
 }
 
 /* macOS sidebar transparency for vibrancy */
@@ -51,10 +31,600 @@
   --bg-sidebar: rgba(255, 255, 255, 0.02);
 }
 
+/*
+ * Windows 11 (22H2+): Mica shows through the sidebar, the content stays opaque (AppShell). Windows
+ * 10 and 11 21H2 have no data-material and keep the opaque bg.sidebar of the token contract.
+ */
+[data-platform="win32"][data-material="mica"] {
+  --bg-sidebar: rgba(0, 0, 0, 0.02);
+}
+
+.dark[data-platform="win32"][data-material="mica"] {
+  --bg-sidebar: rgba(255, 255, 255, 0.02);
+}
+
+/*
+ * Windows type: Segoe UI Variable Text for reading text, Segoe UI Variable Display for page
+ * titles (Windows 11; Windows 10 falls back to Segoe UI). font-sans is the Tailwind class the
+ * keyboard hints use.
+ */
+[data-platform="win32"] {
+  --font-text: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --font-display: "Segoe UI Variable Display", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+}
+
+html[data-platform="win32"],
+[data-platform="win32"] .font-sans {
+  font-family: var(--font-text);
+}
+
+[data-platform="win32"] .text-page-title {
+  font-family: var(--font-display);
+}
+
+/*
+ * Focus (card 1.5). One ring for every control a keyboard can reach: 2 px focus-ring, 2 px
+ * outside. Rows sit in a clipped list and touch their neighbours, so their ring goes inside.
+ * A control that draws its own focus state (a borderless text field inside a bar) says so with
+ * focus:outline-none; a bordered field takes the ring and has no focus border of its own.
+ */
+:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+[data-task-id]:focus-visible,
+[role="row"]:focus-visible,
+[role="option"]:focus-visible,
+[role="menuitem"]:focus-visible,
+[role="menuitemradio"]:focus-visible {
+  outline-offset: -2px;
+}
+
+/*
+ * Reduced motion base layer (card 1.5). Under prefers-reduced-motion: reduce nothing moves, grows
+ * or slides: transitions are limited to colour and opacity and last at most --dur-fade-fast, a
+ * spinner becomes a slow fade, a pulse stops, and smooth scrolling is off. Transforms still apply, instantly.
+ */
+@keyframes vicu-fade-pulse {
+  50% {
+    opacity: 0.4;
+  }
+}
+
+/* The selection bar rises from the bottom of the list; reduced motion only fades it in. */
+@keyframes vicu-bar-rise {
+  from {
+    opacity: 0;
+    transform: translateY(0.75rem);
+  }
+}
+
+@keyframes vicu-bar-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+.vicu-bar-rise {
+  animation: vicu-bar-rise var(--dur-move) var(--ease-enter);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vicu-bar-rise {
+    animation: vicu-bar-fade var(--dur-fade-fast) var(--ease-standard);
+  }
+
+  *,
+  ::before,
+  ::after {
+    transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, opacity !important;
+    transition-duration: var(--dur-fade-fast) !important;
+    transition-delay: 0s !important;
+    scroll-behavior: auto !important;
+  }
+
+  .animate-spin {
+    animation: vicu-fade-pulse calc(var(--dur-move-expressive) * 3) var(--ease-standard) infinite;
+  }
+
+  .animate-pulse {
+    animation: none;
+  }
+}
+
+/*
+ * Popovers, menus and tooltips (card 4.1). They enter from the side of their anchor: scale 0.96 to
+ * 1 with a fade of the fade.base token (fade.fast for a tooltip). The start values are an
+ * @starting-style rule on the open popover, so the browser runs the transition when showPopover()
+ * makes it visible. Leaving is a "ghost": the components unmount on close, so a transition on the
+ * popover itself would be cut off; leaveAsGhost() (components/overlay/leave-ghost.ts) puts a
+ * static copy where it was and this class fades it out. Reduced motion: opacity only, no scale (the
+ * base layer above already limits transitions to opacity, the scale start value is not set).
+ */
+.vicu-popover {
+  --pop-dur: var(--dur-fade-base);
+  transform-origin: top left;
+  transition:
+    opacity var(--pop-dur) var(--ease-enter),
+    scale var(--pop-dur) var(--ease-enter);
+}
+
+.vicu-tooltip {
+  --pop-dur: var(--dur-fade-fast);
+}
+
+@starting-style {
+  .vicu-popover:popover-open {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  @starting-style {
+    .vicu-popover:popover-open {
+      scale: 0.96;
+    }
+  }
+}
+
+/* The side the anchor is on is the side it grows from. */
+:is(.vicu-popover, .vicu-popover-leaving)[data-placement='bottom'] { transform-origin: top center; }
+:is(.vicu-popover, .vicu-popover-leaving)[data-placement='bottom-start'] { transform-origin: top left; }
+:is(.vicu-popover, .vicu-popover-leaving)[data-placement='bottom-end'] { transform-origin: top right; }
+:is(.vicu-popover, .vicu-popover-leaving)[data-placement='top'] { transform-origin: bottom center; }
+:is(.vicu-popover, .vicu-popover-leaving)[data-placement='top-start'] { transform-origin: bottom left; }
+:is(.vicu-popover, .vicu-popover-leaving)[data-placement='top-end'] { transform-origin: bottom right; }
+:is(.vicu-popover, .vicu-popover-leaving)[data-placement^='left'] { transform-origin: center right; }
+:is(.vicu-popover, .vicu-popover-leaving)[data-placement^='right'] { transform-origin: center left; }
+
+@keyframes vicu-popover-out {
+  to {
+    opacity: 0;
+    scale: 0.98;
+  }
+}
+
+@keyframes vicu-fade-out {
+  to {
+    opacity: 0;
+  }
+}
+
+.vicu-popover-leaving {
+  position: fixed;
+  margin: 0;
+  z-index: 60;
+  pointer-events: none;
+  transform-origin: top left;
+  animation: vicu-popover-out var(--dur-fade-fast) var(--ease-exit) forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vicu-popover-leaving {
+    animation-name: vicu-fade-out;
+  }
+}
+
+/*
+ * Toasts enter and leave with a fade of the fade.base token and a small rise (8 px). Reduced
+ * motion: the fade only. Put vicu-toast-in on the toast when it mounts and vicu-toast-out while it
+ * is leaving (it stays in the document until the animation ends). They use the individual
+ * `translate` property, so they do not replace a transform the toast already has.
+ */
+@keyframes vicu-toast-in {
+  from {
+    opacity: 0;
+    translate: 0 0.5rem;
+  }
+}
+
+@keyframes vicu-toast-out {
+  to {
+    opacity: 0;
+    translate: 0 0.25rem;
+  }
+}
+
+.vicu-toast-in {
+  animation: vicu-toast-in var(--dur-fade-base) var(--ease-enter);
+}
+
+.vicu-toast-out {
+  animation: vicu-toast-out var(--dur-fade-base) var(--ease-exit) forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vicu-toast-in {
+    animation: vicu-bar-fade var(--dur-fade-base) var(--ease-enter);
+  }
+
+  .vicu-toast-out {
+    animation: vicu-fade-out var(--dur-fade-base) var(--ease-exit) forwards;
+  }
+}
+
+/*
+ * Completing a task (card 4.2c, the same moves as Android). The checkbox ring fills with the pop
+ * spring (360 ms, it overshoots a little), the check draws over 220 ms and the title strike draws
+ * left to right over 240 ms. They only play when the task was completed while the row is on screen
+ * (the *-play classes); a row that is already done is simply drawn. Reduced motion: no scale and no
+ * drawing, the fill and the check fade in over fade.fast and the strike appears.
+ */
+@keyframes vicu-check-fill {
+  from {
+    scale: 0;
+  }
+}
+
+@keyframes vicu-check-draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+}
+
+@keyframes vicu-strike-draw {
+  from {
+    background-size: 0 1px;
+  }
+}
+
+.vicu-check-fill-play {
+  animation: vicu-check-fill var(--dur-pop) var(--spring-pop) both;
+}
+
+.vicu-check-draw {
+  stroke-dasharray: 1;
+}
+
+.vicu-check-draw-play {
+  animation: vicu-check-draw var(--dur-check-draw) var(--ease-standard) both;
+}
+
+/* The strike is a one pixel line behind the text, in the text's own colour. */
+.vicu-strike {
+  background: linear-gradient(currentColor, currentColor) no-repeat 0 55% / 100% 1px;
+}
+
+.vicu-strike-play {
+  animation: vicu-strike-draw var(--dur-strike-draw) var(--ease-standard) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vicu-check-fill-play,
+  .vicu-check-draw-play {
+    animation: vicu-bar-fade var(--dur-fade-fast) var(--ease-standard) both;
+  }
+
+  .vicu-strike-play {
+    animation: none;
+  }
+}
+
+/* Forced colours drop background images: the strike goes back to a text decoration. */
+@media (forced-colors: active) {
+  .vicu-strike {
+    background: none;
+    text-decoration: line-through;
+  }
+}
+
+/*
+ * Opening and closing a task (card 4.4, lib/task-transition.ts). The row and the card of a task share
+ * a view-transition-name for the length of the transition; their group moves and resizes with the
+ * move spring, and the card's content fades in one item after another (--stagger apart). The page
+ * itself (root) does not animate. Reduced motion: no morph, the new row or card fades in over
+ * fade.fast.
+ */
+::view-transition-group(*) {
+  animation-duration: var(--dur-move);
+  animation-timing-function: var(--spring-move);
+}
+
+::view-transition-old(*),
+::view-transition-new(*) {
+  animation-duration: var(--dur-fade-fast);
+  animation-timing-function: var(--ease-standard);
+}
+
+::view-transition-group(root) {
+  animation: none;
+}
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+::view-transition-old(root) {
+  display: none;
+}
+
+html[data-task-transition='morph'] .vicu-card > :nth-child(n + 2) {
+  animation: vicu-bar-fade var(--dur-fade-fast) var(--ease-enter) both;
+}
+html[data-task-transition='morph'] .vicu-card > :nth-child(3) { animation-delay: var(--stagger); }
+html[data-task-transition='morph'] .vicu-card > :nth-child(4) { animation-delay: calc(var(--stagger) * 2); }
+html[data-task-transition='morph'] .vicu-card > :nth-child(5) { animation-delay: calc(var(--stagger) * 3); }
+html[data-task-transition='morph'] .vicu-card > :nth-child(n + 6) { animation-delay: calc(var(--stagger) * 4); }
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-task-transition='fade'] .vicu-task-fade {
+    animation: vicu-bar-fade var(--dur-fade-fast) var(--ease-standard);
+  }
+}
+
+/*
+ * Changing view (card 4.6, lib/navigation-motion.ts). A pointer navigation runs a view transition
+ * with the type "page". Only while it runs does the content region carry a view-transition-name
+ * (so the task morph of card 4.4 never captures it). The sidebar and the title bar are not in the
+ * content group and the root does not animate; the sidebar selection pill slides on its own
+ * (components/sidebar/SelectionPill.tsx), so it stays behind the labels. The old page
+ * fades out over page-out, the new one fades in over page-in after it with a rise of --page-rise.
+ * Reduced motion: a plain cross-fade over fade.fast, no rise.
+ */
+html:active-view-transition-type(page) main {
+  view-transition-name: content;
+}
+
+@keyframes vicu-page-out {
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes vicu-page-in {
+  from {
+    opacity: 0;
+    translate: 0 var(--page-rise);
+  }
+}
+
+::view-transition-group(content) {
+  animation: none;
+}
+
+::view-transition-old(content) {
+  mix-blend-mode: normal;
+  animation: vicu-page-out var(--dur-page-out) var(--ease-exit) both;
+}
+
+::view-transition-new(content) {
+  mix-blend-mode: normal;
+  animation: vicu-page-in var(--dur-page-in) var(--ease-enter) var(--dur-page-out) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(content) {
+    animation: vicu-page-out var(--dur-fade-fast) var(--ease-standard) both;
+  }
+
+  ::view-transition-new(content) {
+    animation: vicu-bar-fade var(--dur-fade-fast) var(--ease-standard) both;
+  }
+}
+
+/*
+ * Dialogs (card 4.4): a small entrance, scale 0.98 to 1 with a fade of fade.base, the backdrop
+ * fades with it. Reduced motion: opacity only. No exit animation (the dialog is removed when it closes).
+ */
+.vicu-dialog {
+  transition:
+    opacity var(--dur-fade-base) var(--ease-enter),
+    scale var(--dur-fade-base) var(--ease-enter);
+}
+
+.vicu-dialog::backdrop {
+  transition: opacity var(--dur-fade-base) var(--ease-enter);
+}
+
+@starting-style {
+  .vicu-dialog[open] {
+    opacity: 0;
+  }
+
+  .vicu-dialog[open]::backdrop {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  @starting-style {
+    .vicu-dialog[open] {
+      scale: 0.98;
+    }
+  }
+}
+
+/*
+ * Dragging a task row (card 4.8). The overlay lifts on pickup: scale 1.02 and the deeper shadow it
+ * already has, over fade.fast. The drop animation settles the scale again (lib/drop-animation.ts).
+ * Reduced motion: no lift.
+ */
+@keyframes vicu-lift {
+  from {
+    scale: 1;
+  }
+}
+
+.vicu-lift {
+  scale: 1.02;
+  animation: vicu-lift var(--dur-fade-fast) var(--ease-enter);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vicu-lift {
+    scale: none;
+    animation: none;
+  }
+}
+
+/*
+ * Signature moments (card 4.11a).
+ *
+ * Counts roll: the old number leaves and the new one comes in, over fade.base. A larger count
+ * rolls up, a smaller one down (RollingCount). Reduced motion: a cross-fade, no travel.
+ */
+@keyframes vicu-roll-in-up {
+  from {
+    opacity: 0;
+    translate: 0 60%;
+  }
+}
+
+@keyframes vicu-roll-in-down {
+  from {
+    opacity: 0;
+    translate: 0 -60%;
+  }
+}
+
+@keyframes vicu-roll-out-up {
+  to {
+    opacity: 0;
+    translate: 0 -60%;
+  }
+}
+
+@keyframes vicu-roll-out-down {
+  to {
+    opacity: 0;
+    translate: 0 60%;
+  }
+}
+
+.vicu-roll-in[data-roll-in='up'] {
+  animation: vicu-roll-in-up var(--dur-fade-base) var(--ease-enter) both;
+}
+
+.vicu-roll-in[data-roll-in='down'] {
+  animation: vicu-roll-in-down var(--dur-fade-base) var(--ease-enter) both;
+}
+
+.vicu-roll-out[data-roll-out='up'] {
+  animation: vicu-roll-out-up var(--dur-fade-base) var(--ease-exit) both;
+}
+
+.vicu-roll-out[data-roll-out='down'] {
+  animation: vicu-roll-out-down var(--dur-fade-base) var(--ease-exit) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vicu-roll-in[data-roll-in] {
+    animation: vicu-bar-fade var(--dur-fade-fast) var(--ease-standard) both;
+  }
+
+  .vicu-roll-out[data-roll-out] {
+    animation: vicu-fade-out var(--dur-fade-fast) var(--ease-standard) both;
+  }
+}
+
+/*
+ * All clear: when the last task of Today is done the empty state fades in and the sun warms from
+ * grey to its identity colour (the colour of the icon only, never of text). Reduced motion: the fade.
+ */
+@keyframes vicu-warm {
+  from {
+    color: var(--text-tertiary);
+  }
+}
+
+.vicu-all-clear {
+  animation: vicu-bar-fade var(--dur-fade-base) var(--ease-enter) both;
+}
+
+.vicu-warm {
+  animation: vicu-warm var(--dur-move-expressive) var(--ease-standard) var(--dur-fade-fast) backwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vicu-all-clear {
+    animation-duration: var(--dur-fade-fast);
+  }
+
+  .vicu-warm {
+    animation: none;
+  }
+}
+
+/*
+ * A stuck section header gets a hairline under it (ListSectionHeader reports it with data-stuck).
+ */
+.vicu-hairline {
+  opacity: 0;
+  transition: opacity var(--dur-fade-fast) var(--ease-standard);
+}
+
+[data-stuck] > .vicu-hairline {
+  opacity: 1;
+}
+
+/*
+ * Skeleton rows shimmer once: a light sweeps across each placeholder, then they rest. Reduced
+ * motion: they fade in instead.
+ */
+@keyframes vicu-shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
+}
+
+.vicu-shimmer {
+  background-image: linear-gradient(100deg, transparent 30%, var(--bg-primary) 50%, transparent 70%);
+  background-size: 200% 100%;
+  background-repeat: no-repeat;
+  background-position: 200% 0;
+  animation: vicu-shimmer calc(var(--dur-move-expressive) * 3) var(--ease-standard) 1 both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vicu-shimmer {
+    background-image: none;
+    animation: vicu-bar-fade var(--dur-fade-base) var(--ease-enter) both;
+  }
+}
+
+/*
+ * Setup steps slide: the next step comes in from the right (back: from the left) with a fade. Reduced
+ * motion: the fade only.
+ */
+@keyframes vicu-step-forward {
+  from {
+    opacity: 0;
+    translate: 24px 0;
+  }
+}
+
+@keyframes vicu-step-back {
+  from {
+    opacity: 0;
+    translate: -24px 0;
+  }
+}
+
+.vicu-step-forward {
+  animation: vicu-step-forward var(--dur-fade-base) var(--ease-enter) both;
+}
+
+.vicu-step-back {
+  animation: vicu-step-back var(--dur-fade-base) var(--ease-enter) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vicu-step-forward,
+  .vicu-step-back {
+    animation: vicu-bar-fade var(--dur-fade-fast) var(--ease-standard) both;
+  }
+}
+
 /* Thin overlay scrollbar — light mode */
 .custom-scrollbar::-webkit-scrollbar,
 .overflow-y-auto::-webkit-scrollbar {
-  width: 6px;
+  width: var(--scrollbar-size);
 }
 
 .custom-scrollbar::-webkit-scrollbar-track,
@@ -110,4 +680,221 @@
 .ProseMirror ul[data-type="taskList"] li > div {
   flex: 1;
   min-width: 0;
+}
+
+/*
+ * Forced colours (card 5.2): Windows contrast themes, and any user who sets their own palette. The browser
+ * replaces text, background and border colours with the system colours and drops background images and
+ * box shadows. What carries meaning has to survive that, so it is drawn with shapes, borders, outlines and
+ * system colours: Canvas and CanvasText for the page, Highlight and HighlightText for what is selected or
+ * checked, GrayText for what is off, currentColor for icons and marks.
+ */
+@media (forced-colors: active) {
+  /* An svg keeps the colour its author gave it; icons and marks follow the text of their surface instead,
+     so the shape (bars, a square with "!", a ring that fills) is what says what they mean. */
+  svg {
+    color: inherit !important;
+  }
+
+  /* Focus: the same ring, in the highlight colour; on a highlighted surface it flips to the text colour. */
+  :focus-visible {
+    outline-color: Highlight;
+  }
+
+  /* Ring utilities are box shadows and vanish: draw them as outlines. A focus ring keeps priority. */
+  [class~='ring-1']:not(:focus-visible),
+  [class~='ring-2']:not(:focus-visible) {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
+  }
+
+  /* Things that float on a shadow alone get an edge. */
+  :is([class~='shadow-md'], [class~='shadow-lg'], [class~='shadow-xl']):not([class*='border']),
+  .vicu-tooltip {
+    outline: 1px solid CanvasText;
+    outline-offset: -1px;
+  }
+
+  /* Solid fills (primary buttons, drop lines, dots) */
+  .bg-accent-fill,
+  .bg-danger,
+  .bg-\[var\(--accent-blue\)\] {
+    background-color: Highlight;
+    color: HighlightText;
+    forced-color-adjust: none;
+  }
+
+  /* Chips: the tint is gone, so the chip is an outlined shape. */
+  .vicu-chip {
+    outline: 1px solid currentColor;
+    outline-offset: -1px;
+  }
+
+  /* The stuck header's hairline is a background and vanishes: draw it as a border. */
+  .vicu-hairline {
+    background: none;
+    border-bottom: 1px solid CanvasText;
+  }
+
+  /* A dragged row lifts on a shadow alone: give the overlay an edge while it is dragged. */
+  .vicu-lift {
+    outline: 1px solid CanvasText;
+    outline-offset: -1px;
+  }
+
+  /* The Next up offer is a borderless button with no name attribute, so the rule below misses it. */
+  [data-next-upcoming]:not(:focus-visible) {
+    outline: 1px solid ButtonBorder;
+    outline-offset: -1px;
+  }
+
+  /* Borderless buttons are text on a hover tint: outline them so a control looks like one. Icon-only
+     buttons (they have a name), the toolbar and toast buttons, and the quiet buttons (vicu-edge). */
+  :is(button[aria-label]:not([role], [data-date], [class*='border']), .vicu-edge, [role='toolbar'] button, .vicu-toast-in button, [role='group'][aria-label='Quick choices'] button):not(:focus-visible) {
+    outline: 1px solid ButtonBorder;
+    outline-offset: -1px;
+  }
+
+  /* Disabled */
+  :is(:disabled, [aria-disabled='true']),
+  :is(:disabled, [aria-disabled='true']) * {
+    color: GrayText;
+    border-color: GrayText;
+    opacity: 1;
+  }
+
+  /* Task checkbox: a ring; checked, a filled disc with a check in the text-on-highlight colour. */
+  [role='checkbox'] {
+    border-color: CanvasText;
+  }
+  [role='checkbox']:hover {
+    border-color: Highlight;
+  }
+  [role='checkbox'][aria-checked='true'] {
+    border-color: Highlight;
+    background-color: Highlight;
+  }
+  [role='checkbox'][aria-checked='true'] > span {
+    background-color: Highlight;
+  }
+  [role='checkbox'][aria-checked='true'] svg {
+    color: HighlightText !important;
+  }
+
+  /* Form checkbox and switch */
+  input[type='checkbox'] {
+    border-color: CanvasText;
+  }
+  input[type='checkbox']:checked {
+    border-color: Highlight;
+    background-color: Highlight;
+  }
+  input[type='checkbox']:checked + svg {
+    color: HighlightText !important;
+  }
+  [role='switch'] {
+    border-color: CanvasText;
+  }
+  [role='switch'] > span {
+    background-color: CanvasText;
+  }
+  [role='switch'][aria-checked='true'] {
+    background-color: Highlight;
+    border-color: Highlight;
+  }
+  [role='switch'][aria-checked='true'] > span {
+    background-color: HighlightText;
+  }
+  [aria-invalid='true'] {
+    border-style: dashed;
+    border-width: 2px;
+  }
+
+  /* Selected rows and the active sidebar item. */
+  /* forced-color-adjust: none keeps the browser from painting a Canvas plate behind text on Highlight. */
+  [data-selected],
+  :has(> [data-sidebar-pill]) {
+    background-color: Highlight;
+    color: HighlightText;
+    outline-color: HighlightText;
+    forced-color-adjust: none;
+  }
+  [data-selected] *,
+  :has(> [data-sidebar-pill]) * {
+    color: HighlightText;
+  }
+  [data-sidebar-pill] {
+    display: none;
+  }
+  [data-selected] [role='checkbox'] {
+    border-color: HighlightText;
+  }
+  [data-selected] [role='checkbox'][aria-checked='true'],
+  [data-selected] [role='checkbox'][aria-checked='true'] > span {
+    background-color: HighlightText;
+  }
+  [data-selected] [role='checkbox'][aria-checked='true'] svg {
+    color: Highlight !important;
+  }
+  [data-selected] .vicu-chip {
+    background-color: Highlight;
+  }
+
+  /* Menu items, options and open toggles: the current one is the highlighted one. */
+  :is([role='menuitem'], [role='menuitemradio'], [role='option']):not(:disabled, [aria-disabled='true']):is(:hover, :focus-visible, [aria-selected='true']),
+  button[aria-expanded='true'][aria-haspopup],
+  button[aria-pressed='true'] {
+    background-color: Highlight;
+    color: HighlightText;
+    outline-color: HighlightText;
+    border-color: Highlight;
+    forced-color-adjust: none;
+  }
+  :is([role='menuitem'], [role='menuitemradio'], [role='option']):not(:disabled, [aria-disabled='true']):is(:hover, :focus-visible, [aria-selected='true']) *,
+  button[aria-expanded='true'][aria-haspopup] *,
+  button[aria-pressed='true'] * {
+    color: HighlightText;
+  }
+
+  /* The When panel: the chosen day is filled, today is ringed, both read without colour. */
+  [role='gridcell'][aria-selected='true'] > button {
+    background-color: Highlight;
+    color: HighlightText;
+    forced-color-adjust: none;
+  }
+  button[aria-current='date'] {
+    outline: 1px solid CanvasText;
+    outline-offset: -1px;
+  }
+  [role='gridcell'][aria-selected='true'] > button[aria-current='date'] {
+    outline-color: HighlightText;
+  }
+
+  /* Progress rings: the arc is the text colour, the track a faint copy of it. */
+  [data-progress-ring] circle:first-of-type {
+    stroke: currentColor;
+    opacity: 0.35;
+  }
+  [data-progress-ring] circle:nth-of-type(2) {
+    stroke: currentColor;
+  }
+
+  /* The typed-text highlight layer is transparent text over the input; forced colours would paint it. */
+  .vicu-token-layer {
+    forced-color-adjust: none;
+  }
+  .vicu-token-layer [data-token-type] {
+    background: transparent !important;
+    text-decoration: underline 2px Highlight;
+    text-underline-offset: 3px;
+  }
+  /* The field sits over the layer; its own Canvas fill would hide the underlines. */
+  .vicu-token-layer + :is(input, textarea) {
+    forced-color-adjust: none;
+    background: transparent;
+    color: CanvasText;
+  }
+  .vicu-token-layer + :is(input, textarea)::placeholder {
+    color: GrayText;
+  }
 }

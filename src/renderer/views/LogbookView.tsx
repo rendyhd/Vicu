@@ -2,36 +2,31 @@ import { useEffect, useMemo, useRef } from 'react'
 import { useLogbookTasks } from '@/hooks/use-logbook-tasks'
 import { useProjects } from '@/hooks/use-projects'
 import { usePrintable } from '@/stores/print-store'
-import { isNullDate } from '@/lib/date-utils'
-import { cn } from '@/lib/cn'
+import { useDayKey } from '@/stores/day-store'
+import { groupLogbookTasks } from '@/lib/logbook'
+import { useDateFormat } from '@/hooks/use-date-format'
+import { ListSectionHeader } from '@/components/task-list/ListSectionHeader'
 import { TaskCheckbox } from '@/components/task-list/TaskCheckbox'
 import { Inbox } from 'lucide-react'
 import { EmptyState } from '@/components/shared/EmptyState'
+import { PageHeader } from '@/components/shared/PageHeader'
+import { ReadingScroll } from '@/components/layout/ReadingScroll'
+import { SmartListIcon } from '@/components/shared/SmartListIcon'
 import type { Task } from '@/lib/vikunja-types'
 
-function formatCompletionDate(date: string): string {
-  if (isNullDate(date)) return ''
-  const d = new Date(date)
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-}
-
-function LogbookRow({ task }: { task: Task }) {
+/**
+ * A completed task: a filled check, the title in the muted colour (no strikethrough, the check says
+ * it is done) and the time of the completion on the right. The day is the group heading above.
+ * A task reopened here stays in the list as an ordinary open row until the user navigates away.
+ */
+function LogbookRow({ task, time }: { task: Task; time: string }) {
   return (
     <div className="flex h-10 items-center gap-3 border-b border-[var(--border-color)] px-4">
       <TaskCheckbox task={task} />
-      <span
-        className={cn(
-          'min-w-0 flex-1 truncate text-[13px]',
-          task.done
-            ? 'text-[var(--text-secondary)] line-through'
-            : 'text-[var(--text-primary)]'
-        )}
-      >
+      <span className={`min-w-0 flex-1 truncate text-task-title ${task.done ? 'text-text-secondary' : 'text-text'}`}>
         {task.title}
       </span>
-      <span className="shrink-0 text-2xs text-[var(--text-secondary)]">
-        {formatCompletionDate(task.done_at)}
-      </span>
+      {time && <span className="shrink-0 text-meta tabular-nums text-text-secondary">{time}</span>}
     </div>
   )
 }
@@ -39,10 +34,21 @@ function LogbookRow({ task }: { task: Task }) {
 export function LogbookView() {
   const { tasks, isLoading, hasMore, isLoadingMore, moreError, loadMore, retryMore } = useLogbookTasks()
   const { data: projects } = useProjects()
+  const dateFormat = useDateFormat()
+  // Re-rendered when the local day rolls over, so "Today" becomes "Yesterday" at midnight.
+  const dayKey = useDayKey()
   const visibleTasks = useMemo(() => {
     const activeIds = new Set(projects?.flat.map((project) => project.id) ?? [])
     return tasks.filter((task) => activeIds.has(task.project_id))
   }, [tasks, projects?.flat])
+
+  // Newest first, grouped by the day of the completion; the clock is read again at each render, and
+  // useDayKey renders again at midnight.
+  const groups = useMemo(
+    () => groupLogbookTasks(visibleTasks, new Date(), dateFormat),
+    // dayKey stands for the clock: a new local day regroups the rows.
+    [visibleTasks, dateFormat, dayKey]
+  )
 
   // The history loads a page at a time: the next page is asked for when the end of the list scrolls
   // into view (and by the button below, for anyone who cannot scroll).
@@ -73,15 +79,20 @@ export function LogbookView() {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="px-6 pb-2 pt-6">
-        <h1 className="text-xl font-bold text-[var(--text-primary)]">Logbook</h1>
-      </div>
+      <PageHeader title="Logbook" icon={<SmartListIcon list="logbook" className="h-5 w-5" />} />
 
-      <div ref={scrollRef} className="flex-1 overflow-y-auto">
+      <ReadingScroll ref={scrollRef}>
         {visibleTasks.length === 0 && !hasMore && !isLoadingMore && !moreError ? (
-          <EmptyState icon={Inbox} title="No completed tasks" subtitle="Completed tasks appear here" />
+          <EmptyState icon={Inbox} identity="logbook" title="No completed tasks" subtitle="Completed tasks appear here" />
         ) : (
-          visibleTasks.map((task) => <LogbookRow key={task.id} task={task} />)
+          groups.map((group, index) => (
+            <section key={`${index}:${group.title}`} aria-label={group.title || undefined}>
+              {group.title !== '' && <ListSectionHeader level={1} title={group.title} />}
+              {group.rows.map(({ task, time }) => (
+                <LogbookRow key={task.id} task={task} time={time} />
+              ))}
+            </section>
+          ))
         )}
         {moreError ? (
           <div className="flex items-center justify-center gap-2 px-6 py-3 text-xs text-[var(--text-secondary)]">
@@ -103,7 +114,7 @@ export function LogbookView() {
             </button>
           </div>
         ) : null}
-      </div>
+      </ReadingScroll>
     </div>
   )
 }

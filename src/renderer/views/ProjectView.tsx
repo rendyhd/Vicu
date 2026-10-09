@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 import { useParams } from '@tanstack/react-router'
 import { useDndMonitor } from '@dnd-kit/core'
 import { SortableContext } from '@dnd-kit/sortable'
@@ -13,6 +13,8 @@ import { TaskList } from '@/components/task-list/TaskList'
 import { SectionGroup } from '@/components/task-list/SectionGroup'
 import { AddSectionButton } from '@/components/task-list/AddSectionButton'
 import { ParentDropZone } from '@/components/task-list/ParentDropZone'
+import { RowViewProvider } from '@/components/task-list/RowViewContext'
+import { ListSkeleton } from '@/components/shared/ListSkeleton'
 
 function findSectionForTask(
   sections: SectionData[],
@@ -44,6 +46,8 @@ interface InsertIndicator {
 export function ProjectView() {
   const { projectId } = useParams({ from: '/project/$projectId' })
   const pid = Number(projectId)
+  // The rows are listed inside this project: none of them names it.
+  const rowView = useMemo(() => ({ projectId: pid }), [pid])
   const { data: projectData, isLoading: projectsLoading } = useProjects()
   const activeProject = projectData?.flat.find((p) => p.id === pid)
   const archivedProject = projectData?.archived.find((p) => p.id === pid)
@@ -169,11 +173,7 @@ export function ProjectView() {
   const isLoading = projectsLoading || tasksLoading || sectionsLoading
 
   if (isLoading) {
-    return (
-      <div className="flex flex-1 items-center justify-center text-sm text-[var(--text-secondary)]">
-        Loading...
-      </div>
-    )
+    return <ListSkeleton title={projectName} />
   }
 
   if (projectData && !activeProject) {
@@ -196,15 +196,18 @@ export function ProjectView() {
     insertIndicator?.containerId === 'parent' ? insertIndicator.index : undefined
 
   return (
+    <RowViewProvider value={rowView}>
     <TaskList
       title={projectName}
       tasks={tasks}
       projectId={pid}
       sortable
       viewId={viewId}
+      empty={tasks.length === 0 && !hasSections}
       emptyTitle="No tasks in this project"
       emptySubtitle="Create a new task to get started"
       insertIndex={parentInsertIndex}
+      newTaskPlacement="after-tasks"
     >
       <div className="px-2">
         {hasSections && <ParentDropZone projectId={pid} />}
@@ -213,9 +216,10 @@ export function ProjectView() {
             items={sectionProjects.map((p) => `section-${p.id}`)}
             strategy={verticalListSortingStrategyForeignSafe}
           >
-            {sections.map((section) => (
+            {sections.map((section, i) => (
+              <Fragment key={section.project.id}>
+                {i > 0 && <AddSectionButton parentProjectId={pid} siblings={sectionProjects} index={i} />}
               <SectionGroup
-                key={section.project.id}
                 project={section.project}
                 tasks={section.tasks}
                 viewId={section.viewId}
@@ -224,11 +228,13 @@ export function ProjectView() {
                 depth={0}
                 insertIndicator={insertIndicator}
               />
+              </Fragment>
             ))}
           </SortableContext>
         )}
-        <AddSectionButton parentProjectId={pid} />
+        <AddSectionButton parentProjectId={pid} siblings={sectionProjects} index={sectionProjects.length} />
       </div>
     </TaskList>
+    </RowViewProvider>
   )
 }

@@ -1,3 +1,5 @@
+import { isNullDate } from './date-utils'
+import { formatDateDisplay, type DateFormat } from './date-display'
 import { hasVicuMetadataMarker } from './metadata-tasks'
 import { withoutNestedSubtasks } from './nested-subtasks'
 import type { Task, TaskQueryParams } from './vikunja-types'
@@ -48,4 +50,30 @@ export function logbookHasMore(pages: ReadonlyArray<readonly Task[] | undefined>
 export function logbookTasks(pages: ReadonlyArray<readonly Task[] | undefined>): Task[] {
   const visible = mergeLogbookPages(pages).filter((task) => !hasVicuMetadataMarker(task.description))
   return withoutNestedSubtasks(visible)
+}
+
+/** One day group of the Logbook: its heading and the rows under it, each with its completion time. */
+export interface LogbookGroup {
+  /** "Today", "Yesterday", "Mon 5 Oct" or "September 2026"; '' for tasks without a completion time. */
+  title: string
+  rows: { task: Task; time: string }[]
+}
+
+/**
+ * The rows split into day groups by completion time (`logbook.group`), each row with its time of
+ * day (`logbook.time`). The list is newest first, so a group is a run of neighbours with the same
+ * heading. A task without a completion time (one reopened in the Logbook) has no time and stays in
+ * the group it sits in; at the very top it forms a group without a heading.
+ */
+export function groupLogbookTasks(tasks: readonly Task[], now: Date, fmt: DateFormat): LogbookGroup[] {
+  const groups: LogbookGroup[] = []
+  for (const task of tasks) {
+    const completed = isNullDate(task.done_at) ? null : new Date(task.done_at)
+    const title = completed ? formatDateDisplay('logbook.group', completed, now, false, fmt) : ''
+    const time = completed ? formatDateDisplay('logbook.time', completed, now, false, fmt) : ''
+    const last = groups[groups.length - 1]
+    if (last && (last.title === title || !completed)) last.rows.push({ task, time })
+    else groups.push({ title, rows: [{ task, time }] })
+  }
+  return groups
 }

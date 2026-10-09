@@ -1,3 +1,4 @@
+import { Button } from '@/components/shared/Button'
 import { useState, useEffect, useCallback } from 'react'
 import type { AppConfig } from '@/lib/vikunja-types'
 
@@ -40,7 +41,7 @@ export function BrowserSettings({ config, onChange, disabled }: BrowserSettingsP
   }, [expanded, mode, handleRegister])
 
   return (
-    <div className={`rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] p-5${disabled ? ' opacity-50 pointer-events-none' : ''}`}>
+    <div className={`rounded-card border border-[var(--border-color)] bg-[var(--bg-primary)] p-5${disabled ? ' opacity-50 pointer-events-none' : ''}`}>
       <button
         type="button"
         className="flex w-full items-center justify-between pointer-events-auto"
@@ -59,7 +60,7 @@ export function BrowserSettings({ config, onChange, disabled }: BrowserSettingsP
             <select
               value={mode}
               onChange={(e) => onChange({ browser_link_mode: e.target.value as 'off' | 'ask' | 'always' })}
-              className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] focus:border-accent-blue focus:outline-none"
+              className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)]"
             >
               <option value="off">Off</option>
               <option value="ask">Ask ({window.api.platform === 'darwin' ? '\u2318L' : 'Ctrl+L'})</option>
@@ -76,7 +77,7 @@ export function BrowserSettings({ config, onChange, disabled }: BrowserSettingsP
                   value={config.browser_extension_id ?? ''}
                   onChange={(e) => onChange({ browser_extension_id: e.target.value })}
                   placeholder="For instant detection — leave blank to use auto-detect"
-                  className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)] focus:border-accent-blue focus:outline-none"
+                  className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]"
                 />
               </div>
 
@@ -84,25 +85,20 @@ export function BrowserSettings({ config, onChange, disabled }: BrowserSettingsP
                 <div className="flex items-center gap-3 text-xs text-[var(--text-secondary)]">
                   {config.browser_extension_id && (
                     <span className="flex items-center gap-1">
-                      <span className={`inline-block h-2 w-2 rounded-full ${regStatus.chrome ? 'bg-accent-green' : 'bg-[var(--text-secondary)]'}`} />
+                      <span className={`inline-block h-2 w-2 rounded-full ${regStatus.chrome ? 'bg-status-done' : 'bg-[var(--text-secondary)]'}`} />
                       Chrome bridge: {regStatus.chrome ? 'Registered' : 'Not registered'}
                     </span>
                   )}
                   <span className="flex items-center gap-1">
-                    <span className={`inline-block h-2 w-2 rounded-full ${regStatus.firefox ? 'bg-accent-green' : 'bg-[var(--text-secondary)]'}`} />
+                    <span className={`inline-block h-2 w-2 rounded-full ${regStatus.firefox ? 'bg-status-done' : 'bg-[var(--text-secondary)]'}`} />
                     Firefox bridge: {regStatus.firefox ? 'Registered' : 'Not registered'}
                   </span>
                 </div>
               )}
 
-              <button
-                type="button"
-                onClick={handleRegister}
-                disabled={registering}
-                className="rounded-md border border-[var(--border-color)] px-4 py-2 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-hover)] disabled:opacity-50"
-              >
+              <Button variant="secondary" onClick={handleRegister} disabled={registering}>
                 {registering ? 'Registering...' : 'Re-register Bridge'}
-              </button>
+              </Button>
 
               <div>
                 <button
@@ -113,7 +109,7 @@ export function BrowserSettings({ config, onChange, disabled }: BrowserSettingsP
                   How to set up {showSetupInfo ? '\u25BC' : '\u25B6'}
                 </button>
                 {showSetupInfo && (
-                  <div className="mt-2 rounded-lg bg-[var(--bg-secondary)] p-3 text-xs text-[var(--text-secondary)]">
+                  <div className="mt-2 rounded-card bg-[var(--bg-secondary)] p-3 text-xs text-[var(--text-secondary)]">
                     <p className="mb-2 font-semibold">How it works</p>
                     <p className="mb-3">
                       {window.api.platform === 'darwin'
@@ -141,11 +137,11 @@ export function BrowserSettings({ config, onChange, disabled }: BrowserSettingsP
                         onClick={() => window.api.openBrowserExtensionFolder()}
                         className="inline cursor-pointer text-accent-blue underline hover:text-accent-blue/80"
                       >extensions/browser</button>
-                      {' '}folder and locate the <code className="rounded bg-[var(--bg-primary)] px-1">.xpi</code> file
+                      {' '}folder and locate the <code className="rounded-control bg-[var(--bg-primary)] px-1">.xpi</code> file
                     </p>
-                    <p>Open Firefox and go to <code className="rounded bg-[var(--bg-primary)] px-1">about:addons</code></p>
+                    <p>Open Firefox and go to <code className="rounded-control bg-[var(--bg-primary)] px-1">about:addons</code></p>
                     <p>Click the gear icon &rarr; &ldquo;Install Add-on From File&hellip;&rdquo;</p>
-                    <p>Select the <code className="rounded bg-[var(--bg-primary)] px-1">.xpi</code> file and click &ldquo;Add&rdquo;</p>
+                    <p>Select the <code className="rounded-control bg-[var(--bg-primary)] px-1">.xpi</code> file and click &ldquo;Add&rdquo;</p>
                     <p className="mb-3">Then click &ldquo;Re-register Bridge&rdquo; above</p>
 
                     <p className="mb-2 font-semibold">Chrome (optional extension for instant detection)</p>
@@ -153,7 +149,7 @@ export function BrowserSettings({ config, onChange, disabled }: BrowserSettingsP
                       Chrome works without the extension, but installing it provides instant (&lt;1ms)
                       detection instead of the ~300ms fallback.
                     </p>
-                    <p>Open <code className="rounded bg-[var(--bg-primary)] px-1">chrome://extensions</code></p>
+                    <p>Open <code className="rounded-control bg-[var(--bg-primary)] px-1">chrome://extensions</code></p>
                     <p>Enable &ldquo;Developer mode&rdquo; (top-right toggle)</p>
                     <p>
                       Click &ldquo;Load unpacked&rdquo; &rarr; select the{' '}

@@ -95,6 +95,10 @@ export const api = {
   updateTaskPosition: (taskId: number, viewId: number, position: number) =>
     window.api.updateTaskPosition(taskId, viewId, position) as Promise<ApiResult<unknown>>,
 
+  /** Tasks of a project that are done (or open), hidden carriers excluded; cached in main for ten minutes. */
+  countProjectTasks: (projectId: number, done: boolean) =>
+    window.api.countProjectTasks(projectId, done) as Promise<ApiResult<number>>,
+
   fetchProjects: (includeArchived = false) =>
     window.api.fetchProjects(includeArchived) as Promise<ApiResult<Project[]>>,
 

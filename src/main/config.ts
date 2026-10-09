@@ -31,6 +31,7 @@ const DEFAULT_CONFIG: AppConfig = {
   api_token: '',
   inbox_project_id: 0,
   theme: 'system',
+  clock_format: 'system',
   subtask_display: 'inside_task',
   review: {
     enabled: true,
@@ -104,6 +105,13 @@ function normalizeReview(raw: unknown): ReviewConfig {
   }
 }
 
+/** A list of project ids: whole positive numbers, no duplicates, ascending. Missing or malformed is undefined. */
+function normalizeProjectIds(raw: unknown): number[] | undefined {
+  if (!Array.isArray(raw)) return undefined
+  const ids = raw.filter((id): id is number => typeof id === 'number' && Number.isInteger(id) && id > 0)
+  return [...new Set(ids)].sort((a, b) => a - b)
+}
+
 export function normalizeConfig(raw: Record<string, unknown>): AppConfig {
   return {
     vikunja_url: typeof raw.vikunja_url === 'string'
@@ -119,8 +127,10 @@ export function normalizeConfig(raw: Record<string, unknown>): AppConfig {
     theme: raw.theme === 'light' || raw.theme === 'dark' || raw.theme === 'system'
       ? raw.theme
       : DEFAULT_CONFIG.theme,
+    clock_format: raw.clock_format === '12h' || raw.clock_format === '24h' ? raw.clock_format : 'system',
     window_bounds: isWindowBounds(raw.window_bounds) ? raw.window_bounds : undefined,
     sidebar_width: typeof raw.sidebar_width === 'number' ? raw.sidebar_width : undefined,
+    sidebar_collapsed_projects: normalizeProjectIds(raw.sidebar_collapsed_projects),
     custom_lists: Array.isArray(raw.custom_lists) ? raw.custom_lists as AppConfig['custom_lists'] : undefined,
     custom_lists_sync: raw.custom_lists_sync && typeof raw.custom_lists_sync === 'object'
       ? raw.custom_lists_sync as AppConfig['custom_lists_sync']
@@ -200,6 +210,8 @@ export function normalizeConfig(raw: Record<string, unknown>): AppConfig {
     last_used_project_id: typeof raw.last_used_project_id === 'number' ? raw.last_used_project_id : undefined,
     last_used_label_id: typeof raw.last_used_label_id === 'number' ? raw.last_used_label_id : undefined,
     review: normalizeReview(raw.review),
+    routines_enabled: raw.routines_enabled !== false,
+    routines_in_today: raw.routines_in_today !== false,
   }
 }
 
@@ -259,6 +271,7 @@ export function saveConfigQuietly(config: AppConfig, what: string): boolean {
 
 /** Data that belongs to one server/account: IDs and state that mean nothing elsewhere. */
 const ACCOUNT_SPECIFIC_KEYS = [
+  'sidebar_collapsed_projects',
   'custom_lists',
   'custom_lists_sync',
   'quick_entry_default_project_id',

@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useId, useState } from 'react'
 import { cn } from '@/lib/cn'
 import { normalizeEditableLink } from '@/lib/description-html'
+import { Dialog } from '@/components/overlay/Dialog'
 
 interface LinkDialogProps {
   open: boolean
@@ -19,7 +20,7 @@ export function LinkDialog({
   onRemove,
   onCancel,
 }: LinkDialogProps) {
-  const inputRef = useRef<HTMLInputElement>(null)
+  const titleId = useId()
   const [url, setUrl] = useState(initialUrl)
   const [error, setError] = useState<string | null>(null)
 
@@ -27,21 +28,7 @@ export function LinkDialog({
     if (!open) return
     setUrl(initialUrl)
     setError(null)
-    const id = requestAnimationFrame(() => inputRef.current?.focus())
-    return () => cancelAnimationFrame(id)
   }, [open, initialUrl])
-
-  useEffect(() => {
-    if (!open) return
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.stopPropagation()
-        onCancel()
-      }
-    }
-    document.addEventListener('keydown', handleKey, true)
-    return () => document.removeEventListener('keydown', handleKey, true)
-  }, [open, onCancel])
 
   if (!open) return null
 
@@ -64,20 +51,14 @@ export function LinkDialog({
   }
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
-      onClick={onCancel}
-    >
-      <div
-        className="mx-4 w-full max-w-sm rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] p-5 shadow-xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <h2 className="mb-3 text-sm font-medium text-[var(--text-primary)]">
+    <Dialog open onClose={onCancel} labelledBy={titleId} className="w-[calc(100%-2rem)] max-w-sm">
+      <div className="p-5">
+        <h2 id={titleId} className="mb-3 text-sm font-medium text-[var(--text-primary)]">
           {canRemove ? 'Edit link' : 'Add link'}
         </h2>
         <label className="mb-1 block text-xs text-[var(--text-secondary)]">URL</label>
         <input
-          ref={inputRef}
+          data-autofocus
           type="text"
           value={url}
           onChange={(e) => {
@@ -92,15 +73,13 @@ export function LinkDialog({
           }}
           placeholder="https://example.com"
           className={cn(
-            'mb-1 w-full rounded-md border bg-[var(--bg-primary)] px-3 py-1.5 text-sm text-[var(--text-primary)]',
-            'placeholder:text-[var(--text-secondary)] focus:outline-none focus:ring-1',
-            error
-              ? 'border-[var(--accent-red)] focus:ring-[var(--accent-red)]'
-              : 'border-[var(--border-color)] focus:ring-[var(--accent-blue)]',
+            'mb-1 w-full rounded-control border bg-[var(--bg-primary)] px-3 py-1.5 text-sm text-[var(--text-primary)]',
+            'placeholder:text-[var(--text-secondary)]',
+            error ? 'border-danger' : 'border-[var(--border-color)]',
           )}
         />
         {error && (
-          <p className="mb-3 text-xs text-[var(--accent-red)]">{error}</p>
+          <p className="mb-3 text-xs text-danger">{error}</p>
         )}
         {!error && <div className="mb-3" />}
         <div className="flex justify-end gap-2">
@@ -108,7 +87,7 @@ export function LinkDialog({
             type="button"
             onClick={onCancel}
             className={cn(
-              'rounded-md border border-[var(--border-color)] px-4 py-1.5 text-sm font-medium',
+              'rounded-control border border-[var(--border-color)] px-4 py-1.5 text-sm font-medium',
               'text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-hover)]',
             )}
           >
@@ -119,7 +98,7 @@ export function LinkDialog({
               type="button"
               onClick={onRemove}
               className={cn(
-                'rounded-md border border-[var(--border-color)] px-4 py-1.5 text-sm font-medium',
+                'rounded-control border border-[var(--border-color)] px-4 py-1.5 text-sm font-medium',
                 'text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-hover)]',
               )}
             >
@@ -129,12 +108,12 @@ export function LinkDialog({
           <button
             type="button"
             onClick={handleApply}
-            className="rounded-md bg-accent-blue px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-accent-blue/90"
+            className="rounded-control bg-accent-fill px-4 py-1.5 text-sm font-medium text-on-accent transition-colors hover:bg-accent-fill/90"
           >
             Apply
           </button>
         </div>
       </div>
-    </div>
+    </Dialog>
   )
 }

@@ -13,7 +13,7 @@ export function TaskSyncIcon({ taskId }: { taskId: number }) {
 
   if (failed) {
     return (
-      <span title="A change to this task could not be synced. Open the sync panel in the sidebar to retry or discard it." className="shrink-0 text-accent-red">
+      <span title="A change to this task could not be synced. Open the sync panel in the sidebar to retry or discard it." className="shrink-0 text-danger">
         <AlertTriangle className="h-3 w-3" aria-label="Sync failed" />
       </span>
     )

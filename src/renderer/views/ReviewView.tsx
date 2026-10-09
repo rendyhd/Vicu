@@ -11,16 +11,17 @@ import {
 import { useAppConfig } from '@/hooks/use-app-config'
 import { useSelectionStore } from '@/stores/selection-store'
 import { useReviewNoticeStore } from '@/stores/review-notice-store'
+import { toast, UNDO_TOAST_MS, useToastStore } from '@/stores/toast-store'
 import { ProjectBranch } from '@/components/review/ProjectBranch'
+import { SmartListIcon } from '@/components/shared/SmartListIcon'
+import { PageHeader } from '@/components/shared/PageHeader'
+import { EmptyState } from '@/components/shared/EmptyState'
+import { ReadingScroll } from '@/components/layout/ReadingScroll'
 import type { Project } from '@/lib/vikunja-types'
 
 type Tab = 'due' | 'all'
 
-interface ToastState {
-  projectId: number
-  title: string
-  prevProject: Project
-}
+const REVIEW_TOAST_KEY = 'review-reviewed'
 
 function isEditableTarget(el: EventTarget | null): boolean {
   if (!(el instanceof HTMLElement)) return false
@@ -33,7 +34,6 @@ export function ReviewView() {
   const [reviewedThisSession, setReviewedThisSession] = useState<ReadonlySet<number>>(new Set())
   const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set())
   const [focusedId, setFocusedId] = useState<number | null>(null)
-  const [toast, setToast] = useState<ToastState | null>(null)
 
   const due = useReviewTree('due', reviewedThisSession)
   const all = useReviewTree('all', reviewedThisSession)
@@ -70,11 +70,13 @@ export function ReviewView() {
     })
   }
 
-  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const showToast = (t: ToastState) => {
-    if (toastTimer.current) clearTimeout(toastTimer.current)
-    setToast(t)
-    toastTimer.current = setTimeout(() => setToast(null), 6000)
+  // "Marked X reviewed, Undo" is an app toast (UNDO_TOAST_MS, paused while the pointer or focus is on it).
+  const showReviewedToast = (prevProject: Project) => {
+    toast.success(`Marked ${prevProject.title} reviewed`, {
+      key: REVIEW_TOAST_KEY,
+      durationMs: UNDO_TOAST_MS,
+      action: { label: 'Undo', onAction: () => handleUndo(prevProject) },
+    })
   }
 
   const handleMarkReviewed = (node: ReviewTreeNode) => {
@@ -90,7 +92,7 @@ export function ReviewView() {
     markReviewed.mutate(
       { project: prevProject },
       {
-        onSuccess: () => showToast({ projectId: prevProject.id, title: prevProject.title, prevProject }),
+        onSuccess: () => showReviewedToast(prevProject),
         onError: () =>
           setReviewedThisSession((prev) => {
             const next = new Set(prev)
@@ -109,20 +111,16 @@ export function ReviewView() {
     if (nextDue) setFocusedId(nextDue.project.id)
   }
 
-  const handleUndo = () => {
-    if (!toast) return
-    const undone = toast
+  const handleUndo = (undone: Project) => {
     restoreDescription.mutate(
-      { project: undone.prevProject },
-      { onError: () => setReviewedThisSession((prev) => new Set(prev).add(undone.projectId)) },
+      { project: undone },
+      { onError: () => setReviewedThisSession((prev) => new Set(prev).add(undone.id)) },
     )
     setReviewedThisSession((prev) => {
       const next = new Set(prev)
-      next.delete(toast.projectId)
+      next.delete(undone.id)
       return next
     })
-    if (toastTimer.current) clearTimeout(toastTimer.current)
-    setToast(null)
   }
 
   const collapseEverything = () => {
@@ -189,9 +187,8 @@ export function ReviewView() {
     return () => window.removeEventListener('keydown', handler)
   }, [])
 
-  useEffect(() => () => {
-    if (toastTimer.current) clearTimeout(toastTimer.current)
-  }, [])
+  // The toast belongs to this screen: leaving it takes the toast away.
+  useEffect(() => () => useToastStore.getState().remove(REVIEW_TOAST_KEY), [])
 
   // A failed save stays visible long enough to read, then clears itself.
   useEffect(() => {
@@ -205,43 +202,45 @@ export function ReviewView() {
   return (
     <div className="relative flex h-full flex-col" style={{ background: 'var(--bg-primary)' }}>
       {/* Header */}
-      <div style={{ padding: '20px 28px 14px', borderBottom: '1px solid var(--border-color)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
-          <RefreshCw width={20} height={20} style={{ color: 'var(--accent-purple)' }} />
-          <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, letterSpacing: '-0.01em', color: 'var(--text-primary)' }}>
-            Review
-          </h1>
+      <PageHeader
+        title="Review"
+        icon={<SmartListIcon list="review" className="h-5 w-5" />}
+        subtitle={
+          <>
+            Click a project to review tasks in place. Press{' '}
+            <kbd
+              style={{
+                fontFamily: '"SF Mono", ui-monospace, Menlo, Consolas, monospace',
+                fontSize: 'var(--type-caption-size)',
+                padding: '1px 5px',
+                borderRadius: 3,
+                background: 'var(--bg-hover)',
+                border: '1px solid var(--border-color)',
+              }}
+            >
+              R
+            </kbd>{' '}
+            to mark reviewed.
+          </>
+        }
+        actions={
           <span
             style={{
-              fontSize: 11,
+              fontSize: 'var(--type-chip-size)',
               fontWeight: 600,
               padding: '2px 8px',
               borderRadius: 999,
-              background: 'rgba(175,82,222,0.15)',
+              background: 'rgb(var(--accent-purple-rgb) / 0.15)',
               color: 'var(--accent-purple)',
               fontVariantNumeric: 'tabular-nums',
             }}
           >
             {remaining} due
           </span>
-        </div>
-        <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-          Click a project to review tasks in place. Press{' '}
-          <kbd
-            style={{
-              fontFamily: '"SF Mono", ui-monospace, Menlo, Consolas, monospace',
-              fontSize: 10,
-              padding: '1px 5px',
-              borderRadius: 3,
-              background: 'var(--bg-hover)',
-              border: '1px solid var(--border-color)',
-            }}
-          >
-            R
-          </kbd>{' '}
-          to mark reviewed.
-        </div>
-
+        }
+      />
+      <div className="mx-auto w-full max-w-reading shrink-0 pr-[var(--scrollbar-size)]">
+      <div className="px-6 pb-3.5" style={{ borderBottom: '1px solid var(--border-color)' }}>
         {/* Tabs */}
         <div style={{ display: 'flex', gap: 6, marginTop: 12 }} role="tablist">
           <TabButton active={tab === 'due'} onClick={() => setTab('due')} count={remaining}>
@@ -260,7 +259,7 @@ export function ReviewView() {
                 width: total > 0 ? `${(done / total) * 100}%` : '0%',
                 height: '100%',
                 background: 'var(--accent-purple)',
-                transition: 'width 0.3s',
+                transition: 'width var(--dur-fade-base) var(--ease-standard)',
               }}
             />
           </div>
@@ -269,28 +268,28 @@ export function ReviewView() {
           </span>
         </div>
       </div>
+      </div>
 
       {/* Tree list */}
-      <div className="custom-scrollbar" style={{ flex: 1, overflowY: 'auto', padding: '8px 16px 24px' }}>
+      <ReadingScroll columnClassName="flex flex-col px-4 pb-6 pt-2">
         {isLoading && <div className="px-2 py-4 text-sm text-[var(--text-secondary)]">Loading…</div>}
 
         {allCaughtUp && (
-          <div className="flex h-full flex-col items-center justify-center px-6 py-12 text-center">
-            <RefreshCw className="mb-3 h-12 w-12" style={{ color: 'var(--accent-green)' }} />
-            <p style={{ fontSize: 20, fontWeight: 600, color: 'var(--text-primary)' }}>All reviewed</p>
-            <p className="mt-1 max-w-sm" style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
-              You&apos;re caught up. Next review available in {defaultCadence} days.
-            </p>
-          </div>
+          <EmptyState
+            icon={RefreshCw}
+            identity="review"
+            title="All reviewed"
+            subtitle={`You're caught up. Next review available in ${defaultCadence} days.`}
+          />
         )}
 
         {!isLoading && !allCaughtUp && currentTree.length === 0 && (
-          <div className="flex h-full flex-col items-center justify-center px-6 py-12 text-center">
-            <p style={{ fontSize: 15, fontWeight: 500, color: 'var(--text-primary)' }}>No tracked projects</p>
-            <p className="mt-1 max-w-sm" style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
-              Projects appear here once review tracking is enabled in Settings.
-            </p>
-          </div>
+          <EmptyState
+            icon={RefreshCw}
+            identity="review"
+            title="No tracked projects"
+            subtitle="Projects appear here once review tracking is enabled in Settings."
+          />
         )}
 
         {!isLoading &&
@@ -307,15 +306,15 @@ export function ReviewView() {
               onFocus={setFocusedId}
             />
           ))}
-      </div>
+      </ReadingScroll>
 
       {/* Error notice: failed saves must not pass silently */}
       {errorNotice && (
         <div
           role="alert"
-          className="absolute left-1/2 -translate-x-1/2"
+          className="absolute left-1/2 -translate-x-1/2 shadow-lg"
           style={{
-            bottom: toast ? 72 : 20,
+            bottom: 20,
             display: 'flex',
             alignItems: 'center',
             gap: 12,
@@ -324,7 +323,6 @@ export function ReviewView() {
             borderRadius: 8,
             background: 'var(--bg-secondary)',
             border: '1px solid var(--accent-red)',
-            boxShadow: '0 8px 24px rgba(0,0,0,0.18)',
             fontSize: 13,
             color: 'var(--text-primary)',
             zIndex: 31,
@@ -337,38 +335,6 @@ export function ReviewView() {
             style={{ fontSize: 13, fontWeight: 600, color: 'var(--accent-red)', cursor: 'pointer' }}
           >
             Dismiss
-          </button>
-        </div>
-      )}
-
-      {/* Undo toast */}
-      {toast && (
-        <div
-          className="absolute left-1/2 -translate-x-1/2"
-          style={{
-            bottom: 20,
-            display: 'flex',
-            alignItems: 'center',
-            gap: 12,
-            padding: '8px 12px 8px 14px',
-            borderRadius: 8,
-            background: 'var(--bg-secondary)',
-            border: '1px solid var(--border-color)',
-            boxShadow: '0 8px 24px rgba(0,0,0,0.18)',
-            fontSize: 13,
-            color: 'var(--text-primary)',
-            zIndex: 30,
-          }}
-        >
-          <span>
-            Marked <strong>{toast.title}</strong> reviewed
-          </span>
-          <button
-            type="button"
-            onClick={handleUndo}
-            style={{ fontSize: 13, fontWeight: 600, color: 'var(--accent-purple)', cursor: 'pointer' }}
-          >
-            Undo
           </button>
         </div>
       )}
@@ -393,10 +359,10 @@ function TabButton({
       role="tab"
       aria-selected={active}
       onClick={onClick}
-      className={cn('flex items-center gap-1.5 rounded-md px-3 py-1 text-[13px] transition-colors')}
+      className={cn('flex items-center gap-1.5 rounded-control px-3 py-1 text-section transition-colors')}
       style={
         active
-          ? { background: 'rgba(175,82,222,0.15)', color: 'var(--accent-purple)', fontWeight: 600 }
+          ? { background: 'rgb(var(--accent-purple-rgb) / 0.15)', color: 'var(--accent-purple)', fontWeight: 600 }
           : { background: 'transparent', color: 'var(--text-secondary)', fontWeight: 500 }
       }
     >
@@ -406,7 +372,7 @@ function TabButton({
           fontSize: 11,
           fontWeight: 600,
           fontVariantNumeric: 'tabular-nums',
-          color: active ? 'var(--accent-purple)' : 'var(--text-tertiary)',
+          color: active ? 'var(--accent-purple)' : 'var(--text-secondary)',
         }}
       >
         {count}

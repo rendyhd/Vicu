@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useId } from 'react'
+import { SelectionPill } from './SelectionPill'
 import { useNavigate, useMatches } from '@tanstack/react-router'
 import { useDroppable } from '@dnd-kit/core'
 import { Pencil, Trash2, X } from 'lucide-react'
@@ -6,8 +7,11 @@ import { useLabels } from '@/hooks/use-labels'
 import { useCreateLabel, useUpdateLabel, useDeleteLabel } from '@/hooks/use-task-mutations'
 import { useConfirmDelete } from '@/hooks/use-confirm-delete'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
+import { Dialog } from '@/components/overlay/Dialog'
+import { Menu, MenuItem } from '@/components/overlay/Menu'
 import { useSidebarStore } from '@/stores/sidebar-store'
 import { cn } from '@/lib/cn'
+import { focusTargetOf } from '@/lib/focus-target'
 import type { Label } from '@/lib/vikunja-types'
 import { normalizeHex } from '@/lib/constants'
 
@@ -20,6 +24,7 @@ function LabelDialog({
   label: Label | null
   onClose: () => void
 }) {
+  const titleId = useId()
   const [title, setTitle] = useState('')
   const [hexColor, setHexColor] = useState('')
   const createLabel = useCreateLabel()
@@ -52,18 +57,17 @@ function LabelDialog({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}>
-      <div
-        className="w-[360px] rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] shadow-xl"
-      >
+    <Dialog open onClose={onClose} labelledBy={titleId} className="w-[360px]">
+      <div>
         <div className="flex items-center justify-between border-b border-[var(--border-color)] px-5 py-3">
-          <h2 className="text-sm font-semibold text-[var(--text-primary)]">
+          <h2 id={titleId} className="text-sm font-semibold text-[var(--text-primary)]">
             {label ? 'Edit Label' : 'New Label'}
           </h2>
           <button
             type="button"
             onClick={onClose}
-            className="rounded p-1 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
+            aria-label="Close"
+            className="rounded-control p-1 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
           >
             <X className="h-4 w-4" />
           </button>
@@ -77,8 +81,8 @@ function LabelDialog({
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Label name"
-              autoFocus
-              className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)] focus:border-accent-blue focus:outline-none"
+              data-autofocus
+              className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]"
               onKeyDown={(e) => {
                 if (e.key === 'Enter') handleSave()
               }}
@@ -94,7 +98,7 @@ function LabelDialog({
                   type="button"
                   onClick={() => setHexColor(c)}
                   className={cn(
-                    'h-6 w-6 rounded-full transition-transform hover:scale-110',
+                    'h-6 w-6 rounded-full transition-transform hover:scale-110 motion-reduce:hover:scale-100',
                     hexColor === c && 'ring-2 ring-[var(--text-primary)] ring-offset-1 ring-offset-[var(--bg-primary)]'
                   )}
                   style={{ backgroundColor: c }}
@@ -111,7 +115,7 @@ function LabelDialog({
                 value={hexColor}
                 onChange={(e) => setHexColor(e.target.value)}
                 placeholder="#hex"
-                className="flex-1 rounded-md border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-1.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)] focus:border-accent-blue focus:outline-none"
+                className="flex-1 rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-1.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]"
               />
               {hexColor && (
                 <button
@@ -130,7 +134,7 @@ function LabelDialog({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-md border border-[var(--border-color)] px-4 py-1.5 text-xs font-medium text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-hover)]"
+            className="rounded-control border border-[var(--border-color)] px-4 py-1.5 text-xs font-medium text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-hover)]"
           >
             Cancel
           </button>
@@ -139,8 +143,8 @@ function LabelDialog({
             onClick={handleSave}
             disabled={!title.trim()}
             className={cn(
-              'rounded-md px-4 py-1.5 text-xs font-medium transition-colors',
-              'bg-accent-blue text-white hover:bg-accent-blue/90',
+              'rounded-control px-4 py-1.5 text-xs font-medium transition-colors',
+              'bg-accent-fill text-on-accent hover:bg-accent-fill/90',
               'disabled:cursor-not-allowed disabled:opacity-50'
             )}
           >
@@ -148,7 +152,7 @@ function LabelDialog({
           </button>
         </div>
       </div>
-    </div>
+    </Dialog>
   )
 }
 
@@ -177,14 +181,15 @@ function TagListItem({
       onClick={() => navigate({ to: '/tag/$labelId', params: { labelId: String(label.id) } })}
       onContextMenu={(e) => onContextMenu(e, label)}
       className={cn(
-        'flex h-7 items-center gap-2.5 rounded-md px-2.5 text-xs transition-colors',
+        'relative flex h-7 items-center gap-2.5 rounded-control px-2.5 text-xs transition-colors',
         isOver
-          ? 'bg-[var(--accent-blue)]/15 ring-1 ring-[var(--accent-blue)]'
+          ? 'bg-accent-blue/15 ring-1 ring-[var(--accent-blue)]'
           : isActive
-            ? 'bg-[var(--bg-selected)] text-[var(--text-primary)]'
+            ? 'text-[var(--text-primary)]'
             : 'text-[var(--text-primary)] hover:bg-[var(--bg-hover)]'
       )}
     >
+      {isActive && !isOver && <SelectionPill />}
       <span
         className="h-2.5 w-2.5 shrink-0 rounded-full bg-[var(--text-secondary)]"
         style={normalizeHex(label.hex_color) ? { backgroundColor: normalizeHex(label.hex_color) } : undefined}
@@ -205,19 +210,13 @@ export function TagList() {
     x: number
     y: number
     label: Label
+    /** The row's button: the delete confirmation gives focus back here. */
+    opener: HTMLElement | null
   } | null>(null)
-
-  // Close context menu on click outside
-  useEffect(() => {
-    if (!contextMenu) return
-    const handler = () => setContextMenu(null)
-    window.addEventListener('click', handler)
-    return () => window.removeEventListener('click', handler)
-  }, [contextMenu])
 
   const handleContextMenu = (e: React.MouseEvent, label: Label) => {
     e.preventDefault()
-    setContextMenu({ x: e.clientX, y: e.clientY, label })
+    setContextMenu({ x: e.clientX, y: e.clientY, label, opener: focusTargetOf(e.currentTarget) })
   }
 
   const handleCloseDialog = () => {
@@ -235,40 +234,39 @@ export function TagList() {
         ))}
       </div>
 
-      {/* Context Menu */}
+      {/* Context menu: the Menu primitive at the pointer (arrow keys, Escape, focus return, kept in the window). */}
       {contextMenu && (
-        <div
-          className="fixed z-50 min-w-[140px] rounded-md border border-[var(--border-color)] bg-[var(--bg-primary)] py-1 shadow-lg"
-          style={{ left: contextMenu.x, top: contextMenu.y }}
+        <Menu
+          key={`${contextMenu.label.id}:${contextMenu.x}:${contextMenu.y}`}
+          anchorPoint={{ x: contextMenu.x, y: contextMenu.y }}
+          label={`${contextMenu.label.title} actions`}
+          onClose={() => setContextMenu(null)}
         >
-          <button
-            type="button"
-            onClick={() => {
+          <MenuItem
+            icon={<Pencil />}
+            onSelect={() => {
               setEditingLabel(contextMenu.label)
               setLabelDialogOpen(true)
-              setContextMenu(null)
             }}
-            className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-[var(--text-primary)] hover:bg-[var(--bg-hover)]"
           >
-            <Pencil className="h-3.5 w-3.5" />
             Edit
-          </button>
-          <button
-            type="button"
-            onClick={async () => {
+          </MenuItem>
+          <MenuItem
+            icon={<Trash2 />}
+            danger
+            onSelect={async () => {
               const label = contextMenu.label
-              setContextMenu(null)
-              const ok = await confirmDelete('Delete this label? It will be removed from all tasks. This cannot be undone.')
+              const ok = await confirmDelete('Delete this label? It will be removed from all tasks. This cannot be undone.', {
+                returnFocusTo: contextMenu.opener,
+              })
               if (ok) {
                 deleteLabel.mutate(label.id)
               }
             }}
-            className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-accent-red hover:bg-[var(--bg-hover)]"
           >
-            <Trash2 className="h-3.5 w-3.5" />
             Delete
-          </button>
-        </div>
+          </MenuItem>
+        </Menu>
       )}
 
       <LabelDialog

@@ -2,6 +2,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useMatches, useRouter } from '@tanstack/react-router'
 import { api } from '@/lib/api'
 import { useCompletedTasksStore } from '@/stores/completed-tasks-store'
+import { completionHold } from '@/stores/completion-hold-store'
+import { announce } from '@/stores/announcer-store'
 import { sortProjectTasks } from '@/lib/task-sort'
 import {
   applyPositionUpdates,
@@ -18,6 +20,7 @@ import {
 } from '@/lib/task-hierarchy'
 import { updateTaskDetailDone } from '@/lib/task-detail-cache'
 import { projectPatch, taskPatch } from '@/lib/merge-patches'
+import { rememberRepeatCompletion, repeatUndoPatch, takeRepeatSnapshot } from '@/lib/repeat-undo'
 import {
   addLabelOrQueue,
   createTaskOrQueue,
@@ -456,11 +459,40 @@ export function useDeleteTask() {
       }
     },
     onSettled: () => {
-      refreshTasks(qc, [['tasks'], ['view-tasks'], ['section-tasks']])
+      refreshTasks(qc, [['tasks'], ['view-tasks'], ['section-tasks'], ['project-counts']])
       // A deleted task's reminders must not fire.
       api.refreshTaskReminders()
     },
   })
+}
+
+/** What a reorder changed in the caches, to put back when the write fails. */
+export interface ReorderSnapshot {
+  previousViewQueries: [readonly unknown[], Task[] | undefined][]
+  previousSectionQueries: [readonly unknown[], SectionTaskCacheEntry[] | undefined][]
+}
+
+/**
+ * Writes the new position (and any renumbered ones) into the cached lists and sorts them, so the
+ * array order matches the new visual order at once. Without sorting, @dnd-kit clears transforms on
+ * drop and items snap back to the old array order. Returns the previous data for a rollback.
+ */
+export function applyReorderToCache(
+  qc: ReturnType<typeof useQueryClient>,
+  { taskId, position, renumbered = [] }: { taskId: number; position: number; renumbered?: PositionUpdate[] },
+): ReorderSnapshot {
+  const previousViewQueries = qc.getQueriesData<Task[]>({ queryKey: ['view-tasks'] })
+  const previousSectionQueries = qc.getQueriesData<SectionTaskCacheEntry[]>({ queryKey: ['section-tasks'] })
+  const updates = [...renumbered, { taskId, position }]
+  qc.setQueriesData<Task[]>({ queryKey: ['view-tasks'] }, (old) => (old ? sortProjectTasks(applyPositionUpdates(old, updates)) : old))
+  qc.setQueriesData<SectionTaskCacheEntry[]>({ queryKey: ['section-tasks'] }, (old) => {
+    if (!old) return old
+    return old.map((section) => {
+      if (!section.tasks.some((t) => t.id === taskId)) return section
+      return { ...section, tasks: sortProjectTasks(applyPositionUpdates(section.tasks, updates)) }
+    })
+  })
+  return { previousViewQueries, previousSectionQueries }
 }
 
 export function useReorderTask() {
@@ -479,6 +511,8 @@ export function useReorderTask() {
       position: number
       /** Other tasks whose positions change too: tasks that shared a position are spread apart (see planMove). */
       renumbered?: PositionUpdate[]
+      /** The caller already wrote the new order into the caches (a drop does, so it is on screen at once): what to put back on failure. */
+      applied?: ReorderSnapshot
     }) => {
       // Positions are per view and are not queued offline.
       if (isTempTaskId(taskId) || renumbered.some((update) => isTempTaskId(update.taskId))) {
@@ -495,32 +529,10 @@ export function useReorderTask() {
       // A task dragged to the end moves the end of the list; the next new task goes after it.
       newTaskPlacer.noteViewPosition(viewId, Math.max(position, ...renumbered.map((update) => update.position)))
     },
-    onMutate: ({ taskId, position, renumbered = [] }) => {
+    onMutate: ({ taskId, position, renumbered = [], applied }) => {
       qc.cancelQueries({ queryKey: ['view-tasks'] })
       qc.cancelQueries({ queryKey: ['section-tasks'] })
-      const previousViewQueries = qc.getQueriesData<Task[]>({ queryKey: ['view-tasks'] })
-      const previousSectionQueries = qc.getQueriesData<SectionTaskCacheEntry[]>({
-        queryKey: ['section-tasks'],
-      })
-
-      // Update position AND sort so the array order matches the new visual order immediately.
-      // Without sorting, @dnd-kit clears transforms on drop and items snap back to the old array order.
-      const updates = [...renumbered, { taskId, position }]
-      const reorderTasks = (old: Task[] | undefined) => {
-        if (!old) return old
-        return sortProjectTasks(applyPositionUpdates(old, updates))
-      }
-
-      qc.setQueriesData<Task[]>({ queryKey: ['view-tasks'] }, reorderTasks)
-      qc.setQueriesData<SectionTaskCacheEntry[]>({ queryKey: ['section-tasks'] }, (old) => {
-        if (!old) return old
-        return old.map((section) => {
-          if (!section.tasks.some((t) => t.id === taskId)) return section
-          return { ...section, tasks: sortProjectTasks(applyPositionUpdates(section.tasks, updates)) }
-        })
-      })
-
-      return { previousViewQueries, previousSectionQueries }
+      return applied ?? applyReorderToCache(qc, { taskId, position, renumbered })
     },
     onError: (_err, _vars, context) => {
       if (context?.previousViewQueries) {
@@ -570,6 +582,8 @@ export async function completeTaskRequest(task: Task): Promise<Task> {
       completed.push({ task: child, queued: outcome.queued })
     }
     const outcome = await sendTaskPatch(task.id, { done: true }, task.title)
+    // A repeating task comes back open with its next dates: remember how it was, for Undo.
+    rememberRepeatCompletion(task, outcome.task)
     return outcome.task ?? { ...task, done: true }
   } catch (error) {
     await Promise.allSettled(completed.map((entry) => reverseDone(entry, false)))
@@ -590,6 +604,18 @@ export async function uncompleteTaskRequest(task: Task, autoCompleted: readonly 
       if (cancelled.success && cancelled.data) {
         restored.push({ task: item, queued: false })
         return null
+      }
+    }
+    // A repeating task that advanced when it was completed is open already: Undo puts its dates and
+    // reminders back instead (nothing when the user changed them since).
+    const snapshot = takeRepeatSnapshot(item.id)
+    if (snapshot) {
+      const current = await api.fetchTaskById(item.id)
+      if (current.success) {
+        const patch = repeatUndoPatch(snapshot, current.data)
+        if (Object.keys(patch).length === 0) return current.data
+        // Not added to `restored`: if a later step fails, completing this task again would advance it again.
+        return (await sendTaskPatch(item.id, patch, item.title)).task
       }
     }
     const outcome = await sendTaskPatch(item.id, { done: false }, item.title)
@@ -628,8 +654,11 @@ export function useCompleteTask() {
         [task.id, true],
         ...autoCompleted.map((child) => [child.id, true] as const),
       ])
-      // Track completed task so it stays visible (with strikethrough) until navigation
+      // Keep the row in its list, struck through, while the completion hold runs (a few seconds after
+      // the pointer or focus leaves it, or until the user leaves the view); then the hold removes it.
       addCompleted(mapTaskDoneByIds(task, doneById), currentPathname(router), autoCompleted, suppressTopLevelUndo)
+      completionHold.complete(task.id)
+      announce(`Completed ${task.title}`)
 
       await qc.cancelQueries({ queryKey: ['tasks'] })
       await qc.cancelQueries({ queryKey: ['view-tasks'] })
@@ -663,6 +692,7 @@ export function useCompleteTask() {
     onError: (_err, input, context) => {
       const task = 'task' in input ? input.task : input
       removeCompleted(task.id)
+      completionHold.reopened(task.id)
       if (context?.previousTaskQueries) {
         for (const [key, data] of context.previousTaskQueries) {
           qc.setQueryData(key, data)
@@ -685,7 +715,7 @@ export function useCompleteTask() {
       }
     },
     onSettled: () => {
-      refreshTasks(qc, [['task-detail']])
+      refreshTasks(qc, [['task-detail'], ['project-counts']])
       // Completing stops a task's reminders; a recurring task's advance to the next ones.
       api.refreshTaskReminders()
     },
@@ -716,6 +746,8 @@ export function useUncompleteTask() {
       const wasInStore = useCompletedTasksStore.getState().tasks.has(task.id)
       const autoCompleted = useCompletedTasksStore.getState().tasks
         .get(task.id)?.autoCompletedSubtasks ?? []
+      // Unchecking a held row cancels its hold (no toast); a row reopened from the Logbook or the toast is just open.
+      completionHold.reopened(task.id)
       const doneById = new Map<number, boolean>([
         [task.id, false],
         ...autoCompleted.map((child) => [child.id, false] as const),
@@ -755,6 +787,8 @@ export function useUncompleteTask() {
     onError: (_err, task, context) => {
       if (context?.wasInStore) {
         updateCompleted(task.id, { done: true })
+        // The reopen failed: the row is done again, so it is held again.
+        completionHold.complete(task.id)
       } else {
         removeCompleted(task.id)
       }
@@ -780,7 +814,7 @@ export function useUncompleteTask() {
       }
     },
     onSettled: () => {
-      refreshTasks(qc, [['task-detail']])
+      refreshTasks(qc, [['task-detail'], ['project-counts']])
       api.refreshTaskReminders()
     },
     // Skip list invalidation — the optimistic update keeps the task at its

@@ -1,0 +1,416 @@
+{
+  "contractVersion": 1,
+  "about": "Design token contract for docs/design-system-v1.md. Colours are #RRGGBB, sizes are px on desktop and dp or sp on Android, times are milliseconds. Role names are dotted. Keep this file identical in vicu and vicu-android.",
+  "roles": {
+    "bg.page": { "light": "#FFFFFF", "dark": "#1C1C1E", "note": "page background" },
+    "bg.sidebar": { "light": "#F5F5F7", "dark": "#2C2C2E", "note": "sidebar; macOS keeps its translucent override" },
+    "bg.card": { "light": "#FFFFFF", "dark": "#2A2A2D", "note": "cards and popovers; dark adds a 1 px highlight, #FFFFFF at 8%, and no shadow" },
+    "bg.hover": { "light": "#F2F2F7", "dark": "#323234", "note": "hover fill" },
+    "bg.selected": { "light": "#E8F0FE", "dark": "#1C3049", "note": "selected row and item fill" },
+    "border": { "light": "#E5E5EA", "dark": "#38383A", "note": "separators only, never a control boundary" },
+    "text": { "light": "#1D1D1F", "dark": "#F5F5F7", "note": "primary text" },
+    "text.secondary": { "light": "#636366", "dark": "#AEAEB2", "note": "secondary text and placeholders" },
+    "text.tertiary": { "light": "#AEAEB2", "dark": "#636366", "note": "disabled and decoration only, never readable text" },
+    "control.ring": { "light": "#8E8E93", "dark": "#7C7C80", "note": "checkbox and radio rings" },
+    "accent": { "light": "#0A66D1", "dark": "#6AACFF", "note": "links and accent text" },
+    "accent.fill": { "light": "#0A66D1", "dark": "#0A66D1", "note": "filled buttons and the checked checkbox" },
+    "on.accent": { "light": "#FFFFFF", "dark": "#FFFFFF", "note": "content on accent.fill" },
+    "focus.ring": { "light": "#0A66D1", "dark": "#6AACFF", "note": "keyboard focus ring" },
+    "status.overdue": { "light": "#D70015", "dark": "#FF7B73", "note": "overdue dates and marks" },
+    "status.today": { "light": "#C2410C", "dark": "#FFB340", "note": "due today" },
+    "status.done": { "light": "#1E7D34", "dark": "#30D158", "note": "completed" },
+    "danger": { "light": "#D70015", "dark": "#FF7B73", "note": "delete, clear date" },
+    "priority.low": { "light": "#0066CC", "dark": "#6AACFF", "note": "priority 1" },
+    "priority.medium": { "light": "#8A5F00", "dark": "#FFD60A", "note": "priority 2" },
+    "priority.high": { "light": "#A74A09", "dark": "#FF9F0A", "note": "priority 3" },
+    "priority.urgent": { "light": "#D70015", "dark": "#FF7B73", "note": "priority 4 and 5" },
+    "palette.red": { "light": "#FF3B30", "dark": "#FF453A", "note": "icons only" },
+    "palette.orange": { "light": "#FF9500", "dark": "#FF9F0A", "note": "icons only" },
+    "palette.yellow": { "light": "#FFCC00", "dark": "#FFD60A", "note": "icons only" },
+    "palette.green": { "light": "#34C759", "dark": "#30D158", "note": "icons only" },
+    "palette.purple": { "light": "#AF52DE", "dark": "#BF5AF2", "note": "icons only" },
+    "palette.teal": { "light": "#5AC8FA", "dark": "#64D2FF", "note": "icons only" }
+  },
+  "css": {
+    "about": "Desktop CSS variable of a role: two dashes plus the role with dots turned into dashes, unless listed in aliases (legacy names kept so existing CSS keeps working). bg.sidebar keeps its raw var() form: it has a translucent override on macOS and never gets a channel variable or an opacity class.",
+    "aliases": {
+      "bg.page": "--bg-primary",
+      "text": "--text-primary",
+      "accent": "--accent-blue",
+      "border": "--border-color",
+      "palette.red": "--accent-red",
+      "palette.orange": "--accent-orange",
+      "palette.yellow": "--accent-yellow",
+      "palette.green": "--accent-green",
+      "palette.purple": "--accent-purple",
+      "palette.teal": "--accent-teal"
+    },
+    "rawVar": ["bg.sidebar"]
+  },
+  "contrast": {
+    "about": "Pairs to assert in both themes. A background is a role name or a tint: the role at alpha composited over another role, channels rounded half up to 8 bits. Ratio is WCAG 2.x relative luminance (sRGB linearisation threshold 0.04045).",
+    "rules": [
+      { "name": "text on surfaces", "fg": "text", "bg": ["bg.page", "bg.sidebar", "bg.card", "bg.hover", "bg.selected"], "min": 4.5 },
+      { "name": "text.secondary on surfaces", "fg": "text.secondary", "bg": ["bg.page", "bg.sidebar", "bg.card", "bg.hover", "bg.selected"], "min": 5.2 },
+      { "name": "accent on surfaces", "fg": "accent", "bg": ["bg.page", "bg.sidebar", "bg.card", "bg.hover", "bg.selected"], "min": 4.5 },
+      { "name": "status.overdue on surfaces", "fg": "status.overdue", "bg": ["bg.page", "bg.sidebar", "bg.card", "bg.hover", "bg.selected"], "min": 4.5 },
+      { "name": "status.today on surfaces", "fg": "status.today", "bg": ["bg.page", "bg.sidebar", "bg.card", "bg.hover", "bg.selected"], "min": 4.5 },
+      { "name": "status.done on surfaces", "fg": "status.done", "bg": ["bg.page", "bg.sidebar", "bg.card", "bg.hover", "bg.selected"], "min": 4.5 },
+      { "name": "danger on surfaces", "fg": "danger", "bg": ["bg.page", "bg.sidebar", "bg.card", "bg.hover", "bg.selected"], "min": 4.5 },
+      { "name": "priority.low on surfaces", "fg": "priority.low", "bg": ["bg.page", "bg.sidebar", "bg.card", "bg.hover", "bg.selected"], "min": 4.5 },
+      { "name": "priority.medium on surfaces", "fg": "priority.medium", "bg": ["bg.page", "bg.sidebar", "bg.card", "bg.hover", "bg.selected"], "min": 4.5 },
+      { "name": "priority.high on surfaces", "fg": "priority.high", "bg": ["bg.page", "bg.sidebar", "bg.card", "bg.hover", "bg.selected"], "min": 4.5 },
+      { "name": "priority.urgent on surfaces", "fg": "priority.urgent", "bg": ["bg.page", "bg.sidebar", "bg.card", "bg.hover", "bg.selected"], "min": 4.5 },
+      { "name": "on.accent on accent.fill", "fg": "on.accent", "bg": ["accent.fill"], "min": 4.5 },
+      { "name": "control.ring on page and card", "fg": "control.ring", "bg": ["bg.page", "bg.card"], "min": 3 },
+      { "name": "focus.ring on page and card", "fg": "focus.ring", "bg": ["bg.page", "bg.card"], "min": 3 },
+      {
+        "name": "status.overdue on its own 8% tint over bg.page",
+        "fg": "status.overdue",
+        "bg": [{ "tint": "status.overdue", "alpha": 0.08, "over": "bg.page" }],
+        "min": 4.5
+      }
+    ]
+  },
+  "labelChip": {
+    "about": "Label chips: the label colour at tintAlpha over bg.page is the fill; the text is the label colour kept in hue and saturation (HSL) and moved in lightness until it passes minContrast on that fill.",
+    "tintAlpha": 0.12,
+    "text": { "sizePx": 11, "weight": 600 },
+    "minContrast": 4.5,
+    "derivation": [
+      "tint = round(alpha * label + (1 - alpha) * bg.page) per channel, rounded half up, with the bg.page of the theme.",
+      "Convert the label to HSL (h in degrees, s and l as fractions, no rounding).",
+      "For n = 0, 1, 2 ...: lightness = clamp(l - n / 100) in light mode, clamp(l + n / 100) in dark mode, with the same h and s; n = 0 is the label itself.",
+      "Convert each candidate to sRGB with the standard HSL formulas and round each channel to 8 bits as floor(channel * 255 + 0.5 + 1e-9) (once per candidate, never between steps; the 1e-9 makes exact ties round up the same way on every platform).",
+      "The first candidate whose contrast against tint is at least minContrast is the text colour."
+    ],
+    "vectors": [
+      { "label": "#1973FF", "source": "vikunja.picker", "light": { "text": "#0060F4", "tint": "#E3EEFF" }, "dark": { "text": "#428CFF", "tint": "#1C2639" } },
+      { "label": "#7F23FF", "source": "vikunja.picker", "light": { "text": "#7F23FF", "tint": "#F0E5FF" }, "dark": { "text": "#A96AFF", "tint": "#281D39" } },
+      { "label": "#FF4136", "source": "vikunja.picker", "light": { "text": "#D40C00", "tint": "#FFE8E7" }, "dark": { "text": "#FF4B40", "tint": "#372021" } },
+      { "label": "#FF851B", "source": "vikunja.picker", "light": { "text": "#AF5100", "tint": "#FFF0E4" }, "dark": { "text": "#FF851B", "tint": "#37291E" } },
+      { "label": "#FFEB10", "source": "vikunja.picker", "light": { "text": "#807500", "tint": "#FFFDE2" }, "dark": { "text": "#FFEB10", "tint": "#37351C" } },
+      { "label": "#00DB60", "source": "vikunja.picker", "light": { "text": "#007F38", "tint": "#E0FBEC" }, "dark": { "text": "#00DB60", "tint": "#193326" } },
+      { "label": "#FFBE0B", "source": "vikunja.newLabel", "light": { "text": "#906900", "tint": "#FFF7E2" }, "dark": { "text": "#FFBE0B", "tint": "#372F1C" } },
+      { "label": "#FD8A09", "source": "vikunja.newLabel", "light": { "text": "#A95A01", "tint": "#FFF1E1" }, "dark": { "text": "#FD8A09", "tint": "#37291B" } },
+      { "label": "#FB5607", "source": "vikunja.newLabel", "light": { "text": "#BD3F03", "tint": "#FFEBE1" }, "dark": { "text": "#FB5607", "tint": "#37231B" } },
+      { "label": "#FF006E", "source": "vikunja.newLabel", "light": { "text": "#CC0058", "tint": "#FFE0EE" }, "dark": { "text": "#FF2E88", "tint": "#371928" } },
+      { "label": "#EFBDEB", "source": "vikunja.newLabel", "light": { "text": "#C12FB5", "tint": "#FDF7FD" }, "dark": { "text": "#EFBDEB", "tint": "#352F37" } },
+      { "label": "#8338EC", "source": "vikunja.newLabel", "light": { "text": "#8338EC", "tint": "#F0E7FD" }, "dark": { "text": "#A670F1", "tint": "#281F37" } },
+      { "label": "#5F5FF6", "source": "vikunja.newLabel", "light": { "text": "#5151F5", "tint": "#ECECFE" }, "dark": { "text": "#8181F8", "tint": "#242438" } },
+      { "label": "#3A86FF", "source": "vikunja.newLabel", "light": { "text": "#005FF7", "tint": "#E7F0FF" }, "dark": { "text": "#498FFF", "tint": "#202939" } },
+      { "label": "#4C91FF", "source": "vikunja.newLabel", "light": { "text": "#0060F9", "tint": "#EAF2FF" }, "dark": { "text": "#4C91FF", "tint": "#222A39" } },
+      { "label": "#0EAD69", "source": "vikunja.newLabel", "light": { "text": "#0A7E4C", "tint": "#E2F5ED" }, "dark": { "text": "#0EAD69", "tint": "#1A2D27" } },
+      { "label": "#25BE8B", "source": "vikunja.newLabel", "light": { "text": "#197E5C", "tint": "#E5F7F1" }, "dark": { "text": "#25BE8B", "tint": "#1D2F2B" } },
+      { "label": "#073B4C", "source": "vikunja.newLabel", "light": { "text": "#073B4C", "tint": "#E1E7EA" }, "dark": { "text": "#1192BC", "tint": "#192024" } },
+      { "label": "#373F47", "source": "vikunja.newLabel", "light": { "text": "#373F47", "tint": "#E7E8E9" }, "dark": { "text": "#7A8998", "tint": "#1F2023" } },
+      { "label": "#5AC8FA", "source": "review", "light": { "text": "#0578AC", "tint": "#EBF8FE" }, "dark": { "text": "#5AC8FA", "tint": "#233138" } },
+      { "label": "#000000", "source": "edge", "light": { "text": "#000000", "tint": "#E0E0E0" }, "dark": { "text": "#828282", "tint": "#19191A" } },
+      { "label": "#808080", "source": "edge", "light": { "text": "#6C6C6C", "tint": "#F0F0F0" }, "dark": { "text": "#8F8F8F", "tint": "#28282A" } },
+      { "label": "#FFFFFF", "source": "edge", "light": { "text": "#757575", "tint": "#FFFFFF" }, "dark": { "text": "#FFFFFF", "tint": "#373739" } }
+    ]
+  },
+  "priority": {
+    "about": "Vikunja priority to mark and colour role. 0 shows nothing. A mark never carries meaning alone: it has a text name for assistive technology.",
+    "levels": {
+      "1": { "mark": "bars-1", "role": "priority.low" },
+      "2": { "mark": "bars-2", "role": "priority.medium" },
+      "3": { "mark": "bars-3", "role": "priority.high" },
+      "4": { "mark": "square-bang", "role": "priority.urgent" },
+      "5": { "mark": "square-bang", "role": "priority.urgent" }
+    }
+  },
+  "identity": {
+    "about": "Smart list identity. These colours only ever colour list icons, never text.",
+    "lists": {
+      "inbox": { "color": "#0A84FF", "desktopIcon": "Inbox", "androidIcon": "Outlined.Inbox" },
+      "today": { "color": "#E8A400", "desktopIcon": "Sun", "androidIcon": "Outlined.WbSunny" },
+      "upcoming": { "color": "#E5484D", "desktopIcon": "CalendarDays", "androidIcon": "Outlined.CalendarMonth" },
+      "anytime": { "color": "#14A3A3", "desktopIcon": "Layers", "androidIcon": "Outlined.Layers" },
+      "routines": { "color": "#E5487A", "desktopIcon": "HeartPulse", "androidIcon": "Outlined.MonitorHeart" },
+      "review": { "color": "#8E55E8", "desktopIcon": "RefreshCw", "androidIcon": "Outlined.Autorenew" },
+      "logbook": { "color": "#2E9D58", "desktopIcon": "CircleCheckBig", "androidIcon": "Outlined.CheckCircle" }
+    }
+  },
+  "type": {
+    "about": "Type scale. Desktop sizes are px with weight and an optional line height in px; Android gives the M3 style and its sp size where the contract fixes one. Nothing is below 11.",
+    "pageTitle": { "px": 26, "weight": 700, "android": { "style": "large top app bar", "sp": 28, "bold": true } },
+    "section": { "px": 13, "weight": 600, "note": "with a count", "android": { "style": "titleSmall" } },
+    "group": { "px": 12, "weight": 600, "note": "with a dot", "android": { "style": "labelMedium" } },
+    "taskTitle": { "px": 14, "weight": 400, "lineHeightPx": 20, "android": { "style": "bodyLarge", "sp": 16 } },
+    "cardTitle": { "px": 15, "weight": 600 },
+    "meta": { "px": 12, "weight": 500, "android": { "style": "labelMedium", "sp": 12 } },
+    "chip": { "px": 11, "weight": 600, "android": { "style": "labelSmall", "sp": 11 } },
+    "caption": { "px": 11, "weight": 600, "android": { "style": "labelSmall", "sp": 11 } }
+  },
+  "radius": {
+    "about": "Corner radii. Desktop px, Android dp; null means the platform has no such surface.",
+    "control": { "px": 6, "dp": 8 },
+    "popover": { "px": 10, "dp": 12 },
+    "card": { "px": 12, "dp": 12 },
+    "sheet": { "px": null, "dp": 28 },
+    "chip": "full"
+  },
+  "motion": {
+    "about": "Durations in ms. A spring is a damping ratio and a stiffness (Compose spring(dampingRatio, stiffness)); desktop turns a spring into a CSS duration plus a generated curve. Every motion has a reduced variant (docs/design-system-v1.md).",
+    "fade": {
+      "fast": { "ms": 150, "easing": "cubic-bezier(0.2, 0, 0, 1)", "spring": { "damping": 1, "stiffness": 3800 } },
+      "base": { "ms": 240, "enter": "cubic-bezier(0.05, 0.7, 0.1, 1)", "exit": "cubic-bezier(0.3, 0, 0.8, 0.15)", "spring": { "damping": 1, "stiffness": 1600 } }
+    },
+    "move": { "ms": 320, "spring": { "damping": 0.9, "stiffness": 700 } },
+    "moveExpressive": { "ms": 440, "spring": { "damping": 0.8, "stiffness": 380 } },
+    "pop": { "ms": 360, "spring": { "damping": 0.6, "stiffness": 800 } },
+    "page": { "outMs": 90, "inMs": 210, "risePx": 6 },
+    "stagger": { "ms": 35, "maxItems": 5 },
+    "keyboardMoveMaxMs": 120,
+    "checkDrawMs": 220,
+    "strikeDrawMs": 240,
+    "motionScheme": {
+      "fastSpatial": { "damping": 0.6, "stiffness": 800 },
+      "defaultSpatial": { "damping": 0.9, "stiffness": 700 },
+      "slowSpatial": { "damping": 0.9, "stiffness": 300 },
+      "fastEffects": { "damping": 1, "stiffness": 3800 },
+      "defaultEffects": { "damping": 1, "stiffness": 1600 },
+      "slowEffects": { "damping": 1, "stiffness": 800 }
+    }
+  },
+  "android": {
+    "about": "Material 3 colour schemes generated once from the seed with @material/material-color-utilities 0.4.0 (SchemeFidelity, contrast level 0, spec 2021). Role names are the Compose ColorScheme property names. custom holds the colours outside the scheme: <name> is the colour as { light, dark }, with on (content on it), container and onContainer pairs. statusMap says which Android colour carries a status role: a bare name is a colorScheme role, custom.<name> a custom colour. contrast refs are colorScheme.<role>, custom.<name>[.on|.container|.onContainer] or role.<role>; each is resolved per theme.",
+    "seed": "#0A66D1",
+    "variant": "fidelity",
+    "colorScheme": {
+      "light": {
+        "primary": "#004EA5",
+        "onPrimary": "#FFFFFF",
+        "primaryContainer": "#0A66D1",
+        "onPrimaryContainer": "#E3EAFF",
+        "inversePrimary": "#ACC7FF",
+        "secondary": "#495E88",
+        "onSecondary": "#FFFFFF",
+        "secondaryContainer": "#B9CFFF",
+        "onSecondaryContainer": "#425881",
+        "tertiary": "#8B3700",
+        "onTertiary": "#FFFFFF",
+        "tertiaryContainer": "#B24900",
+        "onTertiaryContainer": "#FFE5DA",
+        "error": "#BA1A1A",
+        "onError": "#FFFFFF",
+        "errorContainer": "#FFDAD6",
+        "onErrorContainer": "#93000A",
+        "background": "#F9F9FF",
+        "onBackground": "#191C22",
+        "surface": "#F9F9FF",
+        "onSurface": "#191C22",
+        "surfaceVariant": "#DEE2F2",
+        "onSurfaceVariant": "#424753",
+        "surfaceTint": "#005BBE",
+        "inverseSurface": "#2E3037",
+        "inverseOnSurface": "#EFF0FA",
+        "outline": "#727784",
+        "outlineVariant": "#C2C6D5",
+        "scrim": "#000000",
+        "surfaceBright": "#F9F9FF",
+        "surfaceDim": "#D8D9E3",
+        "surfaceContainerLowest": "#FFFFFF",
+        "surfaceContainerLow": "#F2F3FD",
+        "surfaceContainer": "#ECEDF7",
+        "surfaceContainerHigh": "#E6E8F1",
+        "surfaceContainerHighest": "#E1E2EB",
+        "primaryFixed": "#D7E2FF",
+        "primaryFixedDim": "#ACC7FF",
+        "onPrimaryFixed": "#001A40",
+        "onPrimaryFixedVariant": "#004492",
+        "secondaryFixed": "#D7E2FF",
+        "secondaryFixedDim": "#B1C7F6",
+        "onSecondaryFixed": "#001A40",
+        "onSecondaryFixedVariant": "#31476F",
+        "tertiaryFixed": "#FFDBCC",
+        "tertiaryFixedDim": "#FFB693",
+        "onTertiaryFixed": "#351000",
+        "onTertiaryFixedVariant": "#7A3000"
+      },
+      "dark": {
+        "primary": "#ACC7FF",
+        "onPrimary": "#002F67",
+        "primaryContainer": "#0A66D1",
+        "onPrimaryContainer": "#E3EAFF",
+        "inversePrimary": "#005BBE",
+        "secondary": "#B1C7F6",
+        "onSecondary": "#193057",
+        "secondaryContainer": "#334971",
+        "onSecondaryContainer": "#A3B8E7",
+        "tertiary": "#FFB693",
+        "onTertiary": "#561F00",
+        "tertiaryContainer": "#B24900",
+        "onTertiaryContainer": "#FFE5DA",
+        "error": "#FFB4AB",
+        "onError": "#690005",
+        "errorContainer": "#93000A",
+        "onErrorContainer": "#FFDAD6",
+        "background": "#11131A",
+        "onBackground": "#E1E2EB",
+        "surface": "#11131A",
+        "onSurface": "#E1E2EB",
+        "surfaceVariant": "#424753",
+        "onSurfaceVariant": "#C2C6D5",
+        "surfaceTint": "#ACC7FF",
+        "inverseSurface": "#E1E2EB",
+        "inverseOnSurface": "#2E3037",
+        "outline": "#8C909F",
+        "outlineVariant": "#424753",
+        "scrim": "#000000",
+        "surfaceBright": "#363940",
+        "surfaceDim": "#11131A",
+        "surfaceContainerLowest": "#0B0E14",
+        "surfaceContainerLow": "#191C22",
+        "surfaceContainer": "#1D2026",
+        "surfaceContainerHigh": "#272A31",
+        "surfaceContainerHighest": "#32353C",
+        "primaryFixed": "#D7E2FF",
+        "primaryFixedDim": "#ACC7FF",
+        "onPrimaryFixed": "#001A40",
+        "onPrimaryFixedVariant": "#004492",
+        "secondaryFixed": "#D7E2FF",
+        "secondaryFixedDim": "#B1C7F6",
+        "onSecondaryFixed": "#001A40",
+        "onSecondaryFixedVariant": "#31476F",
+        "tertiaryFixed": "#FFDBCC",
+        "tertiaryFixedDim": "#FFB693",
+        "onTertiaryFixed": "#351000",
+        "onTertiaryFixedVariant": "#7A3000"
+      }
+    },
+    "custom": {
+      "dueToday": {
+        "light": "#9A4600",
+        "dark": "#FFB870",
+        "on": { "light": "#FFFFFF", "dark": "#532200" },
+        "container": { "light": "#FFDBC9", "dark": "#753400" },
+        "onContainer": { "light": "#321200", "dark": "#FFDBC9" }
+      },
+      "done": {
+        "light": "#1E7D34",
+        "dark": "#30D158",
+        "on": { "light": "#FFFFFF", "dark": "#002106" },
+        "container": { "light": "#9AF89F", "dark": "#00531B" },
+        "onContainer": { "light": "#002106", "dark": "#9AF89F" }
+      },
+      "swipeComplete": {
+        "light": "#026E27",
+        "dark": "#7FDB85",
+        "on": { "light": "#FFFFFF", "dark": "#002106" },
+        "container": { "light": "#9AF89F", "dark": "#00531B" },
+        "onContainer": { "light": "#002106", "dark": "#9AF89F" }
+      },
+      "swipeSchedule": {
+        "light": "#E99B00",
+        "dark": "#FFB952",
+        "on": { "light": "#291800", "dark": "#291800" },
+        "container": { "light": "#FFDDB4", "dark": "#633F00" },
+        "onContainer": { "light": "#291800", "dark": "#FFDDB4" }
+      }
+    },
+    "statusMap": { "status.overdue": "error", "status.today": "custom.dueToday", "status.done": "custom.done" },
+    "contrast": [
+      {
+        "name": "onSurface on surfaces",
+        "fg": "colorScheme.onSurface",
+        "bg": [
+          "colorScheme.surface",
+          "colorScheme.surfaceContainerLowest",
+          "colorScheme.surfaceContainerLow",
+          "colorScheme.surfaceContainer",
+          "colorScheme.surfaceContainerHigh",
+          "colorScheme.surfaceContainerHighest"
+        ],
+        "min": 4.5
+      },
+      {
+        "name": "onSurfaceVariant on surfaces",
+        "fg": "colorScheme.onSurfaceVariant",
+        "bg": [
+          "colorScheme.surface",
+          "colorScheme.surfaceContainerLowest",
+          "colorScheme.surfaceContainerLow",
+          "colorScheme.surfaceContainer",
+          "colorScheme.surfaceContainerHigh",
+          "colorScheme.surfaceContainerHighest"
+        ],
+        "min": 4.5
+      },
+      {
+        "name": "error on surfaces",
+        "fg": "colorScheme.error",
+        "bg": [
+          "colorScheme.surface",
+          "colorScheme.surfaceContainerLowest",
+          "colorScheme.surfaceContainerLow",
+          "colorScheme.surfaceContainer",
+          "colorScheme.surfaceContainerHigh",
+          "colorScheme.surfaceContainerHighest"
+        ],
+        "min": 4.5
+      },
+      {
+        "name": "error on its own 8% tint over surface",
+        "fg": "colorScheme.error",
+        "bg": [{ "tint": "colorScheme.error", "alpha": 0.08, "over": "colorScheme.surface" }],
+        "min": 4.5
+      },
+      {
+        "name": "custom.dueToday on surfaces",
+        "fg": "custom.dueToday",
+        "bg": [
+          "colorScheme.surface",
+          "colorScheme.surfaceContainerLowest",
+          "colorScheme.surfaceContainerLow",
+          "colorScheme.surfaceContainer",
+          "colorScheme.surfaceContainerHigh",
+          "colorScheme.surfaceContainerHighest"
+        ],
+        "min": 4.5
+      },
+      {
+        "name": "custom.done on surface, Lowest and Low",
+        "fg": "custom.done",
+        "bg": ["colorScheme.surface", "colorScheme.surfaceContainerLowest", "colorScheme.surfaceContainerLow"],
+        "min": 4.5
+      },
+      { "name": "onPrimary on primary", "fg": "colorScheme.onPrimary", "bg": ["colorScheme.primary"], "min": 4.5 },
+      { "name": "onPrimaryContainer on primaryContainer", "fg": "colorScheme.onPrimaryContainer", "bg": ["colorScheme.primaryContainer"], "min": 4.5 },
+      { "name": "onErrorContainer on errorContainer", "fg": "colorScheme.onErrorContainer", "bg": ["colorScheme.errorContainer"], "min": 4.5 },
+      {
+        "name": "priority.low on surface, Lowest, Low and Container",
+        "fg": "role.priority.low",
+        "bg": ["colorScheme.surface", "colorScheme.surfaceContainerLowest", "colorScheme.surfaceContainerLow", "colorScheme.surfaceContainer"],
+        "min": 4.5
+      },
+      {
+        "name": "priority.medium on surface, Lowest, Low and Container",
+        "fg": "role.priority.medium",
+        "bg": ["colorScheme.surface", "colorScheme.surfaceContainerLowest", "colorScheme.surfaceContainerLow", "colorScheme.surfaceContainer"],
+        "min": 4.5
+      },
+      {
+        "name": "priority.high on surface, Lowest, Low and Container",
+        "fg": "role.priority.high",
+        "bg": ["colorScheme.surface", "colorScheme.surfaceContainerLowest", "colorScheme.surfaceContainerLow", "colorScheme.surfaceContainer"],
+        "min": 4.5
+      },
+      {
+        "name": "priority.urgent on surface, Lowest, Low and Container",
+        "fg": "role.priority.urgent",
+        "bg": ["colorScheme.surface", "colorScheme.surfaceContainerLowest", "colorScheme.surfaceContainerLow", "colorScheme.surfaceContainer"],
+        "min": 4.5
+      },
+      { "name": "custom.dueToday onColor on color", "fg": "custom.dueToday.on", "bg": ["custom.dueToday"], "min": 4.5 },
+      { "name": "custom.dueToday onContainer on container", "fg": "custom.dueToday.onContainer", "bg": ["custom.dueToday.container"], "min": 4.5 },
+      { "name": "custom.done onColor on color", "fg": "custom.done.on", "bg": ["custom.done"], "min": 4.5 },
+      { "name": "custom.done onContainer on container", "fg": "custom.done.onContainer", "bg": ["custom.done.container"], "min": 4.5 },
+      { "name": "custom.swipeComplete onColor on color", "fg": "custom.swipeComplete.on", "bg": ["custom.swipeComplete"], "min": 4.5 },
+      { "name": "custom.swipeComplete onContainer on container", "fg": "custom.swipeComplete.onContainer", "bg": ["custom.swipeComplete.container"], "min": 4.5 },
+      { "name": "custom.swipeSchedule onColor on color", "fg": "custom.swipeSchedule.on", "bg": ["custom.swipeSchedule"], "min": 4.5 },
+      { "name": "custom.swipeSchedule onContainer on container", "fg": "custom.swipeSchedule.onContainer", "bg": ["custom.swipeSchedule.container"], "min": 4.5 }
+    ]
+  }
+}

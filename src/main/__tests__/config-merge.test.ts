@@ -27,6 +27,7 @@ function userConfig(overrides: Partial<AppConfig> = {}): AppConfig {
     theme: 'dark',
     window_bounds: { x: 10, y: 20, width: 1200, height: 800 },
     sidebar_width: 333,
+    sidebar_collapsed_projects: [4, 9],
     quick_entry_enabled: true,
     quick_view_enabled: true,
     quick_entry_hotkey: 'Ctrl+Alt+N',
@@ -67,6 +68,7 @@ function userConfig(overrides: Partial<AppConfig> = {}): AppConfig {
 
 const PREFERENCE_KEYS = [
   'theme',
+  'clock_format',
   'window_bounds',
   'sidebar_width',
   'quick_entry_enabled',
@@ -95,6 +97,7 @@ const ACCOUNT_KEYS = [
   'last_username',
   'custom_lists',
   'custom_lists_sync',
+  'sidebar_collapsed_projects',
 ] as const satisfies readonly (keyof AppConfig)[]
 
 function expectKeysKept(result: AppConfig, before: AppConfig, keys: readonly (keyof AppConfig)[]) {
@@ -175,8 +178,15 @@ describe('applyConnectionFields: another server or account', () => {
     expect(result.last_used_project_id).toBeUndefined()
     expect(result.last_used_label_id).toBeUndefined()
     expect(result.last_username).toBeUndefined()
+    expect(result.sidebar_collapsed_projects).toBeUndefined()
     expect(result.standalone_mode).toBe(false)
     expect(result.viewer_filter).toMatchObject({ project_ids: [], sort_by: 'due_date' })
+  })
+
+  it('sidebar_collapsed_projects keeps whole positive ids, once each, ascending', () => {
+    expect(normalizeConfig({ sidebar_collapsed_projects: [9, 4, 4, 0, -2, 1.5, 'x', null] }).sidebar_collapsed_projects).toEqual([4, 9])
+    expect(normalizeConfig({ sidebar_collapsed_projects: 'nope' }).sidebar_collapsed_projects).toBeUndefined()
+    expect(normalizeConfig({}).sidebar_collapsed_projects).toBeUndefined()
   })
 
   it('does not carry the old inbox project over', () => {
@@ -334,6 +344,24 @@ describe('applyConfigPatch (D-CFG-2)', () => {
 
     expect(result.review).toEqual({ enabled: true, default_cadence_days: 7, exclude_inbox: true })
     expect(result.viewer_filter).toMatchObject({ project_ids: [1, 2], sort_by: 'title' })
+  })
+
+  it('keeps routines on unless they were turned off, and saves a turned-off switch', () => {
+    const fresh = normalizeConfig({})
+    expect(fresh.routines_enabled).toBe(true)
+    expect(fresh.routines_in_today).toBe(true)
+
+    const off = applyConfigPatch(userConfig(), { routines_enabled: false, routines_in_today: false })
+    expect(off.routines_enabled).toBe(false)
+    expect(off.routines_in_today).toBe(false)
+    expect(normalizeConfig({ ...off }).routines_enabled).toBe(false)
+  })
+
+  it('keeps the clock choice, and anything else means the system clock', () => {
+    expect(normalizeConfig({}).clock_format).toBe('system')
+    expect(applyConfigPatch(userConfig(), { clock_format: '24h' }).clock_format).toBe('24h')
+    expect(applyConfigPatch(userConfig(), { clock_format: '12h' }).clock_format).toBe('12h')
+    expect(applyConfigPatch(userConfig({ clock_format: '24h' }), { clock_format: 'sundial' }).clock_format).toBe('system')
   })
 
   it('normalizes values (invalid types fall back to defaults)', () => {

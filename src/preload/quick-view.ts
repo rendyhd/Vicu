@@ -23,6 +23,10 @@ contextBridge.exposeInMainWorld('quickViewApi', {
   getPendingCount: () => ipcRenderer.invoke('qv:get-pending-count'),
   getQueueCounts: () => ipcRenderer.invoke('qv:get-queue-counts'),
   getConfig: () => ipcRenderer.invoke('qv:get-config'),
+  getDateFormat: () => ipcRenderer.invoke('get-date-format'),
+  onDateFormatChanged: (callback: (format: { locale: string; hour12: boolean }) => void) => {
+    ipcRenderer.on('date-format-changed', (_event, format: { locale: string; hour12: boolean }) => callback(format))
+  },
   onShowWindow: (callback: () => void) => {
     ipcRenderer.on('viewer-shown', () => callback())
   },

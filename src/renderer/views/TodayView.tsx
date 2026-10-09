@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTasks } from '@/hooks/use-tasks'
 import { useProjects } from '@/hooks/use-projects'
 import { useFilters } from '@/hooks/use-filters'
@@ -6,20 +6,31 @@ import { usePrintable } from '@/stores/print-store'
 import { useDayKey } from '@/stores/day-store'
 import { splitTodayOverdue } from '@/lib/today-overdue'
 import { TaskList } from '@/components/task-list/TaskList'
-import { TaskRow } from '@/components/task-list/TaskRow'
+import { ListSectionHeader } from '@/components/task-list/ListSectionHeader'
+import { ProjectTaskGroup } from '@/components/task-list/ProjectTaskGroup'
+import { openCount } from '@/lib/list-sections'
+import { DueDateContextProvider } from '@/components/task-list/TaskDueBadge'
+import { useDateFormat } from '@/hooks/use-date-format'
+import { formatDateDisplay } from '@/lib/date-display'
 import { api } from '@/lib/api'
-import type { Task } from '@/lib/vikunja-types'
+import { showRoutinesInToday, type Task } from '@/lib/vikunja-types'
+import { useAppConfig } from '@/hooks/use-app-config'
 import { RoutineTodaySection } from '@/components/routines/RoutineTodaySection'
+import { useRoutines } from '@/hooks/use-routines'
+import { isFinished } from '@/lib/routines'
+import { ListSkeleton } from '@/components/shared/ListSkeleton'
+import { NextUpcomingOffer } from '@/components/task-list/NextUpcomingOffer'
 
-function groupByProject(tasks: Task[], projectsFlat?: { id: number; title: string }[]) {
+function groupByProject(tasks: Task[], projectsFlat?: { id: number; title: string; hex_color?: string }[]) {
   const activeIds = new Set(projectsFlat?.map((project) => project.id) ?? [])
-  const byProject = new Map<number, { name: string; tasks: Task[] }>()
+  const byProject = new Map<number, { name: string; color?: string; tasks: Task[] }>()
   for (const task of tasks) {
     const pid = task.project_id
     if (!activeIds.has(pid)) continue
     if (!byProject.has(pid)) {
       byProject.set(pid, {
         name: projectsFlat?.find((p) => p.id === pid)?.title ?? 'Unknown Project',
+        color: projectsFlat?.find((p) => p.id === pid)?.hex_color,
         tasks: [],
       })
     }
@@ -32,6 +43,12 @@ export function TodayView() {
   const params = useFilters({ view: 'today' })
   const { data: tasks = [], isLoading } = useTasks(params)
   const { data: projects } = useProjects()
+  const { data: config } = useAppConfig()
+  // Wait for the config, so a turned-off section does not flash in (and fetch routines) on start.
+  const routinesShown = !!config && showRoutinesInToday(config)
+  // The routines section draws itself, so Today is only empty once it has nothing left to show either.
+  const routines = useRoutines({ enabled: routinesShown })
+  const routinesLeft = routinesShown && (routines.isLoading || routines.today.some((o) => !isFinished(o.status)))
   const [inboxProjectId, setInboxProjectId] = useState<number | undefined>()
   // The local day: re-read when it rolls over at midnight (or after sleep), so a task added to Today
   // after midnight is dated today, not yesterday, and the overdue / due-today split follows.
@@ -80,77 +97,65 @@ export function TodayView() {
     )
   )
 
-  const dateStr = new Date().toLocaleDateString('en-US', {
-    weekday: 'long',
-    month: 'long',
-    day: 'numeric',
-  })
+  const dateFormat = useDateFormat()
+  const now = new Date()
+  const dateStr = formatDateDisplay('header.full', now, now, true, dateFormat)
+
+  // Empty after having had tasks in this visit (the last one was done): All clear warms in and offers
+  // the next upcoming task. Empty from the start it simply shows.
+  const empty = overdueTasks.length === 0 && todayTasks.length === 0 && !routinesLeft
+  const hadTasks = useRef(false)
+  if (!empty) hadTasks.current = true
+  const justCleared = empty && hadTasks.current
 
   if (isLoading) {
-    return (
-      <div className="flex flex-1 items-center justify-center text-sm text-[var(--text-secondary)]">
-        Loading...
-      </div>
-    )
+    return <ListSkeleton title="Today" identity="today" subtitle={dateStr} />
   }
 
   return (
-    <TaskList
-      title="Today"
-      tasks={[]}
-      projectId={inboxProjectId}
-      showNewTask={!!inboxProjectId && projects?.flat.some((project) => project.id === inboxProjectId)}
-      defaultDueDate={today}
-      headerContent={<p className="px-6 pb-3 text-xs text-[var(--text-secondary)]">{dateStr}</p>}
-      emptyTitle="All clear for today"
-      emptySubtitle="Tasks due today will appear here"
-    >
-      <RoutineTodaySection />
-      {overdueTasks.length > 0 && (
-        <div>
-          <div className="px-6 pb-1 pt-2">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-accent-red">
-              Overdue
-            </span>
+    <DueDateContextProvider value="row.inToday">
+      <TaskList
+        title="Today"
+        identity="today"
+        tasks={[]}
+        projectId={inboxProjectId}
+        showNewTask={!!inboxProjectId && projects?.flat.some((project) => project.id === inboxProjectId)}
+        defaultDueDate={today}
+        subtitle={dateStr}
+        empty={empty}
+        emptyTitle="All clear"
+        emptySubtitle="Nothing is due today"
+        emptyWarm={justCleared}
+        emptyExtra={empty ? <NextUpcomingOffer /> : undefined}
+      >
+        {routinesShown && <RoutineTodaySection hideFinished />}
+        {overdueTasks.length > 0 && (
+          <div>
+            <ListSectionHeader level={1} title="Overdue" count={openCount(overdueTasks)} tone="overdue" />
+            {overdueGroups.map((group) => (
+              <ProjectTaskGroup key={group.name} level={2} name={group.name} color={group.color} tasks={group.tasks} />
+            ))}
           </div>
-          {overdueGroups.map((group) => (
-            <div key={group.name}>
-              <div className="px-6 pb-0.5 pt-1.5">
-                <span className="text-[10px] font-medium tracking-wide text-[var(--text-secondary)]">
-                  {group.name}
-                </span>
-              </div>
-              {group.tasks.map((task) => (
-                <TaskRow key={task.id} task={task} />
-              ))}
-            </div>
-          ))}
-        </div>
-      )}
+        )}
 
-      {todayTasks.length > 0 && (
-        <div>
-          {overdueTasks.length > 0 && (
-            <div className="px-6 pb-1 pt-3">
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
-                Today
-              </span>
-            </div>
-          )}
-          {todayGroups.map((group) => (
-            <div key={group.name}>
-              <div className="px-6 pb-0.5 pt-1.5">
-                <span className="text-[10px] font-medium tracking-wide text-[var(--text-secondary)]">
-                  {group.name}
-                </span>
-              </div>
-              {group.tasks.map((task) => (
-                <TaskRow key={task.id} task={task} />
-              ))}
-            </div>
-          ))}
-        </div>
-      )}
-    </TaskList>
+        {todayTasks.length > 0 && (
+          <div>
+            {overdueTasks.length > 0 && (
+              <ListSectionHeader level={1} title="Today" count={openCount(todayTasks)} />
+            )}
+            {/* Without an Overdue section above, the projects are the top level of the list. */}
+            {todayGroups.map((group) => (
+              <ProjectTaskGroup
+                key={group.name}
+                level={overdueTasks.length > 0 ? 2 : 1}
+                name={group.name}
+                color={group.color}
+                tasks={group.tasks}
+              />
+            ))}
+          </div>
+        )}
+      </TaskList>
+    </DueDateContextProvider>
   )
 }

@@ -66,6 +66,11 @@ export function occurrencesForDate<TTask>(
   })
 }
 
+/** Done for the day: completed or skipped. Pending and not-logged occurrences still need attention. */
+export function isFinished(status: OccurrenceStatus): boolean {
+  return status === 'COMPLETED' || status === 'SKIPPED'
+}
+
 export function routineDay<TTask>(carriers: RoutineCarrier<TTask>[], date = localDateString()): RoutineOccurrence<TTask>[] {
   return carriers
     .flatMap((carrier) => occurrencesForDate(carrier, date))

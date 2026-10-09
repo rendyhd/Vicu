@@ -1,3 +1,4 @@
+import { Button } from '@/components/shared/Button'
 import { useState, useCallback } from 'react'
 import type { AppConfig } from '@/lib/vikunja-types'
 
@@ -29,7 +30,7 @@ export function ObsidianSettings({ config, onChange, disabled }: ObsidianSetting
   }, [])
 
   return (
-    <div className={`rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] p-5${disabled ? ' opacity-50 pointer-events-none' : ''}`}>
+    <div className={`rounded-card border border-[var(--border-color)] bg-[var(--bg-primary)] p-5${disabled ? ' opacity-50 pointer-events-none' : ''}`}>
       <button
         type="button"
         className="flex w-full items-center justify-between pointer-events-auto"
@@ -48,7 +49,7 @@ export function ObsidianSettings({ config, onChange, disabled }: ObsidianSetting
             <select
               value={mode}
               onChange={(e) => onChange({ obsidian_mode: e.target.value as 'off' | 'ask' | 'always' })}
-              className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] focus:border-accent-blue focus:outline-none"
+              className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)]"
             >
               <option value="off">Off</option>
               <option value="ask">Ask ({window.api.platform === 'darwin' ? '\u2318L' : 'Ctrl+L'})</option>
@@ -67,7 +68,7 @@ export function ObsidianSettings({ config, onChange, disabled }: ObsidianSetting
                   How to set up Obsidian {showSetupInfo ? '\u25BC' : '\u25B6'}
                 </button>
                 {showSetupInfo && (
-                  <div className="mt-2 rounded-lg bg-[var(--bg-secondary)] p-3 text-xs text-[var(--text-secondary)]">
+                  <div className="mt-2 rounded-card bg-[var(--bg-secondary)] p-3 text-xs text-[var(--text-secondary)]">
                     <p className="mb-2">
                       <span className="font-semibold">1. Local REST API</span> (by Adam Coddington)
                     </p>
@@ -100,15 +101,11 @@ export function ObsidianSettings({ config, onChange, disabled }: ObsidianSetting
                     value={config.obsidian_api_key ?? ''}
                     onChange={(e) => onChange({ obsidian_api_key: e.target.value })}
                     placeholder="Obsidian > Settings > Local REST API > Copy API Key"
-                    className="flex-1 rounded-md border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)] focus:border-accent-blue focus:outline-none"
+                    className="flex-1 rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]"
                   />
-                  <button
-                    type="button"
-                    onClick={() => setShowKey(!showKey)}
-                    className="rounded-md border border-[var(--border-color)] px-3 py-2 text-xs text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
-                  >
+                  <Button variant="quiet" onClick={() => setShowKey(!showKey)}>
                     {showKey ? 'Hide' : 'Show'}
-                  </button>
+                  </Button>
                 </div>
               </div>
 
@@ -119,7 +116,7 @@ export function ObsidianSettings({ config, onChange, disabled }: ObsidianSetting
                   value={config.obsidian_vault_name ?? ''}
                   onChange={(e) => onChange({ obsidian_vault_name: e.target.value })}
                   placeholder="Shown in Obsidian's title bar"
-                  className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)] focus:border-accent-blue focus:outline-none"
+                  className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]"
                 />
               </div>
 
@@ -129,24 +126,19 @@ export function ObsidianSettings({ config, onChange, disabled }: ObsidianSetting
                   type="number"
                   value={config.obsidian_port ?? 27124}
                   onChange={(e) => onChange({ obsidian_port: Number(e.target.value) || 27124 })}
-                  className="w-32 rounded-md border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] focus:border-accent-blue focus:outline-none"
+                  className="w-32 rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)]"
                 />
               </div>
 
               <div>
-                <button
-                  type="button"
-                  onClick={handleTest}
-                  disabled={testStatus.type === 'loading'}
-                  className="rounded-md border border-[var(--border-color)] px-4 py-2 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-hover)] disabled:opacity-50"
-                >
+                <Button variant="secondary" onClick={handleTest} disabled={testStatus.type === 'loading'}>
                   {testStatus.type === 'loading' ? 'Testing...' : 'Test Connection'}
-                </button>
+                </Button>
                 {testStatus.type === 'success' && (
-                  <span className="ml-2 text-xs text-green-600 dark:text-green-400">{testStatus.message}</span>
+                  <span className="ml-2 text-xs text-status-done">{testStatus.message}</span>
                 )}
                 {testStatus.type === 'error' && (
-                  <span className="ml-2 text-xs text-accent-red">{testStatus.message}</span>
+                  <span className="ml-2 text-xs text-danger">{testStatus.message}</span>
                 )}
               </div>
             </>

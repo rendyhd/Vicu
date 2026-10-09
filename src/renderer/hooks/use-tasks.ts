@@ -5,7 +5,7 @@ import { api } from '@/lib/api'
 import { useCompletedTasksStore } from '@/stores/completed-tasks-store'
 import type { TaskQueryParams } from '@/lib/vikunja-types'
 import { hasVicuMetadataMarker } from '@/lib/metadata-tasks'
-import { mergeSmartListUndoWindow } from '@/lib/undo-window'
+import { asksForOpenTasksOnly, dropReleasedCompletions, mergeSmartListUndoWindow } from '@/lib/undo-window'
 
 export function useTasks(params: TaskQueryParams, enabled = true) {
   const matches = useMatches()
@@ -31,9 +31,12 @@ export function useTasks(params: TaskQueryParams, enabled = true) {
   // - Completed tasks shown with strikethrough in non-logbook views
   // - Uncompleted tasks shown without strikethrough in logbook
   const data = useMemo(() => {
-    const tasks = (query.data ?? []).filter((task) => !hasVicuMetadataMarker(task.description))
+    const loaded = (query.data ?? []).filter((task) => !hasVicuMetadataMarker(task.description))
+    // An open-only query never returns a done task, so a done row is a completion that is still
+    // held or that the hold has released (it leaves the list then).
+    const tasks = asksForOpenTasksOnly(params.filter) ? dropReleasedCompletions(loaded, completedTasks, pathname) : loaded
     return mergeSmartListUndoWindow(tasks, completedTasks, pathname)
-  }, [query.data, completedTasks, pathname])
+  }, [query.data, completedTasks, pathname, params])
 
   return { ...query, data }
 }

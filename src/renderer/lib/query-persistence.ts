@@ -16,6 +16,7 @@ export const PERSISTED_KEY_PREFIXES: ReadonlySet<unknown> = new Set([
   'projects',
   'labels',
   'project-views',
+  'project-counts',
 ])
 
 /** A saved copy older than this is not restored: it would show a long out-of-date picture. */

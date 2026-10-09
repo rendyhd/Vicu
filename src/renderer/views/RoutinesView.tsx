@@ -1,4 +1,8 @@
-import { useMemo, useState } from 'react'
+import { Checkbox } from '@/components/shared/Checkbox'
+import { useId, useMemo, useState } from 'react'
+import { formatDateChip, formatMinutesOfDay } from '@/lib/date-utils'
+import { useDateFormat } from '@/hooks/use-date-format'
+import { ListSectionHeader } from '@/components/task-list/ListSectionHeader'
 import {
   Archive,
   Bell,
@@ -15,6 +19,12 @@ import {
   X,
 } from 'lucide-react'
 import { RoutineTodaySection } from '@/components/routines/RoutineTodaySection'
+import { SmartListIcon } from '@/components/shared/SmartListIcon'
+import { PageHeader } from '@/components/shared/PageHeader'
+import { ReadingScroll } from '@/components/layout/ReadingScroll'
+import { Button } from '@/components/shared/Button'
+import { Dialog } from '@/components/overlay/Dialog'
+import { EmptyState } from '@/components/shared/EmptyState'
 import { useRoutineHistory, useRoutines, type RoutineDraft } from '@/hooks/use-routines'
 import {
   csvForRoutines,
@@ -28,12 +38,15 @@ import {
   type RoutinePeriod,
   type RoutineSlot,
 } from '@/lib/routines'
-import type { Task } from '@/lib/vikunja-types'
+import { isRoutinesEnabled, type Task } from '@/lib/vikunja-types'
+import { useAppConfig } from '@/hooks/use-app-config'
 import { cn } from '@/lib/cn'
 
-const FIELD = 'h-9 w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 text-sm text-[var(--text-primary)] outline-none transition focus:border-accent-blue'
-const LABEL = 'mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-[var(--text-secondary)]'
-const COLORS = ['#AF52DE', '#007AFF', '#34C759', '#FF9500', '#FF3B30', '#5AC8FA']
+const FIELD = 'h-9 w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 text-sm text-[var(--text-primary)] transition'
+const LABEL = 'mb-1.5 block text-caption uppercase tracking-wide text-[var(--text-secondary)]'
+// Stored data, not theme colours: a routine saves the hex it was given (definition.color), so these
+// values are fixed here and must not follow the palette roles or the theme.
+const STORED_ROUTINE_COLORS = ['#AF52DE', '#007AFF', '#34C759', '#FF9500', '#FF3B30', '#5AC8FA']
 const WEEKDAYS = [
   { id: 1, label: 'M' }, { id: 2, label: 'T' }, { id: 3, label: 'W' },
   { id: 4, label: 'T' }, { id: 5, label: 'F' }, { id: 6, label: 'S' }, { id: 7, label: 'S' },
@@ -60,7 +73,7 @@ function emptyDraft(kind: RoutineKind = 'HEALTH'): RoutineDraft {
     amount: '',
     unit: '',
     iconName: kind === 'HEALTH' ? 'pill' : 'home',
-    color: kind === 'HEALTH' ? COLORS[0] : COLORS[2],
+    color: kind === 'HEALTH' ? STORED_ROUTINE_COLORS[0] : STORED_ROUTINE_COLORS[2],
     schedule: { type: 'calendar', weekdays: kind === 'HEALTH' ? [] : [isoWeekday(today)], weekInterval: 1, anchorDate: today },
     slots: [defaultSlot(kind)],
   }
@@ -81,22 +94,21 @@ function draftFor(carrier: RoutineCarrier<Task>): RoutineDraft {
   }
 }
 
+/** A routine dialog on the Dialog primitive: modal, Escape and the backdrop close it, focus returns to the opener. */
 function DialogFrame({ title, children, onClose }: { title: string; children: React.ReactNode; onClose: () => void }) {
+  const titleId = useId()
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-6" onMouseDown={onClose}>
-      <div
-        className="flex max-h-[88vh] w-full max-w-xl flex-col overflow-hidden rounded-xl border border-[var(--border-color)] bg-[var(--bg-primary)] shadow-2xl"
-        onMouseDown={(event) => event.stopPropagation()}
-      >
+    <Dialog open onClose={onClose} labelledBy={titleId} className="w-[calc(100%-3rem)] max-w-xl">
+      <div className="flex max-h-[88vh] flex-col overflow-hidden">
         <header className="flex h-14 shrink-0 items-center border-b border-[var(--border-color)] px-5">
-          <h2 className="flex-1 text-base font-semibold text-[var(--text-primary)]">{title}</h2>
-          <button type="button" onClick={onClose} className="rounded-md p-1.5 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]">
+          <h2 id={titleId} className="flex-1 text-base font-semibold text-[var(--text-primary)]">{title}</h2>
+          <button type="button" onClick={onClose} aria-label="Close" className="rounded-control p-1.5 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]">
             <X className="h-4 w-4" />
           </button>
         </header>
         {children}
       </div>
-    </div>
+    </Dialog>
   )
 }
 
@@ -128,13 +140,13 @@ function RoutineEditor({
     <DialogFrame title={carrier ? 'Edit routine' : 'New routine'} onClose={onClose}>
       <form className="overflow-y-auto" onSubmit={(event) => { event.preventDefault(); onSave(draft) }}>
         <div className="space-y-5 p-5">
-          <div className="grid grid-cols-2 gap-2 rounded-lg bg-[var(--bg-secondary)] p-1">
+          <div className="grid grid-cols-2 gap-2 rounded-card bg-[var(--bg-secondary)] p-1">
             {(['HEALTH', 'CHORE'] as RoutineKind[]).map((kind) => (
               <button
                 key={kind}
                 type="button"
                 onClick={() => setKind(kind)}
-                className={cn('flex h-9 items-center justify-center gap-2 rounded-md text-sm font-medium transition', draft.kind === kind ? 'bg-[var(--bg-primary)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-secondary)]')}
+                className={cn('flex h-9 items-center justify-center gap-2 rounded-control text-sm font-medium transition', draft.kind === kind ? 'bg-[var(--bg-primary)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-secondary)]')}
               >
                 {kind === 'HEALTH' ? <Pill className="h-4 w-4" /> : <Home className="h-4 w-4" />}
                 {kind === 'HEALTH' ? 'Health' : 'Chore'}
@@ -144,7 +156,7 @@ function RoutineEditor({
 
           <div>
             <label className={LABEL}>Name</label>
-            <input autoFocus className={FIELD} value={draft.name} placeholder={draft.kind === 'HEALTH' ? 'Creatine' : 'Take out the trash'} onChange={(event) => setDraft({ ...draft, name: event.target.value })} />
+            <input data-autofocus className={FIELD} value={draft.name} placeholder={draft.kind === 'HEALTH' ? 'Creatine' : 'Take out the trash'} onChange={(event) => setDraft({ ...draft, name: event.target.value })} />
           </div>
 
           {draft.kind === 'HEALTH' && (
@@ -170,8 +182,8 @@ function RoutineEditor({
           <div>
             <label className={LABEL}>Color</label>
             <div className="flex gap-2">
-              {COLORS.map((color) => (
-                <button key={color} type="button" onClick={() => setDraft({ ...draft, color })} className={cn('h-7 w-7 rounded-full transition-transform hover:scale-110', draft.color === color && 'ring-2 ring-offset-2 ring-offset-[var(--bg-primary)]')} style={{ backgroundColor: color, color }} aria-label={`Use ${color}`} />
+              {STORED_ROUTINE_COLORS.map((color) => (
+                <button key={color} type="button" onClick={() => setDraft({ ...draft, color })} className={cn('h-7 w-7 rounded-full transition-transform hover:scale-110 motion-reduce:hover:scale-100', draft.color === color && 'ring-2 ring-offset-2 ring-offset-[var(--bg-primary)]')} style={{ backgroundColor: color, color }} aria-label={`Use ${color}`} />
               ))}
             </div>
           </div>
@@ -180,24 +192,24 @@ function RoutineEditor({
             <label className={LABEL}>Schedule</label>
             {draft.kind === 'CHORE' && (
               <div className="mb-3 flex gap-2">
-                <button type="button" onClick={() => setDraft({ ...draft, schedule: { type: 'calendar', weekdays: [isoWeekday(localDateString())], weekInterval: 1, anchorDate: localDateString() } })} className={cn('rounded-md border px-3 py-1.5 text-xs font-medium', calendar ? 'border-accent-blue bg-accent-blue/10 text-accent-blue' : 'border-[var(--border-color)] text-[var(--text-secondary)]')}>On a schedule</button>
-                <button type="button" onClick={() => setDraft({ ...draft, schedule: { type: 'after_completion', intervalDays: 14, firstDueDate: localDateString() } })} className={cn('rounded-md border px-3 py-1.5 text-xs font-medium', !calendar ? 'border-accent-blue bg-accent-blue/10 text-accent-blue' : 'border-[var(--border-color)] text-[var(--text-secondary)]')}>After completion</button>
+                <button type="button" onClick={() => setDraft({ ...draft, schedule: { type: 'calendar', weekdays: [isoWeekday(localDateString())], weekInterval: 1, anchorDate: localDateString() } })} className={cn('rounded-control border px-3 py-1.5 text-xs font-medium', calendar ? 'border-accent-blue bg-accent-blue/10 text-accent-blue' : 'border-[var(--border-color)] text-[var(--text-secondary)]')}>On a schedule</button>
+                <button type="button" onClick={() => setDraft({ ...draft, schedule: { type: 'after_completion', intervalDays: 14, firstDueDate: localDateString() } })} className={cn('rounded-control border px-3 py-1.5 text-xs font-medium', !calendar ? 'border-accent-blue bg-accent-blue/10 text-accent-blue' : 'border-[var(--border-color)] text-[var(--text-secondary)]')}>After completion</button>
               </div>
             )}
             {calendar ? (
-              <div className="space-y-3 rounded-lg border border-[var(--border-color)] p-3">
+              <div className="space-y-3 rounded-card border border-[var(--border-color)] p-3">
                 <div className="flex gap-1.5">
                   {WEEKDAYS.map((day) => {
                     const selected = calendar.weekdays.includes(day.id)
                     return (
-                      <button key={day.id} type="button" onClick={() => setDraft({ ...draft, schedule: { ...calendar, weekdays: selected ? calendar.weekdays.filter((id) => id !== day.id) : [...calendar.weekdays, day.id].sort() } })} className={cn('h-8 w-8 rounded-full text-xs font-semibold', selected ? 'bg-accent-blue text-white' : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)]')}>{day.label}</button>
+                      <button key={day.id} type="button" onClick={() => setDraft({ ...draft, schedule: { ...calendar, weekdays: selected ? calendar.weekdays.filter((id) => id !== day.id) : [...calendar.weekdays, day.id].sort() } })} className={cn('h-8 w-8 rounded-full text-xs font-semibold', selected ? 'bg-accent-fill text-on-accent' : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)]')}>{day.label}</button>
                     )
                   })}
-                  <button type="button" onClick={() => setDraft({ ...draft, schedule: { ...calendar, weekdays: [] } })} className={cn('ml-1 rounded-md px-2 text-xs', calendar.weekdays.length === 0 ? 'bg-accent-blue/10 text-accent-blue' : 'text-[var(--text-secondary)]')}>Daily</button>
+                  <button type="button" onClick={() => setDraft({ ...draft, schedule: { ...calendar, weekdays: [] } })} className={cn('ml-1 rounded-control px-2 text-xs', calendar.weekdays.length === 0 ? 'bg-accent-blue/10 text-accent-blue' : 'text-[var(--text-secondary)]')}>Daily</button>
                 </div>
                 <label className="flex items-center gap-2 text-xs text-[var(--text-secondary)]">
                   Repeat
-                  <select className="h-8 rounded-md border border-[var(--border-color)] bg-[var(--bg-primary)] px-2 text-[var(--text-primary)]" value={calendar.weekInterval} onChange={(event) => setDraft({ ...draft, schedule: { ...calendar, weekInterval: Number(event.target.value) } })}>
+                  <select className="h-8 rounded-control border border-[var(--border-color)] bg-[var(--bg-primary)] px-2 text-[var(--text-primary)]" value={calendar.weekInterval} onChange={(event) => setDraft({ ...draft, schedule: { ...calendar, weekInterval: Number(event.target.value) } })}>
                     <option value={1}>every week</option>
                     <option value={2}>every 2 weeks</option>
                     <option value={3}>every 3 weeks</option>
@@ -206,9 +218,9 @@ function RoutineEditor({
                 </label>
               </div>
             ) : (
-              <div className="flex items-center gap-2 rounded-lg border border-[var(--border-color)] p-3 text-xs text-[var(--text-secondary)]">
+              <div className="flex items-center gap-2 rounded-card border border-[var(--border-color)] p-3 text-xs text-[var(--text-secondary)]">
                 Show again
-                <input type="number" min={1} max={365} className="h-8 w-20 rounded-md border border-[var(--border-color)] bg-[var(--bg-primary)] px-2 text-[var(--text-primary)]" value={afterCompletion?.intervalDays ?? 14} onChange={(event) => afterCompletion && setDraft({ ...draft, schedule: { ...afterCompletion, intervalDays: Math.max(1, Number(event.target.value)) } })} />
+                <input type="number" min={1} max={365} className="h-8 w-20 rounded-control border border-[var(--border-color)] bg-[var(--bg-primary)] px-2 text-[var(--text-primary)]" value={afterCompletion?.intervalDays ?? 14} onChange={(event) => afterCompletion && setDraft({ ...draft, schedule: { ...afterCompletion, intervalDays: Math.max(1, Number(event.target.value)) } })} />
                 days after I complete it
               </div>
             )}
@@ -216,20 +228,20 @@ function RoutineEditor({
 
           <div>
             <div className="mb-2 flex items-center">
-              <label className="flex-1 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-secondary)]">Times & reminders</label>
+              <label className="flex-1 text-caption uppercase tracking-wide text-[var(--text-secondary)]">Times & reminders</label>
               {draft.kind === 'HEALTH' && <button type="button" onClick={() => setDraft({ ...draft, slots: [...draft.slots, defaultSlot('HEALTH', draft.slots.length)] })} className="flex items-center gap-1 text-xs font-medium text-accent-blue"><Plus className="h-3.5 w-3.5" /> Add time</button>}
             </div>
             <div className="space-y-2">
               {draft.slots.map((slot) => (
-                <div key={slot.id} className="rounded-lg border border-[var(--border-color)] p-3">
+                <div key={slot.id} className="rounded-card border border-[var(--border-color)] p-3">
                   <div className="flex items-center gap-2">
-                    <input className="h-8 min-w-0 flex-1 rounded-md border border-[var(--border-color)] bg-[var(--bg-primary)] px-2 text-xs text-[var(--text-primary)]" value={slot.label} onChange={(event) => updateSlot(slot.id, { label: event.target.value })} />
-                    <input type="time" className="h-8 rounded-md border border-[var(--border-color)] bg-[var(--bg-primary)] px-2 text-xs text-[var(--text-primary)]" value={timeLabel(slot.reminderMinutes)} onChange={(event) => { const [hours, minutes] = event.target.value.split(':').map(Number); updateSlot(slot.id, { reminderMinutes: hours * 60 + minutes }) }} />
-                    {draft.slots.length > 1 && <button type="button" onClick={() => setDraft({ ...draft, slots: draft.slots.filter((item) => item.id !== slot.id) })} className="p-1 text-[var(--text-secondary)] hover:text-accent-red"><X className="h-4 w-4" /></button>}
+                    <input className="h-8 min-w-0 flex-1 rounded-control border border-[var(--border-color)] bg-[var(--bg-primary)] px-2 text-xs text-[var(--text-primary)]" value={slot.label} onChange={(event) => updateSlot(slot.id, { label: event.target.value })} />
+                    <input type="time" className="h-8 rounded-control border border-[var(--border-color)] bg-[var(--bg-primary)] px-2 text-xs text-[var(--text-primary)]" value={timeLabel(slot.reminderMinutes)} onChange={(event) => { const [hours, minutes] = event.target.value.split(':').map(Number); updateSlot(slot.id, { reminderMinutes: hours * 60 + minutes }) }} />
+                    {draft.slots.length > 1 && <button type="button" onClick={() => setDraft({ ...draft, slots: draft.slots.filter((item) => item.id !== slot.id) })} className="p-1 text-[var(--text-secondary)] hover:text-danger"><X className="h-4 w-4" /></button>}
                   </div>
                   <div className="mt-2 flex items-center gap-4">
-                    <label className="flex items-center gap-2 text-xs text-[var(--text-secondary)]"><input type="checkbox" checked={slot.reminderEnabled} onChange={(event) => updateSlot(slot.id, { reminderEnabled: event.target.checked })} /><Bell className="h-3.5 w-3.5" /> Remind me</label>
-                    {slot.reminderEnabled && <label className="flex items-center gap-2 text-xs text-[var(--text-secondary)]">Follow up<select className="h-7 rounded border border-[var(--border-color)] bg-[var(--bg-primary)] px-1 text-[var(--text-primary)]" value={slot.followUpMinutes} onChange={(event) => updateSlot(slot.id, { followUpMinutes: Number(event.target.value) })}><option value={0}>Off</option><option value={15}>15 min</option><option value={30}>30 min</option><option value={60}>1 hour</option></select></label>}
+                    <label className="flex items-center gap-2 text-xs text-[var(--text-secondary)]"><Checkbox checked={slot.reminderEnabled} onChange={(event) => updateSlot(slot.id, { reminderEnabled: event.target.checked })} /><Bell className="h-3.5 w-3.5" /> Remind me</label>
+                    {slot.reminderEnabled && <label className="flex items-center gap-2 text-xs text-[var(--text-secondary)]">Follow up<select className="h-7 rounded-control border border-[var(--border-color)] bg-[var(--bg-primary)] px-1 text-[var(--text-primary)]" value={slot.followUpMinutes} onChange={(event) => updateSlot(slot.id, { followUpMinutes: Number(event.target.value) })}><option value={0}>Off</option><option value={15}>15 min</option><option value={30}>30 min</option><option value={60}>1 hour</option></select></label>}
                   </div>
                 </div>
               ))}
@@ -238,8 +250,8 @@ function RoutineEditor({
         </div>
 
         <footer className="sticky bottom-0 flex justify-end gap-2 border-t border-[var(--border-color)] bg-[var(--bg-primary)] p-4">
-          <button type="button" onClick={onClose} className="rounded-md border border-[var(--border-color)] px-4 py-2 text-sm font-medium text-[var(--text-primary)] hover:bg-[var(--bg-hover)]">Cancel</button>
-          <button type="submit" disabled={busy || !draft.name.trim() || draft.slots.length === 0} className="rounded-md bg-accent-blue px-4 py-2 text-sm font-medium text-white disabled:opacity-50">{busy ? 'Saving...' : carrier ? 'Save changes' : 'Create routine'}</button>
+          <button type="button" onClick={onClose} className="rounded-control border border-[var(--border-color)] px-4 py-2 text-sm font-medium text-[var(--text-primary)] hover:bg-[var(--bg-hover)]">Cancel</button>
+          <button type="submit" disabled={busy || !draft.name.trim() || draft.slots.length === 0} className="rounded-control bg-accent-fill px-4 py-2 text-sm font-medium text-on-accent disabled:opacity-50">{busy ? 'Saving...' : carrier ? 'Save changes' : 'Create routine'}</button>
         </footer>
       </form>
     </DialogFrame>
@@ -247,6 +259,7 @@ function RoutineEditor({
 }
 
 function HistoryDialog({ carrier, onClose }: { carrier: RoutineCarrier<Task>; onClose: () => void }) {
+  const dateFormat = useDateFormat()
   const { records, loadingArchive, archiveError } = useRoutineHistory(carrier)
   const logged = records.filter((record) => record.status !== 'PENDING')
   const completed = logged.filter((record) => record.status === 'COMPLETED').length
@@ -255,21 +268,21 @@ function HistoryDialog({ carrier, onClose }: { carrier: RoutineCarrier<Task>; on
     <DialogFrame title={carrier.payload.definition.name} onClose={onClose}>
       <div className="overflow-y-auto p-5">
         <div className="mb-5 grid grid-cols-2 gap-3">
-          <div className="rounded-lg bg-[var(--bg-secondary)] p-4"><div className="text-2xl font-semibold text-[var(--text-primary)]">{adherence}%</div><div className="text-xs text-[var(--text-secondary)]">Logged adherence</div></div>
-          <div className="rounded-lg bg-[var(--bg-secondary)] p-4"><div className="text-2xl font-semibold text-[var(--text-primary)]">{completed}</div><div className="text-xs text-[var(--text-secondary)]">Completions</div></div>
+          <div className="rounded-card bg-[var(--bg-secondary)] p-4"><div className="text-2xl font-semibold text-[var(--text-primary)]">{adherence}%</div><div className="text-xs text-[var(--text-secondary)]">Logged adherence</div></div>
+          <div className="rounded-card bg-[var(--bg-secondary)] p-4"><div className="text-2xl font-semibold text-[var(--text-primary)]">{completed}</div><div className="text-xs text-[var(--text-secondary)]">Completions</div></div>
         </div>
-        <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-secondary)]">History</h3>
+        <h3 className="mb-2 text-caption uppercase tracking-wide text-[var(--text-secondary)]">History</h3>
         {loadingArchive && <p className="mb-2 text-xs text-[var(--text-secondary)]">Loading earlier history...</p>}
-        {archiveError && <p className="mb-2 text-xs text-accent-red">Could not load earlier history: {archiveError}</p>}
+        {archiveError && <p className="mb-2 text-xs text-danger">Could not load earlier history: {archiveError}</p>}
         {records.length === 0 ? <p className="py-8 text-center text-sm text-[var(--text-secondary)]">No check-ins yet.</p> : (
           <div className="divide-y divide-[var(--border-color)]">
             {records.slice(0, 100).map((record) => (
               <div key={record.key} className="flex items-center gap-3 py-2.5">
-                <div className={cn('flex h-6 w-6 items-center justify-center rounded-full', record.status === 'COMPLETED' ? 'bg-accent-green/15 text-accent-green' : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)]')}>
+                <div className={cn('flex h-6 w-6 items-center justify-center rounded-full', record.status === 'COMPLETED' ? 'bg-status-done/15 text-status-done' : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)]')}>
                   {record.status === 'COMPLETED' ? <Check className="h-3.5 w-3.5" /> : <X className="h-3.5 w-3.5" />}
                 </div>
-                <div className="min-w-0 flex-1"><div className="text-sm text-[var(--text-primary)]">{new Date(`${record.scheduledDate}T12:00:00`).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}</div><div className="text-[11px] text-[var(--text-secondary)]">{timeLabel(record.scheduledMinutes)}</div></div>
-                <span className="text-[11px] font-medium capitalize text-[var(--text-secondary)]">{record.status.toLowerCase().replace('_', ' ')}</span>
+                <div className="min-w-0 flex-1"><div className="text-sm text-[var(--text-primary)]">{formatDateChip(new Date(`${record.scheduledDate}T12:00:00`), true, new Date(), dateFormat)}</div><div className="text-meta text-[var(--text-secondary)]">{formatMinutesOfDay(record.scheduledMinutes, dateFormat)}</div></div>
+                <span className="text-meta capitalize text-[var(--text-secondary)]">{record.status.toLowerCase().replace('_', ' ')}</span>
               </div>
             ))}
           </div>
@@ -280,6 +293,21 @@ function HistoryDialog({ carrier, onClose }: { carrier: RoutineCarrier<Task>; on
 }
 
 export function RoutinesView() {
+  const { data: config } = useAppConfig()
+  // The sidebar hides Routines when they are off; a route kept from before (history, a link) lands here.
+  if (config && !isRoutinesEnabled(config)) {
+    return (
+      <div className="flex h-full flex-1 flex-col items-center justify-center gap-2 bg-[var(--bg-primary)] px-6 text-center">
+        <HeartPulse className="h-8 w-8 text-[var(--text-tertiary)]" />
+        <p className="text-sm font-medium text-[var(--text-primary)]">Routines are turned off</p>
+        <p className="text-xs text-[var(--text-secondary)]">Turn them on in Settings to track health and home routines.</p>
+      </div>
+    )
+  }
+  return <RoutinesContent />
+}
+
+function RoutinesContent() {
   const routines = useRoutines()
   const [editor, setEditor] = useState<RoutineCarrier<Task> | 'new' | null>(null)
   const [history, setHistory] = useState<RoutineCarrier<Task> | null>(null)
@@ -307,34 +335,46 @@ export function RoutinesView() {
 
   return (
     <div className="flex h-full min-w-0 flex-1 flex-col bg-[var(--bg-primary)]">
-      <header className="flex h-16 shrink-0 items-center gap-3 border-b border-[var(--border-color)] px-6">
-        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-accent-purple/15 text-accent-purple"><HeartPulse className="h-5 w-5" /></div>
-        <div className="min-w-0 flex-1"><h1 className="text-xl font-semibold text-[var(--text-primary)]">Routines</h1><p className="text-xs text-[var(--text-secondary)]">Daily health and recurring home rhythms</p></div>
-        <button type="button" onClick={exportCsv} disabled={routines.carriers.length === 0} className="flex h-9 items-center gap-2 rounded-md border border-[var(--border-color)] px-3 text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--bg-hover)] disabled:opacity-40"><Download className="h-4 w-4" /> Export</button>
-        <button type="button" onClick={() => setEditor('new')} className="flex h-9 items-center gap-2 rounded-md bg-accent-blue px-3 text-xs font-semibold text-white"><Plus className="h-4 w-4" /> New routine</button>
-      </header>
+      <PageHeader
+        title="Routines"
+        subtitle="Daily health and recurring home rhythms"
+        icon={<SmartListIcon list="routines" className="h-5 w-5" />}
+        actions={
+          <>
+            <Button variant="secondary" onClick={exportCsv} disabled={routines.carriers.length === 0}><Download className="h-4 w-4" /> Export</Button>
+            <Button variant="primary" onClick={() => setEditor('new')}><Plus className="h-4 w-4" /> New routine</Button>
+          </>
+        }
+      />
 
-      <div className="min-h-0 flex-1 overflow-y-auto pb-10">
-        <div className="mx-auto max-w-3xl">
+      <ReadingScroll columnClassName="pb-10">
+        <div>
           <RoutineTodaySection showEmpty />
 
           <section className="px-6 pt-6">
-            <div className="mb-3 flex items-center"><h2 className="flex-1 text-[11px] font-semibold uppercase tracking-wider text-[var(--text-secondary)]">Your routines</h2><span className="text-xs text-[var(--text-secondary)]">{active.length} active</span></div>
-            {routines.isLoading && <div className="rounded-xl border border-[var(--border-color)] p-8 text-center text-sm text-[var(--text-secondary)]">Loading routines...</div>}
+            <ListSectionHeader level={1} title="Your routines" count={active.length} sticky={false} className="mb-3 px-0" />
+            {routines.isLoading && <div className="rounded-card border border-[var(--border-color)] p-8 text-center text-sm text-[var(--text-secondary)]">Loading routines...</div>}
             {!routines.isLoading && active.length === 0 && (
-              <button type="button" onClick={() => setEditor('new')} className="flex w-full flex-col items-center rounded-xl border border-dashed border-[var(--border-color)] px-6 py-10 text-center hover:bg-[var(--bg-hover)]"><div className="mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-accent-purple/15 text-accent-purple"><Plus className="h-5 w-5" /></div><span className="text-sm font-semibold text-[var(--text-primary)]">Create your first routine</span><span className="mt-1 max-w-sm text-xs leading-5 text-[var(--text-secondary)]">Track supplements, medication, or chores without turning them into an endless pile of recurring tasks.</span></button>
+              <EmptyState
+                icon={Plus}
+                identity="routines"
+                title="Create your first routine"
+                subtitle="Track supplements, medication, or chores without turning them into an endless pile of recurring tasks."
+                className="py-10"
+                action={<Button variant="secondary" onClick={() => setEditor('new')}><Plus className="h-4 w-4" /> Create routine</Button>}
+              />
             )}
             <div className="space-y-2">
               {active.map((carrier) => {
                 const definition = carrier.payload.definition
                 const Icon = definition.kind === 'HEALTH' ? Pill : Home
                 return (
-                  <article key={definition.id} className="group flex items-center gap-3 rounded-xl border border-[var(--border-color)] bg-[var(--bg-primary)] p-3.5 transition hover:border-[var(--text-tertiary)] hover:shadow-sm">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-white" style={{ backgroundColor: definition.color || COLORS[0] }}><Icon className="h-5 w-5" /></div>
+                  <article key={definition.id} className="group flex items-center gap-3 rounded-card border border-[var(--border-color)] bg-[var(--bg-primary)] p-3.5 transition hover:border-[var(--text-tertiary)] hover:shadow-sm">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-card text-white" style={{ backgroundColor: definition.color || STORED_ROUTINE_COLORS[0] }}><Icon className="h-5 w-5" /></div>
                     <button type="button" onClick={() => setHistory(carrier)} className="min-w-0 flex-1 text-left"><div className="truncate text-sm font-semibold text-[var(--text-primary)]">{definition.name}</div><div className="mt-0.5 truncate text-xs text-[var(--text-secondary)]">{[definition.amount, definition.unit, scheduleSummary(definition)].filter(Boolean).join(' / ')}</div></button>
-                    <button type="button" title="History" onClick={() => setHistory(carrier)} className="rounded-md p-2 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"><History className="h-4 w-4" /></button>
-                    <button type="button" title="Edit" onClick={() => setEditor(carrier)} className="rounded-md p-2 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"><ChevronRight className="h-4 w-4" /></button>
-                    <button type="button" title="Archive" onClick={() => routines.archiveRoutine.mutate({ carrier, archived: true })} className="rounded-md p-2 text-[var(--text-secondary)] opacity-0 hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] group-hover:opacity-100"><Archive className="h-4 w-4" /></button>
+                    <button type="button" title="History" onClick={() => setHistory(carrier)} className="rounded-control p-2 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"><History className="h-4 w-4" /></button>
+                    <button type="button" title="Edit" onClick={() => setEditor(carrier)} className="rounded-control p-2 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"><ChevronRight className="h-4 w-4" /></button>
+                    <button type="button" title="Archive" onClick={() => routines.archiveRoutine.mutate({ carrier, archived: true })} className="rounded-control p-2 text-[var(--text-secondary)] opacity-0 hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] group-hover:opacity-100"><Archive className="h-4 w-4" /></button>
                   </article>
                 )
               })}
@@ -343,16 +383,16 @@ export function RoutinesView() {
 
           {routines.archived.length > 0 && (
             <section className="px-6 pt-7">
-              <button type="button" onClick={() => setShowArchived(!showArchived)} className="mb-3 flex w-full items-center text-left text-[11px] font-semibold uppercase tracking-wider text-[var(--text-secondary)]"><span className="flex-1">Archived</span><span>{routines.archived.length}</span></button>
-              {showArchived && <div className="space-y-2">{routines.archived.map((carrier) => <div key={carrier.payload.definition.id} className="flex items-center gap-3 rounded-lg border border-[var(--border-color)] px-3 py-2.5"><Archive className="h-4 w-4 text-[var(--text-secondary)]" /><span className="flex-1 text-sm text-[var(--text-primary)]">{carrier.payload.definition.name}</span><button type="button" onClick={() => routines.archiveRoutine.mutate({ carrier, archived: false })} className="flex items-center gap-1 text-xs font-medium text-accent-blue"><Undo2 className="h-3.5 w-3.5" /> Restore</button><button type="button" onClick={() => { if (window.confirm(`Permanently delete "${carrier.payload.definition.name}" and its history?`)) routines.deleteRoutine.mutate(carrier) }} className="rounded-md p-1.5 text-[var(--text-secondary)] hover:bg-accent-red/10 hover:text-accent-red"><Trash2 className="h-4 w-4" /></button></div>)}</div>}
+              <button type="button" onClick={() => setShowArchived(!showArchived)} aria-expanded={showArchived} className="mb-3 flex h-8 w-full items-center gap-2 text-left text-section text-text"><span>Archived</span><span className="font-medium tabular-nums text-text-secondary">{routines.archived.length}</span></button>
+              {showArchived && <div className="space-y-2">{routines.archived.map((carrier) => <div key={carrier.payload.definition.id} className="flex items-center gap-3 rounded-card border border-[var(--border-color)] px-3 py-2.5"><Archive className="h-4 w-4 text-[var(--text-secondary)]" /><span className="flex-1 text-sm text-[var(--text-primary)]">{carrier.payload.definition.name}</span><button type="button" onClick={() => routines.archiveRoutine.mutate({ carrier, archived: false })} className="flex items-center gap-1 text-xs font-medium text-accent-blue"><Undo2 className="h-3.5 w-3.5" /> Restore</button><button type="button" onClick={() => { if (window.confirm(`Permanently delete "${carrier.payload.definition.name}" and its history?`)) routines.deleteRoutine.mutate(carrier) }} className="rounded-control p-1.5 text-[var(--text-secondary)] hover:bg-danger/10 hover:text-danger"><Trash2 className="h-4 w-4" /></button></div>)}</div>}
             </section>
           )}
 
-          {routines.archiveWarning && <div className="mx-6 mt-5 rounded-lg border border-accent-orange/30 bg-accent-orange/10 px-4 py-3 text-xs text-accent-orange">Older history could not be archived yet and stays in the routine for now: {routines.archiveWarning}</div>}
-          {exportError && <div className="mx-6 mt-5 rounded-lg border border-accent-red/30 bg-accent-red/10 px-4 py-3 text-xs text-accent-red">{exportError}</div>}
-          {routines.error && <div className="mx-6 mt-5 rounded-lg border border-accent-red/30 bg-accent-red/10 px-4 py-3 text-xs text-accent-red">{routines.error instanceof Error ? routines.error.message : 'Could not update routines'}</div>}
+          {routines.archiveWarning && <div className="mx-6 mt-5 rounded-card border border-status-today/30 bg-status-today/10 px-4 py-3 text-xs text-status-today">Older history could not be archived yet and stays in the routine for now: {routines.archiveWarning}</div>}
+          {exportError && <div className="mx-6 mt-5 rounded-card border border-danger/30 bg-danger/10 px-4 py-3 text-xs text-danger">{exportError}</div>}
+          {routines.error && <div className="mx-6 mt-5 rounded-card border border-danger/30 bg-danger/10 px-4 py-3 text-xs text-danger">{routines.error instanceof Error ? routines.error.message : 'Could not update routines'}</div>}
         </div>
-      </div>
+      </ReadingScroll>
 
       {editor && <RoutineEditor carrier={editor === 'new' ? undefined : editor} busy={routines.isMutating} onClose={() => setEditor(null)} onSave={(draft) => editor === 'new' ? routines.createRoutine.mutate(draft, { onSuccess: () => setEditor(null) }) : routines.updateRoutine.mutate({ carrier: editor, draft }, { onSuccess: () => setEditor(null) })} />}
       {history && <HistoryDialog carrier={history} onClose={() => setHistory(null)} />}

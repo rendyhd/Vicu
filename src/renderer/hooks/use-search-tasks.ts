@@ -1,44 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { api } from '@/lib/api'
-import type { Task } from '@/lib/vikunja-types'
 import { hasVicuMetadataMarker } from '@/lib/metadata-tasks'
-
-/**
- * Score how well a task matches a search query.
- * Higher score = better match. Returns 0 for no match.
- */
-function scoreTask(task: Task, terms: string[]): number {
-  const title = task.title.toLowerCase()
-  const desc = (task.description || '').toLowerCase()
-  let score = 0
-
-  for (const term of terms) {
-    const titleIdx = title.indexOf(term)
-    const descIdx = desc.indexOf(term)
-
-    if (titleIdx === -1 && descIdx === -1) return 0 // all terms must match somewhere
-
-    if (titleIdx !== -1) {
-      score += 100
-      // Bonus: match at start of title
-      if (titleIdx === 0) score += 50
-      // Bonus: match at word boundary
-      if (titleIdx === 0 || title[titleIdx - 1] === ' ') score += 25
-      // Bonus: exact full-word match
-      const endIdx = titleIdx + term.length
-      if ((titleIdx === 0 || title[titleIdx - 1] === ' ') &&
-          (endIdx === title.length || title[endIdx] === ' ')) {
-        score += 25
-      }
-    }
-
-    if (descIdx !== -1) {
-      score += 10
-    }
-  }
-
-  return score
-}
+import { rankTasks } from '@/lib/search-ranking'
 
 export function useSearchTasks(query: string) {
   return useQuery({
@@ -53,16 +16,7 @@ export function useSearchTasks(query: string) {
       if (!result.success) throw new Error(result.error)
 
       const visibleTasks = result.data.filter((task) => !hasVicuMetadataMarker(task.description))
-      const terms = query.toLowerCase().split(/\s+/).filter(Boolean)
-      if (terms.length === 0) return visibleTasks
-
-      // Score and rank results client-side
-      const scored = visibleTasks
-        .map((task) => ({ task, score: scoreTask(task, terms) }))
-        .filter((r) => r.score > 0)
-        .sort((a, b) => b.score - a.score)
-
-      return scored.map((r) => r.task)
+      return rankTasks(visibleTasks, query)
     },
     enabled: !!query && query.length > 0,
   })

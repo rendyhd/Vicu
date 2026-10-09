@@ -157,8 +157,19 @@ export interface AppConfig {
   inbox_project_id: number
   auth_method?: AuthMethod
   theme: 'light' | 'dark' | 'system'
+  /**
+   * The clock in dates and times: follow the system locale's hour cycle (the default), or force
+   * the 12-hour or 24-hour clock for an OS custom format the web engine cannot see. Missing
+   * means 'system'.
+   */
+  clock_format?: 'system' | '12h' | '24h'
   window_bounds?: { x: number; y: number; width: number; height: number }
   sidebar_width?: number
+  /**
+   * Ids of the sidebar projects (areas) the person collapsed. Everything else shows its child
+   * projects. Ids belong to one server, so this is dropped with the rest of the account's data.
+   */
+  sidebar_collapsed_projects?: number[]
   custom_lists?: CustomList[]
   /** Owned by the custom list service in the main process; the renderer never writes it. */
   custom_lists_sync?: {
@@ -234,6 +245,11 @@ export interface AppConfig {
   last_used_label_id?: number
   // Project review
   review?: ReviewConfig
+  // Routines
+  /** Routines feature (sidebar entry, Today section, reminders). Missing means on. */
+  routines_enabled?: boolean
+  /** Whether Today shows the routines still open today. Missing means on. */
+  routines_in_today?: boolean
 }
 
 // --- Defaults every reader shares -------------------------------------------------------------
@@ -249,4 +265,16 @@ export function isQuickEntryEnabled(config: Pick<AppConfig, 'quick_entry_enabled
 
 export function isQuickViewEnabled(config: Pick<AppConfig, 'quick_view_enabled'> | null | undefined): boolean {
   return config?.quick_view_enabled === true
+}
+
+/** Routines are on unless the user turned them off (configs from before the setting have none). */
+export function isRoutinesEnabled(config: Pick<AppConfig, 'routines_enabled'> | null | undefined): boolean {
+  return config?.routines_enabled !== false
+}
+
+/** Today lists open routines only while routines are on and the Today section is not turned off. */
+export function showRoutinesInToday(
+  config: Pick<AppConfig, 'routines_enabled' | 'routines_in_today'> | null | undefined,
+): boolean {
+  return isRoutinesEnabled(config) && config?.routines_in_today !== false
 }

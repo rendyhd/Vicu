@@ -9,6 +9,11 @@ export interface UseTaskParserReturn {
   parseResult: ParseResult | null
   parserConfig: ParserConfig
   suppressType: (type: TokenType) => void
+  /**
+   * The user set this field with its own control: the text is no longer read for it (until reset),
+   * so the control wins, its token loses the highlight and stays in the title.
+   */
+  pinType: (type: TokenType) => void
   reset: () => void
   enabled: boolean
   prefixes: SyntaxPrefixes
@@ -16,9 +21,9 @@ export interface UseTaskParserReturn {
 
 /**
  * Suppression entry: remembers the raw token texts at the time of dismissal
- * so we can lift the suppression when the user edits the token.
+ * so we can lift the suppression when the user edits the token. A pinned type (null) is never lifted.
  */
-type SuppressionMap = Map<TokenType, string[]>
+type SuppressionMap = Map<TokenType, string[] | null>
 
 export function useTaskParser(): UseTaskParserReturn {
   const parserConfig = useParserConfig()
@@ -55,7 +60,7 @@ export function useTaskParser(): UseTaskParserReturn {
       let changed = false
       const next: SuppressionMap = new Map()
       for (const [type, rawTexts] of prev) {
-        if (rawTexts.every((t) => value.includes(t))) {
+        if (rawTexts === null || rawTexts.every((t) => value.includes(t))) {
           next.set(type, rawTexts)
         } else {
           changed = true
@@ -97,6 +102,10 @@ export function useTaskParser(): UseTaskParserReturn {
     })
   }, [])
 
+  const pinType = useCallback((type: TokenType) => {
+    setSuppressions((prev) => (prev.get(type) === null ? prev : new Map(prev).set(type, null)))
+  }, [])
+
   const reset = useCallback(() => {
     setInputValueRaw('')
     inputValueRef.current = ''
@@ -111,6 +120,7 @@ export function useTaskParser(): UseTaskParserReturn {
     parseResult,
     parserConfig,
     suppressType,
+    pinType,
     reset,
     enabled: parserConfig.enabled,
     prefixes,

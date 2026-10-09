@@ -1,0 +1,4 @@
+# Test credentials, API token, seed ids and throwaway app profiles
+.local/
+# Captures and result lines of every run
+out/

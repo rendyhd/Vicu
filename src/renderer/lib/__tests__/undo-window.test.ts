@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
+  asksForOpenTasksOnly,
+  dropReleasedCompletions,
   evictForeignCompletions,
   mergeProjectUndoWindow,
   mergeSectionUndoWindow,
@@ -160,5 +162,46 @@ describe('mergeSmartListUndoWindow', () => {
   it('never shows an implementation-detail task', () => {
     const carrier = { ...task(5), description: '<!-- vicu-routine:v1:e30 -->' } as Task
     expect(mergeSmartListUndoWindow([], store([{ task: carrier, path: '/logbook' }]), '/logbook')).toEqual([])
+  })
+})
+
+describe('dropReleasedCompletions', () => {
+  it('keeps a done row while the hold has it on this path and drops it once the entry is gone', () => {
+    const tasks = [task(1, true), task(2, false)]
+    expect(dropReleasedCompletions(tasks, store([{ task: task(1, true), path: '/today' }]), '/today')).toBe(tasks)
+    expect(dropReleasedCompletions(tasks, new Map(), '/today')).toEqual([task(2, false)])
+  })
+
+  it('drops a done row held for another path', () => {
+    const tasks = [task(1, true)]
+    expect(dropReleasedCompletions(tasks, store([{ task: task(1, true), path: '/anytime' }]), '/today')).toEqual([])
+  })
+
+  it('keeps the subtasks a held parent completed along with it', () => {
+    const tasks = [task(5, true), task(6, true), task(7, false)]
+    const completed = store([{ task: task(5, true), path: '/tag/1', autoCompletedSubtasks: [task(6)] }])
+    expect(dropReleasedCompletions(tasks, completed, '/tag/1')).toBe(tasks)
+    expect(dropReleasedCompletions(tasks, new Map(), '/tag/1')).toEqual([task(7, false)])
+  })
+
+  it('never touches open rows and returns the same array when nothing is dropped', () => {
+    const tasks = [task(1, false), task(2, false)]
+    expect(dropReleasedCompletions(tasks, new Map(), '/today')).toBe(tasks)
+  })
+})
+
+describe('asksForOpenTasksOnly', () => {
+  it('is true for the open-only filters of the smart lists', () => {
+    expect(asksForOpenTasksOnly('done = false')).toBe(true)
+    expect(asksForOpenTasksOnly("done = false && due_date != '0001-01-01T00:00:00Z'")).toBe(true)
+    expect(asksForOpenTasksOnly('done = false && labels = 4')).toBe(true)
+    expect(asksForOpenTasksOnly('project_id = 3 && done=false')).toBe(true)
+  })
+
+  it('is false for the Logbook, other filters and no filter', () => {
+    expect(asksForOpenTasksOnly('done = true')).toBe(false)
+    expect(asksForOpenTasksOnly('project_id = 3')).toBe(false)
+    expect(asksForOpenTasksOnly('done = false || done = true')).toBe(false)
+    expect(asksForOpenTasksOnly(undefined)).toBe(false)
   })
 })

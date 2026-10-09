@@ -33,7 +33,7 @@ export function SubtaskList({ parentTask, showInput = false }: SubtaskListProps)
   }
 
   if (isLoading && subtasks.length === 0 && showInput) {
-    return <div className="py-1 text-2xs text-[var(--text-secondary)]">Loading subtasks...</div>
+    return <div className="py-1 text-caption text-[var(--text-secondary)]">Loading subtasks...</div>
   }
 
   if (subtasks.length === 0 && !showInput) return null
@@ -46,23 +46,31 @@ export function SubtaskList({ parentTask, showInput = false }: SubtaskListProps)
             <div key={st.id} className="flex items-center gap-2">
               <button
                 type="button"
+                role="checkbox"
+                aria-checked={st.done}
+                aria-label={`Complete ${st.title}`}
                 onClick={async () => {
                   if (!st.done && await confirmTaskCompletion(st)) {
                     completeTask.mutate({ task: st, suppressTopLevelUndo: true })
                   }
                 }}
-                className={cn(
-                  'flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded border transition-colors',
-                  st.done
-                    ? 'border-[var(--text-secondary)] bg-[var(--text-secondary)]'
-                    : 'border-[var(--border-color)] hover:border-[var(--accent-blue)]'
-                )}
+                // A 24 px target around the 14 px box.
+                className="group/sub flex h-6 w-6 shrink-0 items-center justify-center"
               >
-                {st.done && (
-                  <svg className="h-2 w-2 text-white" viewBox="0 0 12 12" fill="none">
-                    <path d="M2.5 6L5 8.5L9.5 3.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                )}
+                <span
+                  className={cn(
+                    'flex h-3.5 w-3.5 items-center justify-center rounded-control border transition-colors',
+                    st.done
+                      ? 'border-accent-fill bg-accent-fill'
+                      : 'border-control-ring group-hover/sub:border-accent-fill'
+                  )}
+                >
+                  {st.done && (
+                    <svg className="h-2 w-2 text-on-accent" viewBox="0 0 12 12" fill="none">
+                      <path d="M2.5 6L5 8.5L9.5 3.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  )}
+                </span>
               </button>
               <span
                 className={cn(
@@ -77,14 +85,14 @@ export function SubtaskList({ parentTask, showInput = false }: SubtaskListProps)
         </div>
       )}
       {completeTask.isError && (
-        <div role="alert" className="mb-1 text-2xs text-red-500">
+        <div role="alert" className="mb-1 text-caption text-danger">
           Could not complete subtask: {completeTask.error.message}
         </div>
       )}
 
       {showInput && (
         <div className="flex items-center gap-2">
-          <div className="h-3.5 w-3.5 shrink-0 rounded border border-dashed border-[var(--border-color)]" />
+          <div className="h-3.5 w-3.5 shrink-0 rounded-control border border-dashed border-[var(--border-color)]" />
           <input
             ref={inputRef}
             type="text"

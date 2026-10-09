@@ -9,6 +9,6 @@ export default defineConfig({
   },
   test: {
     globals: false,
-    exclude: [...configDefaults.exclude, '**/out/**'],
+    exclude: [...configDefaults.exclude, '**/out/**', '**/.claude/**'],
   },
 })

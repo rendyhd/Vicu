@@ -1,0 +1,160 @@
+# UI verification harness (desktop)
+
+Drives the built Vicu with `playwright-core` against a throwaway local Vikunja, with real mouse and
+keyboard input, and leaves captures plus one JSON line per assertion in `out/<run>/`. It is a
+developer tool: `electron-builder.yml` does not package `scripts/`, and `npm run verify` does not
+run it.
+
+Everything under `.local/` (test credentials, the API token, seed ids, app profiles) and `out/` is
+git-ignored. No script prints a credential or the token.
+
+## 1. The test server
+
+Git Bash (the `MSYS_NO_PATHCONV` line stops Git Bash from rewriting `/tmp/...` into a Windows path):
+
+```bash
+export MSYS_NO_PATHCONV=1
+SECRET=$(node -e "console.log(require('crypto').randomBytes(24).toString('hex'))")
+docker run -d --name vicu-test-vikunja -p 127.0.0.1:3456:3456 \
+  -e VIKUNJA_SERVICE_PUBLICURL=http://localhost:3456/ \
+  -e VIKUNJA_SERVICE_SECRET=$SECRET \
+  -e VIKUNJA_FILES_BASEPATH=/tmp/files \
+  -e VIKUNJA_DATABASE_PATH=/tmp/vikunja.db \
+  -e VIKUNJA_SERVICE_ENABLEREGISTRATION=false \
+  vikunja/vikunja:2.4.0
+```
+
+- The API is `http://127.0.0.1:3456/api/v2`. The container keeps its data until it is removed, so
+  later sessions only need `docker start vicu-test-vikunja`.
+- A completely fresh server: `docker rm -f vicu-test-vikunja`, then the `docker run` above.
+- Users are made with `docker exec vicu-test-vikunja /app/vikunja/vikunja user create ...`;
+  `seed.mjs` does this for its own test user, you do not have to.
+- Other port or container: set `VICU_TEST_SERVER` (default `http://127.0.0.1:3456`) and
+  `VICU_TEST_CONTAINER` (default `vicu-test-vikunja`). `VICU_UI_LOCAL` moves `.local/` elsewhere.
+
+## 2. Seed and profiles
+
+```bash
+node scripts/ui-verify/seed.mjs       # test user, API token and the dataset
+node scripts/ui-verify/profile.mjs    # .local/profile-light and .local/profile-dark
+```
+
+`seed.mjs` is idempotent and can refresh the data at any time (the dates are relative to today, so
+run it again when the day changes). It makes sure the test user exists (a new password is made up
+and stored in `.local/credentials.json` on the first run; if the user exists but the file is lost,
+the password is reset through the container), deletes that user's projects, labels and tasks (the
+default Inbox project stays, emptied), then creates:
+
+- Areas Work and Personal with child projects (Website redesign, Q4 planning, Home renovation,
+  Trip to Lisbon), the Inbox, and labels, all in Vikunja's preset colours.
+- Overdue, today, timed (14:00 with a reminder), upcoming (tomorrow to six weeks out), undated,
+  repeating, checklist (task list in the description), subtasks, priorities 1 to 5, a very long
+  title, and finished tasks for the Logbook (the server stamps them with the time of the run).
+- Review footers on the projects: reviewed recently, overdue, never, excluded, and a 30-day cadence.
+- Routines are not seeded (the Routines view shows its empty state).
+
+`profile.mjs` rebuilds the throwaway `VICU_USER_DATA_DIR` folders from scratch: the API token,
+the Inbox id, Vikunja syntax for the quick-add parser, Quick Entry and Quick View switched on with
+unusual hotkeys (so a run never takes the hotkeys of a Vicu you use), no sounds or notifications.
+To look at a profile by hand:
+
+```bash
+VICU_USER_DATA_DIR=scripts/ui-verify/.local/profile-light npx electron .
+```
+
+## 3. Build and run
+
+```bash
+npm run build
+npm run ui:verify -- --scenario baseline --theme light
+npm run ui:verify -- --scenario baseline --theme dark
+```
+
+| Option | Meaning |
+|---|---|
+| `--theme light\|dark` | Profile theme (default light). |
+| `--size WxH` | Content size of the main window (default 1280x820). |
+| `--motion full\|reduce` | `full` (default) forces `prefers-reduced-motion: no-preference`, because this PC has Windows animation effects off and reports `reduce`; `reduce` emulates it. |
+| `--forced-colors` | Emulate `forced-colors: active`. |
+| `--scenario a,b` | Scenarios by file name or id: `baseline`, `e4`, `e04-schedule-popover`. |
+| `--wave N` | Every E scenario whose first wave (in the plan, section 5) is N or earlier. |
+| `--reseed` | Run `seed.mjs` before the run, so it starts from the known dataset. |
+| `--no-reseed` | With `--wave`: skip the reseed that wave runs do by default. |
+| `--run NAME` | Folder name under `out/` (default: time stamp, scenarios, theme). |
+| `--build` | Run `npm run build` first. |
+| `--list` | List the scenarios with their ids and waves. |
+
+With neither `--scenario` nor `--wave`, `baseline` runs. Scenarios mutate the shared test server
+(they complete, move, reschedule and delete tasks), so a `--wave N` run re-seeds first by default
+(`--no-reseed` skips it) and any other run can ask for it with `--reseed`. Do not run a scenario
+against the server while another harness uses it (the Android one shares the same dataset), and
+`moments` and E10 (`e10-drag-reorder`) in particular must not run then: `moments` completes every
+Today task and pauses the container with `docker pause`, and E10 reorders tasks. A scenario that
+exports `meta.destructive = true` (`moments`) runs first in a wave run, on the fresh seed and a cold
+app, and the run re-seeds again after it (new ids, app cache dropped) before the next scenario. The harness warns when `src/` is newer than
+`out/`, when the seed is from another day, and it refuses to run without a build or the server.
+Each launch rebuilds the profile, so runs never depend on each other. The GitHub update check is
+cut off (no update banner, no outside traffic), device scale is 1, and the app is shut down with
+`app.exit()` so no helper process keeps the profile folder.
+
+Output: one JSON object per line on stdout and in `out/<run>/results.jsonl`
+(`t` is `run`, `env`, `start`, `capture`, `assert`, `axe`, `skip`, `warn`, `pageerror`, `error` or
+`summary`), and the PNGs as `out/<run>/<scenario>--<name>.png`. The exit code is 1 when a scenario
+threw, the page threw, or an assertion failed. The baseline gives 16 captures per theme: Inbox,
+Today, Upcoming, Anytime, Logbook, Review, Routines, Settings, a project, a tag, an open card, the
+date popover on the last Today row, the composer with parsed text, the context menu, Quick Entry
+and Quick View.
+
+## 4. Scenarios
+
+`scenarios/<name>.mjs` exports `meta = { id, wave, title }` and a default `async function (h)`.
+Files starting with `_` are helpers. `baseline` is not part of a wave. E4 and E13 (wave 1) are
+real. E4 covers the popover primitive (card 1.3): the pickers stay inside the window, Escape and
+focus return, all nine pickers by mouse and keyboard, the nested Repeat panel, the composer and
+context-menu pickers, scrolling and transformed ancestors. E13 asserts behaviour the app fails until
+its card lands (offset highlights). E15 (wave 6, read-only) captures every view and each Settings tab at 1440x900, 1280x820 and 900x600 in the run's theme and asserts per view and size: no horizontal scroll of the document, body or main, no element wider than the main region, no text clipped without an ellipsis, and the h1 visible. The others are stubs that log `skip: not implemented yet` until
+their card fills them in. `keyboard-tab` (id KT, card 1.5) Tabs through Today with the real keyboard and
+asserts the focus ring on every stop, the 20 px checkbox with its 24 px hit area (`elementFromPoint`
+11 px from the centre), 24 px row buttons, 28 px toolbar buttons and the reduced-motion base layer.
+`motion-popover` (id MP, card 4.1) opens a popover, a menu and a tooltip with full motion and samples
+the enter frame by frame (opacity, scale from 0.96), freezes a mid-animation frame for a capture, checks the
+leaving copy, then repeats with `--motion reduce` and asserts no scale, transform or translate.
+`moments` (id MO, card 4.11a) captures each signature moment mid-motion (animations paused at 40 percent) and settled:
+the skeleton shimmer (it pauses the test server with `docker pause`, resumes it afterwards), rolling counts, a token travelling
+into its chip, the stuck-header hairline and Today turning into All clear. Run seed.mjs before it (it completes every Today
+task) and after it; it runs with `--motion reduce` too.
+Scenario code computes dates from the run day (`lib.mjs`: `localDate`, `comingWeekday`, `at`).
+
+The helpers on `h`:
+
+- `goto(route)`, `click(textOrSelector)`, `rightClick`, `hover`, `key('Control+F')`, `type(text)`,
+  `drag(from, to, { steps, hold })`, `wait(ms)`, `dismiss()` (closes popovers, menus, the composer
+  and an expanded card), `rows()`, `lastRow()`, `resize(w, h)`, `setMotion`, `setForcedColors`, `motion` and `forcedColors` (the current modes; a scenario checks the forced-colours equivalent when `h.forcedColors` is true), `skip(label, why)` (logged as a `skip` line, not counted).
+- `capture(name, { clip, page, transparent })` (device scale 1), `assert(label, fn)` (a boolean or
+  `{ ok, detail }`), `axe(selector?)` (axe-core; one line per violation, returns them),
+  `frames(ms)` (requestAnimationFrame timing sample), `api(method, path)` (reads the server to check
+  what was really saved).
+- `requests(since?)`: the HTTP requests the app's main process has started since launch
+  (`[{ t, method, url }]`, no headers or bodies), read from `main-requests.jsonl` in the run folder.
+  `request-log.cjs` is loaded into the main process with `electron --require` by `desktop.mjs` and
+  wraps `net.request`; it is test-only and not packaged. The `sidebar-tree` scenario (card 3.9a)
+  uses it to assert at most projects + 1 count requests; run it alone for a clean count.
+- `showQuick('entry' | 'view')` and `hideQuick(...)`: the popups open through the app's own
+  second-instance path, the code a global hotkey runs; the returned page is the popup window.
+- `h.ids` (seed ids), `h.wave`, `h.options`, `h.app`, `h.page` (the raw Playwright objects).
+
+A text target matches visible text exactly; anything that looks like a selector (`[data-task-id]`,
+`.class`, `css=...`, `role=...`) is used as a selector.
+
+## 5. Tools
+
+- `tools/contrast.mjs`: WCAG contrast of colour pairs from the command line or a JSON list.
+- `tools/springs.mjs`: damping and stiffness to a CSS `linear()` easing curve and duration.
+
+## Troubleshooting
+
+- "The test server does not answer": `docker start vicu-test-vikunja`.
+- "seed-ids.json is missing": run `seed.mjs` first. After a re-seed the Inbox id may change; every
+  launch rewrites the profile, so only a manually started app needs `profile.mjs` again.
+- A stale `electron.exe` holding `.local/profile-*` (EPERM when the profile is rebuilt): end the
+  processes whose command line contains `scripts\ui-verify\.local`.

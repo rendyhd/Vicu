@@ -1,0 +1,61 @@
+// E11: E1 and E7 with --motion reduce.
+// View half (card 4.6): changing views is a cross-fade only, no rise, no travelling pill.
+// Completion half (card 4.2): the completion hold keeps the same timing, the checkbox and the strike
+// only fade (no scale, no drawing, no overshoot) and the row closes with a fade and no height animation.
+import { HOLD_MS, checkboxOf, makeTasks, openToday, pointerAway, removeTasks, rowGoneAt, rowOf, readAnimations, recordAnimations } from './_completion.mjs'
+import { mouseSwitch } from './_view-switch.mjs'
+
+export const meta = {
+  id: 'E11',
+  wave: 4,
+  title: 'E1 and E7 with --motion reduce: no transforms or overshoot, same hold timing',
+}
+
+export default async function run(h) {
+  await h.resize(1280, 820)
+  await h.setMotion('reduce')
+  await h.assert('prefers-reduced-motion is emulated as reduce', () => h.page.evaluate(() => matchMedia('(prefers-reduced-motion: reduce)').matches))
+  await h.startMotionAudit()
+  await mouseSwitch(h, h.page, { full: false })
+  const viewAudit = await h.stopMotionAudit()
+  await h.assert('reduced: changing view runs only fades (no animation changes a transform, size or drawn property)', { ok: viewAudit.seen > 0 && viewAudit.moving.length === 0, detail: `${viewAudit.seen} animations seen; ${JSON.stringify(viewAudit.moving.slice(0, 4))}` })
+  await h.setMotion('full')
+  await h.dismiss()
+
+  const ids = await makeTasks(h, ['E11 reduce A'])
+  try {
+    const [a] = ids
+    await h.setMotion('reduce')
+    await h.assert('the page reports prefers-reduced-motion: reduce', async () => h.page.evaluate(() => matchMedia('(prefers-reduced-motion: reduce)').matches))
+    await h.assert('the task is listed in Today', { ok: await openToday(h, ids) })
+
+    await recordAnimations(h, a)
+    await h.startMotionAudit()
+    await checkboxOf(h, a).click()
+    await h.wait(300)
+    const left = await pointerAway(h)
+    await h.assert('the row is held right after the pointer left', async () => (await rowOf(h, a).count()) === 1)
+    const gone = await rowGoneAt(h, a, HOLD_MS + 4000)
+    await h.assert('reduced motion: the row collapses 5 s after the pointer left (4.8 s to 6.0 s)', {
+      ok: gone !== null && gone - left >= HOLD_MS - 200 && gone - left <= HOLD_MS + 1000,
+      detail: gone === null ? 'still there' : `${Math.round(gone - left)} ms`,
+    })
+
+    const seen = await readAnimations(h)
+    const doneAudit = await h.stopMotionAudit()
+    await h.assert('reduced: completing a task runs only fades (no animation changes a transform, size or drawn property)', { ok: doneAudit.seen > 0 && doneAudit.moving.length === 0, detail: `${doneAudit.seen} animations seen; ${JSON.stringify(doneAudit.moving.slice(0, 4))}` })
+    await h.assert('reduced motion: no scale or drawing animation starts, the fill and the check fade over 150 ms', {
+      ok:
+        !seen.anims.some((x) => ['vicu-check-fill', 'vicu-check-draw', 'vicu-strike-draw'].includes(x.name)) &&
+        seen.anims.filter((x) => x.name === 'vicu-bar-fade' && x.duration === 150).length >= 2,
+      detail: JSON.stringify(seen.anims),
+    })
+    await h.assert('reduced motion: the row closes with a fade only, no height or transform', {
+      ok: seen.rowAnims.length > 0 && seen.rowAnims.every((x) => x.props.join() === 'opacity'),
+      detail: JSON.stringify(seen.rowAnims),
+    })
+  } finally {
+    await h.setMotion('full')
+    await removeTasks(h, ids)
+  }
+}

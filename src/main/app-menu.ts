@@ -40,7 +40,7 @@ export function setupApplicationMenu(getMainWindow: () => BrowserWindow | null):
     label: 'File',
     submenu: [
       {
-        label: 'New Task',
+        label: 'New task',
         accelerator: 'CmdOrCtrl+N',
         click: () => {
           const win = getMainWindow()

@@ -2,10 +2,12 @@ import { describe, expect, it } from 'vitest'
 import {
   buildTaskAttachmentDownloadUrl,
   buildProjectCollectionUrl,
+  buildProjectTaskCountUrl,
   createProjectPatch,
   createTaskCollectionSearchParams,
   createTaskPatch,
   finishTaskCollection,
+  readEnvelopeTotal,
   withoutNestedSubtasks,
 } from '../api-v2'
 
@@ -151,5 +153,28 @@ describe('buildTaskAttachmentDownloadUrl', () => {
   it('requests a bounded server-side image preview', () => {
     expect(buildTaskAttachmentDownloadUrl('https://vikunja.example/base', 42, 7, 'lg'))
       .toBe('https://vikunja.example/base/api/v2/tasks/42/attachments/7?preview_size=lg')
+  })
+})
+
+describe('project task count request', () => {
+  it('asks for a page of one task, filtered by done, in the project', () => {
+    const done = new URL(buildProjectTaskCountUrl('https://vikunja.example/', 42, true))
+    expect(done.pathname).toBe('/api/v2/projects/42/tasks')
+    expect(done.searchParams.get('filter')).toBe('done = true')
+    expect(done.searchParams.get('per_page')).toBe('1')
+    expect(done.searchParams.has('page')).toBe(false)
+
+    const open = new URL(buildProjectTaskCountUrl('https://vikunja.example', 7, false))
+    expect(open.searchParams.get('filter')).toBe('done = false')
+  })
+
+  it('reads the total of the envelope and nothing else', () => {
+    expect(readEnvelopeTotal({ items: [], total: 12, page: 1, per_page: 1, total_pages: 12 })).toBe(12)
+    expect(readEnvelopeTotal({ items: null, total: 0 })).toBe(0)
+    expect(readEnvelopeTotal({ items: [] })).toBeNull()
+    expect(readEnvelopeTotal({ total: '3' })).toBeNull()
+    expect(readEnvelopeTotal({ total: -1 })).toBeNull()
+    expect(readEnvelopeTotal([])).toBeNull()
+    expect(readEnvelopeTotal(null)).toBeNull()
   })
 })

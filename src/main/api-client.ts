@@ -5,6 +5,8 @@ import { getAPIToken } from './auth/token-store'
 import {
   buildTaskAttachmentDownloadUrl,
   buildProjectCollectionUrl,
+  buildProjectTaskCountUrl,
+  readEnvelopeTotal,
   createTaskCollectionSearchParams,
   createProjectPatch,
   createTaskPatch,
@@ -352,6 +354,24 @@ export async function fetchTasks(params: Record<string, unknown>): Promise<ApiRe
   const tasks = await result
   if (!tasks.success) return tasks
   return { success: true, data: finishTaskCollection(tasks.data, params) }
+}
+
+/**
+ * How many tasks a project holds that are (not) done: the `total` of the API v2 envelope of a page
+ * of one task, never a listing (sidebar progress rings, decision 11). Hidden carrier tasks are
+ * included; the caller subtracts the ones it knows. A response without a usable `total` is an
+ * error, not zero.
+ */
+export async function fetchProjectTaskTotal(projectId: number, done: boolean): Promise<ApiResult<number>> {
+  const c = await getConfigOrFail()
+  if ('success' in c) return c
+
+  const result = await requestWithRetry<unknown>('GET', buildProjectTaskCountUrl(c.url, projectId, done), c.token)
+  if (!result.success) return result
+  const total = readEnvelopeTotal(result.data)
+  return total === null
+    ? { success: false, error: 'The server did not report a task total' }
+    : { success: true, data: total }
 }
 
 export async function createTask(

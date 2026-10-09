@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { runTaskTransition, transitionIds } from '@/lib/task-transition'
 
 interface SelectionState {
   expandedTaskId: number | null
@@ -30,19 +31,46 @@ interface SelectionState {
   remapTaskIds: (idMap: ReadonlyMap<number, number>) => void
 }
 
-export const useSelectionStore = create<SelectionState>((set) => ({
+type Get = () => SelectionState
+type SetState = (partial: Partial<SelectionState>) => void
+
+/** The task a running open/close transition is about to expand (its state change is applied a moment later). */
+let requested: { id: number | null } | null = null
+
+/** The expanded task as the user last asked for it, before a running transition has applied it. */
+function expandedNow(get: Get): number | null {
+  return requested ? requested.id : get().expandedTaskId
+}
+
+/**
+ * The expanded task as the user last asked for it. Key handlers read this instead of
+ * `getState().expandedTaskId`, which still shows the old task while an open/close transition has not
+ * applied its change yet (two handlers for one key press would otherwise disagree).
+ */
+export const currentExpandedTaskId = (): number | null => expandedNow(useSelectionStore.getState)
+
+function expand(get: Get, set: SetState, next: number | null): void {
+  const current = expandedNow(get)
+  if (current === next) return
+  const request = { id: next }
+  requested = request
+  runTaskTransition(transitionIds(current, next), () => {
+    set({ expandedTaskId: next })
+    if (requested === request) requested = null
+  })
+}
+
+export const useSelectionStore = create<SelectionState>((set, get) => ({
   expandedTaskId: null,
   focusedTaskId: null,
   pendingOpenTaskId: null,
   selectedTaskIds: new Set(),
   selectionAnchorId: null,
 
-  setExpandedTask: (id) => set({ expandedTaskId: id }),
+  // Opening, closing and switching the expanded task go through the open/close transition (lib/task-transition.ts).
+  setExpandedTask: (id) => expand(get, set, id),
 
-  toggleExpandedTask: (id) =>
-    set((state) => ({
-      expandedTaskId: state.expandedTaskId === id ? null : id,
-    })),
+  toggleExpandedTask: (id) => expand(get, set, expandedNow(get) === id ? null : id),
 
   setFocusedTask: (id) => set({ focusedTaskId: id }),
 
@@ -53,7 +81,7 @@ export const useSelectionStore = create<SelectionState>((set) => ({
 
   clearOpenRequest: (id) => set((state) => (state.pendingOpenTaskId === id ? { pendingOpenTaskId: null } : state)),
 
-  collapseAll: () => set({ expandedTaskId: null }),
+  collapseAll: () => expand(get, set, null),
 
   // Always assign a NEW Set so React re-renders subscribers.
   toggleSelected: (id) =>

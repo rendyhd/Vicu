@@ -1,28 +1,41 @@
 import type { Config } from 'tailwindcss'
 import typography from '@tailwindcss/typography'
+import { loadTokens, tailwindTheme } from './scripts/gen-tokens.mjs'
+
+// Colours, type sizes and radii come from the design token contract
+// (test-fixtures/design-tokens-v1.json) through scripts/gen-tokens.mjs, the same module that
+// writes src/renderer/assets/tokens.css. Colours are rgb(var(--x-rgb) / <alpha-value>), so
+// opacity classes such as bg-accent-blue/15 work; bg-sidebar stays a raw var() (no opacity).
+const tokenTheme = tailwindTheme(loadTokens())
 
 const config: Config = {
   content: ['./src/renderer/**/*.{ts,tsx,html}'],
   darkMode: 'class',
   theme: {
     extend: {
-      colors: {
-        sidebar: {
-          DEFAULT: 'var(--bg-sidebar)',
-        },
-        accent: {
-          blue: 'var(--accent-blue)',
-          red: 'var(--accent-red)',
-          orange: 'var(--accent-orange)',
-          yellow: 'var(--accent-yellow)',
-          green: 'var(--accent-green)',
-          purple: 'var(--accent-purple)',
-          teal: 'var(--accent-teal)',
-        },
+      colors: tokenTheme.colors,
+      // Motion roles (test-fixtures/design-tokens-v1.json, "motion"). The variables are in tokens.css, so
+      // components write duration-fade-base or ease-standard instead of a millisecond value.
+      transitionDuration: {
+        // A bare `transition` or `transition-colors` takes the fast fade, not Tailwind's own 150 ms.
+        DEFAULT: 'var(--dur-fade-fast)',
+        'fade-fast': 'var(--dur-fade-fast)',
+        'fade-base': 'var(--dur-fade-base)',
+        move: 'var(--dur-move)',
+        'move-expressive': 'var(--dur-move-expressive)',
+        pop: 'var(--dur-pop)',
       },
-      fontSize: {
-        '2xs': ['0.625rem', { lineHeight: '0.875rem' }],
+      transitionTimingFunction: {
+        DEFAULT: 'var(--ease-standard)',
+        standard: 'var(--ease-standard)',
+        enter: 'var(--ease-enter)',
+        exit: 'var(--ease-exit)',
       },
+      // The reading column every view sits in (ContentArea.tsx).
+      maxWidth: { reading: '760px' },
+      fontSize: tokenTheme.fontSize,
+      borderRadius: tokenTheme.borderRadius,
+      opacity: tokenTheme.opacity,
       typography: {
         DEFAULT: {
           css: {

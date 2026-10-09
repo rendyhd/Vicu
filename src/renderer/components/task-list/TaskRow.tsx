@@ -1,5 +1,5 @@
 import { forwardRef, memo, useState, useRef, useEffect, useCallback, useImperativeHandle, useMemo } from 'react'
-import { Calendar, Tag, ListChecks, FolderOpen, Trash2, Bell, Repeat, Paperclip, Info, Flag, AlignLeft, ChevronRight } from 'lucide-react'
+import { ListChecks, Bell, Repeat, Paperclip, AlignLeft, ChevronRight } from 'lucide-react'
 import type { Editor } from '@tiptap/react'
 import { useDraggable } from '@dnd-kit/core'
 import { useSortable, defaultAnimateLayoutChanges } from '@dnd-kit/sortable'
@@ -9,30 +9,28 @@ import { cn } from '@/lib/cn'
 import { useSelectionStore } from '@/stores/selection-store'
 import { orderedTaskIds } from '@/lib/task-selection'
 import { useUpdateTask, useCompleteTask, useDeleteTask, useUploadAttachmentFromDrop, useAddLabel, useCreateLabel } from '@/hooks/use-task-mutations'
+import { useCompletionHoldEngagement } from '@/hooks/use-completion-hold'
+import { useCompletionCollapse } from '@/hooks/use-completion-collapse'
+import { useCompletionPlay } from '@/hooks/use-completion-play'
 import { useConfirmDelete } from '@/hooks/use-confirm-delete'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
-import { isNullDate } from '@/lib/date-utils'
 import { dueToday, parsedDue } from '@/lib/due-dates'
 import { labelChipStyle } from '@/lib/label-style'
+import { normalizeHex } from '@/lib/constants'
+import { checklistLabel, rowLabels, rowProjectSource } from '@/lib/row-anatomy'
 import { useIsDark } from '@/hooks/use-is-dark'
 import type { Task, TaskReminder } from '@/lib/vikunja-types'
 import { TaskCheckbox } from './TaskCheckbox'
+import { TaskCardBar, type CardPopover } from './TaskCardBar'
 import { TaskDueBadge } from './TaskDueBadge'
-import { PriorityDot } from '@/components/shared/PriorityDot'
-import { DatePickerPopover } from './DatePickerPopover'
-import { LabelPickerPopover } from './LabelPickerPopover'
+import { useRowView } from './RowViewContext'
+import { PriorityMark } from '@/components/shared/PriorityMark'
 import { SubtaskList } from './SubtaskList'
 import { TaskDescription } from './TaskDescription'
-import { ProjectPickerPopover } from './ProjectPickerPopover'
-import { ReminderPickerPopover } from './ReminderPickerPopover'
-import { AttachmentPickerPopover } from './AttachmentPickerPopover'
-import { PriorityPickerPopover } from './PriorityPickerPopover'
 import { TaskContextMenu } from './TaskContextMenu'
-import { InfoPopover } from './InfoPopover'
 import { TaskLinkIcon } from '@/components/TaskLinkIcon'
 import { TaskSyncIcon } from '@/components/task-list/TaskSyncIcon'
 import { stripNoteLink, stripPageLink, extractNoteLinkHtml, extractPageLinkHtml, hasNotesContent } from '@/lib/note-link'
-import { formatRecurrenceLabel } from '@/lib/recurrence'
 import { useTaskParser } from '@/hooks/use-task-parser'
 import { useLabels } from '@/hooks/use-labels'
 import { useProjects } from '@/hooks/use-projects'
@@ -46,28 +44,43 @@ import {
 } from '@/lib/task-hierarchy'
 import { confirmTaskCompletion } from '@/lib/task-completion'
 
-type PopoverType = 'date' | 'label' | 'project' | 'subtasks' | 'reminder' | 'attachment' | 'info' | 'priority' | null
 
 interface TaskRowProps {
   task: Task
   sortable?: boolean
   nestedDepth?: number
   parentProjectId?: number
+  /**
+   * Set by a list view when the task is alone in its project group (no group header): the project
+   * goes on the row's meta line, unless the view is that project (`RowViewContext`).
+   */
+  projectMeta?: { title: string; color?: string }
 }
 
-// Animate displacement during active drag, but never animate layout changes after drop.
-// The default FLIP animation after drop causes a visual "bump" because items briefly
-// snap to their old positions before animating to new ones.
-const sortableAnimateLayoutChanges: AnimateLayoutChanges = (args) => {
-  if (args.isSorting) {
-    return defaultAnimateLayoutChanges(args)
-  }
-  return false
+/** `projectMeta` is a new object on every render of a group, so compare it by value to keep memo useful. */
+function sameRowProps(a: TaskRowProps, b: TaskRowProps): boolean {
+  return (
+    a.task === b.task &&
+    a.sortable === b.sortable &&
+    a.nestedDepth === b.nestedDepth &&
+    a.parentProjectId === b.parentProjectId &&
+    a.projectMeta?.title === b.projectMeta?.title &&
+    a.projectMeta?.color === b.projectMeta?.color
+  )
 }
 
-/** What a row takes from drag and drop, whichever hook provided it. */
+// dnd-kit's own layout animation is on again (card 4.8). It used to be off after a drop because the
+// rows were drawn in their old order for a frame before the list reordered, which looked like a
+// bump; the drop now renders the new order first (AppShell, commitSync), so the dragged row's
+// layout animation starts from where it was and ends in its slot, hidden under the drag overlay.
+const sortableAnimateLayoutChanges: AnimateLayoutChanges = defaultAnimateLayoutChanges
+
+/**
+ * What a row takes from drag and drop, whichever hook provided it. The hooks' `attributes` (role
+ * "button", tabindex, aria-pressed) are left out on purpose: they made a row a button that holds
+ * buttons, and no keyboard sensor is registered, so they only added noise. Only the pointer starts a drag.
+ */
 interface DragBehavior {
-  attributes: ReturnType<typeof useDraggable>['attributes']
   listeners: ReturnType<typeof useDraggable>['listeners']
   setNodeRef: (node: HTMLElement | null) => void
   isDragging: boolean
@@ -86,7 +99,6 @@ function useSortableRow(task: Task): DragBehavior {
     animateLayoutChanges: sortableAnimateLayoutChanges,
   })
   return {
-    attributes: sortableHook.attributes,
     listeners: sortableHook.listeners,
     setNodeRef: sortableHook.setNodeRef,
     isDragging: sortableHook.isDragging,
@@ -103,7 +115,6 @@ function useDraggableRow(task: Task): DragBehavior {
     data: { type: 'task', task },
   })
   return {
-    attributes: draggable.attributes,
     listeners: draggable.listeners,
     setNodeRef: draggable.setNodeRef,
     isDragging: draggable.isDragging,
@@ -293,7 +304,28 @@ const TaskTitleEditor = forwardRef<TaskTitleEditorHandle, TaskTitleEditorProps>(
   },
 )
 
-function TaskRowInner({ task, nestedDepth = 0, parentProjectId, drag }: Omit<TaskRowProps, 'sortable'> & { drag: DragBehavior }) {
+/** The project on a row's meta line: its colour dot and name. */
+function RowProject({ title, color }: { title: string; color?: string }) {
+  return (
+    <span className="flex min-w-0 shrink items-center gap-1">
+      <span
+        aria-hidden="true"
+        className="h-1.5 w-1.5 shrink-0 rounded-full"
+        style={{ backgroundColor: normalizeHex(color) ?? 'var(--text-tertiary)' }}
+      />
+      <span className="truncate">{title}</span>
+    </span>
+  )
+}
+
+/** The project of a row in a list that mixes projects without headers (Search, custom lists). */
+function RowProjectLookup({ projectId }: { projectId: number }) {
+  const { data } = useProjects()
+  const project = data?.flat.find((candidate) => candidate.id === projectId)
+  return project ? <RowProject title={project.title} color={project.hex_color} /> : null
+}
+
+function TaskRowInner({ task, nestedDepth = 0, parentProjectId, projectMeta, drag }: Omit<TaskRowProps, 'sortable'> & { drag: DragBehavior }) {
   // Per-field subscriptions: each row re-renders only when *its own* derived
   // state flips, not on every focus/selection change anywhere in the list.
   const isExpanded = useSelectionStore((s) => s.expandedTaskId === task.id)
@@ -315,8 +347,22 @@ function TaskRowInner({ task, nestedDepth = 0, parentProjectId, drag }: Omit<Tas
   const { confirmDelete, dialogProps } = useConfirmDelete()
   const uploadFromDrop = useUploadAttachmentFromDrop()
   const { data: appConfig } = useAppConfig()
+  const rowView = useRowView()
+  // Pointer and keyboard focus on the row keep a completed row in its list (the completion hold).
+  const holdEngagement = useCompletionHoldEngagement(task.id)
 
-  const { attributes, listeners, setNodeRef, isDragging, style } = drag
+  const { listeners, setNodeRef, isDragging, style } = drag
+  // When the hold ends the row fades and its height closes before it leaves the list.
+  const rowElement = useRef<HTMLElement | null>(null)
+  const setRowElement = useCallback(
+    (node: HTMLElement | null) => {
+      setNodeRef(node)
+      rowElement.current = node
+    },
+    [setNodeRef]
+  )
+  useCompletionCollapse(task.id, rowElement)
+  const strikePlay = useCompletionPlay(task.done)
   const isDark = useIsDark()
 
   const [editDescription, setEditDescription] = useState(stripPageLink(stripNoteLink(task.description)))
@@ -329,7 +375,11 @@ function TaskRowInner({ task, nestedDepth = 0, parentProjectId, drag }: Omit<Tas
   const canExpandSubtasks = appConfig?.subtask_display === 'expandable' && directSubtasks.length > 0
   const [subtasksExpanded, setSubtasksExpanded] = useState(false)
   const [structuralDeleteOpen, setStructuralDeleteOpen] = useState(false)
-  const [activePopover, setActivePopover] = useState<PopoverType>(null)
+  const [activePopover, setActivePopover] = useState<CardPopover>(null)
+  // The toolbar buttons that open the pickers: each picker sits next to its button and gives
+  // focus back to it when it closes.
+  const headerAttachmentButtonRef = useRef<HTMLButtonElement>(null)
+  const attachmentInvokers = useMemo(() => [headerAttachmentButtonRef], [])
   useEffect(() => {
     if (isOpenRequested) useSelectionStore.getState().openRequestedTask(task.id)
   }, [isOpenRequested, task.id])
@@ -407,7 +457,7 @@ function TaskRowInner({ task, nestedDepth = 0, parentProjectId, drag }: Omit<Tas
     updateTask.mutate({ id: task.id, changes: { due_date: dueToday() }, original: task })
   }, [task, updateTask])
 
-  const togglePopover = (popover: PopoverType) => {
+  const togglePopover = (popover: Exclude<CardPopover, null>) => {
     setActivePopover((prev) => (prev === popover ? null : popover))
   }
 
@@ -482,21 +532,45 @@ function TaskRowInner({ task, nestedDepth = 0, parentProjectId, drag }: Omit<Tas
   )
 
   const labels = task.labels ?? []
+  const metaLabels = rowLabels(labels, rowView)
+  const projectSource = rowProjectSource(task.project_id, rowView, projectMeta !== undefined)
+  const isRepeating = (task.repeat_after ?? 0) > 0 || (task.repeat_mode ?? 0) > 0
+  const hasMeta =
+    projectSource !== 'none' ||
+    metaLabels.length > 0 ||
+    subtaskCount > 0 ||
+    isRepeating ||
+    hasNotesContent(task.description) ||
+    (task.attachments?.length ?? 0) > 0 ||
+    (nestedDepth === 0 && !!parentTitle(task)) ||
+    (nestedDepth > 0 && parentProjectId !== undefined && parentProjectId !== task.project_id)
 
   // Collapsed row — entire row is draggable (PointerSensor distance:8 distinguishes click vs drag)
   if (!isExpanded) {
     return (
       <>
       <div
-        ref={setNodeRef}
+        ref={setRowElement}
         data-task-id={task.id}
+        data-selected={isSelected ? '' : undefined}
+        role="listitem"
+        // Roving tabindex: the row the keyboard selection is on is the one Tab stop of the list.
+        tabIndex={isFocused ? 0 : -1}
+        onFocus={(e) => {
+          // Keyboard focus anywhere in the row (the row itself, its checkbox) moves the keyboard selection here.
+          if (!isFocused && e.target.matches(':focus-visible')) setFocusedTask(task.id)
+          holdEngagement.onFocus(e)
+        }}
+        onBlur={holdEngagement.onBlur}
+        onPointerEnter={holdEngagement.onPointerEnter}
+        onPointerLeave={holdEngagement.onPointerLeave}
         className={cn(
-          'group flex min-h-10 cursor-default items-center gap-3 border-b border-[var(--border-color)] px-4 py-2 transition-colors hover:bg-[var(--bg-hover)]',
-          isSelected && 'bg-[var(--accent-blue)]/15 ring-1 ring-inset ring-[var(--accent-blue)]/40',
-          isFocused && !isSelected && !isExpanded && 'bg-[var(--accent-blue)]/8 ring-1 ring-inset ring-[var(--accent-blue)]/30',
+          'vicu-task-fade group grid cursor-default grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-x-3 border-b border-[var(--border-color)] px-4 py-2.5 transition-colors hover:bg-[var(--bg-hover)]',
+          isSelected && 'bg-bg-selected ring-1 ring-inset ring-accent-blue/40',
+          isFocused && !isSelected && !isExpanded && 'bg-accent-blue/8 ring-1 ring-inset ring-accent-blue/30',
           isDragging && 'opacity-30',
-          isDragOver && 'ring-2 ring-inset ring-[var(--accent-blue)] bg-[var(--accent-blue)]/5',
-          dropError && 'ring-2 ring-inset ring-red-500 bg-red-500/5'
+          isDragOver && 'ring-2 ring-inset ring-[var(--accent-blue)] bg-accent-blue/5',
+          dropError && 'ring-2 ring-inset ring-danger bg-danger/5'
         )}
         style={{
           ...style,
@@ -552,96 +626,98 @@ function TaskRowInner({ task, nestedDepth = 0, parentProjectId, drag }: Omit<Tas
           setContextMenu({ x: e.clientX, y: e.clientY })
         }}
         {...listeners}
-        {...attributes}
       >
         <TaskCheckbox task={task} suppressTopLevelUndo={nestedDepth > 0} />
 
-        {labels.length > 0 && (
-          <div className="flex shrink-0 items-center gap-1">
-            {labels.map((l) => (
-              <span
-                key={l.id}
-                className="rounded-full px-1.5 py-px text-[10px] font-medium leading-tight"
-                style={labelChipStyle(l.hex_color, isDark)}
-              >
-                {l.title}
-              </span>
-            ))}
-          </div>
-        )}
-
-        <div className="min-w-0 flex-1">
+        {/* Line 1 is the title, level with the checkbox; line 2 is the meta line, when there is one. */}
+        <div className="min-w-0">
           <span
             className={cn(
-              'block break-words text-[13px] text-[var(--text-primary)]',
-              task.done && 'text-[var(--text-secondary)] line-through'
+              'block truncate text-task-title',
+              task.done ? 'text-text-secondary' : 'text-text'
             )}
           >
-            {dropError ? <span className="text-red-500">{dropError}</span> : task.title}
+            {dropError ? (
+              <span className="text-danger">{dropError}</span>
+            ) : (
+              // The strike is drawn behind the text left to right when the task has just been completed.
+              <span className={cn(task.done && 'vicu-strike', task.done && strikePlay && 'vicu-strike-play')}>{task.title}</span>
+            )}
           </span>
-          {nestedDepth === 0 && parentTitle(task) && (
-            <span className="block truncate text-[10px] text-[var(--text-secondary)]">
-              Subtask of {parentTitle(task)}
-            </span>
-          )}
-          {nestedDepth > 0 && parentProjectId !== undefined && parentProjectId !== task.project_id && (
-            <span className="block text-[10px] text-[var(--text-secondary)]">Different project</span>
+          {hasMeta && (
+            <div className="mt-0.5 flex min-w-0 items-center gap-x-2 overflow-hidden whitespace-nowrap text-meta text-text-secondary">
+              {projectSource === 'group' && projectMeta && (
+                <RowProject title={projectMeta.title} color={projectMeta.color} />
+              )}
+              {projectSource === 'lookup' && <RowProjectLookup projectId={task.project_id} />}
+              {metaLabels.map((l) => (
+                <span
+                  key={l.id}
+                  className="vicu-chip shrink-0 rounded-chip px-2 py-px text-chip leading-tight"
+                  style={labelChipStyle(l.hex_color, isDark)}
+                >
+                  {l.title}
+                </span>
+              ))}
+              {nestedDepth === 0 && parentTitle(task) && (
+                <span className="min-w-0 truncate">Subtask of {parentTitle(task)}</span>
+              )}
+              {nestedDepth > 0 && parentProjectId !== undefined && parentProjectId !== task.project_id && (
+                <span className="shrink-0">Different project</span>
+              )}
+              {subtaskCount > 0 && (
+                <button
+                  type="button"
+                  disabled={!canExpandSubtasks}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    if (canExpandSubtasks) setSubtasksExpanded((expanded) => !expanded)
+                  }}
+                  className={cn(
+                    'flex min-h-6 shrink-0 items-center justify-center gap-0.5',
+                    canExpandSubtasks && 'rounded-control px-0.5 hover:bg-bg-hover hover:text-text',
+                  )}
+                  aria-label={`${checklistLabel(progress.completed, progress.total)} subtasks complete`}
+                  aria-expanded={canExpandSubtasks ? subtasksExpanded : undefined}
+                >
+                  {canExpandSubtasks && (
+                    <ChevronRight className={cn('h-3 w-3 transition-transform duration-fade-fast', subtasksExpanded && 'rotate-90')} />
+                  )}
+                  <ListChecks className="h-3 w-3" />
+                  <span>{checklistLabel(progress.completed, progress.total)}</span>
+                </button>
+              )}
+              {hasNotesContent(task.description) && (
+                <AlignLeft className="h-3 w-3 shrink-0" aria-label="Has notes" />
+              )}
+              {isRepeating && <Repeat className="h-3 w-3 shrink-0" aria-label="Repeats" />}
+              {(task.attachments?.length ?? 0) > 0 && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    toggleExpandedTask(task.id)
+                    setActivePopover('attachment')
+                  }}
+                  className="relative shrink-0 after:absolute after:-inset-1.5 after:content-[''] hover:text-text"
+                  aria-label="Attachments"
+                >
+                  <Paperclip className="h-3 w-3" />
+                </button>
+              )}
+            </div>
           )}
         </div>
 
-        <TaskSyncIcon taskId={task.id} />
-        <TaskLinkIcon description={task.description} />
-
-        <div className="flex items-center gap-2">
-          {hasNotesContent(task.description) && (
-            <AlignLeft
-              className="h-3 w-3 text-[var(--text-secondary)]"
-              aria-label="Has notes"
-            />
-          )}
-          {subtaskCount > 0 && (
-            <button
-              type="button"
-              disabled={!canExpandSubtasks}
-              onClick={(e) => {
-                e.stopPropagation()
-                if (canExpandSubtasks) setSubtasksExpanded((expanded) => !expanded)
-              }}
-              className={cn(
-                'flex items-center gap-0.5 text-[10px] text-[var(--text-secondary)]',
-                canExpandSubtasks && 'rounded px-0.5 hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]',
-              )}
-              aria-label={`${progress.completed} of ${progress.total} subtasks complete`}
-              aria-expanded={canExpandSubtasks ? subtasksExpanded : undefined}
-            >
-              {canExpandSubtasks && (
-                <ChevronRight className={cn('h-3 w-3 transition-transform', subtasksExpanded && 'rotate-90')} />
-              )}
-              <ListChecks className="h-3 w-3" />
-              <span>{progress.completed}/{progress.total}</span>
-            </button>
-          )}
-          {(task.repeat_after ?? 0) > 0 || (task.repeat_mode ?? 0) > 0 ? (
-            <Repeat className="h-3 w-3 text-[var(--text-secondary)]" />
-          ) : null}
-          {(task.attachments?.length ?? 0) > 0 && (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation()
-                toggleExpandedTask(task.id)
-                setActivePopover('attachment')
-              }}
-              className="text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-            >
-              <Paperclip className="h-3 w-3" />
-            </button>
-          )}
-          {(task.reminders?.length ?? 0) > 0 && (
-            <Bell className="h-3 w-3 text-[var(--text-secondary)]" />
-          )}
-          <PriorityDot priority={task.priority} />
+        {/* Trailing cluster, level with the title: the due phrase, the reminder bell, the priority last. */}
+        <div className="flex h-5 shrink-0 items-center gap-2">
+          <TaskSyncIcon taskId={task.id} />
+          <TaskLinkIcon description={task.description} />
           <TaskDueBadge dueDate={task.due_date} />
+          {(task.reminders?.length ?? 0) > 0 && (
+            <Bell className="h-3 w-3 text-text-secondary" aria-label="Has a reminder" />
+          )}
+          <PriorityMark priority={task.priority} />
         </div>
       </div>
       {contextMenu && (
@@ -669,19 +745,26 @@ function TaskRowInner({ task, nestedDepth = 0, parentProjectId, drag }: Omit<Tas
   return (
     <div
       data-task-id={task.id}
+      role="listitem"
       className={cn(
-        'mx-2 my-1 rounded-xl border border-[var(--border-color)] bg-[var(--bg-primary)] shadow-md',
-        isDragOver && 'ring-2 ring-[var(--accent-blue)] bg-[var(--accent-blue)]/5',
-        dropError && 'ring-2 ring-red-500 bg-red-500/5'
+        // Two columns, the checkbox and the body: the notes, subtasks and property bar sit under the title.
+        // The surface is bg.card; in dark it is lifted by a 1 px white-at-8% edge instead of a shadow.
+        'vicu-task-fade vicu-card mx-2 my-1 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 rounded-card border border-[var(--border-color)] bg-bg-card px-4 shadow-md dark:border-white/8 dark:shadow-none',
+        isDragOver && 'ring-2 ring-[var(--accent-blue)] bg-accent-blue/5',
+        dropError && 'ring-2 ring-danger bg-danger/5'
       )}
       onKeyDown={handleExpandedKeyDown}
+      onFocus={holdEngagement.onFocus}
+      onBlur={holdEngagement.onBlur}
+      onPointerEnter={holdEngagement.onPointerEnter}
+      onPointerLeave={holdEngagement.onPointerLeave}
       onDragOver={handleFileDragOver}
       onDragLeave={handleFileDragLeave}
       onDrop={handleFileDrop}
     >
       {/* Title row */}
-      <div className="flex items-start gap-3 px-4 pt-3">
-        <TaskCheckbox task={task} className="mt-0.5" suppressTopLevelUndo={nestedDepth > 0} />
+      <TaskCheckbox task={task} className="mt-3.5" suppressTopLevelUndo={nestedDepth > 0} />
+      <div className="flex min-w-0 items-start gap-3 pt-3">
         <TaskTitleEditor
           ref={titleEditorRef}
           task={task}
@@ -693,9 +776,12 @@ function TaskRowInner({ task, nestedDepth = 0, parentProjectId, drag }: Omit<Tas
         <TaskLinkIcon description={task.description} />
         {(task.attachments?.length ?? 0) > 0 && (
           <button
+            ref={headerAttachmentButtonRef}
             type="button"
+            aria-haspopup="dialog"
+            aria-expanded={activePopover === 'attachment'}
             onClick={() => togglePopover('attachment')}
-            className="shrink-0 text-[var(--text-secondary)]"
+            className="relative shrink-0 text-[var(--text-secondary)] after:absolute after:-inset-1.5 after:content-['']"
             title="Attachments"
           >
             <Paperclip className="h-3.5 w-3.5" />
@@ -704,7 +790,7 @@ function TaskRowInner({ task, nestedDepth = 0, parentProjectId, drag }: Omit<Tas
       </div>
 
       {/* Description */}
-      <div className="px-4 pt-2 pl-[43px]">
+      <div className="col-start-2 pt-2">
         <TaskDescription
           taskId={task.id}
           value={editDescription}
@@ -731,224 +817,37 @@ function TaskRowInner({ task, nestedDepth = 0, parentProjectId, drag }: Omit<Tas
       </div>
 
       {/* Existing subtasks stay visible; the action button toggles the add input. */}
-      <div className="px-4 pl-[43px]">
+      <div className="col-start-2">
         <SubtaskList parentTask={task} showInput={activePopover === 'subtasks'} />
       </div>
 
-      {/* Action bar */}
-      <div className="flex items-center justify-between px-4 pb-3 pt-2 pl-[43px]">
-        {/* Labels */}
-        <div className="flex flex-1 flex-wrap items-center gap-1">
-          {labels.map((l) => (
-            <span
-              key={l.id}
-              className="rounded-full px-2 py-0.5 text-2xs font-medium"
-              style={labelChipStyle(l.hex_color, isDark)}
-            >
-              {l.title}
-            </span>
-          ))}
-          {!isNullDate(task.due_date) && (
-            <TaskDueBadge dueDate={task.due_date} />
-          )}
-          {((task.repeat_after ?? 0) > 0 || (task.repeat_mode ?? 0) > 0) && (
-            <span className="flex items-center gap-0.5 text-2xs text-[var(--text-secondary)]">
-              <Repeat className="h-3 w-3" />
-              {formatRecurrenceLabel(task.repeat_after ?? 0, task.repeat_mode ?? 0)}
-            </span>
-          )}
-          <PriorityDot priority={task.priority} />
-        </div>
-
-        {/* Action buttons */}
-        <div className="flex items-center gap-1">
-          <div className="relative">
-            <button
-              type="button"
-              onClick={() => togglePopover('date')}
-              className={cn(
-                'flex h-6 w-6 items-center justify-center rounded transition-colors',
-                activePopover === 'date'
-                  ? 'bg-[var(--accent-blue)]/10 text-[var(--accent-blue)]'
-                  : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]'
-              )}
-              title="Schedule"
-            >
-              <Calendar className="h-3.5 w-3.5" />
-            </button>
-            {activePopover === 'date' && (
-              <DatePickerPopover
-                currentDate={task.due_date}
-                onDateChange={handleDateChange}
-                onClose={() => setActivePopover(null)}
-                repeatAfter={task.repeat_after ?? 0}
-                repeatMode={task.repeat_mode ?? 0}
-                onRecurrenceChange={handleRecurrenceChange}
-              />
-            )}
-          </div>
-          <div className="relative">
-            <button
-              type="button"
-              onClick={() => togglePopover('priority')}
-              className={cn(
-                'flex h-6 w-6 items-center justify-center rounded transition-colors',
-                activePopover === 'priority'
-                  ? 'bg-[var(--accent-blue)]/10 text-[var(--accent-blue)]'
-                  : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]'
-              )}
-              title="Priority"
-            >
-              <Flag className="h-3.5 w-3.5" />
-            </button>
-            {activePopover === 'priority' && (
-              <PriorityPickerPopover
-                currentPriority={task.priority}
-                onPriorityChange={handlePriorityChange}
-                onClose={() => setActivePopover(null)}
-              />
-            )}
-          </div>
-          <div className="relative">
-            <button
-              type="button"
-              onClick={() => togglePopover('label')}
-              className={cn(
-                'flex h-6 w-6 items-center justify-center rounded transition-colors',
-                activePopover === 'label'
-                  ? 'bg-[var(--accent-blue)]/10 text-[var(--accent-blue)]'
-                  : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]'
-              )}
-              title="Labels"
-            >
-              <Tag className="h-3.5 w-3.5" />
-            </button>
-            {activePopover === 'label' && (
-              <LabelPickerPopover
-                tasks={[task]}
-                onClose={() => setActivePopover(null)}
-              />
-            )}
-          </div>
-          <button
-            type="button"
-            onClick={() => togglePopover('subtasks')}
-            className={cn(
-              'flex h-6 w-6 items-center justify-center rounded transition-colors',
-              activePopover === 'subtasks'
-                ? 'bg-[var(--accent-blue)]/10 text-[var(--accent-blue)]'
-                : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]'
-            )}
-            title={activePopover === 'subtasks' ? 'Hide add subtask' : 'Add subtask'}
-          >
-            <ListChecks className="h-3.5 w-3.5" />
-          </button>
-          <div className="relative">
-            <button
-              type="button"
-              onClick={() => togglePopover('reminder')}
-              className={cn(
-                'flex h-6 w-6 items-center justify-center rounded transition-colors',
-                activePopover === 'reminder'
-                  ? 'bg-[var(--accent-blue)]/10 text-[var(--accent-blue)]'
-                  : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]'
-              )}
-              title="Reminders"
-            >
-              <Bell className="h-3.5 w-3.5" />
-            </button>
-            {activePopover === 'reminder' && (
-              <ReminderPickerPopover
-                task={task}
-                onReminderChange={handleReminderChange}
-                onClose={() => setActivePopover(null)}
-              />
-            )}
-          </div>
-          <div className="relative">
-            <button
-              type="button"
-              onClick={() => togglePopover('attachment')}
-              className={cn(
-                'flex h-6 w-6 items-center justify-center rounded transition-colors',
-                activePopover === 'attachment' || (task.attachments?.length ?? 0) > 0
-                  ? 'bg-[var(--accent-blue)]/10 text-[var(--accent-blue)]'
-                  : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]'
-              )}
-              title="Attachments"
-            >
-              <Paperclip className="h-3.5 w-3.5" />
-            </button>
-            {activePopover === 'attachment' && (
-              <AttachmentPickerPopover
-                taskId={task.id}
-                onClose={() => setActivePopover(null)}
-              />
-            )}
-          </div>
-          <div className="relative">
-            <button
-              type="button"
-              onClick={() => togglePopover('project')}
-              className={cn(
-                'flex h-6 w-6 items-center justify-center rounded transition-colors',
-                activePopover === 'project'
-                  ? 'bg-[var(--accent-blue)]/10 text-[var(--accent-blue)]'
-                  : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]'
-              )}
-              title="Move to project"
-            >
-              <FolderOpen className="h-3.5 w-3.5" />
-            </button>
-            {activePopover === 'project' && (
-              <ProjectPickerPopover
-                currentProjectId={task.project_id}
-                onSelect={(pid) => updateTask.mutate({ id: task.id, changes: { project_id: pid }, original: task })}
-                onClose={() => setActivePopover(null)}
-              />
-            )}
-          </div>
-          <div className="relative">
-            <button
-              type="button"
-              onClick={() => togglePopover('info')}
-              className={cn(
-                'flex h-6 w-6 items-center justify-center rounded transition-colors',
-                activePopover === 'info'
-                  ? 'bg-[var(--accent-blue)]/10 text-[var(--accent-blue)]'
-                  : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]'
-              )}
-              title="Task info"
-            >
-              <Info className="h-3.5 w-3.5" />
-            </button>
-            {activePopover === 'info' && (
-              <InfoPopover
-                task={task}
-                onClose={() => setActivePopover(null)}
-              />
-            )}
-          </div>
-          <button
-            type="button"
-            onClick={async () => {
-              if (taskDescendants(task).length > 0) {
-                setStructuralDeleteOpen(true)
-                return
-              }
-              const ok = await confirmDelete('Delete this task? This cannot be undone.')
-              if (ok) {
-                deleteTask.mutate({ task })
-                collapseAll()
-              }
-            }}
-            className="flex h-6 w-6 items-center justify-center rounded text-[var(--text-secondary)] transition-colors hover:bg-accent-red/10 hover:text-accent-red"
-            title="Delete task"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </button>
-        </div>
-      </div>
+      {/* Properties: chips for what is set, quiet "+" buttons for what is not; Info and Delete under More. */}
+      <TaskCardBar
+        task={task}
+        active={activePopover}
+        onToggle={togglePopover}
+        onOpen={setActivePopover}
+        onClose={() => setActivePopover(null)}
+        attachmentInvokers={attachmentInvokers}
+        onDateChange={handleDateChange}
+        onRecurrenceChange={handleRecurrenceChange}
+        onPriorityChange={handlePriorityChange}
+        onReminderChange={handleReminderChange}
+        onProjectChange={(pid) => updateTask.mutate({ id: task.id, changes: { project_id: pid }, original: task })}
+        onDelete={async () => {
+          setActivePopover(null)
+          if (taskDescendants(task).length > 0) {
+            setStructuralDeleteOpen(true)
+            return
+          }
+          const ok = await confirmDelete('Delete this task? This cannot be undone.')
+          if (ok) {
+            deleteTask.mutate({ task })
+            collapseAll()
+          }
+        }}
+      />
+      <div className="col-span-2">
       <ConfirmDialog {...dialogProps} />
       <ConfirmDialog
         open={structuralDeleteOpen}
@@ -967,21 +866,22 @@ function TaskRowInner({ task, nestedDepth = 0, parentProjectId, drag }: Omit<Tas
         }}
         onCancel={() => setStructuralDeleteOpen(false)}
       />
+      </div>
     </div>
   )
 }
 
 const SortableTaskRow = memo(function SortableTaskRow(props: TaskRowProps) {
   const drag = useSortableRow(props.task)
-  return <TaskRowInner task={props.task} nestedDepth={props.nestedDepth} parentProjectId={props.parentProjectId} drag={drag} />
-})
+  return <TaskRowInner task={props.task} nestedDepth={props.nestedDepth} parentProjectId={props.parentProjectId} projectMeta={props.projectMeta} drag={drag} />
+}, sameRowProps)
 
 const DraggableTaskRow = memo(function DraggableTaskRow(props: TaskRowProps) {
   const drag = useDraggableRow(props.task)
-  return <TaskRowInner task={props.task} nestedDepth={props.nestedDepth} parentProjectId={props.parentProjectId} drag={drag} />
-})
+  return <TaskRowInner task={props.task} nestedDepth={props.nestedDepth} parentProjectId={props.parentProjectId} projectMeta={props.projectMeta} drag={drag} />
+}, sameRowProps)
 
 export const TaskRow = memo(function TaskRow(props: TaskRowProps) {
   // `sortable` is fixed by the list a row belongs to, so a row never switches between the two.
   return props.sortable ? <SortableTaskRow {...props} /> : <DraggableTaskRow {...props} />
-})
+}, sameRowProps)

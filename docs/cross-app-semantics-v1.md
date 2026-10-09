@@ -8,9 +8,10 @@ Test vectors live in `test-fixtures/` in both repos and must stay byte-identical
 
 | Fixture | Covers |
 |---|---|
-| `cross-app-semantics-v1.json` | due-date rules, smart lists, weeks, custom-list windows, review math |
+| `cross-app-semantics-v1.json` | due-date rules, smart lists, weeks, custom-list windows, review math, completion hold, date display |
 | `nlp-corpus-v1.json` | quick-add parsing |
 | `routine-archive-v1.json` | routine merge, pruning and archive rules |
+| `design-tokens-v1.json` | colour roles, type, radii and motion (see `design-system-v1.md`) |
 
 Both test suites load these files. When behavior changes, change the fixture first, in both
 repos, in the same release.
@@ -38,7 +39,8 @@ them with the system time zone. Fixtures avoid DST transition hours.
   date-only values at midnight). Don't rewrite them in bulk; they become 23:59:59 the next
   time the user sets the date.
 - Any other local time is explicit: show the time (device 12/24-hour setting).
-- Show the year when the date is not in the current year.
+- Show the year when the date is not in the current year. How dates are phrased in each
+  place (rows, chips, headers, the logbook) is section 8.
 
 ### 1.3 Setters
 
@@ -292,3 +294,121 @@ archive and changes the merge.
 Android 1.8.x kept pruned history in a phone-only table. On first launch of 1.9.0, Android
 uploads that table into archive parts (merged with any existing parts), then treats the table
 as a cache.
+
+---
+
+## 7. Completion hold
+
+When the user completes a task in a list, the row does not vanish at once. The completion itself
+is written immediately (`{ done: true }`); the hold only decides how long the row stays visible,
+so the user can see what happened and change their mind. Constants (the fixture block
+`completion`): hold 5000 ms, toast 6000 ms, toast text "Completed" for one task and
+"{n} completed" for two or more, action label "Undo".
+
+### 7.1 States
+
+A completed row is **held** (still in the list, shown as done) or **collapsed** (gone from the
+list, still done on the server). An open row that is completed becomes held; a held row becomes
+collapsed; a held row can go back to open (undo).
+
+### 7.2 Hold
+
+- The hold ends **5 s after the later of the completion and the last moment the row stopped
+  being engaged**. A row is *engaged* while the pointer is over it or keyboard (or assistive)
+  focus is on it. While engaged the hold cannot end; when both the pointer and the focus have
+  left, a full 5 s starts again.
+- Engagement is tracked from before the completion: a row completed with the pointer already on
+  it is engaged, so its hold starts when the pointer leaves. Completing with the keyboard and
+  moving focus to the next row at once starts the 5 s at that moment.
+- **Leaving the view** (navigating to another list or screen) ends every hold at once: all held
+  rows collapse at that instant, whether or not they are engaged.
+- Completing a row that is already held or collapsed does nothing (the first deadline stays).
+- Undoing a held row (unchecking it) sends `{ done: false }`, returns it to open and cancels its
+  hold; no toast is shown.
+
+### 7.3 Toast
+
+- When a row collapses, it joins the toast: if no toast is showing a new one appears with
+  "Completed" and Undo; if one is showing, its count grows ("2 completed", "3 completed") and
+  its 6 s clock restarts.
+- While the pointer is over the toast or focus is on it, it cannot expire; when both have left,
+  a full 6 s starts again (the same rule as the hold).
+- When the clock runs out the toast disappears; the rows stay collapsed.
+- Undo on the toast sends `{ done: false }` for every row the toast covers, returns them to open
+  and removes the toast. Rows that are still held are not affected and are not in the toast.
+- A completion after the toast is gone starts a new toast with "Completed".
+- The toast survives navigation; leaving the view only collapses the held rows (and adds them to
+  the toast).
+
+### 7.4 Vectors
+
+`completion.vectors` in the fixture are event sequences. Times are milliseconds from the start
+of the sequence. Events: `complete`, `hoverStart`, `hoverEnd`, `focusIn`, `focusOut` (a row id in
+`row`, or `"target": "toast"`), `navigate`, and `undo` (`"via": "row"` with a row id, or
+`"via": "toast"`). Each `expect` entry is the state after every event up to and including its
+`at`, with the timers due at that time already fired; a timer due at the same instant as an event
+fires first. `held` and `collapsed` are row ids in ascending order, `toast` is the text shown or
+`null`. Rows in the vectors start open.
+
+---
+
+## 8. Date display
+
+This section says how a due date (or a completion time) is phrased. It applies to both apps; the
+fixture block `dateDisplay` pins the exact strings for `en-US` and `en-GB`.
+
+### 8.1 Inputs
+
+- **Day difference** `diff`: the number of calendar days from today's local date to the local
+  date of the value (negative for the past), computed on dates, never from a count of 24-hour
+  blocks, so a day with a daylight-saving change is still one day.
+- **Date only** as in section 1.2: local 23:59:59, or legacy 00:00:00. Any other time is a
+  time of day.
+- **Current year**: the year of today's local date. The year is shown only when the date's year
+  is different.
+- **Locale**: the system (region) locale on both apps. **Clock**: 12-hour or 24-hour. Android
+  follows the system setting. Desktop takes the hour cycle of the system locale
+  (`app.getSystemLocale()`) and has a Settings choice (System, 12-hour, 24-hour) for an OS custom
+  format the web engine cannot see.
+
+### 8.2 Strings
+
+The text is built from parts, not from platform date formatters, so ICU on desktop and
+`java.time` on Android give the same result. The English names, the per-locale patterns and the
+words are in the fixture (`dateDisplay.names`, `.patterns`, `.words`). Spaces are plain U+0020.
+September is "Sep". For `en-US` the order is month, day ("Oct 18"); for `en-GB` day, month
+("18 Oct"). Clock: 24-hour is `HH:mm` ("09:05", "15:00"); 12-hour is `h:mm` plus a plain space
+and the marker, `AM`/`PM` in `en-US` and `am`/`pm` in `en-GB` ("3:00 PM", "3:00 pm", "12:05
+AM"). Other locales follow the same phrase structure with the platform's own order and
+separators; only `en-US` and `en-GB` are pinned. The words ("Today", "Yesterday", "Tomorrow",
+"{n} days ago") are the app's strings.
+
+A **day phrase** is a short date (`dayMonth`, `dayMonthYear` when the year differs) or a weekday
+date (`weekdayDayMonth`, `weekdayDayMonthYear`: "Sat 10 Oct", "Sat, Oct 10"). **Appending a
+time**: when the value has a time of day, the text is the day phrase, a comma and a space, and
+the time ("Fri, 15:00", "Oct 18, 3:00 PM"). A date-only value has no time part.
+
+### 8.3 Contexts
+
+| Context | Rule |
+|---|---|
+| `row` | `diff` of -7 or less: short date. -6 to -2: "{n} days ago". -1: "Yesterday". 0: "Today". 1: "Tomorrow". 2 to 6: the short weekday ("Fri"). 7 or more: short date. Then append the time, if any. |
+| `row.inToday` | Like `row`, except a value dated today shows nothing when date only and just the time otherwise. |
+| `row.inDayGroup` | The time only, if any, otherwise nothing. |
+| `chip` | Always the weekday date, never a relative word: "Sat 10 Oct, 15:00" or "Sat, Oct 10, 3:00 PM"; date only: "Sat 10 Oct". |
+| `header.day` | 0: "Today". 1: "Tomorrow". 2 to 6: weekday and day number ("Fri 9"). Otherwise the weekday date ("Mon 12 Oct", "Mon, Oct 12"). No time. |
+| `header.full` | "Wednesday 7 October" or "Wednesday, October 7", with the year when it differs. |
+| `logbook.group` | The group of a completion time. 0 or later: "Today". -1: "Yesterday". -6 to -2: the weekday date ("Mon 5 Oct"). -7 or older: the month and year ("September 2026"), always with the year. |
+| `logbook.time` | The time of the completion in the user's clock. |
+
+For the logbook contexts the value is the completion time and is never date only. A completion
+time later than now (a clock that is a little ahead) counts as today.
+
+### 8.4 Vectors
+
+`dateDisplay.vectors` carry `now` and `due` as local wall-clock times in `zone` (without an
+offset, as elsewhere in this document), `locale` (`en-US` or `en-GB`), `hour12`, `dateOnly`,
+`context` and the expected text. They cover every context, both locales with both clocks, the
+boundaries between the phrases, the year boundary in both directions and the days around daylight
+saving changes in Pacific/Auckland and America/New_York. No vector uses a time inside a
+transition hour.

@@ -1,5 +1,6 @@
-import { useState, useEffect, useImperativeHandle, forwardRef, useCallback, useRef } from 'react'
+import { useState, useEffect, useImperativeHandle, forwardRef, useCallback, useId, useRef } from 'react'
 import type { SyntaxPrefixes } from '@/lib/task-parser'
+import { Popover } from '../overlay/Popover'
 
 interface AutocompleteItem {
   id: number
@@ -12,6 +13,13 @@ export interface AutocompleteHandle {
   handleKeyDown: (e: React.KeyboardEvent) => boolean
 }
 
+/** What the input needs to announce the list: it is a combobox that owns this listbox. */
+export interface AutocompleteAria {
+  listboxId: string
+  /** The id of the highlighted option. */
+  activeId: string
+}
+
 interface AutocompleteDropdownProps {
   inputValue: string
   cursorPosition: number
@@ -20,6 +28,10 @@ interface AutocompleteDropdownProps {
   labels: AutocompleteItem[]
   onSelect: (item: AutocompleteItem, triggerStart: number, prefix: string) => void
   enabled: boolean
+  /** The input the list belongs to; the list opens under the start of the word being typed. */
+  inputElement?: HTMLInputElement | HTMLTextAreaElement | null
+  /** Called with the listbox and highlighted option while the list is open, null while it is closed. */
+  onAriaChange?: (aria: AutocompleteAria | null) => void
 }
 
 const MAX_ITEMS = 8
@@ -41,12 +53,31 @@ function findTrigger(
   return { start: lastIdx, query, prefix, type }
 }
 
+/** Where the text before `index` ends, in pixels from the left edge of a single-line input. */
+function caretOffset(input: HTMLInputElement | HTMLTextAreaElement, index: number): number {
+  const cs = getComputedStyle(input)
+  const ctx = document.createElement('canvas').getContext('2d')
+  if (!ctx) return 0
+  ctx.font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`
+  if ('letterSpacing' in ctx) (ctx as CanvasRenderingContext2D & { letterSpacing: string }).letterSpacing = cs.letterSpacing
+  const left = input.offsetLeft + parseFloat(cs.paddingLeft) + parseFloat(cs.borderLeftWidth)
+  return left + ctx.measureText(input.value.slice(0, index)).width - input.scrollLeft
+}
+
+/**
+ * The project and label suggestions: a listbox on the popover primitive, under the start of the
+ * word being typed. Focus stays in the input (the input is the combobox, the highlighted option is
+ * its `aria-activedescendant`), so typing and the arrow keys keep working.
+ */
 export const AutocompleteDropdown = forwardRef<AutocompleteHandle, AutocompleteDropdownProps>(
-  function AutocompleteDropdown({ inputValue, cursorPosition, prefixes, projects, labels, onSelect, enabled }, ref) {
+  function AutocompleteDropdown({ inputValue, cursorPosition, prefixes, projects, labels, onSelect, enabled, inputElement, onAriaChange }, ref) {
+    const listboxId = useId()
+    const anchorRef = useRef<HTMLSpanElement>(null)
     const [items, setItems] = useState<AutocompleteItem[]>([])
     const [selectedIndex, setSelectedIndex] = useState(0)
     const [visible, setVisible] = useState(false)
     const triggerRef = useRef<{ start: number; prefix: string } | null>(null)
+    const [triggerStart, setTriggerStart] = useState(0)
     const [itemType, setItemType] = useState<ItemType>('project')
 
     // Update dropdown on input/cursor changes
@@ -75,6 +106,7 @@ export const AutocompleteDropdown = forwardRef<AutocompleteHandle, AutocompleteD
       }
 
       triggerRef.current = { start: trigger.start, prefix: trigger.prefix }
+      setTriggerStart(trigger.start)
       setItemType(trigger.type)
 
       const source = trigger.type === 'project' ? projects : labels
@@ -139,32 +171,63 @@ export const AutocompleteDropdown = forwardRef<AutocompleteHandle, AutocompleteD
       },
     }), [visible, items, selectedIndex, selectItem])
 
-    if (!visible) return null
+    const activeId = `${listboxId}-option-${selectedIndex}`
+    useEffect(() => {
+      onAriaChange?.(visible ? { listboxId, activeId } : null)
+    }, [visible, listboxId, activeId, onAriaChange])
+    useEffect(() => () => onAriaChange?.(null), [onAriaChange])
 
     const typeLabel = itemType === 'project' ? 'project' : 'label'
     const colorMap = {
-      project: 'bg-[rgba(59,130,246,0.08)] dark:bg-[rgba(59,130,246,0.15)]',
-      label: 'bg-[rgba(249,115,22,0.08)] dark:bg-[rgba(249,115,22,0.15)]',
+      project: 'bg-accent-blue/8 dark:bg-accent-blue/15',
+      label: 'bg-accent-orange/8 dark:bg-accent-orange/15',
     }
 
+    // The anchor is an empty box at the start of the word, as tall as the input. A textarea (the
+    // title editor) wraps, so there the list sits at the left edge.
+    const left = inputElement && inputElement.tagName === 'INPUT' ? Math.max(0, caretOffset(inputElement, triggerStart)) : 0
+
     return (
-      <div className="absolute left-0 right-0 top-full z-50 mt-1 overflow-hidden rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] shadow-lg">
-        {items.map((item, i) => (
-          <div
-            key={item.id}
-            className={`cursor-pointer px-3 py-1.5 text-[12px] text-[var(--text-primary)] transition-colors ${
-              i === selectedIndex ? colorMap[typeLabel] : 'hover:bg-[var(--bg-hover)]'
-            }`}
-            onMouseDown={(e) => {
-              e.preventDefault()
-              selectItem(i)
-            }}
-            onMouseEnter={() => setSelectedIndex(i)}
+      <>
+        <span
+          ref={anchorRef}
+          aria-hidden
+          className="pointer-events-none absolute top-0 h-full w-px"
+          style={{ left }}
+        />
+        {visible && (
+          <Popover
+            // A new word starts a new list: mount it again so it is placed under that word.
+            key={triggerStart}
+            id={listboxId}
+            anchorRef={anchorRef}
+            onClose={() => setVisible(false)}
+            label={itemType === 'project' ? 'Project suggestions' : 'Label suggestions'}
+            role="listbox"
+            initialFocus="none"
+            className="min-w-48 max-w-80 py-1"
           >
-            {item.title}
-          </div>
-        ))}
-      </div>
+            {items.map((item, i) => (
+              <div
+                key={item.id}
+                id={`${listboxId}-option-${i}`}
+                role="option"
+                aria-selected={i === selectedIndex}
+                className={`cursor-pointer px-3 py-1.5 text-[12px] text-[var(--text-primary)] transition-colors ${
+                  i === selectedIndex ? colorMap[typeLabel] : 'hover:bg-[var(--bg-hover)]'
+                }`}
+                onMouseDown={(e) => {
+                  e.preventDefault()
+                  selectItem(i)
+                }}
+                onMouseEnter={() => setSelectedIndex(i)}
+              >
+                {item.title}
+              </div>
+            ))}
+          </Popover>
+        )}
+      </>
     )
   },
 )

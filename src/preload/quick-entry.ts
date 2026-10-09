@@ -33,6 +33,10 @@ contextBridge.exposeInMainWorld('quickEntryApi', {
   fetchProjects: () => ipcRenderer.invoke('fetch-projects', false),
   addLabelToTask: (taskId: number, labelId: number) => ipcRenderer.invoke('add-label-to-task', taskId, labelId),
   createLabel: (label: { title: string; hex_color?: string }) => ipcRenderer.invoke('create-label', label),
+  getDateFormat: () => ipcRenderer.invoke('get-date-format'),
+  onDateFormatChanged: (callback: (format: { locale: string; hour12: boolean }) => void) => {
+    ipcRenderer.on('date-format-changed', (_event, format: { locale: string; hour12: boolean }) => callback(format))
+  },
   onShowWindow: (callback: () => void) => {
     ipcRenderer.on('window-shown', () => callback())
   },

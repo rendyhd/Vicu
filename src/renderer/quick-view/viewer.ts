@@ -15,6 +15,9 @@ declare global {
       getPendingCount(): Promise<number>
       getQueueCounts(): Promise<{ pending: number; failed: number }>
       getConfig(): Promise<QuickViewConfig | null>
+      // The locale and clock dates are phrased with (system locale, Settings clock choice).
+      getDateFormat(): Promise<{ locale: string; hour12: boolean }>
+      onDateFormatChanged(callback: (format: { locale: string; hour12: boolean }) => void): void
       onShowWindow(callback: () => void): void
       onHideWindow(callback: () => void): void
       onSyncCompleted(callback: () => void): void
@@ -56,12 +59,18 @@ interface ActionResult {
 
 interface QuickViewConfig {
   standalone_mode: boolean
+  // The app theme ('light' | 'dark' | 'system'): this window is dark whenever the main window is.
+  theme?: string
 }
 
 import { extractTaskLink, stripNoteLink, stripPageLink, extractNoteLinkHtml, extractPageLinkHtml } from '@/lib/note-link'
 import { sanitizeTaskHtml } from '@/lib/sanitize-html'
 import { taskPatch, type TaskPatch } from '@/lib/merge-patches'
 import { diffLocalDays, dueToday, isDateOnly, isNoDueDate, toLocalDate } from '@/lib/due-dates'
+import { followColorScheme, followConfiguredTheme } from '@/lib/theme'
+import { formatDateDisplay } from '@/lib/date-display'
+import { getDateFormat, initDateFormat, subscribeDateFormat } from '@/lib/date-format'
+import { priorityMarkSvg } from '../../shared/priority-mark-svg'
 import {
   hasRichDescriptionBody,
   plainTextFromDescriptionLines,
@@ -77,6 +86,8 @@ function plainTextFromHtml(html: string): string {
   tmp.innerHTML = sanitizeTaskHtml(withLineBreaksAsNewlines(html))
   return plainTextFromDescriptionLines(tmp.textContent ?? '')
 }
+
+followColorScheme()
 
 const container = document.getElementById('container')!
 const taskList = document.getElementById('task-list')!
@@ -177,7 +188,8 @@ function updateSelection(newIndex: number): void {
 }
 
 // Buckets follow the local calendar date (cross-app semantics v1): a task due at 08:00 today
-// is still "Today" at 10:00 and becomes overdue tomorrow. Date-only values show no time.
+// is still "Today" at 10:00 and becomes overdue tomorrow. The text is the `row` phrasing of the
+// contract (section 8): "Yesterday", "3 days ago", "Fri", "27 Sep", with the time when it has one.
 function formatDueDate(dueDateStr: string | null | undefined): { label: string; cssClass: string } | null {
   if (isNoDueDate(dueDateStr)) return null
 
@@ -185,33 +197,8 @@ function formatDueDate(dueDateStr: string | null | undefined): { label: string; 
   const now = new Date()
   const diffDays = diffLocalDays(toLocalDate(now), toLocalDate(due))
 
-  let label: string
-  let cssClass: string
-
-  if (diffDays < 0) {
-    label = diffDays === -1 ? 'Yesterday' : `${-diffDays} days overdue`
-    cssClass = 'overdue'
-  } else if (diffDays === 0) {
-    label = 'Today'
-    cssClass = 'today'
-  } else if (diffDays === 1) {
-    label = 'Tomorrow'
-    cssClass = 'upcoming'
-  } else {
-    if (diffDays <= 6) {
-      const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
-      label = days[due.getDay()]
-    } else {
-      const month = due.toLocaleString('default', { month: 'short' })
-      label = `${month} ${due.getDate()}`
-      if (due.getFullYear() !== now.getFullYear()) label += `, ${due.getFullYear()}`
-    }
-    cssClass = 'upcoming'
-  }
-
-  if (diffDays >= -1 && !isDateOnly(dueDateStr as string)) {
-    label += ` ${due.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}`
-  }
+  const label = formatDateDisplay('row', due, now, isDateOnly(dueDateStr as string), getDateFormat())
+  const cssClass = diffDays < 0 ? 'overdue' : diffDays === 0 ? 'today' : 'upcoming'
 
   return { label, cssClass }
 }
@@ -221,12 +208,6 @@ function buildTaskItemDOM(task: TaskData): HTMLElement {
   item.className = 'task-item'
   item.dataset.taskId = String(task.id)
   item.dataset.task = JSON.stringify(task)
-
-  if (task.priority && task.priority > 0) {
-    const priority = document.createElement('span')
-    priority.className = `task-priority priority-${Math.min(task.priority, 5)}`
-    item.appendChild(priority)
-  }
 
   const checkbox = document.createElement('input') as HTMLInputElement
   checkbox.type = 'checkbox'
@@ -293,14 +274,6 @@ function buildTaskItemDOM(task: TaskData): HTMLElement {
 
   content.appendChild(titleRow)
 
-  const dueInfo = formatDueDate(task.due_date)
-  if (dueInfo) {
-    const due = document.createElement('div')
-    due.className = `task-due ${dueInfo.cssClass}`
-    due.textContent = dueInfo.label
-    content.appendChild(due)
-  }
-
   if (task.description) {
     const desc = document.createElement('div')
     desc.className = 'task-description task-description-rich hidden'
@@ -326,6 +299,22 @@ function buildTaskItemDOM(task: TaskData): HTMLElement {
   }
 
   item.appendChild(content)
+  // The due phrase sits in the trailing cluster, level with the title (design system, section 4).
+  const dueInfo = formatDueDate(task.due_date)
+  if (dueInfo) {
+    const due = document.createElement('div')
+    due.className = `task-due ${dueInfo.cssClass}`
+    due.textContent = dueInfo.label
+    item.appendChild(due)
+  }
+  // The priority mark closes the row (the shared SVG, drawn in the priority role colour).
+  const markSvg = priorityMarkSvg(task.priority)
+  if (markSvg) {
+    const mark = document.createElement('span')
+    mark.className = `task-priority priority-${Math.min(task.priority, 5)}`
+    mark.innerHTML = markSvg
+    item.appendChild(mark)
+  }
   return item
 }
 
@@ -449,22 +438,14 @@ async function toggleDueDate(): Promise<void> {
       lastFetchResult = null
       taskData.due_date = dueToday()
       item.dataset.task = JSON.stringify(taskData)
-      const content = item.querySelector('.task-content')
       let dueEl = item.querySelector('.task-due')
-      if (dueEl) {
-        dueEl.textContent = 'Today'
-        dueEl.className = 'task-due today'
-      } else if (content) {
+      if (!dueEl) {
+        // Before the priority mark, which closes the row.
         dueEl = document.createElement('div')
-        dueEl.className = 'task-due today'
-        dueEl.textContent = 'Today'
-        const titleRow = content.querySelector('.task-title-row')
-        if (titleRow && titleRow.nextSibling) {
-          content.insertBefore(dueEl, titleRow.nextSibling)
-        } else {
-          content.appendChild(dueEl)
-        }
+        item.insertBefore(dueEl, item.querySelector('.task-priority'))
       }
+      dueEl.textContent = 'Today'
+      dueEl.className = 'task-due today'
     } else {
       showError(result.error || 'Failed to schedule task')
     }
@@ -633,7 +614,10 @@ async function handleEnterOnSelected(): Promise<void> {
 
 async function loadConfig(): Promise<void> {
   const cfg = await window.quickViewApi.getConfig()
-  if (cfg) isStandaloneMode = cfg.standalone_mode === true
+  if (cfg) {
+    isStandaloneMode = cfg.standalone_mode === true
+    followConfiguredTheme(cfg.theme)
+  }
 }
 
 async function loadTasks(forceRefresh = false): Promise<void> {
@@ -717,6 +701,13 @@ window.quickViewApi.onSyncCompleted(async () => {
 // When settings change in the main app, drop the cached fetch so the next
 // show fetches fresh tasks with the updated viewer_filter.
 window.quickViewApi.onConfigChanged(() => {
+  lastFetchTime = 0
+})
+
+// Dates follow the system locale and the Settings clock choice. A change drops the cached list so
+// the next show draws the due dates again with the new format.
+void initDateFormat(window.quickViewApi)
+subscribeDateFormat(() => {
   lastFetchTime = 0
 })
 

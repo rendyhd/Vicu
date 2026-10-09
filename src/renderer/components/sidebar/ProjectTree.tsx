@@ -1,25 +1,35 @@
-import { useState, useEffect, useMemo } from 'react'
-import { Archive, Pencil, Trash2, X } from 'lucide-react'
+import { useState, useEffect, useId, useMemo } from 'react'
+import { Archive, Pencil, Plus, Trash2, X } from 'lucide-react'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { useProjects, type ProjectTreeNode } from '@/hooks/use-projects'
 import { useCreateProject, useUpdateProject, useDeleteProject, useSetProjectArchived } from '@/hooks/use-task-mutations'
 import { useConfirmDelete } from '@/hooks/use-confirm-delete'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { useSidebarStore } from '@/stores/sidebar-store'
+import { useOpenTaskCounts } from '@/hooks/use-project-progress'
+import { useSidebarCollapsed } from '@/hooks/use-sidebar-collapsed'
+import { useAppConfig } from '@/hooks/use-app-config'
 import { cn } from '@/lib/cn'
+import { focusTargetOf } from '@/lib/focus-target'
 import { api } from '@/lib/api'
+import { Dialog } from '@/components/overlay/Dialog'
+import { Menu, MenuItem } from '@/components/overlay/Menu'
 import { ProjectTreeItem } from './ProjectTreeItem'
 import type { Project } from '@/lib/vikunja-types'
 
 function ProjectDialog({
   open,
   project,
+  parentProject = null,
   onClose,
 }: {
   open: boolean
   project: Project | null
+  /** Set (with no `project`) to add a section: a child project of this one. */
+  parentProject?: Project | null
   onClose: () => void
 }) {
+  const titleId = useId()
   const [title, setTitle] = useState('')
   const [hexColor, setHexColor] = useState('')
   const createProject = useCreateProject()
@@ -49,25 +59,28 @@ function ProjectDialog({
       )
     } else {
       createProject.mutate(
-        { title: trimmed, hex_color: hexColor || undefined },
+        {
+          title: trimmed,
+          hex_color: hexColor || undefined,
+          ...(parentProject ? { parent_project_id: parentProject.id } : {}),
+        },
         { onSuccess: onClose }
       )
     }
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}>
-      <div
-        className="w-[360px] rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] shadow-xl"
-      >
+    <Dialog open onClose={onClose} labelledBy={titleId} className="w-[360px]">
+      <div>
         <div className="flex items-center justify-between border-b border-[var(--border-color)] px-5 py-3">
-          <h2 className="text-sm font-semibold text-[var(--text-primary)]">
-            {project ? 'Edit Project' : 'New Project'}
+          <h2 id={titleId} className="text-sm font-semibold text-[var(--text-primary)]">
+            {project ? 'Edit Project' : parentProject ? 'New Section' : 'New Project'}
           </h2>
           <button
             type="button"
             onClick={onClose}
-            className="rounded p-1 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
+            aria-label="Close"
+            className="rounded-control p-1 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
           >
             <X className="h-4 w-4" />
           </button>
@@ -80,9 +93,9 @@ function ProjectDialog({
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="Project name"
-              autoFocus
-              className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)] focus:border-accent-blue focus:outline-none"
+              placeholder={parentProject ? 'Section name' : 'Project name'}
+              data-autofocus
+              className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]"
               onKeyDown={(e) => {
                 if (e.key === 'Enter') handleSave()
               }}
@@ -98,7 +111,7 @@ function ProjectDialog({
                   type="button"
                   onClick={() => setHexColor(c)}
                   className={cn(
-                    'h-6 w-6 rounded-full transition-transform hover:scale-110',
+                    'h-6 w-6 rounded-full transition-transform hover:scale-110 motion-reduce:hover:scale-100',
                     hexColor === c && 'ring-2 ring-[var(--text-primary)] ring-offset-1 ring-offset-[var(--bg-primary)]'
                   )}
                   style={{ backgroundColor: c }}
@@ -115,7 +128,7 @@ function ProjectDialog({
                 value={hexColor}
                 onChange={(e) => setHexColor(e.target.value)}
                 placeholder="#hex"
-                className="flex-1 rounded-md border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-1.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)] focus:border-accent-blue focus:outline-none"
+                className="flex-1 rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-1.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]"
               />
               {hexColor && (
                 <button
@@ -134,7 +147,7 @@ function ProjectDialog({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-md border border-[var(--border-color)] px-4 py-1.5 text-xs font-medium text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-hover)]"
+            className="rounded-control border border-[var(--border-color)] px-4 py-1.5 text-xs font-medium text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-hover)]"
           >
             Cancel
           </button>
@@ -143,8 +156,8 @@ function ProjectDialog({
             onClick={handleSave}
             disabled={!title.trim()}
             className={cn(
-              'rounded-md px-4 py-1.5 text-xs font-medium transition-colors',
-              'bg-accent-blue text-white hover:bg-accent-blue/90',
+              'rounded-control px-4 py-1.5 text-xs font-medium transition-colors',
+              'bg-accent-fill text-on-accent hover:bg-accent-fill/90',
               'disabled:cursor-not-allowed disabled:opacity-50'
             )}
           >
@@ -152,7 +165,7 @@ function ProjectDialog({
           </button>
         </div>
       </div>
-    </div>
+    </Dialog>
   )
 }
 
@@ -162,38 +175,33 @@ export function ProjectTree() {
   const setArchived = useSetProjectArchived()
   const { confirmDelete, dialogProps: deleteDialogProps } = useConfirmDelete()
   const { projectDialogOpen, setProjectDialogOpen } = useSidebarStore()
+  const openCounts = useOpenTaskCounts()
+  const { collapsed, setCollapsed } = useSidebarCollapsed()
 
-  const [inboxProjectId, setInboxProjectId] = useState<number | undefined>()
   const [editingProject, setEditingProject] = useState<Project | null>(null)
   const [archiveTarget, setArchiveTarget] = useState<Project | null>(null)
+  const [sectionParent, setSectionParent] = useState<Project | null>(null)
   const [contextMenu, setContextMenu] = useState<{
     x: number
     y: number
     project: ProjectTreeNode
+    /** The row's control: a confirmation opened from a menu entry gives focus back here. */
+    opener: HTMLElement | null
   } | null>(null)
+  const [archiveOpener, setArchiveOpener] = useState<HTMLElement | null>(null)
 
-  useEffect(() => {
-    api.getConfig().then((config) => {
-      if (config?.inbox_project_id) setInboxProjectId(config.inbox_project_id)
-    })
-  }, [])
+  // The tree waits for the config so the Inbox is never drawn (and counted) for a moment.
+  const { data: config, isLoading: configLoading } = useAppConfig()
+  const inboxProjectId = config?.inbox_project_id || undefined
 
   const visibleTree = useMemo(
     () => (inboxProjectId ? data?.tree.filter((n) => n.id !== inboxProjectId) : data?.tree) ?? [],
     [data?.tree, inboxProjectId]
   )
 
-  // Close context menu on click outside
-  useEffect(() => {
-    if (!contextMenu) return
-    const handler = () => setContextMenu(null)
-    window.addEventListener('click', handler)
-    return () => window.removeEventListener('click', handler)
-  }, [contextMenu])
-
   const handleContextMenu = (e: React.MouseEvent, node: ProjectTreeNode) => {
     e.preventDefault()
-    setContextMenu({ x: e.clientX, y: e.clientY, project: node })
+    setContextMenu({ x: e.clientX, y: e.clientY, project: node, opener: focusTargetOf(e.currentTarget) })
   }
 
   const handleCloseDialog = () => {
@@ -201,7 +209,7 @@ export function ProjectTree() {
     setEditingProject(null)
   }
 
-  if (isLoading || !data) {
+  if (isLoading || configLoading || !data) {
     return (
       <div className="px-4 py-2 text-xs text-[var(--text-secondary)]">
         Loading...
@@ -231,60 +239,68 @@ export function ProjectTree() {
       <div className="flex flex-col gap-0.5 px-2">
         <SortableContext items={sortableIds} strategy={verticalListSortingStrategy}>
           {visibleTree.map((node) => (
-            <ProjectTreeItem key={node.id} node={node} siblings={visibleTree} onContextMenu={handleContextMenu} />
+            <ProjectTreeItem
+              key={node.id}
+              node={node}
+              siblings={visibleTree}
+              openCounts={openCounts}
+              collapsed={collapsed}
+              onToggleCollapsed={setCollapsed}
+              onContextMenu={handleContextMenu}
+            />
           ))}
         </SortableContext>
       </div>
 
-      {/* Context Menu */}
+      {/* Context menu: the Menu primitive at the pointer (arrow keys, Escape, focus return, kept in the window). */}
       {contextMenu && (
-        <div
-          className="fixed z-50 min-w-[140px] rounded-md border border-[var(--border-color)] bg-[var(--bg-primary)] py-1 shadow-lg"
-          style={{ left: contextMenu.x, top: contextMenu.y }}
+        <Menu
+          key={`${contextMenu.project.id}:${contextMenu.x}:${contextMenu.y}`}
+          anchorPoint={{ x: contextMenu.x, y: contextMenu.y }}
+          label={`${contextMenu.project.title} actions`}
+          onClose={() => setContextMenu(null)}
         >
-          <button
-            type="button"
-            onClick={() => {
+          <MenuItem
+            icon={<Pencil />}
+            onSelect={() => {
               setEditingProject(contextMenu.project)
               setProjectDialogOpen(true)
-              setContextMenu(null)
             }}
-            className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-[var(--text-primary)] hover:bg-[var(--bg-hover)]"
           >
-            <Pencil className="h-3.5 w-3.5" />
             Edit
-          </button>
+          </MenuItem>
+          <MenuItem icon={<Plus />} onSelect={() => setSectionParent(contextMenu.project)}>
+            Add section
+          </MenuItem>
           {contextMenu.project.id !== inboxProjectId && (
             <>
-              <button
-                type="button"
-                onClick={() => {
+              <MenuItem
+                icon={<Archive />}
+                onSelect={() => {
                   setArchiveTarget(contextMenu.project)
-                  setContextMenu(null)
+                  setArchiveOpener(contextMenu.opener)
                 }}
-                className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-[var(--text-primary)] hover:bg-[var(--bg-hover)]"
               >
-                <Archive className="h-3.5 w-3.5" />
                 Archive
-              </button>
-              <button
-                type="button"
-                onClick={async () => {
+              </MenuItem>
+              <MenuItem
+                icon={<Trash2 />}
+                danger
+                onSelect={async () => {
                   const project = contextMenu.project
-                  setContextMenu(null)
-                  const ok = await confirmDelete('Delete this project? All tasks in it will be deleted. This cannot be undone.')
+                  const ok = await confirmDelete('Delete this project? All tasks in it will be deleted. This cannot be undone.', {
+                    returnFocusTo: contextMenu.opener,
+                  })
                   if (ok) {
                     deleteProject.mutate(project.id)
                   }
                 }}
-                className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-accent-red hover:bg-[var(--bg-hover)]"
               >
-                <Trash2 className="h-3.5 w-3.5" />
                 Delete
-              </button>
+              </MenuItem>
             </>
           )}
-        </div>
+        </Menu>
       )}
 
       <ProjectDialog
@@ -292,12 +308,19 @@ export function ProjectTree() {
         project={editingProject}
         onClose={handleCloseDialog}
       />
+      <ProjectDialog
+        open={sectionParent != null}
+        project={null}
+        parentProject={sectionParent}
+        onClose={() => setSectionParent(null)}
+      />
       <ConfirmDialog {...deleteDialogProps} />
       <ConfirmDialog
         open={archiveTarget != null}
         message={archiveTarget ? `Archive “${archiveTarget.title}”? Its tasks will be kept and it can be restored from Settings.` : ''}
         confirmLabel="Archive"
         destructive={false}
+        returnFocusTo={archiveOpener}
         onCancel={() => setArchiveTarget(null)}
         onConfirm={() => {
           if (archiveTarget) setArchived.mutate({ project: archiveTarget, archived: true })

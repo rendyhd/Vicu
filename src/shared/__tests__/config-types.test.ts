@@ -5,6 +5,8 @@ import {
   CUSTOM_LIST_SORT_FIELDS,
   isQuickEntryEnabled,
   isQuickViewEnabled,
+  isRoutinesEnabled,
+  showRoutinesInToday,
 } from '../config-types'
 
 describe('Quick Entry and Quick View defaults', () => {
@@ -21,6 +23,21 @@ describe('Quick Entry and Quick View defaults', () => {
     expect(isQuickViewEnabled({ quick_view_enabled: false })).toBe(false)
     expect(isQuickEntryEnabled({ quick_entry_enabled: true })).toBe(true)
     expect(isQuickEntryEnabled({ quick_entry_enabled: false })).toBe(false)
+  })
+})
+
+describe('routine switches', () => {
+  it('are on when a config has no setting (configs from before the switches)', () => {
+    expect(isRoutinesEnabled({})).toBe(true)
+    expect(isRoutinesEnabled(null)).toBe(true)
+    expect(showRoutinesInToday({})).toBe(true)
+  })
+
+  it('hide routines from Today when routines are off or the Today section is off', () => {
+    expect(isRoutinesEnabled({ routines_enabled: false })).toBe(false)
+    expect(showRoutinesInToday({ routines_enabled: false, routines_in_today: true })).toBe(false)
+    expect(showRoutinesInToday({ routines_enabled: true, routines_in_today: false })).toBe(false)
+    expect(showRoutinesInToday({ routines_enabled: true, routines_in_today: true })).toBe(true)
   })
 })
 

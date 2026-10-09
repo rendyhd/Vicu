@@ -5,6 +5,8 @@ export interface ConfirmOptions {
   force?: boolean
   confirmLabel?: string
   destructive?: boolean
+  /** Focus goes here when the dialog closes (the row or button a context menu came from). */
+  returnFocusTo?: HTMLElement | null
 }
 
 export function useConfirmDelete() {
@@ -53,6 +55,7 @@ export function useConfirmDelete() {
       onCancel,
       confirmLabel: options.confirmLabel,
       destructive: options.destructive,
+      returnFocusTo: options.returnFocusTo,
     },
   }
 }

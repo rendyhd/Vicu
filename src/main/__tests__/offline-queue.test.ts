@@ -546,7 +546,7 @@ describe('OfflineQueue', () => {
       expect(existsSync(join(attachmentsDir, file))).toBe(false)
     })
 
-    it('forgets entries older than the retention window and keeps the log bounded', async () => {
+    it('forgets entries older than the retention window', async () => {
       const q = make()
       const first = await q.enqueueUpdate(1, { done: true })
       await q.failAction(first.actionId, { error: 'x', statusCode: 400, reason: 'rejected' })
@@ -555,12 +555,30 @@ describe('OfflineQueue', () => {
       const second = await q.enqueueUpdate(2, { done: true })
       await q.failAction(second.actionId, { error: 'y', statusCode: 400, reason: 'rejected' })
       expect(q.getFailed().map((f) => f.id)).toEqual([second.actionId])
+    })
 
-      for (let i = 0; i < MAX_FAILED_ENTRIES + 5; i++) {
-        const a = await q.enqueueUpdate(100 + i, { done: true })
-        await q.failAction(a.actionId, { error: 'z', statusCode: 400, reason: 'rejected' })
+    it('keeps the log bounded, dropping the oldest entries', async () => {
+      // The log is seeded on disk instead of built with 100+ real enqueue/fail writes (each one an
+      // atomic file write), which took long enough to hit the 5 s timeout on a loaded machine.
+      const failedAt = new Date(clock * 1000).toISOString()
+      const entry = (i: number) => {
+        const action = { id: `seed${i}`, type: 'update', taskId: 100 + i, patch: { done: true }, createdAt: failedAt, attempts: 0 }
+        return { id: action.id, action, error: 'z', statusCode: 400, reason: 'rejected', failedAt }
       }
+      const seeded = { version: 1, actions: [], failed: Array.from({ length: MAX_FAILED_ENTRIES + 5 }, (_, i) => entry(i)), resolved: {}, lastTempId: 0 }
+      writeFileSync(queuePath, JSON.stringify(seeded))
+
+      // Loading trims an oversized log to the newest entries.
+      const q = make()
       expect(q.getFailed()).toHaveLength(MAX_FAILED_ENTRIES)
+      expect(q.getFailed()[0].id).toBe('seed5')
+
+      // And a new failure at the cap pushes the oldest one out.
+      const next = await q.enqueueUpdate(1, { done: true })
+      await q.failAction(next.actionId, { error: 'y', statusCode: 400, reason: 'rejected' })
+      expect(q.getFailed()).toHaveLength(MAX_FAILED_ENTRIES)
+      expect(q.getFailed()[0].id).toBe('seed6')
+      expect(q.getFailed().at(-1)?.id).toBe(next.actionId)
     })
 
     it('counts attempts per action', async () => {

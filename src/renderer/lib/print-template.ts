@@ -1,5 +1,7 @@
 import type { Task } from './vikunja-types'
 import { formatClockTime, isNullDate } from './date-utils'
+import { formatDayMonthYear, formatFullDateWithYear, type DateFormat } from './date-display'
+import { getDateFormat } from './date-format'
 import { isDateOnly } from './due-dates'
 import { normalizeHex } from './constants'
 
@@ -24,6 +26,8 @@ export interface PrintOptions {
   sanitize: (html: string) => string
   logoDataUrl: string
   now?: Date
+  /** Locale and clock for the dates; the window's own by default. */
+  dateFormat?: DateFormat
 }
 
 const PRIORITY_LABELS = ['', 'Low', 'Medium', 'High', 'Urgent']
@@ -37,18 +41,14 @@ function escapeHtml(s: string): string {
     .replace(/'/g, '&#39;')
 }
 
-function formatPrintDate(date: string): string {
-  return new Date(date).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  })
+function formatPrintDate(date: string, fmt: DateFormat): string {
+  return formatDayMonthYear(new Date(date), fmt)
 }
 
 /** The due date, plus the time of day when it has an explicit time (date-only values show none). */
-function formatPrintDue(date: string): string {
-  const day = formatPrintDate(date)
-  return isDateOnly(date) ? day : `${day} ${formatClockTime(new Date(date))}`
+function formatPrintDue(date: string, fmt: DateFormat): string {
+  const day = formatPrintDate(date, fmt)
+  return isDateOnly(date) ? day : `${day}, ${formatClockTime(new Date(date), fmt)}`
 }
 
 function hasText(html: string): boolean {
@@ -67,14 +67,14 @@ function renderLabels(task: Task): string {
   return `<span class="labels">${pills}</span>`
 }
 
-function renderTask(task: Task, sanitize: (html: string) => string): string {
+function renderTask(task: Task, sanitize: (html: string) => string, fmt: DateFormat): string {
   const meta: string[] = []
   if (task.priority > 0 && PRIORITY_LABELS[task.priority]) {
     meta.push(`<span class="meta-priority">⚑ ${PRIORITY_LABELS[task.priority]}</span>`)
   }
-  if (!isNullDate(task.due_date)) meta.push(`Due ${formatPrintDue(task.due_date)}`)
-  if (!isNullDate(task.start_date)) meta.push(`Starts ${formatPrintDate(task.start_date)}`)
-  if (task.done && !isNullDate(task.done_at)) meta.push(`Completed ${formatPrintDate(task.done_at)}`)
+  if (!isNullDate(task.due_date)) meta.push(`Due ${formatPrintDue(task.due_date, fmt)}`)
+  if (!isNullDate(task.start_date)) meta.push(`Starts ${formatPrintDate(task.start_date, fmt)}`)
+  if (task.done && !isNullDate(task.done_at)) meta.push(`Completed ${formatPrintDate(task.done_at, fmt)}`)
 
   const notes = sanitize(task.description ?? '')
   return `
@@ -93,12 +93,8 @@ function renderTask(task: Task, sanitize: (html: string) => string): string {
 
 export function buildPrintHtml(payload: PrintablePayload, options: PrintOptions): string {
   const now = options.now ?? new Date()
-  const dateLine = now.toLocaleDateString('en-US', {
-    weekday: 'long',
-    month: 'long',
-    day: 'numeric',
-    year: 'numeric',
-  })
+  const fmt = options.dateFormat ?? getDateFormat()
+  const dateLine = formatFullDateWithYear(now, fmt)
   const allTasks = payload.sections.flatMap((s) => s.groups.flatMap((g) => g.tasks))
   const countLine = `${allTasks.length} ${allTasks.length === 1 ? 'task' : 'tasks'}`
 
@@ -112,7 +108,7 @@ export function buildPrintHtml(payload: PrintablePayload, options: PrintOptions)
               .map(
                 (g) =>
                   `${g.heading ? `<h3 class="group-heading">${escapeHtml(g.heading)}</h3>` : ''}${g.tasks
-                    .map((t) => renderTask(t, options.sanitize))
+                    .map((t) => renderTask(t, options.sanitize, fmt))
                     .join('')}`
               )
               .join('')
@@ -150,7 +146,7 @@ export function buildPrintHtml(payload: PrintablePayload, options: PrintOptions)
     color: #444; margin: 18px 0 4px; break-after: avoid;
   }
   .group-heading {
-    font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em;
+    font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em;
     color: #888; margin: 10px 0 2px; break-after: avoid;
   }
   .task {
@@ -161,7 +157,7 @@ export function buildPrintHtml(payload: PrintablePayload, options: PrintOptions)
   .checkbox {
     flex-shrink: 0; width: 13px; height: 13px; margin-top: 2px;
     border: 1.5px solid #555; border-radius: 3px;
-    font-size: 10px; line-height: 11px; text-align: center; color: #555;
+    font-size: 11px; line-height: 12px; text-align: center; color: #555;
   }
   .task-body { min-width: 0; flex: 1; }
   .task-line { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
@@ -170,7 +166,7 @@ export function buildPrintHtml(payload: PrintablePayload, options: PrintOptions)
   .labels { display: inline-flex; gap: 4px; flex-wrap: wrap; }
   .label {
     display: inline-flex; align-items: center; gap: 4px;
-    font-size: 10px; color: #555; border: 1px solid #ccc; border-radius: 9px;
+    font-size: 11px; color: #555; border: 1px solid #ccc; border-radius: 9px;
     padding: 0 7px; line-height: 16px;
   }
   .label-dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
@@ -181,12 +177,12 @@ export function buildPrintHtml(payload: PrintablePayload, options: PrintOptions)
   .task-notes p { margin: 0 0 4px; }
   .task-notes ul, .task-notes ol { margin: 2px 0 4px; padding-left: 18px; }
   .task-notes a { color: #444; }
-  .task-notes pre, .task-notes code { font-family: Consolas, monospace; font-size: 10.5px; }
+  .task-notes pre, .task-notes code { font-family: Consolas, monospace; font-size: 11px; }
   .task-notes blockquote { margin: 2px 0; padding-left: 8px; border-left: 2px solid #ccc; color: #666; }
   .empty { color: #777; font-size: 13px; }
   footer {
     margin-top: 28px; padding-top: 8px; border-top: 1px solid #ddd;
-    font-size: 10px; color: #999;
+    font-size: 11px; color: #999;
   }
 </style>
 </head>

@@ -5,6 +5,8 @@ import { useReorderStore } from '@/stores/reorder-store'
 import { usePrintable } from '@/stores/print-store'
 import { api } from '@/lib/api'
 import { TaskList } from '@/components/task-list/TaskList'
+import { RowViewProvider } from '@/components/task-list/RowViewContext'
+import { ListSkeleton } from '@/components/shared/ListSkeleton'
 
 export function InboxView() {
   const [inboxProjectId, setInboxProjectId] = useState<number | undefined>()
@@ -22,6 +24,7 @@ export function InboxView() {
     ? inboxProjectId
     : undefined
   const { data: tasks = [], isLoading, viewId } = useProjectTasks(activeInboxId)
+  const rowView = useMemo(() => ({ projectId: activeInboxId }), [activeInboxId])
   const setReorderContext = useReorderStore((s) => s.setReorderContext)
 
   useEffect(() => {
@@ -33,22 +36,21 @@ export function InboxView() {
   )
 
   if (isLoading || projectsLoading) {
-    return (
-      <div className="flex flex-1 items-center justify-center text-sm text-[var(--text-secondary)]">
-        Loading...
-      </div>
-    )
+    return <ListSkeleton title="Inbox" identity="inbox" />
   }
 
   return (
-    <TaskList
-      title="Inbox"
-      tasks={tasks}
-      projectId={activeInboxId}
-      sortable
-      viewId={viewId}
-      emptyTitle={inboxProjectId && !activeInboxId ? 'Inbox project is archived' : 'Nothing in Inbox'}
-      emptySubtitle={inboxProjectId && !activeInboxId ? 'Select an active Inbox project in Settings' : 'Tasks added here will be sorted later'}
-    />
+    <RowViewProvider value={rowView}>
+      <TaskList
+        title="Inbox"
+        identity="inbox"
+        tasks={tasks}
+        projectId={activeInboxId}
+        sortable
+        viewId={viewId}
+        emptyTitle={inboxProjectId && !activeInboxId ? 'Inbox project is archived' : 'Nothing in Inbox'}
+        emptySubtitle={inboxProjectId && !activeInboxId ? 'Select an active Inbox project in Settings' : 'Tasks added here will be sorted later'}
+      />
+    </RowViewProvider>
   )
 }

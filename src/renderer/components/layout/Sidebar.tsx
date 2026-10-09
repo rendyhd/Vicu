@@ -1,4 +1,5 @@
 import { Plus } from 'lucide-react'
+import { QuickFind } from '@/components/sidebar/QuickFind'
 import { SmartListNav } from '@/components/sidebar/SmartListNav'
 import { CustomListNav } from '@/components/sidebar/CustomListNav'
 import { ProjectTree } from '@/components/sidebar/ProjectTree'
@@ -10,7 +11,11 @@ export function Sidebar() {
   const { openProjectDialog, openLabelDialog } = useSidebarActions()
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="isolate flex h-full flex-col">
+      <div role="search" className="px-2 pt-2">
+        <QuickFind />
+      </div>
+
       <SmartListNav />
 
       <div className="mx-4 border-t border-[var(--border-color)]" />
@@ -24,7 +29,7 @@ export function Sidebar() {
             <button
               type="button"
               onClick={() => openProjectDialog()}
-              className="flex h-5 w-5 items-center justify-center rounded text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
+              className="flex h-5 w-5 items-center justify-center rounded-control text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
               aria-label="New project"
             >
               <Plus className="h-3.5 w-3.5" />
@@ -47,7 +52,7 @@ export function Sidebar() {
             <button
               type="button"
               onClick={() => openLabelDialog()}
-              className="flex h-5 w-5 items-center justify-center rounded text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
+              className="flex h-5 w-5 items-center justify-center rounded-control text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
               aria-label="New label"
             >
               <Plus className="h-3.5 w-3.5" />

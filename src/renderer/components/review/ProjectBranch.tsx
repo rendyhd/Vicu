@@ -7,6 +7,7 @@ import { useSetReviewCadence, useExcludeFromReview, type ReviewTreeNode } from '
 import { useProjectTasks } from '@/hooks/use-project-tasks'
 import { useCreateTask } from '@/hooks/use-task-mutations'
 import { TaskRow } from '@/components/task-list/TaskRow'
+import { TaskRowGroup } from '@/components/task-list/TaskRowGroup'
 
 interface ProjectBranchProps {
   node: ReviewTreeNode
@@ -105,7 +106,7 @@ interface ProjectHeaderProps {
 
 function ProjectHeader({ node, depth, isOpen, isReviewed, isFocused, onToggle, onMarkReviewed }: ProjectHeaderProps) {
   const { project } = node
-  const dotColor = normalizeHex(project.hex_color) || '#8E8E93'
+  const dotColor = normalizeHex(project.hex_color) || 'var(--control-ring)'
   const subCount = node.children.length
 
   return (
@@ -118,7 +119,7 @@ function ProjectHeader({ node, depth, isOpen, isReviewed, isFocused, onToggle, o
         alignItems: 'center',
         gap: 10,
         padding: '8px 10px',
-        borderRadius: 8,
+        borderRadius: 'var(--radius-control)',
         marginLeft: depth * 18,
         marginBottom: 2,
         background: isOpen ? 'var(--bg-hover)' : 'transparent',
@@ -133,14 +134,14 @@ function ProjectHeader({ node, depth, isOpen, isReviewed, isFocused, onToggle, o
           color: 'var(--text-secondary)',
           flexShrink: 0,
           transform: isOpen ? 'rotate(90deg)' : 'none',
-          transition: 'transform 0.15s',
+          transition: 'transform var(--dur-fade-fast) var(--ease-standard)',
         }}
       />
       <span
         style={{
           width: 10,
           height: 10,
-          borderRadius: depth ? 5 : 2,
+          borderRadius: 'var(--radius-chip)',
           background: dotColor,
           flexShrink: 0,
           opacity: depth ? 0.6 : 1,
@@ -153,7 +154,7 @@ function ProjectHeader({ node, depth, isOpen, isReviewed, isFocused, onToggle, o
         {project.title}
       </span>
       {depth === 0 && subCount > 0 && (
-        <span style={{ fontSize: 10, color: 'var(--text-tertiary)', flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>
+        <span style={{ fontSize: 'var(--type-caption-size)', color: 'var(--text-secondary)', flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>
           {subCount} sub-project{subCount === 1 ? '' : 's'}
         </span>
       )}
@@ -170,10 +171,10 @@ function ProjectHeader({ node, depth, isOpen, isReviewed, isFocused, onToggle, o
             fontSize: 11,
             fontWeight: 600,
             padding: '4px 10px',
-            borderRadius: 6,
+            borderRadius: 'var(--radius-control)',
             background: 'transparent',
             color: 'var(--accent-purple)',
-            border: '1px solid rgba(175,82,222,0.4)',
+            border: '1px solid rgb(var(--accent-purple-rgb) / 0.4)',
             cursor: 'pointer',
             display: 'inline-flex',
             alignItems: 'center',
@@ -206,22 +207,14 @@ function ProjectHeader({ node, depth, isOpen, isReviewed, isFocused, onToggle, o
 
 function StalenessPill({ node }: { node: ReviewTreeNode }) {
   const pill = formatStalenessPill(node.status)
+  // Grey says nothing is wrong; amber ("Due") is the one state that asks for attention.
   const tones = {
-    red: { background: 'rgba(255,59,48,0.12)', color: 'var(--accent-red)' },
-    orange: { background: 'rgba(255,149,0,0.12)', color: 'var(--accent-orange)' },
-    gray: { background: 'var(--bg-hover)', color: 'var(--text-secondary)' },
+    amber: 'bg-status-today/12 text-status-today',
+    gray: 'bg-bg-hover text-text-secondary',
   }
   return (
-    <span
-      style={{
-        fontSize: 10,
-        fontWeight: 600,
-        padding: '2px 7px',
-        borderRadius: 999,
-        flexShrink: 0,
-        ...tones[pill.tone],
-      }}
-    >
+    // Not through cn(): tailwind-merge reads text-caption as a colour and drops it next to the tone.
+    <span className={`vicu-chip shrink-0 rounded-chip px-[7px] py-0.5 text-caption ${tones[pill.tone]}`}>
       {pill.text}
     </span>
   )
@@ -240,14 +233,14 @@ function ProjectRowMenu({ node }: { node: ReviewTreeNode }) {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex h-6 w-6 items-center justify-center rounded text-[var(--text-tertiary)] opacity-0 transition-opacity hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] group-hover:opacity-100"
+        className="flex h-6 w-6 items-center justify-center rounded-control text-[var(--text-secondary)] opacity-0 transition-opacity hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] group-hover:opacity-100"
         title="Review options"
       >
         <MoreHorizontal className="h-4 w-4" />
       </button>
       {open && !cadenceOpen && (
         <div
-          className="absolute right-0 top-full z-20 mt-1 w-48 rounded-md border border-[var(--border-color)] bg-[var(--bg-primary)] py-1 shadow-lg"
+          className="absolute right-0 top-full z-20 mt-1 w-48 rounded-popover border border-[var(--border-color)] bg-[var(--bg-primary)] py-1 shadow-lg"
           onMouseLeave={() => setOpen(false)}
         >
           <button
@@ -259,7 +252,7 @@ function ProjectRowMenu({ node }: { node: ReviewTreeNode }) {
           </button>
           <button
             type="button"
-            className="w-full px-3 py-1.5 text-left text-sm text-[var(--accent-red)] hover:bg-[var(--bg-hover)]"
+            className="w-full px-3 py-1.5 text-left text-sm text-danger hover:bg-[var(--bg-hover)]"
             onClick={() => {
               setOpen(false)
               exclude.mutate({ project: node.project, excluded: true })
@@ -270,7 +263,7 @@ function ProjectRowMenu({ node }: { node: ReviewTreeNode }) {
         </div>
       )}
       {cadenceOpen && (
-        <div className="absolute right-0 top-full z-20 mt-1 w-52 space-y-2 rounded-md border border-[var(--border-color)] bg-[var(--bg-primary)] p-3 shadow-lg">
+        <div className="absolute right-0 top-full z-20 mt-1 w-52 space-y-2 rounded-popover border border-[var(--border-color)] bg-[var(--bg-primary)] p-3 shadow-lg">
           <label className="block text-xs text-[var(--text-secondary)]">Cadence in days (blank = default)</label>
           <input
             type="number"
@@ -278,12 +271,12 @@ function ProjectRowMenu({ node }: { node: ReviewTreeNode }) {
             max={365}
             value={cadenceInput}
             onChange={(e) => setCadenceInput(e.target.value)}
-            className="w-full rounded border border-[var(--border-color)] bg-[var(--bg-primary)] px-2 py-1 text-sm"
+            className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-primary)] px-2 py-1 text-sm"
           />
           <div className="flex gap-2">
             <button
               type="button"
-              className="flex-1 rounded bg-[var(--accent-blue)] px-2 py-1 text-sm text-white"
+              className="flex-1 rounded-control bg-accent-fill px-2 py-1 text-sm text-on-accent"
               onClick={() => {
                 const n = cadenceInput === '' ? null : parseInt(cadenceInput, 10)
                 setCadence.mutate({ project: node.project, cadenceDays: Number.isFinite(n ?? NaN) ? n : null })
@@ -295,7 +288,7 @@ function ProjectRowMenu({ node }: { node: ReviewTreeNode }) {
             </button>
             <button
               type="button"
-              className="rounded border border-[var(--border-color)] px-2 py-1 text-sm"
+              className="rounded-control border border-[var(--border-color)] px-2 py-1 text-sm"
               onClick={() => {
                 setCadenceOpen(false)
                 setOpen(false)
@@ -317,9 +310,11 @@ function ProjectReviewTasks({ projectId, depth }: { projectId: number; depth: nu
     <div style={{ paddingLeft: 26 + depth * 18, paddingRight: 4, paddingBottom: 8 }}>
       {isLoading && <div className="px-2 py-1 text-xs text-[var(--text-secondary)]">Loading…</div>}
       {!isLoading && tasks.length === 0 && (
-        <div className="px-2 py-1 text-xs text-[var(--text-tertiary)]">No open tasks.</div>
+        <div className="px-2 py-1 text-xs text-[var(--text-secondary)]">No open tasks.</div>
       )}
-      {!isLoading && tasks.map((task) => <TaskRow key={task.id} task={task} />)}
+      {!isLoading && tasks.length > 0 && (
+        <TaskRowGroup>{tasks.map((task) => <TaskRow key={task.id} task={task} />)}</TaskRowGroup>
+      )}
       <AddTaskInline projectId={projectId} />
     </div>
   )
@@ -369,7 +364,7 @@ function AddTaskInline({ projectId }: { projectId: number }) {
       onBlur={() => {
         if (!title.trim()) setAdding(false)
       }}
-      className="mt-1 w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-primary)] px-2.5 py-1.5 text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-secondary)] focus:outline-none"
+      className="mt-1 w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-primary)] px-2.5 py-1.5 text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]"
     />
   )
 }

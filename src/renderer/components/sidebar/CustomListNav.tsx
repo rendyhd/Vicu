@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
+import { SelectionPill } from './SelectionPill'
 import { useNavigate, useMatches } from '@tanstack/react-router'
 import {
   Plus, List, ListFilter, Folder, Star, Heart, Home, Briefcase, GraduationCap,
@@ -11,6 +12,7 @@ import { useDndMonitor } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
 import { cn } from '@/lib/cn'
 import { CustomListDialog } from '@/components/shared/CustomListDialog'
+import { Menu, MenuItem } from '@/components/overlay/Menu'
 import type { CustomList } from '@/lib/vikunja-types'
 import {
   useCustomLists,
@@ -80,14 +82,16 @@ function CustomListItem({
       {...listeners}
       type="button"
       onClick={onNavigate}
+      aria-current={isActive ? 'page' : undefined}
       onContextMenu={onContextMenu}
       className={cn(
-        'flex h-8 items-center gap-2.5 rounded-md px-2.5 text-[13px] font-medium transition-colors',
+        'relative flex h-8 items-center gap-2.5 rounded-control px-2.5 text-[13px] font-medium transition-colors',
         isActive
-          ? 'bg-[var(--bg-selected)] text-[var(--text-primary)]'
+          ? 'text-[var(--text-primary)]'
           : 'text-[var(--text-primary)] hover:bg-[var(--bg-hover)]'
       )}
     >
+      {isActive && <SelectionPill />}
       <ItemIcon className="h-4 w-4 shrink-0 text-[var(--text-secondary)]" strokeWidth={1.8} />
       <span className="flex-1 truncate text-left">{item.name}</span>
     </button>
@@ -108,14 +112,6 @@ export function CustomListNav() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingList, setEditingList] = useState<CustomList | null>(null)
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; list: CustomList } | null>(null)
-
-  // Close context menu on click outside
-  useEffect(() => {
-    if (!contextMenu) return
-    const handler = () => setContextMenu(null)
-    window.addEventListener('click', handler)
-    return () => window.removeEventListener('click', handler)
-  }, [contextMenu])
 
   // Handle custom list reorder via dnd monitor
   useDndMonitor({
@@ -176,9 +172,9 @@ export function CustomListNav() {
                 onClick={() => syncLists.mutate()}
                 disabled={syncStatus.state === 'syncing'}
                 className={cn(
-                  'flex h-5 w-5 items-center justify-center rounded transition-colors hover:bg-[var(--bg-hover)]',
+                  'flex h-5 w-5 items-center justify-center rounded-control transition-colors hover:bg-[var(--bg-hover)]',
                   syncStatus.state === 'error' || syncStatus.state === 'update_required'
-                    ? 'text-accent-red'
+                    ? 'text-danger'
                     : 'text-[var(--text-secondary)]',
                 )}
                 title={'message' in syncStatus ? syncStatus.message : syncStatus.state === 'pending' ? 'Custom-list sync pending' : 'Syncing custom lists'}
@@ -195,7 +191,7 @@ export function CustomListNav() {
                 setEditingList(null)
                 setDialogOpen(true)
               }}
-              className="flex h-5 w-5 items-center justify-center rounded text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
+              className="flex h-5 w-5 items-center justify-center rounded-control text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
               aria-label="New list"
             >
               <Plus className="h-3.5 w-3.5" />
@@ -204,7 +200,7 @@ export function CustomListNav() {
         </div>
       </div>
 
-      <nav className="flex flex-col gap-0.5 px-2 pb-2">
+      <nav aria-label="Custom lists" className="flex flex-col gap-0.5 px-2 pb-2">
         <SortableContext items={sortableIds} strategy={verticalListSortingStrategy}>
           {lists.map((item) => {
             const path = `/list/${item.id}`
@@ -228,33 +224,27 @@ export function CustomListNav() {
         )}
       </nav>
 
-      {/* Context Menu */}
+      {/* Context menu: the Menu primitive at the pointer (arrow keys, Escape, focus return, kept in the window). */}
       {contextMenu && (
-        <div
-          className="fixed z-50 min-w-[140px] rounded-md border border-[var(--border-color)] bg-[var(--bg-primary)] py-1 shadow-lg"
-          style={{ left: contextMenu.x, top: contextMenu.y }}
+        <Menu
+          key={`${contextMenu.list.id}:${contextMenu.x}:${contextMenu.y}`}
+          anchorPoint={{ x: contextMenu.x, y: contextMenu.y }}
+          label={`${contextMenu.list.name} actions`}
+          onClose={() => setContextMenu(null)}
         >
-          <button
-            type="button"
-            onClick={() => {
+          <MenuItem
+            icon={<Pencil />}
+            onSelect={() => {
               setEditingList(contextMenu.list)
               setDialogOpen(true)
-              setContextMenu(null)
             }}
-            className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-[var(--text-primary)] hover:bg-[var(--bg-hover)]"
           >
-            <Pencil className="h-3.5 w-3.5" />
             Edit
-          </button>
-          <button
-            type="button"
-            onClick={() => handleDelete(contextMenu.list.id)}
-            className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-accent-red hover:bg-[var(--bg-hover)]"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
+          </MenuItem>
+          <MenuItem icon={<Trash2 />} danger onSelect={() => void handleDelete(contextMenu.list.id)}>
             Delete
-          </button>
-        </div>
+          </MenuItem>
+        </Menu>
       )}
 
       <CustomListDialog

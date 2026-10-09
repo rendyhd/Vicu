@@ -53,16 +53,24 @@ export function loadCustomListCarriers(): Promise<ApiResult<CarrierTask[]>> {
   return server ? getLoader().load(CUSTOM_LIST_CARRIER_SPEC, server) : Promise.resolve(NOT_CONFIGURED)
 }
 
-/** A task this app just created through the API: if it is a carrier, fetch it directly from now on. */
-export function rememberCreatedTask(task: unknown): void {
+/**
+ * A task this app just created through the API: if it is a carrier, fetch it directly from now on.
+ * Returns true for a carrier, so the caller can drop the project counts, which subtract the known
+ * carriers (`project-task-counts.ts`) and would otherwise count the new one as a done task.
+ */
+export function rememberCreatedTask(task: unknown): boolean {
   const created = task as CarrierTask | null
   const server = currentServer()
-  if (!server || !created || typeof created.id !== 'number') return
+  if (!server || !created || typeof created.id !== 'number') return false
   if (ROUTINE_CARRIER_SPEC.isCarrier(created)) {
     getLoader().remember(server, 'routine', created.id)
-  } else if (CUSTOM_LIST_CARRIER_SPEC.isCarrier(created)) {
-    getLoader().remember(server, 'custom-lists', created.id)
+    return true
   }
+  if (CUSTOM_LIST_CARRIER_SPEC.isCarrier(created)) {
+    getLoader().remember(server, 'custom-lists', created.id)
+    return true
+  }
+  return false
 }
 
 /** A task this app deleted: never look for it again (a 404 would trigger a full scan). */
