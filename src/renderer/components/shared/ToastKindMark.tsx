@@ -18,7 +18,7 @@ const COLOURS: Record<ToastKind, string> = {
 export function ToastKindMark({ kind }: { kind: ToastKind }) {
   const Icon = ICONS[kind]
   return (
-    <span role="img" aria-label={TOAST_KIND_LABEL[kind]} data-toast-icon={kind} className={cn('mt-px shrink-0', COLOURS[kind])}>
+    <span role="img" aria-label={TOAST_KIND_LABEL[kind]} data-toast-icon={kind} className={cn('flex h-6 shrink-0 items-center', COLOURS[kind])}>
       <Icon className="h-3.5 w-3.5" aria-hidden="true" />
     </span>
   )

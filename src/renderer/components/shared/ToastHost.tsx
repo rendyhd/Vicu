@@ -127,7 +127,8 @@ function ToastItem({ toast, onGone }: { toast: Shown; onGone: () => void }) {
       )}
     >
       <ToastKindMark kind={toast.kind} />
-      <span className="min-w-0 flex-1 break-words">{toast.message}</span>
+      {/* py-1 puts the first line on the 24 px line of the buttons; a wrapped message grows downwards. */}
+      <span className="min-w-0 flex-1 break-words py-1">{toast.message}</span>
       {toast.action && (
         <button
           type="button"

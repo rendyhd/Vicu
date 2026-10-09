@@ -32,7 +32,7 @@ export function ReviewSettingsPanel({ config, onChange }: ReviewSettingsPanelPro
           <span className="text-sm text-[var(--text-primary)]">Enable project review tracking</span>
         </label>
 
-        <div className="flex items-start justify-between gap-4">
+        <div className="flex items-center justify-between gap-4">
           <div>
             <div className="text-sm text-[var(--text-primary)]">Default review cadence (days)</div>
             <p className="text-xs text-[var(--text-secondary)]">

@@ -88,6 +88,24 @@ export default async function run(h) {
       return { ok: (await toastText(h)) === 'Completed' && (await toast.getByRole('button', { name: 'Undo' }).count()) === 1, detail: await toastText(h) }
     })
     await h.assert('the live region carries the toast', async () => (await page.locator('[aria-live="polite"] [data-toast-kind="success"]').count()) === 1)
+    await h.assert('the icon, the message and the buttons of the toast share one centre line', async () => {
+      const centres = await page.evaluate(() => {
+        const toast = document.querySelector('[aria-live="polite"] [data-toast-kind="success"]')
+        const mid = (r) => r.top + r.height / 2
+        // The glyph box of the text, not the span (whose padding would hide the bug).
+        const range = document.createRange()
+        range.selectNodeContents(toast.querySelector('span.flex-1'))
+        const [undo, close] = toast.querySelectorAll('button')
+        return {
+          icon: mid(toast.querySelector('[data-toast-icon] svg').getBoundingClientRect()),
+          text: mid(range.getBoundingClientRect()),
+          undo: mid(undo.getBoundingClientRect()),
+          close: mid(close.getBoundingClientRect()),
+        }
+      })
+      const values = Object.values(centres)
+      return { ok: Math.max(...values) - Math.min(...values) <= 1, detail: centres }
+    })
     await h.capture('toast')
     await toastRegion(h).hover()
     await h.wait(TOAST_MS + 1500)
