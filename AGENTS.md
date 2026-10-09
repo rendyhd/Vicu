@@ -33,7 +33,7 @@ Run the app against a throwaway profile with `VICU_USER_DATA_DIR=<dir>` (config,
 
 GitHub Actions workflow at `.github/workflows/release.yml` triggers on tag pushes matching `v*`:
 
-- **create-release**: decides stable or pre-release from the tag alone (a plain `vX.Y.Z` is stable; any suffix such as `v1.9.0-beta.1` is a pre-release, nothing is hardcoded per version) and creates the draft release up front, with notes taken from `docs/releases/<tag>.md` in the repository (generated notes when that file is missing).
+- **create-release**: decides stable or pre-release from the tag alone (a plain `vX.Y.Z` is stable; any suffix such as `v1.9.0-beta.1` is a pre-release, and so is a plain tag whose annotation contains `[prerelease]`, e.g. `git tag -a v1.9.0 -m "Vicu 1.9.0 [prerelease]"`; nothing is hardcoded per version) and creates the draft release up front, with notes taken from `docs/releases/<tag>.md` in the repository (generated notes when that file is missing).
 - **Windows** NSIS x64 (`build-windows`, `windows-latest`, `npm run dist:publish`)
 - **macOS** DMG arm64 (`build-macos`, `macos-latest`, `npm run dist:mac:publish`)
 - **Linux** AppImage x64 + arm64 (`build-linux` matrix — `ubuntu-latest` for x64, `ubuntu-24.04-arm` for arm64, `npm run dist:linux:publish`)
