@@ -1,11 +1,13 @@
 // E14 (card 3.1 starts it): axe-core on each surface. Serious and critical violations fail the run;
-// minor and moderate ones are listed as `axe` lines. Later cards add their own surfaces (When
-// popover, context menu, Settings) to `SURFACES`.
+// minor and moderate ones are listed as `axe` lines. Later cards add their own surfaces to `SURFACES`
+// (the When popover and each Settings tab are in).
 export const meta = {
   id: 'E14',
   wave: 3,
-  title: 'axe on Today, Upcoming, open card, When popover, context menu, Settings: no serious or critical violations',
+  title: 'axe on Today, Upcoming, open card, When popover, each Settings section: no serious or critical violations',
 }
+
+const SETTINGS_SECTIONS = ['General', 'Projects', 'Quick Entry / View', 'Notifications', 'Keyboard Shortcuts']
 
 const blocking = (violations) => violations.filter((v) => v.impact === 'serious' || v.impact === 'critical')
 const LANDMARK_RULES = ['landmark-one-main', 'landmark-unique', 'region']
@@ -39,6 +41,33 @@ export default async function run(h) {
       },
       ready: () => h.page.evaluate(() => !!document.querySelector('[data-task-id] button[data-prop="schedule"]')),
     },
+    {
+      // The When popover, opened from the schedule button of the last Today row (as the baseline does).
+      name: 'When popover',
+      open: async () => {
+        await h.goto('/today')
+        await h.dismiss()
+        const last = h.lastRow()
+        const taskId = await last.getAttribute('data-task-id')
+        await last.click({ position: { x: 180, y: 12 } })
+        await h.wait(700)
+        await h.click(`[data-task-id="${taskId}"] button[data-prop="schedule"]`)
+        await h.wait(600)
+      },
+      ready: () => h.page.evaluate(() => !!document.querySelector('[popover]:popover-open')),
+    },
+    // Settings, one surface per tab (nothing is changed, the tabs are only read).
+    ...SETTINGS_SECTIONS.map((section) => ({
+      name: `Settings: ${section}`,
+      open: async () => {
+        // Not dismissed after the goto: Escape leaves Settings (it goes back), so close what is open first.
+        await h.dismiss()
+        await h.goto('/settings')
+        await h.page.getByRole('button', { name: section, exact: true }).click()
+        await h.wait(600)
+      },
+      ready: () => h.page.getByRole('button', { name: section, exact: true }).evaluate((b) => b.className.includes('border-b-2')),
+    })),
   ]
 
   for (const surface of SURFACES) {

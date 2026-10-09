@@ -57,14 +57,15 @@ export default async function run(h) {
     const bar = page.getByRole('toolbar', { name: 'Selected tasks' })
     const rowBg = (i) => row(i).evaluate((el) => getComputedStyle(el).backgroundColor)
     const tokenBg = () =>
-      page.evaluate(() => {
+      page.evaluate((value) => {
         const probe = document.createElement('div')
-        probe.style.backgroundColor = 'var(--bg-selected)'
+        probe.style.backgroundColor = value
+        probe.style.forcedColorAdjust = 'none'
         document.body.appendChild(probe)
         const c = getComputedStyle(probe).backgroundColor
         probe.remove()
         return c
-      })
+      }, h.forcedColors ? 'Highlight' : 'var(--bg-selected)') // forced colours: a selected row is Highlight (index.css)
     const ready = (await row(0).count()) === 1 && (await row(1).count()) === 1 && (await row(2).count()) === 1
     await h.assert('the three throwaway tasks are listed in the Inbox', ready)
     if (!ready) return
@@ -90,7 +91,7 @@ export default async function run(h) {
     })
     await page.mouse.move(5, 5)
     await h.wait(300)
-    await h.assert('selected rows use bg.selected', async () => {
+    await h.assert(h.forcedColors ? 'selected rows are Highlight (forced colours)' : 'selected rows use bg.selected', async () => {
       const [a, b] = [await rowBg(0), await tokenBg()]
       return { ok: a === b, detail: `${a} vs ${b}` }
     })

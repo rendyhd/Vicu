@@ -26,10 +26,18 @@ async function readFocus(page) {
     seen.add(el)
     const cs = getComputedStyle(el)
     const probe = document.createElement('span')
-    probe.style.color = 'var(--focus-ring)'
-    document.body.appendChild(probe)
-    const ringColour = getComputedStyle(probe).color
-    probe.remove()
+    // Forced colours: the ring is the system Highlight; on a highlighted surface (the active sidebar item,
+    // a selected row) it flips to HighlightText (index.css, @media (forced-colors: active)).
+    const forced = matchMedia('(forced-colors: active)').matches
+    const colourOf = (value) => {
+      probe.style.color = value
+      probe.style.forcedColorAdjust = 'none'
+      document.body.appendChild(probe)
+      const resolved = getComputedStyle(probe).color
+      probe.remove()
+      return resolved
+    }
+    const ringColour = forced ? (cs.backgroundColor === colourOf('Highlight') ? colourOf('HighlightText') : colourOf('Highlight')) : colourOf('var(--focus-ring)')
     const r = el.getBoundingClientRect()
     const tag = el.tagName.toLowerCase()
     const textField = tag === 'textarea' || (tag === 'input' && !['checkbox', 'radio', 'button', 'submit'].includes(el.type)) || el.isContentEditable

@@ -112,7 +112,7 @@ Files starting with `_` are helpers. `baseline` is not part of a wave. E4 and E1
 real. E4 covers the popover primitive (card 1.3): the pickers stay inside the window, Escape and
 focus return, all nine pickers by mouse and keyboard, the nested Repeat panel, the composer and
 context-menu pickers, scrolling and transformed ancestors. E13 asserts behaviour the app fails until
-its card lands (offset highlights). The others are stubs that log `skip: not implemented yet` until
+its card lands (offset highlights). E15 (wave 6, read-only) captures every view and each Settings tab at 1440x900, 1280x820 and 900x600 in the run's theme and asserts per view and size: no horizontal scroll of the document, body or main, no element wider than the main region, no text clipped without an ellipsis, and the h1 visible. The others are stubs that log `skip: not implemented yet` until
 their card fills them in. `keyboard-tab` (id KT, card 1.5) Tabs through Today with the real keyboard and
 asserts the focus ring on every stop, the 20 px checkbox with its 24 px hit area (`elementFromPoint`
 11 px from the centre), 24 px row buttons, 28 px toolbar buttons and the reduced-motion base layer.
@@ -129,7 +129,7 @@ The helpers on `h`:
 
 - `goto(route)`, `click(textOrSelector)`, `rightClick`, `hover`, `key('Control+F')`, `type(text)`,
   `drag(from, to, { steps, hold })`, `wait(ms)`, `dismiss()` (closes popovers, menus, the composer
-  and an expanded card), `rows()`, `lastRow()`, `resize(w, h)`, `setMotion`, `setForcedColors`.
+  and an expanded card), `rows()`, `lastRow()`, `resize(w, h)`, `setMotion`, `setForcedColors`, `motion` and `forcedColors` (the current modes; a scenario checks the forced-colours equivalent when `h.forcedColors` is true), `skip(label, why)` (logged as a `skip` line, not counted).
 - `capture(name, { clip, page, transparent })` (device scale 1), `assert(label, fn)` (a boolean or
   `{ ok, detail }`), `axe(selector?)` (axe-core; one line per violation, returns them),
   `frames(ms)` (requestAnimationFrame timing sample), `api(method, path)` (reads the server to check

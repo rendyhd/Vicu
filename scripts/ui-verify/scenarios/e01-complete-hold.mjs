@@ -30,8 +30,11 @@ export default async function run(h) {
       const state = await rowOf(h, a).evaluate((row) => ({
         checked: row.querySelector('button[role="checkbox"]')?.getAttribute('aria-checked'),
         struck: getComputedStyle(row.querySelector('.vicu-strike')).backgroundImage,
+        decoration: getComputedStyle(row.querySelector('.vicu-strike')).textDecorationLine,
       }))
-      return { ok: state.checked === 'true' && state.struck.includes('linear-gradient'), detail: JSON.stringify(state) }
+      // Forced colours drop background images: the strike is a text-decoration there (index.css).
+      const struck = h.forcedColors ? state.decoration.includes('line-through') : state.struck.includes('linear-gradient')
+      return { ok: state.checked === 'true' && struck, detail: JSON.stringify(state) }
     })
     await h.assert('the completion is on the server at once', { ok: await serverDone(h, a) })
     await h.capture('held-hovered')

@@ -266,6 +266,9 @@ export default async function run(h) {
     })
     await menu.getByRole('menuitem').nth(1).hover()
     await h.wait(300)
+    // Under --motion reduce every element fades colours over 150 ms, and the icon (an svg that inherits its colour
+    // in forced colours) starts its own fade after its parent's: wait until no transition is running, then read.
+    await page.waitForFunction(() => !document.getAnimations().some((a) => a instanceof CSSTransition && a.playState !== 'finished'), null, { timeout: 3000 }).catch(() => {})
     await h.assert('a hovered menu item is Highlight with HighlightText', async () => {
       const r = await menu.evaluate((m) => {
         const hot = [...m.querySelectorAll('[role="menuitem"]')].find((i) => i.matches(':hover'))

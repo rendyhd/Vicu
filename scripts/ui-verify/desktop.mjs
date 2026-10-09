@@ -357,6 +357,10 @@ const h = {
   get motion() {
     return state.motion
   },
+  /** True while forced-colors: active is emulated (the option, or a scenario that turned it on). */
+  get forcedColors() {
+    return state.forcedColors
+  },
   get today() {
     return new Date()
   },
@@ -468,6 +472,11 @@ const h = {
     else tally.fail++
     emit({ t: 'assert', label, ok, ...(detail === undefined ? {} : { detail }) })
     return ok
+  },
+
+  /** A check with nothing meaningful to compare in this mode (say why): logged as a skip, not counted. */
+  skip(label, message) {
+    emit({ t: 'skip', label, message })
   },
 
   /** Runs axe-core on the page (or inside `selector`); one line per violation; returns them all. */

@@ -190,16 +190,24 @@ export default async function run(h) {
       probe.style.color = 'var(--bg-card)'
       document.body.appendChild(probe)
       const bgCard = getComputedStyle(probe).color
+      probe.style.color = 'Canvas'
+      probe.style.forcedColorAdjust = 'none'
+      document.body.appendChild(probe)
+      const canvas = getComputedStyle(probe).color
       probe.remove()
-      return { shadow: cs.boxShadow, border: cs.borderTopColor, borderWidth: cs.borderTopWidth, bg: cs.backgroundColor, bgCard }
+      return { shadow: cs.boxShadow, border: cs.borderTopColor, borderWidth: cs.borderTopWidth, borderStyle: cs.borderTopStyle, bg: cs.backgroundColor, bgCard, canvas }
     }, target.id)
-    if (dark) {
+    if (h.forcedColors) {
+      // Forced colours drop shadows and the card token: the card is Canvas inside its 1 px border.
+      await h.assert('E forced: the card has no shadow and is bounded by its 1 px border', { ok: surface.shadow === 'none' && surface.borderWidth === '1px' && surface.borderStyle === 'solid', detail: `${surface.shadow} ${surface.borderWidth} ${surface.borderStyle}` })
+      await h.assert('E forced: the card surface is Canvas', { ok: surface.bg === surface.canvas, detail: `${surface.bg} vs ${surface.canvas}` })
+    } else if (dark) {
       await h.assert('E: the dark card has no shadow', { ok: surface.shadow === 'none' || !/rgba\((?!0, 0, 0, 0\))/.test(surface.shadow), detail: surface.shadow })
       await h.assert('E: the dark card has a 1 px white-at-8% edge', { ok: surface.borderWidth === '1px' && /rgba\(255, 255, 255, 0\.08\)|color\(srgb 1 1 1 \/ 0\.08\)/.test(surface.border), detail: `${surface.borderWidth} ${surface.border}` })
     } else {
       await h.assert('E: the light card keeps its shadow', { ok: surface.shadow !== 'none', detail: surface.shadow })
     }
-    await h.assert('E: the card surface is bg.card', { ok: surface.bg === surface.bgCard, detail: `${surface.bg} vs ${surface.bgCard}` })
+    if (!h.forcedColors) await h.assert('E: the card surface is bg.card', { ok: surface.bg === surface.bgCard, detail: `${surface.bg} vs ${surface.bgCard}` })
   }
   await h.dismiss()
 }

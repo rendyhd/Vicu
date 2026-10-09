@@ -252,7 +252,9 @@ export default async function run(h) {
   await h.capture('all-clear-mid')
   await release(page)
   await h.wait(1200)
-  if (!reduced) {
+  if (!reduced && h.forcedColors) {
+    h.skip('E: mid-warm the sun is between grey and its colour', 'forced colours: the icon takes the system text colour (svg { color: inherit !important }), so the colour animation has no visible values to compare')
+  } else if (!reduced) {
     const final = await page.evaluate(() => getComputedStyle(document.querySelector('.vicu-warm')).color)
     await h.assert('E: mid-warm the sun is between grey and its colour (neither the start nor the end)', { ok: warm.length >= 1 && warm[0].color !== final && warm[0].color !== 'rgb(174, 174, 178)', detail: `mid ${warm[0]?.color}, end ${final}` })
   }

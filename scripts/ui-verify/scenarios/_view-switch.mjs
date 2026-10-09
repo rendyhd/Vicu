@@ -103,10 +103,15 @@ export async function mouseSwitch(h, page, { full }) {
   })
   await h.assert(`${tag}: the root does not animate (the sidebar and title bar stay)`, { ok: !running.some((s) => s.groups.includes('root')), detail: 'no root group animation' })
   const travelling = free.samples.filter((x) => x.pillTransform && x.pillTransform !== 'none')
-  await h.assert(
-    full ? 'full motion: the sidebar pill slides (a transform on its element for several frames)' : 'reduced: the sidebar pill does not slide (no transform on any frame)',
-    { ok: full ? travelling.length >= 3 : travelling.length === 0, detail: `${travelling.length} frames with a transform` },
-  )
+  if (h.forcedColors && full) {
+    // Forced colours hide the pill (display: none) and highlight the active item instead: nothing slides.
+    h.skip('full motion: the sidebar pill slides', 'forced colours: the pill is display: none and the active item is Highlight (checked below)')
+  } else {
+    await h.assert(
+      full ? 'full motion: the sidebar pill slides (a transform on its element for several frames)' : 'reduced: the sidebar pill does not slide (no transform on any frame)',
+      { ok: full ? travelling.length >= 3 : travelling.length === 0, detail: `${travelling.length} frames with a transform` },
+    )
+  }
   const fading = running.filter((s) => s.newOpacity > 0.02 && s.newOpacity < 0.98)
   await h.assert(`${tag}: the new page fades in (opacity between 0 and 1 on at least 2 frames)`, { ok: fading.length >= 2, detail: `${fading.length} frames` })
   const rising = running.filter((s) => translateY(s.newTranslate) > 0.2)
@@ -130,9 +135,37 @@ export async function mouseSwitch(h, page, { full }) {
     const r = el.getBoundingClientRect()
     const b = el.parentElement.getBoundingClientRect()
     // The pill must be painted: a visible background, and behind the label (the topmost element at its centre is not the pill).
-    return { w: r.width, same: Math.abs(r.left - b.left) < 1 && Math.abs(r.top - b.top) < 1 && Math.abs(r.width - b.width) < 1 && Math.abs(r.height - b.height) < 1, bg: getComputedStyle(el).backgroundColor, text: el.parentElement.textContent.trim().slice(0, 12) }
+    const probe = document.createElement('span')
+    const colourOf = (value) => {
+      probe.style.color = value
+      probe.style.forcedColorAdjust = 'none'
+      document.body.appendChild(probe)
+      const resolved = getComputedStyle(probe).color
+      probe.remove()
+      return resolved
+    }
+    const item = getComputedStyle(el.parentElement)
+    return {
+      w: r.width,
+      same: Math.abs(r.left - b.left) < 1 && Math.abs(r.top - b.top) < 1 && Math.abs(r.width - b.width) < 1 && Math.abs(r.height - b.height) < 1,
+      bg: getComputedStyle(el).backgroundColor,
+      display: getComputedStyle(el).display,
+      itemBg: item.backgroundColor,
+      itemColor: item.color,
+      highlight: colourOf('Highlight'),
+      highlightText: colourOf('HighlightText'),
+      text: el.parentElement.textContent.trim().slice(0, 12),
+    }
   })
-  await h.assert(`${tag}: the sidebar pill sits behind the active item (same box, visible background)`, { ok: !!pill && pill.same && pill.w > 100 && pill.bg !== 'rgba(0, 0, 0, 0)' && /Upcoming/.test(pill.text), detail: JSON.stringify(pill) })
+  if (h.forcedColors) {
+    // Forced colours: the pill is hidden and the active item itself is Highlight with HighlightText (index.css).
+    await h.assert(`${tag}: forced colours: the pill is hidden and the active item is Highlight with HighlightText`, {
+      ok: !!pill && pill.display === 'none' && pill.itemBg === pill.highlight && pill.itemColor === pill.highlightText && /Upcoming/.test(pill.text),
+      detail: JSON.stringify(pill),
+    })
+  } else {
+    await h.assert(`${tag}: the sidebar pill sits behind the active item (same box, visible background)`, { ok: !!pill && pill.same && pill.w > 100 && pill.bg !== 'rgba(0, 0, 0, 0)' && /Upcoming/.test(pill.text), detail: JSON.stringify(pill) })
+  }
 
   // Frozen mid-frame: back to Today.
   await startSampler(page, { freeze: true, freezeAt: full ? 100 : 25 })

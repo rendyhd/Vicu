@@ -157,10 +157,12 @@ export default async function run(h) {
     const el = document.querySelector('.vicu-lift')
     if (!el) return null
     const cs = getComputedStyle(el)
-    return { scale: cs.scale, shadow: cs.boxShadow }
+    return { scale: cs.scale, shadow: cs.boxShadow, outlineStyle: cs.outlineStyle, outlineWidth: cs.outlineWidth }
   })
-  await h.assert(reduced ? 'reduced: the dragged overlay has no lift (no scale)' : 'the dragged overlay is lifted (scale 1.02) with a shadow', {
-    ok: !!lift && (reduced ? lift.scale === 'none' || lift.scale === '1' : Math.abs(parseFloat(lift.scale) - 1.02) < 0.001 && lift.shadow !== 'none'),
+  // Forced colours drop the shadow; .vicu-lift draws a 1 px outline instead (index.css).
+  const edge = h.forcedColors ? !!lift && lift.shadow === 'none' && lift.outlineStyle === 'solid' && lift.outlineWidth === '1px' : !!lift && lift.shadow !== 'none'
+  await h.assert(reduced ? 'reduced: the dragged overlay has no lift (no scale)' : h.forcedColors ? 'the dragged overlay is lifted (scale 1.02) with an outline instead of a shadow (forced colours)' : 'the dragged overlay is lifted (scale 1.02) with a shadow', {
+    ok: !!lift && (reduced ? lift.scale === 'none' || lift.scale === '1' : Math.abs(parseFloat(lift.scale) - 1.02) < 0.001 && edge),
     detail: JSON.stringify(lift),
   })
   await h.capture('drag-held')
@@ -221,10 +223,14 @@ export default async function run(h) {
   await h.dismiss()
   await rows.nth(1).click()
   await rows.nth(3).click({ modifiers: ['Shift'] })
+  // The plain click opened row 1 as a card; the Shift+click selects the range at once and closes that card in
+  // the view transition's callback a moment later (task-transition.ts). Wait for the card to be gone, then
+  // read: the row that was clicked first is part of the range (reading earlier races the close, which is why
+  // this failed at 900x600 and passed at 1280x820).
+  await h.page.waitForFunction(() => document.querySelectorAll('.vicu-card').length === 0, null, { timeout: 4000 }).catch(() => {})
+  await h.wait(150)
   const range = await selected()
-  // The row that was clicked first is a card now (a plain click opens it), not a selected row.
-  const firstIsCard = await h.page.evaluate(() => document.querySelectorAll('.vicu-card').length > 0)
-  await h.assert('Shift+click selects the range', { ok: (range[1] || firstIsCard) && range[2] && range[3], detail: range.slice(0, 5).join(',') })
+  await h.assert('Shift+click selects the range', { ok: range[1] && range[2] && range[3], detail: range.slice(0, 5).join(',') })
   await h.dismiss()
 
   await openAndClose(h, reduced)
