@@ -313,7 +313,7 @@ export function SettingsView() {
                   <button
                     type="button"
                     onClick={() => setShowToken(!showToken)}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded-control px-2 py-0.5 text-meta text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                    className="absolute right-2 top-1/2 inline-flex min-h-6 -translate-y-1/2 items-center rounded-control px-2 py-0.5 text-meta text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                   >
                     {showToken ? 'Hide' : 'Show'}
                   </button>
@@ -422,8 +422,9 @@ export function SettingsView() {
             </label>
 
             <div>
-              <label className="mb-1 block text-xs text-[var(--text-secondary)]">Inbox Project</label>
+              <label htmlFor="settings-inbox-project" className="mb-1 block text-xs text-[var(--text-secondary)]">Inbox Project</label>
               <select
+                id="settings-inbox-project"
                 value={inboxProjectId}
                 onChange={(e) => { const id = Number(e.target.value); setInboxProjectId(id); handleQuickEntryChange({ inbox_project_id: id }) }}
                 className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)]"

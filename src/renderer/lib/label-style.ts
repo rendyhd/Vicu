@@ -118,3 +118,22 @@ export function labelChipStyle(rawHex: string | undefined, isDark: boolean): CSS
   }
   return style
 }
+
+const solidCache = new Map<string, CSSProperties>()
+
+/**
+ * The same chip with the contract tint as an opaque fill. A chip on a surface other than bg.page
+ * (the open card is bg.card, a property button can be on bg.selected) would show the translucent
+ * fill over that surface and miss the 4.5:1 the text colour was derived for; the opaque tint keeps it.
+ */
+export function labelChipSolidStyle(rawHex: string | undefined, isDark: boolean): CSSProperties {
+  const hex = normalizeHex(rawHex)
+  if (!hex) return NO_COLOR
+  const key = `${isDark ? 'd' : 'l'}${hex.toLowerCase()}`
+  let style = solidCache.get(key)
+  if (!style) {
+    style = { backgroundColor: labelChipTint(hex, isDark) as string, color: labelChipText(hex, isDark) as string }
+    solidCache.set(key, style)
+  }
+  return style
+}

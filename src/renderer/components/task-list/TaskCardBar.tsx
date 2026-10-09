@@ -2,7 +2,7 @@ import { Fragment, useRef, type ReactNode, type RefObject } from 'react'
 import { Calendar, Bell, Repeat, Paperclip, ListChecks, FolderOpen, MoreHorizontal, Info, Trash2, Plus } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { isNullDate } from '@/lib/date-utils'
-import { labelChipStyle } from '@/lib/label-style'
+import { labelChipSolidStyle } from '@/lib/label-style'
 import { checklistLabel } from '@/lib/row-anatomy'
 import { formatRecurrenceLabel } from '@/lib/recurrence'
 import { formatDueDate } from '@/lib/date-utils'
@@ -61,7 +61,7 @@ interface TaskCardBarProps {
 const BUTTON = 'inline-flex min-h-7 shrink-0 items-center gap-1 rounded-control px-2 text-meta transition-colors duration-fade-fast'
 const SET = 'border border-[var(--border-color)] text-text hover:bg-bg-hover'
 const UNSET = 'border border-transparent text-text-secondary hover:bg-bg-hover hover:text-text'
-const OPEN = 'border border-transparent bg-accent-blue/10 text-accent-blue'
+const OPEN = 'border border-transparent bg-bg-selected text-accent-blue'
 
 interface PropertyButtonProps {
   /** The stable hook for scenarios; the accessible name is `name`. */
@@ -204,7 +204,7 @@ export function TaskCardBar({
       <PropertyButton prop="labels" name="Labels" unsetName="Add label" value={labels.map((l) => l.title).join(' ')} isSet={labels.length > 0} open={is('label')} haspopup="dialog" buttonRef={labelRef} onClick={() => onToggle('label')} unsetLabel="Label" className="gap-1.5 px-1.5">
         {labels.map((l) => (
           <Fragment key={l.id}>
-            <span className="vicu-chip rounded-chip px-2 py-px text-chip leading-tight" style={labelChipStyle(l.hex_color, isDark)}>
+            <span className="vicu-chip rounded-chip px-2 py-px text-chip leading-tight" style={labelChipSolidStyle(l.hex_color, isDark)}>
               {l.title}
             </span>
             {/* A space between chips, so the visible text reads as separate words. */}

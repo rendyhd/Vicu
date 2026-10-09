@@ -82,9 +82,11 @@ interface HotkeyRecorderProps {
   onChange: (value: string) => void
   defaultValue: string
   warning?: boolean
+  /** The accessible name of the field. */
+  label?: string
 }
 
-export function HotkeyRecorder({ value, onChange, defaultValue, warning }: HotkeyRecorderProps) {
+export function HotkeyRecorder({ value, onChange, defaultValue, warning, label = 'Hotkey' }: HotkeyRecorderProps) {
   const [recording, setRecording] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const prevValueRef = useRef(value)
@@ -134,6 +136,7 @@ export function HotkeyRecorder({ value, onChange, defaultValue, warning }: Hotke
       <input
         ref={inputRef}
         type="text"
+        aria-label={label}
         readOnly
         value={recording ? '' : formatAcceleratorForDisplay(value)}
         placeholder={recording ? 'Press keys...' : undefined}

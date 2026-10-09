@@ -186,6 +186,7 @@ export function QuickEntrySettings({ config, projects, onChange, hotkeyWarnings 
                     value={config.quick_entry_hotkey || 'Alt+Shift+V'}
                     onChange={(v) => onChange({ quick_entry_hotkey: v })}
                     defaultValue="Alt+Shift+V"
+                    label="Quick Entry hotkey"
                     warning={hotkeyWarnings?.entry === false}
                   />
                   {hotkeyWarnings?.entry === false && (
@@ -198,6 +199,7 @@ export function QuickEntrySettings({ config, projects, onChange, hotkeyWarnings 
                 <div>
                   <label className="mb-1 block text-xs text-[var(--text-secondary)]">Default Project</label>
                   <select
+                    aria-label="Default project"
                     value={defaultProjectAvailable ? configuredDefaultProjectId : 0}
                     onChange={(e) => onChange({ quick_entry_default_project_id: Number(e.target.value) })}
                     className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)]"
@@ -238,6 +240,7 @@ export function QuickEntrySettings({ config, projects, onChange, hotkeyWarnings 
                       </p>
                     )}
                     <select
+                      aria-label="Add a project to the cycle"
                       value=""
                       onChange={(e) => {
                         if (e.target.value) addSecondaryProject(Number(e.target.value))
@@ -307,6 +310,7 @@ export function QuickEntrySettings({ config, projects, onChange, hotkeyWarnings 
                     value={config.quick_view_hotkey || 'Alt+Shift+B'}
                     onChange={(v) => onChange({ quick_view_hotkey: v })}
                     defaultValue="Alt+Shift+B"
+                    label="Quick View hotkey"
                     warning={hotkeyWarnings?.viewer === false}
                   />
                   {hotkeyWarnings?.viewer === false && (
@@ -320,6 +324,7 @@ export function QuickEntrySettings({ config, projects, onChange, hotkeyWarnings 
                 <div>
                   <label className="mb-1 block text-xs text-[var(--text-secondary)]">List</label>
                   <select
+                    aria-label="List"
                     value={
                       viewerFilter.view_type
                         ? `view:${viewerFilter.view_type}`

@@ -41,6 +41,7 @@ export function ReviewSettingsPanel({ config, onChange }: ReviewSettingsPanelPro
           </div>
           <input
             type="number"
+            aria-label="Default review cadence in days"
             min={1}
             max={365}
             value={review.default_cadence_days}

@@ -22,6 +22,13 @@ const OFFSET_OPTIONS = [
   { label: '1 day before', value: 86400 },
 ]
 
+/** While the master switch is off the sections are dimmed: take them out of the Tab order and the accessibility tree too. */
+function inertWhen(off: boolean) {
+  return (el: HTMLDivElement | null) => {
+    if (el) el.inert = off
+  }
+}
+
 export function NotificationSettings({ config, onChange }: NotificationSettingsProps) {
   const [testStatus, setTestStatus] = useState<'idle' | 'sent'>('idle')
   const enabled = config.notifications_enabled ?? false
@@ -60,7 +67,7 @@ export function NotificationSettings({ config, onChange }: NotificationSettingsP
       <div className={cn(
         'rounded-card border border-[var(--border-color)] bg-[var(--bg-primary)] p-5',
         !enabled && 'pointer-events-none opacity-40'
-      )}>
+      )} ref={inertWhen(!enabled)}>
         <h2 className="text-sm font-semibold text-[var(--text-primary)]">Scheduled Reminders</h2>
         <p className="mb-4 mt-1 text-xs text-[var(--text-secondary)]">
           Daily notifications that summarize your overdue, due today, and upcoming tasks.
@@ -79,6 +86,7 @@ export function NotificationSettings({ config, onChange }: NotificationSettingsP
             <div className="flex items-center gap-1.5">
               <input
                 type="time"
+                aria-label="Morning reminder time"
                 value={config.notifications_daily_reminder_time || '08:00'}
                 onChange={(e) => onChange({ notifications_daily_reminder_time: e.target.value })}
                 className="rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-2 py-1 text-sm text-[var(--text-primary)]"
@@ -98,6 +106,7 @@ export function NotificationSettings({ config, onChange }: NotificationSettingsP
             <div className="flex items-center gap-1.5">
               <input
                 type="time"
+                aria-label="Afternoon reminder time"
                 value={config.notifications_secondary_reminder_time || '16:00'}
                 onChange={(e) => onChange({ notifications_secondary_reminder_time: e.target.value })}
                 className="rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-2 py-1 text-sm text-[var(--text-primary)]"
@@ -159,7 +168,7 @@ export function NotificationSettings({ config, onChange }: NotificationSettingsP
       <div className={cn(
         'rounded-card border border-[var(--border-color)] bg-[var(--bg-primary)] p-5',
         !enabled && 'pointer-events-none opacity-40'
-      )}>
+      )} ref={inertWhen(!enabled)}>
         <h2 className="text-sm font-semibold text-[var(--text-primary)]">Task Reminders</h2>
         <p className="mb-4 mt-1 text-xs text-[var(--text-secondary)]">
           Reminders you set on individual tasks using the bell icon.
@@ -191,6 +200,7 @@ export function NotificationSettings({ config, onChange }: NotificationSettingsP
             </p>
             <div className="flex flex-col gap-2">
               <select
+                aria-label="Default reminder"
                 value={offsetDropdownValue}
                 onChange={(e) => handleOffsetChange(Number(e.target.value))}
                 className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-2 py-1.5 text-sm text-[var(--text-primary)]"
@@ -204,6 +214,7 @@ export function NotificationSettings({ config, onChange }: NotificationSettingsP
 
               {offsetDropdownValue !== 0 && (
                 <select
+                  aria-label="Default reminder relative to"
                   value={config.notifications_default_reminder_relative_to || 'due_date'}
                   onChange={(e) =>
                     onChange({
