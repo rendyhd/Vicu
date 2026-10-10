@@ -10,11 +10,10 @@ import { describe, expect, it } from 'vitest'
 const renderer = resolve(__dirname, '..', '..')
 
 const ALLOWED: Record<string, string> = {
-  'components/sidebar/ProjectTree.tsx':
+  'components/projects/ProjectDialog.tsx':
     'the colour picker of the project dialog: swatches the user chooses from; the choice is stored on the project (data)',
   'components/sidebar/TagList.tsx':
     'the colour picker of the label dialog: swatches the user chooses from; the choice is stored on the label (data)',
-  'components/settings/ProjectSettings.tsx': 'the example "#3498db" in the placeholder of the project colour field',
   'views/RoutinesView.tsx':
     'STORED_ROUTINE_COLORS: the colours written into the routine definition and read by Android (cross-app data, not themed)',
 }

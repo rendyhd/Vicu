@@ -53,6 +53,8 @@ interface TaskListProps {
   defaultDueDate?: Date
   /** Content rendered inside the scroll area above the task input (e.g. date subtitle) */
   headerContent?: React.ReactNode
+  /** Buttons at the right of the title, before New task (a project's … menu). */
+  headerActions?: React.ReactNode
   onTaskCreated?: (task: Task) => void
   /**
    * Where the quiet "New task" row (and the composer it turns into) sits: after the list's own
@@ -81,6 +83,7 @@ export function TaskList({
   insertIndex,
   defaultDueDate,
   headerContent,
+  headerActions,
   onTaskCreated,
   newTaskPlacement = 'after-children',
 }: TaskListProps) {
@@ -517,7 +520,10 @@ export function TaskList({
         icon={identity && <SmartListIcon list={identity} className="h-5 w-5" />}
         onClick={handleHeaderClick}
         actions={
-          showNewTask && projectId ? (
+          headerActions || (showNewTask && projectId) ? (
+            <>
+            {headerActions}
+            {showNewTask && projectId && (
             <button
               type="button"
               onClick={startAdding}
@@ -526,6 +532,8 @@ export function TaskList({
             >
               <Plus className="h-4 w-4" />
             </button>
+            )}
+            </>
           ) : undefined
         }
       />

@@ -1,194 +1,168 @@
-import { useState, useEffect, useId, useMemo } from 'react'
-import { Archive, Pencil, Plus, Trash2, X } from 'lucide-react'
-import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
-import { useProjects, type ProjectTreeNode } from '@/hooks/use-projects'
-import { useCreateProject, useUpdateProject, useDeleteProject, useSetProjectArchived } from '@/hooks/use-task-mutations'
-import { useConfirmDelete } from '@/hooks/use-confirm-delete'
-import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
-import { useSidebarStore } from '@/stores/sidebar-store'
+import { useMemo, useRef, useState } from 'react'
+import { useNavigate } from '@tanstack/react-router'
+import { ChevronRight, FolderOpen, MoreHorizontal, RotateCcw } from 'lucide-react'
+import { buildProjectTree, useProjects, type ProjectTreeNode } from '@/hooks/use-projects'
 import { useOpenTaskCounts } from '@/hooks/use-project-progress'
 import { useSidebarCollapsed } from '@/hooks/use-sidebar-collapsed'
 import { useAppConfig } from '@/hooks/use-app-config'
+import { useSharedProjectActions } from '@/hooks/use-project-actions'
 import { cn } from '@/lib/cn'
-import { focusTargetOf } from '@/lib/focus-target'
-import { api } from '@/lib/api'
-import { Dialog } from '@/components/overlay/Dialog'
-import { Menu, MenuItem } from '@/components/overlay/Menu'
-import { ProjectTreeItem } from './ProjectTreeItem'
+import { normalizeHex } from '@/lib/constants'
+import { ProjectMenu } from '@/components/projects/ProjectMenu'
+import { ProjectCreateRow } from '@/components/projects/ProjectRowParts'
+import { useProjectActionsStore } from '@/stores/project-actions-store'
+import { useSidebarStore } from '@/stores/sidebar-store'
+import { ProjectTreeItem, type OpenProjectMenu } from './ProjectTreeItem'
 import type { Project } from '@/lib/vikunja-types'
 
-function ProjectDialog({
-  open,
-  project,
-  parentProject = null,
-  onClose,
+interface MenuState {
+  project: Project
+  point?: { x: number; y: number }
+  anchor?: HTMLElement
+  /** The row it came from: a dialog or confirmation the menu opens gives focus back here. */
+  opener: HTMLElement | null
+}
+
+function flatten(nodes: ProjectTreeNode[], depth = 0): { node: ProjectTreeNode; depth: number }[] {
+  return nodes.flatMap((node) => [{ node, depth }, ...flatten(node.children, depth + 1)])
+}
+
+/** Archived projects, collapsed at the end of the tree: open one to look at it, restore it here. */
+function ArchivedGroup({
+  archived,
+  onOpenMenu,
+  menuOpenFor,
 }: {
-  open: boolean
-  project: Project | null
-  /** Set (with no `project`) to add a section: a child project of this one. */
-  parentProject?: Project | null
-  onClose: () => void
+  archived: Project[]
+  onOpenMenu: (project: Project, at: { point: { x: number; y: number } } | { anchor: HTMLElement }, opener: HTMLElement | null) => void
+  menuOpenFor: number | null
 }) {
-  const titleId = useId()
-  const [title, setTitle] = useState('')
-  const [hexColor, setHexColor] = useState('')
-  const createProject = useCreateProject()
-  const updateProject = useUpdateProject()
+  const navigate = useNavigate()
+  const open = useSidebarStore((s) => s.archivedProjectsOpen)
+  const setOpen = useSidebarStore((s) => s.setArchivedProjectsOpen)
+  const { restore } = useSharedProjectActions()
+  const rows = useMemo(() => flatten(buildProjectTree(archived)), [archived])
 
-  useEffect(() => {
-    if (open) {
-      setTitle(project?.title ?? '')
-      setHexColor(project?.hex_color ?? '')
-    }
-  }, [open, project])
+  return (
+    <div className="mt-1">
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen(!open)}
+        className="flex h-7 w-full items-center rounded-control pl-1 text-left text-caption font-semibold uppercase tracking-wider text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
+      >
+        <span className="flex h-6 w-6 shrink-0 items-center justify-center">
+          <ChevronRight
+            aria-hidden="true"
+            className={cn('h-3 w-3 transition-transform duration-fade-fast motion-reduce:transition-none', open && 'rotate-90')}
+            strokeWidth={2}
+          />
+        </span>
+        Archived
+        <span className="ml-1.5 font-semibold normal-case tracking-normal">{archived.length}</span>
+      </button>
+      {open &&
+        rows.map(({ node, depth }) => (
+          <ArchivedRow
+            key={node.id}
+            project={node}
+            depth={depth}
+            menuOpen={menuOpenFor === node.id}
+            onOpen={() => navigate({ to: '/project/$projectId', params: { projectId: String(node.id) } })}
+            onRestore={() => restore(node)}
+            onOpenMenu={onOpenMenu}
+          />
+        ))}
+    </div>
+  )
+}
 
-  if (!open) return null
-
-  const handleSave = () => {
-    const trimmed = title.trim()
-    if (!trimmed) return
-
-    if (project) {
-      updateProject.mutate(
-        {
-          id: project.id,
-          changes: { title: trimmed, hex_color: hexColor },
-          original: project,
-        },
-        { onSuccess: onClose }
-      )
-    } else {
-      createProject.mutate(
-        {
-          title: trimmed,
-          hex_color: hexColor || undefined,
-          ...(parentProject ? { parent_project_id: parentProject.id } : {}),
-        },
-        { onSuccess: onClose }
-      )
-    }
+function ArchivedRow({
+  project,
+  depth,
+  menuOpen,
+  onOpen,
+  onRestore,
+  onOpenMenu,
+}: {
+  project: Project
+  depth: number
+  menuOpen: boolean
+  onOpen: () => void
+  onRestore: () => void
+  onOpenMenu: (project: Project, at: { point: { x: number; y: number } } | { anchor: HTMLElement }, opener: HTMLElement | null) => void
+}) {
+  const rowRef = useRef<HTMLButtonElement>(null)
+  const moreRef = useRef<HTMLButtonElement>(null)
+  const color = normalizeHex(project.hex_color)
+  const openMenuAtButton = () => {
+    if (moreRef.current) onOpenMenu(project, { anchor: moreRef.current }, rowRef.current)
   }
 
   return (
-    <Dialog open onClose={onClose} labelledBy={titleId} className="w-[360px]">
-      <div>
-        <div className="flex items-center justify-between border-b border-[var(--border-color)] px-5 py-3">
-          <h2 id={titleId} className="text-sm font-semibold text-[var(--text-primary)]">
-            {project ? 'Edit Project' : parentProject ? 'New Section' : 'New Project'}
-          </h2>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close"
-            className="rounded-control p-1 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-
-        <div className="space-y-4 p-5">
-          <div>
-            <label className="mb-1 block text-xs text-[var(--text-secondary)]">Name</label>
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder={parentProject ? 'Section name' : 'Project name'}
-              data-autofocus
-              className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]"
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') handleSave()
-              }}
-            />
-          </div>
-
-          <div>
-            <label className="mb-1 block text-xs text-[var(--text-secondary)]">Color</label>
-            <div className="flex flex-wrap gap-1.5">
-              {['#e74c3c', '#e67e22', '#f1c40f', '#2ecc71', '#1abc9c', '#3498db', '#9b59b6', '#e91e63', '#795548', '#607d8b', '#34495e', '#000000'].map((c) => (
-                <button
-                  key={c}
-                  type="button"
-                  onClick={() => setHexColor(c)}
-                  className={cn(
-                    'h-6 w-6 rounded-full transition-transform hover:scale-110 motion-reduce:hover:scale-100',
-                    hexColor === c && 'ring-2 ring-[var(--text-primary)] ring-offset-1 ring-offset-[var(--bg-primary)]'
-                  )}
-                  style={{ backgroundColor: c }}
-                />
-              ))}
-            </div>
-            <div className="mt-2 flex items-center gap-2">
-              <span
-                className="h-6 w-6 shrink-0 rounded-full border border-[var(--border-color)]"
-                style={{ backgroundColor: hexColor || 'var(--bg-hover)' }}
-              />
-              <input
-                type="text"
-                value={hexColor}
-                onChange={(e) => setHexColor(e.target.value)}
-                placeholder="#hex"
-                className="flex-1 rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-1.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]"
-              />
-              {hexColor && (
-                <button
-                  type="button"
-                  onClick={() => setHexColor('')}
-                  className="text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-                >
-                  Clear
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-
-        <div className="flex justify-end gap-2 border-t border-[var(--border-color)] px-5 py-3">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-control border border-[var(--border-color)] px-4 py-1.5 text-xs font-medium text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-hover)]"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={handleSave}
-            disabled={!title.trim()}
-            className={cn(
-              'rounded-control px-4 py-1.5 text-xs font-medium transition-colors',
-              'bg-accent-fill text-on-accent hover:bg-accent-fill/90',
-              'disabled:cursor-not-allowed disabled:opacity-50'
-            )}
-          >
-            {project ? 'Save' : 'Create'}
-          </button>
-        </div>
-      </div>
-    </Dialog>
+    <div
+      className={cn('group relative flex h-7 items-center rounded-control hover:bg-[var(--bg-hover)]', menuOpen && 'bg-[var(--bg-hover)]')}
+      style={{ paddingLeft: `${depth * 16 + 4}px` }}
+      onContextMenu={(event) => {
+        event.preventDefault()
+        onOpenMenu(project, { point: { x: event.clientX, y: event.clientY } }, rowRef.current)
+      }}
+    >
+      <span aria-hidden className="w-6 shrink-0" />
+      <button
+        ref={rowRef}
+        type="button"
+        onClick={onOpen}
+        onKeyDown={(event) => {
+          if ((event.key === 'F10' && event.shiftKey) || event.key === 'ContextMenu') {
+            event.preventDefault()
+            openMenuAtButton()
+          }
+        }}
+        className="flex h-full min-w-0 flex-1 items-center text-left"
+      >
+        <FolderOpen aria-hidden="true" className="mr-2 h-3.5 w-3.5 shrink-0 opacity-60" style={{ color: color || 'var(--text-secondary)' }} strokeWidth={1.8} />
+        <span className="min-w-0 flex-1 truncate text-xs text-[var(--text-secondary)]">
+          {project.title}
+          <span className="sr-only"> (archived)</span>
+        </span>
+      </button>
+      <span className={cn('mx-1.5 items-center gap-0.5', menuOpen ? 'flex' : 'hidden group-hover:flex group-focus-within:flex')}>
+        <button
+          type="button"
+          tabIndex={-1}
+          aria-label={`Restore ${project.title}`}
+          title="Restore"
+          onClick={onRestore}
+          className="flex h-5 w-5 items-center justify-center rounded-control text-[var(--text-secondary)] hover:bg-[var(--bg-selected)] hover:text-[var(--accent-blue)]"
+        >
+          <RotateCcw aria-hidden="true" className="h-3.5 w-3.5" />
+        </button>
+        <button
+          ref={moreRef}
+          type="button"
+          tabIndex={-1}
+          aria-label={`${project.title} actions`}
+          aria-haspopup="menu"
+          aria-expanded={menuOpen}
+          onClick={openMenuAtButton}
+          className="flex h-5 w-5 items-center justify-center rounded-control text-[var(--text-secondary)] hover:bg-[var(--bg-selected)] hover:text-[var(--text-primary)]"
+        >
+          <MoreHorizontal aria-hidden="true" className="h-3.5 w-3.5" />
+        </button>
+      </span>
+    </div>
   )
 }
 
 export function ProjectTree() {
   const { data, isLoading } = useProjects()
-  const deleteProject = useDeleteProject()
-  const setArchived = useSetProjectArchived()
-  const { confirmDelete, dialogProps: deleteDialogProps } = useConfirmDelete()
-  const { projectDialogOpen, setProjectDialogOpen } = useSidebarStore()
   const openCounts = useOpenTaskCounts()
   const { collapsed, setCollapsed } = useSidebarCollapsed()
-
-  const [editingProject, setEditingProject] = useState<Project | null>(null)
-  const [archiveTarget, setArchiveTarget] = useState<Project | null>(null)
-  const [sectionParent, setSectionParent] = useState<Project | null>(null)
-  const [contextMenu, setContextMenu] = useState<{
-    x: number
-    y: number
-    project: ProjectTreeNode
-    /** The row's control: a confirmation opened from a menu entry gives focus back here. */
-    opener: HTMLElement | null
-  } | null>(null)
-  const [archiveOpener, setArchiveOpener] = useState<HTMLElement | null>(null)
+  const renaming = useProjectActionsStore((s) => s.renaming)
+  const creating = useProjectActionsStore((s) => s.creating)
+  const [menu, setMenu] = useState<MenuState | null>(null)
+  const anchorRef = useRef<HTMLElement | null>(null)
 
   // The tree waits for the config so the Inbox is never drawn (and counted) for a moment.
   const { data: config, isLoading: configLoading } = useAppConfig()
@@ -197,138 +171,64 @@ export function ProjectTree() {
 
   const visibleTree = useMemo(
     () => (inboxProjectId ? data?.tree.filter((n) => n.id !== inboxProjectId) : data?.tree) ?? [],
-    [data?.tree, inboxProjectId]
+    [data?.tree, inboxProjectId],
   )
+  const archived = data?.archived ?? []
 
-  const handleContextMenu = (e: React.MouseEvent, node: ProjectTreeNode) => {
-    e.preventDefault()
-    setContextMenu({ x: e.clientX, y: e.clientY, project: node, opener: focusTargetOf(e.currentTarget) })
+  const openMenu = (project: Project, at: { point: { x: number; y: number } } | { anchor: HTMLElement }, opener: HTMLElement | null) => {
+    if ('anchor' in at) {
+      anchorRef.current = at.anchor
+      setMenu({ project, anchor: at.anchor, opener })
+    } else {
+      setMenu({ project, point: at.point, opener })
+    }
   }
-
-  const handleCloseDialog = () => {
-    setProjectDialogOpen(false)
-    setEditingProject(null)
-  }
+  const openTreeMenu: OpenProjectMenu = (node, at, opener) => openMenu(node, at, opener)
 
   if (isLoading || configLoading || !data) {
-    return (
-      <div className="px-4 py-2 text-xs text-[var(--text-secondary)]">
-        Loading...
-      </div>
-    )
+    return <div className="px-4 py-2 text-xs text-[var(--text-secondary)]">Loading...</div>
   }
 
-  if (visibleTree.length === 0) {
-    return (
-      <>
-        <div className="px-4 py-2 text-xs text-[var(--text-secondary)]">
-          No projects
-        </div>
-        <ProjectDialog
-          open={projectDialogOpen}
-          project={editingProject}
-          onClose={handleCloseDialog}
-        />
-      </>
-    )
-  }
-
-  const sortableIds = visibleTree.map((n) => `project-${n.id}`)
+  const renamingId = renaming?.surface === 'sidebar' ? renaming.id : null
+  const menuOpenFor = menu?.project.id ?? null
 
   return (
     <>
       <div className="flex flex-col gap-0.5 px-2">
-        <SortableContext items={sortableIds} strategy={verticalListSortingStrategy}>
-          {visibleTree.map((node) => (
-            <ProjectTreeItem
-              key={node.id}
-              node={node}
-              siblings={visibleTree}
-              openCounts={openCounts}
-              showProgress={showProgress}
-              collapsed={collapsed}
-              onToggleCollapsed={setCollapsed}
-              onContextMenu={handleContextMenu}
-            />
-          ))}
-        </SortableContext>
+        {visibleTree.length === 0 && creating?.parentId !== 0 && (
+          <div className="px-2 py-2 text-xs text-[var(--text-secondary)]">No projects</div>
+        )}
+        {visibleTree.map((node) => (
+          <ProjectTreeItem
+            key={node.id}
+            node={node}
+            openCounts={openCounts}
+            showProgress={showProgress}
+            collapsed={collapsed}
+            onToggleCollapsed={setCollapsed}
+            onOpenMenu={openTreeMenu}
+            menuOpenFor={menuOpenFor}
+            renamingId={renamingId}
+            creatingUnder={creating?.parentId ?? null}
+          />
+        ))}
+        {creating?.parentId === 0 && <ProjectCreateRow parentId={0} depth={0} />}
+        {archived.length > 0 && <ArchivedGroup archived={archived} onOpenMenu={openMenu} menuOpenFor={menuOpenFor} />}
       </div>
 
-      {/* Context menu: the Menu primitive at the pointer (arrow keys, Escape, focus return, kept in the window). */}
-      {contextMenu && (
-        <Menu
-          key={`${contextMenu.project.id}:${contextMenu.x}:${contextMenu.y}`}
-          anchorPoint={{ x: contextMenu.x, y: contextMenu.y }}
-          label={`${contextMenu.project.title} actions`}
-          onClose={() => setContextMenu(null)}
-        >
-          <MenuItem
-            icon={<Pencil />}
-            onSelect={() => {
-              setEditingProject(contextMenu.project)
-              setProjectDialogOpen(true)
-            }}
-          >
-            Edit
-          </MenuItem>
-          <MenuItem icon={<Plus />} onSelect={() => setSectionParent(contextMenu.project)}>
-            Add section
-          </MenuItem>
-          {contextMenu.project.id !== inboxProjectId && (
-            <>
-              <MenuItem
-                icon={<Archive />}
-                onSelect={() => {
-                  setArchiveTarget(contextMenu.project)
-                  setArchiveOpener(contextMenu.opener)
-                }}
-              >
-                Archive
-              </MenuItem>
-              <MenuItem
-                icon={<Trash2 />}
-                danger
-                onSelect={async () => {
-                  const project = contextMenu.project
-                  const ok = await confirmDelete('Delete this project? All tasks in it will be deleted. This cannot be undone.', {
-                    returnFocusTo: contextMenu.opener,
-                  })
-                  if (ok) {
-                    deleteProject.mutate(project.id)
-                  }
-                }}
-              >
-                Delete
-              </MenuItem>
-            </>
-          )}
-        </Menu>
+      {/* The project menu: the Menu primitive at the pointer or at the … button (arrow keys,
+          Escape, focus return, kept in the window). */}
+      {menu && (
+        <ProjectMenu
+          key={`${menu.project.id}:${menu.point ? `${menu.point.x}:${menu.point.y}` : 'button'}`}
+          project={menu.project}
+          surface="sidebar"
+          anchorPoint={menu.point}
+          anchorRef={menu.anchor ? anchorRef : undefined}
+          opener={menu.opener}
+          onClose={() => setMenu(null)}
+        />
       )}
-
-      <ProjectDialog
-        open={projectDialogOpen}
-        project={editingProject}
-        onClose={handleCloseDialog}
-      />
-      <ProjectDialog
-        open={sectionParent != null}
-        project={null}
-        parentProject={sectionParent}
-        onClose={() => setSectionParent(null)}
-      />
-      <ConfirmDialog {...deleteDialogProps} />
-      <ConfirmDialog
-        open={archiveTarget != null}
-        message={archiveTarget ? `Archive “${archiveTarget.title}”? Its tasks will be kept and it can be restored from Settings.` : ''}
-        confirmLabel="Archive"
-        destructive={false}
-        returnFocusTo={archiveOpener}
-        onCancel={() => setArchiveTarget(null)}
-        onConfirm={() => {
-          if (archiveTarget) setArchived.mutate({ project: archiveTarget, archived: true })
-          setArchiveTarget(null)
-        }}
-      />
     </>
   )
 }

@@ -160,9 +160,9 @@ describe('modals are on the Dialog primitive', () => {
     const dialogs = [
       'components/sync/SyncPanel.tsx',
       'views/RoutinesView.tsx',
-      'components/settings/ProjectSettings.tsx',
+      'components/projects/ProjectDialog.tsx',
+      'components/projects/ProjectActionsHost.tsx',
       'components/rich-text/LinkDialog.tsx',
-      'components/sidebar/ProjectTree.tsx',
       'components/sidebar/TagList.tsx',
     ]
     for (const path of dialogs) {
@@ -185,7 +185,7 @@ describe('modals are on the Dialog primitive', () => {
 })
 
 describe('the sidebar context menus', () => {
-  for (const file of ['ProjectTree', 'TagList', 'CustomListNav']) {
+  for (const file of ['TagList', 'CustomListNav']) {
     const source = read(`components/sidebar/${file}.tsx`)
 
     it(`${file} is a Menu at the pointer, not a hand-placed div`, () => {
@@ -195,6 +195,25 @@ describe('the sidebar context menus', () => {
       expect(source).toContain('<MenuItem')
       expect(source).not.toContain('fixed z-50')
       expect(source).not.toContain("addEventListener('click'")
+    })
+  }
+
+  // The project menu is one component shared by the sidebar, the project page and Settings.
+  it('ProjectMenu is on the Menu primitive', () => {
+    const source = read('components/projects/ProjectMenu.tsx')
+    expect(source).toContain("from '@/components/overlay/Menu'")
+    expect(source).toMatch(/<Menu\s/)
+    expect(source).toContain('anchorPoint')
+    expect(source).toContain('<MenuItem')
+    expect(source).not.toContain('fixed z-50')
+  })
+
+  for (const path of ['components/sidebar/ProjectTree.tsx', 'components/settings/ProjectSettings.tsx']) {
+    it(`${path} opens the shared project menu at the pointer`, () => {
+      const source = read(path)
+      expect(source).toMatch(/<ProjectMenu\s/)
+      expect(source).toContain('anchorPoint')
+      expect(source).toContain('onContextMenu')
     })
   }
 })

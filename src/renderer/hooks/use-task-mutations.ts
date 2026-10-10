@@ -11,6 +11,7 @@ import {
   type PositionUpdate,
   type SiblingPositionUpdate,
 } from '@/lib/reorder-positions'
+import { applyPlacement, type ProjectPlacement } from '@/lib/project-moves'
 import { playCompletionSound } from '@/lib/completion-sound'
 import {
   mapTaskDoneByIds,
@@ -962,6 +963,57 @@ export function useReorderProject() {
     },
     onSettled: () => {
       qc.invalidateQueries({ queryKey: ['projects'] })
+    },
+  })
+}
+
+export interface MoveProjectVariables {
+  project: Project
+  placement: ProjectPlacement
+}
+
+/**
+ * Moves a project to another parent or another place among its siblings (drag and drop in the
+ * project tree, the keyboard, "Move to…"). The moved project gets its new parent (only when that
+ * changes) and position; siblings that had to be spread out get their positions first.
+ */
+export function useMoveProject() {
+  const qc = useQueryClient()
+
+  return useMutation({
+    meta: metaFor('move the project'),
+    mutationFn: async ({ project, placement }: MoveProjectVariables) => {
+      await sendPositionUpdates<SiblingPositionUpdate>(
+        async (update) => {
+          if (update.id !== project.id) {
+            await updateProjectRequest({ id: update.id, changes: { position: update.position } })
+            return
+          }
+          await updateProjectRequest({
+            id: project.id,
+            changes: placement.parentChanged
+              ? { parent_project_id: placement.parentId, position: update.position }
+              : { position: update.position },
+            original: project,
+          })
+        },
+        { id: project.id, position: placement.position },
+        placement.renumbered,
+      )
+    },
+    onMutate: async ({ project, placement }) => {
+      await qc.cancelQueries({ queryKey: ['projects'] })
+      const previous = qc.getQueryData<Project[]>(['projects'])
+      if (previous) qc.setQueryData<Project[]>(['projects'], applyPlacement(previous, project.id, placement))
+      return { previous }
+    },
+    onError: (_error, _variables, context) => {
+      if (context?.previous) qc.setQueryData(['projects'], context.previous)
+    },
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: ['projects'] })
+      // A project page lists its child projects as sections.
+      refreshTasks(qc, [['section-tasks']])
     },
   })
 }

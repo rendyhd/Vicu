@@ -15,6 +15,9 @@ import { AddSectionButton } from '@/components/task-list/AddSectionButton'
 import { ParentDropZone } from '@/components/task-list/ParentDropZone'
 import { RowViewProvider } from '@/components/task-list/RowViewContext'
 import { ListSkeleton } from '@/components/shared/ListSkeleton'
+import { Button } from '@/components/shared/Button'
+import { ProjectHeaderMenu } from '@/components/projects/ProjectHeaderMenu'
+import { useSharedProjectActions } from '@/hooks/use-project-actions'
 
 function findSectionForTask(
   sections: SectionData[],
@@ -46,6 +49,7 @@ interface InsertIndicator {
 export function ProjectView() {
   const { projectId } = useParams({ from: '/project/$projectId' })
   const pid = Number(projectId)
+  const { restore } = useSharedProjectActions()
   // The rows are listed inside this project: none of them names it.
   const rowView = useMemo(() => ({ projectId: pid }), [pid])
   const { data: projectData, isLoading: projectsLoading } = useProjects()
@@ -184,9 +188,14 @@ export function ProjectView() {
         </h1>
         <p className="max-w-sm text-sm text-[var(--text-secondary)]">
           {archivedProject
-            ? 'Restore this project from Settings to view its tasks.'
+            ? 'Restore it to see its tasks again.'
             : 'This project may have been deleted or you may no longer have access.'}
         </p>
+        {archivedProject && (
+          <Button variant="primary" className="mt-2" onClick={() => restore(archivedProject)}>
+            Restore project
+          </Button>
+        )}
       </div>
     )
   }
@@ -206,6 +215,7 @@ export function ProjectView() {
       empty={tasks.length === 0 && !hasSections}
       emptyTitle="No tasks in this project"
       emptySubtitle="Create a new task to get started"
+      headerActions={activeProject && <ProjectHeaderMenu project={activeProject} />}
       insertIndex={parentInsertIndex}
       newTaskPlacement="after-tasks"
     >

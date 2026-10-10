@@ -77,7 +77,7 @@ export default async function run(h) {
     [...document.querySelectorAll('aside [data-progress-ring]')].map((el) => ({
       label: el.getAttribute('aria-label'),
       ring: el.getAttribute('data-progress-ring'),
-      row: el.closest('[role="button"]')?.textContent?.trim() ?? '',
+      row: el.closest('[data-sidebar-project]')?.textContent?.trim() ?? '',
     })))
   const websiteTasks = (await h.api('GET', `/projects/${h.ids.website}/tasks?per_page=500`)).items
   const wDone = websiteTasks.filter((t) => t.done).length

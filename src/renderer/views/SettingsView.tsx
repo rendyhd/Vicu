@@ -17,7 +17,6 @@ import { SecretStorageNotice } from '@/components/settings/SecretStorageNotice'
 import { KeyboardShortcuts } from '@/components/settings/KeyboardShortcuts'
 import { NotificationSettings } from '@/components/settings/NotificationSettings'
 import { CompletionSoundSettings } from '@/components/settings/CompletionSoundSettings'
-import { ReviewSettingsPanel } from '@/components/review/ReviewSettingsPanel'
 import { RoutinesSettingsPanel } from '@/components/routines/RoutinesSettingsPanel'
 import { ProjectSettings } from '@/components/settings/ProjectSettings'
 import { useProjects } from '@/hooks/use-projects'
@@ -31,6 +30,9 @@ import type { ThemeOption } from '@/lib/theme'
 
 type SettingsTab = 'general' | 'projects' | 'integrations' | 'notifications' | 'shortcuts'
 
+/** Every tab's content sits in the same column, left-aligned with the tab bar. */
+const SETTINGS_COLUMN = 'mx-6 max-w-[640px] space-y-6 pb-8 pt-4'
+
 export function SettingsView() {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
@@ -41,7 +43,6 @@ export function SettingsView() {
   // The token itself never reaches this page: only whether one is saved, so Test Connection can use it.
   const [hasSavedToken, setHasSavedToken] = useState(false)
   const [showToken, setShowToken] = useState(false)
-  const [inboxProjectId, setInboxProjectId] = useState(0)
   const [theme, setTheme] = useState<ThemeOption>('system')
   const [authMethod, setAuthMethod] = useState<'api_token' | 'oidc' | 'password'>('api_token')
   const [currentUser, setCurrentUser] = useState<VikunjaUser | null>(null)
@@ -90,7 +91,6 @@ export function SettingsView() {
         setFullConfig(config)
         setUrl(config.vikunja_url || '')
         setToken(config.api_token || '')
-        setInboxProjectId(config.inbox_project_id || 0)
         setTheme(config.theme || 'system')
         setAuthMethod(config.auth_method || 'api_token')
         if (!config.auth_method || config.auth_method === 'api_token') {
@@ -244,19 +244,26 @@ export function SettingsView() {
         ))}
       </div>
 
+      {/* One column width for every tab (SETTINGS_COLUMN). */}
       {activeTab === 'shortcuts' ? (
-        <KeyboardShortcuts />
+        <div className={SETTINGS_COLUMN}>
+          <KeyboardShortcuts />
+        </div>
       ) : activeTab === 'projects' ? (
-        <ProjectSettings />
+        <div className={SETTINGS_COLUMN}>
+          {fullConfig && <ProjectSettings config={fullConfig} onChange={handleQuickEntryChange} />}
+        </div>
       ) : activeTab === 'notifications' ? (
-        fullConfig && (
-          <NotificationSettings
-            config={fullConfig}
-            onChange={handleQuickEntryChange}
-          />
-        )
+        <div className={SETTINGS_COLUMN}>
+          {fullConfig && (
+            <NotificationSettings
+              config={fullConfig}
+              onChange={handleQuickEntryChange}
+            />
+          )}
+        </div>
       ) : activeTab === 'general' ? (
-      <div className="mx-6 space-y-6 pb-8 pt-4">
+      <div className={SETTINGS_COLUMN}>
         <div className="rounded-card border border-[var(--border-color)] bg-[var(--bg-primary)] p-5">
           <h2 className="mb-4 text-sm font-semibold text-[var(--text-primary)]">Connection</h2>
 
@@ -351,6 +358,77 @@ export function SettingsView() {
         </div>
 
         <div className="rounded-card border border-[var(--border-color)] bg-[var(--bg-primary)] p-5">
+          <h2 className="mb-4 text-sm font-semibold text-[var(--text-primary)]">Appearance</h2>
+
+          <div className="space-y-3">
+            <div>
+              <label className="mb-2 block text-xs text-[var(--text-secondary)]">Theme</label>
+              <div className="flex gap-3">
+                {(['light', 'dark', 'system'] as ThemeOption[]).map((opt) => (
+                  <label
+                    key={opt}
+                    className={cn(
+                      'flex cursor-pointer items-center gap-1.5 rounded-control border px-3 py-1.5 text-xs font-medium transition-colors',
+                      theme === opt
+                        ? 'border-accent-blue bg-accent-blue/10 text-accent-blue'
+                        : 'border-[var(--border-color)] text-[var(--text-secondary)] hover:border-[var(--text-secondary)]'
+                    )}
+                  >
+                    <input
+                      type="radio"
+                      name="theme"
+                      value={opt}
+                      checked={theme === opt}
+                      onChange={() => { setTheme(opt); applyTheme(opt); handleQuickEntryChange({ theme: opt }) }}
+                      className="sr-only"
+                    />
+                    {opt.charAt(0).toUpperCase() + opt.slice(1)}
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="mb-2 block text-xs text-[var(--text-secondary)]">Clock</label>
+              <div className="flex gap-3" role="radiogroup" aria-label="Clock">
+                {([
+                  { value: 'system' as const, label: 'System' },
+                  { value: '12h' as const, label: '12-hour' },
+                  { value: '24h' as const, label: '24-hour' },
+                ]).map((opt) => {
+                  const current = fullConfig?.clock_format ?? 'system'
+                  return (
+                    <label
+                      key={opt.value}
+                      className={cn(
+                        'flex cursor-pointer items-center gap-1.5 rounded-control border px-3 py-1.5 text-xs font-medium transition-colors',
+                        current === opt.value
+                          ? 'border-accent-blue bg-accent-blue/10 text-accent-blue'
+                          : 'border-[var(--border-color)] text-[var(--text-secondary)] hover:border-[var(--text-secondary)]'
+                      )}
+                    >
+                      <input
+                        type="radio"
+                        name="clock_format"
+                        value={opt.value}
+                        checked={current === opt.value}
+                        onChange={() => handleQuickEntryChange({ clock_format: opt.value })}
+                        className="sr-only"
+                      />
+                      {opt.label}
+                    </label>
+                  )
+                })}
+              </div>
+              <p className="mt-1.5 text-xs text-[var(--text-secondary)]">
+                System follows your region. Pick 12-hour or 24-hour if your system uses a custom time format. Applies to every Vicu window.
+              </p>
+            </div>
+
+          </div>
+        </div>
+
+        <div className="rounded-card border border-[var(--border-color)] bg-[var(--bg-primary)] p-5">
           <h2 className="mb-4 text-sm font-semibold text-[var(--text-primary)]">Preferences</h2>
 
           <div className="space-y-3">
@@ -421,63 +499,6 @@ export function SettingsView() {
               </span>
             </label>
 
-            <label className="flex cursor-pointer items-center gap-2">
-              <Checkbox
-                checked={fullConfig?.show_project_progress !== false}
-                onChange={(e) => handleQuickEntryChange({ show_project_progress: e.target.checked })}
-              />
-              <span className="text-sm text-[var(--text-primary)]">
-                Show project progress in the sidebar
-              </span>
-            </label>
-
-            <div>
-              <label htmlFor="settings-inbox-project" className="mb-1 block text-xs text-[var(--text-secondary)]">Inbox Project</label>
-              <select
-                id="settings-inbox-project"
-                value={inboxProjectId}
-                onChange={(e) => { const id = Number(e.target.value); setInboxProjectId(id); handleQuickEntryChange({ inbox_project_id: id }) }}
-                className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)]"
-              >
-                <option value={0}>Select a project...</option>
-                {projects.map((p) => (
-                  <option key={p.id} value={p.id}>{p.title}</option>
-                ))}
-              </select>
-              {inboxProjectId !== 0 && !projects.some((project) => project.id === inboxProjectId) && (
-                <p className="mt-1 text-xs text-danger">
-                  The configured Inbox project is archived or unavailable. Select an active project.
-                </p>
-              )}
-            </div>
-
-            <div>
-              <label className="mb-2 block text-xs text-[var(--text-secondary)]">Theme</label>
-              <div className="flex gap-3">
-                {(['light', 'dark', 'system'] as ThemeOption[]).map((opt) => (
-                  <label
-                    key={opt}
-                    className={cn(
-                      'flex cursor-pointer items-center gap-1.5 rounded-control border px-3 py-1.5 text-xs font-medium transition-colors',
-                      theme === opt
-                        ? 'border-accent-blue bg-accent-blue/10 text-accent-blue'
-                        : 'border-[var(--border-color)] text-[var(--text-secondary)] hover:border-[var(--text-secondary)]'
-                    )}
-                  >
-                    <input
-                      type="radio"
-                      name="theme"
-                      value={opt}
-                      checked={theme === opt}
-                      onChange={() => { setTheme(opt); applyTheme(opt); handleQuickEntryChange({ theme: opt }) }}
-                      className="sr-only"
-                    />
-                    {opt.charAt(0).toUpperCase() + opt.slice(1)}
-                  </label>
-                ))}
-              </div>
-            </div>
-
             <div>
               <label className="mb-2 block text-xs text-[var(--text-secondary)]">What does urgent mean?</label>
               <div className="flex gap-3">
@@ -514,55 +535,11 @@ export function SettingsView() {
               </p>
             </div>
 
-            <div>
-              <label className="mb-2 block text-xs text-[var(--text-secondary)]">Clock</label>
-              <div className="flex gap-3" role="radiogroup" aria-label="Clock">
-                {([
-                  { value: 'system' as const, label: 'System' },
-                  { value: '12h' as const, label: '12-hour' },
-                  { value: '24h' as const, label: '24-hour' },
-                ]).map((opt) => {
-                  const current = fullConfig?.clock_format ?? 'system'
-                  return (
-                    <label
-                      key={opt.value}
-                      className={cn(
-                        'flex cursor-pointer items-center gap-1.5 rounded-control border px-3 py-1.5 text-xs font-medium transition-colors',
-                        current === opt.value
-                          ? 'border-accent-blue bg-accent-blue/10 text-accent-blue'
-                          : 'border-[var(--border-color)] text-[var(--text-secondary)] hover:border-[var(--text-secondary)]'
-                      )}
-                    >
-                      <input
-                        type="radio"
-                        name="clock_format"
-                        value={opt.value}
-                        checked={current === opt.value}
-                        onChange={() => handleQuickEntryChange({ clock_format: opt.value })}
-                        className="sr-only"
-                      />
-                      {opt.label}
-                    </label>
-                  )
-                })}
-              </div>
-              <p className="mt-1.5 text-xs text-[var(--text-secondary)]">
-                System follows your region. Pick 12-hour or 24-hour if your system uses a custom time format. Applies to every Vicu window.
-              </p>
-            </div>
-
           </div>
         </div>
 
         {fullConfig && (
           <CompletionSoundSettings
-            config={fullConfig}
-            onChange={handleQuickEntryChange}
-          />
-        )}
-
-        {fullConfig && (
-          <ReviewSettingsPanel
             config={fullConfig}
             onChange={handleQuickEntryChange}
           />
@@ -680,7 +657,7 @@ export function SettingsView() {
         )}
       </div>
       ) : activeTab === 'integrations' ? (
-      <div className="mx-6 space-y-6 pb-8 pt-4">
+      <div className={SETTINGS_COLUMN}>
         {fullConfig && (
           <QuickEntrySettings
             config={fullConfig}

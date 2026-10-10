@@ -4,21 +4,22 @@ interface SidebarState {
   activeView: string
   expandedAreas: Set<number>
   sidebarWidth: number
-  projectDialogOpen: boolean
   labelDialogOpen: boolean
+  /** Whether the Archived group under the sidebar projects is open (for this session). */
+  archivedProjectsOpen: boolean
   setActiveView: (view: string) => void
   toggleArea: (id: number) => void
   setSidebarWidth: (width: number) => void
-  setProjectDialogOpen: (open: boolean) => void
   setLabelDialogOpen: (open: boolean) => void
+  setArchivedProjectsOpen: (open: boolean) => void
 }
 
 export const useSidebarStore = create<SidebarState>((set) => ({
   activeView: 'inbox',
   expandedAreas: new Set<number>(),
   sidebarWidth: 240,
-  projectDialogOpen: false,
   labelDialogOpen: false,
+  archivedProjectsOpen: false,
 
   setActiveView: (view) => set({ activeView: view }),
 
@@ -34,16 +35,14 @@ export const useSidebarStore = create<SidebarState>((set) => ({
     }),
 
   setSidebarWidth: (width) => set({ sidebarWidth: width }),
-  setProjectDialogOpen: (open) => set({ projectDialogOpen: open }),
   setLabelDialogOpen: (open) => set({ labelDialogOpen: open }),
+  setArchivedProjectsOpen: (open) => set({ archivedProjectsOpen: open }),
 }))
 
 export function useSidebarActions() {
-  const setProjectDialogOpen = useSidebarStore((s) => s.setProjectDialogOpen)
   const setLabelDialogOpen = useSidebarStore((s) => s.setLabelDialogOpen)
 
   return {
-    openProjectDialog: () => setProjectDialogOpen(true),
     openLabelDialog: () => setLabelDialogOpen(true),
   }
 }

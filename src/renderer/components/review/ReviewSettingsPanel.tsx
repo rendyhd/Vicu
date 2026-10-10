@@ -1,6 +1,48 @@
+import { useMemo } from 'react'
+import { Folder } from 'lucide-react'
+import { Button } from '@/components/shared/Button'
 import { Checkbox } from '@/components/shared/Checkbox'
 import { Switch } from '@/components/shared/Switch'
-import type { AppConfig } from '@/lib/vikunja-types'
+import { useProjects } from '@/hooks/use-projects'
+import { useSharedProjectActions } from '@/hooks/use-project-actions'
+import { normalizeHex } from '@/lib/constants'
+import { parseReviewFooter } from '@/lib/review-metadata'
+import type { AppConfig, Project } from '@/lib/vikunja-types'
+
+/** Active projects someone excluded from review (the footer in their description says so). */
+export function excludedFromReview(projects: readonly Project[]): Project[] {
+  return projects
+    .filter((project) => parseReviewFooter(project.description).state === 'excluded')
+    .sort((a, b) => a.title.localeCompare(b.title))
+}
+
+/** The projects taken out of the Review list, each with a way back in. */
+function ExcludedProjects() {
+  const { data } = useProjects()
+  const { setExcludedFromReview } = useSharedProjectActions()
+  const excluded = useMemo(() => excludedFromReview(data?.flat ?? []), [data?.flat])
+  if (excluded.length === 0) return null
+
+  return (
+    <div className="border-t border-[var(--border-color)] pt-3">
+      <div className="text-sm text-[var(--text-primary)]">Excluded from review</div>
+      <p className="mb-2 text-xs text-[var(--text-secondary)]">
+        Projects you took out of the Review list. Include one to track it again.
+      </p>
+      <ul className="divide-y divide-[var(--border-color)] rounded-control border border-[var(--border-color)]">
+        {excluded.map((project) => (
+          <li key={project.id} className="flex items-center gap-2 px-3 py-1.5">
+            <Folder aria-hidden="true" className="h-4 w-4 shrink-0" style={{ color: normalizeHex(project.hex_color) || 'var(--text-secondary)' }} />
+            <span className="min-w-0 flex-1 truncate text-sm text-[var(--text-primary)]">{project.title}</span>
+            <Button variant="secondary" onClick={() => setExcludedFromReview(project, false)} aria-label={`Include again: ${project.title}`}>
+              Include again
+            </Button>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
 
 interface ReviewSettingsPanelProps {
   config: AppConfig
@@ -68,6 +110,8 @@ export function ReviewSettingsPanel({ config, onChange }: ReviewSettingsPanelPro
             </p>
           </div>
         </label>
+
+        {review.enabled && <ExcludedProjects />}
       </div>
     </div>
   )

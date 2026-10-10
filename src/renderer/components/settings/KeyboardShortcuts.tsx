@@ -37,7 +37,7 @@ function Kbd({ children }: { children: string }) {
 
 export function KeyboardShortcuts() {
   return (
-    <div className="mx-6 max-w-lg space-y-6 pb-8 pt-4">
+    <div className="space-y-6">
       {shortcuts.map((section) => (
         <div
           key={section.category}

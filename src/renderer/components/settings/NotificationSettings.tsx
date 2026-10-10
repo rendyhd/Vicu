@@ -46,7 +46,7 @@ export function NotificationSettings({ config, onChange }: NotificationSettingsP
   const offsetDropdownValue = config.notifications_default_reminder_offset ?? 0
 
   return (
-    <div className="mx-6 max-w-lg space-y-4 pb-8 pt-4">
+    <div className="space-y-4">
       {/* Master toggle */}
       <div className="rounded-card border border-[var(--border-color)] bg-[var(--bg-primary)] p-5">
         <label className="flex cursor-pointer items-center gap-2">

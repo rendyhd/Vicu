@@ -10,10 +10,14 @@ import {
   useSensor,
   useSensors,
 } from '@dnd-kit/core'
-import type { CollisionDetection, DragStartEvent, DragEndEvent } from '@dnd-kit/core'
+import type { CollisionDetection, DragStartEvent, DragEndEvent, DragMoveEvent } from '@dnd-kit/core'
 import { useSidebarStore } from '@/stores/sidebar-store'
 import { useSelectionStore } from '@/stores/selection-store'
 import { useUpdateTask, useReorderTask, useReorderProject, useAddLabel, applyReorderToCache } from '@/hooks/use-task-mutations'
+import { ProjectActionsContext, useProjectActions } from '@/hooks/use-project-actions'
+import { childrenOf, dropZone, placeAt, placeRelative, TOP_LEVEL, type ProjectPlacement } from '@/lib/project-moves'
+import { setProjectDropTarget, useProjectDropStore, type ProjectDropTarget } from '@/stores/project-drop-store'
+import { ProjectActionsHost } from '@/components/projects/ProjectActionsHost'
 import { commitSync } from '@/lib/sync-commit'
 import { taskDropAnimation } from '@/lib/drop-animation'
 import { motionEasing, motionMs } from '@/lib/motion'
@@ -26,7 +30,7 @@ import { useReorderStore } from '@/stores/reorder-store'
 import { api } from '@/lib/api'
 import { applyTheme } from '@/lib/theme'
 import type { ThemeOption } from '@/lib/theme'
-import type { Task, Project, CustomList } from '@/lib/vikunja-types'
+import type { Task, Project, CustomList, AppConfig } from '@/lib/vikunja-types'
 import type { ProjectTreeNode } from '@/hooks/use-projects'
 import { useCompletedTasksStore } from '@/stores/completed-tasks-store'
 import { completionHold } from '@/stores/completion-hold-store'
@@ -43,7 +47,7 @@ import { CustomListDragOverlay } from '@/components/sidebar/CustomListDragOverla
 import { SectionDragOverlay } from '@/components/task-list/SectionDragOverlay'
 import { UpdateBanner } from '@/components/UpdateBanner'
 import { ToastHost } from '@/components/shared/ToastHost'
-import { useAppConfig } from '@/hooks/use-app-config'
+import { APP_CONFIG_QUERY_KEY, useAppConfig } from '@/hooks/use-app-config'
 import { openTaskInApp } from '@/lib/open-task'
 import { toast } from '@/stores/toast-store'
 import { useOfflineQueueSync } from '@/hooks/use-offline-queue'
@@ -74,6 +78,24 @@ type DragItem =
   | { type: 'project'; node: ProjectTreeNode }
   | { type: 'custom-list'; list: CustomList }
   | { type: 'section'; project: Project; siblings: Project[] }
+
+/**
+ * Where a dragged project would land for this drop target, or null when it cannot go there (on
+ * itself, inside one of its own projects, inside the Inbox, or nowhere new).
+ */
+function projectDropPlacement(
+  projects: readonly Project[],
+  inboxId: number,
+  movedId: number,
+  target: ProjectDropTarget,
+): ProjectPlacement | null {
+  if (target.kind === 'root') {
+    const topLevel = childrenOf(projects, TOP_LEVEL).filter((p) => p.id !== movedId)
+    return placeAt(projects, movedId, TOP_LEVEL, topLevel.length)
+  }
+  if (target.zone === 'into' && target.projectId === inboxId) return null
+  return placeRelative(projects, movedId, target.projectId, target.zone)
+}
 
 function BadgeSyncEnabled() {
   const count = useTodayOverdueCount()
@@ -125,6 +147,7 @@ export function AppShell() {
   const updateTask = useUpdateTask()
   const reorderTask = useReorderTask()
   const reorderProject = useReorderProject()
+  const projectActionsApi = useProjectActions()
   const addLabel = useAddLabel()
   const reducedMotion = useReducedMotion()
   // The drop travels into the slot over fade.base with the enter curve; reduced motion has none.
@@ -188,8 +211,17 @@ export function AppShell() {
     (args) => {
       const activeType = dragItem?.type
 
-      // For project, section, and custom-list drags, use rect intersection only (sortable reorder)
-      if (activeType === 'project' || activeType === 'custom-list' || activeType === 'section') {
+      // A project goes where the pointer is: onto a project row (before, into or after it) or
+      // onto a PROJECTS header (the top level). Archived rows are not targets.
+      if (activeType === 'project') {
+        return pointerWithin(args).filter((c) => {
+          const data = c.data?.droppableContainer?.data?.current as Record<string, unknown> | undefined
+          return data?.type === 'project' || data?.type === 'project-root'
+        })
+      }
+
+      // For section and custom-list drags, use rect intersection only (sortable reorder)
+      if (activeType === 'custom-list' || activeType === 'section') {
         return rectIntersection(args)
       }
 
@@ -239,9 +271,41 @@ export function AppShell() {
     [setExpandedTask, queryClient]
   )
 
+  // While a project is dragged, work out the drop zone under the pointer and show it on that row.
+  const handleDragMove = useCallback(
+    (event: DragMoveEvent) => {
+      if (dragItem?.type !== 'project') return
+      const { over, activatorEvent, delta } = event
+      const overData = over?.data.current as Record<string, unknown> | undefined
+      let target: ProjectDropTarget | null = null
+      if (over && overData?.type === 'project-root') {
+        target = { kind: 'root', dndId: String(over.id) }
+      } else if (over && overData?.type === 'project') {
+        const pointerY = (activatorEvent as PointerEvent).clientY + delta.y
+        const zone = dropZone(pointerY, over.rect, overData.hasVisibleChildren === true)
+        target = { kind: 'row', dndId: String(over.id), projectId: overData.projectId as number, zone }
+      }
+      if (target) {
+        const projects = (queryClient.getQueryData<Project[]>(['projects']) ?? []).filter((p) => !p.is_archived)
+        const inboxId = queryClient.getQueryData<AppConfig | null>(APP_CONFIG_QUERY_KEY)?.inbox_project_id ?? 0
+        if (!projectDropPlacement(projects, inboxId, dragItem.node.id, target)) target = null
+      }
+      setProjectDropTarget(target)
+    },
+    [dragItem, queryClient],
+  )
+
+  const handleDragCancel = useCallback(() => {
+    setProjectDropTarget(null)
+    setDragItem(null)
+  }, [])
+
   const handleDragEnd = useCallback(
     (event: DragEndEvent) => {
       const { active, over } = event
+      // Where a dragged project was going; the drop line goes away however the drag ends.
+      const projectTarget = useProjectDropStore.getState().target
+      setProjectDropTarget(null)
       if (!over || !dragItem) {
         setDragItem(null)
         return
@@ -437,25 +501,20 @@ export function AppShell() {
           }
         }
       } else if (dragItem.type === 'project') {
-        if (overData?.type === 'project' && active.id !== over.id) {
-          const siblings = (active.data.current as Record<string, unknown>)?.siblings as ProjectTreeNode[]
-          const node = dragItem.node
-          if (siblings) {
-            const oldIndex = siblings.findIndex((s) => s.id === node.id)
-            const overNode = overData.node as ProjectTreeNode
-            const newIndex = siblings.findIndex((s) => s.id === overNode.id)
-            if (oldIndex !== -1 && newIndex !== -1) {
-              const plan = planSiblingMove(siblings, oldIndex, newIndex)
-              reorderProject.mutate({ id: node.id, position: plan.position, renumbered: plan.renumbered })
-            }
-          }
+        const target = projectTarget
+        if (target) {
+          const projects = (queryClient.getQueryData<Project[]>(['projects']) ?? []).filter((p) => !p.is_archived)
+          const inboxId = queryClient.getQueryData<AppConfig | null>(APP_CONFIG_QUERY_KEY)?.inbox_project_id ?? 0
+          const project = projects.find((p) => p.id === dragItem.node.id)
+          const placement = project ? projectDropPlacement(projects, inboxId, project.id, target) : null
+          if (project && placement) projectActionsApi.move(project, placement)
         }
       }
       // custom-list reorder is handled by CustomListNav's useDndMonitor
 
       setDragItem(null)
     },
-    [dragItem, updateTask, reorderTask, reorderProject, addLabel]
+    [dragItem, updateTask, reorderTask, reorderProject, addLabel, queryClient, projectActionsApi]
   )
 
   useEffect(() => {
@@ -662,7 +721,15 @@ export function AppShell() {
   }
 
   return (
-    <DndContext sensors={sensors} collisionDetection={collisionDetection} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+    <ProjectActionsContext.Provider value={projectActionsApi}>
+    <DndContext
+      sensors={sensors}
+      collisionDetection={collisionDetection}
+      onDragStart={handleDragStart}
+      onDragMove={handleDragMove}
+      onDragEnd={handleDragEnd}
+      onDragCancel={handleDragCancel}
+    >
       {/* With Mica behind the window the root stays clear so the translucent sidebar shows it; the content column and the splitter carry the page colour themselves. */}
       <div className={`relative flex h-screen w-screen overflow-hidden${window.api.windowMaterial === 'mica' ? '' : ' bg-[var(--bg-primary)]'}`}>
         {/* Window drag region overlay */}
@@ -707,6 +774,7 @@ export function AppShell() {
         <BadgeSync />
         <CompletionSoundSync />
         <GlobalConfirm />
+        <ProjectActionsHost />
         <ToastHost />
         <CommandPalette />
       </div>
@@ -726,5 +794,6 @@ export function AppShell() {
         )}
       </DragOverlay>
     </DndContext>
+    </ProjectActionsContext.Provider>
   )
 }
