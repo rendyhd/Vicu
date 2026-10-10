@@ -16,6 +16,8 @@ interface ProjectTreeItemProps {
   siblings: ProjectTreeNode[]
   /** Open tasks per project id (null while loading): the open side of every ring. */
   openCounts: ReadonlyMap<number, number> | null
+  /** Whether rings are drawn at all (Settings); off, no done count is asked for either. */
+  showProgress: boolean
   /** Ids of the collapsed projects; a project not in it shows its children. */
   collapsed: ReadonlySet<number>
   onToggleCollapsed: (id: number, collapse: boolean) => void
@@ -27,6 +29,7 @@ export function ProjectTreeItem({
   depth = 0,
   siblings,
   openCounts,
+  showProgress,
   collapsed,
   onToggleCollapsed,
   onContextMenu,
@@ -40,7 +43,7 @@ export function ProjectTreeItem({
   const hasChildren = node.children.length > 0
   const expanded = hasChildren && !collapsed.has(node.id)
   const color = normalizeHex(node.hex_color)
-  const progress = useProjectProgress(node.id, openCounts)
+  const progress = useProjectProgress(node.id, openCounts, showProgress)
 
   const activeType = (active?.data.current as Record<string, unknown>)?.type as string | undefined
 
@@ -134,7 +137,7 @@ export function ProjectTreeItem({
 
           <span className="min-w-0 flex-1 truncate text-xs">{node.title}</span>
 
-          {progress && <ProgressRing progress={progress} color={color} className="mx-2" />}
+          {showProgress && progress && <ProgressRing progress={progress} color={color} className="mx-2" />}
         </div>
       </div>
 
@@ -147,6 +150,7 @@ export function ProjectTreeItem({
               depth={depth + 1}
               siblings={node.children}
               openCounts={openCounts}
+              showProgress={showProgress}
               collapsed={collapsed}
               onToggleCollapsed={onToggleCollapsed}
               onContextMenu={onContextMenu}

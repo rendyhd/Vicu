@@ -421,6 +421,16 @@ export function SettingsView() {
               </span>
             </label>
 
+            <label className="flex cursor-pointer items-center gap-2">
+              <Checkbox
+                checked={fullConfig?.show_project_progress !== false}
+                onChange={(e) => handleQuickEntryChange({ show_project_progress: e.target.checked })}
+              />
+              <span className="text-sm text-[var(--text-primary)]">
+                Show project progress in the sidebar
+              </span>
+            </label>
+
             <div>
               <label htmlFor="settings-inbox-project" className="mb-1 block text-xs text-[var(--text-secondary)]">Inbox Project</label>
               <select

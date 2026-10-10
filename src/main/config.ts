@@ -160,6 +160,7 @@ export function normalizeConfig(raw: Record<string, unknown>): AppConfig {
     start_hidden: raw.start_hidden === true,
     standalone_mode: raw.standalone_mode === true,
     show_today_overdue_badge: raw.show_today_overdue_badge === true,
+    show_project_progress: raw.show_project_progress !== false,
     // Obsidian
     obsidian_mode: raw.obsidian_mode === 'off' || raw.obsidian_mode === 'always' ? raw.obsidian_mode : 'ask',
     obsidian_api_key: typeof raw.obsidian_api_key === 'string' ? raw.obsidian_api_key : '',

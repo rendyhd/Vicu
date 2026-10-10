@@ -193,6 +193,7 @@ export function ProjectTree() {
   // The tree waits for the config so the Inbox is never drawn (and counted) for a moment.
   const { data: config, isLoading: configLoading } = useAppConfig()
   const inboxProjectId = config?.inbox_project_id || undefined
+  const showProgress = config?.show_project_progress !== false
 
   const visibleTree = useMemo(
     () => (inboxProjectId ? data?.tree.filter((n) => n.id !== inboxProjectId) : data?.tree) ?? [],
@@ -244,6 +245,7 @@ export function ProjectTree() {
               node={node}
               siblings={visibleTree}
               openCounts={openCounts}
+              showProgress={showProgress}
               collapsed={collapsed}
               onToggleCollapsed={setCollapsed}
               onContextMenu={handleContextMenu}

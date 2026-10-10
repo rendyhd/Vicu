@@ -196,6 +196,8 @@ export interface AppConfig {
   start_hidden?: boolean
   standalone_mode?: boolean
   show_today_overdue_badge?: boolean
+  /** Progress rings next to the projects in the sidebar. Missing means on. */
+  show_project_progress?: boolean
   // Obsidian
   obsidian_mode?: 'off' | 'ask' | 'always'
   obsidian_api_key?: string
