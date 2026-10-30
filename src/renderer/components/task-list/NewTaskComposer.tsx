@@ -31,6 +31,7 @@ import { useLabels } from '@/hooks/use-labels'
 import { useProjects } from '@/hooks/use-projects'
 import { useAppConfig } from '@/hooks/use-app-config'
 import { withDefaultReminder } from '../../../shared/default-reminder'
+import { withTaskDuration } from '@/lib/task-duration'
 import {
   useAddLabel,
   useCreateLabel,
@@ -367,6 +368,10 @@ export function NewTaskComposer({
       // No reminder picked: the default reminder for the due date, as every create path adds it
       // (src/shared/default-reminder.ts). Reminders the user picked are kept as they are.
       payload = withDefaultReminder(payload, appConfig)
+      if (parsed?.durationMinutes !== null && parsed?.durationMinutes !== undefined) {
+        payload.description = withTaskDuration(payload.description, parsed.durationMinutes)
+      }
+      const finalDescription = payload.description ?? ''
 
       const labelNames = [...new Set(parsed?.labels ?? [])]
       const explicitLabels = labels.filter((label) => selectedLabelIds.includes(label.id))
@@ -377,7 +382,7 @@ export function NewTaskComposer({
         parsedLabelNames: labelNames,
         knownLabels: labels,
         attachments,
-        description: draftDescription,
+        description: finalDescription,
       })
       const task = await createTask.mutateAsync({ projectId: targetProjectId, task: payload, extras })
       const place = parsed?.place
@@ -410,7 +415,7 @@ export function NewTaskComposer({
       }
       const labelled = withLabels(task, addedLabels)
       createdTask = labelled
-      const uploaded = await uploadDrafts(task.id, attachments, draftDescription)
+      const uploaded = await uploadDrafts(task.id, attachments, finalDescription)
       const failure: PartialFailure = {
         taskId: task.id,
         labels: failedLabels,

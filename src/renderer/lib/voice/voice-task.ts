@@ -6,6 +6,7 @@ import { formatDateChip } from '../date-utils'
 import type { ChipData } from '../parse-chips'
 import type { CreateTaskPayload } from '../vikunja-types'
 import { withDefaultReminder, type DefaultReminderSettings } from '../../../shared/default-reminder'
+import { withTaskDuration } from '../task-duration'
 
 // One spoken sentence as a new task, read like quick add (docs/voice-input.md): the quick-add
 // parser with the user's settings and the composer's field rules with nothing picked by hand. The
@@ -95,6 +96,7 @@ export function voiceTaskDraft(text: string, ctx: VoiceTaskContext): VoiceTaskDr
   if (fields.priority > 0) payload.priority = fields.priority
   if (fields.repeat) Object.assign(payload, fields.repeat)
   payload = withDefaultReminder(payload, ctx.defaultReminder)
+  if (parsed.durationMinutes !== null) payload.description = withTaskDuration(payload.description, parsed.durationMinutes)
 
   return {
     ok: true,

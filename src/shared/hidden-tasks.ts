@@ -9,12 +9,13 @@
  */
 
 /**
- * A task is hidden when its description holds a Vicu marker, whatever the kind (known or not): a
- * later version can add a kind without this one showing it. Only space, tab, CR and LF count as
+ * A task is hidden when its description holds a Vicu carrier marker, whatever the kind (known or
+ * not): a later version can add a kind without this one showing it. `vicu-duration` is the exception:
+ * it is inline metadata on an ordinary task, never a carrier. Only space, tab, CR and LF count as
  * whitespace here (`\s` would also take a no-break space, which the vectors pin as not hidden), and
  * the match is case sensitive. The title never decides.
  */
-export const HIDDEN_TASK_MARKER_RE = /<!--[ \t\r\n]*vicu-[a-z0-9-]+:/
+export const HIDDEN_TASK_MARKER_RE = /<!--[ \t\r\n]*vicu-(?!duration:)[a-z0-9-]+:/
 
 /** True for a hidden task's description: never listed, counted or searched as a user task. */
 export function isHiddenTask(description?: string | null): boolean {

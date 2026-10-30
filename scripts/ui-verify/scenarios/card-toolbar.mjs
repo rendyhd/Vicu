@@ -13,10 +13,11 @@ export const meta = {
   title: 'Open card: set properties are chips, unset ones "+" buttons, Info and Delete under More, tooltips after 400 ms, dark card without a shadow',
 }
 
-const ORDER = ['schedule', 'priority', 'labels', 'checklist', 'reminders', 'repeat', 'project', 'attachments', 'more']
+const ORDER = ['schedule', 'duration', 'priority', 'labels', 'checklist', 'reminders', 'repeat', 'project', 'attachments', 'more']
 const items = (res) => (Array.isArray(res) ? res : (res?.items ?? []))
 const isSet = (t) => ({
   schedule: !!t.due_date && !t.due_date.startsWith('0001'),
+  duration: /<!--\s*vicu-duration:v1:[1-9]\d*\s*-->/.test(t.description ?? ''),
   priority: (t.priority ?? 0) > 0,
   labels: (t.labels ?? []).length > 0,
   reminders: (t.reminders ?? []).length > 0,
@@ -70,7 +71,7 @@ export default async function run(h) {
   } else if (await open(without)) {
     const bar = await readBar(page, without.id)
     await h.assert('A: the bar has the buttons in the Android order', { ok: JSON.stringify(bar.map((b) => b.prop)) === JSON.stringify(ORDER), detail: bar.map((b) => b.prop).join(',') })
-    const unset = ['schedule', 'priority', 'labels', 'checklist', 'reminders', 'repeat']
+    const unset = ['schedule', 'duration', 'priority', 'labels', 'checklist', 'reminders', 'repeat']
     await h.assert('A: every unset property is a quiet "+" button', { ok: unset.every((p) => bar.find((b) => b.prop === p)?.plus), detail: bar.map((b) => `${b.prop}${b.plus ? '+' : ''}`).join(' ') })
     await h.assert('A: the project is a chip with its name', { ok: !!bar.find((b) => b.prop === 'project' && !b.plus && b.text.length > 0), detail: bar.find((b) => b.prop === 'project')?.text })
     await h.assert('A: every button is at least 28 px high and 28 px wide', { ok: bar.every((b) => b.h >= 27.5 && b.w >= 27.5), detail: bar.filter((b) => b.h < 27.5 || b.w < 27.5).map((b) => `${b.prop} ${b.w}x${b.h}`).join(', ') })
@@ -85,7 +86,7 @@ export default async function run(h) {
   } else if (await open(withProps)) {
     const bar = await readBar(page, withProps.id)
     const set = isSet(withProps)
-    const hooks = { schedule: set.schedule, priority: set.priority, labels: set.labels, reminders: set.reminders, repeat: set.repeat }
+    const hooks = { schedule: set.schedule, duration: set.duration, priority: set.priority, labels: set.labels, reminders: set.reminders, repeat: set.repeat }
     await h.assert('B: set properties are chips (no plus), unset ones keep the plus', {
       ok: Object.entries(hooks).every(([prop, on]) => bar.find((b) => b.prop === prop)?.plus === !on),
       detail: bar.map((b) => `${b.prop}${b.plus ? '+' : ''}`).join(' '),
@@ -95,6 +96,7 @@ export default async function run(h) {
     // Each chip opens its editor.
     for (const [prop, role, label] of [
       ['schedule', 'dialog', 'Schedule'],
+      ['duration', 'dialog', 'Duration'],
       ['priority', 'listbox', 'Priority'],
       ['labels', 'dialog', 'Labels'],
       ['reminders', 'dialog', 'Reminders'],

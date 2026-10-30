@@ -12,6 +12,7 @@ import {
   writeRoutineCarrier,
 } from '@/lib/routine-store'
 import { SHARE_ROUTINE_OFFLINE, hiddenForMe, sharedRoutinesIn } from '@/lib/routine-sharing'
+import { parseTaskDuration } from '@/lib/task-duration'
 import { useCurrentUser } from './use-current-user'
 import { useSyncedPrefs } from './use-synced-prefs'
 import type { Project, Task } from '@/lib/vikunja-types'
@@ -40,10 +41,15 @@ import {
  * What the editor sets. The kind, subtype, amount, unit and each time's label and period are no
  * longer chosen; they are written with the values older app versions read (contract 6.7).
  */
-export type RoutineDraft = Pick<RoutineDefinition, 'name' | 'iconName' | 'color' | 'schedule' | 'slots'>
+export type RoutineDraft = Pick<RoutineDefinition, 'name' | 'iconName' | 'color' | 'schedule' | 'slots'> & {
+  durationMinutes?: number | null
+}
 
 function checkDraft(draft: RoutineDraft) {
   if (!draft.name.trim()) throw new Error('Give this routine a name')
+  if (draft.durationMinutes != null && (!Number.isSafeInteger(draft.durationMinutes) || draft.durationMinutes <= 0)) {
+    throw new Error('Duration must be a positive whole number of minutes')
+  }
   if (draft.slots.length === 0) throw new Error('Add at least one time')
   if (draft.slots.length > MAX_ROUTINE_TIMES) throw new Error(`A routine has at most ${MAX_ROUTINE_TIMES} times`)
 }
@@ -151,8 +157,9 @@ function writeCarrier(
   carrier: RoutineCarrier<Task>,
   localPayload: RoutinePayload,
   changed: RoutineOccurrenceRecord[] = [],
+  durationMinutes?: number | null,
 ): Promise<RoutineCarrier<Task>> {
-  return writeRoutineCarrier(api, carrier, localPayload, { changed, onArchiveError: setArchiveWarning })
+  return writeRoutineCarrier(api, carrier, localPayload, { changed, durationMinutes, onArchiveError: setArchiveWarning })
     .then(({ task, payload, archiveError }) => {
       knownCarriers.set(task.id, payload)
       if (!archiveError) setArchiveWarning(null)
@@ -183,15 +190,14 @@ export function useRoutines({ enabled = true }: { enabled?: boolean } = {}) {
   const createMutation = useMutation({
     /** `shareProjectId`: create it shared through that project in one request (section 6.9). */
     mutationFn: async (draft: RoutineDraft & { shareProjectId?: number }) => {
-      const { shareProjectId, ...fields } = draft
-      draft = fields
+      const { shareProjectId, durationMinutes, ...fields } = draft
       const config = await api.getConfig()
       if (!config?.inbox_project_id) throw new Error('Choose an inbox project before creating routines')
       if (shareProjectId !== undefined && !navigator.onLine) throw new Error(SHARE_ROUTINE_OFFLINE)
       checkDraft(draft)
       const now = new Date().toISOString()
       const definition: RoutineDefinition = {
-        ...draft,
+        ...fields,
         name: draft.name.trim(),
         kind: routineKindFor(draft.schedule),
         healthSubtype: null,
@@ -208,7 +214,7 @@ export function useRoutines({ enabled = true }: { enabled?: boolean } = {}) {
       }
       const payload: RoutinePayload = { version: 1, definition, occurrences: {}, prunedBefore: '' }
       // One request, already done: no window where an open carrier shows up in task lists.
-      return createRoutineCarrier(api, shareProjectId ?? config.inbox_project_id, payload)
+      return createRoutineCarrier(api, shareProjectId ?? config.inbox_project_id, payload, durationMinutes)
     },
     onSettled: settle,
   })
@@ -218,11 +224,12 @@ export function useRoutines({ enabled = true }: { enabled?: boolean } = {}) {
       checkDraft(draft)
       const now = new Date().toISOString()
       const stored = carrier.payload.definition
+      const { durationMinutes, ...fields } = draft
       const payload: RoutinePayload = {
         ...carrier.payload,
         definition: {
           ...stored,
-          ...draft,
+          ...fields,
           name: draft.name.trim(),
           kind: routineKindFor(draft.schedule, stored.kind),
           healthSubtype: null,
@@ -233,7 +240,9 @@ export function useRoutines({ enabled = true }: { enabled?: boolean } = {}) {
           updatedBy: deviceId(),
         },
       }
-      return writeCarrier(carrier, payload)
+      // An unchanged duration is not part of this edit: keep another device's newer marker.
+      const durationChange = durationMinutes === parseTaskDuration(carrier.task.description) ? undefined : durationMinutes
+      return writeCarrier(carrier, payload, [], durationChange)
     },
     onSettled: settle,
   })

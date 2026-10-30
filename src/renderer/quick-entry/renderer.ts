@@ -81,6 +81,7 @@ import { AutocompleteDropdown } from './autocomplete'
 import { cache } from './vikunja-cache'
 import { applyQuickEntryFollowUps } from '../lib/quick-entry-follow-ups'
 import { escapeHtml, plainTextToDescriptionHtml } from '../lib/description-html'
+import { withTaskDuration } from '../lib/task-duration'
 
 followColorScheme()
 
@@ -650,6 +651,10 @@ async function saveTask(): Promise<void> {
         dueDate = dueToday()
       }
     }
+  }
+
+  if (parserConfig.enabled && lastParseResult?.durationMinutes !== null && lastParseResult?.durationMinutes !== undefined) {
+    description = withTaskDuration(description, lastParseResult.durationMinutes)
   }
 
   input.disabled = true

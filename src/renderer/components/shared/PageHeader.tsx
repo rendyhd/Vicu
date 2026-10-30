@@ -13,14 +13,16 @@ interface PageHeaderProps extends Omit<React.HTMLAttributes<HTMLDivElement>, 'ti
    * does not need to keep the scrollbar's width clear.
    */
   inScroll?: boolean
+  /** Use the whole content width instead of the centred reading column (Planner). */
+  wide?: boolean
 }
 
 /** The one page header: title (page-title role), optional subtitle, actions on the right. */
-export function PageHeader({ title, subtitle, icon, actions, inScroll, className, ...rest }: PageHeaderProps) {
+export function PageHeader({ title, subtitle, icon, actions, inScroll, wide, className, ...rest }: PageHeaderProps) {
   return (
     // The outer band spans the content region; the column inside is the same reading column as the list.
     <div className={cn('shrink-0', !inScroll && 'pr-[var(--scrollbar-size)]', className)} {...rest}>
-      <div className="mx-auto flex w-full max-w-reading items-start justify-between gap-3 px-6 pb-3 pt-6">
+      <div className={cn('mx-auto flex w-full items-start justify-between gap-3 px-6 pb-3 pt-6', !wide && 'max-w-reading')}>
         <div className="flex min-w-0 items-start gap-2.5">
           {icon && <span className="flex h-8 shrink-0 items-center">{icon}</span>}
           <div className="min-w-0">

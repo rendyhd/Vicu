@@ -21,6 +21,12 @@ describe('both copies of the hiding rule follow the contract', () => {
     })
   }
 
+  it('keeps inline duration metadata visible in both processes', () => {
+    const description = '<p>Ordinary task</p>\n<!-- vicu-duration:v1:120 -->'
+    expect(rendererRule(description)).toBe(false)
+    expect(mainRule(description)).toBe(false)
+  })
+
   it('recognises each kind by its marker only, with the same whitespace rule', () => {
     expect(hasCustomListMarker('<!--\n\tvicu-custom-lists:v1:e30 -->')).toBe(true)
     expect(hasCustomListMarker('<!-- vicu-custom-lists:v1:e30 -->')).toBe(false)

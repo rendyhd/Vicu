@@ -3,6 +3,7 @@ import { formatDateChip } from './date-utils'
 import type { DateFormat } from './date-display'
 import { getDateFormat } from './date-format'
 import { locationReminderLabel, type LocationTrigger } from '../../shared/synced-prefs'
+import { formatTaskDuration } from './task-duration'
 
 // The chips under a quick-add input: one builder for the composer, the title editor and Quick
 // Entry, so the same parse gives the same words everywhere. Pure: no React, no DOM.
@@ -36,11 +37,14 @@ export function placeChipName(trigger: LocationTrigger, placeName: string): stri
   return locationReminderLabel(trigger, placeName)
 }
 
-/** A ParseResult as chips, in the order date, priority, labels, project, repeat, place. */
+/** A ParseResult as chips, in the order date, duration, priority, labels, project, repeat, place. */
 export function parseChips(result: ParseResult, fmt: DateFormat = getDateFormat(), now: Date = new Date()): ChipData[] {
   const chips: ChipData[] = []
   if (result.dueDate) {
     chips.push({ type: 'date', label: formatDateChip(result.dueDate, !result.dueHasTime, now, fmt), key: 'date', source: 'text' })
+  }
+  if (result.durationMinutes !== null) {
+    chips.push({ type: 'duration', label: formatTaskDuration(result.durationMinutes), key: 'duration', source: 'text' })
   }
   if (result.priority !== null && result.priority > 0) {
     chips.push({ type: 'priority', label: priorityChipName(result.priority), key: 'priority', source: 'text', priority: result.priority })

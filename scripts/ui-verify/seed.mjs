@@ -146,7 +146,7 @@ const roadmap = await task(q4.id, 'Draft Q4 roadmap', {
   priority: 3,
   labels: ['deep work'],
   description:
-    '<p>Outline the three big bets for Q4 and the metric that tells us each one worked.</p><ul><li><p>Growth: self-serve onboarding</p></li><li><p>Retention: weekly review flow</p></li></ul>',
+    '<p>Outline the three big bets for Q4 and the metric that tells us each one worked.</p><ul><li><p>Growth: self-serve onboarding</p></li><li><p>Retention: weekly review flow</p></li></ul>\n<!-- vicu-duration:v1:90 -->',
 })
 await task(home.id, 'Call the plumber about the kitchen leak', {
   key: 'plumber',
@@ -156,7 +156,14 @@ await task(home.id, 'Call the plumber about the kitchen leak', {
 })
 await task(personal.id, 'Buy groceries', { key: 'groceries', due_date: dateOnly(0), labels: ['errand'], description: checklist })
 await task(personal.id, 'Water the plants', { due_date: dateOnly(0), repeat_after: 3 * 86400 })
-await task(lisbon.id, 'Book flights to Lisbon', { key: 'flights', due_date: dateOnly(0), priority: 2 })
+await task(lisbon.id, 'Book flights to Lisbon', {
+  key: 'flights',
+  due_date: dateOnly(0),
+  start_date: at(0, 9, 0, 0),
+  end_date: at(0, 17, 0, 0),
+  priority: 2,
+  description: '<!-- vicu-duration:v1:45 -->',
+})
 await task(personal.id, 'Send the signed lease back to the landlord', { due_date: dateOnly(0), priority: 5 })
 
 // Upcoming

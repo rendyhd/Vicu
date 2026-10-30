@@ -28,6 +28,7 @@ import {
   type RoutinePayload,
 } from '../routines'
 import type { ApiResult, CreateTaskPayload, Task, TaskQueryParams, UpdateTaskPayload } from '../vikunja-types'
+import { parseTaskDuration, withTaskDuration } from '../task-duration'
 
 const TODAY = '2026-10-06'
 
@@ -243,6 +244,55 @@ describe('creating a routine carrier', () => {
     const created = await createRoutineCarrier(server, 7, payloadOf([]))
     expect(server.log).toEqual(['createTask:Vitamin D', 'updateTask:100:done'])
     expect(created.task.done).toBe(true)
+  })
+})
+
+describe('routine duration metadata', () => {
+  it('creates duration beside the routine envelope, not inside its definition', async () => {
+    const server = new FakeServer()
+    const payload = payloadOf([])
+    const created = await createRoutineCarrier(server, 7, payload, 45)
+    expect(parseTaskDuration(created.task.description)).toBe(45)
+    expect(parseRoutineEnvelope(created.task.description).payload).toEqual(payload)
+    expect(created.task.done).toBe(true)
+  })
+
+  it.each([60, null])('sets duration to %s while retaining notes, metadata and history', async (durationMinutes) => {
+    const server = new FakeServer()
+    const payload = payloadOf([TODAY])
+    const task = server.addCarrier(payload)
+    task.description = withTaskDuration(`<p>Notes</p>\n<!-- other:metadata -->\n${task.description}`, 30)
+    const result = await writeRoutineCarrier(server, carrierFor(server), payload, { durationMinutes, today: TODAY })
+    expect(parseTaskDuration(result.task.description)).toBe(durationMinutes)
+    expect(result.task.description).toContain('<p>Notes</p>\n<!-- other:metadata -->')
+    expect(result.payload).toEqual(payload)
+    expect(result.task.done).toBe(true)
+  })
+
+  it('preserves fresh server duration during a status or sharing write', async () => {
+    const server = new FakeServer()
+    const payload = payloadOf([])
+    const task = server.addCarrier(payload)
+    const stale = structuredClone(carrierFor(server))
+    task.description = withTaskDuration(task.description, 75)
+    const result = await writeRoutineCarrier(server, stale, payload, { today: TODAY })
+    expect(parseTaskDuration(result.task.description)).toBe(75)
+  })
+
+  it('retries when another write removes the duration after a successful patch', async () => {
+    const server = new FakeServer()
+    const payload = payloadOf([])
+    server.addCarrier(payload)
+    let removed = false
+    server.onSleep = () => {
+      if (removed) return
+      removed = true
+      const task = server.tasks.get(1)!
+      task.description = withTaskDuration(task.description, null)
+    }
+    const result = await writeRoutineCarrier(server, carrierFor(server), payload, { durationMinutes: 45, today: TODAY })
+    expect(parseTaskDuration(result.task.description)).toBe(45)
+    expect(server.patches).toHaveLength(2)
   })
 })
 

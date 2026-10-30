@@ -3,7 +3,7 @@ import type { PlaceMatch } from './place-phrases'
 export type SyntaxMode = 'todoist' | 'vikunja'
 
 /** `place` is "when I get home" for a saved place (section 5.3), read only when the caller passes places. */
-export type TokenType = 'label' | 'project' | 'priority' | 'recurrence' | 'date' | 'place'
+export type TokenType = 'label' | 'project' | 'priority' | 'duration' | 'recurrence' | 'date' | 'place'
 
 export interface ParsedToken {
   type: TokenType
@@ -27,6 +27,8 @@ export interface ParseResult {
    * otherwise the due date is date-only (build it with `parsedDue`).
    */
   dueHasTime: boolean
+  /** Duration read from a standalone `~XX` token, always in whole minutes. */
+  durationMinutes: number | null
   priority: number | null
   labels: string[]
   project: string | null

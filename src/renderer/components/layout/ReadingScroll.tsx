@@ -5,6 +5,8 @@ import { useListMotion } from '@/hooks/use-list-motion'
 interface ReadingScrollProps extends React.HTMLAttributes<HTMLDivElement> {
   /** Classes for the reading column inside the scroll area (padding, flex layout). */
   columnClassName?: string
+  /** Use the full content width instead of the centred reading column. */
+  wide?: boolean
 }
 
 /**
@@ -15,15 +17,15 @@ interface ReadingScrollProps extends React.HTMLAttributes<HTMLDivElement> {
  * new rows open, removed rows close, reordered rows and the rows below a card move (use-list-motion).
  */
 export const ReadingScroll = forwardRef<HTMLDivElement, ReadingScrollProps>(function ReadingScroll(
-  { className, columnClassName, children, ...rest },
+  { className, columnClassName, wide = false, children, ...rest },
   ref,
 ) {
   const inner = useRef<HTMLDivElement>(null)
   useImperativeHandle(ref, () => inner.current as HTMLDivElement)
   useListMotion(inner)
   return (
-    <div ref={inner} className={cn('min-h-0 flex-1 overflow-y-auto [scrollbar-gutter:stable]', className)} {...rest}>
-      <div className={cn('mx-auto min-h-full w-full max-w-reading', columnClassName)}>{children}</div>
+    <div ref={inner} data-scroll-area="" className={cn('min-h-0 flex-1 overflow-y-auto [scrollbar-gutter:stable]', className)} {...rest}>
+      <div className={cn('mx-auto min-h-full w-full', !wide && 'max-w-reading', columnClassName)}>{children}</div>
     </div>
   )
 })

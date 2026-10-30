@@ -3,6 +3,7 @@ import { DEFAULT_PARSER_CONFIG, getPrefixes } from './types'
 import { extractLabels } from './extract-labels'
 import { extractProject } from './extract-projects'
 import { extractPriority } from './extract-priority'
+import { extractDuration } from './extract-duration'
 import { extractRecurrence } from './extract-recurrence'
 import type { WeekdayAnchor } from './extract-recurrence'
 import { extractDate, extractBangToday } from './extract-dates'
@@ -19,7 +20,7 @@ export type { PlaceMatch, PlaceRef } from './place-phrases'
  * Parse free-form task input into structured fields. Implements shared-parser-spec.md and
  * section 5 of docs/cross-app-semantics-v1.md; test-fixtures/nlp-corpus-v1.json is the test.
  *
- * Extraction order: Place → Labels → Projects → Priority → Recurrence → Dates → Title
+ * Extraction order: Place → Labels → Projects → Priority → Duration → Recurrence → Dates → Title
  *
  * The `!` → today shortcut (standalone, leading or trailing `!`) is controlled by
  * `config.bangToday` and has one rule, `extractBangToday`: `parse()` applies it whether the
@@ -40,6 +41,7 @@ export function parse(
     title: rawInput,
     dueDate: null,
     dueHasTime: false,
+    durationMinutes: null,
     priority: null,
     labels: [],
     project: null,
@@ -97,7 +99,14 @@ export function parse(
     result.tokens.push(...tokens)
   }
 
-  // 4. Recurrence
+  // 4. Duration
+  if (!suppress.has('duration')) {
+    const extracted = extractDuration(rawInput, consumed)
+    result.durationMinutes = extracted.durationMinutes
+    result.tokens.push(...extracted.tokens)
+  }
+
+  // 5. Recurrence
   let weekday: WeekdayAnchor | undefined
   let recurrenceToken: ParsedToken | undefined
   if (!suppress.has('recurrence')) {
@@ -108,7 +117,7 @@ export function parse(
     recurrenceToken = extracted.tokens[0]
   }
 
-  // 5. Dates
+  // 6. Dates
   const dateOptions = { reference, locale: config.locale }
   if (!suppress.has('date')) {
     let found: ReturnType<typeof extractDate> | null = null
@@ -140,10 +149,10 @@ export function parse(
     }
   }
 
-  // 6. Build title from non-consumed regions
+  // 7. Build title from non-consumed regions
   result.title = buildTitle(rawInput, consumed)
 
-  // 7. Standalone/leading/trailing ! → today. An explicit date wins, but the
+  // 8. Standalone/leading/trailing ! → today. An explicit date wins, but the
   //    "!" marker is still removed from the title ("Call mom tomorrow!").
   if (config.bangToday) {
     const bang = extractBangToday(result.title, reference)

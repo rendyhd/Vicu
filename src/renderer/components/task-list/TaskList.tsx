@@ -46,6 +46,8 @@ interface TaskListProps {
   /** Under the empty state's title (the next upcoming task). */
   emptyExtra?: React.ReactNode
   showNewTask?: boolean
+  /** Delegate new-task requests to a view-owned composer (Planner's Unplanned column). */
+  onNewTask?: () => void
   /** The list is a project's (or the Inbox's) and rows may be dragged into a new place there. */
   sortable?: boolean
   /**
@@ -55,6 +57,10 @@ interface TaskListProps {
   taskOrder?: TaskOrderKey
   viewId?: number
   className?: string
+  /** Scroll viewport overrides (Planner's edge-to-edge calendar needs no reserved gutter). */
+  scrollClassName?: string
+  /** Use the whole content width for the header and body instead of the reading column. */
+  wide?: boolean
   children?: React.ReactNode
   /** Overrides the guess that the list is empty (no tasks and no children); a view that fills the list through children says so. */
   empty?: boolean
@@ -85,10 +91,13 @@ export function TaskList({
   emptyWarm,
   emptyExtra,
   showNewTask = true,
+  onNewTask,
   sortable = false,
   taskOrder = DEFAULT_TASK_ORDER,
   viewId,
   className,
+  scrollClassName,
+  wide = false,
   children,
   empty,
   insertIndex,
@@ -185,11 +194,16 @@ export function TaskList({
   // The empty state has its own "Add task" button, so the list shows no second one under it.
   const isEmpty = empty ?? (tasks.length === 0 && !children)
 
-  // The header's + button and the empty state's "Add task" open the composer at the top.
+  const canAddTask = !!onNewTask || (showNewTask && !!projectId)
+  // The header, shortcut, app menu and palette all use the same new-task destination.
   const startAdding = useCallback(() => {
-    setAddPosition('top')
-    setIsAdding(true)
-  }, [])
+    if (onNewTask) {
+      onNewTask()
+    } else if (showNewTask && projectId) {
+      setAddPosition('top')
+      setIsAdding(true)
+    }
+  }, [onNewTask, showNewTask, projectId])
 
   const handleHeaderClick = useCallback(
     (e: React.MouseEvent) => {
@@ -206,13 +220,12 @@ export function TaskList({
   const handleScrollAreaClick = useCallback(
     (e: React.MouseEvent) => {
       const target = e.target as HTMLElement
-      // Only collapse when clicking empty space: the scroll container itself (beside the column) or
-      // the reading column inside it (below the tasks).
-      if (target === e.currentTarget || target.parentElement === e.currentTarget) {
-        collapseAll()
-        setFocusedTask(null)
-        clearSelection()
-      }
+      // A click anywhere in the content background closes the card, including the gaps and empty
+      // areas inside Planner's grid. Task rows handle themselves; overlays are not background.
+      if (target.closest('[data-task-id], [popover], dialog, [role="dialog"], [role="menu"], [role="listbox"]')) return
+      collapseAll()
+      setFocusedTask(null)
+      clearSelection()
     },
     [collapseAll, setFocusedTask, clearSelection]
   )
@@ -311,10 +324,7 @@ export function TaskList({
       // Ctrl+N / ⌘N: New task
       if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
         e.preventDefault()
-        if (showNewTask && projectId) {
-          setAddPosition('top')
-          setIsAdding(true)
-        }
+        startAdding()
         return
       }
 
@@ -448,8 +458,7 @@ export function TaskList({
     [
       tasks,
       focusedTaskId,
-      projectId,
-      showNewTask,
+      startAdding,
       pasteTasks,
       completeTask,
       updateTask,
@@ -472,25 +481,17 @@ export function TaskList({
   }, [handleKeyDown])
 
   // File > New Task (Ctrl+N) arrives from the app menu, which takes the key first.
-  useEffect(() => {
-    return api.onNewTask(() => {
-      if (showNewTask && projectId) {
-        setAddPosition('top')
-        setIsAdding(true)
-      }
-    })
-  }, [showNewTask, projectId])
+  useEffect(() => api.onNewTask(startAdding), [startAdding])
 
   // The command palette's "New task" asks the list on screen; the first list that can add a task
   // takes the request (also one that mounts after the palette navigated to Inbox).
   const newTaskRequestedAt = useNewTaskRequestStore((s) => s.requestedAt)
   useEffect(() => {
-    if (newTaskRequestedAt === null || !showNewTask || !projectId) return
+    if (newTaskRequestedAt === null || !canAddTask) return
     if (useNewTaskRequestStore.getState().take()) {
-      setAddPosition('top')
-      setIsAdding(true)
+      startAdding()
     }
-  }, [newTaskRequestedAt, showNewTask, projectId])
+  }, [newTaskRequestedAt, canAddTask, startAdding])
 
   // Scroll focused task into view
   useEffect(() => {
@@ -554,6 +555,7 @@ export function TaskList({
       <PageHeader
         title={title}
         subtitle={subtitle}
+        wide={wide}
         icon={identity && <SmartListIcon list={identity} className="h-5 w-5" />}
         onClick={handleHeaderClick}
         actions={
@@ -577,7 +579,7 @@ export function TaskList({
         }
       />
 
-      <ReadingScroll ref={listRef} onClick={handleScrollAreaClick}>
+      <ReadingScroll ref={listRef} onClick={handleScrollAreaClick} wide={wide} className={scrollClassName}>
         {headerContent}
 
         {isAdding && addPosition === 'top' && taskInputElement}

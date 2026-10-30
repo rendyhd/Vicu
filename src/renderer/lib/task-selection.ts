@@ -73,6 +73,15 @@ export function resolveSelectedTasks(qc: QueryClient, ids: Set<number>): Task[] 
   return result
 }
 
+/** A grabbed member carries the selection; an unselected row carries only itself. */
+export function resolveDraggedTasks(qc: QueryClient, task: Task, selectedIds: Set<number>): Task[] {
+  if (selectedIds.has(task.id) && selectedIds.size > 1) {
+    const resolved = resolveSelectedTasks(qc, selectedIds)
+    if (resolved.some((item) => item.id === task.id)) return resolved
+  }
+  return [task]
+}
+
 /**
  * Copy the selected tasks' titles to the clipboard, one per line, in visual
  * order. Uses CRLF on Windows so the text pastes with real line breaks into any

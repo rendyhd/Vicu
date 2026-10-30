@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
+import type { CalDavApi } from '../shared/caldav-types'
 import type { ProjectPatch, TaskPatch } from '../shared/merge-patches'
 import type {
   OfflineCreateInput,
@@ -13,6 +14,15 @@ const api = {
   platform: process.platform as 'darwin' | 'win32' | 'linux',
   /** 'mica' when the main window has Mica behind it (Windows 11 22H2+; set by main, window-chrome.ts). */
   windowMaterial: (process.argv.includes('--vicu-window-material=mica') ? 'mica' : 'none') as 'mica' | 'none',
+
+  caldav: {
+    connections: () => ipcRenderer.invoke('caldav:connections'),
+    discover: (input) => ipcRenderer.invoke('caldav:discover', input),
+    select: (id, calendars) => ipcRenderer.invoke('caldav:select', id, calendars),
+    remove: (id) => ipcRenderer.invoke('caldav:remove', id),
+    events: (start, end) => ipcRenderer.invoke('caldav:events', start, end),
+    update: (input) => ipcRenderer.invoke('caldav:update', input),
+  } satisfies CalDavApi,
 
   // Tasks
   fetchTasks: (params: Record<string, unknown>) =>

@@ -2,7 +2,7 @@ import type { TokenType } from '@/lib/task-parser'
 
 /**
  * The colours of the parse chips and the highlight behind a recognised word in the task input
- * (green date, red priority, orange label, blue project, purple recurrence, teal place), as roles of the design
+ * (green date, yellow duration, red priority, orange label, blue project, purple recurrence, teal place), as roles of the design
  * tokens instead of raw values.
  *
  * - The fill is the role's channel variable at an alpha (Tailwind `bg-accent-green/12`), 12% in the
@@ -17,6 +17,7 @@ import type { TokenType } from '@/lib/task-parser'
  */
 export const TOKEN_CHIP_ROLE = {
   date: 'accent-green',
+  duration: 'accent-yellow',
   priority: 'accent-red',
   label: 'accent-orange',
   project: 'accent-blue',
@@ -26,6 +27,7 @@ export const TOKEN_CHIP_ROLE = {
 
 export const TOKEN_CHIP_CLASSES: Record<Exclude<TokenType, 'priority'>, string> = {
   date: 'bg-accent-green/12 dark:bg-accent-green/20 text-[color:color-mix(in_srgb,rgb(var(--accent-green-rgb)),var(--text-primary))]',
+  duration: 'bg-accent-yellow/12 dark:bg-accent-yellow/20 text-[color:color-mix(in_srgb,rgb(var(--accent-yellow-rgb))_40%,var(--text-primary))]',
   label: 'bg-accent-orange/12 dark:bg-accent-orange/20 text-[color:color-mix(in_srgb,rgb(var(--accent-orange-rgb)),var(--text-primary))]',
   project: 'bg-accent-blue/12 dark:bg-accent-blue/20 text-[color:color-mix(in_srgb,rgb(var(--accent-blue-rgb)),var(--text-primary))]',
   recurrence: 'bg-accent-purple/12 dark:bg-accent-purple/20 text-[color:color-mix(in_srgb,rgb(var(--accent-purple-rgb)),var(--text-primary))]',
@@ -33,7 +35,7 @@ export const TOKEN_CHIP_CLASSES: Record<Exclude<TokenType, 'priority'>, string> 
 }
 
 /** The share of the role in a chip's text colour (the rest is `text`); half unless listed. */
-export const TOKEN_CHIP_TEXT_SHARE: Partial<Record<TokenType, number>> = { place: 0.4 }
+export const TOKEN_CHIP_TEXT_SHARE: Partial<Record<TokenType, number>> = { duration: 0.4, place: 0.4 }
 
 /** The alpha of the fill, per theme. */
 export const TOKEN_CHIP_ALPHA = { light: 0.12, dark: 0.2 } as const

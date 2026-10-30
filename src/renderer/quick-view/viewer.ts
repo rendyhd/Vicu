@@ -64,6 +64,7 @@ interface QuickViewConfig {
 }
 
 import { extractTaskLink, stripNoteLink, stripPageLink, extractNoteLinkHtml, extractPageLinkHtml } from '@/lib/note-link'
+import { parseTaskDuration, stripTaskDuration, withTaskDuration } from '@/lib/task-duration'
 import { sanitizeTaskHtml } from '@/lib/sanitize-html'
 import { taskPatch, type TaskPatch } from '@/lib/merge-patches'
 import { diffLocalDays, dueToday, isDateOnly, isNoDueDate, toLocalDate } from '@/lib/due-dates'
@@ -241,6 +242,7 @@ function buildTaskItemDOM(task: TaskData): HTMLElement {
   }
   titleRow.appendChild(title)
 
+  const descriptionBody = stripTaskDuration(stripPageLink(stripNoteLink(task.description)))
   const taskLink = extractTaskLink(task.description)
   if (taskLink) {
     const btn = document.createElement('button')
@@ -256,7 +258,7 @@ function buildTaskItemDOM(task: TaskData): HTMLElement {
     titleRow.appendChild(btn)
   }
 
-  if (task.description) {
+  if (descriptionBody) {
     const descIcon = document.createElement('span')
     descIcon.className = 'description-icon'
     descIcon.title = 'Toggle description'
@@ -274,10 +276,10 @@ function buildTaskItemDOM(task: TaskData): HTMLElement {
 
   content.appendChild(titleRow)
 
-  if (task.description) {
+  if (descriptionBody) {
     const desc = document.createElement('div')
     desc.className = 'task-description task-description-rich hidden'
-    desc.innerHTML = sanitizeTaskHtml(stripPageLink(stripNoteLink(task.description)))
+    desc.innerHTML = sanitizeTaskHtml(descriptionBody)
     desc.addEventListener('click', (e) => {
       e.stopPropagation()
       // A link opens in the default handler. Without preventDefault the window would navigate
@@ -462,7 +464,7 @@ function enterEditMode(focusDescription = false): void {
   if (item.classList.contains('completed-undo') || item.classList.contains('editing')) return
 
   const taskData: TaskData = JSON.parse(item.dataset.task || '{}')
-  const descriptionBody = stripPageLink(stripNoteLink(taskData.description || ''))
+  const descriptionBody = stripTaskDuration(stripPageLink(stripNoteLink(taskData.description || '')))
   const hasRichDescription = hasRichDescriptionBody(descriptionBody)
   // A task that only exists in the offline queue cannot be opened in the app yet.
   const canOpenInApp = typeof taskData.id === 'number'
@@ -554,10 +556,13 @@ async function saveEdit(item: HTMLElement, newTitle: string, newDescription: str
   if (!preserveRichDescription) {
     // Notes that were not edited keep their stored HTML exactly; edited text is written the way
     // every plain-text box writes it (escaped, one <p> per line).
-    const original = plainTextFromHtml(stripPageLink(stripNoteLink(taskData.description || '')))
+    const original = plainTextFromHtml(stripTaskDuration(stripPageLink(stripNoteLink(taskData.description || ''))))
     if (plainTextFromDescriptionLines(newDescription) !== original) {
       const linkHtml = extractNoteLinkHtml(taskData.description) + extractPageLinkHtml(taskData.description)
-      finalDescription = plainTextToDescriptionHtml(newDescription) + linkHtml
+      finalDescription = withTaskDuration(
+        plainTextToDescriptionHtml(newDescription) + linkHtml,
+        parseTaskDuration(taskData.description),
+      )
     }
   }
   // Send only what changed so a stale cached row cannot revert other edits (D-REN-2).

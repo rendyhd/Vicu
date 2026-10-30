@@ -1,4 +1,5 @@
 import { useNavigate, useMatches } from '@tanstack/react-router'
+import { CalendarRange } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { SelectionPill } from './SelectionPill'
 import { RollingCount } from '@/components/shared/RollingCount'
@@ -15,6 +16,11 @@ export interface SmartListItem {
   label: string
   path: string
 }
+
+type SidebarItem = SmartListItem | { id: 'planner'; label: string; path: string }
+
+// Planner is desktop-only, so it is navigation rather than a cross-app smart-list identity.
+const PLANNER_ITEM: SidebarItem = { id: 'planner', label: 'Planner', path: '/planner' }
 
 // Icon and colour of each list come from the identity table (lib/smart-list-identity.ts).
 const ALL_SMART_LISTS: SmartListItem[] = [
@@ -46,7 +52,14 @@ export function SmartListNav() {
   const currentPath = matches[matches.length - 1]?.pathname ?? ''
   const reviewCount = useReviewBadgeCount()
   const { data: config } = useAppConfig()
-  const items = useSmartLists().filter((item) => !isHiddenFromSidebar(config, item.id))
+  const smartItems = useSmartLists().filter((item) => !isHiddenFromSidebar(config, item.id))
+  const upcomingIndex = smartItems.findIndex((item) => item.id === 'upcoming')
+  const plannerIndex = upcomingIndex === -1 ? smartItems.length : upcomingIndex
+  const items: SidebarItem[] = [
+    ...smartItems.slice(0, plannerIndex),
+    PLANNER_ITEM,
+    ...smartItems.slice(plannerIndex),
+  ]
   const openCounts = useOpenTaskCounts()
   const todayCount = useTodayOverdueCount()
 
@@ -64,7 +77,7 @@ export function SmartListNav() {
         const isActive = currentPath === item.path
         const isReview = item.id === 'review'
         const reviewActiveBorder = isReview && isActive && reviewCount > 0
-        const count = countOf(item.id)
+        const count = item.id === 'planner' ? 0 : countOf(item.id)
         return (
           <button
             key={item.id}
@@ -79,7 +92,11 @@ export function SmartListNav() {
               reviewActiveBorder && 'border border-accent-purple/40'
             )}
           >
-            <SmartListIcon list={item.id} className="h-4 w-4" />
+            {item.id === 'planner' ? (
+              <CalendarRange aria-hidden className="h-4 w-4 shrink-0 text-accent-blue" strokeWidth={1.8} />
+            ) : (
+              <SmartListIcon list={item.id} className="h-4 w-4" />
+            )}
             <span className="flex-1 text-left">{item.label}</span>
             {count > 0 && (
               <RollingCount value={count} className="text-[11px] font-semibold text-[var(--text-secondary)]" />

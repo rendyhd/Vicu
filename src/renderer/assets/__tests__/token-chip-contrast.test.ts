@@ -38,6 +38,7 @@ const role = (name: string, theme: Theme) => toRgb(tokens.roles[name][theme])
 const ROLE_OF: Record<string, string> = {
   'accent-blue': 'accent',
   'accent-green': 'palette.green',
+  'accent-yellow': 'palette.yellow',
   'accent-orange': 'palette.orange',
   'accent-purple': 'palette.purple',
   'accent-red': 'palette.red',
@@ -55,7 +56,7 @@ describe('the parse chip colours', () => {
       expect(classes, type).toContain(share === 0.5 ? `rgb(var(--${name}-rgb)),` : `rgb(var(--${name}-rgb))_${share * 100}%,`)
       expect(classes, type).toContain('var(--text-primary)')
     }
-    expect(new Set(Object.values(TOKEN_CHIP_ROLE)).size).toBe(6)
+    expect(new Set(Object.values(TOKEN_CHIP_ROLE)).size).toBe(7)
   })
 
   it('has the alphas the classes spell', () => {

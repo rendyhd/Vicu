@@ -129,6 +129,12 @@ describe('chips show what is saved', () => {
     ])
   })
 
+  it('shows the duration that will be saved', () => {
+    expect(chipsFor('Deep work ~90').map((c) => [c.type, c.label, c.source])).toEqual([
+      ['duration', '90m', 'text'],
+    ])
+  })
+
   it('has no chip for a default date from the list', () => {
     expect(chipsFor('Call Ana', { contextDue: dateOnlyDue('2026-10-07') })).toEqual([])
   })
@@ -164,9 +170,10 @@ describe('parse chips', () => {
   })
 
   it('turn a parse into chips in a fixed order', () => {
-    const result = parse('Call Ana saturday 3pm +Personal *call !4 every week', config, NOW)
+    const result = parse('Call Ana saturday 3pm ~45 +Personal *call !4 every week', config, NOW)
     expect(parseChips(result, GB, NOW).map((c) => [c.type, c.label])).toEqual([
       ['date', 'Sat 10 Oct, 15:00'],
+      ['duration', '45m'],
       ['priority', 'Urgent'],
       ['label', 'call'],
       ['project', 'Personal'],

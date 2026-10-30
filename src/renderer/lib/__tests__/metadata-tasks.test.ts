@@ -48,6 +48,17 @@ describe('hiding metadata tasks', () => {
     expect(hasVicuMetadataMarker('buy milk, vicu-routine is a word here')).toBe(false)
   })
 
+  it('keeps duration-bearing tasks visible in Today and Planner', () => {
+    expect(hasVicuMetadataMarker('<!-- vicu-duration:v1:120 -->')).toBe(false)
+    expect(hasVicuMetadataMarker('<p>Notes</p>\n<!-- vicu-duration:v1:45 -->')).toBe(false)
+    // A future duration format is still inline metadata, not a hidden carrier.
+    expect(hasVicuMetadataMarker('<!-- vicu-duration:v2:eyJtaW51dGVzIjo0NX0 -->')).toBe(false)
+  })
+
+  it('still hides a carrier that also has duration metadata', () => {
+    expect(hasVicuMetadataMarker(`${encodeRoutineEnvelope(carrier)}\n<!-- vicu-duration:v1:45 -->`)).toBe(true)
+  })
+
   it('does not mistake an archive part for a routine carrier', () => {
     expect(hasRoutineMarker(archivePart)).toBe(false)
     expect(hasRoutineArchiveMarker(archivePart)).toBe(true)

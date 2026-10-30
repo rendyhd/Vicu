@@ -29,7 +29,7 @@ import { useReducedMotion } from '@/hooks/use-reduced-motion'
 import { useConfirmDelete } from '@/hooks/use-confirm-delete'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { registerConfirm } from '@/lib/confirm-bridge'
-import { resolveSelectedTasks } from '@/lib/task-selection'
+import { resolveDraggedTasks } from '@/lib/task-selection'
 import { useSyncedPrefsEvents } from '@/hooks/use-synced-prefs'
 import { useReorderStore } from '@/stores/reorder-store'
 import { api } from '@/lib/api'
@@ -75,6 +75,8 @@ import { canReorderTask, type TaskOrderKey } from '../../../shared/task-order'
 import { usePrintStore } from '@/stores/print-store'
 import { buildPrintHtml } from '@/lib/print-template'
 import { sanitizeTaskHtml } from '@/lib/sanitize-html'
+import { plannerStartDateOnDrop } from '@/lib/planner'
+import type { PlannerCalendarDropData } from '@/lib/planner-calendar-drop'
 
 const MIN_WIDTH = 180
 const MAX_WIDTH = 360
@@ -243,8 +245,12 @@ export function AppShell() {
       })
       if (sidebarDrop) return [sidebarDrop]
 
-      // Fall back to rect intersection for sortable reordering
-      return rectIntersection(args)
+      // Calendar scheduling follows the pointer, not the source card's intersecting rectangle.
+      const calendarDrop = pointerCollisions.find((c) => c.data?.droppableContainer?.data?.current?.type === 'planner-calendar')
+      if (calendarDrop) return [calendarDrop]
+
+      // A source card can still overlap the rail after the pointer leaves it.
+      return rectIntersection(args).filter((c) => c.data?.droppableContainer?.data?.current?.type !== 'planner-calendar')
     },
     [dragItem?.type]
   )
@@ -259,11 +265,7 @@ export function AppShell() {
         // If the grabbed row is part of the multi-selection, carry all of it;
         // otherwise drag just this task.
         const { selectedTaskIds } = useSelectionStore.getState()
-        let dragTasks: Task[] = [task]
-        if (selectedTaskIds.has(task.id) && selectedTaskIds.size > 1) {
-          const resolved = resolveSelectedTasks(queryClient, selectedTaskIds)
-          if (resolved.some((t) => t.id === task.id)) dragTasks = resolved
-        }
+        const dragTasks = resolveDraggedTasks(queryClient, task, selectedTaskIds)
         setDragItem({ type: 'task', task, tasks: dragTasks })
         setExpandedTask(null)
       } else if (type === 'project') {
@@ -332,7 +334,26 @@ export function AppShell() {
           if (isMulti) useSelectionStore.getState().clearSelection()
         }
 
-        if (overData?.type === 'project') {
+        if (overData?.type === 'planner-calendar') {
+          const startDate = (over.data.current as PlannerCalendarDropData).getStartDate()
+          if (startDate) {
+            dragTasks.forEach((t) => {
+              if (new Date(t.start_date).getTime() !== new Date(startDate).getTime()) {
+                updateTask.mutate({ id: t.id, changes: { start_date: startDate }, original: t })
+              }
+            })
+            clearIfMulti()
+          }
+        } else if (overData?.type === 'planner-day') {
+          const targetDate = overData.date as string
+          dragTasks.forEach((t) => {
+            const startDate = plannerStartDateOnDrop(t.start_date, targetDate)
+            if (startDate) {
+              updateTask.mutate({ id: t.id, changes: { start_date: startDate }, original: t })
+            }
+          })
+          clearIfMulti()
+        } else if (overData?.type === 'project') {
           const projectId = overData.projectId as number
           dragTasks.forEach((t) => {
             if (projectId !== t.project_id) {
@@ -766,6 +787,7 @@ export function AppShell() {
           ref={sidebarRef}
           className="flex shrink-0 flex-col overflow-hidden border-r border-[var(--border-color)] bg-[var(--bg-sidebar)]"
           style={{ width: sidebarWidth }}
+          onClick={() => setExpandedTask(null)}
         >
           <div className="h-8 shrink-0" />
           <div className="flex-1 overflow-hidden">

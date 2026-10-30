@@ -10,6 +10,10 @@ import { WhenPanel } from './WhenPanel'
 
 interface WhenPopoverProps {
   anchorRef: RefObject<HTMLElement | null>
+  /** The property's name for the popover's accessible label. */
+  label?: string
+  /** The clear action's text. */
+  clearLabel?: string
   /** Where it opens relative to the anchor; a menu entry opens it beside the menu. */
   placement?: 'bottom-start' | 'right-start'
   currentDate: string
@@ -33,6 +37,8 @@ interface WhenPopoverProps {
  */
 export function WhenPopover({
   anchorRef,
+  label = 'Schedule',
+  clearLabel = 'Clear date',
   placement = 'bottom-start',
   currentDate,
   onDateChange,
@@ -62,7 +68,7 @@ export function WhenPopover({
   }
 
   return (
-    <Popover anchorRef={anchorRef} onClose={onClose} placement={placement} label="Schedule" className="w-72 p-3">
+    <Popover anchorRef={anchorRef} onClose={onClose} placement={placement} label={label} className="w-72 p-3">
       <WhenPanel value={value} onChange={change} />
 
       {(hasDate || allowClear || onRecurrenceChange) && (
@@ -88,7 +94,7 @@ export function WhenPopover({
           {(hasDate || allowClear) && (
             <Button variant="quiet" danger onClick={clear} className="px-2">
               <X className="h-3.5 w-3.5" />
-              Clear date
+              {clearLabel}
             </Button>
           )}
 

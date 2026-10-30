@@ -61,6 +61,13 @@ describe('planPastedTask', () => {
     expect(new Date(plan.payload.due_date!).getHours()).toBe(15)
   })
 
+  it('stores a parsed duration as hidden description metadata', () => {
+    const plan = planPastedTask('Write report ~45', context())!
+
+    expect(plan.payload.title).toBe('Write report')
+    expect(plan.payload.description).toBe('<!-- vicu-duration:v1:45 -->')
+  })
+
   it('turns a recurrence into repeat_after and repeat_mode', () => {
     const plan = planPastedTask('Water plants every 2 weeks', context())!
     expect(plan.payload.title).toBe('Water plants')

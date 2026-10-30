@@ -39,6 +39,7 @@ import {
 import { isRoutinesEnabled, type Task } from '@/lib/vikunja-types'
 import { useAppConfig } from '@/hooks/use-app-config'
 import { cn } from '@/lib/cn'
+import { parseTaskDuration } from '@/lib/task-duration'
 import { RoutineShareField, SharedRoutineLabel, useRoutineSharing, type RoutineShareChoice } from '@/components/routines/RoutineSharing'
 import { useCollabMe, useProjectAccess } from '@/hooks/use-project-access'
 import { useSetSyncedPreference, useSyncedPrefs } from '@/hooks/use-synced-prefs'
@@ -69,6 +70,7 @@ function emptyDraft(): RoutineDraft {
     color: STORED_ROUTINE_COLORS[0],
     schedule: { type: 'calendar', weekdays: [], weekInterval: 1, anchorDate: today },
     slots: [newSlot()],
+    durationMinutes: null,
   }
 }
 
@@ -80,6 +82,7 @@ function draftFor(carrier: RoutineCarrier<Task>): RoutineDraft {
     color: definition.color,
     schedule: definition.schedule,
     slots: definition.slots.map((slot) => ({ ...slot })),
+    durationMinutes: parseTaskDuration(carrier.task.description),
   }
 }
 
@@ -190,6 +193,20 @@ function RoutineEditor({
               <label className="flex-1 text-caption uppercase tracking-wide text-[var(--text-secondary)]">Times & reminders</label>
               {draft.slots.length < MAX_ROUTINE_TIMES && <button type="button" onClick={() => setDraft({ ...draft, slots: [...draft.slots, newSlot(Math.max(...draft.slots.map((slot) => slot.reminderMinutes)))] })} className="flex items-center gap-1 text-xs font-medium text-accent-blue"><Plus className="h-3.5 w-3.5" /> Add time</button>}
             </div>
+            <label className="mb-1.5 flex items-center gap-2 text-xs text-text-secondary">
+              Duration
+              <input
+                type="number"
+                min={1}
+                step={1}
+                placeholder="Optional"
+                className="h-8 w-24 rounded-control border border-border bg-bg-page px-2 text-text"
+                value={draft.durationMinutes ?? ''}
+                onChange={(event) => setDraft({ ...draft, durationMinutes: event.target.value === '' ? null : Number(event.target.value) })}
+              />
+              minutes per time
+            </label>
+            <p className="mb-3 text-meta text-text-secondary">Set a duration to show this routine in the Planner calendar. Leave blank to hide it.</p>
             <div className="space-y-2">
               {draft.slots.map((slot) => (
                 <div key={slot.id} className="rounded-card border border-[var(--border-color)] p-3">

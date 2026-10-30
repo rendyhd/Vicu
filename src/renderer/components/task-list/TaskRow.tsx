@@ -50,6 +50,7 @@ import { useCollabMe, useProjectAccess } from '@/hooks/use-project-access'
 import { useUIStore } from '@/stores/ui-store'
 import { useCommentsPaneStore } from '@/stores/comments-pane-store'
 import { AvatarStack } from '@/components/shared/Avatar'
+import { formatTaskDuration, parseTaskDuration, stripTaskDuration, withTaskDuration } from '@/lib/task-duration'
 
 
 interface TaskRowProps {
@@ -62,6 +63,8 @@ interface TaskRowProps {
    * goes on the row's meta line, unless the view is that project (`RowViewContext`).
    */
   projectMeta?: { title: string; color?: string }
+  /** Planner replaces the whole trailing cluster with duration; every other list keeps the default. */
+  trailing?: 'default' | 'duration'
 }
 
 /** `projectMeta` is a new object on every render of a group, so compare it by value to keep memo useful. */
@@ -72,7 +75,8 @@ function sameRowProps(a: TaskRowProps, b: TaskRowProps): boolean {
     a.nestedDepth === b.nestedDepth &&
     a.parentProjectId === b.parentProjectId &&
     a.projectMeta?.title === b.projectMeta?.title &&
-    a.projectMeta?.color === b.projectMeta?.color
+    a.projectMeta?.color === b.projectMeta?.color &&
+    a.trailing === b.trailing
   )
 }
 
@@ -138,10 +142,11 @@ interface TaskTitleEditorProps {
   onSave: (changes: Partial<Task>) => void
   onSubmit: () => void
   onCancel: () => void
+  planner?: boolean
 }
 
 const TaskTitleEditor = forwardRef<TaskTitleEditorHandle, TaskTitleEditorProps>(
-  function TaskTitleEditor({ task, onSave, onSubmit, onCancel }, ref) {
+  function TaskTitleEditor({ task, onSave, onSubmit, onCancel, planner = false }, ref) {
     const addLabel = useAddLabel()
     const createLabel = useCreateLabel()
     const parser = useTaskParser()
@@ -193,6 +198,9 @@ const TaskTitleEditor = forwardRef<TaskTitleEditorHandle, TaskTitleEditorProps>(
           if (parsed.dueDate) {
             // A parsed time ("tomorrow at 3pm") is kept; a bare date is date-only.
             changes.due_date = parsedDue(parsed.dueDate, parsed.dueHasTime)
+          }
+          if (parsed.durationMinutes !== null) {
+            changes.description = withTaskDuration(task.description, parsed.durationMinutes)
           }
           if (parsed.priority !== null && parsed.priority > 0) {
             changes.priority = parsed.priority
@@ -303,7 +311,7 @@ const TaskTitleEditor = forwardRef<TaskTitleEditorHandle, TaskTitleEditorProps>(
           inputRef={inputRef}
           placeholder="Task title"
           showBangTodayHint={isDirty && !parser.enabled && !!parser.parserConfig.bangToday}
-          inputClassName="font-medium leading-snug"
+          inputClassName={cn('leading-snug', planner ? 'text-[12px] font-normal' : 'font-medium')}
           multiline
         />
       </div>
@@ -337,6 +345,7 @@ function TaskRowInner({
   nestedDepth = 0,
   parentProjectId,
   projectMeta,
+  trailing = 'default',
   drag,
   reorderable = false,
 }: Omit<TaskRowProps, 'sortable'> & { drag: DragBehavior; reorderable?: boolean }) {
@@ -409,7 +418,7 @@ function TaskRowInner({
     [access, me, commentsPaneOpen],
   )
 
-  const [editDescription, setEditDescription] = useState(stripPageLink(stripNoteLink(task.description)))
+  const [editDescription, setEditDescription] = useState(stripTaskDuration(stripPageLink(stripNoteLink(task.description))))
   const [isDragOver, setIsDragOver] = useState(false)
   const [dropError, setDropError] = useState<string | null>(null)
   const noteLinkHtml = extractNoteLinkHtml(task.description) + extractPageLinkHtml(task.description)
@@ -442,7 +451,7 @@ function TaskRowInner({
   }, [uploadFromDrop.isError, uploadFromDrop.failureCount, uploadFromDrop.error])
 
   useEffect(() => {
-    setEditDescription(stripPageLink(stripNoteLink(task.description)))
+    setEditDescription(stripTaskDuration(stripPageLink(stripNoteLink(task.description))))
   }, [task.description])
 
   const saveTaskChanges = useCallback((titleChanges: Partial<Task> = {}) => {
@@ -455,7 +464,8 @@ function TaskRowInner({
       const fullDescription = noteLinkHtml
         ? (editDescription ? editDescription + noteLinkHtml : noteLinkHtml)
         : editDescription
-      changes.description = fullDescription
+      const durationMinutes = parseTaskDuration(titleChanges.description ?? task.description)
+      changes.description = withTaskDuration(fullDescription, durationMinutes)
       descBaselineRef.current = editDescription
     }
     if (Object.keys(changes).length > 0) {
@@ -472,6 +482,25 @@ function TaskRowInner({
   const handleDateChange = useCallback(
     (isoDate: string) => {
       updateTask.mutate({ id: task.id, changes: { due_date: isoDate }, original: task })
+    },
+    [task, updateTask]
+  )
+
+  // Vikunja's task field is named start_date even when the picker includes a time of day.
+  const handleStartDateChange = useCallback(
+    (isoDate: string) => {
+      updateTask.mutate({ id: task.id, changes: { start_date: isoDate }, original: task })
+    },
+    [task, updateTask]
+  )
+
+  const handleDurationChange = useCallback(
+    (minutes: number | null) => {
+      updateTask.mutate({
+        id: task.id,
+        changes: { description: withTaskDuration(task.description, minutes) },
+        original: task,
+      })
     },
     [task, updateTask]
   )
@@ -576,6 +605,8 @@ function TaskRowInner({
   )
 
   const labels = task.labels ?? []
+  const isPlanner = trailing === 'duration'
+  const durationMinutes = parseTaskDuration(task.description)
   const metaLabels = rowLabels(labels, rowView)
   const projectSource = rowProjectSource(task.project_id, rowView, projectMeta !== undefined)
   const isRepeating = (task.repeat_after ?? 0) > 0 || (task.repeat_mode ?? 0) > 0
@@ -610,7 +641,8 @@ function TaskRowInner({
         onPointerEnter={holdEngagement.onPointerEnter}
         onPointerLeave={holdEngagement.onPointerLeave}
         className={cn(
-          'vicu-task-fade group grid cursor-default grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-x-3 border-b border-[var(--border-color)] px-4 py-2.5 transition-colors hover:bg-[var(--bg-hover)]',
+          'vicu-task-fade group grid cursor-default grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-x-3 border-b border-[var(--border-color)] py-2.5 transition-colors hover:bg-[var(--bg-hover)]',
+          isPlanner ? 'px-2' : 'px-4',
           isSelected && 'bg-bg-selected ring-1 ring-inset ring-accent-blue/40',
           isFocused && !isSelected && !isExpanded && 'bg-accent-blue/8 ring-1 ring-inset ring-accent-blue/30',
           isDragging && 'opacity-30',
@@ -619,7 +651,7 @@ function TaskRowInner({
         )}
         style={{
           ...style,
-          paddingLeft: `${16 + nestedDepth * 20}px`,
+          paddingLeft: `${(isPlanner ? 8 : 16) + nestedDepth * 20}px`,
         }}
         onClick={(e) => {
           // Event handlers want current-at-click values — read them
@@ -678,7 +710,8 @@ function TaskRowInner({
         <div className="min-w-0">
           <span
             className={cn(
-              'block truncate text-task-title',
+              'block truncate',
+              isPlanner ? 'text-[13px] font-normal leading-5' : 'text-task-title',
               task.done ? 'text-text-secondary' : 'text-text'
             )}
           >
@@ -785,20 +818,33 @@ function TaskRowInner({
           )}
         </div>
 
-        {/* Trailing cluster, level with the title: assignees, the due phrase, the reminder bell, the priority last. */}
+        {/* Planner shows duration alone; other rows keep assignees, due, reminders and priority. */}
         <div className="flex h-5 shrink-0 items-center gap-2">
-          {assignees.length > 0 && (
-            <span role="img" aria-label={assignedLabel(assignees, me?.id)} className="inline-flex">
-              <AvatarStack people={assignees} size={18} max={2} surface="page" />
-            </span>
+          {trailing === 'duration' ? (
+            durationMinutes !== null && (
+              <span
+                className="text-meta text-text-secondary"
+                aria-label={`Duration: ${durationMinutes} minutes`}
+              >
+                {formatTaskDuration(durationMinutes)}
+              </span>
+            )
+          ) : (
+            <>
+              {assignees.length > 0 && (
+                <span role="img" aria-label={assignedLabel(assignees, me?.id)} className="inline-flex">
+                  <AvatarStack people={assignees} size={18} max={2} surface="page" />
+                </span>
+              )}
+              <TaskSyncIcon taskId={task.id} />
+              <TaskLinkIcon description={task.description} />
+              <TaskDueBadge dueDate={task.due_date} />
+              {((task.reminders?.length ?? 0) > 0 || hasPlaceReminder) && (
+                <Bell className="h-3 w-3 text-text-secondary" aria-label="Has a reminder" />
+              )}
+              <PriorityMark priority={task.priority} />
+            </>
           )}
-          <TaskSyncIcon taskId={task.id} />
-          <TaskLinkIcon description={task.description} />
-          <TaskDueBadge dueDate={task.due_date} />
-          {((task.reminders?.length ?? 0) > 0 || hasPlaceReminder) && (
-            <Bell className="h-3 w-3 text-text-secondary" aria-label="Has a reminder" />
-          )}
-          <PriorityMark priority={task.priority} />
         </div>
       </div>
       {contextMenu && (
@@ -817,10 +863,11 @@ function TaskRowInner({
           sortable={false}
           nestedDepth={nestedDepth + 1}
           parentProjectId={task.project_id}
+          trailing={trailing}
         />
       ))}
       {hasOpenedSubtask && !(canExpandSubtasks && subtasksExpanded) && (
-        <OpenedSubtaskRows parent={task} nestedDepth={nestedDepth} />
+        <OpenedSubtaskRows parent={task} nestedDepth={nestedDepth} trailing={trailing} />
       )}
       </>
     )
@@ -833,8 +880,10 @@ function TaskRowInner({
       role="listitem"
       className={cn(
         // Two columns, the checkbox and the body: the notes, subtasks and property bar sit under the title.
-        // The surface is bg.card; in dark it is lifted by a 1 px white-at-8% edge instead of a shadow.
-        'vicu-task-fade vicu-card mx-2 my-1 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 rounded-card border border-[var(--border-color)] bg-bg-card px-4 shadow-md dark:border-white/8 dark:shadow-none',
+        'vicu-task-fade vicu-card grid grid-cols-[auto_minmax(0,1fr)] gap-x-3',
+        isPlanner
+          ? 'px-2'
+          : 'mx-2 my-1 rounded-card border border-[var(--border-color)] bg-bg-card px-4 shadow-md dark:border-white/8 dark:shadow-none',
         isDragOver && 'ring-2 ring-[var(--accent-blue)] bg-accent-blue/5',
         dropError && 'ring-2 ring-danger bg-danger/5'
       )}
@@ -856,6 +905,7 @@ function TaskRowInner({
           onSave={saveTaskChanges}
           onSubmit={() => descEditorRef.current?.commands.focus('end')}
           onCancel={collapseAll}
+          planner={isPlanner}
         />
         <TaskSyncIcon taskId={task.id} />
         <TaskLinkIcon description={task.description} />
@@ -915,6 +965,8 @@ function TaskRowInner({
         onClose={() => setActivePopover(null)}
         attachmentInvokers={attachmentInvokers}
         onDateChange={handleDateChange}
+        onStartDateChange={handleStartDateChange}
+        onDurationChange={handleDurationChange}
         onRecurrenceChange={handleRecurrenceChange}
         onPriorityChange={handlePriorityChange}
         onReminderChange={handleReminderChange}
@@ -959,19 +1011,19 @@ function TaskRowInner({
 
 const SortableTaskRow = memo(function SortableTaskRow(props: TaskRowProps) {
   const drag = useSortableRow(props.task)
-  return <TaskRowInner task={props.task} nestedDepth={props.nestedDepth} parentProjectId={props.parentProjectId} projectMeta={props.projectMeta} drag={drag} reorderable />
+  return <TaskRowInner task={props.task} nestedDepth={props.nestedDepth} parentProjectId={props.parentProjectId} projectMeta={props.projectMeta} trailing={props.trailing} drag={drag} reorderable />
 }, sameRowProps)
 
 const DraggableTaskRow = memo(function DraggableTaskRow(props: TaskRowProps) {
   const drag = useDraggableRow(props.task)
-  return <TaskRowInner task={props.task} nestedDepth={props.nestedDepth} parentProjectId={props.parentProjectId} projectMeta={props.projectMeta} drag={drag} />
+  return <TaskRowInner task={props.task} nestedDepth={props.nestedDepth} parentProjectId={props.parentProjectId} projectMeta={props.projectMeta} trailing={props.trailing} drag={drag} />
 }, sameRowProps)
 
 /**
  * The subtasks opened from `parent`'s card. They come from the parent's fetched subtask list (the
  * one the card showed), which edits and deletes keep up to date.
  */
-function OpenedSubtaskRows({ parent, nestedDepth }: { parent: Task; nestedDepth: number }) {
+function OpenedSubtaskRows({ parent, nestedDepth, trailing }: { parent: Task; nestedDepth: number; trailing?: TaskRowProps['trailing'] }) {
   const opened = useSelectionStore((s) => s.openedSubtasks)
   const { data: fetched } = useSubtasks(parent.id)
   const subtasks = fetched ?? parent.related_tasks?.subtask ?? []
@@ -986,6 +1038,7 @@ function OpenedSubtaskRows({ parent, nestedDepth }: { parent: Task; nestedDepth:
             sortable={false}
             nestedDepth={nestedDepth + 1}
             parentProjectId={parent.project_id}
+            trailing={trailing}
           />
         ))}
     </>

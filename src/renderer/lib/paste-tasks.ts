@@ -10,6 +10,7 @@ import { parse, recurrenceToVikunja } from './task-parser'
 import type { ParserConfig } from './task-parser'
 import type { CreateTaskPayload } from './vikunja-types'
 import { withDefaultReminder, type DefaultReminderSettings } from '../../shared/default-reminder'
+import { withTaskDuration } from './task-duration'
 
 /** The non-empty lines of the pasted text, trimmed. */
 export function splitPastedLines(text: string): string[] {
@@ -69,6 +70,7 @@ export function planPastedTask(line: string, context: PasteContext): PastedTaskP
   if (dueDate && dueDate !== NULL_DATE) payload.due_date = dueDate
   if (parsed.priority && parsed.priority > 0) payload.priority = parsed.priority
   if (parsed.recurrence) Object.assign(payload, recurrenceToVikunja(parsed.recurrence))
+  if (parsed.durationMinutes !== null) payload.description = withTaskDuration(payload.description, parsed.durationMinutes)
 
   return { line: raw, projectId, payload: withDefaultReminder(payload, context.defaultReminder), labelNames: [...new Set(parsed.labels)] }
 }

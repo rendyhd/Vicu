@@ -1,3 +1,4 @@
+import { useDndContext } from '@dnd-kit/core'
 import type { Task } from '@/lib/vikunja-types'
 
 interface TaskDragOverlayProps {
@@ -7,6 +8,9 @@ interface TaskDragOverlayProps {
 }
 
 export function TaskDragOverlay({ task, count = 1 }: TaskDragOverlayProps) {
+  const { over } = useDndContext()
+  // The calendar paints the drag preview at its scheduled height directly on the time grid.
+  if (over?.data.current?.type === 'planner-calendar') return null
   const multi = count > 1
   return (
     <div className="relative">

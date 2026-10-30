@@ -48,11 +48,13 @@
     "chrono-node": "^2.7.0",
     "clsx": "^2.1.0",
     "dompurify": "^3.4.16",
+    "ical.js": "^2.2.1",
     "koffi": "^2.15.1",
     "lucide-react": "^0.400.0",
     "react": "^18.3.0",
     "react-dom": "^18.3.0",
     "tailwind-merge": "^2.3.0",
+    "tsdav": "^2.5.0",
     "zustand": "^4.5.0"
   },
   "devDependencies": {

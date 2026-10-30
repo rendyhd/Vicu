@@ -21,6 +21,7 @@
  * count.
  */
 import { taskPatch } from './merge-patches'
+import { parseTaskDuration, withTaskDuration } from './task-duration'
 import { isBrokenSearch } from '../../shared/error-classify'
 import { isOwnTask } from '../../shared/hidden-tasks'
 import {
@@ -92,6 +93,8 @@ export function routineReadSet(carriers: ReadonlyArray<{ payload: RoutinePayload
 export interface RoutineWriteOptions {
   /** The occurrence records this write is about; one older than `prunedBefore` goes to the archive. */
   changed?: RoutineOccurrenceRecord[]
+  /** Set or clear duration on the carrier description; omitted preserves the fresh server value. */
+  durationMinutes?: number | null
   /** Move the carrier to this project in the same write (sharing, stopping, section 6.9). */
   moveToProject?: number
   /**
@@ -150,10 +153,11 @@ export async function createRoutineCarrier(
   api: RoutineStoreApi,
   projectId: number,
   payload: RoutinePayload,
+  durationMinutes: number | null = null,
 ): Promise<RoutineCarrier<Task>> {
   const created = unwrap(await api.createTask(projectId, {
     title: payload.definition.name,
-    description: upsertRoutineEnvelope('', payload),
+    description: withTaskDuration(upsertRoutineEnvelope('', payload), durationMinutes),
     done: true,
   }))
   // A server that ignored `done` on create would leave an open, visible carrier: finish it.
@@ -349,14 +353,17 @@ export async function writeRoutineCarrier(
     const result = await api.patchTaskJson(fresh.id, carrierWriteOperations(
       fresh.description ?? '',
       finalPayload.definition.name,
-      upsertRoutineEnvelope(parsed.body, finalPayload),
+      options.durationMinutes === undefined
+        ? upsertRoutineEnvelope(parsed.body, finalPayload)
+        : withTaskDuration(upsertRoutineEnvelope(parsed.body, finalPayload), options.durationMinutes),
       { projectId: options.moveToProject },
     ))
     if (!result.success && !isRetryable(result)) unwrap(result)
     if (result.success) sent = finalPayload
     await afterWrite(api, result, writes)
     ;({ fresh, parsed, remote } = await readFresh())
-    if (sent && routineWriteHeld(remote, sent)) return { task: fresh, payload: remote, archiveError }
+    const durationHeld = options.durationMinutes === undefined || parseTaskDuration(fresh.description) === options.durationMinutes
+    if (sent && routineWriteHeld(remote, sent) && durationHeld) return { task: fresh, payload: remote, archiveError }
     if (sent) console.warn('[Routines] A write made at the same moment removed part of this one; writing again')
     if (writes >= ROUTINE_WRITE_ATTEMPTS) throw new Error(ROUTINE_KEPT_CHANGING_ERROR)
     finalPayload = sent ? keepServerRecordsOfSameState(mergeRoutinePayload(sent, remote), remote) : mergeForWrite(finalPayload, remote)

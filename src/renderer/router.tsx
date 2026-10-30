@@ -8,6 +8,7 @@ import {
 import { AppShell } from '@/components/layout/AppShell'
 import { InboxView } from '@/views/InboxView'
 import { TodayView } from '@/views/TodayView'
+import { PlannerView } from '@/views/PlannerView'
 import { UpcomingView } from '@/views/UpcomingView'
 import { AnytimeView } from '@/views/AnytimeView'
 import { LogbookView } from '@/views/LogbookView'
@@ -40,6 +41,12 @@ const todayRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/today',
   component: TodayView,
+})
+
+const plannerRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/planner',
+  component: PlannerView,
 })
 
 const upcomingRoute = createRoute({
@@ -124,6 +131,7 @@ const routeTree = rootRoute.addChildren([
   inboxRoute,
   todayRoute,
   routinesRoute,
+  plannerRoute,
   upcomingRoute,
   anytimeRoute,
   reviewRoute,

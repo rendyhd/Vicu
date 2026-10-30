@@ -194,7 +194,12 @@ export function TaskInputParser({
       {/* Input wrapper with highlight overlay */}
       <div className="relative">
         {hasTokens && (
-          <NlpInputHighlight value={value} tokens={parseResult.tokens} multiline={multiline} />
+          <NlpInputHighlight
+            value={value}
+            tokens={parseResult.tokens}
+            multiline={multiline}
+            inputClassName={inputClassName}
+          />
         )}
         {multiline ? (
           <textarea

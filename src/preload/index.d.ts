@@ -133,6 +133,7 @@ export interface ElectronAPI {
   deleteLabel(id: number): Promise<ApiResult<void>>
 
   // Config
+  caldav: import('../shared/caldav-types').CalDavApi
   getConfig(): Promise<AppConfig | null>
   saveConfigPatch(patch: Partial<AppConfig>): Promise<void>
   saveConnectionConfig(connection: ConnectionConfig): Promise<void>

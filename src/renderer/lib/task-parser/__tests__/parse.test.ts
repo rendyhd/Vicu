@@ -309,6 +309,56 @@ describe('extractBangToday', () => {
   })
 })
 
+// ─── Duration ───────────────────────────────────────────────
+
+describe('duration', () => {
+  it('reads a standalone token as minutes in either syntax mode', () => {
+    for (const config of [todoist, vikunja]) {
+      const result = parse('Write report ~45', config)
+      expect(result.durationMinutes).toBe(45)
+      expect(result.title).toBe('Write report')
+      expect(result.tokens).toEqual([
+        { type: 'duration', start: 13, end: 16, value: 45, raw: '~45' },
+      ])
+    }
+  })
+
+  it('coexists with a time of day and all other task fields', () => {
+    const result = parse('Call Ana tomorrow 14:30 ~90 @calls p2 #Work', todoist)
+
+    expect(result.title).toBe('Call Ana')
+    expect(result.dueDate).toBeInstanceOf(Date)
+    expect(result.dueHasTime).toBe(true)
+    expect(result.durationMinutes).toBe(90)
+    expect(result.labels).toEqual(['calls'])
+    expect(result.priority).toBe(3)
+    expect(result.project).toBe('Work')
+  })
+
+  it('uses the first valid token', () => {
+    const result = parse('Focus ~30 ~60', todoist)
+
+    expect(result.durationMinutes).toBe(30)
+    expect(result.title).toBe('Focus ~60')
+  })
+
+  it.each(['Task ~0', 'Task ~-5', 'Task ~1.5', 'Task~45', 'Task ~45min', 'Task ~ 45'])(
+    'leaves invalid duration text in the title: %s',
+    (input) => {
+      const result = parse(input, todoist)
+      expect(result.durationMinutes).toBeNull()
+      expect(result.title).toBe(input)
+    },
+  )
+
+  it('can be dismissed like any other parsed field', () => {
+    const result = parse('Task ~45', { ...todoist, suppressTypes: ['duration'] })
+
+    expect(result.durationMinutes).toBeNull()
+    expect(result.title).toBe('Task ~45')
+  })
+})
+
 // ─── Disabled Parser ────────────────────────────────────────
 
 describe('disabled parser', () => {
@@ -320,6 +370,7 @@ describe('disabled parser', () => {
     expect(r.labels).toEqual([])
     expect(r.project).toBeNull()
     expect(r.recurrence).toBeNull()
+    expect(r.durationMinutes).toBeNull()
     expect(r.tokens).toEqual([])
   })
 })

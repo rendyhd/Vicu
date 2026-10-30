@@ -20,6 +20,7 @@ import { AssistantSettings } from '@/components/settings/AssistantSettings'
 import { NotificationSettings } from '@/components/settings/NotificationSettings'
 import { CompletionSoundSettings } from '@/components/settings/CompletionSoundSettings'
 import { SidebarSettings } from '@/components/settings/SidebarSettings'
+import { CalDavSettings } from '@/components/settings/CalDavSettings'
 import { RoutinesSettingsPanel } from '@/components/routines/RoutinesSettingsPanel'
 import { ProjectSettings } from '@/components/settings/ProjectSettings'
 import { useProjects } from '@/hooks/use-projects'
@@ -563,6 +564,8 @@ export function SettingsView() {
             onChange={handleQuickEntryChange}
           />
         )}
+
+        <CalDavSettings />
 
         {/* Task Parser */}
         <div className="rounded-card border border-[var(--border-color)] bg-[var(--bg-primary)] p-5">

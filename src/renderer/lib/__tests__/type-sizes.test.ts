@@ -29,6 +29,8 @@ const ARBITRARY_SIZE_ALLOWLIST = [
   'components/task-list/NlpInputHighlight.tsx',
   'components/task-list/ParentDropZone.tsx',
   'components/task-list/SectionDragOverlay.tsx',
+  // Planner titles are one pixel smaller than the standard row and editor titles.
+  'components/task-list/TaskRow.tsx',
 ]
 
 // Built from parts so this file does not carry literal classes into the Tailwind content scan.

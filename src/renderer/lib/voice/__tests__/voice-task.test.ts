@@ -60,6 +60,14 @@ describe('voiceTaskDraft', () => {
     expect(draft.payload.repeat_after).toBe(7 * 86400)
   })
 
+  it('stores a spoken duration token as hidden description metadata', () => {
+    const draft = ok('Write report ~45')
+
+    expect(draft.title).toBe('Write report')
+    expect(draft.payload.description).toBe('<!-- vicu-duration:v1:45 -->')
+    expect(voiceCardChips(draft.parsed, 'Write report ~45', ctx, gb24).map((chip) => chip.type)).toContain('duration')
+  })
+
   it('drops the full stop a recognizer adds', () => {
     expect(ok('Buy milk.').title).toBe('Buy milk')
     expect(cleanTranscript('  Buy   milk .  ')).toBe('Buy milk')

@@ -1,8 +1,9 @@
 import type { ParsedToken } from '@/lib/task-parser'
 import { useIsDark } from '@/hooks/use-is-dark'
+import { cn } from '@/lib/cn'
 import { tokenHighlightBackground } from '@/lib/token-chip-colors'
 
-// Token highlight colours: green=date, red=priority, orange=label, blue=project, purple=recurrence,
+// Token highlight colours: green=date, yellow=duration, red=priority, orange=label, blue=project, purple=recurrence,
 // as design token roles (lib/token-chip-colors.ts).
 
 function escapeHtml(str: string): string {
@@ -17,9 +18,10 @@ interface NlpInputHighlightProps {
   value: string
   tokens: ParsedToken[]
   multiline?: boolean
+  inputClassName?: string
 }
 
-export function NlpInputHighlight({ value, tokens, multiline = false }: NlpInputHighlightProps) {
+export function NlpInputHighlight({ value, tokens, multiline = false, inputClassName }: NlpInputHighlightProps) {
   const isDark = useIsDark()
   if (!tokens.length) return null
 
@@ -44,11 +46,12 @@ export function NlpInputHighlight({ value, tokens, multiline = false }: NlpInput
 
   return (
     <div
-      className={
+      className={cn(
         multiline
           ? 'vicu-token-layer pointer-events-none absolute inset-0 overflow-hidden whitespace-pre-wrap break-words text-[13px] font-medium leading-snug text-transparent'
-          : 'vicu-token-layer pointer-events-none absolute inset-0 flex items-center overflow-hidden whitespace-pre text-[13px] text-transparent'
-      }
+          : 'vicu-token-layer pointer-events-none absolute inset-0 flex items-center overflow-hidden whitespace-pre text-[13px] text-transparent',
+        inputClassName,
+      )}
       aria-hidden
     >
       {parts.map((part, i) =>

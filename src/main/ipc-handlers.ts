@@ -121,6 +121,7 @@ import {
 import { printHtml } from './print'
 import { uploadStandaloneTasks } from './standalone-upload'
 import { getOfflineQueue, knownUserIdFor, rememberKnownUser } from './offline/service'
+import { registerCalDavIpc } from './caldav/ipc'
 import { registerOfflineQueueIpc } from './offline/ipc'
 import { registerCollaborationIpc } from './collab-ipc'
 import { registerVoiceIpc } from './voice/service'
@@ -263,6 +264,7 @@ function projectIdOf(task: unknown): number | undefined {
 }
 
 export function registerIpcHandlers(): void {
+  registerCalDavIpc()
   registerOfflineQueueIpc()
   registerCollaborationIpc()
   registerVoiceIpc()

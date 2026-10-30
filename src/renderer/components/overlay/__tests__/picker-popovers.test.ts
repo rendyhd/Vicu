@@ -16,13 +16,14 @@ const PICKERS = [
   'DraftLabelPickerPopover',
   'ProjectPickerPopover',
   'RecurrencePickerPopover',
+  'DurationPickerPopover',
   'AttachmentPickerPopover',
   'InfoPopover',
 ]
 
 describe('picker popovers', () => {
-  it('has all nine pickers on the Popover primitive', () => {
-    expect(PICKERS).toHaveLength(9)
+  it('has all ten pickers on the Popover primitive', () => {
+    expect(PICKERS).toHaveLength(10)
     for (const name of PICKERS) {
       const source = read(`components/task-list/${name}.tsx`)
       expect(source, name).toContain("from '../overlay/Popover'")
@@ -50,7 +51,7 @@ describe('picker popovers', () => {
   it('gives every anchor to its picker', () => {
     // The open card's property bar (card 3.3) holds the pickers' anchors.
     const row = read('components/task-list/TaskCardBar.tsx')
-    for (const picker of ['WhenPopover', 'PriorityPickerPopover', 'LabelPickerPopover', 'ReminderPickerPopover', 'AttachmentPickerPopover', 'ProjectPickerPopover', 'RecurrencePickerPopover', 'InfoPopover']) {
+    for (const picker of ['WhenPopover', 'PriorityPickerPopover', 'LabelPickerPopover', 'ReminderPickerPopover', 'AttachmentPickerPopover', 'ProjectPickerPopover', 'RecurrencePickerPopover', 'DurationPickerPopover', 'InfoPopover']) {
       expect(row, picker).toMatch(new RegExp(`<${picker}\\s+anchorRef=`))
     }
     const composer = read('components/task-list/NewTaskComposer.tsx')

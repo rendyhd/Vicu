@@ -11,7 +11,7 @@ export function datesOnlyParserConfig(locale?: string): ParserConfig {
   return {
     enabled: true,
     syntaxMode: 'todoist',
-    suppressTypes: ['place', 'label', 'project', 'priority', 'recurrence'],
+    suppressTypes: ['place', 'label', 'project', 'priority', 'duration', 'recurrence'],
     bangToday: false,
     ...(locale ? { locale } : {}),
   }

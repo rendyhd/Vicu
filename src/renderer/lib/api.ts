@@ -215,6 +215,15 @@ export const api = {
   deleteLabel: (id: number) =>
     window.api.deleteLabel(id) as Promise<ApiResult<void>>,
 
+  caldav: {
+    connections: () => window.api.caldav.connections(),
+    discover: (input: import('../../shared/caldav-types').CalDavConnectionInput) => window.api.caldav.discover(input),
+    select: (id: string, calendars: import('../../shared/caldav-types').CalDavCalendar[]) => window.api.caldav.select(id, calendars),
+    remove: (id: string) => window.api.caldav.remove(id),
+    events: (start: string, end: string) => window.api.caldav.events(start, end),
+    update: (input: import('../../shared/caldav-types').CalDavEventUpdate) => window.api.caldav.update(input),
+  },
+
   getConfig: () =>
     window.api.getConfig() as Promise<AppConfig | null>,
 
