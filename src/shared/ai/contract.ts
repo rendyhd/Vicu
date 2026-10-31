@@ -140,6 +140,7 @@ export const AI_LIMITS = fixtureLimits as unknown as Readonly<{
   organize_notes_max_chars: number
   organize_reason_max_chars: number
   organize_max_tokens: number
+  saved_addresses_max: number
 }>
 export const PROTOCOLS = fixtureProtocols as unknown as Record<WireProtocol, { chat: string; models: string }>
 export const PROVIDER_PRESETS = fixtureProviders as unknown as ProviderPreset[]
@@ -180,7 +181,13 @@ export type StarterKind = 'today' | 'upcoming' | 'inbox' | 'project' | 'other'
 export const ASK_STARTERS = fixtureAsk.starters as unknown as Record<StarterKind, string[]>
 export const TALK_CONFIRM = fixtureTalk.confirm as unknown as Record<string, { yes: string[]; no: string[] }>
 export const PROMPTS = fixturePrompts as unknown as Record<'dictation' | 'dictationEdit' | 'brainDump' | 'brainDumpEdit' | 'ask' | 'talk' | 'organize', Prompt>
-export const AI_MESSAGES = fixtureMessages as unknown as { promptSchemaIntro: string; repair: string; finalAnswer: string }
+export const AI_MESSAGES = fixtureMessages as unknown as {
+  promptSchemaIntro: string
+  repair: string
+  finalAnswer: string
+  addressHelp: string
+  addressVersionHint: string
+}
 
 export type DraftField = 'title' | 'notes' | 'when' | 'project' | 'labels' | 'priority' | 'repeat' | 'reminder' | 'place' | 'subtasks'
 

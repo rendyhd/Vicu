@@ -236,6 +236,10 @@ export interface ElectronAPI {
     getSettings(): Promise<AiSettingsView>
     saveSettings(patch: AiSettingsPatch): Promise<AiSettingsView>
     setKey(key: string | null): Promise<AiSettingsView>
+    chooseProvider(id: string | null): Promise<AiSettingsView>
+    saveAddress(address: string, replacing: boolean): Promise<AiSettingsView>
+    useSavedAddress(address: string): Promise<AiSettingsView>
+    removeSavedAddress(address: string): Promise<AiSettingsView>
     listModels(): Promise<AiResult<string[]>>
     testConnection(model: string): Promise<AiResult<ConnectionTestResult>>
     /**

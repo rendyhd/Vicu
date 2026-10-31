@@ -17,7 +17,7 @@ import {
 import { startTalk, useAskStore } from '@/stores/ask-store'
 import { useDictationStore } from '@/stores/dictation-store'
 import { toast } from '@/stores/toast-store'
-import { PROVIDER_PRESETS, SPEECH, providerPreset } from '../../../shared/ai/contract'
+import { AI_MESSAGES, PROVIDER_PRESETS, SPEECH, providerPreset } from '../../../shared/ai/contract'
 import {
   canRunFeature,
   capabilitiesOf,
@@ -28,6 +28,8 @@ import {
   hasConsent,
   isCleartextToRemoteHost,
   isSetUp,
+  sameAddress,
+  savedAddressesOf,
   untestedModels,
   type ModelFeature,
 } from '../../../shared/ai/settings'
@@ -184,26 +186,14 @@ function ThinkingCard({ settings, tests }: { settings: AiSettingsView; tests: Mo
   const save = useSaveAiSettings()
   const qc = useQueryClient()
   const preset = settings.provider ? providerPreset(settings.provider) : undefined
-  const [address, setAddress] = useState(settings.address)
   const [key, setKey] = useState('')
   const [showKey, setShowKey] = useState(false)
-  useEffect(() => setAddress(settings.address), [settings.address, settings.provider])
 
-  // One model for everything by default: the preset's dictation suggestion (the quicker one).
+  // What the preset was set to before comes back; a new one starts with its suggested model (7.2).
   const chooseProvider = async (id: string) => {
-    const next = providerPreset(id)
-    if (!next) {
-      await save({ provider: null })
-      return
-    }
-    const model = next.suggested.dictation ?? next.suggested.ask ?? ''
-    const view = await save({
-      provider: next.id,
-      address: next.address ?? '',
-      models: { dictation: model, ask: model },
-      features: { dictation: false, ask: false, talk: false },
-    })
-    tests.testUntested(view)
+    const view = await window.api.ai.chooseProvider(id || null)
+    qc.setQueryData(AI_SETTINGS_QUERY_KEY, view)
+    if (view.provider) tests.testUntested(view)
   }
 
   const saveKey = async (value: string | null) => {
@@ -214,8 +204,6 @@ function ThinkingCard({ settings, tests }: { settings: AiSettingsView; tests: Mo
     if (value) tests.testUntested(view)
   }
 
-  const shownAddress = preset?.addressEditable ? address : effectiveAddress(settings)
-  const warn = isCleartextToRemoteHost(shownAddress)
 
   return (
     <section className={CARD} aria-labelledby="ai-provider-heading">
@@ -242,24 +230,20 @@ function ThinkingCard({ settings, tests }: { settings: AiSettingsView; tests: Mo
 
         {preset && (
           <>
-            <div>
-              <label className={LABEL} htmlFor="ai-address">Address</label>
-              <input
-                id="ai-address"
-                type="url"
-                value={shownAddress}
-                disabled={!preset.addressEditable}
-                placeholder="https://example.com/v1"
-                onChange={(e) => setAddress(e.target.value)}
-                onBlur={() => { if (preset.addressEditable && address !== settings.address) void save({ address }).then(tests.testUntested) }}
-                className={cn(INPUT, !preset.addressEditable && 'text-[var(--text-secondary)]')}
-              />
-              {warn && (
-                <p className="mt-1 text-xs text-danger" role="alert">
-                  This address is not encrypted (http) and is outside your local network: your key and what you send can be read on the way. Use https.
-                </p>
-              )}
-            </div>
+            {preset.addressEditable ? (
+              <TypedAddress key={settings.provider} settings={settings} tests={tests} />
+            ) : (
+              <div>
+                <label className={LABEL} htmlFor="ai-address">Address</label>
+                <input
+                  id="ai-address"
+                  type="url"
+                  value={effectiveAddress(settings)}
+                  disabled
+                  className={cn(INPUT, 'text-[var(--text-secondary)]')}
+                />
+              </div>
+            )}
 
             <div>
               <label className={LABEL} htmlFor="ai-key">
@@ -297,6 +281,119 @@ function ThinkingCard({ settings, tests }: { settings: AiSettingsView; tests: Mo
         )}
       </div>
     </section>
+  )
+}
+
+function CleartextWarning({ address }: { address: string }) {
+  if (!isCleartextToRemoteHost(address)) return null
+  return (
+    <p className="mt-1 text-xs text-danger" role="alert">
+      This address is not encrypted (http) and is outside your local network: your key and what you send can be read on the way. Use https.
+    </p>
+  )
+}
+
+/**
+ * The address of a typed preset (2.1, 7.2): saved, it shows as a value with Edit, and the saved
+ * addresses are listed to pick or remove; Add address saves another one next to it.
+ */
+function TypedAddress({ settings, tests }: { settings: AiSettingsView; tests: ModelTests }) {
+  const qc = useQueryClient()
+  const current = effectiveAddress(settings)
+  const saved = savedAddressesOf(settings)
+  const [mode, setMode] = useState<'edit' | 'add' | null>(null)
+  const [draft, setDraft] = useState('')
+  const editing = mode ?? (current ? null : 'edit')
+  const helpId = useId()
+
+  const show = (view: AiSettingsView) => qc.setQueryData(AI_SETTINGS_QUERY_KEY, view)
+  const start = (next: 'edit' | 'add') => {
+    setDraft(next === 'edit' ? current : '')
+    setMode(next)
+  }
+  const submit = async () => {
+    if (!draft.trim()) return
+    const view = await window.api.ai.saveAddress(draft, editing === 'edit')
+    show(view)
+    setMode(null)
+    tests.testUntested(view)
+  }
+  const pick = async (address: string) => {
+    const view = await window.api.ai.useSavedAddress(address)
+    show(view)
+    tests.testUntested(view)
+  }
+  const remove = async (address: string) => show(await window.api.ai.removeSavedAddress(address))
+
+  if (editing) {
+    return (
+      <div>
+        <label className={LABEL} htmlFor="ai-address">{editing === 'add' ? 'New address' : 'Address'}</label>
+        <div className="flex gap-2">
+          <input
+            id="ai-address"
+            type="url"
+            value={draft}
+            placeholder="http://192.168.1.10:1234/v1"
+            aria-describedby={helpId}
+            autoFocus={mode !== null}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') void submit()
+              if (e.key === 'Escape' && current) setMode(null)
+            }}
+            className={cn(INPUT, 'flex-1')}
+          />
+          <Button variant="secondary" disabled={!draft.trim()} onClick={() => void submit()}>Save address</Button>
+          {current && <Button variant="quiet" onClick={() => setMode(null)}>Cancel</Button>}
+        </div>
+        <p id={helpId} className="mt-1 text-xs text-[var(--text-secondary)]">{AI_MESSAGES.addressHelp}</p>
+        <CleartextWarning address={draft} />
+      </div>
+    )
+  }
+
+  return (
+    <div>
+      <p className={LABEL}>Address</p>
+      <div className="flex items-center gap-2">
+        <span className="min-w-0 flex-1 truncate text-sm text-[var(--text-primary)]" title={current}>{current}</span>
+        <Button variant="secondary" onClick={() => start('edit')}>Edit</Button>
+        <Button variant="quiet" onClick={() => start('add')}>Add address</Button>
+      </div>
+      <CleartextWarning address={current} />
+      {saved.length > 1 && (
+        <div className="mt-2">
+          <p className="text-xs text-[var(--text-secondary)]">Saved addresses</p>
+          <ul className="mt-1 space-y-1">
+            {saved.map((entry) => {
+              const inUse = sameAddress(entry.address, current)
+              return (
+                <li key={entry.address} className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    aria-current={inUse ? 'true' : undefined}
+                    disabled={inUse}
+                    onClick={() => void pick(entry.address)}
+                    className={cn(
+                      'min-w-0 flex-1 truncate rounded-control px-2 py-1 text-left text-xs',
+                      inUse ? 'bg-bg-selected text-text' : 'text-text hover:bg-bg-hover',
+                    )}
+                  >
+                    {entry.address}
+                    {entry.models.dictation && <span className="text-[var(--text-secondary)]"> · {entry.models.dictation}</span>}
+                    {inUse && <span className="text-[var(--text-secondary)]"> · in use</span>}
+                  </button>
+                  {!inUse && (
+                    <Button variant="quiet" aria-label={`Remove ${entry.address}`} onClick={() => void remove(entry.address)}>Remove</Button>
+                  )}
+                </li>
+              )
+            })}
+          </ul>
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -571,6 +668,7 @@ function TestResult({ model, result }: { model: string; result: ConnectionTestRe
         {row(result.tool.ok, result.tool.ok ? 'Tool call' : `Tool call: ${result.tool.error ?? 'failed'}`)}
       </ul>
       <p className="mt-1 text-[var(--text-secondary)]">{features.length ? `Can run: ${features.join(', ')}` : 'This model can run none of the features.'}</p>
+      {result.hint && <p className="mt-1 text-[var(--text-secondary)]">{result.hint}</p>}
     </div>
   )
 }
