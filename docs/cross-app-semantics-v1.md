@@ -703,7 +703,7 @@ on purpose.
 
 - Read-only members are listed in Assign but cannot be picked: disabled, with "Can view only".
   (The server would accept them; the rule keeps a task with someone who cannot act on it.)
-- **Assign for a selection** (the selection's menu, "Assign..."): offered only when every
+- **Assign for a selection** (the selection's menu, "Assign"): offered only when every
   selected task is in a shared project where you may write. It lists the members of all those
   projects (usually one), ordered as in 9.3. A person assigned to every selected task is ticked,
   to some of them partly ticked. Picking a person who is not ticked, or partly ticked, assigns them
