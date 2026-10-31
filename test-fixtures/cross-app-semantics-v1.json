@@ -1913,5 +1913,114 @@
       { "days": 730, "expect": "2 years ago" },
       { "days": 1100, "expect": "3 years ago" }
     ]
+  },
+  "todayRoutines": {
+    "about": "Section 6.10. now is a local time on the day; each occurrence is one time of a routine today (status open, completed or skipped; carried: an after_completion occurrence carried to today from an earlier date). rows is every row in order (time is the occurrence the row stands for, progress finished/total or null); visible the rows shown while the line is closed; line the closed line, or null when nothing is behind it. limit is a number or \"all\".",
+    "soonMinutes": 120,
+    "defaultLimit": 2,
+    "cases": [
+      {
+        "name": "one row per routine, for its earliest open time",
+        "now": "07:00",
+        "limit": 2,
+        "occurrences": [
+          { "routine": "water", "name": "Water", "time": "08:00", "status": "completed" },
+          { "routine": "water", "name": "Water", "time": "12:00", "status": "open" },
+          { "routine": "water", "name": "Water", "time": "16:00", "status": "open" },
+          { "routine": "stretch", "name": "Stretch", "time": "07:30", "status": "open" },
+          { "routine": "read", "name": "Read", "time": "21:00", "status": "open" }
+        ],
+        "rows": [
+          { "routine": "stretch", "time": "07:30", "progress": null },
+          { "routine": "water", "time": "12:00", "progress": "1/3" },
+          { "routine": "read", "time": "21:00", "progress": null }
+        ],
+        "visible": ["stretch"],
+        "line": { "count": 2, "text": "2 later today" }
+      },
+      {
+        "name": "the limit, ties by name, and a due-now row behind the line",
+        "now": "10:00",
+        "limit": 2,
+        "occurrences": [
+          { "routine": "meds", "name": "Meds", "time": "06:00", "status": "open" },
+          { "routine": "walk", "name": "Walk", "time": "09:00", "status": "open" },
+          { "routine": "breathe", "name": "Breathe", "time": "09:00", "status": "open" },
+          { "routine": "tidy", "name": "Tidy", "time": "12:00", "status": "open" },
+          { "routine": "call", "name": "Call home", "time": "12:01", "status": "open" }
+        ],
+        "rows": [
+          { "routine": "meds", "time": "06:00", "progress": null },
+          { "routine": "breathe", "time": "09:00", "progress": null },
+          { "routine": "walk", "time": "09:00", "progress": null },
+          { "routine": "tidy", "time": "12:00", "progress": null },
+          { "routine": "call", "time": "12:01", "progress": null }
+        ],
+        "visible": ["meds", "breathe"],
+        "line": { "count": 3, "text": "Show 3 more" }
+      },
+      {
+        "name": "nothing due now: only the line",
+        "now": "06:00",
+        "limit": 2,
+        "occurrences": [
+          { "routine": "walk", "name": "Walk", "time": "09:00", "status": "open" },
+          { "routine": "read", "name": "Read", "time": "21:00", "status": "open" }
+        ],
+        "rows": [
+          { "routine": "walk", "time": "09:00", "progress": null },
+          { "routine": "read", "time": "21:00", "progress": null }
+        ],
+        "visible": [],
+        "line": { "count": 2, "text": "2 later today" }
+      },
+      {
+        "name": "all due-now rows, the rest behind the line",
+        "now": "10:00",
+        "limit": "all",
+        "occurrences": [
+          { "routine": "meds", "name": "Meds", "time": "06:00", "status": "open" },
+          { "routine": "walk", "name": "Walk", "time": "09:00", "status": "open" },
+          { "routine": "tidy", "name": "Tidy", "time": "11:00", "status": "open" },
+          { "routine": "read", "name": "Read", "time": "21:00", "status": "open" }
+        ],
+        "rows": [
+          { "routine": "meds", "time": "06:00", "progress": null },
+          { "routine": "walk", "time": "09:00", "progress": null },
+          { "routine": "tidy", "time": "11:00", "progress": null },
+          { "routine": "read", "time": "21:00", "progress": null }
+        ],
+        "visible": ["meds", "walk", "tidy"],
+        "line": { "count": 1, "text": "1 later today" }
+      },
+      {
+        "name": "a carried occurrence is due now; a finished routine has no row",
+        "now": "08:00",
+        "limit": 1,
+        "occurrences": [
+          { "routine": "plants", "name": "Water plants", "time": "20:00", "status": "open", "carried": true },
+          { "routine": "meds", "name": "Meds", "time": "07:00", "status": "completed" },
+          { "routine": "meds", "name": "Meds", "time": "19:00", "status": "skipped" },
+          { "routine": "walk", "name": "Walk", "time": "09:30", "status": "open" }
+        ],
+        "rows": [
+          { "routine": "walk", "time": "09:30", "progress": null },
+          { "routine": "plants", "time": "20:00", "progress": null }
+        ],
+        "visible": ["walk"],
+        "line": { "count": 1, "text": "Show 1 more" }
+      },
+      {
+        "name": "nothing open",
+        "now": "12:00",
+        "limit": 2,
+        "occurrences": [
+          { "routine": "meds", "name": "Meds", "time": "07:00", "status": "completed" }
+        ],
+        "rows": [],
+        "visible": [],
+        "line": null
+      }
+    ]
   }
 }

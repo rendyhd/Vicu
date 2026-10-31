@@ -4,6 +4,7 @@ import { isRoutinesEnabled, type AppConfig } from '@/lib/vikunja-types'
 import { useRoutines } from '@/hooks/use-routines'
 import { useSetSyncedPreference } from '@/hooks/use-synced-prefs'
 import { routineHiddenKey } from '../../../shared/synced-prefs'
+import { TODAY_ROUTINES_LIMITS, todayRoutinesLimit } from '../../../shared/today-routines'
 
 interface RoutinesSettingsPanelProps {
   config: AppConfig
@@ -13,6 +14,7 @@ interface RoutinesSettingsPanelProps {
 export function RoutinesSettingsPanel({ config, onChange }: RoutinesSettingsPanelProps) {
   const enabled = isRoutinesEnabled(config)
   const inToday = config.routines_in_today !== false
+  const limit = todayRoutinesLimit(config.routines_today_limit)
 
   return (
     <div className="rounded-card border border-[var(--border-color)] bg-[var(--bg-primary)] p-5">
@@ -44,6 +46,27 @@ export function RoutinesSettingsPanel({ config, onChange }: RoutinesSettingsPane
             </p>
           </div>
         </label>
+
+        {enabled && inToday && (
+          <div className="pl-6">
+            <label htmlFor="routines-today-limit" className="text-sm text-[var(--text-primary)]">Routines shown on Today</label>
+            <p className="mb-2 mt-0.5 text-xs text-[var(--text-secondary)]">
+              How many routines due in the next two hours show at once. The rest wait behind one line.
+            </p>
+            <select
+              id="routines-today-limit"
+              value={String(limit)}
+              onChange={(e) => onChange({ routines_today_limit: todayRoutinesLimit(e.target.value === 'all' ? 'all' : Number(e.target.value)) })}
+              className="w-40 rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-2 py-1.5 text-sm text-[var(--text-primary)]"
+            >
+              {TODAY_ROUTINES_LIMITS.map((choice) => (
+                <option key={choice} value={String(choice)}>
+                  {choice === 'all' ? 'All' : choice}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
 
       {enabled && <HiddenSharedRoutines />}

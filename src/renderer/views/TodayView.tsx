@@ -128,7 +128,7 @@ export function TodayView() {
         emptyWarm={justCleared}
         emptyExtra={empty ? <NextUpcomingOffer /> : undefined}
       >
-        {routinesShown && <RoutineTodaySection hideFinished />}
+        {routinesShown && <RoutineTodaySection onToday />}
         {overdueTasks.length > 0 && (
           <div>
             <ListSectionHeader level={1} title="Overdue" count={openCount(overdueTasks)} tone="overdue" />

@@ -10,6 +10,7 @@ import type {
   ViewerFilter,
 } from '../shared/config-types'
 import { isCategoryId } from '../shared/project-categories'
+import { todayRoutinesLimit } from '../shared/today-routines'
 
 // The config types are shared with the renderer (src/shared/config-types.ts).
 export type {
@@ -235,6 +236,8 @@ export function normalizeConfig(raw: Record<string, unknown>): AppConfig {
     review: normalizeReview(raw.review),
     routines_enabled: raw.routines_enabled !== false,
     routines_in_today: raw.routines_in_today !== false,
+    routines_today_limit: todayRoutinesLimit(raw.routines_today_limit),
+    routines_today_folded: raw.routines_today_folded === true,
   }
 }
 

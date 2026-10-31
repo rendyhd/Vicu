@@ -378,6 +378,17 @@ describe('applyConfigPatch (D-CFG-2)', () => {
     expect(normalizeConfig({ ...off }).routines_enabled).toBe(false)
   })
 
+  it('keeps the Today routine limit and fold, with 2 and open for anything else', () => {
+    const fresh = normalizeConfig({})
+    expect(fresh.routines_today_limit).toBe(2)
+    expect(fresh.routines_today_folded).toBe(false)
+
+    const set = applyConfigPatch(userConfig(), { routines_today_limit: 'all', routines_today_folded: true })
+    expect(set.routines_today_limit).toBe('all')
+    expect(set.routines_today_folded).toBe(true)
+    expect(applyConfigPatch(userConfig(), { routines_today_limit: 4 }).routines_today_limit).toBe(2)
+  })
+
   it('keeps the clock choice, and anything else means the system clock', () => {
     expect(normalizeConfig({}).clock_format).toBe('system')
     expect(applyConfigPatch(userConfig(), { clock_format: '24h' }).clock_format).toBe('24h')
