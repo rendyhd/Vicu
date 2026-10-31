@@ -1,9 +1,10 @@
 import { Button } from '@/components/shared/Button'
 import { Checkbox } from '@/components/shared/Checkbox'
+import { Play } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { api } from '@/lib/api'
 import { cn } from '@/lib/cn'
-import { reloadCompletionSound, playCompletionSound } from '@/lib/completion-sound'
+import { reloadCompletionSound, previewCompletionSound } from '@/lib/completion-sound'
 import type { AppConfig } from '@/lib/vikunja-types'
 
 interface SoundInfo {
@@ -59,8 +60,9 @@ export function CompletionSoundSettings({ config, onChange }: Props) {
     }
   }
 
-  const handleTest = () => {
-    playCompletionSound()
+  const handlePlay = async () => {
+    setError(null)
+    if (!(await previewCompletionSound())) setError('This sound cannot be played. Choose another file.')
   }
 
   return (
@@ -90,6 +92,9 @@ export function CompletionSoundSettings({ config, onChange }: Props) {
           </div>
 
           <div className="flex flex-wrap gap-2">
+            <Button variant="secondary" onClick={() => void handlePlay()} disabled={busy} aria-label="Play the completion sound">
+              <Play className="h-4 w-4" aria-hidden="true" /> Play
+            </Button>
             <Button variant="secondary" onClick={handleChooseFile} disabled={busy}>
               Choose file...
             </Button>
@@ -98,9 +103,6 @@ export function CompletionSoundSettings({ config, onChange }: Props) {
                 Reset to default
               </Button>
             )}
-            <Button variant="secondary" onClick={handleTest} disabled={busy}>
-              Test
-            </Button>
           </div>
 
           {error && <p className="text-xs text-danger">{error}</p>}

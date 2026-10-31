@@ -52,3 +52,20 @@ export function playCompletionSound(): void {
     void audio.play().catch(() => { /* ignore autoplay/decode errors */ })
   } catch { /* ignore */ }
 }
+
+/**
+ * Settings' Play button: plays the current sound from the start, waiting for a reload still
+ * running. Unlike a completion it ignores the switch and the throttle, and it answers false when
+ * the sound cannot be played, so Settings can say so.
+ */
+export async function previewCompletionSound(): Promise<boolean> {
+  if (loadingPromise) await loadingPromise
+  if (!audio) return false
+  try {
+    audio.currentTime = 0
+    await audio.play()
+    return true
+  } catch {
+    return false
+  }
+}
