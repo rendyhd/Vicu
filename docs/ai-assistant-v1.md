@@ -62,7 +62,10 @@ suggested models per feature.
 
 - An address the user types is used as given, without a trailing `/`. Plain `http` is allowed (a
   model on the home network); an `http` address outside the local network gets the warning the
-  setup screen gives for a Vikunja server.
+  setup screen gives for a Vikunja server. Nothing adds a version path: the field of a preset
+  whose address is typed (`addressEditable`) says so under it (`messages.addressHelp`).
+- The address of a typed preset is saved with Save address and then shown as a value with Edit,
+  not as an open field (section 7.2 keeps the saved ones).
 - The chat endpoint is `<address>/chat/completions` (`openai-chat`) or `<address>/messages`
   (`anthropic-messages`); the model list is `<address>/models` for every preset (`protocols` in
   the fixture).
@@ -111,6 +114,12 @@ fixture, with the answer each must give). When the structured answer fails with
 `json_schema`, it is tried again with `prompt`, and the one that works is kept for that model.
 Dictation needs the structured answer; Ask and Talk also need the tool call. The settings show
 which features the model can run.
+
+A typed address without its version path usually answers 404 or 405. When a request to a typed
+address (the model list, Load models or a probe) answers one of those, and no path segment of the
+address starts with `v` and a digit (`v1`, `v1beta`, any case) and its last segment is not `api`,
+the failure ends with `messages.addressVersionHint`. The `addressVersion` cases of the fixture pin
+the rule.
 
 ### 2.5 Requests
 
@@ -702,6 +711,15 @@ agreement; a local server (Ollama or Open WebUI at a local address) skips it.
   and a network address on a phone. Synced preference keys starting with `ai.` are reserved for a
   later version and added to the registry (semantics 11.3) first.
 - Wiping all local data and uninstalling remove them; backups and device transfer leave them out.
+- Each preset keeps what was last set for it: its address when typed, its models and its key.
+  Choosing another preset and then this one again brings them back; the feature switches start off,
+  as after any change of preset. A preset with a fixed address always uses the fixture's address.
+- A typed preset keeps at most `limits.saved_addresses_max` saved addresses, the latest first, each
+  with the models and the key it was used with. Picking a saved address brings them back; removing
+  one forgets them, its key included. The address in use cannot be removed.
+- The key is kept per preset, and for a typed preset per preset and address, so a key is only ever
+  sent to the address it was saved for. A key stored before this rule moves to the address it was
+  last used with, once.
 
 ---
 

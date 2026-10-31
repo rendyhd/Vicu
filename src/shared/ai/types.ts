@@ -67,6 +67,12 @@ export interface ModelCapabilities {
   tools: boolean
 }
 
+/** What a preset was set to: its address and models (7.2). */
+export interface ProviderSetup {
+  address: string
+  models: { dictation: string; ask: string }
+}
+
 /** The assistant's settings on this device (7.2): never synced, never in the prefs carrier. */
 export interface AiSettings {
   provider: ProviderId | null
@@ -90,6 +96,10 @@ export interface AiSettings {
   speakAnswers: boolean
   /** The smart dictation sheet's Brain dump switch, as last set there (4.8). */
   brainDump: boolean
+  /** What each other preset was last set to, so choosing it again brings it back (7.2). */
+  remembered: Partial<Record<ProviderId, ProviderSetup>>
+  /** The saved addresses of each typed preset, the latest first (7.2). */
+  savedAddresses: Partial<Record<ProviderId, ProviderSetup[]>>
 }
 
 /** What a window sees: the settings and whether a key is saved, never the key. */
@@ -98,7 +108,7 @@ export interface AiSettingsView extends AiSettings {
 }
 
 /** A change to the settings. Nested groups merge per key in main, so a patch names only what changed (two quick saves never undo each other). */
-export type AiSettingsPatch = Partial<Omit<AiSettings, 'tested' | 'refusedFields' | 'models' | 'features' | 'speech'>> & {
+export type AiSettingsPatch = Partial<Omit<AiSettings, 'tested' | 'refusedFields' | 'models' | 'features' | 'speech' | 'provider' | 'address' | 'remembered' | 'savedAddresses'>> & {
   models?: Partial<AiSettings['models']>
   features?: Partial<AiSettings['features']>
   speech?: Partial<AiSettings['speech']>
@@ -110,6 +120,8 @@ export interface ConnectionTestResult {
   tool: { ok: boolean; error?: string }
   /** Which features the model can run. */
   features: { dictation: boolean; ask: boolean; talk: boolean }
+  /** `messages.addressVersionHint` when a step failed in a way that points at a missing version path (2.4). */
+  hint?: string
 }
 
 export type AiResult<T> = { success: true; data: T } | { success: false; error: AiError }

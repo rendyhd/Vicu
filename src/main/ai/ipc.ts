@@ -2,7 +2,17 @@ import { handleTrusted } from '../secure-ipc'
 import type { AiSettingsPatch, AskTurnRequest, KeptTranscript } from '../../shared/ai/types'
 import { clearAiAccountData, dropKeptTranscript, flushAiLocalData, getConversations, getKeptTranscripts, keepTranscript, saveConversations } from './local-data'
 import { aiAskTurn, aiBrainDump, aiDictate, aiListModels, aiOrganize, aiTestConnection, cancelAllAskTurns, cancelAskTurn } from './service'
-import { aiSettingsView, flushAiSettings, patchAiSettings, setProviderKey } from './settings-store'
+import { providerPreset, type ProviderId } from '../../shared/ai/contract'
+import {
+  aiSettingsView,
+  chooseAiProvider,
+  flushAiSettings,
+  patchAiSettings,
+  removeSavedAddress,
+  saveTypedAddress,
+  setProviderKey,
+  useSavedAddress,
+} from './settings-store'
 import {
   cancelModelDownload,
   cancelSpeechSession,
@@ -25,6 +35,23 @@ export function registerAiIpc(): void {
   handleTrusted('ai:get-settings', () => aiSettingsView())
   handleTrusted('ai:save-settings', async (_event, patch: AiSettingsPatch) => {
     await patchAiSettings(patch && typeof patch === 'object' ? patch : {})
+    return aiSettingsView()
+  })
+  // Choosing a preset brings back what it was set to; a typed preset keeps saved addresses (7.2).
+  handleTrusted('ai:choose-provider', async (_event, id: unknown) => {
+    await chooseAiProvider(typeof id === 'string' && providerPreset(id) ? id as ProviderId : null)
+    return aiSettingsView()
+  })
+  handleTrusted('ai:save-address', async (_event, input: { address?: unknown; replacing?: unknown }) => {
+    await saveTypedAddress(typeof input?.address === 'string' ? input.address : '', input?.replacing === true)
+    return aiSettingsView()
+  })
+  handleTrusted('ai:use-saved-address', async (_event, address: unknown) => {
+    if (typeof address === 'string') await useSavedAddress(address)
+    return aiSettingsView()
+  })
+  handleTrusted('ai:remove-saved-address', async (_event, address: unknown) => {
+    if (typeof address === 'string') await removeSavedAddress(address)
     return aiSettingsView()
   })
   // The key goes one way: a window can save or remove it, never read it back.

@@ -6,6 +6,7 @@
  */
 import {
   AI_LIMITS,
+  AI_MESSAGES,
   BRAIN_DUMP_ANSWER_SCHEMA,
   DICTATION_ANSWER_SCHEMA,
   ORGANIZE_ANSWER_SCHEMA,
@@ -19,7 +20,7 @@ import {
   type JsonSchema,
   type StructuredMode,
 } from '../../shared/ai/contract'
-import { capabilitiesOf, hasConsent, isSetUp, modelKey } from '../../shared/ai/settings'
+import { ADDRESS_HINT_STATUSES, capabilitiesOf, effectiveAddress, hasConsent, isSetUp, mayLackVersionPath, modelKey } from '../../shared/ai/settings'
 import { extractJsonObject } from '../../shared/ai/schema'
 import type {
   AiError,
@@ -87,8 +88,23 @@ async function wrap<T>(run: () => Promise<T>): Promise<AiResult<T>> {
   }
 }
 
+/** A 404 or 405 from a typed address without a version path points at what is likely missing (2.4). */
+function lacksVersionPath(settings: AiSettings, err: unknown): boolean {
+  const preset = settings.provider ? providerPreset(settings.provider) : undefined
+  return !!preset?.addressEditable && err instanceof AiFailure && err.status !== undefined &&
+    ADDRESS_HINT_STATUSES.includes(err.status) && mayLackVersionPath(effectiveAddress(settings))
+}
+
 export function aiListModels(): Promise<AiResult<string[]>> {
-  return wrap(async () => listModels(connectionOf(getAiSettings()), transport))
+  return wrap(async () => {
+    const settings = getAiSettings()
+    try {
+      return await listModels(connectionOf(settings), transport)
+    } catch (err) {
+      if (err instanceof AiFailure && lacksVersionPath(settings, err)) throw new AiFailure(err.kind, `${err.message} ${AI_MESSAGES.addressVersionHint}`, err.status)
+      throw err
+    }
+  })
 }
 
 function sameValues(actual: unknown, expected: Record<string, unknown>): boolean {
@@ -113,11 +129,13 @@ export function aiTestConnection(model: string): Promise<AiResult<ConnectionTest
       tool: { ok: false },
       features: { dictation: false, ask: false, talk: false },
     }
+    let hint = false
     try {
       const models = await listModels(connection, transport)
       result.models = { ok: true, count: models.length }
     } catch (err) {
       result.models = { ok: false, count: 0, error: toAiError(err).message }
+      hint ||= lacksVersionPath(settings, err)
     }
 
     const preset = providerPreset(settings.provider ?? '')
@@ -139,6 +157,7 @@ export function aiTestConnection(model: string): Promise<AiResult<ConnectionTest
         result.structured = { ok: false, mode: null, error: `The answer was ${JSON.stringify(answer)}.` }
       } catch (err) {
         result.structured = { ok: false, mode: null, error: toAiError(err).message }
+        hint ||= lacksVersionPath(settings, err)
         if (err instanceof AiFailure && (err.kind === 'auth' || err.kind === 'network' || err.kind === 'not_found')) break
       }
     }
@@ -164,7 +183,9 @@ export function aiTestConnection(model: string): Promise<AiResult<ConnectionTest
       else result.tool = { ok: false, error: call ? 'The model called the tool with other numbers.' : 'The model did not call the tool.' }
     } catch (err) {
       result.tool = { ok: false, error: toAiError(err).message }
+      hint ||= lacksVersionPath(settings, err)
     }
+    if (hint) result.hint = AI_MESSAGES.addressVersionHint
 
     result.features = {
       dictation: result.structured.ok,

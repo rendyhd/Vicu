@@ -45,7 +45,8 @@
     "organize_prefetch": 5,
     "organize_notes_max_chars": 500,
     "organize_reason_max_chars": 120,
-    "organize_max_tokens": 8000
+    "organize_max_tokens": 8000,
+    "saved_addresses_max": 5
   },
   "protocols": {
     "openai-chat": {"chat": "/chat/completions", "models": "/models"},
@@ -3262,6 +3263,24 @@
   "messages": {
     "promptSchemaIntro": "Answer with JSON that matches this schema:",
     "repair": "That answer did not match the schema: {problem}. Answer again with JSON only.",
-    "finalAnswer": "Answer now with what you found."
+    "finalAnswer": "Answer now with what you found.",
+    "addressHelp": "Include the version path, usually /v1, for example http://192.168.1.10:1234/v1.",
+    "addressVersionHint": "The address may be missing its version path, usually /v1."
+  },
+  "addressVersion": {
+    "about": "Section 2.4: hint is whether a 404 or 405 from a typed address adds messages.addressVersionHint. It does when no path segment starts with v and a digit (v1, v1beta, V2; any case) and the last segment is not api.",
+    "cases": [
+      { "address": "http://192.168.1.10:1234", "hint": true },
+      { "address": "http://192.168.1.10:1234/", "hint": true },
+      { "address": "localhost:1234", "hint": true },
+      { "address": "https://example.com/openai", "hint": true },
+      { "address": "https://example.com/vision", "hint": true },
+      { "address": "http://localhost:11434/v1", "hint": false },
+      { "address": "http://localhost:11434/v1/", "hint": false },
+      { "address": "http://localhost:3000/api", "hint": false },
+      { "address": "https://example.com/v1beta/openai", "hint": false },
+      { "address": "https://example.com/api/v2", "hint": false },
+      { "address": "https://example.com/llm/V1", "hint": false }
+    ]
   }
 }
