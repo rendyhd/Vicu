@@ -1,9 +1,11 @@
 import { useId, useMemo, useState } from 'react'
-import { X } from 'lucide-react'
+import { FolderOpen, X } from 'lucide-react'
+import { useQueryClient } from '@tanstack/react-query'
 import { Dialog } from '@/components/overlay/Dialog'
 import { Button } from '@/components/shared/Button'
 import { useAppConfig } from '@/hooks/use-app-config'
 import { useProjects } from '@/hooks/use-projects'
+import { setProjectShowIcon, useProjectsWithoutIcon } from '@/hooks/use-project-icons'
 import { useCreateProject, useUpdateProject } from '@/hooks/use-task-mutations'
 import { cn } from '@/lib/cn'
 import { childrenOf, descendantIds, effectiveParent, placeAt, TOP_LEVEL } from '@/lib/project-moves'
@@ -55,6 +57,11 @@ export function ProjectDialog({ project, initialParentId = TOP_LEVEL, returnFocu
   const [title, setTitle] = useState(project?.title ?? '')
   const [hexColor, setHexColor] = useState(project?.hex_color ? `#${project.hex_color.replace(/^#/, '')}` : '')
   const [parent, setParent] = useState(project ? effectiveParent(project, active) : initialParentId)
+  // The icon of an existing project, saved with Save (cross-app semantics 11.3): the folder, or
+  // none, so the name (which may start with an emoji) begins where the icon would be.
+  const qc = useQueryClient()
+  const hadIcon = !useProjectsWithoutIcon().has(project?.id ?? 0)
+  const [showIcon, setShowIcon] = useState(hadIcon)
 
   // Never under itself or its own projects, and never under the Inbox (the sidebar hides the
   // Inbox, so projects inside it would disappear from the tree).
@@ -80,6 +87,7 @@ export function ProjectDialog({ project, initialParentId = TOP_LEVEL, returnFocu
           changes.position = placement.position
         }
       }
+      if (showIcon !== hadIcon) void setProjectShowIcon(qc, project.id, showIcon)
       updateProject.mutate({ id: project.id, changes, original: project }, { onSuccess: onClose })
     } else {
       createProject.mutate(
@@ -182,6 +190,32 @@ export function ProjectDialog({ project, initialParentId = TOP_LEVEL, returnFocu
               )}
             </div>
           </fieldset>
+          {project && (
+            <fieldset>
+              <legend className="mb-1 block text-xs text-[var(--text-secondary)]">Icon</legend>
+              <div role="radiogroup" aria-label="Icon" className="flex gap-1.5">
+                {[true, false].map((folder) => (
+                  <button
+                    key={String(folder)}
+                    type="button"
+                    role="radio"
+                    aria-checked={showIcon === folder}
+                    onClick={() => setShowIcon(folder)}
+                    className={cn(
+                      'inline-flex min-h-7 items-center gap-1.5 rounded-control border px-2.5 text-xs transition-colors duration-fade-fast',
+                      showIcon === folder
+                        ? 'border-accent-blue bg-accent-blue/10 text-text'
+                        : 'border-[var(--border-color)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]',
+                    )}
+                  >
+                    {folder && <FolderOpen aria-hidden="true" className="h-3.5 w-3.5" strokeWidth={1.8} />}
+                    {folder ? 'Folder' : 'None'}
+                  </button>
+                ))}
+              </div>
+              <p className="mt-1 text-xs text-[var(--text-secondary)]">With None the name starts where the icon would be, for a name that begins with an emoji.</p>
+            </fieldset>
+          )}
           {mutation.error && <p className="text-xs text-danger">{mutation.error.message}</p>}
         </div>
 

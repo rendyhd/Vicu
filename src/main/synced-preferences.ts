@@ -28,6 +28,8 @@ import {
   validateSyncedPrefs,
   readWeeklyReviewLast,
   WEEKLY_REVIEW_LAST_KEY,
+  ICON_NONE,
+  projectIdOfIconKey,
   type SyncedPrefsDocument,
   type SyncedPrefsSnapshot,
 } from '../shared/synced-prefs'
@@ -238,6 +240,8 @@ export function isWritablePref(key: unknown, value: unknown): key is string {
     const reminder = readLocationReminderPref(value)
     return reminder !== null && canonicalJson(reminder) === canonicalJson(value)
   }
+  // A project drawn without its folder icon (section 11.3).
+  if (projectIdOfIconKey(key) !== null) return value === null || value === ICON_NONE
   // A shared routine's reminders turned off, or the routine hidden, on this account (section 6.9).
   if (routineIdOfKey(key, ROUTINE_REMINDERS_KEY_PREFIX) !== null) return value === null || value === 'off'
   if (routineIdOfKey(key, ROUTINE_HIDDEN_KEY_PREFIX) !== null) return value === null || value === true

@@ -346,3 +346,13 @@ describe('synced preferences', () => {
   })
 })
 
+describe('project icons (section 11.3)', () => {
+  it('takes "none" or null for a project_icon key and nothing else', async () => {
+    const { isWritablePref } = await loadService()
+    expect(isWritablePref('project_icon.5', 'none')).toBe(true)
+    expect(isWritablePref('project_icon.5', null)).toBe(true)
+    expect(isWritablePref('project_icon.5', 'rocket')).toBe(false)
+    expect(isWritablePref('project_icon.0', 'none')).toBe(false)
+    expect(isWritablePref('project_icon.x', 'none')).toBe(false)
+  })
+})

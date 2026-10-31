@@ -37,6 +37,7 @@ import type { Project } from '@/lib/vikunja-types'
 import { parentOptions } from './ProjectDialog'
 import { TaskOrderMenu } from './TaskOrderMenu'
 import { canAddCategoryAbove, groupOfProject, type ProjectCategory } from '../../../shared/project-categories'
+import { useProjectsWithoutIcon } from '@/hooks/use-project-icons'
 
 interface ParentPickerProps {
   anchorRef: RefObject<HTMLElement | null>
@@ -56,6 +57,7 @@ function ParentPicker({ anchorRef, project, projects, inboxId, onSelect, onClose
     return parentOptions(projects, exclude)
   }, [project.id, projects, inboxId])
 
+  const withoutIcon = useProjectsWithoutIcon()
   const choose = (parentId: number) => {
     if (parentId !== current) onSelect(parentId)
     onClose()
@@ -72,7 +74,7 @@ function ParentPicker({ anchorRef, project, projects, inboxId, onSelect, onClose
       className="flex w-full items-center gap-2 py-1.5 pr-3 text-left text-xs text-[var(--text-primary)] hover:bg-[var(--bg-hover)] focus-visible:bg-[var(--bg-hover)]"
       style={{ paddingLeft: `${depth * 12 + 12}px` }}
     >
-      <FolderOpen aria-hidden="true" className="h-3 w-3 shrink-0" style={{ color: color || 'var(--text-secondary)' }} strokeWidth={1.8} />
+      {!withoutIcon.has(parentId) && <FolderOpen aria-hidden="true" className="h-3 w-3 shrink-0" style={{ color: color || 'var(--text-secondary)' }} strokeWidth={1.8} />}
       <span className="min-w-0 flex-1 truncate">{label}</span>
       {parentId === current && <Check aria-hidden="true" className="h-3.5 w-3.5 shrink-0 text-[var(--accent-blue)]" />}
     </button>

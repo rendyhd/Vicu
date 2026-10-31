@@ -1,6 +1,7 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import { CUSTOM_LIST_ICONS, customListIcon } from '@/lib/custom-list-icons'
+import { List } from 'lucide-react'
 import { ListIconPicker, nextIconIndex } from '../ListIconPicker'
 
 const radios = (html: string) => html.match(/<button[^>]*role="radio"[^>]*>/g) ?? []
@@ -49,5 +50,19 @@ describe('custom list icons', () => {
     expect(customListIcon('favorite')).toBe(CUSTOM_LIST_ICONS[3].icon)
     expect(customListIcon(undefined)).toBeUndefined()
     expect(customListIcon('rocket')).toBeUndefined()
+  })
+})
+
+describe('a list without an icon (cross-app semantics 3)', () => {
+  it('offers None first when asked and draws a None list without an icon', async () => {
+    const { listIconOrNone } = await import('@/lib/custom-list-icons')
+    const html = renderToStaticMarkup(<ListIconPicker value="none" onChange={() => {}} allowNone />)
+    expect(html.indexOf('aria-label="None"')).toBeGreaterThan(-1)
+    expect(html.indexOf('aria-label="None"')).toBeLessThan(html.indexOf('aria-label="Folder"'))
+    expect(html).toMatch(/aria-checked="true"[^>]*aria-label="None"/)
+    expect(renderToStaticMarkup(<ListIconPicker value="none" onChange={() => {}} />)).not.toContain('aria-label="None"')
+    expect(listIconOrNone('none', List)).toBeNull()
+    expect(listIconOrNone('', List)).toBe(List)
+    expect(listIconOrNone('star', List)).not.toBe(List)
   })
 })

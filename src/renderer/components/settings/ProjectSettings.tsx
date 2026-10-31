@@ -26,6 +26,7 @@ import { useCategoryDropActive, useRootDropActive, useRowDropZone } from '@/stor
 import type { AppConfig, Project } from '@/lib/vikunja-types'
 import { TASK_ORDER_KEYS, TASK_ORDER_LABELS, parseTaskOrder } from '../../../shared/task-order'
 import type { ProjectCategory } from '../../../shared/project-categories'
+import { useProjectsWithoutIcon } from '@/hooks/use-project-icons'
 
 const ROOT_ID = 'project-root-settings'
 
@@ -46,6 +47,7 @@ function ProjectRow({ node, depth, inboxId, menuOpenFor, renamingId, onOpenMenu 
   const moreRef = useRef<HTMLButtonElement>(null)
   const isInbox = node.id === inboxId
   const color = normalizeHex(node.hex_color)
+  const showIcon = !useProjectsWithoutIcon().has(node.id)
   const dndId = `settings-project-${node.id}`
   const menuOpen = menuOpenFor === node.id
   const indent = 12 + depth * 20
@@ -90,7 +92,7 @@ function ProjectRow({ node, depth, inboxId, menuOpenFor, renamingId, onOpenMenu 
         />
         {renamingId === node.id ? (
           <div className="flex min-w-0 flex-1 items-center gap-2 py-1.5">
-            <Folder aria-hidden="true" className="h-4 w-4 shrink-0" style={{ color: color || 'var(--text-secondary)' }} />
+            {showIcon && <Folder aria-hidden="true" className="h-4 w-4 shrink-0" style={{ color: color || 'var(--text-secondary)' }} />}
             <ProjectRenameInput project={node} surface="settings" className="text-sm" />
           </div>
         ) : (
@@ -117,7 +119,7 @@ function ProjectRow({ node, depth, inboxId, menuOpenFor, renamingId, onOpenMenu 
             }}
             className="flex min-h-10 min-w-0 flex-1 cursor-default items-center gap-2"
           >
-            <Folder aria-hidden="true" className="h-4 w-4 shrink-0" style={{ color: color || 'var(--text-secondary)' }} />
+            {showIcon && <Folder aria-hidden="true" className="h-4 w-4 shrink-0" style={{ color: color || 'var(--text-secondary)' }} />}
             <span className="min-w-0 flex-1 truncate text-sm text-[var(--text-primary)]">{node.title}</span>
             {isInbox && (
               <span className="vicu-chip rounded-chip bg-[var(--bg-secondary)] px-1.5 py-0.5 text-caption text-[var(--text-secondary)]">Inbox</span>
@@ -230,6 +232,7 @@ function ArchivedRow({
 }) {
   const moreRef = useRef<HTMLButtonElement>(null)
   const restoreRef = useRef<HTMLButtonElement>(null)
+  const showIcon = !useProjectsWithoutIcon().has(node.id)
   return (
     <>
       <div
@@ -240,7 +243,7 @@ function ArchivedRow({
           onOpenMenu(node, { point: { x: event.clientX, y: event.clientY } }, restoreRef.current)
         }}
       >
-        <Folder aria-hidden="true" className="h-4 w-4 shrink-0 opacity-60" style={{ color: normalizeHex(node.hex_color) || 'var(--text-secondary)' }} />
+        {showIcon && <Folder aria-hidden="true" className="h-4 w-4 shrink-0 opacity-60" style={{ color: normalizeHex(node.hex_color) || 'var(--text-secondary)' }} />}
         <span className="min-w-0 flex-1 truncate text-sm text-[var(--text-secondary)]">{node.title}</span>
         <Button ref={restoreRef} variant="quiet" onClick={onRestore} aria-label={`Restore ${node.title}`}>
           <RotateCcw aria-hidden="true" className="h-3.5 w-3.5" />

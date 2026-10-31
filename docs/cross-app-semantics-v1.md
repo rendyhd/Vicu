@@ -97,6 +97,11 @@ is and is no condition, like a `due_date_filter` from a newer app.
 Both apps' protocol normalizers must **preserve unknown fields** in list values and filters
 from now on, so a future field added by one app survives a round trip through the other.
 
+A list's `icon` is a key of the shared icon set (`folder`, `star`, ... `palette`; empty or a key
+an app does not know is drawn as the filter icon), or `none`: the list is drawn without an icon,
+and its name starts where the icon would be (a name may begin with an emoji instead). Places that
+need an icon whatever the list says (a bottom-bar slot, which has its own) are not affected.
+
 ### 3.1 Date windows (`due_date_filter`)
 
 With today = T (local date):
@@ -989,6 +994,7 @@ A key is added here, in both repos, in the release that starts writing it.
 | `routine_hidden.<routineId>` | `true`: that shared routine is hidden on this account; or `null`. Any other value acts as the default and is kept; section 6.9 | shown |
 | `category.<categoryId>` | a project category, `{"name", "order"}`, or `null` (deleted); section 13 | none |
 | `category.project.<projectId>` | the id of the category a top-level project is in, or `null`; section 13 | no category |
+| `project_icon.<projectId>` | `"none"`: the project is drawn without its folder icon and its name starts where the icon would be; or `null`. Any other value acts as the default and is kept | the folder |
 | `weekly_review.last` | the local date the last weekly review was finished, `"YYYY-MM-DD"`; section 14.7 | never done |
 
 ### 11.4 The Inbox

@@ -18,6 +18,7 @@ import { ProjectTreeItem, type OpenProjectMenu } from './ProjectTreeItem'
 import { CategoryHeader, type OpenCategoryMenu } from './CategoryHeader'
 import type { Project } from '@/lib/vikunja-types'
 import type { ProjectCategory } from '../../../shared/project-categories'
+import { useProjectsWithoutIcon } from '@/hooks/use-project-icons'
 
 interface MenuState {
   project: Project
@@ -105,6 +106,7 @@ function ArchivedRow({
   const rowRef = useRef<HTMLButtonElement>(null)
   const moreRef = useRef<HTMLButtonElement>(null)
   const color = normalizeHex(project.hex_color)
+  const showIcon = !useProjectsWithoutIcon().has(project.id)
   const openMenuAtButton = () => {
     if (moreRef.current) onOpenMenu(project, { anchor: moreRef.current }, rowRef.current)
   }
@@ -131,7 +133,7 @@ function ArchivedRow({
         }}
         className="flex h-full min-w-0 flex-1 items-center text-left"
       >
-        <FolderOpen aria-hidden="true" className="mr-2 h-3.5 w-3.5 shrink-0 opacity-60" style={{ color: color || 'var(--text-secondary)' }} strokeWidth={1.8} />
+        {showIcon && <FolderOpen aria-hidden="true" className="mr-2 h-3.5 w-3.5 shrink-0 opacity-60" style={{ color: color || 'var(--text-secondary)' }} strokeWidth={1.8} />}
         <span className="min-w-0 flex-1 truncate text-xs text-[var(--text-secondary)]">
           {project.title}
           <span className="sr-only"> (archived)</span>

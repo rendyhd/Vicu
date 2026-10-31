@@ -1,11 +1,13 @@
 import { useRef } from 'react'
 import { cn } from '@/lib/cn'
-import { CUSTOM_LIST_ICONS } from '@/lib/custom-list-icons'
+import { CUSTOM_LIST_ICONS, NONE_ICON_OPTION } from '@/lib/custom-list-icons'
 
 interface ListIconPickerProps {
   value: string
   onChange: (key: string) => void
   labelledBy?: string
+  /** Offers None first: the name alone, with no icon (cross-app semantics 3). */
+  allowNone?: boolean
 }
 
 /** The step an arrow, Home or End key takes through [count] icons from [index], or null for another key. */
@@ -31,22 +33,23 @@ export function nextIconIndex(key: string, index: number, count: number): number
  * the chosen icon (the first one when the stored key is unknown); the arrows move and choose.
  * A key this version does not offer (from a newer app) selects nothing and is kept until one is clicked.
  */
-export function ListIconPicker({ value, onChange, labelledBy }: ListIconPickerProps) {
+export function ListIconPicker({ value, onChange, labelledBy, allowNone = false }: ListIconPickerProps) {
   const buttons = useRef<(HTMLButtonElement | null)[]>([])
-  const selectedIndex = CUSTOM_LIST_ICONS.findIndex((option) => option.key === value)
+  const icons = allowNone ? [NONE_ICON_OPTION, ...CUSTOM_LIST_ICONS] : CUSTOM_LIST_ICONS
+  const selectedIndex = icons.findIndex((option) => option.key === value)
   const tabStop = selectedIndex >= 0 ? selectedIndex : 0
 
   const handleKeyDown = (event: React.KeyboardEvent, index: number) => {
-    const next = nextIconIndex(event.key, index, CUSTOM_LIST_ICONS.length)
+    const next = nextIconIndex(event.key, index, icons.length)
     if (next === null) return
     event.preventDefault()
-    onChange(CUSTOM_LIST_ICONS[next].key)
+    onChange(icons[next].key)
     buttons.current[next]?.focus()
   }
 
   return (
     <div role="radiogroup" aria-labelledby={labelledBy} className="flex flex-wrap gap-1.5">
-      {CUSTOM_LIST_ICONS.map((option, index) => {
+      {icons.map((option, index) => {
         const selected = index === selectedIndex
         const Icon = option.icon
         return (
