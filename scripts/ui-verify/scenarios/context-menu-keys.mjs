@@ -95,8 +95,8 @@ export default async function run(h) {
     const rightEdges = [...new Set(items.filter((i) => i.querySelector('kbd')).map((i) => Math.round(i.querySelector('kbd').getBoundingClientRect().right)))]
     return { hints, labelXs, iconMarks, rightEdges }
   })
-  await h.assert('only Set Today, Copy, Complete and Delete show a shortcut', {
-    ok: layout.hints.map((x) => x[0]).join('|') === 'Set Today|Copy task|Complete task|Delete task',
+  await h.assert('only Set Today, Copy, Duplicate, Complete and Delete show a shortcut', {
+    ok: layout.hints.map((x) => x[0]).join('|') === 'Set Today|Copy task|Duplicate task|Complete task|Delete task',
     detail: JSON.stringify(layout.hints),
   })
   await h.assert('every item has the icon column, so all labels start at one x', { ok: layout.iconMarks === 0 && layout.labelXs.length === 1, detail: JSON.stringify(layout) })

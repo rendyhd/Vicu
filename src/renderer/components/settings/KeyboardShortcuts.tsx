@@ -13,6 +13,8 @@ const shortcuts = [
     { keys: [mod, 'V'], description: 'New task from clipboard' },
     { keys: [mod, 'Enter'], description: 'Save and close task' },
     { keys: [mod, 'K'], description: 'Complete selected task' },
+    { keys: [mod, 'D'], description: 'Duplicate selected task' },
+    { keys: [mod, 'C'], description: 'Copy selected task titles' },
   ]},
   { category: 'Scheduling', items: [
     { keys: [mod, 'T'], description: 'Set due date to today' },

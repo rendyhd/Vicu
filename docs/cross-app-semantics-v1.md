@@ -1338,3 +1338,28 @@ Each item opens its session. The starters of `ai-assistant-v1.md` section 5.7 fo
 `guided.health` each project's facts and line, `guided.weekly` each step's count (and the `done`
 and `upcoming` ids), `guided.agenda` the items for a `weekly_review.last`, and `guided.ago` the
 phrases.
+
+---
+
+## 15. Duplicating a task
+
+Duplicate (the editor's menu, a task's context menu on the desktop, the selection's menu) makes a
+new task from an existing one. Both apps copy the same things, so a copy made on either device is
+the same task.
+
+| Copied | Not copied |
+|---|---|
+| title (unchanged), description, due date, start date, priority, repeat (`repeat_after`, `repeat_mode`), reminders (absolute and relative), labels | done and `done_at` (a copy is always open), comments, attachments, relations other than subtasks, a location reminder (11.7), position |
+| assignees, on a project that is shared (9.1) | |
+| subtasks, duplicated the same way as open subtasks of the copy, nested ones included | |
+
+- The copy goes to the same project, where any new task goes: the end of the project's order.
+- It is created through each app's ordinary create, so it works offline; labels, assignees and
+  subtasks follow the create the way they follow any new task. An app that links a subtask only
+  once both tasks are on the server (the desktop) makes an offline copy without its subtasks and
+  says so.
+- Several selected tasks are each duplicated once; a selected subtask whose parent is selected too
+  is only copied with that parent.
+- Hidden tasks (section 10) are never shown, so they cannot be duplicated.
+- **Copy titles** (the selection's menu) is something else: it puts the titles of the selected
+  tasks on the clipboard, one per line, for pasting outside Vicu.

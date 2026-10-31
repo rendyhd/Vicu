@@ -232,7 +232,7 @@ describe('the task context menu', () => {
   it('shows priorities as radios with the priority mark and only real shortcuts', () => {
     expect(source).toContain('MenuRadioItem')
     expect(source).toContain('PriorityMark')
-    expect([...source.matchAll(/hint\('([^']+)'\)/g)].map((m) => m[1]).sort()).toEqual(['Alt+Shift+↑', 'Alt+Shift+↓', 'Delete', 'Mod+C', 'Mod+K', 'Mod+T'])
+    expect([...source.matchAll(/hint\('([^']+)'\)/g)].map((m) => m[1]).sort()).toEqual(['Alt+Shift+↑', 'Alt+Shift+↓', 'Delete', 'Mod+C', 'Mod+D', 'Mod+K', 'Mod+T'])
   })
 })
 

@@ -8,6 +8,7 @@ import {
   CalendarX,
   CheckCircle2,
   Copy,
+  CopyPlus,
   FlagOff,
   Folder,
   FolderInput,
@@ -23,6 +24,7 @@ import { isNullDate } from '@/lib/date-utils'
 import { normalizeHex, NULL_DATE } from '@/lib/constants'
 import { useAppConfig } from '@/hooks/use-app-config'
 import { useTaskActions } from '@/hooks/use-task-actions'
+import { useDuplicateTasks } from '@/hooks/use-duplicate-tasks'
 import { canStepTask, useTaskStep } from '@/hooks/use-task-step'
 import { useProjects } from '@/hooks/use-projects'
 import { useLabels } from '@/hooks/use-labels'
@@ -76,6 +78,8 @@ export function TaskContextMenu({ fallbackTask, x, y, reorderable = false, onClo
 
   const [sub, setSub] = useState<SubMenu>(null)
   const stepTask = useTaskStep()
+  const duplicate = useDuplicateTasks()
+  const clearSelection = useSelectionStore((s) => s.clearSelection)
 
   // A picker closes the menu too once something was chosen. When the browser dismissed the picker
   // (Escape, or a press that landed elsewhere) only the picker closes: the press may be on a menu
@@ -273,6 +277,16 @@ export function TaskContextMenu({ fallbackTask, x, y, reorderable = false, onClo
       {/* Bulk-friendly actions */}
       <MenuItem icon={<Copy />} shortcut={hint('Mod+C')} onSelect={actions.copyAll}>
         {multi ? 'Copy tasks' : 'Copy task'}
+      </MenuItem>
+      <MenuItem
+        icon={<CopyPlus />}
+        shortcut={hint('Mod+D')}
+        onSelect={() => {
+          void duplicate(tasks)
+          clearSelection()
+        }}
+      >
+        {multi ? 'Duplicate tasks' : 'Duplicate task'}
       </MenuItem>
       {anyNotDone && (
         <MenuItem icon={<CheckCircle2 />} shortcut={hint('Mod+K')} onSelect={actions.completeAll}>
