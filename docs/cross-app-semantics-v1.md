@@ -8,7 +8,7 @@ Test vectors live in `test-fixtures/` in both repos and must stay byte-identical
 
 | Fixture | Covers |
 |---|---|
-| `cross-app-semantics-v1.json` | due-date rules, smart lists, weeks, custom-list windows, review math, completion hold, date display, collaboration, hidden tasks, synced preferences, task order, project categories, guided organizing |
+| `cross-app-semantics-v1.json` | due-date rules, smart lists, weeks, custom-list windows, review math, completion hold, date display, collaboration, hidden tasks, synced preferences, task order, project categories, guided organizing, routines on Today |
 | `nlp-corpus-v1.json` | quick-add parsing |
 | `routine-archive-v1.json` | routine merge, pruning and archive rules |
 | `design-tokens-v1.json` | colour roles, type, radii and motion (see `design-system-v1.md`) |
@@ -514,6 +514,27 @@ Apps never create or share a project for it.
 - **Vectors.** The `routine-archive-v1.json` blocks `writeKeep` (the same-state rule of 6.8),
   `sharedVisibility` (which carriers and archive parts an app reads) and `loggedBy` (when a name is
   shown); the placeholder rule is in `merge`.
+
+### 6.10 Routines on Today
+
+Today lists the routines that still have an open occurrence today, one row per routine (not one
+per time), so a day with many routines stays short:
+
+- A routine's row stands for its earliest open occurrence of the day, by time. It shows that time
+  and, when the routine has more than one occurrence today, how many of them are finished
+  (completed or skipped) out of all, as `1/3`. Checking or skipping the row acts on that
+  occurrence; the row then stands for the next open one.
+- A row is **due now** when its time is at most `soonMinutes` (120) after the current local time,
+  or has passed. An `after_completion` occurrence carried to today from an earlier date is due now.
+- Rows are ordered by time, then by name.
+- The section shows at most `limit` due-now rows: a device setting of 1, 2, 3, 5 or all, 2 unless
+  changed. The other rows (due now past the limit, and not due now) are one line: `{n} later today`
+  when none of them is due now, else `Show {n} more`. The line opens them in place, in the same
+  order, and becomes `Show less`; leaving Today closes it again.
+- The header (`Routines` with the finished and scheduled occurrences of the day, as before) folds
+  the section away: folded, only the header shows. Folded or not is kept per device and never
+  syncs, like the other folding sections (13.3).
+- The `todayRoutines` vectors of the fixture pin the rows, their order, the limit and the line.
 
 ---
 

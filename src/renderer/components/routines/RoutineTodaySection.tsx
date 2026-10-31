@@ -1,5 +1,12 @@
-import { Bell, Check, Clock3, SkipForward, Undo2 } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
+import { Bell, Check, ChevronRight, Clock3, SkipForward, Undo2 } from 'lucide-react'
 import { useRoutines } from '@/hooks/use-routines'
+import { APP_CONFIG_QUERY_KEY, useAppConfig } from '@/hooks/use-app-config'
+import { api } from '@/lib/api'
+import type { AppConfig } from '@/lib/vikunja-types'
+import { useDayKey } from '@/stores/day-store'
+import { planTodayRoutines, todayRoutinesLimit } from '../../../shared/today-routines'
 import { isFinished, type OccurrenceStatus, type RoutineOccurrence } from '@/lib/routines'
 import type { Task } from '@/lib/vikunja-types'
 import { cn } from '@/lib/cn'
@@ -14,10 +21,13 @@ function RoutineCheck({
   occurrence,
   disabled,
   onStatus,
+  progress = null,
 }: {
   occurrence: RoutineOccurrence<Task>
   disabled: boolean
   onStatus: (status: OccurrenceStatus) => void
+  /** How far the routine is today, as `1/3`, when it has more than one time (Today, semantics 6.10). */
+  progress?: string | null
 }) {
   const dateFormat = useDateFormat()
   const completed = occurrence.status === 'COMPLETED'
@@ -62,6 +72,7 @@ function RoutineCheck({
             {formatMinutesOfDay(occurrence.slot.reminderMinutes, dateFormat)}
           </span>
           {occurrence.slot.reminderEnabled && <Bell className="h-3 w-3" />}
+          {progress && <span className="tabular-nums">{progress}</span>}
           {occurrence.status === 'NOT_LOGGED' && <span>Not logged</span>}
           {skipped && !doneBy && <span>Skipped</span>}
           {doneBy && <span>{doneBy}</span>}
@@ -82,24 +93,89 @@ function RoutineCheck({
   )
 }
 
+/** The local time of day in minutes, read again every 30 seconds while `active`. */
+function useMinutesNow(active: boolean): number {
+  const read = () => {
+    const now = new Date()
+    return now.getHours() * 60 + now.getMinutes()
+  }
+  const [minutes, setMinutes] = useState(read)
+  useEffect(() => {
+    if (!active) return
+    setMinutes(read())
+    const timer = setInterval(() => setMinutes(read()), 30_000)
+    return () => clearInterval(timer)
+  }, [active])
+  return minutes
+}
+
+/** Today's routine limit, and whether the section is folded to its header (kept in this device's config). */
+function useTodayRoutinesPrefs() {
+  const qc = useQueryClient()
+  const { data: config } = useAppConfig()
+  const setFolded = useCallback(
+    (folded: boolean) => {
+      const current = qc.getQueryData<AppConfig | null>(APP_CONFIG_QUERY_KEY)
+      if (current) qc.setQueryData<AppConfig>(APP_CONFIG_QUERY_KEY, { ...current, routines_today_folded: folded })
+      void api.saveConfigPatch({ routines_today_folded: folded })
+    },
+    [qc],
+  )
+  return { folded: config?.routines_today_folded === true, limit: todayRoutinesLimit(config?.routines_today_limit), setFolded }
+}
+
 export function RoutineTodaySection({
   showEmpty = false,
-  hideFinished = false,
+  onToday = false,
 }: {
   showEmpty?: boolean
-  /** Leave out what is done for the day (completed or skipped); the Today view lists only what is left. */
-  hideFinished?: boolean
+  /**
+   * The Today view (cross-app semantics 6.10): one row per routine for its next open time, the ones
+   * due now up to the limit, the rest behind one line that opens until Today is left; the header folds.
+   */
+  onToday?: boolean
 }) {
   const routines = useRoutines()
   const completed = routines.today.filter((occurrence) => occurrence.status === 'COMPLETED').length
   const total = routines.today.length
-  const shown = hideFinished ? routines.today.filter((occurrence) => !isFinished(occurrence.status)) : routines.today
+  const { folded, limit, setFolded } = useTodayRoutinesPrefs()
+  const nowMinutes = useMinutesNow(onToday)
+  const dayKey = useDayKey()
+  const [opened, setOpened] = useState(false)
+  const plan = useMemo(
+    () => planTodayRoutines(routines.today, nowMinutes, limit, (occurrence) => ({
+      routineId: occurrence.carrier.payload.definition.id,
+      name: occurrence.carrier.payload.definition.name,
+      minutes: occurrence.slot.reminderMinutes,
+      finished: isFinished(occurrence.status),
+      carried: occurrence.scheduledDate < dayKey,
+    })),
+    [routines.today, nowMinutes, limit, dayKey],
+  )
+  const rows = !onToday
+    ? routines.today.map((occurrence) => ({ occurrence, progress: null as string | null }))
+    : folded ? [] : (opened ? plan.rows : plan.visible).map((row) => ({ occurrence: row.item, progress: row.progress }))
+  const line = onToday && !folded ? plan.lineText : null
 
-  if (!routines.isLoading && shown.length === 0 && !showEmpty) return null
+  if (!routines.isLoading && (onToday ? plan.rows.length === 0 : total === 0) && !showEmpty) return null
 
   return (
     <section className="border-b border-[var(--border-color)] pb-2">
       <ListSectionHeader level={1} title="Routines" tone="routines" className="gap-3">
+        {onToday && (
+          <button
+            type="button"
+            aria-label={folded ? 'Expand routines' : 'Collapse routines'}
+            aria-expanded={!folded}
+            onClick={() => setFolded(!folded)}
+            className="-ml-2 flex h-6 w-6 shrink-0 items-center justify-center rounded-control text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
+          >
+            <ChevronRight
+              className={cn('h-3.5 w-3.5 transition-transform duration-fade-fast motion-reduce:transition-none', !folded && 'rotate-90')}
+              strokeWidth={2}
+            />
+          </button>
+        )}
         {total > 0 && (
           <>
             <div className="h-1.5 min-w-16 flex-1 overflow-hidden rounded-full bg-[var(--bg-tertiary)]">
@@ -119,10 +195,11 @@ export function RoutineTodaySection({
       {!routines.isLoading && total === 0 && (
         <div className="px-6 py-3 text-xs text-[var(--text-secondary)]">Nothing scheduled for today.</div>
       )}
-      {shown.map((occurrence) => (
+      {rows.map(({ occurrence, progress }) => (
         <RoutineCheck
-          key={occurrence.key}
+          key={onToday ? occurrence.carrier.payload.definition.id : occurrence.key}
           occurrence={occurrence}
+          progress={progress}
           disabled={routines.isMutating}
           onStatus={(status) => routines.setStatus.mutate({
             carrier: occurrence.carrier,
@@ -132,6 +209,16 @@ export function RoutineTodaySection({
           })}
         />
       ))}
+      {line && (
+        <button
+          type="button"
+          aria-expanded={opened}
+          onClick={() => setOpened(!opened)}
+          className="ml-4 mt-1 flex h-7 items-center rounded-control px-2 text-meta font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
+        >
+          {opened ? 'Show less' : line}
+        </button>
+      )}
     </section>
   )
 }

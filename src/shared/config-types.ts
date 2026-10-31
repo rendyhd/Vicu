@@ -10,6 +10,7 @@
 
 /** The sort keys a custom list may use, in the order the editor offers them (same as Android). */
 import type { SyncedPrefsDocument } from './synced-prefs'
+import type { TodayRoutinesLimit } from './today-routines'
 
 export const CUSTOM_LIST_SORT_FIELDS = [
   'due_date',
@@ -326,6 +327,10 @@ export interface AppConfig {
   routines_enabled?: boolean
   /** Whether Today shows the routines still open today. Missing means on. */
   routines_in_today?: boolean
+  /** How many due-now routines Today shows (cross-app semantics 6.10). Missing means 2. */
+  routines_today_limit?: TodayRoutinesLimit
+  /** Today's routine section is folded to its header (per device). */
+  routines_today_folded?: boolean
 }
 
 // --- Defaults every reader shares -------------------------------------------------------------
