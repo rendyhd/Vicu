@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { SpeechEngine, SpeechSession } from '../ai/speech/engine'
 import type { NativeHandle, SpeechNative } from '../ai/speech/native'
 import type { SpeechEvent } from '../../shared/ai/types'
@@ -37,6 +37,11 @@ function fakeNative(transcribeMs: number[]) {
 function audio(seconds: number, loud: boolean): Float32Array {
   return new Float32Array(Math.round(seconds * 16000)).fill(loud ? 0.5 : 0)
 }
+
+// Waits for the session instead of a fixed time: each fake transcription waits on a timer, which
+// Windows runs on a ~15 ms tick, so 23 phrases took 300 to 330 ms and a fixed 300 ms wait failed
+// about one run in three (more under load).
+const SESSION_WAIT = { timeout: 8000, interval: 5 }
 
 describe('speech session', () => {
   it('transcribes finished phrases in order, even when a later one is faster, and joins them', async () => {
@@ -103,12 +108,11 @@ describe('speech session', () => {
     session.start()
     const minute = audio(60, true)
     for (let i = 0; i < 11; i++) session.addAudio(minute)
-    await new Promise((resolve) => setTimeout(resolve, 300))
-    expect(events.some((e) => e.type === 'turn')).toBe(true)
+    await vi.waitFor(() => expect(events.some((e) => e.type === 'turn')).toBe(true), SESSION_WAIT)
     expect(events.some((e) => e.type === 'final')).toBe(false)
     session.cancel()
     await engine.closeAll()
-  })
+  }, 10000)
 
   it('stops by itself after 600 s', async () => {
     const { native } = fakeNative([])
@@ -118,8 +122,7 @@ describe('speech session', () => {
     session.start()
     const minute = audio(60, false)
     for (let i = 0; i < 11; i++) session.addAudio(minute)
-    await new Promise((resolve) => setTimeout(resolve, 10))
-    expect(events.at(-1)?.type).toBe('final')
+    await vi.waitFor(() => expect(events.at(-1)?.type).toBe('final'), SESSION_WAIT)
     await engine.closeAll()
-  })
+  }, 10000)
 })
