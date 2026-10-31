@@ -21,6 +21,7 @@ import { useProjectProgress } from '@/hooks/use-project-progress'
 import { openTaskCountLabel, shownOpenCount } from '@/lib/project-progress'
 import { useRowDropZone } from '@/stores/project-drop-store'
 import type { ProjectTreeNode } from '@/hooks/use-projects'
+import { useProjectsWithoutIcon } from '@/hooks/use-project-icons'
 
 /** How the tree asks for the project menu: at the pointer (right-click) or at the … button. */
 export type OpenProjectMenu = (
@@ -75,6 +76,8 @@ export function ProjectTreeItem(props: ProjectTreeItemProps) {
   const hasChildren = node.children.length > 0
   const expanded = hasChildren && !collapsed.has(node.id)
   const color = normalizeHex(node.hex_color)
+  // Without its icon the name starts where the folder would be (cross-app semantics 11.3).
+  const showIcon = !useProjectsWithoutIcon().has(node.id)
   const progress = useProjectProgress(node.id, openCounts, showProgress)
   const openCount = showCount ? shownOpenCount(openCounts, node.id) : null
   const renaming = renamingId === node.id
@@ -149,7 +152,7 @@ export function ProjectTreeItem(props: ProjectTreeItemProps) {
 
         {renaming ? (
           <div className="flex h-full min-w-0 flex-1 items-center">
-            <FolderOpen aria-hidden="true" className="mr-2 h-3.5 w-3.5 shrink-0" style={{ color: color || 'var(--text-secondary)' }} strokeWidth={1.8} />
+            {showIcon && <FolderOpen aria-hidden="true" className="mr-2 h-3.5 w-3.5 shrink-0" style={{ color: color || 'var(--text-secondary)' }} strokeWidth={1.8} />}
             <ProjectRenameInput project={node} surface="sidebar" className="text-xs" />
           </div>
         ) : (
@@ -175,12 +178,14 @@ export function ProjectTreeItem(props: ProjectTreeItemProps) {
               else if (event.key === 'ArrowLeft' && expanded) onToggleCollapsed(node.id, true)
             }}
           >
-            <FolderOpen
-              aria-hidden="true"
-              className="mr-2 h-3.5 w-3.5 shrink-0"
-              style={{ color: color || 'var(--text-secondary)' }}
-              strokeWidth={1.8}
-            />
+            {showIcon && (
+              <FolderOpen
+                aria-hidden="true"
+                className="mr-2 h-3.5 w-3.5 shrink-0"
+                style={{ color: color || 'var(--text-secondary)' }}
+                strokeWidth={1.8}
+              />
+            )}
             <span className="min-w-0 flex-1 truncate text-xs">{node.title}</span>
             <SharedMark projectId={node.id} />
             {openCount !== null && <span className="sr-only">, {openTaskCountLabel(openCount)}</span>}

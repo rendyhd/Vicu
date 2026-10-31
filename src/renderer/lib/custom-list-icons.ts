@@ -1,4 +1,5 @@
 import {
+  Ban,
   Bookmark, Briefcase, Code2, Dumbbell, Flag, Folder, GraduationCap, Heart, Home, Lightbulb,
   ListFilter, Palette, PawPrint, ShoppingCart, Sparkles, Star, Wrench,
 } from 'lucide-react'
@@ -38,4 +39,16 @@ export const CUSTOM_LIST_ICONS: readonly CustomListIcon[] = [
 /** The icon for a stored key, or undefined for none or one this version does not know. */
 export function customListIcon(key: string | undefined): LucideIcon | undefined {
   return CUSTOM_LIST_ICONS.find((option) => option.key === key)?.icon
+}
+
+/** The key of a list drawn without an icon (cross-app semantics 3): its name starts where the icon would be. */
+export const LIST_ICON_NONE = 'none'
+
+/** The None choice of the icon picker. */
+export const NONE_ICON_OPTION = { key: LIST_ICON_NONE, label: 'None', icon: Ban }
+
+/** What a list is drawn with: its icon, `fallback` for an empty or unknown key, or null for None. */
+export function listIconOrNone(key: string | undefined, fallback: LucideIcon): LucideIcon | null {
+  if (key === LIST_ICON_NONE) return null
+  return customListIcon(key) ?? fallback
 }

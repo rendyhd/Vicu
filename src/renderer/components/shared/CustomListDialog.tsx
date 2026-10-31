@@ -193,7 +193,7 @@ export function CustomListDialog({ open, list, onSave, onClose }: CustomListDial
 
         <div>
           <span id={`${titleId}-icon`} className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">Icon</span>
-          <ListIconPicker value={icon} onChange={setIcon} labelledBy={`${titleId}-icon`} />
+          <ListIconPicker value={icon} onChange={setIcon} labelledBy={`${titleId}-icon`} allowNone />
         </div>
 
         {/* Sort + Order */}

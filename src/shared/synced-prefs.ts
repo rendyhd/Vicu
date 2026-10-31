@@ -170,6 +170,35 @@ export function readWeeklyReviewLast(value: unknown): string | null {
   return date.getUTCFullYear() === y && date.getUTCMonth() === m - 1 && date.getUTCDate() === d ? value : null
 }
 
+// A project drawn without its folder icon (section 11.3): `project_icon.<id>` is "none"; no entry
+// is the folder, and any other value acts as the folder and is kept.
+
+export const PROJECT_ICON_KEY_PREFIX = 'project_icon.'
+/** The icon value of a project, and the icon key of a custom list, drawn without an icon. */
+export const ICON_NONE = 'none'
+
+export function projectIconKey(projectId: number): string {
+  return `${PROJECT_ICON_KEY_PREFIX}${projectId}`
+}
+
+/** The project id of a `project_icon.<id>` key (above 0), or null. */
+export function projectIdOfIconKey(key: string): number | null {
+  const match = /^project_icon\.([1-9]\d*)$/.exec(key)
+  if (!match) return null
+  const id = Number(match[1])
+  return Number.isSafeInteger(id) ? id : null
+}
+
+/** The projects whose synced icon is "none". */
+export function projectsWithoutIcon(values: Readonly<Record<string, unknown>>): Set<number> {
+  const ids = new Set<number>()
+  for (const [key, value] of Object.entries(values)) {
+    const id = projectIdOfIconKey(key)
+    if (id !== null && value === ICON_NONE) ids.add(id)
+  }
+  return ids
+}
+
 // Places and location reminders (section 11.7): a place's id and name, and a task's reminder at
 // it. Where a place is never syncs; only phones know it, and only phones remind.
 

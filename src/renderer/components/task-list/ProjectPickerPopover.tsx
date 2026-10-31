@@ -6,6 +6,7 @@ import { useProjectCategories } from '@/hooks/use-project-categories'
 import { groupsWithInbox } from '@/lib/project-groups'
 import type { ProjectTreeNode } from '@/hooks/use-projects'
 import { Popover, type PopoverCloseReason } from '../overlay/Popover'
+import { useProjectsWithoutIcon } from '@/hooks/use-project-icons'
 
 interface ProjectPickerPopoverProps {
   anchorRef: RefObject<HTMLElement | null>
@@ -50,6 +51,7 @@ export function ProjectPickerPopover({ anchorRef, placement = 'bottom-start', cu
 
   const empty = groups.every((group) => group.nodes.length === 0)
 
+  const withoutIcon = useProjectsWithoutIcon()
   const options = (nodes: ProjectTreeNode[]) =>
     flattenTree(nodes).map(({ node, depth }) => (
       <button
@@ -62,11 +64,13 @@ export function ProjectPickerPopover({ anchorRef, placement = 'bottom-start', cu
         className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-[var(--text-primary)] hover:bg-[var(--bg-hover)]"
         style={{ paddingLeft: `${depth * 12 + 12}px` }}
       >
-        <FolderOpen
-          className="h-3 w-3 shrink-0"
-          style={{ color: node.hex_color || 'var(--text-secondary)' }}
-          strokeWidth={1.8}
-        />
+        {!withoutIcon.has(node.id) && (
+          <FolderOpen
+            className="h-3 w-3 shrink-0"
+            style={{ color: node.hex_color || 'var(--text-secondary)' }}
+            strokeWidth={1.8}
+          />
+        )}
         <span className="min-w-0 flex-1 truncate">{node.title}</span>
         {node.id === currentProjectId && (
           <Check className="h-3.5 w-3.5 shrink-0 text-[var(--accent-blue)]" />

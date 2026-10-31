@@ -6,7 +6,7 @@ import { useSortable, SortableContext, verticalListSortingStrategy, arrayMove } 
 import { useDndMonitor } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
 import { cn } from '@/lib/cn'
-import { customListIcon } from '@/lib/custom-list-icons'
+import { listIconOrNone } from '@/lib/custom-list-icons'
 import { CustomListDialog } from '@/components/shared/CustomListDialog'
 import { Menu, MenuItem } from '@/components/overlay/Menu'
 import type { CustomList } from '@/lib/vikunja-types'
@@ -30,7 +30,7 @@ function CustomListItem({
   onNavigate: () => void
   onContextMenu: (e: React.MouseEvent) => void
 }) {
-  const ItemIcon = customListIcon(item.icon) ?? List
+  const ItemIcon = listIconOrNone(item.icon, List)
   const {
     attributes,
     listeners,
@@ -68,7 +68,7 @@ function CustomListItem({
       )}
     >
       {isActive && <SelectionPill />}
-      <ItemIcon className="h-4 w-4 shrink-0 text-[var(--text-secondary)]" strokeWidth={1.8} />
+      {ItemIcon && <ItemIcon className="h-4 w-4 shrink-0 text-[var(--text-secondary)]" strokeWidth={1.8} />}
       <span className="flex-1 truncate text-left">{item.name}</span>
     </button>
   )
