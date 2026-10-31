@@ -18,6 +18,7 @@ import {
   Tag,
   Trash2,
   Sparkles,
+  UserPlus,
 } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { isNullDate } from '@/lib/date-utils'
@@ -33,6 +34,9 @@ import { resolveSelectedTasks } from '@/lib/task-selection'
 import type { Task } from '@/lib/vikunja-types'
 import { DatePickerPopover } from './DatePickerPopover'
 import { ProjectPickerPopover } from './ProjectPickerPopover'
+import { BulkAssignPopover } from './BulkAssignPopover'
+import { useProjectAccessMap } from '@/hooks/use-project-access'
+import { canAssignSelection } from '@/lib/bulk-assign'
 import { LabelPickerPopover } from './LabelPickerPopover'
 import { PRIORITY_OPTIONS } from './PriorityPickerPopover'
 import { PriorityMark } from '../shared/PriorityMark'
@@ -51,11 +55,13 @@ interface TaskContextMenuProps {
   onClose: () => void
 }
 
-type SubMenu = 'date' | 'project' | 'label' | null
+type SubMenu = 'date' | 'project' | 'label' | 'assign' | null
 
 export function TaskContextMenu({ fallbackTask, x, y, reorderable = false, onClose }: TaskContextMenuProps) {
   const scheduleRef = useRef<HTMLButtonElement>(null)
   const projectRef = useRef<HTMLButtonElement>(null)
+  const assignRef = useRef<HTMLButtonElement>(null)
+  const access = useProjectAccessMap()
   const labelRef = useRef<HTMLButtonElement>(null)
   const qc = useQueryClient()
   const { data: config } = useAppConfig()
@@ -68,6 +74,7 @@ export function TaskContextMenu({ fallbackTask, x, y, reorderable = false, onClo
     const resolved = resolveSelectedTasks(qc, selectedTaskIds)
     return resolved.length > 0 ? resolved : [fallbackTask]
   }, [qc, selectedTaskIds, fallbackTask])
+  const taskIdSet = useMemo(() => new Set(tasks.map((t) => t.id)), [tasks])
 
   // Where the menu was opened from (the row): a confirmation a menu entry opens gives focus back
   // there, since the entry itself is gone by then.
@@ -106,6 +113,8 @@ export function TaskContextMenu({ fallbackTask, x, y, reorderable = false, onClo
   const allSameProject = tasks.every((t) => t.project_id === tasks[0].project_id)
   const currentProjectId = allSameProject ? tasks[0].project_id : undefined
   const datePickerCurrent = tasks.length === 1 ? tasks[0].due_date : NULL_DATE
+  // Assign for a selection (semantics 9.2); one task is assigned in its card.
+  const canAssign = multi && canAssignSelection(tasks, access)
   // Move up and Move down, for one row, only where it can go (like a drag; cross-app semantics 12.4).
   const [canMoveUp, canMoveDown] = useMemo(
     () => (reorderable && !multi ? [canStepTask(fallbackTask.id, 'up'), canStepTask(fallbackTask.id, 'down')] : [false, false]),
@@ -253,6 +262,21 @@ export function TaskContextMenu({ fallbackTask, x, y, reorderable = false, onClo
           }}
           onClose={closeSubAndMenu}
         />
+      )}
+
+      {canAssign && (
+        <MenuItem
+          ref={assignRef}
+          icon={<UserPlus />}
+          popup="menu"
+          expanded={sub === 'assign'}
+          onSelect={() => setSub((s) => (s === 'assign' ? null : 'assign'))}
+        >
+          Assign…
+        </MenuItem>
+      )}
+      {sub === 'assign' && (
+        <BulkAssignPopover anchorRef={assignRef} taskIds={taskIdSet} placement="right-start" onClose={closeSubAndMenu} />
       )}
 
       {canMoveUp && (
