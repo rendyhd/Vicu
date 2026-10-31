@@ -1,5 +1,5 @@
 import { Fragment, useRef, type ReactNode, type RefObject } from 'react'
-import { Calendar, Bell, Repeat, Paperclip, ListChecks, FolderOpen, MoreHorizontal, Info, Trash2, Plus, MessageSquare } from 'lucide-react'
+import { Calendar, Bell, Repeat, Paperclip, ListChecks, FolderOpen, MoreHorizontal, Info, CopyPlus, Trash2, Plus, MessageSquare } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { isNullDate } from '@/lib/date-utils'
 import { labelChipSolidStyle } from '@/lib/label-style'
@@ -11,6 +11,7 @@ import { subtaskProgress } from '@/lib/task-hierarchy'
 import { useIsDark } from '@/hooks/use-is-dark'
 import { useProjects } from '@/hooks/use-projects'
 import { useLocationReminders } from '@/hooks/use-location-reminders'
+import { useDuplicateTasks } from '@/hooks/use-duplicate-tasks'
 import { assignChipLabel, nameList, orderPeople } from '@/lib/collaboration'
 import type { ProjectAccess } from '@/hooks/use-project-access'
 import { commentsButtonId } from '@/stores/comments-pane-store'
@@ -161,6 +162,7 @@ export function TaskCardBar({
   const dateFormat = useDateFormat()
   const { data: projects } = useProjects()
   const { reminderFor } = useLocationReminders()
+  const duplicate = useDuplicateTasks()
   const dateRef = useRef<HTMLButtonElement>(null)
   const priorityRef = useRef<HTMLButtonElement>(null)
   const labelRef = useRef<HTMLButtonElement>(null)
@@ -340,6 +342,15 @@ export function TaskCardBar({
         <Popover anchorRef={moreRef} onClose={onClose} label="More" role="menu" placement="bottom-end" className="w-44 p-1">
           <MenuItem icon={<Info className="h-3.5 w-3.5" aria-hidden="true" />} onSelect={() => onOpen('info')}>
             Task info
+          </MenuItem>
+          <MenuItem
+            icon={<CopyPlus className="h-3.5 w-3.5" aria-hidden="true" />}
+            onSelect={() => {
+              onClose()
+              void duplicate([task])
+            }}
+          >
+            Duplicate task
           </MenuItem>
           <MenuItem icon={<Trash2 className="h-3.5 w-3.5" aria-hidden="true" />} danger onSelect={onDelete}>
             Delete task

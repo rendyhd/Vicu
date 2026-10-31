@@ -6,6 +6,7 @@ import { cn } from '@/lib/cn'
 import { DEFAULT_TASK_ORDER, canReorderTask, type TaskOrderKey } from '../../../shared/task-order'
 import { verticalListSortingStrategyForeignSafe } from '@/lib/sortable-strategy'
 import { useCompleteTask, useUpdateTask, useDeleteTask } from '@/hooks/use-task-mutations'
+import { useDuplicateTasks } from '@/hooks/use-duplicate-tasks'
 import { usePasteTasks } from '@/hooks/use-paste-tasks'
 import { useTaskStep } from '@/hooks/use-task-step'
 import { currentExpandedTaskId, useSelectionStore } from '@/stores/selection-store'
@@ -119,6 +120,7 @@ export function TaskList({
   const pendingTaskClickRef = useRef<number | null>(null)
   const pasteTasks = usePasteTasks({ projectId, defaultDueDate })
   const completeTask = useCompleteTask()
+  const duplicate = useDuplicateTasks()
   const updateTask = useUpdateTask()
   const deleteTask = useDeleteTask()
   const stepTask = useTaskStep()
@@ -249,6 +251,14 @@ export function TaskList({
           e.preventDefault()
           void copySelectedTitles(qc, selectedTaskIds)
         }
+        return
+      }
+
+      // Ctrl+D / ⌘D: duplicate the selected tasks (cross-app semantics 15).
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'd' && selectedTaskIds.size > 0) {
+        e.preventDefault()
+        void duplicate(resolveSelectedTasks(qc, selectedTaskIds))
+        clearSelection()
         return
       }
 
@@ -452,6 +462,7 @@ export function TaskList({
       showNewTask,
       pasteTasks,
       completeTask,
+      duplicate,
       updateTask,
       deleteTask,
       sortable,

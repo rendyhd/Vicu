@@ -15,6 +15,7 @@ const APP_SHORTCUTS: Array<{ keys: string; name: string }> = [
   { keys: 'Mod+N', name: 'New task' },
   { keys: 'Mod+V', name: 'New task from clipboard' },
   { keys: 'Mod+K', name: 'Complete task' },
+  { keys: 'Mod+D', name: 'Duplicate task' },
   { keys: 'Mod+T', name: 'Set due date to today' },
   { keys: 'Mod+Enter', name: 'Save and close task' },
   { keys: 'Mod+R', name: 'Refresh' },
