@@ -1,16 +1,19 @@
 import { useRef, useState } from 'react'
-import { CalendarClock, CheckCircle2, FolderInput, Tag, Trash2, X } from 'lucide-react'
+import { CalendarClock, CheckCircle2, FolderInput, Tag, Trash2, UserPlus, X } from 'lucide-react'
 import { useSelectionStore } from '@/stores/selection-store'
 import { useSelectedTasks } from '@/hooks/use-selected-tasks'
 import { useTaskActions } from '@/hooks/use-task-actions'
+import { useProjectAccessMap } from '@/hooks/use-project-access'
+import { canAssignSelection } from '@/lib/bulk-assign'
 import { NULL_DATE } from '@/lib/constants'
 import { cn } from '@/lib/cn'
 import { nextRowAfterRemoval, visibleRowIds } from '@/lib/row-focus'
 import { WhenPopover } from './WhenPopover'
 import { ProjectPickerPopover } from './ProjectPickerPopover'
 import { LabelPickerPopover } from './LabelPickerPopover'
+import { BulkAssignPopover } from './BulkAssignPopover'
 
-type Picker = 'date' | 'project' | 'label' | null
+type Picker = 'date' | 'project' | 'label' | 'assign' | null
 
 const BUTTON =
   'inline-flex min-h-7 items-center gap-1.5 rounded-control px-2.5 text-meta text-text transition-colors duration-fade-fast hover:bg-bg-hover disabled:opacity-40'
@@ -29,6 +32,8 @@ export function SelectionBar() {
   const dateRef = useRef<HTMLButtonElement>(null)
   const projectRef = useRef<HTMLButtonElement>(null)
   const labelRef = useRef<HTMLButtonElement>(null)
+  const assignRef = useRef<HTMLButtonElement>(null)
+  const access = useProjectAccessMap()
 
   const setFocusedTask = useSelectionStore((s) => s.setFocusedTask)
 
@@ -58,6 +63,8 @@ export function SelectionBar() {
   const toggle = (next: Exclude<Picker, null>) => setPicker((p) => (p === next ? null : next))
   const allSameProject = tasks.length > 0 && tasks.every((t) => t.project_id === tasks[0].project_id)
   const anyNotDone = tasks.some((t) => !t.done)
+  // Assign only while every selected task is in a shared project you may write (semantics 9.2).
+  const canAssign = canAssignSelection(tasks, access)
 
   return (
     <div className="vicu-bar-rise shrink-0 border-t border-[var(--border-color)] bg-bg-card px-4 py-2">
@@ -101,6 +108,16 @@ export function SelectionBar() {
         </button>
         {picker === 'label' && (
           <LabelPickerPopover anchorRef={labelRef} tasks={tasks} onApplied={(label) => void actions.recordLastLabel(label)} onClose={() => setPicker(null)} />
+        )}
+
+        {canAssign && (
+          <button ref={assignRef} type="button" className={cn(BUTTON, picker === 'assign' && 'bg-bg-selected')} aria-haspopup="menu" aria-expanded={picker === 'assign'} onClick={() => toggle('assign')}>
+            <UserPlus className="h-3.5 w-3.5" aria-hidden="true" />
+            Assign
+          </button>
+        )}
+        {picker === 'assign' && canAssign && (
+          <BulkAssignPopover anchorRef={assignRef} taskIds={selectedTaskIds} onClose={() => setPicker(null)} />
         )}
 
         <button type="button" className={cn(BUTTON, 'text-danger hover:bg-danger/10')} onClick={() => void deleteSelected()}>

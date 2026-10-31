@@ -677,6 +677,13 @@ on purpose.
 
 - Read-only members are listed in Assign but cannot be picked: disabled, with "Can view only".
   (The server would accept them; the rule keeps a task with someone who cannot act on it.)
+- **Assign for a selection** (the selection's menu, "Assign..."): offered only when every
+  selected task is in a shared project where you may write. It lists the members of all those
+  projects (usually one), ordered as in 9.3. A person assigned to every selected task is ticked,
+  to some of them partly ticked. Picking a person who is not ticked, or partly ticked, assigns them
+  to every selected task that lacks them; picking a ticked person removes them from all. Each
+  change is the single task's assign or unassign (section 9.6 queues it offline). A read-only
+  member stays disabled unless they are assigned to one of the tasks, so they can be removed.
 - Only the author may edit or delete a comment. Apps show Edit and Delete on your own comments
   only; Edit only on a comment in the plain form (section 9.5).
 - Comments on done tasks stay readable and writable.
