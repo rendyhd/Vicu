@@ -157,7 +157,7 @@ export function TaskContextMenu({ fallbackTask, x, y, reorderable = false, onClo
         expanded={sub === 'date'}
         onSelect={() => setSub((s) => (s === 'date' ? null : 'date'))}
       >
-        Schedule…
+        Schedule
       </MenuItem>
       {sub === 'date' && (
         <DatePickerPopover
@@ -216,7 +216,7 @@ export function TaskContextMenu({ fallbackTask, x, y, reorderable = false, onClo
         expanded={sub === 'label'}
         onSelect={() => setSub((s) => (s === 'label' ? null : 'label'))}
       >
-        Apply label…
+        Apply label
       </MenuItem>
       {sub === 'label' && (
         <LabelPickerPopover
@@ -249,7 +249,7 @@ export function TaskContextMenu({ fallbackTask, x, y, reorderable = false, onClo
         expanded={sub === 'project'}
         onSelect={() => setSub((s) => (s === 'project' ? null : 'project'))}
       >
-        Move to project…
+        Move to project
       </MenuItem>
       {sub === 'project' && (
         <ProjectPickerPopover
@@ -272,7 +272,7 @@ export function TaskContextMenu({ fallbackTask, x, y, reorderable = false, onClo
           expanded={sub === 'assign'}
           onSelect={() => setSub((s) => (s === 'assign' ? null : 'assign'))}
         >
-          Assign…
+          Assign
         </MenuItem>
       )}
       {sub === 'assign' && (

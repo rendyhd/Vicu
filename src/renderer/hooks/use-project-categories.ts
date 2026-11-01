@@ -153,7 +153,7 @@ export function useProjectCategoryActions() {
     [qc, write],
   )
 
-  /** "New category…" from a project's menu: the category, last, with the project in it. */
+  /** "New category" from a project's menu: the category, last, with the project in it. */
   const createWithProject = useCallback(
     async (name: string, project: Pick<Project, 'id' | 'title'>) => {
       const values = valuesOf(qc)

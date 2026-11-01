@@ -404,7 +404,7 @@ export default async function run(h) {
       await row.scrollIntoViewIfNeeded()
       await row.click({ button: 'right', position: { x: 180, y: 12 } })
       await h.wait(500)
-      const item = page.getByRole('menuitem', { name: /^Schedule…/ })
+      const item = page.getByRole('menuitem', { name: /^Schedule/ })
       if ((await item.count()) === 0) {
         await h.assert(`${t}: the menu opens`, false)
       } else {
@@ -428,7 +428,7 @@ export default async function run(h) {
           await h.capture(`context-schedule-${tag}`)
 
           // A press on another menu entry while the picker is open reaches that entry.
-          await page.getByRole('menuitem', { name: /^Move to project…/ }).click()
+          await page.getByRole('menuitem', { name: /^Move to project/ }).click()
           await h.wait(450)
           state = await readState(page)
           const others = state.popovers.filter((x) => x.role !== 'menu')
@@ -439,10 +439,10 @@ export default async function run(h) {
           await h.key('Escape')
           await h.wait(350)
           state = await readState(page)
-          await h.assert(`${t}: Escape closes the picker and leaves the menu`, async () => state.popovers.filter((x) => x.role !== 'menu').length === 0 && (await page.getByRole('menuitem', { name: /^Schedule…/ }).count()) === 1)
+          await h.assert(`${t}: Escape closes the picker and leaves the menu`, async () => state.popovers.filter((x) => x.role !== 'menu').length === 0 && (await page.getByRole('menuitem', { name: /^Schedule/ }).count()) === 1)
           await h.key('Escape')
           await h.wait(350)
-          await h.assert(`${t}: a second Escape closes the menu`, async () => (await page.getByRole('menuitem', { name: /^Schedule…/ }).count()) === 0)
+          await h.assert(`${t}: a second Escape closes the menu`, async () => (await page.getByRole('menuitem', { name: /^Schedule/ }).count()) === 0)
         }
       }
       await h.dismiss()

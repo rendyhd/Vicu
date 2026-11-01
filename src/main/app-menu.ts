@@ -12,7 +12,7 @@ export function setupApplicationMenu(getMainWindow: () => BrowserWindow | null):
         { role: 'about' },
         { type: 'separator' },
         {
-          label: 'Preferences…',
+          label: 'Preferences',
           accelerator: 'CmdOrCtrl+,',
           click: () => {
             const win = getMainWindow()
@@ -53,7 +53,7 @@ export function setupApplicationMenu(getMainWindow: () => BrowserWindow | null):
       },
       { type: 'separator' },
       {
-        label: 'Print…',
+        label: 'Print',
         accelerator: 'CmdOrCtrl+P',
         click: () => {
           const win = getMainWindow()

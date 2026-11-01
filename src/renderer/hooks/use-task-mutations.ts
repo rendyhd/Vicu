@@ -981,7 +981,7 @@ export interface MoveProjectVariables {
 
 /**
  * Moves a project to another parent or another place among its siblings (drag and drop in the
- * project tree, the keyboard, "Move to…"). The moved project gets its new parent (only when that
+ * project tree, the keyboard, "Move to"). The moved project gets its new parent (only when that
  * changes) and position; siblings that had to be spread out get their positions first.
  */
 export function useMoveProject() {

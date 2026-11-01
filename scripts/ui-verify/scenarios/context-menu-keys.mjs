@@ -107,7 +107,7 @@ export default async function run(h) {
   await h.wait(900) // a pause starts a new search
   await h.type('move to p', { delay: 40 })
   s = await menuState(page)
-  await h.assert('typing "move to p" lands on Move to project', { ok: s.activeName === 'Move to project…', detail: s.activeName })
+  await h.assert('typing "move to p" lands on Move to project', { ok: s.activeName === 'Move to project', detail: s.activeName })
   await h.key('ArrowRight')
   await h.wait(450)
   const listbox = await page.evaluate(() => {
@@ -119,7 +119,7 @@ export default async function run(h) {
   await h.wait(350)
   s = await menuState(page)
   const closedList = await page.evaluate(() => !document.querySelector('[role="menu"] [role="listbox"]'))
-  await h.assert('ArrowLeft closes the list and focus returns to Move to project', { ok: closedList && s.open && s.activeName === 'Move to project…', detail: JSON.stringify({ closedList, ...s }) })
+  await h.assert('ArrowLeft closes the list and focus returns to Move to project', { ok: closedList && s.open && s.activeName === 'Move to project', detail: JSON.stringify({ closedList, ...s }) })
 
   // ---- D. Tab, Escape, Enter ---------------------------------------------------------------
   await h.key('Tab')

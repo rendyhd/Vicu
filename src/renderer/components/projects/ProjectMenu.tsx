@@ -48,7 +48,7 @@ interface ParentPickerProps {
   onClose: (reason?: PopoverCloseReason) => void
 }
 
-/** "Move to…": the top level and every project the project can go under, as a tree. */
+/** "Move to": the top level and every project the project can go under, as a tree. */
 function ParentPicker({ anchorRef, project, projects, inboxId, onSelect, onClose }: ParentPickerProps) {
   const current = effectiveParent(project, projects)
   const options = useMemo(() => {
@@ -103,8 +103,8 @@ interface CategoryPickerProps {
 }
 
 /**
- * "Move to category…" (cross-app semantics 13.4): the categories in display order, No category,
- * and New category… which asks for a name and puts the project in it.
+ * "Move to category" (cross-app semantics 13.4): the categories in display order, No category,
+ * and New category, which asks for a name and puts the project in it.
  */
 function CategoryPicker({ anchorRef, categories, current, onSelect, onNew, onClose }: CategoryPickerProps) {
   const choose = (categoryId: string | null) => {
@@ -143,7 +143,7 @@ function CategoryPicker({ anchorRef, categories, current, onSelect, onNew, onClo
           className="flex w-full items-center gap-2 border-t border-[var(--border-color)] px-3 py-1.5 text-left text-xs text-[var(--accent-blue)] hover:bg-[var(--bg-hover)] focus-visible:bg-[var(--bg-hover)]"
         >
           <Plus aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />
-          <span className="min-w-0 flex-1 truncate">New category…</span>
+          <span className="min-w-0 flex-1 truncate">New category</span>
         </button>
       </div>
     </Popover>
@@ -222,11 +222,11 @@ export function ProjectMenu({ project, surface, anchorRef, anchorPoint, opener =
         </MenuItem>
       )}
       <MenuItem icon={<SlidersHorizontal />} onSelect={() => projectActions.openDialog({ kind: 'edit', project }, opener)}>
-        Edit…
+        Edit
       </MenuItem>
       {canShare && (
         <MenuItem icon={<Users />} onSelect={() => projectActions.openDialog({ kind: 'share', project }, opener)}>
-          Share…
+          Share
         </MenuItem>
       )}
       <MenuItem
@@ -250,7 +250,7 @@ export function ProjectMenu({ project, surface, anchorRef, anchorPoint, opener =
           expanded={sub === 'move'}
           onSelect={() => setSub((s) => (s === 'move' ? null : 'move'))}
         >
-          Move to…
+          Move to
         </MenuItem>
       )}
       {sub === 'move' && (
@@ -275,7 +275,7 @@ export function ProjectMenu({ project, surface, anchorRef, anchorPoint, opener =
           expanded={sub === 'category'}
           onSelect={() => setSub((s) => (s === 'category' ? null : 'category'))}
         >
-          Move to category…
+          Move to category
         </MenuItem>
       )}
       {sub === 'category' && group && (
@@ -334,7 +334,7 @@ export function ProjectMenu({ project, surface, anchorRef, anchorPoint, opener =
                 Mark reviewed
               </MenuItem>
               <MenuItem icon={<Timer />} onSelect={() => projectActions.openDialog({ kind: 'cadence', project }, opener)}>
-                Review cadence…
+                Review cadence
               </MenuItem>
               <MenuItem icon={<EyeOff />} onSelect={() => actions.setExcludedFromReview(project, true)}>
                 Exclude from review

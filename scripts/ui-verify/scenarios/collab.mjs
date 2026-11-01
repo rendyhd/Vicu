@@ -178,7 +178,7 @@ export default async function run(h) {
     // ---- E. Share dialog ------------------------------------------------------------------------
     await aside.locator(`[data-project-row="sidebar:${ids.lisbon}"]`).click({ button: 'right' })
     await h.wait(300)
-    await page.getByRole('menuitem', { name: 'Share…' }).click()
+    await page.getByRole('menuitem', { name: 'Share' }).click()
     const dialog = page.locator('dialog[open]')
     await until(async () => (await dialog.locator('li').count()) >= 3)
     const people = await dialog.locator('li').allTextContents()
@@ -198,7 +198,7 @@ export default async function run(h) {
     // ---- F. Unshared again --------------------------------------------------------------------
     await aside.locator(`[data-project-row="sidebar:${ids.lisbon}"]`).click({ button: 'right' })
     await h.wait(300)
-    await page.getByRole('menuitem', { name: 'Share…' }).click()
+    await page.getByRole('menuitem', { name: 'Share' }).click()
     await until(async () => (await dialog.locator('li').count()) >= 3)
     for (const name of ['Maya', 'Sam']) {
       await dialog.getByRole('button', { name: `Remove ${name}` }).click()

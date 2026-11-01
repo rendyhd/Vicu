@@ -1,5 +1,5 @@
 // Where a project goes when it is dragged in the project tree, moved with the keyboard or sent
-// somewhere with "Move to…". A move can change both the parent and the place among the new
+// somewhere with "Move to". A move can change both the parent and the place among the new
 // siblings, so it is planned as a parent plus a sibling position (planSiblingMove does the
 // position part, including spreading siblings out when two of them share a position).
 //

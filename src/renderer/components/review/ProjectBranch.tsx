@@ -248,7 +248,7 @@ function ProjectRowMenu({ node }: { node: ReviewTreeNode }) {
             className="w-full px-3 py-1.5 text-left text-sm hover:bg-[var(--bg-hover)]"
             onClick={() => setCadenceOpen(true)}
           >
-            Set cadence…
+            Set cadence
           </button>
           <button
             type="button"

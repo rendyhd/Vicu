@@ -1,8 +1,8 @@
 // project-manage: managing projects from the sidebar, the project page and Settings → Projects.
 //
-//   A. The … button shows on a hovered sidebar row and opens the project menu (Rename, Edit…,
-//      Share… (you are the admin), Add subproject, Move to…, Set as Inbox, Review, Archive, Delete); right-click opens the same.
-//   B. Move to… puts Q4 planning under Personal on the server; Undo in the toast puts it back.
+//   A. The … button shows on a hovered sidebar row and opens the project menu (Rename, Edit,
+//      Share (you are the admin), Add subproject, Move to, Set as Inbox, Review, Archive, Delete); right-click opens the same.
+//   B. Move to puts Q4 planning under Personal on the server; Undo in the toast puts it back.
 //   C. Dragging Trip to Lisbon onto the middle of Work nests it there (the row shows the "into"
 //      highlight while held); Undo puts it back after Home renovation.
 //   D. Alt+Shift+Down / Up on a focused row reorders it among its siblings.
@@ -69,7 +69,7 @@ export default async function run(h) {
     await more.click()
     await h.wait(300)
     const items = await menuItems()
-    const expected = ['Rename', 'Edit…', 'Share…', 'Add subproject', 'Move to…', 'Set as Inbox', 'Review', 'Archive', 'Delete']
+    const expected = ['Rename', 'Edit', 'Share', 'Add subproject', 'Move to', 'Set as Inbox', 'Review', 'Archive', 'Delete']
     await h.assert('A: the menu lists every project action', {
       ok: expected.every((label) => items.some((item) => item.startsWith(label))),
       detail: JSON.stringify(items),
@@ -83,18 +83,18 @@ export default async function run(h) {
     await h.wait(250)
     await activator(ids.work).click({ button: 'right' })
     await h.wait(300)
-    await h.assert('A: right-click opens the same menu', async () => (await menuItems()).includes('Edit…'))
+    await h.assert('A: right-click opens the same menu', async () => (await menuItems()).includes('Edit'))
     await h.key('Escape')
     await h.wait(250)
 
-    // --- B. Move to… and Undo -------------------------------------------------------------------
+    // --- B. Move to and Undo -------------------------------------------------------------------
     await row(ids.q4).hover()
     await more.click()
     await h.wait(250)
-    await page.locator('[role="menu"]:popover-open [role="menuitem"]', { hasText: 'Move to…' }).click()
+    await page.locator('[role="menu"]:popover-open [role="menuitem"]', { hasText: /^Move to$/ }).click()
     await h.wait(300)
     const picker = page.locator('[role="listbox"][aria-label="Move to"]')
-    await h.assert('B: Move to… opens a picker with the top level and the projects', async () => {
+    await h.assert('B: Move to opens a picker with the top level and the projects', async () => {
       const options = await picker.locator('[role="option"]').allTextContents()
       return { ok: options[0] === 'Top level' && options.includes('Personal') && !options.includes('Q4 planning'), detail: JSON.stringify(options) }
     })
@@ -211,8 +211,8 @@ export default async function run(h) {
     await page.locator('main').getByRole('button', { name: 'Work actions' }).click()
     await h.wait(300)
     const pageItems = await menuItems()
-    await h.assert('G: the project page menu has Edit… and no Rename', {
-      ok: pageItems.includes('Edit…') && !pageItems.some((item) => item.startsWith('Rename')),
+    await h.assert('G: the project page menu has Edit and no Rename', {
+      ok: pageItems.includes('Edit') && !pageItems.some((item) => item.startsWith('Rename')),
       detail: JSON.stringify(pageItems),
     })
     await h.capture('page-menu')
@@ -233,7 +233,7 @@ export default async function run(h) {
     await h.capture('settings-projects')
     await page.locator(`[data-project-row="settings:${ids.q4}"]`).click({ button: 'right' })
     await h.wait(300)
-    await h.assert('G: right-click on a Settings row opens the project menu', async () => (await menuItems()).includes('Move to…'))
+    await h.assert('G: right-click on a Settings row opens the project menu', async () => (await menuItems()).includes('Move to'))
     await h.key('Escape')
     await h.assert('G: axe finds no serious violation in Settings → Projects', async () => {
       const found = await h.axe('main', { label: 'settings projects' })
