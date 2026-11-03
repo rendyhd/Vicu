@@ -1010,13 +1010,15 @@ export function registerIpcHandlers(): void {
     return refreshViewerOnSuccess(await deleteTaskAttachment(taskId, attachmentId))
   })
 
-  handleTrusted('fetch-task-attachment-bytes', async (_event, taskId: number, attachmentId: number) => {
+  handleTrusted('fetch-task-attachment-bytes', async (_event, taskId: number, attachmentId: number, size?: unknown) => {
     // Inline task-note images only need a bounded preview. Fetching full-size
     // phone photos here can exhaust the renderer/IPC budget before <img> decodes.
-    const result = await downloadTaskAttachment(taskId, attachmentId, 'lg')
+    // The image viewer asks for the original of the one image it shows.
+    const original = size === 'original'
+    const result = await downloadTaskAttachment(taskId, attachmentId, original ? undefined : 'lg')
     if (!result.success) return result
     if (result.data.length === 0) {
-      return { success: false, error: 'Attachment preview was empty' }
+      return { success: false, error: original ? 'Attachment was empty' : 'Attachment preview was empty' }
     }
     return { success: true, data: new Uint8Array(result.data) }
   })

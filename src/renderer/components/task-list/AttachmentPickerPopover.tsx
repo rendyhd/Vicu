@@ -1,8 +1,10 @@
-import { useState, type RefObject } from 'react'
+import { useMemo, useState, type RefObject } from 'react'
 import { X, FileText, Image, File, Loader2, Download } from 'lucide-react'
 import { useTaskAttachments, useUploadAttachment, useDeleteAttachment } from '@/hooks/use-task-mutations'
-import { api } from '@/lib/api'
+import { useAttachmentActions } from '@/hooks/use-attachment-actions'
+import { viewableImages } from '@/lib/attachment-preview'
 import { Popover, type PopoverCloseReason } from '../overlay/Popover'
+import { AttachmentViewer } from './AttachmentViewer'
 
 interface AttachmentPickerPopoverProps {
   anchorRef: RefObject<HTMLElement | null>
@@ -29,30 +31,10 @@ export function AttachmentPickerPopover({ anchorRef, invokedBy, taskId, onClose 
   const uploadAttachment = useUploadAttachment()
   const deleteAttachment = useDeleteAttachment()
   // What the last Open or Save did, shown under the list; and the attachment being saved.
-  const [notice, setNotice] = useState<{ text: string; error: boolean } | null>(null)
-  const [savingId, setSavingId] = useState<number | null>(null)
-
-  const handleOpen = async (attachmentId: number, fileName: string) => {
-    setNotice(null)
-    const result = await api.openTaskAttachment(taskId, attachmentId, fileName)
-    if (!result.success) setNotice({ text: `Could not open ${fileName}: ${result.error}`, error: true })
-  }
-
-  const handleSave = async (attachmentId: number, fileName: string) => {
-    setNotice(null)
-    setSavingId(attachmentId)
-    try {
-      const result = await api.saveTaskAttachment(taskId, attachmentId, fileName)
-      if (!result.success) {
-        setNotice({ text: `Could not save ${fileName}: ${result.error}`, error: true })
-      } else if (result.data.saved) {
-        const where = result.data.path?.split(/[\\/]/).slice(-2, -1)[0]
-        setNotice({ text: where ? `Saved to ${where}` : 'Saved', error: false })
-      }
-    } finally {
-      setSavingId(null)
-    }
-  }
+  const { notice, savingId, open: handleOpen, save: handleSave } = useAttachmentActions(taskId)
+  // Images open in the viewer, which sits inside this popover so the list stays open behind it.
+  const images = useMemo(() => viewableImages(attachments), [attachments])
+  const [viewingId, setViewingId] = useState<number | null>(null)
 
   const handleDelete = (attachmentId: number) => {
     deleteAttachment.mutate({ taskId, attachmentId })
@@ -72,6 +54,7 @@ export function AttachmentPickerPopover({ anchorRef, invokedBy, taskId, onClose 
         <div className="mb-2 flex max-h-48 flex-col gap-1 overflow-y-auto custom-scrollbar">
           {attachments.map((att) => {
             const Icon = getFileIcon(att.file.mime)
+            const isImage = images.some((image) => image.id === att.id)
             return (
               <div
                 key={att.id}
@@ -80,8 +63,8 @@ export function AttachmentPickerPopover({ anchorRef, invokedBy, taskId, onClose 
                 <Icon className="h-4 w-4 shrink-0 text-[var(--text-secondary)]" />
                 <button
                   type="button"
-                  onClick={() => handleOpen(att.id, att.file.name)}
-                  title="Open"
+                  onClick={() => (isImage ? setViewingId(att.id) : handleOpen(att.id, att.file.name))}
+                  title={isImage ? 'View' : 'Open'}
                   className="min-w-0 flex-1 text-left"
                 >
                   <div className="truncate text-xs text-[var(--text-primary)]">
@@ -147,6 +130,10 @@ export function AttachmentPickerPopover({ anchorRef, invokedBy, taskId, onClose 
         <p className="mt-1.5 text-caption text-danger">
           {deleteAttachment.error?.message || 'Delete failed'}
         </p>
+      )}
+
+      {viewingId != null && (
+        <AttachmentViewer taskId={taskId} images={images} startId={viewingId} onClose={() => setViewingId(null)} />
       )}
     </Popover>
   )

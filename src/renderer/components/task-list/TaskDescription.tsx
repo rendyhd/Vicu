@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { X } from 'lucide-react'
 import type { Editor } from '@tiptap/react'
 import { cn } from '@/lib/cn'
-import { segmentDescription, imageToken, pendingToken } from '@/lib/image-tokens'
+import { splitDescriptionImages, joinDescriptionImages, type DescriptionImage } from '@/lib/image-tokens'
 import { getClipboardImages, fileToUint8Array } from '@/lib/clipboard-images'
 import {
   useTaskAttachments,
@@ -10,7 +10,9 @@ import {
   useDeleteAttachment,
 } from '@/hooks/use-task-mutations'
 import { useAttachmentBlobUrl } from '@/hooks/use-attachment-bytes'
+import { viewableImageType, type ViewerImage } from '@/lib/attachment-preview'
 import { LazyRichTextEditor } from '@/components/rich-text/LazyRichTextEditor'
+import { AttachmentViewer } from './AttachmentViewer'
 
 export interface PendingImage {
   uuid: string
@@ -22,9 +24,7 @@ export interface PendingImage {
   mime: string
 }
 
-type ImageRef =
-  | { kind: 'image'; attachmentId: number }
-  | { kind: 'pending'; uuid: string }
+type ImageRef = DescriptionImage
 
 type Props = {
   value: string
@@ -48,29 +48,8 @@ type Props = {
   autoFocus?: boolean
   /** Expose the underlying TipTap editor for programmatic focus. */
   editorRef?: React.MutableRefObject<Editor | null>
-  /** Fired once with the editor's normalized HTML of the initial content. */
-  onReady?: (normalizedHtml: string) => void
-}
-
-function parseValue(value: string): { text: string; images: ImageRef[] } {
-  const segments = segmentDescription(value)
-  let text = ''
-  const images: ImageRef[] = []
-  for (const seg of segments) {
-    if (seg.kind === 'text') text += seg.text
-    else if (seg.kind === 'image') images.push({ kind: 'image', attachmentId: seg.attachmentId })
-    else if (seg.kind === 'pending') images.push({ kind: 'pending', uuid: seg.uuid })
-  }
-  return { text: text.replace(/^\n+|\n+$/g, ''), images }
-}
-
-function buildValue(text: string, images: ImageRef[]): string {
-  const tokens = images
-    .map((img) => (img.kind === 'image' ? imageToken(img.attachmentId) : pendingToken(img.uuid)))
-    .join('\n')
-  if (!tokens) return text
-  if (!text) return tokens
-  return `${text}\n${tokens}`
+  /** Fired once with the initial value as the editor writes it: its normalized HTML, then the image tokens. */
+  onReady?: (normalizedValue: string) => void
 }
 
 function imageRefKey(img: ImageRef): string {
@@ -101,9 +80,26 @@ export function TaskDescription({
   const onChangeRef = useRef(onChange)
   onChangeRef.current = onChange
 
-  const { text, images } = useMemo(() => parseValue(value), [value])
+  const { text, images } = useMemo(() => splitDescriptionImages(value), [value])
   textRef.current = text
   imagesRef.current = images
+
+  // A click on an uploaded image shows it in the viewer, with the note's other images.
+  const [viewingId, setViewingId] = useState<number | null>(null)
+  const { data: attachments } = useTaskAttachments(taskId ?? -1, taskId != null)
+  const viewerImages = useMemo<ViewerImage[]>(
+    () =>
+      images.flatMap((img) => {
+        if (img.kind !== 'image') return []
+        const file = attachments?.find((a) => a.id === img.attachmentId)?.file
+        return [{
+          id: img.attachmentId,
+          name: file?.name || `Image ${img.attachmentId}`,
+          mime: (file && viewableImageType(file)) || 'image/png',
+        }]
+      }),
+    [images, attachments]
+  )
 
   // Clear stale upload errors after 4s
   useEffect(() => {
@@ -112,9 +108,18 @@ export function TaskDescription({
     return () => clearTimeout(t)
   }, [uploadError])
 
+  // The editor only holds the text: put the image tokens back, or the card would take the text
+  // alone as the description and the pictures would drop out of the notes.
+  const handleReady = useCallback(
+    (normalizedText: string) => {
+      onReady?.(joinDescriptionImages(normalizedText, imagesRef.current))
+    },
+    [onReady]
+  )
+
   const handleTextChange = useCallback(
     (html: string) => {
-      onChange(buildValue(html, imagesRef.current))
+      onChange(joinDescriptionImages(html, imagesRef.current))
     },
     [onChange]
   )
@@ -122,7 +127,7 @@ export function TaskDescription({
   const removeImage = useCallback(
     (toRemove: ImageRef) => {
       const next = imagesRef.current.filter((img) => imageRefKey(img) !== imageRefKey(toRemove))
-      onChange(buildValue(textRef.current, next))
+      onChange(joinDescriptionImages(textRef.current, next))
       if (toRemove.kind === 'image' && taskId != null) {
         deleteMutation.mutate({ taskId, attachmentId: toRemove.attachmentId })
       } else if (toRemove.kind === 'pending') {
@@ -162,7 +167,7 @@ export function TaskDescription({
             setUploadError(err instanceof Error ? err.message : 'Upload failed')
           }
         }
-        onChangeRef.current(buildValue(textRef.current, next))
+        onChangeRef.current(joinDescriptionImages(textRef.current, next))
       })()
       return true
     },
@@ -177,7 +182,7 @@ export function TaskDescription({
         onBlur={onBlur}
         onKeyDown={onKeyDown}
         onPaste={handlePaste}
-        onReady={onReady}
+        onReady={handleReady}
         editorRef={editorRef}
         autoFocus={autoFocus}
         placeholder={placeholder}
@@ -193,9 +198,14 @@ export function TaskDescription({
               taskId={taskId}
               pendingImages={pendingImages}
               onRemove={() => removeImage(img)}
+              onView={img.kind === 'image' && taskId != null ? () => setViewingId(img.attachmentId) : undefined}
             />
           ))}
         </div>
+      )}
+
+      {viewingId != null && taskId != null && (
+        <AttachmentViewer taskId={taskId} images={viewerImages} startId={viewingId} onClose={() => setViewingId(null)} />
       )}
 
       {uploadMutation.isPending && (
@@ -213,11 +223,13 @@ function ImageThumb({
   taskId,
   pendingImages,
   onRemove,
+  onView,
 }: {
   img: ImageRef
   taskId?: number
   pendingImages?: Record<string, PendingImage>
   onRemove: () => void
+  onView?: () => void
 }) {
   if (img.kind === 'pending') {
     const pending = pendingImages?.[img.uuid]
@@ -230,21 +242,24 @@ function ImageThumb({
       />
     )
   }
-  return <AttachmentThumb taskId={taskId} attachmentId={img.attachmentId} onRemove={onRemove} />
+  return <AttachmentThumb taskId={taskId} attachmentId={img.attachmentId} onRemove={onRemove} onView={onView} />
 }
 
 function AttachmentThumb({
   taskId,
   attachmentId,
   onRemove,
+  onView,
 }: {
   taskId?: number
   attachmentId: number
   onRemove: () => void
+  onView?: () => void
 }) {
   const [decodeError, setDecodeError] = useState(false)
   const { data: attachments } = useTaskAttachments(taskId ?? -1, taskId != null)
-  const mime = attachments?.find((a) => a.id === attachmentId)?.file.mime || 'image/png'
+  const file = attachments?.find((a) => a.id === attachmentId)?.file
+  const mime = file?.mime || 'image/png'
   const { url, isLoading, error, retry } = useAttachmentBlobUrl(taskId, attachmentId, mime)
 
   if (isLoading) {
@@ -270,9 +285,10 @@ function AttachmentThumb({
   return (
     <Thumb
       src={url}
-      alt={`Attachment ${attachmentId}`}
+      alt={file?.name || `Attachment ${attachmentId}`}
       onRemove={onRemove}
       onError={() => setDecodeError(true)}
+      onView={onView}
     />
   )
 }
@@ -282,21 +298,33 @@ function Thumb({
   alt,
   onRemove,
   onError,
+  onView,
 }: {
   src: string
   alt: string
   onRemove: () => void
   onError?: () => void
+  /** Shows the image in the viewer; without it the thumbnail is only a picture. */
+  onView?: () => void
 }) {
+  const image = (
+    <img
+      src={src}
+      alt={alt}
+      draggable={false}
+      onError={onError}
+      className="block h-auto max-h-40 w-auto max-w-md rounded-control border border-[var(--border-color)] object-contain"
+    />
+  )
   return (
     <div className="group relative inline-block">
-      <img
-        src={src}
-        alt={alt}
-        draggable={false}
-        onError={onError}
-        className="block h-auto max-h-40 w-auto max-w-md rounded-control border border-[var(--border-color)] object-contain"
-      />
+      {onView ? (
+        <button type="button" onClick={onView} aria-label={`View ${alt}`} title="View image" className="block cursor-zoom-in rounded-control">
+          {image}
+        </button>
+      ) : (
+        image
+      )}
       <button
         type="button"
         tabIndex={-1}

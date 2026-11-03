@@ -76,3 +76,30 @@ export function imageToken(attachmentId: number): string {
 export function pendingToken(uuid: string): string {
   return `[[image-pending:${uuid}]]`
 }
+
+/** An image of a description: an uploaded attachment, or one staged before its task exists. */
+export type DescriptionImage =
+  | { kind: 'image'; attachmentId: number }
+  | { kind: 'pending'; uuid: string }
+
+/** The editable text of a description and its images, in order (description format v1, the envelope). */
+export function splitDescriptionImages(value: string): { text: string; images: DescriptionImage[] } {
+  let text = ''
+  const images: DescriptionImage[] = []
+  for (const seg of segmentDescription(value)) {
+    if (seg.kind === 'text') text += seg.text
+    else if (seg.kind === 'image') images.push({ kind: 'image', attachmentId: seg.attachmentId })
+    else images.push({ kind: 'pending', uuid: seg.uuid })
+  }
+  return { text: text.replace(/^\n+|\n+$/g, ''), images }
+}
+
+/** The text followed by one token per line for each image: what `splitDescriptionImages` takes apart. */
+export function joinDescriptionImages(text: string, images: readonly DescriptionImage[]): string {
+  const tokens = images
+    .map((img) => (img.kind === 'image' ? imageToken(img.attachmentId) : pendingToken(img.uuid)))
+    .join('\n')
+  if (!tokens) return text
+  if (!text) return tokens
+  return `${text}\n${tokens}`
+}

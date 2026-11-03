@@ -185,7 +185,7 @@ export interface ElectronAPI {
   fetchTaskAttachments(taskId: number): Promise<ApiResult<TaskAttachment[]>>
   uploadTaskAttachment(taskId: number, fileData: Uint8Array, fileName: string, mimeType: string): Promise<ApiResult<unknown>>
   deleteTaskAttachment(taskId: number, attachmentId: number): Promise<ApiResult<void>>
-  fetchTaskAttachmentBytes(taskId: number, attachmentId: number): Promise<ApiResult<Uint8Array>>
+  fetchTaskAttachmentBytes(taskId: number, attachmentId: number, size?: 'preview' | 'original'): Promise<ApiResult<Uint8Array>>
   openTaskAttachment(taskId: number, attachmentId: number, fileName: string): Promise<ApiResult<void>>
   saveTaskAttachment(taskId: number, attachmentId: number, fileName: string): Promise<ApiResult<{ saved: boolean; path?: string }>>
   pickAndUploadAttachment(taskId: number): Promise<ApiResult<{ count: number }>>

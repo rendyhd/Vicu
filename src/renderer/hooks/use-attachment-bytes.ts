@@ -3,30 +3,38 @@ import { useCallback, useEffect, useState } from 'react'
 import { api } from '@/lib/api'
 
 const PREVIEW_STALE_TIME = 5 * 60 * 1000
+// An original can be a full-size phone photo: keep it only a little while after the viewer closes.
+const ORIGINAL_GC_TIME = 60 * 1000
 
 /**
  * Fetches the bytes for a task attachment and returns an object URL suitable for
  * <img src>. The URL is revoked when the component unmounts or the attachment
  * changes. Preview bytes are periodically revalidated so a transient bad
  * response cannot remain cached for the lifetime of a long-running app.
+ *
+ * `preview` is the server's bounded image preview (task-note thumbnails);
+ * `original` is the file itself (the image viewer).
  */
 export function useAttachmentBlobUrl(
   taskId: number | undefined,
   attachmentId: number | undefined,
-  mime: string = 'application/octet-stream'
+  mime: string = 'application/octet-stream',
+  size: 'preview' | 'original' = 'preview'
 ): { url: string | null; isLoading: boolean; error: unknown; retry: () => Promise<void> } {
   const enabled = taskId != null && attachmentId != null
   const query = useQuery<Uint8Array>({
-    queryKey: ['attachment-preview-bytes', taskId, attachmentId],
+    queryKey: size === 'preview'
+      ? ['attachment-preview-bytes', taskId, attachmentId]
+      : ['attachment-original-bytes', taskId, attachmentId],
     queryFn: async () => {
-      const result = await api.fetchTaskAttachmentBytes(taskId as number, attachmentId as number)
+      const result = await api.fetchTaskAttachmentBytes(taskId as number, attachmentId as number, size)
       if (!result.success) throw new Error(result.error)
       if (result.data.byteLength === 0) throw new Error('Attachment preview was empty')
       return result.data
     },
     enabled,
     staleTime: PREVIEW_STALE_TIME,
-    gcTime: 1000 * 60 * 10,
+    gcTime: size === 'preview' ? 1000 * 60 * 10 : ORIGINAL_GC_TIME,
   })
 
   // Create + revoke the URL inside the same effect so strict-mode double-invoke
