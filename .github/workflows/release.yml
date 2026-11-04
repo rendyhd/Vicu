@@ -220,18 +220,20 @@ jobs:
       # builds and publishes its matrix arch. Without this override both
       # runners would build both arches AND publish them, leading to duplicate
       # asset-upload conflicts on the second runner.
-      - name: Build and publish (${{ matrix.arch }})
-        run: npm run build && npm run speech:lib && npx electron-builder --linux AppImage:${{ matrix.arch }} --publish always
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build (${{ matrix.arch }})
+        run: npm run build && npm run speech:lib && npx electron-builder --linux AppImage:${{ matrix.arch }} --publish never
 
-      - name: Remove blockmap assets
+      # electron-builder leaves the AppImage's update information empty, so
+      # AppImage managers cannot find newer versions. The script writes it
+      # (gh-releases-zsync, pointing at this repository's releases), makes the
+      # .zsync it names and uploads both into the draft. Building with
+      # --publish never above keeps the unpatched AppImage (and its blockmap)
+      # off the release.
+      - name: Add update information and publish (${{ matrix.arch }})
         run: |
-          for asset in dist/*.blockmap; do
-            [ -f "$asset" ] || continue
-            name=$(basename "$asset")
-            gh release delete-asset "${{ github.ref_name }}" "$name" --yes || true
-          done
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq zsync
+          node scripts/appimage-update-info.mjs --upload "${{ github.ref_name }}"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
