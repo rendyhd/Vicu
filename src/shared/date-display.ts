@@ -241,6 +241,20 @@ function rowDay(diff: number, value: Date, now: Date, p: Phrases): string {
   return shortDate(value, now, p)
 }
 
+/** Yesterday, today and tomorrow say the word and the date; any other day its weekday date. */
+function chipDay(diff: number, value: Date, now: Date, p: Phrases): string {
+  if (diff === -1) return `${WORDS.yesterday}, ${shortDate(value, now, p)}`
+  if (diff === 0) return `${WORDS.today}, ${shortDate(value, now, p)}`
+  if (diff === 1) return `${WORDS.tomorrow}, ${shortDate(value, now, p)}`
+  return weekdayDate(value, now, p)
+}
+
+/** A chip phrase in the middle of a sentence ("Remind today, Nov 4"): its word in lower case. */
+export function midSentence(phrase: string): string {
+  const relative = [WORDS.yesterday, WORDS.today, WORDS.tomorrow].some((word) => phrase.startsWith(word))
+  return relative ? phrase.charAt(0).toLowerCase() + phrase.slice(1) : phrase
+}
+
 /**
  * The text of a date for one context (section 8.3 of the contract). `dateOnly` says the value has
  * no time of day (section 1.2); it is ignored by the logbook and comment contexts, whose value is always a
@@ -265,7 +279,7 @@ export function formatDateDisplay(
     case 'row.inDayGroup':
       return dateOnly ? '' : p.time(value, fmt.hour12)
     case 'chip':
-      return withTime(weekdayDate(value, now, p), value, dateOnly, fmt, p)
+      return withTime(chipDay(diff, value, now, p), value, dateOnly, fmt, p)
     case 'header.day':
       if (diff === 0) return WORDS.today
       if (diff === 1) return WORDS.tomorrow

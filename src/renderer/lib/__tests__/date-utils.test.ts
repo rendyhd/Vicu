@@ -85,9 +85,9 @@ describe('formatDueDate', () => {
 describe('formatDateChip', () => {
   const now = new Date(2026, 9, 7, 9, 30)
 
-  it('is always the weekday date, never a relative word', () => {
+  it('says the word and the date for three days, else the weekday date', () => {
     const today = new Date(2026, 9, 7, 15, 0)
-    expect(formatDateChip(today, false, now, GB)).toBe('Wed 7 Oct, 15:00')
+    expect(formatDateChip(today, false, now, GB)).toBe('Today, 7 Oct, 15:00')
     expect(formatDateChip(new Date(2026, 9, 10, 15, 0), false, now, US)).toBe('Sat, Oct 10, 3:00 PM')
     expect(formatDateChip(new Date(2026, 9, 10, 23, 59, 59), true, now, GB)).toBe('Sat 10 Oct')
   })

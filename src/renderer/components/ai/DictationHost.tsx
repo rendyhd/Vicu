@@ -12,7 +12,7 @@ import { api } from '@/lib/api'
 import { addBrainDump, addedMessage, undoBrainDump } from '@/lib/ai/add-brain-dump'
 import { cancelOpenMic, stopOpenMic, useOpenMicStore } from '@/lib/ai/open-mic'
 import { contextProjects, defaultProjectFor, listInfoOf, pathOf } from '@/lib/ai/workspace'
-import { formatDateChip } from '@/lib/date-utils'
+import { formatDateChip, midSentence } from '@/lib/date-utils'
 import { toLocalDate } from '@/lib/due-dates'
 import { describeMutationError } from '@/lib/mutation-errors'
 import { UNDO_TOAST_MS, toast, useToastStore } from '@/stores/toast-store'
@@ -624,7 +624,7 @@ function DraftCardView({ card, disabled, ws, newProjects }: DraftCardProps) {
           <span className={cn(fieldClass('reminder'), 'inline-flex items-center gap-1')}>
             {'before_due_minutes' in draft.reminder
               ? `Remind ${draft.reminder.before_due_minutes} min before`
-              : `Remind ${formatDateChip(instantOfLocal(draft.reminder.at), false, new Date(), fmt)}`}
+              : `Remind ${midSentence(formatDateChip(instantOfLocal(draft.reminder.at), false, new Date(), fmt))}`}
             <button type="button" aria-label="Remove reminder" disabled={disabled} onClick={() => update({ reminder: null })} className="text-[var(--text-secondary)] hover:text-danger">
               <X className="h-3 w-3" />
             </button>

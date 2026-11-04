@@ -1,23 +1,21 @@
-import { createContext, useContext, useEffect, useMemo, type ReactNode } from 'react'
-import { useQueries, useQueryClient } from '@tanstack/react-query'
+import { createContext, useContext, useMemo, type ReactNode } from 'react'
+import { useQueries } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import { apiError } from '@/lib/mutation-errors'
-import { setCollabSignalsWanted } from '@/lib/collab-signals'
 import { effectivePermission, isSharedProject, orderPeople, type Permission } from '@/lib/collaboration'
-import { refreshTasks } from '@/lib/task-refresh'
 import type { PersonRef, Project } from '@/lib/vikunja-types'
 import { useCurrentUser } from './use-current-user'
 import { useProjects } from './use-projects'
 
-// Who can see each project, and so whether collaboration shows on its tasks (cross-app semantics
-// 9.1): a project is shared when its members (`users/search` with an empty query, which also counts
+// Who can see each project, and so whether what involves other people shows on its tasks (cross-app
+// semantics 9.1; comments are on every task): a project is shared when its members (`users/search` with an empty query, which also counts
 // owners, team members and shares inherited from a parent project) include someone who is not you.
 // Members are fetched once per project, kept with the saved lists and refreshed after ten minutes.
 
 export const MEMBERS_STALE_MS = 10 * 60 * 1000
 
 export interface ProjectAccess {
-  /** Someone besides you can see the project: assignees and comments show on its tasks. */
+  /** Someone besides you can see the project: assignees, unread marks and Notify me show on its tasks. */
   shared: boolean
   /** Everyone who can see it, you first. Empty while unknown. */
   members: PersonRef[]
@@ -66,11 +64,9 @@ export function accessFor(project: Project, members: readonly PersonRef[] | unde
 
 /**
  * Fetches the members of every active project and provides the access of each one to the rows,
- * the card and the comments pane. Also decides whether task lists ask for the comment signals:
- * on as soon as one project is shared, off once every project is known to be private.
+ * the card and the comments pane.
  */
 export function ProjectAccessProvider({ children }: { children: ReactNode }) {
-  const qc = useQueryClient()
   const { data: me } = useCurrentUser()
   const { data: projects } = useProjects()
   const active = projects?.active
@@ -88,18 +84,6 @@ export function ProjectAccessProvider({ children }: { children: ReactNode }) {
     return { me: me ?? null, byProject }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `stamp` stands for `results`
   }, [stamp, active, me])
-
-  const anyShared = useMemo(() => [...value.byProject.values()].some((access) => access.shared), [value])
-  const allKnown = !!me && !!active && results.every((r) => r.data !== undefined || r.isError)
-
-  useEffect(() => {
-    if (anyShared) {
-      if (setCollabSignalsWanted(true)) refreshTasks(qc)
-    } else if (allKnown) {
-      // Counts already in the cache are simply not shown on private projects; no refetch needed.
-      setCollabSignalsWanted(false)
-    }
-  }, [anyShared, allKnown, qc])
 
   return <CollabContext.Provider value={value}>{children}</CollabContext.Provider>
 }

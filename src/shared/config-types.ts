@@ -195,6 +195,11 @@ export interface AppConfig {
    * means 'system'.
    */
   clock_format?: 'system' | '12h' | '24h'
+  /**
+   * How much of a task a row shows (design-system section 4). Per device, never synced: a desktop
+   * window and a phone differ in width. Missing means 'compact'.
+   */
+  row_density?: 'compact' | 'comfortable'
   window_bounds?: { x: number; y: number; width: number; height: number }
   sidebar_width?: number
   /**

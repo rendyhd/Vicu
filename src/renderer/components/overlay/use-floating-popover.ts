@@ -18,7 +18,9 @@ interface FloatingPopoverOptions {
  * stops the card, the list and the content area from clipping it.
  *
  * Mounting the element opens the popover; unmounting it closes it (the browser drops a removed
- * popover from the top layer without events).
+ * popover from the top layer without events). Moving it in the document drops it just as silently,
+ * and a list does that when it sorts a row of an open popover further down (a later date, say). It
+ * is still open as far as anyone knows, so it opens again before the next paint.
  */
 export function useFloatingPopover(
   anchorRef: RefObject<HTMLElement | null>,
@@ -88,13 +90,41 @@ export function useFloatingPopover(
     // A context menu on macOS mounts while the right button is still down; shown now, the release
     // would light-dismiss it at once. It opens on the release instead (`pointer-press.ts`).
     let stop = () => {}
+    let opened = false
     const cancelOpen = afterPress(() => {
       if (!el.matches(':popover-open')) el.showPopover()
       stop = autoUpdate(anchor, el, update)
+      opened = true
     })
+
+    // A hide with events was meant: light dismiss, Escape, the code. Only a move has none.
+    let closing = false
+    const onBeforeToggle = (event: Event) => {
+      closing = (event as ToggleEvent).newState === 'closed'
+    }
+    let lastFocus: HTMLElement | null = null
+    const onFocusIn = (event: FocusEvent) => {
+      lastFocus = event.target as HTMLElement
+    }
+    el.addEventListener('beforetoggle', onBeforeToggle)
+    el.addEventListener('focusin', onFocusIn)
+    const moves = new MutationObserver(() => {
+      if (!opened || closing || !el.isConnected || el.matches(':popover-open')) return
+      // Back as it was, so without the opening fade and with focus where it was.
+      el.style.transition = 'none'
+      el.showPopover()
+      el.getBoundingClientRect()
+      el.style.transition = ''
+      if (lastFocus && el.contains(lastFocus)) lastFocus.focus({ preventScroll: true })
+      update()
+    })
+    moves.observe(el.ownerDocument.body, { childList: true, subtree: true })
 
     return () => {
       alive = false
+      moves.disconnect()
+      el.removeEventListener('beforetoggle', onBeforeToggle)
+      el.removeEventListener('focusin', onFocusIn)
       cancelOpen()
       stop()
       for (const invoker of invokers) {

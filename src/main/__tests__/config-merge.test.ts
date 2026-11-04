@@ -73,6 +73,7 @@ function userConfig(overrides: Partial<AppConfig> = {}): AppConfig {
 const PREFERENCE_KEYS = [
   'theme',
   'clock_format',
+  'row_density',
   'window_bounds',
   'sidebar_width',
   'sidebar_hidden_lists',
@@ -394,6 +395,12 @@ describe('applyConfigPatch (D-CFG-2)', () => {
     expect(applyConfigPatch(userConfig(), { clock_format: '24h' }).clock_format).toBe('24h')
     expect(applyConfigPatch(userConfig(), { clock_format: '12h' }).clock_format).toBe('12h')
     expect(applyConfigPatch(userConfig({ clock_format: '24h' }), { clock_format: 'sundial' }).clock_format).toBe('system')
+  })
+
+  it('keeps the row density, and anything else means compact', () => {
+    expect(normalizeConfig({}).row_density).toBe('compact')
+    expect(applyConfigPatch(userConfig(), { row_density: 'comfortable' }).row_density).toBe('comfortable')
+    expect(applyConfigPatch(userConfig({ row_density: 'comfortable' }), { row_density: 'roomy' as never }).row_density).toBe('compact')
   })
 
   it('normalizes values (invalid types fall back to defaults)', () => {

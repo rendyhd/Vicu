@@ -140,9 +140,10 @@ These conditions gather the tasks people share (section 9) and the tasks that mo
 today, the evaluator takes who you are and which projects are shared.
 
 - A project is **shared** as in section 9.1: its members include someone besides you; one whose
-  members are not known yet is not shared. `assigned` and `comments` only match tasks of shared
-  projects, the tasks whose rows show assignees and comments; a task of a project nobody else can
-  see never matches them, whatever the server holds for it.
+  members are not known yet is not shared. `assigned` and `comments: unread` only match tasks of
+  shared projects, the tasks whose rows show assignees and the unread mark; a task of a project
+  nobody else can see never matches them, whatever the server holds for it. `comments: any` matches
+  a task of any project, as comments are on every task (section 9.1).
 - `shared_only: true` keeps tasks of shared projects.
 - `assigned`: `me` keeps tasks you are assigned to (alone or with others); `others` keeps tasks
   with at least one assignee where you are not one of them; `nobody` keeps tasks without
@@ -153,15 +154,15 @@ today, the evaluator takes who you are and which projects are shared.
   pull the row away; the next visit no longer shows it.
 - `changed_within_days: N` (a whole number, 1 or more) keeps tasks whose `updated` is at or
   after the start of the local day N - 1 days before today: 1 is changed today, 7 the last seven
-  days (a time after now, from a server clock ahead of this device, counts too). The server moves `updated` when a task is edited, completed or reopened, commented on,
-  assigned or unassigned, or labelled; marking its comments read does not (checked on 2.4.0). It
+  days (a time after now, from a server clock ahead of this device, counts too). The server moves `updated` when a task is edited, completed or reopened, when a comment is added, edited or deleted,
+  when it is assigned or unassigned, or labelled; marking its comments read does not (checked on 2.4.0). It
   counts your own changes too: the API does not say who changed a task. Any other value (0, a
   negative or a fraction, not a number) is no condition. The server clause
   `updated >= '<start of that local day>'` is exact.
 - `include_today_all_projects` only widens the project condition; these conditions still apply
   to every task.
-- Apps ask the server for `comment_count` and `is_unread` only while a project is shared
-  (section 9.4), so these conditions cost nothing for a user who shares nothing.
+- Apps read `comment_count` and `is_unread` with the task lists they already fetch (section 9.4),
+  so these conditions cost no extra requests.
 
 Vectors: the `customListActivity` block of the fixture (`me`, the shared project ids, its own
 tasks with `assignees`, `commentCount`, `unread` and `updated` as local wall-clock times; a
@@ -636,7 +637,7 @@ the time ("Fri, 15:00", "Oct 18, 3:00 PM"). A date-only value has no time part.
 | `row` | `diff` of -7 or less: short date. -6 to -2: "{n} days ago". -1: "Yesterday". 0: "Today". 1: "Tomorrow". 2 to 6: the short weekday ("Fri"). 7 or more: short date. Then append the time, if any. |
 | `row.inToday` | Like `row`, except a value dated today shows nothing when date only and just the time otherwise. |
 | `row.inDayGroup` | The time only, if any, otherwise nothing. |
-| `chip` | Always the weekday date, never a relative word: "Sat 10 Oct, 15:00" or "Sat, Oct 10, 3:00 PM"; date only: "Sat 10 Oct". |
+| `chip` | -1, 0 and 1: the word, a comma and the short date ("Today, 7 Oct", "Today, Oct 7", "Tomorrow, 1 Jan 2027"). Otherwise the weekday date ("Sat 10 Oct", "Sat, Oct 10"). Then append the time, if any ("Today, Oct 7, 3:00 PM", "Sat 10 Oct, 15:00"). In the middle of a sentence the word is in lower case ("Remind today, 7 Oct, 15:00"). |
 | `header.day` | 0: "Today". 1: "Tomorrow". 2 to 6: weekday and day number ("Fri 9"). Otherwise the weekday date ("Mon 12 Oct", "Mon, Oct 12"). No time. |
 | `header.full` | "Wednesday 7 October" or "Wednesday, October 7", with the year when it differs. |
 | `logbook.group` | The group of a completion time. 0 or later: "Today". -1: "Yesterday". -6 to -2: the weekday date ("Mon 5 Oct"). -7 or older: the month and year ("September 2026"), always with the year. |
@@ -677,10 +678,11 @@ on purpose.
   with, and the people a parent project is shared with (sharing a project shares its subprojects;
   their own share lists stay empty).
 - A project is **shared** when its members include someone whose user id is not yours. Sharing is
-  the switch: assignees, comments and their signals appear only on tasks of shared projects. A
-  project nobody else can see shows nothing new, and an app whose user shares nothing looks and
-  fetches exactly as before. (The share lists alone are not enough: a subproject of a shared
-  project has none of its own, and a team that holds only you shares nothing.)
+  the switch for what involves other people: assignees, the unread mark, mentions, "Notify me" and
+  sharing's own lists appear only on tasks of shared projects. **Comments and their count are on
+  every task**; on a project nobody else can see they are notes to yourself, visible to you alone.
+  (The share lists alone are not enough: a subproject of a shared project has none of its own, and
+  a team that holds only you shares nothing.)
 - Apps keep the members with the project list, refresh them at most every 10 minutes and at once
   after a share change, keep the last answer while offline, and drop them on an account change.
   A project whose members are not known yet counts as not shared.
@@ -735,17 +737,19 @@ on purpose.
 
 - `assignees` is always on a task. `comment_count` and `is_unread` come only with
   `expand=comment_count&expand=is_unread` (the parameter is repeated; a comma-separated value is
-  refused) and are left out of the answer when 0 and false. Apps add the two expands to task list
-  requests only while at least one project is shared.
+  refused) and are left out of the answer when 0 and false. Apps add the two expands to the task
+  list requests they make anyway, whether or not a project is shared, and send no extra request for
+  them on a project nobody else can see.
 - `is_unread` is raised for every member except the author when a comment is added (a mention
-  raises it too; an assignment does not). `PUT tasks/{id}/read` clears it; it is idempotent. Apps
-  call it when the comments of a task open and clear the flag locally at once.
+  raises it too; an assignment does not). `PUT tasks/{id}/read` clears it; it is idempotent. On a
+  shared project apps call it when the comments of a task open and clear the flag locally at once.
+  On any other project the flag is ignored and the call is not made.
 - **Never put `assignees` in a task merge patch.** Assign is `POST tasks/{id}/assignees
   {"user_id": N}` (an already assigned user answers 400 with code 4021, which counts as done);
   unassign is `DELETE tasks/{id}/assignees/{userId}` (idempotent). Assigning someone also
   subscribes them to the task on the server.
-- The row signals and their order are in `design-system-v1.md` section 4. An unassigned task with
-  no comments in a shared project looks exactly like a task in a private project.
+- The row signals and their order are in `design-system-v1.md` section 4. A task without assignees
+  or comments looks the same in a shared project and in a private one.
 - Custom lists can select tasks by assignee, comments, shared project and recent change
   (section 3.3).
 
@@ -827,8 +831,8 @@ space), and the caret moves after the space.
 
 ### 9.7 Notify me and sharing
 
-- "Notify me" is the task subscription: `task.subscription` (present only on a single-task read,
-  `GET tasks/{id}`) is on when it is not null. `POST subscriptions/task/{id}` turns it on (412
+- "Notify me" exists only on shared projects, and is the task subscription: `task.subscription`
+  (present only on a single-task read, `GET tasks/{id}`) is on when it is not null. `POST subscriptions/task/{id}` turns it on (412
   with code 12002 means already on, which counts as done); `DELETE subscriptions/task/{id}` turns
   it off. Apps toggle it optimistically and put it back with a message when the server refuses.
 - Sharing (admins only): find the person with `GET users?q={username}`, which matches a username
@@ -837,8 +841,8 @@ space), and the caret moves after the space.
   access; 404 code 1005: no such user); change with `PUT projects/{id}/users/{username}
   {"permission"}`; remove with `DELETE projects/{id}/users/{username}`. The owner cannot be added.
   Team shares are listed read only and are managed in Vikunja. A change refreshes the project's
-  members at once; when a project stops being shared, its chips and signals go and an open comments
-  pane or screen closes.
+  members at once; when a project stops being shared, its Assign chips, assignee avatars and unread
+  marks go. Its comments stay, and an open comments pane or screen stays open.
 - **API tokens.** Vikunja does not offer API tokens the `subscriptions` route group, so with a
   token every Notify me call answers 401: apps signed in with an API token do not offer Notify me.
   A token can also lack a route group this section uses (`tasks_comments`, `tasks_assignees`,

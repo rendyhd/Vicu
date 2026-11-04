@@ -4,6 +4,7 @@ import {
   formatDateDisplay,
   type DateFormat,
 } from './date-display'
+export { midSentence } from './date-display'
 import { getDateFormat } from './date-format'
 import {
   addLocalDays,
@@ -30,13 +31,13 @@ export function formatDueDate(
   date: string,
   now: Date = new Date(),
   fmt: DateFormat = getDateFormat(),
-  context: 'row' | 'row.inToday' | 'row.inDayGroup' = 'row'
+  context: 'row' | 'row.inToday' | 'row.inDayGroup' | 'chip' = 'row'
 ): string {
   if (isNullDate(date)) return ''
   return formatDateDisplay(context, new Date(date), now, isDateOnly(date), fmt)
 }
 
-/** The `chip` phrasing: always the weekday date ("Sat 10 Oct, 15:00"), never a relative word. */
+/** The `chip` phrasing: the word and the date for three days ("Today, 7 Oct"), else the weekday date ("Sat 10 Oct, 15:00"). */
 export function formatDateChip(
   date: Date,
   dateOnly: boolean,

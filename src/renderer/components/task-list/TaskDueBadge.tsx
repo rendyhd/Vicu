@@ -4,11 +4,12 @@ import { isNullDate, formatDueDate } from '@/lib/date-utils'
 import { isDueToday, isOverdue } from '@/lib/due-dates'
 import { useDateFormat } from '@/hooks/use-date-format'
 
-type DueDateContext = 'row' | 'row.inToday' | 'row.inDayGroup'
+type DueDateContext = 'row' | 'row.inToday' | 'row.inDayGroup' | 'chip'
 
 /**
  * Where the rows are shown decides how much of the date they repeat (contract section 8.3): Today
- * already says "today", a day group of Upcoming already says the day. Rows default to `row`.
+ * already says "today", a day group of Upcoming already says the day. Rows default to `row`; the
+ * open card's date is a `chip`.
  */
 const DueDateContextValue = createContext<DueDateContext>('row')
 export const DueDateContextProvider = DueDateContextValue.Provider

@@ -435,6 +435,42 @@ export function SettingsView() {
               </p>
             </div>
 
+            <div>
+              <label className="mb-2 block text-xs text-[var(--text-secondary)]">Task rows</label>
+              <div className="flex gap-3" role="radiogroup" aria-label="Task rows">
+                {([
+                  { value: 'compact' as const, label: 'Compact' },
+                  { value: 'comfortable' as const, label: 'Comfortable' },
+                ]).map((opt) => {
+                  const current = fullConfig?.row_density ?? 'compact'
+                  return (
+                    <label
+                      key={opt.value}
+                      className={cn(
+                        'flex cursor-pointer items-center gap-1.5 rounded-control border px-3 py-1.5 text-xs font-medium transition-colors',
+                        current === opt.value
+                          ? 'border-accent-blue bg-accent-blue/10 text-accent-blue'
+                          : 'border-[var(--border-color)] text-[var(--text-secondary)] hover:border-[var(--text-secondary)]'
+                      )}
+                    >
+                      <input
+                        type="radio"
+                        name="row_density"
+                        value={opt.value}
+                        checked={current === opt.value}
+                        onChange={() => handleQuickEntryChange({ row_density: opt.value })}
+                        className="sr-only"
+                      />
+                      {opt.label}
+                    </label>
+                  )
+                })}
+              </div>
+              <p className="mt-1.5 text-xs text-[var(--text-secondary)]">
+                Comfortable shows longer titles and a line of notes.
+              </p>
+            </div>
+
           </div>
         </div>
 

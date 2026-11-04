@@ -437,7 +437,7 @@ export function CustomListDialog({ open, list, onSave, onClose }: CustomListDial
               Only tasks in shared projects
             </label>
             <p className="text-xs text-[var(--text-secondary)]">
-              Assigned and Comments only match tasks in projects someone else can see.
+              Assigned and unread comments only match tasks in projects someone else can see.
             </p>
           </fieldset>
         )}

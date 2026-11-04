@@ -38,8 +38,8 @@ import { Tooltip } from '@/components/overlay/Tooltip'
 import type { PersonRef, Task, TaskComment } from '@/lib/vikunja-types'
 
 // The comments pane (collaboration D3): a third column right of the content region that follows the
-// open card. It shows while the card's project is shared and the pane is on (sticky for the
-// session); it reads like a document, oldest first, with day dividers, and opens scrolled to the end.
+// open card. It shows while a card is open and the pane is on (sticky for the session); it reads
+// like a document, oldest first, with day dividers, and opens scrolled to the end.
 
 /** Older pages load when the thread is scrolled this close to its top. */
 const LOAD_OLDER_THRESHOLD_PX = 48
@@ -60,10 +60,10 @@ export function CommentsPaneHost() {
   const task = useCommentsPaneStore((s) => s.task)
   const access = useProjectAccess(task?.project_id)
   const me = useCollabMe()
-  const available = !!task && access.shared
+  const available = !!task
   const [focusComposer, setFocusComposer] = useState(0)
 
-  // Mod+Shift+C shows or hides the pane while a shared card is open.
+  // Mod+Shift+C shows or hides the pane while a card is open.
   useEffect(() => {
     if (!available) return
     const onKey = (e: globalThis.KeyboardEvent) => {
@@ -83,7 +83,7 @@ export function CommentsPaneHost() {
     return () => window.removeEventListener('keydown', onKey, true)
   }, [available, task])
 
-  if (!open || !task || !access.shared) return null
+  if (!open || !task) return null
 
   const close = () => {
     useUIStore.getState().setCommentsPaneOpen(false)
@@ -125,9 +125,10 @@ function CommentsThread({ task, access, me, onClose, focusComposer }: ThreadProp
   const query = useTaskComments(task.id)
   const { comments, isLoading, isError, refetch, hasNextPage, fetchNextPage, isFetchingNextPage } = query
   const markRead = useMarkTaskRead()
-  // Vikunja does not let API tokens follow tasks (cross-app semantics 9.7): no Notify me with one.
+  // Notify me is about other people, so only on a shared project; and Vikunja does not let API tokens
+  // follow tasks (cross-app semantics 9.7): none with one.
   const { data: config } = useAppConfig()
-  const canFollow = config?.auth_method === 'oidc' || config?.auth_method === 'password'
+  const canFollow = access.shared && (config?.auth_method === 'oidc' || config?.auth_method === 'password')
   const subscription = useTaskSubscription(task.id > 0 && canFollow ? task.id : null)
   const canWrite = access.permission >= 1
   const count = Math.max(task.comment_count ?? 0, comments.length)
@@ -137,14 +138,16 @@ function CommentsThread({ task, access, me, onClose, focusComposer }: ThreadProp
   const composerRef = useRef<HTMLTextAreaElement>(null)
   const titleId = useId()
 
-  // Opening the thread marks it read; so does a new comment arriving while it is open.
+  // Opening the thread marks it read; so does a new comment arriving while it is open. Only on a
+  // shared project: nobody else can write on another one (cross-app semantics 9.4).
   const readFor = useRef<number | null>(null)
   useEffect(() => {
+    if (!access.shared) return
     if (readFor.current !== task.id || task.is_unread) {
       readFor.current = task.id
       markRead(task.id)
     }
-  }, [task.id, task.is_unread, markRead])
+  }, [access.shared, task.id, task.is_unread, markRead])
 
   // Read the thread again now and then while it is open.
   useEffect(() => {
@@ -518,7 +521,7 @@ function Composer({ task, access, me, composerRef, onEscape }: ComposerProps) {
         ref={composerRef}
         value={text}
         rows={3}
-        placeholder="Write a comment. Type @ to mention someone."
+        placeholder={access.shared ? 'Write a comment. Type @ to mention someone.' : 'Write a comment.'}
         aria-label="Write a comment"
         aria-autocomplete="list"
         aria-controls={pickerOpen ? listId : undefined}

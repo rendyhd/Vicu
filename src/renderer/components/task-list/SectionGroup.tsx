@@ -126,7 +126,7 @@ export function SectionGroup({
                     <div className="h-[2px] flex-1 rounded-full bg-[var(--accent-blue)]" />
                   </div>
                 )}
-                <TaskRow task={task} sortable={canReorderTask(taskOrder, task)} />
+                <TaskRow task={task} sortable={canReorderTask(taskOrder, task)} inSortableList />
               </Fragment>
             ))}
             {insertIndex != null && insertIndex >= tasks.length && (

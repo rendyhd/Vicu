@@ -1,11 +1,12 @@
 // card-toolbar (card 3.3, D-3): the property bar and surface of an open task card.
 //
 //   A. A card with no properties shows quiet "+" buttons in the Android order (date, priority,
-//      labels, checklist, reminder, repeat), the project as a chip, an attachment button and More.
+//      labels, checklist, reminder, repeat), the project as a chip, attachment and comments buttons
+//      and More.
 //   B. A card with properties shows them as chips (no plus) and each chip opens its editor.
 //   C. Tooltips: nothing at 250 ms, the tooltip at 600 ms with the name and the shortcut, in the top
 //      layer, fading over fade.fast; it goes on a press, on leaving and on Escape.
-//   D. More holds Task info and Delete task; Task info opens its popover and focus returns to More.
+//   D. More holds Task info, Duplicate task and Delete task; Task info opens its popover and focus returns to More.
 //   E. Surface: light keeps its shadow; dark has bg.card, no shadow and a 1 px white-at-8% edge.
 export const meta = {
   id: 'CT',
@@ -13,7 +14,7 @@ export const meta = {
   title: 'Open card: set properties are chips, unset ones "+" buttons, Info and Delete under More, tooltips after 400 ms, dark card without a shadow',
 }
 
-const ORDER = ['schedule', 'priority', 'labels', 'checklist', 'reminders', 'repeat', 'project', 'attachments', 'more']
+const ORDER = ['schedule', 'priority', 'labels', 'checklist', 'reminders', 'repeat', 'project', 'attachments', 'comments', 'more']
 const items = (res) => (Array.isArray(res) ? res : (res?.items ?? []))
 const isSet = (t) => ({
   schedule: !!t.due_date && !t.due_date.startsWith('0001'),
@@ -167,7 +168,7 @@ export default async function run(h) {
       const el = [...document.querySelectorAll('[popover]:popover-open')].find((e) => e.getAttribute('role') === 'menu')
       return el ? { label: el.getAttribute('aria-label'), items: [...el.querySelectorAll('[role="menuitem"]')].map((i) => i.textContent.trim()) } : null
     })
-    await h.assert('D: More opens a menu with Task info and Delete task', { ok: menu?.label === 'More' && JSON.stringify(menu.items) === JSON.stringify(['Task info', 'Delete task']), detail: JSON.stringify(menu) })
+    await h.assert('D: More opens a menu with Task info, Duplicate task and Delete task', { ok: menu?.label === 'More' && JSON.stringify(menu.items) === JSON.stringify(['Task info', 'Duplicate task', 'Delete task']), detail: JSON.stringify(menu) })
     await h.capture(`more-menu-${theme}`)
     await page.getByRole('menuitem', { name: 'Task info' }).click()
     await h.wait(450)

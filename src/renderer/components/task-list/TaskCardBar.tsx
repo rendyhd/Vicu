@@ -183,7 +183,7 @@ export function TaskCardBar({
   const repeats = (task.repeat_after ?? 0) > 0 || (task.repeat_mode ?? 0) > 0
   const attachmentCount = task.attachments?.length ?? 0
   const project = projects?.flat.find((p) => p.id === task.project_id)
-  const dueText = hasDate ? (formatDueDate(task.due_date, new Date(), dateFormat, 'row') ?? '') : ''
+  const dueText = hasDate ? (formatDueDate(task.due_date, new Date(), dateFormat, 'chip') ?? '') : ''
   const repeatText = formatRecurrenceLabel(task.repeat_after ?? 0, task.repeat_mode ?? 0)
   // A location reminder alone reads as its place ("Arrive: Home"), as on the phone.
   const reminderText = placeReminder && reminderCount === 1
@@ -213,7 +213,7 @@ export function TaskCardBar({
         unsetLabel="Date"
         icon={<Calendar className="h-3.5 w-3.5" aria-hidden="true" />}
       >
-        <DueDateContextProvider value="row">
+        <DueDateContextProvider value="chip">
           <TaskDueBadge dueDate={task.due_date} className="px-0 py-0" />
         </DueDateContextProvider>
       </PropertyButton>
@@ -335,7 +335,7 @@ export function TaskCardBar({
       {is('attachment') && <AttachmentPickerPopover anchorRef={attachmentRef} invokedBy={attachmentInvokers} taskId={task.id} onClose={onClose} />}
 
       <div className="ml-auto flex items-center gap-1">
-        {shared && collab && <CommentsButton taskId={task.id} count={commentCount} unread={!!task.is_unread} open={collab.commentsOpen} onClick={collab.onToggleComments} />}
+        {collab && <CommentsButton taskId={task.id} count={commentCount} unread={shared && !!task.is_unread} open={collab.commentsOpen} onClick={collab.onToggleComments} />}
         <PropertyButton prop="more" name="More" isSet={false} open={is('more') || is('info')} haspopup="menu" buttonRef={moreRef} onClick={() => onToggle('more')} iconOnly icon={<MoreHorizontal className="h-4 w-4" aria-hidden="true" />} />
       </div>
       {is('more') && (

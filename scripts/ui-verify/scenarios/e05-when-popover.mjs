@@ -284,7 +284,9 @@ export default async function run(h) {
     await h.wait(500)
     await h.assert('Enter in the custom time saves the time and keeps the popover open', async () => {
       const due = await savedDue((value) => !isNull(value))
-      return { ok: (await popover.count()) === 1 && !isNull(due) && parts(due).time === '17:00:00', detail: due }
+      const open = await popover.count()
+      await h.capture('custom-time-enter')
+      return { ok: open === 1 && !isNull(due) && parts(due).time === '17:00:00', detail: JSON.stringify({ due, time: parts(due).time, open }) }
     })
     await closeIt()
     await open()

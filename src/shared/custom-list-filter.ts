@@ -130,7 +130,8 @@ function matchesActivity(task: CustomListTask, filter: CustomListFilterInput, da
       if (!shared || task.is_unread !== true) return false
       break
     case 'any':
-      if (!shared || !((task.comment_count ?? 0) > 0)) return false
+      // Comments are on every task; only the unread mark needs someone else (section 9.1).
+      if (!((task.comment_count ?? 0) > 0)) return false
       break
   }
 
