@@ -199,9 +199,10 @@ export default async function run(h) {
       ok: s.open && /actions$/.test(s.label ?? '') && s.inside && s.activeInMenu && s.activeRole === 'menuitem',
       detail: JSON.stringify(s),
     })
+    const firstItem = s.activeName
     await h.key('ArrowDown')
     s = await menuState(page)
-    await h.assert(`ArrowDown moves inside the sidebar ${kind} menu`, { ok: s.activeInMenu && s.activeName !== '' && s.activeName !== 'Edit', detail: JSON.stringify(s) })
+    await h.assert(`ArrowDown moves inside the sidebar ${kind} menu`, { ok: s.activeInMenu && s.activeName !== '' && s.activeName !== firstItem, detail: JSON.stringify(s) })
     await h.key('Escape')
     await h.wait(300)
     s = await menuState(page)
