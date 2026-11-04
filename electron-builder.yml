@@ -88,6 +88,11 @@ linux:
       Comment: Task management app powered by Vikunja
       Keywords: task;todo;productivity;vikunja;
 
+# The static AppImage runtime carries its own libfuse3, so the host needs no FUSE 2 (Fedora Atomic
+# ships none). The default toolset, 0.0.0, builds with the old runtime, which does need it.
+toolsets:
+  appimage: "1.0.3"
+
 appImage:
   artifactName: "${productName}-${version}-${arch}.${ext}"
 
