@@ -30,7 +30,7 @@ import { TaskDescription } from './TaskDescription'
 import { TaskContextMenu } from './TaskContextMenu'
 import { TaskLinkIcon } from '@/components/TaskLinkIcon'
 import { TaskSyncIcon } from '@/components/task-list/TaskSyncIcon'
-import { stripNoteLink, stripPageLink, extractNoteLinkHtml, extractPageLinkHtml, hasNotesContent } from '@/lib/note-link'
+import { stripNoteLink, stripPageLink, extractNoteLinkHtml, extractPageLinkHtml, hasNotesContent, notesPreview } from '@/lib/note-link'
 import { useTaskParser } from '@/hooks/use-task-parser'
 import { useLabels } from '@/hooks/use-labels'
 import { useProjects } from '@/hooks/use-projects'
@@ -393,11 +393,12 @@ function TaskRowInner({
   useCompletionCollapse(task.id, rowElement)
   const strikePlay = useCompletionPlay(task.done)
   const isDark = useIsDark()
-  // Collaboration shows only on a shared project (cross-app semantics 9.1, design system section 4).
+  // The comment count is on every task; assignees and the unread mark only on a shared project
+  // (cross-app semantics 9.1, design system section 4).
   const access = useProjectAccess(task.project_id)
   const me = useCollabMe()
   const commentsPaneOpen = useUIStore((s) => s.commentsPaneOpen)
-  const commentCount = access.shared ? (task.comment_count ?? 0) : 0
+  const commentCount = task.comment_count ?? 0
   const unread = access.shared && !!task.is_unread
   const assignees = useMemo(
     () => (access.shared ? orderPeople(task.assignees ?? [], me?.id) : []),
@@ -591,12 +592,16 @@ function TaskRowInner({
   const metaLabels = rowLabels(labels, rowView)
   const projectSource = rowProjectSource(task.project_id, rowView, projectMeta !== undefined)
   const isRepeating = (task.repeat_after ?? 0) > 0 || (task.repeat_mode ?? 0) > 0
+  // Comfortable, the notes show as a line of text, which takes the place of their icon (design system section 4).
+  const comfortable = appConfig?.row_density === 'comfortable'
+  const notesLine = comfortable ? notesPreview(task.description) : ''
+  const showNotesIcon = notesLine === '' && hasNotesContent(task.description)
   const hasMeta =
     projectSource !== 'none' ||
     metaLabels.length > 0 ||
     subtaskCount > 0 ||
     isRepeating ||
-    hasNotesContent(task.description) ||
+    showNotesIcon ||
     (task.attachments?.length ?? 0) > 0 ||
     commentCount > 0 ||
     (nestedDepth === 0 && !!parentTitle(task)) ||
@@ -690,7 +695,8 @@ function TaskRowInner({
         <div className="min-w-0">
           <span
             className={cn(
-              'block truncate text-task-title',
+              'text-task-title',
+              comfortable ? 'line-clamp-3 break-words' : 'block truncate',
               task.done ? 'text-text-secondary' : 'text-text'
             )}
           >
@@ -701,6 +707,7 @@ function TaskRowInner({
               <span className={cn(task.done && 'vicu-strike', task.done && strikePlay && 'vicu-strike-play')}>{task.title}</span>
             )}
           </span>
+          {notesLine && <p className="mt-0.5 truncate text-meta font-normal text-text-secondary">{notesLine}</p>}
           {hasMeta && (
             <div className="mt-0.5 flex min-w-0 items-center gap-x-2 overflow-hidden whitespace-nowrap text-meta text-text-secondary">
               {projectSource === 'group' && projectMeta && (
@@ -744,7 +751,7 @@ function TaskRowInner({
                   <span>{checklistLabel(progress.completed, progress.total)}</span>
                 </button>
               )}
-              {hasNotesContent(task.description) && (
+              {showNotesIcon && (
                 <AlignLeft className="h-3 w-3 shrink-0" aria-label="Has notes" />
               )}
               {isRepeating && <Repeat className="h-3 w-3 shrink-0" aria-label="Repeats" />}

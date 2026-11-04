@@ -138,13 +138,13 @@ describe('voiceCardChips', () => {
 
   it('shows the list date and project before anything is said, never the Inbox', () => {
     expect(chipsFor('', { projectId: 7, defaultDueDate: null })).toEqual(['project:Work'])
-    expect(chipsFor('', { projectId: 1, defaultDueDate: new Date(2026, 9, 21) })).toEqual(['date:Wed 21 Oct'])
+    expect(chipsFor('', { projectId: 1, defaultDueDate: new Date(2026, 9, 21) })).toEqual(['date:Today, 21 Oct'])
     expect(chipsFor('', null)).toEqual([])
   })
 
   it('replaces them with what the words say', () => {
     expect(chipsFor('Call mom tomorrow 3pm #Family', { projectId: 7, defaultDueDate: new Date(2026, 9, 21) })).toEqual([
-      'date:Thu 22 Oct, 15:00',
+      'date:Tomorrow, 22 Oct, 15:00',
       'project:Family',
     ])
   })

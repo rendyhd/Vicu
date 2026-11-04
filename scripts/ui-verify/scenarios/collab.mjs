@@ -1,7 +1,7 @@
 // collab: household collaboration (docs/cross-app-semantics-v1.md section 9, design system 4 and 4.1).
 //
-//   A. A private project looks as before: no avatars, no comment counts, no Assign or Comments in
-//      the card.
+//   A. A private project has no avatars and no Assign; its tasks have Comments in the card, and a
+//      task without comments shows no count.
 //   B. In the shared "Trip to Lisbon" the sidebar row has the shared mark, task lists ask for the
 //      comment signals, and the flights row shows its assignees ("Assigned to you, Maya") and an
 //      unread count ("2 comments, new").
@@ -13,8 +13,8 @@
 //      closes the pane and focus returns to the Comments button; Mod+Shift+C opens it again.
 //   E. Share dialog from the sidebar menu: owner, Maya and Sam with their permissions; removing Sam
 //      offers Undo in the dialog, which puts Sam back.
-//   F. With every share removed the project turns private: the shared mark goes and task lists stop
-//      asking for the comment signals.
+//   F. With every share removed the project turns private: the shared mark goes and task lists keep
+//      asking for the comment signals, which every task has.
 //
 // It changes the server (assignees, a comment, shares) and puts the shares and assignees back in a
 // finally block. Run it alone: --scenario collab.
@@ -23,7 +23,7 @@ import { createApi, readApiToken } from '../lib.mjs'
 export const meta = {
   id: 'CO',
   wave: null,
-  title: 'Collaboration: private projects unchanged, shared rows with avatars and counts, Assign, the comments pane, sharing',
+  title: 'Collaboration: private projects with Comments only, shared rows with avatars and counts, Assign, the comments pane, sharing',
 }
 
 const items = (res) => (Array.isArray(res) ? res : (res?.items ?? []))
@@ -75,12 +75,36 @@ export default async function run(h) {
       counts: [...document.querySelectorAll('[data-task-id] button[aria-label]')].filter((b) => /\d+ comments?\b/.test(b.getAttribute('aria-label'))).length,
     }))
     await h.assert('A: a private project shows no avatars and no comment counts', { ok: privateSignals.avatars === 0 && privateSignals.counts === 0, detail: JSON.stringify(privateSignals) })
-    const firstPrivate = row(await page.locator('[data-task-id]').first().getAttribute('data-task-id'))
+    const firstPrivateId = Number(await page.locator('[data-task-id]').first().getAttribute('data-task-id'))
+    const firstPrivate = row(firstPrivateId)
     await firstPrivate.click({ position: { x: 180, y: 12 } })
     await h.wait(700)
     const privateBar = await page.evaluate(() => [...document.querySelectorAll('[data-prop]')].map((b) => b.getAttribute('data-prop')))
-    await h.assert('A: a private card has no Assign and no Comments', { ok: privateBar.length > 0 && !privateBar.includes('assign') && !privateBar.includes('comments'), detail: privateBar.join(',') })
+    await h.assert('A: a private card has Comments and no Assign', { ok: !privateBar.includes('assign') && privateBar.includes('comments'), detail: privateBar.join(',') })
+
+    // A comment on a private task: a note to yourself, with nothing about other people.
+    await firstPrivate.locator('button[data-prop="comments"]').click()
+    const privatePane = page.locator('#comments-pane')
+    const privateComposer = privatePane.locator('textarea[aria-label="Write a comment"]')
+    await until(async () => (await privateComposer.count()) > 0)
+    const privatePlaceholder = await privateComposer.getAttribute('placeholder')
+    await h.assert('A: the comments pane opens on a private task and offers no mention', { ok: privatePlaceholder === 'Write a comment.', detail: privatePlaceholder })
+    await h.assert('A: a private task has no Notify me', { ok: !/Notify me|Notifying you/.test((await privatePane.textContent()) ?? '') })
+    await privateComposer.click()
+    await h.type('Note to self')
+    await h.key('Control+Enter')
+    const privateComment = await until(async () => items(await api.call('GET', `/tasks/${firstPrivateId}/comments?per_page=50`)).find((c) => c.comment.includes('Note to self')))
+    await h.assert('A: a comment on a private task reaches the server', !!privateComment)
+    const privateRead = h.requests().filter((r) => r.url.includes(`/tasks/${firstPrivateId}/read`))
+    await h.assert('A: reading it sends no read mark', { ok: privateRead.length === 0, detail: privateRead.map((r) => r.url).join(' | ') })
+    await h.capture('comments-pane-private', { clip: { x: 0, y: 0, width: 1280, height: 820 } })
+    await privateComposer.focus()
+    await h.key('Escape')
+    await h.wait(300)
     await h.dismiss()
+    const privateCount = await until(async () => (await firstPrivate.locator('button[aria-label*="comment"]').count()) > 0)
+    await h.assert('A: the row shows the count', !!privateCount)
+    if (privateComment) await api.call('DELETE', `/tasks/${firstPrivateId}/comments/${privateComment.id}`)
 
     // ---- B. Shared rows -------------------------------------------------------------------------
     const mark = h.requests().length
@@ -89,7 +113,7 @@ export default async function run(h) {
     const sidebarShared = await aside.locator(`[data-sidebar-project="${ids.lisbon}"]`).evaluate((el) => !!el.querySelector('svg.lucide-users') && /shared with/i.test(el.textContent))
     await h.assert('B: the sidebar row of the shared project has the shared mark', sidebarShared)
     const taskRequests = h.requests(mark).filter((r) => /\/tasks(\?|$)|\/views\/\d+\/tasks/.test(r.url))
-    await h.assert('B: task lists ask for comment_count and is_unread while a project is shared', {
+    await h.assert('B: task lists ask for comment_count and is_unread', {
       ok: taskRequests.length > 0 && taskRequests.every((r) => r.url.includes('expand=comment_count') && r.url.includes('expand=is_unread')),
       detail: taskRequests.map((r) => r.url.replace(/^.*\/api\/v2/, '')).slice(0, 3).join(' | '),
     })
@@ -214,8 +238,8 @@ export default async function run(h) {
     await h.goto('/anytime')
     await h.wait(800)
     const later = h.requests(quiet).filter((r) => /\/tasks(\?|$)|\/views\/\d+\/tasks/.test(r.url))
-    await h.assert('F: with nothing shared, task lists do not ask for the comment signals', {
-      ok: later.length > 0 && later.every((r) => !r.url.includes('expand=comment_count')),
+    await h.assert('F: with nothing shared, task lists still ask for the comment signals', {
+      ok: later.length > 0 && later.every((r) => r.url.includes('expand=comment_count')),
       detail: later.map((r) => r.url.replace(/^.*\/api\/v2/, '')).slice(0, 3).join(' | '),
     })
   } finally {

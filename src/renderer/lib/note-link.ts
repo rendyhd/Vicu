@@ -80,3 +80,29 @@ export function hasNotesContent(description: string | undefined | null): boolean
   const stripped = stripPageLink(stripNoteLink(description))
   return stripped.replace(/<[^>]+>/g, '').replace(/\s|&nbsp;/g, '').length > 0
 }
+
+const ENTITIES: Record<string, string> = { nbsp: ' ', lt: '<', gt: '>', quot: '"', apos: "'", amp: '&' }
+
+/** `&amp;` is decoded in the same pass as the others, so `&amp;lt;` stays the text `&lt;`. */
+function decodeEntities(text: string): string {
+  return text.replace(/&(?:#(\d+)|#x([0-9a-f]+)|(nbsp|lt|gt|quot|apos|amp));/gi, (whole, dec, hex, name) => {
+    if (name) return ENTITIES[name.toLowerCase()] ?? whole
+    const code = dec ? Number.parseInt(dec, 10) : Number.parseInt(hex, 16)
+    return code > 0 && code <= 0xffff ? String.fromCharCode(code) : whole
+  })
+}
+
+/**
+ * The notes as one line of plain text, for a Comfortable row (design-system section 4): no link
+ * markers and images, line breaks as spaces. Empty when no text is left. The same as the phone's
+ * `TaskLinkParser.notesPreview`.
+ */
+export function notesPreview(description: string | undefined | null): string {
+  if (!description) return ''
+  const text = stripPageLink(stripNoteLink(description))
+    .replace(/<!--[\s\S]*?-->/g, ' ')
+    .replace(/\[\[image(-pending)?:[^\]]*]]/g, ' ')
+    .replace(/<br\s*\/?>|<\/(p|li|div|h[1-6]|blockquote|pre)>/gi, ' ')
+    .replace(/<[^>]+>/g, '')
+  return decodeEntities(text).replace(/\s+/g, ' ').trim()
+}

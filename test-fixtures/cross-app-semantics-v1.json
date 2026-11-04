@@ -108,7 +108,7 @@
       { "name": "assigned to nobody", "today": "2026-10-06", "filter": { "due_date_filter": "all", "assigned": "nobody" }, "expect": [4, 5] },
       { "name": "unknown assigned value is no condition", "today": "2026-10-06", "filter": { "due_date_filter": "all", "assigned": "team" }, "expect": [1, 2, 3, 4, 5, 6, 7] },
       { "name": "unread comments", "today": "2026-10-06", "filter": { "due_date_filter": "all", "comments": "unread" }, "expect": [3, 4] },
-      { "name": "any comments", "today": "2026-10-06", "filter": { "due_date_filter": "all", "comments": "any" }, "expect": [1, 3, 4] },
+      { "name": "any comments", "today": "2026-10-06", "filter": { "due_date_filter": "all", "comments": "any" }, "expect": [1, 3, 4, 6] },
       { "name": "unknown comments value is no condition", "today": "2026-10-06", "filter": { "due_date_filter": "all", "comments": "mentions" }, "expect": [1, 2, 3, 4, 5, 6, 7] },
       { "name": "shared projects only", "today": "2026-10-06", "filter": { "due_date_filter": "all", "shared_only": true }, "expect": [1, 2, 3, 4, 5] },
       { "name": "shared_only false is no condition", "today": "2026-10-06", "filter": { "due_date_filter": "all", "shared_only": false }, "expect": [1, 2, 3, 4, 5, 6, 7] },
@@ -719,8 +719,13 @@
       { "name": "row.inDayGroup, 23:59, en-US 24-hour", "context": "row.inDayGroup", "locale": "en-US", "hour12": false, "zone": "America/New_York", "now": "2026-10-07T09:30:00", "due": "2026-10-09T23:59:00", "dateOnly": false, "expect": "23:59" },
       { "name": "row.inDayGroup, date only, en-US 24-hour", "context": "row.inDayGroup", "locale": "en-US", "hour12": false, "zone": "America/New_York", "now": "2026-10-07T09:30:00", "due": "2026-10-09T23:59:59", "dateOnly": true, "expect": "" },
       { "name": "chip, 3 days ago, with a time, en-GB", "context": "chip", "locale": "en-GB", "hour12": false, "zone": "Pacific/Auckland", "now": "2026-10-07T09:30:00", "due": "2026-10-04T14:30:00", "dateOnly": false, "expect": "Sun 4 Oct, 14:30" },
-      { "name": "chip, today, with a time, en-GB", "context": "chip", "locale": "en-GB", "hour12": false, "zone": "Pacific/Auckland", "now": "2026-10-07T09:30:00", "due": "2026-10-07T15:00:00", "dateOnly": false, "expect": "Wed 7 Oct, 15:00" },
-      { "name": "chip, tomorrow, with a time, en-GB", "context": "chip", "locale": "en-GB", "hour12": false, "zone": "Pacific/Auckland", "now": "2026-10-07T09:30:00", "due": "2026-10-08T09:00:00", "dateOnly": false, "expect": "Thu 8 Oct, 09:00" },
+      { "name": "chip, today, with a time, en-GB", "context": "chip", "locale": "en-GB", "hour12": false, "zone": "Pacific/Auckland", "now": "2026-10-07T09:30:00", "due": "2026-10-07T15:00:00", "dateOnly": false, "expect": "Today, 7 Oct, 15:00" },
+      { "name": "chip, tomorrow, with a time, en-GB", "context": "chip", "locale": "en-GB", "hour12": false, "zone": "Pacific/Auckland", "now": "2026-10-07T09:30:00", "due": "2026-10-08T09:00:00", "dateOnly": false, "expect": "Tomorrow, 8 Oct, 09:00" },
+      { "name": "chip, yesterday, with a time, en-GB", "context": "chip", "locale": "en-GB", "hour12": false, "zone": "Pacific/Auckland", "now": "2026-10-07T09:30:00", "due": "2026-10-06T14:30:00", "dateOnly": false, "expect": "Yesterday, 6 Oct, 14:30" },
+      { "name": "chip, yesterday, date only, en-GB", "context": "chip", "locale": "en-GB", "hour12": false, "zone": "Pacific/Auckland", "now": "2026-10-07T09:30:00", "due": "2026-10-06T23:59:59", "dateOnly": true, "expect": "Yesterday, 6 Oct" },
+      { "name": "chip, tomorrow, date only, en-GB", "context": "chip", "locale": "en-GB", "hour12": false, "zone": "Pacific/Auckland", "now": "2026-10-07T09:30:00", "due": "2026-10-08T23:59:59", "dateOnly": true, "expect": "Tomorrow, 8 Oct" },
+      { "name": "chip, tomorrow across the year, en-GB", "context": "chip", "locale": "en-GB", "hour12": false, "zone": "Pacific/Auckland", "now": "2026-12-31T10:00:00", "due": "2027-01-01T09:00:00", "dateOnly": false, "expect": "Tomorrow, 1 Jan 2027, 09:00" },
+      { "name": "chip, yesterday across the year, en-GB", "context": "chip", "locale": "en-GB", "hour12": false, "zone": "Pacific/Auckland", "now": "2027-01-01T10:00:00", "due": "2026-12-31T23:59:59", "dateOnly": true, "expect": "Yesterday, 31 Dec 2026" },
       { "name": "chip, saturday, with a time, en-GB", "context": "chip", "locale": "en-GB", "hour12": false, "zone": "Pacific/Auckland", "now": "2026-10-07T09:30:00", "due": "2026-10-10T15:00:00", "dateOnly": false, "expect": "Sat 10 Oct, 15:00" },
       {
         "name": "chip, in 20 days, with a time, en-GB",
@@ -733,7 +738,7 @@
         "dateOnly": false,
         "expect": "Tue 27 Oct, 18:45"
       },
-      { "name": "chip, today, date only, en-GB", "context": "chip", "locale": "en-GB", "hour12": false, "zone": "Pacific/Auckland", "now": "2026-10-07T09:30:00", "due": "2026-10-07T23:59:59", "dateOnly": true, "expect": "Wed 7 Oct" },
+      { "name": "chip, today, date only, en-GB", "context": "chip", "locale": "en-GB", "hour12": false, "zone": "Pacific/Auckland", "now": "2026-10-07T09:30:00", "due": "2026-10-07T23:59:59", "dateOnly": true, "expect": "Today, 7 Oct" },
       { "name": "chip, saturday, date only, en-GB", "context": "chip", "locale": "en-GB", "hour12": false, "zone": "Pacific/Auckland", "now": "2026-10-07T09:30:00", "due": "2026-10-10T23:59:59", "dateOnly": true, "expect": "Sat 10 Oct" },
       {
         "name": "chip, legacy midnight saturday, date only, en-GB",
@@ -757,8 +762,13 @@
         "dateOnly": false,
         "expect": "Sun, Oct 4, 2:30 PM"
       },
-      { "name": "chip, today, with a time, en-US", "context": "chip", "locale": "en-US", "hour12": true, "zone": "America/New_York", "now": "2026-10-07T09:30:00", "due": "2026-10-07T15:00:00", "dateOnly": false, "expect": "Wed, Oct 7, 3:00 PM" },
-      { "name": "chip, tomorrow, with a time, en-US", "context": "chip", "locale": "en-US", "hour12": true, "zone": "America/New_York", "now": "2026-10-07T09:30:00", "due": "2026-10-08T09:00:00", "dateOnly": false, "expect": "Thu, Oct 8, 9:00 AM" },
+      { "name": "chip, today, with a time, en-US", "context": "chip", "locale": "en-US", "hour12": true, "zone": "America/New_York", "now": "2026-10-07T09:30:00", "due": "2026-10-07T15:00:00", "dateOnly": false, "expect": "Today, Oct 7, 3:00 PM" },
+      { "name": "chip, tomorrow, with a time, en-US", "context": "chip", "locale": "en-US", "hour12": true, "zone": "America/New_York", "now": "2026-10-07T09:30:00", "due": "2026-10-08T09:00:00", "dateOnly": false, "expect": "Tomorrow, Oct 8, 9:00 AM" },
+      { "name": "chip, yesterday, with a time, en-US", "context": "chip", "locale": "en-US", "hour12": true, "zone": "America/New_York", "now": "2026-10-07T09:30:00", "due": "2026-10-06T14:30:00", "dateOnly": false, "expect": "Yesterday, Oct 6, 2:30 PM" },
+      { "name": "chip, yesterday, date only, en-US", "context": "chip", "locale": "en-US", "hour12": true, "zone": "America/New_York", "now": "2026-10-07T09:30:00", "due": "2026-10-06T23:59:59", "dateOnly": true, "expect": "Yesterday, Oct 6" },
+      { "name": "chip, tomorrow, date only, en-US", "context": "chip", "locale": "en-US", "hour12": true, "zone": "America/New_York", "now": "2026-10-07T09:30:00", "due": "2026-10-08T23:59:59", "dateOnly": true, "expect": "Tomorrow, Oct 8" },
+      { "name": "chip, tomorrow across the year, en-US", "context": "chip", "locale": "en-US", "hour12": true, "zone": "America/New_York", "now": "2026-12-31T10:00:00", "due": "2027-01-01T09:00:00", "dateOnly": false, "expect": "Tomorrow, Jan 1, 2027, 9:00 AM" },
+      { "name": "chip, yesterday across the year, en-US", "context": "chip", "locale": "en-US", "hour12": true, "zone": "America/New_York", "now": "2027-01-01T10:00:00", "due": "2026-12-31T23:59:59", "dateOnly": true, "expect": "Yesterday, Dec 31, 2026" },
       {
         "name": "chip, saturday, with a time, en-US",
         "context": "chip",
@@ -781,7 +791,7 @@
         "dateOnly": false,
         "expect": "Tue, Oct 27, 6:45 PM"
       },
-      { "name": "chip, today, date only, en-US", "context": "chip", "locale": "en-US", "hour12": true, "zone": "America/New_York", "now": "2026-10-07T09:30:00", "due": "2026-10-07T23:59:59", "dateOnly": true, "expect": "Wed, Oct 7" },
+      { "name": "chip, today, date only, en-US", "context": "chip", "locale": "en-US", "hour12": true, "zone": "America/New_York", "now": "2026-10-07T09:30:00", "due": "2026-10-07T23:59:59", "dateOnly": true, "expect": "Today, Oct 7" },
       { "name": "chip, saturday, date only, en-US", "context": "chip", "locale": "en-US", "hour12": true, "zone": "America/New_York", "now": "2026-10-07T09:30:00", "due": "2026-10-10T23:59:59", "dateOnly": true, "expect": "Sat, Oct 10" },
       {
         "name": "chip, legacy midnight saturday, date only, en-US",
@@ -981,7 +991,7 @@
         "now": "2026-12-30T10:00:00",
         "due": "2026-12-31T09:00:00",
         "dateOnly": false,
-        "expect": "Thu 31 Dec, 09:00"
+        "expect": "Tomorrow, 31 Dec, 09:00"
       },
       {
         "name": "year end: header.day, 3 days ahead across the year, en-GB",
@@ -1070,7 +1080,7 @@
         "now": "2026-12-30T10:00:00",
         "due": "2026-12-31T09:00:00",
         "dateOnly": false,
-        "expect": "Thu, Dec 31, 9:00 AM"
+        "expect": "Tomorrow, Dec 31, 9:00 AM"
       },
       {
         "name": "year end: header.day, 3 days ahead across the year, en-US",
@@ -1292,7 +1302,7 @@
         "now": "2026-09-26T23:30:00",
         "due": "2026-09-27T09:00:00",
         "dateOnly": false,
-        "expect": "Sun 27 Sep, 09:00"
+        "expect": "Tomorrow, 27 Sep, 09:00"
       },
       {
         "name": "DST: Auckland spring forward, 6 days ahead, en-GB",
