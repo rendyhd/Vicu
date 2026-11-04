@@ -498,17 +498,25 @@ function Composer({ task, access, me, composerRef, onEscape }: ComposerProps) {
 
   const syncCaret = () => setCaret(composerRef.current?.selectionStart ?? 0)
 
+  // Placed as soon as React has written a picked mention into the box, not a frame later: a key
+  // pressed before that frame would go in first, and the rest of the typing would land before it.
+  const caretAfterPick = useRef<number | null>(null)
+  useLayoutEffect(() => {
+    const place = caretAfterPick.current
+    if (place === null) return
+    caretAfterPick.current = null
+    const el = composerRef.current
+    if (!el) return
+    el.focus()
+    el.setSelectionRange(place, place)
+  })
+
   const pick = (person: PersonRef) => {
     if (!mention) return
     const next = applyMention(text, caret, mention, person.username)
+    caretAfterPick.current = next.caret
     setText(next.text)
     setCaret(next.caret)
-    requestAnimationFrame(() => {
-      const el = composerRef.current
-      if (!el) return
-      el.focus()
-      el.setSelectionRange(next.caret, next.caret)
-    })
   }
 
   // A comment can be files alone; nothing is sent while a file is still on its way to the task.
