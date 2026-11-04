@@ -2,7 +2,7 @@ import { useMemo, useState, type RefObject } from 'react'
 import { X, FileText, Image, File, Loader2, Download } from 'lucide-react'
 import { useTaskAttachments, useUploadAttachment, useDeleteAttachment } from '@/hooks/use-task-mutations'
 import { useAttachmentActions } from '@/hooks/use-attachment-actions'
-import { viewableImages } from '@/lib/attachment-preview'
+import { formatFileSize, viewableImages } from '@/lib/attachment-preview'
 import { Popover, type PopoverCloseReason } from '../overlay/Popover'
 import { AttachmentViewer } from './AttachmentViewer'
 
@@ -12,12 +12,6 @@ interface AttachmentPickerPopoverProps {
   invokedBy?: RefObject<HTMLElement | null>[]
   taskId: number
   onClose: (reason?: PopoverCloseReason) => void
-}
-
-function formatFileSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
 function getFileIcon(mime: string) {

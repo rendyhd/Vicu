@@ -63,6 +63,12 @@ export function viewableImages(
   return images
 }
 
+export function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
 /** The image after (`1`) or before (`-1`) the current one, going round at the ends. */
 export function stepImage(index: number, count: number, step: 1 | -1): number {
   if (count <= 0) return 0

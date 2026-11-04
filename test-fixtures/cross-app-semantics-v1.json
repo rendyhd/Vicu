@@ -1593,6 +1593,53 @@
         { "name": "empty", "html": "", "segments": [], "plain": true, "editText": "" }
       ]
     },
+    "attachments": {
+      "about": "A file in a comment is a task attachment its HTML points at (section 9.5). The encode and decode vectors are comments of task 7.",
+      "task": 7,
+      "members": [
+        { "id": 2, "username": "maya", "name": "Maya" }
+      ],
+      "address": [
+        { "name": "a server address", "server": "https://todo.example.com", "task": 7, "attachment": 3, "expect": "https://todo.example.com/api/v1/tasks/7/attachments/3" },
+        { "name": "a trailing slash and a sub-path", "server": "http://192.168.1.5:3456/vikunja/", "task": 7, "attachment": 3, "expect": "http://192.168.1.5:3456/vikunja/api/v1/tasks/7/attachments/3" }
+      ],
+      "inlineTypes": [
+        { "type": "image/png", "expect": true },
+        { "type": "IMAGE/JPEG", "expect": true },
+        { "type": "image/gif", "expect": true },
+        { "type": "image/webp; charset=binary", "expect": true },
+        { "type": "image/svg+xml", "expect": false },
+        { "type": "image/heic", "expect": false },
+        { "type": "application/pdf", "expect": false },
+        { "type": "", "expect": false }
+      ],
+      "encode": [
+        { "name": "text and an image", "text": "Look", "attachments": [{ "attachment": 3, "name": "shot.png", "image": true, "url": "https://t.example/api/v1/tasks/7/attachments/3" }], "expect": "<p>Look</p><img src=\"https://t.example/api/v1/tasks/7/attachments/3\" alt=\"shot.png\">" },
+        { "name": "a file without text", "text": "  ", "attachments": [{ "attachment": 4, "name": "report.pdf", "image": false, "url": "https://t.example/api/v1/tasks/7/attachments/4" }], "expect": "<p><a href=\"https://t.example/api/v1/tasks/7/attachments/4\">report.pdf</a></p>" },
+        { "name": "attachments keep their order", "text": "Both", "attachments": [{ "attachment": 4, "name": "report.pdf", "image": false, "url": "https://t.example/api/v1/tasks/7/attachments/4" }, { "attachment": 3, "name": "shot.png", "image": true, "url": "https://t.example/api/v1/tasks/7/attachments/3" }], "expect": "<p>Both</p><p><a href=\"https://t.example/api/v1/tasks/7/attachments/4\">report.pdf</a></p><img src=\"https://t.example/api/v1/tasks/7/attachments/3\" alt=\"shot.png\">" },
+        { "name": "a name is escaped", "text": "", "attachments": [{ "attachment": 5, "name": "a<b> & \"c\".png", "image": true, "url": "https://t.example/api/v1/tasks/7/attachments/5" }, { "attachment": 6, "name": "x<y>.txt", "image": false, "url": "https://t.example/api/v1/tasks/7/attachments/6" }], "expect": "<img src=\"https://t.example/api/v1/tasks/7/attachments/5\" alt=\"a&lt;b&gt; &amp; &quot;c&quot;.png\"><p><a href=\"https://t.example/api/v1/tasks/7/attachments/6\">x&lt;y&gt;.txt</a></p>" },
+        { "name": "a mention beside an attachment", "text": "@maya look", "attachments": [{ "attachment": 3, "name": "shot.png", "image": true, "url": "https://t.example/api/v1/tasks/7/attachments/3" }], "expect": "<p><mention-user data-id=\"maya\" data-label=\"Maya\">@maya</mention-user> look</p><img src=\"https://t.example/api/v1/tasks/7/attachments/3\" alt=\"shot.png\">" },
+        { "name": "nothing to send", "text": " ", "attachments": [], "expect": "" }
+      ],
+      "decode": [
+        { "name": "what Vicu writes", "html": "<p>Look</p><img src=\"https://t.example/api/v1/tasks/7/attachments/3\" alt=\"shot.png\"><p><a href=\"https://t.example/api/v1/tasks/7/attachments/4\">report.pdf</a></p>", "segments": [{ "text": "Look" }, { "attachment": 3, "name": "shot.png", "image": true, "url": "https://t.example/api/v1/tasks/7/attachments/3" }, { "attachment": 4, "name": "report.pdf", "image": false, "url": "https://t.example/api/v1/tasks/7/attachments/4" }], "plain": true, "editText": "Look" },
+        { "name": "only an image", "html": "<img src=\"https://t.example/api/v1/tasks/7/attachments/3\" alt=\"shot.png\">", "segments": [{ "attachment": 3, "name": "shot.png", "image": true, "url": "https://t.example/api/v1/tasks/7/attachments/3" }], "plain": true, "editText": "" },
+        { "name": "the web editor's data-src wins over src", "html": "<p>See</p><img data-src=\"https://t.example/api/v2/tasks/7/attachments/3\" src=\"#\" alt=\"\" id=\"tiptap-image-7-3\">", "segments": [{ "text": "See" }, { "attachment": 3, "name": "", "image": true, "url": "https://t.example/api/v2/tasks/7/attachments/3" }], "plain": true, "editText": "See" },
+        { "name": "an image in a paragraph with a title and a relative address", "html": "<p><img src=\"/api/v2/tasks/7/attachments/3\" title=\" shot \"></p>", "segments": [{ "attachment": 3, "name": "shot", "image": true, "url": "/api/v2/tasks/7/attachments/3" }], "plain": true, "editText": "" },
+        { "name": "an address without an API path, with a query", "html": "<img src=\"/tasks/7/attachments/3?preview_size=md\">", "segments": [{ "attachment": 3, "name": "", "image": true, "url": "/tasks/7/attachments/3?preview_size=md" }], "plain": true, "editText": "" },
+        { "name": "a mention before an attachment", "html": "<p><mention-user data-id=\"maya\" data-label=\"Maya\">@maya</mention-user> look</p><img src=\"/api/v1/tasks/7/attachments/3\" alt=\"s\">", "segments": [{ "mention": "maya", "label": "Maya" }, { "text": " look" }, { "attachment": 3, "name": "s", "image": true, "url": "/api/v1/tasks/7/attachments/3" }], "plain": true, "editText": "@maya look" },
+        { "name": "text after an attachment stops it being plain", "html": "<p>one</p><img src=\"/api/v1/tasks/7/attachments/3\" alt=\"s\"><p>two</p>", "segments": [{ "text": "one" }, { "attachment": 3, "name": "s", "image": true, "url": "/api/v1/tasks/7/attachments/3" }, { "text": "two" }], "plain": false, "editText": null },
+        { "name": "line breaks next to an attachment go", "html": "<p>one<br></p><p><img src=\"/api/v1/tasks/7/attachments/3\" alt=\"s\"></p><p><br>two</p>", "segments": [{ "text": "one" }, { "attachment": 3, "name": "s", "image": true, "url": "/api/v1/tasks/7/attachments/3" }, { "text": "two" }], "plain": false, "editText": null },
+        { "name": "a file link in a sentence", "html": "<p>See <a href=\"/api/v1/tasks/7/attachments/4\">notes.txt</a> please</p>", "segments": [{ "text": "See" }, { "attachment": 4, "name": "notes.txt", "image": false, "url": "/api/v1/tasks/7/attachments/4" }, { "text": "please" }], "plain": false, "editText": null },
+        { "name": "a link's text is trimmed and its inner tags are dropped", "html": "<p><a href=\"/api/v1/tasks/7/attachments/4\"> <strong>re</strong>port.pdf </a></p>", "segments": [{ "attachment": 4, "name": "report.pdf", "image": false, "url": "/api/v1/tasks/7/attachments/4" }], "plain": false, "editText": null },
+        { "name": "a file link without text", "html": "<p><a href=\"/api/v1/tasks/7/attachments/4\"></a></p>", "segments": [{ "attachment": 4, "name": "", "image": false, "url": "/api/v1/tasks/7/attachments/4" }], "plain": true, "editText": "" },
+        { "name": "an attachment of another task is not one", "html": "<p>a</p><img src=\"/api/v1/tasks/8/attachments/3\"><p>b</p>", "segments": [{ "text": "a\nb" }], "plain": false, "editText": null },
+        { "name": "a link to another task's attachment keeps its text", "html": "<p><a href=\"/api/v1/tasks/8/attachments/3\">old</a></p>", "segments": [{ "text": "old" }], "plain": false, "editText": null },
+        { "name": "an image from elsewhere is dropped", "html": "<p>a</p><img src=\"https://elsewhere.example/x.png\">", "segments": [{ "text": "a" }], "plain": false, "editText": null },
+        { "name": "an address with more after the id is not one", "html": "<img src=\"/api/v1/tasks/7/attachments/3/download\">", "segments": [], "plain": false, "editText": null },
+        { "name": "an id too large to be one", "html": "<img src=\"/api/v1/tasks/7/attachments/99999999999999999999\">", "segments": [], "plain": false, "editText": null }
+      ]
+    },
     "mention": {
       "me": 1,
       "members": [

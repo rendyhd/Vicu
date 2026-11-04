@@ -6,11 +6,13 @@ import {
   assignChipLabel,
   assignedLabel,
   avatarInitial,
+  commentAttachmentAddress,
   commentCountLabel,
   decodeCommentHtml,
   effectivePermission,
   encodeCommentHtml,
   isCommentEdited,
+  isInlineImageType,
   isSharedProject,
   memberPermission,
   mentionQueryAt,
@@ -18,6 +20,7 @@ import {
   nameList,
   visibleToText,
   type CollabUser,
+  type CommentAttachment,
   type CommentSegment,
   type ShareGraph,
 } from '../collaboration'
@@ -45,6 +48,14 @@ interface Fixture {
     decode: {
       members: CollabUser[]
       vectors: { name: string; html: string; segments: CommentSegment[]; plain: boolean; editText: string | null }[]
+    }
+    attachments: {
+      task: number
+      members: CollabUser[]
+      address: { name: string; server: string; task: number; attachment: number; expect: string }[]
+      inlineTypes: { type: string; expect: boolean }[]
+      encode: { name: string; text: string; attachments: CommentAttachment[]; expect: string }[]
+      decode: { name: string; html: string; segments: CommentSegment[]; plain: boolean; editText: string | null }[]
     }
     mention: {
       me: number
@@ -153,6 +164,42 @@ describe('collaboration: text from comment HTML', () => {
     for (const html of ['<p', '<p class="x', '<mention-user data-id="a"', '<a href=x>y', '<<<>>>', '&#xFFFFFFFF;', '<p>a</p', '</>']) {
       expect(() => decodeCommentHtml(html, [])).not.toThrow()
     }
+  })
+})
+
+describe('collaboration: attachments in a comment', () => {
+  const a = c.attachments
+  for (const v of a.address) {
+    it(`address: ${v.name}`, () => expect(commentAttachmentAddress(v.server, v.task, v.attachment)).toBe(v.expect))
+  }
+  for (const v of a.inlineTypes) {
+    it(`inline type: ${v.type || 'none'}`, () => expect(isInlineImageType(v.type)).toBe(v.expect))
+  }
+  for (const v of a.encode) {
+    it(`encode: ${v.name}`, () => expect(encodeCommentHtml(v.text, a.members, v.attachments)).toBe(v.expect))
+  }
+  for (const v of a.decode) {
+    it(`decode: ${v.name}`, () => {
+      const decoded = decodeCommentHtml(v.html, a.members, a.task)
+      expect(decoded.segments).toEqual(v.segments)
+      expect(decoded.plain).toBe(v.plain)
+      expect(decoded.editText).toBe(v.editText)
+    })
+  }
+  for (const v of a.decode.filter((vector) => vector.plain)) {
+    it(`an edit keeps the attachments as they were: ${v.name}`, () => {
+      const decoded = decodeCommentHtml(v.html, a.members, a.task)
+      const again = encodeCommentHtml(decoded.editText ?? '', a.members, decoded.attachments)
+      const reread = decodeCommentHtml(again, a.members, a.task)
+      expect(reread.segments).toEqual(decoded.segments)
+      expect(reread.plain).toBe(true)
+    })
+  }
+  it('without the task nothing is an attachment', () => {
+    const decoded = decodeCommentHtml('<p>a</p><img src="/api/v1/tasks/7/attachments/3">', [])
+    expect(decoded.segments).toEqual([{ text: 'a' }])
+    expect(decoded.attachments).toEqual([])
+    expect(decoded.plain).toBe(false)
   })
 })
 

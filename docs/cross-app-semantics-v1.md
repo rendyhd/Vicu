@@ -667,9 +667,9 @@ Assignees and task comments for a household of a few people. Everything here is 
 checked against a 2.4.0 server.
 
 Not part of it, because the API has no such thing: presence or typing, an activity log ("Maya
-completed ..."; `done_at` has no author), threaded replies, files on comments (files stay task
-attachments), push delivery and a "household" object. Reactions exist in the API and are left out
-on purpose.
+completed ..."; `done_at` has no author), threaded replies, a file field on comments (a comment
+points at task attachments instead, section 9.5), push delivery and a "household" object. Reactions
+exist in the API and are left out on purpose.
 
 ### 9.1 Members and the shared rule
 
@@ -772,7 +772,8 @@ on purpose.
 **Comment HTML from text** (what the composer sends; fixture `collaboration.encode`):
 
 1. Line breaks (`\r\n`, `\r`) become `\n`; spaces, tabs, no-break spaces and line breaks at the
-   start and end of the whole text are removed. Empty text is not sent.
+   start and end of the whole text are removed. Empty text is not sent, unless the comment carries
+   attachments (below).
 2. A **mention** is an `@` at the start of the text or after a character that is not a letter, a
    digit or `_`, followed by the username of a member (compared without case) and then by the end
    of the text or a character that is not a letter, a digit or `_`. Members are tried longest
@@ -802,6 +803,46 @@ on purpose.
   those can be edited in Vicu: the editor gets the text with each mention as "@" + `data-id`, and
   saving encodes it again as above. Other comments (rich text from Vikunja's web editor) are
   shown as text and can be deleted, not edited, so no formatting is lost.
+
+**Attachments in a comment** (fixture `collaboration.attachments`). The API has no file field on a
+comment. A file in a comment is a task attachment that the comment's HTML points at, the way
+Vikunja's web editor inserts an image, so it is also listed in the task's attachments.
+
+- **Address**: `{server}/api/v1/tasks/{task}/attachments/{attachment}`, with `{server}` the address
+  the app signed in with, without a trailing `/`. It says `v1` on purpose: the web app of Vikunja
+  2.4 only recognises an image whose address starts with its own API address, which ends in
+  `/api/v1`; later versions accept `v1` and `v2`. Every version also compares the server address, so
+  a browser that reaches the server at another address than the app did shows the image as broken.
+- **Writing**: the file is uploaded first (`POST tasks/{id}/attachments`), which needs a connection
+  and a task the server knows; the comment is then queued like any other (section 9.6). The comment
+  is the paragraph from the steps above, left out when there is no text, followed by one element per
+  attachment in the order they were added: `<img src="{address}" alt="{file name}">` when the server
+  reports the type as `image/png`, `image/jpeg`, `image/gif` or `image/webp` (without case, and
+  without parameters such as `; charset=binary`), which every browser can show, and
+  `<p><a href="{address}">{file name}</a></p>` for anything else. Values are escaped as in step 3.
+  Vikunja's web app shows such a link as a plain link, which answers 401 in a browser because it
+  carries no sign-in; there the file is reached through the task's attachments.
+- **Reading**: an `img` (its `data-src`, else its `src`; the web editor can store either) or an `a`
+  (its `href`) is an attachment when the address ends in `/tasks/{task}/attachments/{attachment}`, a
+  query or fragment aside, and `{task}` is the task the comment belongs to. The rest of the address
+  is not used: apps fetch by id, from their own server with their own sign-in. Any other `img` is
+  dropped and any other `a` stays its text, as above, and nothing else in a comment is ever fetched,
+  so a comment cannot send the token elsewhere or learn who read it.
+- **Segments**: an attachment is a segment in reading order, with its `attachment` id, `image` (true
+  for an `img`), `url` as written, and `name`: the `alt`, else the `title`, of an `img`, or the text
+  of an `a`, trimmed; it can be empty. Text next to an attachment loses the spaces and line breaks
+  on that side.
+- **Plain form**: attachments keep a comment plain as long as no text or mention comes after one
+  and no other element is in it. The editor gets the text alone, and saving encodes that text
+  followed by the same attachments (same element, address and name). The text may then be empty.
+- **Showing**: an `img` attachment shows inline from the server's preview
+  (`GET tasks/{id}/attachments/{attachment}` with a `preview_size`), and opening it shows the
+  original. An `a` attachment, or an image that cannot be loaded, shows its name and size with Open
+  and Save, and Share on a phone. The task's attachment list gives the real name, type and size when
+  it holds the attachment. An attachment missing from a list the server has just answered shows "No
+  longer available" under its name.
+- **Deleting**: deleting a comment leaves its files on the task, and the delete question says so.
+  Deleting a file leaves the comment.
 
 **Mention suggestions** (fixture `collaboration.mention`): while the text before the caret ends
 with an `@` that is at the start or after whitespace, followed by zero or more characters that are
