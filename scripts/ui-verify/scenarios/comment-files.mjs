@@ -14,6 +14,7 @@
 //   I. A file newer than the list read before: "No longer available" must not flash.
 //   J. The delete question says the files stay, and they do.
 //   K. A file deleted from the task: its row says "No longer available", with no buttons.
+//   L. A screenshot on the real clipboard and Ctrl+V, where A dispatches the paste.
 //
 // It works on one throwaway task in the shared project, deleted at the end. Run it alone:
 // --scenario comment-files.
@@ -410,9 +411,70 @@ export default async function run(h) {
     await page.locator('dialog[open] button', { hasText: /^Cancel$/ }).click()
     await h.wait(300)
 
+    // ---- L. A screenshot on the real clipboard ------------------------------------------------
+    // The steps above dispatch the paste; this one goes through the system clipboard and the key.
+    // It borrows the clipboard of whoever runs this: everything on it is kept and put back, and it
+    // runs only when that can be done (copied files are not something read() hands over).
+    const clipboardKept = await h.app.evaluate(async ({ clipboard, ClipboardItem }) => {
+      if (await clipboard.has('electron application/osclipboard;format="FileNameW"')) return false
+      const kept = []
+      for (const item of await clipboard.read()) {
+        const payload = {}
+        for (const type of item.types) payload[type] = await item.getType(type)
+        if (item.types.length > 0) kept.push(new ClipboardItem(payload))
+      }
+      globalThis.__cfClipboard = kept
+      globalThis.__cfClipboardText = await clipboard.readText()
+      return kept.length > 0
+    })
+    if (!clipboardKept) {
+      h.skip('L: a real screenshot paste', 'the clipboard holds nothing this step could put back afterwards')
+    } else try {
+      await h.app.evaluate(async ({ clipboard, ClipboardItem }, bytes) => {
+        const image = new Blob([Buffer.from(bytes)], { type: 'image/png' })
+        await clipboard.write([new ClipboardItem({ 'image/png': image })])
+      }, board)
+      await composer.click()
+      await h.key('ControlOrMeta+V')
+      await until(async () => (await chips.count()) === 1)
+      await uploaded()
+      const chipText = (await chips.first().textContent().catch(() => '')) ?? ''
+      await h.assert('L: Ctrl+V with a screenshot on the clipboard makes a chip, and no text', {
+        ok: /\.png/.test(chipText) && (await composer.inputValue()) === '',
+        detail: chipText,
+      })
+      const pastedName = chipText.trim()
+      await h.assert('L: the screenshot is on the task as a PNG', async () => {
+        const stored = await until(() => named(pastedName))
+        return { ok: stored?.file.mime === 'image/png', detail: JSON.stringify(stored?.file ?? null) }
+      })
+      await pane.locator(`button[aria-label="Remove ${pastedName}"]`).click()
+      await until(async () => !(await named(pastedName)))
+    } finally {
+      const restored = await h.app.evaluate(async ({ clipboard }) => {
+        await clipboard.write(globalThis.__cfClipboard)
+        const same = (await clipboard.readText()) === globalThis.__cfClipboardText
+        delete globalThis.__cfClipboard
+        delete globalThis.__cfClipboardText
+        return same
+      })
+      await h.assert('L: the clipboard is back as it was', { ok: restored })
+    }
+
     // ---- K. Gone ----------------------------------------------------------------------------
-    await h.api('DELETE', `/tasks/${task.id}/attachments/${notesFile.id}`)
-    await h.api('DELETE', `/tasks/${task.id}/attachments/${boardFile.id}`)
+    // The test server's SQLite can answer 500 "database is locked" while the app is writing too.
+    const deleteFile = async (id) => {
+      for (let attempt = 1; ; attempt++) {
+        try {
+          return await h.api('DELETE', `/tasks/${task.id}/attachments/${id}`)
+        } catch (error) {
+          if (error.status !== 500 || attempt === 5) throw error
+          await h.wait(500)
+        }
+      }
+    }
+    await deleteFile(notesFile.id)
+    await deleteFile(boardFile.id)
     // The list is read again when the pane opens.
     await pane.locator('button[aria-label="Close comments"]').click()
     await h.wait(300)
