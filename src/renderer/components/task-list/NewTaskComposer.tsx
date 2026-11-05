@@ -361,6 +361,7 @@ export function NewTaskComposer({
       const draftDescription = description.trim()
       if (draftDescription) payload.description = draftDescription
       if (saved.dueDate) payload.due_date = saved.dueDate
+      if (saved.block) Object.assign(payload, saved.block)
       if (saved.priority > 0) payload.priority = saved.priority
       if (reminders.length) payload.reminders = reminders
       if (saved.repeat) Object.assign(payload, saved.repeat)

@@ -2032,5 +2032,134 @@
         "line": null
       }
     ]
+  },
+  "timeBlocks": {
+    "about": "Section 16. Times are local wall-clock times without an offset; null is no date. hours is [start, end] of the working day. Run in Pacific/Auckland, America/New_York and a third zone.",
+    "defaultLengthMinutes": 30,
+    "maxBlockMinutes": 720,
+    "defaultHours": ["08:00", "18:00"],
+    "isBlock": [
+      { "name": "same day", "start": "2026-10-06T09:00:00", "end": "2026-10-06T09:30:00", "block": true, "day": "2026-10-06", "minutes": 30 },
+      { "name": "exactly 12 hours", "start": "2026-10-06T06:00:00", "end": "2026-10-06T18:00:00", "block": true, "day": "2026-10-06", "minutes": 720 },
+      { "name": "ends at the next midnight", "start": "2026-10-06T23:30:00", "end": "2026-10-07T00:00:00", "block": true, "day": "2026-10-06", "minutes": 30 },
+      { "name": "a minute over 12 hours", "start": "2026-10-06T06:00:00", "end": "2026-10-06T18:01:00", "block": false },
+      { "name": "crosses midnight", "start": "2026-10-06T23:30:00", "end": "2026-10-07T00:30:00", "block": false },
+      { "name": "several days, as a Gantt bar", "start": "2026-10-06T00:00:00", "end": "2026-10-09T00:00:00", "block": false },
+      { "name": "start only", "start": "2026-10-06T09:00:00", "end": null, "block": false },
+      { "name": "end only", "start": null, "end": "2026-10-06T09:00:00", "block": false },
+      { "name": "neither", "start": null, "end": null, "block": false },
+      { "name": "end equal to start", "start": "2026-10-06T09:00:00", "end": "2026-10-06T09:00:00", "block": false },
+      { "name": "end before start", "start": "2026-10-06T09:00:00", "end": "2026-10-06T08:00:00", "block": false }
+    ],
+    "placing": [
+      { "name": "no due date gets the block's day", "due": null, "start": "2026-10-06T15:00:00", "minutes": 30, "expectDue": "2026-10-06T23:59:59", "expectEnd": "2026-10-06T15:30:00" },
+      { "name": "an earlier date moves up", "due": "2026-10-01T23:59:59", "start": "2026-10-06T15:00:00", "minutes": 30, "expectDue": "2026-10-06T23:59:59", "expectEnd": "2026-10-06T15:30:00" },
+      { "name": "a later date is a deadline and stays", "due": "2026-10-09T23:59:59", "start": "2026-10-06T15:00:00", "minutes": 45, "expectDue": "2026-10-09T23:59:59", "expectEnd": "2026-10-06T15:45:00" },
+      { "name": "the same day, date only, stays", "due": "2026-10-06T23:59:59", "start": "2026-10-06T15:00:00", "minutes": 30, "expectDue": "2026-10-06T23:59:59", "expectEnd": "2026-10-06T15:30:00" },
+      { "name": "a due time after the start stays", "due": "2026-10-06T15:00:00", "start": "2026-10-06T10:00:00", "minutes": 30, "expectDue": "2026-10-06T15:00:00", "expectEnd": "2026-10-06T10:30:00" },
+      { "name": "a due time equal to the start stays", "due": "2026-10-06T15:00:00", "start": "2026-10-06T15:00:00", "minutes": 30, "expectDue": "2026-10-06T15:00:00", "expectEnd": "2026-10-06T15:30:00" },
+      { "name": "a due time before the start becomes date only", "due": "2026-10-06T15:00:00", "start": "2026-10-06T16:00:00", "minutes": 30, "expectDue": "2026-10-06T23:59:59", "expectEnd": "2026-10-06T16:30:00" },
+      { "name": "a legacy midnight date becomes 23:59:59", "due": "2026-10-06T00:00:00", "start": "2026-10-06T10:00:00", "minutes": 30, "expectDue": "2026-10-06T23:59:59", "expectEnd": "2026-10-06T10:30:00" },
+      { "name": "the end is held at midnight", "due": null, "start": "2026-10-06T23:45:00", "minutes": 30, "expectDue": "2026-10-06T23:59:59", "expectEnd": "2026-10-07T00:00:00" }
+    ],
+    "dueChange": [
+      { "name": "a block on the old due day follows", "today": "2026-10-06", "oldDue": "2026-10-06T23:59:59", "start": "2026-10-06T15:00:00", "end": "2026-10-06T15:30:00", "newDue": "2026-10-08T23:59:59", "expectStart": "2026-10-08T15:00:00", "expectEnd": "2026-10-08T15:30:00" },
+      { "name": "a block on another day stays", "today": "2026-10-06", "oldDue": "2026-10-09T23:59:59", "start": "2026-10-06T15:00:00", "end": "2026-10-06T15:30:00", "newDue": "2026-10-12T23:59:59", "expectStart": "2026-10-06T15:00:00", "expectEnd": "2026-10-06T15:30:00" },
+      { "name": "the same date with a new time leaves the block alone", "today": "2026-10-06", "oldDue": "2026-10-06T23:59:59", "start": "2026-10-06T15:00:00", "end": "2026-10-06T15:30:00", "newDue": "2026-10-06T17:00:00", "expectStart": "2026-10-06T15:00:00", "expectEnd": "2026-10-06T15:30:00" },
+      { "name": "a move to a past day drops the time", "today": "2026-10-06", "oldDue": "2026-10-06T23:59:59", "start": "2026-10-06T15:00:00", "end": "2026-10-06T15:30:00", "newDue": "2026-10-05T23:59:59", "expectStart": null, "expectEnd": null },
+      { "name": "clearing the due date removes a block on that day", "today": "2026-10-06", "oldDue": "2026-10-06T23:59:59", "start": "2026-10-06T15:00:00", "end": "2026-10-06T15:30:00", "newDue": null, "expectStart": null, "expectEnd": null },
+      { "name": "clearing the due date leaves a block on another day", "today": "2026-10-06", "oldDue": "2026-10-09T23:59:59", "start": "2026-10-06T15:00:00", "end": "2026-10-06T15:30:00", "newDue": null, "expectStart": "2026-10-06T15:00:00", "expectEnd": "2026-10-06T15:30:00" },
+      { "name": "no old due date leaves the block alone", "today": "2026-10-06", "oldDue": null, "start": "2026-10-06T15:00:00", "end": "2026-10-06T15:30:00", "newDue": "2026-10-08T23:59:59", "expectStart": "2026-10-06T15:00:00", "expectEnd": "2026-10-06T15:30:00" },
+      { "name": "something that is not a block is never rewritten", "today": "2026-10-06", "oldDue": "2026-10-06T23:59:59", "start": "2026-10-06T00:00:00", "end": "2026-10-09T00:00:00", "newDue": "2026-10-08T23:59:59", "expectStart": "2026-10-06T00:00:00", "expectEnd": "2026-10-09T00:00:00" },
+      { "name": "the wall clock holds across New York's change", "today": "2026-10-28", "oldDue": "2026-10-30T23:59:59", "start": "2026-10-30T09:00:00", "end": "2026-10-30T09:30:00", "newDue": "2026-11-02T23:59:59", "expectStart": "2026-11-02T09:00:00", "expectEnd": "2026-11-02T09:30:00" },
+      { "name": "the wall clock holds across Auckland's change", "today": "2026-09-20", "oldDue": "2026-09-25T23:59:59", "start": "2026-09-25T09:00:00", "end": "2026-09-25T09:30:00", "newDue": "2026-09-28T23:59:59", "expectStart": "2026-09-28T09:00:00", "expectEnd": "2026-09-28T09:30:00" }
+    ],
+    "removeTime": [
+      { "name": "reminders on the block go, the others stay", "reminders": [{ "relative_to": "start_date", "relative_period": -3600 }, { "relative_to": "end_date", "relative_period": 0 }, { "relative_to": "due_date", "relative_period": -3600 }, { "reminder": "2026-10-06T09:00:00" }], "expect": [{ "relative_to": "due_date", "relative_period": -3600 }, { "reminder": "2026-10-06T09:00:00" }] },
+      { "name": "nothing to remove", "reminders": [], "expect": [] }
+    ],
+    "today": {
+      "now": "2026-10-06T10:40:00",
+      "tasks": [
+        { "id": 1, "due": "2026-10-06T23:59:59", "start": null, "end": null, "done": false },
+        { "id": 2, "due": "2026-10-13T23:59:59", "start": "2026-10-06T15:00:00", "end": "2026-10-06T15:30:00", "done": false },
+        { "id": 3, "due": "2026-10-13T23:59:59", "start": null, "end": null, "done": false },
+        { "id": 4, "due": null, "start": "2026-10-06T15:00:00", "end": "2026-10-06T15:30:00", "done": false },
+        { "id": 5, "due": null, "start": "2026-10-06T15:00:00", "end": null, "done": false },
+        { "id": 6, "due": "2026-10-04T23:59:59", "start": null, "end": null, "done": false },
+        { "id": 7, "due": "2026-10-13T23:59:59", "start": "2026-10-07T15:00:00", "end": "2026-10-07T15:30:00", "done": false },
+        { "id": 8, "due": null, "start": "2026-10-06T15:00:00", "end": "2026-10-06T15:30:00", "done": true },
+        { "id": 9, "due": "2026-10-04T23:59:59", "start": "2026-10-06T15:00:00", "end": "2026-10-06T15:30:00", "done": false },
+        { "id": 10, "due": "2026-10-13T23:59:59", "start": "2026-10-06T00:00:00", "end": "2026-10-09T00:00:00", "done": false }
+      ],
+      "overdue": [6, 9],
+      "todaySection": [1, 2, 4],
+      "upcoming": [2, 3, 7, 10]
+    },
+    "defaultReminder": [
+      { "name": "relative to the due date becomes the start", "offset": 3600, "relativeTo": "due_date", "due": "2026-10-06T23:59:59", "start": "2026-10-06T15:00:00", "end": "2026-10-06T15:30:00", "expect": { "reminder": "2026-10-06T14:00:00", "relative_period": -3600, "relative_to": "start_date" } },
+      { "name": "at the due time becomes the start", "offset": -1, "relativeTo": "due_date", "due": "2026-10-06T23:59:59", "start": "2026-10-06T15:00:00", "end": "2026-10-06T15:30:00", "expect": { "reminder": "2026-10-06T15:00:00", "relative_period": 0, "relative_to": "start_date" } },
+      { "name": "relative to the start stays", "offset": 900, "relativeTo": "start_date", "due": "2026-10-06T23:59:59", "start": "2026-10-06T15:00:00", "end": "2026-10-06T15:30:00", "expect": { "reminder": "2026-10-06T14:45:00", "relative_period": -900, "relative_to": "start_date" } },
+      { "name": "relative to the end stays, from the end", "offset": 3600, "relativeTo": "end_date", "due": "2026-10-06T23:59:59", "start": "2026-10-06T15:00:00", "end": "2026-10-06T15:30:00", "expect": { "reminder": "2026-10-06T14:30:00", "relative_period": -3600, "relative_to": "end_date" } },
+      { "name": "off", "offset": 0, "relativeTo": "due_date", "due": "2026-10-06T23:59:59", "start": "2026-10-06T15:00:00", "end": "2026-10-06T15:30:00", "expect": null },
+      { "name": "no block: as before", "offset": 3600, "relativeTo": "due_date", "due": "2026-10-06T15:00:00", "start": null, "end": null, "expect": { "reminder": "2026-10-06T14:00:00", "relative_period": -3600, "relative_to": "due_date" } }
+    ],
+    "nextFree": [
+      { "name": "today starts from now, on a 15 minute line", "now": "2026-10-06T10:40:00", "day": "2026-10-06", "hours": ["08:00", "18:00"], "minutes": 30, "busy": [], "expect": "10:45" },
+      { "name": "skips a gap too short", "now": "2026-10-06T10:40:00", "day": "2026-10-06", "hours": ["08:00", "18:00"], "minutes": 30, "busy": [["11:00", "12:00"]], "expect": "12:00" },
+      { "name": "takes a gap that fits exactly", "now": "2026-10-06T10:40:00", "day": "2026-10-06", "hours": ["08:00", "18:00"], "minutes": 15, "busy": [["11:00", "12:00"]], "expect": "10:45" },
+      { "name": "another day starts at the work hours", "now": "2026-10-06T10:40:00", "day": "2026-10-07", "hours": ["08:00", "18:00"], "minutes": 30, "busy": [["08:00", "08:45"]], "expect": "08:45" },
+      { "name": "must end inside the work hours", "now": "2026-10-06T10:40:00", "day": "2026-10-07", "hours": ["08:00", "18:00"], "minutes": 60, "busy": [["08:00", "17:15"]], "expect": null },
+      { "name": "after the work hours there is nothing today", "now": "2026-10-06T18:10:00", "day": "2026-10-06", "hours": ["08:00", "18:00"], "minutes": 30, "busy": [], "expect": null }
+    ],
+    "freeMinutes": [
+      { "name": "today counts from now", "now": "2026-10-06T10:40:00", "day": "2026-10-06", "hours": ["08:00", "18:00"], "busy": [["10:45", "11:30"]], "expect": 395 },
+      { "name": "overlaps count once", "now": "2026-10-06T10:40:00", "day": "2026-10-07", "hours": ["08:00", "18:00"], "busy": [["09:00", "10:00"], ["09:30", "10:30"]], "expect": 510 },
+      { "name": "time outside the work hours does not count", "now": "2026-10-06T10:40:00", "day": "2026-10-07", "hours": ["08:00", "18:00"], "busy": [["17:30", "19:00"]], "expect": 570 },
+      { "name": "after the work hours", "now": "2026-10-06T19:00:00", "day": "2026-10-06", "hours": ["08:00", "18:00"], "busy": [], "expect": 0 }
+    ],
+    "fit": [
+      {
+        "name": "overdue first, then priority, then due date, then no due date",
+        "now": "2026-10-06T10:40:00", "day": "2026-10-06", "hours": ["08:00", "18:00"], "minutes": 30, "busy": [["11:00", "12:00"]],
+        "tasks": [
+          { "id": 1, "due": "2026-10-08T23:59:59", "priority": 0 },
+          { "id": 2, "due": "2026-10-05T23:59:59", "priority": 0 },
+          { "id": 3, "due": "2026-10-06T23:59:59", "priority": 4 },
+          { "id": 4, "due": null, "priority": 4 },
+          { "id": 5, "due": "2026-10-06T23:59:59", "priority": 1 }
+        ],
+        "expect": [{ "id": 2, "start": "12:00", "end": "12:30" }, { "id": 3, "start": "12:30", "end": "13:00" }, { "id": 4, "start": "13:00", "end": "13:30" }, { "id": 5, "start": "13:30", "end": "14:00" }, { "id": 1, "start": "14:00", "end": "14:30" }]
+      },
+      {
+        "name": "what does not fit is left out",
+        "now": "2026-10-06T10:40:00", "day": "2026-10-07", "hours": ["08:00", "09:00"], "minutes": 30, "busy": [],
+        "tasks": [{ "id": 1, "due": null, "priority": 0 }, { "id": 2, "due": null, "priority": 0 }, { "id": 3, "due": null, "priority": 0 }],
+        "expect": [{ "id": 1, "start": "08:00", "end": "08:30" }, { "id": 2, "start": "08:30", "end": "09:00" }]
+      }
+    ],
+    "display": [
+      { "name": "today, 24 hour", "now": "2026-10-06T10:40:00", "start": "2026-10-06T15:00:00", "end": "2026-10-06T15:30:00", "locale": "en-GB", "hour12": false, "text": "15:00–15:30" },
+      { "name": "today, 12 hour", "now": "2026-10-06T10:40:00", "start": "2026-10-06T15:00:00", "end": "2026-10-06T15:30:00", "locale": "en-US", "hour12": true, "text": "3:00 PM–3:30 PM" },
+      { "name": "today, en-GB 12 hour", "now": "2026-10-06T10:40:00", "start": "2026-10-06T11:30:00", "end": "2026-10-06T12:30:00", "locale": "en-GB", "hour12": true, "text": "11:30 am–12:30 pm" },
+      { "name": "tomorrow", "now": "2026-10-06T10:40:00", "start": "2026-10-07T15:00:00", "end": "2026-10-07T15:30:00", "locale": "en-GB", "hour12": false, "text": "Tomorrow, 15:00–15:30" },
+      { "name": "this week", "now": "2026-10-06T10:40:00", "start": "2026-10-09T15:00:00", "end": "2026-10-09T15:30:00", "locale": "en-US", "hour12": false, "text": "Fri, 15:00–15:30" },
+      { "name": "yesterday", "now": "2026-10-06T10:40:00", "start": "2026-10-05T15:00:00", "end": "2026-10-05T15:30:00", "locale": "en-GB", "hour12": false, "text": "Yesterday, 15:00–15:30" },
+      { "name": "further out", "now": "2026-10-06T10:40:00", "start": "2026-10-18T15:00:00", "end": "2026-10-18T15:30:00", "locale": "en-US", "hour12": true, "text": "Oct 18, 3:00 PM–3:30 PM" },
+      { "name": "ends at midnight", "now": "2026-10-06T10:40:00", "start": "2026-10-06T23:30:00", "end": "2026-10-07T00:00:00", "locale": "en-GB", "hour12": false, "text": "23:30–00:00" }
+    ],
+    "prefs": {
+      "defaultLength": [
+        { "value": 15, "expect": 15 }, { "value": 45, "expect": 45 }, { "value": 90, "expect": 90 },
+        { "value": 20, "expect": 30 }, { "value": 105, "expect": 30 }, { "value": "45", "expect": 30 }, { "value": null, "expect": 30 }
+      ],
+      "hours": [
+        { "value": ["09:00", "17:30"], "expect": ["09:00", "17:30"] },
+        { "value": ["18:00", "08:00"], "expect": ["08:00", "18:00"] },
+        { "value": ["9:00", "17:00"], "expect": ["08:00", "18:00"] },
+        { "value": ["08:00"], "expect": ["08:00", "18:00"] },
+        { "value": null, "expect": ["08:00", "18:00"] }
+      ]
+    }
   }
 }

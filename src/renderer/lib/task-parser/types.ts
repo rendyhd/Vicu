@@ -2,8 +2,11 @@ import type { PlaceMatch } from './place-phrases'
 
 export type SyntaxMode = 'todoist' | 'vikunja'
 
-/** `place` is "when I get home" for a saved place (section 5.3), read only when the caller passes places. */
-export type TokenType = 'label' | 'project' | 'priority' | 'recurrence' | 'date' | 'place'
+/**
+ * `place` is "when I get home" for a saved place (section 5.3), read only when the caller passes
+ * places. `length` is `for 30m` when it makes a time block (section 5.4).
+ */
+export type TokenType = 'label' | 'project' | 'priority' | 'recurrence' | 'date' | 'length' | 'place'
 
 export interface ParsedToken {
   type: TokenType
@@ -27,6 +30,11 @@ export interface ParseResult {
    * otherwise the due date is date-only (build it with `parsedDue`).
    */
   dueHasTime: boolean
+  /**
+   * The time block `for 30m` makes with the text's time of day (section 5.4). The due date is then
+   * that day, date-only: `dueHasTime` is false and the block holds the time.
+   */
+  block: { start: Date; end: Date } | null
   priority: number | null
   labels: string[]
   project: string | null

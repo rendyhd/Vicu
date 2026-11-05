@@ -8,7 +8,7 @@ Test vectors live in `test-fixtures/` in both repos and must stay byte-identical
 
 | Fixture | Covers |
 |---|---|
-| `cross-app-semantics-v1.json` | due-date rules, smart lists, weeks, custom-list windows, review math, completion hold, date display, collaboration, hidden tasks, synced preferences, task order, project categories, guided organizing, routines on Today |
+| `cross-app-semantics-v1.json` | due-date rules, smart lists, weeks, custom-list windows, review math, completion hold, date display, collaboration, hidden tasks, synced preferences, task order, project categories, guided organizing, routines on Today, time blocks |
 | `nlp-corpus-v1.json` | quick-add parsing |
 | `routine-archive-v1.json` | routine merge, pruning and archive rules |
 | `design-tokens-v1.json` | colour roles, type, radii and motion (see `design-system-v1.md`) |
@@ -66,14 +66,18 @@ Reminders relative to the due date ("1 hour before") are computed from the store
 - "Today" is the device's local calendar date. A task is due today when the local date of its
   due date equals today, whatever the time of day.
 - Weeks start on **Monday** and end on **Sunday**.
-- **Today list**: open tasks with a due date whose local date is today or earlier.
-  - Overdue section: local date before today.
-  - Today section: local date equal to today. A task due at 08:00 today is still in the Today
+- **Today list**: open tasks with a due date whose local date is today or earlier, and open tasks
+  with a time block that starts today (section 16), whatever their due date.
+  - Overdue section: a due date whose local date is before today.
+  - Today section: every other task on the list. A task due at 08:00 today is still in the Today
     section at 10:00; it moves to Overdue tomorrow.
-- **Upcoming list**: open tasks whose local due date is tomorrow or later.
+- **Upcoming list**: open tasks whose local due date is tomorrow or later. A task due Friday with a
+  block today is on both lists.
 - Server filters must use local-day boundaries converted to UTC, for example "before the start
   of tomorrow" is `due_date < '<local tomorrow 00:00 as UTC ISO>'`. A server filter may return
-  more than the window (the client filters exactly), never less.
+  more than the window (the client filters exactly), never less. The Today list's filter is
+  `done = false && ((due_date != '<null date>' && due_date < '<local tomorrow>') || (start_date >= '<local today>' && start_date < '<local tomorrow>'))`.
+- Every count of the Today list (badges, widgets) uses the same rule.
 
 ---
 
@@ -206,6 +210,9 @@ the date and recurrence rules.
   `in N days|weeks`, `in N hours|minutes` (exact time), month-name dates (`jan 15`, `15 jan`,
   `march 3rd`), ISO dates (`2026-10-15`) and slash dates (`10/15`, `15/10`). `weekend` and
   `weekday` are words, not dates: "Plan the weekend" has no due date.
+- An amount of time is a date only right after `in`. Without it the words stay in the title:
+  "Call 30m", "Rest 3 days", "Plan the week", "Renew within 3 days" and "Review 3 days from now"
+  have no due date.
 - A date phrase is made of whole words: it starts at the start of the text or after a space,
   and ends at a space, the end of the text, or one of `. , ! ? ; )`. "Send Monday's report
   tomorrow" is due tomorrow, and "Call Ana (tomorrow)", "Plan Friday/Saturday" and "Ship it
@@ -303,6 +310,27 @@ off, the words stay in the title. The corpus parses every case with its `places`
   leave work tomorrow #errands").
 - The reminder uses the default radius (200 m). It is written as `location_reminder.<taskId>`
   once the task has its server id (section 11.7).
+
+### 5.4 Length
+
+`for` and a length give a task a time block (section 16).
+
+- A length is a whole number of hours, minutes or both, in whole words: `for 30m`, `for 90 min`,
+  `for 2 hours`, `for 1h30m`, `for 1h 30m`. The units are `m`, `min`, `mins`, `minute`, `minutes`,
+  `h`, `hr`, `hrs`, `hour` and `hours`, in any case. A digit must follow `for`: "Gift for mum" and
+  "Table for 4" have no length.
+- A length is not part of a date phrase and does not split one: dates are read as if its words were
+  not there. "Call tomorrow for 1h at 9am" is tomorrow at 09:00.
+- When the text also has a time of day (`in N hours|minutes` counts), the length is 1 minute to
+  12 hours and the block ends by the next midnight, the task gets a block: the start is that time,
+  the end is the start plus the length, the due date is that day, date-only, and the words leave the
+  title. "Call at 3pm for 30m" is due today (date-only), 15:00 to 15:30, with the title "Call".
+- Otherwise the words stay in the title and dates are read as usual. "Call for 30m" has no due date;
+  "Call tomorrow for 30m" is due tomorrow with the title "Call for 30m"; "Workshop at 11pm for 2h" is
+  due at 23:00 with the title "Workshop for 2h".
+- `for` with a number and `days`, `nights`, `weeks`, `months` or `years` is never a date phrase and
+  stays in the title. "Pay for 3 months" has no due date.
+- A time without a length is still a due time. "Call at 3pm" is due at 15:00 and has no start date.
 
 ---
 
@@ -637,6 +665,7 @@ the time ("Fri, 15:00", "Oct 18, 3:00 PM"). A date-only value has no time part.
 | `row` | `diff` of -7 or less: short date. -6 to -2: "{n} days ago". -1: "Yesterday". 0: "Today". 1: "Tomorrow". 2 to 6: the short weekday ("Fri"). 7 or more: short date. Then append the time, if any. |
 | `row.inToday` | Like `row`, except a value dated today shows nothing when date only and just the time otherwise. |
 | `row.inDayGroup` | The time only, if any, otherwise nothing. |
+| `row.block` | A task's time block (section 16). The range is the start, an en dash (U+2013) without spaces, and the end, each in the user's clock ("15:00–15:30", "3:00 PM–3:30 PM"). A block today shows the range only. Otherwise the `row` day phrase without a time, a comma and a space, and the range ("Tomorrow, 15:00–15:30", "Fri, 15:00–15:30"). |
 | `chip` | -1, 0 and 1: the word, a comma and the short date ("Today, 7 Oct", "Today, Oct 7", "Tomorrow, 1 Jan 2027"). Otherwise the weekday date ("Sat 10 Oct", "Sat, Oct 10"). Then append the time, if any ("Today, Oct 7, 3:00 PM", "Sat 10 Oct, 15:00"). In the middle of a sentence the word is in lower case ("Remind today, 7 Oct, 15:00"). |
 | `header.day` | 0: "Today". 1: "Tomorrow". 2 to 6: weekday and day number ("Fri 9"). Otherwise the weekday date ("Mon 12 Oct", "Mon, Oct 12"). No time. |
 | `header.full` | "Wednesday 7 October" or "Wednesday, October 7", with the year when it differs. |
@@ -1021,6 +1050,8 @@ A key is added here, in both repos, in the release that starts writing it.
 | `category.project.<projectId>` | the id of the category a top-level project is in, or `null`; section 13 | no category |
 | `project_icon.<projectId>` | `"none"`: the project is drawn without its folder icon and its name starts where the icon would be; or `null`. Any other value acts as the default and is kept | the folder |
 | `weekly_review.last` | the local date the last weekly review was finished, `"YYYY-MM-DD"`; section 14.7 | never done |
+| `planner.default_length` | the length of a new block in minutes: 15, 30, 45, 60, 75 or 90. Any other value acts as the default and is kept; section 16.2 | 30 |
+| `planner.hours` | the work hours, `["HH:mm", "HH:mm"]` in 24-hour local time, the start before the end. Any other value acts as the default and is kept; section 16.6 | `["08:00", "18:00"]` |
 
 ### 11.4 The Inbox
 
@@ -1387,7 +1418,7 @@ the same task.
 
 | Copied | Not copied |
 |---|---|
-| title (unchanged), description, due date, start date, priority, repeat (`repeat_after`, `repeat_mode`), reminders (absolute and relative), labels | done and `done_at` (a copy is always open), comments, attachments, relations other than subtasks, a location reminder (11.7), position |
+| title (unchanged), description, due date, start date, end date, priority, repeat (`repeat_after`, `repeat_mode`), reminders (absolute and relative), labels | done and `done_at` (a copy is always open), comments, attachments, relations other than subtasks, a location reminder (11.7), position |
 | assignees, on a project that is shared (9.1) | |
 | subtasks, duplicated the same way as open subtasks of the copy, nested ones included | |
 
@@ -1401,3 +1432,103 @@ the same task.
 - Hidden tasks (section 10) are never shown, so they cannot be duplicated.
 - **Copy titles** (the selection's menu) is something else: it puts the titles of the selected
   tasks on the clipboard, one per line, for pasting outside Vicu.
+
+---
+
+## 16. Time blocks
+
+A time block says when the user means to do a task. It sits on top of the due date: the due date
+says which day a task belongs to and when it is due, the block says what time is set aside for it. A
+task without a block is a complete task, and nothing moves on its own.
+
+### 16.1 What a block is
+
+- A block is the task's own `start_date` and `end_date`. It is stored nowhere else: not in the
+  description (any `vicu-` marker hides a task, section 10.1) and not in a synced preference.
+- A task has a block when both are set, the end is after the start, they are at most 12 hours apart,
+  and the end is no later than the midnight that ends the start's local day.
+- The block's day is the local date of its start.
+- Anything else in those fields (a start date alone, several days, a Gantt bar from Vikunja's web
+  app) is not a block. It is ignored by this section and never rewritten.
+
+### 16.2 Changing a block
+
+Each action sends only the fields it changes, as a merge patch.
+
+| Action | Writes |
+|---|---|
+| Drop a task on a time | `start_date`, `end_date`, and the due rule. The length is the block's own if it has one, else `planner.default_length`. |
+| Move a block, on its day or to another | `start_date`, `end_date`, and the due rule. |
+| Drag the bottom edge | `end_date` |
+| Drag the top edge | `start_date` and the due rule. The end stays. |
+| Draw on an empty time | A new task with `title`, `due_date` (that day, date-only), `start_date` and `end_date`, in the project being browsed, else the Inbox. |
+| Drop a task on a day without a time | `start_date` and `end_date` null, `due_date` that day, date-only. |
+| Remove the time | `start_date` and `end_date` null, and any reminder relative to either removed. The due date stays. |
+| Complete | `{ "done": true }` and nothing else. The server moves a repeating task's start and end with it. |
+
+**The due rule:** if the task has no due date, or its due date is before the block's start, the due
+date becomes that day, date-only. Otherwise it stays: a later date is a deadline.
+
+Gestures work in 15-minute steps. A dragged block is at least 15 minutes and stays within 16.1. A
+block cannot be placed on a past day.
+
+### 16.3 When the due date changes
+
+Anything that sets a due date (a list's quick choices, postpone, a calendar, dragging in Upcoming)
+also applies these rules in the same patch, when the block is on the day of the old due date:
+
+- The new due date is on another day: the block moves to that day, at the same wall-clock times.
+- The new due date is before today: the time is removed.
+- The due date is cleared: the time is removed.
+
+A block on any other day stays, and so does a block when only the due date's time changes.
+
+### 16.4 Lists and rows
+
+- The Today list also holds tasks with a block starting today (section 2). Upcoming, custom lists,
+  overdue and the guided queues read the due date only.
+- A row with a block shows it with `row.block` (section 8.3), next to its due phrase as usual.
+
+### 16.5 Reminders
+
+- A new task created with a block gets the default reminder relative to its start when the setting
+  says relative to the due date, and at the setting's own field otherwise. The reminder's time comes
+  from that field. A date-only due date would otherwise put "1 hour before" at 22:59:59.
+- Changing a block never adds a reminder. A reminder relative to the start or end follows the block
+  (the server recalculates it).
+
+### 16.6 Free time and fitting
+
+- **Busy** is the day's open blocks and any calendar events. Routine times and due-time markers have
+  no length and are never busy.
+- **Free time** is the work hours (`planner.hours`; today, from now) minus busy time, with overlaps
+  counted once.
+- **The next free slot** is the first 15-minute line from the start of the work hours (today, from
+  now) where the length fits without touching busy time and ends inside the work hours. There may be
+  none.
+- **Fit** orders tasks overdue first, then priority from high to low, then due date from earliest,
+  with no due date last, then id. Each takes the next free slot at `planner.default_length`. What
+  does not fit is left out.
+
+### 16.7 Tasks with a due time
+
+On the timeline, a task with a time-of-day due date and no block is a marker at that time. It has no
+length. Dragging it places it like any task (16.2).
+
+### 16.8 People and offline
+
+A block follows the task's permissions (section 9.2): someone who can only view sees it and cannot
+change it. Changes queue offline like any other merge patch.
+
+### 16.9 The planner setting
+
+The Plan screen is a per-device option, off by default. When it is off there is no Plan entry and no
+Day view on Today. Sections 2, 8, 16.3 and 16.5 hold either way, because they read synced data and
+every device must agree on it.
+
+### 16.10 Vectors
+
+`timeBlocks` in `cross-app-semantics-v1.json` covers what a block is, placing and the due rule, due
+date changes (including the daylight-saving weeks in both test zones), removing the time, the lists,
+the default reminder, the next free slot, free time, fit, the row text and the two preferences.
+`nlp-corpus-v1.json` covers section 5.4 with the new fields `start` and `end`.

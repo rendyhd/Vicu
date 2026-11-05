@@ -665,7 +665,7 @@ export function registerIpcHandlers(): void {
   })
 
   // --- Quick Entry IPC ---
-  handleTrusted('qe:save-task', async (_event, title: string, description: string | null, dueDate: string | null, projectId: number | null, priority?: number, repeatAfter?: number, repeatMode?: number, extras?: { labels?: unknown; images?: unknown; location?: unknown }) => {
+  handleTrusted('qe:save-task', async (_event, title: string, description: string | null, dueDate: string | null, projectId: number | null, priority?: number, repeatAfter?: number, repeatMode?: number, extras?: { labels?: unknown; images?: unknown; location?: unknown; block?: { start_date: string; end_date: string } | null }) => {
     const config = loadConfig()
     if (!config) return { success: false, error: 'Configuration not loaded' }
 
@@ -677,7 +677,7 @@ export function registerIpcHandlers(): void {
     }
 
     const targetProjectId = projectId || config.quick_entry_default_project_id || config.inbox_project_id
-    const taskPayload = quickEntryTaskPayload({ title, description, dueDate, priority, repeatAfter, repeatMode }, config)
+    const taskPayload = quickEntryTaskPayload({ title, description, dueDate, block: extras?.block, priority, repeatAfter, repeatMode }, config)
 
     // The create is queued with everything the user set when the server cannot be reached; see
     // createFromQuickEntry for what may be queued and why.

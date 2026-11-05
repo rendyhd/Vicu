@@ -8,6 +8,10 @@
 // before. The reminder is relative (`relative_period` = minus the offset, `relative_to` from the
 // setting), with the absolute time worked out from the stored due date. A date-only due date is
 // stored as local 23:59:59, so "1 hour before" it is 22:59:59 that day (cross-app semantics 1).
+// A new task with a time block goes by the block instead (section 16.5): "relative to the due date"
+// becomes relative to its start, because its due date is date-only and would remind at 22:59:59.
+
+import { isTimeBlock } from './time-blocks'
 
 const NULL_DATE = '0001-01-01T00:00:00Z'
 
@@ -30,16 +34,19 @@ export function buildDefaultReminder(
   dueDate: string | null | undefined,
   offsetSeconds: number | null | undefined,
   relativeTo: ReminderRelativeTo = 'due_date',
+  block?: { start: string; end: string } | null,
 ): DefaultReminder | null {
   if (!offsetSeconds || !Number.isFinite(offsetSeconds)) return null
   if (!dueDate || dueDate === NULL_DATE) return null
-  if (offsetSeconds === -1) return { reminder: dueDate, relative_period: 0, relative_to: relativeTo }
-  const due = Date.parse(dueDate)
-  if (Number.isNaN(due)) return null
+  const to: ReminderRelativeTo = block && relativeTo === 'due_date' ? 'start_date' : relativeTo
+  const base = block ? (to === 'end_date' ? block.end : block.start) : dueDate
+  if (offsetSeconds === -1) return { reminder: base, relative_period: 0, relative_to: to }
+  const from = Date.parse(base)
+  if (Number.isNaN(from)) return null
   return {
-    reminder: new Date(due - offsetSeconds * 1000).toISOString(),
+    reminder: new Date(from - offsetSeconds * 1000).toISOString(),
     relative_period: -offsetSeconds,
-    relative_to: relativeTo,
+    relative_to: to,
   }
 }
 
@@ -52,12 +59,15 @@ export function withDefaultReminder<T extends object>(
   settings: DefaultReminderSettings | null | undefined,
 ): T & { reminders?: unknown } {
   if (!settings) return payload
-  const fields = payload as { due_date?: unknown; reminders?: unknown }
+  const fields = payload as { due_date?: unknown; start_date?: unknown; end_date?: unknown; reminders?: unknown }
   if (Array.isArray(fields.reminders) && fields.reminders.length > 0) return payload
+  const start = typeof fields.start_date === 'string' ? fields.start_date : null
+  const end = typeof fields.end_date === 'string' ? fields.end_date : null
   const reminder = buildDefaultReminder(
     typeof fields.due_date === 'string' ? fields.due_date : null,
     settings.notifications_default_reminder_offset,
     settings.notifications_default_reminder_relative_to ?? 'due_date',
+    start && end && isTimeBlock(start, end) ? { start, end } : null,
   )
   return reminder ? { ...payload, reminders: [reminder] } : payload
 }

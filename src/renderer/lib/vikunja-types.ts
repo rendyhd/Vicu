@@ -141,6 +141,8 @@ export interface CreateTaskPayload {
   done?: boolean
   due_date?: string
   start_date?: string
+  /** With `start_date`, a time block (contract section 16). */
+  end_date?: string
   priority?: number
   labels?: { id: number }[]
   reminders?: TaskReminder[]

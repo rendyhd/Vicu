@@ -61,6 +61,20 @@ describe('planPastedTask', () => {
     expect(new Date(plan.payload.due_date!).getHours()).toBe(15)
   })
 
+  it('makes a time block from a length and a time, and its start takes the default reminder', () => {
+    const start = new Date(2026, 9, 7, 15, 0).toISOString()
+    const plan = planPastedTask('Call Sam tomorrow at 3pm for 30m', context({
+      defaultReminder: { notifications_default_reminder_offset: 900, notifications_default_reminder_relative_to: 'due_date' },
+    }))!
+    expect(plan.payload).toEqual({
+      title: 'Call Sam',
+      due_date: dateOnlyDue('2026-10-07'),
+      start_date: start,
+      end_date: new Date(2026, 9, 7, 15, 30).toISOString(),
+      reminders: [{ reminder: new Date(2026, 9, 7, 14, 45).toISOString(), relative_period: -900, relative_to: 'start_date' }],
+    })
+  })
+
   it('turns a recurrence into repeat_after and repeat_mode', () => {
     const plan = planPastedTask('Water plants every 2 weeks', context())!
     expect(plan.payload.title).toBe('Water plants')

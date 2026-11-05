@@ -34,7 +34,7 @@ import { stripNoteLink, stripPageLink, extractNoteLinkHtml, extractPageLinkHtml,
 import { useTaskParser } from '@/hooks/use-task-parser'
 import { useLabels } from '@/hooks/use-labels'
 import { useProjects } from '@/hooks/use-projects'
-import { extractBangToday, recurrenceToVikunja } from '@/lib/task-parser'
+import { blockFields, extractBangToday, recurrenceToVikunja } from '@/lib/task-parser'
 import { TaskInputParser } from '@/components/task-input/TaskInputParser'
 import { useAppConfig } from '@/hooks/use-app-config'
 import { useSubtasks } from '@/hooks/use-subtasks'
@@ -205,6 +205,8 @@ const TaskTitleEditor = forwardRef<TaskTitleEditorHandle, TaskTitleEditorProps>(
           if (parsed.dueDate) {
             // A parsed time ("tomorrow at 3pm") is kept; a bare date is date-only.
             changes.due_date = parsedDue(parsed.dueDate, parsed.dueHasTime)
+            // "at 4pm for 30m" makes a time block, which holds the time.
+            Object.assign(changes, blockFields(parsed))
           }
           if (parsed.priority !== null && parsed.priority > 0) {
             changes.priority = parsed.priority

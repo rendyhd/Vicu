@@ -303,6 +303,22 @@ export function formatDateDisplay(
   }
 }
 
+/** A time block's times: the start, an en dash without spaces, and the end ("15:00–15:30"). */
+export function formatBlockRange(start: Date, end: Date, fmt: DateFormat): string {
+  const p = phrasesFor(fmt.locale)
+  return `${p.time(start, fmt.hour12)}–${p.time(end, fmt.hour12)}`
+}
+
+/**
+ * A time block on a row (`row.block`, section 8.3): the range alone today, otherwise the `row` day
+ * phrase, a comma and the range ("Tomorrow, 15:00–15:30").
+ */
+export function formatBlockRow(start: Date, end: Date, now: Date, fmt: DateFormat): string {
+  const range = formatBlockRange(start, end, fmt)
+  const diff = calendarDiff(now, start)
+  return diff === 0 ? range : `${rowDay(diff, start, now, phrasesFor(fmt.locale))}, ${range}`
+}
+
 /**
  * A full timestamp for details such as created and updated: the short date with its year, a comma
  * and the time ("Apr 13, 2026, 3:42 PM", "13 Apr 2026, 15:42"). Not a contract context: nothing

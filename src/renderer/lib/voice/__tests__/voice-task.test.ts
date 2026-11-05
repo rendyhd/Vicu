@@ -150,6 +150,31 @@ describe('voiceCardChips', () => {
   })
 })
 
+describe('a time block said aloud', () => {
+  const block = { start_date: new Date(2026, 9, 22, 15, 0).toISOString(), end_date: new Date(2026, 9, 22, 15, 30).toISOString() }
+
+  it('holds the time on the task', () => {
+    const draft = ok('Call mom tomorrow at 3 PM for 30 minutes')
+    expect(draft.title).toBe('Call mom')
+    expect(draft.payload).toMatchObject(block)
+    expect(new Date(draft.payload.due_date!)).toEqual(new Date(2026, 9, 22, 23, 59, 59))
+  })
+
+  it('takes the default reminder from its start', () => {
+    const draft = ok('Call mom tomorrow at 3 PM for 30 minutes', {
+      defaultReminder: { notifications_default_reminder_offset: 900, notifications_default_reminder_relative_to: 'due_date' },
+    })
+    expect(draft.payload.reminders).toEqual([
+      { reminder: new Date(2026, 9, 22, 14, 45).toISOString(), relative_period: -900, relative_to: 'start_date' },
+    ])
+  })
+
+  it('the confirmation says its times', () => {
+    expect(voiceConfirmation(ok('Call mom tomorrow at 3 PM for 30 minutes'), now, gb24)).toBe('Added “Call mom”, tomorrow, 15:00–15:30')
+    expect(voiceConfirmation(ok('Call mom at 3 PM for 30 minutes'), now, gb24)).toBe('Added “Call mom”, 15:00–15:30')
+  })
+})
+
 describe('voiceConfirmation', () => {
   it('says what was added with the row date phrase', () => {
     expect(voiceConfirmation(ok('Call mom tomorrow 3pm'), now, gb24)).toBe('Added “Call mom”, tomorrow, 15:00')

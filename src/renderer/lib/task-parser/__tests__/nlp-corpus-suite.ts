@@ -24,6 +24,9 @@ interface CorpusCase {
   locale?: string
   parserEnabled?: boolean
   due?: string | null
+  /** The time block `for 30m` makes (section 5.4). */
+  start?: string
+  end?: string
   priority?: number | null
   labels?: string[]
   project?: string | null
@@ -65,7 +68,7 @@ export function runNlpCorpusSuite(options: { zone: string; expectedOffsetMinutes
   describe(`nlp corpus v1 in ${options.zone}`, () => {
     it('is running in the requested time zone', () => {
       expect(corpus.contractVersion).toBe(1)
-      expect(corpus.cases.length).toBe(113)
+      expect(corpus.cases.length).toBe(152)
       if (options.expectedOffsetMinutesInOctober !== undefined) {
         expect(new Date(2026, 9, 6).getTimezoneOffset()).toBe(options.expectedOffsetMinutesInOctober)
       }
@@ -95,6 +98,8 @@ export function runNlpCorpusSuite(options: { zone: string; expectedOffsetMinutes
         expect({
           title: result.title,
           due,
+          start: result.block ? wall(result.block.start.toISOString()) : null,
+          end: result.block ? wall(result.block.end.toISOString()) : null,
           priority: result.priority,
           labels: result.labels,
           project: result.project,
@@ -103,6 +108,8 @@ export function runNlpCorpusSuite(options: { zone: string; expectedOffsetMinutes
         }).toEqual({
           title: testCase.title,
           due: testCase.due ?? null,
+          start: testCase.start ?? null,
+          end: testCase.end ?? null,
           priority: testCase.priority ?? null,
           labels: testCase.labels ?? [],
           project: testCase.project ?? null,

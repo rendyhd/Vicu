@@ -1,6 +1,6 @@
 import type { ParseResult, TokenType } from './task-parser'
 import { formatDateChip } from './date-utils'
-import type { DateFormat } from './date-display'
+import { formatBlockRange, type DateFormat } from './date-display'
 import { getDateFormat } from './date-format'
 import { locationReminderLabel, type LocationTrigger } from '../../shared/synced-prefs'
 
@@ -36,11 +36,14 @@ export function placeChipName(trigger: LocationTrigger, placeName: string): stri
   return locationReminderLabel(trigger, placeName)
 }
 
-/** A ParseResult as chips, in the order date, priority, labels, project, repeat, place. */
+/** A ParseResult as chips, in the order date, time block, priority, labels, project, repeat, place. */
 export function parseChips(result: ParseResult, fmt: DateFormat = getDateFormat(), now: Date = new Date()): ChipData[] {
   const chips: ChipData[] = []
   if (result.dueDate) {
     chips.push({ type: 'date', label: formatDateChip(result.dueDate, !result.dueHasTime, now, fmt), key: 'date', source: 'text' })
+  }
+  if (result.block) {
+    chips.push({ type: 'length', label: formatBlockRange(result.block.start, result.block.end, fmt), key: 'length', source: 'text' })
   }
   if (result.priority !== null && result.priority > 0) {
     chips.push({ type: 'priority', label: priorityChipName(result.priority), key: 'priority', source: 'text', priority: result.priority })

@@ -89,6 +89,32 @@ describe('Quick Entry and Quick View with the offline queue', () => {
       expect(notified).toBe(0)
     })
 
+    it('builds the payload with a time block, whose start the default reminder follows, and a queued create keeps it', async () => {
+      const block = { start_date: '2026-10-08T14:00:00.000Z', end_date: '2026-10-08T14:30:00.000Z' }
+      const settings = { notifications_default_reminder_offset: 900, notifications_default_reminder_relative_to: 'due_date' as const }
+      const built = quickEntryTaskPayload({ title: 'Call', description: null, dueDate: '2026-10-08T22:59:59.000Z', block }, settings)
+      expect(built).toEqual({
+        title: 'Call',
+        due_date: '2026-10-08T22:59:59.000Z',
+        ...block,
+        reminders: [{ reminder: '2026-10-08T13:45:00.000Z', relative_period: -900, relative_to: 'start_date' }],
+      })
+
+      createTask.mockResolvedValue(err('net::ERR_INTERNET_DISCONNECTED'))
+      await createFromQuickEntry(deps(), 7, built)
+      expect(queue.getPending()[0]).toMatchObject({ fields: block })
+    })
+
+    it('leaves out a block that is not one', () => {
+      const built = quickEntryTaskPayload({
+        title: 'Call',
+        description: null,
+        dueDate: null,
+        block: { start_date: '2026-10-08T14:30:00.000Z', end_date: '2026-10-08T14:00:00.000Z' },
+      }, null)
+      expect(built).toEqual({ title: 'Call' })
+    })
+
     it('builds the payload with the default reminder for a due date, and a queued create keeps it', async () => {
       const settings = { notifications_default_reminder_offset: 900, notifications_default_reminder_relative_to: 'due_date' as const }
       const built = quickEntryTaskPayload({ title: 'Water plants', description: null, dueDate: '2026-10-08T14:30:00.000Z', priority: 3 }, settings)
