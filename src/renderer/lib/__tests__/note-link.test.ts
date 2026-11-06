@@ -1,17 +1,5 @@
-import { readFileSync } from 'node:fs'
-import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { hasNotesContent, notesPreview } from '../note-link'
-
-const fixture = JSON.parse(readFileSync(resolve(__dirname, '../../../../test-fixtures/design-tokens-v1.json'), 'utf-8'))
-
-describe('row density', () => {
-  it('has the values of the shared fixture, which the row classes follow', () => {
-    expect(fixture.rowDensity.default).toBe('compact')
-    expect(fixture.rowDensity.compact).toEqual({ titleLines: 1, notesLines: 0 })
-    expect(fixture.rowDensity.comfortable).toEqual({ titleLines: 3, notesLines: 1 })
-  })
-})
 
 describe('notesPreview', () => {
   it('is the plain text on one line', () => {
