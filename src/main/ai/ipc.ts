@@ -1,7 +1,8 @@
 import { handleTrusted } from '../secure-ipc'
 import type { AiSettingsPatch, AskTurnRequest, KeptTranscript } from '../../shared/ai/types'
 import { clearAiAccountData, dropKeptTranscript, flushAiLocalData, getConversations, getKeptTranscripts, keepTranscript, saveConversations } from './local-data'
-import { aiAskTurn, aiBrainDump, aiDictate, aiListModels, aiOrganize, aiTestConnection, cancelAllAskTurns, cancelAskTurn } from './service'
+import { aiAskTurn, aiBrainDump, aiDictate, aiListModels, aiOrganize,
+  aiPlanDay, aiTestConnection, cancelAllAskTurns, cancelAskTurn } from './service'
 import { providerPreset, type ProviderId } from '../../shared/ai/contract'
 import {
   aiSettingsView,
@@ -78,6 +79,18 @@ export function registerAiIpc(): void {
     controller?.abort()
     return !!controller
   })
+  // Plan my day's suggestions (section 10): the same, one request per session.
+  handleTrusted('ai:plan-day', async (_event, input: { requestId?: unknown; user?: unknown }) => {
+    const id = typeof input?.requestId === 'string' ? input.requestId : ''
+    const controller = new AbortController()
+    if (id) dictations.set(id, controller)
+    try {
+      return await aiPlanDay({ user: typeof input?.user === 'string' ? input.user : '' }, controller.signal)
+    } finally {
+      if (id) dictations.delete(id)
+    }
+  })
+
   // A guided session's suggestions (section 9): Ask's model, cancelled like a dictation.
   handleTrusted('ai:organize', async (_event, input: { requestId?: unknown; user?: unknown }) => {
     const id = typeof input?.requestId === 'string' ? input.requestId : ''

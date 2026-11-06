@@ -5,6 +5,7 @@ import {
   BRAIN_DUMP_ANSWER_SCHEMA,
   DICTATION_ANSWER_SCHEMA,
   ORGANIZE_ANSWER_SCHEMA,
+  PLAN_DAY_ANSWER_SCHEMA,
   PROBE,
   PROMPTS,
   askSystemPrompt,
@@ -25,6 +26,7 @@ describe('model-facing schemas obey schemaSubset', () => {
     ['dictation.answerSchema', DICTATION_ANSWER_SCHEMA],
     ['brainDump.answerSchema', BRAIN_DUMP_ANSWER_SCHEMA],
     ['organize.answerSchema', ORGANIZE_ANSWER_SCHEMA],
+    ['planDay.answerSchema', PLAN_DAY_ANSWER_SCHEMA],
     ['probe.structured.schema', PROBE.structured.schema],
     ['probe.tool.parameters', PROBE.tool.tool.parameters],
     ...ASK_TOOLS.map((tool): [string, unknown] => [`ask.tools.${tool.name}`, tool.parameters]),
@@ -39,6 +41,7 @@ describe('model-facing schemas obey schemaSubset', () => {
     expect(DICTATION_ANSWER_SCHEMA).toEqual(aiFixture.dictation.answerSchema)
     expect(BRAIN_DUMP_ANSWER_SCHEMA).toEqual(aiFixture.brainDump.answerSchema)
     expect(ORGANIZE_ANSWER_SCHEMA).toEqual(aiFixture.organize.answerSchema)
+    expect(PLAN_DAY_ANSWER_SCHEMA).toEqual(aiFixture.planDay.answerSchema)
     expect(ASK_STARTERS).toEqual(aiFixture.ask.starters)
     expect(ASK_TOOLS).toEqual(aiFixture.ask.tools)
   })

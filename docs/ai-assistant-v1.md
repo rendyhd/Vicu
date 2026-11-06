@@ -734,6 +734,7 @@ agreement; a local server (Ollama or Open WebUI at a local address) skips it.
   for shorter answers (the answer first, at most three bullets in Ask, one sentence in Talk).
 - `brainDump` 1 and `brainDumpEdit` 1 are new with the brain dump (4.8).
 - `organize` 1 is new with the suggestions in guided sessions (section 9).
+- `planDay` 1 is new with Plan my day (section 10).
 
 ---
 
@@ -832,3 +833,78 @@ with the context of `dictation.context`.
 - `close` is shown as the suggested way out (Complete or Delete) and is never taken without a tap.
 - While a batch is on its way, its cards say so and can be decided without waiting.
 - A failed request is said once ("No suggestions: …") and the session goes on without them.
+
+---
+
+## 10. Plan my day
+
+Plan my day (semantics 14.10) works without a model. With Ask set up, a switch in the session (on to
+start with) adds suggestions: leftover actions, a realistic set of tasks, how long each takes, what
+can wait, and an order with start times, each with a reason. Nothing is written until the person
+taps. It uses Ask's model and Ask's agreement (7.1).
+
+### 10.1 Request
+
+- One request per session, sent when the session opens, or when its day changes. "Ask again" sends
+  another. It is sent again for nothing else: changing what is ticked lays the draft out again with
+  the answer in hand.
+- The request describes the day as the server has it: the day's lists are read from the server first
+  (offline, what is stored). An answer or a failure belongs to the day it was asked for and is not
+  shown on another.
+- System: the `planDay` prompt.
+- One user message, each block's tag on a line of its own: the `<context>` block of 4.1 (`list` is
+  `Plan`, `default_project_id` the Inbox), then `<plan>` with a JSON object, `<leftovers>` and
+  `<candidates>` with JSON arrays of tasks.
+- `<plan>` has `day` (`YYYY-MM-DD`), `now` (`HH:MM`), `default_length` (minutes), `free` (the free time
+  of semantics 16.6 as `{"start","end"}` in `HH:MM`), and `routines` (the routine times of the day,
+  `HH:MM`, no names).
+- A task is its summary (5.2) followed by `notes` as in 9.1. Candidates are the groups of semantics
+  14.10 without a picked project, on the day first, at most `limits.plan_day_candidates_max`.
+  Leftovers are at most the same number.
+- The answer may use up to `limits.plan_day_max_tokens` tokens. It is asked for as dictation's is
+  (deterministic, structured, `limits.dictation_idle_timeout_s`).
+
+### 10.2 Answer
+
+The `planDay.answerSchema` schema of the fixture:
+
+```json
+{
+  "leftovers": [{ "task_id": 1, "action": "today", "reason": "High priority and already late" }],
+  "picks": [{ "task_id": 3, "minutes": 30, "start": "09:30", "reason": "Short call, fits before lunch" }],
+  "can_wait": [{ "task_id": 6, "reason": "Lowest priority" }]
+}
+```
+
+`action` is `today`, `tomorrow`, `no_date` or `done`. `start` may be null.
+
+### 10.3 Checks
+
+1. **Leftovers**: a `task_id` that is not one of `<leftovers>`, or repeats an earlier one, is dropped
+   (`field` `"task_id"`); an `action` outside the four is dropped (`field` `"action"`). Reasons are
+   checked as in 9.3 step 6.
+2. **Picks**: a `task_id` that is not one of `<candidates>`, or repeats an earlier one, is dropped
+   (`field` `"task_id"`). After `limits.plan_day_picks_max` picks the rest are dropped (`field`
+   `"limit"`).
+3. **Minutes**: a whole number from `limits.plan_day_minutes_min` to `limits.plan_day_minutes_max`,
+   rounded up to a 15-minute step. Anything else is `null` (`field` `"minutes"`), and the task takes
+   the length it would have anyway.
+4. **Start**: `HH:MM`, where the pick's length (its minutes, else `default_length`) lies inside one
+   free range and does not overlap an earlier pick's start. Anything else is `null` (`field`
+   `"start"`), and the task takes the next free slot.
+5. **Can wait**: one of `<candidates>`, once, and not a pick; otherwise dropped (`field` `"task_id"`).
+
+A checked answer has `leftovers`, `picks`, `can_wait` and `dropped` (`task_id`, `field`, `value`), in
+order. Vectors: `planDay.checks`.
+
+### 10.4 In the session
+
+- Every suggestion is dashed, with its reason, and nothing is written without a tap.
+- *Leftovers*: each row marks the suggested action, and "Apply the N suggestions" writes them all.
+- *Choose*: a pick not ticked yet is under *Suggested*. A pick's length shows on its row, dashed until
+  the person changes it. While over the free time, what can wait is named with a Move button, which
+  writes the due date of the next day at once.
+- *Arrange*: "Assistant's order" or "First free slots" (semantics 14.10), each block with its reason.
+- *Ready*: nothing.
+- A failed request is said once ("No suggestions: …") and the session goes on with first free slots
+  and the default length. With the switch off, nothing is sent and nothing is shown.

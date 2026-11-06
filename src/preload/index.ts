@@ -308,6 +308,7 @@ const api = {
     testConnection: (model: string) => ipcRenderer.invoke('ai:test-connection', model),
     dictate: (input: { requestId: string; edit: boolean; user: string; brainDump?: boolean }) => ipcRenderer.invoke('ai:dictate', input),
     cancelDictation: (requestId: string) => ipcRenderer.invoke('ai:cancel-dictation', requestId),
+    planDay: (input: { requestId: string; user: string }) => ipcRenderer.invoke('ai:plan-day', input),
     organize: (input: { requestId: string; user: string }) => ipcRenderer.invoke('ai:organize', input),
     askStart: (request: AskTurnRequest) => ipcRenderer.invoke('ai:ask-start', request),
     askCancel: (turnId: string) => ipcRenderer.invoke('ai:ask-cancel', turnId),

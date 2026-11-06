@@ -19,7 +19,7 @@ interface ProjectPickerPopoverProps {
   onClose: (reason?: PopoverCloseReason) => void
 }
 
-function flattenTree(nodes: ProjectTreeNode[], depth = 0): { node: ProjectTreeNode; depth: number }[] {
+export function flattenTree(nodes: ProjectTreeNode[], depth = 0): { node: ProjectTreeNode; depth: number }[] {
   const result: { node: ProjectTreeNode; depth: number }[] = []
   for (const n of nodes) {
     result.push({ node: n, depth })

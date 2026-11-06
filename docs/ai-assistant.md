@@ -137,6 +137,14 @@ suggests a decision for each card: the choices are filled in with a dashed outli
 is under the title. Nothing is saved until you press Next, and Complete or Delete are only marked
 "Suggested", never done for you.
 
+## Suggestions in Plan my day
+
+Plan my day (see `docs/planner.md`) works without the assistant too. With Ask set up, a switch in the
+session adds Ask's model: what to do with each leftover, how long tasks take, tasks worth adding, what
+can wait, and an order with start times. Each is dashed with a short reason, and nothing is saved
+until you tap. It asks once when the session opens and again when you change the day or press Ask
+again.
+
 ## Speech on this computer
 
 Voice input normally uses the system's recogniser. Under Hearing you can download
@@ -150,7 +158,9 @@ and resumed, and a model can be deleted again.
 - Sent to the provider: for dictation and brain dump, the words (never audio) with the names of
   your projects, labels and places and today's date and time; for Ask, your messages and what its
   tools look up; for suggestions in a guided session, the same names and date with the session's
-  tasks (their summaries, when they were added and changed, and the start of their notes).
+  tasks (their summaries, when they were added and changed, and the start of their notes); for
+  Plan my day, the same names and date with the candidate tasks' summaries and the start of their
+  notes, your free time and your routines' times, without their names.
 - On this computer only: the last five conversations and any transcript kept after a failed
   request. They are deleted when you sign out, or with Delete conversations in Settings,
   Assistant, Privacy.

@@ -60,6 +60,7 @@ Dates, times, projects, labels, priority, repeats and places are read as you typ
 |-------|----------|
 | Days and dates | `tomorrow`, `friday`, `next Monday`, `in 3 days`, `jan 15`, `10/15` |
 | Times | `3pm`, `at 14:00`, `in 2 hours` |
+| Length | `at 3pm for 30m`, `at 9am for 2 hours` (a time block) |
 | Due today | `Buy milk !` |
 | Projects, labels | `#work`, `#"side project"`, `@errand`, `@"grocery list"` |
 | Priority | `p1`–`p4`, `!urgent`, `!high`, `!medium`, `!low` |
@@ -77,6 +78,7 @@ Prefer Vikunja's syntax? Switch to `*label` and `+project` in **Settings, Genera
 - **Routines**: habits next to your tasks, once or several times a day, with history and CSV export. Never overdue.
 - **Project review**: step through your projects on a cadence to keep them current, one project at a time with its health ("7 open · 4 untouched for 30+ days · 1 overdue") and its next step.
 - **Guided organizing**: sort the Inbox, overdue tasks or tasks that have waited for months one card at a time, with the keyboard, then Undo all if you change your mind. A weekly review checklist takes you through it in GTD order. With the assistant set up, each card comes with a suggestion you confirm ([how it works](docs/guided-organizing.md)).
+- **Plan**: an optional timeline for the day, 3 days or the week. Drop a task on a time, drag its edges, or type `tomorrow at 3pm for 30m`. Plan my day takes you from leftovers to a finished day in four steps, with the assistant's suggestions if you want them ([how it works](docs/planner.md)). A block is the task's own start and end date, so the web app and other clients see it too.
 - **Task order** per project: due date, priority, title, newest, oldest or manual. Subprojects follow their parent.
 - **Find anything**: quick find as you type (`Ctrl+F`), Search through finished tasks too, and a command palette (`Ctrl+Shift+P`) for every list and action.
 

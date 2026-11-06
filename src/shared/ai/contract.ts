@@ -19,6 +19,7 @@ import {
   dictation as fixtureDictation,
   brainDump as fixtureBrainDump,
   organize as fixtureOrganize,
+  planDay as fixturePlanDay,
   ask as fixtureAsk,
   talk as fixtureTalk,
   prompts as fixturePrompts,
@@ -140,6 +141,11 @@ export const AI_LIMITS = fixtureLimits as unknown as Readonly<{
   organize_notes_max_chars: number
   organize_reason_max_chars: number
   organize_max_tokens: number
+  plan_day_candidates_max: number
+  plan_day_picks_max: number
+  plan_day_minutes_min: number
+  plan_day_minutes_max: number
+  plan_day_max_tokens: number
   saved_addresses_max: number
 }>
 export const PROTOCOLS = fixtureProtocols as unknown as Record<WireProtocol, { chat: string; models: string }>
@@ -170,6 +176,7 @@ export const DICTATION_FIELDS = fixtureDictation.fields as unknown as DraftField
 export const BRAIN_DUMP_ANSWER_SCHEMA = fixtureBrainDump.answerSchema as unknown as JsonSchema
 /** The answer of a guided session's suggestions (section 9.2). */
 export const ORGANIZE_ANSWER_SCHEMA = fixtureOrganize.answerSchema as unknown as JsonSchema
+export const PLAN_DAY_ANSWER_SCHEMA = fixturePlanDay.answerSchema as unknown as JsonSchema
 export const ASK_TASK_SUMMARY_SCHEMA = fixtureAsk.taskSummary as unknown as JsonSchema
 export const ASK_TOOLS = fixtureAsk.tools as unknown as AskTool[]
 export const PROPOSAL_STATUSES = fixtureAsk.proposalResult.status as unknown as Array<'applied' | 'declined' | 'partly_applied' | 'failed'>
@@ -180,7 +187,7 @@ export type StarterKind = 'today' | 'upcoming' | 'inbox' | 'project' | 'other'
 /** Ask's starters by the kind of list it was opened from (5.7); one is sent exactly as written. */
 export const ASK_STARTERS = fixtureAsk.starters as unknown as Record<StarterKind, string[]>
 export const TALK_CONFIRM = fixtureTalk.confirm as unknown as Record<string, { yes: string[]; no: string[] }>
-export const PROMPTS = fixturePrompts as unknown as Record<'dictation' | 'dictationEdit' | 'brainDump' | 'brainDumpEdit' | 'ask' | 'talk' | 'organize', Prompt>
+export const PROMPTS = fixturePrompts as unknown as Record<'dictation' | 'dictationEdit' | 'brainDump' | 'brainDumpEdit' | 'ask' | 'talk' | 'organize' | 'planDay', Prompt>
 export const AI_MESSAGES = fixtureMessages as unknown as {
   promptSchemaIntro: string
   repair: string

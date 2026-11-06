@@ -16,12 +16,13 @@ import { createTaskReminderScheduler } from './task-reminders'
 import { notificationCategory, notificationFilters, overdueDays } from './notification-windows'
 import { addLocalDays, startOfLocalDay, toLocalDate } from '../shared/due-dates'
 import { isSharedRoutine, parseRoutineEnvelope, routineOccurrenceKey, scheduledDateOn, type RoutinePayload } from '../shared/routines'
-import { isRoutinesEnabled } from '../shared/config-types'
+import { isPlannerEnabled, isRoutinesEnabled } from '../shared/config-types'
 
 const NULL_DATE = '0001-01-01T00:00:00Z'
 
 // Active timer IDs so we can cancel on reschedule
 let dailyTimerId: ReturnType<typeof setTimeout> | null = null
+let plannerNudgeTimerId: ReturnType<typeof setTimeout> | null = null
 let secondaryTimerId: ReturnType<typeof setTimeout> | null = null
 let routineRefreshTimerId: ReturnType<typeof setTimeout> | null = null
 
@@ -72,6 +73,7 @@ export function initNotifications(mainWindow: BrowserWindow | null): void {
   taskReminders.start()
   refreshRoutineReminders()
   scheduleRoutineRefresh()
+  schedulePlannerNudge()
 }
 
 /** Update the main-window ref after a recreation without rescheduling timers. */
@@ -85,6 +87,7 @@ export function rescheduleNotifications(): void {
   void refreshTaskReminders()
   refreshRoutineReminders()
   scheduleRoutineRefresh()
+  schedulePlannerNudge()
 }
 
 export function stopNotifications(): void {
@@ -192,7 +195,45 @@ export function sendTestNotification(): void {
 
 // --- Scheduling ---
 
+/** Plan my day's evening nudge (contract 14.10): per device, one notification at the time set. */
+function schedulePlannerNudge(): void {
+  if (plannerNudgeTimerId !== null) {
+    clearTimeout(plannerNudgeTimerId)
+    plannerNudgeTimerId = null
+  }
+  const config = loadConfig()
+  const time = config?.planner_nudge
+  if (!config?.notifications_enabled || !isPlannerEnabled(config) || typeof time !== 'string') return
+  const [hours, minutes] = time.split(':').map(Number)
+  const now = new Date()
+  const next = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hours, minutes, 0, 0)
+  if (next.getTime() <= now.getTime()) next.setDate(next.getDate() + 1)
+  plannerNudgeTimerId = setTimeout(() => {
+    plannerNudgeTimerId = null
+    const current = loadConfig()
+    if (current?.notifications_enabled && isPlannerEnabled(current) && current.planner_nudge === time) {
+      const notification = new Notification({
+        title: 'Plan tomorrow',
+        body: 'Set up tomorrow in Plan my day.',
+        silent: !current.notifications_sound,
+        icon: getIcon(),
+      })
+      attachNotificationDiagnostics(notification, 'plan nudge')
+      notification.on('click', () => {
+        showMainWindow()
+        mainWindowRef?.webContents.send('navigate', '/plan')
+      })
+      notification.show()
+    }
+    schedulePlannerNudge()
+  }, next.getTime() - now.getTime())
+}
+
 function clearTimers(): void {
+  if (plannerNudgeTimerId !== null) {
+    clearTimeout(plannerNudgeTimerId)
+    plannerNudgeTimerId = null
+  }
   if (dailyTimerId !== null) {
     clearTimeout(dailyTimerId)
     dailyTimerId = null

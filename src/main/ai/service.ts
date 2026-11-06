@@ -10,6 +10,7 @@ import {
   BRAIN_DUMP_ANSWER_SCHEMA,
   DICTATION_ANSWER_SCHEMA,
   ORGANIZE_ANSWER_SCHEMA,
+  PLAN_DAY_ANSWER_SCHEMA,
   PROBE,
   askSystemPrompt,
   brainDumpSystemPrompt,
@@ -257,6 +258,17 @@ export function aiOrganize(input: { user: string }, signal?: AbortSignal): Promi
     user: input.user,
     schema: ORGANIZE_ANSWER_SCHEMA,
     maxTokens: ORGANIZE_MAX_TOKENS,
+    feature: 'ask',
+  }, signal)
+}
+
+/** Plan my day's suggestions (10.1): Ask's model and agreement, like a guided session's. */
+export function aiPlanDay(input: { user: string }, signal?: AbortSignal): Promise<AiResult<unknown>> {
+  return structuredModelAnswer({
+    system: promptText('planDay'),
+    user: input.user,
+    schema: PLAN_DAY_ANSWER_SCHEMA,
+    maxTokens: AI_LIMITS.plan_day_max_tokens,
     feature: 'ask',
   }, signal)
 }
