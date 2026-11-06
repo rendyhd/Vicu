@@ -31,6 +31,7 @@ import { buildShortcutStatus } from './shortcut-status'
 import { handleTrusted } from './secure-ipc'
 import { cleanAttachmentTempDir } from './attachment-temp'
 import { registerWebSecurity } from './web-security'
+import { registerTextContextMenu } from './text-context-menu'
 import { APP_ID } from './app-id'
 import { cancelVoiceSession } from './voice/service'
 import { shutdownAi } from './ai/ipc'
@@ -612,6 +613,7 @@ if (process.env.VICU_USER_DATA_DIR) {
 // Navigation, window-open and webview guards for every WebContents (D-SEC-1).
 // Registered before the first window is created.
 registerWebSecurity()
+registerTextContextMenu()
 
 // Linux: force Chromium's "basic" password-store backend. The default is
 // "detect", which tries libsecret (gnome-keyring / KWallet) and falls back

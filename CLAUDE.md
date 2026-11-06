@@ -102,6 +102,10 @@ API responses use a discriminated union: `{ success: true, data: T } | { success
 - Preload callbacks (`ipcRenderer.on`) must pass only the payload to page code, never the `IpcRendererEvent`.
 - Attachments opened from the server go to `<temp>/vicu-attachments` (cleaned at startup and quit). Executable, script, shortcut and macro extensions are revealed with `shell.showItemInFolder` instead of opened (`attachment-safety.ts`). Binary downloads are capped at 100 MB.
 
+### Text context menu
+
+Electron shows no menu of its own on a right click. `src/main/text-context-menu.ts` (registered in `index.ts` before any window exists) opens a native one in every window, the OIDC sign-in windows included; `text-menu-template.ts` decides what it holds (pure, unit-tested): spelling suggestions, Cut, Copy, Paste and Select all in a text field, Copy on selected read-only text, otherwise no menu. A page's own menu (a task row, a sidebar item) calls `preventDefault`, so the event never reaches main. Harness: `scenarios/text-context-menu.mjs`.
+
 ### Vikunja API
 
 Vicu uses Vikunja API v2. List responses are unwrapped from their pagination envelopes in `src/main/api-client.ts` (collections are paginated fully in main, `paginate.ts`), and task and project updates are JSON Merge Patch (`application/merge-patch+json`).
