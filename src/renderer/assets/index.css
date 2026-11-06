@@ -527,6 +527,21 @@ html:active-view-transition-type(page) main {
 }
 
 /*
+ * While anything is dragged (AppShell sets the attribute) the pointer is a grabbing hand everywhere.
+ * An explicit cursor is what beats the I-beam Chromium shows for the text selection a press can start,
+ * and with no element under the pointer no row shows its hover state or tooltip on the way past. Drop
+ * targets are worked out from coordinates, so they do not need pointer events.
+ */
+html[data-dragging] {
+  cursor: grabbing;
+}
+
+html[data-dragging] * {
+  cursor: grabbing !important;
+  pointer-events: none !important;
+}
+
+/*
  * Signature moments (card 4.11a).
  *
  * Counts roll: the old number leaves and the new one comes in, over fade.base. A larger count
