@@ -112,6 +112,14 @@ describe('resolveViewerFilter', () => {
 })
 
 describe('selectViewerTasks (D-QV-1)', () => {
+  it('"today" also holds a time block starting today, and custom lists do not (contract 16.4)', () => {
+    const start = new Date(tuesday().getTime() + 2 * 3_600_000).toISOString()
+    const end = new Date(tuesday().getTime() + 3 * 3_600_000).toISOString()
+    const tasks = [{ ...task(1), start_date: start, end_date: end }, { ...task(2), start_date: start }]
+    const out = selectViewerTasks(tasks as never[], { ...base, view_type: 'today' }, { now: tuesday() }) as { id: number }[]
+    expect(out.map((t) => t.id)).toEqual([1])
+  })
+
   it('leaves the inbox out of "anytime", like the main Anytime view', () => {
     const tasks = [task(1, { project_id: INBOX }), task(2, { project_id: 10 }), task(3, { project_id: INBOX, done: true })]
     const out = selectViewerTasks(tasks, { ...base, view_type: 'anytime' }, { now: tuesday(), inboxProjectId: INBOX })

@@ -4,6 +4,7 @@ import { filterCustomList, type CustomListContext, type CustomListTask } from '.
 import { sortCustomListTasks, type CustomListSortable } from '../../shared/custom-list-sort'
 import { isUpcoming, toLocalDate } from '../../shared/due-dates'
 import { withoutNestedSubtasks } from '../../shared/nested-subtasks'
+import { blockStartsOn, type BlockFields } from '../../shared/time-blocks'
 
 export interface ResolvedViewerFilter {
   filter: ViewerFilter
@@ -77,8 +78,11 @@ export function selectViewerTasks<T extends CustomListTask>(
   const today = toLocalDate(now)
 
   switch (viewerFilter.view_type) {
-    case 'today':
-      return filterCustomList(tasks, { due_date_filter: 'today' }, today)
+    case 'today': {
+      // Today also holds a time block starting today (section 16.4); custom lists read the due date only.
+      const dueToday = new Set(filterCustomList(tasks, { due_date_filter: 'today' }, today))
+      return tasks.filter((task) => dueToday.has(task) || (!task.done && blockStartsOn(task as BlockFields, today)))
+    }
     case 'upcoming':
       return tasks.filter((task) => !task.done && isUpcoming(task.due_date, now))
     case 'anytime':

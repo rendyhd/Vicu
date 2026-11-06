@@ -22,7 +22,8 @@ import { useIsDark } from '@/hooks/use-is-dark'
 import type { Task, TaskReminder } from '@/lib/vikunja-types'
 import { TaskCheckbox } from './TaskCheckbox'
 import { TaskCardBar, type CardPopover } from './TaskCardBar'
-import { TaskDueBadge } from './TaskDueBadge'
+import { TaskBlockBadge, TaskDueBadge } from './TaskDueBadge'
+import { blockOf, dueRepeatsBlockDay } from '../../../shared/time-blocks'
 import { useRowView } from './RowViewContext'
 import { PriorityMark } from '@/components/shared/PriorityMark'
 import { SubtaskList } from './SubtaskList'
@@ -358,6 +359,7 @@ function TaskRowInner({
   // state flips, not on every focus/selection change anywhere in the list.
   const isExpanded = useSelectionStore((s) => s.expandedTaskId === task.id)
   const hasPlaceReminder = useHasLocationReminder(task.id)
+  const block = useMemo(() => blockOf(task), [task.start_date, task.end_date])
   const isFocused = useSelectionStore((s) => s.focusedTaskId === task.id)
   const isSelected = useSelectionStore((s) => s.selectedTaskIds.has(task.id))
   // Main asked for this task to be shown (a clicked reminder): expand once the row is on screen.
@@ -815,7 +817,9 @@ function TaskRowInner({
           )}
           <TaskSyncIcon taskId={task.id} />
           <TaskLinkIcon description={task.description} />
-          <TaskDueBadge dueDate={task.due_date} />
+          {/* A date-only due date on the block's own day would repeat its day phrase (contract 16.4). */}
+          {!(block && dueRepeatsBlockDay(task.due_date, block)) && <TaskDueBadge dueDate={task.due_date} />}
+          {block && <TaskBlockBadge block={block} />}
           {((task.reminders?.length ?? 0) > 0 || hasPlaceReminder) && (
             <Bell className="h-3 w-3 text-text-secondary" aria-label="Has a reminder" />
           )}

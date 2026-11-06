@@ -1408,6 +1408,67 @@ Each item opens its session. The starters of `ai-assistant-v1.md` section 5.7 fo
 and `upcoming` ids), `guided.agenda` the items for a `weekly_review.last`, and `guided.ago` the
 phrases.
 
+### 14.10 Plan my day
+
+A session on one day, today or tomorrow, from the Plan screen (section 16.9). It has four steps, and
+works the same with or without the assistant (`docs/ai-assistant-v1.md` section 10). The day can be
+changed in the first two steps. Tasks the person cannot change are left out of every step.
+
+**Leftovers.** Open tasks whose due date is before today or whose block is on a day before today,
+oldest first (the earlier of the two, then id). They are not the session's day: they wait until the
+person decides, and each can be skipped. An action is written at once:
+
+| Action | Writes |
+|---|---|
+| Today, Tomorrow | `due_date` that day, date-only, and the time removed (16.2) |
+| No date | `due_date` null, and the time removed |
+| Done | `{ "done": true }` and nothing else |
+
+**Choose.** The person ticks what they will do. The groups hold no task twice, in this order:
+
+- *On the day*, ticked to start with: due on the day or with a block on it, and on today also the
+  overdue tasks, in Fit order (16.6).
+- *Inbox*: tasks of the Inbox without a due date, in the Inbox's order.
+- *Coming up*: due one to three days after the day, without a block on the day, by due date, then
+  priority from high to low, then id.
+- *From a project* the person picks: its tasks, in its order, at most six.
+
+Each task to place has a length: the person's choice, else the assistant's, else
+`planner.default_length`. **To place** is the ticked tasks without a block on the day, less those
+kept without a time. The meter shows the tasks ticked, the minutes to place (a task placed by hand
+counts its own length) and the free time of the day (16.6). **Over** is the minutes to place less
+the free time, when that is above zero.
+
+**Arrange.** A draft on the timeline, not saved. Blocks the person placed come first, and count as
+busy. Then, with the assistant's order, its starts that still fit, in its order. Then the rest take
+the next free slot (16.6) in Fit order. A task with no slot left stays in the list and says so. The
+person can drag, stretch or keep a task without a time; the rest of the draft is laid out again
+around it.
+
+**Accept** writes one merge patch per task:
+
+| Task | Writes |
+|---|---|
+| In the draft | As a drop on a time (16.2): `start_date`, `end_date`, and the due rule |
+| Kept without a time, or no slot left, and not due on the day | `due_date` the day, date-only, and the time removed |
+| Kept without a time, or no slot left, and due on the day | Nothing |
+| Ticked with a block on the day | Nothing |
+
+**Ready.** A summary of the day (with a time, without a time, still free), and:
+
+- *Undo all* writes back what the session changed, Leftovers and "can wait" included: the due date,
+  start, end and reminders each task had, and reopens what it completed. It deletes nothing.
+- *Remind me when each block starts* adds `{ "relative_to": "start_date", "relative_period": 0 }` to
+  each open block of the day that does not have one; off removes those. It is written at once and
+  Undo all takes it back.
+- *Ask me to plan tomorrow* is a per-device time for one notification each evening while the planner
+  is on.
+
+Vectors: `planSession` in `cross-app-semantics-v1.json`, with `now`, `hours`, `defaultLength`,
+`inboxProjectId` and `tasks` (local wall-clock times; absent fields are done false, due, start and
+end null, priority 0, project 2); `leftovers`, `leftoverActions`, `groups` (`onDay`, `inbox`,
+`comingUp`), `freeRanges`, `meter`, `draft`, `accept` and `reminders`.
+
 ---
 
 ## 15. Duplicating a task
@@ -1487,7 +1548,9 @@ A block on any other day stays, and so does a block when only the due date's tim
 
 - The Today list also holds tasks with a block starting today (section 2). Upcoming, custom lists,
   overdue and the guided queues read the due date only.
-- A row with a block shows it with `row.block` (section 8.3), next to its due phrase as usual.
+- A row with a block shows it with `row.block` (section 8.3), next to its due phrase as usual. A
+  date-only due date on the block's own day is left out, because the block already says that day; an
+  overdue one stays.
 
 ### 16.5 Reminders
 

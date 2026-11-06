@@ -30,6 +30,7 @@ export function duplicatePayload(task: Task): CreateTaskPayload {
   if (task.description) payload.description = task.description
   if (!isNullDate(task.due_date)) payload.due_date = task.due_date
   if (!isNullDate(task.start_date)) payload.start_date = task.start_date
+  if (!isNullDate(task.end_date)) payload.end_date = task.end_date
   if (task.priority) payload.priority = task.priority
   if (task.repeat_after) payload.repeat_after = task.repeat_after
   if (task.repeat_mode) payload.repeat_mode = task.repeat_mode

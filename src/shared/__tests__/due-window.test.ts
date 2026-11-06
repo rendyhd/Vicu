@@ -24,10 +24,9 @@ afterEach(() => {
 
 /** The filters the Today and Upcoming lists send: the renderer's base filter plus the window. */
 function listFilters(now: Date): { today: string; upcoming: string } {
-  const base = `done = false && due_date != '${NULL_DATE}'`
   return {
-    today: withDueWindow(base, 'today', now)!,
-    upcoming: withDueWindow(base, 'upcoming', now)!,
+    today: withDueWindow('done = false', 'today', now)!,
+    upcoming: withDueWindow(`done = false && due_date != '${NULL_DATE}'`, 'upcoming', now)!,
   }
 }
 
@@ -128,11 +127,33 @@ describe('Today and Upcoming server windows (D-PERF-2)', () => {
     }
   })
 
+  it('Today also fetches a task whose start is today, whatever its due date (contract 16.4); Upcoming does not', () => {
+    for (const zone of ZONES) {
+      process.env.TZ = zone
+      const now = new Date('2026-10-06T21:30:00')
+      const filters = listFilters(now)
+      const today = compileServerFilter(filters.today)
+      const upcoming = compileServerFilter(filters.upcoming)
+      const start = new Date('2026-10-06T15:00:00').toISOString()
+      const nextWeek = new Date('2026-10-13T12:00:00').toISOString()
+      expect(today({ ...task(NULL_DATE), start_date: start }), zone).toBe(true)
+      expect(today({ ...task(nextWeek), start_date: start }), zone).toBe(true)
+      expect(upcoming({ ...task(NULL_DATE), start_date: start }), zone).toBe(false)
+      // Starting tomorrow or yesterday is not today.
+      expect(today({ ...task(NULL_DATE), start_date: new Date('2026-10-07T00:00:00').toISOString() }), zone).toBe(false)
+      expect(today({ ...task(NULL_DATE), start_date: new Date('2026-10-05T23:59:00').toISOString() }), zone).toBe(false)
+      expect(today({ ...task(NULL_DATE), start_date: start, done: true }), zone).toBe(false)
+    }
+  })
+
   it('builds each clause from the start of local tomorrow', () => {
     process.env.TZ = 'America/New_York'
     const now = new Date('2026-10-06T21:30:00') // 21:30 EDT
     const tomorrowStart = new Date('2026-10-07T00:00:00').toISOString()
-    expect(dueWindowClause('today', now)).toBe(`due_date < '${tomorrowStart}'`)
+    const todayStart = new Date('2026-10-06T00:00:00').toISOString()
+    expect(dueWindowClause('today', now)).toBe(
+      `((due_date != '0001-01-01T00:00:00Z' && due_date < '${tomorrowStart}') || (start_date >= '${todayStart}' && start_date < '${tomorrowStart}'))`,
+    )
     expect(dueWindowClause('upcoming', now)).toBe(`due_date >= '${tomorrowStart}'`)
   })
 

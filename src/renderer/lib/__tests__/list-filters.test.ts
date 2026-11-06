@@ -8,7 +8,7 @@ describe('what each list asks the server for (D-PERF-2)', () => {
     const today = filtersFor({ view: 'today' })
     const upcoming = filtersFor({ view: 'upcoming' })
 
-    expect(today).toMatchObject({ filter: `done = false && due_date != '${NULL_DATE}'`, due_window: 'today', sort_by: 'due_date', order_by: 'asc' })
+    expect(today).toMatchObject({ filter: 'done = false', due_window: 'today', sort_by: 'due_date', order_by: 'asc' })
     expect(upcoming).toMatchObject({ filter: `done = false && due_date != '${NULL_DATE}'`, due_window: 'upcoming', sort_by: 'due_date', order_by: 'asc' })
     // Different queries, so the two lists never share (or overwrite) a cache entry.
     expect(JSON.stringify(today)).not.toBe(JSON.stringify(upcoming))

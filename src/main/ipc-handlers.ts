@@ -88,6 +88,7 @@ import { buildViewerFilterParams } from './quick-entry/filter-builder'
 import { forgetDeletedTask, loadRoutineCarriers, rememberCreatedTask } from './carrier-service'
 import { countProjectTasks, invalidateProjectCounts } from './project-counts-service'
 import { dueToday } from '../shared/due-dates'
+import { withDueChangeRules } from '../shared/time-blocks'
 import { COLLAB_SIGNALS_PARAM, KEEP_NESTED_SUBTASKS_PARAM } from './api-v2'
 import { hasCollaborationCondition, needsCommentSignals, type CustomListContext } from '../shared/custom-list-filter'
 import { fetchPositionSortedTasks } from './quick-entry/position-sort'
@@ -857,7 +858,8 @@ export function registerIpcHandlers(): void {
       const task = removeStandaloneTaskDueDate(String(rawTaskId))
       return task ? { success: true, task } : { success: false, error: 'Task not found' }
     }
-    return quickViewPatch(quickActionDeps(), rawTaskId, { due_date: null }, taskData)
+    // Clearing the date also removes a block on its day (contract section 16.3).
+    return quickViewPatch(quickActionDeps(), rawTaskId, withDueChangeRules(taskData, { due_date: null }, new Date()), taskData)
   })
 
   handleTrusted('qv:update-task', async (_event, rawTaskId: number | string, patch: Record<string, unknown>) => {
