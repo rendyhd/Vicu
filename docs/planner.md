@@ -27,7 +27,9 @@ You can make one anywhere you type a task: `Call Sam tomorrow at 3pm for 30m`.
   your other devices). A due date before that time moves to that day; a later one stays as a deadline.
 - **Drag an edge** to change the start or the end, in 15-minute steps. **Click a block** for exact
   lengths and nudges.
-- **Drag on an empty time** to add a task, into the project you are browsing or the Inbox.
+- **Drag on an empty time** to add a task, into the project you are browsing or the Inbox. **Ctrl+N**
+  (Cmd+N on a Mac) does the same at the selected day's next free time. With no free time left on that
+  day, it opens the Inbox's new task field.
 - **Drag a block back on the list** to remove its time. The date stays.
 - **Keyboard:** Alt+Shift+Up or Down moves a focused block 15 minutes, Shift+Up or Down changes its
   length, Enter opens the lengths.

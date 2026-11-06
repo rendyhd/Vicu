@@ -1,5 +1,5 @@
-import { useMemo, useRef, useState } from 'react'
-import { Navigate } from '@tanstack/react-router'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Navigate, useNavigate } from '@tanstack/react-router'
 import { ChevronLeft, ChevronRight, Settings2, Sun } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { cn } from '@/lib/cn'
@@ -24,10 +24,12 @@ import { useProjectTasks } from '@/hooks/use-project-tasks'
 import { useProjects } from '@/hooks/use-projects'
 import { useTasks } from '@/hooks/use-tasks'
 import { useCreateTask, useUpdateTask } from '@/hooks/use-task-mutations'
+import { api } from '@/lib/api'
 import { formatDateDisplay } from '@/lib/date-display'
 import { useCompletedTasksStore } from '@/stores/completed-tasks-store'
 import { useDayKey } from '@/stores/day-store'
 import { announce } from '@/stores/announcer-store'
+import { useNewTaskRequestStore } from '@/stores/new-task-request-store'
 import { toast } from '@/stores/toast-store'
 import { dayWithoutTime, formatLength, plannedMinutes, type GestureRange } from '@/lib/planner-timeline'
 import {
@@ -50,6 +52,7 @@ import {
   busyOfDay,
   fitTasks,
   freeMinutes,
+  nextFreeSlot,
   placeBlock,
   viewDays,
   type BlockChanges,
@@ -182,6 +185,31 @@ function PlanScreen() {
       },
     )
   }
+
+  // New task (Ctrl+N, File > New task, the palette): the title box at the selected day's next free
+  // time. With none left the Inbox's composer takes the request, as in a view without a composer.
+  const navigate = useNavigate()
+  const newTaskRequestedAt = useNewTaskRequestStore((s) => s.requestedAt)
+  useEffect(() => {
+    return api.onNewTask(() => {
+      if (!inSession) useNewTaskRequestStore.getState().request()
+    })
+  }, [inSession])
+  useEffect(() => {
+    if (newTaskRequestedAt === null || inSession) return
+    const start = nextFreeSlot(new Date(), selectedDay, prefs.hours, prefs.defaultLength, busyOfDay(range.tasks, selectedDay))
+    if (start === null) {
+      void navigate({ to: '/inbox' })
+      return
+    }
+    if (!useNewTaskRequestStore.getState().take()) return
+    setPressed(null)
+    setDrawn((current) => current ?? { day: selectedDay, range: { startMinute: start, endMinute: start + prefs.defaultLength } })
+  }, [newTaskRequestedAt])
+  // That time may be off screen; a stretch drawn by hand already shows.
+  useEffect(() => {
+    if (drawn) drawnRef.current?.scrollIntoView({ block: 'nearest' })
+  }, [drawn])
 
   // Totals of the selected day.
   const now = new Date()
