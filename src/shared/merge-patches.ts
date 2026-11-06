@@ -286,11 +286,17 @@ export function projectPatch(original: ProjectInput | null | undefined, edited: 
 /**
  * Last line of defence for the main process: reduce any task-shaped object (a
  * cached task, a queued legacy payload) to a valid writable patch without diffing.
+ * Undefined and server-owned response fields are never written back, empty dates
+ * become `null`, and reminders never carry a blank `reminder`.
  */
 export function sanitizeTaskPatch(patch: Record<string, unknown>): TaskPatch {
   return taskPatch(null, patch as TaskInput)
 }
 
+/**
+ * The same for a project. Keys outside the writable schema, such as a tree node's
+ * `children`, are rejected by the server with a 422.
+ */
 export function sanitizeProjectPatch(patch: Record<string, unknown>): ProjectPatch {
   return projectPatch(null, patch as ProjectInput)
 }

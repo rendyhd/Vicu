@@ -1,4 +1,4 @@
-// How a shortcut is written next to a menu entry. Specs use the same words everywhere: "Mod" is
+// How a shortcut is written next to a menu entry or in a tooltip. Specs use the same words everywhere: "Mod" is
 // Ctrl (Windows, Linux) or Command (macOS); the other keys are written as they are on the key.
 
 const NAMES: Record<string, { mac: string; other: string }> = {

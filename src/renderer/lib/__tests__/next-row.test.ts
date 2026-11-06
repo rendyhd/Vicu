@@ -1,19 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseCssMs } from '../row-close'
 import { pickNextRow } from '../next-row'
-
-describe('parseCssMs', () => {
-  it('reads milliseconds and seconds', () => {
-    expect(parseCssMs('320ms', 1)).toBe(320)
-    expect(parseCssMs(' 150ms ', 1)).toBe(150)
-    expect(parseCssMs('0.32s', 1)).toBeCloseTo(320)
-  })
-
-  it('falls back when the value is empty or not a time', () => {
-    expect(parseCssMs('', 320)).toBe(320)
-    expect(parseCssMs('auto', 320)).toBe(320)
-  })
-})
 
 describe('pickNextRow', () => {
   const rows = [

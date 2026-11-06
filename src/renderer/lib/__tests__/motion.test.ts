@@ -16,6 +16,11 @@ describe('parseCssTime', () => {
     expect(parseCssTime('fast')).toBe(0)
     expect(parseCssTime('12')).toBe(0)
   })
+  it('takes another fallback', () => {
+    expect(parseCssTime('', 320)).toBe(320)
+    expect(parseCssTime('auto', 320)).toBe(320)
+    expect(parseCssTime('150ms', 320)).toBe(150)
+  })
 })
 
 describe('SPRINGS', () => {

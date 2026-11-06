@@ -8,8 +8,6 @@ import {
   buildProjectTaskCountUrl,
   readEnvelopeTotal,
   createTaskCollectionSearchParams,
-  createProjectPatch,
-  createTaskPatch,
   type AttachmentPreviewSize,
   MAX_PAGE_SIZE,
   clampPageSize,
@@ -24,6 +22,7 @@ import {
   VIKUNJA_ERROR_ALREADY_SUBSCRIBED,
   type TaskCommentPage,
 } from './api-v2'
+import { sanitizeProjectPatch, sanitizeTaskPatch } from '../shared/merge-patches'
 import type { ApiError, ApiResult } from './api-result'
 import { collectAllPages } from './paginate'
 import { decodeUtf8Chunks } from './response-body'
@@ -416,7 +415,7 @@ export async function updateTask(
   const c = await getConfigOrFail()
   if ('success' in c) return c
 
-  return patchWithRetry<unknown>(`${c.url}${API_BASE_PATH}/tasks/${id}`, c.token, createTaskPatch(task))
+  return patchWithRetry<unknown>(`${c.url}${API_BASE_PATH}/tasks/${id}`, c.token, sanitizeTaskPatch(task))
 }
 
 /**
@@ -479,7 +478,7 @@ export async function updateProject(
   const c = await getConfigOrFail()
   if ('success' in c) return c
 
-  return patchWithRetry<unknown>(`${c.url}${API_BASE_PATH}/projects/${id}`, c.token, createProjectPatch(project))
+  return patchWithRetry<unknown>(`${c.url}${API_BASE_PATH}/projects/${id}`, c.token, sanitizeProjectPatch(project))
 }
 
 export async function deleteProject(id: number): Promise<ApiResult<void>> {

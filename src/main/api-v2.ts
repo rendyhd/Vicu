@@ -1,5 +1,4 @@
 import { withDueWindow } from '../shared/due-dates'
-import { sanitizeProjectPatch, sanitizeTaskPatch } from '../shared/merge-patches'
 import { withoutNestedSubtasks } from '../shared/nested-subtasks'
 
 export interface PaginatedResponse<T> {
@@ -173,21 +172,4 @@ export function buildTaskAttachmentDownloadUrl(
     url.searchParams.set('preview_size', previewSize)
   }
   return url.toString()
-}
-
-/**
- * Turn task state or a partial update into a v2-safe merge patch.
- * Undefined and server-owned response fields are never written back, empty
- * dates become `null`, and reminders never carry a blank `reminder`.
- */
-export function createTaskPatch(task: Record<string, unknown>): Record<string, unknown> {
-  return { ...sanitizeTaskPatch(task) }
-}
-
-/**
- * Reduce a project update to the writable PATCH schema. Keys outside it, such
- * as a tree node's `children`, are rejected by the server with a 422.
- */
-export function createProjectPatch(project: Record<string, unknown>): Record<string, unknown> {
-  return { ...sanitizeProjectPatch(project) }
 }

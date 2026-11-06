@@ -4,13 +4,7 @@
  * The numbers come from the tokens (`--dur-move`, `--spring-move`, `--dur-fade-fast`).
  */
 
-/** "320ms" or "0.32s" as milliseconds; `fallback` when the value is empty or not a time. */
-export function parseCssMs(value: string, fallback: number): number {
-  const match = /^\s*(-?\d*\.?\d+)\s*(ms|s)\s*$/.exec(value)
-  if (!match) return fallback
-  const n = Number(match[1])
-  return match[2] === 's' ? n * 1000 : n
-}
+import { parseCssTime } from './motion'
 
 function token(name: string): string {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim()
@@ -43,7 +37,7 @@ export function playRowClose(el: HTMLElement, reduced: boolean): Animation {
 function closeAnimation(el: HTMLElement, reduced: boolean): Animation {
   if (reduced) {
     return el.animate([{ opacity: 1 }, { opacity: 0 }], {
-      duration: parseCssMs(token('--dur-fade-fast'), 150),
+      duration: parseCssTime(token('--dur-fade-fast'), 150),
       easing: 'linear',
       fill: 'forwards',
     })
@@ -63,7 +57,7 @@ function closeAnimation(el: HTMLElement, reduced: boolean): Animation {
       { height: '0px', opacity: 0, paddingTop: '0px', paddingBottom: '0px', borderBottomWidth: '0px', overflow: 'hidden' },
     ],
     {
-      duration: parseCssMs(token('--dur-move'), 320),
+      duration: parseCssTime(token('--dur-move'), 320),
       easing: token('--spring-move') || 'ease',
       fill: 'forwards',
     }
@@ -78,7 +72,7 @@ function closeAnimation(el: HTMLElement, reduced: boolean): Animation {
 export function playRowOpen(el: HTMLElement, reduced: boolean): Animation {
   if (reduced) {
     return el.animate([{ opacity: 0 }, { opacity: 1 }], {
-      duration: parseCssMs(token('--dur-fade-fast'), 150),
+      duration: parseCssTime(token('--dur-fade-fast'), 150),
       easing: 'linear',
     })
   }
@@ -97,7 +91,7 @@ export function playRowOpen(el: HTMLElement, reduced: boolean): Animation {
       },
     ],
     {
-      duration: parseCssMs(token('--dur-move'), 320),
+      duration: parseCssTime(token('--dur-move'), 320),
       easing: token('--spring-move') || 'ease',
     }
   )

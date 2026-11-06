@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { computePosition, flip, offset, shift } from '@floating-ui/dom'
-import { shortcutLabel } from '@/lib/shortcut-label'
+import { shortcutHint } from '@/lib/shortcut-hint'
 import { leaveAsGhost } from './leave-ghost'
 import { TOOLTIP_DELAY_MS, TOOLTIP_EDGE, TOOLTIP_GAP } from './tooltip-logic'
 
 interface TooltipProps {
   /** What the control does. The control keeps its own accessible name; this is the visible hint. */
   label: string
-  /** A shortcut such as `Mod+T`, written for the platform (see `shortcutLabel`). */
+  /** A shortcut such as `Mod+T`, written for the platform (see `shortcutHint`). */
   shortcut?: string
   children: ReactNode
 }
@@ -139,7 +139,7 @@ function TooltipBubble({ id, anchor, label, shortcut }: { id: string; anchor: HT
       className="vicu-popover vicu-tooltip pointer-events-none m-0 inset-auto flex items-center gap-2 overflow-visible whitespace-nowrap rounded-control border-0 bg-text px-2 py-1 text-meta text-bg-page"
     >
       <span>{label}</span>
-      {shortcut && <kbd className="font-sans text-caption opacity-70">{shortcutLabel(shortcut, isMac)}</kbd>}
+      {shortcut && <kbd className="font-sans text-caption opacity-70">{shortcutHint(shortcut, isMac)}</kbd>}
     </div>
   )
 }

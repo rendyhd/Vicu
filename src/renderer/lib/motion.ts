@@ -21,10 +21,10 @@ export type MotionDuration =
 export type MotionSpringToken = 'move' | 'move-expressive' | 'pop'
 export type MotionEasing = 'standard' | 'enter' | 'exit'
 
-/** Milliseconds from a CSS time: "150ms", "0.2s". Anything else is 0. */
-export function parseCssTime(text: string): number {
+/** Milliseconds from a CSS time: "150ms", "0.2s". Anything else is `fallback`. */
+export function parseCssTime(text: string, fallback = 0): number {
   const match = /^\s*(-?\d*\.?\d+)\s*(ms|s)\s*$/.exec(text)
-  if (!match) return 0
+  if (!match) return fallback
   const value = Number(match[1])
   return match[2] === 's' ? value * 1000 : value
 }
