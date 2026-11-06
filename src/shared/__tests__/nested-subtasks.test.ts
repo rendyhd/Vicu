@@ -49,11 +49,6 @@ describe('filtering before hiding nested subtasks (X-16)', () => {
   ]
   const tagged = (list: TestTask[]) => filterCustomList(list, { label_ids: [7], include_done: true }, '2026-10-06')
 
-  it('the old order (hide nested first) loses a matching subtask whose parent does not match', () => {
-    const oldOrder = tagged(withoutNestedSubtasks(tasks))
-    expect(oldOrder.map((t) => t.id)).toEqual([3])
-  })
-
   it('shows a matching subtask whose parent does not match, and nests one whose parent matches', () => {
     const newOrder = withoutNestedSubtasks(tagged(tasks), { hideChildrenOfCompletedParents: false })
     expect(newOrder.map((t) => t.id)).toEqual([2, 3])

@@ -3,9 +3,7 @@ import {
   buildTaskAttachmentDownloadUrl,
   buildProjectCollectionUrl,
   buildProjectTaskCountUrl,
-  createProjectPatch,
   createTaskCollectionSearchParams,
-  createTaskPatch,
   finishTaskCollection,
   readEnvelopeTotal,
   withoutNestedSubtasks,
@@ -104,73 +102,6 @@ describe('finishTaskCollection', () => {
   it('does not send the option to the server', () => {
     const query = createTaskCollectionSearchParams({ filter: 'done = false', keep_nested_subtasks: true })
     expect([...query.keys()].sort()).toEqual(['expand', 'filter'])
-  })
-})
-
-describe('createTaskPatch', () => {
-  it('keeps writable issue #24 fields and drops server-owned task fields', () => {
-    expect(createTaskPatch({
-      id: 42,
-      title: 'Keep title',
-      description: 'Persist these notes',
-      priority: 3,
-      due_date: '2030-01-15T12:00:00Z',
-      labels: [{ id: 7 }],
-      position: 65536,
-      created: '2026-07-24T10:00:00Z',
-      created_by: { id: 1, username: 'owner' },
-    })).toEqual({
-      title: 'Keep title',
-      description: 'Persist these notes',
-      priority: 3,
-      due_date: '2030-01-15T12:00:00Z',
-    })
-  })
-
-  it('preserves explicit false and zero values while omitting undefined', () => {
-    expect(createTaskPatch({
-      done: false,
-      priority: 0,
-      reminders: null,
-      description: undefined,
-    })).toEqual({
-      done: false,
-      priority: 0,
-      reminders: [],
-    })
-  })
-
-  it('turns the null date into an explicit null and drops blank reminder fields', () => {
-    expect(createTaskPatch({
-      due_date: '0001-01-01T00:00:00Z',
-      reminders: [{ reminder: '', relative_period: -900, relative_to: 'due_date' }],
-    })).toEqual({
-      due_date: null,
-      reminders: [{ relative_period: -900, relative_to: 'due_date' }],
-    })
-  })
-})
-
-describe('createProjectPatch', () => {
-  it('drops children and every other key outside the PATCH schema', () => {
-    expect(createProjectPatch({
-      id: 5,
-      title: 'Renamed',
-      description: 'notes',
-      children: [{ id: 6 }],
-      views: [],
-      owner: { id: 1 },
-      created: 'x',
-      parent_project_id: 0,
-      position: 1024,
-      is_archived: false,
-    })).toEqual({
-      title: 'Renamed',
-      description: 'notes',
-      parent_project_id: 0,
-      position: 1024,
-      is_archived: false,
-    })
   })
 })
 

@@ -98,28 +98,26 @@ describe('one definition of the config types', () => {
     return out
   }
 
+  // Read once: every test below scans the same files.
+  const sources = sourceFiles(srcDir).map((file) => ({
+    rel: relative(srcDir, file).split(sep).join('/'),
+    text: readFileSync(file, 'utf8'),
+  }))
+
   const shared = ['AppConfig', 'ViewerFilter', 'ReviewConfig', 'SecondaryProject', 'CustomList', 'CustomListFilter', 'ConnectionFields']
 
   it.each(shared)('declares %s only in src/shared/config-types.ts', (name) => {
     // A declaration, not an import of the name.
     const declaration = new RegExp(`^\\s*(?:export\\s+)?(?:interface\\s+${name}\\b|type\\s+${name}\\s*=)`, 'm')
-    const offenders: string[] = []
-    for (const file of sourceFiles(srcDir)) {
-      const rel = relative(srcDir, file).split(sep).join('/')
-      if (rel === 'shared/config-types.ts') continue
-      if (declaration.test(readFileSync(file, 'utf8'))) offenders.push(rel)
-    }
+    const offenders = sources.filter(({ rel, text }) => rel !== 'shared/config-types.ts' && declaration.test(text)).map(({ rel }) => rel)
     expect(offenders).toEqual([])
   })
 
   it('reads the Quick View setting through isQuickViewEnabled', () => {
-    const offenders: string[] = []
-    for (const file of sourceFiles(srcDir)) {
-      const rel = relative(srcDir, file).split(sep).join('/')
-      if (rel === 'shared/config-types.ts' || rel === 'main/config.ts') continue
-      const text = readFileSync(file, 'utf8')
-      if (/quick_view_enabled\s*(?:!==|===)\s*(?:true|false)/.test(text)) offenders.push(rel)
-    }
+    const exempt = ['shared/config-types.ts', 'main/config.ts']
+    const offenders = sources
+      .filter(({ rel, text }) => !exempt.includes(rel) && /quick_view_enabled\s*(?:!==|===)\s*(?:true|false)/.test(text))
+      .map(({ rel }) => rel)
     expect(offenders).toEqual([])
   })
 })

@@ -21,13 +21,6 @@ describe('decodeUtf8Chunks', () => {
     expect(JSON.parse(decoded)).toEqual({ title: 'Café 日本語 🚀' })
   })
 
-  it('shows why per-chunk decoding is wrong', () => {
-    const body = Buffer.from('é', 'utf8')
-    const perChunk = body.subarray(0, 1).toString() + body.subarray(1).toString()
-    expect(perChunk).toContain('�')
-    expect(decodeUtf8Chunks([body.subarray(0, 1), body.subarray(1)])).toBe('é')
-  })
-
   it('accepts Uint8Array chunks and an empty body', () => {
     expect(decodeUtf8Chunks([])).toBe('')
     expect(decodeUtf8Chunks([new Uint8Array([0x68, 0x69])])).toBe('hi')

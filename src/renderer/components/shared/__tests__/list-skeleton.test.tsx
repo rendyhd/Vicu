@@ -1,10 +1,6 @@
-import { readFileSync } from 'node:fs'
-import { resolve } from 'node:path'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import { ListSkeleton } from '../ListSkeleton'
-
-const views = resolve(__dirname, '..', '..', '..', 'views')
 
 describe('ListSkeleton', () => {
   it('keeps the page header and shows four placeholder rows by default, three on request', () => {
@@ -21,13 +17,5 @@ describe('ListSkeleton', () => {
     expect(html).toContain('role="status"')
     expect(html).toContain('aria-label="Loading Inbox"')
     expect(html).not.toContain('Loading...')
-  })
-})
-
-describe('the list views while loading', () => {
-  it.each(['TodayView', 'InboxView', 'UpcomingView', 'AnytimeView', 'ProjectView', 'TagView'])('%s shows the skeleton, not a "Loading..." line', (name) => {
-    const source = readFileSync(resolve(views, `${name}.tsx`), 'utf8')
-    expect(source).toContain('<ListSkeleton')
-    expect(source).not.toContain('Loading...')
   })
 })

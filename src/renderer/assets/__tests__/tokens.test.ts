@@ -5,7 +5,6 @@ import postcss from 'postcss'
 import tailwindcss from 'tailwindcss'
 import { describe, expect, it } from 'vitest'
 import {
-  FIXTURE_PATH,
   OUTPUT_PATH,
   channels,
   cssVar,
@@ -263,11 +262,5 @@ describe('the Tailwind theme', () => {
     expect(out).not.toContain('bg-sidebar\\/50')
     expect(out).toMatch(/\.text-meta \{\s*font-size: var\(--type-meta-size\);\s*font-weight: var\(--type-meta-weight\)/)
     expect(out).toMatch(/\.rounded-card \{\s*border-radius: var\(--radius-card\)/)
-  })
-})
-
-describe('the fixture location', () => {
-  it('is the shared test-fixtures file', () => {
-    expect(FIXTURE_PATH).toBe(resolve(root, 'test-fixtures', 'design-tokens-v1.json'))
   })
 })

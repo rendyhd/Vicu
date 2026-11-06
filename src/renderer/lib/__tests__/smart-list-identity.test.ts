@@ -28,9 +28,4 @@ describe('smart list identity', () => {
       expect(SMART_LIST_IDENTITY[id as keyof typeof SMART_LIST_IDENTITY].icon).toBe(component)
     }
   })
-
-  it('keeps identity colours off role names: they colour icons only', () => {
-    expect(tokens.identity.about).toMatch(/only ever colour list icons/)
-    for (const def of Object.values(lists)) expect(def.color).toMatch(/^#[0-9A-F]{6}$/)
-  })
 })

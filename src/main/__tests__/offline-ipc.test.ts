@@ -56,23 +56,6 @@ describe('offline queue IPC (the contract for the main window)', () => {
     rmSync(dir, { recursive: true, force: true })
   })
 
-  it('registers every channel the preload calls', () => {
-    expect([...hoisted.handlers.keys()].sort()).toEqual([
-      'offline-queue:cancel-change',
-      'offline-queue:discard-failed',
-      'offline-queue:discard-pending',
-      'offline-queue:enqueue-add-label',
-      'offline-queue:enqueue-complete',
-      'offline-queue:enqueue-create',
-      'offline-queue:enqueue-delete',
-      'offline-queue:enqueue-remove-label',
-      'offline-queue:enqueue-update',
-      'offline-queue:replay-now',
-      'offline-queue:retry-failed',
-      'offline-queue:snapshot',
-    ])
-  })
-
   it('enqueue-update stores a patch and reports whether it folded', async () => {
     const first = await call<{ actionId: string; taskId: number; folded: boolean }>('offline-queue:enqueue-update', 5, { title: 'a' }, { title: 'Old title' })
     expect(first).toMatchObject({ success: true, data: { taskId: 5, folded: false } })

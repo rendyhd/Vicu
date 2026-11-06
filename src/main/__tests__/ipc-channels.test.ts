@@ -51,9 +51,6 @@ const listened = channels(
   /ipcRenderer\.on(?:ce)?\(\s*['"]([^'"]+)['"]/g,
 )
 
-/** Channels main sends that no window listens to yet. Each one is a bug to fix, not a pattern to copy. */
-const KNOWN_UNHEARD = new Set<string>([])
-
 describe('IPC channels', () => {
   it('finds the channels at all', () => {
     expect(invoked.size).toBeGreaterThan(50)
@@ -75,11 +72,7 @@ describe('IPC channels', () => {
   })
 
   it('has a listener in a preload script for every channel main sends to a window', () => {
-    expect([...sent].filter((channel) => !listened.has(channel) && !KNOWN_UNHEARD.has(channel)).sort()).toEqual([])
-  })
-
-  it('lists only channels that really are unheard', () => {
-    expect([...KNOWN_UNHEARD].filter((channel) => listened.has(channel) || !sent.has(channel))).toEqual([])
+    expect([...sent].filter((channel) => !listened.has(channel)).sort()).toEqual([])
   })
 
   // A renderer that saves its whole config snapshot can overwrite what main changed in the
