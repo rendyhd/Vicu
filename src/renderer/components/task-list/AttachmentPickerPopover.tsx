@@ -2,7 +2,8 @@ import { useMemo, useState, type RefObject } from 'react'
 import { X, FileText, Image, File, Loader2, Download } from 'lucide-react'
 import { useTaskAttachments, useUploadAttachment, useDeleteAttachment } from '@/hooks/use-task-mutations'
 import { useAttachmentActions } from '@/hooks/use-attachment-actions'
-import { formatFileSize, viewableImages } from '@/lib/attachment-preview'
+import { useAttachmentBlobUrl } from '@/hooks/use-attachment-bytes'
+import { formatFileSize, viewableImages, type ViewerImage } from '@/lib/attachment-preview'
 import { Popover, type PopoverCloseReason } from '../overlay/Popover'
 import { AttachmentViewer } from './AttachmentViewer'
 
@@ -18,6 +19,21 @@ function getFileIcon(mime: string) {
   if (mime.startsWith('image/')) return Image
   if (mime.startsWith('text/') || mime === 'application/pdf') return FileText
   return File
+}
+
+/** An image row's picture: the server's preview, with the image icon until it arrives or if it cannot be drawn. */
+function ImageThumbnail({ taskId, image }: { taskId: number; image: ViewerImage }) {
+  const { url } = useAttachmentBlobUrl(taskId, image.id, image.mime)
+  const [broken, setBroken] = useState(false)
+  return (
+    <span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-control bg-bg-hover">
+      {url && !broken ? (
+        <img src={url} alt="" draggable={false} onError={() => setBroken(true)} className="h-full w-full object-cover" />
+      ) : (
+        <Image className="h-4 w-4 text-[var(--text-secondary)]" aria-hidden="true" />
+      )}
+    </span>
+  )
 }
 
 export function AttachmentPickerPopover({ anchorRef, invokedBy, taskId, onClose }: AttachmentPickerPopoverProps) {
@@ -48,25 +64,31 @@ export function AttachmentPickerPopover({ anchorRef, invokedBy, taskId, onClose 
         <div className="mb-2 flex max-h-48 flex-col gap-1 overflow-y-auto custom-scrollbar">
           {attachments.map((att) => {
             const Icon = getFileIcon(att.file.mime)
-            const isImage = images.some((image) => image.id === att.id)
+            const image = images.find((candidate) => candidate.id === att.id)
             return (
               <div
                 key={att.id}
                 className="group/att flex items-center gap-2 rounded-control px-2 py-1.5 hover:bg-[var(--bg-hover)]"
               >
-                <Icon className="h-4 w-4 shrink-0 text-[var(--text-secondary)]" />
                 <button
                   type="button"
-                  onClick={() => (isImage ? setViewingId(att.id) : handleOpen(att.id, att.file.name))}
-                  title={isImage ? 'View' : 'Open'}
-                  className="min-w-0 flex-1 text-left"
+                  onClick={() => (image ? setViewingId(att.id) : handleOpen(att.id, att.file.name))}
+                  title={image ? 'View' : 'Open'}
+                  className="flex min-w-0 flex-1 items-center gap-2 text-left"
                 >
-                  <div className="truncate text-xs text-[var(--text-primary)]">
-                    {att.file.name}
-                  </div>
-                  <div className="text-caption text-[var(--text-secondary)]">
-                    {formatFileSize(att.file.size)}
-                  </div>
+                  {image ? (
+                    <ImageThumbnail taskId={taskId} image={image} />
+                  ) : (
+                    <Icon className="h-4 w-4 shrink-0 text-[var(--text-secondary)]" aria-hidden="true" />
+                  )}
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-xs text-[var(--text-primary)]">
+                      {att.file.name}
+                    </span>
+                    <span className="block text-caption text-[var(--text-secondary)]">
+                      {formatFileSize(att.file.size)}
+                    </span>
+                  </span>
                 </button>
                 <button
                   type="button"

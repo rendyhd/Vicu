@@ -1,7 +1,7 @@
 // attachment-viewer: an image attachment shows in the app instead of opening in another program.
 //
-//   A. The attachment list: an image row says View, another file still says Open.
-//   B. View opens the viewer over the app with the attachment list still open behind it: the file
+//   A. The attachment list: an image row has a thumbnail and says View, another file still says Open.
+//   B. The thumbnail opens the viewer over the app with the attachment list still open behind it: the file
 //      name, "1 of 2", the original (not the 400 px preview) fitted to the window.
 //   C. A large image: Actual size shows it at its own size with scrolling, Fit to window goes back.
 //   D. Right and Left go through the task's images (round at the ends); a small image has no zoom.
@@ -87,7 +87,8 @@ export default async function run(h) {
   const task = await h.api('POST', `/projects/${h.ids.inbox}/tasks`, { title: 'AV image viewer task' })
   try {
     const big = await upload(task.id, 'whiteboard.png', 'image/png', new Uint8Array(await drawPng(page, 2400, 1600, 'Whiteboard 2400 x 1600')))
-    const small = await upload(task.id, 'small.png', 'image/png', new Uint8Array(await drawPng(page, 320, 200, 'Small')))
+    // The way the phone uploads a shared file: the server reads the real type from the content.
+    const small = await upload(task.id, 'small.png', 'application/octet-stream', new Uint8Array(await drawPng(page, 320, 200, 'Small')))
     await upload(task.id, 'notes.txt', 'text/plain', new TextEncoder().encode('not an image'))
     // The big image also sits in the notes, the way a pasted image does.
     const stored = `<p>Photo of the board</p>\n[[image:${big.id}]]`
@@ -113,10 +114,21 @@ export default async function run(h) {
       ok: rows.filter((r) => r.title === 'View').length === 2 && rows.find((r) => r.name.startsWith('notes.txt'))?.title === 'Open',
       detail: JSON.stringify(rows),
     })
+    await page.waitForFunction(() => {
+      const imgs = [...document.querySelectorAll('[popover][aria-label="Attachments"] button[title="View"] img')]
+      return imgs.length === 2 && imgs.every((img) => img.complete && img.naturalWidth > 0)
+    }, null, { timeout: 15000 }).catch(() => {})
+    const thumbs = await page.evaluate(() => {
+      const list = document.querySelector('[popover][aria-label="Attachments"]')
+      const drawn = (title) => [...(list?.querySelectorAll(`button[title="${title}"] img`) ?? [])].filter((img) => img.naturalWidth > 0).length
+      return { view: drawn('View'), open: drawn('Open') }
+    })
+    await h.assert('A: image rows show a thumbnail, the text file does not', { ok: thumbs.view === 2 && thumbs.open === 0, detail: JSON.stringify(thumbs) })
+    await h.capture(`list-thumbnails-${theme}`)
 
     // ---- B. View ----------------------------------------------------------------------------
     const bigRow = page.locator('[popover][aria-label="Attachments"] button[title="View"]', { hasText: 'whiteboard.png' })
-    await bigRow.click()
+    await bigRow.locator('img').click()
     await h.wait(400)
     await page.waitForFunction(() => {
       const img = [...document.querySelectorAll('dialog[open] img')].at(-1)
