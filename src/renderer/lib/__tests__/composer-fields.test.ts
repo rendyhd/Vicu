@@ -71,6 +71,37 @@ describe('the text decides until a control is used', () => {
   })
 })
 
+describe('a time block from the text', () => {
+  it('holds the time, and the due date is that day', () => {
+    const fields = resolveComposerFields(input('Call Ana saturday 3pm for 30m'))
+    expect(fields.dueDate).toBe(dateOnlyDue('2026-10-10'))
+    expect(fields.block).toEqual({ start_date: SATURDAY_3PM, end_date: new Date(2026, 9, 10, 15, 30).toISOString() })
+  })
+
+  it('has its own chip, and none without a block', () => {
+    const chipsOf = (text: string) => {
+      const i = input(text)
+      return composerChips({ fields: resolveComposerFields(i), parsed: i.parsed, chipLabels: [], projectTitle: 'Inbox', fmt: GB, now: NOW })
+    }
+    expect(chipsOf('Call Ana saturday 3pm for 30m').map((chip) => chip.type)).toEqual(['date', 'length'])
+    expect(chipsOf('Call Ana saturday 3pm for 30m')[1].label).toBe('15:00–15:30')
+    expect(chipsOf('Call Ana saturday 3pm').map((chip) => chip.type)).toEqual(['date'])
+  })
+
+  it('goes when a date is picked by hand', () => {
+    const picked = dateOnlyDue('2026-10-12')
+    const fields = resolveComposerFields(input('Call Ana saturday 3pm for 30m', { dueTouched: true, dueValue: picked }))
+    expect(fields.dueDate).toBe(picked)
+    expect(fields.block).toBeNull()
+  })
+
+  it('leaves the words in the title without a time', () => {
+    const fields = resolveComposerFields(input('Call Ana saturday for 30m'))
+    expect(fields.block).toBeNull()
+    expect(input('Call Ana saturday for 30m').parsed!.title).toBe('Call Ana for 30m')
+  })
+})
+
 describe('a control wins over the text', () => {
   it('the picked date wins, and clearing it keeps it cleared', () => {
     const picked = dateOnlyDue('2026-10-20')

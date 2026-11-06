@@ -2,8 +2,8 @@ import { NULL_DATE } from './constants'
 import { isDateOnly, isNoDueDate, parsedDue } from './due-dates'
 import { formatDateChip } from './date-utils'
 import { detectRecurrencePreset, formatRecurrenceLabel } from './recurrence'
-import { recurrenceToVikunja, type ParseResult } from './task-parser'
-import type { DateFormat } from './date-display'
+import { blockFields, recurrenceToVikunja, type ParseResult } from './task-parser'
+import { formatBlockRange, type DateFormat } from './date-display'
 import { placeChipName, priorityChipName, recurrenceChipName, type ChipData, type ChipSource } from './parse-chips'
 
 // One source of truth for the new-task composer (card 3.5). A field shows, and saves, what the
@@ -37,6 +37,8 @@ export interface ComposerFields {
   /** The due date to save, or null for none. */
   dueDate: string | null
   dueSource: FieldSource | null
+  /** The time block the text makes (`for 30m` with a time), as task fields, or null. */
+  block: { start_date: string; end_date: string } | null
   /** 0 for none. */
   priority: number
   prioritySource: FieldSource | null
@@ -66,6 +68,8 @@ export function resolveComposerFields(input: ComposerInput): ComposerFields {
     dueDate = input.contextDue
     dueSource = 'default'
   }
+  // A block belongs to the date the text read; a date picked by hand replaces both.
+  const block = input.dueTouched ? null : blockFields(parsed)
 
   let priority = 0
   let prioritySource: FieldSource | null = null
@@ -101,7 +105,7 @@ export function resolveComposerFields(input: ComposerInput): ComposerFields {
     repeatSource = 'text'
   }
 
-  return { dueDate, dueSource, priority, prioritySource, projectId, projectSource, projectNotFound, repeat, repeatSource }
+  return { dueDate, dueSource, block, priority, prioritySource, projectId, projectSource, projectNotFound, repeat, repeatSource }
 }
 
 /** True while the caret is still in the project word ("+Pe" at the end of the text): the name may be unfinished. */
@@ -124,9 +128,9 @@ export interface ComposerChipInput {
 }
 
 /**
- * The chips of the composer: the date (weekday and date, with the time when there is one), the
- * priority name, the labels, the project, the repeat and the place ("when I get home"), each from
- * the text or from the control that was used. A default date from the list is not a chip here (the composer shows it apart).
+ * The chips of the composer: the date (weekday and date, with the time when there is one), the time
+ * block, the priority name, the labels, the project, the repeat and the place ("when I get home"),
+ * each from the text or from the control that was used. A default date from the list is not a chip here (the composer shows it apart).
  */
 export function composerChips({ fields, parsed, chipLabels, projectTitle, fmt, now = new Date(), text }: ComposerChipInput): ChipData[] {
   const chips: ChipData[] = []
@@ -139,6 +143,9 @@ export function composerChips({ fields, parsed, chipLabels, projectTitle, fmt, n
       source: source(fields.dueSource),
       label: formatDateChip(new Date(fields.dueDate), isDateOnly(fields.dueDate), now, fmt),
     })
+  }
+  if (fields.block && parsed?.block) {
+    chips.push({ type: 'length', key: 'length', source: 'text', label: formatBlockRange(parsed.block.start, parsed.block.end, fmt) })
   }
   if (fields.priority > 0) {
     chips.push({ type: 'priority', key: 'priority', source: source(fields.prioritySource), label: priorityChipName(fields.priority), priority: fields.priority })

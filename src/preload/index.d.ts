@@ -253,6 +253,8 @@ export interface ElectronAPI {
      * agreement; checked against `organize.answerSchema` in main. Cancelled with `cancelDictation`.
      */
     organize(input: { requestId: string; user: string }): Promise<AiResult<unknown>>
+    /** Plan my day's suggestions (docs/ai-assistant-v1.md section 10). Cancelled with `cancelDictation`. */
+    planDay(input: { requestId: string; user: string }): Promise<AiResult<unknown>>
     askStart(request: AskTurnRequest): Promise<boolean>
     askCancel(turnId: string): Promise<boolean>
     onAskEvent(cb: (envelope: AskTurnEnvelope) => void): () => void

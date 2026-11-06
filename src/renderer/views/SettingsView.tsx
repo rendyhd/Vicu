@@ -20,6 +20,7 @@ import { AssistantSettings } from '@/components/settings/AssistantSettings'
 import { NotificationSettings } from '@/components/settings/NotificationSettings'
 import { CompletionSoundSettings } from '@/components/settings/CompletionSoundSettings'
 import { SidebarSettings } from '@/components/settings/SidebarSettings'
+import { PlannerSettings } from '@/components/settings/PlannerSettings'
 import { RoutinesSettingsPanel } from '@/components/routines/RoutinesSettingsPanel'
 import { ProjectSettings } from '@/components/settings/ProjectSettings'
 import { useProjects } from '@/hooks/use-projects'
@@ -583,6 +584,8 @@ export function SettingsView() {
 
           </div>
         </div>
+
+        {fullConfig && !fullConfig.standalone_mode && <PlannerSettings config={fullConfig} onChange={handleQuickEntryChange} />}
 
         {fullConfig && <SidebarSettings config={fullConfig} onChange={handleQuickEntryChange} />}
 

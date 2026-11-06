@@ -6,7 +6,7 @@
 
 import { NULL_DATE } from './constants'
 import { parsedDue } from './due-dates'
-import { parse, recurrenceToVikunja } from './task-parser'
+import { blockFields, parse, recurrenceToVikunja } from './task-parser'
 import type { ParserConfig } from './task-parser'
 import type { CreateTaskPayload } from './vikunja-types'
 import { withDefaultReminder, type DefaultReminderSettings } from '../../shared/default-reminder'
@@ -67,6 +67,7 @@ export function planPastedTask(line: string, context: PasteContext): PastedTaskP
   const parsedDate = parsed.dueDate ? parsedDue(parsed.dueDate, parsed.dueHasTime) : undefined
   const dueDate = parsedDate ?? context.defaultDueDate
   if (dueDate && dueDate !== NULL_DATE) payload.due_date = dueDate
+  Object.assign(payload, blockFields(parsed))
   if (parsed.priority && parsed.priority > 0) payload.priority = parsed.priority
   if (parsed.recurrence) Object.assign(payload, recurrenceToVikunja(parsed.recurrence))
 

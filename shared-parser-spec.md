@@ -2,7 +2,7 @@
 
 This document defines the exact parser behavior that BOTH Vicu (desktop) and Vicu Android must implement identically. Both apps must produce the same `ParseResult` for the same input string and the same `ParserConfig`.
 
-The date and recurrence rules are the contract in `docs/cross-app-semantics-v1.md` section 5, and the test is the shared corpus `test-fixtures/nlp-corpus-v1.json` (113 cases, reference time Tue 2026-10-06 10:00 local; both apps run the same file). If this document and the corpus disagree, the corpus wins. The desktop implementation is `src/renderer/lib/task-parser/`: there is one parser (the main window, the task title editor and Quick Entry all call it), and the date work is done by chrono-node plus the rules below.
+The date and recurrence rules are the contract in `docs/cross-app-semantics-v1.md` section 5, and the test is the shared corpus `test-fixtures/nlp-corpus-v1.json` (152 cases, reference time Tue 2026-10-06 10:00 local; both apps run the same file). If this document and the corpus disagree, the corpus wins. The desktop implementation is `src/renderer/lib/task-parser/`: there is one parser (the main window, the task title editor and Quick Entry all call it), and the date work is done by chrono-node plus the rules below.
 
 ---
 
@@ -239,6 +239,7 @@ Contract: `docs/cross-app-semantics-v1.md` section 5.1; corpus: `test-fixtures/n
 - `next week` is the Monday of the following week (chrono itself says "in 7 days"; do not use that). `next month` is the same day next month.
 - **Three-letter abbreviations** (`mon`, `tue`, `tues`, `wed`, `thu`, `thur`, `thurs`, `fri`, `sat`, `sun`) only count as dates when the previous word is `on`, `next`, `this`, `by` or `due`, or when a time follows (`mon 9am`, `wed at 3pm`, `fri 14:00`). Otherwise they are plain words: "Buy sun cream", "Notes we sat on" and "Plan wed anniversary" have no date. Full weekday names always count.
 - `weekend` and `weekday` are words, not dates: "Plan the weekend" has no date. (chrono reads them as Saturday and the next working day; desktop blanks them before chrono runs.)
+- An amount of time is a date only right after `in`. "Call 30m", "Rest 3 days", "Plan the week", "Renew within 3 days" and "Review 3 days from now" keep their words and have no date. (chrono reads them all as that long from now; desktop marks them before chrono runs, so they also keep two date phrases apart. The When field is the exception on desktop: typed text there is nothing but a date, so "3 days" means that.)
 
 ### Words that are not dates
 
@@ -261,6 +262,14 @@ The words `on`, `by` and `due` directly before a date phrase, and `at` directly 
 - A time (`3pm`, `3:30pm`, `14:00`, optionally after `at`) can come before or after a date phrase.
 - A time without a date is today if it is still ahead, otherwise tomorrow.
 - `now` is never a date ("Do it now" keeps its title and has no due date).
+
+### Length
+
+`for` and a length (`for 30m`, `for 90 min`, `for 2 hours`, `for 1h30m`) make a time block when the
+text also has a time of day. Contract section 5.4 has the rules; the corpus pins them. Unlike a
+label, project or priority, a length does not split a date phrase: "Call tomorrow for 1h at 9am" is
+tomorrow at 09:00. chrono reads `for 30m` as 30 minutes from now and `for 3 months` as a date, so
+desktop blanks these words before chrono runs.
 
 ### Slash dates
 

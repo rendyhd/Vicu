@@ -371,6 +371,11 @@ textarea {
   color: var(--text-secondary);
 }
 
+/* A time block (section 16.4), in the same colour as on a row of the main window */
+.task-due.task-block {
+  color: var(--accent-blue);
+}
+
 /* Priority mark: the shared SVG (src/shared/priority-mark-svg.ts), drawn in the role colour at the end of the row */
 .task-priority {
   display: inline-flex;

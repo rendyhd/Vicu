@@ -1,5 +1,6 @@
 import { withDefaultReminder, type DefaultReminderSettings } from '../../shared/default-reminder'
 import { isQueueableFailure, maybeCreatedMessage } from '../../shared/error-classify'
+import { isTimeBlock } from '../../shared/time-blocks'
 import type { ApiResult } from '../api-result'
 import type { OfflineQueue } from './queue'
 import { parseQueuedImages, parseQueuedLabels } from './parse-input'
@@ -41,6 +42,8 @@ export interface QuickEntryTaskInput {
   title: string
   description: string | null
   dueDate: string | null
+  /** The time block `for 30m` made (contract section 5.4). */
+  block?: { start_date: string; end_date: string } | null
   priority?: number
   repeatAfter?: number
   repeatMode?: number
@@ -55,6 +58,10 @@ export function quickEntryTaskPayload(input: QuickEntryTaskInput, settings: Defa
   const payload: Record<string, unknown> = { title: input.title }
   if (input.description) payload.description = input.description
   if (input.dueDate) payload.due_date = input.dueDate
+  if (input.block && isTimeBlock(input.block.start_date, input.block.end_date)) {
+    payload.start_date = input.block.start_date
+    payload.end_date = input.block.end_date
+  }
   if (input.priority && input.priority > 0) payload.priority = input.priority
   if (input.repeatAfter !== undefined) payload.repeat_after = input.repeatAfter
   if (input.repeatMode !== undefined) payload.repeat_mode = input.repeatMode

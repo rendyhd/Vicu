@@ -3,7 +3,7 @@
  * check that a server filter string is a superset of what the client-side evaluator accepts.
  *
  * Grammar: `expr := and ('||' and)*`, `and := primary ('&&' primary)*`,
- * `primary := '(' expr ')' | field op value`. Fields: done, project_id, due_date, updated.
+ * `primary := '(' expr ')' | field op value`. Fields: done, project_id, due_date, start_date, updated.
  * Anything else throws, so a new clause cannot slip through a test unnoticed.
  */
 
@@ -11,6 +11,8 @@ export interface ServerFilterTask {
   done: boolean
   project_id: number
   due_date: string
+  /** Absent reads as no start date. */
+  start_date?: string | null
   /** Required only by filters that compare `updated`. */
   updated?: string | null
 }
@@ -63,6 +65,8 @@ function compareField(task: ServerFilterTask, field: string, op: string, value: 
       return compare(op, task.project_id, Number(value))
     case 'due_date':
       return compare(op, new Date(task.due_date).getTime(), new Date(value).getTime())
+    case 'start_date':
+      return compare(op, new Date(task.start_date ?? '0001-01-01T00:00:00Z').getTime(), new Date(value).getTime())
     case 'updated':
       if (!task.updated) throw new Error('The filter compares updated but the task has none')
       return compare(op, new Date(task.updated).getTime(), new Date(value).getTime())

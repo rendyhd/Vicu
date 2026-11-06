@@ -3,8 +3,20 @@ import { cn } from '@/lib/cn'
 import { isNullDate, formatDueDate } from '@/lib/date-utils'
 import { isDueToday, isOverdue } from '@/lib/due-dates'
 import { useDateFormat } from '@/hooks/use-date-format'
+import { formatBlockRow } from '@/lib/date-display'
+import type { TimeBlock } from '../../../shared/time-blocks'
 
 type DueDateContext = 'row' | 'row.inToday' | 'row.inDayGroup' | 'chip'
+
+/** A task's time block on a row (`row.block`, contract section 8.3): "15:00–15:30", "Fri, 15:00–15:30". */
+export function TaskBlockBadge({ block, className }: { block: TimeBlock; className?: string }) {
+  const fmt = useDateFormat()
+  return (
+    <span className={cn('shrink-0 rounded-control px-1.5 py-0.5 text-meta font-medium text-accent-blue', className)}>
+      {formatBlockRow(block.start, block.end, new Date(), fmt)}
+    </span>
+  )
+}
 
 /**
  * Where the rows are shown decides how much of the date they repeat (contract section 8.3): Today

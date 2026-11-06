@@ -244,11 +244,11 @@ export interface WhenParse {
 /**
  * What the quick-add parser's date extraction makes of typed text ("tomorrow 9am", "next mon",
  * "oct 20 at 3pm"). A phrase that names no time gives a date-only value. Null when the text has no
- * date in it.
+ * date in it. Typed text here is nothing but a date, so "3 days" means that, unlike in a task's title.
  */
 export function parseWhenText(text: string, now: Date, locale?: string): WhenParse | null {
   if (!text.trim()) return null
-  const found = extractDate(text, [], { reference: now, locale })
+  const found = extractDate(text, [], { reference: now, locale, bareAmounts: true })
   if (!found.dueDate) return null
   const date = toLocalDate(found.dueDate)
   const time = found.hasTime ? `${pad2(found.dueDate.getHours())}:${pad2(found.dueDate.getMinutes())}` : null

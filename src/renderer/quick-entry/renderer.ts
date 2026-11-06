@@ -16,6 +16,8 @@ declare global {
           labels?: Array<{ id?: number; title?: string }>
           images?: Array<{ name: string; mime: string; bytes: Uint8Array }>
           location?: { place: string; trigger: 'arrive' | 'leave' }
+          // The time block `for 30m` made; part of the create.
+          block?: { start_date: string; end_date: string } | null
         },
       ): Promise<{ success: boolean; cached?: boolean; error?: string; mayExist?: boolean; data?: { id: number } }>
       uploadAttachment(taskId: number, fileData: Uint8Array, fileName: string, mimeType: string): Promise<{ success: boolean; error?: string; statusCode?: number }>
@@ -69,7 +71,7 @@ interface QuickEntryConfig {
   nlp_syntax_mode: 'todoist' | 'vikunja'
 }
 
-import { parse, getParserConfig, recurrenceToVikunja, extractBangToday } from '../lib/task-parser'
+import { blockFields, parse, getParserConfig, recurrenceToVikunja, extractBangToday } from '../lib/task-parser'
 import { dueToday, parsedDue } from '../lib/due-dates'
 import { followColorScheme } from '../lib/theme'
 import { parseChips } from '../lib/parse-chips'
@@ -663,7 +665,7 @@ async function saveTask(): Promise<void> {
     return match ? { id: match.id, title: match.title } : { title: name }
   })
   const imageInputs = pendingImages.map((img) => ({ name: img.name, mime: img.mime, bytes: img.bytes }))
-  const result = await window.quickEntryApi.saveTask(title, description || null, dueDate, projectId, priority, repeatAfter, repeatMode, { labels: labelRefs, images: imageInputs, location })
+  const result = await window.quickEntryApi.saveTask(title, description || null, dueDate, projectId, priority, repeatAfter, repeatMode, { labels: labelRefs, images: imageInputs, location, block: parserConfig.enabled ? blockFields(lastParseResult) : null })
 
   if (result.success) {
     const createdTask = result.data as (Record<string, unknown> & { id?: number }) | undefined
@@ -712,7 +714,7 @@ function applyConfig(cfg: QuickEntryConfig): void {
   exclamationTodayEnabled = cfg.exclamation_today !== false
   projectCycleModifier = cfg.project_cycle_modifier || 'ctrl'
   buildProjectCycle(cfg)
-  parserConfig = getParserConfig({ nlp_enabled: cfg.nlp_enabled, nlp_syntax_mode: cfg.nlp_syntax_mode, exclamation_today: cfg.exclamation_today })
+  parserConfig = getParserConfig({ nlp_enabled: cfg.nlp_enabled, nlp_syntax_mode: cfg.nlp_syntax_mode, exclamation_today: cfg.exclamation_today, standalone_mode: cfg.standalone_mode })
   autocomplete.setSyntaxMode(parserConfig.syntaxMode)
   autocomplete.setEnabled(parserConfig.enabled)
 }
@@ -851,7 +853,7 @@ function handleInputChange(): void {
   }
 
   const configWithSuppress: ParserConfig = suppressedTypes.size > 0
-    ? { ...parserConfig, suppressTypes: [...suppressedTypes.keys()] }
+    ? { ...parserConfig, suppressTypes: [...(parserConfig.suppressTypes ?? []), ...suppressedTypes.keys()] }
     : parserConfig
   const result = parse(raw, configWithSuppress, new Date(), cachedPlaces)
   lastParseResult = result

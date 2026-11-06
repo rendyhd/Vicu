@@ -336,6 +336,16 @@ export interface AppConfig {
   routines_today_limit?: TodayRoutinesLimit
   /** Today's routine section is folded to its header (per device). */
   routines_today_folded?: boolean
+  /** The Plan screen and Today's Day view (cross-app semantics 16.9): per device, off by default. */
+  planner_enabled?: boolean
+  /** The Plan screen's last view. */
+  planner_view?: PlannerView
+  /** The Plan screen's last source, a list name or a project id (`project:12`). */
+  planner_source?: string
+  /** Routine times on the timeline; on unless false. */
+  planner_show_routines?: boolean
+  /** A notification in the evening to plan tomorrow; off unless true. Local time, `HH:MM`. */
+  planner_nudge?: string | null
 }
 
 // --- Defaults every reader shares -------------------------------------------------------------
@@ -359,10 +369,17 @@ export function isRoutinesEnabled(config: Pick<AppConfig, 'routines_enabled'> | 
 }
 
 /** The smart lists Settings can take out of the sidebar, in the sidebar's order; the Inbox always stays. */
-export const SIDEBAR_HIDEABLE_LISTS = ['today', 'routines', 'upcoming', 'anytime', 'review', 'logbook'] as const
+export const SIDEBAR_HIDEABLE_LISTS = ['today', 'plan', 'routines', 'upcoming', 'anytime', 'review', 'logbook'] as const
 export type SidebarHideableList = (typeof SIDEBAR_HIDEABLE_LISTS)[number]
 
 /** Whether the person took `list` out of the sidebar (Settings → General → Sidebar). */
+export type PlannerView = 'day' | '3days' | 'week'
+
+/** Standalone tasks have no start and end date, so the planner needs a server. */
+export function isPlannerEnabled(config: Pick<AppConfig, 'planner_enabled' | 'standalone_mode'> | null | undefined): boolean {
+  return config?.planner_enabled === true && config.standalone_mode !== true
+}
+
 export function isHiddenFromSidebar(config: Pick<AppConfig, 'sidebar_hidden_lists'> | null | undefined, list: string): boolean {
   return config?.sidebar_hidden_lists?.includes(list) === true
 }

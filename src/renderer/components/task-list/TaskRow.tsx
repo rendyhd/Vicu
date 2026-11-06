@@ -22,7 +22,8 @@ import { useIsDark } from '@/hooks/use-is-dark'
 import type { Task, TaskReminder } from '@/lib/vikunja-types'
 import { TaskCheckbox } from './TaskCheckbox'
 import { TaskCardBar, type CardPopover } from './TaskCardBar'
-import { TaskDueBadge } from './TaskDueBadge'
+import { TaskBlockBadge, TaskDueBadge } from './TaskDueBadge'
+import { blockOf, dueRepeatsBlockDay } from '../../../shared/time-blocks'
 import { useRowView } from './RowViewContext'
 import { PriorityMark } from '@/components/shared/PriorityMark'
 import { SubtaskList } from './SubtaskList'
@@ -34,7 +35,7 @@ import { stripNoteLink, stripPageLink, extractNoteLinkHtml, extractPageLinkHtml,
 import { useTaskParser } from '@/hooks/use-task-parser'
 import { useLabels } from '@/hooks/use-labels'
 import { useProjects } from '@/hooks/use-projects'
-import { extractBangToday, recurrenceToVikunja } from '@/lib/task-parser'
+import { blockFields, extractBangToday, recurrenceToVikunja } from '@/lib/task-parser'
 import { TaskInputParser } from '@/components/task-input/TaskInputParser'
 import { useAppConfig } from '@/hooks/use-app-config'
 import { useSubtasks } from '@/hooks/use-subtasks'
@@ -205,6 +206,8 @@ const TaskTitleEditor = forwardRef<TaskTitleEditorHandle, TaskTitleEditorProps>(
           if (parsed.dueDate) {
             // A parsed time ("tomorrow at 3pm") is kept; a bare date is date-only.
             changes.due_date = parsedDue(parsed.dueDate, parsed.dueHasTime)
+            // "at 4pm for 30m" makes a time block, which holds the time.
+            Object.assign(changes, blockFields(parsed))
           }
           if (parsed.priority !== null && parsed.priority > 0) {
             changes.priority = parsed.priority
@@ -356,6 +359,7 @@ function TaskRowInner({
   // state flips, not on every focus/selection change anywhere in the list.
   const isExpanded = useSelectionStore((s) => s.expandedTaskId === task.id)
   const hasPlaceReminder = useHasLocationReminder(task.id)
+  const block = useMemo(() => blockOf(task), [task.start_date, task.end_date])
   const isFocused = useSelectionStore((s) => s.focusedTaskId === task.id)
   const isSelected = useSelectionStore((s) => s.selectedTaskIds.has(task.id))
   // Main asked for this task to be shown (a clicked reminder): expand once the row is on screen.
@@ -813,7 +817,9 @@ function TaskRowInner({
           )}
           <TaskSyncIcon taskId={task.id} />
           <TaskLinkIcon description={task.description} />
-          <TaskDueBadge dueDate={task.due_date} />
+          {/* A date-only due date on the block's own day would repeat its day phrase (contract 16.4). */}
+          {!(block && dueRepeatsBlockDay(task.due_date, block)) && <TaskDueBadge dueDate={task.due_date} />}
+          {block && <TaskBlockBadge block={block} />}
           {((task.reminders?.length ?? 0) > 0 || hasPlaceReminder) && (
             <Bell className="h-3 w-3 text-text-secondary" aria-label="Has a reminder" />
           )}

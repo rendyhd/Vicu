@@ -80,6 +80,13 @@ const weeklyReviewRoute = createRoute({
   component: lazyRouteComponent(() => import('@/views/WeeklyReviewView'), 'WeeklyReviewView'),
 })
 
+// The Plan screen (contract 16): its own chunk, only opened with the planner on.
+const planRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/plan',
+  component: lazyRouteComponent(() => import('@/views/PlanView'), 'PlanView'),
+})
+
 const logbookRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/logbook',
@@ -129,6 +136,7 @@ const routeTree = rootRoute.addChildren([
   reviewRoute,
   guidedRoute,
   weeklyReviewRoute,
+  planRoute,
   logbookRoute,
   projectRoute,
   tagRoute,

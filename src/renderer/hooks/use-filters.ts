@@ -41,13 +41,21 @@ export function filtersFor({
         order_by: 'desc',
       }
 
-    // Today and Upcoming fetch the open dated tasks of their own window only: the main process
-    // adds the clause (`due_date < start of local tomorrow`, or `>=`) from the local-day boundary
-    // when the request is made (`due_window`, src/shared/due-dates.ts), so the query key does not
-    // change at midnight and the server never compares a date-only value across time zones. The
-    // views still classify client-side on the local date (isOverdue/isDueToday in TodayView,
-    // isUpcoming in UpcomingView), which is the exact rule; the server window is never narrower.
+    // Today and Upcoming fetch the open tasks of their own window only: the main process adds the
+    // clause (due before the start of local tomorrow or a block starting today, or due from then
+    // on) from the local-day boundary when the request is made (`due_window`,
+    // src/shared/due-dates.ts), so the query key does not change at midnight and the server never
+    // compares a date-only value across time zones. The views still classify client-side on the
+    // local date (splitToday in TodayView, isUpcoming in UpcomingView), which is the exact rule;
+    // the server window is never narrower.
     case 'today':
+      return {
+        filter: 'done = false',
+        due_window: view,
+        sort_by: 'due_date',
+        order_by: 'asc',
+      }
+
     case 'upcoming':
       return {
         filter: `done = false && due_date != '${NULL_DATE}'`,

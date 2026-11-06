@@ -7,6 +7,8 @@ interface QueuedCreateExtras {
   images?: OfflineImageInput[]
   /** "When I get home": set on the server id once the create reaches the server, never queued. */
   location?: { place: string; trigger: 'arrive' | 'leave' }
+  /** The time block `for 30m` made; part of the create. */
+  block?: { start_date: string; end_date: string } | null
 }
 
 // Page callbacks only ever receive the payload. The IpcRendererEvent carries

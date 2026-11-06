@@ -165,6 +165,11 @@ describe('text to selection', () => {
     expect(parseWhenText('next mon', NOW, 'en-US')!.value).toEqual({ date: '2026-10-12', time: null })
   })
 
+  it('reads an amount without "in", because typed text here is nothing but a date', () => {
+    expect(parseWhenText('3 days', NOW, 'en-US')!.value).toEqual({ date: '2026-10-10', time: null })
+    expect(parseWhenText('2w', NOW, 'en-US')!.value.date).toBe('2026-10-21')
+  })
+
   it('reads weekdays, dates and times', () => {
     expect(parseWhenText('saturday 3pm', NOW, 'en-US')!.value).toEqual({ date: '2026-10-10', time: '15:00' })
     expect(parseWhenText('oct 20', NOW, 'en-US')!.value).toEqual({ date: '2026-10-20', time: null })

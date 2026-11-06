@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parse, extractBangToday } from '../index'
+import { blockFields, getParserConfig, parse, extractBangToday } from '../index'
 import { recurrenceToVikunja } from '../recurrence-map'
 import { dateOnlyDue, parsedDue } from '../../due-dates'
 import type { ParserConfig } from '../types'
@@ -510,5 +510,84 @@ describe('explicit times', () => {
     parsedDue(r.dueDate!, r.dueHasTime)
     expect(r.dueDate!.getTime()).toBe(before)
     expect(parsedDue(r.dueDate!, false)).toBe(dateOnlyDue(`${r.dueDate!.getFullYear()}-${String(r.dueDate!.getMonth() + 1).padStart(2, '0')}-${String(r.dueDate!.getDate()).padStart(2, '0')}`))
+  })
+})
+
+// ─── for: a length (contract section 5.4; the corpus has the forms both apps share) ──────────────
+
+describe('for', () => {
+  const now = new Date(2026, 9, 6, 10, 0, 0)
+  const at = (text: string, config: ParserConfig = todoist) => parse(text, config, now)
+
+  it('is not a date in the forms chrono reads as that long from now', () => {
+    for (const text of ['Run for an hour', 'Holiday for two weeks', 'Stretch for 2d', 'Wait for 5s', 'Hold for half an hour', 'Rest for two weeks and three days']) {
+      const r = at(text)
+      expect(r.dueDate, text).toBeNull()
+      expect(r.title, text).toBe(text)
+    }
+  })
+
+  it('those forms are plain words: they keep two date phrases apart', () => {
+    const r = at('Call tomorrow for an hour at 9am')
+    expect(r.title).toBe('Call for an hour at 9am')
+    expect(r.dueHasTime).toBe(false)
+    expect(r.dueDate!.getDate()).toBe(7)
+    expect(r.block).toBeNull()
+  })
+
+  it('a length inside a date phrase leaves tokens that do not overlap', () => {
+    const r = at('Call tomorrow for 1h at 9am')
+    expect(r.tokens.map((t) => [t.type, t.raw])).toEqual([
+      ['date', 'tomorrow'],
+      ['date', 'at 9am'],
+      ['length', 'for 1h'],
+    ])
+    const sorted = [...r.tokens].sort((a, b) => a.start - b.start)
+    sorted.forEach((token, i) => {
+      if (i > 0) expect(token.start).toBeGreaterThanOrEqual(sorted[i - 1].end)
+    })
+  })
+
+  it('a phrase that is not a block stays in the title, also inside a date phrase', () => {
+    const r = at('Call tomorrow for 13h at 9am')
+    expect(r.title).toBe('Call for 13h')
+    expect(r.block).toBeNull()
+    expect(r.dueHasTime).toBe(true)
+    expect(r.dueDate).toEqual(new Date(2026, 9, 7, 9, 0))
+  })
+
+  it('dismissing the length keeps the time as the due time and the words in the title', () => {
+    const r = at('Call at 3pm for 30m', { ...todoist, suppressTypes: ['length'] })
+    expect(r.title).toBe('Call for 30m')
+    expect(r.block).toBeNull()
+    expect(r.dueHasTime).toBe(true)
+    expect(r.dueDate).toEqual(new Date(2026, 9, 6, 15, 0))
+  })
+
+  it('dismissing the date leaves all the words', () => {
+    const r = at('Call at 3pm for 30m', { ...todoist, suppressTypes: ['date'] })
+    expect(r.title).toBe('Call at 3pm for 30m')
+    expect(r.dueDate).toBeNull()
+    expect(r.block).toBeNull()
+  })
+
+  it('gives the task fields of a block, and none without one', () => {
+    expect(blockFields(at('Call at 3pm for 30m'))).toEqual({
+      start_date: new Date(2026, 9, 6, 15, 0).toISOString(),
+      end_date: new Date(2026, 9, 6, 15, 30).toISOString(),
+    })
+    expect(blockFields(at('Call at 3pm'))).toBeNull()
+    expect(blockFields(null)).toBeNull()
+  })
+
+  it('"the day after tomorrow" is a day, not the amount "the day" (desktop only: Android reads tomorrow)', () => {
+    const r = at('Call the day after tomorrow')
+    expect(r.title).toBe('Call')
+    expect(r.dueDate!.getDate()).toBe(8)
+  })
+
+  it('is off in standalone mode, where a task only keeps a due date', () => {
+    expect(getParserConfig({ standalone_mode: true }).suppressTypes).toEqual(['length'])
+    expect(getParserConfig({}).suppressTypes).toBeUndefined()
   })
 })

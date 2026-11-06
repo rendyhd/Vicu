@@ -6,7 +6,9 @@ import { extractPriority } from './extract-priority'
 import { extractRecurrence } from './extract-recurrence'
 import type { WeekdayAnchor } from './extract-recurrence'
 import { extractDate, extractBangToday } from './extract-dates'
+import { findForPhrases } from './extract-length'
 import { matchPlacePhrase, type PlaceRef } from './place-phrases'
+import { isTimeBlock } from '../../../shared/time-blocks'
 
 export type { ParseResult, ParserConfig, ParsedToken, ParsedRecurrence, SyntaxMode, TokenType, SyntaxPrefixes } from './types'
 export { DEFAULT_PARSER_CONFIG, getPrefixes } from './types'
@@ -19,7 +21,8 @@ export type { PlaceMatch, PlaceRef } from './place-phrases'
  * Parse free-form task input into structured fields. Implements shared-parser-spec.md and
  * section 5 of docs/cross-app-semantics-v1.md; test-fixtures/nlp-corpus-v1.json is the test.
  *
- * Extraction order: Place → Labels → Projects → Priority → Recurrence → Dates → Title
+ * Extraction order: Place → Labels → Projects → Priority → Recurrence → Dates → Length → Title
+ * (`for` phrases are found before Recurrence, so Dates does not read them; see section 5.4)
  *
  * The `!` → today shortcut (standalone, leading or trailing `!`) is controlled by
  * `config.bangToday` and has one rule, `extractBangToday`: `parse()` applies it whether the
@@ -40,6 +43,7 @@ export function parse(
     title: rawInput,
     dueDate: null,
     dueHasTime: false,
+    block: null,
     priority: null,
     labels: [],
     project: null,
@@ -97,6 +101,10 @@ export function parse(
     result.tokens.push(...tokens)
   }
 
+  // `for 30m` and `for 3 months` are never dates, and do not split one. A suppressed length still
+  // is not a date: its words simply stay in the title and the time stays the due time.
+  const forPhrases = findForPhrases(rawInput, consumed)
+
   // 4. Recurrence
   let weekday: WeekdayAnchor | undefined
   let recurrenceToken: ParsedToken | undefined
@@ -109,7 +117,7 @@ export function parse(
   }
 
   // 5. Dates
-  const dateOptions = { reference, locale: config.locale }
+  const dateOptions = { reference, locale: config.locale, hidden: forPhrases.hidden }
   if (!suppress.has('date')) {
     let found: ReturnType<typeof extractDate> | null = null
     if (weekday) {
@@ -140,10 +148,25 @@ export function parse(
     }
   }
 
-  // 6. Build title from non-consumed regions
+  // 6. Length: with a time of day it is a block, and the block holds the time. Otherwise the words
+  //    stay in the title.
+  const length = forPhrases.length
+  if (length && !suppress.has('length') && result.dueDate && result.dueHasTime) {
+    const start = new Date(result.dueDate.getTime())
+    start.setSeconds(0, 0)
+    const end = new Date(start.getTime() + length.minutes * 60_000)
+    if (isTimeBlock(start, end)) {
+      result.block = { start, end }
+      result.dueHasTime = false
+      consumed.push({ start: length.start, end: length.end })
+      result.tokens.push({ type: 'length', start: length.start, end: length.end, value: length.minutes, raw: rawInput.slice(length.start, length.end) })
+    }
+  }
+
+  // 7. Build title from non-consumed regions
   result.title = buildTitle(rawInput, consumed)
 
-  // 7. Standalone/leading/trailing ! → today. An explicit date wins, but the
+  // 8. Standalone/leading/trailing ! → today. An explicit date wins, but the
   //    "!" marker is still removed from the title ("Call mom tomorrow!").
   if (config.bangToday) {
     const bang = extractBangToday(result.title, reference)
@@ -157,6 +180,12 @@ export function parse(
   }
 
   return result
+}
+
+/** A parsed block as the fields of a task, or null when the text made none. */
+export function blockFields(result: Pick<ParseResult, 'block'> | null | undefined): { start_date: string; end_date: string } | null {
+  if (!result?.block) return null
+  return { start_date: result.block.start.toISOString(), end_date: result.block.end.toISOString() }
 }
 
 /**

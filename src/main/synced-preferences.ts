@@ -6,6 +6,7 @@ import { loadConfig, saveConfig, type AppConfig } from './config'
 import { onAccountDataCleared } from './known-user'
 import { fetchCurrentUser } from './auth/user-info'
 import { normalizeServerUrl } from './offline/owner'
+import { BLOCK_LENGTHS, readPlannerHours } from '../shared/time-blocks'
 import { createSyncedDocumentService, type SyncedDocumentCodec, type SyncedDocumentStatus } from './synced-document-service'
 import { PREFS_CARRIER_SEARCH, PREFS_CARRIER_TITLE, encodePrefsEnvelope, hasPrefsMarker, parsePrefsEnvelope } from './synced-prefs-protocol'
 import { canonicalJson, isOwnTask } from '../shared/hidden-tasks'
@@ -28,6 +29,8 @@ import {
   validateSyncedPrefs,
   readWeeklyReviewLast,
   WEEKLY_REVIEW_LAST_KEY,
+  PLANNER_DEFAULT_LENGTH_KEY,
+  PLANNER_HOURS_KEY,
   ICON_NONE,
   projectIdOfIconKey,
   type SyncedPrefsDocument,
@@ -231,6 +234,9 @@ export function isWritablePref(key: unknown, value: unknown): key is string {
   if (typeof key !== 'string') return false
   if (key === INBOX_PROJECT_ID_KEY) return readInboxProjectId(value) !== null
   if (key === GLOBAL_TASK_ORDER_KEY || /^task_order\.project\.[1-9]\d*$/.test(key)) return value === null || isTaskOrderKey(value)
+  // The planner's default length and work hours (section 16).
+  if (key === PLANNER_DEFAULT_LENGTH_KEY) return value === null || (BLOCK_LENGTHS as readonly unknown[]).includes(value)
+  if (key === PLANNER_HOURS_KEY) return value === null || canonicalJson(readPlannerHours(value)) === canonicalJson(value)
   // The day the last weekly review was finished (section 14.7).
   if (key === WEEKLY_REVIEW_LAST_KEY) return value === null || readWeeklyReviewLast(value) !== null
   // A task's location reminder at a place a phone saved (section 11.7). The desktop never creates,

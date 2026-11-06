@@ -227,13 +227,16 @@ export type DueWindow = 'today' | 'upcoming'
 
 /**
  * The server filter clause for a list window, from the start of local tomorrow: Today is
- * everything due before it (overdue and due today), Upcoming everything from then on. That is
- * exactly the client rule (`isOverdue || isDueToday`, `isUpcoming`), so the lists fetch what they
- * show and no more. Callers combine it with `done = false` and a due date that exists.
+ * everything due before it (overdue and due today) and anything starting today (a time block,
+ * section 2 of the contract), Upcoming everything due from then on. The client applies the exact
+ * rule (`splitToday`, `isUpcoming`); a start date alone is not a block, so Today may fetch a little
+ * more than it shows. Callers combine it with `done = false`, and Upcoming with a due date that exists.
  */
 export function dueWindowClause(window: DueWindow, now: Date = new Date()): string {
   const tomorrowStart = startOfLocalDayIso(1, now)
-  return window === 'today' ? `due_date < '${tomorrowStart}'` : `due_date >= '${tomorrowStart}'`
+  if (window === 'upcoming') return `due_date >= '${tomorrowStart}'`
+  const todayStart = startOfLocalDayIso(0, now)
+  return `((due_date != '${NULL_DUE_DATE}' && due_date < '${tomorrowStart}') || (start_date >= '${todayStart}' && start_date < '${tomorrowStart}'))`
 }
 
 /**

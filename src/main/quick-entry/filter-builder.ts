@@ -1,7 +1,7 @@
 import type { ViewerFilter } from '../config'
 import { MAX_PAGE_SIZE } from '../api-v2'
 import { buildCustomListServerFilter } from '../../shared/custom-list-filter'
-import { startOfLocalDayIso } from '../../shared/due-dates'
+import { dueWindowClause, startOfLocalDayIso } from '../../shared/due-dates'
 
 // Vikunja caps per_page at 1000 (anything above is a 422). No `page` is set on purpose:
 // the API client then reads every page until total_pages, so lists beyond 1000 tasks
@@ -29,7 +29,8 @@ export function buildViewerFilterParams(viewerFilter: ViewerFilter, now: Date = 
     switch (viewerFilter.view_type) {
       case 'today':
         return {
-          filter: `done = false && due_date < '${tomorrowStartIso}' && due_date != '${nullDate}'`,
+          // Overdue, due today, or a time block starting today (cross-app semantics 2 and 16.4).
+          filter: `done = false && ${dueWindowClause('today', now)}`,
           sort_by: 'due_date',
           order_by: 'asc',
           per_page: MAX_PAGE_SIZE,

@@ -81,7 +81,7 @@ export function useTaskParser(places: readonly PlaceRef[] = NO_PLACES): UseTaskP
   const parseResult = useMemo(() => {
     if (!parserConfig.enabled || !inputValue.trim()) return null
     const config: ParserConfig = suppressTypes.length > 0
-      ? { ...parserConfig, suppressTypes }
+      ? { ...parserConfig, suppressTypes: [...(parserConfig.suppressTypes ?? []), ...suppressTypes] }
       : parserConfig
     return parse(inputValue, config, new Date(), places)
   }, [inputValue, parserConfig, suppressTypes, places])

@@ -71,6 +71,8 @@ import { followColorScheme, followConfiguredTheme } from '@/lib/theme'
 import { formatDateDisplay } from '@/lib/date-display'
 import { getDateFormat, initDateFormat, subscribeDateFormat } from '@/lib/date-format'
 import { priorityMarkSvg } from '../../shared/priority-mark-svg'
+import { blockOf, dueRepeatsBlockDay } from '../../shared/time-blocks'
+import { formatBlockRow } from '../../shared/date-display'
 import {
   hasRichDescriptionBody,
   plainTextFromDescriptionLines,
@@ -300,12 +302,19 @@ function buildTaskItemDOM(task: TaskData): HTMLElement {
 
   item.appendChild(content)
   // The due phrase sits in the trailing cluster, level with the title (design system, section 4).
-  const dueInfo = formatDueDate(task.due_date)
+  const block = blockOf({ start_date: task.start_date as string | undefined, end_date: task.end_date as string | undefined })
+  const dueInfo = block && dueRepeatsBlockDay(task.due_date, block) ? null : formatDueDate(task.due_date)
   if (dueInfo) {
     const due = document.createElement('div')
     due.className = `task-due ${dueInfo.cssClass}`
     due.textContent = dueInfo.label
     item.appendChild(due)
+  }
+  if (block) {
+    const when = document.createElement('div')
+    when.className = 'task-due task-block'
+    when.textContent = formatBlockRow(block.start, block.end, new Date(), getDateFormat())
+    item.appendChild(when)
   }
   // The priority mark closes the row (the shared SVG, drawn in the priority role colour).
   const markSvg = priorityMarkSvg(task.priority)

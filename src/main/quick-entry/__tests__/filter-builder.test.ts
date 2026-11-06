@@ -26,11 +26,11 @@ const base: ViewerFilter = {
 const eveningInNewYork = () => new Date(2026, 9, 6, 21, 0)
 
 describe('built-in Today / Upcoming views use local-day boundaries (cross-app semantics v1)', () => {
-  it('Today is everything before the start of local tomorrow', () => {
+  it('Today is everything before the start of local tomorrow, and a block starting today', () => {
     inTimeZone('America/New_York', () => {
       const params = buildViewerFilterParams({ ...base, view_type: 'today' }, eveningInNewYork())
       expect(params.filter).toBe(
-        "done = false && due_date < '2026-10-07T04:00:00.000Z' && due_date != '0001-01-01T00:00:00Z'",
+        "done = false && ((due_date != '0001-01-01T00:00:00Z' && due_date < '2026-10-07T04:00:00.000Z') || (start_date >= '2026-10-06T04:00:00.000Z' && start_date < '2026-10-07T04:00:00.000Z'))",
       )
     })
   })

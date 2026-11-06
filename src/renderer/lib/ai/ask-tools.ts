@@ -10,6 +10,7 @@ import { compareLowercased, isRealDate, localDateTimeOf } from '../../../shared/
 import { filterCustomList, buildCustomListServerFilter, type CustomListFilterInput } from '../../../shared/custom-list-filter'
 import { sortCustomListTasks } from '../../../shared/custom-list-sort'
 import { addLocalDays, localDateOf, toLocalDate } from '../../../shared/due-dates'
+import { blockStartsOn } from '../../../shared/time-blocks'
 import { resolveTaskOrder, sortTasksByOrder } from '../../../shared/task-order'
 import { parseReviewFooter, computeStatus } from '../review-metadata'
 import type { Task, TaskQueryParams } from '../vikunja-types'
@@ -194,10 +195,14 @@ export async function listView(args: Args, ctx: ToolContext): Promise<{ tasks: T
     }
     case 'today':
     case 'upcoming': {
-      const tasks = visible(await ctx.fetchTasks({ filter: "done = false && due_date != '0001-01-01T00:00:00Z'", due_window: view }))
+      const tasks = visible(await ctx.fetchTasks(view === 'today'
+        ? { filter: 'done = false', due_window: view }
+        : { filter: "done = false && due_date != '0001-01-01T00:00:00Z'", due_window: view }))
       const inWindow = tasks.filter((task) => {
         const due = localDateOf(task.due_date)
-        return active.has(task.project_id) && due !== '' && (view === 'today' ? due <= today : due >= addLocalDays(today, 1))
+        if (!active.has(task.project_id)) return false
+        if (view === 'today' && blockStartsOn(task, today)) return true
+        return due !== '' && (view === 'today' ? due <= today : due >= addLocalDays(today, 1))
       })
       ordered = sortTasksByOrder(inWindow, 'due_date_first')
       break

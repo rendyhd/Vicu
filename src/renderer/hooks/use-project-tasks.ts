@@ -51,5 +51,7 @@ export function useProjectTasks(projectId: number | undefined) {
     return order === 'due_date_first' ? merged : sortTasksByOrder(merged, order)
   }, [tasksQuery.data, completedTasks, pathname, projectId, order])
 
-  return { ...tasksQuery, data, viewId: viewQuery.data?.id, order }
+  // Loading until the view is known too: the tasks query waits for it and would say "not loading",
+  // so a list would mount, go to its skeleton and mount again, and lose what it had open.
+  return { ...tasksQuery, isLoading: viewQuery.isLoading || tasksQuery.isLoading, data, viewId: viewQuery.data?.id, order }
 }

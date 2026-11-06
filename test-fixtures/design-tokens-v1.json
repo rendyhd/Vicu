@@ -125,6 +125,7 @@
     "lists": {
       "inbox": { "color": "#0A84FF", "desktopIcon": "Inbox", "androidIcon": "Outlined.Inbox" },
       "today": { "color": "#E8A400", "desktopIcon": "Sun", "androidIcon": "Outlined.WbSunny" },
+      "plan": { "color": "#2F6FED", "desktopIcon": "CalendarRange", "androidIcon": "Outlined.EventNote" },
       "upcoming": { "color": "#E5484D", "desktopIcon": "CalendarDays", "androidIcon": "Outlined.CalendarMonth" },
       "anytime": { "color": "#14A3A3", "desktopIcon": "Layers", "androidIcon": "Outlined.Layers" },
       "routines": { "color": "#E5487A", "desktopIcon": "HeartPulse", "androidIcon": "Outlined.MonitorHeart" },

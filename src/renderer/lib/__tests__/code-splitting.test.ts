@@ -13,7 +13,7 @@ const staticImport = (source: string, specifier: string) =>
 describe('what the first chunk loads', () => {
   it('loads the rarely opened views through lazy routes', () => {
     const router = read('router.tsx')
-    for (const view of ['SettingsView', 'ReviewView', 'RoutinesView', 'GuidedView', 'WeeklyReviewView']) {
+    for (const view of ['SettingsView', 'ReviewView', 'RoutinesView', 'GuidedView', 'WeeklyReviewView', 'PlanView']) {
       expect(staticImport(router, `@/views/${view}`)).toBe(false)
       expect(router).toContain(`import('@/views/${view}')`)
     }

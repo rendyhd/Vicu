@@ -2,8 +2,8 @@ import type { TokenType } from '@/lib/task-parser'
 
 /**
  * The colours of the parse chips and the highlight behind a recognised word in the task input
- * (green date, red priority, orange label, blue project, purple recurrence, teal place), as roles of the design
- * tokens instead of raw values.
+ * (green date and length, red priority, orange label, blue project, purple recurrence, teal place), as roles of
+ * the design tokens instead of raw values.
  *
  * - The fill is the role's channel variable at an alpha (Tailwind `bg-accent-green/12`), 12% in the
  *   light theme and 20% in the dark one, so it follows the theme and the token file.
@@ -17,6 +17,7 @@ import type { TokenType } from '@/lib/task-parser'
  */
 export const TOKEN_CHIP_ROLE = {
   date: 'accent-green',
+  length: 'accent-green',
   priority: 'accent-red',
   label: 'accent-orange',
   project: 'accent-blue',
@@ -26,6 +27,7 @@ export const TOKEN_CHIP_ROLE = {
 
 export const TOKEN_CHIP_CLASSES: Record<Exclude<TokenType, 'priority'>, string> = {
   date: 'bg-accent-green/12 dark:bg-accent-green/20 text-[color:color-mix(in_srgb,rgb(var(--accent-green-rgb)),var(--text-primary))]',
+  length: 'bg-accent-green/12 dark:bg-accent-green/20 text-[color:color-mix(in_srgb,rgb(var(--accent-green-rgb)),var(--text-primary))]',
   label: 'bg-accent-orange/12 dark:bg-accent-orange/20 text-[color:color-mix(in_srgb,rgb(var(--accent-orange-rgb)),var(--text-primary))]',
   project: 'bg-accent-blue/12 dark:bg-accent-blue/20 text-[color:color-mix(in_srgb,rgb(var(--accent-blue-rgb)),var(--text-primary))]',
   recurrence: 'bg-accent-purple/12 dark:bg-accent-purple/20 text-[color:color-mix(in_srgb,rgb(var(--accent-purple-rgb)),var(--text-primary))]',

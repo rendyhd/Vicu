@@ -26,7 +26,9 @@ import type { ParsedToken } from './types'
  * - a date-only phrase is judged against the start of the day, so "tuesday" typed on a Tuesday
  *   afternoon is today and not next week (chrono would compare it with the current time);
  * - a day and month that are today stay today when the time typed with them has passed ("oct 7 at
- *   9am" at 10:30 on 7 October), instead of moving to next year.
+ *   9am" at 10:30 on 7 October), instead of moving to next year;
+ * - an amount of time is a date only right after `in` (chrono also reads "call 30m", "rest 3 days",
+ *   "for 3 months" and "plan the week" as that long from now); sections 5.1 and 5.4.
  */
 
 export interface ExtractDateOptions {
@@ -38,6 +40,13 @@ export interface ExtractDateOptions {
   skipTimeOnly?: boolean
   /** Take the result that overlaps this region (the weekday of "every monday") before any other. */
   prefer?: { start: number; end: number }
+  /** Words read as if they were not there: they are no date and do not split one (`for 30m`). */
+  hidden?: Array<{ start: number; end: number }>
+  /**
+   * Also read an amount of time without `in` ("3 days") as a date. For the When field, where typed
+   * text is nothing but a date; in a task's text those words are the title (section 5.1).
+   */
+  bareAmounts?: boolean
 }
 
 /** The locale of the running app: the renderer's, falling back to en-US (tests, main process). */
@@ -93,11 +102,12 @@ export function extractDate(
   // Consumed regions become spaces, and words that are not dates (abbreviations without a
   // marker, "weekend", phrases about the past) become spaces too, so every index still points
   // into the input.
-  const working = maskWeekdayAbbreviations(maskPastPhrases(maskWeekendWords(buildWorkingText(input, consumed))))
+  const working = maskWeekdayAbbreviations(maskPastPhrases(maskWeekendWords(buildWorkingText(input, [...consumed, ...(options.hidden ?? [])]))))
   // chrono reads a copy in which consumed text and range words are marks instead: a date phrase
   // never continues across text another extractor took ("tomorrow @home 3pm"), and "friday to
   // sunday" is two dates, not a range.
-  const chronoText = markRangeWords(markRegions(working, consumed))
+  const marked = markRangeWords(markRegions(working, consumed))
+  const chronoText = options.bareAmounts ? marked : markBareAmounts(marked)
   const parser = chronoFor(isDayFirstLocale(options.locale ?? systemLocale()), working)
 
   const results = parser.parse(chronoText, reference, chronoOptions)
@@ -168,16 +178,43 @@ export function extractDate(
   // Verify the matched region doesn't overlap with already-consumed regions
   if (consumed.some((c) => start < c.end && end > c.start)) return none
 
-  consumed.push({ start, end })
-  tokens.push({
-    type: 'date',
-    start,
-    end,
-    value: dueDate,
-    raw: input.slice(start, end),
-  })
+  // Hidden words inside the phrase ("tomorrow for 1h at 9am") are not part of it, so it can be two
+  // pieces: tokens never overlap, and the words are the title's unless the caller takes them.
+  for (const piece of withoutHidden({ start, end }, options.hidden ?? [], input)) {
+    consumed.push(piece)
+    tokens.push({
+      type: 'date',
+      start: piece.start,
+      end: piece.end,
+      value: dueDate,
+      raw: input.slice(piece.start, piece.end),
+    })
+  }
 
   return { dueDate, hasTime, tokens }
+}
+
+/** `span` without the hidden regions and the spaces next to them. */
+function withoutHidden(
+  span: { start: number; end: number },
+  hidden: ReadonlyArray<{ start: number; end: number }>,
+  input: string,
+): Array<{ start: number; end: number }> {
+  const pieces: Array<{ start: number; end: number }> = []
+  let from = span.start
+  const add = (to: number): void => {
+    let end = to
+    while (end > from && /\s/.test(input[end - 1])) end--
+    if (end > from) pieces.push({ start: from, end })
+  }
+  for (const region of [...hidden].sort((a, b) => a.start - b.start)) {
+    if (region.end <= from || region.start >= span.end) continue
+    add(region.start)
+    from = region.end
+    while (from < span.end && /\s/.test(input[from])) from++
+  }
+  add(span.end)
+  return pieces
 }
 
 /**
@@ -326,6 +363,20 @@ const RANGE_WORD_RE = /(?<=^|\s)(?:to|until|through|till|[-–~〜])(?=\s|$)/gi
 
 function markRangeWords(text: string): string {
   return text.replace(RANGE_WORD_RE, (word) => MARK.repeat(word.length))
+}
+
+// chrono reads an amount of time as that long from now, in its own amounts and units, whatever is
+// around it: "call 30m", "rest 3 days", "for an hour", "plan the week", "within 3 days", "3 days from
+// now". In the contract an amount is a date only right after `in` (section 5.1). Android has no other
+// pattern, so to it these are plain words, which keep two date phrases apart: a mark, not a space.
+// `for` phrases the contract names ("for 30m", "for 3 days") are already blanked (`hidden`). "The"
+// is no amount even after `in` ("in the week"), and "the day after tomorrow" is a day, not an amount.
+const AMOUNT_RE = new RegExp(`(?<![\\w:./-])${AMOUNT_OF_TIME}(?:\\s*,?\\s*(?:and\\s+)?${AMOUNT_OF_TIME})*(?!\\w)(?!\\s+after\\s+tomorrow\\b)`, 'gi')
+const IN_BEFORE_RE = /(?:^|\s)in\s+$/i
+
+function markBareAmounts(text: string): string {
+  return text.replace(AMOUNT_RE, (phrase: string, offset: number) =>
+    IN_BEFORE_RE.test(text.slice(0, offset)) && !/^the\b/i.test(phrase) ? phrase : MARK.repeat(phrase.length))
 }
 
 // Three-letter weekday abbreviations chrono knows.

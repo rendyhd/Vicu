@@ -243,8 +243,12 @@ export function AppShell() {
       })
       if (sidebarDrop) return [sidebarDrop]
 
+      // The Plan screen's timeline and top rows go by the pointer too.
+      const planDrop = pointerCollisions.find((c) => c.data?.droppableContainer?.data?.current?.type === 'plan-drop')
+      if (planDrop) return [planDrop]
+
       // Fall back to rect intersection for sortable reordering
-      return rectIntersection(args)
+      return rectIntersection(args).filter((c) => c.data?.droppableContainer?.data?.current?.type !== 'plan-drop')
     },
     [dragItem?.type]
   )
@@ -332,7 +336,10 @@ export function AppShell() {
           if (isMulti) useSelectionStore.getState().clearSelection()
         }
 
-        if (overData?.type === 'project') {
+        if (overData?.type === 'plan-drop') {
+          ;(overData.drop as (tasks: Task[]) => void)(dragTasks)
+          clearIfMulti()
+        } else if (overData?.type === 'project') {
           const projectId = overData.projectId as number
           dragTasks.forEach((t) => {
             if (projectId !== t.project_id) {

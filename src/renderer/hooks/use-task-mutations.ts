@@ -21,6 +21,7 @@ import {
 } from '@/lib/task-hierarchy'
 import { removeFromTaskDetail, restoreTaskDetail, updateTaskDetailDone, updateTaskDetailFields } from '@/lib/task-detail-cache'
 import { projectPatch, taskPatch } from '@/lib/merge-patches'
+import { NULL_DATE } from '@/lib/constants'
 import { rememberRepeatCompletion, repeatUndoPatch, takeRepeatSnapshot } from '@/lib/repeat-undo'
 import {
   addLabelOrQueue,
@@ -30,6 +31,7 @@ import {
   sendTaskPatch,
   type CreateExtras,
 } from '@/lib/offline-mutations'
+import { withDueRules } from '@/lib/task-due-rules'
 import { ApiError, apiError, type MutationMeta } from '@/lib/mutation-errors'
 import {
   insertPendingTask,
@@ -284,12 +286,14 @@ export async function updateTaskRequest({
   return outcome.task ?? (original ? { ...original, ...changes } : null)
 }
 
+
 export function useUpdateTask(options?: MutationHookOptions) {
   const qc = useQueryClient()
 
   return useMutation({
-    mutationFn: (variables: UpdateTaskVariables) => updateTaskRequest(variables),
-    onMutate: async ({ id, changes, original }) => {
+    mutationFn: (variables: UpdateTaskVariables) => updateTaskRequest(withDueRules(variables)),
+    onMutate: async (variables) => {
+      const { id, changes, original } = withDueRules(variables)
       await qc.cancelQueries({ queryKey: ['tasks'] })
       await qc.cancelQueries({ queryKey: ['view-tasks'] })
       await qc.cancelQueries({ queryKey: ['section-tasks'] })

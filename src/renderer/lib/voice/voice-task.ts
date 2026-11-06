@@ -1,7 +1,7 @@
 import { parse, type ParseResult, type ParserConfig } from '../task-parser'
 import { composerChips, resolveComposerFields, type ComposerFields } from '../composer-fields'
 import { dateOnlyDue, isDateOnly, toLocalDate } from '../due-dates'
-import { formatDateDisplay, type DateFormat } from '../date-display'
+import { formatBlockRow, formatDateDisplay, type DateFormat } from '../date-display'
 import { formatDateChip } from '../date-utils'
 import type { ChipData } from '../parse-chips'
 import type { CreateTaskPayload } from '../vikunja-types'
@@ -92,6 +92,7 @@ export function voiceTaskDraft(text: string, ctx: VoiceTaskContext): VoiceTaskDr
 
   let payload: CreateTaskPayload = { title }
   if (fields.dueDate) payload.due_date = fields.dueDate
+  if (fields.block) Object.assign(payload, fields.block)
   if (fields.priority > 0) payload.priority = fields.priority
   if (fields.repeat) Object.assign(payload, fields.repeat)
   payload = withDefaultReminder(payload, ctx.defaultReminder)
@@ -128,19 +129,20 @@ export function voiceCardChips(parsed: ParseResult | null, text: string, ctx: Vo
 
 /**
  * The toast after a voice add: `Added “Call mom”, tomorrow, 15:00` or `Added “Report” to Work`.
- * The date is the row's phrase (date-display.ts), with Today and Tomorrow in lower case.
+ * The date is the row's phrase (date-display.ts), with Today and Tomorrow in lower case; a time
+ * block says its times, because its due date has none.
  */
 export function voiceConfirmation(
-  draft: { title: string; projectTitle: string | null; payload: Pick<CreateTaskPayload, 'due_date'> },
+  draft: { title: string; projectTitle: string | null; payload: Pick<CreateTaskPayload, 'due_date' | 'start_date' | 'end_date'> },
   now: Date,
   fmt: DateFormat,
 ): string {
   let text = `Added “${draft.title}”`
   if (draft.projectTitle) text += ` to ${draft.projectTitle}`
-  const due = draft.payload.due_date
-  if (due) {
-    const phrase = formatDateDisplay('row', new Date(due), now, isDateOnly(due), fmt)
-    if (phrase) text += `, ${/^(Today|Tomorrow)\b/.test(phrase) ? phrase[0].toLowerCase() + phrase.slice(1) : phrase}`
-  }
+  const { due_date: due, start_date: start, end_date: end } = draft.payload
+  const phrase = start && end
+    ? formatBlockRow(new Date(start), new Date(end), now, fmt)
+    : due ? formatDateDisplay('row', new Date(due), now, isDateOnly(due), fmt) : ''
+  if (phrase) text += `, ${/^(Today|Tomorrow)\b/.test(phrase) ? phrase[0].toLowerCase() + phrase.slice(1) : phrase}`
   return text
 }

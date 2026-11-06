@@ -8,7 +8,7 @@ import { useReviewBadgeCount, useReviewFeatureEnabled } from '@/hooks/use-review
 import { useAppConfig } from '@/hooks/use-app-config'
 import { useOpenTaskCounts } from '@/hooks/use-project-progress'
 import { useTodayOverdueCount } from '@/hooks/use-today-overdue-count'
-import { isHiddenFromSidebar, isRoutinesEnabled } from '@/lib/vikunja-types'
+import { isHiddenFromSidebar, isPlannerEnabled, isRoutinesEnabled } from '@/lib/vikunja-types'
 
 export interface SmartListItem {
   id: SmartListId
@@ -20,6 +20,7 @@ export interface SmartListItem {
 const ALL_SMART_LISTS: SmartListItem[] = [
   { id: 'inbox', label: 'Inbox', path: '/inbox' },
   { id: 'today', label: 'Today', path: '/today' },
+  { id: 'plan', label: 'Plan', path: '/plan' },
   { id: 'routines', label: 'Routines', path: '/routines' },
   { id: 'upcoming', label: 'Upcoming', path: '/upcoming' },
   { id: 'anytime', label: 'Anytime', path: '/anytime' },
@@ -35,9 +36,10 @@ export function useSmartLists(): SmartListItem[] {
   const reviewEnabled = useReviewFeatureEnabled()
   const { data: config } = useAppConfig()
   const routinesEnabled = isRoutinesEnabled(config)
+  const plannerEnabled = isPlannerEnabled(config)
 
   return ALL_SMART_LISTS.filter((i) =>
-    (i.id !== 'review' || reviewEnabled) && (i.id !== 'routines' || routinesEnabled))
+    (i.id !== 'review' || reviewEnabled) && (i.id !== 'routines' || routinesEnabled) && (i.id !== 'plan' || plannerEnabled))
 }
 
 export function SmartListNav() {

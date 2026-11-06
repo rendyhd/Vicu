@@ -73,6 +73,8 @@ interface TaskListProps {
    * of the whole list (Today, Upcoming, Anytime: the tasks are all in the children). Default: the end.
    */
   newTaskPlacement?: 'after-tasks' | 'after-children'
+  /** The list sits in a panel with its own heading: no page header. */
+  hideHeader?: boolean
 }
 
 export function TaskList({
@@ -98,6 +100,7 @@ export function TaskList({
   headerActions,
   onTaskCreated,
   newTaskPlacement = 'after-children',
+  hideHeader = false,
 }: TaskListProps) {
   const [isAdding, setIsAdding] = useState(false)
   // Holding the header + says a task instead of typing it (docs/voice-input.md). A voice task gets
@@ -562,7 +565,7 @@ export function TaskList({
 
   return (
     <div className={cn('flex h-full flex-col', className)} onClick={handleContainerClick}>
-      <PageHeader
+      {!hideHeader && <PageHeader
         title={title}
         subtitle={subtitle}
         icon={identity && <SmartListIcon list={identity} className="h-5 w-5" />}
@@ -586,7 +589,7 @@ export function TaskList({
             </>
           ) : undefined
         }
-      />
+      />}
 
       <ReadingScroll ref={listRef} onClick={handleScrollAreaClick}>
         {headerContent}

@@ -240,6 +240,11 @@ export function normalizeConfig(raw: Record<string, unknown>): AppConfig {
     routines_in_today: raw.routines_in_today !== false,
     routines_today_limit: todayRoutinesLimit(raw.routines_today_limit),
     routines_today_folded: raw.routines_today_folded === true,
+    planner_enabled: raw.planner_enabled === true,
+    planner_view: raw.planner_view === '3days' || raw.planner_view === 'week' ? raw.planner_view : 'day',
+    planner_source: typeof raw.planner_source === 'string' ? raw.planner_source : undefined,
+    planner_show_routines: raw.planner_show_routines !== false,
+    planner_nudge: typeof raw.planner_nudge === 'string' && /^\d{2}:\d{2}$/.test(raw.planner_nudge) ? raw.planner_nudge : null,
   }
 }
 
