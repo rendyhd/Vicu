@@ -9,7 +9,7 @@ interface TaskDragOverlayProps {
 export function TaskDragOverlay({ task, count = 1 }: TaskDragOverlayProps) {
   const multi = count > 1
   return (
-    <div className="relative">
+    <div className="relative w-fit max-w-[min(100%,20rem)]">
       {multi && (
         <>
           <div className="absolute inset-x-2 -bottom-1.5 h-10 rounded-card border-2 border-accent-blue/30 bg-[var(--bg-primary)]" />

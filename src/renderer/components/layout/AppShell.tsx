@@ -23,7 +23,8 @@ import { setProjectDropTarget, useProjectDropStore, type ProjectDropTarget } fro
 import type { SyncedPrefsSnapshot } from '../../../shared/synced-prefs'
 import { ProjectActionsHost } from '@/components/projects/ProjectActionsHost'
 import { commitSync } from '@/lib/sync-commit'
-import { taskDropAnimation } from '@/lib/drop-animation'
+import { taskDropAnimation, type DropLanding } from '@/lib/drop-animation'
+import { overlayBesidePointer, rowBandAtPointer } from '@/lib/drag-overlay'
 import { motionEasing, motionMs } from '@/lib/motion'
 import { useReducedMotion } from '@/hooks/use-reduced-motion'
 import { useConfirmDelete } from '@/hooks/use-confirm-delete'
@@ -147,6 +148,8 @@ function GlobalConfirm() {
   return <ConfirmDialog {...dialogProps} />
 }
 
+const DRAG_OVERLAY_MODIFIERS = [overlayBesidePointer]
+
 export function AppShell() {
   const queryClient = useQueryClient()
   const { sidebarWidth, setSidebarWidth } = useSidebarStore()
@@ -159,9 +162,16 @@ export function AppShell() {
   // Another device's synced settings (the Inbox, the task order) arrive here.
   useSyncedPrefsEvents()
   const reducedMotion = useReducedMotion()
-  // The drop travels into the slot over fade.base with the enter curve; reduced motion has none.
+  // The drop travels into the slot over fade.base with the enter curve; reduced motion has none. A
+  // task sent somewhere else lands there instead: handleDragEnd says where, before the animation runs.
+  const dropLanding = useRef<DropLanding | null>(null)
   const dropAnimation = useMemo(
-    () => taskDropAnimation({ duration: motionMs('fade-base'), easing: motionEasing('enter') }, reducedMotion),
+    () =>
+      taskDropAnimation({ duration: motionMs('fade-base'), easing: motionEasing('enter') }, reducedMotion, () => {
+        const landing = dropLanding.current
+        dropLanding.current = null
+        return landing
+      }),
     [reducedMotion],
   )
   const dragging = useRef(false)
@@ -171,6 +181,14 @@ export function AppShell() {
   const [appState, setAppState] = useState<AppState>('loading')
   const [reauthInfo, setReauthInfo] = useState<ReauthInfo | null>(null)
   const [dragItem, setDragItem] = useState<DragItem | null>(null)
+  // The grabbing cursor, over everything, while something is dragged (index.css).
+  const anythingDragged = dragItem !== null
+  useEffect(() => {
+    if (!anythingDragged) return
+    const root = document.documentElement
+    root.setAttribute('data-dragging', '')
+    return () => root.removeAttribute('data-dragging')
+  }, [anythingDragged])
   const themeRef = useRef<ThemeOption>('system')
   const navigate = useNavigate()
 
@@ -247,8 +265,17 @@ export function AppShell() {
       const planDrop = pointerCollisions.find((c) => c.data?.droppableContainer?.data?.current?.type === 'plan-drop')
       if (planDrop) return [planDrop]
 
-      // Fall back to rect intersection for sortable reordering
-      return rectIntersection(args).filter((c) => c.data?.droppableContainer?.data?.current?.type !== 'plan-drop')
+      // A row, section header or section end goes by the pointer too: the overlay is drawn beside it,
+      // so its box says nothing about where the task is going.
+      const notPlan = (c: { data?: { droppableContainer?: { data?: { current?: { type?: unknown } } } } }) =>
+        c.data?.droppableContainer?.data?.current?.type !== 'plan-drop'
+      const underPointer = pointerCollisions.filter(notPlan)
+      if (underPointer.length > 0) return underPointer
+
+      // Over no target (beside the list): the row's own column at the pointer's height.
+      const row = args.active.rect.current.initial
+      const collisionRect = row && args.pointerCoordinates ? rowBandAtPointer(row, args.pointerCoordinates) : args.collisionRect
+      return rectIntersection({ ...args, collisionRect }).filter(notPlan)
     },
     [dragItem?.type]
   )
@@ -257,6 +284,7 @@ export function AppShell() {
     (event: DragStartEvent) => {
       const data = event.active.data.current as Record<string, unknown>
       const type = data?.type as string
+      dropLanding.current = null
 
       if (type === 'task') {
         const task = data.task as Task
@@ -336,11 +364,19 @@ export function AppShell() {
           if (isMulti) useSelectionStore.getState().clearSelection()
         }
 
+        // A task sent somewhere else has no slot here to go back to: the overlay goes to the target.
+        const landOnTarget = () => {
+          dropLanding.current = { into: over.rect }
+        }
+        const leavesFor = (projectId: number) => dragTasks.some((t) => t.project_id !== projectId)
+
         if (overData?.type === 'plan-drop') {
+          dropLanding.current = { into: null }
           ;(overData.drop as (tasks: Task[]) => void)(dragTasks)
           clearIfMulti()
         } else if (overData?.type === 'project') {
           const projectId = overData.projectId as number
+          if (leavesFor(projectId)) landOnTarget()
           dragTasks.forEach((t) => {
             if (projectId !== t.project_id) {
               updateTask.mutate({ id: t.id, changes: { project_id: projectId }, original: t })
@@ -349,14 +385,17 @@ export function AppShell() {
           clearIfMulti()
         } else if (overData?.type === 'label') {
           const labelId = overData.labelId as number
+          const lacksLabel = (t: Task) => !(t.labels ?? []).some((l) => l.id === labelId)
+          if (dragTasks.some(lacksLabel)) dropLanding.current = { into: over.rect, keepsRow: true }
           dragTasks.forEach((t) => {
-            if (!(t.labels ?? []).some((l) => l.id === labelId)) {
+            if (lacksLabel(t)) {
               addLabel.mutate({ taskId: t.id, labelId })
             }
           })
         } else if (overData?.type === 'section') {
           // Dropped on a section header — move every dragged task to that project.
           const sectionProject = overData.project as Project
+          if (leavesFor(sectionProject.id)) landOnTarget()
           dragTasks.forEach((t) => {
             if (sectionProject.id !== t.project_id) {
               updateTask.mutate({ id: t.id, changes: { project_id: sectionProject.id }, original: t })
@@ -366,6 +405,7 @@ export function AppShell() {
         } else if (overData?.type === 'parent-project') {
           // Dropped on the parent-project drop zone — move back to the parent.
           const projectId = overData.projectId as number
+          if (leavesFor(projectId)) landOnTarget()
           dragTasks.forEach((t) => {
             if (projectId !== t.project_id) {
               updateTask.mutate({ id: t.id, changes: { project_id: projectId }, original: t })
@@ -391,6 +431,7 @@ export function AppShell() {
             const newPosition = lastUndatedPos + 2 ** 15
 
             if (sectionProjectId !== task.project_id) {
+              landOnTarget()
               const finalViewId = ctx.viewId
               updateTask.mutate(
                 {
@@ -497,6 +538,7 @@ export function AppShell() {
             const targetIndex = destTasks.findIndex((t) => t.id === targetTaskId)
             const insertPosition = slotPosition(destTasks, targetIndex, anchorsFor(destOrder)).position
 
+            landOnTarget()
             const finalDestViewId = destViewId
             updateTask.mutate(
               {
@@ -808,7 +850,7 @@ export function AppShell() {
         <CommandPalette />
       </div>
 
-      <DragOverlay dropAnimation={dropAnimation}>
+      <DragOverlay dropAnimation={dropAnimation} modifiers={DRAG_OVERLAY_MODIFIERS}>
         {dragItem?.type === 'task' && (
           <TaskDragOverlay task={dragItem.task} count={dragItem.tasks.length} />
         )}
