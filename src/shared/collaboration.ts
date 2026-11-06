@@ -187,12 +187,43 @@ function escapeHtml(text: string): string {
   return out
 }
 
+function attachmentHtml(attachment: CommentAttachment): string {
+  const url = escapeHtml(attachment.url)
+  const name = escapeHtml(attachment.name)
+  return attachment.image ? `<img src="${url}" alt="${name}">` : `<p><a href="${url}">${name}</a></p>`
+}
+
 /**
  * The HTML a comment is sent as (section 9.5): one paragraph, `<br>` for line breaks, escaped
- * text, and each `@username` of a member as a `mention-user` element so the server notifies them.
- * Empty when there is nothing to send.
+ * text, each `@username` of a member as a `mention-user` element so the server notifies them, and
+ * then the attachments. Empty when there is nothing to send.
  */
-export function encodeCommentHtml(text: string, members: readonly CollabUser[]): string {
+export function encodeCommentHtml(text: string, members: readonly CollabUser[], attachments: readonly CommentAttachment[] = []): string {
+  return encodeCommentText(text, members) + attachments.map(attachmentHtml).join('')
+}
+
+/** Where a comment points at an attachment (section 9.5; `v1` is what the web app recognises). */
+export function commentAttachmentAddress(server: string, taskId: number, attachmentId: number): string {
+  return `${server.replace(/\/+$/, '')}/api/v1/tasks/${taskId}/attachments/${attachmentId}`
+}
+
+const INLINE_IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/gif', 'image/webp'])
+
+/** Whether a file of this type goes into a comment as an image: the ones every browser can show. */
+export function isInlineImageType(mimeType: string): boolean {
+  return INLINE_IMAGE_TYPES.has(mimeType.split(';')[0].trim().toLowerCase())
+}
+
+/** The attachment of `taskId` that `address` points at, or null when it points at anything else. */
+function attachmentIdIn(address: string | undefined, taskId: number | undefined): number | null {
+  if (address === undefined || taskId === undefined) return null
+  const match = /\/tasks\/(\d+)\/attachments\/(\d+)(?:[?#].*)?$/.exec(address)
+  if (!match || Number(match[1]) !== taskId) return null
+  const id = Number(match[2])
+  return Number.isSafeInteger(id) ? id : null
+}
+
+function encodeCommentText(text: string, members: readonly CollabUser[]): string {
   const normalized = trimBoth(text.replace(/\r\n?/g, '\n'))
   if (!normalized) return ''
   // Longest username first; equal lengths keep the members' order (sort is stable).
@@ -222,11 +253,27 @@ export function encodeCommentHtml(text: string, members: readonly CollabUser[]):
   return `<p>${out}</p>`
 }
 
-export type CommentSegment = { text: string } | { mention: string; label: string }
+/** A task attachment a comment points at (section 9.5). */
+export interface CommentAttachment {
+  attachment: number
+  /** The `alt` or `title` of an image, the text of a link, trimmed; it can be empty. */
+  name: string
+  /** An `img`, shown inline; otherwise a link, shown as a file. */
+  image: boolean
+  /** The address as written, so saving an edit changes nothing about it. */
+  url: string
+}
+
+export type CommentSegment = { text: string } | { mention: string; label: string } | CommentAttachment
 
 export interface DecodedComment {
   segments: CommentSegment[]
-  /** Only `p`, `br` and `mention-user` elements: Vicu can edit it without losing anything. */
+  /** The attachments among the segments, in reading order. */
+  attachments: CommentAttachment[]
+  /**
+   * Only `p`, `br`, `mention-user` and attachments, with nothing after the first attachment but more
+   * of them: Vicu can edit it without losing anything.
+   */
   plain: boolean
   /** The text the editor starts from (mentions as `@username`); null when the comment is not plain. */
   editText: string | null
@@ -332,13 +379,16 @@ function parseTag(inner: string): ParsedTag {
 /**
  * What a comment shows (section 9.5): text and mentions, line breaks for `<br>` and block ends,
  * everything else as its text. Mentions take the member's display name when the member is known.
+ * With `taskId`, the task the comment belongs to, what points at one of its attachments is an
+ * attachment; nothing else in a comment is ever fetched.
  */
-export function decodeCommentHtml(html: string, members: readonly CollabUser[]): DecodedComment {
+export function decodeCommentHtml(html: string, members: readonly CollabUser[], taskId?: number): DecodedComment {
   const segments: CommentSegment[] = []
   let plain = true
   let pendingBreak = false
   let wroteAny = false
   let mention: { id: string; label: string; text: string } | null = null
+  let fileLink: { attachment: number; url: string; text: string } | null = null
 
   const pushText = (text: string) => {
     if (!text) return
@@ -350,9 +400,25 @@ export function decodeCommentHtml(html: string, members: readonly CollabUser[]):
     if (pendingBreak && wroteAny) pushText('\n')
     pendingBreak = false
   }
+  const addAttachment = (attachment: CommentAttachment) => {
+    // The line breaks around an attachment are its own place in the comment.
+    pendingBreak = false
+    segments.push(attachment)
+    wroteAny = true
+  }
+  const finishFileLink = () => {
+    if (!fileLink) return
+    const link = fileLink
+    fileLink = null
+    addAttachment({ attachment: link.attachment, name: trimBoth(link.text), image: false, url: link.url })
+  }
   const appendText = (raw: string) => {
     if (mention) {
       mention.text += raw
+      return
+    }
+    if (fileLink) {
+      fileLink.text += raw
       return
     }
     const text = raw.replace(/\r\n|\r|\n/g, ' ')
@@ -404,6 +470,30 @@ export function decodeCommentHtml(html: string, members: readonly CollabUser[]):
         const tag = parseTag(html.slice(i + 1, end))
         i = end + 1
         if (!tag.name) continue
+        if (fileLink) {
+          if (tag.name === 'a' && tag.closing) finishFileLink()
+          else if (!PLAIN_TAGS.has(tag.name)) plain = false
+          continue
+        }
+        if (!mention && !tag.closing) {
+          if (tag.name === 'img') {
+            const url = tag.attrs['data-src'] || tag.attrs['src']
+            const id = attachmentIdIn(url, taskId)
+            if (id !== null) {
+              addAttachment({ attachment: id, name: trimBoth(tag.attrs['alt'] ?? '') || trimBoth(tag.attrs['title'] ?? ''), image: true, url })
+              continue
+            }
+          }
+          if (tag.name === 'a') {
+            const url = tag.attrs['href']
+            const id = attachmentIdIn(url, taskId)
+            if (id !== null) {
+              fileLink = { attachment: id, url, text: '' }
+              if (tag.selfClosing) finishFileLink()
+              continue
+            }
+          }
+        }
         if (!PLAIN_TAGS.has(tag.name)) plain = false
         if (!tag.closing && SKIPPED_CONTENT.has(tag.name)) {
           const close = html.toLowerCase().indexOf(`</${tag.name}`, i)
@@ -443,7 +533,17 @@ export function decodeCommentHtml(html: string, members: readonly CollabUser[]):
     i = j
   }
   finishMention()
+  finishFileLink()
 
+  // Text next to an attachment loses its spaces and line breaks on that side.
+  const isAttachment = (s: CommentSegment | undefined): boolean => s !== undefined && 'attachment' in s
+  for (let index = segments.length - 1; index >= 0; index--) {
+    const segment = segments[index]
+    if (!('text' in segment)) continue
+    if (isAttachment(segments[index - 1])) segment.text = trimStart(segment.text)
+    if (isAttachment(segments[index + 1])) segment.text = trimEnd(segment.text)
+    if (!segment.text) segments.splice(index, 1)
+  }
   // Trim the ends across segments: a text segment at either end loses its spaces and line breaks.
   const first = segments[0]
   if (first && 'text' in first) {
@@ -456,14 +556,19 @@ export function decodeCommentHtml(html: string, members: readonly CollabUser[]):
     if (!last.text) segments.pop()
   }
 
-  const editText = plain ? segments.map((s) => ('text' in s ? s.text : `@${s.mention}`)).join('') : null
-  return { segments, plain, editText }
+  // An edit puts the attachments back after the text, so only that order can be edited.
+  const firstAttachment = segments.findIndex((s) => 'attachment' in s)
+  if (firstAttachment !== -1 && segments.slice(firstAttachment).some((s) => !('attachment' in s))) plain = false
+
+  const attachments = segments.filter((s): s is CommentAttachment => 'attachment' in s)
+  const editText = plain ? segments.map((s) => ('text' in s ? s.text : 'mention' in s ? `@${s.mention}` : '')).join('') : null
+  return { segments, attachments, plain, editText }
 }
 
 /** The comment as plain text, mentions as "@" and the label: for previews and search. */
 export function commentPlainText(html: string, members: readonly CollabUser[]): string {
   return decodeCommentHtml(html, members)
-    .segments.map((s) => ('text' in s ? s.text : `@${s.label}`))
+    .segments.map((s) => ('text' in s ? s.text : 'label' in s ? `@${s.label}` : ''))
     .join('')
 }
 

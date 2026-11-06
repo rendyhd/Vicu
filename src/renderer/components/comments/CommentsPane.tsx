@@ -35,7 +35,12 @@ import { Avatar, AvatarStack } from '@/components/shared/Avatar'
 import { buttonClasses } from '@/components/shared/Button'
 import { Popover } from '@/components/overlay/Popover'
 import { Tooltip } from '@/components/overlay/Tooltip'
+import { AttachmentViewer } from '@/components/task-list/AttachmentViewer'
+import { commentAttachmentsOf, commentBlocks, filesToAttach, pastedFiles, viewerImagesOf, type CommentFileList, type TextSegment } from '@/lib/comment-files'
+import { useCommentFileList, useCommentFiles } from '@/hooks/use-comment-files'
+import type { CommentAttachment } from '@/lib/collaboration'
 import type { PersonRef, Task, TaskComment } from '@/lib/vikunja-types'
+import { AttachButton, CommentFile, CommentImage, StagedFiles } from './CommentFiles'
 
 // The comments pane (collaboration D3): a third column right of the content region that follows the
 // open card. It shows while a card is open and the pane is on (sticky for the session); it reads
@@ -124,6 +129,7 @@ interface ThreadProps {
 function CommentsThread({ task, access, me, onClose, focusComposer }: ThreadProps) {
   const query = useTaskComments(task.id)
   const { comments, isLoading, isError, refetch, hasNextPage, fetchNextPage, isFetchingNextPage } = query
+  const fileList = useCommentFileList(task.id, comments)
   const markRead = useMarkTaskRead()
   // Notify me is about other people, so only on a shared project; and Vikunja does not let API tokens
   // follow tasks (cross-app semantics 9.7): none with one.
@@ -276,7 +282,7 @@ function CommentsThread({ task, access, me, onClose, focusComposer }: ThreadProp
                   </li>
                 )}
                 {group.items.map((comment) => (
-                  <CommentItem key={comment.id} comment={comment} task={task} access={access} me={me} dayLabel={group.label} />
+                  <CommentItem key={comment.id} comment={comment} task={task} access={access} me={me} dayLabel={group.label} fileList={fileList} />
                 ))}
               </Fragment>
             ))}
@@ -293,8 +299,8 @@ function CommentsThread({ task, access, me, onClose, focusComposer }: ThreadProp
   )
 }
 
-/** A comment's text: mentions as "@Name" in the accent colour. */
-function CommentBody({ segments }: { segments: ReturnType<typeof decodeCommentHtml>['segments'] }) {
+/** A run of a comment's text: mentions as "@Name" in the accent colour. */
+function CommentBody({ segments }: { segments: TextSegment[] }) {
   return (
     <>
       {segments.map((segment, i) =>
@@ -316,11 +322,15 @@ interface CommentItemProps {
   access: ProjectAccess
   me: PersonRef | null
   dayLabel: string
+  fileList: CommentFileList
 }
 
-function CommentItem({ comment, task, access, me, dayLabel }: CommentItemProps) {
+function CommentItem({ comment, task, access, me, dayLabel, fileList }: CommentItemProps) {
   const fmt = useDateFormat()
-  const decoded = useMemo(() => decodeCommentHtml(comment.comment, access.members), [comment.comment, access.members])
+  const decoded = useMemo(() => decodeCommentHtml(comment.comment, access.members, task.id), [comment.comment, access.members, task.id])
+  const blocks = useMemo(() => commentBlocks(decoded.segments), [decoded.segments])
+  const images = useMemo(() => viewerImagesOf(decoded.attachments, fileList), [decoded.attachments, fileList])
+  const [viewingId, setViewingId] = useState<number | null>(null)
   const author = comment.author
   const mine = !!author && !!me && author.id === me.id
   const name = mine ? 'You' : author ? displayName(author) : 'Someone'
@@ -349,17 +359,27 @@ function CommentItem({ comment, task, access, me, dayLabel }: CommentItemProps) 
     requestAnimationFrame(() => editButtonRef.current?.focus())
   }
   const saveEdit = () => {
-    const html = encodeCommentHtml(draft, access.members)
+    // An edit changes the text; the files stay as they are.
+    const html = encodeCommentHtml(draft, access.members, decoded.attachments)
     if (!html) return
     if (html !== comment.comment) update.mutate({ task, comment, html })
     setEditing(false)
   }
   const askDelete = async () => {
-    const ok = await confirmDelete('Delete comment? This cannot be undone.', { force: true })
+    const question = decoded.attachments.length > 0
+      ? "Delete comment? This cannot be undone. Its files stay in the task's attachments."
+      : 'Delete comment? This cannot be undone.'
+    const ok = await confirmDelete(question, { force: true })
     if (ok) remove.mutate({ task, comment })
   }
+  const renderFile = (file: CommentAttachment) =>
+    file.image ? (
+      <CommentImage key={`${file.attachment}-${file.url}`} file={file} taskId={task.id} list={fileList} onView={() => setViewingId(file.attachment)} />
+    ) : (
+      <CommentFile key={`${file.attachment}-${file.url}`} file={file} taskId={task.id} list={fileList} />
+    )
 
-  // Edit only what Vicu writes itself (paragraphs, line breaks, mentions), so nothing is lost.
+  // Edit only what Vicu writes itself (paragraphs, line breaks, mentions, files after the text), so nothing is lost.
   const canEdit = mine && decoded.plain && !sending
   const canDelete = mine && !sending
   const status = comment.pending ? 'Waiting to sync' : edited ? 'edited' : ''
@@ -378,14 +398,14 @@ function CommentItem({ comment, task, access, me, dayLabel }: CommentItemProps) 
             {status && ` · ${status}`}
           </span>
           {(canEdit || canDelete) && !editing && (
-            <span className="ml-auto flex gap-0.5 self-center opacity-0 transition-opacity duration-fade-fast focus-within:opacity-100 group-hover/comment:opacity-100">
+            <span className="-my-0.5 ml-auto flex gap-0.5 self-center opacity-0 transition-opacity duration-fade-fast focus-within:opacity-100 group-hover/comment:opacity-100">
               {canEdit && (
-                <button ref={editButtonRef} type="button" aria-label="Edit comment" onClick={startEdit} className="inline-flex rounded-control p-1 text-text-secondary hover:bg-bg-hover hover:text-text">
+                <button ref={editButtonRef} type="button" aria-label="Edit comment" onClick={startEdit} className="inline-flex rounded-control p-1.5 text-text-secondary hover:bg-bg-hover hover:text-text">
                   <Pencil className="h-3 w-3" aria-hidden="true" />
                 </button>
               )}
               {canDelete && (
-                <button type="button" aria-label="Delete comment" onClick={() => void askDelete()} className="inline-flex rounded-control p-1 text-text-secondary hover:bg-bg-hover hover:text-danger">
+                <button type="button" aria-label="Delete comment" onClick={() => void askDelete()} className="inline-flex rounded-control p-1.5 text-text-secondary hover:bg-bg-hover hover:text-danger">
                   <Trash2 className="h-3 w-3" aria-hidden="true" />
                 </button>
               )}
@@ -412,21 +432,29 @@ function CommentItem({ comment, task, access, me, dayLabel }: CommentItemProps) 
               }}
               className="block w-full resize-none rounded-control border border-[var(--border-color)] bg-bg-card px-2.5 py-[7px] text-task-title text-text focus:border-focus-ring focus:outline-none focus:ring-1 focus:ring-focus-ring"
             />
+            {decoded.attachments.map(renderFile)}
             <div className="mt-1.5 flex justify-end gap-1.5">
               <button type="button" onClick={cancelEdit} className={buttonClasses('secondary')}>
                 Cancel
               </button>
-              <button type="button" onClick={saveEdit} disabled={!draft.trim()} className={buttonClasses('primary')}>
+              <button type="button" onClick={saveEdit} disabled={!draft.trim() && decoded.attachments.length === 0} className={buttonClasses('primary')}>
                 Save
               </button>
             </div>
           </div>
         ) : (
-          <p className={cn('whitespace-pre-wrap break-words text-task-title text-text [text-wrap:pretty]', comment.pending && 'text-text-secondary')}>
-            <CommentBody segments={decoded.segments} />
-          </p>
+          blocks.map((block, index) =>
+            block.kind === 'file' ? (
+              renderFile(block.file)
+            ) : (
+              <p key={`text-${index}`} className={cn('whitespace-pre-wrap break-words text-task-title text-text [text-wrap:pretty]', comment.pending && 'text-text-secondary')}>
+                <CommentBody segments={block.segments} />
+              </p>
+            ),
+          )
         )}
       </div>
+      {viewingId !== null && <AttachmentViewer taskId={task.id} images={images} startId={viewingId} onClose={() => setViewingId(null)} />}
       <ConfirmDialog {...dialogProps} />
     </li>
   )
@@ -442,6 +470,9 @@ interface ComposerProps {
 
 function Composer({ task, access, me, composerRef, onEscape }: ComposerProps) {
   const create = useCreateComment()
+  const files = useCommentFiles(task.id)
+  const { data: config } = useAppConfig()
+  const [dropping, setDropping] = useState(false)
   const [text, setText] = useState(() => commentDraft(task.id))
   const [caret, setCaret] = useState(0)
   const [active, setActive] = useState(0)
@@ -467,23 +498,35 @@ function Composer({ task, access, me, composerRef, onEscape }: ComposerProps) {
 
   const syncCaret = () => setCaret(composerRef.current?.selectionStart ?? 0)
 
+  // Placed as soon as React has written a picked mention into the box, not a frame later: a key
+  // pressed before that frame would go in first, and the rest of the typing would land before it.
+  const caretAfterPick = useRef<number | null>(null)
+  useLayoutEffect(() => {
+    const place = caretAfterPick.current
+    if (place === null) return
+    caretAfterPick.current = null
+    const el = composerRef.current
+    if (!el) return
+    el.focus()
+    el.setSelectionRange(place, place)
+  })
+
   const pick = (person: PersonRef) => {
     if (!mention) return
     const next = applyMention(text, caret, mention, person.username)
+    caretAfterPick.current = next.caret
     setText(next.text)
     setCaret(next.caret)
-    requestAnimationFrame(() => {
-      const el = composerRef.current
-      if (!el) return
-      el.focus()
-      el.setSelectionRange(next.caret, next.caret)
-    })
   }
 
-  const html = encodeCommentHtml(text, access.members)
+  // A comment can be files alone; nothing is sent while a file is still on its way to the task.
+  const ready = files.staged.flatMap((file) => (file.attachment ? [file.attachment] : []))
+  const html = encodeCommentHtml(text, access.members, commentAttachmentsOf(ready, config?.vikunja_url ?? '', task.id))
+  const canSend = !!html && !files.picking && files.staged.every((file) => file.attachment) && (ready.length === 0 || !!config?.vikunja_url)
   const send = () => {
-    if (!html) return
+    if (!canSend) return
     create.mutate({ task, html, me })
+    files.clear()
     setText('')
     setCaret(0)
     setDismissedAt(null)
@@ -516,7 +559,25 @@ function Composer({ task, access, me, composerRef, onEscape }: ComposerProps) {
   }
 
   return (
-    <div className="shrink-0 border-t border-[var(--border-color)] p-3">
+    <div
+      className={cn('shrink-0 border-t border-[var(--border-color)] p-3', dropping && 'bg-bg-hover')}
+      onDragOver={(e) => {
+        if (!e.dataTransfer.types.includes('Files')) return
+        e.preventDefault()
+        setDropping(true)
+      }}
+      onDragLeave={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDropping(false)
+      }}
+      onDrop={(e) => {
+        if (!e.dataTransfer.types.includes('Files')) return
+        e.preventDefault()
+        e.stopPropagation()
+        setDropping(false)
+        files.add(filesToAttach(e.dataTransfer.files))
+      }}
+    >
+      {files.staged.length > 0 && <StagedFiles files={files.staged} onRemove={files.remove} />}
       <textarea
         ref={composerRef}
         value={text}
@@ -532,8 +593,19 @@ function Composer({ task, access, me, composerRef, onEscape }: ComposerProps) {
         }}
         onSelect={syncCaret}
         onKeyDown={onKeyDown}
+        onPaste={(e) => {
+          const pasted = pastedFiles(e)
+          if (pasted.length === 0) return
+          e.preventDefault()
+          files.add(pasted)
+        }}
         className="block w-full resize-none rounded-control border border-[var(--border-color)] bg-bg-card px-2.5 py-[7px] text-task-title text-text placeholder:text-text-secondary focus:border-focus-ring focus:outline-none focus:ring-1 focus:ring-focus-ring"
       />
+      {files.notice && (
+        <p role="status" className="mt-1.5 text-caption text-danger">
+          {files.notice}
+        </p>
+      )}
       {pickerOpen && (
         <Popover
           anchorRef={composerRef}
@@ -551,8 +623,9 @@ function Composer({ task, access, me, composerRef, onEscape }: ComposerProps) {
         </Popover>
       )}
       <div className="mt-2 flex items-center">
+        <AttachButton busy={files.picking} onClick={files.browse} />
         <span className="flex-1 text-caption text-text-secondary">{isMac ? '⌘' : 'Ctrl'}+Enter to send</span>
-        <button type="button" onClick={send} disabled={!html} className={buttonClasses('primary', false, 'min-h-7 disabled:opacity-45')}>
+        <button type="button" onClick={send} disabled={!canSend} className={buttonClasses('primary', false, 'min-h-7 disabled:opacity-45')}>
           Comment
         </button>
       </div>

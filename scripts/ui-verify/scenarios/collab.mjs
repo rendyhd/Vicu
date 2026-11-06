@@ -173,8 +173,23 @@ export default async function run(h) {
     await h.wait(400)
     const picker = await page.evaluate(() => [...document.querySelectorAll('[role="listbox"]:popover-open [role="option"]')].map((o) => o.textContent.trim()))
     await h.assert('D: typing @ma suggests Maya', { ok: picker.length === 1 && /^Maya/.test(picker[0]), detail: JSON.stringify(picker) })
+    // A frame can come late on a busy renderer. Hold the frames back until a few letters are in: a
+    // caret placed in a frame would then jump back over them and the rest would go in before them.
+    await page.evaluate(() => {
+      window.__realRaf = window.requestAnimationFrame
+      window.__heldFrames = []
+      window.requestAnimationFrame = (callback) => window.__heldFrames.push(callback)
+    })
     await h.key('Enter')
-    await h.type('see you at the gate')
+    await h.type('see ')
+    await page.evaluate(() => {
+      const held = window.__heldFrames
+      window.requestAnimationFrame = window.__realRaf
+      delete window.__realRaf
+      delete window.__heldFrames
+      for (const callback of held) callback(performance.now())
+    })
+    await h.type('you at the gate')
     await h.assert('D: Enter in the picker inserts the username', { ok: (await composer.inputValue()) === `@${maya.username} see you at the gate`, detail: await composer.inputValue() })
     const before = items(await api.call('GET', `/tasks/${flights}/comments?per_page=50`)).length
     await h.key('Control+Enter')

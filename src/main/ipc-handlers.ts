@@ -2,6 +2,7 @@ import { shell, dialog, app, nativeTheme } from 'electron'
 import { handleTrusted } from './secure-ipc'
 import { tokenForConnectionTest } from './connection-test-token'
 import { isExternalAllowed } from './web-security-policy'
+import { readUploadAnswer } from '../shared/attachment-upload'
 import { isRiskyAttachment, sanitizeAttachmentFileName } from './attachment-safety'
 import { ensureAttachmentTempDir } from './attachment-temp'
 import { saveAttachment } from './attachment-save'
@@ -1084,7 +1085,7 @@ export function registerIpcHandlers(): void {
       ),
     })
     if (dialogResult.canceled || dialogResult.filePaths.length === 0) {
-      return { success: true, data: { count: 0 } }
+      return { success: true, data: { count: 0, attachments: [] } }
     }
 
     if (config) {
@@ -1094,6 +1095,7 @@ export function registerIpcHandlers(): void {
 
     let count = 0
     let lastError = ''
+    const attachments: unknown[] = []
     for (const filePath of dialogResult.filePaths) {
       // Size is checked against the server's limit from stat, before the file is read, and the read
       // is asynchronous: picking a huge file neither freezes the app nor fills memory (D-IPC-5).
@@ -1105,14 +1107,21 @@ export function registerIpcHandlers(): void {
       const fileName = path.basename(filePath)
       const mimeType = getMimeType(fileName)
       const result = await uploadTaskAttachment(taskId, loaded.buffer, fileName, mimeType)
-      if (result.success) count++
-      else lastError = result.error
+      if (!result.success) {
+        lastError = result.error
+        continue
+      }
+      // The server answers 201 even for a file it refused.
+      const answer = readUploadAnswer(result.data)
+      attachments.push(...answer.attachments)
+      if (answer.error && answer.attachments.length === 0) lastError = answer.error
+      else count++
     }
     if (count === 0 && dialogResult.filePaths.length > 0) {
       return { success: false, error: lastError || 'Upload failed' }
     }
     if (count > 0) notifyViewerSync()
-    return { success: true, data: { count } }
+    return { success: true, data: { count, attachments, ...(lastError ? { error: lastError } : {}) } }
   })
 
   // --- Obsidian IPC ---

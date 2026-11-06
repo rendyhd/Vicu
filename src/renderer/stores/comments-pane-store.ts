@@ -1,12 +1,25 @@
 import { create } from 'zustand'
-import type { Task } from '@/lib/vikunja-types'
+import type { Task, TaskAttachment } from '@/lib/vikunja-types'
 
 // The task the comments pane follows: the open card publishes its task here while it is expanded
 // (with the row's live data, so a count or title change shows in the pane at once), and clears it
 // when it collapses. The pane itself lives in the app shell, beside the content region.
 
+/** A file added to the comment being written: on the task once `attachment` is known. */
+export interface StagedFile {
+  /** Tells it apart while it uploads, before it has an id. */
+  key: number
+  name: string
+  /** Null while the file uploads. */
+  attachment: TaskAttachment | null
+}
+
 interface CommentsPaneState {
   task: Task | null
+  /** The files added to the unsent comment per task, for the session, like the text below. */
+  stagedFiles: Record<number, StagedFile[]>
+  /** The file dialogs running per task: what they upload is not known until they finish. */
+  picking: Record<number, number>
   showCardTask: (task: Task) => void
   /** The card of this task closed (or its row went away). */
   clearCardTask: (taskId: number) => void
@@ -14,6 +27,8 @@ interface CommentsPaneState {
 
 export const useCommentsPaneStore = create<CommentsPaneState>((set) => ({
   task: null,
+  stagedFiles: {},
+  picking: {},
   showCardTask: (task) => set((state) => (state.task === task ? state : { task })),
   clearCardTask: (taskId) => set((state) => (state.task?.id === taskId ? { task: null } : state)),
 }))
