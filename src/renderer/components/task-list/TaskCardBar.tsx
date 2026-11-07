@@ -1,5 +1,5 @@
 import { Fragment, useRef, type ReactNode, type RefObject } from 'react'
-import { Calendar, Bell, Repeat, Paperclip, ListChecks, FolderOpen, MoreHorizontal, Info, CopyPlus, Trash2, Plus, MessageSquare } from 'lucide-react'
+import { Calendar, Bell, Repeat, Paperclip, ListChecks, FolderOpen, MoreHorizontal, Info, CopyPlus, FileText, Trash2, Plus, MessageSquare } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { isNullDate } from '@/lib/date-utils'
 import { labelChipSolidStyle } from '@/lib/label-style'
@@ -12,6 +12,7 @@ import { useIsDark } from '@/hooks/use-is-dark'
 import { useProjects } from '@/hooks/use-projects'
 import { useLocationReminders } from '@/hooks/use-location-reminders'
 import { useDuplicateTasks } from '@/hooks/use-duplicate-tasks'
+import { useTemplateActions } from '@/hooks/use-task-templates'
 import { assignChipLabel, nameList, orderPeople } from '@/lib/collaboration'
 import type { ProjectAccess } from '@/hooks/use-project-access'
 import { commentsButtonId } from '@/stores/comments-pane-store'
@@ -163,6 +164,7 @@ export function TaskCardBar({
   const { data: projects } = useProjects()
   const { reminderFor } = useLocationReminders()
   const duplicate = useDuplicateTasks()
+  const templateActions = useTemplateActions()
   const dateRef = useRef<HTMLButtonElement>(null)
   const priorityRef = useRef<HTMLButtonElement>(null)
   const labelRef = useRef<HTMLButtonElement>(null)
@@ -351,6 +353,15 @@ export function TaskCardBar({
             }}
           >
             Duplicate task
+          </MenuItem>
+          <MenuItem
+            icon={<FileText className="h-3.5 w-3.5" aria-hidden="true" />}
+            onSelect={() => {
+              onClose()
+              void templateActions.saveFrom(task)
+            }}
+          >
+            Save as template
           </MenuItem>
           <MenuItem icon={<Trash2 className="h-3.5 w-3.5" aria-hidden="true" />} danger onSelect={onDelete}>
             Delete task

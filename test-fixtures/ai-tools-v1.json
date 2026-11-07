@@ -3306,6 +3306,7 @@
       "status": ["applied", "declined", "partly_applied", "failed"],
       "applied": "task ids",
       "skipped": "[{task_id, reason}]",
+      "edited": "[{task_id or ref, due}], only when the user changed a date on the card",
       "skipReasons": ["not_found", "read_only", "invalid"]
     },
     "taskMark": "[task:{id}]"

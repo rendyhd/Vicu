@@ -10,6 +10,8 @@ import { BLOCK_LENGTHS, readPlannerHours } from '../shared/time-blocks'
 import { createSyncedDocumentService, type SyncedDocumentCodec, type SyncedDocumentStatus } from './synced-document-service'
 import { PREFS_CARRIER_SEARCH, PREFS_CARRIER_TITLE, encodePrefsEnvelope, hasPrefsMarker, parsePrefsEnvelope } from './synced-prefs-protocol'
 import { canonicalJson, isOwnTask } from '../shared/hidden-tasks'
+import { TEMPLATE_KEY_PREFIX, readTemplate } from '../shared/task-templates'
+import { readSubtaskOrder } from '../shared/subtask-order'
 import {
   INBOX_PROJECT_ID_KEY,
   emptySyncedPrefs,
@@ -255,6 +257,9 @@ export function isWritablePref(key: unknown, value: unknown): key is string {
   // are kept with it), and the category a top-level project is in.
   if (categoryIdOfKey(key) !== null) return value === null || readCategoryPref(value) !== null
   if (projectIdOfCategoryKey(key) !== null) return value === null || isCategoryId(value)
+  // A task template (section 18) and the order of a task's subtasks (section 19).
+  if (key.startsWith(TEMPLATE_KEY_PREFIX) && key.length > TEMPLATE_KEY_PREFIX.length) return value === null || readTemplate(value) !== null
+  if (/^subtask_order\.\d+$/.test(key)) return value === null || (Array.isArray(value) && readSubtaskOrder(value).length === value.length)
   return false
 }
 

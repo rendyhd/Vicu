@@ -53,6 +53,7 @@ import { CustomListDragOverlay } from '@/components/sidebar/CustomListDragOverla
 import { SectionDragOverlay } from '@/components/task-list/SectionDragOverlay'
 import { UpdateBanner } from '@/components/UpdateBanner'
 import { ToastHost } from '@/components/shared/ToastHost'
+import { TemplateEditHost } from '@/components/task-list/TemplateEditHost'
 import { VoiceHost } from '@/components/voice/VoiceHost'
 import { CommentsPaneHost } from '@/components/comments/CommentsPane'
 import { AskHost } from '@/components/ai/AskPane'
@@ -842,6 +843,7 @@ export function AppShell() {
         <CompletionSoundSync />
         <GlobalConfirm />
         <ProjectActionsHost />
+        <TemplateEditHost />
         <ToastHost />
         <VoiceHost />
         <DictationHost />

@@ -24,6 +24,9 @@ interface SelectionState {
    * so a parent row shows the ones listed here as rows of their own under it until another task opens.
    */
   openedSubtasks: OpenedSubtask[]
+  /** A task made from a template: its title is selected when its card opens, once. */
+  selectTitleTaskId: number | null
+  selectTitleOf: (id: number | null) => void
   setExpandedTask: (id: number | null) => void
   toggleExpandedTask: (id: number) => void
   /** Open a subtask of the task whose card shows it: the card closes and the subtask opens under it. */
@@ -87,6 +90,10 @@ export const useSelectionStore = create<SelectionState>((set, get) => ({
   openedSubtasks: [],
 
   // Opening, closing and switching the expanded task go through the open/close transition (lib/task-transition.ts).
+  selectTitleTaskId: null,
+
+  selectTitleOf: (id) => set({ selectTitleTaskId: id }),
+
   setExpandedTask: (id) => expand(get, set, id),
 
   toggleExpandedTask: (id) => expand(get, set, expandedNow(get) === id ? null : id),

@@ -1090,6 +1090,8 @@ A key is added here, in both repos, in the release that starts writing it.
 | `category.<categoryId>` | a project category, `{"name", "order"}`, or `null` (deleted); section 13 | none |
 | `category.project.<projectId>` | the id of the category a top-level project is in, or `null`; section 13 | no category |
 | `project_icon.<projectId>` | `"none"`: the project is drawn without its folder icon and its name starts where the icon would be; or `null`. Any other value acts as the default and is kept | the folder |
+| `template.<id>` | a task template, or `null` (removed); section 18 | none |
+| `subtask_order.<taskId>` | the ids of a task's subtasks in the order the person dragged them, or `null`; section 19 | the server's order |
 | `weekly_review.last` | the local date the last weekly review was finished, `"YYYY-MM-DD"`; section 14.7 | never done |
 | `planner.default_length` | the length of a new block in minutes: 15, 30, 45, 60, 75 or 90. Any other value acts as the default and is kept; section 16.2 | 30 |
 | `planner.hours` | the work hours, `["HH:mm", "HH:mm"]` in 24-hour local time, the start before the end. Any other value acts as the default and is kept; section 16.6 | `["08:00", "18:00"]` |
@@ -1636,3 +1638,111 @@ every device must agree on it.
 date changes (including the daylight-saving weeks in both test zones), removing the time, the lists,
 the default reminder, the next free slot, free time, fit, the row text and the two preferences.
 `nlp-corpus-v1.json` covers section 5.4 with the new fields `start` and `end`.
+
+## 17. Search filters
+
+Search can be narrowed by four filters, shown under the search field or page header. They hold for
+one search only: nothing is saved or synced, and they reset when the person leaves search. A saved
+search is a custom list. Filters work without any text; with no text and no filter there are no
+results. They are evaluated on the device after the text has matched, on the full set before hiding
+nested subtasks (section 3.2). Hidden tasks never match.
+
+| Filter | Values | Meaning |
+|---|---|---|
+| `date` | `all` (default), `overdue`, `today`, `this_week`, `this_month`, `no_due_date`, `range` | On the local due date, by day. The windows of section 3.1 with `include_overdue` false: a filter for this week does not bring back last week. |
+| `from`, `to` | local dates, with `range` | `from` <= local due date <= `to`, both days included, whichever way round they were picked. A task without a due date is outside every range. |
+| `status` | `all` (default), `open`, `done` | `all` shows both; mobile keeps its Completed section. |
+| `label_ids` | ids | The task has at least one of them. Empty is no condition. |
+| `priorities` | numbers | The task's priority is one of them. Empty is no condition. |
+
+What is sent to the server is only a superset: `q` with the text, `filter` with the date and status
+and, when there is no text to narrow the read, `labels in` and `priority in`.
+
+### 17.1 Vectors
+
+`searchFilters` in `cross-app-semantics-v1.json` runs over the same `tasks` as `customLists`.
+
+## 18. Task templates
+
+A template is a task to start from, saved by the person from a task they already have. Templates
+are one entry each in the synced preferences (`template.<id>`, section 11.3), so they reach every
+device of the account and nobody else; they are not hidden tasks. `<id>` is a random id made by the
+device that saved it.
+
+| Field | Value | Left out means |
+|---|---|---|
+| `title` | text, required. It is the template's name; a template has no other. | the entry is not a template and is ignored and kept |
+| `created_ms` | when it was saved, epoch milliseconds. Top level only. Templates are listed by it, ties by id. | 0 |
+| `project_id` | a project id. Top level only. | see 18.2 |
+| `notes` | the description | empty |
+| `labels` | label ids | none |
+| `priority` | number | 0 |
+| `due` | `{"days": n, "time": "HH:mm"}`, `time` left out for a date-only due date | no due date |
+| `repeat_after`, `repeat_mode` | as on a task | no repeat |
+| `reminders` | `[{"relative_period": s, "relative_to": "due_date"}]` | none |
+| `subtasks` | templates of the same shape, in order, without `created_ms` and `project_id` | none |
+
+A field at its default is not written. Unknown fields at the top level are kept when a template is
+edited.
+
+### 18.1 Saving a task as a template
+
+"Save as template" is in the task's menu, above Delete, and saves at once: the title is the name, so
+nothing is asked. It answers with "Saved as a template" and an Edit action.
+
+- `due.days` is the local due date minus today, never below 0: a task overdue when saved gives 0.
+  `due.time` is the local time of day; a date-only due date has none (section 1).
+- Only reminders relative to the due date are kept, and only with a due date. A reminder at a fixed
+  time, or one relative to a start or end date, is left out.
+- Images are left out of the notes (`[[image:ID]]`, `[[image-pending:UUID]]` and `<img>`): they are
+  attachments of the task saved.
+- Subtasks are taken nested, done or not, each by the same rules. A relation cycle stops at the task
+  already taken.
+- Never taken: done state, comments, attachments, assignees, start and end dates, positions and any
+  link back to the task saved.
+- A template of more than 16 KiB of JSON is refused with a message. The carrier is one description.
+
+### 18.2 Making a task from a template
+
+Choosing a template makes the task at once and opens it with its title selected. It goes through the
+ordinary create, label and subtask paths, so it works offline like any new task.
+
+- `project_id` is used when the person can still write to that project; otherwise, or when it is
+  left out, the task goes where a new task would go at that moment.
+- A label that no longer exists is skipped.
+- The due date is the local date today plus `days`, at `time`, or date-only (section 1).
+- A task with a due date and no reminders gets the default reminder, like any new task. Subtasks get
+  exactly what the template holds. A subtask goes in the task's project.
+
+### 18.3 Where templates show
+
+Quick add and the desktop's new task row have a Template button, last among their buttons, only when
+the account has a template. Long press on the phone, or the small arrow on a desktop row, offers Edit
+and Remove (with Undo). There is no list of templates in Settings. Edit opens the sheet or new task
+row with the template in it, due date as the date it would be today, and writes the same entry;
+the title is taken as typed, without quick-add parsing. A subtask kept by the edit, matched by title,
+keeps its fields and its own subtasks.
+
+### 18.4 Vectors
+
+`taskTemplates` in `cross-app-semantics-v1.json`: `capture` (a task, written as local wall-clock
+times, and what is saved), `apply` (a template and today, what the new task gets) and `read` (entry
+values that are or are not templates).
+
+## 19. Subtask order
+
+Vikunja keeps no order among a task's subtasks that both apps could write, so the order a person
+drags is kept per parent in the synced preferences: `subtask_order.<taskId>` holds subtask ids. It
+belongs to the account: other people on a shared project, and Vikunja's own web app, see the server's
+order.
+
+- Ids listed come first, in the listed order. Subtasks not listed follow, in the server's order. Ids
+  that are not subtasks any more are ignored and dropped by the next write.
+- Written only when the person moves a subtask: the whole visible order. A value that is not a list
+  of numbers acts as the default and is kept until then.
+- A subtask or parent that exists only on this device has no id to write, so it cannot be moved until
+  it has reached the server.
+
+Done subtasks stay where they are in the order.
+
+`subtaskOrder` in `cross-app-semantics-v1.json` holds the vectors.

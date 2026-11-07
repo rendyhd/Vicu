@@ -21,6 +21,7 @@ import { checklistLabel, rowLabels, rowProjectSource } from '@/lib/row-anatomy'
 import { useIsDark } from '@/hooks/use-is-dark'
 import type { Task, TaskReminder } from '@/lib/vikunja-types'
 import { TaskCheckbox } from './TaskCheckbox'
+import { FoldedNotes } from '../rich-text/FoldedNotes'
 import { TaskCardBar, type CardPopover } from './TaskCardBar'
 import { TaskBlockBadge, TaskDueBadge } from './TaskDueBadge'
 import { blockOf, dueRepeatsBlockDay } from '../../../shared/time-blocks'
@@ -182,6 +183,11 @@ const TaskTitleEditor = forwardRef<TaskTitleEditorHandle, TaskTitleEditorProps>(
 
     useEffect(() => {
       inputRef.current?.focus()
+      const selection = useSelectionStore.getState()
+      if (selection.selectTitleTaskId === task.id) {
+        inputRef.current?.select()
+        selection.selectTitleOf(null)
+      }
     }, [])
 
     useEffect(() => {
@@ -873,7 +879,7 @@ function TaskRowInner({
       onDrop={handleFileDrop}
     >
       {/* Title row */}
-      <TaskCheckbox task={task} className="mt-3.5" suppressTopLevelUndo={nestedDepth > 0} />
+      <TaskCheckbox task={task} className="mt-3" suppressTopLevelUndo={nestedDepth > 0} />
       <div className="flex min-w-0 items-start gap-3 pt-3">
         <TaskTitleEditor
           ref={titleEditorRef}
@@ -901,6 +907,7 @@ function TaskRowInner({
 
       {/* Description */}
       <div className="col-start-2 pt-2">
+        <FoldedNotes>
         <TaskDescription
           taskId={task.id}
           value={editDescription}
@@ -924,6 +931,7 @@ function TaskRowInner({
           editorRef={descEditorRef}
           placeholder="Notes"
         />
+        </FoldedNotes>
       </div>
 
       {/* Existing subtasks stay visible; the action button toggles the add input. */}

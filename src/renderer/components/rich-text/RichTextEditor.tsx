@@ -1,16 +1,17 @@
 import { useEffect, useRef, useState } from 'react'
-import { useEditor, EditorContent, type Editor } from '@tiptap/react'
+import { useEditor, useEditorState, EditorContent, type Editor } from '@tiptap/react'
 import { BubbleMenu } from '@tiptap/react/menus'
 import { StarterKit } from '@tiptap/starter-kit'
 import { Link } from '@tiptap/extension-link'
 import { TaskList } from '@tiptap/extension-task-list'
 import { TaskItem } from '@tiptap/extension-task-item'
 import { Placeholder } from '@tiptap/extension-placeholder'
-import { Bold as BoldIcon, Italic as ItalicIcon, Strikethrough, Underline as UnderlineIcon, Code as CodeIcon, List, ListOrdered, ListChecks, Link2 } from 'lucide-react'
+import { ArrowDown, ArrowUp, Bold as BoldIcon, Italic as ItalicIcon, Strikethrough, Underline as UnderlineIcon, Code as CodeIcon, List, ListOrdered, ListChecks, Link2 } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { isAllowedDescriptionUrl, resolveOpenableDescriptionHref } from '@/lib/description-html'
 import { sanitizeTaskHtmlForStorage } from '@/lib/sanitize-html'
 import { LinkDialog } from '@/components/rich-text/LinkDialog'
+import { MoveListItem, canMoveListItem, isInListItem, moveListItem, type MoveDirection } from '@/components/rich-text/move-list-item'
 
 interface RichTextEditorProps {
   value: string
@@ -66,6 +67,7 @@ export function RichTextEditor({
       }),
       TaskList,
       TaskItem.configure({ nested: true }),
+      MoveListItem,
       Placeholder.configure({ placeholder: placeholder ?? '' }),
     ],
     content: sanitizeTaskHtmlForStorage(value),
@@ -128,7 +130,21 @@ export function RichTextEditor({
     }
   }, [value, editor])
 
+  const listLine = useEditorState({
+    editor,
+    selector: ({ editor: e }) =>
+      e && isInListItem(e.state)
+        ? { canUp: canMoveListItem(e.state, -1), canDown: canMoveListItem(e.state, 1) }
+        : null,
+    equalityFn: (a, b) => a?.canUp === b?.canUp && a?.canDown === b?.canDown,
+  })
+
   if (!editor) return null
+
+  const moveLine = (direction: MoveDirection) => {
+    const tr = moveListItem(editor.state, direction)
+    if (tr) editor.view.dispatch(tr)
+  }
 
   const closeLinkDialog = () => {
     setLinkDialog({ open: false, initialUrl: '', canRemove: false })
@@ -197,6 +213,16 @@ export function RichTextEditor({
         >
           <ListChecks className="h-3.5 w-3.5" />
         </ToolbarButton>
+        {listLine && (
+          <>
+            <ToolbarButton onClick={() => moveLine(-1)} disabled={!listLine.canUp} title="Move line up (Alt+Up)">
+              <ArrowUp className="h-3.5 w-3.5" />
+            </ToolbarButton>
+            <ToolbarButton onClick={() => moveLine(1)} disabled={!listLine.canDown} title="Move line down (Alt+Down)">
+              <ArrowDown className="h-3.5 w-3.5" />
+            </ToolbarButton>
+          </>
+        )}
         <span className="mx-0.5 h-4 w-px bg-[var(--border-color)]" />
         <ToolbarButton
           onClick={() => {
@@ -231,24 +257,29 @@ export function RichTextEditor({
 interface ToolbarButtonProps {
   onClick: () => void
   active?: boolean
+  disabled?: boolean
   title: string
   children: React.ReactNode
 }
 
-function ToolbarButton({ onClick, active, title, children }: ToolbarButtonProps) {
+function ToolbarButton({ onClick, active, disabled, title, children }: ToolbarButtonProps) {
   return (
     <button
       type="button"
+      disabled={disabled}
       onMouseDown={(e) => {
         e.preventDefault()
-        onClick()
+        if (!disabled) onClick()
       }}
       title={title}
+      aria-label={title}
       className={cn(
         'flex h-7 w-7 items-center justify-center rounded-control transition-colors',
-        active
-          ? 'bg-accent-blue/15 text-[var(--accent-blue)]'
-          : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]',
+        disabled
+          ? 'text-[var(--text-secondary)] opacity-40'
+          : active
+            ? 'bg-accent-blue/15 text-[var(--accent-blue)]'
+            : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]',
       )}
     >
       {children}

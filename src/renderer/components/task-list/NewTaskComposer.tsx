@@ -3,6 +3,7 @@ import {
   AlignLeft,
   Bell,
   CalendarDays,
+  FileText,
   Flag,
   FolderOpen,
   Loader2,
@@ -27,6 +28,8 @@ import { useTaskParser } from '@/hooks/use-task-parser'
 import { useLocationReminders } from '@/hooks/use-location-reminders'
 import { toast } from '@/stores/toast-store'
 import { DEFAULT_LOCATION_RADIUS } from '../../../shared/synced-prefs'
+import { relativeReminders, templateDueDate, templateDueOf, withSubtaskTitles, type ListedTemplate, type TaskTemplate } from '../../../shared/task-templates'
+import { useTaskTemplates } from '@/hooks/use-task-templates'
 import { useLabels } from '@/hooks/use-labels'
 import { useProjects } from '@/hooks/use-projects'
 import { useAppConfig } from '@/hooks/use-app-config'
@@ -47,8 +50,9 @@ import { PriorityPickerPopover, PRIORITY_OPTIONS } from './PriorityPickerPopover
 import { ProjectPickerPopover } from './ProjectPickerPopover'
 import { ReminderPickerPopover } from './ReminderPickerPopover'
 import { DraftLabelPickerPopover } from './DraftLabelPickerPopover'
+import { TemplatePickerPopover } from './TemplatePickerPopover'
 
-type OpenPicker = 'date' | 'reminder' | 'priority' | 'labels' | 'project' | null
+type OpenPicker = 'date' | 'reminder' | 'priority' | 'labels' | 'project' | 'template' | null
 
 interface DraftAttachment {
   id: string
@@ -73,6 +77,9 @@ export interface NewTaskComposerProps {
   onCancel: () => void
   onCreated?: (task: Task) => void
   onBlurOutside?: () => void
+  /** Edits this template instead of making a task (section 18.3): the title is taken as typed. */
+  template?: ListedTemplate
+  onSaveTemplate?: (edited: TaskTemplate) => void
   className?: string
 }
 
@@ -122,6 +129,8 @@ export function NewTaskComposer({
   onCancel,
   onCreated,
   onBlurOutside,
+  template,
+  onSaveTemplate,
   className,
 }: NewTaskComposerProps) {
   // "Call mom when I get home": a phrase that names a place saved on a phone sets the task's
@@ -138,25 +147,29 @@ export function NewTaskComposer({
   const createLabel = useCreateLabel({ silent: true })
   const uploadAttachment = useUploadAttachmentFromPaste({ silent: true })
   const updateTask = useUpdateTask({ silent: true })
-  const [description, setDescription] = useState('')
-  const [showNotes, setShowNotes] = useState(false)
+  const [description, setDescription] = useState(template?.notes ?? '')
+  const [showNotes, setShowNotes] = useState(!!template?.notes)
+  const templates = useTaskTemplates()
+  const templateButtonRef = useRef<HTMLButtonElement>(null)
+  const [subtaskTitles, setSubtaskTitles] = useState<string[]>(() => (template?.subtasks ?? []).map((subtask) => subtask.title))
+  const [newSubtask, setNewSubtask] = useState('')
   const [openPicker, setOpenPicker] = useState<OpenPicker>(null)
   const dateButtonRef = useRef<HTMLButtonElement>(null)
   const reminderButtonRef = useRef<HTMLButtonElement>(null)
   const priorityButtonRef = useRef<HTMLButtonElement>(null)
   const labelsButtonRef = useRef<HTMLButtonElement>(null)
   const projectButtonRef = useRef<HTMLButtonElement>(null)
-  const [explicitDueDate, setExplicitDueDate] = useState<string | null>(null)
-  const [dateTouched, setDateTouched] = useState(false)
+  const [explicitDueDate, setExplicitDueDate] = useState<string | null>(() => (template ? templateDueDate(template.due, toLocalDate(new Date())) ?? NULL_DATE : null))
+  const [dateTouched, setDateTouched] = useState(!!template)
   const [defaultDateDismissed, setDefaultDateDismissed] = useState(false)
-  const [priority, setPriority] = useState<number | null>(null)
-  const [repeatAfter, setRepeatAfter] = useState(0)
-  const [repeatMode, setRepeatMode] = useState(0)
-  const [recurrenceTouched, setRecurrenceTouched] = useState(false)
-  const [reminders, setReminders] = useState<TaskReminder[]>([])
-  const [selectedLabelIds, setSelectedLabelIds] = useState<number[]>([])
+  const [priority, setPriority] = useState<number | null>(template ? template.priority ?? 0 : null)
+  const [repeatAfter, setRepeatAfter] = useState(template?.repeat_after ?? 0)
+  const [repeatMode, setRepeatMode] = useState(template?.repeat_mode ?? 0)
+  const [recurrenceTouched, setRecurrenceTouched] = useState(!!template)
+  const [reminders, setReminders] = useState<TaskReminder[]>(() => (template?.reminders ?? []) as TaskReminder[])
+  const [selectedLabelIds, setSelectedLabelIds] = useState<number[]>(template?.labels ?? [])
   const [selectedProjectId, setSelectedProjectId] = useState(projectId)
-  const [projectTouched, setProjectTouched] = useState(false)
+  const [projectTouched, setProjectTouched] = useState(!!template)
   const [attachments, setAttachments] = useState<DraftAttachment[]>([])
   const attachmentsRef = useRef<DraftAttachment[]>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -167,7 +180,7 @@ export function NewTaskComposer({
   const projectItems = useMemo(() => (projects?.flat ?? []).map((project) => ({ id: project.id, title: project.title })), [projects])
   const labelItems = useMemo(() => labels.map((label) => ({ id: label.id, title: label.title })), [labels])
   // What the text says unless a control was used: the buttons, the chips and the save all read this.
-  const parsed = parser.parserConfig.enabled ? parser.parseResult : null
+  const parsed = parser.parserConfig.enabled && !template ? parser.parseResult : null
   const resolveWith = (read: ParseResult | null) => resolveComposerFields({
     parsed: read,
     dueTouched: dateTouched,
@@ -192,6 +205,11 @@ export function NewTaskComposer({
   useEffect(() => {
     if (!projectTouched) setSelectedProjectId(projectId)
   }, [projectId, projectTouched])
+  useEffect(() => {
+    if (template) parser.setInputValue(template.title)
+    // Filled once, when it opens.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   useEffect(() => { attachmentsRef.current = attachments }, [attachments])
   useEffect(() => () => {
     attachmentsRef.current.forEach((attachment) => {
@@ -344,6 +362,25 @@ export function NewTaskComposer({
       onCancel()
       return
     }
+    if (template) {
+      const due = templateDueOf(fields.dueDate, toLocalDate(new Date()))
+      const kept = due ? relativeReminders(reminders) : []
+      if (kept.length < reminders.length) toast.info('A template keeps only reminders that count from its due date.')
+      onSaveTemplate?.({
+        ...template,
+        title: rawTitle,
+        notes: description.trim(),
+        project_id: fields.projectId,
+        labels: selectedLabelIds,
+        priority: fields.priority,
+        due,
+        repeat_after: effectiveRepeatAfter,
+        repeat_mode: effectiveRepeatMode,
+        reminders: kept,
+        subtasks: withSubtaskTitles(template.subtasks ?? [], subtaskTitles),
+      })
+      return
+    }
     setSubmitting(true)
     setError(null)
     let createdTask: Task | null = null
@@ -442,6 +479,10 @@ export function NewTaskComposer({
   }
 
   const stagePendingImage = (image: PendingImage) => {
+    if (template) {
+      toast.info("A template can't hold images.")
+      return
+    }
     setAttachments((current) => [...current, {
       id: image.uuid,
       name: image.name,
@@ -476,7 +517,7 @@ export function NewTaskComposer({
     <div
       className={cn('border-b border-[var(--border-color)]', className)}
       onBlur={(event) => {
-        if (event.currentTarget.contains(event.relatedTarget as Node)) return
+        if (template || event.currentTarget.contains(event.relatedTarget as Node)) return
         void submit()
         onBlurOutside?.()
       }}
@@ -489,16 +530,16 @@ export function NewTaskComposer({
           onSubmit={() => { void submit() }}
           onCancel={() => { closeAndReset(); onCancel() }}
           onTab={() => setShowNotes(true)}
-          parseResult={parser.parseResult}
+          parseResult={template ? null : parser.parseResult}
           parserConfig={parser.parserConfig}
           onSuppressType={parser.suppressType}
           prefixes={parser.prefixes}
-          enabled={parser.enabled}
+          enabled={!template && parser.enabled}
           projects={projectItems}
           labels={labelItems}
           inputRef={inputRef}
           placeholder="New task"
-          showBangTodayHint={!parser.enabled && !!parser.parserConfig.bangToday}
+          showBangTodayHint={!template && !parser.enabled && !!parser.parserConfig.bangToday}
           className="min-w-0 flex-1"
           contextChips={contextChips}
           chips={chips}
@@ -508,7 +549,7 @@ export function NewTaskComposer({
         {parser.inputValue.trim() && !submitting && (
           <kbd aria-hidden className="mt-1 shrink-0 rounded-control border border-[var(--border-color)] px-1.5 py-0.5 font-sans text-caption text-[var(--text-secondary)]">Enter</kbd>
         )}
-        <button type="button" onClick={() => { void submit() }} disabled={submitting || !parser.inputValue.trim()} className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-control bg-accent-fill text-on-accent disabled:opacity-40" aria-label="Create task" title="Create task (Enter)">
+        <button type="button" onClick={() => { void submit() }} disabled={submitting || !parser.inputValue.trim()} className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-control bg-accent-fill text-on-accent disabled:opacity-40" aria-label={template ? 'Save template' : 'Create task'} title={template ? 'Save template (Enter)' : 'Create task (Enter)'}>
           {submitting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
         </button>
       </div>
@@ -533,6 +574,31 @@ export function NewTaskComposer({
               if (event.key === 'Escape') (inputRef as React.RefObject<HTMLInputElement> | undefined)?.current?.focus()
               if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') { event.preventDefault(); void submit() }
             }}
+          />
+        </div>
+      )}
+
+      {template && (
+        <div className="pb-2 pl-[46px] pr-4">
+          {subtaskTitles.map((title, index) => (
+            <div key={`${title}-${index}`} className="flex items-center gap-2 py-0.5 text-sm text-[var(--text-primary)]">
+              <span className="min-w-0 flex-1 truncate">{title}</span>
+              <button type="button" onClick={() => setSubtaskTitles((titles) => titles.filter((_, at) => at !== index))} aria-label={`Remove subtask ${title}`} className="rounded-control text-[var(--text-secondary)] hover:text-[var(--text-primary)]"><X className="h-3 w-3" /></button>
+            </div>
+          ))}
+          <input
+            value={newSubtask}
+            onChange={(event) => setNewSubtask(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key !== 'Enter') return
+              event.preventDefault()
+              const title = newSubtask.trim()
+              if (title) setSubtaskTitles((titles) => [...titles, title])
+              setNewSubtask('')
+            }}
+            placeholder="Add subtask"
+            aria-label="Add subtask"
+            className="w-full bg-transparent py-1 text-sm text-[var(--text-primary)] outline-none placeholder:text-[var(--text-secondary)]"
           />
         </div>
       )}
@@ -571,10 +637,30 @@ export function NewTaskComposer({
         <ActionButton active={showNotes || !!description} label="Notes" onClick={() => setShowNotes((value) => !value)}>
           <AlignLeft className="h-3.5 w-3.5" /> Notes
         </ActionButton>
-        <ActionButton active={attachments.length > 0} label="Attachments" onClick={() => fileInputRef.current?.click()}>
-          <Paperclip className="h-3.5 w-3.5" /> {attachments.length ? `${attachments.length} file${attachments.length === 1 ? '' : 's'}` : 'Attach'}
-        </ActionButton>
+        {!template && (
+          <ActionButton active={attachments.length > 0} label="Attachments" onClick={() => fileInputRef.current?.click()}>
+            <Paperclip className="h-3.5 w-3.5" /> {attachments.length ? `${attachments.length} file${attachments.length === 1 ? '' : 's'}` : 'Attach'}
+          </ActionButton>
+        )}
         <input ref={fileInputRef} type="file" multiple className="hidden" onChange={(event) => { void stageFiles(event.target.files) }} />
+        {!template && templates.length > 0 && (
+          <div className="relative">
+            <ActionButton buttonRef={templateButtonRef} popup="dialog" expanded={openPicker === 'template'} label="Template" onClick={() => setOpenPicker(openPicker === 'template' ? null : 'template')}>
+              <FileText className="h-3.5 w-3.5" /> Template
+            </ActionButton>
+            {openPicker === 'template' && (
+              <TemplatePickerPopover
+                anchorRef={templateButtonRef}
+                fallbackProjectId={fields.projectId}
+                onUsed={() => {
+                  setOpenPicker(null)
+                  if (!parser.inputValue.trim()) { closeAndReset(); onCancel() }
+                }}
+                onClose={() => setOpenPicker(null)}
+              />
+            )}
+          </div>
+        )}
       </div>
 
       {attachments.length > 0 && (
