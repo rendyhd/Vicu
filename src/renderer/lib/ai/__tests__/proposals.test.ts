@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { applyProposal, buildProposal, updateChanges, type ApplyDeps } from '../proposals'
+import { applyProposal, buildProposal, updateChanges, withEditedDue, type ApplyDeps } from '../proposals'
 import { readSaid } from '../said-parser'
 import { task, workspace } from './helpers'
 import { ToolError } from '../ask-tools'
@@ -109,5 +109,37 @@ describe('proposals', () => {
 
     const done = await applyProposal(await buildProposal('propose_complete_tasks', { task_ids: [1], done: true }, deps), applyDeps)
     expect(done.result).toEqual({ status: 'applied', applied: [1], skipped: [] })
+  })
+
+  it('writes the date chosen on the card and tells the model', async () => {
+    const calls: Array<Record<string, unknown>> = []
+    const applyDeps = {
+      updateTask: async (_task: unknown, changes: Record<string, unknown>) => { calls.push(changes) },
+    } as unknown as ApplyDeps
+    const built = await buildProposal('propose_update_tasks', { changes: [change(1, { when: { said: 'tomorrow', date: '2026-10-07', time: null, confidence: 'high' }, priority: 3 })] }, deps)
+    const edited = withEditedDue(built, 1, '2026-10-20T23:59:59')
+    const applied = await applyProposal(edited, applyDeps)
+    expect(calls[0].due_date).toBe(new Date(2026, 9, 20, 23, 59, 59).toISOString())
+    expect(applied.result.edited).toEqual([{ task_id: 1, due: '2026-10-20T23:59:59' }])
+  })
+
+  it('leaves edited out when no date was changed', async () => {
+    const applyDeps = { updateTask: async () => {} } as unknown as ApplyDeps
+    const built = await buildProposal('propose_update_tasks', { changes: [change(1, { priority: 3 })] }, deps)
+    expect(await applyProposal(built, applyDeps).then((a) => 'edited' in a.result)).toBe(false)
+  })
+
+  it('reports a removed date as null, and a date changed on a new task by its ref', async () => {
+    const applyDeps = {
+      updateTask: async () => {},
+      addDrafts: async () => ({ created: [tasks.get(1)!], tasks: [tasks.get(1)!] }),
+    } as unknown as ApplyDeps
+    const update = await buildProposal('propose_update_tasks', { changes: [change(1, { clear_due: true })] }, deps)
+    expect((await applyProposal(withEditedDue(update, 1, null), applyDeps)).result.edited).toEqual([{ task_id: 1, due: null }])
+
+    const create = await buildProposal('propose_create_tasks', { tasks: [{ ref: 't1', title: 'New', notes: '', when: null, project_id: 1, labels: [], priority: null, repeat: null, reminder: null, place: null, subtasks: [], unsure: [] }] }, deps)
+    expect(create.tool === 'propose_create_tasks' && create.drafts[0].ref).toBe('t1')
+    const applied = await applyProposal(withEditedDue(create, 't1', '2026-10-20T14:00:00'), applyDeps)
+    expect(applied.result.edited).toEqual([{ ref: 't1', due: '2026-10-20T14:00:00' }])
   })
 })

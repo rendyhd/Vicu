@@ -25,14 +25,16 @@ import {
 import { openMicHearing, openMicOwner, setOpenMicInterruptible, stopOpenMic, useOpenMicStore } from '@/lib/ai/open-mic'
 import { speakAnswer, stopSpeaking } from '@/lib/ai/speech-output'
 import { defaultProjectFor, listInfoOf, pathOf } from '@/lib/ai/workspace'
-import { proposalSize } from '@/lib/ai/proposals'
+import { proposalSize, withEditedDue } from '@/lib/ai/proposals'
 import { formatDateChip } from '@/lib/date-utils'
 import { isDateOnly, isNoDueDate, toLocalDate } from '@/lib/due-dates'
 import { startTalk, useAskStore, setAskDeps, type PendingProposal } from '@/stores/ask-store'
 import { useUIStore } from '@/stores/ui-store'
 import { useVoiceListStore } from '@/stores/voice-list-store'
 import { answerParts } from '../../../shared/ai/ask'
-import { instantOfLocal } from '../../../shared/ai/dictation'
+import { dueForApi, instantOfLocal, localDateTimeOf } from '../../../shared/ai/dictation'
+import { NULL_DATE } from '@/lib/constants'
+import { WhenPopover } from '@/components/task-list/WhenPopover'
 import type { ChatMessage } from '../../../shared/ai/types'
 import type { Task } from '@/lib/vikunja-types'
 
@@ -389,7 +391,8 @@ function ProposalCard({ card, which }: { card: PendingProposal; which: 'pending'
   // A skipped task by its title when a row of this conversation loaded it, else by its id.
   const skippedName = (id: number) => qc.getQueryData<Task>(['ai-task', id])?.title ?? `task ${id}`
   const nothingToApply = proposalSize(proposal) === 0
-  const dueText = (due: string | null | undefined) => (due ? formatDateChip(instantOfLocal(due), due.endsWith('T23:59:59'), new Date(), fmt) : 'no date')
+  const editCard = useAskStore((s) => s.editCard)
+  const editDue = (key: number | string, due: string | null) => editCard(which, withEditedDue(proposal, key, due))
 
   let title: string
   let rows: React.ReactNode
@@ -398,9 +401,10 @@ function ProposalCard({ card, which }: { card: PendingProposal; which: 'pending'
     rows = proposal.drafts.map((draft) => (
       <li key={draft.ref} className="space-y-0.5">
         <p className="text-task-title text-[var(--text-primary)]">{draft.title}</p>
-        <p className="text-caption text-[var(--text-secondary)]">
-          {[dueText(draft.due), pathOf(ws, draft.project_id), ...draft.labels.map((l) => `#${l.title}`), draft.subtasks.length ? `${draft.subtasks.length} steps` : ''].filter(Boolean).join(' · ')}
-        </p>
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-caption text-[var(--text-secondary)]">
+          <CardDueChip due={draft.due} guessed={draft.guessed.includes('when')} onChange={(due) => editDue(draft.ref, due)} />
+          <span>{[pathOf(ws, draft.project_id), ...draft.labels.map((l) => `#${l.title}`), draft.subtasks.length ? `${draft.subtasks.length} steps` : ''].filter(Boolean).join(' · ')}</span>
+        </div>
       </li>
     ))
   } else if (proposal.tool === 'propose_complete_tasks') {
@@ -413,7 +417,12 @@ function ProposalCard({ card, which }: { card: PendingProposal; which: 'pending'
         <p className="text-task-title text-[var(--text-primary)]">{item.task.title}</p>
         <ul className="text-caption text-[var(--text-secondary)]">
           {item.title !== undefined && <li>Title: {item.title}</li>}
-          {item.due !== undefined && <li className={cn(item.dueGuessed && 'underline decoration-dashed')}>Due: {dueText(item.due)}</li>}
+          {item.due !== undefined && (
+            <li className="flex items-center gap-1.5 py-0.5">
+              Due
+              <CardDueChip due={item.due} guessed={item.dueGuessed} onChange={(due) => editDue(item.task.id, due)} />
+            </li>
+          )}
           {item.projectId !== undefined && <li>Project: {pathOf(ws, item.projectId)}</li>}
           {item.priority !== undefined && <li>Priority: {PRIORITY_NAMES[item.priority] ?? item.priority}</li>}
           {item.labelsAdd.length > 0 && <li>Add labels: {item.labelsAdd.map((l) => l.title).join(', ')}</li>}
@@ -448,6 +457,39 @@ function ProposalCard({ card, which }: { card: PendingProposal; which: 'pending'
         )}
       </div>
     </section>
+  )
+}
+
+/** A date on a proposal card: opens the When panel, and the date chosen is the one applied (5.4). */
+function CardDueChip({ due, guessed, onChange }: { due: string | null; guessed: boolean; onChange: (due: string | null) => void }) {
+  const fmt = useDateFormat()
+  const anchor = useRef<HTMLButtonElement>(null)
+  const [open, setOpen] = useState(false)
+  const text = due ? formatDateChip(instantOfLocal(due), due.endsWith('T23:59:59'), new Date(), fmt) : 'No date'
+  return (
+    <>
+      <button
+        ref={anchor}
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-label={`Change the date, ${text}`}
+        className={cn(
+          'rounded-control border border-[var(--border-color)] px-1.5 py-0.5 text-caption text-[var(--text-primary)] transition-colors duration-fade-fast hover:bg-[var(--bg-hover)]',
+          guessed && 'border-dashed',
+        )}
+      >
+        {text}
+      </button>
+      {open && (
+        <WhenPopover
+          anchorRef={anchor}
+          currentDate={due ? dueForApi(due) : NULL_DATE}
+          allowClear
+          onDateChange={(iso) => onChange(isNoDueDate(iso) ? null : localDateTimeOf(new Date(iso)))}
+          onClose={() => setOpen(false)}
+        />
+      )}
+    </>
   )
 }
 

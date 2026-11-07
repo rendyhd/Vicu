@@ -204,6 +204,22 @@ describe('synced preferences', () => {
     await vi.waitFor(() => expect(documentOf(7).entries['location_reminder.42'].value).toBeNull())
   })
 
+  it('writes task templates and subtask orders (sections 18 and 19)', async () => {
+    writeConfig({ inbox_project_id: 0 })
+    const service = await loadService()
+
+    service.setSyncedPreferences({ 'template.abc': { title: 'Trip', from_the_future: 1 }, 'subtask_order.12': [3, 1, 2] })
+    expect(service.getSyncedPrefs().values['template.abc']).toEqual({ title: 'Trip', from_the_future: 1 })
+    expect(service.getSyncedPrefs().values['subtask_order.12']).toEqual([3, 1, 2])
+    service.setSyncedPreferences({ 'template.abc': null, 'subtask_order.12': null })
+    expect(service.getSyncedPrefs().values['template.abc']).toBeNull()
+
+    expect(() => service.setSyncedPreference('template.abc', { title: '  ' })).toThrow()
+    expect(() => service.setSyncedPreference('template.', { title: 'A' })).toThrow()
+    expect(() => service.setSyncedPreference('subtask_order.12', [1, 'a'])).toThrow()
+    expect(() => service.setSyncedPreference('subtask_order.x', [1])).toThrow()
+  })
+
   it('writes project categories, several keys in one change (section 13)', async () => {
     writeConfig({ inbox_project_id: 0 })
     putCarrier(7, { version: 1, entries: { 'category.work': entry({ name: 'Work', order: 65536, color: 'teal' }) } })

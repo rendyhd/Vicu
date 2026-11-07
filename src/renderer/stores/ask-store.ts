@@ -77,6 +77,8 @@ interface AskState {
    */
   interrupt: () => void
   decide: (apply: boolean, which?: 'pending' | 'lingering') => Promise<void>
+  /** The user changed a date on the card: Apply reads the card as it is now. */
+  editCard: (which: 'pending' | 'lingering', proposal: Proposal) => void
 }
 
 let turnCounter = 0
@@ -360,6 +362,11 @@ export const useAskStore = create<AskState>((set, get) => {
       const pending = get().pending
       if (pending) pending.resolve(DECLINED(pending.proposal))
       set({ pending: null, status: null, streaming: '' })
+    },
+
+    editCard: (which, proposal) => {
+      const card = get()[which]
+      if (card) set({ [which]: { ...card, proposal } } as Pick<AskState, 'pending'> | Pick<AskState, 'lingering'>)
     },
 
     decide: async (apply, which = 'pending') => {

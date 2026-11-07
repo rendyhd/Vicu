@@ -38,6 +38,8 @@ export interface UpdateItem {
   /** Local `YYYY-MM-DDTHH:mm:ss`, or null to clear. */
   due?: string | null
   dueGuessed: boolean
+  /** The user changed the date on the card (section 5.4). */
+  dueEdited?: boolean
   projectId?: number
   priority?: number
   appendNotes?: string
@@ -46,7 +48,7 @@ export interface UpdateItem {
 }
 
 export type Proposal =
-  | { tool: 'propose_create_tasks'; drafts: CheckedDraft[]; dropped: DroppedField[]; unclear: string[]; skipped: Skip[] }
+  | { tool: 'propose_create_tasks'; drafts: CheckedDraft[]; dropped: DroppedField[]; unclear: string[]; skipped: Skip[]; editedRefs?: string[] }
   | { tool: 'propose_update_tasks'; updates: UpdateItem[]; skipped: Skip[] }
   | { tool: 'propose_complete_tasks'; done: boolean; tasks: Task[]; skipped: Skip[] }
 
@@ -54,6 +56,34 @@ export interface ProposalResult {
   status: 'applied' | 'declined' | 'partly_applied' | 'failed'
   applied: number[]
   skipped: Skip[]
+  /** Left out when no date was changed on the card. */
+  edited?: EditedDue[]
+}
+
+/** A date the user changed on a card: `task_id` on an update, `ref` on a new task. */
+export type EditedDue = ({ task_id: number } | { ref: string }) & { due: string | null }
+
+/** The card with the date of one task changed by the user; null removes it. */
+export function withEditedDue(proposal: Proposal, key: number | string, due: string | null): Proposal {
+  if (proposal.tool === 'propose_update_tasks') {
+    return {
+      ...proposal,
+      updates: proposal.updates.map((item) => (item.task.id === key ? { ...item, due, dueGuessed: false, dueEdited: true } : item)),
+    }
+  }
+  if (proposal.tool === 'propose_create_tasks') {
+    return {
+      ...proposal,
+      drafts: proposal.drafts.map((draft) => {
+        if (draft.ref !== key) return draft
+        // A reminder counted from the date goes with the date.
+        const reminder = due === null && draft.reminder && 'before_due_minutes' in draft.reminder ? null : draft.reminder
+        return { ...draft, due, reminder, guessed: draft.guessed.filter((field) => field !== 'when') }
+      }),
+      editedRefs: [...new Set([...(proposal.editedRefs ?? []), String(key)])],
+    }
+  }
+  return proposal
 }
 
 export function proposalSize(proposal: Proposal): number {
@@ -257,7 +287,12 @@ export async function applyProposal(proposal: Proposal, deps: ApplyDeps): Promis
       for (const task of [...created].reverse()) await deps.deleteTask(task).catch(() => {})
     })
     return {
-      result: { status: statusOf(tasks.length, proposal.drafts.length, proposal.dropped.filter((d) => d.field === 'title' || d.field === 'task').length), applied: tasks.map((t) => t.id), skipped: [] },
+      result: {
+        status: statusOf(tasks.length, proposal.drafts.length, proposal.dropped.filter((d) => d.field === 'title' || d.field === 'task').length),
+        applied: tasks.map((t) => t.id),
+        skipped: [],
+        ...editedOf(tasks.length > 0 ? proposal.drafts.filter((d) => proposal.editedRefs?.includes(d.ref)).map((d) => ({ ref: d.ref, due: d.due })) : []),
+      },
       count: tasks.length,
       undo,
     }
@@ -310,7 +345,18 @@ export async function applyProposal(proposal: Proposal, deps: ApplyDeps): Promis
       // the app's error toast says why
     }
   }
-  return { result: { status: statusOf(applied.length, proposal.updates.length, proposal.skipped.length), applied, skipped: proposal.skipped }, count: applied.length, undo }
+  return {
+    result: {
+      status: statusOf(applied.length, proposal.updates.length, proposal.skipped.length),
+      applied,
+      skipped: proposal.skipped,
+      ...editedOf(proposal.updates.filter((item) => item.dueEdited && applied.includes(item.task.id)).map((item) => ({ task_id: item.task.id, due: item.due ?? null }))),
+    },
+    count: applied.length,
+    undo,
+  }
 }
+
+const editedOf = (edited: EditedDue[]) => (edited.length > 0 ? { edited } : {})
 
 export const DECLINED = (proposal: Proposal): ProposalResult => ({ status: 'declined', applied: [], skipped: proposal.skipped })

@@ -9,6 +9,7 @@ import {
   CheckCircle2,
   Copy,
   CopyPlus,
+  FileText,
   FlagOff,
   Folder,
   FolderInput,
@@ -26,6 +27,7 @@ import { normalizeHex, NULL_DATE } from '@/lib/constants'
 import { useAppConfig } from '@/hooks/use-app-config'
 import { useTaskActions } from '@/hooks/use-task-actions'
 import { useDuplicateTasks } from '@/hooks/use-duplicate-tasks'
+import { useTemplateActions } from '@/hooks/use-task-templates'
 import { canStepTask, useTaskStep } from '@/hooks/use-task-step'
 import { useProjects } from '@/hooks/use-projects'
 import { useLabels } from '@/hooks/use-labels'
@@ -86,6 +88,7 @@ export function TaskContextMenu({ fallbackTask, x, y, reorderable = false, onClo
   const [sub, setSub] = useState<SubMenu>(null)
   const stepTask = useTaskStep()
   const duplicate = useDuplicateTasks()
+  const templateActions = useTemplateActions()
   const clearSelection = useSelectionStore((s) => s.clearSelection)
 
   // A picker closes the menu too once something was chosen. When the browser dismissed the picker
@@ -320,6 +323,17 @@ export function TaskContextMenu({ fallbackTask, x, y, reorderable = false, onClo
 
       <MenuSeparator />
 
+      {!multi && (
+        <MenuItem
+          icon={<FileText />}
+          onSelect={() => {
+            void templateActions.saveFrom(tasks[0])
+            clearSelection()
+          }}
+        >
+          Save as template
+        </MenuItem>
+      )}
       <MenuItem icon={<Trash2 />} danger shortcut={hint('Delete')} onSelect={actions.deleteAll}>
         {multi ? 'Delete tasks' : 'Delete task'}
       </MenuItem>

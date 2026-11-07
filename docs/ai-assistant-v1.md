@@ -618,6 +618,12 @@ that project and `find_tasks` with its id.
   until the user applies or declines it; then the tool result goes back to the model:
   `{"status": "applied" | "declined" | "partly_applied" | "failed", "applied": [ids], "skipped":
   [{"task_id", "reason"}]}`.
+- A due date on a card, on an update that sets or clears one and on every new task, is a chip that
+  opens the app's When sheet or panel. Nothing else on a card can be changed. The date chosen is the
+  one applied, and the result then also holds `"edited": [{"task_id" | "ref", "due"}]` so the model
+  does not repeat the date it proposed: `task_id` for an update, `ref` for a new task, `due` local
+  (`YYYY-MM-DDTHH:mm:ss`, a date-only date at 23:59:59) or null when the date was removed. The key is
+  left out when no date was changed.
 - Tasks the user cannot change are listed on the card as skipped, never sent: `not_found`
   (unknown or hidden), `read_only` (permission 0 or an archived project, semantics 9.1), `invalid`
   (a change that both sets and clears the due date, or changes nothing).

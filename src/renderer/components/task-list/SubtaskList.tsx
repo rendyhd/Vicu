@@ -1,5 +1,12 @@
 import { useEffect, useState, useRef } from 'react'
-import { ArrowUpRight, Pencil, Trash2 } from 'lucide-react'
+import { ArrowDown, ArrowUp, ArrowUpRight, GripVertical, Pencil, Trash2 } from 'lucide-react'
+import { DndContext, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core'
+import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
+import { useQueryClient } from '@tanstack/react-query'
+import { useSyncedPrefs, writeSyncedPrefs } from '@/hooks/use-synced-prefs'
+import { isTempTaskId } from '@/lib/pending-cache'
+import { movedId, readSubtaskOrder, sortSubtasks, subtaskOrderKey } from '../../../shared/subtask-order'
 import { useSubtasks } from '@/hooks/use-subtasks'
 import { useCreateSubtask, useCompleteTask, useDeleteTask, useUpdateTask } from '@/hooks/use-task-mutations'
 import { api } from '@/lib/api'
@@ -23,7 +30,26 @@ const ACTION_BUTTON =
 export function SubtaskList({ parentTask, showInput = false }: SubtaskListProps) {
   const embeddedSubtasks = parentTask.related_tasks?.subtask ?? []
   const { data: fetchedSubtasks, isLoading } = useSubtasks(parentTask.id)
-  const subtasks = fetchedSubtasks ?? embeddedSubtasks
+  const { snapshot } = useSyncedPrefs()
+  const subtasks = sortSubtasks(fetchedSubtasks ?? embeddedSubtasks, readSubtaskOrder(snapshot.values[subtaskOrderKey(parentTask.id)]))
+  const queryClient = useQueryClient()
+  // Section 19: only ids the server has can be written, so a task made offline waits.
+  const canMove = subtasks.length > 1 && !isTempTaskId(parentTask.id) && !subtasks.some((st) => isTempTaskId(st.id))
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }))
+  const writeOrder = (ids: number[]) => {
+    void writeSyncedPrefs(queryClient, { [subtaskOrderKey(parentTask.id)]: ids })
+  }
+  const moveBy = (id: number, delta: number) => {
+    const ids = movedId(subtasks.map((st) => st.id), id, delta)
+    if (ids) writeOrder(ids)
+  }
+  const onDragEnd = ({ active, over }: DragEndEvent) => {
+    if (!over || active.id === over.id) return
+    const ids = subtasks.map((st) => st.id)
+    const to = ids.indexOf(over.id as number)
+    const moved = movedId(ids, active.id as number, to - ids.indexOf(active.id as number))
+    if (moved) writeOrder(moved)
+  }
   const createSubtask = useCreateSubtask()
   const completeTask = useCompleteTask()
   const updateTask = useUpdateTask()
@@ -36,6 +62,13 @@ export function SubtaskList({ parentTask, showInput = false }: SubtaskListProps)
   useEffect(() => {
     if (showInput) inputRef.current?.focus()
   }, [showInput, isLoading])
+
+  // Adding several in a row: each new row pushes the input down, so it follows.
+  useEffect(() => {
+    if (document.activeElement === inputRef.current) {
+      inputRef.current?.scrollIntoView({ block: 'nearest' })
+    }
+  }, [subtasks.length])
 
   const handleSubmit = () => {
     const trimmed = newTitle.trim()
@@ -91,10 +124,15 @@ export function SubtaskList({ parentTask, showInput = false }: SubtaskListProps)
     <div className="mt-2">
       {subtasks.length > 0 && (
         <div ref={listRef} className="mb-1 flex flex-col gap-0.5">
-          {subtasks.map((st) => (
+          <DndContext sensors={sensors} onDragEnd={onDragEnd}>
+          <SortableContext items={subtasks.map((st) => st.id)} strategy={verticalListSortingStrategy}>
+          {subtasks.map((st, index) => (
             <SubtaskRow
               key={st.id}
               subtask={st}
+              canMove={canMove}
+              onMoveUp={index > 0 ? () => moveBy(st.id, -1) : undefined}
+              onMoveDown={index < subtasks.length - 1 ? () => moveBy(st.id, 1) : undefined}
               onComplete={async () => {
                 if (!st.done && await confirmTaskCompletion(st)) {
                   completeTask.mutate({ task: st, suppressTopLevelUndo: true })
@@ -105,6 +143,8 @@ export function SubtaskList({ parentTask, showInput = false }: SubtaskListProps)
               onDelete={(returnFocusTo) => void remove(st, returnFocusTo)}
             />
           ))}
+          </SortableContext>
+          </DndContext>
         </div>
       )}
       {completeTask.isError && (
@@ -142,6 +182,9 @@ export function SubtaskList({ parentTask, showInput = false }: SubtaskListProps)
 
 interface SubtaskRowProps {
   subtask: Task
+  canMove: boolean
+  onMoveUp?: () => void
+  onMoveDown?: () => void
   onComplete: () => void
   onRename: (draft: string) => void
   onOpen: () => void
@@ -152,7 +195,8 @@ interface SubtaskRowProps {
  * One subtask in the open card: complete it, click the title to rename it in place, open it as its
  * own task, or delete it (the buttons at the end, or the right-click menu).
  */
-function SubtaskRow({ subtask: st, onComplete, onRename, onOpen, onDelete }: SubtaskRowProps) {
+function SubtaskRow({ subtask: st, canMove, onMoveUp, onMoveDown, onComplete, onRename, onOpen, onDelete }: SubtaskRowProps) {
+  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({ id: st.id, disabled: !canMove })
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(st.title)
   const [menuAt, setMenuAt] = useState<{ x: number; y: number } | null>(null)
@@ -185,7 +229,9 @@ function SubtaskRow({ subtask: st, onComplete, onRename, onOpen, onDelete }: Sub
 
   return (
     <div
-      className="group/subrow flex items-center gap-2"
+      ref={setNodeRef}
+      style={{ transform: CSS.Translate.toString(transform), transition }}
+      className={cn('group/subrow relative flex items-center gap-2', isDragging && 'z-10 rounded-control bg-[var(--bg-hover)]')}
       onContextMenu={(e) => {
         if (editing) return
         e.preventDefault()
@@ -193,6 +239,20 @@ function SubtaskRow({ subtask: st, onComplete, onRename, onOpen, onDelete }: Sub
         setMenuAt({ x: e.clientX, y: e.clientY })
       }}
     >
+      {canMove && (
+        <button
+          ref={setActivatorNodeRef}
+          type="button"
+          {...attributes}
+          {...listeners}
+          // The keyboard's way is Move up and Move down in the row's menu.
+          tabIndex={-1}
+          aria-hidden="true"
+          className="absolute -left-4 flex h-6 w-4 cursor-grab items-center justify-center text-[var(--text-secondary)] opacity-0 transition-opacity duration-fade-fast active:cursor-grabbing group-hover/subrow:opacity-100"
+        >
+          <GripVertical className="h-3.5 w-3.5" aria-hidden="true" />
+        </button>
+      )}
       <button
         type="button"
         role="checkbox"
@@ -280,6 +340,8 @@ function SubtaskRow({ subtask: st, onComplete, onRename, onOpen, onDelete }: Sub
         <Menu anchorPoint={menuAt} label="Subtask actions" onClose={() => setMenuAt(null)}>
           <MenuItem icon={<Pencil />} onSelect={startEditing}>Rename</MenuItem>
           <MenuItem icon={<ArrowUpRight />} onSelect={onOpen}>Open subtask</MenuItem>
+          {canMove && onMoveUp && <MenuItem icon={<ArrowUp />} onSelect={onMoveUp}>Move up</MenuItem>}
+          {canMove && onMoveDown && <MenuItem icon={<ArrowDown />} onSelect={onMoveDown}>Move down</MenuItem>}
           <MenuSeparator />
           <MenuItem icon={<Trash2 />} danger onSelect={() => onDelete(titleRef.current)}>Delete subtask</MenuItem>
         </Menu>
