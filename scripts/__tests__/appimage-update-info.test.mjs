@@ -2,7 +2,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { findElfSection, updateInformation, writeUpdateInformation } from '../appimage-update-info.mjs'
+import { findElfSection, isAppImageOf, updateInformation, writeUpdateInformation } from '../appimage-update-info.mjs'
 
 /** A minimal little-endian ELF64 file with a null section, `.upd_info` (`size` bytes) and `.shstrtab`. */
 function elfWithUpdInfo(size) {
@@ -40,9 +40,28 @@ describe('updateInformation', () => {
     )
   })
 
+  it('follows pre-releases too on the latest-all channel', () => {
+    expect(updateInformation('Vicu-2.7.0-beta.1-arm64.AppImage', '2.7.0-beta.1', 'latest-all')).toBe(
+      'gh-releases-zsync|rendyhd|Vicu|latest-all|Vicu-*-arm64.AppImage.zsync',
+    )
+    expect(() => updateInformation('Vicu-2.6.3-x86_64.AppImage', '2.6.3', 'beta')).toThrow(/unknown channel/)
+  })
+
   it('refuses a file that does not carry the version', () => {
     expect(() => updateInformation('Vicu-2.6.2-x86_64.AppImage', '2.6.3')).toThrow()
     expect(() => updateInformation('Vicu-2.6.3-x86_64.dmg', '2.6.3')).toThrow()
+    expect(() => updateInformation('Vicu-2.6.3-beta.1-x86_64.AppImage', '2.6.3')).toThrow()
+  })
+})
+
+describe('isAppImageOf', () => {
+  it('takes only the AppImages of exactly this version', () => {
+    expect(isAppImageOf('Vicu-2.6.3-x86_64.AppImage', '2.6.3')).toBe(true)
+    expect(isAppImageOf('Vicu-2.6.3-arm64.AppImage', '2.6.3')).toBe(true)
+    expect(isAppImageOf('Vicu-2.7.0-beta.1-arm64.AppImage', '2.7.0-beta.1')).toBe(true)
+    expect(isAppImageOf('Vicu-2.6.3-beta.1-x86_64.AppImage', '2.6.3')).toBe(false)
+    expect(isAppImageOf('Vicu-2.6.2-x86_64.AppImage', '2.6.3')).toBe(false)
+    expect(isAppImageOf('Vicu-2.6.3-x86_64.AppImage.zsync', '2.6.3')).toBe(false)
   })
 })
 
@@ -66,6 +85,15 @@ describe('writeUpdateInformation', () => {
     expect(section.toString('utf8').replace(/\0+$/, '')).toBe('gh-releases-zsync|a|b|latest|x.zsync')
     expect(after.subarray(0, updOffset)).toEqual(file.subarray(0, updOffset))
     expect(after.subarray(updOffset + 64)).toEqual(file.subarray(updOffset + 64))
+  })
+
+  it('refuses anything but a little-endian ELF64 file', () => {
+    const { file } = elfWithUpdInfo(64)
+    file[4] = 1 // 32-bit
+    dir = mkdtempSync(join(tmpdir(), 'vicu-appimage-'))
+    const path = join(dir, 'a.AppImage')
+    writeFileSync(path, file)
+    expect(() => writeUpdateInformation(path, 'x')).toThrow(/little-endian ELF64/)
   })
 
   it('fails when the information does not fit', () => {

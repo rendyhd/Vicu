@@ -2,18 +2,21 @@
 // Makes the Linux AppImages updateable (https://docs.appimage.org/packaging-guide/optional/updates.html).
 // electron-builder leaves the runtime's `.upd_info` ELF section empty and writes no .zsync file, so
 // AppImage managers (AppImageUpdate, Gear Lever, AppImageLauncher, AM ...) cannot tell where a newer
-// version lives. For every AppImage in dist/ this script:
+// version lives. For every AppImage of this version in dist/ this script:
 //
 //   1. writes the update information into `.upd_info`, pointing at the GitHub releases of this
 //      repository for the AppImage's own architecture, e.g.
 //      gh-releases-zsync|rendyhd|Vicu|latest|Vicu-*-x86_64.AppImage.zsync
+//      (`latest-all` instead of `latest` with --channel latest-all, for pre-releases: they then
+//      follow newer pre-releases and the next stable, instead of being offered the older stable)
 //   2. runs zsyncmake to write <AppImage>.zsync next to it (the file the update information names);
 //   3. with --upload <tag>, uploads both to that GitHub release with `gh release upload`.
 //
 // It has to run after electron-builder and before anything is uploaded (the .zsync describes the
-// final bytes), which is why CI and dist:linux:publish build with `--publish never` and upload here.
+// final bytes), which is why the release workflow builds with `--publish never` and uploads here.
 //
-//   node scripts/appimage-update-info.mjs [--dir dist] [--optional] [--upload <tag>]
+//   node scripts/appimage-update-info.mjs [--dir dist] [--channel latest|latest-all] [--optional]
+//                                         [--upload <tag>]
 //
 // --optional skips the .zsync with a warning when zsyncmake is missing (a local dist:linux still
 // gets the update information); without it a missing zsyncmake fails (Debian/Ubuntu: apt install
@@ -21,7 +24,7 @@
 
 import { execFileSync } from 'node:child_process'
 import { closeSync, existsSync, openSync, readdirSync, readFileSync, readSync, writeSync } from 'node:fs'
-import { basename, dirname, join } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 /** The GitHub repository the releases come from (https://github.com/rendyhd/Vicu/releases/). */
@@ -29,47 +32,57 @@ export const RELEASES_REPO = { owner: 'rendyhd', repo: 'Vicu' }
 
 const UPDATE_INFO_SECTION = '.upd_info'
 
+/** `latest`: the newest stable release. `latest-all`: the newest release, pre-releases included. */
+export const UPDATE_CHANNELS = ['latest', 'latest-all']
+
+/**
+ * True for `<name>-<version>-<arch>.AppImage`. The arch has no hyphen, so a pre-release of the same
+ * base version (`Vicu-2.6.3-beta.1-x86_64.AppImage` for 2.6.3) does not count.
+ */
+export function isAppImageOf(fileName, version) {
+  const marker = `-${version}-`
+  const at = fileName.indexOf(marker)
+  if (at <= 0 || !fileName.endsWith('.AppImage')) return false
+  return !fileName.slice(at + marker.length, -'.AppImage'.length).includes('-')
+}
+
 /**
  * The update information for one AppImage: the file name with its version replaced by `*`, so it
  * keeps matching the AppImage of the same architecture in later releases.
  * `Vicu-2.6.3-x86_64.AppImage` -> `gh-releases-zsync|rendyhd|Vicu|latest|Vicu-*-x86_64.AppImage.zsync`
  */
-export function updateInformation(fileName, version, repo = RELEASES_REPO) {
-  const marker = `-${version}-`
-  if (!fileName.endsWith('.AppImage') || !fileName.includes(marker)) {
+export function updateInformation(fileName, version, channel = 'latest') {
+  if (!isAppImageOf(fileName, version)) {
     throw new Error(`${fileName} is not named <name>-${version}-<arch>.AppImage`)
   }
-  const pattern = fileName.replace(marker, '-*-')
-  return `gh-releases-zsync|${repo.owner}|${repo.repo}|latest|${pattern}.zsync`
+  if (!UPDATE_CHANNELS.includes(channel)) {
+    throw new Error(`unknown channel ${channel} (${UPDATE_CHANNELS.join(' or ')})`)
+  }
+  const pattern = fileName.replace(`-${version}-`, '-*-')
+  return `gh-releases-zsync|${RELEASES_REPO.owner}|${RELEASES_REPO.repo}|${channel}|${pattern}.zsync`
 }
 
 /**
  * Where a section lives in an ELF file, from its section headers. `read(position, length)` returns
- * the bytes at that position, so the whole AppImage never has to be in memory.
+ * the bytes at that position, so the whole AppImage never has to be in memory. Only little-endian
+ * ELF64, the format of every AppImage Vicu ships (x86_64 and arm64).
  */
 export function findElfSection(read, name) {
   const ident = read(0, 64)
   if (ident.readUInt32BE(0) !== 0x7f454c46) throw new Error('not an ELF file')
-  const is64 = ident[4] === 2
-  const le = ident[5] === 1
-  const u16 = (b, o) => (le ? b.readUInt16LE(o) : b.readUInt16BE(o))
-  const u32 = (b, o) => (le ? b.readUInt32LE(o) : b.readUInt32BE(o))
-  const word = (b, o) => (is64 ? Number(le ? b.readBigUInt64LE(o) : b.readBigUInt64BE(o)) : u32(b, o))
+  if (ident[4] !== 2 || ident[5] !== 1) throw new Error('expected a little-endian ELF64 file')
+  const u64 = (b, o) => Number(b.readBigUInt64LE(o))
 
-  const shoff = word(ident, is64 ? 0x28 : 0x20)
-  const shentsize = u16(ident, is64 ? 0x3a : 0x2e)
-  const shnum = u16(ident, is64 ? 0x3c : 0x30)
-  const shstrndx = u16(ident, is64 ? 0x3e : 0x32)
+  const shoff = u64(ident, 0x28)
+  const shentsize = ident.readUInt16LE(0x3a)
+  const shnum = ident.readUInt16LE(0x3c)
+  const shstrndx = ident.readUInt16LE(0x3e)
   if (!shoff || !shnum) throw new Error('the ELF file has no section headers')
 
   const headers = read(shoff, shentsize * shnum)
   const section = (i) => {
     const o = i * shentsize
-    return {
-      nameOffset: u32(headers, o),
-      offset: word(headers, o + (is64 ? 0x18 : 0x10)),
-      size: word(headers, o + (is64 ? 0x20 : 0x14)),
-    }
+    return { nameOffset: headers.readUInt32LE(o), offset: u64(headers, o + 0x18), size: u64(headers, o + 0x20) }
   }
   const strings = section(shstrndx)
   const names = read(strings.offset, strings.size)
@@ -117,17 +130,21 @@ function hasCommand(command) {
 function main(argv) {
   const arg = (flag) => {
     const i = argv.indexOf(flag)
-    return i === -1 ? undefined : argv[i + 1]
+    if (i === -1) return undefined
+    const value = argv[i + 1]
+    if (!value || value.startsWith('--')) throw new Error(`${flag} needs a value`)
+    return value
   }
   const root = join(dirname(fileURLToPath(import.meta.url)), '..')
-  const dir = arg('--dir') ?? join(root, 'dist')
+  const dir = resolve(arg('--dir') ?? join(root, 'dist'))
   const optional = argv.includes('--optional')
+  const channel = arg('--channel') ?? 'latest'
   const tag = arg('--upload')
   const { version } = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'))
 
   // Only this version's AppImages: dist/ can still hold older builds.
   const appImages = existsSync(dir)
-    ? readdirSync(dir).filter((f) => f.endsWith('.AppImage') && f.includes(`-${version}-`))
+    ? readdirSync(dir).filter((f) => isAppImageOf(f, version))
     : []
   if (appImages.length === 0) throw new Error(`no AppImage of version ${version} in ${dir}`)
 
@@ -140,13 +157,13 @@ function main(argv) {
   const uploads = []
   for (const name of appImages) {
     const file = join(dir, name)
-    const info = updateInformation(name, version)
+    const info = updateInformation(name, version, channel)
     writeUpdateInformation(file, info)
     console.log(`${name}: ${info}`)
     uploads.push(file)
     if (zsync) {
       // -u is relative, so the .zsync resolves the AppImage next to itself on the release.
-      execFileSync('zsyncmake', ['-u', basename(file), '-o', `${file}.zsync`, file], { cwd: dir, stdio: 'inherit' })
+      execFileSync('zsyncmake', ['-u', name, '-o', `${name}.zsync`, name], { cwd: dir, stdio: 'inherit' })
       uploads.push(`${file}.zsync`)
     }
   }
