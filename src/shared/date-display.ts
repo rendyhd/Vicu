@@ -209,9 +209,44 @@ export function resolveHour12(locale: string, clock: ClockFormat): boolean {
   return localeUsesHour12(locale)
 }
 
+function isValidTag(tag: string): boolean {
+  try {
+    return Intl.getCanonicalLocales(tag).length === 1
+  } catch {
+    return false
+  }
+}
+
+/**
+ * A BCP 47 tag every Intl API accepts, from a system locale that may be in ICU form. macOS reports
+ * a region chosen apart from the language as `en-US@rg=nlzzzz` (English, region Netherlands), which
+ * Intl rejects with "Invalid language tag". The `rg` region replaces the tag's region, because dates
+ * follow the region locale (contract section 8): `en-NL`. Other keywords are dropped. Anything still
+ * invalid falls back to its language and region, then to `en-US`.
+ */
+export function normalizeLocaleTag(locale: string | null | undefined): string {
+  const raw = (locale ?? '').trim()
+  if (!raw) return 'en-US'
+  if (!/[@_]/.test(raw) && isValidTag(raw)) return raw
+  const [base, keywords = ''] = raw.split('@', 2)
+  const parts = base.split(/[-_]/).filter(Boolean)
+  const rg = /(?:^|;)rg=([a-z]{2})[a-z0-9]*/i.exec(keywords)?.[1]
+  if (rg) {
+    const regionAt = parts.findIndex((part, i) => i > 0 && /^([A-Za-z]{2}|\d{3})$/.test(part))
+    if (regionAt > 0) parts[regionAt] = rg.toUpperCase()
+    else parts.push(rg.toUpperCase())
+  }
+  const candidates = [parts.join('-'), parts.slice(0, 2).join('-'), parts[0] ?? '']
+  for (const candidate of candidates) {
+    if (candidate && isValidTag(candidate)) return Intl.getCanonicalLocales(candidate)[0]
+  }
+  return 'en-US'
+}
+
 /** The locale and clock the UI phrases dates with, from the system locale and the Settings choice. */
 export function dateFormatFor(locale: string, clock: ClockFormat): DateFormat {
-  return { locale, hour12: resolveHour12(locale, clock) }
+  const tag = normalizeLocaleTag(locale)
+  return { locale: tag, hour12: resolveHour12(tag, clock) }
 }
 
 function calendarDiff(now: Date, value: Date): number {

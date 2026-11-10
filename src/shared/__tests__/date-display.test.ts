@@ -1,5 +1,33 @@
 import { describe, expect, it } from 'vitest'
-import { formatDateDisplay, isClockFormat, localeUsesHour12, resolveHour12 } from '../date-display'
+import { dateFormatFor, formatDateDisplay, isClockFormat, localeUsesHour12, normalizeLocaleTag, resolveHour12 } from '../date-display'
+
+describe('normalizeLocaleTag', () => {
+  it('keeps a valid BCP 47 tag', () => {
+    expect(normalizeLocaleTag('en-US')).toBe('en-US')
+    expect(normalizeLocaleTag('de-DE')).toBe('de-DE')
+    expect(normalizeLocaleTag('zh-Hant-TW')).toBe('zh-Hant-TW')
+  })
+
+  it('turns the macOS region override into the region (en-US@rg=nlzzzz)', () => {
+    expect(normalizeLocaleTag('en-US@rg=nlzzzz')).toBe('en-NL')
+    expect(normalizeLocaleTag('en_US@rg=gbzzzz;calendar=gregorian')).toBe('en-GB')
+    expect(normalizeLocaleTag('en@rg=nlzzzz')).toBe('en-NL')
+    expect(normalizeLocaleTag('nl_NL')).toBe('nl-NL')
+  })
+
+  it('falls back instead of throwing', () => {
+    expect(normalizeLocaleTag('')).toBe('en-US')
+    expect(normalizeLocaleTag(undefined)).toBe('en-US')
+    expect(normalizeLocaleTag('not a locale!')).toBe('en-US')
+  })
+
+  it('gives dateFormatFor a tag the Intl APIs accept', () => {
+    const fmt = dateFormatFor('en-US@rg=nlzzzz', 'system')
+    expect(fmt).toEqual({ locale: 'en-NL', hour12: false })
+    expect(() => new Date(2026, 10, 10).toLocaleDateString(fmt.locale, { weekday: 'short', day: 'numeric' })).not.toThrow()
+    expect(formatDateDisplay('row', evening, now, false, fmt)).toBe('Sat, 15:00')
+  })
+})
 
 const now = new Date(2026, 9, 7, 9, 30)
 const evening = new Date(2026, 9, 10, 15, 0)
