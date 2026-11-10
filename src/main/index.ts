@@ -23,6 +23,7 @@ import { replayPendingActions } from './sync'
 import { flushOfflineQueue } from './offline/service'
 import { flushTaskCache } from './cache'
 import { syncCustomLists } from './custom-list-service'
+import { startSavedFilterImport } from './saved-filter-service'
 import { syncSyncedPrefs } from './synced-preferences'
 import { parseHiddenArg, shouldStartHidden } from './login-item-settings'
 import { applyLaunchOnStartup } from './launch-on-startup'
@@ -767,6 +768,8 @@ if (!gotLock) {
     // every 5 minutes as a safety net while the app runs.
     setTimeout(() => { void replayPendingActions() }, 10_000)
     setInterval(() => { void replayPendingActions() }, 5 * 60_000)
+    // Vikunja saved filters are imported after the first custom-list sync (section 3.7).
+    startSavedFilterImport()
     setTimeout(() => { void syncCustomLists() }, 12_000)
     setInterval(() => { void syncCustomLists() }, 5 * 60_000)
     // The synced preferences (the Inbox, the task order) sync whenever custom lists do.

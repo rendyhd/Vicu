@@ -235,6 +235,119 @@
       { "name": "assigned to me due today", "today": "2026-10-06", "filter": { "due_date_filter": "today", "assigned": "me" }, "expect": [1] }
     ]
   },
+  "customListRule": {
+    "about": "Section 3.5. Times are local wall-clock times; now is the vector's now in the zone under test. expect lists ids in task order.",
+    "tasks": [
+      {"id": 1, "title": "Call the plumber", "description": "Ask about the kitchen tap", "done": false, "doneAt": null, "priority": 3, "percentDone": 0, "projectId": 10, "index": 1, "hexColor": "", "repeatAfter": 0, "due": "2026-10-06T23:59:59", "start": null, "end": null, "created": "2026-09-01T09:00:00", "updated": "2026-10-05T10:00:00", "labels": [1], "assignees": ["maya"], "createdBy": "rendy", "reminders": ["2026-10-06T09:00:00"]},
+      {"id": 2, "title": "Renew passport", "description": "", "done": false, "doneAt": null, "priority": 5, "percentDone": 0.5, "projectId": 10, "index": 2, "hexColor": "e8b400", "repeatAfter": 0, "due": "2026-10-09T23:59:59", "start": "2026-10-07T09:00:00", "end": "2026-10-07T10:30:00", "created": "2026-08-15T12:00:00", "updated": "2026-10-06T08:00:00", "labels": [1, 2], "assignees": [], "createdBy": "rendy", "reminders": []},
+      {"id": 3, "title": "Water the plants", "description": "", "done": false, "doneAt": null, "priority": 0, "percentDone": 0, "projectId": 11, "index": 1, "hexColor": "", "repeatAfter": 604800, "due": null, "start": null, "end": null, "created": "2026-10-01T18:00:00", "updated": "2026-10-01T18:00:00", "labels": [], "assignees": [], "createdBy": "maya", "reminders": []},
+      {"id": 4, "title": "File the tax return", "description": "", "done": true, "doneAt": "2026-10-04T16:00:00", "priority": 4, "percentDone": 1, "projectId": 11, "index": 2, "hexColor": "", "repeatAfter": 0, "due": "2026-10-03T23:59:59", "start": null, "end": null, "created": "2026-07-01T10:00:00", "updated": "2026-10-04T16:00:00", "labels": [2], "assignees": ["rendy", "maya"], "createdBy": "rendy", "reminders": ["2026-10-02T09:00:00", "2026-10-03T09:00:00"]},
+      {"id": 5, "title": "Plan the team offsite", "description": "Venue, dates and an R&D agenda", "done": false, "doneAt": null, "priority": 2, "percentDone": 0.25, "projectId": 12, "index": 1, "hexColor": "", "repeatAfter": 0, "due": "2026-10-20T23:59:59", "start": null, "end": null, "created": "2026-09-20T09:00:00", "updated": "2026-09-28T09:00:00", "labels": [3], "assignees": ["tom"], "createdBy": "tom", "reminders": ["2026-10-13T09:00:00"]},
+      {"id": 6, "title": "Buy milk", "description": "", "done": false, "doneAt": null, "priority": 1, "percentDone": 0, "projectId": 10, "index": 3, "hexColor": "", "repeatAfter": 0, "due": "2026-10-05T23:59:59", "start": null, "end": null, "created": "2026-10-05T07:00:00", "updated": "2026-10-05T07:00:00", "labels": [], "assignees": [], "createdBy": "rendy", "reminders": []},
+      {"id": 7, "title": "Clean the garage", "description": "", "done": false, "doneAt": null, "priority": 0, "percentDone": 0, "projectId": 12, "index": 2, "hexColor": "", "repeatAfter": 0, "due": "2026-10-11T23:59:59", "start": null, "end": null, "created": "2026-10-02T10:00:00", "updated": "2026-10-02T10:00:00", "labels": [], "assignees": [], "createdBy": "maya", "reminders": []}
+    ],
+    "vectors": [
+      {"name": "and", "now": "2026-10-06T10:00:00", "rule": "done = false && priority > 2", "includeNulls": false, "expect": [1, 2]},
+      {"name": "or", "now": "2026-10-06T10:00:00", "rule": "priority >= 3 || done = true", "includeNulls": false, "expect": [1, 2, 4]},
+      {"name": "left to right, no precedence", "now": "2026-10-06T10:00:00", "rule": "done = true || priority = 3 && project = 10", "includeNulls": false, "expect": [1]},
+      {"name": "a group", "now": "2026-10-06T10:00:00", "rule": "done = true || (priority = 3 && project = 10)", "includeNulls": false, "expect": [1, 4]},
+      {"name": "left to right inside a group", "now": "2026-10-06T10:00:00", "rule": "(priority = 0 || priority = 1 && project = 10)", "includeNulls": false, "expect": [6]},
+      {"name": "labels in", "now": "2026-10-06T10:00:00", "rule": "labels in 1, 3", "includeNulls": false, "expect": [1, 2, 5]},
+      {"name": "both labels", "now": "2026-10-06T10:00:00", "rule": "labels = 1 && labels = 2", "includeNulls": false, "expect": [2]},
+      {"name": "labels !=", "now": "2026-10-06T10:00:00", "rule": "labels != 1", "includeNulls": false, "expect": [3, 4, 5, 6, 7]},
+      {"name": "labels not in", "now": "2026-10-06T10:00:00", "rule": "labels not in 1, 2", "includeNulls": false, "expect": [3, 5, 6, 7]},
+      {"name": "before tomorrow", "now": "2026-10-06T10:00:00", "rule": "due_date < now/d+1d && done = false", "includeNulls": false, "expect": [1, 6]},
+      {"name": "this week", "now": "2026-10-06T10:00:00", "rule": "due_date >= now/w && due_date < now/w+1w", "includeNulls": false, "expect": [1, 2, 6, 7]},
+      {"name": "before now", "now": "2026-10-06T10:00:00", "rule": "due_date < now", "includeNulls": false, "expect": [4, 6]},
+      {"name": "later, without a value", "now": "2026-10-06T10:00:00", "rule": "due_date > now+5d", "includeNulls": true, "expect": [3, 5, 7]},
+      {"name": "later", "now": "2026-10-06T10:00:00", "rule": "due_date > now+5d", "includeNulls": false, "expect": [5, 7]},
+      {"name": "priority 0 counts as without a value", "now": "2026-10-06T10:00:00", "rule": "priority > 3", "includeNulls": true, "expect": [2, 3, 4, 7]},
+      {"name": "no labels counts as without a value", "now": "2026-10-06T10:00:00", "rule": "labels = 3", "includeNulls": true, "expect": [3, 5, 6, 7]},
+      {"name": "assignees in", "now": "2026-10-06T10:00:00", "rule": "assignees in maya", "includeNulls": false, "expect": [1, 4]},
+      {"name": "assignees !=", "now": "2026-10-06T10:00:00", "rule": "assignees != maya", "includeNulls": false, "expect": [2, 3, 5, 6, 7]},
+      {"name": "created_by", "now": "2026-10-06T10:00:00", "rule": "created_by = maya", "includeNulls": false, "expect": [3, 7]},
+      {"name": "like ignores case", "now": "2026-10-06T10:00:00", "rule": "title like PLUMB", "includeNulls": false, "expect": [1]},
+      {"name": "a quoted value", "now": "2026-10-06T10:00:00", "rule": "description like 'R&D'", "includeNulls": false, "expect": [5]},
+      {"name": "assignees like is skipped", "now": "2026-10-06T10:00:00", "rule": "assignees like may && priority = 5", "includeNulls": false, "expect": [2]},
+      {"name": "percent_done", "now": "2026-10-06T10:00:00", "rule": "percent_done >= 0.5", "includeNulls": false, "expect": [2, 4]},
+      {"name": "start and end", "now": "2026-10-06T10:00:00", "rule": "start_date >= 2026-10-07 && end_date <= '2026-10-07 12:00'", "includeNulls": false, "expect": [2]},
+      {"name": "done_at", "now": "2026-10-06T10:00:00", "rule": "done_at > now-7d", "includeNulls": false, "expect": [4]},
+      {"name": "one reminder in the range", "now": "2026-10-06T10:00:00", "rule": "reminders > '2026-10-02 12:00' && reminders < '2026-10-02 18:00'", "includeNulls": false, "expect": []},
+      {"name": "a reminder in the range", "now": "2026-10-06T10:00:00", "rule": "reminders > '2026-10-02 12:00' && reminders < '2026-10-03 12:00'", "includeNulls": false, "expect": [4]},
+      {"name": "repeat_after", "now": "2026-10-06T10:00:00", "rule": "project = 11 && repeat_after > 0", "includeNulls": false, "expect": [3]},
+      {"name": "project in", "now": "2026-10-06T10:00:00", "rule": "project in 10, 12 && done = false && priority >= 2", "includeNulls": false, "expect": [1, 2, 5]},
+      {"name": "hex_color", "now": "2026-10-06T10:00:00", "rule": "hex_color = e8b400", "includeNulls": false, "expect": [2]},
+      {"name": "created and creator", "now": "2026-10-06T10:00:00", "rule": "created > 2026-09-15 && created_by != rendy", "includeNulls": false, "expect": [3, 5, 7]},
+      {"name": "this month", "now": "2026-10-06T10:00:00", "rule": "due_date > now/M && due_date < now/M+1M", "includeNulls": false, "expect": [1, 2, 4, 5, 6, 7]},
+      {"name": "business days", "now": "2026-10-06T10:00:00", "rule": "due_date <= now/d+3b", "includeNulls": false, "expect": [1, 4, 6]},
+      {"name": "business days skip the weekend", "now": "2026-10-09T10:00:00", "rule": "due_date < now/d+1b", "includeNulls": false, "expect": [1, 2, 4, 6, 7]},
+      {"name": "a day is a day", "now": "2026-10-09T10:00:00", "rule": "due_date < now/d+1d", "includeNulls": false, "expect": [1, 2, 4, 6]},
+      {"name": "group with or", "now": "2026-10-06T10:00:00", "rule": "done = false && (labels in 2 || assignees in tom)", "includeNulls": false, "expect": [2, 5]},
+      {"name": "index", "now": "2026-10-06T10:00:00", "rule": "index = 1", "includeNulls": false, "expect": [1, 3, 5]},
+      {"name": "id", "now": "2026-10-06T10:00:00", "rule": "id > 4", "includeNulls": false, "expect": [5, 6, 7]},
+      {"name": "a fixed anchor", "now": "2026-10-06T10:00:00", "rule": "done = false && due_date < '2026-10-06||+1d'", "includeNulls": false, "expect": [1, 6]},
+      {"name": "done as a number", "now": "2026-10-06T10:00:00", "rule": "done = 0", "includeNulls": false, "expect": [1, 2, 3, 5, 6, 7]},
+      {"name": "text in a quoted list", "now": "2026-10-06T10:00:00", "rule": "title in 'Buy milk, Water the plants'", "includeNulls": false, "expect": [3, 6]},
+      {"name": "an empty rule", "now": "2026-10-06T10:00:00", "rule": "", "includeNulls": false, "expect": [1, 2, 3, 4, 5, 6, 7]}
+    ],
+    "invalid": [
+      "lables = 1",
+      "Priority = 1",
+      "priority > ",
+      "(done = false",
+      "done = false)",
+      "priority = high",
+      "title like",
+      "labels like 3",
+      "due_date > tomorrow",
+      "bucket_id = 3",
+      "done = false &&",
+      "priority ~ 2",
+      "created_by > maya",
+      "percent_done = half",
+      "due_date > now+3x",
+      "due_date > 'now/b'",
+      "&& done = true"
+    ]
+  },
+  "customListSort": {
+    "about": "Section 3.6. Times are local wall-clock times. expect is the order of ids.",
+    "tasks": [
+      {"id": 1, "title": "beta", "done": false, "priority": 2, "due": "2026-10-08T23:59:59", "position": 3},
+      {"id": 2, "title": "Alpha", "done": false, "priority": 2, "due": null, "position": 1},
+      {"id": 3, "title": "gamma", "done": true, "priority": 5, "due": "2026-10-07T23:59:59", "position": 2},
+      {"id": 4, "title": "delta", "done": false, "priority": 0, "due": "2026-10-07T23:59:59", "position": 5},
+      {"id": 5, "title": "Epsilon", "done": false, "priority": 5, "due": null, "position": 4}
+    ],
+    "vectors": [
+      {"name": "priority, then due date", "filter": {"sort_by": "priority", "order_by": "desc", "then_by": [{"sort_by": "due_date", "order_by": "asc"}]}, "expect": [3, 5, 1, 2, 4]},
+      {"name": "open first, then title", "filter": {"sort_by": "done", "order_by": "asc", "then_by": [{"sort_by": "title", "order_by": "asc"}]}, "expect": [2, 1, 4, 5, 3]},
+      {"name": "latest due first, then priority", "filter": {"sort_by": "due_date", "order_by": "desc", "then_by": [{"sort_by": "priority", "order_by": "desc"}]}, "expect": [1, 3, 4, 5, 2]},
+      {"name": "an unknown then_by key is skipped", "filter": {"sort_by": "priority", "order_by": "asc", "then_by": [{"sort_by": "hex_color", "order_by": "asc"}, {"sort_by": "title", "order_by": "desc"}]}, "expect": [4, 1, 2, 3, 5]},
+      {"name": "title only", "filter": {"sort_by": "title", "order_by": "asc"}, "expect": [2, 1, 4, 5, 3]},
+      {"name": "an unknown order is ascending, ties keep their order", "filter": {"sort_by": "priority", "order_by": "sideways"}, "expect": [4, 1, 2, 3, 5]},
+      {"name": "position", "filter": {"sort_by": "position", "order_by": "asc"}, "expect": [2, 3, 1, 5, 4]}
+    ]
+  },
+  "savedFilterImport": {
+    "about": "Section 3.7. list.filter lists only the fields that differ from a new list's defaults; list is null when nothing is imported.",
+    "filters": [
+      {"name": "exact, two sort keys", "savedFilter": {"id": 1, "title": "High Priority", "filters": {"filter": "done = false && priority > 2", "filter_include_nulls": false, "sort_by": ["done", "id"], "order_by": ["asc", "desc"]}}, "list": {"name": "High Priority", "icon": "filter_list", "savedFilterId": 1, "filter": {"include_done": true, "rule": "done = false && priority > 2", "sort_by": "done", "order_by": "asc", "then_by": [{"sort_by": "id", "order_by": "desc"}]}}, "status": "exact", "reasons": []},
+      {"name": "a kanban column and manual order", "savedFilter": {"id": 2, "title": "Sprint board", "filters": {"filter": "project in 4, 7 && bucket_id = 12", "sort_by": ["position"], "order_by": ["asc"]}}, "list": {"name": "Sprint board", "icon": "filter_list", "savedFilterId": 2, "filter": {"include_done": true, "rule": "project in 4, 7"}}, "status": "changed", "reasons": ["kanban_column", "manual_order"]},
+      {"name": "unreadable", "savedFilter": {"id": 3, "title": "Broken", "filters": {"filter": "priority >> 2"}}, "list": null, "status": "unreadable", "reasons": []},
+      {"name": "search text only", "savedFilter": {"id": 4, "title": "Plumber", "filters": {"filter": "", "s": "plumb"}}, "list": {"name": "Plumber", "icon": "filter_list", "savedFilterId": 4, "filter": {"include_done": true, "rule": "title like plumb || description like plumb"}}, "status": "exact", "reasons": []},
+      {"name": "an emptied group and a sort key left out", "savedFilter": {"id": 5, "title": "Waiting", "filters": {"filter": "done = false && (bucket_id = 1 || bucket_id = 2) || priority = 5", "filter_include_nulls": true, "sort_by": ["due_date", "hex_color", "priority"], "order_by": ["desc", "asc", "desc"]}}, "list": {"name": "Waiting", "icon": "filter_list", "savedFilterId": 5, "filter": {"include_done": true, "rule": "done = false || priority = 5", "rule_include_nulls": true, "sort_by": "due_date", "order_by": "desc", "then_by": [{"sort_by": "priority", "order_by": "desc"}]}}, "status": "changed", "reasons": ["kanban_column", "sort_key"]},
+      {"name": "the first term removed, order_by missing", "savedFilter": {"id": 6, "title": "Column", "filters": {"filter": "bucket_id = 3 && labels in 2", "sort_by": ["priority"], "order_by": []}}, "list": {"name": "Column", "icon": "filter_list", "savedFilterId": 6, "filter": {"include_done": true, "rule": "labels in 2", "sort_by": "priority", "order_by": "asc"}}, "status": "changed", "reasons": ["kanban_column"]},
+      {"name": "values quoted when written out", "savedFilter": {"id": 7, "title": "R&D", "filters": {"filter": "uid = abc || description like 'R&D' && title != \"it's\""}}, "list": {"name": "R&D", "icon": "filter_list", "savedFilterId": 7, "filter": {"include_done": true, "rule": "description like 'R&D' && title != 'it\\'s'"}}, "status": "changed", "reasons": ["other_field"]}
+    ],
+    "duplicates": [
+      {"name": "the first id wins", "lists": [{"id": "b-list", "savedFilterId": 1}, {"id": "a-list", "savedFilterId": 1}, {"id": "c-list", "savedFilterId": 2}, {"id": "d-list"}], "kept": ["a-list", "c-list", "d-list"]}
+    ],
+    "union": [
+      {"left": [1, 3], "right": [3, 2], "merged": [1, 2, 3]},
+      {"left": [], "right": [5], "merged": [5]}
+    ]
+  },
   "review": [
     { "name": "never reviewed", "today": "2026-10-06", "defaultCadence": 14, "meta": { "state": "never" }, "expect": { "isOverdue": true, "daysSince": null, "daysUntil": null, "next": null } },
     { "name": "excluded", "today": "2026-10-06", "defaultCadence": 14, "meta": { "state": "excluded", "lastReviewedAt": "2026-01-01" }, "expect": { "isOverdue": false, "daysSince": null, "daysUntil": null, "next": null } },

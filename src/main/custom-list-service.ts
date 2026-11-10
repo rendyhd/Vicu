@@ -8,6 +8,8 @@ import {
   activeLists,
   appListToWire,
   documentFromLists,
+  dropDuplicateImports,
+  duplicateImports,
   emptyCustomListDocument,
   encodeCustomListEnvelope,
   hasCustomListMarker,
@@ -17,6 +19,7 @@ import {
   normalizeWireList,
   parseCustomListEnvelope,
   pruneTombstones,
+  unionImported,
   validateCustomListDocument,
   wireToAppList,
   type CustomList,
@@ -181,8 +184,60 @@ export function reorderCustomLists(ids: string[]): CustomList[] {
   return config.custom_lists ?? []
 }
 
-export function syncCustomLists(): Promise<CustomListSyncStatus> {
-  return service.sync()
+/** Runs after every custom-list sync with its result (the saved-filter step, section 3.7). */
+let afterSync: ((status: CustomListSyncStatus) => Promise<void>) | null = null
+
+export function setAfterCustomListSync(step: (status: CustomListSyncStatus) => Promise<void>): void {
+  afterSync = step
+}
+
+export async function syncCustomLists(): Promise<CustomListSyncStatus> {
+  const status = await service.sync()
+  if (afterSync) {
+    try {
+      await afterSync(status)
+    } catch (error) {
+      console.warn('[CustomLists] After-sync step failed:', error instanceof Error ? error.message : error)
+    }
+  }
+  return service.status()
+}
+
+/** The saved filters any device imported (section 3.7), from the synced document. */
+export function importedSavedFilterIds(): number[] {
+  const config = loadConfig()
+  if (!config) return []
+  return config.custom_lists_sync?.document.imported_saved_filters ?? []
+}
+
+/**
+ * Adds `lists` at the end and records `filterIds` as imported, in one change; the change syncs
+ * at once. Lists without a name are skipped.
+ */
+export function importCustomLists(lists: CustomListWire[], filterIds: number[]): CustomList[] {
+  if (lists.length === 0 && filterIds.length === 0) return getCustomLists()
+  const config = service.mutate((document, deviceId) => {
+    for (const value of lists) {
+      const normalized = normalizeWireList(value)
+      document.lists[normalized.id] = { value: normalized, revision: nextRevision(document, deviceId) }
+    }
+    const added = lists.map((list) => list.id).filter((id) => !document.order.ids.includes(id))
+    if (added.length > 0) {
+      document.order = { ids: [...document.order.ids, ...added], revision: nextRevision(document, deviceId) }
+    }
+    const imported = unionImported(document.imported_saved_filters, filterIds)
+    if (imported) document.imported_saved_filters = imported
+    return document
+  })
+  return config.custom_lists ?? []
+}
+
+/** Turns lists that repeat another list's saved filter into tombstones; false when there were none. */
+export function dropDuplicateCustomListImports(): boolean {
+  const config = loadConfig()
+  if (!config?.custom_lists_sync || duplicateImports(config.custom_lists_sync.document).length === 0) return false
+  service.mutate((document, deviceId) => dropDuplicateImports(document, deviceId))
+  return true
 }
 
 /** Custom-list changes made here that have not reached the server yet. */

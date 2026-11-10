@@ -8,7 +8,7 @@ Test vectors live in `test-fixtures/` in both repos and must stay byte-identical
 
 | Fixture | Covers |
 |---|---|
-| `cross-app-semantics-v1.json` | due-date rules, smart lists, weeks, custom-list windows, review math, completion hold, date display, collaboration, hidden tasks, synced preferences, task order, project categories, guided organizing, routines on Today, time blocks |
+| `cross-app-semantics-v1.json` | due-date rules, smart lists, weeks, custom-list windows, rules and sorting, saved-filter import, review math, completion hold, date display, collaboration, hidden tasks, synced preferences, task order, project categories, guided organizing, routines on Today, time blocks |
 | `nlp-corpus-v1.json` | quick-add parsing |
 | `routine-archive-v1.json` | routine merge, pruning and archive rules |
 | `design-tokens-v1.json` | colour roles, type, radii and motion (see `design-system-v1.md`) |
@@ -93,9 +93,17 @@ these fields:
 | `comments` | string, optional | `unread` or `any` (section 3.3). Absent means no condition. |
 | `shared_only` | boolean, optional | Only tasks of shared projects (section 3.3). Absent means `false`. |
 | `changed_within_days` | whole number, optional | Only tasks changed on the last N local days, today included (section 3.3). Absent means no condition. |
+| `rule` | string, optional | A condition in Vikunja's filter language (section 3.5). Absent or empty means no rule. |
+| `rule_include_nulls` | boolean, optional | Whether a condition of the rule also matches a task without a value for its field (section 3.5). Absent means `false`. |
+| `then_by` | array, optional | Further sort keys after `sort_by` and `order_by`, each `{ "sort_by", "order_by" }` (section 3.6). Absent means none. |
 
-Apps write `assigned`, `comments`, `shared_only` and `changed_within_days` only when they are
-set. A string value of `assigned` or `comments` that this version does not know is kept as it
+The list value (next to `id`, `name`, `icon` and `filter`) gains `saved_filter_id`, a whole
+number, when the list was imported from a Vikunja saved filter (section 3.7). The custom-list
+document gains `imported_saved_filters` at its top level: the ids of every saved filter any device
+imported, as an array of whole numbers (section 3.7).
+
+Apps write `assigned`, `comments`, `shared_only`, `changed_within_days`, `rule`,
+`rule_include_nulls`, `then_by` and `saved_filter_id` only when they are set. A string value of `assigned` or `comments` that this version does not know is kept as it
 is and is no condition, like a `due_date_filter` from a newer app.
 
 Both apps' protocol normalizers must **preserve unknown fields** in list values and filters
@@ -180,6 +188,156 @@ vector with `signedOut: true` runs without `me`).
 | Sun 2026-10-11 | Sun 2026-10-11 | 2026-10-31 |
 | Mon 2026-10-12 | Sun 2026-10-18 | 2026-10-31 |
 | Sat 2026-10-31 | Sun 2026-11-01 | 2026-10-31 |
+
+### 3.5 The rule
+
+A list's `rule` is written in the filter language of Vikunja's saved filters, as Vikunja 2.8
+reads it, so an imported filter means the same thing in Vicu. A task is on the list when it passes
+the conditions of sections 3.1 to 3.3 **and** the rule. Like those conditions, the rule is checked
+on the full task set before nested subtasks are hidden.
+
+**Grammar.**
+
+- A rule is a sequence of terms joined by `&&` or `||`. A term is `field operator value`, or a
+  group `( ... )` holding its own sequence.
+- Joins apply **left to right without precedence**, as on the server: `a || b && c` means
+  `(a || b) && c`, and `a && b || c` means `(a && b) || c`.
+- Operators: `=`, `!=`, `>`, `>=`, `<`, `<=`, `like`, `in` and `not in`. The words are lowercase
+  and have whitespace on both sides.
+- A value is quoted with `'` or `"` (a backslash escapes the next character), or it runs up to the
+  next `&`, `|`, `(` or `)` and is trimmed. A value holding one of those characters must be quoted.
+  `in` and `not in` take a comma-separated list; each item is trimmed.
+- Field names are lowercase. Whitespace between tokens is free.
+- A rule longer than 16,384 bytes, nested deeper than 100 groups, or adding more than 10,000
+  business days in total is invalid.
+
+**Fields.**
+
+| Field | Kind | Value |
+|---|---|---|
+| `done` | yes or no | `true` or `false` (also `1`, `0`, `t`, `f`, in any case) |
+| `priority`, `id`, `index`, `repeat_after`, `project` (also `project_id`), `created_by_id` | whole number | digits, optionally signed; `repeat_after` is in seconds |
+| `percent_done` | number | a decimal, 0 to 1 |
+| `due_date`, `start_date`, `end_date`, `done_at`, `created`, `updated` | date | see Dates |
+| `title`, `description`, `hex_color` | text | any text; `hex_color` without `#` |
+| `labels` | many label ids | label ids |
+| `assignees` | many usernames | usernames |
+| `reminders` | many dates | see Dates; each reminder's moment (a relative reminder's computed moment) |
+| `created_by` | username | a username |
+
+Any other field makes the rule invalid. `bucket_id`, `position` and `uid` are valid on the
+server but not here (section 3.7 drops them on import).
+
+**Comparing.**
+
+- Single-valued fields compare the task's value with the operator. `in` matches when the value
+  equals any item, `not in` when it equals none. Text compares exactly, case included, and the
+  range operators compare text by its characters. `like` means the text contains the value,
+  ignoring case; it is only allowed on text fields, `assignees` and `created_by`.
+- A date field without a value (no due date, an open task's `done_at`, ...) fails every comparison,
+  `!=` and `not in` included. Whole numbers, numbers, text and `done` always have a value
+  (a priority of 0 is the value 0).
+- Many-valued fields (`labels`, `assignees`, `reminders`): `=`, `in` and the range operators match
+  when at least one value matches; `!=` and `not in` match when no value equals the item or items
+  (so a task without labels passes `labels != 4`). `labels = 4 && labels = 5` needs both labels.
+- Consecutive terms joined by `&&` on the same many-valued field that all use range operators
+  (`>`, `>=`, `<`, `<=`) must hold for **one** value together: `reminders > A && reminders < B`
+  asks for a reminder between A and B.
+- `created_by` compares the creator's username, with `=`, `!=`, `in` and `not in` only.
+- `assignees like ...` and `created_by like ...` are skipped, as the server skips them: the term
+  is removed together with the join in front of it.
+- `labels` and `project` take ids. Editors show names and save ids.
+
+**Dates.** A date value is either
+
+- a fixed date: `YYYY-MM-DD`, `YYYY-MM-DD HH:mm`, or an RFC 3339 date-time. Without an offset it
+  is a local wall-clock time (midnight for a bare date); with one, that instant; or
+- date math: an anchor, `now` or a fixed date followed by `||` (`2026-10-06||`), then any number
+  of steps. A step is `+N<unit>` or `-N<unit>` (N whole, 1 when left out) or `/<unit>`, which
+  rounds down to the start of that unit. Units: `y` year, `M` month, `w` week, `d` day, `h` or
+  `H` hour, `m` minute, `s` second, and `b` business day (Monday to Friday, only after `+` or
+  `-`: each step moves one day and skips Saturdays and Sundays). Weeks start on Monday. A value
+  with `||` must be quoted.
+
+`now` and local wall-clock times are read in the **device's time zone**, so `now/d` is the start
+of the local day. (The server reads them in the filter's time zone; section 2 rules here.)
+
+**Without a value.** When `rule_include_nulls` is true, every term of the rule also matches a
+task that has no value for its field: a date without a value, a whole number of 0, no labels, no
+assignees or no reminders. Text, `percent_done`, `done` and `created_by` always have a value.
+
+**An invalid rule** (one that does not read, or names a field, operator or value this section does
+not allow) matches **no task**, and the editor says what is wrong. An absent or empty rule is no
+condition.
+
+**The server.** When a list asks the server for tasks, apps send `(<the usual superset>) &&
+(<rule>)` as `filter`, with `filter_timezone` set to the device's zone and `filter_include_nulls`
+set from `rule_include_nulls`, unless the rule uses `like`: the server's case rules depend on its
+database, so such a rule is left to the device. The device's check stays the exact one.
+
+Vectors: the `customListRule` block of the fixture. `tasks` use local wall-clock times; each
+vector gives `now`, the `rule`, `includeNulls` and the ids that match, in task order. `invalid`
+lists rules that must be rejected.
+
+### 3.6 Sorting by more than one key
+
+A list sorts by `sort_by` and `order_by`, then by each `then_by` entry in turn; tasks that tie on
+every key keep their order. Sort keys: `due_date`, `start_date`, `end_date`, `done_at`, `created`,
+`updated` (dates: a task without the date comes last whichever the order), `priority`,
+`percent_done`, `done` (open before done when ascending), `id`, `title` (ignoring case) and
+`position`. A `then_by` entry with a key this version does not know is skipped; a `sort_by` it
+does not know keeps the fallback (most recently updated first). `order_by` is `asc` or `desc`, and
+anything else is `asc`.
+
+Vectors: `customListSort` gives tasks, a filter's `sort_by`, `order_by` and `then_by`, and the
+order of ids.
+
+### 3.7 Saved filters
+
+Vikunja returns each saved filter in `GET projects` as a pseudo-project with a **negative id**:
+saved filter `n` is project `-(n + 1)`, and `-1` is Vikunja's Favorites. Apps never show, store or
+act on a project with an id below 0 as a project. They read saved filter `n` with
+`GET filters/{n}`.
+
+**Importing.** A saved filter becomes a custom list:
+
+- `name` is the filter's title, and the icon is `filter_list`.
+- `filter` has the defaults of every form condition except `include_done`, which is `true` (the
+  rule decides). `rule` is the filter's `filters.filter` with the terms below removed, and
+  `rule_include_nulls` is `filters.filter_include_nulls`. A filter with no `filter` text but a
+  search text `s` gets the rule `title like <s> || description like <s>`, written out as below.
+- `bucket_id`, `position` and `uid` terms are removed with the join in front of them (or the join
+  behind them, for the first term of a sequence); a group left empty is removed the same way. The
+  rule is then written out again: terms as `field operator value` with single spaces, list items
+  joined by `, `, joins as ` && ` and ` || `, groups in parentheses, and a value quoted with `'`
+  (a backslash before `'` and `\`) when it is empty, holds `&`, `|`, `(`, `)`, `'`, `"` or `\`,
+  holds a comma (outside a list), or starts or ends with a space. A rule with nothing removed is
+  kept exactly as it came.
+- Sorting: each `sort_by[i]` with `order_by[i]` (default `asc`), in order. The first key this
+  version sorts by (section 3.6) becomes `sort_by` and `order_by`, the rest `then_by`. `position`
+  and keys it cannot sort by are left out. Without any, the list sorts by `due_date` ascending.
+- `saved_filter_id` is `n`.
+- The result is **exact** when nothing was left out; **changed** with the reasons, in this order,
+  `kanban_column` (a `bucket_id` term was removed), `other_field` (a `position` or `uid` term was
+  removed), `manual_order` (`position` was in the sort) and `sort_key` (another sort key was left
+  out); or **unreadable** when the rule is still invalid by section 3.5 after the removal, and it
+  is not imported.
+
+**When.** On a device's **first connect** to an account (the first successful sync of that account
+on a version with this section; a device keeps that per account), the app imports every saved
+filter that is not unreadable and not in the document's `imported_saved_filters`, right after
+syncing the custom lists, and adds their ids there. After that, a saved filter not in
+`imported_saved_filters` is offered, and the person may import any filter again.
+
+**Duplicates.** `imported_saved_filters` merges as the union of both sides, in ascending order.
+When two lists with values hold the same `saved_filter_id`, the one whose `id` sorts first (as a
+string) is the list; apps hide the others and write a tombstone for each at their next write.
+An imported list is an ordinary list: changing it never changes the saved filter, and the saved
+filter is never changed or deleted.
+
+Vectors: `savedFilterImport.filters` gives saved filters as `GET filters/{n}` returns them and
+the list each becomes (`filter`, `savedFilterId`, `status`, `reasons`), and
+`savedFilterImport.duplicates` gives lists with `savedFilterId` and the ids kept.
 
 ---
 

@@ -1,5 +1,5 @@
-import { useEffect, useId, useState } from 'react'
-import { X } from 'lucide-react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
+import { Info, X } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { Dialog } from '@/components/overlay/Dialog'
 import { ListIconPicker } from '@/components/shared/ListIconPicker'
@@ -14,6 +14,7 @@ import {
   windowHonorsIncludeOverdue,
 } from '@/lib/custom-list-filter'
 import type { CustomList, CustomListFilter } from '@/lib/vikunja-types'
+import { ruleFromDisplay, ruleToDisplay, suggestRule, type Named } from '../../../shared/rule-editing'
 
 interface CustomListDialogProps {
   open: boolean
@@ -23,14 +24,37 @@ interface CustomListDialogProps {
 }
 
 const SORT_OPTIONS = [
-  { value: 'due_date', label: 'Due Date' },
-  { value: 'priority', label: 'Priority' },
+  { value: 'due_date', label: 'Due date' },
+  { value: 'start_date', label: 'Start date' },
+  { value: 'end_date', label: 'End date' },
   { value: 'created', label: 'Created' },
   { value: 'updated', label: 'Updated' },
-  { value: 'title', label: 'Title' },
   { value: 'done_at', label: 'Completed' },
+  { value: 'priority', label: 'Priority' },
+  { value: 'percent_done', label: 'Progress' },
+  { value: 'title', label: 'Title' },
+  { value: 'done', label: 'Done' },
+  { value: 'id', label: 'Order created' },
   { value: 'position', label: 'Position' },
 ] as const
+
+/** The two orders of `sortBy`, named for the field ("Soonest first", "A to Z"); the same on Android. */
+export function orderOptions(sortBy: string): Array<{ value: 'asc' | 'desc'; label: string }> {
+  const [asc, desc] = (() => {
+    switch (sortBy) {
+      case 'due_date': case 'start_date': case 'end_date': return ['Soonest first', 'Latest first']
+      case 'created': case 'updated': case 'done_at': case 'id': return ['Oldest first', 'Newest first']
+      case 'priority': return ['Lowest first', 'Highest first']
+      case 'percent_done': return ['Least done first', 'Most done first']
+      case 'title': return ['A to Z', 'Z to A']
+      case 'done': return ['Open first', 'Done first']
+      default: return ['Ascending', 'Descending']
+    }
+  })()
+  return [{ value: 'asc', label: asc }, { value: 'desc', label: desc }]
+}
+
+const SELECT_CLASS = 'w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)]'
 
 const DUE_DATE_OPTIONS = [
   { value: 'all', label: 'All' },
@@ -93,8 +117,20 @@ export function CustomListDialog({ open, list, onSave, onClose }: CustomListDial
   const { data: projectData } = useProjects()
   const { data: labels } = useLabels()
   const sharedProjectIds = useSharedProjectIds()
+  const [ruleText, setRuleText] = useState('')
+  const [ruleCursor, setRuleCursor] = useState(0)
+  const [ruleFocused, setRuleFocused] = useState(false)
+  const ruleTouched = useRef(false)
+  const ruleInput = useRef<HTMLTextAreaElement>(null)
+
+  const namedLabels = useMemo<Named[]>(() => (labels ?? []).map((label) => ({ id: label.id, name: label.title })), [labels])
+  const namedProjects = useMemo<Named[]>(
+    () => (projectData?.flat ?? []).map((project) => ({ id: project.id, name: project.title })),
+    [projectData],
+  )
 
   useEffect(() => {
+    ruleTouched.current = false
     if (list) {
       setName(list.name)
       setIcon(list.icon || DEFAULT_CUSTOM_LIST_ICON)
@@ -106,19 +142,69 @@ export function CustomListDialog({ open, list, onSave, onClose }: CustomListDial
     }
   }, [list, open])
 
+  // The rule is shown with names; labels and projects may arrive after the dialog opened.
+  useEffect(() => {
+    if (ruleTouched.current) return
+    setRuleText(ruleToDisplay(list?.filter.rule, namedLabels, namedProjects))
+  }, [list, open, namedLabels, namedProjects])
+
   if (!open) return null
+
+  const savedRule = ruleFromDisplay(ruleText, namedLabels, namedProjects)
+  const ruleProblem = 'problem' in savedRule ? savedRule.problem : null
+  // Suggestions only while the rule is being written, as on Android.
+  const suggestions = ruleFocused ? suggestRule(ruleText, ruleCursor, namedLabels, namedProjects) : []
 
   const handleSave = () => {
     const trimmed = name.trim()
-    if (!trimmed) return
-
+    if (!trimmed || 'problem' in savedRule) return
+    const { rule: _rule, rule_include_nulls: includeNulls, ...rest } = filter
     onSave({
       id: list?.id ?? crypto.randomUUID(),
       name: trimmed,
       icon,
-      filter,
+      filter: {
+        ...rest,
+        ...(savedRule.rule ? { rule: savedRule.rule } : {}),
+        ...(savedRule.rule && includeNulls ? { rule_include_nulls: true } : {}),
+      },
+      ...(typeof list?.saved_filter_id === 'number' ? { saved_filter_id: list.saved_filter_id } : {}),
     })
   }
+
+  const editRule = (text: string, cursor: number) => {
+    ruleTouched.current = true
+    setRuleText(text)
+    setRuleCursor(cursor)
+  }
+
+  const applySuggestion = (start: number, end: number, insert: string) => {
+    const text = ruleText.slice(0, start) + insert + ruleText.slice(end)
+    const cursor = start + insert.length
+    editRule(text, cursor)
+    requestAnimationFrame(() => {
+      const input = ruleInput.current
+      if (!input) return
+      input.focus()
+      input.setSelectionRange(cursor, cursor)
+    })
+  }
+
+  const thenBy = filter.then_by?.[0]
+  const setSortBy = (sortBy: string) =>
+    setFilter((f) => ({
+      ...f,
+      sort_by: sortBy,
+      // A further key equal to the first adds nothing.
+      then_by: f.then_by?.[0]?.sort_by === sortBy ? undefined : f.then_by,
+    }))
+  const setThenBy = (sortBy: string, orderBy: string) =>
+    setFilter((f) => ({
+      ...f,
+      // Further keys an import brought (section 3.6) stay after the one the editor shows.
+      then_by: sortBy === '' ? undefined : [{ sort_by: sortBy, order_by: orderBy }, ...(f.then_by?.slice(1) ?? [])],
+    }))
+  const thenByOptions = SORT_OPTIONS.filter((option) => option.value !== filter.sort_by)
 
   const toggleProjectId = (id: number) => {
     setFilter((prev) => {
@@ -174,6 +260,13 @@ export function CustomListDialog({ open, list, onSave, onClose }: CustomListDial
       </div>
 
       <div className="space-y-4 p-5">
+        {typeof list?.saved_filter_id === 'number' && (
+          <p className="flex gap-2 rounded-control bg-[var(--bg-secondary)] px-3 py-2 text-xs text-[var(--text-secondary)]">
+            <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-accent-blue" aria-hidden />
+            Imported from a Vikunja saved filter. Changes here stay in Vicu and won't update the saved filter on your server.
+          </p>
+        )}
+
         {/* Name */}
         <div>
           <label htmlFor={`${titleId}-name`} className="mb-1 block text-xs text-[var(--text-secondary)]">Name</label>
@@ -196,19 +289,15 @@ export function CustomListDialog({ open, list, onSave, onClose }: CustomListDial
           <ListIconPicker value={icon} onChange={setIcon} labelledBy={`${titleId}-icon`} allowNone />
         </div>
 
-        {/* Sort + Order */}
+        {/* Sort + Order, then a further key (section 3.6) */}
         <div className="flex gap-3">
           <div className="flex-1">
-            <label htmlFor={`${titleId}-sort`} className="mb-1 block text-xs text-[var(--text-secondary)]">Sort By</label>
-            <select
-              id={`${titleId}-sort`}
-              value={filter.sort_by}
-              onChange={(e) => setFilter((f) => ({ ...f, sort_by: e.target.value }))}
-              className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)]"
-            >
+            <label htmlFor={`${titleId}-sort`} className="mb-1 block text-xs text-[var(--text-secondary)]">Sort by</label>
+            <select id={`${titleId}-sort`} value={filter.sort_by} onChange={(e) => setSortBy(e.target.value)} className={SELECT_CLASS}>
               {SORT_OPTIONS.map((o) => (
                 <option key={o.value} value={o.value}>{o.label}</option>
               ))}
+              {!isOffered(filter.sort_by, SORT_OPTIONS) && <option value={filter.sort_by}>Set by a newer version</option>}
             </select>
           </div>
           <div className="flex-1">
@@ -217,11 +306,48 @@ export function CustomListDialog({ open, list, onSave, onClose }: CustomListDial
               id={`${titleId}-order`}
               value={filter.order_by}
               onChange={(e) => setFilter((f) => ({ ...f, order_by: e.target.value as 'asc' | 'desc' }))}
-              className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)]"
+              className={SELECT_CLASS}
             >
-              <option value="asc">Ascending</option>
-              <option value="desc">Descending</option>
+              {orderOptions(filter.sort_by).map((o) => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
             </select>
+          </div>
+        </div>
+        <div className="flex gap-3">
+          <div className="flex-1">
+            <label htmlFor={`${titleId}-then`} className="mb-1 block text-xs text-[var(--text-secondary)]">Then by</label>
+            <select
+              id={`${titleId}-then`}
+              value={thenBy?.sort_by ?? ''}
+              onChange={(e) => setThenBy(e.target.value, thenBy?.order_by ?? 'asc')}
+              className={SELECT_CLASS}
+            >
+              <option value="">None</option>
+              {thenByOptions.map((o) => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+              {thenBy && !isOffered(thenBy.sort_by, thenByOptions) && (
+                <option value={thenBy.sort_by}>Set by a newer version</option>
+              )}
+            </select>
+          </div>
+          <div className="flex-1">
+            {thenBy && (
+              <>
+                <label htmlFor={`${titleId}-then-order`} className="mb-1 block text-xs text-[var(--text-secondary)]">Then order</label>
+                <select
+                  id={`${titleId}-then-order`}
+                  value={thenBy.order_by}
+                  onChange={(e) => setThenBy(thenBy.sort_by, e.target.value)}
+                  className={SELECT_CLASS}
+                >
+                  {orderOptions(thenBy.sort_by).map((o) => (
+                    <option key={o.value} value={o.value}>{o.label}</option>
+                  ))}
+                </select>
+              </>
+            )}
           </div>
         </div>
 
@@ -442,6 +568,61 @@ export function CustomListDialog({ open, list, onSave, onClose }: CustomListDial
           </fieldset>
         )}
 
+        {/* Rule (section 3.5) */}
+        <div>
+          <label htmlFor={`${titleId}-rule`} className="mb-1 block text-xs text-[var(--text-secondary)]">Rule</label>
+          <textarea
+            id={`${titleId}-rule`}
+            ref={ruleInput}
+            rows={2}
+            value={ruleText}
+            spellCheck={false}
+            placeholder="done = false && priority > 2"
+            aria-describedby={`${titleId}-rule-help`}
+            aria-invalid={ruleProblem !== null}
+            onChange={(e) => editRule(e.target.value, e.target.selectionStart)}
+            onSelect={(e) => setRuleCursor(e.currentTarget.selectionStart)}
+            onFocus={(e) => {
+              setRuleFocused(true)
+              setRuleCursor(e.currentTarget.selectionStart)
+            }}
+            onBlur={() => setRuleFocused(false)}
+            className={cn(
+              'w-full resize-y rounded-control border bg-[var(--bg-secondary)] px-3 py-2 font-mono text-xs text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]',
+              ruleProblem ? 'border-danger' : 'border-[var(--border-color)]',
+            )}
+          />
+          {suggestions.length > 0 && (
+            <div className="mt-1 flex flex-wrap gap-1" role="group" aria-label="Suggestions">
+              {suggestions.map((suggestion) => (
+                <button
+                  key={`${suggestion.label}-${suggestion.start}`}
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => applySuggestion(suggestion.start, suggestion.end, suggestion.insert)}
+                  className="rounded-control border border-[var(--border-color)] px-2 py-0.5 font-mono text-caption text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
+                >
+                  {suggestion.label}
+                </button>
+              ))}
+            </div>
+          )}
+          <p id={`${titleId}-rule-help`} className={cn('mt-1 text-xs', ruleProblem ? 'text-danger' : 'text-[var(--text-secondary)]')}>
+            {ruleProblem ?? "Tasks must also match this. It is written as in Vikunja's saved filters."}
+          </p>
+          {ruleText.trim() !== '' && (
+            <label className="mt-2 flex cursor-pointer items-center gap-2 text-xs text-[var(--text-primary)]">
+              <input
+                type="checkbox"
+                checked={filter.rule_include_nulls === true}
+                onChange={(e) => setFilter((f) => ({ ...f, rule_include_nulls: e.target.checked || undefined }))}
+                className="accent-accent-blue"
+              />
+              Include tasks without a value
+            </label>
+          )}
+        </div>
+
         {/* Include Done */}
         <label className="flex cursor-pointer items-center gap-2 text-xs text-[var(--text-primary)]">
           <input
@@ -477,7 +658,7 @@ export function CustomListDialog({ open, list, onSave, onClose }: CustomListDial
         <button
           type="button"
           onClick={handleSave}
-          disabled={!name.trim()}
+          disabled={!name.trim() || ruleProblem !== null}
           className={cn(
             'rounded-control px-4 py-1.5 text-xs font-medium transition-colors',
             'bg-accent-fill text-on-accent hover:bg-accent-fill/90',

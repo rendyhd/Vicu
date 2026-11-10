@@ -18,6 +18,7 @@ import {
   createTaskRelation,
   deleteTaskRelation,
   fetchProjects,
+  fetchProjectsAndSavedFilters,
   fetchProjectById,
   createProject,
   updateProject,
@@ -77,6 +78,19 @@ import {
 import { readSyncedPlaces } from '../shared/synced-prefs'
 import { quickEntryLocationReminder } from './quick-entry/location-reminder'
 import type { CustomListWire } from './custom-list-protocol'
+import {
+  closeImportNotice,
+  dismissSavedFilters,
+  getSavedFilterState,
+  importSavedFilters,
+  previewSavedFilters,
+  recordKnownSavedFilters,
+} from './saved-filter-service'
+
+/** A list of saved-filter ids from the renderer: at most 500 whole numbers of 0 or more. */
+function isIdList(value: unknown): value is number[] {
+  return Array.isArray(value) && value.length <= 500 && value.every((id) => typeof id === 'number' && Number.isInteger(id) && id >= 0)
+}
 import type { UnsyncedDocuments } from '../shared/config-types'
 import { hasVicuMetadataMarker } from './custom-list-protocol'
 import { discoverProviders, discoverAuthMethods } from './auth/oidc-discovery'
@@ -378,8 +392,13 @@ export function registerIpcHandlers(): void {
   })
 
   // Projects
-  handleTrusted('fetch-projects', (_event, includeArchived = false) => {
-    return fetchProjects(includeArchived)
+  handleTrusted('fetch-projects', async (_event, includeArchived = false) => {
+    // The read also lists the saved filters (negative ids), which are kept apart and never shown
+    // as projects (cross-app semantics 3.7).
+    const result = await fetchProjectsAndSavedFilters(includeArchived === true)
+    if (!result.success) return result
+    recordKnownSavedFilters(result.data.pseudo)
+    return { success: true as const, data: result.data.projects }
   })
 
   handleTrusted('fetch-project', (_event, id: number) => {
@@ -514,6 +533,17 @@ export function registerIpcHandlers(): void {
     return syncCustomLists()
   })
   handleTrusted('custom-lists:status', () => getCustomListSyncStatus())
+
+  // Vikunja saved filters as custom lists (cross-app semantics 3.7).
+  handleTrusted('saved-filters:state', () => getSavedFilterState())
+  handleTrusted('saved-filters:preview', (_event, ids: unknown) => {
+    if (ids !== undefined && !isIdList(ids)) return null
+    return previewSavedFilters(ids as number[] | undefined)
+  })
+  handleTrusted('saved-filters:import', (_event, ids: unknown) => (isIdList(ids) ? importSavedFilters(ids) : null))
+  handleTrusted('saved-filters:dismiss', (_event, ids: unknown) => (isIdList(ids) ? dismissSavedFilters(ids) : getSavedFilterState()))
+  handleTrusted('saved-filters:close-notice', (_event, listId: unknown) =>
+    (typeof listId === 'string' && listId !== '' ? closeImportNotice(listId) : getSavedFilterState()))
 
   // Synced preferences (cross-app semantics section 11): the Inbox and the task order.
   handleTrusted('synced-prefs:get', () => getSyncedPrefs())

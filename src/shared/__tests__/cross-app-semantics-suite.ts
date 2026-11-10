@@ -24,6 +24,17 @@ import {
   type CustomListFilterInput,
 } from '../custom-list-filter'
 import { computeStatus, type ReviewMetadata } from '../review-metadata'
+import { compileRule, validateRule, type RuleTask } from '../custom-list-rule'
+import { sortCustomListTasks } from '../custom-list-sort'
+import { convertSavedFilter, type SavedFilterDto } from '../saved-filter-import'
+import {
+  activeLists,
+  documentFromLists,
+  dropDuplicateImports,
+  mergeCustomListDocuments,
+  normalizeWireList,
+  type CustomListWire,
+} from '../../main/custom-list-protocol'
 import { evaluateServerFilter } from './server-filter-eval'
 
 /**
@@ -82,8 +93,53 @@ interface ReviewVector {
   meta: { state: ReviewMetadata['state']; lastReviewedAt?: string; cadenceDaysOverride?: number }
   expect: { isOverdue: boolean; daysSince: number | null; daysUntil: number | null; next: string | null }
 }
+interface RuleFixtureTask {
+  id: number
+  title: string
+  description: string
+  done: boolean
+  doneAt: string | null
+  priority: number
+  percentDone: number
+  projectId: number
+  index: number
+  hexColor: string
+  repeatAfter: number
+  due: string | null
+  start: string | null
+  end: string | null
+  created: string
+  updated: string
+  labels: number[]
+  assignees: string[]
+  createdBy: string
+  reminders: string[]
+}
+interface RuleBlock {
+  tasks: RuleFixtureTask[]
+  vectors: Array<{ name: string; now: string; rule: string; includeNulls: boolean; expect: number[] }>
+  invalid: string[]
+}
+interface SortBlock {
+  tasks: Array<{ id: number; title: string; done: boolean; priority: number; due: string | null; position: number }>
+  vectors: Array<{ name: string; filter: { sort_by: string; order_by: string; then_by?: Array<{ sort_by: string; order_by: string }> }; expect: number[] }>
+}
+interface ImportBlock {
+  filters: Array<{
+    name: string
+    savedFilter: SavedFilterDto
+    list: { name: string; icon: string; savedFilterId: number; filter: Record<string, unknown> } | null
+    status: string
+    reasons: string[]
+  }>
+  duplicates: Array<{ name: string; lists: Array<{ id: string; savedFilterId?: number }>; kept: string[] }>
+  union: Array<{ left: number[]; right: number[]; merged: number[] }>
+}
 interface Fixture {
   contractVersion: number
+  customListRule: RuleBlock
+  customListSort: SortBlock
+  savedFilterImport: ImportBlock
   dueDates: { display: DisplayVector[]; setters: SetterVector[] }
   weeks: WeekVector[]
   tasks: FixtureTask[]
@@ -274,6 +330,115 @@ export function runCrossAppSemanticsSuite(options: { zone: string; expectedOffse
             }
           })
         }
+      }
+    })
+
+    describe('customListRule (section 3.5)', () => {
+      const iso = (value: string | null) => (value ? local(value).toISOString() : null)
+      const ruleTasks = (): RuleTask[] => fixture.customListRule.tasks.map((t) => ({
+        id: t.id,
+        title: t.title,
+        description: t.description,
+        done: t.done,
+        done_at: iso(t.doneAt),
+        priority: t.priority,
+        percent_done: t.percentDone,
+        project_id: t.projectId,
+        index: t.index,
+        hex_color: t.hexColor,
+        repeat_after: t.repeatAfter,
+        due_date: t.due ? local(t.due).toISOString() : '0001-01-01T00:00:00Z',
+        start_date: iso(t.start),
+        end_date: iso(t.end),
+        created: iso(t.created),
+        updated: iso(t.updated),
+        labels: t.labels.map((id) => ({ id })),
+        assignees: t.assignees.map((username) => ({ username })),
+        created_by: { id: 1, username: t.createdBy },
+        reminders: t.reminders.map((r) => ({ reminder: local(r).toISOString() })),
+      }))
+      for (const vector of fixture.customListRule.vectors) {
+        it(vector.name, () => {
+          expect(validateRule(vector.rule)).toBeNull()
+          const match = compileRule(vector.rule, vector.includeNulls, local(vector.now))
+          expect(ruleTasks().filter(match).map((task) => task.id), vector.rule).toEqual(vector.expect)
+          const filter = { include_done: true, rule: vector.rule, rule_include_nulls: vector.includeNulls }
+          const viaList = filterCustomList(ruleTasks() as unknown as Parameters<typeof filterCustomList>[0], filter, vector.now.slice(0, 10), {}, local(vector.now))
+          expect(viaList.map((task) => task.id)).toEqual(vector.expect)
+        })
+      }
+      for (const rule of fixture.customListRule.invalid) {
+        it(`rejects "${rule}"`, () => {
+          expect(validateRule(rule)).not.toBeNull()
+          expect(ruleTasks().filter(compileRule(rule, false, local('2026-10-06T10:00:00')))).toEqual([])
+        })
+      }
+    })
+
+    describe('customListSort (section 3.6)', () => {
+      for (const vector of fixture.customListSort.vectors) {
+        it(vector.name, () => {
+          const tasks = fixture.customListSort.tasks.map((t) => ({
+            id: t.id,
+            title: t.title,
+            done: t.done,
+            priority: t.priority,
+            position: t.position,
+            due_date: t.due ? local(t.due).toISOString() : '0001-01-01T00:00:00Z',
+          }))
+          const { sort_by: sortBy, order_by: orderBy, then_by: thenBy } = vector.filter
+          expect(sortCustomListTasks(tasks, sortBy, orderBy, thenBy ?? []).map((task) => task.id)).toEqual(vector.expect)
+        })
+      }
+    })
+
+    describe('savedFilterImport (section 3.7)', () => {
+      const defaults = normalizeWireList({ id: 'new', name: 'x', icon: '', filter: {} } as unknown as CustomListWire).filter
+      for (const vector of fixture.savedFilterImport.filters) {
+        it(vector.name, () => {
+          const result = convertSavedFilter(vector.savedFilter, 'new')
+          expect(result.status).toBe(vector.status)
+          expect(result.reasons).toEqual(vector.reasons)
+          if (vector.list === null) {
+            expect(result.list).toBeNull()
+            return
+          }
+          expect(result.list?.name).toBe(vector.list.name)
+          expect(result.list?.icon).toBe(vector.list.icon)
+          expect(result.list?.saved_filter_id).toBe(vector.list.savedFilterId)
+          const made = normalizeWireList({ id: 'new', name: 'x', icon: '', filter: { ...result.list?.filter } } as unknown as CustomListWire).filter
+          const want = normalizeWireList({ id: 'new', name: 'x', icon: '', filter: { ...defaults, ...vector.list.filter } } as unknown as CustomListWire).filter
+          expect(made).toEqual(want)
+        })
+      }
+      for (const vector of fixture.savedFilterImport.duplicates) {
+        it(vector.name, () => {
+          const lists = vector.lists.map((list) => ({
+            id: list.id,
+            name: list.id,
+            icon: '',
+            filter: { ...defaults },
+            ...(list.savedFilterId !== undefined ? { saved_filter_id: list.savedFilterId } : {}),
+          }) as CustomListWire)
+          const document = documentFromLists(lists, 'device', 1000)
+          expect(activeLists(document).map((list) => list.id)).toEqual(vector.kept)
+          const cleaned = dropDuplicateImports(document, 'device', 2000)
+          for (const id of vector.lists.map((list) => list.id).filter((id) => !vector.kept.includes(id))) {
+            expect(cleaned.lists[id].value).toBeNull()
+          }
+        })
+      }
+      for (const vector of fixture.savedFilterImport.union) {
+        it(`union of ${vector.left} and ${vector.right}`, () => {
+          const revision = { wall_time_ms: 1, counter: 0, device_id: 'd' }
+          const doc = (ids: number[]) => ({
+            version: 1 as const,
+            lists: {},
+            order: { ids: [], revision },
+            ...(ids.length ? { imported_saved_filters: ids } : {}),
+          })
+          expect(mergeCustomListDocuments(doc(vector.left), doc(vector.right)).imported_saved_filters).toEqual(vector.merged)
+        })
       }
     })
 

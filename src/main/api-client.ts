@@ -446,14 +446,37 @@ export async function deleteTask(id: number): Promise<ApiResult<void>> {
 
 // --- Projects ---
 
+/**
+ * The account's projects. Vikunja also lists its pseudo-projects with negative ids (saved filters
+ * and Favorites, cross-app semantics 3.7); they are left out, so nothing treats them as projects.
+ * `fetchProjectsAndSavedFilters` has both.
+ */
 export async function fetchProjects(includeArchived = false): Promise<ApiResult<unknown[]>> {
+  const result = await fetchProjectsAndSavedFilters(includeArchived)
+  return result.success ? { success: true, data: result.data.projects } : result
+}
+
+/** The real projects, and the pseudo-projects (negative ids) Vikunja lists among them. */
+export async function fetchProjectsAndSavedFilters(
+  includeArchived = false,
+): Promise<ApiResult<{ projects: unknown[]; pseudo: Array<{ id: number; title?: string }> }>> {
   const c = await getConfigOrFail()
   if ('success' in c) return c
 
-  return requestAllPagesWithRetry<unknown>(
-    buildProjectCollectionUrl(c.url, includeArchived),
-    c.token,
-  )
+  const result = await requestAllPagesWithRetry<unknown>(buildProjectCollectionUrl(c.url, includeArchived), c.token)
+  if (!result.success) return result
+  const idOf = (project: unknown) => (project as { id?: unknown })?.id
+  const projects = result.data.filter((project) => typeof idOf(project) !== 'number' || (idOf(project) as number) > 0)
+  const pseudo = result.data.filter((project) => typeof idOf(project) === 'number' && (idOf(project) as number) < 0) as Array<{ id: number; title?: string }>
+  return { success: true, data: { projects, pseudo } }
+}
+
+/** A saved filter (cross-app semantics 3.7). */
+export async function fetchSavedFilter(id: number): Promise<ApiResult<unknown>> {
+  const c = await getConfigOrFail()
+  if ('success' in c) return c
+
+  return requestWithRetry<unknown>('GET', `${c.url}${API_BASE_PATH}/filters/${id}`, c.token)
 }
 
 /** One project as the server has it right now (GET /projects/{id}); bypasses every cache. */

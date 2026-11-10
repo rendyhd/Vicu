@@ -137,6 +137,21 @@ const api = {
     return () => { ipcRenderer.removeListener('synced-prefs-sync-status', handler) }
   },
   getCustomListSyncStatus: () => ipcRenderer.invoke('custom-lists:status'),
+  getSavedFilterState: () => ipcRenderer.invoke('saved-filters:state'),
+  previewSavedFilters: (ids?: number[]) => ipcRenderer.invoke('saved-filters:preview', ids),
+  importSavedFilters: (ids: number[]) => ipcRenderer.invoke('saved-filters:import', ids),
+  dismissSavedFilters: (ids: number[]) => ipcRenderer.invoke('saved-filters:dismiss', ids),
+  closeSavedFilterNotice: (listId: string) => ipcRenderer.invoke('saved-filters:close-notice', listId),
+  onSavedFiltersChanged: (cb: (state: unknown) => void) => {
+    const handler = (_: unknown, state: unknown) => cb(state)
+    ipcRenderer.on('saved-filters-changed', handler)
+    return () => { ipcRenderer.removeListener('saved-filters-changed', handler) }
+  },
+  onSavedFiltersImported: (cb: (outcome: unknown) => void) => {
+    const handler = (_: unknown, outcome: unknown) => cb(outcome)
+    ipcRenderer.on('saved-filters-imported', handler)
+    return () => { ipcRenderer.removeListener('saved-filters-imported', handler) }
+  },
   getUnsyncedDocuments: () => ipcRenderer.invoke('synced-documents:unsynced'),
   discardUnsyncedDocuments: () => ipcRenderer.invoke('synced-documents:discard'),
   onCustomListsChanged: (cb: (lists: unknown[]) => void) => {

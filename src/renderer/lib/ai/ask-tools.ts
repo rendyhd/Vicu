@@ -7,7 +7,7 @@
  */
 import { AI_LIMITS } from '../../../shared/ai/contract'
 import { compareLowercased, isRealDate, localDateTimeOf } from '../../../shared/ai/dictation'
-import { filterCustomList, buildCustomListServerFilter, type CustomListFilterInput } from '../../../shared/custom-list-filter'
+import { filterCustomList, buildCustomListServerFilter, customListRuleParams, type CustomListFilterInput } from '../../../shared/custom-list-filter'
 import { sortCustomListTasks } from '../../../shared/custom-list-sort'
 import { addLocalDays, localDateOf, toLocalDate } from '../../../shared/due-dates'
 import { blockStartsOn } from '../../../shared/time-blocks'
@@ -218,9 +218,13 @@ export async function listView(args: Args, ctx: ToolContext): Promise<{ tasks: T
       const list = ws.customLists.find((l) => l.id === id)
       if (!list) throw new ToolError('not_found', `No custom list ${id}`)
       const server = buildCustomListServerFilter(list.filter, now)
-      const tasks = visible(await ctx.fetchTasks({ ...(server ? { filter: server } : {}), keep_nested_subtasks: true }))
-      const matching = filterCustomList(tasks, list.filter, today, customListContext(ws)).filter((task) => active.has(task.project_id))
-      ordered = sortCustomListTasks(matching, list.filter.sort_by, list.filter.order_by)
+      const tasks = visible(await ctx.fetchTasks({
+        ...(server ? { filter: server } : {}),
+        ...customListRuleParams(list.filter),
+        keep_nested_subtasks: true,
+      }))
+      const matching = filterCustomList(tasks, list.filter, today, customListContext(ws), now).filter((task) => active.has(task.project_id))
+      ordered = sortCustomListTasks(matching, list.filter.sort_by, list.filter.order_by, list.filter.then_by ?? [])
       break
     }
     default:

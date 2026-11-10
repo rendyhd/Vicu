@@ -152,6 +152,9 @@ export function normalizeConfig(raw: Record<string, unknown>): AppConfig {
     custom_lists_sync: raw.custom_lists_sync && typeof raw.custom_lists_sync === 'object'
       ? raw.custom_lists_sync as AppConfig['custom_lists_sync']
       : undefined,
+    saved_filters: raw.saved_filters && typeof raw.saved_filters === 'object' && Array.isArray((raw.saved_filters as { known?: unknown }).known)
+      ? raw.saved_filters as AppConfig['saved_filters']
+      : undefined,
     synced_prefs_sync: raw.synced_prefs_sync && typeof raw.synced_prefs_sync === 'object'
       ? raw.synced_prefs_sync as AppConfig['synced_prefs_sync']
       : undefined,
@@ -314,6 +317,7 @@ const ACCOUNT_SPECIFIC_KEYS = [
   'sidebar_collapsed_categories',
   'custom_lists',
   'custom_lists_sync',
+  'saved_filters',
   'synced_prefs_sync',
   'known_user',
   'account_owner',
@@ -340,7 +344,7 @@ export function connectionKeysIn(patch: object): string[] {
 }
 
 /** Owned by main (the custom list service with its own IPCs and sync, the known user); never taken from a renderer patch. */
-const MAIN_OWNED_KEYS: ReadonlySet<string> = new Set(['custom_lists', 'custom_lists_sync', 'synced_prefs_sync', 'known_user', 'account_owner'])
+const MAIN_OWNED_KEYS: ReadonlySet<string> = new Set(['custom_lists', 'custom_lists_sync', 'saved_filters', 'synced_prefs_sync', 'known_user', 'account_owner'])
 
 /** Every key of AppConfig, derived from the normalizer so the two cannot drift apart. */
 const CONFIG_KEYS: ReadonlySet<string> = new Set(Object.keys(normalizeConfig({})))

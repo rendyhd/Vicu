@@ -4,8 +4,9 @@
  * relied on: it places tasks without a date differently per database, and `position` has no
  * meaning outside a project view (`GET /tasks?sort_by=position` is a 400).
  *
- * - Sort keys: due_date, created, updated, priority, title, done_at, position. Any other key means
- *   last updated first.
+ * - Sort keys (section 3.6): due_date, start_date, end_date, created, updated, done_at, priority,
+ *   percent_done, title, done, id, position. Any other first key means last updated first; a
+ *   further key (`then_by`) this version does not know is skipped.
  * - Dates compare as instants, not as text ("...:00.500Z" is after "...:00Z"). A task without that
  *   date (empty, the Vikunja null date, or unreadable) comes last in both directions, so tasks
  *   without a due date never lead a descending list.
@@ -19,14 +20,28 @@
 
 /** The fields of a Vikunja task the sort reads. */
 export interface CustomListSortable {
+  id?: number
   title?: string
+  done?: boolean
   priority?: number
+  percent_done?: number
   position?: number
   due_date?: string | null
+  start_date?: string | null
+  end_date?: string | null
   created?: string | null
   updated?: string | null
   done_at?: string | null
 }
+
+/** A further sort key (section 3.6). */
+export interface CustomListSortKey { sort_by: string; order_by?: string }
+
+/** The keys the sort understands, in the order the list editor offers them. */
+export const CUSTOM_LIST_SORT_KEYS = [
+  'due_date', 'start_date', 'end_date', 'created', 'updated', 'done_at', 'priority',
+  'percent_done', 'title', 'done', 'id', 'position',
+] as const
 
 /** The instant of Vikunja's null date; no real date is at or before it. */
 const NULL_DATE_MS = Date.parse('0001-01-01T00:00:00Z')
@@ -58,38 +73,57 @@ function byKey<T, K extends number | string>(descending: boolean, key: (task: T)
   }
 }
 
-/** A sorted copy of `tasks`; the list given is not changed. */
+/** The order of one key, or null for a key this version does not know. */
+function comparatorFor<T extends CustomListSortable>(sortBy: string, orderBy: string | undefined): Comparator<T> | null {
+  const descending = (orderBy ?? '').toLowerCase() === 'desc'
+  switch (sortBy) {
+    case 'due_date':
+      return byDate(descending, (task) => task.due_date)
+    case 'start_date':
+      return byDate(descending, (task) => task.start_date)
+    case 'end_date':
+      return byDate(descending, (task) => task.end_date)
+    case 'created':
+      return byDate(descending, (task) => task.created)
+    case 'updated':
+      return byDate(descending, (task) => task.updated)
+    case 'done_at':
+      return byDate(descending, (task) => task.done_at)
+    case 'priority':
+      return byKey(descending, (task) => task.priority ?? 0)
+    case 'percent_done':
+      return byKey(descending, (task) => task.percent_done ?? 0)
+    case 'title':
+      return byKey(descending, (task) => (task.title ?? '').toLowerCase())
+    case 'done':
+      return byKey(descending, (task) => (task.done ? 1 : 0))
+    case 'id':
+      return byKey(descending, (task) => task.id ?? 0)
+    case 'position':
+      return byKey(descending, (task) => task.position ?? 0)
+    default:
+      return null
+  }
+}
+
+/** A sorted copy of `tasks`, by `sortBy` and then each `thenBy` key; the list given is not changed. */
 export function sortCustomListTasks<T extends CustomListSortable>(
   tasks: readonly T[],
   sortBy: string,
   orderBy: string,
+  thenBy: readonly CustomListSortKey[] = [],
 ): T[] {
-  const descending = orderBy.toLowerCase() === 'desc'
-  let comparator: Comparator<T>
-  switch (sortBy) {
-    case 'due_date':
-      comparator = byDate(descending, (task) => task.due_date)
-      break
-    case 'created':
-      comparator = byDate(descending, (task) => task.created)
-      break
-    case 'updated':
-      comparator = byDate(descending, (task) => task.updated)
-      break
-    case 'priority':
-      comparator = byKey(descending, (task) => task.priority ?? 0)
-      break
-    case 'title':
-      comparator = byKey(descending, (task) => (task.title ?? '').toLowerCase())
-      break
-    case 'done_at':
-      comparator = byDate(descending, (task) => task.done_at)
-      break
-    case 'position':
-      comparator = byKey(descending, (task) => task.position ?? 0)
-      break
-    default:
-      comparator = byDate(true, (task) => task.updated)
+  const comparators: Comparator<T>[] = [comparatorFor<T>(sortBy, orderBy) ?? byDate(true, (task) => task.updated)]
+  for (const key of thenBy) {
+    const next = comparatorFor<T>(key.sort_by, key.order_by)
+    if (next) comparators.push(next)
+  }
+  const comparator: Comparator<T> = (a, b) => {
+    for (const compare of comparators) {
+      const result = compare(a, b)
+      if (result !== 0) return result
+    }
+    return 0
   }
   // Array.prototype.sort is stable: ties keep the order they came in.
   return [...tasks].sort(comparator)
