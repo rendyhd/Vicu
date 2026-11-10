@@ -2,16 +2,44 @@ import { useEffect, useRef, useState } from 'react'
 import { useEditor, useEditorState, EditorContent, type Editor } from '@tiptap/react'
 import { BubbleMenu } from '@tiptap/react/menus'
 import { StarterKit } from '@tiptap/starter-kit'
-import { Link } from '@tiptap/extension-link'
 import { TaskList } from '@tiptap/extension-task-list'
 import { TaskItem } from '@tiptap/extension-task-item'
 import { Placeholder } from '@tiptap/extension-placeholder'
 import { ArrowDown, ArrowUp, Bold as BoldIcon, Italic as ItalicIcon, Strikethrough, Underline as UnderlineIcon, Code as CodeIcon, List, ListOrdered, ListChecks, Link2 } from 'lucide-react'
 import { cn } from '@/lib/cn'
-import { isAllowedDescriptionUrl, resolveOpenableDescriptionHref } from '@/lib/description-html'
+import { resolveOpenableDescriptionHref } from '@/lib/description-html'
+import { DescriptionLink } from '@/components/rich-text/description-link'
+import { MarkdownShortcuts } from '@/components/rich-text/markdown-shortcuts'
 import { sanitizeTaskHtmlForStorage } from '@/lib/sanitize-html'
+import { markdownPasteContent } from '@/lib/markdown-input'
+import type { EditorView } from '@tiptap/pm/view'
 import { LinkDialog } from '@/components/rich-text/LinkDialog'
 import { MoveListItem, canMoveListItem, isInListItem, moveListItem, type MoveDirection } from '@/components/rich-text/move-list-item'
+
+/** How long after Shift+Mod+V a paste counts as "paste as plain text". */
+const PLAIN_PASTE_WINDOW_MS = 1000
+
+/**
+ * Pasted Markdown becomes notes (description format, "Markdown input"): only text that comes
+ * without an HTML version, outside a code block, and not pasted as plain text.
+ */
+function pasteMarkdown(view: EditorView, event: ClipboardEvent, plainPasteAt: number): boolean {
+  const data = event.clipboardData
+  if (!data || data.types.includes('text/html') || Date.now() - plainPasteAt < PLAIN_PASTE_WINDOW_MS) return false
+  if (view.state.selection.$from.parent.type.spec.code) return false
+  const content = markdownPasteContent(data.getData('text/plain'))
+  if (!content) return false
+  const editor = (view.dom as HTMLElement & { editor?: Editor }).editor
+  if (!editor) return false
+  event.preventDefault()
+  const html = sanitizeTaskHtmlForStorage(content.html)
+  editor
+    .chain()
+    .focus()
+    .insertContent(html, content.inline ? undefined : { parseOptions: { preserveWhitespace: false } })
+    .run()
+  return true
+}
 
 interface RichTextEditorProps {
   value: string
@@ -49,6 +77,8 @@ export function RichTextEditor({
   onPasteRef.current = onPaste
   onReadyRef.current = onReady
 
+  const plainPasteAt = useRef(0)
+
   const [linkDialog, setLinkDialog] = useState<{
     open: boolean
     initialUrl: string
@@ -58,18 +88,17 @@ export function RichTextEditor({
   const editor = useEditor({
     extensions: [
       StarterKit.configure({ link: false }),
-      Link.configure({
-        openOnClick: false,
-        autolink: true,
-        protocols: ['mailto'],
-        isAllowedUri: (url) => isAllowedDescriptionUrl(url),
-        HTMLAttributes: {},
-      }),
+      DescriptionLink,
       TaskList,
       TaskItem.configure({ nested: true }),
       MoveListItem,
+      MarkdownShortcuts,
       Placeholder.configure({ placeholder: placeholder ?? '' }),
     ],
+    // Pasted Markdown is converted by pasteMarkdown, by the shared rules; StarterKit's own paste
+    // rules would also format `*text*` in HTML pastes and plain-text pastes. Link's rule stays, so
+    // a pasted URL is still a link.
+    enablePasteRules: ['link'],
     content: sanitizeTaskHtmlForStorage(value),
     autofocus: autoFocus ? 'end' : false,
     editorProps: {
@@ -81,12 +110,16 @@ export function RichTextEditor({
         ),
       },
       handleKeyDown: (_view, event) => {
+        // Shift+paste is "paste as plain text": the paste that follows is not read as Markdown.
+        if (event.shiftKey && (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'v') {
+          plainPasteAt.current = Date.now()
+        }
         const result = onKeyDownRef.current?.(event)
         return result === true
       },
-      handlePaste: (_view, event) => {
-        const result = onPasteRef.current?.(event)
-        return result === true
+      handlePaste: (view, event) => {
+        if (onPasteRef.current?.(event) === true) return true
+        return pasteMarkdown(view, event, plainPasteAt.current)
       },
       handleClick: (_view, _pos, event) => {
         if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
@@ -124,8 +157,11 @@ export function RichTextEditor({
 
   useEffect(() => {
     if (!editor) return
+    // Compare stored forms: replacing the document whenever the editor's own
+    // HTML differs only in what the sanitizer drops would reset the text being
+    // typed (rendyhd/Vicu#67).
     const sanitized = sanitizeTaskHtmlForStorage(value)
-    if (editor.getHTML() !== sanitized) {
+    if (sanitizeTaskHtmlForStorage(editor.getHTML()) !== sanitized) {
       editor.commands.setContent(sanitized, { emitUpdate: false })
     }
   }, [value, editor])
