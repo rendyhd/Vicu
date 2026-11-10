@@ -67,9 +67,18 @@ jobs:
         timeout-minutes: 30
         run: npx electron-builder --linux AppImage:${{ matrix.arch }} --publish never
 
+      # The update information and .zsync of the release workflow
+      # (scripts/appimage-update-info.mjs, without --upload), so both
+      # architectures are checked before a tag depends on it.
+      - name: Add update information (${{ matrix.arch }})
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq zsync
+          node scripts/appimage-update-info.mjs
+
       - name: Upload AppImage artifact
         uses: actions/upload-artifact@v4
         with:
           name: vicu-linux-${{ matrix.arch }}-appimage
-          path: dist/*.AppImage
+          path: dist/*.AppImage*
           if-no-files-found: warn

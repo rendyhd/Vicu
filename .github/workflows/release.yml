@@ -10,8 +10,9 @@ permissions:
 
 jobs:
   # Create the draft release up-front so build-windows, build-macos, and
-  # build-linux all see an existing release when they call
-  # `electron-builder --publish always`. Without this, each runner races
+  # build-linux all see an existing release when they upload (Windows and
+  # macOS through `electron-builder --publish always`, Linux through
+  # scripts/appimage-update-info.mjs). Without this, each runner races
   # to POST /repos/.../releases and whoever loses gets `422 already_exists`
   # and fails the job.
   #
@@ -20,8 +21,8 @@ jobs:
   # a pre-release. A plain tag can still ask for a pre-release when it is an
   # annotated tag whose message contains [prerelease]; that keeps the version
   # in package.json and the tag equal, which electron-builder needs. The "kind"
-  # step is the only place that decides this; the publish-release job reads
-  # its result.
+  # step is the only place that decides this; build-linux (the AppImage update
+  # channel) and the publish-release job read its result.
   create-release:
     runs-on: ubuntu-latest
     outputs:
@@ -207,6 +208,13 @@ jobs:
           node-version: 22
           cache: npm
 
+      # zsyncmake, for the AppImage update step below. Installed first so a
+      # failing apt-get fails the job in seconds, not after the build.
+      - name: Install zsync
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq zsync
+
       - run: npm ci
 
       - name: Typecheck
@@ -217,26 +225,28 @@ jobs:
 
       # electron-builder.yml lists both arches under linux.target; we override
       # via the positional `AppImage:<arch>` target so each matrix runner only
-      # builds and publishes its matrix arch. Without this override both
-      # runners would build both arches AND publish them, leading to duplicate
-      # asset-upload conflicts on the second runner.
-      - name: Build and publish (${{ matrix.arch }})
-        run: npm run build && npm run speech:lib && npx electron-builder --linux AppImage:${{ matrix.arch }} --publish always
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # builds its matrix arch. Without this override both runners would build
+      # both arches AND upload them, leading to duplicate asset-upload
+      # conflicts on the second runner.
+      - name: Build (${{ matrix.arch }})
+        run: npm run build && npm run speech:lib && npx electron-builder --linux AppImage:${{ matrix.arch }} --publish never
 
-      - name: Remove blockmap assets
-        run: |
-          for asset in dist/*.blockmap; do
-            [ -f "$asset" ] || continue
-            name=$(basename "$asset")
-            gh release delete-asset "${{ github.ref_name }}" "$name" --yes || true
-          done
+      # electron-builder leaves the AppImage's update information empty, so
+      # AppImage managers cannot find newer versions. The script writes it
+      # (gh-releases-zsync, pointing at this repository's releases), makes the
+      # .zsync it names and uploads both into the draft. Building with
+      # --publish never above keeps the unpatched AppImage (and its blockmap)
+      # off the release. Pre-releases get the latest-all channel, so they are
+      # offered newer pre-releases and the next stable, never an older stable.
+      - name: Add update information and publish (${{ matrix.arch }})
+        run: node scripts/appimage-update-info.mjs --channel "$CHANNEL" --upload "${{ github.ref_name }}"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CHANNEL: ${{ needs.create-release.outputs.prerelease == 'true' && 'latest-all' || 'latest' }}
 
   # Publish the draft release once every platform build has uploaded its assets.
-  # The build jobs upload via `electron-builder --publish always` but leave the
+  # The build jobs upload their assets (electron-builder --publish always on
+  # Windows and macOS, scripts/appimage-update-info.mjs on Linux) but leave the
   # release as the draft that create-release made, so nothing publishes it on its
   # own. This flips it to published only after all builds succeed — a failed
   # build leaves the release as a draft instead of shipping a partial release.

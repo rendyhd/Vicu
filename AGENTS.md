@@ -36,10 +36,10 @@ GitHub Actions workflow at `.github/workflows/release.yml` triggers on tag pushe
 - **create-release**: decides stable or pre-release from the tag alone (a plain `vX.Y.Z` is stable; any suffix such as `v1.9.0-beta.1` is a pre-release, and so is a plain tag whose annotation contains `[prerelease]`, e.g. `git tag -a v1.9.0 -m "Vicu 1.9.0 [prerelease]"`; nothing is hardcoded per version) and creates the draft release up front, with notes taken from `docs/releases/<tag>.md` in the repository (generated notes when that file is missing).
 - **Windows** NSIS x64 (`build-windows`, `windows-latest`, `npm run dist:publish`)
 - **macOS** DMG arm64 (`build-macos`, `macos-latest`, `npm run dist:mac:publish`)
-- **Linux** AppImage x64 + arm64 (`build-linux` matrix — `ubuntu-latest` for x64, `ubuntu-24.04-arm` for arm64, `npm run dist:linux:publish`)
+- **Linux** AppImage x64 + arm64 (`build-linux` matrix — `ubuntu-latest` for x64, `ubuntu-24.04-arm` for arm64; built with `--publish never`, then `scripts/appimage-update-info.mjs --channel <latest|latest-all> --upload <tag>` writes the AppImage update information and uploads the AppImage with its `.zsync`)
 - **publish-release**: once all builds succeeded, flips the draft to published (stable tags become "Latest", others are marked pre-release).
 
-Each build job runs `npm run typecheck` and `npm test` before packaging, then uploads into the draft with `electron-builder --publish always`. Windows builds are unsigned. macOS signs and notarizes only when the `BUILD_CERTIFICATE_BASE64` and `APPLE_*` secrets exist; without them the DMG is unsigned.
+Each build job runs `npm run typecheck` and `npm test` before packaging, then uploads into the draft: Windows and macOS with `electron-builder --publish always`, Linux through `scripts/appimage-update-info.mjs`. Windows builds are unsigned. macOS signs and notarizes only when the `BUILD_CERTIFICATE_BASE64` and `APPLE_*` secrets exist; without them the DMG is unsigned.
 
 **Do NOT manually create releases or attach build artifacts** — CI handles everything. `create-release` makes the draft first so the three build jobs do not race to create it; a release made by hand will have no assets.
 
