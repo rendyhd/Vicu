@@ -45,6 +45,9 @@ export function resolveViewerFilter(
         comments: filter.comments,
         shared_only: filter.shared_only,
         changed_within_days: filter.changed_within_days,
+        rule: filter.rule,
+        rule_include_nulls: filter.rule_include_nulls,
+        then_by: filter.then_by,
       },
     }
   }
@@ -115,6 +118,6 @@ export function selectQuickViewTasks<T extends CustomListTask & CustomListSortab
   // A custom list has its own sort, applied here like the main window does: tasks without the
   // date last in both directions and ties in the order they came in. Plain filters keep the
   // order the server (or the position fetch) gave.
-  const sorted = sortCustomListTasks(kept, resolved.filter.sort_by, resolved.filter.order_by)
+  const sorted = sortCustomListTasks(kept, resolved.filter.sort_by, resolved.filter.order_by, resolved.filter.then_by ?? [])
   return withoutNestedSubtasks(sorted, { hideChildrenOfCompletedParents: false })
 }

@@ -27,6 +27,7 @@ import type { AppConfig, Project } from '@/lib/vikunja-types'
 import { TASK_ORDER_KEYS, TASK_ORDER_LABELS, parseTaskOrder } from '../../../shared/task-order'
 import type { ProjectCategory } from '../../../shared/project-categories'
 import { useProjectsWithoutIcon } from '@/hooks/use-project-icons'
+import { SavedFilterSettings } from './SavedFilterSettings'
 
 const ROOT_ID = 'project-root-settings'
 
@@ -532,6 +533,8 @@ export function ProjectSettings({ config, onChange }: ProjectSettingsProps) {
       </div>
 
       <ReviewSettingsPanel config={config} onChange={onChange} />
+
+      <SavedFilterSettings />
     </>
   )
 }

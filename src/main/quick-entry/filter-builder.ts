@@ -1,6 +1,6 @@
 import type { ViewerFilter } from '../config'
 import { MAX_PAGE_SIZE } from '../api-v2'
-import { buildCustomListServerFilter } from '../../shared/custom-list-filter'
+import { buildCustomListServerFilter, customListRuleParams } from '../../shared/custom-list-filter'
 import { dueWindowClause, startOfLocalDayIso } from '../../shared/due-dates'
 
 // Vikunja caps per_page at 1000 (anything above is a 422). No `page` is set on purpose:
@@ -12,6 +12,7 @@ interface FilterParams {
   order_by: string
   per_page: number
   filter_include_nulls?: string
+  filter_timezone?: string
 }
 
 /**
@@ -69,6 +70,10 @@ export function buildViewerFilterParams(viewerFilter: ViewerFilter, now: Date = 
   if (sortBy === 'due_date' && !isUnionMode) {
     params.filter_include_nulls = 'true'
   }
+  // A custom list's rule (section 3.5): its dates in this device's zone, and its own null rule.
+  const rule = customListRuleParams(viewerFilter)
+  if (rule.filter_timezone) params.filter_timezone = rule.filter_timezone
+  if (rule.filter_include_nulls) params.filter_include_nulls = 'true'
 
   return params
 }

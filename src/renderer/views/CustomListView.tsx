@@ -1,5 +1,9 @@
 import { useMemo, useRef, useState } from 'react'
 import { useParams } from '@tanstack/react-router'
+import { useQueryClient } from '@tanstack/react-query'
+import { Info } from 'lucide-react'
+import { api } from '@/lib/api'
+import { SAVED_FILTERS_QUERY_KEY, useSavedFilters } from '@/hooks/use-saved-filters'
 import { useTasks } from '@/hooks/use-tasks'
 import { useProjects } from '@/hooks/use-projects'
 import { useCustomList } from '@/hooks/use-custom-lists'
@@ -9,7 +13,7 @@ import { usePrintable } from '@/stores/print-store'
 import { useDayKey } from '@/stores/day-store'
 import { TaskList } from '@/components/task-list/TaskList'
 import { RowViewProvider } from '@/components/task-list/RowViewContext'
-import { buildCustomListServerFilter, matchesCustomList, type CustomListContext } from '@/lib/custom-list-filter'
+import { buildCustomListServerFilter, customListRuleParams, matchesCustomList, type CustomListContext } from '@/lib/custom-list-filter'
 import { serverSortParams, sortCustomListTasks } from '@/lib/custom-list-sort'
 import { toLocalDate } from '@/lib/due-dates'
 import { withoutNestedSubtasks } from '@/lib/nested-subtasks'
@@ -27,6 +31,8 @@ function buildQueryParams(list: CustomList): TaskQueryParams {
   const { filter } = list
   return {
     filter: buildCustomListServerFilter(filter),
+    // The rule's dates are read in this device's zone (section 3.5).
+    ...customListRuleParams(filter),
     // The order shown is applied below (sortCustomListTasks); the server only gets a sort it accepts.
     ...serverSortParams(filter.sort_by, filter.order_by),
     keep_nested_subtasks: true,
@@ -43,6 +49,16 @@ export function CustomListView() {
   const { data: projects } = useProjects()
   const { data: config } = useAppConfig()
   const [creationNotice, setCreationNotice] = useState<string | null>(null)
+  const { data: savedFilters } = useSavedFilters()
+  const queryClient = useQueryClient()
+  // An imported list says once, on this device, that it is a copy (section 3.7).
+  const showImportNotice = typeof customList?.saved_filter_id === 'number'
+    && savedFilters !== undefined
+    && !savedFilters.notice_closed.includes(customList.id)
+  const closeImportNotice = () => {
+    if (!customList) return
+    void api.closeSavedFilterNotice(customList.id).then((state) => queryClient.setQueryData(SAVED_FILTERS_QUERY_KEY, state))
+  }
   // The server filter holds local-day boundaries for date windows. They are computed when the
   // params are built, so the day is a dependency: after midnight the filter (and with it the query
   // key) changes instead of reusing yesterday's window.
@@ -85,7 +101,7 @@ export function CustomListView() {
     })
     // The list's own sort, the same as on Android: tasks without the date last in both directions,
     // ties in the order they came in. Subtasks are hidden after sorting, so the order holds.
-    const sorted = sortCustomListTasks(matching, customList.filter.sort_by, customList.filter.order_by)
+    const sorted = sortCustomListTasks(matching, customList.filter.sort_by, customList.filter.order_by, customList.filter.then_by ?? [])
     // A matching subtask is shown even when its parent does not match (cross-app semantics v1, 3.2).
     return withoutNestedSubtasks(sorted, { hideChildrenOfCompletedParents: false })
   }, [tasks, customList, projects?.flat, dayKey, context])
@@ -129,10 +145,31 @@ export function CustomListView() {
         setCreationNotice(`Task created in ${projectTitle}, but it does not currently match this list's filters.`)
         setTimeout(() => setCreationNotice(null), 6000)
       }}
-      headerContent={creationNotice ? (
-        <div className="mx-4 mb-2 rounded-control bg-[var(--bg-hover)] px-3 py-2 text-xs text-[var(--text-secondary)]">
-          {creationNotice}
-        </div>
+      headerContent={creationNotice || showImportNotice ? (
+        <>
+          {showImportNotice && (
+            <div className="mx-4 mb-2 flex items-start gap-2 rounded-control bg-[var(--bg-hover)] px-3 py-2 text-xs text-[var(--text-secondary)]">
+              <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-accent-blue" aria-hidden />
+              <p className="flex-1">
+                <span className="block font-medium text-[var(--text-primary)]">Imported from your server</span>
+                This list is a copy of the saved filter &ldquo;{customList?.name}&rdquo;. Changes you make here stay in Vicu
+                and won&apos;t update the filter on your server.
+              </p>
+              <button
+                type="button"
+                onClick={closeImportNotice}
+                className="shrink-0 rounded-control px-2 py-0.5 font-medium text-accent-blue hover:bg-[var(--bg-secondary)]"
+              >
+                Got it
+              </button>
+            </div>
+          )}
+          {creationNotice && (
+            <div className="mx-4 mb-2 rounded-control bg-[var(--bg-hover)] px-3 py-2 text-xs text-[var(--text-secondary)]">
+              {creationNotice}
+            </div>
+          )}
+        </>
       ) : undefined}
       emptyTitle="No matching tasks"
       emptySubtitle="Try adjusting the list filters"

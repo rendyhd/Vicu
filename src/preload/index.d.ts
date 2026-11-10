@@ -28,6 +28,7 @@ import type {
   TaskCommentPage,
 } from '../renderer/lib/vikunja-types'
 import type { TaskPatch } from '../shared/merge-patches'
+import type { SavedFilterImportOutcome, SavedFilterPreview, SavedFilterState } from '../shared/saved-filter-import'
 import type { SyncedPrefsSnapshot } from '../shared/synced-prefs'
 import type {
   OfflineCreateInput,
@@ -142,6 +143,13 @@ export interface ElectronAPI {
   reorderCustomLists(ids: string[]): Promise<CustomList[]>
   syncCustomLists(): Promise<CustomListSyncStatus>
   getCustomListSyncStatus(): Promise<CustomListSyncStatus>
+  getSavedFilterState(): Promise<SavedFilterState>
+  previewSavedFilters(ids?: number[]): Promise<SavedFilterPreview[] | null>
+  importSavedFilters(ids: number[]): Promise<SavedFilterImportOutcome | null>
+  dismissSavedFilters(ids: number[]): Promise<SavedFilterState>
+  closeSavedFilterNotice(listId: string): Promise<SavedFilterState>
+  onSavedFiltersChanged(cb: (state: SavedFilterState) => void): () => void
+  onSavedFiltersImported(cb: (outcome: SavedFilterImportOutcome) => void): () => void
   onCustomListsChanged(cb: (lists: CustomList[]) => void): () => void
   onCustomListSyncStatus(cb: (status: CustomListSyncStatus) => void): () => void
   /** The synced preferences (cross-app semantics 11): every entry's value and the Inbox in use. */

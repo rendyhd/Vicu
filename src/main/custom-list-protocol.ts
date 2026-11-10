@@ -111,7 +111,7 @@ export function pruneTombstones(document: CustomListSyncDocumentV1, now = Date.n
   return { ...document, lists }
 }
 
-const KNOWN_LIST_KEYS: ReadonlySet<string> = new Set(['id', 'name', 'icon', 'filter'])
+const KNOWN_LIST_KEYS: ReadonlySet<string> = new Set(['id', 'name', 'icon', 'filter', 'saved_filter_id'])
 const KNOWN_FILTER_KEYS: ReadonlySet<string> = new Set([
   'project_ids',
   'project_filter_mode',
@@ -128,7 +128,19 @@ const KNOWN_FILTER_KEYS: ReadonlySet<string> = new Set([
   'comments',
   'shared_only',
   'changed_within_days',
+  'rule',
+  'rule_include_nulls',
+  'then_by',
 ])
+
+/** `then_by` in its canonical form: entries with a string key, the order `asc` or `desc`. */
+function normalizeThenBy(value: unknown): Array<{ sort_by: string; order_by: string }> {
+  if (!Array.isArray(value)) return []
+  return value
+    .filter((entry): entry is { sort_by: string; order_by?: unknown } =>
+      typeof entry === 'object' && entry !== null && typeof (entry as { sort_by?: unknown }).sort_by === 'string')
+    .map((entry) => ({ sort_by: entry.sort_by, order_by: entry.order_by === 'desc' ? 'desc' : 'asc' }))
+}
 
 /**
  * The fields of `source` that are not in `known`, with keys in sorted order so two devices
@@ -151,8 +163,10 @@ function unknownFields(source: object, known: ReadonlySet<string>): Record<strin
  * `shared_only` when true and `changed_within_days` when it is a whole number of 1 or more.
  */
 export function normalizeWireList(value: CustomListWire): CustomListWire {
-  const { assigned, comments } = value.filter
+  const { assigned, comments, rule } = value.filter
   const changedDays = changedWithinDays(value.filter)
+  const thenBy = normalizeThenBy(value.filter.then_by)
+  const savedFilterId = value.saved_filter_id
   return {
     id: value.id,
     name: value.name.trim(),
@@ -173,8 +187,12 @@ export function normalizeWireList(value: CustomListWire): CustomListWire {
       ...(typeof comments === 'string' && comments ? { comments } : {}),
       ...(value.filter.shared_only === true ? { shared_only: true } : {}),
       ...(changedDays !== null ? { changed_within_days: changedDays } : {}),
+      ...(typeof rule === 'string' && rule.trim() !== '' ? { rule } : {}),
+      ...(value.filter.rule_include_nulls === true ? { rule_include_nulls: true } : {}),
+      ...(thenBy.length > 0 ? { then_by: thenBy } : {}),
       ...unknownFields(value.filter, KNOWN_FILTER_KEYS),
     },
+    ...(typeof savedFilterId === 'number' && Number.isInteger(savedFilterId) ? { saved_filter_id: savedFilterId } : {}),
     ...unknownFields(value, KNOWN_LIST_KEYS),
   }
 }
@@ -241,7 +259,47 @@ export function activeLists(document: CustomListSyncDocumentV1): CustomListWire[
   const missing = active
     .filter((record) => !seen.has(record.value.id))
     .sort((left, right) => compareRevision(left.revision, right.revision) || compareStrings(left.value.id, right.value.id))
-  return [...result, ...missing.map((record) => normalizeWireList(record.value))]
+  return withoutDuplicateImports([...result, ...missing.map((record) => normalizeWireList(record.value))])
+}
+
+/**
+ * `lists` without the ones that repeat another list's saved filter: per `saved_filter_id`, the
+ * list whose id sorts first stays (section 3.7).
+ */
+export function withoutDuplicateImports(lists: CustomListWire[]): CustomListWire[] {
+  const winners = new Map<number, string>()
+  for (const list of lists) {
+    const filterId = list.saved_filter_id
+    if (typeof filterId !== 'number') continue
+    const current = winners.get(filterId)
+    if (current === undefined || compareStrings(list.id, current) < 0) winners.set(filterId, list.id)
+  }
+  return lists.filter((list) => typeof list.saved_filter_id !== 'number' || winners.get(list.saved_filter_id) === list.id)
+}
+
+/** The lists `activeLists` hides as duplicate imports, which the next write turns into tombstones. */
+export function duplicateImports(document: CustomListSyncDocumentV1): string[] {
+  const active = Object.values(document.lists).flatMap((record) => (record.value ? [record.value] : []))
+  const kept = new Set(withoutDuplicateImports(active).map((list) => list.id))
+  return active.map((list) => list.id).filter((id) => !kept.has(id)).sort(compareStrings)
+}
+
+/** `document` with every hidden duplicate import deleted (a tombstone stamped `deviceId`). */
+export function dropDuplicateImports(
+  document: CustomListSyncDocumentV1,
+  deviceId: string,
+  now = Date.now(),
+): CustomListSyncDocumentV1 {
+  for (const id of duplicateImports(document)) {
+    document.lists[id] = { value: null, revision: nextRevision(document, deviceId, now) }
+  }
+  return document
+}
+
+/** The union of two `imported_saved_filters`, ascending; undefined when empty. */
+export function unionImported(left?: number[], right?: number[]): number[] | undefined {
+  const all = [...new Set([...(left ?? []), ...(right ?? [])])].filter((id) => Number.isInteger(id)).sort((a, b) => a - b)
+  return all.length > 0 ? all : undefined
 }
 
 export function normalizeDocument(document: CustomListSyncDocumentV1): CustomListSyncDocumentV1 {
@@ -250,6 +308,8 @@ export function normalizeDocument(document: CustomListSyncDocumentV1): CustomLis
     lists[id] = { ...record, value: record.value ? normalizeWireList({ ...record.value, id }) : null }
   }
   const normalized: CustomListSyncDocumentV1 = { version: 1, lists, order: { ...document.order, ids: [...document.order.ids] } }
+  const imported = unionImported(document.imported_saved_filters)
+  if (imported) normalized.imported_saved_filters = imported
   normalized.order.ids = activeLists(normalized).map((list) => list.id)
   return normalized
 }
@@ -265,7 +325,13 @@ export function mergeCustomListDocuments(
     lists[id] = !a ? b : !b ? a : compareRevision(a.revision, b.revision) >= 0 ? a : b
   }
   const order = compareRevision(left.order.revision, right.order.revision) >= 0 ? left.order : right.order
-  return normalizeDocument({ version: 1, lists, order: { ids: [...order.ids], revision: { ...order.revision } } })
+  const imported = unionImported(left.imported_saved_filters, right.imported_saved_filters)
+  return normalizeDocument({
+    version: 1,
+    lists,
+    order: { ids: [...order.ids], revision: { ...order.revision } },
+    ...(imported ? { imported_saved_filters: imported } : {}),
+  })
 }
 
 function validateRevision(value: unknown): asserts value is CustomListRevision {

@@ -243,6 +243,15 @@ export const api = {
   readSetupPreferences: (url: string, token?: string) => window.api.readSetupPreferences(url, token),
   syncCustomLists: () => window.api.syncCustomLists(),
   getCustomListSyncStatus: () => window.api.getCustomListSyncStatus(),
+  getSavedFilterState: () => window.api.getSavedFilterState(),
+  previewSavedFilters: (ids?: number[]) => window.api.previewSavedFilters(ids),
+  importSavedFilters: (ids: number[]) => window.api.importSavedFilters(ids),
+  dismissSavedFilters: (ids: number[]) => window.api.dismissSavedFilters(ids),
+  closeSavedFilterNotice: (listId: string) => window.api.closeSavedFilterNotice(listId),
+  onSavedFiltersChanged: (cb: (state: import('../../shared/saved-filter-import').SavedFilterState) => void) =>
+    window.api.onSavedFiltersChanged(cb),
+  onSavedFiltersImported: (cb: (outcome: import('../../shared/saved-filter-import').SavedFilterImportOutcome) => void) =>
+    window.api.onSavedFiltersImported(cb),
   getUnsyncedDocuments: () => window.api.getUnsyncedDocuments(),
   discardUnsyncedDocuments: () => window.api.discardUnsyncedDocuments(),
   onSyncedPrefsStatus: (cb: (status: import('./vikunja-types').CustomListSyncStatus) => void) =>

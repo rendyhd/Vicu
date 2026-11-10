@@ -641,6 +641,19 @@ export function AppShell() {
     })
   }, [navigate])
 
+  // Saved filters imported as lists (first connect or Settings, cross-app semantics 3.7): say so,
+  // with Open for the first one.
+  useEffect(() => {
+    return api.onSavedFiltersImported(({ count, list_id: listId }) => {
+      if (count < 1) return
+      const message = count === 1 ? 'Imported 1 saved filter as a list' : `Imported ${count} saved filters as lists`
+      toast.success(message, {
+        key: 'saved-filters-imported',
+        ...(listId ? { action: { label: 'Open', onAction: () => navigate({ to: '/list/$listId', params: { listId } }) } } : {}),
+      })
+    })
+  }, [navigate])
+
   // A clicked task reminder or Quick View's "open in app": show that task in this window.
   useEffect(() => {
     return api.onNavigateToTask((taskId) => {

@@ -69,11 +69,16 @@ describe('custom list sort fields', () => {
   it('offer the same keys as Android, in the same order', () => {
     expect([...CUSTOM_LIST_SORT_FIELDS]).toEqual([
       'due_date',
+      'start_date',
+      'end_date',
       'created',
       'updated',
-      'priority',
-      'title',
       'done_at',
+      'priority',
+      'percent_done',
+      'title',
+      'done',
+      'id',
       'position',
     ])
   })

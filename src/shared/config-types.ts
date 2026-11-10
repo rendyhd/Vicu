@@ -14,11 +14,16 @@ import type { TodayRoutinesLimit } from './today-routines'
 
 export const CUSTOM_LIST_SORT_FIELDS = [
   'due_date',
+  'start_date',
+  'end_date',
   'created',
   'updated',
-  'priority',
-  'title',
   'done_at',
+  'priority',
+  'percent_done',
+  'title',
+  'done',
+  'id',
   'position',
 ] as const
 export type CustomListSortField = (typeof CUSTOM_LIST_SORT_FIELDS)[number]
@@ -54,6 +59,12 @@ export interface CustomListWireFilter {
   shared_only?: boolean
   /** Only tasks changed on the last N local days, today included. Written only when a whole number of 1 or more. */
   changed_within_days?: number
+  /** A condition in Vikunja's filter language (section 3.5). Written only when not empty. */
+  rule?: string
+  /** Whether the rule's terms also match a task without a value. Written only when true. */
+  rule_include_nulls?: boolean
+  /** Sort keys after sort_by (section 3.6). Written only when not empty. */
+  then_by?: Array<{ sort_by: string; order_by: string }>
   [unknownField: string]: unknown
 }
 
@@ -62,6 +73,8 @@ export interface CustomListWire {
   name: string
   icon: string
   filter: CustomListWireFilter
+  /** The Vikunja saved filter the list was imported from (section 3.7). */
+  saved_filter_id?: number
   [unknownField: string]: unknown
 }
 
@@ -74,6 +87,8 @@ export interface CustomListSyncDocumentV1 {
   version: 1
   lists: Record<string, CustomListSyncRecord>
   order: { ids: string[]; revision: CustomListRevision }
+  /** The saved filters any device imported (section 3.7), merged as a union. */
+  imported_saved_filters?: number[]
 }
 
 /**
@@ -104,6 +119,12 @@ export interface CustomListFilter {
   shared_only?: boolean
   /** Only tasks changed on the last N local days, today included. Written only when a whole number of 1 or more. */
   changed_within_days?: number
+  /** A condition in Vikunja's filter language (section 3.5). */
+  rule?: string
+  /** Whether the rule's terms also match a task without a value. */
+  rule_include_nulls?: boolean
+  /** Sort keys after sort_by (section 3.6). */
+  then_by?: Array<{ sort_by: string; order_by: string }>
   [unknownField: string]: unknown
 }
 
@@ -112,6 +133,8 @@ export interface CustomList {
   name: string
   icon?: string
   filter: CustomListFilter
+  /** The Vikunja saved filter the list was imported from (section 3.7). */
+  saved_filter_id?: number
   [unknownField: string]: unknown
 }
 
@@ -154,6 +177,9 @@ export interface ViewerFilter {
   comments?: string
   shared_only?: boolean
   changed_within_days?: number
+  rule?: string
+  rule_include_nulls?: boolean
+  then_by?: Array<{ sort_by: string; order_by: string }>
 }
 
 export interface SecondaryProject {
@@ -219,6 +245,17 @@ export interface AppConfig {
    */
   sidebar_hidden_lists?: string[]
   custom_lists?: CustomList[]
+  /**
+   * What this device knows about the account's Vikunja saved filters (cross-app semantics 3.7):
+   * the filters the last project read found, whether the first connect imported them, the ones
+   * put off with Not now, and the imported lists whose first-open notice was closed. Owned by main.
+   */
+  saved_filters?: {
+    known: Array<{ id: number; title: string }>
+    first_connect_done?: boolean
+    dismissed?: number[]
+    notice_closed?: string[]
+  }
   /** Owned by the custom list service in the main process; the renderer never writes it. */
   custom_lists_sync?: {
     device_id: string

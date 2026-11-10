@@ -14,9 +14,13 @@
  *   `changed_within_days`, section 3.3) also read a `CustomListContext`: who you are and which
  *   projects are shared. `customListActivity` in the fixture covers them.
  *
- * This file only imports its sibling due-date helpers, so any tsconfig can include it.
+ * - A list's `rule` (section 3.5) is checked by `custom-list-rule.ts` after the conditions above;
+ *   the `customListRule` vectors cover it.
+ *
+ * This file only imports its sibling helpers, so any tsconfig can include it.
  */
 
+import { compileRule, ruleUsesLike, validateRule, type RuleTask } from './custom-list-rule'
 import {
   addLocalDays,
   diffLocalDays,
@@ -58,10 +62,14 @@ export interface CustomListFilterInput {
   shared_only?: boolean
   /** Only tasks changed on the last N local days, today included; a whole number of 1 or more. */
   changed_within_days?: number
+  /** A condition in Vikunja's filter language (section 3.5); absent or empty is none. */
+  rule?: string
+  /** Whether the rule's terms also match a task without a value for their field. */
+  rule_include_nulls?: boolean
 }
 
-/** The fields of a Vikunja task the evaluator reads. */
-export interface CustomListTask {
+/** The fields of a Vikunja task the evaluator reads (the rule reads more, all optional). */
+export interface CustomListTask extends Omit<RuleTask, 'project_id' | 'assignees'> {
   project_id: number
   done?: boolean
   due_date?: string | null
@@ -185,17 +193,33 @@ export function inDateWindow(
   }
 }
 
+/** The list's rule as a predicate at `now` (section 3.5); every task when there is none. */
+function ruleOf(filter: CustomListFilterInput, now: Date): (task: CustomListTask) => boolean {
+  return compileRule(filter.rule, filter.rule_include_nulls === true, now) as (task: CustomListTask) => boolean
+}
+
 /**
  * Whether `task` belongs on the list described by `filter`, on the local date `today`.
- * `context` is read by the collaboration conditions only; without it nothing is shared.
+ * `context` is read by the collaboration conditions only; without it nothing is shared. `now` is
+ * the moment the rule's `now` means (by default: the current moment).
  */
 export function matchesCustomList(
   task: CustomListTask,
   filter: CustomListFilterInput,
   today: EvaluationDay,
   context: CustomListContext = {},
+  now: Date = new Date(),
 ): boolean {
-  const day = dayOf(today)
+  return matchesForm(task, filter, dayOf(today), context) && ruleOf(filter, now)(task)
+}
+
+/** The conditions of sections 3.1 to 3.3, without the rule. */
+function matchesForm(
+  task: CustomListTask,
+  filter: CustomListFilterInput,
+  day: LocalDate,
+  context: CustomListContext,
+): boolean {
   const overdueToo = includesOverdue(filter)
 
   if (!filter.include_done && task.done) return false
@@ -231,9 +255,11 @@ export function filterCustomList<T extends CustomListTask>(
   filter: CustomListFilterInput,
   today: EvaluationDay,
   context: CustomListContext = {},
+  now: Date = new Date(),
 ): T[] {
   const day = dayOf(today)
-  return tasks.filter((task) => matchesCustomList(task, filter, day, context))
+  const rule = ruleOf(filter, now)
+  return tasks.filter((task) => matchesForm(task, filter, day, context) && rule(task))
 }
 
 // --- Server filter ----------------------------------------------------------------------
@@ -303,7 +329,32 @@ export function buildCustomListServerFilter(filter: CustomListFilterInput, now: 
   const days = changedWithinDays(filter)
   if (days !== null) parts.push(`updated >= '${startOfLocalDayIso(-(days - 1), now)}'`)
 
-  return parts.length > 0 ? parts.join(' && ') : undefined
+  const base = parts.join(' && ')
+  const rule = serverRule(filter)
+  if (rule !== null) return base === '' ? `(${rule})` : `(${base}) && (${rule})`
+  return parts.length > 0 ? base : undefined
+}
+
+/**
+ * The rule when the server can be asked for it (section 3.5): valid, and without `like`, whose
+ * case rules depend on the server's database. Null otherwise.
+ */
+function serverRule(filter: CustomListFilterInput): string | null {
+  const rule = filter.rule?.trim() ?? ''
+  if (rule === '' || validateRule(rule) !== null || ruleUsesLike(rule)) return null
+  return rule
+}
+
+/**
+ * What a list's query sends next to `filter` when the rule goes to the server: the device's zone
+ * for the rule's dates, and `filter_include_nulls` from the list (section 3.5).
+ */
+export function customListRuleParams(filter: CustomListFilterInput): { filter_timezone?: string; filter_include_nulls?: boolean } {
+  if (serverRule(filter) === null) return {}
+  return {
+    filter_timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    ...(filter.rule_include_nulls ? { filter_include_nulls: true } : {}),
+  }
 }
 
 /** Whether the "include overdue" option has any effect for this window (the editor shows it then). */
