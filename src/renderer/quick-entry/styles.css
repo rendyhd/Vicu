@@ -489,17 +489,11 @@ body {
 }
 
 /* Focus (card 1.5): the ring the main window draws. Buttons get it outside. The input and the
- * description field are borderless and run to the card edge, so their ring is drawn inside, where
- * the card's overflow clip cannot cut it. */
+ * description field draw no ring: the window is the text field, so the caret is the focus state
+ * (forced colours still draw one, below). */
 button:focus-visible {
   outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
-}
-
-#task-input:focus-visible,
-.description-input:focus-visible {
-  outline: 2px solid var(--focus-ring);
-  outline-offset: -2px;
 }
 
 /* Dark mode */
@@ -640,9 +634,11 @@ button:focus-visible {
     color: GrayText;
   }
 
+  /* Drawn inside, where the card's overflow clip cannot cut it. */
   #task-input:focus-visible,
   .description-input:focus-visible {
-    outline-color: Highlight;
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
   }
 
   #task-input:disabled {
