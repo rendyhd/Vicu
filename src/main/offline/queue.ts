@@ -12,6 +12,7 @@ import type {
   OfflineQueueCounts,
   OfflineQueueItemView,
   OfflineQueueSnapshot,
+  OfflineUploadView,
 } from '../../shared/offline-queue-types'
 import { OfflineAttachmentFiles } from './attachments'
 import { isSameOwner, type OfflineOwner } from './owner'
@@ -86,6 +87,11 @@ interface Meta {
 }
 
 const IMAGE_MIME = /^[a-z0-9][a-z0-9.+-]*\/[a-z0-9][a-z0-9.+-]*$/i
+
+/** What the task's attachment list shows of a queued upload. */
+function uploadView(action: UploadAttachmentAction): OfflineUploadView {
+  return { name: action.name, inline: action.addImageToken === true }
+}
 
 /**
  * The offline queue: pending actions, the failed log, temp-id bookkeeping and their persistence
@@ -195,6 +201,7 @@ export class OfflineQueue {
           createdAt: a.createdAt,
           attempts: a.attempts,
         }
+        if (a.type === 'upload-attachment') view.upload = uploadView(a)
         if (hasTaskId(a)) view.taskId = a.taskId
         else {
           view.taskId = a.tempId
@@ -218,6 +225,7 @@ export class OfflineQueue {
         failedAt: f.failedAt,
         groupId: f.groupId,
         taskId: hasTaskId(f.action) ? f.action.taskId : f.action.tempId,
+        ...(f.action.type === 'upload-attachment' ? { upload: uploadView(f.action) } : {}),
       })),
       replaying: this.replaying,
       authProblem: this.authProblem,

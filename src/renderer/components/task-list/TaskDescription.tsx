@@ -6,7 +6,7 @@ import { splitDescriptionImages, joinDescriptionImages, type DescriptionImage } 
 import { getClipboardImages, fileToUint8Array } from '@/lib/clipboard-images'
 import {
   useTaskAttachments,
-  useUploadAttachmentFromPaste,
+  useAttachPastedImage,
   useDeleteAttachment,
 } from '@/hooks/use-task-mutations'
 import { useAttachmentBlobUrl } from '@/hooks/use-attachment-bytes'
@@ -72,7 +72,7 @@ export function TaskDescription({
   onReady,
 }: Props) {
   const [uploadError, setUploadError] = useState<string | null>(null)
-  const uploadMutation = useUploadAttachmentFromPaste()
+  const uploadMutation = useAttachPastedImage()
   const deleteMutation = useDeleteAttachment()
   // Refs to latest text/images — paste is async and closes over stale deps otherwise.
   const textRef = useRef('')
@@ -154,7 +154,8 @@ export function TaskDescription({
                 fileName: img.name,
                 mimeType: img.mime,
               })
-              next.push({ kind: 'image', attachmentId: result.attachmentId })
+              // Offline the image waits in the queue and joins the notes once uploaded (issue 104).
+              if ('attachmentId' in result) next.push({ kind: 'image', attachmentId: result.attachmentId })
             } else if (onStagePending) {
               const uuid = crypto.randomUUID().slice(0, 8)
               const blobUrl = URL.createObjectURL(

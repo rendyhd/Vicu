@@ -208,8 +208,8 @@ const api = {
   // Attachments
   fetchTaskAttachments: (taskId: number) =>
     ipcRenderer.invoke('fetch-task-attachments', taskId),
-  uploadTaskAttachment: (taskId: number, fileData: Uint8Array, fileName: string, mimeType: string) =>
-    ipcRenderer.invoke('upload-task-attachment', taskId, fileData, fileName, mimeType),
+  uploadTaskAttachment: (taskId: number, fileData: Uint8Array, fileName: string, mimeType: string, options?: unknown) =>
+    ipcRenderer.invoke('upload-task-attachment', taskId, fileData, fileName, mimeType, options),
   deleteTaskAttachment: (taskId: number, attachmentId: number) =>
     ipcRenderer.invoke('delete-task-attachment', taskId, attachmentId),
   fetchTaskAttachmentBytes: (taskId: number, attachmentId: number, size?: 'preview' | 'original') =>
