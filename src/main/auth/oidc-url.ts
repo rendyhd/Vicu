@@ -55,7 +55,7 @@ export function buildAuthorizationUrl(
 export type RedirectOutcome =
   | { kind: 'ignore' }
   | { kind: 'code'; code: string }
-  | { kind: 'error'; message: string }
+  | { kind: 'error'; message: string; error?: string; description?: string }
 
 function stripTrailingSlashes(path: string): string {
   return path.replace(/\/+$/, '')
@@ -95,6 +95,8 @@ export function interpretRedirect(
   if (error) {
     return {
       kind: 'error',
+      error,
+      description: parsed.searchParams.get('error_description') ?? undefined,
       message:
         `${wording.errorPrefix ?? 'OIDC login failed'}: ${error} — ` +
         (parsed.searchParams.get('error_description') ?? wording.defaultErrorDescription ?? 'unknown error'),

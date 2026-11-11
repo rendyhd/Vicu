@@ -6,11 +6,23 @@ import { Checkbox } from '@/components/shared/Checkbox'
 import { cn } from '@/lib/cn'
 import { useCalendarActions } from '@/hooks/use-calendar-events'
 import { CALDAV_PRESETS, caldavPreset, type CaldavDraft, type CaldavPresetId } from '../../../shared/calendar-sources'
+import { CALENDAR_ACCOUNT_PROVIDERS } from '../../../shared/calendar-accounts'
+import { OAuthAccountForm } from './OAuthAccountForm'
+import { PickCalendars } from './PickCalendars'
 
-// Add a calendar (contract 20.9): a calendar link or a CalDAV account. The link and the password go
-// to the main process once and are never read back; nothing is saved until the calendar was read.
+// Add a calendar (contract 20.9): a calendar link, a CalDAV account, or a Microsoft 365 or Google
+// account. The link, the password and the tokens stay in the main process and are never read back;
+// nothing is saved until the calendar was read (a link) or the calendars were picked (an account).
 
-type Kind = 'link' | 'account'
+type Kind = 'link' | 'account' | 'microsoft' | 'google'
+
+/** The kinds the dialog offers, in order. */
+const KINDS: { value: Kind; label: string; summary: string }[] = [
+  { value: 'link', label: 'Calendar link', summary: 'A secret address of a calendar (iCal, .ics). Read every few minutes.' },
+  { value: 'account', label: 'CalDAV account', summary: 'iCloud, Fastmail, Nextcloud and other CalDAV servers. Pick which calendars to show.' },
+  { value: 'microsoft', label: CALENDAR_ACCOUNT_PROVIDERS.microsoft.label, summary: CALENDAR_ACCOUNT_PROVIDERS.microsoft.summary },
+  { value: 'google', label: CALENDAR_ACCOUNT_PROVIDERS.google.label, summary: CALENDAR_ACCOUNT_PROVIDERS.google.summary },
+]
 
 const INPUT =
   'w-full rounded-control border border-border bg-transparent px-2 py-1 text-meta text-text placeholder:text-text-secondary'
@@ -23,7 +35,7 @@ const LINK_HELP: { name: string; where: string }[] = [
   { name: 'Proton', where: 'the calendar’s Share, Share via link ("Limited view" gives busy times only).' },
 ]
 
-function Segmented<T extends string>({ label, value, options, onChange, data }: {
+export function Segmented<T extends string>({ label, value, options, onChange, data }: {
   label: string
   value: T
   options: { value: T; label: string }[]
@@ -117,7 +129,7 @@ function LinkForm({ onDone, onCancel }: { onDone: () => void; onCancel: () => vo
 }
 
 function AccountForm({ onDone, onCancel }: { onDone: () => void; onCancel: () => void }) {
-  const { discover, saveAccount } = useCalendarActions()
+  const { discover } = useCalendarActions()
   const serverId = useId()
   const userId = useId()
   const passwordId = useId()
@@ -126,8 +138,6 @@ function AccountForm({ onDone, onCancel }: { onDone: () => void; onCancel: () =>
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [draft, setDraft] = useState<CaldavDraft | null>(null)
-  const [shown, setShown] = useState<Set<string>>(new Set())
-  const [busyOnly, setBusyOnly] = useState(false)
   const preset = caldavPreset(presetId)
   const needsServer = !preset.server
   // A signed-in account not added yet is let go of when the dialog closes.
@@ -147,7 +157,6 @@ function AccountForm({ onDone, onCancel }: { onDone: () => void; onCancel: () =>
           // The password stays in the main process now; the form lets go of it.
           setPassword('')
           setDraft(found)
-          setShown(new Set(found.calendars.map((calendar) => calendar.remoteId)))
         },
       },
     )
@@ -156,52 +165,9 @@ function AccountForm({ onDone, onCancel }: { onDone: () => void; onCancel: () =>
   const back = () => {
     if (draft) void window.api.calendar.caldavCancel(draft.draftId)
     setDraft(null)
-    saveAccount.reset()
   }
 
-  if (draft) {
-    const toggle = (remoteId: string, on: boolean) => {
-      const next = new Set(shown)
-      if (on) next.add(remoteId)
-      else next.delete(remoteId)
-      setShown(next)
-    }
-    return (
-      <form
-        className="space-y-2.5"
-        onSubmit={(event) => {
-          event.preventDefault()
-          if (shown.size === 0 || saveAccount.isPending) return
-          saveAccount.mutate({ draftId: draft.draftId, input: { shown: [...shown], busyOnly } }, { onSuccess: onDone })
-        }}
-      >
-        <p className="text-meta text-text">
-          Signed in as <span className="font-medium">{draft.detail}</span>. Pick the calendars to show.
-        </p>
-        <ul className="max-h-56 overflow-y-auto" data-calendar-found>
-          {draft.calendars.map((calendar) => (
-            <li key={calendar.remoteId}>
-              <label className="flex cursor-pointer items-center gap-2 py-1">
-                <Checkbox checked={shown.has(calendar.remoteId)} onChange={(e) => toggle(calendar.remoteId, e.target.checked)} />
-                <span className="text-meta text-text">{calendar.name}</span>
-              </label>
-            </li>
-          ))}
-        </ul>
-        <label className="flex cursor-pointer items-center gap-2 border-t border-border pt-2">
-          <Checkbox checked={busyOnly} onChange={(e) => setBusyOnly(e.target.checked)} />
-          <span className="text-meta text-text">Show only &ldquo;Busy&rdquo;, not titles</span>
-        </label>
-        {saveAccount.error && <p role="alert" className="text-caption text-status-overdue">{(saveAccount.error as Error).message}</p>}
-        <div className="flex justify-end gap-2 pt-1">
-          <Button variant="secondary" onClick={back}>Back</Button>
-          <Button variant="primary" type="submit" disabled={shown.size === 0 || saveAccount.isPending} data-calendar-account-save>
-            {shown.size === 1 ? 'Add 1 calendar' : `Add ${shown.size} calendars`}
-          </Button>
-        </div>
-      </form>
-    )
-  }
+  if (draft) return <PickCalendars draft={draft} onBack={back} onDone={onDone} />
 
   return (
     <form onSubmit={signIn} className="space-y-2.5" autoComplete="off">
@@ -281,22 +247,11 @@ export function AddCalendarDialog({ open, onClose }: { open: boolean; onClose: (
     <Dialog open={open} onClose={onClose} labelledBy={titleId} className="w-[460px] max-w-[92vw]">
       <div className="space-y-3 p-5" data-calendar-dialog>
         <h2 id={titleId} className="text-card-title font-semibold text-text">Add a calendar</h2>
-        <Segmented
-          label="Kind of calendar"
-          value={kind}
-          data="kind"
-          options={[
-            { value: 'link', label: 'Calendar link' },
-            { value: 'account', label: 'CalDAV account' },
-          ]}
-          onChange={setKind}
-        />
-        <p className="text-caption text-text-secondary">
-          {kind === 'link'
-            ? 'A secret address of a calendar (iCal, .ics). Read every few minutes.'
-            : 'iCloud, Fastmail, Nextcloud and other CalDAV servers. Pick which calendars to show.'}
-        </p>
-        {kind === 'link' ? <LinkForm onDone={onClose} onCancel={onClose} /> : <AccountForm onDone={onClose} onCancel={onClose} />}
+        <Segmented label="Kind of calendar" value={kind} data="kind" options={KINDS} onChange={setKind} />
+        <p className="text-caption text-text-secondary">{KINDS.find((k) => k.value === kind)?.summary}</p>
+        {kind === 'link' && <LinkForm onDone={onClose} onCancel={onClose} />}
+        {kind === 'account' && <AccountForm onDone={onClose} onCancel={onClose} />}
+        {(kind === 'microsoft' || kind === 'google') && <OAuthAccountForm key={kind} provider={kind} onDone={onClose} onCancel={onClose} />}
       </div>
     </Dialog>
   )

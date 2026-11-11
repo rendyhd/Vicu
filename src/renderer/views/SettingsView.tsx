@@ -92,6 +92,9 @@ export function SettingsView() {
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key !== 'Escape' || event.defaultPrevented || event.isComposing) return
+      // A modal dialog (Add a calendar, a confirmation) closes on Escape itself, also when focus
+      // fell to the page behind it (a button disabled while it works).
+      if (document.querySelector('dialog[open]')) return
 
       event.preventDefault()
       if (router.history.canGoBack()) {

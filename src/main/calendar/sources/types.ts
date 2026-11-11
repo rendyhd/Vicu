@@ -3,7 +3,7 @@
 // (../store.ts), the per-calendar choices, the last good copy on disk (../cache.ts), Busy only, the
 // 5-minute rule, the limits, the IPC. A kind only knows how to reach its calendars.
 //
-// To add a kind ('eventkit' on macOS, 'microsoft', 'google'):
+// To add a kind (such as 'eventkit' on macOS):
 //   1. Add its name to `CalendarSourceKind` in src/shared/calendar-sources.ts.
 //   2. Write `sources/<kind>.ts` exporting a `CalendarSource<YourConfig>`:
 //      - `parseConfig`: read back the config the store unsealed; null when unusable.
@@ -20,14 +20,24 @@
 //   Secrets: everything in the config is sealed by the store with safeStorage, so put the password
 //   or token there and nowhere else; `read` can return a changed config (a refreshed token) and the
 //   store seals it again. Never put a secret in a message: throw CalendarReadError with a sentence.
-//   Read-only: ctx.http refuses anything but GET, HEAD, OPTIONS, PROPFIND and REPORT.
+//   Read-only: ctx.http refuses anything but GET, HEAD, OPTIONS, PROPFIND and REPORT. An OAuth kind
+//   (microsoft.ts, google.ts on oauth-account.ts) posts to its provider's token endpoint through
+//   ctx.signInFetch and nothing else.
 
 import type { CalendarSourceKind } from '../../../shared/calendar-sources'
-import type { BasicAuth, CalendarHttp } from '../http'
+import type { BasicAuth, BearerAuth, CalendarHttp, FetchLike } from '../http'
 
 export interface SourceContext {
-  /** HTTP through Electron's net.fetch with a time limit, a byte budget and (CalDAV) the sign-in. */
-  http(options?: { auth?: BasicAuth; maxBytes?: number }): CalendarHttp
+  /**
+   * HTTP through Electron's net.fetch with a time limit, a byte budget and the sign-in: CalDAV's
+   * user name and password (`auth`) or an OAuth access token (`bearer`), each only to its own site.
+   */
+  http(options?: { auth?: BasicAuth; bearer?: BearerAuth; maxBytes?: number }): CalendarHttp
+  /**
+   * A sign-in provider's token and revoke endpoints only (OAuth form POSTs, ../oauth.ts). Not
+   * read-only, so nothing else may use it; absent where a kind needs no OAuth.
+   */
+  signInFetch?: FetchLike
   now(): number
 }
 
@@ -68,6 +78,8 @@ export interface RemoteCalendar {
   /** Stable within the connection; never an address (it is stored next to the choices). */
   remoteId: string
   name: string
+  /** False when the account itself hides it: the add dialog leaves it unticked. */
+  suggested?: boolean
 }
 
 export interface ConnectResult<Config> {

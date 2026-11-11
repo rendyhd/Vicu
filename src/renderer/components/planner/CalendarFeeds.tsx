@@ -10,7 +10,10 @@ import { formatLength } from '@/lib/planner-timeline'
 import { CALENDAR_COLOR_NAMES, CALENDAR_COLORS, type CalendarFeedView } from '../../../shared/calendar-events'
 import type { CalendarConnectionView, CalendarSecretLevel } from '../../../shared/calendar-sources'
 import { MY_EVENTS_COLOR, repeatText, type ListedEvent } from '../../../shared/plan-events'
+import { useCalendarAccountActions, shownError } from '@/hooks/use-calendar-accounts'
+import { accountProblem } from '../../../shared/calendar-accounts'
 import { AddCalendarDialog } from './AddCalendarDialog'
+import { AccountError } from './OAuthAccountForm'
 
 // Events and connected calendars (contract 20.3, 20.9) in Settings, General, Plan. The Plan screen's
 // gear shows a summary with Manage, which opens them here.
@@ -109,12 +112,21 @@ function ColorChoice({ feed }: { feed: CalendarFeedView }) {
   )
 }
 
-function CalendarRow({ feed, onRemove }: { feed: CalendarFeedView; onRemove?: () => void }) {
+/**
+ * One calendar. `accountSays`: the account above already says why it cannot be read (sign in again,
+ * the organisation), so the row only says since when.
+ */
+function CalendarRow({ feed, onRemove, accountSays = false }: { feed: CalendarFeedView; onRemove?: () => void; accountSays?: boolean }) {
   const { update } = useCalendarActions()
   const [open, setOpen] = useState(false)
   const [name, setName] = useState(feed.name)
   const set = (patch: Parameters<typeof update.mutate>[0]['patch']) => update.mutate({ id: feed.id, patch })
-  const status = calendarStatus(feed)
+  const said = accountSays && accountProblem(feed.error) !== null
+  const status = said
+    ? !feed.enabled
+      ? { text: 'Not shown', problem: false }
+      : { text: feed.fetchedAt ? `Not updated since ${clock(feed.fetchedAt)}.` : 'Not read yet.', problem: true }
+    : calendarStatus(feed)
   const commitName = () => {
     const trimmed = name.trim()
     if (trimmed && trimmed !== feed.name) set({ name: trimmed })
@@ -186,6 +198,31 @@ function CalendarRow({ feed, onRemove }: { feed: CalendarFeedView; onRemove?: ()
   )
 }
 
+/** A Microsoft or Google account the provider no longer lets Vicu read: Sign in again, or the page for IT. */
+function AccountRepair({ connection }: { connection: CalendarConnectionView }) {
+  const { reconnect, cancel } = useCalendarAccountActions()
+  const messages = [connection.error, ...connection.calendars.map((feed) => feed.error)]
+  const org = messages.find((message) => accountProblem(message) === 'org')
+  const signIn = messages.some((message) => accountProblem(message) === 'sign-in')
+  const error = shownError(reconnect.error)
+  if (!org && !signIn && !reconnect.isPending && !error) return null
+  // The account's own error line says it already; otherwise the first calendar's reason, once.
+  const reason = !org && signIn && !connection.error ? messages.find((message) => accountProblem(message) === 'sign-in') : undefined
+  return (
+    <div className="mt-1.5 space-y-1.5" data-calendar-repair={connection.id}>
+      {org && <AccountError message={org} />}
+      {reason && <p className="text-caption text-status-overdue">{reason}</p>}
+      <div className="flex items-center gap-2">
+        <Button variant="secondary" onClick={() => reconnect.mutate(connection.id)} disabled={reconnect.isPending} data-calendar-sign-in-again>
+          {reconnect.isPending ? 'Waiting for the browser...' : 'Sign in again'}
+        </Button>
+        {reconnect.isPending && <Button variant="quiet" onClick={cancel}>Stop waiting</Button>}
+      </div>
+      {error && <AccountError message={error} />}
+    </div>
+  )
+}
+
 function ConnectionBlock({ connection }: { connection: CalendarConnectionView }) {
   const { remove, refresh } = useCalendarActions()
   if (connection.kind === 'ics') {
@@ -213,10 +250,11 @@ function ConnectionBlock({ connection }: { connection: CalendarConnectionView })
           <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
         </button>
       </div>
-      {connection.error && <p className="mt-0.5 text-caption text-status-overdue">{connection.error}</p>}
+      {connection.error && accountProblem(connection.error) !== 'org' && <p className="mt-0.5 text-caption text-status-overdue">{connection.error}</p>}
+      {(connection.kind === 'microsoft' || connection.kind === 'google') && <AccountRepair connection={connection} />}
       <ul className="mt-1.5 space-y-1">
         {connection.calendars.map((feed) => (
-          <CalendarRow key={feed.id} feed={feed} />
+          <CalendarRow key={feed.id} feed={feed} accountSays={connection.kind === 'microsoft' || connection.kind === 'google'} />
         ))}
       </ul>
     </li>

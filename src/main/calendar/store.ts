@@ -1,7 +1,8 @@
 // The connected calendars of this device (contract 20.9, 20.11): userData/calendar-feeds.json,
 // file mode 600, never synced, kept through signing out. One entry per connection (a calendar link,
-// a CalDAV account) with its calendars and their choices. Each connection's config (the link, or
-// the server, user name and password) is one value sealed with safeStorage (../safe-storage.ts);
+// a CalDAV, Microsoft 365 or Google account) with its calendars and their choices. Each connection's
+// config (the link; the server, user name and password; the OAuth client and tokens) is one value
+// sealed with safeStorage (../safe-storage.ts);
 // nothing else in the file is a secret. Version 1 (the proof of concept: one link per entry) is
 // read and written back as version 2.
 
@@ -38,7 +39,7 @@ export interface CalendarStoreState {
   connections: StoredConnection[]
 }
 
-const KINDS: readonly CalendarSourceKind[] = ['ics', 'caldav']
+const KINDS: readonly CalendarSourceKind[] = ['ics', 'caldav', 'microsoft', 'google']
 const COLOR = /^#[0-9a-f]{6}$/i
 
 export function emptyStore(): CalendarStoreState {

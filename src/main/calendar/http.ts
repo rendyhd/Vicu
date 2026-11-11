@@ -5,7 +5,8 @@
 //   (PUT, DELETE, MKCALENDAR ...) is refused before it is sent.
 // - A time limit per request and a byte budget per read (a calendar too large to read says so).
 // - A CalDAV sign-in is added here and only to the account's own site over the account's scheme,
-//   so a server cannot send the password to another host or over plain http.
+//   so a server cannot send the password to another host or over plain http. An OAuth access token
+//   goes only to the API's own origin over https (plain http only to this computer, for tests).
 // - No cookies: the app's session is never sent to a calendar host.
 // - Failures become plain sentences (`CalendarReadError`); a URL, user name or password is never in
 //   one, so the message can be shown and logged.
@@ -28,12 +29,30 @@ export interface BasicAuth {
   origin: string
 }
 
+/** An OAuth access token (Microsoft Graph, Google Calendar), sent only to the API's own origin. */
+export interface BearerAuth {
+  token: string
+  /** The API's origin, such as https://graph.microsoft.com: exactly this scheme, host and port. */
+  origin: string
+}
+
 export interface CalendarHttpOptions {
   base: FetchLike
   timeoutMs?: number
   /** Bytes a whole read may take, over all its requests. */
   maxBytes?: number
   auth?: BasicAuth
+  bearer?: BearerAuth
+}
+
+/** Whether a request to `target` may carry the access token given for `origin`: the same origin only. */
+export function mayCarryBearer(target: string, origin: string): boolean {
+  try {
+    const to = new URL(target)
+    return to.origin === new URL(origin).origin && (to.protocol === 'https:' || to.hostname === '127.0.0.1' || to.hostname === 'localhost')
+  } catch {
+    return false
+  }
 }
 
 export interface CalendarHttp {
@@ -95,6 +114,7 @@ export function calendarHttp(options: CalendarHttpOptions): CalendarHttp {
     const headers = new Headers(init.headers ?? {})
     headers.delete('authorization')
     if (options.auth && mayCarrySignIn(url, options.auth.origin)) headers.set('Authorization', basicHeader(options.auth))
+    else if (options.bearer && mayCarryBearer(url, options.bearer.origin)) headers.set('Authorization', `Bearer ${options.bearer.token}`)
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), timeoutMs)
     const outer = init.signal

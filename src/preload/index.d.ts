@@ -37,6 +37,7 @@ import type {
   CalendarConnectionView,
   CalendarSourcesView,
 } from '../shared/calendar-sources'
+import type { CalendarAccountProvider, OAuthClientsView, OwnOAuthClientInput } from '../shared/calendar-accounts'
 import type { SavedFilterImportOutcome, SavedFilterPreview, SavedFilterState } from '../shared/saved-filter-import'
 import type { SyncedPrefsSnapshot } from '../shared/synced-prefs'
 import type {
@@ -272,6 +273,16 @@ export interface ElectronAPI {
     remove(connectionId: string): Promise<CalendarSourcesView>
     /** Read now: one connection, or every one. */
     refresh(connectionId?: string): Promise<CalendarSourcesView>
+    /** Which OAuth client the Microsoft 365 and Google sign-ins use on this device. */
+    oauthClients(): Promise<OAuthClientsView>
+    /** Save (or with null remove) the own OAuth client of a provider; its secret is never read back. */
+    oauthSetClient(provider: CalendarAccountProvider, input: OwnOAuthClientInput | null): Promise<ApiResult<OAuthClientsView>>
+    /** Sign in in the system browser and list the account's calendars; picked with caldavSave. */
+    oauthSignIn(provider: CalendarAccountProvider): Promise<ApiResult<CaldavDraft>>
+    /** Stop waiting for the browser. */
+    oauthCancel(): Promise<void>
+    /** Sign in again to a connected account whose sign-in the provider no longer takes. */
+    oauthReconnect(connectionId: string): Promise<ApiResult<CalendarSourcesView>>
     /** A background read brought something new: ask for the events again. */
     onChanged(cb: () => void): () => void
   }

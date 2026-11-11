@@ -2,7 +2,11 @@
 //
 // The parts:
 //   sources/types.ts   what a kind of source implements, and how to add one (read it first)
-//   sources/*.ts       the kinds: a calendar link (ics-link.ts), a CalDAV account (caldav.ts)
+//   sources/*.ts       the kinds: a calendar link (ics-link.ts), a CalDAV account (caldav.ts),
+//                      Microsoft 365 and Google accounts (microsoft.ts, google.ts on oauth-account.ts)
+//   oauth.ts           the browser sign-in (PKCE, loopback) and the tokens of those accounts
+//   oauth-clients.ts   Vicu's registered OAuth clients, and "Use my own client" per device
+//   oauth-ipc.ts       their IPC: sign in, cancel, sign in again, the own client
 //   store.ts           the connections and their calendars' choices, configs sealed (calendar-feeds.json)
 //   cache.ts           the last good copy of each calendar, encrypted (calendar-cache/)
 //   ics.ts             iCalendar into occurrences, VFREEBUSY, reducing a copy to what may be kept
@@ -51,7 +55,11 @@ import {
   type StoredConnection,
 } from './store'
 import { caldavSource } from './sources/caldav'
+import { googleSource } from './sources/google'
 import { icsLinkSource } from './sources/ics-link'
+import { microsoftSource } from './sources/microsoft'
+import type { OAuthAccountConfig } from './sources/oauth-account'
+import { registerCalendarOAuthIpc } from './oauth-ipc'
 import type { CalendarCopy, CalendarSource, ConnectResult, ReadOutcome, RemoteCalendar, SourceContext } from './sources/types'
 
 /** Every kind this app has built. A new kind is registered here (see sources/types.ts). */
@@ -59,6 +67,8 @@ import type { CalendarCopy, CalendarSource, ConnectResult, ReadOutcome, RemoteCa
 const SOURCES: Record<CalendarSourceKind, CalendarSource<any>> = {
   ics: icsLinkSource,
   caldav: caldavSource,
+  microsoft: microsoftSource,
+  google: googleSource,
 }
 
 /** A calendar is read at most this often unless a refresh asks (20.9). */
@@ -67,7 +77,7 @@ export const FRESH_MS = 5 * 60_000
 export const MAX_RANGE_EVENTS = 2000
 /** A copy that only got "not modified" is written again at most this often (for "Not updated since"). */
 const COPY_REWRITE_MS = 60 * 60_000
-/** A signed-in CalDAV account waits this long for the user's pick. */
+/** A signed-in account waits this long for the user's pick. */
 const DRAFT_MS = 10 * 60_000
 const DAY = 24 * 3600_000
 
@@ -87,10 +97,12 @@ const states = new Map<string, CalendarState>()
 /** Unsealed configs, in this process's memory only. */
 const configs = new Map<string, unknown>()
 const connectionErrors = new Map<string, string>()
-const drafts = new Map<string, { result: ConnectResult<unknown>; expires: number }>()
+const drafts = new Map<string, { kind: CalendarSourceKind; result: ConnectResult<unknown>; expires: number }>()
 
 const ctx: SourceContext = {
   http: (options) => calendarHttp({ base: (url, init) => net.fetch(url, init), ...options }),
+  // OAuth token requests (oauth.ts): Node's fetch, so no Origin header goes with them.
+  signInFetch: (url, init) => fetch(url, init),
   now: () => Date.now(),
 }
 
@@ -393,7 +405,8 @@ async function removeConnection(id: string): Promise<void> {
   const store = readCalendarStore()
   const connection = store.connections.find((c) => c.id === id || c.calendars.some((calendar) => calendar.id === id))
   if (!connection) return
-  const config = configs.get(connection.id)
+  // Loaded when needed, so a token is revoked also when nothing was read since the app started.
+  const config = SOURCES[connection.kind].disconnect ? await configOf(connection) : null
   if (config && SOURCES[connection.kind].disconnect) {
     await SOURCES[connection.kind].disconnect!(config, ctx).catch(() => {})
   }
@@ -493,10 +506,37 @@ function pruneDrafts(): void {
   for (const [id, draft] of drafts) if (draft.expires < now) drafts.delete(id)
 }
 
+/** Keep a signed-in account (CalDAV, Microsoft 365, Google) until the user picks its calendars. */
+function saveDraft(kind: CalendarSourceKind, result: ConnectResult<unknown>): CaldavDraft {
+  pruneDrafts()
+  const draftId = randomUUID()
+  drafts.set(draftId, { kind, result, expires: Date.now() + DRAFT_MS })
+  return { draftId, name: result.name, detail: SOURCES[kind].describe(result.config), calendars: result.calendars }
+}
+
+/** New tokens for a connection after "Sign in again": seal them, forget the errors, read it now. */
+async function replaceConfig(connectionId: string, config: OAuthAccountConfig): Promise<void> {
+  await updateConnection(connectionId, async (c) => ({ ...c, sealed: await sealConfig(c.id, config) }))
+  connectionErrors.delete(connectionId)
+  await refreshAll(connectionId)
+  announceChanged()
+}
+
 // --- IPC ------------------------------------------------------------------------------------------
 
 export function registerCalendarIpc(): void {
   handleTrusted('calendar:list', () => sourcesView())
+
+  registerCalendarOAuthIpc({
+    ctx,
+    sources: { microsoft: microsoftSource, google: googleSource },
+    saveDraft,
+    connection: (id) => readCalendarStore().connections.find((c) => c.id === id),
+    configOf,
+    replaceConfig,
+    messageOf,
+    view: sourcesView,
+  })
 
   handleTrusted('calendar:events', (_event, range: { from: string; to: string }) => {
     const from = new Date(range?.from)
@@ -519,10 +559,7 @@ export function registerCalendarIpc(): void {
     pruneDrafts()
     try {
       const result = await caldavSource.connect(input, ctx)
-      const draftId = randomUUID()
-      drafts.set(draftId, { result, expires: Date.now() + DRAFT_MS })
-      const draft: CaldavDraft = { draftId, name: result.name, detail: caldavSource.describe(result.config), calendars: result.calendars }
-      return { success: true, data: draft }
+      return { success: true, data: saveDraft('caldav', result) }
     } catch (error) {
       return { success: false, error: messageOf(error) }
     }
@@ -534,7 +571,7 @@ export function registerCalendarIpc(): void {
     if (!draft) return { success: false, error: 'The sign-in has expired. Sign in again.' }
     drafts.delete(String(draftId))
     const shown = new Set(Array.isArray(input?.shown) ? input.shown.map(String) : [])
-    const connection = await addConnection('caldav', draft.result, (calendar) => shown.has(calendar.remoteId), input?.busyOnly === true)
+    const connection = await addConnection(draft.kind, draft.result, (calendar) => shown.has(calendar.remoteId), input?.busyOnly === true)
     announceChanged()
     return { success: true, data: await connectionView(connection) }
   })

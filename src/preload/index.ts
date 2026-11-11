@@ -321,6 +321,12 @@ const api = {
     update: (id: string, patch: Record<string, unknown>) => ipcRenderer.invoke('calendar:update', id, patch),
     remove: (id: string) => ipcRenderer.invoke('calendar:remove', id),
     refresh: (connectionId?: string) => ipcRenderer.invoke('calendar:refresh', connectionId),
+    // Microsoft 365 and Google: the tokens stay in main; the pick of calendars uses caldavSave.
+    oauthClients: () => ipcRenderer.invoke('calendar:oauth-clients'),
+    oauthSetClient: (provider: string, input: { clientId: string; clientSecret?: string } | null) => ipcRenderer.invoke('calendar:oauth-set-client', provider, input),
+    oauthSignIn: (provider: string) => ipcRenderer.invoke('calendar:oauth-sign-in', provider),
+    oauthCancel: () => ipcRenderer.invoke('calendar:oauth-cancel'),
+    oauthReconnect: (connectionId: string) => ipcRenderer.invoke('calendar:oauth-reconnect', connectionId),
     onChanged: (cb: () => void) => {
       const handler = () => cb()
       ipcRenderer.on('calendar-changed', handler)

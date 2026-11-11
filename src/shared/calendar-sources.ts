@@ -1,13 +1,14 @@
 // Connected calendars (contract 20.9), the shapes the windows and the main process share. A
-// connection is what the user added: a calendar link (one calendar) or a CalDAV account (several).
+// connection is what the user added: a calendar link (one calendar), or an account with several
+// (CalDAV, Microsoft 365, Google).
 // Each calendar of a connection has its own choices (CalendarFeedView in calendar-events.ts). No
 // address, user name, password or token ever crosses to a window (20.11): `detail` is the only
 // description, and it never holds a secret. Pure: no Electron, no DOM.
 
 import type { CalendarFeedView } from './calendar-events'
 
-/** The kinds this app has built; later kinds: 'eventkit' (macOS), 'microsoft', 'google'. */
-export type CalendarSourceKind = 'ics' | 'caldav'
+/** The kinds this app has built; a later kind: 'eventkit' (macOS). */
+export type CalendarSourceKind = 'ics' | 'caldav' | 'microsoft' | 'google'
 
 /** How the stored links and passwords are protected (auth/secret-storage.ts). */
 export type CalendarSecretLevel = 'encrypted' | 'obfuscated' | 'plaintext'
@@ -96,13 +97,15 @@ export interface CaldavDiscoverInput {
   password: string
 }
 
-/** A calendar found on a CalDAV account, before the user picks it. */
+/** A calendar found on an account (CalDAV, Microsoft 365, Google), before the user picks it. */
 export interface CaldavFoundCalendar {
   remoteId: string
   name: string
+  /** False when the account itself does not show it (a Google calendar unticked there): left unticked. */
+  suggested?: boolean
 }
 
-/** A signed-in account waiting for the user's pick; nothing is saved until it is. */
+/** A signed-in account (CalDAV, Microsoft 365, Google) waiting for the user's pick; nothing is saved until it is. */
 export interface CaldavDraft {
   draftId: string
   name: string
