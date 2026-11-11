@@ -40,9 +40,12 @@ win:
       arch:
         - x64
 
+# No allowToChangeInstallationDirectory: with it, electron-builder's installer only keeps the
+# shortcuts when started with --updated (electron-updater), so running a new installer by hand
+# made the old uninstaller unpin Vicu from the taskbar (rendyhd/Vicu#69). A reinstall still goes
+# to the folder of the previous install (InstallLocation in the registry).
 nsis:
   oneClick: false
-  allowToChangeInstallationDirectory: true
   createDesktopShortcut: false
   license: LICENSE
   installerIcon: build/icon.ico
