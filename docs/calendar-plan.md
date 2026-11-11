@@ -60,18 +60,20 @@ Done in the proof of concept (desktop): drag, choose Event and a repeat; the pop
 length, repeat, counts as busy, Skip this one, Delete with Undo); the list in the Plan gear and Settings;
 synced storage; busy time for free time, next free slot and Fit.
 
-Still to do, desktop:
+Done since, desktop (branch `feat/calendar-poc`):
 
-- **Plan my day** counts Events and calendar events as busy (`planMeter`, `draftBlocks` take an event-busy
-  input; `use-plan-session.ts` sends the reduced free time to the assistant, never titles).
-- **Move and resize your own Events on the timeline** with the block gestures (this time only, or all
-  times: the popover asks when the Event repeats).
-- **Ends on** in the popover (sets `until`), and **This and following** (ends the series the day before
-  and starts a new one) for a changed schedule.
-- **New event without drawing**: the palette's "New event" and Ctrl+Shift+N on Plan, with the quick-add
-  parser reading `Manager call every Tue 10:00 for 30m`.
-- Keyboard: Enter opens an event (done), arrows move your own Event like a block.
-- Harness: scenario `calendar-poc` becomes `plan-events` (id EVT), plus axe and forced colours.
+- **Plan my day** counts Events and calendar events as busy (`planMeter`, `draftBlocks` take `eventBusy`;
+  `use-plan-busy.ts` is the one source for the Plan views and Plan my day; the assistant gets the
+  reduced free time, never titles). Plan my day's timeline draws the events.
+- **Move and resize your own Events on the timeline** with the block gestures; a repeating one asks
+  This time only, This and following or All times when it is let go (Escape cancels).
+- The popover: a **Change** selector at its top (This time, This and following, All times; All times by
+  default) for a repeating Event, **Ends on** (Never or a date, sets `until`).
+- **New event without drawing**: the palette's "New event" and Ctrl+Shift+N on Plan; the title box reads
+  `Manager call every Tue 10:00 for 30m` (`lib/event-quick-add.ts` over the quick-add parser).
+- Keyboard: Enter opens an event, Alt+Shift+Up/Down moves your own Event, Shift+Up/Down its length.
+- Harness: scenario `plan-events` (id EVT, axe and forced colours); `calendar-poc` (CAL) keeps the
+  calendar links.
 
 Android:
 
