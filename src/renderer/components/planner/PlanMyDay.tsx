@@ -12,10 +12,13 @@ import { PLAN_STEPS, usePlanSession, type PlanSession } from '@/hooks/use-plan-s
 import type { Task } from '@/lib/vikunja-types'
 import { formatBlockRange } from '../../../shared/date-display'
 import { isDateOnly, isNoDueDate, isOverdue, localDateOf, startOfLocalDay, type LocalDate } from '../../../shared/due-dates'
-import { atClock, blockOf, busyOfDay, freeMinutes } from '../../../shared/time-blocks'
-import type { LeftoverAction } from '../../../shared/plan-day'
+import { atClock, blockOf, freeMinutes } from '../../../shared/time-blocks'
+import { dayBusy, type LeftoverAction } from '../../../shared/plan-day'
+import { MY_EVENTS_CALENDAR_ID } from '../../../shared/plan-events'
+import type { CalendarEvent } from '../../../shared/calendar-events'
 import { Timeline } from './Timeline'
 import { BlockPopover } from './BlockPopover'
+import { EventPopover } from './EventPopover'
 
 const LEFTOVER_BUTTONS: { action: LeftoverAction; label: string }[] = [
   { action: 'today', label: 'Today' },
@@ -375,7 +378,7 @@ function ReadyStep({ session, onDone }: { session: PlanSession; onDone: () => vo
     .filter((task) => blockOf(task)?.day === session.day)
     .sort((a, b) => blockOf(a)!.start.getTime() - blockOf(b)!.start.getTime())
   const withoutTime = session.onDay.filter((task) => blockOf(task)?.day !== session.day && !task.done)
-  const free = freeMinutes(new Date(), session.day, session.prefs.hours, busyOfDay(session.range.tasks, session.day))
+  const free = freeMinutes(new Date(), session.day, session.prefs.hours, dayBusy(session.range.tasks, session.day, session.eventBusy))
   return (
     <div className="grid gap-1.5" data-plan-ready>
       <p className="text-section text-text">{dayName(session.day, session, fmt)} is planned</p>
@@ -431,6 +434,10 @@ export function PlanMyDaySession({ onExit, listRef }: { onExit: () => void; list
   const session = usePlanSession()
   const [pressed, setPressed] = useState<{ id: number; element: HTMLElement } | null>(null)
   const pressedTask = pressed ? session.timelineTasks.find((task) => task.id === pressed.id) : undefined
+  // The day's events show while planning and open for a look (or a change of your own); they do not
+  // move here, so the draft is laid out around them as they are.
+  const [pressedEvent, setPressedEvent] = useState<{ id: string; element: HTMLElement } | null>(null)
+  const pressedOccurrence: CalendarEvent | undefined = pressedEvent ? session.events.find((event) => event.id === pressedEvent.id) : undefined
   const { step } = session
   const next = [() => session.setStep(1), () => session.setStep(2), session.accept][step]
   const planned = plannedMinutes(session.timelineTasks, session.day)
@@ -518,12 +525,37 @@ export function PlanMyDaySession({ onExit, listRef }: { onExit: () => void; list
         isLoading={session.range.isLoading}
         listRef={listRef}
         onChange={session.timelineChange}
-        onPressBlock={(task, element) => setPressed({ id: task.id, element })}
+        onPressBlock={(task, element) => {
+          setPressedEvent(null)
+          setPressed({ id: task.id, element })
+        }}
         dashedIds={session.dashedIds}
         draft={step === 2}
         reasonOf={session.assistantActive ? (task) => session.reasons.get(task.id) : undefined}
         note={step === 2 ? 'draft, not saved yet' : undefined}
+        events={session.events}
+        eventColor={session.eventColor}
+        onPressEvent={(event, element) => {
+          setPressed(null)
+          setPressedEvent({ id: event.id, element })
+        }}
       />
+
+      {pressedEvent && pressedOccurrence && (
+        <EventPopover
+          key={pressedEvent.id}
+          occurrence={pressedOccurrence}
+          element={pressedEvent.element}
+          planEvent={
+            pressedOccurrence.calendarId === MY_EVENTS_CALENDAR_ID
+              ? session.planEvents.find((event) => event.id === pressedOccurrence.planEventId)
+              : undefined
+          }
+          calendarName={session.feeds.find((feed) => feed.id === pressedOccurrence.calendarId)?.name}
+          defaultLength={session.prefs.defaultLength}
+          onClose={() => setPressedEvent(null)}
+        />
+      )}
 
       {pressed && pressedTask && (
         <BlockPopover

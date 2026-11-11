@@ -13,17 +13,32 @@ import {
 } from '@/lib/planner-timeline'
 import type { Task } from '@/lib/vikunja-types'
 import type { LocalDate } from '../../../shared/due-dates'
+import type { CalendarEvent } from '../../../shared/calendar-events'
 
 const SCROLL_EDGE_PX = 32
 const MAX_SCROLL_PX_PER_SECOND = 600
 
 /** What a press grabbed: a block or a marker with its real times; nothing when drawing. */
-export interface GestureItem {
+export interface TaskGestureItem {
+  kind: 'task'
   task: Task
   day: LocalDate
   range: GestureRange
   hasBlock: boolean
 }
+
+/**
+ * One of your own Events, on the day it starts (contract 20.7): moved and its edges dragged like a
+ * block, but never onto the task panel or a day's top row.
+ */
+export interface EventGestureItem {
+  kind: 'event'
+  event: CalendarEvent
+  day: LocalDate
+  range: GestureRange
+}
+
+export type GestureItem = TaskGestureItem | EventGestureItem
 
 export type GestureTarget =
   | { kind: 'grid'; day: LocalDate; range: GestureRange }
@@ -35,14 +50,22 @@ export type GestureTarget =
 export interface GesturePreview {
   mode: GestureMode
   taskId?: number
+  /** The occurrence id of an Event being moved. */
+  eventId?: string
   target: GestureTarget
 }
 
+/** Where the pointer was let go, for a question asked there. */
+export interface GesturePoint {
+  x: number
+  y: number
+}
+
 export type GestureResult =
-  | { kind: 'place'; item: GestureItem; day: LocalDate; range: GestureRange }
-  | { kind: 'start' | 'end'; item: GestureItem; range: GestureRange }
-  | { kind: 'remove'; item: GestureItem }
-  | { kind: 'day'; item: GestureItem; day: LocalDate }
+  | { kind: 'place'; item: GestureItem; day: LocalDate; range: GestureRange; at: GesturePoint }
+  | { kind: 'start' | 'end'; item: GestureItem; range: GestureRange; at: GesturePoint }
+  | { kind: 'remove'; item: TaskGestureItem }
+  | { kind: 'day'; item: TaskGestureItem; day: LocalDate }
   | { kind: 'draw'; day: LocalDate; range: GestureRange }
 
 const inside = (box: DOMRect | undefined, x: number, y: number) =>
@@ -69,8 +92,11 @@ interface GestureOptions {
  */
 export function useTimelineGesture(options: GestureOptions) {
   const [preview, setPreview] = useState<GesturePreview | null>(null)
-  /** A block or marker is being moved (past the drag threshold), for the drop row and the page turn. */
-  const [moving, setMoving] = useState(false)
+  /**
+   * What is being moved (past the drag threshold): a block or marker ('task') shows the drop row,
+   * either turns the page.
+   */
+  const [moving, setMoving] = useState<GestureItem['kind'] | null>(null)
   const cancelRef = useRef<(() => void) | null>(null)
   const latest = useRef(options)
   latest.current = options
@@ -116,8 +142,14 @@ export function useTimelineGesture(options: GestureOptions) {
         if (!canPlaceOn(day, today)) return null
         return { kind: 'grid', day, range: mode === 'start' ? startEdgeRange(item.range, minute) : endEdgeRange(item.range, minute) }
       }
-      if (item.hasBlock && inside(listRef?.current?.getBoundingClientRect(), clientX, clientY)) return { kind: 'list' }
-      if (inside(topRowRef?.current?.getBoundingClientRect(), clientX, clientY)) {
+      if (item.kind === 'event') {
+        // An Event stays on the timeline: over the panel or a top row it has nowhere to go.
+        if (inside(listRef?.current?.getBoundingClientRect(), clientX, clientY)) return null
+        if (inside(topRowRef?.current?.getBoundingClientRect(), clientX, clientY)) return null
+      } else if (item.hasBlock && inside(listRef?.current?.getBoundingClientRect(), clientX, clientY)) {
+        return { kind: 'list' }
+      }
+      if (item.kind === 'task' && inside(topRowRef?.current?.getBoundingClientRect(), clientX, clientY)) {
         // The Day view's row spans the hour gutter too: it is that one day's row all the way across.
         const rowDay = overDay ?? (days.length === 1 ? days[0] : null)
         return rowDay && canPlaceOn(rowDay, today) ? { kind: 'top', day: rowDay } : null
@@ -130,10 +162,14 @@ export function useTimelineGesture(options: GestureOptions) {
 
     const refresh = () => {
       if (!active && Math.hypot(clientX - startX, clientY - startY) < DRAG_THRESHOLD_PX) return
-      if (!active && mode === 'move' && item) setMoving(true)
+      if (!active && mode === 'move' && item) setMoving(item.kind)
       active = true
       current = compute()
-      setPreview(current ? { mode, taskId: item?.task.id, target: current } : null)
+      setPreview(
+        current
+          ? { mode, taskId: item?.kind === 'task' ? item.task.id : undefined, eventId: item?.kind === 'event' ? item.event.id : undefined, target: current }
+          : null,
+      )
     }
 
     const tick = (now: number) => {
@@ -169,27 +205,29 @@ export function useTimelineGesture(options: GestureOptions) {
       scroller.removeEventListener('lostpointercapture', pointerCancel)
       if (scroller.hasPointerCapture(pointerId)) scroller.releasePointerCapture(pointerId)
       setPreview(null)
-      setMoving(false)
+      setMoving(null)
       if (!commit) return
       if (!active) {
         if (item) latest.current.onPress(item, element)
         return
       }
       if (!current) return
+      const at = { x: clientX, y: clientY }
       if (current.kind === 'list') {
-        if (item) latest.current.onCommit({ kind: 'remove', item })
+        if (item?.kind === 'task') latest.current.onCommit({ kind: 'remove', item })
       } else if (current.kind === 'top') {
-        if (item) latest.current.onCommit({ kind: 'day', item, day: current.day })
+        if (item?.kind === 'task') latest.current.onCommit({ kind: 'day', item, day: current.day })
       } else if (mode === 'draw') {
         latest.current.onCommit({ kind: 'draw', day: current.day, range: current.range })
       } else if (item) {
         const same = current.range.startMinute === item.range.startMinute && current.range.endMinute === item.range.endMinute
         if (mode === 'move') {
-          if (!item.hasBlock || !same || current.day !== item.day) {
-            latest.current.onCommit({ kind: 'place', item, day: current.day, range: current.range })
+          const marker = item.kind === 'task' && !item.hasBlock
+          if (marker || !same || current.day !== item.day) {
+            latest.current.onCommit({ kind: 'place', item, day: current.day, range: current.range, at })
           }
         } else if (!same) {
-          latest.current.onCommit({ kind: mode, item, range: current.range })
+          latest.current.onCommit({ kind: mode, item, range: current.range, at })
         }
       }
     }

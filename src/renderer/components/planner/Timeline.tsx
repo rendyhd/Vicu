@@ -24,7 +24,7 @@ import {
 import { formatBlockRange } from '../../../shared/date-display'
 import { normalizeHex } from '@/lib/constants'
 import type { Task } from '@/lib/vikunja-types'
-import { startOfLocalDay, toLocalDate, type LocalDate } from '../../../shared/due-dates'
+import { addLocalDays, startOfLocalDay, toLocalDate, type LocalDate } from '../../../shared/due-dates'
 import {
   atClock,
   blockOf,
@@ -40,7 +40,7 @@ import {
 } from '../../../shared/time-blocks'
 import type { PlanRoutine } from '@/hooks/use-planner'
 import { CALENDAR_COLORS, allDayEventsOn, timedEventsOn, type CalendarEvent } from '../../../shared/calendar-events'
-import { useTimelineGesture, type GestureItem, type GestureResult } from './use-timeline-gesture'
+import { useTimelineGesture, type EventGestureItem, type GestureItem, type GesturePoint, type GestureResult } from './use-timeline-gesture'
 import { PLAN_DROP, lengthWhenPlaced, useTimelineDrop, type PlanDropData } from './use-timeline-drop'
 import { turnAt, usePageTurnWhileDragging, type PageTurn } from './use-page-turn'
 
@@ -81,6 +81,22 @@ interface TimelineProps {
   eventColor?: (calendarId: string) => string | undefined
   /** A press on an event (or Enter on it). */
   onPressEvent?: (event: CalendarEvent, element: HTMLElement) => void
+  /** Whether an event can be moved and its edges dragged: one of your own Events (20.7). */
+  canChangeEvent?: (event: CalendarEvent) => boolean
+  /**
+   * An Event moved or resized: by the pointer (`point`, where it was let go) or the keyboard
+   * (`element`, the event). The page asks which times when it repeats, then writes.
+   */
+  onChangeEvent?: (event: CalendarEvent, to: EventMove, anchor: { element?: HTMLElement; point?: GesturePoint }) => void
+  /** A change waiting for its answer: drawn where it goes, the event itself faded. */
+  pendingEvent?: ({ id: string } & EventMove) | null
+}
+
+/** Where an Event's occurrence goes: its day and wall-clock minutes. */
+export interface EventMove {
+  day: LocalDate
+  startMinute: number
+  endMinute: number
 }
 
 const NO_EVENTS: readonly CalendarEvent[] = []
@@ -197,7 +213,10 @@ function AllDayChip({ event, color, wide, onPress }: { event: CalendarEvent; col
   )
 }
 
-/** A calendar event on the grid: read-only, striped, so it never reads as a task. */
+/**
+ * An event on the grid, striped so it never reads as a task. A calendar's is read-only; one of your
+ * own Events can be moved and its edges dragged like a block (`editable`).
+ */
 const EventView = memo(function EventView({
   event,
   top,
@@ -207,6 +226,11 @@ const EventView = memo(function EventView({
   range,
   color,
   onPress,
+  editable = false,
+  hidden = false,
+  instructionsId,
+  onGrab,
+  onKey,
 }: {
   event: CalendarEvent
   top: number
@@ -216,6 +240,12 @@ const EventView = memo(function EventView({
   range: string
   color: string
   onPress?: (event: CalendarEvent, element: HTMLElement) => void
+  editable?: boolean
+  /** Faded while it is moved, or while its move waits for an answer. */
+  hidden?: boolean
+  instructionsId?: string
+  onGrab?: (pointer: React.PointerEvent<HTMLElement>) => void
+  onKey?: (key: React.KeyboardEvent<HTMLButtonElement>) => void
 }) {
   const compact = height < 40
   // A free event is fainter, but only its tint and edge: the words keep their contrast.
@@ -225,8 +255,12 @@ const EventView = memo(function EventView({
     <li
       data-plan-event={event.id}
       title={[event.title, range, event.location, event.tentative ? 'Tentative' : null, event.busy ? null : 'Free'].filter(Boolean).join(' · ')}
-      // Never starts a drawing or a drag: a press opens it.
+      // Never starts a drawing; a calendar's never moves, and a press opens it.
       onPointerDown={(pointer) => {
+        if (editable && onGrab) {
+          onGrab(pointer)
+          return
+        }
         pointer.stopPropagation()
         if (pointer.button === 0) onPress?.(event, pointer.currentTarget)
       }}
@@ -238,19 +272,28 @@ const EventView = memo(function EventView({
         borderLeftColor: event.busy ? color : `${color}99`,
         backgroundImage: `repeating-linear-gradient(135deg, ${tint} 0 6px, ${stripe} 6px 12px)`,
       }}
+      data-plan-event-editable={editable || undefined}
       className={cn(
-        'pointer-events-auto absolute overflow-hidden rounded-control border border-l-[3px] border-border bg-bg-page pl-1.5 pr-1 select-none cursor-default',
+        'pointer-events-auto absolute overflow-hidden rounded-control border border-l-[3px] border-border bg-bg-page pl-1.5 pr-1 select-none',
+        editable ? 'touch-none cursor-grab active:cursor-grabbing' : 'cursor-default',
         event.tentative && 'border-dashed',
+        hidden && 'opacity-30',
       )}
     >
       <button
         type="button"
         data-plan-focus
+        aria-describedby={editable ? instructionsId : undefined}
+        onKeyDown={editable ? onKey : undefined}
         onClick={(click) => {
           // By keyboard; a press goes through the pointer handler above.
           if (click.detail === 0) onPress?.(event, click.currentTarget.closest('li') as HTMLElement)
         }}
-        className={cn('flex h-full w-full min-w-0 cursor-default flex-col rounded-control text-left focus-visible:-outline-offset-2', compact ? 'justify-center' : 'justify-start pt-1')}
+        className={cn(
+          'flex h-full w-full min-w-0 flex-col rounded-control text-left focus-visible:-outline-offset-2',
+          editable ? 'cursor-[inherit]' : 'cursor-default',
+          compact ? 'justify-center' : 'justify-start pt-1',
+        )}
       >
         <span className="flex min-w-0 items-center gap-1">
           <CalendarDays className="h-3 w-3 shrink-0" style={{ color }} aria-hidden="true" />
@@ -263,6 +306,12 @@ const EventView = memo(function EventView({
           {event.busy ? '' : ' · Free'}
         </span>
       </button>
+      {editable && (
+        <>
+          <span aria-hidden="true" className={cn('absolute inset-x-0 top-0 z-[1] cursor-ns-resize', compact ? 'h-1' : 'h-1.5')} />
+          <span aria-hidden="true" className={cn('absolute inset-x-0 bottom-0 z-[1] cursor-ns-resize', compact ? 'h-1' : 'h-1.5')} />
+        </>
+      )}
     </li>
   )
 })
@@ -370,11 +419,15 @@ export function Timeline({
   events = NO_EVENTS,
   eventColor,
   onPressEvent,
+  canChangeEvent,
+  onChangeEvent,
+  pendingEvent,
 }: TimelineProps) {
   const fmt = useDateFormat()
   const now = useMinuteClock()
   const today = toLocalDate(now)
   const instructionsId = useId()
+  const eventInstructionsId = useId()
   const scrollRef = useRef<HTMLDivElement | null>(null)
   const gridRef = useRef<HTMLDivElement | null>(null)
   const topRowRef = useRef<HTMLDivElement | null>(null)
@@ -398,15 +451,22 @@ export function Timeline({
       onDraw?.(result.day, result.range)
       return
     }
+    if (result.kind === 'remove') {
+      onChange(result.item.task, removeTime(result.item.task))
+      return
+    }
+    if (result.kind === 'day') {
+      onChange(result.item.task, planForDay(result.item.task, result.day))
+      return
+    }
     const { item } = result
+    if (item.kind === 'event') {
+      const to = result.kind === 'place' ? { day: result.day, ...result.range } : { day: item.day, ...result.range }
+      onChangeEvent?.(item.event, to, { point: result.at })
+      return
+    }
     const { task } = item
     switch (result.kind) {
-      case 'remove':
-        onChange(task, removeTime(task))
-        return
-      case 'day':
-        onChange(task, planForDay(task, result.day))
-        return
       case 'place': {
         const minutes = result.range.endMinute - result.range.startMinute
         onChange(task, placeBlock(task.due_date, atClock(result.day, result.range.startMinute), minutes))
@@ -434,7 +494,7 @@ export function Timeline({
     topRowRef,
     ignoreAt: (x, y) => turnAt(pageTurn, x, y) !== null,
     onCommit: commit,
-    onPress: (item, element) => onPressBlock?.(item.task, element),
+    onPress: (item, element) => (item.kind === 'task' ? onPressBlock?.(item.task, element) : onPressEvent?.(item.event, element)),
   })
 
   const drop = useTimelineDrop({
@@ -446,8 +506,10 @@ export function Timeline({
     onPlace: (task, day, start, minutes) => onChange(task, placeBlock(task.due_date, atClock(day, start), minutes)),
   })
 
-  // A block or a task on its way somewhere: the Day view's drop row shows, and Back and Forward turn the page.
-  const dragging = gesture.moving || drop.dragging
+  // A block, an Event or a task on its way somewhere: Back and Forward turn the page, and for a task
+  // the Day view's drop row shows.
+  const dragging = gesture.moving !== null || drop.dragging
+  const draggingTask = gesture.moving === 'task' || drop.dragging
   const draggingRef = useRef(dragging)
   draggingRef.current = dragging
   usePageTurnWhileDragging(dragging, multiDay ? undefined : pageTurn)
@@ -475,6 +537,26 @@ export function Timeline({
     scroller.scrollTop = Math.max(0, openingMinute(first, now, today, clockMinutes(hours[0])) * PX_PER_MINUTE - OPENING_MARGIN_PX)
     opened.current = openKey
   }, [openKey, isLoading])
+
+  /** Alt+Shift+Up or Down moves an Event 15 minutes, Shift+Up or Down changes its length, like a block. */
+  const onEventKey = (item: EventGestureItem, key: React.KeyboardEvent<HTMLButtonElement>) => {
+    if ((key.key !== 'ArrowUp' && key.key !== 'ArrowDown') || !key.shiftKey) return
+    const step = key.key === 'ArrowUp' ? -15 : 15
+    const { startMinute, endMinute } = item.range
+    const length = endMinute - startMinute
+    let to: EventMove
+    if (key.altKey) {
+      const start = Math.max(0, Math.min(DAY_MINUTES - length, startMinute + step))
+      to = { day: item.day, startMinute: start, endMinute: start + length }
+    } else {
+      to = { day: item.day, startMinute, endMinute: Math.max(startMinute + 15, Math.min(DAY_MINUTES, endMinute + step)) }
+    }
+    key.preventDefault()
+    key.stopPropagation()
+    if (to.startMinute === startMinute && to.endMinute === endMinute) return
+    const element = key.currentTarget.closest('li')
+    onChangeEvent?.(item.event, to, { element: element instanceof HTMLElement ? element : undefined })
+  }
 
   const onKey = (task: Task, event: React.KeyboardEvent<HTMLButtonElement>) => {
     const block = blockOf(task)
@@ -509,7 +591,7 @@ export function Timeline({
   const singleDay = days[0]
   const singleDayTop = multiDay ? [] : dayTopRow(tasks, singleDay)
   const singleDayAllDay = multiDay ? NO_EVENTS : allDayEventsOn(events, singleDay)
-  const dropRowOnly = !multiDay && singleDayTop.length === 0 && singleDayAllDay.length === 0 && dragging && canPlaceOn(singleDay, today)
+  const dropRowOnly = !multiDay && singleDayTop.length === 0 && singleDayAllDay.length === 0 && draggingTask && canPlaceOn(singleDay, today)
   const dayTopRowView = (
     <DayTopRow
       day={singleDay}
@@ -532,6 +614,9 @@ export function Timeline({
     <section aria-label="Day timeline" className="flex min-h-0 min-w-0 flex-1 flex-col">
       <p id={instructionsId} className="sr-only">
         Press Enter for lengths and nudges. Alt+Shift+Up or Down moves the block 15 minutes. Shift+Up or Down changes its length.
+      </p>
+      <p id={eventInstructionsId} className="sr-only">
+        Press Enter to change the event. Alt+Shift+Up or Down moves it 15 minutes. Shift+Up or Down changes its length.
       </p>
 
       {multiDay && (
@@ -691,7 +776,7 @@ export function Timeline({
                       const editable = canChange(task) && placeable
                       const color = projectColor.get(task.project_id) ?? null
                       const start = atClock(day, minute)
-                      const item: GestureItem = { task, day, range: { startMinute: minute, endMinute: minute + defaultLength }, hasBlock: false }
+                      const item: GestureItem = { kind: 'task', task, day, range: { startMinute: minute, endMinute: minute + defaultLength }, hasBlock: false }
                       const overBlock = markerOverBlock(minute, [...blocks, ...laid.events])
                       return (
                         <li
@@ -721,26 +806,44 @@ export function Timeline({
                       )
                     })}
 
-                    {laid.events.map((placed) => (
-                      <EventView
-                        key={placed.event.id}
-                        event={placed.event}
-                        top={placed.startMinute * PX_PER_MINUTE}
-                        height={placed.drawnMinutes * PX_PER_MINUTE - 1}
-                        left={`calc(${(placed.column / placed.columnCount) * 100}% + 2px)`}
-                        width={`calc(${100 / placed.columnCount}% - 4px)`}
-                        range={formatBlockRange(new Date(placed.event.start), new Date(placed.event.end), fmt)}
-                        color={eventColor?.(placed.event.calendarId) ?? CALENDAR_COLORS[0]}
-                        onPress={onPressEvent}
-                      />
-                    ))}
+                    {laid.events.map((placed) => {
+                      const event = placed.event
+                      // Only on the day it starts, and when it ends by midnight: the part after
+                      // midnight of a late Event opens, it does not move.
+                      const whole =
+                        toLocalDate(new Date(event.start)) === day &&
+                        new Date(event.end).getTime() <= startOfLocalDay(addLocalDays(day, 1)).getTime()
+                      const editable = !draft && placeable && whole && canChangeEvent?.(event) === true
+                      const item: EventGestureItem = { kind: 'event', event, day, range: { startMinute: placed.startMinute, endMinute: placed.endMinute } }
+                      return (
+                        <EventView
+                          key={event.id}
+                          event={event}
+                          top={placed.startMinute * PX_PER_MINUTE}
+                          height={placed.drawnMinutes * PX_PER_MINUTE - 1}
+                          left={`calc(${(placed.column / placed.columnCount) * 100}% + 2px)`}
+                          width={`calc(${100 / placed.columnCount}% - 4px)`}
+                          range={formatBlockRange(new Date(event.start), new Date(event.end), fmt)}
+                          color={eventColor?.(event.calendarId) ?? CALENDAR_COLORS[0]}
+                          onPress={onPressEvent}
+                          editable={editable}
+                          hidden={gesture.preview?.eventId === event.id || pendingEvent?.id === event.id}
+                          instructionsId={eventInstructionsId}
+                          onGrab={(pointer) => {
+                            const box = pointer.currentTarget.getBoundingClientRect()
+                            gesture.begin(pointer, grabMode(pointer.clientY - box.top, box.height, true), day, item)
+                          }}
+                          onKey={(key) => onEventKey(item, key)}
+                        />
+                      )
+                    })}
 
                     {blocks.map((placed) => {
                       const { task, block, startMinute, drawnMinutes, column, columnCount } = placed
                       const editable = canChange(task)
                       const height = drawnMinutes * PX_PER_MINUTE - 1
                       const realRange: GestureRange = { startMinute: minutesOfDay(block.start), endMinute: minutesOfDay(block.start) + block.minutes }
-                      const item: GestureItem = { task, day, range: realRange, hasBlock: true }
+                      const item: GestureItem = { kind: 'task', task, day, range: realRange, hasBlock: true }
                       return (
                           <BlockView
                             key={task.id}
@@ -785,6 +888,20 @@ export function Timeline({
                       }}
                     >
                       {formatBlockRange(atClock(day, previewTarget.range.startMinute), atClock(day, previewTarget.range.endMinute), fmt)}
+                    </div>
+                  )}
+
+                  {pendingEvent?.day === day && (
+                    <div
+                      aria-hidden="true"
+                      data-plan-event-pending
+                      className="pointer-events-none absolute inset-x-0.5 z-20 flex items-start rounded-control border border-dashed border-accent-blue bg-accent-blue/15 px-1.5 py-0.5 text-caption text-text"
+                      style={{
+                        top: pendingEvent.startMinute * PX_PER_MINUTE,
+                        height: (pendingEvent.endMinute - pendingEvent.startMinute) * PX_PER_MINUTE,
+                      }}
+                    >
+                      {formatBlockRange(atClock(day, pendingEvent.startMinute), atClock(day, pendingEvent.endMinute), fmt)}
                     </div>
                   )}
 

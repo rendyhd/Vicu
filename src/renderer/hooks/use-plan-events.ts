@@ -9,6 +9,7 @@ import {
   deleteEvent,
   encodePlanEvent,
   eventKey,
+  occurrenceId,
   planEventOccurrences,
   readPlanEvents,
   skipEventDay,
@@ -58,9 +59,17 @@ export function usePlanEventActions() {
       return id
     },
     update: (id: string, event: PlanEvent) => write(id, event),
-    /** A change to the occurrence on `day`: all times, this time only, or this and following. */
-    change: (event: ListedEvent, day: LocalDate, edit: EventEdit, scope: EventScope) =>
-      writeWithUndo(changeEvent(event, day, edit, scope, newId()), `Changed ${event.title}`),
+    /**
+     * A change to the occurrence on `day`: all times, this time only, or this and following. Gives
+     * the id of the occurrence afterwards (a split moves it to the new Event), or null when the
+     * write failed.
+     */
+    change: async (event: ListedEvent, day: LocalDate, edit: EventEdit, scope: EventScope): Promise<string | null> => {
+      const split = newId()
+      const writes = changeEvent(event, day, edit, scope, split)
+      if (!(await writeWithUndo(writes, `Changed ${event.title}`))) return null
+      return occurrenceId(eventKey(split) in writes ? split : event.id, edit.day ?? day)
+    },
     skip: (event: ListedEvent, day: LocalDate) => writeWithUndo(skipEventDay(event, day), `Skipped ${event.title} this time`),
     remove: (event: ListedEvent) => writeWithUndo(deleteEvent(event), `Deleted ${event.title}`),
   }

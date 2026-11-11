@@ -8,7 +8,7 @@ import { Popover } from '@/components/overlay/Popover'
 import { SmartListIcon } from '@/components/shared/SmartListIcon'
 import { TaskList } from '@/components/task-list/TaskList'
 import { RowViewProvider } from '@/components/task-list/RowViewContext'
-import { Timeline } from '@/components/planner/Timeline'
+import { Timeline, type EventMove } from '@/components/planner/Timeline'
 import { PlanMyDaySession } from '@/components/planner/PlanMyDay'
 import { BlockPopover } from '@/components/planner/BlockPopover'
 import { DrawTitle } from '@/components/planner/DrawTitle'
@@ -16,12 +16,15 @@ import { SourceChips } from '@/components/planner/SourceMenu'
 import type { PageTurn, TurnDirection } from '@/components/planner/use-page-turn'
 import { PlannerOptions } from '@/components/planner/PlannerOptions'
 import { useAppConfig } from '@/hooks/use-app-config'
-import { useCalendarEvents } from '@/hooks/use-calendar-events'
-import { usePlanEventActions, usePlanEvents } from '@/hooks/use-plan-events'
+import { usePlanEventActions } from '@/hooks/use-plan-events'
+import { usePlanBusy } from '@/hooks/use-plan-busy'
 import { EventPopover } from '@/components/planner/EventPopover'
-import { eventBusyOfDay, type CalendarEvent } from '../../shared/calendar-events'
-import { MY_EVENTS_CALENDAR_ID, MY_EVENTS_COLOR, type EventRepeat } from '../../shared/plan-events'
-import type { DrawnKind } from '@/components/planner/DrawTitle'
+import { EventScopeMenu } from '@/components/planner/EventScopeMenu'
+import type { CalendarEvent } from '../../shared/calendar-events'
+import { MY_EVENTS_CALENDAR_ID, type EventEdit, type EventRepeat, type EventScope, type ListedEvent } from '../../shared/plan-events'
+import type { DrawnKind, DrawnPlace } from '@/components/planner/DrawTitle'
+import type { GesturePoint } from '@/components/planner/use-timeline-gesture'
+import { useNewEventRequestStore } from '@/stores/new-event-request-store'
 import { useDateFormat } from '@/hooks/use-date-format'
 import { useFilters } from '@/hooks/use-filters'
 import { useOpenTask } from '@/hooks/use-open-task'
@@ -55,8 +58,10 @@ import {
   atClock,
   blockOf,
   busyOfDay,
+  clockMinutes,
   clockText,
   fitTasks,
+  minutesOfDay,
   freeMinutes,
   moveBlockToDay,
   nextFreeSlot,
@@ -119,20 +124,75 @@ function PlanScreen() {
   }
 
   const range = usePlanRange(days)
-  const calendar = useCalendarEvents(days)
-  const planEvents = usePlanEvents(days)
+  // Your own Events and the connected calendars' events, on one timeline, and their busy time.
+  const busy = usePlanBusy(days)
+  const allEvents = busy.events
   const planEventActions = usePlanEventActions()
-  // Your own Events and the connected calendars' events, on one timeline.
-  const allEvents = useMemo(() => [...planEvents.occurrences, ...calendar.events], [planEvents.occurrences, calendar.events])
-  const eventColor = (id: string) => (id === MY_EVENTS_CALENDAR_ID ? MY_EVENTS_COLOR : calendar.colorOf(id))
-  /** Busy time of a day (contract 16.6): its open blocks and the events that count. */
-  const busyOn = (day: LocalDate) => [
-    ...busyOfDay(range.tasks, day),
-    ...eventBusyOfDay(allEvents, day, (id) => id === MY_EVENTS_CALENDAR_ID || calendar.countsAsBusy(id)),
-  ]
-  // A pressed event's popover, by occurrence id so it shows the event as it is now.
-  const [pressedEvent, setPressedEvent] = useState<{ id: string; element: HTMLElement } | null>(null)
-  const pressedOccurrence: CalendarEvent | undefined = pressedEvent ? allEvents.find((event) => event.id === pressedEvent.id) : undefined
+  /** Busy time of a day (contract 16.6 and 20.2): its open blocks and the events that count. */
+  const busyOn = (day: LocalDate) => [...busyOfDay(range.tasks, day), ...busy.eventBusyOn(day)]
+  // A pressed event's popover, by occurrence id so it shows the event as it is now. `press` names
+  // one press: a change that moves the occurrence to a new Event keeps the same popover open.
+  const [pressedEvent, setPressedEvent] = useState<{ id: string; element: HTMLElement; press: number; anchor: number } | null>(null)
+  // Which times the popover's changes are for; kept when it opens again at a split's new Event.
+  const [eventScope, setEventScope] = useState<EventScope>('all')
+  const lastPressed = useRef<CalendarEvent | undefined>(undefined)
+  const found = pressedEvent ? allEvents.find((event) => event.id === pressedEvent.id) : undefined
+  if (found) lastPressed.current = found
+  // Between a write and the next render the occurrence may be under its new id already: the last
+  // one seen stands in for that moment.
+  const pressedOccurrence: CalendarEvent | undefined = pressedEvent ? (found ?? lastPressed.current) : undefined
+  const planEventOf = (occurrence: CalendarEvent): ListedEvent | undefined =>
+    occurrence.calendarId === MY_EVENTS_CALENDAR_ID ? busy.planEvents.find((event) => event.id === occurrence.planEventId) : undefined
+  const pressEvent = (event: CalendarEvent, element: HTMLElement) => {
+    setPressed(null)
+    lastPressed.current = event
+    setEventScope('all')
+    setPressedEvent((current) => ({ id: event.id, element, press: (current?.press ?? 0) + 1, anchor: 0 }))
+  }
+  /**
+   * The popover follows the occurrence to the Event a change moved it to, and opens again next to
+   * its new place (a popover keeps the anchor it opened at).
+   */
+  const followOccurrence = (id: string) => {
+    setPressedEvent((current) => (current ? { ...current, id } : current))
+    requestAnimationFrame(() => {
+      const element = document.querySelector<HTMLElement>(`[data-plan-event="${CSS.escape(id)}"]`)
+      if (element) setPressedEvent((current) => (current?.id === id && current.element !== element ? { ...current, element, anchor: current.anchor + 1 } : current))
+    })
+  }
+
+  // An Event moved or resized on the timeline (contract 20.6, 20.7). One that repeats asks which
+  // times first; the move waits on the timeline, dashed, until the answer.
+  const [pendingMove, setPendingMove] = useState<{
+    planEvent: ListedEvent
+    occurrence: CalendarEvent
+    to: EventMove
+    edit: EventEdit
+    element?: HTMLElement
+    point?: GesturePoint
+  } | null>(null)
+  const pendingAnchor = useRef<HTMLElement | null>(null)
+  const applyMove = async (planEvent: ListedEvent, day: LocalDate, edit: EventEdit, scope: EventScope, refocus: boolean) => {
+    const id = await planEventActions.change(planEvent, day, edit, scope)
+    if (edit.day) selectDay(edit.day)
+    // A keyboard change keeps the focus on the event, wherever it went.
+    if (id && refocus) {
+      requestAnimationFrame(() => document.querySelector<HTMLElement>(`[data-plan-event="${CSS.escape(id)}"] [data-plan-focus]`)?.focus({ preventScroll: true }))
+    }
+  }
+  const moveEvent = (occurrence: CalendarEvent, to: EventMove, anchor: { element?: HTMLElement; point?: GesturePoint }) => {
+    const planEvent = planEventOf(occurrence)
+    if (!planEvent || !occurrence.day) return
+    const edit: EventEdit = { time: clockText(to.startMinute), minutes: to.endMinute - to.startMinute }
+    if (to.day !== occurrence.day) edit.day = to.day
+    setPressedEvent(null)
+    if (planEvent.repeat.kind === 'none') {
+      void applyMove(planEvent, occurrence.day, edit, 'all', !!anchor.element)
+      return
+    }
+    pendingAnchor.current = anchor.element ?? null
+    setPendingMove({ planEvent, occurrence, to, edit, ...anchor })
+  }
   const update = useUpdateTask()
   const create = useCreateTask()
   const openTask = useOpenTask()
@@ -260,20 +320,23 @@ function PlanScreen() {
   const [pressed, setPressed] = useState<{ id: number; element: HTMLElement } | null>(null)
   const pressedTask = pressed ? range.tasks.find((task) => task.id === pressed.id) : undefined
 
-  // A drawn stretch, waiting for its title.
-  const [drawn, setDrawn] = useState<{ day: LocalDate; range: GestureRange } | null>(null)
+  // A drawn stretch, waiting for its title; `kind` is what the box starts as.
+  const [drawn, setDrawn] = useState<{ day: LocalDate; range: GestureRange; kind?: DrawnKind } | null>(null)
   const drawnRef = useRef<HTMLDivElement | null>(null)
   const drawProject = drawTargetProject(source, inboxId, canWriteProject)
-  const addDrawn = (title: string, kind: DrawnKind = 'task', repeat: EventRepeat = { kind: 'none' }) => {
+  const addDrawn = (title: string, kind: DrawnKind = 'task', repeat: EventRepeat = { kind: 'none' }, place?: DrawnPlace) => {
     if (!drawn) return
     if (kind === 'event') {
+      // The quick-add text may name another day and time than the box was opened at.
+      const at = place ?? { day: drawn.day, startMinute: drawn.range.startMinute, endMinute: drawn.range.endMinute }
       void planEventActions.add({
         title,
-        start: drawn.day,
-        time: clockText(drawn.range.startMinute),
-        minutes: drawn.range.endMinute - drawn.range.startMinute,
+        start: at.day,
+        time: clockText(at.startMinute),
+        minutes: at.endMinute - at.startMinute,
         repeat,
       })
+      if (at.day !== drawn.day) selectDay(at.day)
       setDrawn(null)
       return
     }
@@ -312,6 +375,33 @@ function PlanScreen() {
     setPressed(null)
     setDrawn((current) => current ?? { day: selectedDay, range: { startMinute: start, endMinute: start + prefs.defaultLength } })
   }, [newTaskRequestedAt])
+  // New event (the palette, Ctrl+Shift+N here): the same title box as Event, at the selected day's
+  // next free time; a full day still takes it (an Event may overlap).
+  const newEventRequestedAt = useNewEventRequestStore((s) => s.requestedAt)
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.shiftKey && !event.altKey && event.key.toLowerCase() === 'n') {
+        event.preventDefault()
+        useNewEventRequestStore.getState().request()
+      }
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [])
+  useEffect(() => {
+    if (newEventRequestedAt === null || inSession) return
+    if (!useNewEventRequestStore.getState().take()) return
+    const now = new Date()
+    const free = nextFreeSlot(now, selectedDay, prefs.hours, prefs.defaultLength, busyOn(selectedDay))
+    // No free time left: today the next quarter hour, another day the start of the work hours.
+    const fallback = selectedDay === toLocalDate(now)
+      ? Math.min(24 * 60 - prefs.defaultLength, Math.ceil(minutesOfDay(now) / 15) * 15)
+      : clockMinutes(prefs.hours[0])
+    const start = free ?? fallback
+    setPressed(null)
+    setPressedEvent(null)
+    setDrawn((current) => current ?? { day: selectedDay, range: { startMinute: start, endMinute: Math.min(24 * 60, start + prefs.defaultLength) }, kind: 'event' })
+  }, [newEventRequestedAt, inSession])
   // That time may be off screen; a stretch drawn by hand already shows.
   useEffect(() => {
     if (drawn) drawnRef.current?.scrollIntoView({ block: 'nearest' })
@@ -552,11 +642,11 @@ function PlanScreen() {
           drawnRef={drawnRef}
           pageTurn={pageTurn}
           events={allEvents}
-          eventColor={eventColor}
-          onPressEvent={(event, element) => {
-            setPressed(null)
-            setPressedEvent({ id: event.id, element })
-          }}
+          eventColor={busy.eventColor}
+          onPressEvent={pressEvent}
+          canChangeEvent={(event) => planEventOf(event) !== undefined}
+          onChangeEvent={moveEvent}
+          pendingEvent={pendingMove ? { id: pendingMove.occurrence.id, ...pendingMove.to } : null}
         />
       </div>
       )}
@@ -577,12 +667,34 @@ function PlanScreen() {
 
       {pressedEvent && pressedOccurrence && (
         <EventPopover
-          key={pressedEvent.id}
+          key={`${pressedEvent.press}-${pressedEvent.anchor}`}
           occurrence={pressedOccurrence}
           element={pressedEvent.element}
-          planEvent={planEvents.events.find((event) => event.id === pressedOccurrence.planEventId)}
-          calendarName={calendar.feeds.find((feed) => feed.id === pressedOccurrence.calendarId)?.name}
+          planEvent={planEventOf(pressedOccurrence)}
+          calendarName={busy.feeds.find((feed) => feed.id === pressedOccurrence.calendarId)?.name}
+          defaultLength={prefs.defaultLength}
+          onMoved={followOccurrence}
+          scope={eventScope}
+          onScopeChange={setEventScope}
           onClose={() => setPressedEvent(null)}
+        />
+      )}
+
+      {pendingMove && (
+        <EventScopeMenu
+          anchorRef={pendingMove.point ? undefined : pendingAnchor}
+          anchorPoint={pendingMove.point}
+          title={pendingMove.planEvent.title}
+          onChoose={(scope) => {
+            const { planEvent, occurrence, edit, element } = pendingMove
+            setPendingMove(null)
+            void applyMove(planEvent, occurrence.day ?? planEvent.start, edit, scope, !!element)
+          }}
+          onCancel={() => {
+            // Escape: nothing changes, and a keyboard change gives the focus back to the event.
+            pendingMove.element?.querySelector<HTMLElement>('[data-plan-focus]')?.focus({ preventScroll: true })
+            setPendingMove(null)
+          }}
         />
       )}
 
@@ -592,6 +704,7 @@ function PlanScreen() {
           day={drawn.day}
           start={atClock(drawn.day, drawn.range.startMinute)}
           end={atClock(drawn.day, drawn.range.endMinute)}
+          initialKind={drawn.kind}
           projectName={projects?.flat.find((candidate) => candidate.id === drawProject)?.title}
           onSubmit={addDrawn}
           onCancel={() => setDrawn(null)}

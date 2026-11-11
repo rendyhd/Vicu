@@ -270,6 +270,11 @@ export function nthRuleDay(repeat: EventRepeat, start: LocalDate, count: number)
   return null
 }
 
+/** The id of an Event's occurrence on `day` among the Plan screen's events. */
+export function occurrenceId(eventId: string, day: LocalDate): string {
+  return `${MY_EVENTS_CALENDAR_ID}:${eventId}:${day}`
+}
+
 /** The event's occurrences on `days` as calendar events of the Plan screen (20.1). */
 export function planEventOccurrences(events: readonly ListedEvent[], days: readonly LocalDate[]): CalendarEvent[] {
   const out: CalendarEvent[] = []
@@ -289,7 +294,7 @@ export function planEventOccurrences(events: readonly ListedEvent[], days: reado
         end = new Date(y, m - 1, d, h, min + event.minutes)
       }
       out.push({
-        id: `${MY_EVENTS_CALENDAR_ID}:${event.id}:${day}`,
+        id: occurrenceId(event.id, day),
         calendarId: MY_EVENTS_CALENDAR_ID,
         title: event.title,
         start: start.toISOString(),
