@@ -159,6 +159,14 @@ Everything added in macOS Settings (iCloud, Google, Exchange, CalDAV) without a 
 helper like `native/voice-macos`; calendar usage strings and the calendars entitlement on the app.
 Gate: a signed, notarized build must show the permission prompt as Vicu's and read events.
 
+Built: `native/calendar-macos/` (read-only helper: status, request, calendars, events, watch), `npm run
+calendar:helper` into `resources/calendar/`, the kind `eventkit` (`src/main/calendar/sources/eventkit.ts`,
+"Mac calendars" in the add dialog on macOS only). Each occurrence becomes one small iCalendar document, so
+Busy only and the last good copy work as for the other kinds; a change on the Mac reads the shown Mac
+calendars again at once. Seen on macOS 27: TCC names the app that starts the helper as responsible and
+refuses to ask when that app's Info.plist lacks the usage string, which is why a development run on
+Electron.app gets no prompt. Still open: the gate above (a signed build, a person to answer the prompt).
+
 ### 2e. Microsoft 365 and Google accounts, desktop (decision gate)
 
 Only if 2a to 2d leave a real gap. Both use the existing browser sign-in pattern (loopback, PKCE, public
