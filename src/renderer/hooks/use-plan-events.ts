@@ -5,16 +5,24 @@ import { announce } from '@/stores/announcer-store'
 import type { LocalDate } from '../../shared/due-dates'
 import type { CalendarEvent } from '../../shared/calendar-events'
 import {
+  changeEvent,
+  deleteEvent,
   encodePlanEvent,
   eventKey,
   planEventOccurrences,
   readPlanEvents,
+  skipEventDay,
+  undoEventWrites,
+  type EventEdit,
+  type EventScope,
+  type EventWrites,
   type ListedEvent,
   type PlanEvent,
 } from '../../shared/plan-events'
-import { useSyncedPrefs, writeSyncedPrefs } from './use-synced-prefs'
+import type { SyncedPrefsSnapshot } from '../../shared/synced-prefs'
+import { SYNCED_PREFS_QUERY_KEY, useSyncedPrefs, writeSyncedPrefs } from './use-synced-prefs'
 
-// Events (proof of concept): times you are not available, typed by hand, one synced preference
+// Events (contract section 20): times you are not available, typed by hand, one synced preference
 // each (`event.<id>`), so every device has them. Shown on the Plan screen only.
 
 const EMPTY: CalendarEvent[] = []
@@ -31,10 +39,18 @@ function newId(): string {
   return crypto.randomUUID().replace(/-/g, '').slice(0, 16)
 }
 
-/** Add, change, skip one day of, or delete an Event; a delete has Undo. */
+/** Add, change, skip one day of, or delete an Event; a change, skip or delete has Undo (20.6). */
 export function usePlanEventActions() {
   const client = useQueryClient()
   const write = (id: string, event: PlanEvent | null) => writeSyncedPrefs(client, { [eventKey(id)]: event ? encodePlanEvent(event) : null })
+  /** Writes `writes` and offers Undo, which puts back the stored values as they were. */
+  const writeWithUndo = async (writes: EventWrites, message: string) => {
+    const before = client.getQueryData<SyncedPrefsSnapshot>(SYNCED_PREFS_QUERY_KEY)?.values ?? {}
+    const undo = undoEventWrites(writes, before)
+    if (!(await writeSyncedPrefs(client, writes))) return false
+    toast.success(message, { action: { label: 'Undo', onAction: () => void writeSyncedPrefs(client, undo) } })
+    return true
+  }
   return {
     add: async (event: PlanEvent) => {
       const id = newId()
@@ -42,19 +58,10 @@ export function usePlanEventActions() {
       return id
     },
     update: (id: string, event: PlanEvent) => write(id, event),
-    skip: async (event: ListedEvent, day: LocalDate) => {
-      const { id, ...rest } = event
-      if (!(await write(id, { ...rest, skips: [...(rest.skips ?? []), day] }))) return
-      toast.success(`Skipped ${event.title} this time`, {
-        action: { label: 'Undo', onAction: () => void write(id, rest) },
-      })
-    },
-    remove: async (event: ListedEvent) => {
-      const { id, ...rest } = event
-      if (!(await write(id, null))) return
-      toast.success(`Deleted ${event.title}`, {
-        action: { label: 'Undo', onAction: () => void write(id, rest) },
-      })
-    },
+    /** A change to the occurrence on `day`: all times, this time only, or this and following. */
+    change: (event: ListedEvent, day: LocalDate, edit: EventEdit, scope: EventScope) =>
+      writeWithUndo(changeEvent(event, day, edit, scope, newId()), `Changed ${event.title}`),
+    skip: (event: ListedEvent, day: LocalDate) => writeWithUndo(skipEventDay(event, day), `Skipped ${event.title} this time`),
+    remove: (event: ListedEvent) => writeWithUndo(deleteEvent(event), `Deleted ${event.title}`),
   }
 }

@@ -1,12 +1,13 @@
-// Calendar events on the Plan screen (proof of concept, branch feat/calendar-poc). Not in the
-// cross-app contract yet: a real version starts with a contract section and vectors in both repos.
-//
-// An event is read-only: Vicu shows it and counts it as busy time (contract 16.6 already says busy
-// is "the day's open blocks and any calendar events"), and never writes it back. Pure: no Electron,
-// no DOM, the clock is passed in.
+// Calendar events on the Plan screen (contract section 20). An event of a connected calendar is
+// read-only: Vicu shows it and counts it as busy time (20.2), and never writes it back. Your own
+// Events (plan-events.ts) become events of the same shape. Pinned by the `eventBusy` vectors of
+// cross-app-semantics-v1.json. Pure: no Electron, no DOM, the clock is passed in.
 
 import { addLocalDays, startOfLocalDay, type LocalDate } from './due-dates'
 import type { BusyRange } from './time-blocks'
+
+/** The calendar id of your own Events (plan-events.ts has the rest). */
+export const MY_EVENTS_CALENDAR_ID = 'vicu:events'
 
 /** One occurrence of a calendar event, recurrence already expanded. */
 export interface CalendarEvent {
@@ -92,6 +93,26 @@ export function timedEventsOn<E extends CalendarEvent>(events: readonly E[], day
 /** The all-day events on `day`, for the row above the timeline. */
 export function allDayEventsOn<E extends CalendarEvent>(events: readonly E[], day: LocalDate): E[] {
   return events.filter((event) => event.allDay && eventMinutesOn(event, day) !== null)
+}
+
+/**
+ * Busy only (20.8): the title becomes "Busy", or "Free" for a free event, and the place is dropped.
+ * Done before anything is stored or drawn.
+ */
+export function busyOnlyEvent<E extends CalendarEvent>(event: E): E {
+  const { location: _location, ...rest } = event
+  return { ...rest, title: event.busy ? 'Busy' : 'Free' } as E
+}
+
+/**
+ * Which calendars count as busy (20.2): your own Events always (each Event says for itself), a
+ * connected calendar while it is shown and counts as busy.
+ */
+export function calendarCounts(
+  feeds: readonly Pick<CalendarFeedView, 'id' | 'enabled' | 'countsAsBusy'>[],
+): (calendarId: string) => boolean {
+  const counting = new Set(feeds.filter((feed) => feed.enabled && feed.countsAsBusy).map((feed) => feed.id))
+  return (calendarId) => calendarId === MY_EVENTS_CALENDAR_ID || counting.has(calendarId)
 }
 
 /**

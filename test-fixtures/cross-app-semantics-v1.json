@@ -2555,5 +2555,642 @@
       { "name": "not twice", "before": [{ "relative_to": "start_date", "relative_period": 0 }], "expect": [{ "relative_to": "start_date", "relative_period": 0 }] },
       { "name": "keeps the others", "before": [{ "relative_to": "due_date", "relative_period": -3600 }], "expect": [{ "relative_to": "due_date", "relative_period": -3600 }, { "relative_to": "start_date", "relative_period": 0 }] }
     ]
+  },
+  "planEvents": {
+    "about": "Section 20.3 to 20.5: your own Events. Days are local dates, times local wall-clock times without an offset. read gives a stored value and what an app writes back after reading it (expect, null when it is not an Event) and whether it is busy. days gives an Event and a range of days, both included, and the days it happens on. times gives the occurrences on the days listed. Run in Pacific/Auckland, America/New_York and a third zone.",
+    "keyPrefix": "event.",
+    "myEventsCalendarId": "vicu:events",
+    "myEventsColor": "#12a594",
+    "maxMinutes": 1440,
+    "read": [
+      { "name": "a timed Event", "value": { "title": "Manager call", "start": "2026-11-10", "time": "10:00", "minutes": 30 }, "expect": { "title": "Manager call", "start": "2026-11-10", "time": "10:00", "minutes": 30 }, "busy": true },
+      { "name": "the title is trimmed", "value": { "title": "  Review  ", "start": "2026-11-10", "time": "10:00", "minutes": 30 }, "expect": { "title": "Review", "start": "2026-11-10", "time": "10:00", "minutes": 30 }, "busy": true },
+      { "name": "a blank title is not an Event", "value": { "title": "  ", "start": "2026-11-10", "time": "10:00", "minutes": 30 }, "expect": null },
+      { "name": "no title is not an Event", "value": { "start": "2026-11-10", "time": "10:00", "minutes": 30 }, "expect": null },
+      { "name": "a first day that is not YYYY-MM-DD", "value": { "title": "x", "start": "2026-11-1", "time": "10:00", "minutes": 30 }, "expect": null },
+      { "name": "an hour past 23", "value": { "title": "x", "start": "2026-11-10", "time": "24:00", "minutes": 30 }, "expect": null },
+      { "name": "a time without two digits for the hour", "value": { "title": "x", "start": "2026-11-10", "time": "9:00", "minutes": 30 }, "expect": null },
+      { "name": "a timed Event without a length", "value": { "title": "x", "start": "2026-11-10", "time": "10:00" }, "expect": null },
+      { "name": "a length of 0", "value": { "title": "x", "start": "2026-11-10", "time": "10:00", "minutes": 0 }, "expect": null },
+      { "name": "a length that is not whole minutes", "value": { "title": "x", "start": "2026-11-10", "time": "10:00", "minutes": 30.5 }, "expect": null },
+      { "name": "a length over 1440", "value": { "title": "x", "start": "2026-11-10", "time": "10:00", "minutes": 1441 }, "expect": null },
+      { "name": "a length of exactly 1440", "value": { "title": "Shift", "start": "2026-11-10", "time": "06:00", "minutes": 1440 }, "expect": { "title": "Shift", "start": "2026-11-10", "time": "06:00", "minutes": 1440 }, "busy": true },
+      { "name": "all-day: time null, no length written", "value": { "title": "Month-end close", "start": "2026-11-30", "time": null, "minutes": 0 }, "expect": { "title": "Month-end close", "start": "2026-11-30" }, "busy": false },
+      { "name": "all-day: no time, a length is ignored", "value": { "title": "Month-end close", "start": "2026-11-30", "minutes": 45 }, "expect": { "title": "Month-end close", "start": "2026-11-30" }, "busy": false },
+      { "name": "all-day is never busy", "value": { "title": "Offsite", "start": "2026-11-30", "busy": true }, "expect": { "title": "Offsite", "start": "2026-11-30" }, "busy": false },
+      { "name": "busy false is written for a timed Event", "value": { "title": "Gym", "start": "2026-11-10", "time": "07:00", "minutes": 60, "busy": false }, "expect": { "title": "Gym", "start": "2026-11-10", "time": "07:00", "minutes": 60, "busy": false }, "busy": false },
+      { "name": "busy true is the default and not written", "value": { "title": "Gym", "start": "2026-11-10", "time": "07:00", "minutes": 60, "busy": true }, "expect": { "title": "Gym", "start": "2026-11-10", "time": "07:00", "minutes": 60 }, "busy": true },
+      { "name": "a busy that is not true or false reads as the default", "value": { "title": "Gym", "start": "2026-11-10", "time": "07:00", "minutes": 60, "busy": "no" }, "expect": { "title": "Gym", "start": "2026-11-10", "time": "07:00", "minutes": 60 }, "busy": true },
+      { "name": "repeat none is not written", "value": { "title": "x", "start": "2026-11-10", "time": "10:00", "minutes": 30, "repeat": { "kind": "none" } }, "expect": { "title": "x", "start": "2026-11-10", "time": "10:00", "minutes": 30 }, "busy": true },
+      { "name": "repeat null is none", "value": { "title": "x", "start": "2026-11-10", "time": "10:00", "minutes": 30, "repeat": null }, "expect": { "title": "x", "start": "2026-11-10", "time": "10:00", "minutes": 30 }, "busy": true },
+      { "name": "every left out is 1 and written", "value": { "title": "x", "start": "2026-11-10", "time": "10:00", "minutes": 30, "repeat": { "kind": "daily" } }, "expect": { "title": "x", "start": "2026-11-10", "time": "10:00", "minutes": 30, "repeat": { "kind": "daily", "every": 1 } }, "busy": true },
+      { "name": "weekly days are sorted and each kept once", "value": { "title": "x", "start": "2026-11-10", "time": "10:00", "minutes": 30, "repeat": { "kind": "weekly", "every": 2, "days": [4, 2, 2] } }, "expect": { "title": "x", "start": "2026-11-10", "time": "10:00", "minutes": 30, "repeat": { "kind": "weekly", "every": 2, "days": [2, 4] } }, "busy": true },
+      { "name": "weekly without days is not an Event", "value": { "title": "x", "start": "2026-11-10", "time": "10:00", "minutes": 30, "repeat": { "kind": "weekly", "every": 1, "days": [] } }, "expect": null },
+      { "name": "a weekday of 7 is not an Event", "value": { "title": "x", "start": "2026-11-10", "time": "10:00", "minutes": 30, "repeat": { "kind": "weekly", "every": 1, "days": [7] } }, "expect": null },
+      { "name": "every 0 is not an Event", "value": { "title": "x", "start": "2026-11-10", "time": "10:00", "minutes": 30, "repeat": { "kind": "daily", "every": 0 } }, "expect": null },
+      { "name": "every 100 is not an Event", "value": { "title": "x", "start": "2026-11-10", "time": "10:00", "minutes": 30, "repeat": { "kind": "daily", "every": 100 } }, "expect": null },
+      { "name": "every 99 is", "value": { "title": "x", "start": "2026-11-10", "time": "10:00", "minutes": 30, "repeat": { "kind": "yearly", "every": 99 } }, "expect": { "title": "x", "start": "2026-11-10", "time": "10:00", "minutes": 30, "repeat": { "kind": "yearly", "every": 99 } }, "busy": true },
+      { "name": "a date of 32 is not an Event", "value": { "title": "x", "start": "2026-11-10", "time": "10:00", "minutes": 30, "repeat": { "kind": "monthly-date", "every": 1, "date": 32 } }, "expect": null },
+      { "name": "a fifth week is not an Event", "value": { "title": "x", "start": "2026-11-10", "time": "10:00", "minutes": 30, "repeat": { "kind": "monthly-weekday", "every": 1, "week": 5, "weekday": 2 } }, "expect": null },
+      { "name": "the last week is -1", "value": { "title": "x", "start": "2026-11-24", "time": "10:00", "minutes": 30, "repeat": { "kind": "monthly-weekday", "week": -1, "weekday": 2 } }, "expect": { "title": "x", "start": "2026-11-24", "time": "10:00", "minutes": 30, "repeat": { "kind": "monthly-weekday", "every": 1, "week": -1, "weekday": 2 } }, "busy": true },
+      { "name": "a repeat kind a newer app added is not an Event (ignored and kept)", "value": { "title": "x", "start": "2026-11-10", "time": "10:00", "minutes": 30, "repeat": { "kind": "hourly", "every": 2 } }, "expect": null },
+      { "name": "an until that is not a date is left out", "value": { "title": "x", "start": "2026-11-10", "time": "10:00", "minutes": 30, "repeat": { "kind": "daily", "every": 1 }, "until": "soon" }, "expect": { "title": "x", "start": "2026-11-10", "time": "10:00", "minutes": 30, "repeat": { "kind": "daily", "every": 1 } }, "busy": true },
+      { "name": "skips: dates only, sorted, each once", "value": { "title": "x", "start": "2026-11-10", "time": "10:00", "minutes": 30, "repeat": { "kind": "daily", "every": 1 }, "until": "2026-11-30", "skips": ["2026-11-20", "tomorrow", 5, "2026-11-12", "2026-11-20"] }, "expect": { "title": "x", "start": "2026-11-10", "time": "10:00", "minutes": 30, "repeat": { "kind": "daily", "every": 1 }, "until": "2026-11-30", "skips": ["2026-11-12", "2026-11-20"] }, "busy": true },
+      { "name": "empty skips are not written", "value": { "title": "x", "start": "2026-11-10", "time": "10:00", "minutes": 30, "skips": [] }, "expect": { "title": "x", "start": "2026-11-10", "time": "10:00", "minutes": 30 }, "busy": true },
+      { "name": "unknown fields are kept", "value": { "title": "x", "start": "2026-11-10", "time": "10:00", "minutes": 30, "color": "#e5484d", "place": { "name": "Office" } }, "expect": { "title": "x", "start": "2026-11-10", "time": "10:00", "minutes": 30, "color": "#e5484d", "place": { "name": "Office" } }, "busy": true },
+      { "name": "a string is not an Event", "value": "Manager call", "expect": null },
+      { "name": "a list is not an Event", "value": [], "expect": null },
+      { "name": "null is a deleted Event", "value": null, "expect": null }
+    ],
+    "list": {
+      "about": "readPlanEvents: entries whose key starts with event. and holds an Event, by title, then id. Other keys and values are ignored.",
+      "values": {
+        "event.b": { "title": "Standup", "start": "2026-11-10", "time": "09:00", "minutes": 15 },
+        "event.a": { "title": "Standup", "start": "2026-11-11", "time": "09:00", "minutes": 15 },
+        "event.c": { "title": "Month-end close", "start": "2026-11-30" },
+        "event.d": null,
+        "event.e": { "title": "x" },
+        "event.": { "title": "No id", "start": "2026-11-10" },
+        "template.1": { "title": "Not an Event", "start": "2026-11-10" }
+      },
+      "expect": ["c", "a", "b"]
+    },
+    "days": [
+      { "name": "does not repeat", "event": { "title": "x", "start": "2026-11-10", "time": "10:00", "minutes": 30 }, "from": "2026-11-01", "to": "2026-12-31", "expect": ["2026-11-10"] },
+      { "name": "every day, until a day", "event": { "title": "x", "start": "2026-11-10", "time": "10:00", "minutes": 30, "repeat": { "kind": "daily", "every": 1 }, "until": "2026-11-11" }, "from": "2026-11-08", "to": "2026-11-14", "expect": ["2026-11-10", "2026-11-11"] },
+      { "name": "every 3 days, across a month end", "event": { "title": "x", "start": "2026-10-30", "time": "10:00", "minutes": 30, "repeat": { "kind": "daily", "every": 3 } }, "from": "2026-10-28", "to": "2026-11-10", "expect": ["2026-10-30", "2026-11-02", "2026-11-05", "2026-11-08"] },
+      { "name": "a skipped first day", "event": { "title": "x", "start": "2026-11-10", "time": "10:00", "minutes": 30, "repeat": { "kind": "daily", "every": 1 }, "skips": ["2026-11-10"] }, "from": "2026-11-10", "to": "2026-11-12", "expect": ["2026-11-11", "2026-11-12"] },
+      { "name": "every weekday, with a skip and an end", "event": { "title": "x", "start": "2026-11-10", "time": "10:00", "minutes": 30, "repeat": { "kind": "weekly", "every": 1, "days": [1, 2, 3, 4, 5] }, "until": "2026-11-16", "skips": ["2026-11-12"] }, "from": "2026-11-09", "to": "2026-11-22", "expect": ["2026-11-10", "2026-11-11", "2026-11-13", "2026-11-16"] },
+      { "name": "every 2 weeks on Tuesday", "event": { "title": "x", "start": "2026-11-10", "time": "10:00", "minutes": 30, "repeat": { "kind": "weekly", "every": 2, "days": [2] } }, "from": "2026-11-01", "to": "2026-12-10", "expect": ["2026-11-10", "2026-11-24", "2026-12-08"] },
+      { "name": "every 2 weeks from a Sunday: weeks start on Monday, and the first day need not fit", "event": { "title": "x", "start": "2026-11-08", "time": "10:00", "minutes": 30, "repeat": { "kind": "weekly", "every": 2, "days": [1, 4] } }, "from": "2026-11-01", "to": "2026-12-06", "expect": ["2026-11-16", "2026-11-19", "2026-11-30", "2026-12-03"] },
+      { "name": "every 2 weeks on Sunday: Sunday ends its week", "event": { "title": "x", "start": "2026-11-08", "time": "10:00", "minutes": 30, "repeat": { "kind": "weekly", "every": 2, "days": [0] } }, "from": "2026-11-01", "to": "2026-12-06", "expect": ["2026-11-08", "2026-11-22", "2026-12-06"] },
+      { "name": "monthly on the 31st: months without one have none", "event": { "title": "x", "start": "2026-10-31", "repeat": { "kind": "monthly-date", "every": 1, "date": 31 } }, "from": "2026-10-01", "to": "2027-03-31", "expect": ["2026-10-31", "2026-12-31", "2027-01-31", "2027-03-31"] },
+      { "name": "monthly on the 30th: none in February", "event": { "title": "x", "start": "2027-01-30", "repeat": { "kind": "monthly-date", "every": 1, "date": 30 } }, "from": "2027-01-01", "to": "2027-04-30", "expect": ["2027-01-30", "2027-03-30", "2027-04-30"] },
+      { "name": "monthly on the 29th: February only in a leap year", "event": { "title": "x", "start": "2027-01-29", "repeat": { "kind": "monthly-date", "every": 1, "date": 29 } }, "from": "2027-01-01", "to": "2028-03-31", "expect": ["2027-01-29", "2027-03-29", "2027-04-29", "2027-05-29", "2027-06-29", "2027-07-29", "2027-08-29", "2027-09-29", "2027-10-29", "2027-11-29", "2027-12-29", "2028-01-29", "2028-02-29", "2028-03-29"] },
+      { "name": "every 2 months on the 15th", "event": { "title": "x", "start": "2026-11-15", "time": "09:00", "minutes": 60, "repeat": { "kind": "monthly-date", "every": 2, "date": 15 } }, "from": "2026-11-01", "to": "2027-05-31", "expect": ["2026-11-15", "2027-01-15", "2027-03-15", "2027-05-15"] },
+      { "name": "monthly on the 15th from the 20th: the first day need not fit", "event": { "title": "x", "start": "2026-11-20", "time": "09:00", "minutes": 60, "repeat": { "kind": "monthly-date", "every": 1, "date": 15 } }, "from": "2026-11-01", "to": "2027-01-31", "expect": ["2026-12-15", "2027-01-15"] },
+      { "name": "the second Tuesday", "event": { "title": "x", "start": "2026-11-10", "time": "10:00", "minutes": 30, "repeat": { "kind": "monthly-weekday", "every": 1, "week": 2, "weekday": 2 } }, "from": "2026-11-01", "to": "2027-02-03", "expect": ["2026-11-10", "2026-12-08", "2027-01-12"] },
+      { "name": "the fourth Tuesday", "event": { "title": "x", "start": "2026-11-24", "time": "10:00", "minutes": 30, "repeat": { "kind": "monthly-weekday", "every": 1, "week": 4, "weekday": 2 } }, "from": "2026-11-01", "to": "2027-01-31", "expect": ["2026-11-24", "2026-12-22", "2027-01-26"] },
+      { "name": "the last Tuesday", "event": { "title": "x", "start": "2026-11-24", "time": "10:00", "minutes": 30, "repeat": { "kind": "monthly-weekday", "every": 1, "week": -1, "weekday": 2 } }, "from": "2026-11-01", "to": "2027-01-31", "expect": ["2026-11-24", "2026-12-29", "2027-01-26"] },
+      { "name": "the last Friday", "event": { "title": "x", "start": "2026-11-27", "time": "17:00", "minutes": 120, "repeat": { "kind": "monthly-weekday", "every": 1, "week": -1, "weekday": 5 } }, "from": "2026-11-01", "to": "2027-02-03", "expect": ["2026-11-27", "2026-12-25", "2027-01-29"] },
+      { "name": "the first Monday every 3 months", "event": { "title": "x", "start": "2026-11-02", "time": "10:00", "minutes": 30, "repeat": { "kind": "monthly-weekday", "every": 3, "week": 1, "weekday": 1 } }, "from": "2026-11-01", "to": "2027-05-31", "expect": ["2026-11-02", "2027-02-01", "2027-05-03"] },
+      { "name": "yearly on 29 February: leap years only", "event": { "title": "Leap day", "start": "2028-02-29", "repeat": { "kind": "yearly", "every": 1 } }, "from": "2028-01-01", "to": "2033-01-01", "expect": ["2028-02-29", "2032-02-29"] },
+      { "name": "every 2 years", "event": { "title": "x", "start": "2026-11-10", "repeat": { "kind": "yearly", "every": 2 } }, "from": "2026-01-01", "to": "2031-01-01", "expect": ["2026-11-10", "2028-11-10", "2030-11-10"] },
+      { "name": "an until before the first day: never", "event": { "title": "x", "start": "2026-11-10", "time": "10:00", "minutes": 30, "repeat": { "kind": "daily", "every": 1 }, "until": "2026-11-09" }, "from": "2026-11-01", "to": "2026-11-30", "expect": [] }
+    ],
+    "times": [
+      { "name": "every day at 10:00 across the New York clock change of 1 November", "event": { "title": "x", "start": "2026-10-30", "time": "10:00", "minutes": 30, "repeat": { "kind": "daily", "every": 1 } }, "days": ["2026-10-30", "2026-10-31", "2026-11-01", "2026-11-02"],
+        "expect": [
+          { "day": "2026-10-30", "start": "2026-10-30T10:00:00", "end": "2026-10-30T10:30:00", "allDay": false, "busy": true },
+          { "day": "2026-10-31", "start": "2026-10-31T10:00:00", "end": "2026-10-31T10:30:00", "allDay": false, "busy": true },
+          { "day": "2026-11-01", "start": "2026-11-01T10:00:00", "end": "2026-11-01T10:30:00", "allDay": false, "busy": true },
+          { "day": "2026-11-02", "start": "2026-11-02T10:00:00", "end": "2026-11-02T10:30:00", "allDay": false, "busy": true }
+        ] },
+      { "name": "every day at 09:00 across the Auckland clock change of 27 September", "event": { "title": "x", "start": "2026-09-26", "time": "09:00", "minutes": 60, "repeat": { "kind": "daily", "every": 1 } }, "days": ["2026-09-26", "2026-09-27", "2026-09-28"],
+        "expect": [
+          { "day": "2026-09-26", "start": "2026-09-26T09:00:00", "end": "2026-09-26T10:00:00", "allDay": false, "busy": true },
+          { "day": "2026-09-27", "start": "2026-09-27T09:00:00", "end": "2026-09-27T10:00:00", "allDay": false, "busy": true },
+          { "day": "2026-09-28", "start": "2026-09-28T09:00:00", "end": "2026-09-28T10:00:00", "allDay": false, "busy": true }
+        ] },
+      { "name": "every Sunday at 08:00 across the March and April clock changes", "event": { "title": "x", "start": "2026-03-01", "time": "08:00", "minutes": 45, "repeat": { "kind": "weekly", "every": 1, "days": [0] } }, "days": ["2026-03-01", "2026-03-08", "2026-04-05", "2026-04-12"],
+        "expect": [
+          { "day": "2026-03-01", "start": "2026-03-01T08:00:00", "end": "2026-03-01T08:45:00", "allDay": false, "busy": true },
+          { "day": "2026-03-08", "start": "2026-03-08T08:00:00", "end": "2026-03-08T08:45:00", "allDay": false, "busy": true },
+          { "day": "2026-04-05", "start": "2026-04-05T08:00:00", "end": "2026-04-05T08:45:00", "allDay": false, "busy": true },
+          { "day": "2026-04-12", "start": "2026-04-12T08:00:00", "end": "2026-04-12T08:45:00", "allDay": false, "busy": true }
+        ] },
+      { "name": "the end is the length later on the clock, even across a clock change", "event": { "title": "x", "start": "2026-11-01", "time": "00:30", "minutes": 180 }, "days": ["2026-11-01"],
+        "expect": [ { "day": "2026-11-01", "start": "2026-11-01T00:30:00", "end": "2026-11-01T03:30:00", "allDay": false, "busy": true } ] },
+      { "name": "past midnight: the end is on the next day", "event": { "title": "x", "start": "2026-11-10", "time": "23:30", "minutes": 90 }, "days": ["2026-11-10", "2026-11-11"],
+        "expect": [ { "day": "2026-11-10", "start": "2026-11-10T23:30:00", "end": "2026-11-11T01:00:00", "allDay": false, "busy": true } ] },
+      { "name": "a whole day of minutes", "event": { "title": "x", "start": "2026-11-10", "time": "06:00", "minutes": 1440 }, "days": ["2026-11-10"],
+        "expect": [ { "day": "2026-11-10", "start": "2026-11-10T06:00:00", "end": "2026-11-11T06:00:00", "allDay": false, "busy": true } ] },
+      { "name": "all-day: midnight to midnight, not busy", "event": { "title": "x", "start": "2026-11-10" }, "days": ["2026-11-09", "2026-11-10"],
+        "expect": [ { "day": "2026-11-10", "start": "2026-11-10T00:00:00", "end": "2026-11-11T00:00:00", "allDay": true, "busy": false } ] },
+      { "name": "busy false", "event": { "title": "x", "start": "2026-11-10", "time": "12:00", "minutes": 60, "busy": false }, "days": ["2026-11-10"],
+        "expect": [ { "day": "2026-11-10", "start": "2026-11-10T12:00:00", "end": "2026-11-10T13:00:00", "allDay": false, "busy": false } ] }
+    ],
+    "choices": [
+      { "day": "2026-11-10", "expect": [
+        { "label": "Does not repeat", "repeat": { "kind": "none" } },
+        { "label": "Every day", "repeat": { "kind": "daily", "every": 1 } },
+        { "label": "Every weekday", "repeat": { "kind": "weekly", "every": 1, "days": [1, 2, 3, 4, 5] } },
+        { "label": "Every Tuesday", "repeat": { "kind": "weekly", "every": 1, "days": [2] } },
+        { "label": "Every 2 weeks on Tuesday", "repeat": { "kind": "weekly", "every": 2, "days": [2] } },
+        { "label": "Monthly on the 10th", "repeat": { "kind": "monthly-date", "every": 1, "date": 10 } },
+        { "label": "Monthly on the second Tuesday", "repeat": { "kind": "monthly-weekday", "every": 1, "week": 2, "weekday": 2 } },
+        { "label": "Every year on November 10", "repeat": { "kind": "yearly", "every": 1 } }
+      ] },
+      { "day": "2026-11-24", "expect": [
+        { "label": "Does not repeat", "repeat": { "kind": "none" } },
+        { "label": "Every day", "repeat": { "kind": "daily", "every": 1 } },
+        { "label": "Every weekday", "repeat": { "kind": "weekly", "every": 1, "days": [1, 2, 3, 4, 5] } },
+        { "label": "Every Tuesday", "repeat": { "kind": "weekly", "every": 1, "days": [2] } },
+        { "label": "Every 2 weeks on Tuesday", "repeat": { "kind": "weekly", "every": 2, "days": [2] } },
+        { "label": "Monthly on the 24th", "repeat": { "kind": "monthly-date", "every": 1, "date": 24 } },
+        { "label": "Monthly on the fourth Tuesday", "repeat": { "kind": "monthly-weekday", "every": 1, "week": 4, "weekday": 2 } },
+        { "label": "Monthly on the last Tuesday", "repeat": { "kind": "monthly-weekday", "every": 1, "week": -1, "weekday": 2 } },
+        { "label": "Every year on November 24", "repeat": { "kind": "yearly", "every": 1 } }
+      ] },
+      { "day": "2026-11-01", "expect": [
+        { "label": "Does not repeat", "repeat": { "kind": "none" } },
+        { "label": "Every day", "repeat": { "kind": "daily", "every": 1 } },
+        { "label": "Every Sunday", "repeat": { "kind": "weekly", "every": 1, "days": [0] } },
+        { "label": "Every 2 weeks on Sunday", "repeat": { "kind": "weekly", "every": 2, "days": [0] } },
+        { "label": "Monthly on the 1st", "repeat": { "kind": "monthly-date", "every": 1, "date": 1 } },
+        { "label": "Monthly on the first Sunday", "repeat": { "kind": "monthly-weekday", "every": 1, "week": 1, "weekday": 0 } },
+        { "label": "Every year on November 1", "repeat": { "kind": "yearly", "every": 1 } }
+      ] },
+      { "day": "2026-12-29", "expect": [
+        { "label": "Does not repeat", "repeat": { "kind": "none" } },
+        { "label": "Every day", "repeat": { "kind": "daily", "every": 1 } },
+        { "label": "Every weekday", "repeat": { "kind": "weekly", "every": 1, "days": [1, 2, 3, 4, 5] } },
+        { "label": "Every Tuesday", "repeat": { "kind": "weekly", "every": 1, "days": [2] } },
+        { "label": "Every 2 weeks on Tuesday", "repeat": { "kind": "weekly", "every": 2, "days": [2] } },
+        { "label": "Monthly on the 29th", "repeat": { "kind": "monthly-date", "every": 1, "date": 29 } },
+        { "label": "Monthly on the last Tuesday", "repeat": { "kind": "monthly-weekday", "every": 1, "week": -1, "weekday": 2 } },
+        { "label": "Every year on December 29", "repeat": { "kind": "yearly", "every": 1 } }
+      ] },
+      { "day": "2026-10-30", "expect": [
+        { "label": "Does not repeat", "repeat": { "kind": "none" } },
+        { "label": "Every day", "repeat": { "kind": "daily", "every": 1 } },
+        { "label": "Every weekday", "repeat": { "kind": "weekly", "every": 1, "days": [1, 2, 3, 4, 5] } },
+        { "label": "Every Friday", "repeat": { "kind": "weekly", "every": 1, "days": [5] } },
+        { "label": "Every 2 weeks on Friday", "repeat": { "kind": "weekly", "every": 2, "days": [5] } },
+        { "label": "Monthly on the 30th", "repeat": { "kind": "monthly-date", "every": 1, "date": 30 } },
+        { "label": "Monthly on the last Friday", "repeat": { "kind": "monthly-weekday", "every": 1, "week": -1, "weekday": 5 } },
+        { "label": "Every year on October 30", "repeat": { "kind": "yearly", "every": 1 } }
+      ] },
+      { "day": "2026-12-31", "expect": [
+        { "label": "Does not repeat", "repeat": { "kind": "none" } },
+        { "label": "Every day", "repeat": { "kind": "daily", "every": 1 } },
+        { "label": "Every weekday", "repeat": { "kind": "weekly", "every": 1, "days": [1, 2, 3, 4, 5] } },
+        { "label": "Every Thursday", "repeat": { "kind": "weekly", "every": 1, "days": [4] } },
+        { "label": "Every 2 weeks on Thursday", "repeat": { "kind": "weekly", "every": 2, "days": [4] } },
+        { "label": "Monthly on the 31st", "repeat": { "kind": "monthly-date", "every": 1, "date": 31 } },
+        { "label": "Monthly on the last Thursday", "repeat": { "kind": "monthly-weekday", "every": 1, "week": -1, "weekday": 4 } },
+        { "label": "Every year on December 31", "repeat": { "kind": "yearly", "every": 1 } }
+      ] },
+      { "day": "2027-02-22", "expect": [
+        { "label": "Does not repeat", "repeat": { "kind": "none" } },
+        { "label": "Every day", "repeat": { "kind": "daily", "every": 1 } },
+        { "label": "Every weekday", "repeat": { "kind": "weekly", "every": 1, "days": [1, 2, 3, 4, 5] } },
+        { "label": "Every Monday", "repeat": { "kind": "weekly", "every": 1, "days": [1] } },
+        { "label": "Every 2 weeks on Monday", "repeat": { "kind": "weekly", "every": 2, "days": [1] } },
+        { "label": "Monthly on the 22nd", "repeat": { "kind": "monthly-date", "every": 1, "date": 22 } },
+        { "label": "Monthly on the fourth Monday", "repeat": { "kind": "monthly-weekday", "every": 1, "week": 4, "weekday": 1 } },
+        { "label": "Monthly on the last Monday", "repeat": { "kind": "monthly-weekday", "every": 1, "week": -1, "weekday": 1 } },
+        { "label": "Every year on February 22", "repeat": { "kind": "yearly", "every": 1 } }
+      ] },
+      { "day": "2028-02-29", "expect": [
+        { "label": "Does not repeat", "repeat": { "kind": "none" } },
+        { "label": "Every day", "repeat": { "kind": "daily", "every": 1 } },
+        { "label": "Every weekday", "repeat": { "kind": "weekly", "every": 1, "days": [1, 2, 3, 4, 5] } },
+        { "label": "Every Tuesday", "repeat": { "kind": "weekly", "every": 1, "days": [2] } },
+        { "label": "Every 2 weeks on Tuesday", "repeat": { "kind": "weekly", "every": 2, "days": [2] } },
+        { "label": "Monthly on the 29th", "repeat": { "kind": "monthly-date", "every": 1, "date": 29 } },
+        { "label": "Monthly on the last Tuesday", "repeat": { "kind": "monthly-weekday", "every": 1, "week": -1, "weekday": 2 } },
+        { "label": "Every year on February 29", "repeat": { "kind": "yearly", "every": 1 } }
+      ] },
+      { "day": "2026-11-11", "expect": [
+        { "label": "Does not repeat", "repeat": { "kind": "none" } },
+        { "label": "Every day", "repeat": { "kind": "daily", "every": 1 } },
+        { "label": "Every weekday", "repeat": { "kind": "weekly", "every": 1, "days": [1, 2, 3, 4, 5] } },
+        { "label": "Every Wednesday", "repeat": { "kind": "weekly", "every": 1, "days": [3] } },
+        { "label": "Every 2 weeks on Wednesday", "repeat": { "kind": "weekly", "every": 2, "days": [3] } },
+        { "label": "Monthly on the 11th", "repeat": { "kind": "monthly-date", "every": 1, "date": 11 } },
+        { "label": "Monthly on the second Wednesday", "repeat": { "kind": "monthly-weekday", "every": 1, "week": 2, "weekday": 3 } },
+        { "label": "Every year on November 11", "repeat": { "kind": "yearly", "every": 1 } }
+      ] },
+      { "day": "2026-12-03", "expect": [
+        { "label": "Does not repeat", "repeat": { "kind": "none" } },
+        { "label": "Every day", "repeat": { "kind": "daily", "every": 1 } },
+        { "label": "Every weekday", "repeat": { "kind": "weekly", "every": 1, "days": [1, 2, 3, 4, 5] } },
+        { "label": "Every Thursday", "repeat": { "kind": "weekly", "every": 1, "days": [4] } },
+        { "label": "Every 2 weeks on Thursday", "repeat": { "kind": "weekly", "every": 2, "days": [4] } },
+        { "label": "Monthly on the 3rd", "repeat": { "kind": "monthly-date", "every": 1, "date": 3 } },
+        { "label": "Monthly on the first Thursday", "repeat": { "kind": "monthly-weekday", "every": 1, "week": 1, "weekday": 4 } },
+        { "label": "Every year on December 3", "repeat": { "kind": "yearly", "every": 1 } }
+      ] }
+    ],
+    "text": [
+      { "repeat": { "kind": "none" }, "text": "Does not repeat" },
+      { "repeat": { "kind": "daily", "every": 1 }, "text": "Every day" },
+      { "repeat": { "kind": "daily", "every": 3 }, "text": "Every 3 days" },
+      { "repeat": { "kind": "weekly", "every": 1, "days": [1, 2, 3, 4, 5] }, "text": "Every weekday" },
+      { "repeat": { "kind": "weekly", "every": 2, "days": [1, 2, 3, 4, 5] }, "text": "Every 2 weeks on Monday, Tuesday, Wednesday, Thursday, Friday" },
+      { "repeat": { "kind": "weekly", "every": 1, "days": [1, 3] }, "text": "Every Monday, Wednesday" },
+      { "repeat": { "kind": "weekly", "every": 1, "days": [0, 6] }, "text": "Every Saturday, Sunday" },
+      { "repeat": { "kind": "weekly", "every": 1, "days": [0] }, "text": "Every Sunday" },
+      { "repeat": { "kind": "weekly", "every": 2, "days": [2] }, "text": "Every 2 weeks on Tuesday" },
+      { "repeat": { "kind": "monthly-date", "every": 1, "date": 1 }, "text": "Monthly on the 1st" },
+      { "repeat": { "kind": "monthly-date", "every": 1, "date": 2 }, "text": "Monthly on the 2nd" },
+      { "repeat": { "kind": "monthly-date", "every": 1, "date": 3 }, "text": "Monthly on the 3rd" },
+      { "repeat": { "kind": "monthly-date", "every": 1, "date": 11 }, "text": "Monthly on the 11th" },
+      { "repeat": { "kind": "monthly-date", "every": 1, "date": 12 }, "text": "Monthly on the 12th" },
+      { "repeat": { "kind": "monthly-date", "every": 1, "date": 13 }, "text": "Monthly on the 13th" },
+      { "repeat": { "kind": "monthly-date", "every": 1, "date": 21 }, "text": "Monthly on the 21st" },
+      { "repeat": { "kind": "monthly-date", "every": 1, "date": 22 }, "text": "Monthly on the 22nd" },
+      { "repeat": { "kind": "monthly-date", "every": 1, "date": 23 }, "text": "Monthly on the 23rd" },
+      { "repeat": { "kind": "monthly-date", "every": 1, "date": 31 }, "text": "Monthly on the 31st" },
+      { "repeat": { "kind": "monthly-date", "every": 2, "date": 15 }, "text": "Every 2 months on the 15th" },
+      { "repeat": { "kind": "monthly-weekday", "every": 1, "week": 2, "weekday": 2 }, "text": "Monthly on the second Tuesday" },
+      { "repeat": { "kind": "monthly-weekday", "every": 1, "week": -1, "weekday": 5 }, "text": "Monthly on the last Friday" },
+      { "repeat": { "kind": "monthly-weekday", "every": 3, "week": 1, "weekday": 1 }, "text": "Every 3 months on the first Monday" },
+      { "repeat": { "kind": "yearly", "every": 1 }, "text": "Every year" },
+      { "repeat": { "kind": "yearly", "every": 2 }, "text": "Every 2 years" }
+    ]
+  },
+  "eventBusy": {
+    "about": "Section 20.1, 20.2 and 20.8. Event times are local wall-clock times without an offset; an all-day event runs from local midnight to the local midnight after its last day. Minutes count from the local midnight of the day, 1440 is the midnight that ends it. timed and busy are sorted by start, then end, then id. calendars lists the connected calendars; vicu:events (your own Events) always counts.",
+    "calendars": [
+      { "id": "work", "shown": true, "countsAsBusy": true },
+      { "id": "family", "shown": true, "countsAsBusy": false },
+      { "id": "old", "shown": false, "countsAsBusy": true }
+    ],
+    "events": [
+      { "id": "standup", "calendar": "work", "start": "2026-11-10T09:00:00", "end": "2026-11-10T09:15:00", "allDay": false, "busy": true, "tentative": false },
+      { "id": "maybe", "calendar": "work", "start": "2026-11-10T11:00:00", "end": "2026-11-10T12:00:00", "allDay": false, "busy": true, "tentative": true },
+      { "id": "focus", "calendar": "work", "start": "2026-11-10T13:00:00", "end": "2026-11-10T14:00:00", "allDay": false, "busy": false, "tentative": false },
+      { "id": "call", "calendar": "vicu:events", "start": "2026-11-10T15:00:00", "end": "2026-11-10T15:30:00", "allDay": false, "busy": true, "tentative": false },
+      { "id": "gym", "calendar": "vicu:events", "start": "2026-11-10T07:00:00", "end": "2026-11-10T08:00:00", "allDay": false, "busy": false, "tentative": false },
+      { "id": "pin", "calendar": "work", "start": "2026-11-10T16:00:00", "end": "2026-11-10T16:00:00", "allDay": false, "busy": true, "tentative": false },
+      { "id": "dinner", "calendar": "family", "start": "2026-11-10T18:00:00", "end": "2026-11-10T19:30:00", "allDay": false, "busy": true, "tentative": false },
+      { "id": "archive", "calendar": "old", "start": "2026-11-10T10:00:00", "end": "2026-11-10T10:30:00", "allDay": false, "busy": true, "tentative": false },
+      { "id": "late", "calendar": "work", "start": "2026-11-10T22:00:00", "end": "2026-11-11T02:00:00", "allDay": false, "busy": true, "tentative": false },
+      { "id": "holiday", "calendar": "work", "start": "2026-11-11T00:00:00", "end": "2026-11-12T00:00:00", "allDay": true, "busy": true, "tentative": false },
+      { "id": "offsite", "calendar": "work", "start": "2026-11-11T09:00:00", "end": "2026-11-13T17:00:00", "allDay": false, "busy": true, "tentative": false },
+      { "id": "trip", "calendar": "family", "start": "2026-11-12T00:00:00", "end": "2026-11-15T00:00:00", "allDay": true, "busy": false, "tentative": false }
+    ],
+    "days": [
+      { "day": "2026-11-10",
+        "timed": [
+          { "id": "gym", "from": 420, "to": 480 },
+          { "id": "standup", "from": 540, "to": 555 },
+          { "id": "archive", "from": 600, "to": 630 },
+          { "id": "maybe", "from": 660, "to": 720 },
+          { "id": "focus", "from": 780, "to": 840 },
+          { "id": "call", "from": 900, "to": 930 },
+          { "id": "dinner", "from": 1080, "to": 1170 },
+          { "id": "late", "from": 1320, "to": 1440 }
+        ],
+        "allDay": [],
+        "busy": [[540, 555], [660, 720], [900, 930], [1320, 1440]] },
+      { "day": "2026-11-11",
+        "timed": [
+          { "id": "late", "from": 0, "to": 120 },
+          { "id": "offsite", "from": 540, "to": 1440 }
+        ],
+        "allDay": ["holiday"],
+        "busy": [[0, 120], [540, 1440]] },
+      { "day": "2026-11-12", "timed": [ { "id": "offsite", "from": 0, "to": 1440 } ], "allDay": ["trip"], "busy": [[0, 1440]] },
+      { "day": "2026-11-13", "timed": [ { "id": "offsite", "from": 0, "to": 1020 } ], "allDay": ["trip"], "busy": [[0, 1020]] },
+      { "day": "2026-11-14", "timed": [], "allDay": ["trip"], "busy": [] },
+      { "day": "2026-11-15", "timed": [], "allDay": [], "busy": [] }
+    ],
+    "free": {
+      "about": "Free time and the next free slot (16.6) of 2026-11-10: busy is the events that count (above) and one open block from 09:00 to 09:30, seen the day before. The free, not shown and not counting events must not block a slot.",
+      "now": "2026-11-09T12:00:00",
+      "day": "2026-11-10",
+      "hours": ["08:00", "18:00"],
+      "blocks": [["09:00", "09:30"]],
+      "freeMinutes": 480,
+      "nextFree": [
+        { "minutes": 60, "expect": "08:00" },
+        { "minutes": 90, "expect": "09:30" },
+        { "minutes": 180, "expect": "12:00" },
+        { "minutes": 240, "expect": null }
+      ]
+    },
+    "busyOnly": [
+      { "name": "a busy event reads Busy and loses its place", "event": { "title": "1:1 with Sam", "location": "Room 4", "busy": true }, "expect": { "title": "Busy" } },
+      { "name": "a free event reads Free", "event": { "title": "Focus time", "busy": false }, "expect": { "title": "Free" } }
+    ]
+  },
+  "eventChanges": {
+    "about": "Section 20.6. entries are the stored values before the change; the change is to the occurrence of event.<id> on day. action is change (with scope all, this or following and edit), skip or delete. newId names the Event a split makes. expect is every entry written (null deletes), undo what Undo writes.",
+    "cases": [
+      { "name": "all times: a new time",
+        "entries": { "event.a": { "title": "Manager call", "start": "2026-11-03", "time": "10:00", "minutes": 30, "repeat": { "kind": "weekly", "every": 1, "days": [2] } } },
+        "id": "a", "day": "2026-11-17", "action": "change", "scope": "all", "edit": { "time": "11:00" }, "newId": "b",
+        "expect": { "event.a": { "title": "Manager call", "start": "2026-11-03", "time": "11:00", "minutes": 30, "repeat": { "kind": "weekly", "every": 1, "days": [2] } } },
+        "undo": { "event.a": { "title": "Manager call", "start": "2026-11-03", "time": "10:00", "minutes": 30, "repeat": { "kind": "weekly", "every": 1, "days": [2] } } } },
+      { "name": "this time only: the day is skipped and a new Event made, not linked",
+        "entries": { "event.a": { "title": "Manager call", "start": "2026-11-03", "time": "10:00", "minutes": 30, "repeat": { "kind": "weekly", "every": 1, "days": [2] } } },
+        "id": "a", "day": "2026-11-17", "action": "change", "scope": "this", "edit": { "time": "11:00", "minutes": 45 }, "newId": "b",
+        "expect": {
+          "event.a": { "title": "Manager call", "start": "2026-11-03", "time": "10:00", "minutes": 30, "repeat": { "kind": "weekly", "every": 1, "days": [2] }, "skips": ["2026-11-17"] },
+          "event.b": { "title": "Manager call", "start": "2026-11-17", "time": "11:00", "minutes": 45 } },
+        "undo": { "event.a": { "title": "Manager call", "start": "2026-11-03", "time": "10:00", "minutes": 30, "repeat": { "kind": "weekly", "every": 1, "days": [2] } }, "event.b": null } },
+      { "name": "this and following: the series ends the day before and a new one starts",
+        "entries": { "event.a": { "title": "Manager call", "start": "2026-11-03", "time": "10:00", "minutes": 30, "repeat": { "kind": "weekly", "every": 1, "days": [2] } } },
+        "id": "a", "day": "2026-11-17", "action": "change", "scope": "following", "edit": { "time": "11:00" }, "newId": "b",
+        "expect": {
+          "event.a": { "title": "Manager call", "start": "2026-11-03", "time": "10:00", "minutes": 30, "repeat": { "kind": "weekly", "every": 1, "days": [2] }, "until": "2026-11-16" },
+          "event.b": { "title": "Manager call", "start": "2026-11-17", "time": "11:00", "minutes": 30, "repeat": { "kind": "weekly", "every": 1, "days": [2] } } },
+        "undo": { "event.a": { "title": "Manager call", "start": "2026-11-03", "time": "10:00", "minutes": 30, "repeat": { "kind": "weekly", "every": 1, "days": [2] } }, "event.b": null } },
+      { "name": "this and following on the first occurrence is all times",
+        "entries": { "event.a": { "title": "Manager call", "start": "2026-11-03", "time": "10:00", "minutes": 30, "repeat": { "kind": "weekly", "every": 1, "days": [2] } } },
+        "id": "a", "day": "2026-11-03", "action": "change", "scope": "following", "edit": { "time": "11:00" }, "newId": "b",
+        "expect": { "event.a": { "title": "Manager call", "start": "2026-11-03", "time": "11:00", "minutes": 30, "repeat": { "kind": "weekly", "every": 1, "days": [2] } } },
+        "undo": { "event.a": { "title": "Manager call", "start": "2026-11-03", "time": "10:00", "minutes": 30, "repeat": { "kind": "weekly", "every": 1, "days": [2] } } } },
+      { "name": "this and following with only skipped days before it is all times",
+        "entries": { "event.a": { "title": "Manager call", "start": "2026-11-03", "time": "10:00", "minutes": 30, "repeat": { "kind": "weekly", "every": 1, "days": [2] }, "skips": ["2026-11-03"] } },
+        "id": "a", "day": "2026-11-10", "action": "change", "scope": "following", "edit": { "minutes": 60 }, "newId": "b",
+        "expect": { "event.a": { "title": "Manager call", "start": "2026-11-03", "time": "10:00", "minutes": 60, "repeat": { "kind": "weekly", "every": 1, "days": [2] }, "skips": ["2026-11-03"] } },
+        "undo": { "event.a": { "title": "Manager call", "start": "2026-11-03", "time": "10:00", "minutes": 30, "repeat": { "kind": "weekly", "every": 1, "days": [2] }, "skips": ["2026-11-03"] } } },
+      { "name": "this and following: the end goes to the new series, the skips to the side they are on",
+        "entries": { "event.a": { "title": "Manager call", "start": "2026-11-03", "time": "10:00", "minutes": 30, "repeat": { "kind": "weekly", "every": 1, "days": [2] }, "until": "2026-12-29", "skips": ["2026-11-10", "2026-12-01"] } },
+        "id": "a", "day": "2026-11-17", "action": "change", "scope": "following", "edit": { "title": "1:1 with Sam" }, "newId": "b",
+        "expect": {
+          "event.a": { "title": "Manager call", "start": "2026-11-03", "time": "10:00", "minutes": 30, "repeat": { "kind": "weekly", "every": 1, "days": [2] }, "until": "2026-11-16", "skips": ["2026-11-10"] },
+          "event.b": { "title": "1:1 with Sam", "start": "2026-11-17", "time": "10:00", "minutes": 30, "repeat": { "kind": "weekly", "every": 1, "days": [2] }, "until": "2026-12-29", "skips": ["2026-12-01"] } },
+        "undo": { "event.a": { "title": "Manager call", "start": "2026-11-03", "time": "10:00", "minutes": 30, "repeat": { "kind": "weekly", "every": 1, "days": [2] }, "until": "2026-12-29", "skips": ["2026-11-10", "2026-12-01"] }, "event.b": null } },
+      { "name": "a move to another day, this time only",
+        "entries": { "event.a": { "title": "Manager call", "start": "2026-11-03", "time": "10:00", "minutes": 30, "repeat": { "kind": "weekly", "every": 1, "days": [2] } } },
+        "id": "a", "day": "2026-11-17", "action": "change", "scope": "this", "edit": { "day": "2026-11-18", "time": "14:00" }, "newId": "b",
+        "expect": {
+          "event.a": { "title": "Manager call", "start": "2026-11-03", "time": "10:00", "minutes": 30, "repeat": { "kind": "weekly", "every": 1, "days": [2] }, "skips": ["2026-11-17"] },
+          "event.b": { "title": "Manager call", "start": "2026-11-18", "time": "14:00", "minutes": 30 } },
+        "undo": { "event.a": { "title": "Manager call", "start": "2026-11-03", "time": "10:00", "minutes": 30, "repeat": { "kind": "weekly", "every": 1, "days": [2] } }, "event.b": null } },
+      { "name": "a move to another day, all times: the first day, the rule and the skips move with it",
+        "entries": { "event.a": { "title": "Manager call", "start": "2026-11-03", "time": "10:00", "minutes": 30, "repeat": { "kind": "weekly", "every": 1, "days": [2] }, "skips": ["2026-11-10"] } },
+        "id": "a", "day": "2026-11-17", "action": "change", "scope": "all", "edit": { "day": "2026-11-19" }, "newId": "b",
+        "expect": { "event.a": { "title": "Manager call", "start": "2026-11-05", "time": "10:00", "minutes": 30, "repeat": { "kind": "weekly", "every": 1, "days": [4] }, "skips": ["2026-11-12"] } },
+        "undo": { "event.a": { "title": "Manager call", "start": "2026-11-03", "time": "10:00", "minutes": 30, "repeat": { "kind": "weekly", "every": 1, "days": [2] }, "skips": ["2026-11-10"] } } },
+      { "name": "a move to another day, this and following",
+        "entries": { "event.a": { "title": "Manager call", "start": "2026-11-03", "time": "10:00", "minutes": 30, "repeat": { "kind": "weekly", "every": 1, "days": [2] } } },
+        "id": "a", "day": "2026-11-17", "action": "change", "scope": "following", "edit": { "day": "2026-11-18" }, "newId": "b",
+        "expect": {
+          "event.a": { "title": "Manager call", "start": "2026-11-03", "time": "10:00", "minutes": 30, "repeat": { "kind": "weekly", "every": 1, "days": [2] }, "until": "2026-11-16" },
+          "event.b": { "title": "Manager call", "start": "2026-11-18", "time": "10:00", "minutes": 30, "repeat": { "kind": "weekly", "every": 1, "days": [3] } } },
+        "undo": { "event.a": { "title": "Manager call", "start": "2026-11-03", "time": "10:00", "minutes": 30, "repeat": { "kind": "weekly", "every": 1, "days": [2] } }, "event.b": null } },
+      { "name": "a move of several weekdays moves each by the same number of days",
+        "entries": { "event.a": { "title": "Gym", "start": "2026-11-02", "time": "07:00", "minutes": 60, "repeat": { "kind": "weekly", "every": 1, "days": [1, 3, 5] } } },
+        "id": "a", "day": "2026-11-13", "action": "change", "scope": "following", "edit": { "day": "2026-11-14" }, "newId": "b",
+        "expect": {
+          "event.a": { "title": "Gym", "start": "2026-11-02", "time": "07:00", "minutes": 60, "repeat": { "kind": "weekly", "every": 1, "days": [1, 3, 5] }, "until": "2026-11-12" },
+          "event.b": { "title": "Gym", "start": "2026-11-14", "time": "07:00", "minutes": 60, "repeat": { "kind": "weekly", "every": 1, "days": [2, 4, 6] } } },
+        "undo": { "event.a": { "title": "Gym", "start": "2026-11-02", "time": "07:00", "minutes": 60, "repeat": { "kind": "weekly", "every": 1, "days": [1, 3, 5] } }, "event.b": null } },
+      { "name": "a move of the last Friday into a month's last week stays last",
+        "entries": { "event.a": { "title": "Drinks", "start": "2026-11-27", "time": "17:00", "minutes": 120, "repeat": { "kind": "monthly-weekday", "every": 1, "week": -1, "weekday": 5 } } },
+        "id": "a", "day": "2026-12-25", "action": "change", "scope": "following", "edit": { "day": "2026-12-28" }, "newId": "b",
+        "expect": {
+          "event.a": { "title": "Drinks", "start": "2026-11-27", "time": "17:00", "minutes": 120, "repeat": { "kind": "monthly-weekday", "every": 1, "week": -1, "weekday": 5 }, "until": "2026-12-24" },
+          "event.b": { "title": "Drinks", "start": "2026-12-28", "time": "17:00", "minutes": 120, "repeat": { "kind": "monthly-weekday", "every": 1, "week": -1, "weekday": 1 } } },
+        "undo": { "event.a": { "title": "Drinks", "start": "2026-11-27", "time": "17:00", "minutes": 120, "repeat": { "kind": "monthly-weekday", "every": 1, "week": -1, "weekday": 5 } }, "event.b": null } },
+      { "name": "a move of the last Friday out of the last week takes the new day's week",
+        "entries": { "event.a": { "title": "Drinks", "start": "2026-11-27", "time": "17:00", "minutes": 120, "repeat": { "kind": "monthly-weekday", "every": 1, "week": -1, "weekday": 5 } } },
+        "id": "a", "day": "2026-12-25", "action": "change", "scope": "following", "edit": { "day": "2026-12-24" }, "newId": "b",
+        "expect": {
+          "event.a": { "title": "Drinks", "start": "2026-11-27", "time": "17:00", "minutes": 120, "repeat": { "kind": "monthly-weekday", "every": 1, "week": -1, "weekday": 5 }, "until": "2026-12-24" },
+          "event.b": { "title": "Drinks", "start": "2026-12-24", "time": "17:00", "minutes": 120, "repeat": { "kind": "monthly-weekday", "every": 1, "week": 4, "weekday": 4 } } },
+        "undo": { "event.a": { "title": "Drinks", "start": "2026-11-27", "time": "17:00", "minutes": 120, "repeat": { "kind": "monthly-weekday", "every": 1, "week": -1, "weekday": 5 } }, "event.b": null } },
+      { "name": "a move of the second Tuesday to a fifth weekday becomes the last",
+        "entries": { "event.a": { "title": "Board", "start": "2026-11-10", "time": "14:00", "minutes": 90, "repeat": { "kind": "monthly-weekday", "every": 1, "week": 2, "weekday": 2 } } },
+        "id": "a", "day": "2026-12-08", "action": "change", "scope": "following", "edit": { "day": "2026-12-29" }, "newId": "b",
+        "expect": {
+          "event.a": { "title": "Board", "start": "2026-11-10", "time": "14:00", "minutes": 90, "repeat": { "kind": "monthly-weekday", "every": 1, "week": 2, "weekday": 2 }, "until": "2026-12-07" },
+          "event.b": { "title": "Board", "start": "2026-12-29", "time": "14:00", "minutes": 90, "repeat": { "kind": "monthly-weekday", "every": 1, "week": -1, "weekday": 2 } } },
+        "undo": { "event.a": { "title": "Board", "start": "2026-11-10", "time": "14:00", "minutes": 90, "repeat": { "kind": "monthly-weekday", "every": 1, "week": 2, "weekday": 2 } }, "event.b": null } },
+      { "name": "a move of a monthly date takes the new day's date",
+        "entries": { "event.a": { "title": "Month-end close", "start": "2026-10-31", "time": "09:00", "minutes": 180, "repeat": { "kind": "monthly-date", "every": 1, "date": 31 } } },
+        "id": "a", "day": "2026-12-31", "action": "change", "scope": "following", "edit": { "day": "2026-12-30" }, "newId": "b",
+        "expect": {
+          "event.a": { "title": "Month-end close", "start": "2026-10-31", "time": "09:00", "minutes": 180, "repeat": { "kind": "monthly-date", "every": 1, "date": 31 }, "until": "2026-12-30" },
+          "event.b": { "title": "Month-end close", "start": "2026-12-30", "time": "09:00", "minutes": 180, "repeat": { "kind": "monthly-date", "every": 1, "date": 30 } } },
+        "undo": { "event.a": { "title": "Month-end close", "start": "2026-10-31", "time": "09:00", "minutes": 180, "repeat": { "kind": "monthly-date", "every": 1, "date": 31 } }, "event.b": null } },
+      { "name": "an Event that does not repeat is always all times",
+        "entries": { "event.a": { "title": "Dentist", "start": "2026-11-12", "time": "08:00", "minutes": 45 } },
+        "id": "a", "day": "2026-11-12", "action": "change", "scope": "this", "edit": { "day": "2026-11-13", "time": "09:00" }, "newId": "b",
+        "expect": { "event.a": { "title": "Dentist", "start": "2026-11-13", "time": "09:00", "minutes": 45 } },
+        "undo": { "event.a": { "title": "Dentist", "start": "2026-11-12", "time": "08:00", "minutes": 45 } } },
+      { "name": "unknown fields are kept, and a new Event takes them",
+        "entries": { "event.a": { "title": "Manager call", "start": "2026-11-03", "time": "10:00", "minutes": 30, "repeat": { "kind": "weekly", "every": 1, "days": [2] }, "color": "#e5484d", "place": { "name": "Office" } } },
+        "id": "a", "day": "2026-11-17", "action": "change", "scope": "this", "edit": { "time": "11:00" }, "newId": "b",
+        "expect": {
+          "event.a": { "title": "Manager call", "start": "2026-11-03", "time": "10:00", "minutes": 30, "repeat": { "kind": "weekly", "every": 1, "days": [2] }, "skips": ["2026-11-17"], "color": "#e5484d", "place": { "name": "Office" } },
+          "event.b": { "title": "Manager call", "start": "2026-11-17", "time": "11:00", "minutes": 30, "color": "#e5484d", "place": { "name": "Office" } } },
+        "undo": { "event.a": { "title": "Manager call", "start": "2026-11-03", "time": "10:00", "minutes": 30, "repeat": { "kind": "weekly", "every": 1, "days": [2] }, "color": "#e5484d", "place": { "name": "Office" } }, "event.b": null } },
+      { "name": "all day: the time, length and busy go",
+        "entries": { "event.a": { "title": "Manager call", "start": "2026-11-03", "time": "10:00", "minutes": 30, "repeat": { "kind": "weekly", "every": 1, "days": [2] }, "busy": false } },
+        "id": "a", "day": "2026-11-17", "action": "change", "scope": "all", "edit": { "time": null }, "newId": "b",
+        "expect": { "event.a": { "title": "Manager call", "start": "2026-11-03", "repeat": { "kind": "weekly", "every": 1, "days": [2] } } },
+        "undo": { "event.a": { "title": "Manager call", "start": "2026-11-03", "time": "10:00", "minutes": 30, "repeat": { "kind": "weekly", "every": 1, "days": [2] }, "busy": false } } },
+      { "name": "an all-day Event given a time and a length",
+        "entries": { "event.a": { "title": "Month-end", "start": "2026-11-30", "repeat": { "kind": "monthly-date", "every": 1, "date": 30 } } },
+        "id": "a", "day": "2026-12-30", "action": "change", "scope": "all", "edit": { "time": "15:00", "minutes": 60 }, "newId": "b",
+        "expect": { "event.a": { "title": "Month-end", "start": "2026-11-30", "time": "15:00", "minutes": 60, "repeat": { "kind": "monthly-date", "every": 1, "date": 30 } } },
+        "undo": { "event.a": { "title": "Month-end", "start": "2026-11-30", "repeat": { "kind": "monthly-date", "every": 1, "date": 30 } } } },
+      { "name": "a new repeat and an end, all times",
+        "entries": { "event.a": { "title": "Manager call", "start": "2026-11-03", "time": "10:00", "minutes": 30, "repeat": { "kind": "weekly", "every": 1, "days": [2] } } },
+        "id": "a", "day": "2026-11-17", "action": "change", "scope": "all", "edit": { "repeat": { "kind": "daily", "every": 1 }, "until": "2026-11-30" }, "newId": "b",
+        "expect": { "event.a": { "title": "Manager call", "start": "2026-11-03", "time": "10:00", "minutes": 30, "repeat": { "kind": "daily", "every": 1 }, "until": "2026-11-30" } },
+        "undo": { "event.a": { "title": "Manager call", "start": "2026-11-03", "time": "10:00", "minutes": 30, "repeat": { "kind": "weekly", "every": 1, "days": [2] } } } },
+      { "name": "an end taken away, all times",
+        "entries": { "event.a": { "title": "Manager call", "start": "2026-11-03", "time": "10:00", "minutes": 30, "repeat": { "kind": "weekly", "every": 1, "days": [2] }, "until": "2026-11-30" } },
+        "id": "a", "day": "2026-11-17", "action": "change", "scope": "all", "edit": { "until": null }, "newId": "b",
+        "expect": { "event.a": { "title": "Manager call", "start": "2026-11-03", "time": "10:00", "minutes": 30, "repeat": { "kind": "weekly", "every": 1, "days": [2] } } },
+        "undo": { "event.a": { "title": "Manager call", "start": "2026-11-03", "time": "10:00", "minutes": 30, "repeat": { "kind": "weekly", "every": 1, "days": [2] }, "until": "2026-11-30" } } },
+      { "name": "counts as busy off, then on again",
+        "entries": { "event.a": { "title": "Gym", "start": "2026-11-10", "time": "07:00", "minutes": 60 }, "event.c": { "title": "Lunch", "start": "2026-11-10", "time": "12:00", "minutes": 60, "busy": false } },
+        "id": "a", "day": "2026-11-10", "action": "change", "scope": "all", "edit": { "busy": false }, "newId": "b",
+        "expect": { "event.a": { "title": "Gym", "start": "2026-11-10", "time": "07:00", "minutes": 60, "busy": false } },
+        "undo": { "event.a": { "title": "Gym", "start": "2026-11-10", "time": "07:00", "minutes": 60 } } },
+      { "name": "counts as busy on again: the default is not written",
+        "entries": { "event.c": { "title": "Lunch", "start": "2026-11-10", "time": "12:00", "minutes": 60, "busy": false } },
+        "id": "c", "day": "2026-11-10", "action": "change", "scope": "all", "edit": { "busy": true }, "newId": "b",
+        "expect": { "event.c": { "title": "Lunch", "start": "2026-11-10", "time": "12:00", "minutes": 60 } },
+        "undo": { "event.c": { "title": "Lunch", "start": "2026-11-10", "time": "12:00", "minutes": 60, "busy": false } } },
+      { "name": "skip this one",
+        "entries": { "event.a": { "title": "Manager call", "start": "2026-11-03", "time": "10:00", "minutes": 30, "repeat": { "kind": "weekly", "every": 1, "days": [2] }, "skips": ["2026-11-24"] } },
+        "id": "a", "day": "2026-11-10", "action": "skip",
+        "expect": { "event.a": { "title": "Manager call", "start": "2026-11-03", "time": "10:00", "minutes": 30, "repeat": { "kind": "weekly", "every": 1, "days": [2] }, "skips": ["2026-11-10", "2026-11-24"] } },
+        "undo": { "event.a": { "title": "Manager call", "start": "2026-11-03", "time": "10:00", "minutes": 30, "repeat": { "kind": "weekly", "every": 1, "days": [2] }, "skips": ["2026-11-24"] } } },
+      { "name": "delete",
+        "entries": { "event.a": { "title": "Manager call", "start": "2026-11-03", "time": "10:00", "minutes": 30, "repeat": { "kind": "weekly", "every": 1, "days": [2] }, "color": "#e5484d" } },
+        "id": "a", "day": "2026-11-10", "action": "delete",
+        "expect": { "event.a": null },
+        "undo": { "event.a": { "title": "Manager call", "start": "2026-11-03", "time": "10:00", "minutes": 30, "repeat": { "kind": "weekly", "every": 1, "days": [2] }, "color": "#e5484d" } } }
+    ]
+  },
+  "icsImport": {
+    "about": "Section 20.10. ics holds the lines of one calendar file between BEGIN:VCALENDAR, VERSION:2.0, PRODID:-//Vicu//Vectors//EN and END:VCALENDAR, joined with CRLF. importDay is the local day of the import; busyOnly is false when left out. expect is the Events made, as written (20.3), sorted by first day, all-day first, then time, then title. A time without a zone is local wall-clock time and runs in any zone; expectByZone is checked only in the zones it names.",
+    "windowDays": 365,
+    "untitled": "(No title)",
+    "cases": [
+      { "name": "FREQ=DAILY;INTERVAL=2 is daily every 2", "importDay": "2026-11-10",
+        "ics": ["BEGIN:VEVENT", "UID:walk", "SUMMARY:Walk", "DTSTART:20261101T073000", "DTEND:20261101T080000", "RRULE:FREQ=DAILY;INTERVAL=2", "END:VEVENT"],
+        "expect": [
+          { "title": "Walk", "start": "2026-11-01", "time": "07:30", "minutes": 30, "repeat": { "kind": "daily", "every": 2 } }
+        ] },
+      { "name": "FREQ=DAILY with weekdays in BYDAY is every weekday", "importDay": "2026-11-10",
+        "ics": ["BEGIN:VEVENT", "UID:standup", "SUMMARY:Standup", "DTSTART:20261102T091500", "DTEND:20261102T093000", "RRULE:FREQ=DAILY;BYDAY=MO,TU,WE,TH,FR", "END:VEVENT"],
+        "expect": [
+          { "title": "Standup", "start": "2026-11-02", "time": "09:15", "minutes": 15, "repeat": { "kind": "weekly", "every": 1, "days": [1, 2, 3, 4, 5] } }
+        ] },
+      { "name": "FREQ=WEEKLY with BYDAY and INTERVAL", "importDay": "2026-11-10",
+        "ics": ["BEGIN:VEVENT", "UID:sync", "SUMMARY:Team sync", "DTSTART:20261103T100000", "DTEND:20261103T110000", "RRULE:FREQ=WEEKLY;INTERVAL=2;BYDAY=TU,TH", "END:VEVENT"],
+        "expect": [
+          { "title": "Team sync", "start": "2026-11-03", "time": "10:00", "minutes": 60, "repeat": { "kind": "weekly", "every": 2, "days": [2, 4] } }
+        ] },
+      { "name": "FREQ=WEEKLY without BYDAY takes the first day's weekday; all-day stays all-day", "importDay": "2026-11-10",
+        "ics": ["BEGIN:VEVENT", "UID:bins", "SUMMARY:Bins out", "DTSTART;VALUE=DATE:20261104", "DTEND;VALUE=DATE:20261105", "RRULE:FREQ=WEEKLY", "END:VEVENT"],
+        "expect": [
+          { "title": "Bins out", "start": "2026-11-04", "repeat": { "kind": "weekly", "every": 1, "days": [3] } }
+        ] },
+      { "name": "WKST other than MO with INTERVAL above 1 is copied as single Events", "importDay": "2026-11-10",
+        "ics": ["BEGIN:VEVENT", "UID:fortnight", "SUMMARY:Fortnightly", "DTSTART:20261110T100000", "DTEND:20261110T103000", "RRULE:FREQ=WEEKLY;INTERVAL=2;WKST=SU;BYDAY=TU;COUNT=3", "END:VEVENT"],
+        "expect": [
+          { "title": "Fortnightly", "start": "2026-11-10", "time": "10:00", "minutes": 30 },
+          { "title": "Fortnightly", "start": "2026-11-24", "time": "10:00", "minutes": 30 },
+          { "title": "Fortnightly", "start": "2026-12-08", "time": "10:00", "minutes": 30 }
+        ] },
+      { "name": "FREQ=MONTHLY;BYMONTHDAY=31 is monthly on the 31st; UNTIL at the start time keeps that day", "importDay": "2026-11-10",
+        "ics": ["BEGIN:VEVENT", "UID:close", "SUMMARY:Month-end close", "DTSTART:20261031T090000", "DTEND:20261031T120000", "RRULE:FREQ=MONTHLY;BYMONTHDAY=31;UNTIL=20270331T090000", "END:VEVENT"],
+        "expect": [
+          { "title": "Month-end close", "start": "2026-10-31", "time": "09:00", "minutes": 180, "repeat": { "kind": "monthly-date", "every": 1, "date": 31 }, "until": "2027-03-31" }
+        ] },
+      { "name": "UNTIL before the start time on its day ends the day before", "importDay": "2026-11-10",
+        "ics": ["BEGIN:VEVENT", "UID:close", "SUMMARY:Month-end close", "DTSTART:20261031T090000", "DTEND:20261031T120000", "RRULE:FREQ=MONTHLY;BYMONTHDAY=31;UNTIL=20270331T085959", "END:VEVENT"],
+        "expect": [
+          { "title": "Month-end close", "start": "2026-10-31", "time": "09:00", "minutes": 180, "repeat": { "kind": "monthly-date", "every": 1, "date": 31 }, "until": "2027-03-30" }
+        ] },
+      { "name": "FREQ=MONTHLY without BY parts is monthly on the first day's date", "importDay": "2026-11-10",
+        "ics": ["BEGIN:VEVENT", "UID:rent", "SUMMARY:Rent", "DTSTART;VALUE=DATE:20261130", "DTEND;VALUE=DATE:20261201", "RRULE:FREQ=MONTHLY", "END:VEVENT"],
+        "expect": [
+          { "title": "Rent", "start": "2026-11-30", "repeat": { "kind": "monthly-date", "every": 1, "date": 30 } }
+        ] },
+      { "name": "FREQ=MONTHLY;BYDAY=2TU is the second Tuesday", "importDay": "2026-11-10",
+        "ics": ["BEGIN:VEVENT", "UID:board", "SUMMARY:Board", "DTSTART:20261110T140000", "DTEND:20261110T153000", "RRULE:FREQ=MONTHLY;BYDAY=2TU", "END:VEVENT"],
+        "expect": [
+          { "title": "Board", "start": "2026-11-10", "time": "14:00", "minutes": 90, "repeat": { "kind": "monthly-weekday", "every": 1, "week": 2, "weekday": 2 } }
+        ] },
+      { "name": "FREQ=MONTHLY;BYDAY=-1FR is the last Friday", "importDay": "2026-11-10",
+        "ics": ["BEGIN:VEVENT", "UID:drinks", "SUMMARY:Drinks", "DTSTART:20261127T170000", "DTEND:20261127T190000", "RRULE:FREQ=MONTHLY;BYDAY=-1FR", "END:VEVENT"],
+        "expect": [
+          { "title": "Drinks", "start": "2026-11-27", "time": "17:00", "minutes": 120, "repeat": { "kind": "monthly-weekday", "every": 1, "week": -1, "weekday": 5 } }
+        ] },
+      { "name": "FREQ=MONTHLY;BYDAY=TH;BYSETPOS=3 is the third Thursday", "importDay": "2026-11-10",
+        "ics": ["BEGIN:VEVENT", "UID:meetup", "SUMMARY:Meetup", "DTSTART:20261119T183000", "DTEND:20261119T200000", "RRULE:FREQ=MONTHLY;BYDAY=TH;BYSETPOS=3", "END:VEVENT"],
+        "expect": [
+          { "title": "Meetup", "start": "2026-11-19", "time": "18:30", "minutes": 90, "repeat": { "kind": "monthly-weekday", "every": 1, "week": 3, "weekday": 4 } }
+        ] },
+      { "name": "a fifth weekday is copied as single Events", "importDay": "2026-11-10",
+        "ics": ["BEGIN:VEVENT", "UID:fifth", "SUMMARY:Fifth Friday", "DTSTART:20270129T120000", "DTEND:20270129T130000", "RRULE:FREQ=MONTHLY;BYDAY=5FR;COUNT=2", "END:VEVENT"],
+        "expect": [
+          { "title": "Fifth Friday", "start": "2027-01-29", "time": "12:00", "minutes": 60 },
+          { "title": "Fifth Friday", "start": "2027-04-30", "time": "12:00", "minutes": 60 }
+        ] },
+      { "name": "several BYMONTHDAY values are copied as single Events", "importDay": "2026-11-10",
+        "ics": ["BEGIN:VEVENT", "UID:pay", "SUMMARY:Payroll", "DTSTART:20261115T090000", "DTEND:20261115T093000", "RRULE:FREQ=MONTHLY;BYMONTHDAY=1,15;COUNT=3", "END:VEVENT"],
+        "expect": [
+          { "title": "Payroll", "start": "2026-11-15", "time": "09:00", "minutes": 30 },
+          { "title": "Payroll", "start": "2026-12-01", "time": "09:00", "minutes": 30 },
+          { "title": "Payroll", "start": "2026-12-15", "time": "09:00", "minutes": 30 }
+        ] },
+      { "name": "FREQ=YEARLY is yearly; 29 February stays", "importDay": "2026-11-10",
+        "ics": ["BEGIN:VEVENT", "UID:leap", "SUMMARY:Leap day", "DTSTART;VALUE=DATE:20240229", "DTEND;VALUE=DATE:20240301", "RRULE:FREQ=YEARLY", "END:VEVENT"],
+        "expect": [
+          { "title": "Leap day", "start": "2024-02-29", "repeat": { "kind": "yearly", "every": 1 } }
+        ] },
+      { "name": "FREQ=YEARLY with the first day's BYMONTH and BYMONTHDAY is yearly", "importDay": "2026-11-10",
+        "ics": ["BEGIN:VEVENT", "UID:bday", "SUMMARY:Birthday", "DTSTART;VALUE=DATE:20261110", "DTEND;VALUE=DATE:20261111", "RRULE:FREQ=YEARLY;INTERVAL=1;BYMONTH=11;BYMONTHDAY=10", "END:VEVENT"],
+        "expect": [
+          { "title": "Birthday", "start": "2026-11-10", "repeat": { "kind": "yearly", "every": 1 } }
+        ] },
+      { "name": "FREQ=YEARLY with BYDAY is copied; occurrences before the import day are left out", "importDay": "2026-11-10",
+        "ics": ["BEGIN:VEVENT", "UID:labour", "SUMMARY:Labour Day", "DTSTART;VALUE=DATE:20260907", "DTEND;VALUE=DATE:20260908", "RRULE:FREQ=YEARLY;BYMONTH=9;BYDAY=1MO;COUNT=2", "END:VEVENT"],
+        "expect": [
+          { "title": "Labour Day", "start": "2027-09-06" }
+        ] },
+      { "name": "COUNT is the day of the last occurrence", "importDay": "2026-11-10",
+        "ics": ["BEGIN:VEVENT", "UID:course", "SUMMARY:Course", "DTSTART:20261103T190000", "DTEND:20261103T210000", "RRULE:FREQ=WEEKLY;BYDAY=TU;COUNT=4", "END:VEVENT"],
+        "expect": [
+          { "title": "Course", "start": "2026-11-03", "time": "19:00", "minutes": 120, "repeat": { "kind": "weekly", "every": 1, "days": [2] }, "until": "2026-11-24" }
+        ] },
+      { "name": "COUNT counts an EXDATE day; EXDATE becomes a skip", "importDay": "2026-11-10",
+        "ics": ["BEGIN:VEVENT", "UID:sprint", "SUMMARY:Sprint", "DTSTART:20261109T083000", "DTEND:20261109T084500", "RRULE:FREQ=DAILY;COUNT=5", "EXDATE:20261111T083000", "END:VEVENT"],
+        "expect": [
+          { "title": "Sprint", "start": "2026-11-09", "time": "08:30", "minutes": 15, "repeat": { "kind": "daily", "every": 1 }, "until": "2026-11-13", "skips": ["2026-11-11"] }
+        ] },
+      { "name": "an EXDATE that is not an occurrence is not a skip", "importDay": "2026-11-10",
+        "ics": ["BEGIN:VEVENT", "UID:gym", "SUMMARY:Gym", "DTSTART:20261110T070000", "DTEND:20261110T080000", "RRULE:FREQ=WEEKLY;BYDAY=TU", "EXDATE:20261112T070000", "EXDATE:20261117T070000", "END:VEVENT"],
+        "expect": [
+          { "title": "Gym", "start": "2026-11-10", "time": "07:00", "minutes": 60, "repeat": { "kind": "weekly", "every": 1, "days": [2] }, "skips": ["2026-11-17"] }
+        ] },
+      { "name": "RDATE is copied as single Events", "importDay": "2026-11-10",
+        "ics": ["BEGIN:VEVENT", "UID:review", "SUMMARY:Review", "DTSTART:20261112T140000", "DTEND:20261112T150000", "RDATE:20261119T140000", "END:VEVENT"],
+        "expect": [
+          { "title": "Review", "start": "2026-11-12", "time": "14:00", "minutes": 60 },
+          { "title": "Review", "start": "2026-11-19", "time": "14:00", "minutes": 60 }
+        ] },
+      { "name": "overrides (RECURRENCE-ID) are copied as single Events, moved and cancelled ones applied", "importDay": "2026-11-10",
+        "ics": ["BEGIN:VEVENT", "UID:standup", "SUMMARY:Standup", "DTSTART:20261116T090000", "DTEND:20261116T093000", "RRULE:FREQ=WEEKLY;BYDAY=MO;COUNT=3", "END:VEVENT", "BEGIN:VEVENT", "UID:standup", "RECURRENCE-ID:20261123T090000", "SUMMARY:Standup (moved)", "DTSTART:20261123T110000", "DTEND:20261123T113000", "END:VEVENT", "BEGIN:VEVENT", "UID:standup", "RECURRENCE-ID:20261130T090000", "SUMMARY:Standup", "STATUS:CANCELLED", "DTSTART:20261130T090000", "DTEND:20261130T093000", "END:VEVENT"],
+        "expect": [
+          { "title": "Standup", "start": "2026-11-16", "time": "09:00", "minutes": 30 },
+          { "title": "Standup (moved)", "start": "2026-11-23", "time": "11:00", "minutes": 30 }
+        ] },
+      { "name": "a series that ended before the import day is left out", "importDay": "2026-11-10",
+        "ics": ["BEGIN:VEVENT", "UID:old", "SUMMARY:Old class", "DTSTART:20260901T180000", "DTEND:20260901T190000", "RRULE:FREQ=WEEKLY;UNTIL=20261031T235959", "END:VEVENT"],
+        "expect": [] },
+      { "name": "single events: from the import day through 365 days after it", "importDay": "2026-11-10",
+        "ics": ["BEGIN:VEVENT", "UID:before", "SUMMARY:Yesterday", "DTSTART:20261109T100000", "DTEND:20261109T110000", "END:VEVENT", "BEGIN:VEVENT", "UID:today", "SUMMARY:Dentist", "DTSTART:20261110T080000", "DTEND:20261110T084500", "END:VEVENT", "BEGIN:VEVENT", "UID:last", "SUMMARY:Last day", "DTSTART:20271110T100000", "DTEND:20271110T110000", "END:VEVENT", "BEGIN:VEVENT", "UID:after", "SUMMARY:Too far", "DTSTART:20271111T100000", "DTEND:20271111T110000", "END:VEVENT"],
+        "expect": [
+          { "title": "Dentist", "start": "2026-11-10", "time": "08:00", "minutes": 45 },
+          { "title": "Last day", "start": "2027-11-10", "time": "10:00", "minutes": 60 }
+        ] },
+      { "name": "an event ending in the import day is kept, one ending at its midnight is not", "importDay": "2026-11-10",
+        "ics": ["BEGIN:VEVENT", "UID:late", "SUMMARY:Night shift", "DTSTART:20261109T230000", "DTEND:20261110T010000", "END:VEVENT", "BEGIN:VEVENT", "UID:evening", "SUMMARY:Evening", "DTSTART:20261109T220000", "DTEND:20261110T000000", "END:VEVENT"],
+        "expect": [
+          { "title": "Night shift", "start": "2026-11-09", "time": "23:00", "minutes": 120 }
+        ] },
+      { "name": "all-day events: one day, several days, and several days already running", "importDay": "2026-11-10",
+        "ics": ["BEGIN:VEVENT", "UID:off", "SUMMARY:Day off", "DTSTART;VALUE=DATE:20261120", "DTEND;VALUE=DATE:20261121", "END:VEVENT", "BEGIN:VEVENT", "UID:trip", "SUMMARY:Conference", "DTSTART;VALUE=DATE:20261120", "DTEND;VALUE=DATE:20261123", "END:VEVENT", "BEGIN:VEVENT", "UID:leave", "SUMMARY:Leave", "DTSTART;VALUE=DATE:20261108", "DTEND;VALUE=DATE:20261112", "END:VEVENT"],
+        "expect": [
+          { "title": "Leave", "start": "2026-11-08", "repeat": { "kind": "daily", "every": 1 }, "until": "2026-11-11" },
+          { "title": "Conference", "start": "2026-11-20", "repeat": { "kind": "daily", "every": 1 }, "until": "2026-11-22" },
+          { "title": "Day off", "start": "2026-11-20" }
+        ] },
+      { "name": "free (TRANSPARENT) and cancelled events", "importDay": "2026-11-10",
+        "ics": ["BEGIN:VEVENT", "UID:focus", "SUMMARY:Focus time", "TRANSP:TRANSPARENT", "DTSTART:20261111T130000", "DTEND:20261111T150000", "END:VEVENT", "BEGIN:VEVENT", "UID:hols", "SUMMARY:Public holiday", "TRANSP:TRANSPARENT", "DTSTART;VALUE=DATE:20261225", "DTEND;VALUE=DATE:20261226", "END:VEVENT", "BEGIN:VEVENT", "UID:gone", "SUMMARY:Cancelled", "STATUS:CANCELLED", "DTSTART:20261111T090000", "DTEND:20261111T100000", "END:VEVENT", "BEGIN:VEVENT", "UID:gone-series", "SUMMARY:Cancelled series", "STATUS:CANCELLED", "DTSTART:20261111T160000", "DTEND:20261111T170000", "RRULE:FREQ=DAILY", "END:VEVENT"],
+        "expect": [
+          { "title": "Focus time", "start": "2026-11-11", "time": "13:00", "minutes": 120, "busy": false },
+          { "title": "Public holiday", "start": "2026-12-25" }
+        ] },
+      { "name": "lengths: rounded to whole minutes, at most 1440", "importDay": "2026-11-10",
+        "ics": ["BEGIN:VEVENT", "UID:long", "SUMMARY:Offsite", "DTSTART:20261111T090000", "DTEND:20261113T090000", "END:VEVENT", "BEGIN:VEVENT", "UID:round", "SUMMARY:  Call  ", "DTSTART:20261111T100000", "DTEND:20261111T102959", "END:VEVENT", "BEGIN:VEVENT", "UID:untitled", "DTSTART:20261111T110000", "DTEND:20261111T111500", "END:VEVENT"],
+        "expect": [
+          { "title": "Offsite", "start": "2026-11-11", "time": "09:00", "minutes": 1440 },
+          { "title": "Call", "start": "2026-11-11", "time": "10:00", "minutes": 30 },
+          { "title": "(No title)", "start": "2026-11-11", "time": "11:00", "minutes": 15 }
+        ] },
+      { "name": "busy only: titles become Busy, or Free for a free event", "importDay": "2026-11-10", "busyOnly": true,
+        "ics": ["BEGIN:VEVENT", "UID:1on1", "SUMMARY:1:1 with Sam", "LOCATION:Room 4", "DTSTART:20261111T100000", "DTEND:20261111T103000", "RRULE:FREQ=WEEKLY", "END:VEVENT", "BEGIN:VEVENT", "UID:focus", "SUMMARY:Focus time", "TRANSP:TRANSPARENT", "DTSTART:20261111T130000", "DTEND:20261111T150000", "END:VEVENT"],
+        "expect": [
+          { "title": "Busy", "start": "2026-11-11", "time": "10:00", "minutes": 30, "repeat": { "kind": "weekly", "every": 1, "days": [3] } },
+          { "title": "Free", "start": "2026-11-11", "time": "13:00", "minutes": 120, "busy": false }
+        ] },
+      { "name": "UTC times are the importing device's local time at the first occurrence", "importDay": "2026-11-10",
+        "ics": ["BEGIN:VEVENT", "UID:utc", "SUMMARY:Global call", "DTSTART:20261201T000000Z", "DTEND:20261201T010000Z", "RRULE:FREQ=WEEKLY", "END:VEVENT"],
+        "expectByZone": {
+          "Pacific/Auckland": [
+            { "title": "Global call", "start": "2026-12-01", "time": "13:00", "minutes": 60, "repeat": { "kind": "weekly", "every": 1, "days": [2] } }
+          ],
+          "America/New_York": [
+            { "title": "Global call", "start": "2026-11-30", "time": "19:00", "minutes": 60, "repeat": { "kind": "weekly", "every": 1, "days": [1] } }
+          ]
+        } },
+      { "name": "a time zone of the file is converted to the importing device's local time", "importDay": "2026-11-10",
+        "ics": ["BEGIN:VTIMEZONE", "TZID:W. Europe Standard Time", "BEGIN:STANDARD", "DTSTART:16010101T030000", "TZOFFSETFROM:+0200", "TZOFFSETTO:+0100", "RRULE:FREQ=YEARLY;BYDAY=-1SU;BYMONTH=10", "END:STANDARD", "BEGIN:DAYLIGHT", "DTSTART:16010101T020000", "TZOFFSETFROM:+0100", "TZOFFSETTO:+0200", "RRULE:FREQ=YEARLY;BYDAY=-1SU;BYMONTH=3", "END:DAYLIGHT", "END:VTIMEZONE", "BEGIN:VEVENT", "UID:berlin", "SUMMARY:Berlin office", "DTSTART;TZID=W. Europe Standard Time:20261112T093000", "DTEND;TZID=W. Europe Standard Time:20261112T103000", "END:VEVENT"],
+        "expectByZone": {
+          "Pacific/Auckland": [
+            { "title": "Berlin office", "start": "2026-11-12", "time": "21:30", "minutes": 60 }
+          ],
+          "America/New_York": [
+            { "title": "Berlin office", "start": "2026-11-12", "time": "03:30", "minutes": 60 }
+          ]
+        } }
+    ]
   }
 }

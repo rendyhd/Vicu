@@ -8,7 +8,7 @@ Test vectors live in `test-fixtures/` in both repos and must stay byte-identical
 
 | Fixture | Covers |
 |---|---|
-| `cross-app-semantics-v1.json` | due-date rules, smart lists, weeks, custom-list windows, rules and sorting, saved-filter import, review math, completion hold, date display, collaboration, hidden tasks, synced preferences, task order, project categories, guided organizing, routines on Today, time blocks |
+| `cross-app-semantics-v1.json` | due-date rules, smart lists, weeks, custom-list windows, rules and sorting, saved-filter import, review math, completion hold, date display, collaboration, hidden tasks, synced preferences, task order, project categories, guided organizing, routines on Today, time blocks, Events and calendars |
 | `nlp-corpus-v1.json` | quick-add parsing |
 | `routine-archive-v1.json` | routine merge, pruning and archive rules |
 | `design-tokens-v1.json` | colour roles, type, radii and motion (see `design-system-v1.md`) |
@@ -1250,6 +1250,7 @@ A key is added here, in both repos, in the release that starts writing it.
 | `project_icon.<projectId>` | `"none"`: the project is drawn without its folder icon and its name starts where the icon would be; or `null`. Any other value acts as the default and is kept | the folder |
 | `template.<id>` | a task template, or `null` (removed); section 18 | none |
 | `subtask_order.<taskId>` | the ids of a task's subtasks in the order the person dragged them, or `null`; section 19 | the server's order |
+| `event.<id>` | one of your Events (`title`, `start`, `time`, `minutes`, `repeat`, `until`, `skips`, `busy`), or `null` (deleted); section 20.3 | none |
 | `weekly_review.last` | the local date the last weekly review was finished, `"YYYY-MM-DD"`; section 14.7 | never done |
 | `planner.default_length` | the length of a new block in minutes: 15, 30, 45, 60, 75 or 90. Any other value acts as the default and is kept; section 16.2 | 30 |
 | `planner.hours` | the work hours, `["HH:mm", "HH:mm"]` in 24-hour local time, the start before the end. Any other value acts as the default and is kept; section 16.6 | `["08:00", "18:00"]` |
@@ -1769,8 +1770,8 @@ A block on any other day stays, and so does a block when only the due date's tim
 
 ### 16.6 Free time and fitting
 
-- **Busy** is the day's open blocks and any calendar events. Routine times and due-time markers have
-  no length and are never busy.
+- **Busy** is the day's open blocks and the busy events of section 20.2 (your Events and connected
+  calendars). Routine times and due-time markers have no length and are never busy.
 - **Free time** is the work hours (`planner.hours`; today, from now) minus busy time, with overlaps
   counted once.
 - **The next free slot** is the first 15-minute line from the start of the work hours (today, from
@@ -1911,3 +1912,304 @@ order.
 Done subtasks stay where they are in the order.
 
 `subtaskOrder` in `cross-app-semantics-v1.json` holds the vectors.
+
+## 20. Events and calendars
+
+The Plan screen (section 16.9) shows everything that takes your time: your tasks' blocks, your own
+**Events**, typed by hand, and the events of the **calendars** you connect. Events and calendar
+events appear on the Plan screen only: its Day, 3 days and Week views and Plan my day (14.10). They
+are never on Today (the phone's Today Day view included), in lists, in Quick View, in notifications
+or reminders, and never in the task caches.
+
+- Vicu never writes to a connected calendar. Only your own Events are Vicu's to change.
+- Your Events sync (20.3). Connected calendars and their settings belong to the device and never
+  sync; their addresses, passwords and tokens never leave it (20.9, 20.11).
+- The assistant only ever gets free time (20.2), never an event's title, place or calendar.
+
+### 20.1 An event
+
+An event is one occurrence, its recurrence already expanded.
+
+| Field | Meaning |
+|---|---|
+| `calendar` | where it comes from: a connected calendar's id on this device, or `vicu:events` for your own Events |
+| `start`, `end` | instants. An all-day event runs from the local midnight of its first day to the local midnight after its last day |
+| `allDay` | a date without a time |
+| `busy` | busy (iCalendar opaque, the default) or free (`TRANSP:TRANSPARENT`, a calendar's "show as free") |
+| `tentative` | not yet accepted (`STATUS:TENTATIVE`, a calendar's own tentative state) |
+| `title`, `place` | as the calendar has them; Busy only drops them (20.8) |
+
+**On a day.** A timed event covers, on a local day, the part between that day's midnight and the
+next, in wall-clock minutes from the day's midnight; 1440 is the midnight that ends the day. An event
+that crosses midnight is on both days, and one that runs for several days covers the whole of the
+days between. Minutes are wall-clock minutes, so the timeline's hour lines stay right on the day of a
+clock change. An event that ends where it starts has no length and is on no day's timeline. An
+all-day event is on each day from its first to its last.
+
+### 20.2 Busy time
+
+This extends section 16.6. The busy time of a day is:
+
+- the day's open blocks (16.6), and
+- the busy, timed events of calendars that count, each clipped to the day (20.1).
+
+Not busy: all-day events (a holiday or a birthday does not fill the day), free events, events with
+no length, and the events of a calendar whose **Counts as busy** is off or that is not shown.
+Tentative events are busy. Your own Events always count as a calendar: each one is busy unless its
+`busy` is false, and an all-day Event never is (20.3).
+
+Overlaps are counted once. Free time, the next free slot and Fit (16.6), and Plan my day (14.10: the
+meter's free time, the draft's busy time, the free time the assistant gets) all use this busy time.
+The assistant is sent the free ranges only.
+
+### 20.3 Your Events
+
+An Event is a time you are not available that is not a task: nothing to tick, nothing to track. A
+weekly manager call, a monthly review, a month-end close. Each Event is one entry in the synced
+preferences (`event.<id>`, section 11.3), so it reaches every device of the account and nobody
+else. `<id>` is a random id made by the device that created it. Events are not hidden tasks and are
+never written to a task.
+
+| Field | Value | Left out means |
+|---|---|---|
+| `title` | text, required; read trimmed | the entry is not an Event |
+| `start` | the first day, `YYYY-MM-DD`, required | the entry is not an Event |
+| `time` | the start, `HH:mm` in 24-hour local time | all-day |
+| `minutes` | the length, a whole number from 1 to 1440; required with a `time` | (with a `time`: the entry is not an Event) |
+| `repeat` | the repeat rule (20.4) | does not repeat |
+| `until` | the last day it may happen on, `YYYY-MM-DD` | no end |
+| `skips` | days left out, `YYYY-MM-DD` | none |
+| `busy` | `false`: a timed Event that does not count as busy | a timed Event is busy; an all-day Event never is |
+
+- **Wall-clock times.** An Event at 10:00 is at 10:00 local time on each of its days, through a
+  clock change and on a device in another time zone. It ends `minutes` later on the clock, on the
+  next day when that is past midnight: an Event at 00:30 for 180 minutes on the night the clock goes
+  back ends at 03:30.
+- **What is not an Event.** A value of the wrong type, without a required field, with a field
+  outside its values, or with a repeat kind this version does not read is not an Event: it is not
+  shown and not busy, and it is kept unchanged. Wrong optional values read as their default: an
+  `until` that is not a date is no end, a skip that is not a date is dropped, a `busy` that is not
+  true or false is the default.
+- **What is written.** The fields without their defaults: `time` and `minutes` only for a timed
+  Event, `busy` only when it is false on a timed Event, `repeat` only when it repeats, `until` only
+  when set, `skips` only when not empty, sorted and each day once. Inside `repeat` every field is
+  written, `every` included.
+- **Unknown fields** are kept and written back when the Event is changed.
+- Deleting an Event writes `null` (section 11.2). Lists of Events (the Plan gear, Settings) are by
+  title, then id.
+
+### 20.4 The repeat rule
+
+Vicu's own small rule, not iCalendar's RRULE, so both apps read it exactly the same. `repeat` is an
+object with a `kind` and `every`, a whole number from 1 to 99 (left out, it reads as 1). Weekdays
+are numbered 0 (Sunday) to 6 (Saturday).
+
+| `kind` | Other fields | Happens on |
+|---|---|---|
+| `none` | | the first day only |
+| `daily` | | every `every` days from the first day |
+| `weekly` | `days`: one or more weekdays | those weekdays, in every `every`th week counted from the week of the first day. Weeks start on Monday |
+| `monthly-date` | `date`, 1 to 31 | that date, in every `every`th month counted from the first day's month. A month without the date (the 31st in April, the 30th in February) has none |
+| `monthly-weekday` | `week`: 1 to 4, or -1; `weekday` | the `week`th such weekday of the month (the 1st to 7th are the first week, the 8th to 14th the second, and so on), or with -1 the last one, in the month's last seven days; in every `every`th month |
+| `yearly` | | the first day's month and date, every `every` years. 29 February happens only in leap years |
+
+- The first day is the earliest day, and the weeks, months and years count from it. It is a day the
+  Event happens on only when the rule gives it: weekly on Monday and Thursday from a Sunday starts on
+  the Monday after.
+- No day after `until`, and none of the `skips`.
+- The rule has no time: each day it gives has the Event's `time` and `minutes`.
+
+### 20.5 The repeat choices
+
+Making an Event on a day offers these repeat choices, in this order:
+
+| Choice | Rule | Offered |
+|---|---|---|
+| Does not repeat | `none` | always |
+| Every day | `daily`, every 1 | always |
+| Every weekday | `weekly`, every 1, Monday to Friday | when the day is Monday to Friday |
+| Every Tuesday | `weekly`, every 1, the day's weekday | always |
+| Every 2 weeks on Tuesday | `weekly`, every 2, the day's weekday | always |
+| Monthly on the 24th | `monthly-date`, the day's date | always |
+| Monthly on the fourth Tuesday | `monthly-weekday`, the day's week (first, second, third, fourth) and weekday | when the day is the 1st to the 28th |
+| Monthly on the last Tuesday | `monthly-weekday`, week -1, the day's weekday | when the day is in its month's last seven days |
+| Every year on November 24 | `yearly`, every 1 | always |
+
+Every choice happens on the day it is offered for. A day can have both the fourth and the last
+weekday (24 November 2026); the 29th to the 31st have only the last.
+
+How a rule reads, in the list and the popover:
+
+| Rule | Text |
+|---|---|
+| `none` | Does not repeat |
+| `daily` | Every day; Every 3 days |
+| `weekly`, every 1, Monday to Friday | Every weekday |
+| `weekly` | Every Monday, Wednesday; Every 2 weeks on Tuesday. Days are named Monday first, Sunday last |
+| `monthly-date` | Monthly on the 31st; Every 2 months on the 15th |
+| `monthly-weekday` | Monthly on the second Tuesday; Monthly on the last Friday; Every 3 months on the first Monday |
+| `yearly` | Every year; Every 2 years |
+
+Ordinals: 1st, 2nd, 3rd, 4th to 20th (11th, 12th and 13th included), 21st, 22nd, 23rd, 24th to
+30th, 31st.
+
+### 20.6 Changing an Event
+
+The Event's popover or sheet (title, all day, time, length, repeat, ends on, counts as busy) and the
+timeline (20.7) change an Event. A change sets any of `title`, `time` (null: all-day), `minutes`,
+`busy`, `repeat` and `until`, and may move the occurrence to another day. When the Event repeats the
+app asks **All times**, **This time only** or **This and following**; an Event that does not repeat
+is changed for all times without asking.
+
+| Choice | Writes |
+|---|---|
+| All times | The Event's own entry with the changes. A move to another day, n days away, moves the first day, `until` and each skip by n days, and the rule with it (below). |
+| This time only | The occurrence's day joins the Event's skips. A new Event with a new id that does not repeat: the Event's fields, unknown ones included, with the changes, on the occurrence's day or the day it moved to, without `until` and skips. The two are not linked: changing either later leaves the other alone. Changing the repeat or the end is never "this time only". |
+| This and following | The Event's `until` becomes the day before the occurrence, and its skips after that are dropped. A new Event with a new id starts on the occurrence's day, or the day it moved to: the Event's fields, unknown ones included, with the changes, the Event's `until`, and its skips from the occurrence's day on (both moved by n days when it moved). When the Event has no occurrence before that day (skipped days do not count), this is "all times". |
+| Skip this one | The day joins the skips. |
+| Delete | The entry becomes `null`. |
+
+**The rule moved with an occurrence** n days: `none`, `daily` and `yearly` follow the first day.
+`weekly` moves each of its weekdays by n days. `monthly-date` takes the new day's date.
+`monthly-weekday` takes the new day's weekday and week: the last when the new day is a fifth
+weekday, or when the rule said last and the new day is in its month's last seven days. A repeat set
+in the same change is used as it is.
+
+Switching to all-day leaves out `time`, `minutes` and `busy` (20.3). An Event given a time without a
+length gets `planner.default_length`.
+
+**Undo** (after any change, Skip this one and Delete) writes back each entry the change wrote, as it
+was stored, unknown fields included, or `null` for an entry the change made. Changes are synced
+preference writes (section 11) and work offline like any setting.
+
+### 20.7 On the timeline
+
+- Timed events sit on the timeline with the blocks, clipped to each day (20.1). Events and blocks
+  share one overlap layout, so neither hides the other: things that overlap sit side by side in
+  columns, and where an event and a block tie for a column the event takes the left one. It was
+  there first; a block is what you place around it.
+- An event is drawn at least as tall as the shortest block, so its title fits. Busy time keeps its
+  real length.
+- All-day events sit in the day's top row (16.4), before the day's tasks without a time, on every
+  view.
+- An event of a connected calendar is read-only. It is never a target: drawing never starts on it, a
+  task dropped over it is placed at that time as anywhere on the timeline, and it cannot be dragged.
+  A press, or Enter, opens it: title, time, place, calendar.
+- Your own Events open the same way, with their fields to change (20.6), and can be moved and their
+  edges dragged with the block gestures (16.2): 15-minute steps, at least 15 minutes, Escape
+  cancels. When the Event repeats, letting go asks All times, This time only or This and following.
+  An Event cannot be dropped on the task panel or a list.
+- How events look: `design-system-v1.md` section 4.2.
+
+### 20.8 Busy only
+
+Every connected calendar has **Show only Busy, not titles** ("Busy only"), off by default, per
+device. When it is on, each event of that calendar is changed before it is stored, cached or drawn:
+its title becomes "Busy", or "Free" for a free event, and its place, description and people are
+dropped. The calendar's name and colour stay. The desktop does it in the main process, Android
+before its repository, so no window, cache or log ever holds the title. Importing a file (20.10)
+can do the same.
+
+### 20.9 Connected calendars
+
+- A connected calendar is a setting of the device, never synced: its id differs per device, and its
+  address or sign-in is a secret.
+- Kinds: a **calendar link** (an `https://` or `http://` address of an iCalendar file; `webcal://`
+  is read as `https://`), a **CalDAV account** (server, user name, app password), the **device's own
+  calendars** (Android's calendar provider, `CalendarContract` instances, with whatever the phone
+  syncs; iOS and macOS EventKit), and **Microsoft 365** and **Google** accounts with read-only
+  access. Each app offers the kinds it has built.
+- The calendar's reader expands recurrence: RRULE, RDATE, EXDATE, overrides (RECURRENCE-ID) and the
+  file's own time zones. Cancelled events are left out.
+- Each calendar has: a name; **Shown** (default on; off, it is not read and counts for nothing);
+  **Colour**, by default the next of `#7c6cf2`, `#0a84ff`, `#30a46c`, `#e5484d`, `#f76b15`,
+  `#12a594` in the order calendars were added; **Counts as busy** (default on); **Busy only**
+  (default off, 20.8).
+- Calendars are read when the Plan screen opens and at most every 5 minutes per calendar while it
+  stays open, and at once on a manual refresh. A calendar the device itself keeps (Android's
+  provider, EventKit) is read again when it says it changed.
+- A calendar that cannot be read keeps its last good copy on screen, says when it was last read and
+  why the read failed. An error never empties it.
+- Read-only: Vicu never adds, changes or deletes a calendar's events, never answers an invitation,
+  and never asks for write access.
+
+### 20.10 Importing a calendar file into Events
+
+Once, from a file (`.ics`): a preview lists the Events it becomes, and Import writes each as a new
+Event with a new id. Afterwards they are ordinary Events, synced and changeable; nothing stays linked
+to the file, and importing it again makes them again. The preview can be Busy only (20.8). The
+import day is the local day of the import.
+
+Times become the importing device's local time: a time with a zone (UTC or a `TZID`) is converted at
+its first occurrence; a time without a zone and an all-day date are taken as written.
+
+**A series becomes one repeating Event** when it has one RRULE, no RDATE and no overrides
+(RECURRENCE-ID), is not an all-day event of several days, its rule fits, and its first day (DTSTART)
+is a day the rule gives:
+
+| RRULE | Repeat rule |
+|---|---|
+| `FREQ=DAILY;INTERVAL=n`, no BY parts | `daily`, every n |
+| `FREQ=DAILY;BYDAY=MO,TU,...`, weekdays without a number, INTERVAL 1 | `weekly`, every 1, on those days |
+| `FREQ=WEEKLY;INTERVAL=n`, BYDAY weekdays without a number | `weekly`, every n, on those days; without BYDAY, the first day's weekday |
+| `FREQ=MONTHLY;INTERVAL=n;BYMONTHDAY=d`, one d from 1 to 31 | `monthly-date`, every n, date d; without BYMONTHDAY, the first day's date |
+| `FREQ=MONTHLY;INTERVAL=n;BYDAY=kXX` (k 1 to 4 or -1), or `BYDAY=XX;BYSETPOS=k` | `monthly-weekday`, every n, week k |
+| `FREQ=YEARLY;INTERVAL=n`, no BY parts, or BYMONTH and BYMONTHDAY equal to the first day's | `yearly`, every n |
+
+INTERVAL is 1 when left out and must be 1 to 99. Anything else does not fit: other BY parts
+(BYHOUR, BYWEEKNO, BYYEARDAY ...), BYMONTH outside FREQ=YEARLY, several or negative BYMONTHDAY
+values, a fifth weekday, BYSETPOS with weekly or with several values, WKST other than MO with an
+INTERVAL above 1, any other FREQ.
+
+- `UNTIL` gives `until`: its local day, or the day before when UNTIL has a time earlier than the
+  Event's start time.
+- `COUNT` gives `until`: the day of the COUNTth day the rule gives from the first day. EXDATE days
+  count, as in iCalendar.
+- `EXDATE` gives `skips`: the local days among the days the rule gives.
+- A series whose `until` is before the import day is not imported.
+
+**Everything else becomes single Events.** The reader expands the series, with its overrides
+applied, cancelled occurrences dropped and EXDATE left out, and each occurrence becomes an Event that
+does not repeat. An event without a rule is one occurrence. An occurrence is imported when it ends
+after the import day begins (an event from the evening before that runs past midnight is kept, one
+that ends at midnight is not) and starts on or before the 365th day after the import day.
+
+**Fields:**
+
+- Title: SUMMARY, trimmed; "(No title)" when there is none. Busy only: "Busy", or "Free" for a free
+  event.
+- A timed event: `time` is the local start (seconds dropped), `minutes` the length (end less start)
+  rounded to whole minutes, at least 1 and at most 1440.
+- An all-day event becomes an all-day Event. One of several days becomes an all-day Event that
+  repeats daily until its last day.
+- `TRANSP:TRANSPARENT` gives a timed Event `busy: false`; an all-day Event never has `busy`.
+- `STATUS:CANCELLED`: not imported.
+- LOCATION, DESCRIPTION, attendees, alarms and UID are not imported.
+
+The preview and the vectors list Events by first day, all-day first, then time, then title.
+
+### 20.11 Privacy
+
+| Data | Where | Synced |
+|---|---|---|
+| Your Events (`event.<id>`: title, first day, time, length, repeat, until, skips, busy), imported ones included | the synced preferences carrier on your Vikunja server (section 11) | yes, every device of the account |
+| Which calendars are connected; their addresses, user names, passwords and tokens | the device, encrypted (desktop `safeStorage`, Android Keystore) | no |
+| Each calendar's choices: shown, colour, counts as busy, Busy only | the device | no |
+| Calendar events | the device's memory and a last good copy on the device, already Busy only where it is on | no |
+| Event titles in tasks, task caches, logs or the assistant | never: the assistant gets free time only | - |
+
+No address, password or token is ever written to a log, the config file, the synced carrier or a
+task.
+
+### 20.12 Vectors
+
+In `cross-app-semantics-v1.json`, run in three time zones like the other date suites:
+
+- `planEvents`: `read` (stored values and what is written back), `list`, `days` (the days an Event
+  happens on over a range, across month ends and leap years), `times` (wall-clock starts and ends
+  across clock changes and midnight), `choices` (20.5 for a day) and `text`.
+- `eventBusy`: events of several calendars, what each day shows and its busy time, `free` (16.6 with
+  events and a block) and `busyOnly`.
+- `eventChanges`: stored entries, a change to one occurrence, the entries written and Undo.
+- `icsImport`: calendar files as lines of text, an import day and the Events made; `expectByZone`
+  for times with a zone. The desktop reads them with ical.js, Android with its own reader.

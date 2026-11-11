@@ -218,7 +218,9 @@ const EventView = memo(function EventView({
   onPress?: (event: CalendarEvent, element: HTMLElement) => void
 }) {
   const compact = height < 40
-  const tint = `${color}29`
+  // A free event is fainter, but only its tint and edge: the words keep their contrast.
+  const tint = event.busy ? `${color}29` : `${color}14`
+  const stripe = event.busy ? `${color}14` : `${color}0a`
   return (
     <li
       data-plan-event={event.id}
@@ -233,13 +235,12 @@ const EventView = memo(function EventView({
         height,
         left,
         width,
-        borderLeftColor: color,
-        backgroundImage: `repeating-linear-gradient(135deg, ${tint} 0 6px, ${color}14 6px 12px)`,
+        borderLeftColor: event.busy ? color : `${color}99`,
+        backgroundImage: `repeating-linear-gradient(135deg, ${tint} 0 6px, ${stripe} 6px 12px)`,
       }}
       className={cn(
         'pointer-events-auto absolute overflow-hidden rounded-control border border-l-[3px] border-border bg-bg-page pl-1.5 pr-1 select-none cursor-default',
         event.tentative && 'border-dashed',
-        !event.busy && 'opacity-60',
       )}
     >
       <button
@@ -258,6 +259,8 @@ const EventView = memo(function EventView({
         <span className={compact ? 'sr-only' : 'block truncate text-caption text-text-secondary'}>
           {range}
           {event.location ? ` · ${event.location}` : ''}
+          {event.tentative ? ' · Tentative' : ''}
+          {event.busy ? '' : ' · Free'}
         </span>
       </button>
     </li>

@@ -17,6 +17,7 @@ import { readFileWithBackup, writeFileAtomic } from '../atomic-file'
 import { handleTrusted } from '../secure-ipc'
 import {
   CALENDAR_COLORS,
+  busyOnlyEvent,
   normaliseFeedUrl,
   type CalendarEvent,
   type CalendarEventsResult,
@@ -176,7 +177,7 @@ async function eventsBetween(from: Date, to: Date): Promise<CalendarEventsResult
     try {
       for (const event of occurrencesBetween(parsed, feed.id, from, to)) {
         // Busy only: the title and place never reach a window.
-        events.push(feed.busyOnly ? { ...event, title: event.busy ? 'Busy' : 'Free', location: undefined } : event)
+        events.push(feed.busyOnly ? busyOnlyEvent(event) : event)
       }
     } catch (error) {
       states.get(feed.id)!.error = `The calendar could not be read: ${(error as Error).message}`

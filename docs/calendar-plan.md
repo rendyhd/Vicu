@@ -39,26 +39,18 @@ the next free slot, Fit and Plan my day.
 ## Phase 0: the contract (both repos, one release)
 
 New section **20. Events and calendars** in `docs/cross-app-semantics-v1.md`, vectors in
-`cross-app-semantics-v1.json`, the same bytes in `vicu-android`:
+`cross-app-semantics-v1.json`, the same bytes in `vicu-android` (written, branch `feat/calendar-poc`
+and `vicu-android` `feat/calendar-events`):
 
-- **20.1 An event.** One occurrence: start and end instants, all-day flag, busy (opaque) or free
-  (transparent), tentative, the calendar it comes from. Clipping to a local day (an event may cross
-  midnight or run for days).
-- **20.2 Busy time.** Extends 16.6: busy is the day's open blocks plus the timed, busy events of calendars
-  that count. All-day events and free events are not busy; tentative ones are. Per-calendar "counts as busy".
-- **20.3 Your Events.** The `event.<id>` entry (registry 11.3), its fields and defaults, wall-clock times,
-  what is written (no defaults), unknown fields kept.
-- **20.4 The repeat rule.** Vicu's own small rule, not iCalendar RRULE: none, daily every N, weekly on
-  days every N (weeks start Monday), monthly on a date (a month without it has none), monthly on the
-  1st to 4th or last weekday, yearly (29 February only in leap years). Until and skips.
-- **20.5 The repeat choices offered for a day**, in order, and how a rule is worded.
-- **20.6 On the timeline.** Events share the overlap columns with blocks and take the left column on a
-  tie; all-day events in the day's top row; read-only events are never a drop or draw target.
-- **20.7 Busy only.** What is dropped and when (title, place; a free event reads "Free").
-- Vectors: `planEvents` (rules, expansion across a clock change), `eventBusy` (clipping, busy rule),
-  run under Pacific/Auckland and America/New_York like the other date suites.
-- `design-system-v1.md`: the event look (striped tint of the calendar colour, left edge, tentative dashed,
-  free faded, the Events colour) with contrast rules.
+- **20.1 An event**, clipped to a local day. **20.2 Busy time** (extends 16.6). **20.3 Your Events**
+  (`event.<id>`, registry 11.3). **20.4 The repeat rule.** **20.5 The repeat choices** and wording.
+  **20.6 Changing an Event**: all times, this time only, this and following, skip, delete, Undo.
+  **20.7 On the timeline.** **20.8 Busy only.** **20.9 Connected calendars.** **20.10 Importing a
+  calendar file.** **20.11 Privacy.** **20.12 Vectors.**
+- Vectors: `planEvents`, `eventBusy`, `eventChanges`, `icsImport`, run under Pacific/Auckland,
+  America/New_York and the system zone.
+- `design-system-v1.md` 4.2: the event look (striped tint of the calendar colour, left edge,
+  tentative dashed, free fainter with its words kept, all-day chip, the colours) with contrast.
 
 Desktop already follows most of this in the proof of concept; the fixture replaces the hand-written tests.
 
