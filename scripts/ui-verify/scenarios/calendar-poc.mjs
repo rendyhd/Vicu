@@ -1,6 +1,6 @@
 // CAL (proof of concept, branch feat/calendar-poc): calendar events on the Plan screen.
 //
-//   A. A calendar is connected through the gear's form (real typing) from a secret ICS link,
+//   A. A calendar is connected through Settings, Add calendar (real typing) from a secret ICS link,
 //      served here on a local port: a weekday standup series, a meeting that overlaps a task block,
 //      a free (transparent) lunch, a tentative 1:1, an event with a place, an all-day event.
 //   B. Day view: events sit beside the blocks in shared columns, the all-day event in the top row,
@@ -8,7 +8,8 @@
 //   C. 3 days and Week.
 //   D. "Busy" only hides the titles. Removing the calendar removes its events.
 //
-// Your own Events (drawn, moved, changed, Plan my day) are scenario plan-events (EVT).
+// Your own Events (drawn, moved, changed, Plan my day) are scenario plan-events (EVT); ETag, failing
+// links, free/busy, Windows zones and CalDAV accounts are calendar-sources (CALS).
 //
 // Its own throwaway tasks; everything is put back at the end.
 
@@ -106,19 +107,22 @@ export default async function run(h) {
     await h.wait(500)
     const freeBefore = await tomorrowTotals()
 
-    // --- A. Connect a calendar through the form --------------------------------------------------
-    await page.locator('[data-plan-gear]').click()
-    await h.wait(300)
+    // --- A. Connect a calendar through Settings, Add calendar ----------------------------------------
+    await h.goto('/settings')
+    await page.locator('[data-calendar-open-add]').waitFor({ timeout: 10000 })
+    await page.locator('[data-calendar-open-add]').scrollIntoViewIfNeeded()
+    await page.locator('[data-calendar-open-add]').click()
     await page.locator('[data-calendar-name]').click()
     await h.type('Work')
     await page.locator('[data-calendar-url]').click()
     await h.type(feedUrl, { delay: 2 })
-    await h.capture('gear-form')
+    await h.capture('add-form')
     await page.locator('[data-calendar-add]').click()
     await page.locator('[data-calendar-feed]').first().waitFor({ timeout: 10000 })
     await h.assert('A: the calendar is listed', (await page.locator('[data-calendar-feed]').count()) === 1)
-    await h.capture('gear-connected')
-    await h.key('Escape')
+    await h.capture('settings-connected')
+    await h.goto('/plan')
+    await page.locator('[data-plan-totals]').waitFor({ timeout: 10000 })
     await h.wait(800)
 
     // --- B. Day view -------------------------------------------------------------------------------
@@ -155,26 +159,34 @@ export default async function run(h) {
 
     // --- D. Busy only, then remove -----------------------------------------------------------------
     await page.locator('[data-plan-view="day"]').click()
-    await h.wait(500)
-    await page.locator('[data-plan-gear]').click()
     await h.wait(300)
-    await page.locator('[data-calendar-feed] label', { hasText: 'not titles' }).click()
-    await h.key('Escape')
+    await h.goto('/settings')
+    await page.locator('[data-calendar-options]').first().scrollIntoViewIfNeeded()
+    await page.locator('[data-calendar-options]').first().click()
+    await page.locator('[data-calendar-busy-toggle]').click()
+    await h.wait(400)
+    await h.goto('/plan')
+    await page.locator('[data-plan-totals]').waitFor({ timeout: 10000 })
+    await page.locator('[data-plan-today]').click()
     await h.wait(800)
     await scrollTo(8)
     await h.wait(300)
-    const busyTitles = await page.locator('[data-plan-event]').evaluateAll((nodes) => nodes.map((node) => node.textContent))
+    // Only the calendar's events: your own Events (vicu:events, maybe another scenario's) are not its business.
+    const busyTitles = await page.locator('[data-plan-event]:not([data-plan-event^="vicu:events"])').evaluateAll((nodes) => nodes.map((node) => node.textContent))
     await h.assert('D: busy only shows no titles', busyTitles.length > 0 && busyTitles.every((t) => /^(Busy|Free)/.test(t) && !t.includes('Design')) && busyTitles.some((t) => t.startsWith('Free')), busyTitles)
     await h.capture('day-busy-only')
-    await page.locator('[data-plan-gear]').click()
-    await h.wait(300)
-    await page.locator('[data-calendar-feed] button[aria-label^="Remove"]').click()
-    await h.key('Escape')
+    await h.goto('/settings')
+    await page.locator('[data-calendar-options]').first().scrollIntoViewIfNeeded()
+    await page.locator('[data-calendar-options]').first().click()
+    await page.locator('[data-calendar-remove]').click()
+    await h.wait(400)
+    await h.goto('/plan')
+    await page.locator('[data-plan-totals]').waitFor({ timeout: 10000 })
     await h.wait(800)
-    await h.assert('D: removing the calendar removes its events', (await page.locator('[data-plan-event]').count()) === 0)
+    await h.assert('D: removing the calendar removes its events', (await page.locator('[data-plan-event]:not([data-plan-event^="vicu:events"])').count()) === 0)
   } finally {
     await page.evaluate(async () => {
-      for (const feed of await window.api.calendar.list()) await window.api.calendar.remove(feed.id)
+      for (const connection of (await window.api.calendar.list()).connections) await window.api.calendar.remove(connection.id)
       await window.api.saveConfigPatch({ planner_enabled: false, planner_view: 'day', planner_source: 'day' })
     }).catch(() => {})
     for (const id of created) await h.api('DELETE', `/tasks/${id}`).catch(() => {})

@@ -123,6 +123,11 @@ leaving copy, then repeats with `--motion reduce` and asserts no scale, transfor
 the skeleton shimmer (it pauses the test server with `docker pause`, resumes it afterwards), rolling counts, a token travelling
 into its chip, the stuck-header hairline and Today turning into All clear. Run seed.mjs before it (it completes every Today
 task) and after it; it runs with `--motion reduce` too.
+`calendar-sources` (id CALS) covers connected calendars: calendar links served on a local port (ETag and 304, a link
+that starts failing, a VFREEBUSY share, a Windows time zone name without VTIMEZONE) and a CalDAV account typed into the
+Add calendar dialog against a local Radicale. It needs Docker: `node scripts/ui-verify/radicale.mjs` creates or starts
+`vicu-test-radicale` on 127.0.0.1:5232 and seeds its calendars (the scenario does that itself; credentials in
+`.local/radicale.json`), `node scripts/ui-verify/radicale.mjs --stop` stops it.
 Scenario code computes dates from the run day (`lib.mjs`: `localDate`, `comingWeekday`, `at`).
 
 The helpers on `h`:
