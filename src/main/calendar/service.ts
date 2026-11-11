@@ -7,6 +7,7 @@
 //   oauth.ts           the browser sign-in (PKCE, loopback) and the tokens of those accounts
 //   oauth-clients.ts   Vicu's registered OAuth clients, and "Use my own client" per device
 //   oauth-ipc.ts       their IPC: sign in, cancel, sign in again, the own client
+//   import-ipc.ts      importing a calendar file into Events (20.10), once
 //   store.ts           the connections and their calendars' choices, configs sealed (calendar-feeds.json)
 //   cache.ts           the last good copy of each calendar, encrypted (calendar-cache/)
 //   ics.ts             iCalendar into occurrences, VFREEBUSY, reducing a copy to what may be kept
@@ -60,6 +61,7 @@ import { icsLinkSource } from './sources/ics-link'
 import { microsoftSource } from './sources/microsoft'
 import type { OAuthAccountConfig } from './sources/oauth-account'
 import { registerCalendarOAuthIpc } from './oauth-ipc'
+import { registerCalendarImportIpc } from './import-ipc'
 import type { CalendarCopy, CalendarSource, ConnectResult, ReadOutcome, RemoteCalendar, SourceContext } from './sources/types'
 
 /** Every kind this app has built. A new kind is registered here (see sources/types.ts). */
@@ -537,6 +539,7 @@ export function registerCalendarIpc(): void {
     messageOf,
     view: sourcesView,
   })
+  registerCalendarImportIpc()
 
   handleTrusted('calendar:events', (_event, range: { from: string; to: string }) => {
     const from = new Date(range?.from)

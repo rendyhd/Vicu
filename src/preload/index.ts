@@ -327,6 +327,7 @@ const api = {
     oauthSignIn: (provider: string) => ipcRenderer.invoke('calendar:oauth-sign-in', provider),
     oauthCancel: () => ipcRenderer.invoke('calendar:oauth-cancel'),
     oauthReconnect: (connectionId: string) => ipcRenderer.invoke('calendar:oauth-reconnect', connectionId),
+    importFile: () => ipcRenderer.invoke('calendar:import-file'),
     onChanged: (cb: () => void) => {
       const handler = () => cb()
       ipcRenderer.on('calendar-changed', handler)

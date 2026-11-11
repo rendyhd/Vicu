@@ -229,3 +229,16 @@ export function sortImported(events: readonly PlanEvent[]): PlanEvent[] {
       compare(JSON.stringify(a), JSON.stringify(b)),
   )
 }
+
+/** Events one import may make at most; a larger file is refused with a sentence (the desktop's limit). */
+export const MAX_IMPORT_EVENTS = 500
+
+/** What the preview of an import shows (desktop: the main process reads the file, the window decides). */
+export interface IcsImportPreview {
+  /** The file's name, without its folder. */
+  fileName: string
+  importDay: LocalDate
+  /** The Events with their titles, and the same file read Busy only (20.8). */
+  events: PlanEvent[]
+  busyOnly: PlanEvent[]
+}

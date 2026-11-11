@@ -7,10 +7,12 @@
 import ICAL from 'ical.js'
 import { addLocalDays, startOfLocalDay, toLocalDate, type LocalDate } from '../../shared/due-dates'
 import {
+  MAX_IMPORT_EVENTS,
   importOccurrence,
   importSeries,
   importWindow,
   sortImported,
+  type IcsImportPreview,
   type IcsOccurrence,
   type IcsRule,
   type IcsSeries,
@@ -141,4 +143,24 @@ export function importIcsText(text: string, options: ImportOptions): PlanEvent[]
     out.push(...(series ?? expanded(event, options)))
   }
   return sortImported(out)
+}
+
+/** Read a calendar file into its preview; a sentence when it cannot be imported. */
+export function importPreview(text: string, fileName: string, importDay: LocalDate): { success: true; data: IcsImportPreview } | { success: false; error: string } {
+  if (!/BEGIN:VCALENDAR/i.test(text)) return { success: false, error: 'That file is not a calendar file (no BEGIN:VCALENDAR).' }
+  let events
+  let busyOnly
+  try {
+    events = importIcsText(text, { importDay, busyOnly: false })
+    busyOnly = importIcsText(text, { importDay, busyOnly: true })
+  } catch {
+    return { success: false, error: 'The file could not be read as a calendar.' }
+  }
+  if (events.length > MAX_IMPORT_EVENTS) {
+    return {
+      success: false,
+      error: `This file makes ${events.length} Events, more than the ${MAX_IMPORT_EVENTS} Vicu imports at once. Export a shorter range and try again.`,
+    }
+  }
+  return { success: true, data: { fileName, importDay, events, busyOnly } }
 }

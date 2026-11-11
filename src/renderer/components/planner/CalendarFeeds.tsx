@@ -13,6 +13,7 @@ import { MY_EVENTS_COLOR, repeatText, type ListedEvent } from '../../../shared/p
 import { useCalendarAccountActions, shownError } from '@/hooks/use-calendar-accounts'
 import { accountProblem } from '../../../shared/calendar-accounts'
 import { AddCalendarDialog } from './AddCalendarDialog'
+import { ImportCalendarFileButton, ImportCalendarHost } from './ImportCalendarFile'
 import { AccountError } from './OAuthAccountForm'
 
 // Events and connected calendars (contract 20.3, 20.9) in Settings, General, Plan. The Plan screen's
@@ -31,6 +32,7 @@ function MyEvents() {
         Times you are not available, such as a weekly manager call. Drag on the timeline and pick Event to add one.
         Shown on Plan only and synced to your devices.
       </p>
+      <ImportCalendarFileButton className="mt-2" />
       {events.length > 0 && (
         <ul className="mt-2 space-y-1">
           {events.map((event: ListedEvent) => (
@@ -282,9 +284,12 @@ function CalendarSummary() {
           {failing.length === 1 ? `${failing[0].name} could not be read.` : `${failing.length} calendars could not be read.`}
         </p>
       )}
-      <Button variant="secondary" className="mt-2" data-calendar-manage onClick={() => void navigate({ to: '/settings', search: { section: 'calendars' } })}>
-        Manage
-      </Button>
+      <div className="mt-2 flex flex-wrap gap-2">
+        <Button variant="secondary" data-calendar-manage onClick={() => void navigate({ to: '/settings', search: { section: 'calendars' } })}>
+          Manage
+        </Button>
+        <ImportCalendarFileButton />
+      </div>
     </div>
   )
 }
@@ -336,6 +341,7 @@ export function CalendarFeeds({ summary = false }: { summary?: boolean }) {
         Add calendar
       </Button>
       <AddCalendarDialog open={adding} onClose={() => setAdding(false)} />
+      <ImportCalendarHost />
     </div>
   )
 }

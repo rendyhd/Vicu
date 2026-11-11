@@ -15,6 +15,7 @@ import { DrawTitle } from '@/components/planner/DrawTitle'
 import { SourceChips } from '@/components/planner/SourceMenu'
 import type { PageTurn, TurnDirection } from '@/components/planner/use-page-turn'
 import { PlannerOptions } from '@/components/planner/PlannerOptions'
+import { ImportCalendarHost } from '@/components/planner/ImportCalendarFile'
 import { useAppConfig } from '@/hooks/use-app-config'
 import { usePlanEventActions } from '@/hooks/use-plan-events'
 import { usePlanBusy } from '@/hooks/use-plan-busy'
@@ -545,6 +546,7 @@ function PlanScreen() {
           >
             <Settings2 className="h-4 w-4" aria-hidden="true" />
           </button>
+          <ImportCalendarHost />
           {gearOpen && (
             <Popover
               anchorRef={gearRef}

@@ -38,6 +38,7 @@ import type {
   CalendarSourcesView,
 } from '../shared/calendar-sources'
 import type { CalendarAccountProvider, OAuthClientsView, OwnOAuthClientInput } from '../shared/calendar-accounts'
+import type { IcsImportPreview } from '../shared/ics-import'
 import type { SavedFilterImportOutcome, SavedFilterPreview, SavedFilterState } from '../shared/saved-filter-import'
 import type { SyncedPrefsSnapshot } from '../shared/synced-prefs'
 import type {
@@ -283,6 +284,8 @@ export interface ElectronAPI {
     oauthCancel(): Promise<void>
     /** Sign in again to a connected account whose sign-in the provider no longer takes. */
     oauthReconnect(connectionId: string): Promise<ApiResult<CalendarSourcesView>>
+    /** Pick a calendar file and read it into a preview of Events (null when the dialog was cancelled). */
+    importFile(): Promise<ApiResult<IcsImportPreview | null>>
     /** A background read brought something new: ask for the events again. */
     onChanged(cb: () => void): () => void
   }

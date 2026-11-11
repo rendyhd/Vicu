@@ -71,6 +71,23 @@ export function usePlanEventActions() {
       return occurrenceId(eventKey(split) in writes ? split : event.id, edit.day ?? day)
     },
     skip: (event: ListedEvent, day: LocalDate) => writeWithUndo(skipEventDay(event, day), `Skipped ${event.title} this time`),
+    /**
+     * Add many Events in one change (importing a calendar file, 20.10), each with a new id, with one
+     * Undo that deletes them again. Gives whether the write went through.
+     */
+    addMany: async (events: readonly PlanEvent[]): Promise<boolean> => {
+      const ids = events.map(() => newId())
+      const writes: Record<string, unknown> = {}
+      events.forEach((event, i) => {
+        writes[eventKey(ids[i])] = encodePlanEvent(event)
+      })
+      if (!(await writeSyncedPrefs(client, writes))) return false
+      const undo = Object.fromEntries(ids.map((id) => [eventKey(id), null]))
+      const message = events.length === 1 ? 'Imported 1 Event' : `Imported ${events.length} Events`
+      toast.success(message, { action: { label: 'Undo', onAction: () => void writeSyncedPrefs(client, undo) } })
+      announce(message)
+      return true
+    },
     remove: (event: ListedEvent) => writeWithUndo(deleteEvent(event), `Deleted ${event.title}`),
   }
 }
