@@ -2,7 +2,8 @@
 //
 // The parts:
 //   sources/types.ts   what a kind of source implements, and how to add one (read it first)
-//   sources/*.ts       the kinds: a calendar link (ics-link.ts), a CalDAV account (caldav.ts)
+//   sources/*.ts       the kinds: a calendar link (ics-link.ts), a CalDAV account (caldav.ts), the
+//                      Mac's calendars (eventkit.ts, through ../eventkit.ts and its helper)
 //   store.ts           the connections and their calendars' choices, configs sealed (calendar-feeds.json)
 //   cache.ts           the last good copy of each calendar, encrypted (calendar-cache/)
 //   ics.ts             iCalendar into occurrences, VFREEBUSY, reducing a copy to what may be kept
@@ -52,6 +53,10 @@ import {
 } from './store'
 import { caldavSource } from './sources/caldav'
 import { icsLinkSource } from './sources/ics-link'
+import { eventKitHelper, eventKitHelperIfAny, eventkitSource, eventKitStatus, openCalendarPrivacySettings } from './eventkit'
+import { foundCalendars } from './sources/eventkit'
+import { EVENTKIT_DENIED_MESSAGE, type EventKitSaveInput } from '../../shared/calendar-eventkit'
+import { isMac } from '../platform'
 import type { CalendarCopy, CalendarSource, ConnectResult, ReadOutcome, RemoteCalendar, SourceContext } from './sources/types'
 
 /** Every kind this app has built. A new kind is registered here (see sources/types.ts). */
@@ -59,6 +64,7 @@ import type { CalendarCopy, CalendarSource, ConnectResult, ReadOutcome, RemoteCa
 const SOURCES: Record<CalendarSourceKind, CalendarSource<any>> = {
   ics: icsLinkSource,
   caldav: caldavSource,
+  eventkit: eventkitSource,
 }
 
 /** A calendar is read at most this often unless a refresh asks (20.9). */
@@ -404,6 +410,7 @@ async function removeConnection(id: string): Promise<void> {
   configs.delete(connection.id)
   connectionErrors.delete(connection.id)
   await writeCalendarStore({ ...readCalendarStore(), connections: readCalendarStore().connections.filter((c) => c.id !== connection.id) })
+  syncEventKitWatch()
 }
 
 /** The calendars an account has now: new ones are added, not shown; gone ones are removed. */
@@ -457,6 +464,7 @@ async function refreshAll(connectionId?: string): Promise<void> {
 
 async function eventsBetween(from: Date, to: Date): Promise<CalendarEventsResult> {
   const store = readCalendarStore()
+  syncEventKitWatch()
   const shown = store.connections.flatMap((connection) => connection.calendars.filter((c) => c.enabled).map((calendar) => ({ connection, calendar })))
   await Promise.all(shown.map(({ calendar }) => ensureLoaded(calendar)))
   const waits: Promise<boolean>[] = []
@@ -491,6 +499,91 @@ async function eventsBetween(from: Date, to: Date): Promise<CalendarEventsResult
 function pruneDrafts(): void {
   const now = Date.now()
   for (const [id, draft] of drafts) if (draft.expires < now) drafts.delete(id)
+}
+
+// --- The Mac's calendars (EventKit) ---------------------------------------------------------------
+// The Mac says when its calendars changed (20.9): while a Mac connection exists the helper watches,
+// and a change reads every shown Mac calendar again at once, past the 5-minute rule. A calendar
+// added or removed on the Mac updates the connection's list as a manual refresh would.
+
+const EVENTKIT_SETTLE_MS = 1500
+let eventKitChangeTimer: ReturnType<typeof setTimeout> | null = null
+
+function syncEventKitWatch(): void {
+  if (!isMac) return
+  const watched = readCalendarStore().connections.some((connection) => connection.kind === 'eventkit')
+  const helper = eventKitHelperIfAny()
+  if (!helper) return
+  if (watched && !helper.watching) helper.watch(onEventKitChanged)
+  else if (!watched && helper.watching) helper.unwatch()
+}
+
+/** Changes come in bursts (a sync of an account): read once they settle. */
+function onEventKitChanged(): void {
+  if (eventKitChangeTimer) clearTimeout(eventKitChangeTimer)
+  eventKitChangeTimer = setTimeout(() => {
+    eventKitChangeTimer = null
+    void rereadEventKit()
+  }, EVENTKIT_SETTLE_MS)
+}
+
+async function rereadEventKit(): Promise<void> {
+  let changed = false
+  for (const connection of readCalendarStore().connections.filter((c) => c.kind === 'eventkit')) {
+    try {
+      const listed = await eventkitSource.listCalendars({ accounts: [] }, ctx)
+      const now = new Set(listed.calendars.map((calendar) => calendar.remoteId))
+      const known = new Set(connection.calendars.map((calendar) => calendar.remoteId))
+      if (now.size !== known.size || [...now].some((id) => !known.has(id))) {
+        await relist(connection)
+        changed = true
+      }
+    } catch {
+      // A read below says why.
+    }
+    const current = readCalendarStore().connections.find((c) => c.id === connection.id)
+    if (!current) continue
+    const reads = current.calendars.filter((c) => c.enabled).map((calendar) => refreshCalendar(current, calendar, null, true))
+    if ((await Promise.all(reads)).some(Boolean)) changed = true
+  }
+  if (changed) announceChanged()
+}
+
+function registerEventKitIpc(): void {
+  const added = () => readCalendarStore().connections.some((connection) => connection.kind === 'eventkit')
+
+  handleTrusted('calendar:eventkit-status', () => eventKitStatus(added()))
+
+  // Asks macOS for the permission when it has not been asked, then lists the calendars to pick.
+  handleTrusted('calendar:eventkit-discover', async () => {
+    try {
+      if (added()) return { success: false, error: 'The calendars of this Mac are already added. Choose which to show in the list.' }
+      const helper = eventKitHelper()
+      const access = await helper.request()
+      if (access !== 'full') return { success: false, error: (await eventKitStatus(false)).problem ?? EVENTKIT_DENIED_MESSAGE }
+      const calendars = foundCalendars(await helper.calendars())
+      if (calendars.length === 0) return { success: false, error: 'This Mac has no calendars with events. Add an account in System Settings, Internet Accounts.' }
+      return { success: true, data: calendars }
+    } catch (error) {
+      return { success: false, error: messageOf(error) }
+    }
+  })
+
+  handleTrusted('calendar:eventkit-save', async (_event, input: EventKitSaveInput) => {
+    try {
+      if (added()) return { success: false, error: 'The calendars of this Mac are already added.' }
+      const result = await eventkitSource.connect(undefined, ctx)
+      const shown = new Set(Array.isArray(input?.shown) ? input.shown.map(String) : [])
+      const connection = await addConnection('eventkit', result, (calendar) => shown.has(calendar.remoteId), input?.busyOnly === true)
+      syncEventKitWatch()
+      announceChanged()
+      return { success: true, data: await connectionView(connection) }
+    } catch (error) {
+      return { success: false, error: messageOf(error) }
+    }
+  })
+
+  handleTrusted('calendar:eventkit-open-settings', () => openCalendarPrivacySettings())
 }
 
 // --- IPC ------------------------------------------------------------------------------------------
@@ -557,4 +650,6 @@ export function registerCalendarIpc(): void {
     await refreshAll(typeof connectionId === 'string' ? connectionId : undefined)
     return sourcesView()
   })
+
+  registerEventKitIpc()
 }

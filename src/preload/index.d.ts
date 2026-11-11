@@ -37,6 +37,7 @@ import type {
   CalendarConnectionView,
   CalendarSourcesView,
 } from '../shared/calendar-sources'
+import type { EventKitFoundCalendar, EventKitSaveInput, EventKitStatusView } from '../shared/calendar-eventkit'
 import type { SavedFilterImportOutcome, SavedFilterPreview, SavedFilterState } from '../shared/saved-filter-import'
 import type { SyncedPrefsSnapshot } from '../shared/synced-prefs'
 import type {
@@ -272,6 +273,16 @@ export interface ElectronAPI {
     remove(connectionId: string): Promise<CalendarSourcesView>
     /** Read now: one connection, or every one. */
     refresh(connectionId?: string): Promise<CalendarSourcesView>
+    /** The Mac's calendars (EventKit), macOS only; nothing is saved until `save`. */
+    eventkit: {
+      /** Whether the kind is offered and what macOS allows; never asks. */
+      status(): Promise<EventKitStatusView>
+      /** Ask for the permission when not asked yet, then list the calendars to pick. */
+      discover(): Promise<ApiResult<EventKitFoundCalendar[]>>
+      save(input: EventKitSaveInput): Promise<ApiResult<CalendarConnectionView>>
+      /** System Settings, Privacy & Security, Calendars. */
+      openSettings(): Promise<void>
+    }
     /** A background read brought something new: ask for the events again. */
     onChanged(cb: () => void): () => void
   }

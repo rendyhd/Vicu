@@ -38,7 +38,7 @@ export interface CalendarStoreState {
   connections: StoredConnection[]
 }
 
-const KINDS: readonly CalendarSourceKind[] = ['ics', 'caldav']
+const KINDS: readonly CalendarSourceKind[] = ['ics', 'caldav', 'eventkit']
 const COLOR = /^#[0-9a-f]{6}$/i
 
 export function emptyStore(): CalendarStoreState {

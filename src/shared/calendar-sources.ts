@@ -6,8 +6,8 @@
 
 import type { CalendarFeedView } from './calendar-events'
 
-/** The kinds this app has built; later kinds: 'eventkit' (macOS), 'microsoft', 'google'. */
-export type CalendarSourceKind = 'ics' | 'caldav'
+/** The kinds this app has built ('eventkit' on macOS only); later kinds: 'microsoft', 'google'. */
+export type CalendarSourceKind = 'ics' | 'caldav' | 'eventkit'
 
 /** How the stored links and passwords are protected (auth/secret-storage.ts). */
 export type CalendarSecretLevel = 'encrypted' | 'obfuscated' | 'plaintext'

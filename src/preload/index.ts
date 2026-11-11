@@ -321,6 +321,13 @@ const api = {
     update: (id: string, patch: Record<string, unknown>) => ipcRenderer.invoke('calendar:update', id, patch),
     remove: (id: string) => ipcRenderer.invoke('calendar:remove', id),
     refresh: (connectionId?: string) => ipcRenderer.invoke('calendar:refresh', connectionId),
+    // The Mac's calendars (EventKit), macOS only.
+    eventkit: {
+      status: () => ipcRenderer.invoke('calendar:eventkit-status'),
+      discover: () => ipcRenderer.invoke('calendar:eventkit-discover'),
+      save: (input: { shown: string[]; busyOnly?: boolean }) => ipcRenderer.invoke('calendar:eventkit-save', input),
+      openSettings: () => ipcRenderer.invoke('calendar:eventkit-open-settings'),
+    },
     onChanged: (cb: () => void) => {
       const handler = () => cb()
       ipcRenderer.on('calendar-changed', handler)

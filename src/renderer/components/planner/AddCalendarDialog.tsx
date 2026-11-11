@@ -5,12 +5,13 @@ import { Button } from '@/components/shared/Button'
 import { Checkbox } from '@/components/shared/Checkbox'
 import { cn } from '@/lib/cn'
 import { useCalendarActions } from '@/hooks/use-calendar-events'
+import { isMacPlatform, MacCalendarsForm } from './MacCalendarsForm'
 import { CALDAV_PRESETS, caldavPreset, type CaldavDraft, type CaldavPresetId } from '../../../shared/calendar-sources'
 
 // Add a calendar (contract 20.9): a calendar link or a CalDAV account. The link and the password go
 // to the main process once and are never read back; nothing is saved until the calendar was read.
 
-type Kind = 'link' | 'account'
+type Kind = 'link' | 'account' | 'mac'
 
 const INPUT =
   'w-full rounded-control border border-border bg-transparent px-2 py-1 text-meta text-text placeholder:text-text-secondary'
@@ -288,15 +289,18 @@ export function AddCalendarDialog({ open, onClose }: { open: boolean; onClose: (
           options={[
             { value: 'link', label: 'Calendar link' },
             { value: 'account', label: 'CalDAV account' },
+            ...(isMacPlatform() ? [{ value: 'mac' as const, label: 'Mac calendars' }] : []),
           ]}
           onChange={setKind}
         />
         <p className="text-caption text-text-secondary">
           {kind === 'link'
             ? 'A secret address of a calendar (iCal, .ics). Read every few minutes.'
-            : 'iCloud, Fastmail, Nextcloud and other CalDAV servers. Pick which calendars to show.'}
+            : kind === 'mac'
+              ? 'The calendars in macOS Calendar: iCloud, Google, Exchange and every account in System Settings, Internet Accounts. No sign-in in Vicu; they stay on this Mac.'
+              : 'iCloud, Fastmail, Nextcloud and other CalDAV servers. Pick which calendars to show.'}
         </p>
-        {kind === 'link' ? <LinkForm onDone={onClose} onCancel={onClose} /> : <AccountForm onDone={onClose} onCancel={onClose} />}
+        {kind === 'link' ? <LinkForm onDone={onClose} onCancel={onClose} /> : kind === 'mac' ? <MacCalendarsForm onDone={onClose} onCancel={onClose} /> : <AccountForm onDone={onClose} onCancel={onClose} />}
       </div>
     </Dialog>
   )
