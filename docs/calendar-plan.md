@@ -1,7 +1,27 @@
 # Events and calendars on the Plan screen: plan
 
-Status: November 2026. Phases 0, 1, 2a, 2c, 2e (without registered clients yet) and 2f built on the desktop (see each phase). Proof of concept on branch `feat/calendar-poc` (commits `8cf9d84`, `ffd7854`).
+Status: 12 November 2026, built on both apps (desktop branch `feat/calendar-poc`, mobile branch
+`feat/calendar-events`), not released. The table below is the final state; each phase says more.
 Background research: `reports/Calendar sync for Plan screen.md` (not committed).
+
+## Status
+
+| Part | Desktop | Android | iOS (vicu-android) | Verified | Not verified |
+|---|---|---|---|---|---|
+| Contract 20 and its vectors (`planEvents`, `eventBusy`, `eventChanges`, `icsImport`) | yes | yes | yes (common code) | both suites; desktop under Auckland and New York; Android JVM and iOS simulator | |
+| Phase 1: Events (make, change, repeat, skip, Undo, timeline gestures, Plan my day busy time) | yes | yes | yes | harness `plan-events` (desktop light and dark), `plan-events.mjs` on the emulator | iOS by hand on a device |
+| 2a. Calendar links | yes | no (2b covers it) | no | unit tests, harness `calendar-poc` and `calendar-sources` | |
+| 2b. Device calendars | - | yes (`CalendarContract`) | yes (EventKit) | Android harness with a local calendar account; iOS simulator tests | iOS permission prompt and reads on a device |
+| 2c. CalDAV accounts | yes | no (DAVx5 through 2b) | no | fake CalDAV server tests, local Radicale (harness `calendar-sources`) | real iCloud, Fastmail, Nextcloud |
+| 2d. Mac calendars (EventKit) | yes (macOS only) | - | - | unit tests with a fake helper | the permission prompt and reads on a signed, notarized build |
+| 2e. Microsoft 365 and Google | yes, without registered OAuth clients | no (desktop only) | no | fake provider (unit tests, harness `calendar-accounts`) | real accounts; registering the clients (`calendar-oauth-setup.md`) |
+| 2f. Import a calendar file | yes | yes | yes | `icsImport` vectors, harness `calendar-import` (desktop) and the emulator | |
+
+Settled in the final integration (contract 20, both repos): the repeat choices of a change are those of
+the day the changed rule starts on (20.6, vectors `choiceDays`); an event you declined is left out and one
+you have not answered is tentative wherever the source tells your answer (20.9); Microsoft's "working
+elsewhere" is free (20.9); a calendar shared as free/busy only shows "Busy" or "Free" (20.8: Google's
+free/busy access and Android's free/busy access level now do).
 
 ## Goal
 
@@ -248,6 +268,23 @@ has on Android, the same busy time on both.
 - Android: the same vectors, the `vicu-android` harness on an emulator with a local calendar account.
 - Privacy checks: no link, password or token in a log line, config.json, the synced carrier or IndexedDB;
   Busy only titles absent from the disk cache.
+
+Final run, 11 and 12 November 2026 (after merging `feat/calendar-eventkit` and the contract changes above):
+
+| Check | Result |
+|---|---|
+| Desktop `npm run verify` | typecheck clean; 298 test files, 6336 tests passed (6 skipped); build ok |
+| Desktop tests under `TZ=America/New_York` | all passed |
+| Desktop tests under `TZ=Pacific/Auckland` | one failure, `print-template.test.ts` ("renders due and start dates"), which fails on `main` too |
+| Harness `plan-events` (light, dark), `calendar-poc`, `calendar-sources` (Radicale), `calendar-accounts`, `calendar-import`, `plan-screen`, `plan-my-day`, `plan-new-task`, `baseline` | all passed |
+| Android `./gradlew test lint assembleDebug :shared:compileCommonMainKotlinMetadata` | passed; lint 0 errors |
+| `:shared:iosSimulatorArm64Test` on the Mac | passed |
+| Android harness `plan-events.mjs` on the emulator | all passed |
+
+Not verified: Mac calendars on a signed, notarized build (the permission prompt as Vicu's and real reads);
+Microsoft 365 and Google against the real services (no registered clients yet); CalDAV against iCloud,
+Fastmail and Nextcloud; iOS device calendars on a phone; the Android harnesses `plan.mjs` and
+`plan-my-day.mjs` in this final run.
 
 ## Open decisions
 
