@@ -175,6 +175,26 @@ export const taskWrites = {
       enqueue: () => queue.enqueueRemoveLabel(taskId, labelId, titleMeta(title)),
     }
   },
+  /**
+   * A file added in the task's editor (Browse, a drop, a pasted image). Sending it twice would
+   * attach it twice, so it is queued only when the request provably never reached the server, like a
+   * create. `inline` puts the image at the end of the notes once the queued upload goes through.
+   */
+  upload(
+    queue: OfflineQueue,
+    api: { uploadTaskAttachment(taskId: number, bytes: Buffer, name: string, mime: string): Promise<ApiResult<unknown>> },
+    taskId: number,
+    file: { bytes: Uint8Array; name: string; mime: string },
+    options: { inline?: boolean; title?: string } = {}
+  ): TaskWriteSpec {
+    return {
+      taskId,
+      kind: 'create',
+      send: () => api.uploadTaskAttachment(taskId, Buffer.from(file.bytes), file.name, file.mime),
+      enqueue: () =>
+        queue.enqueueUpload(taskId, { name: file.name, mime: file.mime, bytes: file.bytes }, { addImageToken: options.inline === true, ...titleMeta(options.title) }),
+    }
+  },
 }
 
 // Requests that change tasks leave one at a time, whatever task they are for. Vikunja's default

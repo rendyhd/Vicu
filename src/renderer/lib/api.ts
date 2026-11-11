@@ -350,6 +350,9 @@ export const api = {
     window.api.fetchTaskAttachments(taskId) as Promise<ApiResult<TaskAttachment[]>>,
   uploadTaskAttachment: (taskId: number, fileData: Uint8Array, fileName: string, mimeType: string) =>
     window.api.uploadTaskAttachment(taskId, fileData, fileName, mimeType) as Promise<ApiResult<unknown>>,
+  /** The editor's drop and paste: offline, the file waits in the queue (`queued: true`). */
+  uploadTaskAttachmentOrQueue: (taskId: number, fileData: Uint8Array, fileName: string, mimeType: string, inline: boolean, title?: string) =>
+    window.api.uploadTaskAttachment(taskId, fileData, fileName, mimeType, { ...queueOptions(title), inline }) as Promise<ApiResult<unknown> | QueuedWriteReply>,
   deleteTaskAttachment: (taskId: number, attachmentId: number) =>
     window.api.deleteTaskAttachment(taskId, attachmentId) as Promise<ApiResult<void>>,
   fetchTaskAttachmentBytes: (taskId: number, attachmentId: number, size: 'preview' | 'original' = 'preview') =>
@@ -359,7 +362,7 @@ export const api = {
   saveTaskAttachment: (taskId: number, attachmentId: number, fileName: string) =>
     window.api.saveTaskAttachment(taskId, attachmentId, fileName) as Promise<ApiResult<{ saved: boolean; path?: string }>>,
   pickAndUploadAttachment: (taskId: number) =>
-    window.api.pickAndUploadAttachment(taskId) as Promise<ApiResult<{ count: number; attachments: TaskAttachment[]; error?: string }>>,
+    window.api.pickAndUploadAttachment(taskId) as Promise<ApiResult<{ count: number; attachments: TaskAttachment[]; queued?: string[]; error?: string }>>,
 
   // Offline queue (main process). Changes that fail for network or server reasons are queued here
   // and replayed in order; see src/main/offline/ and src/shared/offline-queue-types.ts.

@@ -2329,6 +2329,32 @@
       { "name": "a legacy midnight date becomes 23:59:59", "due": "2026-10-06T00:00:00", "start": "2026-10-06T10:00:00", "minutes": 30, "expectDue": "2026-10-06T23:59:59", "expectEnd": "2026-10-06T10:30:00" },
       { "name": "the end is held at midnight", "due": null, "start": "2026-10-06T23:45:00", "minutes": 30, "expectDue": "2026-10-06T23:59:59", "expectEnd": "2026-10-07T00:00:00" }
     ],
+    "moveToDay": [
+      { "name": "to a later day, a due date on the old day follows", "due": "2026-10-06T23:59:59", "start": "2026-10-06T15:00:00", "end": "2026-10-06T15:30:00", "day": "2026-10-08", "expectStart": "2026-10-08T15:00:00", "expectEnd": "2026-10-08T15:30:00", "expectDue": "2026-10-08T23:59:59" },
+      { "name": "to an earlier day, a later due date stays as a deadline", "due": "2026-10-08T23:59:59", "start": "2026-10-08T09:00:00", "end": "2026-10-08T10:15:00", "day": "2026-10-07", "expectStart": "2026-10-07T09:00:00", "expectEnd": "2026-10-07T10:15:00", "expectDue": "2026-10-08T23:59:59" },
+      { "name": "no due date gets the new day", "due": null, "start": "2026-10-06T15:00:00", "end": "2026-10-06T15:30:00", "day": "2026-10-09", "expectStart": "2026-10-09T15:00:00", "expectEnd": "2026-10-09T15:30:00", "expectDue": "2026-10-09T23:59:59" },
+      { "name": "a due time before the new start becomes date only", "due": "2026-10-08T10:00:00", "start": "2026-10-06T15:00:00", "end": "2026-10-06T15:30:00", "day": "2026-10-08", "expectStart": "2026-10-08T15:00:00", "expectEnd": "2026-10-08T15:30:00", "expectDue": "2026-10-08T23:59:59" },
+      { "name": "a block ending at midnight still ends at midnight", "due": "2026-10-06T23:59:59", "start": "2026-10-06T23:00:00", "end": "2026-10-07T00:00:00", "day": "2026-10-07", "expectStart": "2026-10-07T23:00:00", "expectEnd": "2026-10-08T00:00:00", "expectDue": "2026-10-07T23:59:59" },
+      { "name": "across a daylight-saving change, the same wall-clock times", "due": "2026-10-30T23:59:59", "start": "2026-10-30T09:00:00", "end": "2026-10-30T10:00:00", "day": "2026-11-02", "expectStart": "2026-11-02T09:00:00", "expectEnd": "2026-11-02T10:00:00", "expectDue": "2026-11-02T23:59:59" },
+      { "name": "a block across a clock change keeps the wall-clock times it shows", "due": "2026-11-01T23:59:59", "start": "2026-11-01T00:30:00", "end": "2026-11-01T03:30:00", "day": "2026-11-02", "expectStart": "2026-11-02T00:30:00", "expectEnd": "2026-11-02T03:30:00", "expectDue": "2026-11-02T23:59:59" }
+    ],
+    "topRow": {
+      "about": "16.4: the tasks of a day without a time, at the top of the timeline. Each task is open unless done says otherwise.",
+      "day": "2026-10-06",
+      "tasks": [
+        { "id": 1, "due": "2026-10-06T23:59:59", "start": null, "end": null, "done": false },
+        { "id": 2, "due": "2026-10-06T15:00:00", "start": null, "end": null, "done": false },
+        { "id": 3, "due": "2026-10-04T23:59:59", "start": null, "end": null, "done": false },
+        { "id": 4, "due": "2026-10-06T23:59:59", "start": "2026-10-06T15:00:00", "end": "2026-10-06T15:30:00", "done": false },
+        { "id": 5, "due": "2026-10-06T23:59:59", "start": "2026-10-07T15:00:00", "end": "2026-10-07T15:30:00", "done": false },
+        { "id": 6, "due": "2026-10-06T23:59:59", "start": null, "end": null, "done": true },
+        { "id": 7, "due": null, "start": "2026-10-06T15:00:00", "end": "2026-10-06T15:30:00", "done": false },
+        { "id": 8, "due": "2026-10-06T00:00:00", "start": null, "end": null, "done": false },
+        { "id": 9, "due": "2026-10-07T23:59:59", "start": null, "end": null, "done": false },
+        { "id": 10, "due": "2026-10-06T23:59:59", "start": "2026-10-06T15:00:00", "end": null, "done": false }
+      ],
+      "expect": [1, 5, 8, 10]
+    },
     "dueChange": [
       { "name": "a block on the old due day follows", "today": "2026-10-06", "oldDue": "2026-10-06T23:59:59", "start": "2026-10-06T15:00:00", "end": "2026-10-06T15:30:00", "newDue": "2026-10-08T23:59:59", "expectStart": "2026-10-08T15:00:00", "expectEnd": "2026-10-08T15:30:00" },
       { "name": "a block on another day stays", "today": "2026-10-06", "oldDue": "2026-10-09T23:59:59", "start": "2026-10-06T15:00:00", "end": "2026-10-06T15:30:00", "newDue": "2026-10-12T23:59:59", "expectStart": "2026-10-06T15:00:00", "expectEnd": "2026-10-06T15:30:00" },

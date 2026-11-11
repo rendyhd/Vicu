@@ -74,6 +74,13 @@ export interface OfflineCreateInput {
   images?: OfflineImageInput[]
 }
 
+/** The file of a queued upload, for the task's attachment list (issue 104). */
+export interface OfflineUploadView {
+  name: string
+  /** Goes to the end of the notes once uploaded. */
+  inline: boolean
+}
+
 export interface OfflineQueueItemView {
   id: string
   type: OfflineActionType
@@ -84,6 +91,8 @@ export interface OfflineQueueItemView {
   attempts: number
   /** The task the action changes (a negative temp id while its create is still pending). */
   taskId?: number
+  /** Present for a queued upload. */
+  upload?: OfflineUploadView
   /** Present for a pending create. */
   create?: {
     tempId: number
@@ -108,6 +117,8 @@ export interface OfflineFailedItemView {
   groupId?: string
   /** The task the action changed (a negative temp id for a create), so a row can show it failed. */
   taskId?: number
+  /** Present for a failed upload. */
+  upload?: OfflineUploadView
 }
 
 export interface OfflineQueueSnapshot {

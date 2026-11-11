@@ -129,17 +129,21 @@ function ToastItem({ toast, onGone }: { toast: Shown; onGone: () => void }) {
       <ToastKindMark kind={toast.kind} />
       {/* py-1 puts the first line on the 24 px line of the buttons; a wrapped message grows downwards. */}
       <span className="min-w-0 flex-1 break-words py-1">{toast.message}</span>
-      {toast.action && (
-        <button
-          type="button"
-          onClick={() => {
-            toast.action?.onAction()
-            dismiss(id)
-          }}
-          className="shrink-0 rounded-control px-2 py-1 font-medium text-accent hover:bg-[var(--bg-hover)]"
-        >
-          {toast.action.label}
-        </button>
+      {[toast.action, toast.secondAction].map(
+        (action) =>
+          action && (
+            <button
+              key={action.label}
+              type="button"
+              onClick={() => {
+                action.onAction()
+                dismiss(id)
+              }}
+              className="shrink-0 rounded-control px-2 py-1 font-medium text-accent hover:bg-[var(--bg-hover)]"
+            >
+              {action.label}
+            </button>
+          )
       )}
       <button
         type="button"

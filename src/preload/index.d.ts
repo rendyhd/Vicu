@@ -191,12 +191,17 @@ export interface ElectronAPI {
 
   // Attachments
   fetchTaskAttachments(taskId: number): Promise<ApiResult<TaskAttachment[]>>
-  uploadTaskAttachment(taskId: number, fileData: Uint8Array, fileName: string, mimeType: string): Promise<ApiResult<unknown>>
+  /**
+   * With `options.queue` the file waits in the offline queue when the server cannot be reached and
+   * the answer is `QueuedWriteReply`; `inline` then puts the image at the end of the notes once uploaded.
+   */
+  uploadTaskAttachment(taskId: number, fileData: Uint8Array, fileName: string, mimeType: string, options?: TaskWriteOptions & { inline?: boolean }): Promise<ApiResult<unknown> | QueuedWriteReply>
   deleteTaskAttachment(taskId: number, attachmentId: number): Promise<ApiResult<void>>
   fetchTaskAttachmentBytes(taskId: number, attachmentId: number, size?: 'preview' | 'original'): Promise<ApiResult<Uint8Array>>
   openTaskAttachment(taskId: number, attachmentId: number, fileName: string): Promise<ApiResult<void>>
   saveTaskAttachment(taskId: number, attachmentId: number, fileName: string): Promise<ApiResult<{ saved: boolean; path?: string }>>
-  pickAndUploadAttachment(taskId: number): Promise<ApiResult<{ count: number; attachments: unknown[]; error?: string }>>
+  /** `queued` names the files kept for later because the server could not be reached. */
+  pickAndUploadAttachment(taskId: number): Promise<ApiResult<{ count: number; attachments: unknown[]; queued?: string[]; error?: string }>>
 
   // Quick Entry/View
   applyQuickEntrySettings(): Promise<{ entry: boolean; viewer: boolean; waylandLimited: boolean }>

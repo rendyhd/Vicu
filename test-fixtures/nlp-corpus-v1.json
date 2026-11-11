@@ -72,6 +72,8 @@
     { "input": "Call tomorrow at 9am", "title": "Call", "due": "2026-10-07T09:00:00" },
     { "input": "Call at 3pm", "title": "Call", "due": "2026-10-06T15:00:00" },
     { "input": "Call at 9am", "title": "Call", "due": "2026-10-07T09:00:00" },
+    { "input": "Call tomorrow at 1:05 p.m.", "title": "Call", "due": "2026-10-07T13:05:00" },
+    { "input": "Call at 9 a.m. about the report", "title": "Call about the report", "due": "2026-10-07T09:00:00" },
     { "input": "Meeting next friday 14:00", "title": "Meeting", "due": "2026-10-16T14:00:00" },
     { "input": "Check oven in 30 minutes", "title": "Check oven", "due": "2026-10-06T10:30:00" },
     { "input": "Call back in 2 hours", "title": "Call back", "due": "2026-10-06T12:00:00" },

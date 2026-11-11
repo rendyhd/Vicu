@@ -36,8 +36,10 @@ interface DropOptions {
  */
 export function useTimelineDrop({ days, today, gridRef, scrollRef, lengthOf, onPlace }: DropOptions) {
   const pointer = useRef<{ x: number; y: number } | null>(null)
-  const dragging = useRef<Task[] | null>(null)
+  const draggedTasks = useRef<Task[] | null>(null)
   const [hover, setHover] = useState<DropHover | null>(null)
+  /** A task from a list is being dragged (anywhere), for the drop row and the page turn. */
+  const [dragging, setDragging] = useState(false)
   const latest = useRef({ days, today, lengthOf, onPlace })
   latest.current = { days, today, lengthOf, onPlace }
 
@@ -70,12 +72,13 @@ export function useTimelineDrop({ days, today, gridRef, scrollRef, lengthOf, onP
   const { setNodeRef } = useDroppable({ id: 'plan-timeline', data })
 
   const refresh = () => {
-    const tasks = dragging.current
+    const tasks = draggedTasks.current
     const target = tasks ? targetAt() : null
     setHover(tasks && target ? { ...target, tasks } : null)
   }
   const clear = () => {
-    dragging.current = null
+    draggedTasks.current = null
+    setDragging(false)
     setHover(null)
   }
 
@@ -83,7 +86,8 @@ export function useTimelineDrop({ days, today, gridRef, scrollRef, lengthOf, onP
     onDragStart: ({ active }) => {
       const current = active.data.current as { type?: string; task?: Task } | undefined
       if (current?.type !== 'task' || !current.task) return
-      dragging.current = [current.task]
+      draggedTasks.current = [current.task]
+      setDragging(true)
       refresh()
     },
     onDragEnd: clear,
@@ -94,13 +98,13 @@ export function useTimelineDrop({ days, today, gridRef, scrollRef, lengthOf, onP
     // Tracked before the sensor starts a drag, so the first move has the live position.
     const move = (event: PointerEvent) => {
       pointer.current = { x: event.clientX, y: event.clientY }
-      if (dragging.current) refresh()
+      if (draggedTasks.current) refresh()
     }
     window.addEventListener('pointermove', move, true)
     return () => window.removeEventListener('pointermove', move, true)
   }, [])
 
-  return { setNodeRef, hover, refresh }
+  return { setNodeRef, hover, dragging, refresh }
 }
 
 /** The length a task takes when dropped: its block's own, else the default (contract 16.2). */

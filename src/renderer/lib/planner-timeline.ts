@@ -131,17 +131,8 @@ export function markerOverBlock(minute: number, blocks: readonly { startMinute: 
   )
 }
 
-/** A day's date-only tasks without a block on it: the top row of 3 days and Week. */
-export function dayTopRow<T extends PlanTaskFields>(tasks: readonly T[], day: LocalDate): T[] {
-  return tasks.filter(
-    (task) =>
-      !task.done &&
-      !isNoDueDate(task.due_date) &&
-      isDateOnly(task.due_date as string) &&
-      localDateOf(task.due_date) === day &&
-      blockOf(task)?.day !== day,
-  )
-}
+/** A day's tasks without a time, the row above its timeline on every view (section 16.4). */
+export { dayTopRow } from '../../shared/time-blocks'
 
 /**
  * The left panel's first list: what is on the selected day without a time. Overdue tasks count when

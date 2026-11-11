@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
 import {
-  dayListLabel,
   drawTargetProject,
   inNextSevenDays,
   matchesTitleFilter,
@@ -30,8 +29,7 @@ describe('the left panel of the Plan screen', () => {
   })
 
   it('names its lists, the first after the selected day', () => {
-    expect(dayListLabel('Today')).toBe('Today, no time')
-    expect(sourceLists('Today, no time').map((item) => item.label)).toEqual(['Today, no time', 'Inbox', 'Next 7 days', 'No date'])
+    expect(sourceLists('Today').map((item) => item.label)).toEqual(['Today', 'Inbox', 'Next 7 days', 'No date'])
   })
 
   it('Next 7 days is after today and at most seven days on', () => {

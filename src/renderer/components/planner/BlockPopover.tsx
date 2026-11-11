@@ -1,14 +1,15 @@
-import { useRef } from 'react'
+import { useRef, useState } from 'react'
 import { Button } from '@/components/shared/Button'
 import { Popover } from '@/components/overlay/Popover'
 import { TaskCheckbox } from '@/components/task-list/TaskCheckbox'
+import { MonthCalendar } from '@/components/task-list/MonthCalendar'
 import { cn } from '@/lib/cn'
 import { useDateFormat } from '@/hooks/use-date-format'
-import { DAY_MINUTES, formatLength } from '@/lib/planner-timeline'
+import { DAY_MINUTES, canPlaceOn, formatLength } from '@/lib/planner-timeline'
 import { formatDateDisplay } from '@/lib/date-display'
 import type { Task } from '@/lib/vikunja-types'
 import { formatBlockRange } from '../../../shared/date-display'
-import { isNoDueDate, isDateOnly, toLocalDate } from '../../../shared/due-dates'
+import { addLocalDays, isNoDueDate, isDateOnly, startOfLocalDay, toLocalDate, type LocalDate } from '../../../shared/due-dates'
 import {
   BLOCK_LENGTHS,
   atClock,
@@ -21,6 +22,8 @@ import {
 } from '../../../shared/time-blocks'
 
 const LENGTHS = [...BLOCK_LENGTHS, 120]
+/** Today and the five days after it have a chip of their own; any other day is in the calendar. */
+const DAY_CHIPS = 6
 
 interface BlockPopoverProps {
   task: Task
@@ -29,6 +32,8 @@ interface BlockPopoverProps {
   defaultLength: number
   onChange: (task: Task, changes: BlockChanges) => void
   onOpenTask?: (task: Task) => void
+  /** Move the block to another day at the same times (contract 16.2). Without it there is no Day row. */
+  onMoveToDay?: (task: Task, day: LocalDate) => void
   /** Plan my day keeps a block as a draft: leaving it out of the plan instead of removing a saved time. */
   removeLabel?: string
   /** Off for a draft, which is not a saved block yet. */
@@ -44,6 +49,7 @@ export function BlockPopover({
   defaultLength,
   onChange,
   onOpenTask,
+  onMoveToDay,
   removeLabel = 'Remove time',
   canComplete = true,
   onClose,
@@ -52,6 +58,10 @@ export function BlockPopover({
   const anchorRef = useRef<HTMLElement | null>(element)
   const block = blockOf(task)
   const hasDueTime = !isNoDueDate(task.due_date) && !isDateOnly(task.due_date as string)
+  const [picking, setPicking] = useState(false)
+  const now = new Date()
+  const today = toLocalDate(now)
+  const dayChips = Array.from({ length: DAY_CHIPS }, (_, i) => addLocalDays(today, i))
 
   const move = (step: number) => {
     if (!block) return
@@ -61,6 +71,12 @@ export function BlockPopover({
   const setLength = (minutes: number) => {
     if (!block) return
     onChange(task, resizeBlockEnd(block, new Date(block.start.getTime() + minutes * 60_000)))
+  }
+  const moveToDay = (day: LocalDate) => {
+    setPicking(false)
+    if (!block || !onMoveToDay || day === block.day || !canPlaceOn(day, today)) return
+    onMoveToDay(task, day)
+    onClose()
   }
 
   return (
@@ -87,6 +103,61 @@ export function BlockPopover({
               Due {formatDateDisplay('row', new Date(task.due_date as string), new Date(), false, fmt)}
             </p>
           )
+        )}
+
+        {block && canChange && onMoveToDay && (
+          <>
+            <p className="mt-3 text-caption text-text-secondary">Day</p>
+            <div className="mt-1 flex flex-wrap gap-1" role="group" aria-label="Move to day">
+              {dayChips.map((day) => (
+                <button
+                  key={day}
+                  type="button"
+                  data-plan-move-day={day}
+                  aria-pressed={block.day === day}
+                  title={formatDateDisplay('header.full', startOfLocalDay(day), now, true, fmt)}
+                  onClick={() => moveToDay(day)}
+                  className={cn(
+                    'rounded-chip border px-2 py-0.5 text-meta',
+                    block.day === day
+                      ? 'border-accent-blue bg-accent-blue/12 text-accent-blue'
+                      : 'border-border text-text-secondary hover:bg-bg-hover',
+                  )}
+                >
+                  {formatDateDisplay('header.day', startOfLocalDay(day), now, true, fmt)}
+                </button>
+              ))}
+              <button
+                type="button"
+                data-plan-move-pick
+                aria-expanded={picking}
+                onClick={() => setPicking((value) => !value)}
+                className={cn(
+                  'rounded-chip border px-2 py-0.5 text-meta',
+                  picking ? 'border-accent-blue text-accent-blue' : 'border-border text-text-secondary hover:bg-bg-hover',
+                )}
+              >
+                Pick a date
+              </button>
+            </div>
+            {picking && (
+              <div
+                className="mt-2 border-t border-border pt-2"
+                data-plan-move-calendar
+                // The arrows move the calendar's focus; the list behind has window-level shortcuts on them.
+                onKeyDown={(event) => {
+                  if (!event.ctrlKey && !event.metaKey && event.key !== 'Escape') event.stopPropagation()
+                }}
+              >
+                <MonthCalendar
+                  selected={block.day}
+                  today={today}
+                  onPick={moveToDay}
+                  isDisabled={(day) => !canPlaceOn(day, today)}
+                />
+              </div>
+            )}
+          </>
         )}
 
         {block && canChange && (

@@ -1,11 +1,14 @@
 import { useMemo, useState, type RefObject } from 'react'
-import { X, FileText, Image, File, Loader2, Download } from 'lucide-react'
+import { X, FileText, Image, File, Loader2, Download, Clock, AlertCircle } from 'lucide-react'
 import { useTaskAttachments, useUploadAttachment, useDeleteAttachment } from '@/hooks/use-task-mutations'
 import { useAttachmentActions } from '@/hooks/use-attachment-actions'
 import { useAttachmentBlobUrl } from '@/hooks/use-attachment-bytes'
 import { formatFileSize, viewableImages, type ViewerImage } from '@/lib/attachment-preview'
 import { Popover, type PopoverCloseReason } from '../overlay/Popover'
 import { AttachmentViewer } from './AttachmentViewer'
+import { api } from '@/lib/api'
+import { useOfflineStore } from '@/stores/offline-store'
+import { waitingUploadStatus, waitingUploadsFor, type WaitingUpload } from '@/lib/waiting-uploads'
 
 interface AttachmentPickerPopoverProps {
   anchorRef: RefObject<HTMLElement | null>
@@ -36,8 +39,54 @@ function ImageThumbnail({ taskId, image }: { taskId: number; image: ViewerImage 
   )
 }
 
+/**
+ * A file attached while the server could not be reached (issue 104): waiting in the offline queue,
+ * or refused by the server with the reason and, where it can help, Retry.
+ */
+function WaitingUploadRow({ upload }: { upload: WaitingUpload }) {
+  const remove = () => void (upload.failed ? api.offlineQueue.discardFailed([upload.id]) : api.offlineQueue.discardPending([upload.id]))
+  return (
+    <div className={`flex items-center gap-2 rounded-control px-2 py-1.5 ${upload.failed ? 'bg-danger/10' : ''}`}>
+      <span className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-control bg-bg-hover opacity-80">
+        <File className="h-4 w-4 text-[var(--text-secondary)]" aria-hidden="true" />
+        {upload.failed ? (
+          <AlertCircle className="absolute -bottom-1 -right-1 h-3.5 w-3.5 rounded-full bg-[var(--bg-primary)] text-danger" aria-hidden="true" />
+        ) : (
+          <Clock className="absolute -bottom-1 -right-1 h-3.5 w-3.5 rounded-full bg-[var(--bg-primary)] text-accent-blue" aria-hidden="true" />
+        )}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-xs text-[var(--text-primary)]">{upload.name}</span>
+        <span className={`block text-caption ${upload.failed ? 'text-danger' : 'text-[var(--text-secondary)]'}`}>
+          {waitingUploadStatus(upload)}
+        </span>
+      </span>
+      {upload.failed && upload.canRetry && (
+        <button
+          type="button"
+          onClick={() => void api.offlineQueue.retryFailed([upload.id])}
+          className="shrink-0 rounded-control px-1.5 py-0.5 text-caption font-medium text-accent-blue hover:bg-[var(--bg-hover)]"
+        >
+          Retry
+        </button>
+      )}
+      <button
+        type="button"
+        onClick={remove}
+        aria-label={`Remove ${upload.name}`}
+        title="Remove"
+        className="shrink-0 rounded-control p-1 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-danger"
+      >
+        <X className="h-3 w-3" />
+      </button>
+    </div>
+  )
+}
+
 export function AttachmentPickerPopover({ anchorRef, invokedBy, taskId, onClose }: AttachmentPickerPopoverProps) {
   const { data: attachments, isLoading } = useTaskAttachments(taskId, true)
+  const offlineSnapshot = useOfflineStore((state) => state.snapshot)
+  const waiting = useMemo(() => waitingUploadsFor(offlineSnapshot, taskId), [offlineSnapshot, taskId])
   const uploadAttachment = useUploadAttachment()
   const deleteAttachment = useDeleteAttachment()
   // What the last Open or Save did, shown under the list; and the attachment being saved.
@@ -60,9 +109,9 @@ export function AttachmentPickerPopover({ anchorRef, invokedBy, taskId, onClose 
         <div className="flex items-center justify-center py-4">
           <Loader2 className="h-4 w-4 animate-spin text-[var(--text-secondary)]" />
         </div>
-      ) : attachments && attachments.length > 0 ? (
+      ) : (attachments && attachments.length > 0) || waiting.length > 0 ? (
         <div className="mb-2 flex max-h-48 flex-col gap-1 overflow-y-auto custom-scrollbar">
-          {attachments.map((att) => {
+          {(attachments ?? []).map((att) => {
             const Icon = getFileIcon(att.file.mime)
             const image = images.find((candidate) => candidate.id === att.id)
             return (
@@ -118,6 +167,9 @@ export function AttachmentPickerPopover({ anchorRef, invokedBy, taskId, onClose 
               </div>
             )
           })}
+          {waiting.map((upload) => (
+            <WaitingUploadRow key={upload.id} upload={upload} />
+          ))}
         </div>
       ) : (
         <p className="mb-2 text-center text-xs text-[var(--text-secondary)]">No attachments</p>

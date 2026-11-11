@@ -1035,8 +1035,18 @@ export function registerIpcHandlers(): void {
     return fetchTaskAttachments(taskId)
   })
 
-  handleTrusted('upload-task-attachment', async (_event, taskId: number, fileData: Uint8Array, fileName: string, mimeType: string) => {
-    return refreshViewerOnSuccess(await uploadTaskAttachment(taskId, Buffer.from(fileData), fileName, mimeType))
+  handleTrusted('upload-task-attachment', async (_event, taskId: number, fileData: Uint8Array, fileName: string, mimeType: string, options?: unknown) => {
+    const { queue, title } = parseTaskWriteOptions(options)
+    if (!queue) return refreshViewerOnSuccess(await uploadTaskAttachment(taskId, Buffer.from(fileData), fileName, mimeType))
+    // The editor's drop and paste: offline, the file waits in the queue (issue 104).
+    const inline = !!options && typeof options === 'object' && (options as { inline?: unknown }).inline === true
+    const deps = taskWriteDeps()
+    const outcome = await writeTask(
+      deps,
+      taskWrites.upload(deps.queue, { uploadTaskAttachment }, taskId, { bytes: fileData, name: fileName, mime: mimeType }, { inline, title }),
+      { queue: true }
+    )
+    return outcome.kind === 'sent' ? refreshViewerOnSuccess(outcome.result) : taskWriteReply(outcome)
   })
 
   handleTrusted('delete-task-attachment', async (_event, taskId: number, attachmentId: number) => {
@@ -1128,6 +1138,9 @@ export function registerIpcHandlers(): void {
     let count = 0
     let lastError = ''
     const attachments: unknown[] = []
+    // Files kept for later because the server could not be reached (issue 104).
+    const queued: string[] = []
+    const deps = taskWriteDeps()
     for (const filePath of dialogResult.filePaths) {
       // Size is checked against the server's limit from stat, before the file is read, and the read
       // is asynchronous: picking a huge file neither freezes the app nor fills memory (D-IPC-5).
@@ -1138,22 +1151,30 @@ export function registerIpcHandlers(): void {
       }
       const fileName = path.basename(filePath)
       const mimeType = getMimeType(fileName)
-      const result = await uploadTaskAttachment(taskId, loaded.buffer, fileName, mimeType)
-      if (!result.success) {
-        lastError = result.error
+      const outcome = await writeTask(
+        deps,
+        taskWrites.upload(deps.queue, { uploadTaskAttachment }, taskId, { bytes: loaded.buffer, name: fileName, mime: mimeType }),
+        { queue: true }
+      )
+      if (outcome.kind === 'queued') {
+        queued.push(fileName)
+        continue
+      }
+      if (outcome.kind === 'refused') {
+        lastError = outcome.result.error
         continue
       }
       // The server answers 201 even for a file it refused.
-      const answer = readUploadAnswer(result.data)
+      const answer = readUploadAnswer(outcome.result.data)
       attachments.push(...answer.attachments)
       if (answer.error && answer.attachments.length === 0) lastError = answer.error
       else count++
     }
-    if (count === 0 && dialogResult.filePaths.length > 0) {
+    if (count === 0 && queued.length === 0 && dialogResult.filePaths.length > 0) {
       return { success: false, error: lastError || 'Upload failed' }
     }
     if (count > 0) notifyViewerSync()
-    return { success: true, data: { count, attachments, ...(lastError ? { error: lastError } : {}) } }
+    return { success: true, data: { count, attachments, queued, ...(lastError ? { error: lastError } : {}) } }
   })
 
   // --- Obsidian IPC ---

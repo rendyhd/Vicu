@@ -55,6 +55,8 @@ interface GestureOptions {
   gridRef: RefObject<HTMLElement | null>
   listRef?: RefObject<HTMLElement | null>
   topRowRef?: RefObject<HTMLElement | null>
+  /** A point where a moved item has no target (the page-turn buttons): no preview, and a release there does nothing. */
+  ignoreAt?: (x: number, y: number) => boolean
   onCommit: (result: GestureResult) => void
   onPress: (item: GestureItem, element: HTMLElement) => void
 }
@@ -67,6 +69,8 @@ interface GestureOptions {
  */
 export function useTimelineGesture(options: GestureOptions) {
   const [preview, setPreview] = useState<GesturePreview | null>(null)
+  /** A block or marker is being moved (past the drag threshold), for the drop row and the page turn. */
+  const [moving, setMoving] = useState(false)
   const cancelRef = useRef<(() => void) | null>(null)
   const latest = useRef(options)
   latest.current = options
@@ -103,25 +107,30 @@ export function useTimelineGesture(options: GestureOptions) {
     const compute = (): GestureTarget | null => {
       const box = grid.getBoundingClientRect()
       const minute = minuteAtY(clientY, box.top)
-      const { days, today, listRef, topRowRef } = latest.current
+      const { days, today, listRef, topRowRef, ignoreAt } = latest.current
       const overDay = dayAtX(days, clientX, box.left, box.width)
       if (mode === 'draw') return { kind: 'grid', day, range: drawnRange(originMinute, minute) }
       if (!item) return null
+      if (mode === 'move' && ignoreAt?.(clientX, clientY)) return null
       if (mode === 'start' || mode === 'end') {
         if (!canPlaceOn(day, today)) return null
         return { kind: 'grid', day, range: mode === 'start' ? startEdgeRange(item.range, minute) : endEdgeRange(item.range, minute) }
       }
       if (item.hasBlock && inside(listRef?.current?.getBoundingClientRect(), clientX, clientY)) return { kind: 'list' }
       if (inside(topRowRef?.current?.getBoundingClientRect(), clientX, clientY)) {
-        return overDay && canPlaceOn(overDay, today) ? { kind: 'top', day: overDay } : null
+        // The Day view's row spans the hour gutter too: it is that one day's row all the way across.
+        const rowDay = overDay ?? (days.length === 1 ? days[0] : null)
+        return rowDay && canPlaceOn(rowDay, today) ? { kind: 'top', day: rowDay } : null
       }
-      const target = overDay ?? item.day
+      // Beside the columns it stays on its day, or on the day shown now when a page turned under the drag.
+      const target = overDay ?? (days.includes(item.day) ? item.day : days[0])
       if (!canPlaceOn(target, today)) return null
       return { kind: 'grid', day: target, range: movedRange(item.range, minute - originMinute) }
     }
 
     const refresh = () => {
       if (!active && Math.hypot(clientX - startX, clientY - startY) < DRAG_THRESHOLD_PX) return
+      if (!active && mode === 'move' && item) setMoving(true)
       active = true
       current = compute()
       setPreview(current ? { mode, taskId: item?.task.id, target: current } : null)
@@ -138,8 +147,10 @@ export function useTimelineGesture(options: GestureOptions) {
             : clientY > bounds.bottom - SCROLL_EDGE_PX
               ? Math.min(1, (clientY - bounds.bottom + SCROLL_EDGE_PX) / SCROLL_EDGE_PX)
               : 0
-        // Only while the pointer is over the timeline's own column: the header and the list do not scroll it.
-        if (edge !== 0 && clientX >= bounds.left && clientX < bounds.right && clientY >= bounds.top - SCROLL_EDGE_PX) {
+        // Only while the pointer is over the timeline's own column: the header, the list and the row of
+        // tasks without a time (a drop target of its own) do not scroll it.
+        const overTopRow = inside(latest.current.topRowRef?.current?.getBoundingClientRect(), clientX, clientY)
+        if (edge !== 0 && !overTopRow && clientX >= bounds.left && clientX < bounds.right && clientY >= bounds.top - SCROLL_EDGE_PX) {
           scroller.scrollTop += edge * MAX_SCROLL_PX_PER_SECOND * elapsed
           refresh()
         }
@@ -158,6 +169,7 @@ export function useTimelineGesture(options: GestureOptions) {
       scroller.removeEventListener('lostpointercapture', pointerCancel)
       if (scroller.hasPointerCapture(pointerId)) scroller.releasePointerCapture(pointerId)
       setPreview(null)
+      setMoving(false)
       if (!commit) return
       if (!active) {
         if (item) latest.current.onPress(item, element)
@@ -214,5 +226,5 @@ export function useTimelineGesture(options: GestureOptions) {
     frame = requestAnimationFrame(tick)
   }
 
-  return { preview, begin }
+  return { preview, moving, begin }
 }

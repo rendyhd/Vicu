@@ -49,6 +49,8 @@ import {
   readPositionHints,
 } from '@/lib/new-task-position'
 import { useOfflineStore } from '@/stores/offline-store'
+import { toast } from '@/stores/toast-store'
+import { queuedUploadText, queuedUploadsText } from '@/lib/waiting-uploads'
 import type {
   Task,
   Project,
@@ -1138,6 +1140,9 @@ export function useUploadAttachment() {
       if (!result.success) throw apiError(result)
       return result.data
     },
+    onSuccess: (data) => {
+      if (data.queued?.length) toast.info(queuedUploadsText(data.queued))
+    },
     onSettled: (_data, _err, taskId) => {
       qc.invalidateQueries({ queryKey: ['task-attachments', taskId] })
       refreshTasks(qc, [['tasks'], ['view-tasks']])
@@ -1161,8 +1166,12 @@ export function useUploadAttachmentFromDrop() {
       fileName: string
       mimeType: string
     }) => {
-      const result = await api.uploadTaskAttachment(taskId, fileData, fileName, mimeType)
+      const result = await api.uploadTaskAttachmentOrQueue(taskId, fileData, fileName, mimeType, false)
       if (!result.success) throw apiError(result)
+      if (isQueuedUpload(result)) {
+        toast.info(queuedUploadText(fileName))
+        return null
+      }
       return result.data
     },
     onSettled: (_data, _err, vars) => {
@@ -1207,6 +1216,56 @@ export function useUploadAttachmentFromPaste(options?: MutationHookOptions) {
       const picked = byName ?? newAttachments.sort((a, b) => b.id - a.id)[0]
       if (!picked) throw new Error('Upload succeeded but new attachment not found')
 
+      return { attachmentId: picked.id }
+    },
+    onSettled: (_data, _err, vars) => {
+      qc.invalidateQueries({ queryKey: ['task-attachments', vars.taskId] })
+      refreshTasks(qc, [['tasks'], ['view-tasks']])
+    },
+  })
+}
+
+/** The upload answer said the file waits in the offline queue. */
+function isQueuedUpload(result: { success: boolean }): boolean {
+  return result.success && (result as { queued?: unknown }).queued === true
+}
+
+/**
+ * An image pasted into an existing task's notes. Offline it waits in the queue and goes to the end
+ * of the notes once uploaded (`queued`); the caller then adds nothing to the notes itself.
+ */
+export function useAttachPastedImage() {
+  const qc = useQueryClient()
+
+  return useMutation({
+    meta: metaFor('upload the image'),
+    mutationFn: async ({
+      taskId,
+      fileData,
+      fileName,
+      mimeType,
+    }: {
+      taskId: number
+      fileData: Uint8Array
+      fileName: string
+      mimeType: string
+    }): Promise<{ attachmentId: number } | { queued: true }> => {
+      const beforeResult = await api.fetchTaskAttachments(taskId)
+      const beforeIds = new Set<number>(beforeResult.success ? beforeResult.data.map((a) => a.id) : [])
+
+      const uploadResult = await api.uploadTaskAttachmentOrQueue(taskId, fileData, fileName, mimeType, true)
+      if (!uploadResult.success) throw apiError(uploadResult)
+      if (isQueuedUpload(uploadResult)) {
+        toast.info(queuedUploadText(fileName))
+        return { queued: true }
+      }
+
+      const afterResult = await api.fetchTaskAttachments(taskId)
+      if (!afterResult.success) throw apiError(afterResult)
+      const newAttachments = afterResult.data.filter((a) => !beforeIds.has(a.id))
+      const byName = newAttachments.find((a) => a.file.name === fileName)
+      const picked = byName ?? newAttachments.sort((a, b) => b.id - a.id)[0]
+      if (!picked) throw new Error('Upload succeeded but new attachment not found')
       return { attachmentId: picked.id }
     },
     onSettled: (_data, _err, vars) => {
