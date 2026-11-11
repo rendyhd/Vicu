@@ -4,7 +4,7 @@ import type { Label, Project, Task } from './vikunja-types'
 // What the command palette lists and how a query picks from it. Pure: the component turns an
 // action into a navigation or a change.
 
-export type PaletteCommand = 'new-task' | 'voice' | 'dictate' | 'brain-dump' | 'ask' | 'make-tasks' | 'refresh' | 'toggle-theme' | 'settings'
+export type PaletteCommand = 'new-task' | 'new-event' | 'voice' | 'dictate' | 'brain-dump' | 'ask' | 'make-tasks' | 'refresh' | 'toggle-theme' | 'settings'
 
 export type PaletteAction =
   | { type: 'command'; command: PaletteCommand }
@@ -32,6 +32,8 @@ export interface PaletteSources {
   smartLists: readonly { id: string; label: string; path: string }[]
   projects: readonly Pick<Project, 'id' | 'title'>[]
   labels: readonly Pick<Label, 'id' | 'title'>[]
+  /** The Plan screen is on: "New event" is listed (calendar plan, phase 1). */
+  planner?: boolean
 }
 
 /** The guided sessions (cross-app semantics 14): found by name, not listed with an empty query. */
@@ -44,9 +46,13 @@ export const GUIDED_PALETTE_ITEMS: readonly PaletteItem[] = [
 ]
 
 /** Everything the palette can run except tasks: actions, smart lists, guided sessions, projects and labels, in that order. */
-export function buildPaletteItems({ smartLists, projects, labels }: PaletteSources): PaletteItem[] {
+export function buildPaletteItems({ smartLists, projects, labels, planner = false }: PaletteSources): PaletteItem[] {
   const actions: PaletteItem[] = [
     { id: 'cmd:new-task', kind: 'Action', title: 'New task', keywords: 'add create', action: { type: 'command', command: 'new-task' } },
+    // An Event on the Plan screen (contract 20.3), at the selected day's next free time.
+    ...(planner
+      ? [{ id: 'cmd:new-event', kind: 'Action', title: 'New event', keywords: 'add create calendar meeting busy plan', action: { type: 'command', command: 'new-event' } } satisfies PaletteItem]
+      : []),
     // Voice input that needs no holding (docs/voice-input.md): listening until Enter, Esc cancels.
     { id: 'cmd:voice', kind: 'Action', title: 'Say a task', keywords: 'voice dictate speak speech microphone add', action: { type: 'command', command: 'voice' } },
     // The AI assistant (docs/ai-assistant-v1.md): smart dictation with the microphone open, its

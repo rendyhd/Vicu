@@ -20,6 +20,13 @@ const shortcuts = [
     { keys: [mod, 'T'], description: 'Set due date to today' },
     { keys: ['!'], description: 'Set due date to today' },
   ]},
+  { category: 'Plan', items: [
+    { keys: [mod, 'Shift', 'N'], description: 'New event' },
+    { keys: ['Alt', 'Shift', 'Up'], description: 'Move a block or your event 15 minutes earlier' },
+    { keys: ['Alt', 'Shift', 'Down'], description: 'Move a block or your event 15 minutes later' },
+    { keys: ['Shift', 'Up'], description: 'Make a block or your event 15 minutes shorter' },
+    { keys: ['Shift', 'Down'], description: 'Make a block or your event 15 minutes longer' },
+  ]},
   { category: 'Editing (while task is open)', items: [
     { keys: ['Enter'], description: 'Move focus to notes' },
     { keys: ['Escape'], description: 'Save and close task' },

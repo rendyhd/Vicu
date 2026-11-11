@@ -1,7 +1,7 @@
 import { useEffect, useId, useMemo, useState, type KeyboardEvent } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { useQueryClient } from '@tanstack/react-query'
-import { CheckCircle2, Circle, Folder, Layers, Mic, Plus, RefreshCw, Settings, Sparkles, SunMoon, Tag } from 'lucide-react'
+import { CalendarPlus, CheckCircle2, Circle, Folder, Layers, Mic, Plus, RefreshCw, Settings, Sparkles, SunMoon, Tag } from 'lucide-react'
 import { useAppConfig } from '@/hooks/use-app-config'
 import { formatAcceleratorForDisplay } from '@/lib/accelerator'
 import { Dialog } from '@/components/overlay/Dialog'
@@ -27,6 +27,8 @@ import { buildPaletteItems, rankPalette, type PaletteCommand, type PaletteItem, 
 import { shortcutHint } from '@/lib/shortcut-hint'
 import { useUIStore } from '@/stores/ui-store'
 import { useNewTaskRequestStore } from '@/stores/new-task-request-store'
+import { useNewEventRequestStore } from '@/stores/new-event-request-store'
+import { isPlannerEnabled } from '@/lib/vikunja-types'
 import { useVoiceStore } from '@/stores/voice-store'
 
 const ICONS: Record<PaletteKind, typeof Circle> = {
@@ -82,8 +84,8 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
   const ai = useAiReady()
 
   const items = useMemo(
-    () => buildPaletteItems({ smartLists, projects: projects?.flat ?? [], labels: labels ?? [] }),
-    [smartLists, projects?.flat, labels],
+    () => buildPaletteItems({ smartLists, projects: projects?.flat ?? [], labels: labels ?? [], planner: isPlannerEnabled(appConfig) }),
+    [smartLists, projects?.flat, labels, appConfig],
   )
   const shown = useMemo(() => rankPalette(items, query, tasks), [items, query, tasks])
   const activeIndex = shown.length === 0 ? -1 : Math.min(active, shown.length - 1)
@@ -106,6 +108,10 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
       useAskStore.getState().setOpen(true)
     } else if (command === 'make-tasks') {
       useAiUiStore.getState().openMakeTasks()
+    } else if (command === 'new-event') {
+      // The Plan screen takes it once it is on screen.
+      useNewEventRequestStore.getState().request()
+      void navigate({ to: '/plan' })
     } else if (command === 'refresh') {
       refreshNow(queryClient)
     } else if (command === 'toggle-theme') {
@@ -159,6 +165,7 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
   const detailOf = ({ action, kind }: PaletteItem): string => {
     if (action.type === 'task') return projects?.all.find((p) => p.id === action.task.project_id)?.title ?? kind
     if (action.type === 'command' && action.command === 'new-task') return shortcutHint('Mod+N', window.api.platform === 'darwin')
+    if (action.type === 'command' && action.command === 'new-event') return shortcutHint('Mod+Shift+N', window.api.platform === 'darwin')
     if (action.type === 'command' && action.command === 'refresh') return window.api.platform === 'darwin' ? shortcutHint('Mod+R', true) : 'F5'
     if (action.type === 'command' && action.command === 'voice' && appConfig?.voice_hotkey) return formatAcceleratorForDisplay(appConfig.voice_hotkey, window.api.platform === 'darwin')
     return kind
@@ -169,6 +176,7 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
     if (action.type === 'command' && action.command === 'settings') return Settings
     if (action.type === 'command' && action.command === 'toggle-theme') return SunMoon
     if (action.type === 'command' && action.command === 'refresh') return RefreshCw
+    if (action.type === 'command' && action.command === 'new-event') return CalendarPlus
     if (action.type === 'command' && action.command === 'voice') return Mic
     if (action.type === 'command' && (action.command === 'ask' || action.command === 'make-tasks' || action.command === 'dictate' || action.command === 'brain-dump')) return Sparkles
     return ICONS[kind]

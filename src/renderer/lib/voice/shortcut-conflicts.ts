@@ -21,6 +21,7 @@ const APP_SHORTCUTS: Array<{ keys: string; name: string }> = [
   { keys: 'Mod+R', name: 'Refresh' },
   { keys: 'Mod+Shift+R', name: 'Reload' },
   { keys: 'Mod+Shift+C', name: 'Comments' },
+  { keys: 'Mod+Shift+N', name: 'New event' },
   { keys: 'Mod+P', name: 'Print' },
   { keys: 'Mod+,', name: 'Settings' },
 ]

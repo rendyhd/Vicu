@@ -22,6 +22,14 @@ describe('buildPaletteItems', () => {
     expect(ids(items).map((id) => id.split(':')[0])).toEqual(['cmd', 'cmd', 'cmd', 'cmd', 'cmd', 'cmd', 'cmd', 'cmd', 'cmd', 'list', 'list', 'list', 'guided', 'guided', 'guided', 'guided', 'guided', 'project', 'project', 'label'])
   })
 
+  it('lists New event after New task only while the Plan screen is on', () => {
+    expect(items.some((i) => i.id === 'cmd:new-event')).toBe(false)
+    const planner = buildPaletteItems({ smartLists: [], projects: [], labels: [], planner: true })
+    expect(planner.slice(0, 2).map((i) => i.title)).toEqual(['New task', 'New event'])
+    expect(rankPalette(planner, 'new event', [])[0].id).toBe('cmd:new-event')
+    expect(rankPalette(planner, 'meeting', []).map((i) => i.id)).toContain('cmd:new-event')
+  })
+
   it('has the New task, Say a task, Dictate tasks, Brain dump, Ask, Make tasks, Refresh, Toggle theme and Settings actions', () => {
     expect(items.filter((i) => i.kind === 'Action').map((i) => i.title)).toEqual(['New task', 'Say a task', 'Dictate tasks', 'Brain dump', 'Ask Vicu', 'Make tasks from text', 'Refresh', 'Toggle theme', 'Settings'])
   })
