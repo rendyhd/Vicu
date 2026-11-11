@@ -178,6 +178,34 @@ export function runPlanDaySuite({ zone }: { zone: string }): void {
       expect(withoutStartReminder([kept, { relative_to: 'start_date', relative_period: 0 }])).toEqual([kept])
     })
 
+    // Contract 20.2: the day's events are busy time for the meter and the draft (desktop only, the
+    // fixture's vectors have no events; with none the vectors above are unchanged).
+    it('the meter counts the busy time of events, overlaps once', () => {
+      const ticked = [2, 1].map(byId)
+      const plain = planMeter(ticked, tasks(), options('2026-10-27'))
+      const call = planMeter(ticked, tasks(), { ...options('2026-10-27'), eventBusy: [[540, 600]] })
+      // Now is 09:10: the event takes 09:10 to 10:00.
+      expect(call.free).toBe(plain.free - 50)
+      // An event at the same time as a block takes nothing more.
+      const same = planMeter(ticked, tasks(), { ...options('2026-10-27'), eventBusy: [[660, 720]] })
+      expect(same.free).toBe(plain.free)
+    })
+
+    it('the draft places nothing over a busy event', () => {
+      const ticked = [2, 1, 5, 4, 7].map(byId)
+      const draft = draftBlocks(ticked, tasks(), { ...options('2026-10-27'), eventBusy: [[540, 600]] })
+      expect(draft.placed.map((block) => [block.id, block.start, block.end])).toEqual([
+        [2, 600, 630],
+        [1, 630, 660],
+        [5, 720, 750],
+        [4, 750, 780],
+        [7, 780, 810],
+      ])
+      // The assistant's start inside the event does not fit and is laid out like the rest.
+      const asked = draftBlocks([byId(4)], tasks(), { ...options('2026-10-27'), eventBusy: [[540, 600]], starts: [[4, 570]] })
+      expect(asked.placed.map((block) => [block.id, block.start, block.end])).toEqual([[4, 600, 630]])
+    })
+
     it('clock text and minutes agree for the request', () => {
       expect(clockText(555)).toBe('09:15')
     })

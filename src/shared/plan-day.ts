@@ -143,6 +143,20 @@ export interface DraftChoices {
   starts?: readonly (readonly [number, number])[]
   /** Why a block sits there, by task. */
   reasons?: ReadonlyMap<number, string>
+  /**
+   * Busy time of the day's events (contract 20.2): your Events and the connected calendars that
+   * count, as minutes from the day's midnight. Left out: none.
+   */
+  eventBusy?: readonly BusyRange[]
+}
+
+/** The day's busy time before the draft: its open blocks (16.6) and its events (20.2). */
+export function dayBusy(
+  dayTasks: readonly (BlockFields & { done?: boolean })[],
+  day: LocalDate,
+  eventBusy: readonly BusyRange[] = [],
+): BusyRange[] {
+  return [...busyOfDay(dayTasks, day), ...eventBusy]
 }
 
 /** The ticked tasks that need a time: no block on the day, not kept without one. */
@@ -163,7 +177,7 @@ export function planMeter<T extends PlanSessionTask>(
   dayTasks: readonly (BlockFields & { done?: boolean })[],
   options: { now: Date; day: LocalDate; hours: PlannerHours; defaultLength: number } & DraftChoices,
 ): PlanMeter {
-  const free = freeMinutes(options.now, options.day, options.hours, busyOfDay(dayTasks, options.day))
+  const free = freeMinutes(options.now, options.day, options.hours, dayBusy(dayTasks, options.day, options.eventBusy))
   const toPlace = tasksToPlace(ticked, options.day, options.keep).reduce((sum, task) => {
     const pin = options.pins?.get(task.id)
     return sum + (pin ? pin[1] - pin[0] : (options.lengths?.get(task.id) ?? options.defaultLength))
@@ -188,8 +202,8 @@ export interface PlanDraft {
 }
 
 /**
- * The draft: blocks placed by hand first, counted as busy; then the assistant's starts that still
- * fit, in its order; then the rest take the next free slot in Fit order. It is laid out again from
+ * The draft: blocks placed by hand first, counted as busy (with the day's blocks and events); then
+ * the assistant's starts that still fit, in its order; then the rest take the next free slot in Fit order. It is laid out again from
  * these inputs whenever one changes, with no new request.
  */
 export function draftBlocks<T extends PlanSessionTask>(
@@ -197,10 +211,10 @@ export function draftBlocks<T extends PlanSessionTask>(
   dayTasks: readonly (BlockFields & { done?: boolean })[],
   options: { now: Date; day: LocalDate; hours: PlannerHours; defaultLength: number } & DraftChoices,
 ): PlanDraft {
-  const { now, day, hours, defaultLength, lengths, pins, keep, starts, reasons } = options
+  const { now, day, hours, defaultLength, lengths, pins, keep, starts, reasons, eventBusy } = options
   const place = tasksToPlace(ticked, day, keep)
   const lengthOf = (task: T) => lengths?.get(task.id) ?? defaultLength
-  const busy: BusyRange[] = [...busyOfDay(dayTasks, day)]
+  const busy: BusyRange[] = dayBusy(dayTasks, day, eventBusy)
   const placed: DraftBlock[] = []
   const done = new Set<number>()
 

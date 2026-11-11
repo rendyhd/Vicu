@@ -17,6 +17,8 @@ export function useCalendarEvents(days: readonly LocalDate[]): {
   feeds: CalendarFeedView[]
   colorOf: (calendarId: string) => string | undefined
   countsAsBusy: (calendarId: string) => boolean
+  /** A read is running: free time from it may still change. */
+  isFetching: boolean
 } {
   const from = days.length ? startOfLocalDay(days[0]).toISOString() : ''
   const to = days.length ? startOfLocalDay(addLocalDays(days[days.length - 1], 1)).toISOString() : ''
@@ -36,8 +38,9 @@ export function useCalendarEvents(days: readonly LocalDate[]): {
       feeds,
       colorOf: (id: string) => byId.get(id)?.color,
       countsAsBusy: (id: string) => byId.get(id)?.countsAsBusy !== false,
+      isFetching: query.isFetching,
     }
-  }, [query.data])
+  }, [query.data, query.isFetching])
 }
 
 export function useCalendarFeeds() {

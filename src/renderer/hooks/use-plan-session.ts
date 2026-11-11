@@ -8,15 +8,17 @@ import { useProjectTasks } from './use-project-tasks'
 import { useTasks } from './use-tasks'
 import { useCompleteTask, useUncompleteTask, useUpdateTask } from './use-task-mutations'
 import { usePlanSuggestions } from './use-plan-suggestions'
+import { usePlanBusy } from './use-plan-busy'
 import { NULL_DATE } from '@/lib/constants'
 import type { Task, TaskQueryParams } from '@/lib/vikunja-types'
 import { addLocalDays, startOfLocalDay, toLocalDate, type LocalDate } from '../../shared/due-dates'
-import { blockOf, busyOfDay, atClock, freeRanges, minutesOfDay, clockMinutes, type BlockChanges } from '../../shared/time-blocks'
+import { blockOf, atClock, freeRanges, minutesOfDay, clockMinutes, type BlockChanges } from '../../shared/time-blocks'
 import {
   PROJECT_GROUP_MAX,
   acceptChanges,
   canWaitChanges,
   comingUpTasks,
+  dayBusy,
   draftBlocks,
   inboxCandidates,
   leftoverChanges,
@@ -100,6 +102,10 @@ export function usePlanSession() {
   const upcoming = useTasks(upcomingParams)
   const pickedProject = useProjectTasks(projectId ?? undefined)
   const routines = usePlanRoutines(days)
+  // The day's events (contract 20.2): drawn on the timeline and busy time for the meter, the draft
+  // and the free time the assistant gets. Never their titles.
+  const busy = usePlanBusy(days)
+  const eventBusy = useMemo(() => busy.eventBusyOn(day), [busy, day])
 
   const leftovers = useMemo(() => leftoversQueue(leftoverQuery.data.filter(canChange), now), [leftoverQuery.data, canChange, today])
   const onDay = useMemo(() => onDayTasks(range.tasks.filter(canChange), day, now), [range.tasks, canChange, day, today])
@@ -121,7 +127,7 @@ export function usePlanSession() {
   const assistantReady = ready.ask
   const assistantActive = assistantReady && assistantOn
   // Fresh, not only there: a copy saved earlier would give the model a free time that has changed.
-  const dataReady = !range.isFetching && !leftoverQuery.isFetching && !upcoming.isFetching
+  const dataReady = !range.isFetching && !leftoverQuery.isFetching && !upcoming.isFetching && !busy.isFetching
   const suggestions = usePlanSuggestions({
     enabled: assistantActive,
     dataReady,
@@ -130,7 +136,7 @@ export function usePlanSession() {
       day,
       defaultLength: prefs.defaultLength,
       hours: prefs.hours,
-      free: freeRanges(new Date(), day, prefs.hours, busyOfDay(range.tasks, day)),
+      free: freeRanges(new Date(), day, prefs.hours, dayBusy(range.tasks, day, eventBusy)),
       routineMinutes: routines.map((routine) => routine.minute),
       leftovers,
       candidates: [...onDay, ...inboxTasks, ...comingUp],
@@ -167,6 +173,7 @@ export function usePlanSession() {
     lengths: mergedLengths,
     pins,
     keep,
+    eventBusy,
   }
   const meter = planMeter(chosen, range.tasks, choices)
 
@@ -404,6 +411,11 @@ export function usePlanSession() {
     nudgeTime: config?.planner_nudge ?? '21:30',
     range,
     routines,
+    events: busy.events,
+    planEvents: busy.planEvents,
+    feeds: busy.feeds,
+    eventColor: busy.eventColor,
+    eventBusy,
     timelineTasks,
     timelineChange,
     dashedIds,
