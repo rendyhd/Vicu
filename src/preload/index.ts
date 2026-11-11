@@ -328,6 +328,13 @@ const api = {
     oauthCancel: () => ipcRenderer.invoke('calendar:oauth-cancel'),
     oauthReconnect: (connectionId: string) => ipcRenderer.invoke('calendar:oauth-reconnect', connectionId),
     importFile: () => ipcRenderer.invoke('calendar:import-file'),
+    // The Mac's calendars (EventKit), macOS only.
+    eventkit: {
+      status: () => ipcRenderer.invoke('calendar:eventkit-status'),
+      discover: () => ipcRenderer.invoke('calendar:eventkit-discover'),
+      save: (input: { shown: string[]; busyOnly?: boolean }) => ipcRenderer.invoke('calendar:eventkit-save', input),
+      openSettings: () => ipcRenderer.invoke('calendar:eventkit-open-settings'),
+    },
     onChanged: (cb: () => void) => {
       const handler = () => cb()
       ipcRenderer.on('calendar-changed', handler)

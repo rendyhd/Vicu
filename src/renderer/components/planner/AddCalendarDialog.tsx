@@ -5,6 +5,7 @@ import { Button } from '@/components/shared/Button'
 import { Checkbox } from '@/components/shared/Checkbox'
 import { cn } from '@/lib/cn'
 import { useCalendarActions } from '@/hooks/use-calendar-events'
+import { isMacPlatform, MacCalendarsForm } from './MacCalendarsForm'
 import { CALDAV_PRESETS, caldavPreset, type CaldavDraft, type CaldavPresetId } from '../../../shared/calendar-sources'
 import { CALENDAR_ACCOUNT_PROVIDERS } from '../../../shared/calendar-accounts'
 import { OAuthAccountForm } from './OAuthAccountForm'
@@ -14,7 +15,7 @@ import { PickCalendars } from './PickCalendars'
 // account. The link, the password and the tokens stay in the main process and are never read back;
 // nothing is saved until the calendar was read (a link) or the calendars were picked (an account).
 
-type Kind = 'link' | 'account' | 'microsoft' | 'google'
+type Kind = 'link' | 'account' | 'microsoft' | 'google' | 'mac'
 
 /** The kinds the dialog offers, in order. */
 const KINDS: { value: Kind; label: string; summary: string }[] = [
@@ -22,7 +23,16 @@ const KINDS: { value: Kind; label: string; summary: string }[] = [
   { value: 'account', label: 'CalDAV account', summary: 'iCloud, Fastmail, Nextcloud and other CalDAV servers. Pick which calendars to show.' },
   { value: 'microsoft', label: CALENDAR_ACCOUNT_PROVIDERS.microsoft.label, summary: CALENDAR_ACCOUNT_PROVIDERS.microsoft.summary },
   { value: 'google', label: CALENDAR_ACCOUNT_PROVIDERS.google.label, summary: CALENDAR_ACCOUNT_PROVIDERS.google.summary },
+  {
+    value: 'mac',
+    label: 'Mac calendars',
+    summary:
+      'The calendars in macOS Calendar: iCloud, Google, Exchange and every account in System Settings, Internet Accounts. No sign-in in Vicu; they stay on this Mac.',
+  },
 ]
+
+/** The kinds offered on this computer: Mac calendars only on macOS. */
+const kindsHere = () => KINDS.filter((k) => k.value !== 'mac' || isMacPlatform())
 
 const INPUT =
   'w-full rounded-control border border-border bg-transparent px-2 py-1 text-meta text-text placeholder:text-text-secondary'
@@ -247,11 +257,12 @@ export function AddCalendarDialog({ open, onClose }: { open: boolean; onClose: (
     <Dialog open={open} onClose={onClose} labelledBy={titleId} className="w-[460px] max-w-[92vw]">
       <div className="space-y-3 p-5" data-calendar-dialog>
         <h2 id={titleId} className="text-card-title font-semibold text-text">Add a calendar</h2>
-        <Segmented label="Kind of calendar" value={kind} data="kind" options={KINDS} onChange={setKind} />
+        <Segmented label="Kind of calendar" value={kind} data="kind" options={kindsHere()} onChange={setKind} />
         <p className="text-caption text-text-secondary">{KINDS.find((k) => k.value === kind)?.summary}</p>
         {kind === 'link' && <LinkForm onDone={onClose} onCancel={onClose} />}
         {kind === 'account' && <AccountForm onDone={onClose} onCancel={onClose} />}
         {(kind === 'microsoft' || kind === 'google') && <OAuthAccountForm key={kind} provider={kind} onDone={onClose} onCancel={onClose} />}
+        {kind === 'mac' && <MacCalendarsForm onDone={onClose} onCancel={onClose} />}
       </div>
     </Dialog>
   )

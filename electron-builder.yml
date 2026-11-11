@@ -72,6 +72,11 @@ mac:
     # Voice input (docs/voice-input.md): asked for on the first hold of + or the voice shortcut.
     NSMicrophoneUsageDescription: "Vicu listens while you hold + or the voice shortcut, to turn what you say into a task."
     NSSpeechRecognitionUsageDescription: "Vicu turns what you say into a task. Speech is recognized on this Mac when your language allows it."
+    # The Mac's calendars on the Plan screen (docs/calendar-plan.md 2d): asked for when they are
+    # added. The helper (resources/calendar/vicu-calendar-macos, signed with the app through
+    # extraResources) asks; macOS attributes it to Vicu and shows these strings.
+    NSCalendarsFullAccessUsageDescription: "Vicu shows the events of your calendars on the Plan screen and counts them as busy time. It only reads them, never changes them, and they stay on this Mac."
+    NSCalendarsUsageDescription: "Vicu shows the events of your calendars on the Plan screen and counts them as busy time. It only reads them, never changes them, and they stay on this Mac."
 
 linux:
   icon: build/icon.png

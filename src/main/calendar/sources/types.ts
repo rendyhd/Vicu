@@ -3,7 +3,8 @@
 // (../store.ts), the per-calendar choices, the last good copy on disk (../cache.ts), Busy only, the
 // 5-minute rule, the limits, the IPC. A kind only knows how to reach its calendars.
 //
-// To add a kind (such as 'eventkit' on macOS):
+// The kinds built: ics-link.ts, caldav.ts, microsoft.ts and google.ts (on oauth-account.ts), and
+// eventkit.ts (macOS only, through ../eventkit.ts and its helper). To add a kind:
 //   1. Add its name to `CalendarSourceKind` in src/shared/calendar-sources.ts.
 //   2. Write `sources/<kind>.ts` exporting a `CalendarSource<YourConfig>`:
 //      - `parseConfig`: read back the config the store unsealed; null when unusable.
@@ -16,7 +17,9 @@
 //        so (ETag, sync token): nothing is parsed or written then.
 //      - `disconnect` (optional): revoke a token when the connection is removed.
 //   3. Register it in SOURCES in ../service.ts and give the add dialog its form
-//      (src/renderer/components/planner/CalendarFeeds.tsx) and an IPC call in the preload.
+//      (src/renderer/components/planner/AddCalendarDialog.tsx: its KINDS) and an IPC call in the
+//      preload. A kind with a sign-in returns a draft (saveDraft) and its calendars are picked with
+//      PickCalendars.tsx and calendar:caldav-save.
 //   Secrets: everything in the config is sealed by the store with safeStorage, so put the password
 //   or token there and nowhere else; `read` can return a changed config (a refreshed token) and the
 //   store seals it again. Never put a secret in a message: throw CalendarReadError with a sentence.

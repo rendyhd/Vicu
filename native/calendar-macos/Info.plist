@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleIdentifier</key>
+    <string>com.rendyhd.vicu.calendar</string>
+    <key>CFBundleName</key>
+    <string>Vicu Calendar</string>
+    <key>NSCalendarsFullAccessUsageDescription</key>
+    <string>Vicu shows the events of your calendars on the Plan screen and counts them as busy time. It only reads them, never changes them, and they stay on this Mac.</string>
+    <key>NSCalendarsUsageDescription</key>
+    <string>Vicu shows the events of your calendars on the Plan screen and counts them as busy time. It only reads them, never changes them, and they stay on this Mac.</string>
+</dict>
+</plist>
