@@ -1,12 +1,21 @@
 import { useState } from 'react'
-import { RefreshCw, Trash2 } from 'lucide-react'
+import { useNavigate } from '@tanstack/react-router'
+import { Check, ChevronDown, Plus, RefreshCw, Trash2 } from 'lucide-react'
 import { Button } from '@/components/shared/Button'
 import { Checkbox } from '@/components/shared/Checkbox'
-import { useCalendarFeedActions, useCalendarFeeds } from '@/hooks/use-calendar-events'
+import { cn } from '@/lib/cn'
+import { useCalendarActions, useCalendarSources } from '@/hooks/use-calendar-events'
 import { usePlanEventActions, usePlanEvents } from '@/hooks/use-plan-events'
 import { formatLength } from '@/lib/planner-timeline'
-import type { CalendarFeedView } from '../../../shared/calendar-events'
+import { CALENDAR_COLOR_NAMES, CALENDAR_COLORS, type CalendarFeedView } from '../../../shared/calendar-events'
+import type { CalendarConnectionView, CalendarSecretLevel } from '../../../shared/calendar-sources'
 import { MY_EVENTS_COLOR, repeatText, type ListedEvent } from '../../../shared/plan-events'
+import { AddCalendarDialog } from './AddCalendarDialog'
+
+// Events and connected calendars (contract 20.3, 20.9) in Settings, General, Plan. The Plan screen's
+// gear shows a summary with Manage, which opens them here.
+
+const ICON_BUTTON = 'flex h-6 w-6 shrink-0 items-center justify-center rounded-control text-text-secondary hover:bg-bg-hover'
 
 /** Your own Events, to look over and delete; they are added and changed on the timeline. */
 function MyEvents() {
@@ -30,12 +39,7 @@ function MyEvents() {
                   {repeatText(event.repeat)} · {event.time === null ? 'all day' : `${event.time}, ${formatLength(event.minutes)}`}
                 </span>
               </span>
-              <button
-                type="button"
-                aria-label={`Delete ${event.title}`}
-                onClick={() => void actions.remove(event)}
-                className="flex h-6 w-6 shrink-0 items-center justify-center rounded-control text-text-secondary hover:bg-bg-hover"
-              >
+              <button type="button" aria-label={`Delete ${event.title}`} onClick={() => void actions.remove(event)} className={ICON_BUTTON}>
                 <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
               </button>
             </li>
@@ -46,142 +50,254 @@ function MyEvents() {
   )
 }
 
-/** "just now", "4 min ago", "2 h ago". */
-function updatedText(iso?: string): string {
-  if (!iso) return 'Not read yet'
-  const minutes = Math.round((Date.now() - new Date(iso).getTime()) / 60_000)
-  if (minutes < 1) return 'Updated just now'
-  if (minutes < 60) return `Updated ${minutes} min ago`
-  return `Updated ${Math.round(minutes / 60)} h ago`
+function clock(iso: string): string {
+  const date = new Date(iso)
+  const today = new Date()
+  const time = date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+  if (date.toDateString() === today.toDateString()) return time
+  return `${date.toLocaleDateString([], { month: 'short', day: 'numeric' })}, ${time}`
 }
 
-function FeedRow({ feed }: { feed: CalendarFeedView }) {
-  const { update, remove } = useCalendarFeedActions()
-  const set = (patch: Parameters<typeof update.mutate>[0]['patch']) => update.mutate({ id: feed.id, patch })
+/** "Updated 4 min ago"; with an error, "Not updated since 10:42" and why (20.9). */
+export function calendarStatus(feed: Pick<CalendarFeedView, 'enabled' | 'fetchedAt' | 'error'>, now = Date.now()): { text: string; problem: boolean } {
+  if (feed.error) {
+    return { text: feed.fetchedAt ? `Not updated since ${clock(feed.fetchedAt)}. ${feed.error}` : feed.error, problem: true }
+  }
+  if (!feed.enabled) return { text: 'Not shown', problem: false }
+  if (!feed.fetchedAt) return { text: 'Not read yet', problem: false }
+  const minutes = Math.round((now - new Date(feed.fetchedAt).getTime()) / 60_000)
+  if (minutes < 1) return { text: 'Updated just now', problem: false }
+  if (minutes < 60) return { text: `Updated ${minutes} min ago`, problem: false }
+  return { text: `Updated at ${clock(feed.fetchedAt)}`, problem: false }
+}
+
+function StorageNotice({ level }: { level: CalendarSecretLevel }) {
+  if (level === 'encrypted') return null
   return (
-    <li data-calendar-feed={feed.id} className="rounded-control border border-border p-2">
+    <p role="note" data-calendar-storage={level} className="mt-2 rounded-control border border-status-today/40 bg-status-today/10 px-2.5 py-1.5 text-caption text-text-secondary">
+      {level === 'obfuscated'
+        ? 'This system has no keyring Vicu uses, so calendar links and passwords are only obscured on disk, not encrypted. Anyone who can read your user profile can recover them.'
+        : 'This system offers Vicu no secure storage, so calendar links and passwords are saved as plain text, protected only by the file’s permissions.'}
+    </p>
+  )
+}
+
+function ColorChoice({ feed }: { feed: CalendarFeedView }) {
+  const { update } = useCalendarActions()
+  return (
+    <div role="radiogroup" aria-label={`Colour of ${feed.name}`} className="flex gap-1.5">
+      {CALENDAR_COLORS.map((color, index) => (
+        <button
+          key={color}
+          type="button"
+          role="radio"
+          aria-checked={feed.color === color}
+          aria-label={CALENDAR_COLOR_NAMES[index]}
+          data-calendar-color={color}
+          onClick={() => update.mutate({ id: feed.id, patch: { color } })}
+          // The colour is the calendar's own choice, kept in forced colours too; the tick says which.
+          className={cn(
+            'flex h-5 w-5 items-center justify-center rounded-full border-2 forced-color-adjust-none',
+            feed.color === color ? 'border-text' : 'border-transparent hover:border-border',
+          )}
+          style={{ backgroundColor: color }}
+        >
+          {feed.color === color && <Check className="h-3 w-3 text-white" strokeWidth={3} aria-hidden="true" />}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+function CalendarRow({ feed, onRemove }: { feed: CalendarFeedView; onRemove?: () => void }) {
+  const { update } = useCalendarActions()
+  const [open, setOpen] = useState(false)
+  const [name, setName] = useState(feed.name)
+  const set = (patch: Parameters<typeof update.mutate>[0]['patch']) => update.mutate({ id: feed.id, patch })
+  const status = calendarStatus(feed)
+  const commitName = () => {
+    const trimmed = name.trim()
+    if (trimmed && trimmed !== feed.name) set({ name: trimmed })
+    else setName(feed.name)
+  }
+
+  return (
+    <li data-calendar-feed={feed.id} className="rounded-control border border-border px-2 py-1.5">
       <div className="flex items-center gap-2">
-        <span aria-hidden="true" className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: feed.color }} />
-        <span className="min-w-0 flex-1 truncate text-meta font-medium text-text">{feed.name}</span>
+        <Checkbox
+          checked={feed.enabled}
+          aria-label={`Show ${feed.name}`}
+          data-calendar-shown
+          onChange={(event) => set({ enabled: event.target.checked })}
+        />
+        <span aria-hidden="true" className="h-2.5 w-2.5 shrink-0 rounded-full forced-color-adjust-none" style={{ backgroundColor: feed.color }} />
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-meta font-medium text-text" data-calendar-feed-name>{feed.name}</span>
+          <span className={cn('block text-caption', status.problem ? 'text-status-overdue' : 'text-text-secondary')} data-calendar-status>
+            {status.text}
+            {feed.warning && !status.problem ? ` ${feed.warning}` : ''}
+          </span>
+        </span>
         <button
           type="button"
-          aria-label={`Remove ${feed.name}`}
-          onClick={() => remove.mutate(feed.id)}
-          className="flex h-6 w-6 items-center justify-center rounded-control text-text-secondary hover:bg-bg-hover"
+          aria-label={`Options for ${feed.name}`}
+          aria-expanded={open}
+          data-calendar-options
+          onClick={() => setOpen((value) => !value)}
+          className={ICON_BUTTON}
         >
-          <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+          <ChevronDown className={cn('h-3.5 w-3.5 transition-transform duration-fade-fast', open && 'rotate-180')} aria-hidden="true" />
         </button>
       </div>
-      <p className={feed.error ? 'mt-0.5 text-caption text-status-overdue' : 'mt-0.5 text-caption text-text-secondary'}>
-        {feed.error ?? updatedText(feed.fetchedAt)}
-      </p>
-      <div className="mt-1.5 flex flex-col gap-1">
-        <label className="flex cursor-pointer items-center gap-2">
-          <Checkbox checked={feed.enabled} onChange={(event) => set({ enabled: event.target.checked })} />
-          <span className="text-meta text-text">Show on the timeline</span>
-        </label>
-        <label className="flex cursor-pointer items-center gap-2">
-          <Checkbox checked={feed.countsAsBusy} onChange={(event) => set({ countsAsBusy: event.target.checked })} />
-          <span className="text-meta text-text">Counts as busy time</span>
-        </label>
-        <label className="flex cursor-pointer items-center gap-2">
-          <Checkbox checked={feed.busyOnly} onChange={(event) => set({ busyOnly: event.target.checked })} />
-          <span className="text-meta text-text">Show only "Busy", not titles</span>
-        </label>
-      </div>
+      {open && (
+        <div className="mt-2 space-y-2 border-t border-border pb-1 pl-[26px] pt-2">
+          <input
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            onBlur={commitName}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                event.preventDefault()
+                commitName()
+              }
+            }}
+            aria-label="Calendar name"
+            data-calendar-rename
+            className="w-full rounded-control border border-border bg-transparent px-2 py-1 text-meta text-text"
+          />
+          <ColorChoice feed={feed} />
+          <label className="flex cursor-pointer items-center gap-2">
+            <Checkbox checked={feed.countsAsBusy} onChange={(event) => set({ countsAsBusy: event.target.checked })} />
+            <span className="text-meta text-text">Counts as busy time</span>
+          </label>
+          <label className="flex cursor-pointer items-center gap-2">
+            <Checkbox checked={feed.busyOnly} data-calendar-busy-toggle onChange={(event) => set({ busyOnly: event.target.checked })} />
+            <span className="text-meta text-text">Show only &ldquo;Busy&rdquo;, not titles</span>
+          </label>
+          {onRemove && (
+            <Button variant="quiet" danger onClick={onRemove} data-calendar-remove>
+              <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+              Remove calendar
+            </Button>
+          )}
+        </div>
+      )}
     </li>
   )
 }
 
-/**
- * Calendars on the timeline (proof of concept): secret ICS links, read on this device only.
- * Shared by the Plan screen's gear and Settings, through PlannerOptions.
- */
-export function CalendarFeeds() {
-  const feeds = useCalendarFeeds()
-  const { add, refresh } = useCalendarFeedActions()
-  const [name, setName] = useState('')
-  const [url, setUrl] = useState('')
-  const [busyOnly, setBusyOnly] = useState(false)
-  const list = feeds.data ?? []
-
-  const submit = (event: React.FormEvent) => {
-    event.preventDefault()
-    if (!url.trim()) return
-    add.mutate(
-      { name: name.trim() || 'Calendar', url, busyOnly },
-      {
-        onSuccess: () => {
-          setName('')
-          setUrl('')
-          setBusyOnly(false)
-        },
-      },
-    )
+function ConnectionBlock({ connection }: { connection: CalendarConnectionView }) {
+  const { remove, refresh } = useCalendarActions()
+  if (connection.kind === 'ics') {
+    const feed = connection.calendars[0]
+    if (!feed) return null
+    return <CalendarRow feed={feed} onRemove={() => remove.mutate(connection.id)} />
   }
+  return (
+    <li data-calendar-connection={connection.id} className="rounded-control border border-border px-2 py-1.5">
+      <div className="flex items-center gap-2">
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-meta font-medium text-text">{connection.name}</span>
+          <span className="block truncate text-caption text-text-secondary">{connection.detail}</span>
+        </span>
+        <button
+          type="button"
+          aria-label={`Read ${connection.name} again`}
+          onClick={() => refresh.mutate(connection.id)}
+          disabled={refresh.isPending}
+          className={ICON_BUTTON}
+        >
+          <RefreshCw className={cn('h-3.5 w-3.5', refresh.isPending && 'animate-spin')} aria-hidden="true" />
+        </button>
+        <button type="button" aria-label={`Remove ${connection.name}`} onClick={() => remove.mutate(connection.id)} data-calendar-remove-account className={ICON_BUTTON}>
+          <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+        </button>
+      </div>
+      {connection.error && <p className="mt-0.5 text-caption text-status-overdue">{connection.error}</p>}
+      <ul className="mt-1.5 space-y-1">
+        {connection.calendars.map((feed) => (
+          <CalendarRow key={feed.id} feed={feed} />
+        ))}
+      </ul>
+    </li>
+  )
+}
+
+/** The gear's short version: what is connected and how it is doing, and Manage. */
+function CalendarSummary() {
+  const navigate = useNavigate()
+  const { events } = usePlanEvents()
+  const sources = useCalendarSources()
+  const feeds = (sources.data?.connections ?? []).flatMap((connection) => connection.calendars)
+  const shown = feeds.filter((feed) => feed.enabled)
+  const failing = feeds.filter((feed) => feed.error)
+  const parts = [
+    events.length === 1 ? '1 Event' : `${events.length} Events`,
+    shown.length === 1 ? '1 calendar shown' : `${shown.length} calendars shown`,
+  ]
+  return (
+    <div data-calendar-summary>
+      <p className="text-meta font-medium text-text">Events and calendars</p>
+      <p className="mt-1 text-caption text-text-secondary">{parts.join(', ')}.</p>
+      {failing.length > 0 && (
+        <p className="mt-1 text-caption text-status-overdue">
+          {failing.length === 1 ? `${failing[0].name} could not be read.` : `${failing.length} calendars could not be read.`}
+        </p>
+      )}
+      <Button variant="secondary" className="mt-2" data-calendar-manage onClick={() => void navigate({ to: '/settings', search: { section: 'calendars' } })}>
+        Manage
+      </Button>
+    </div>
+  )
+}
+
+/**
+ * Your Events and the connected calendars. In Settings the whole list; in the Plan screen's gear
+ * (`summary`) a line and Manage, so the gear stays short.
+ */
+export function CalendarFeeds({ summary = false }: { summary?: boolean }) {
+  const sources = useCalendarSources()
+  const { refresh } = useCalendarActions()
+  const [adding, setAdding] = useState(false)
+  if (summary) return <CalendarSummary />
+  const connections = sources.data?.connections ?? []
 
   return (
     <div data-calendar-feeds>
       <MyEvents />
       <div className="flex items-center gap-2 border-t border-border pt-3">
         <p className="flex-1 text-meta font-medium text-text">Calendars</p>
-        {list.length > 0 && (
+        {connections.length > 0 && (
           <button
             type="button"
             aria-label="Read the calendars again"
-            onClick={() => refresh.mutate()}
-            className="flex h-6 w-6 items-center justify-center rounded-control text-text-secondary hover:bg-bg-hover"
+            data-calendar-refresh
+            onClick={() => refresh.mutate(undefined)}
+            disabled={refresh.isPending}
+            className={ICON_BUTTON}
           >
-            <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
+            <RefreshCw className={cn('h-3.5 w-3.5', refresh.isPending && 'animate-spin')} aria-hidden="true" />
           </button>
         )}
       </div>
       <p className="mt-1 text-caption text-text-secondary">
-        Events show on the timeline and count as busy time. Read on this device only and never changed. A preview.
+        Their events show on the timeline and count as busy time. Read on this device only, never changed.
       </p>
+      {sources.data && <StorageNotice level={sources.data.storage} />}
 
-      {list.length > 0 && (
+      {connections.length > 0 && (
         <ul className="mt-2 space-y-1.5">
-          {list.map((feed) => (
-            <FeedRow key={feed.id} feed={feed} />
+          {connections.map((connection) => (
+            <ConnectionBlock key={connection.id} connection={connection} />
           ))}
         </ul>
       )}
 
-      <form onSubmit={submit} className="mt-2 space-y-1.5">
-        <input
-          value={name}
-          onChange={(event) => setName(event.target.value)}
-          placeholder="Name, such as Work"
-          aria-label="Calendar name"
-          data-calendar-name
-          className="w-full rounded-control border border-border bg-transparent px-2 py-1 text-meta text-text placeholder:text-text-secondary"
-        />
-        <input
-          value={url}
-          onChange={(event) => setUrl(event.target.value)}
-          placeholder="Calendar link (https:// or webcal://)"
-          aria-label="Calendar link"
-          data-calendar-url
-          spellCheck={false}
-          className="w-full rounded-control border border-border bg-transparent px-2 py-1 text-meta text-text placeholder:text-text-secondary"
-        />
-        <label className="flex cursor-pointer items-center gap-2">
-          <Checkbox checked={busyOnly} onChange={(event) => setBusyOnly(event.target.checked)} />
-          <span className="text-meta text-text">Show only "Busy", not titles</span>
-        </label>
-        <div className="flex items-center gap-2">
-          <Button type="submit" variant="secondary" disabled={!url.trim() || add.isPending} data-calendar-add>
-            {add.isPending ? 'Reading...' : 'Add calendar'}
-          </Button>
-        </div>
-        {add.error && <p className="text-caption text-status-overdue">{(add.error as Error).message}</p>}
-      </form>
-      <p className="mt-2 text-caption text-text-secondary">
-        Use the calendar's secret iCal address: Google, a calendar's settings, "Secret address in iCal format"; Outlook,
-        Settings, Calendar, Shared calendars, Publish; Proton, Share via link. Anyone with the link can read the calendar,
-        so for a work calendar check that your organisation allows publishing it.
-      </p>
+      <Button variant="secondary" className="mt-2" onClick={() => setAdding(true)} data-calendar-open-add>
+        <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+        Add calendar
+      </Button>
+      <AddCalendarDialog open={adding} onClose={() => setAdding(false)} />
     </div>
   )
 }

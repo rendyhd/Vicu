@@ -555,7 +555,7 @@ function PlanScreen() {
               onClose={() => setGearOpen(false)}
               className="w-80 p-3"
             >
-              <PlannerOptions />
+              <PlannerOptions compact />
               <div className="mt-3 border-t border-border pt-3">
                 <Button
                   variant="secondary"

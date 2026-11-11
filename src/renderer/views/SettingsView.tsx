@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { useNavigate, useRouter } from '@tanstack/react-router'
+import { useNavigate, useRouter, useSearch } from '@tanstack/react-router'
 import { api, type VikunjaUser } from '@/lib/api'
 import { APP_CONFIG_QUERY_KEY } from '@/hooks/use-app-config'
 import { cn } from '@/lib/cn'
@@ -42,6 +42,7 @@ export function SettingsView() {
   const navigate = useNavigate()
   const router = useRouter()
   const [activeTab, setActiveTab] = useState<SettingsTab>('general')
+  const { section } = useSearch({ from: '/settings' })
   const [url, setUrl] = useState('')
   const [token, setToken] = useState('')
   // The token itself never reaches this page: only whether one is saved, so Test Connection can use it.
@@ -64,6 +65,22 @@ export function SettingsView() {
 
   // Config as loaded, plus the edits made here. Used to render the controls only.
   const [fullConfig, setFullConfig] = useState<AppConfig | null>(null)
+
+  // Manage in the Plan gear: the calendars of the Plan settings, once they are drawn.
+  useEffect(() => {
+    if (section !== 'calendars' || !fullConfig) return
+    setActiveTab('general')
+    const frame = requestAnimationFrame(() => {
+      const target = document.querySelector<HTMLElement>('[data-calendar-feeds]')
+      // Only the settings column scrolls: scrollIntoView would also shift the window's own layout.
+      let scroller = target?.parentElement ?? null
+      while (scroller && !(scroller.scrollHeight > scroller.clientHeight && /(auto|scroll)/.test(getComputedStyle(scroller).overflowY))) {
+        scroller = scroller.parentElement
+      }
+      if (target && scroller) scroller.scrollTop += target.getBoundingClientRect().top - scroller.getBoundingClientRect().top - 16
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [section, fullConfig])
   const configLoadedRef = useRef(false)
 
   // Auto-save with debounce. Only the keys edited since the last save are sent: main

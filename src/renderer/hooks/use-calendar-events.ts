@@ -1,16 +1,27 @@
-import { useMemo } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useEffect, useMemo } from 'react'
+import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { addLocalDays, startOfLocalDay, type LocalDate } from '../../shared/due-dates'
 import type { CalendarEvent, CalendarEventsResult, CalendarFeedView } from '../../shared/calendar-events'
+import type { AddCalendarLinkInput, CaldavDiscoverInput, CaldavSaveInput, CalendarSourcesView } from '../../shared/calendar-sources'
 
-// Calendars on the Plan screen (proof of concept). Main reads the feeds; this asks for the days on
-// screen and the connected calendars. Not in query-persistence's allowlist, so never saved to
-// IndexedDB: events stay in main's memory.
+// Connected calendars on the Plan screen (contract 20.9). Main reads them; this asks for the days on
+// screen and the connections. Not in query-persistence's allowlist, so never saved to IndexedDB:
+// events stay in main (its memory and its encrypted last good copy).
+//
+// When they are read again: main reads a calendar at most every 5 minutes when asked. This asks on
+// view, every 5 minutes, on window focus, when main says a background read brought something new
+// (`calendar-changed`), and on a manual refresh (F5, Mod+R, the palette), which forces a read.
 
-const EVENTS_KEY = 'calendar-events'
-const FEEDS_KEY = 'calendar-feeds'
+export const CALENDAR_EVENTS_KEY = 'calendar-events'
+export const CALENDAR_SOURCES_KEY = 'calendar-sources'
 
 const EMPTY: CalendarEvent[] = []
+
+/** Ask every view of calendars to read again (main decides whether the servers are asked). */
+export function invalidateCalendars(client: QueryClient): void {
+  void client.invalidateQueries({ queryKey: [CALENDAR_SOURCES_KEY] })
+  void client.invalidateQueries({ queryKey: [CALENDAR_EVENTS_KEY] })
+}
 
 export function useCalendarEvents(days: readonly LocalDate[]): {
   events: CalendarEvent[]
@@ -20,16 +31,30 @@ export function useCalendarEvents(days: readonly LocalDate[]): {
   /** A read is running: free time from it may still change. */
   isFetching: boolean
 } {
+  const client = useQueryClient()
   const from = days.length ? startOfLocalDay(days[0]).toISOString() : ''
   const to = days.length ? startOfLocalDay(addLocalDays(days[days.length - 1], 1)).toISOString() : ''
   const query = useQuery<CalendarEventsResult>({
-    queryKey: [EVENTS_KEY, from, to],
+    queryKey: [CALENDAR_EVENTS_KEY, from, to],
     queryFn: () => window.api.calendar.events({ from, to }),
     enabled: days.length > 0,
     staleTime: 60_000,
     refetchInterval: 5 * 60_000,
     placeholderData: (previous) => previous,
   })
+
+  useEffect(() => {
+    // An Electron window that only loses focus never changes page visibility, so TanStack's own
+    // focus refetch never runs; main keeps its 5-minute rule.
+    const onFocus = () => void client.invalidateQueries({ queryKey: [CALENDAR_EVENTS_KEY] })
+    window.addEventListener('focus', onFocus)
+    const off = window.api.calendar.onChanged(() => invalidateCalendars(client))
+    return () => {
+      window.removeEventListener('focus', onFocus)
+      off()
+    }
+  }, [client])
+
   const feeds = query.data?.feeds ?? []
   return useMemo(() => {
     const byId = new Map(feeds.map((feed) => [feed.id, feed]))
@@ -43,24 +68,41 @@ export function useCalendarEvents(days: readonly LocalDate[]): {
   }, [query.data, query.isFetching])
 }
 
-export function useCalendarFeeds() {
-  return useQuery<CalendarFeedView[]>({
-    queryKey: [FEEDS_KEY],
+/** The connections and their calendars, for the settings. */
+export function useCalendarSources() {
+  return useQuery<CalendarSourcesView>({
+    queryKey: [CALENDAR_SOURCES_KEY],
     queryFn: () => window.api.calendar.list(),
   })
 }
 
-/** Add, change or remove a calendar; every view of events and feeds reads again. */
-export function useCalendarFeedActions() {
+/** Add, change or remove calendars; every view of events and connections reads again. */
+export function useCalendarActions() {
   const client = useQueryClient()
-  const after = (feeds?: CalendarFeedView[]) => {
-    if (feeds) client.setQueryData([FEEDS_KEY], feeds)
-    void client.invalidateQueries({ queryKey: [FEEDS_KEY] })
-    void client.invalidateQueries({ queryKey: [EVENTS_KEY] })
+  const after = (view?: CalendarSourcesView) => {
+    if (view) client.setQueryData([CALENDAR_SOURCES_KEY], view)
+    invalidateCalendars(client)
   }
   const add = useMutation({
-    mutationFn: async (input: { name: string; url: string; busyOnly?: boolean }) => {
+    mutationFn: async (input: AddCalendarLinkInput) => {
       const result = await window.api.calendar.add(input)
+      if (!result.success) throw new Error(result.error)
+      return result.data
+    },
+    onSuccess: () => after(),
+    meta: { silent: true },
+  })
+  const discover = useMutation({
+    mutationFn: async (input: CaldavDiscoverInput) => {
+      const result = await window.api.calendar.caldavDiscover(input)
+      if (!result.success) throw new Error(result.error)
+      return result.data
+    },
+    meta: { silent: true },
+  })
+  const saveAccount = useMutation({
+    mutationFn: async ({ draftId, input }: { draftId: string; input: CaldavSaveInput }) => {
+      const result = await window.api.calendar.caldavSave(draftId, input)
       if (!result.success) throw new Error(result.error)
       return result.data
     },
@@ -73,12 +115,12 @@ export function useCalendarFeedActions() {
     onSuccess: after,
   })
   const remove = useMutation({
-    mutationFn: (id: string) => window.api.calendar.remove(id),
+    mutationFn: (connectionId: string) => window.api.calendar.remove(connectionId),
     onSuccess: after,
   })
   const refresh = useMutation({
-    mutationFn: () => window.api.calendar.refresh(),
+    mutationFn: (connectionId?: string) => window.api.calendar.refresh(connectionId),
     onSuccess: after,
   })
-  return { add, update, remove, refresh }
+  return { add, discover, saveAccount, update, remove, refresh }
 }

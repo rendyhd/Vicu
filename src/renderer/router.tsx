@@ -115,6 +115,8 @@ const settingsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/settings',
   component: lazyRouteComponent(() => import('@/views/SettingsView'), 'SettingsView'),
+  // `section=calendars` opens General at the Plan settings' calendars (the Plan gear's Manage).
+  validateSearch: (search: Record<string, unknown>): { section?: 'calendars' } => (search.section === 'calendars' ? { section: 'calendars' } : {}),
 })
 
 const searchRoute = createRoute({

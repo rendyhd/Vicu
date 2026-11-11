@@ -8,8 +8,11 @@ import { isRoutinesEnabled } from '@/lib/vikunja-types'
 import { BLOCK_LENGTHS, readPlannerHours } from '../../../shared/time-blocks'
 import { CalendarFeeds } from './CalendarFeeds'
 
-/** The planner's settings, shared by the Plan screen's gear and Settings. */
-export function PlannerOptions() {
+/**
+ * The planner's settings, shared by the Plan screen's gear and Settings. In the gear (`compact`)
+ * the Events and calendars are a summary with Manage, which opens them in Settings.
+ */
+export function PlannerOptions({ compact = false }: { compact?: boolean }) {
   const prefs = usePlannerPrefs()
   const { data: config } = useAppConfig()
   const save = useSavePlannerConfig()
@@ -115,7 +118,7 @@ export function PlannerOptions() {
       )}
 
       <div className="border-t border-border pt-3">
-        <CalendarFeeds />
+        <CalendarFeeds summary={compact} />
       </div>
     </div>
   )

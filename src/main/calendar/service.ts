@@ -1,251 +1,560 @@
-// Calendars on the Plan screen (proof of concept): secret ICS links read by this device only.
+// Connected calendars on the Plan screen (contract 20.9 to 20.11), read by this device only.
 //
-// - The links are secrets (anyone with one reads the calendar), so they live in
-//   userData/calendar-feeds.json encrypted with safeStorage (a `plain:` value only where the OS
-//   offers no encryption), file mode 600. The windows never get them back.
-// - Nothing leaves the device: no Vikunja, no synced preferences, no assistant request (it only gets
-//   free time). The settings belong to this device and survive signing out.
-// - Read-only: Vicu never writes to a calendar.
-// - A feed is read again when it is older than FRESH_MS and a window asks for events, through
-//   Electron's net.fetch, which follows the system proxy.
+// The parts:
+//   sources/types.ts   what a kind of source implements, and how to add one (read it first)
+//   sources/*.ts       the kinds: a calendar link (ics-link.ts), a CalDAV account (caldav.ts)
+//   store.ts           the connections and their calendars' choices, configs sealed (calendar-feeds.json)
+//   cache.ts           the last good copy of each calendar, encrypted (calendar-cache/)
+//   ics.ts             iCalendar into occurrences, VFREEBUSY, reducing a copy to what may be kept
+//   timezones.ts       zones a file names without defining them (Windows names)
+//   http.ts            the read-only HTTP every kind uses (net.fetch, limits, the sign-in, messages)
+//
+// This file is what is the same for every kind:
+// - Calendars are read when a window asks for days and the last attempt is older than 5 minutes
+//   (20.9), at once on a manual refresh, and when a CalDAV window does not hold the days yet. A
+//   calendar with a copy answers at once from it and reads in the background; the windows hear
+//   `calendar-changed` when something new came in.
+// - Busy only (20.8): a copy is reduced before it is kept, in memory or on disk; turning it on
+//   reduces the copy at once, turning it off reads the calendar again in full.
+// - A calendar that cannot be read keeps its last good copy and says why (20.9).
+// - Secrets never reach a window, a log line or the config: the windows get CalendarSourcesView.
+// - Nothing leaves the device: no Vikunja, no synced preferences, no assistant (it gets free time).
 
-import { app, net, safeStorage } from 'electron'
-import { existsSync } from 'fs'
-import { join } from 'path'
+import { BrowserWindow, net } from 'electron'
 import { randomUUID } from 'crypto'
-import { readFileWithBackup, writeFileAtomic } from '../atomic-file'
 import { handleTrusted } from '../secure-ipc'
+import { isPlainSecret, openSecret, sealSecret, secretStorageLevel } from '../safe-storage'
 import {
-  CALENDAR_COLORS,
   busyOnlyEvent,
-  normaliseFeedUrl,
   type CalendarEvent,
   type CalendarEventsResult,
   type CalendarFeedView,
 } from '../../shared/calendar-events'
-import { occurrencesBetween, parseIcs, type ParsedFeed } from './ics'
+import type {
+  AddCalendarLinkInput,
+  CaldavDiscoverInput,
+  CaldavDraft,
+  CaldavSaveInput,
+  CalendarConnectionView,
+  CalendarSourceKind,
+  CalendarSourcesView,
+} from '../../shared/calendar-sources'
+import { calendarHttp, CalendarReadError } from './http'
+import { occurrencesBetween, parseIcsDocuments, reduceIcs, type ParsedFeed } from './ics'
+import { dropCopy, loadCopy, saveCopy } from './cache'
+import {
+  readCalendarStore,
+  takeColor,
+  writeCalendarStore,
+  type CalendarStoreState,
+  type StoredCalendar,
+  type StoredConnection,
+} from './store'
+import { caldavSource } from './sources/caldav'
+import { icsLinkSource } from './sources/ics-link'
+import type { CalendarCopy, CalendarSource, ConnectResult, ReadOutcome, RemoteCalendar, SourceContext } from './sources/types'
 
-const FRESH_MS = 5 * 60_000
-const FETCH_TIMEOUT_MS = 20_000
-const MAX_FEED_BYTES = 15 * 1024 * 1024
-const PLAIN_PREFIX = 'plain:'
-
-interface StoredFeed {
-  id: string
-  name: string
-  color: string
-  enabled: boolean
-  busyOnly: boolean
-  countsAsBusy: boolean
-  /** Encrypted link. */
-  url: string
+/** Every kind this app has built. A new kind is registered here (see sources/types.ts). */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- each kind has its own config type
+const SOURCES: Record<CalendarSourceKind, CalendarSource<any>> = {
+  ics: icsLinkSource,
+  caldav: caldavSource,
 }
 
-interface FeedState {
+/** A calendar is read at most this often unless a refresh asks (20.9). */
+export const FRESH_MS = 5 * 60_000
+/** Events of one calendar handed to a window per request at most. */
+export const MAX_RANGE_EVENTS = 2000
+/** A copy that only got "not modified" is written again at most this often (for "Not updated since"). */
+const COPY_REWRITE_MS = 60 * 60_000
+/** A signed-in CalDAV account waits this long for the user's pick. */
+const DRAFT_MS = 10 * 60_000
+const DAY = 24 * 3600_000
+
+interface CalendarState {
+  copy?: CalendarCopy
   parsed?: ParsedFeed
-  fetchedAt?: number
+  loaded?: Promise<void>
+  attemptedAt?: number
+  savedAt?: number
   error?: string
-  inFlight?: Promise<void>
+  warning?: string
+  inFlight?: Promise<boolean>
+  lastRange?: { from: Date; to: Date }
 }
 
-let feeds: StoredFeed[] | null = null
-const states = new Map<string, FeedState>()
+const states = new Map<string, CalendarState>()
+/** Unsealed configs, in this process's memory only. */
+const configs = new Map<string, unknown>()
+const connectionErrors = new Map<string, string>()
+const drafts = new Map<string, { result: ConnectResult<unknown>; expires: number }>()
 
-function filePath(): string {
-  return join(app.getPath('userData'), 'calendar-feeds.json')
+const ctx: SourceContext = {
+  http: (options) => calendarHttp({ base: (url, init) => net.fetch(url, init), ...options }),
+  now: () => Date.now(),
 }
 
-function encrypt(value: string): string {
-  try {
-    if (!safeStorage.isEncryptionAvailable()) return PLAIN_PREFIX + value
-    return safeStorage.encryptString(value).toString('base64')
-  } catch {
-    return PLAIN_PREFIX + value
+function messageOf(error: unknown): string {
+  return error instanceof CalendarReadError ? error.message : 'The calendar could not be read.'
+}
+
+function stateOf(calendarId: string): CalendarState {
+  let state = states.get(calendarId)
+  if (!state) {
+    state = {}
+    states.set(calendarId, state)
   }
+  return state
 }
 
-function decrypt(encoded: string): string | null {
-  if (encoded.startsWith(PLAIN_PREFIX)) return encoded.slice(PLAIN_PREFIX.length)
-  try {
-    return safeStorage.decryptString(Buffer.from(encoded, 'base64'))
-  } catch {
+let changedTimer: ReturnType<typeof setTimeout> | null = null
+/** Tell the windows to ask again: a background read brought something new. */
+function announceChanged(): void {
+  if (changedTimer) return
+  changedTimer = setTimeout(() => {
+    changedTimer = null
+    for (const win of BrowserWindow.getAllWindows()) {
+      if (!win.isDestroyed()) win.webContents.send('calendar-changed')
+    }
+  }, 150)
+}
+
+// --- Configs (sealed in the store) ----------------------------------------------------------------
+
+async function configOf(connection: StoredConnection): Promise<unknown | null> {
+  if (configs.has(connection.id)) return configs.get(connection.id)!
+  const text = await openSecret(connection.sealed)
+  let config: unknown = null
+  if (text !== null) {
+    let value: unknown = text
+    try {
+      value = JSON.parse(text)
+    } catch {
+      // Version 1 sealed the bare link.
+    }
+    config = SOURCES[connection.kind].parseConfig(value)
+  }
+  if (!config) {
+    connectionErrors.set(connection.id, 'The saved address or sign-in could not be read on this computer. Remove it and add it again.')
     return null
   }
+  configs.set(connection.id, config)
+  return config
 }
 
-function readFeeds(): StoredFeed[] {
-  if (feeds) return feeds
-  feeds = []
-  const path = filePath()
-  if (existsSync(path)) {
-    const result = readFileWithBackup(path, (raw) => JSON.parse(raw) as { feeds?: unknown })
-    const list = Array.isArray(result?.value?.feeds) ? (result.value.feeds as Partial<StoredFeed>[]) : []
-    feeds = list
-      .filter((feed): feed is StoredFeed => typeof feed?.id === 'string' && typeof feed.url === 'string')
-      .map((feed) => ({
-        id: feed.id,
-        name: typeof feed.name === 'string' && feed.name ? feed.name : 'Calendar',
-        color: typeof feed.color === 'string' ? feed.color : CALENDAR_COLORS[0],
-        enabled: feed.enabled !== false,
-        busyOnly: feed.busyOnly === true,
-        countsAsBusy: feed.countsAsBusy !== false,
-        url: feed.url,
-      }))
+async function sealConfig(connectionId: string, config: unknown): Promise<string> {
+  configs.set(connectionId, config)
+  return sealSecret(JSON.stringify(config))
+}
+
+// --- Copies ---------------------------------------------------------------------------------------
+
+/** Keep a copy as the calendar's current one; Busy only reduces it first. */
+function setCopy(calendar: StoredCalendar, state: CalendarState, copy: CalendarCopy): void {
+  let kept = copy
+  if (calendar.busyOnly && !copy.busyOnly) {
+    kept = { ...copy, busyOnly: true, documents: reduceDocuments(copy.documents, true, new Set()) }
   }
-  return feeds
-}
-
-function writeFeeds(next: StoredFeed[]): void {
-  feeds = next
-  writeFileAtomic(filePath(), JSON.stringify({ feeds: next }), { backup: true, mode: 0o600 })
-}
-
-function viewOf(feed: StoredFeed): CalendarFeedView {
-  const state = states.get(feed.id)
-  return {
-    id: feed.id,
-    name: feed.name,
-    color: feed.color,
-    enabled: feed.enabled,
-    busyOnly: feed.busyOnly,
-    countsAsBusy: feed.countsAsBusy,
-    fetchedAt: state?.fetchedAt ? new Date(state.fetchedAt).toISOString() : undefined,
-    error: state?.error,
-  }
-}
-
-async function download(url: string): Promise<string> {
-  const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS)
+  state.copy = kept
   try {
-    const response = await net.fetch(url, {
-      signal: controller.signal,
-      headers: { Accept: 'text/calendar, */*;q=0.5' },
-      // Never send the app's cookies to a calendar host.
-      credentials: 'omit',
-    })
-    if (!response.ok) throw new Error(`The calendar answered ${response.status}.`)
-    const body = await response.arrayBuffer()
-    if (body.byteLength > MAX_FEED_BYTES) throw new Error('The calendar is too large to read.')
-    const text = Buffer.from(body).toString('utf8')
-    if (!/BEGIN:VCALENDAR/i.test(text)) throw new Error('That link does not give a calendar (no BEGIN:VCALENDAR).')
-    return text
-  } catch (error) {
-    if (controller.signal.aborted) throw new Error('The calendar took too long to answer.')
-    throw error instanceof Error ? error : new Error(String(error))
-  } finally {
-    clearTimeout(timer)
+    state.parsed = parseIcsDocuments(kept.documents.map((doc) => doc.ics))
+  } catch {
+    state.parsed = undefined
+    state.error = 'The calendar could not be read: it is not a valid calendar file.'
   }
 }
 
-/** Read a feed again when it is stale (or `force`); concurrent callers share one request. */
-function refresh(feed: StoredFeed, force = false): Promise<void> {
-  const state = states.get(feed.id) ?? {}
-  states.set(feed.id, state)
-  if (state.inFlight) return state.inFlight
-  if (!force && state.fetchedAt && Date.now() - state.fetchedAt < FRESH_MS) return Promise.resolve()
-  const url = decrypt(feed.url)
-  if (!url) {
-    state.error = 'The saved link could not be decrypted. Remove the calendar and add it again.'
-    return Promise.resolve()
+/** Reduce documents (ics.ts reduceIcs), except those already kept; one that does not parse is left out. */
+function reduceDocuments(documents: CalendarCopy['documents'], busyOnly: boolean, kept: ReadonlySet<unknown>) {
+  const out: CalendarCopy['documents'] = []
+  for (const doc of documents) {
+    if (kept.has(doc)) {
+      out.push(doc)
+      continue
+    }
+    try {
+      out.push({ ...doc, ics: reduceIcs(doc.ics, busyOnly) })
+    } catch {
+      // Not iCalendar: nothing of it can be shown.
+    }
   }
-  state.inFlight = download(url)
-    .then((text) => {
-      state.parsed = parseIcs(text)
-      state.fetchedAt = Date.now()
+  return out
+}
+
+function ensureLoaded(calendar: StoredCalendar): Promise<void> {
+  const state = stateOf(calendar.id)
+  if (!state.loaded) {
+    state.loaded = loadCopy(calendar.id).then((copy) => {
+      if (copy && !state.copy) {
+        setCopy(calendar, state, copy)
+        state.savedAt = copy.fetchedAt
+      }
+    })
+  }
+  return state.loaded
+}
+
+function keepCopy(calendarId: string, state: CalendarState): void {
+  if (!state.copy) return
+  state.savedAt = Date.now()
+  void saveCopy(calendarId, state.copy)
+}
+
+function defaultRange(): { from: Date; to: Date } {
+  const start = new Date()
+  start.setHours(0, 0, 0, 0)
+  return { from: start, to: new Date(start.getTime() + 7 * DAY) }
+}
+
+/**
+ * Read one calendar when it is due (or `force`), sharing a read already running. Resolves true
+ * when the copy changed.
+ */
+async function refreshCalendar(connection: StoredConnection, calendar: StoredCalendar, range: { from: Date; to: Date } | null, force: boolean): Promise<boolean> {
+  const source = SOURCES[connection.kind]
+  await ensureLoaded(calendar)
+  const state = stateOf(calendar.id)
+  if (state.inFlight) return state.inFlight
+  const { from, to } = range ?? state.lastRange ?? defaultRange()
+  state.lastRange = { from, to }
+  const covered = state.copy ? source.covers(state.copy, from, to) : false
+  const now = Date.now()
+  if (!force && covered && state.attemptedAt !== undefined && now - state.attemptedAt < FRESH_MS) return false
+  state.attemptedAt = now
+  // Set before anything waits, so a second caller shares this read.
+  const run = (async (): Promise<boolean> => {
+    const config = await configOf(connection)
+    if (!config) return false
+    // A copy reduced for Busy only cannot be the base once titles are wanted again.
+    const previous = state.copy && !(state.copy.busyOnly && !calendar.busyOnly) ? state.copy : undefined
+    try {
+      const outcome: ReadOutcome = await source.read(config, calendar.remoteId, { from, to, previous }, ctx)
+      // The choices as they are now: Busy only may have been turned on, or the calendar removed, meanwhile.
+      const current = findCalendar(calendar.id)
+      if (!current || states.get(calendar.id) !== state) return false
+      if (outcome.config) await updateConnection(connection.id, async (c) => ({ ...c, sealed: await sealConfig(c.id, outcome.config) }))
       state.error = undefined
-    })
-    .catch((error: Error) => {
+      connectionErrors.delete(connection.id)
+      if (outcome.status === 'unchanged' && state.copy) {
+        state.copy = { ...state.copy, validators: { ...state.copy.validators, ...(outcome.validators ?? {}) }, fetchedAt: Date.now() }
+        if (Date.now() - (state.savedAt ?? 0) > COPY_REWRITE_MS) keepCopy(calendar.id, state)
+        return false
+      }
+      if (outcome.status !== 'changed') return false
+      const kept = new Set<unknown>(previous?.busyOnly === current.busyOnly ? previous.documents : [])
+      const documents = reduceDocuments(outcome.documents, current.busyOnly, kept)
+      if (connection.kind === 'ics' && outcome.documents.length > 0 && documents.length === 0) {
+        throw new CalendarReadError('The calendar could not be read: it is not a valid calendar file.', 'format')
+      }
+      setCopy(current, state, { documents, validators: outcome.validators, fetchedAt: Date.now(), busyOnly: current.busyOnly })
+      keepCopy(calendar.id, state)
+      return true
+    } catch (error) {
       // The last good copy stays on screen; the error says why it is not newer.
-      state.error = error.message
-      console.warn(`[Calendar] ${feed.name}: ${error.message}`)
+      state.error = messageOf(error)
+      console.warn(`[Calendar] ${calendar.name}: ${state.error}`)
+      return false
+    }
+  })().finally(() => {
+    state.inFlight = undefined
+  })
+  state.inFlight = run
+  return run
+}
+
+function findCalendar(calendarId: string): StoredCalendar | undefined {
+  for (const connection of readCalendarStore().connections) {
+    const found = connection.calendars.find((calendar) => calendar.id === calendarId)
+    if (found) return found
+  }
+  return undefined
+}
+
+// --- Views ----------------------------------------------------------------------------------------
+
+function feedView(connection: StoredConnection, calendar: StoredCalendar): CalendarFeedView {
+  const state = states.get(calendar.id)
+  return {
+    id: calendar.id,
+    connectionId: connection.id,
+    name: calendar.name,
+    color: calendar.color,
+    enabled: calendar.enabled,
+    busyOnly: calendar.busyOnly,
+    countsAsBusy: calendar.countsAsBusy,
+    fetchedAt: state?.copy ? new Date(state.copy.fetchedAt).toISOString() : undefined,
+    error: state?.error ?? connectionErrors.get(connection.id),
+    warning: state?.warning,
+  }
+}
+
+function allFeeds(store: CalendarStoreState): CalendarFeedView[] {
+  return store.connections.flatMap((connection) => connection.calendars.map((calendar) => feedView(connection, calendar)))
+}
+
+async function connectionView(connection: StoredConnection): Promise<CalendarConnectionView> {
+  const config = await configOf(connection)
+  await Promise.all(connection.calendars.map(ensureLoaded))
+  return {
+    id: connection.id,
+    kind: connection.kind,
+    name: connection.name,
+    detail: config ? SOURCES[connection.kind].describe(config) : '',
+    calendars: connection.calendars.map((calendar) => feedView(connection, calendar)),
+    error: connectionErrors.get(connection.id),
+  }
+}
+
+async function sourcesView(): Promise<CalendarSourcesView> {
+  const store = readCalendarStore()
+  return {
+    connections: await Promise.all(store.connections.map(connectionView)),
+    storage: await secretStorageLevel(store.connections.some((connection) => isPlainSecret(connection.sealed))),
+  }
+}
+
+// --- Changes --------------------------------------------------------------------------------------
+
+async function updateConnection(id: string, change: (connection: StoredConnection) => Promise<StoredConnection>): Promise<void> {
+  const current = readCalendarStore().connections.find((c) => c.id === id)
+  if (!current) return
+  const changed = await change(current)
+  const store = readCalendarStore()
+  await writeCalendarStore({ ...store, connections: store.connections.map((c) => (c.id === id ? { ...c, sealed: changed.sealed, name: changed.name } : c)) })
+}
+
+/** Save a connection made by a kind's `connect`, with the calendars it found. */
+async function addConnection(kind: CalendarSourceKind, result: ConnectResult<unknown>, shown: (calendar: RemoteCalendar) => boolean, busyOnly: boolean): Promise<StoredConnection> {
+  const id = randomUUID()
+  const sealed = await sealConfig(id, result.config)
+  // From here on nothing waits, so no other change can come between reading the store and writing it.
+  let store = readCalendarStore()
+  const calendars: StoredCalendar[] = []
+  for (const remote of result.calendars) {
+    const taken = takeColor(store)
+    store = taken.state
+    calendars.push({
+      id: randomUUID(),
+      remoteId: remote.remoteId,
+      name: remote.name || result.name,
+      color: taken.color,
+      enabled: shown(remote),
+      busyOnly,
+      countsAsBusy: true,
     })
-    .finally(() => {
-      state.inFlight = undefined
+  }
+  const connection: StoredConnection = { id, kind, name: result.name, sealed, calendars }
+  for (const calendar of calendars) {
+    const first = result.firstReads?.[calendar.remoteId]
+    if (first?.status !== 'changed') continue
+    const state = stateOf(calendar.id)
+    state.loaded = Promise.resolve()
+    state.attemptedAt = Date.now()
+    setCopy(calendar, state, {
+      documents: reduceDocuments(first.documents, busyOnly, new Set()),
+      validators: first.validators,
+      fetchedAt: Date.now(),
+      busyOnly,
     })
-  return state.inFlight
+    keepCopy(calendar.id, state)
+  }
+  await writeCalendarStore({ ...store, connections: [...store.connections, connection] })
+  return connection
+}
+
+type CalendarPatch = Partial<Pick<StoredCalendar, 'name' | 'color' | 'enabled' | 'busyOnly' | 'countsAsBusy'>>
+
+async function updateCalendar(calendarId: string, patch: CalendarPatch): Promise<void> {
+  const store = readCalendarStore()
+  const connections = store.connections.map((connection) => ({
+    ...connection,
+    calendars: connection.calendars.map((calendar) => {
+      if (calendar.id !== calendarId) return calendar
+      const changed = { ...calendar }
+      if (typeof patch?.name === 'string' && patch.name.trim()) changed.name = patch.name.trim().slice(0, 80)
+      if (typeof patch?.color === 'string' && /^#[0-9a-f]{6}$/i.test(patch.color)) changed.color = patch.color.toLowerCase()
+      if (typeof patch?.enabled === 'boolean') changed.enabled = patch.enabled
+      if (typeof patch?.busyOnly === 'boolean') changed.busyOnly = patch.busyOnly
+      if (typeof patch?.countsAsBusy === 'boolean') changed.countsAsBusy = patch.countsAsBusy
+      const state = stateOf(calendar.id)
+      if (changed.busyOnly && !calendar.busyOnly && state.copy) {
+        // Busy only on: the titles go now, from memory and from disk.
+        setCopy(changed, state, state.copy)
+        keepCopy(calendar.id, state)
+      }
+      if ((!changed.busyOnly && calendar.busyOnly) || (changed.enabled && !calendar.enabled)) state.attemptedAt = undefined
+      return changed
+    }),
+  }))
+  await writeCalendarStore({ ...store, connections })
+}
+
+async function removeConnection(id: string): Promise<void> {
+  const store = readCalendarStore()
+  const connection = store.connections.find((c) => c.id === id || c.calendars.some((calendar) => calendar.id === id))
+  if (!connection) return
+  const config = configs.get(connection.id)
+  if (config && SOURCES[connection.kind].disconnect) {
+    await SOURCES[connection.kind].disconnect!(config, ctx).catch(() => {})
+  }
+  for (const calendar of connection.calendars) {
+    states.delete(calendar.id)
+    await dropCopy(calendar.id)
+  }
+  configs.delete(connection.id)
+  connectionErrors.delete(connection.id)
+  await writeCalendarStore({ ...readCalendarStore(), connections: readCalendarStore().connections.filter((c) => c.id !== connection.id) })
+}
+
+/** The calendars an account has now: new ones are added, not shown; gone ones are removed. */
+async function relist(connection: StoredConnection): Promise<void> {
+  const source = SOURCES[connection.kind]
+  const config = await configOf(connection)
+  if (!config || connection.kind === 'ics') return
+  let listed: { config: unknown; calendars: RemoteCalendar[] }
+  try {
+    listed = await source.listCalendars(config, ctx)
+  } catch (error) {
+    connectionErrors.set(connection.id, messageOf(error))
+    return
+  }
+  connectionErrors.delete(connection.id)
+  const remoteIds = new Set(listed.calendars.map((c) => c.remoteId))
+  for (const gone of connection.calendars.filter((c) => !remoteIds.has(c.remoteId))) {
+    states.delete(gone.id)
+    await dropCopy(gone.id)
+  }
+  const sealed = await sealConfig(connection.id, listed.config)
+  // From here on nothing waits: read the store and write it in one go.
+  let store = readCalendarStore()
+  const current = store.connections.find((c) => c.id === connection.id)
+  if (!current) return
+  const kept = current.calendars.filter((c) => remoteIds.has(c.remoteId))
+  const known = new Set(kept.map((c) => c.remoteId))
+  const added: StoredCalendar[] = []
+  for (const remote of listed.calendars.filter((c) => !known.has(c.remoteId))) {
+    const taken = takeColor(store)
+    store = taken.state
+    added.push({ id: randomUUID(), remoteId: remote.remoteId, name: remote.name, color: taken.color, enabled: false, busyOnly: false, countsAsBusy: true })
+  }
+  await writeCalendarStore({
+    ...store,
+    connections: store.connections.map((c) => (c.id === connection.id ? { ...c, sealed, calendars: [...kept, ...added] } : c)),
+  })
+}
+
+async function refreshAll(connectionId?: string): Promise<void> {
+  const store = readCalendarStore()
+  const chosen = store.connections.filter((c) => !connectionId || c.id === connectionId)
+  await Promise.all(chosen.map(relist))
+  const now = readCalendarStore()
+  const reads: Promise<boolean>[] = []
+  for (const connection of now.connections.filter((c) => !connectionId || c.id === connectionId)) {
+    for (const calendar of connection.calendars.filter((c) => c.enabled)) reads.push(refreshCalendar(connection, calendar, null, true))
+  }
+  await Promise.all(reads)
 }
 
 async function eventsBetween(from: Date, to: Date): Promise<CalendarEventsResult> {
-  const list = readFeeds()
-  const enabled = list.filter((feed) => feed.enabled)
-  await Promise.all(enabled.map((feed) => refresh(feed)))
+  const store = readCalendarStore()
+  const shown = store.connections.flatMap((connection) => connection.calendars.filter((c) => c.enabled).map((calendar) => ({ connection, calendar })))
+  await Promise.all(shown.map(({ calendar }) => ensureLoaded(calendar)))
+  const waits: Promise<boolean>[] = []
+  for (const { connection, calendar } of shown) {
+    const state = stateOf(calendar.id)
+    const holds = state.copy ? SOURCES[connection.kind].covers(state.copy, from, to) : false
+    const read = refreshCalendar(connection, calendar, { from, to }, false)
+    // With a copy that holds the days, answer now and let the read finish in the background.
+    if (holds) void read.then((changed) => changed && announceChanged())
+    else waits.push(read)
+  }
+  await Promise.all(waits)
+
   const events: CalendarEvent[] = []
-  for (const feed of enabled) {
-    const parsed = states.get(feed.id)?.parsed
-    if (!parsed) continue
+  for (const { calendar } of shown) {
+    const state = stateOf(calendar.id)
+    if (!state.parsed) continue
     try {
-      for (const event of occurrencesBetween(parsed, feed.id, from, to)) {
+      const found = occurrencesBetween(state.parsed, calendar.id, from, to, MAX_RANGE_EVENTS + 1)
+      state.warning = found.length > MAX_RANGE_EVENTS ? `Shows the first ${MAX_RANGE_EVENTS} events of these days only.` : undefined
+      for (const event of found.slice(0, MAX_RANGE_EVENTS)) {
         // Busy only: the title and place never reach a window.
-        events.push(feed.busyOnly ? busyOnlyEvent(event) : event)
+        events.push(calendar.busyOnly ? busyOnlyEvent(event) : event)
       }
-    } catch (error) {
-      states.get(feed.id)!.error = `The calendar could not be read: ${(error as Error).message}`
+    } catch {
+      state.error = 'The calendar could not be read: it is not a valid calendar file.'
     }
   }
-  return { events, feeds: list.map(viewOf) }
+  return { events, feeds: allFeeds(readCalendarStore()) }
 }
 
-type FeedPatch = Partial<Pick<StoredFeed, 'name' | 'color' | 'enabled' | 'busyOnly' | 'countsAsBusy'>>
+function pruneDrafts(): void {
+  const now = Date.now()
+  for (const [id, draft] of drafts) if (draft.expires < now) drafts.delete(id)
+}
+
+// --- IPC ------------------------------------------------------------------------------------------
 
 export function registerCalendarIpc(): void {
-  handleTrusted('calendar:list', () => readFeeds().map(viewOf))
+  handleTrusted('calendar:list', () => sourcesView())
 
   handleTrusted('calendar:events', (_event, range: { from: string; to: string }) => {
     const from = new Date(range?.from)
     const to = new Date(range?.to)
-    if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime()) || to <= from) return { events: [], feeds: readFeeds().map(viewOf) }
+    if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime()) || to <= from) return { events: [], feeds: allFeeds(readCalendarStore()) }
     return eventsBetween(from, to)
   })
 
-  handleTrusted('calendar:add', async (_event, input: { name?: string; url?: string; busyOnly?: boolean }) => {
-    const url = normaliseFeedUrl(String(input?.url ?? ''))
-    if (!url) return { success: false, error: 'Paste a calendar link that starts with https:// or webcal://.' }
-    // Read it once before saving, so a wrong link is said at once.
-    let parsed: ParsedFeed
+  handleTrusted('calendar:add', async (_event, input: AddCalendarLinkInput) => {
     try {
-      parsed = parseIcs(await download(url))
+      const result = await icsLinkSource.connect(input, ctx)
+      const connection = await addConnection('ics', result, () => true, input?.busyOnly === true)
+      return { success: true, data: await connectionView(connection) }
     } catch (error) {
-      return { success: false, error: (error as Error).message }
+      return { success: false, error: messageOf(error) }
     }
-    const list = readFeeds()
-    const feed: StoredFeed = {
-      id: randomUUID(),
-      name: String(input?.name ?? '').trim() || 'Calendar',
-      color: CALENDAR_COLORS[list.length % CALENDAR_COLORS.length],
-      enabled: true,
-      busyOnly: input?.busyOnly === true,
-      countsAsBusy: true,
-      url: encrypt(url),
+  })
+
+  handleTrusted('calendar:caldav-discover', async (_event, input: CaldavDiscoverInput) => {
+    pruneDrafts()
+    try {
+      const result = await caldavSource.connect(input, ctx)
+      const draftId = randomUUID()
+      drafts.set(draftId, { result, expires: Date.now() + DRAFT_MS })
+      const draft: CaldavDraft = { draftId, name: result.name, detail: caldavSource.describe(result.config), calendars: result.calendars }
+      return { success: true, data: draft }
+    } catch (error) {
+      return { success: false, error: messageOf(error) }
     }
-    states.set(feed.id, { parsed, fetchedAt: Date.now() })
-    writeFeeds([...list, feed])
-    return { success: true, data: viewOf(feed) }
   })
 
-  handleTrusted('calendar:update', (_event, id: string, patch: FeedPatch) => {
-    const next = readFeeds().map((feed) => {
-      if (feed.id !== id) return feed
-      const changed = { ...feed }
-      if (typeof patch?.name === 'string' && patch.name.trim()) changed.name = patch.name.trim()
-      if (typeof patch?.color === 'string' && /^#[0-9a-f]{6}$/i.test(patch.color)) changed.color = patch.color
-      if (typeof patch?.enabled === 'boolean') changed.enabled = patch.enabled
-      if (typeof patch?.busyOnly === 'boolean') changed.busyOnly = patch.busyOnly
-      if (typeof patch?.countsAsBusy === 'boolean') changed.countsAsBusy = patch.countsAsBusy
-      return changed
-    })
-    writeFeeds(next)
-    return next.map(viewOf)
+  handleTrusted('calendar:caldav-save', async (_event, draftId: string, input: CaldavSaveInput) => {
+    pruneDrafts()
+    const draft = drafts.get(String(draftId))
+    if (!draft) return { success: false, error: 'The sign-in has expired. Sign in again.' }
+    drafts.delete(String(draftId))
+    const shown = new Set(Array.isArray(input?.shown) ? input.shown.map(String) : [])
+    const connection = await addConnection('caldav', draft.result, (calendar) => shown.has(calendar.remoteId), input?.busyOnly === true)
+    announceChanged()
+    return { success: true, data: await connectionView(connection) }
   })
 
-  handleTrusted('calendar:remove', (_event, id: string) => {
-    states.delete(id)
-    writeFeeds(readFeeds().filter((feed) => feed.id !== id))
-    return readFeeds().map(viewOf)
+  handleTrusted('calendar:caldav-cancel', (_event, draftId: string) => {
+    drafts.delete(String(draftId))
   })
 
-  handleTrusted('calendar:refresh', async () => {
-    await Promise.all(readFeeds().filter((feed) => feed.enabled).map((feed) => refresh(feed, true)))
-    return readFeeds().map(viewOf)
+  handleTrusted('calendar:update', async (_event, calendarId: string, patch: CalendarPatch) => {
+    await updateCalendar(String(calendarId), patch ?? {})
+    return sourcesView()
+  })
+
+  handleTrusted('calendar:remove', async (_event, id: string) => {
+    await removeConnection(String(id))
+    return sourcesView()
+  })
+
+  handleTrusted('calendar:refresh', async (_event, connectionId?: string) => {
+    await refreshAll(typeof connectionId === 'string' ? connectionId : undefined)
+    return sourcesView()
   })
 }

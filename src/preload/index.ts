@@ -315,9 +315,17 @@ const api = {
     list: () => ipcRenderer.invoke('calendar:list'),
     events: (range: { from: string; to: string }) => ipcRenderer.invoke('calendar:events', range),
     add: (input: { name: string; url: string; busyOnly?: boolean }) => ipcRenderer.invoke('calendar:add', input),
+    caldavDiscover: (input: unknown) => ipcRenderer.invoke('calendar:caldav-discover', input),
+    caldavSave: (draftId: string, input: { shown: string[]; busyOnly?: boolean }) => ipcRenderer.invoke('calendar:caldav-save', draftId, input),
+    caldavCancel: (draftId: string) => ipcRenderer.invoke('calendar:caldav-cancel', draftId),
     update: (id: string, patch: Record<string, unknown>) => ipcRenderer.invoke('calendar:update', id, patch),
     remove: (id: string) => ipcRenderer.invoke('calendar:remove', id),
-    refresh: () => ipcRenderer.invoke('calendar:refresh'),
+    refresh: (connectionId?: string) => ipcRenderer.invoke('calendar:refresh', connectionId),
+    onChanged: (cb: () => void) => {
+      const handler = () => cb()
+      ipcRenderer.on('calendar-changed', handler)
+      return () => { ipcRenderer.removeListener('calendar-changed', handler) }
+    },
   },
 
   // The AI assistant (docs/ai-assistant-v1.md). Provider requests run in main, where the key is;

@@ -29,6 +29,14 @@ import type {
 } from '../renderer/lib/vikunja-types'
 import type { TaskPatch } from '../shared/merge-patches'
 import type { CalendarEventsResult, CalendarFeedView } from '../shared/calendar-events'
+import type {
+  AddCalendarLinkInput,
+  CaldavDiscoverInput,
+  CaldavDraft,
+  CaldavSaveInput,
+  CalendarConnectionView,
+  CalendarSourcesView,
+} from '../shared/calendar-sources'
 import type { SavedFilterImportOutcome, SavedFilterPreview, SavedFilterState } from '../shared/saved-filter-import'
 import type { SyncedPrefsSnapshot } from '../shared/synced-prefs'
 import type {
@@ -245,14 +253,27 @@ export interface ElectronAPI {
     onEvent(cb: (envelope: VoiceEventEnvelope) => void): () => void
   }
 
-  /** Calendars on the Plan screen (proof of concept). A link can be added, never read back. */
+  /**
+   * Connected calendars on the Plan screen (contract 20.9). A link or a password can be given,
+   * never read back: the windows only get CalendarSourcesView.
+   */
   calendar: {
-    list(): Promise<CalendarFeedView[]>
+    list(): Promise<CalendarSourcesView>
     events(range: { from: string; to: string }): Promise<CalendarEventsResult>
-    add(input: { name: string; url: string; busyOnly?: boolean }): Promise<ApiResult<CalendarFeedView>>
-    update(id: string, patch: Partial<Pick<CalendarFeedView, 'name' | 'color' | 'enabled' | 'busyOnly' | 'countsAsBusy'>>): Promise<CalendarFeedView[]>
-    remove(id: string): Promise<CalendarFeedView[]>
-    refresh(): Promise<CalendarFeedView[]>
+    /** Add a calendar link (read once to check it). */
+    add(input: AddCalendarLinkInput): Promise<ApiResult<CalendarConnectionView>>
+    /** Sign in to a CalDAV account and list its calendars; nothing is saved until caldavSave. */
+    caldavDiscover(input: CaldavDiscoverInput): Promise<ApiResult<CaldavDraft>>
+    caldavSave(draftId: string, input: CaldavSaveInput): Promise<ApiResult<CalendarConnectionView>>
+    caldavCancel(draftId: string): Promise<void>
+    /** Change one calendar's choices. */
+    update(calendarId: string, patch: Partial<Pick<CalendarFeedView, 'name' | 'color' | 'enabled' | 'busyOnly' | 'countsAsBusy'>>): Promise<CalendarSourcesView>
+    /** Remove a connection (a link, an account) with its calendars. */
+    remove(connectionId: string): Promise<CalendarSourcesView>
+    /** Read now: one connection, or every one. */
+    refresh(connectionId?: string): Promise<CalendarSourcesView>
+    /** A background read brought something new: ask for the events again. */
+    onChanged(cb: () => void): () => void
   }
 
   /** The AI assistant (docs/ai-assistant-v1.md). The key can be saved or removed, never read. */

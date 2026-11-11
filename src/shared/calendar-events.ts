@@ -31,9 +31,12 @@ export interface CalendarEvent {
 /** A connected calendar as the windows see it: never its address, which is a secret. */
 export interface CalendarFeedView {
   id: string
+  /** The connection (a calendar link, a CalDAV account) it belongs to. */
+  connectionId: string
   name: string
   /** #rrggbb */
   color: string
+  /** Shown on the timeline (contract 20.9 "Shown"); off, it is not read and counts for nothing. */
   enabled: boolean
   /** Show only "Busy" instead of the event's title (the work-calendar mode). */
   busyOnly: boolean
@@ -41,7 +44,10 @@ export interface CalendarFeedView {
   countsAsBusy: boolean
   /** When it was last read successfully, ISO. */
   fetchedAt?: string
+  /** Why the last read failed; the last good copy stays on screen (20.9). */
   error?: string
+  /** Something to know that is not a failure, such as a limit that cut the events short. */
+  warning?: string
 }
 
 export interface CalendarEventsResult {
@@ -51,6 +57,8 @@ export interface CalendarEventsResult {
 
 /** Default colours for new calendars, in order. */
 export const CALENDAR_COLORS = ['#7c6cf2', '#0a84ff', '#30a46c', '#e5484d', '#f76b15', '#12a594'] as const
+/** Their names, in the same order, for the colour choice. */
+export const CALENDAR_COLOR_NAMES = ['Purple', 'Blue', 'Green', 'Red', 'Orange', 'Teal'] as const
 
 /** webcal:// is https:// (a subscription link); anything else must be http or https. */
 export function normaliseFeedUrl(input: string): string | null {

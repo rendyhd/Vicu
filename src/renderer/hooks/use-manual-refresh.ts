@@ -4,6 +4,7 @@ import { api } from '@/lib/api'
 import { isRefreshKey, manualRefresh } from '@/lib/manual-refresh'
 import { appRefreshDeps } from '@/lib/task-refresh'
 import { announce } from '@/stores/announcer-store'
+import { invalidateCalendars } from '@/hooks/use-calendar-events'
 
 /** Refresh the page now, with the app's queue state; says so to screen readers. */
 export function refreshNow(qc: QueryClient): void {
@@ -12,6 +13,11 @@ export function refreshNow(qc: QueryClient): void {
     syncDocuments: () => {
       void Promise.resolve(api.syncCustomLists()).catch(() => {})
       void Promise.resolve(api.syncSyncedPrefs()).catch(() => {})
+    },
+    refreshCalendars: () => {
+      void Promise.resolve(window.api.calendar.refresh())
+        .catch(() => {})
+        .then(() => invalidateCalendars(qc))
     },
   })
   announce(outcome === 'deferred' ? 'Sending waiting changes, then refreshing' : 'Refreshing')

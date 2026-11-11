@@ -8,7 +8,7 @@ vi.mock('../api', () => ({ api: {} }))
 function setup(pending: number) {
   const qc = new QueryClient()
   const invalidate = vi.spyOn(qc, 'invalidateQueries').mockResolvedValue()
-  const deps = { pendingCount: () => pending, replayNow: vi.fn(), syncDocuments: vi.fn() }
+  const deps = { pendingCount: () => pending, replayNow: vi.fn(), syncDocuments: vi.fn(), refreshCalendars: vi.fn() }
   return { qc, invalidate, deps }
 }
 
@@ -22,6 +22,7 @@ describe('manualRefresh (issue 38: F5 / Mod+R)', () => {
     const keys = invalidatedKeys(invalidate)
     for (const key of [...MANUAL_REFRESH_KEYS, ...DATE_QUERY_KEYS]) expect(keys).toContain(JSON.stringify(key))
     expect(deps.syncDocuments).toHaveBeenCalledOnce()
+    expect(deps.refreshCalendars).toHaveBeenCalledOnce()
     expect(deps.replayNow).not.toHaveBeenCalled()
   })
 
