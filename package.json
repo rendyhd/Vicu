@@ -1,6 +1,6 @@
 {
   "name": "vicu",
-  "version": "2.7.0",
+  "version": "2.8.0",
   "description": "A task management app powered by Vikunja",
   "main": "./out/main/index.js",
   "desktopName": "com.rendyhd.vicu",
