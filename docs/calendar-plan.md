@@ -1,6 +1,6 @@
 # Events and calendars on the Plan screen: plan
 
-Status: plan, November 2026. Proof of concept on branch `feat/calendar-poc` (commits `8cf9d84`, `ffd7854`).
+Status: November 2026. Phases 0, 1, 2a and 2c built on the desktop (see each phase). Proof of concept on branch `feat/calendar-poc` (commits `8cf9d84`, `ffd7854`).
 Background research: `reports/Calendar sync for Plan screen.md` (not committed).
 
 ## Goal
@@ -93,18 +93,29 @@ Done in the proof of concept: add a secret `https://` or `webcal://` link (read 
 encrypted; read at most every 5 minutes; ical.js parses and expands recurrence (RRULE, EXDATE,
 RECURRENCE-ID, the feed's own time zones); shown, counts as busy and Busy only per calendar; remove.
 
-Still to do:
+Done since, desktop (branch `feat/calendar-poc`):
 
-- Keep the last good copy on disk (offline start, a failing feed keeps its events with "Not updated since").
-- Conditional requests (`ETag`, `If-Modified-Since`) and read again on window focus and on Refresh (F5).
-- Rename and colour per calendar; a clear error per calendar; a size and event-count limit.
-- `VFREEBUSY` feeds (busy periods without events), which is what some free/busy shares give.
-- Windows time zone names without a `VTIMEZONE` (map to IANA).
-- The safeStorage change of Electron 45 (async availability check) for this store and the two existing
-  ones, before upgrading past 45. On Linux without a keyring, say that links are only obscured.
-- Help text per provider: Google (Secret address in iCal format), Outlook (Publish calendar), iCloud
-  (Public calendar), Proton (Share via link, busy-only or full). For a work calendar: only if your
-  organisation allows publishing, and prefer a free/busy share.
+- A source structure (`src/main/calendar/sources/types.ts`): every kind (link, CalDAV, and later EventKit,
+  Microsoft, Google) implements connect, list calendars, read a range, describe; the service keeps what is
+  shared. One store for all connections (`calendar-feeds.json` version 2, the proof of concept's version 1
+  read), a connection holding one or more calendars with their own choices.
+- The last good copy on disk per calendar (`userData/calendar-cache/`), reduced to the fields Vicu reads
+  (no title or place for Busy only) and encrypted with safeStorage like the links; offline start, and a
+  failing calendar keeps its events with "Not updated since" and the reason.
+- Conditional requests (`ETag`, `If-Modified-Since`, and the same file again by its hash); read again on
+  window focus (the 5-minute rule) and at once on F5, Mod+R and the palette's Refresh.
+- Rename and colour per calendar, plain error sentences per calendar, 15 MB per read and 2000 events per
+  calendar per range.
+- `VFREEBUSY` periods as events titled "Busy" (FBTYPE=FREE left out, BUSY-TENTATIVE tentative).
+- TZIDs without a `VTIMEZONE`: Windows names (and Outlook display names) mapped to IANA, a zone built from
+  the system's zone data.
+- `src/main/safe-storage.ts`: the asynchronous safeStorage calls when present (Electron 45), the older ones
+  otherwise, used by the calendar store. Still to do before upgrading past 45: the AI key store and the
+  sign-in token store, whose callers are synchronous. On Linux without a keyring Settings says links and
+  passwords are only obscured.
+- Add calendar dialog with help per provider (Google, Outlook, iCloud, Proton) and the work-calendar note;
+  the Plan gear shows a summary and Manage.
+- Harness scenario `calendar-sources` (CALS).
 
 ### 2b. The phone's calendars (Android)
 
@@ -129,6 +140,18 @@ For iCloud, Fastmail, Nextcloud, mailbox.org, Zoho, Posteo, Radicale, Baikal and
 - tsdav (MIT) for the DAV side, ical.js for the data; `sync-collection` with a full read when the token is
   refused; expansion done by Vicu, not the server.
 - Read-only. Password encrypted like a link. Android uses 2b (DAVx5) instead of its own CalDAV client.
+
+Done (desktop, branch `feat/calendar-poc`): `src/main/calendar/sources/caldav.ts`. Presets iCloud, Fastmail,
+Nextcloud (the typed address plus `/remote.php/dav`) and Other, user name and app password with the
+provider's link; discovery through `/.well-known/caldav`, the principal and calendar-home-set; only VEVENT
+calendars are offered and the user picks which to show (nothing is saved before). Reads are a time-range
+calendar-query for a window around the days on screen (ETags only), a calendar-multiget for new and
+changed events, and nothing more while the ctag or sync token is unchanged (`sync-collection` is not
+used: the ETag diff of the window does the same with one REPORT every server has). The password is
+sealed with the rest of the account's config, sent only to the account's own site, never to a window.
+Tested against a fake server in unit tests and a local Radicale (`scripts/ui-verify/radicale.mjs`, unit
+test `calendar-caldav-live.test.ts`, harness `calendar-sources`). Not yet tried against iCloud, Fastmail
+or Nextcloud themselves.
 
 ### 2d. macOS calendars through EventKit, desktop
 
