@@ -309,6 +309,17 @@ const api = {
     },
   },
 
+  // Calendars on the Plan screen (proof of concept). The links are secrets: a window can add one,
+  // never read it back.
+  calendar: {
+    list: () => ipcRenderer.invoke('calendar:list'),
+    events: (range: { from: string; to: string }) => ipcRenderer.invoke('calendar:events', range),
+    add: (input: { name: string; url: string; busyOnly?: boolean }) => ipcRenderer.invoke('calendar:add', input),
+    update: (id: string, patch: Record<string, unknown>) => ipcRenderer.invoke('calendar:update', id, patch),
+    remove: (id: string) => ipcRenderer.invoke('calendar:remove', id),
+    refresh: () => ipcRenderer.invoke('calendar:refresh'),
+  },
+
   // The AI assistant (docs/ai-assistant-v1.md). Provider requests run in main, where the key is;
   // a window can save or remove the key, never read it.
   ai: {

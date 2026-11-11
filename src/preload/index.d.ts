@@ -28,6 +28,7 @@ import type {
   TaskCommentPage,
 } from '../renderer/lib/vikunja-types'
 import type { TaskPatch } from '../shared/merge-patches'
+import type { CalendarEventsResult, CalendarFeedView } from '../shared/calendar-events'
 import type { SavedFilterImportOutcome, SavedFilterPreview, SavedFilterState } from '../shared/saved-filter-import'
 import type { SyncedPrefsSnapshot } from '../shared/synced-prefs'
 import type {
@@ -242,6 +243,16 @@ export interface ElectronAPI {
     stop(sessionId?: number): Promise<boolean>
     cancel(sessionId?: number): Promise<boolean>
     onEvent(cb: (envelope: VoiceEventEnvelope) => void): () => void
+  }
+
+  /** Calendars on the Plan screen (proof of concept). A link can be added, never read back. */
+  calendar: {
+    list(): Promise<CalendarFeedView[]>
+    events(range: { from: string; to: string }): Promise<CalendarEventsResult>
+    add(input: { name: string; url: string; busyOnly?: boolean }): Promise<ApiResult<CalendarFeedView>>
+    update(id: string, patch: Partial<Pick<CalendarFeedView, 'name' | 'color' | 'enabled' | 'busyOnly' | 'countsAsBusy'>>): Promise<CalendarFeedView[]>
+    remove(id: string): Promise<CalendarFeedView[]>
+    refresh(): Promise<CalendarFeedView[]>
   }
 
   /** The AI assistant (docs/ai-assistant-v1.md). The key can be saved or removed, never read. */

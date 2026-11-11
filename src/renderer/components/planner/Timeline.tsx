@@ -1,6 +1,6 @@
 import { memo, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { useDraggable, useDroppable } from '@dnd-kit/core'
-import { HeartPulse } from 'lucide-react'
+import { CalendarDays, HeartPulse } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { useDateFormat } from '@/hooks/use-date-format'
 import { useProjects } from '@/hooks/use-projects'
@@ -13,6 +13,7 @@ import {
   PX_PER_MINUTE,
   dayBlocks,
   dayMarkers,
+  layoutWithEvents,
   markerOverBlock,
   dayTopRow,
   grabMode,
@@ -38,6 +39,7 @@ import {
   type PlannerHours,
 } from '../../../shared/time-blocks'
 import type { PlanRoutine } from '@/hooks/use-planner'
+import { CALENDAR_COLORS, allDayEventsOn, timedEventsOn, type CalendarEvent } from '../../../shared/calendar-events'
 import { useTimelineGesture, type GestureItem, type GestureResult } from './use-timeline-gesture'
 import { PLAN_DROP, lengthWhenPlaced, useTimelineDrop, type PlanDropData } from './use-timeline-drop'
 import { turnAt, usePageTurnWhileDragging, type PageTurn } from './use-page-turn'
@@ -74,7 +76,12 @@ interface TimelineProps {
   note?: string
   /** Day view: resting a drag on Back or Forward turns the page. */
   pageTurn?: PageTurn
+  /** Calendar events (proof of concept): read-only, drawn beside the blocks. */
+  events?: readonly CalendarEvent[]
+  eventColor?: (calendarId: string) => string | undefined
 }
+
+const NO_EVENTS: readonly CalendarEvent[] = []
 
 const GUTTER_CLASS = 'w-14 shrink-0'
 const HOURS = Array.from({ length: 24 }, (_, hour) => hour)
@@ -126,9 +133,14 @@ function DayTopRow({
   highlighted = false,
   wide = false,
   emptyText,
+  allDay = NO_EVENTS,
+  eventColor,
 }: {
   day: LocalDate
   tasks: readonly Task[]
+  /** All-day calendar events, before the tasks; never dragged. */
+  allDay?: readonly CalendarEvent[]
+  eventColor?: (calendarId: string) => string | undefined
   canDrop: boolean
   canChange: (task: Task) => boolean
   onDropTasks: (tasks: Task[]) => void
@@ -151,7 +163,10 @@ function DayTopRow({
         (isOver || highlighted) && 'bg-bg-selected',
       )}
     >
-      {tasks.length === 0 && emptyText && (
+      {allDay.map((event) => (
+        <AllDayChip key={event.id} event={event} color={eventColor?.(event.calendarId)} wide={wide} />
+      ))}
+      {tasks.length === 0 && allDay.length === 0 && emptyText && (
         <span className="flex min-w-0 flex-1 items-center justify-center truncate text-caption text-text-secondary">{emptyText}</span>
       )}
       {tasks.map((task) => (
@@ -160,6 +175,74 @@ function DayTopRow({
     </div>
   )
 }
+
+function AllDayChip({ event, color, wide }: { event: CalendarEvent; color?: string; wide: boolean }) {
+  return (
+    <div
+      data-plan-allday-event={event.id}
+      title={`${event.title} (all day)`}
+      className={cn('flex min-w-0 items-center gap-1 truncate rounded-chip border border-border px-1.5 py-0.5 text-caption text-text', wide && 'max-w-[16rem]')}
+      style={{ backgroundColor: color ? `${color}24` : undefined, borderColor: color ?? undefined }}
+    >
+      <CalendarDays className="h-3 w-3 shrink-0" style={{ color }} aria-hidden="true" />
+      <span className="truncate">{event.title}</span>
+    </div>
+  )
+}
+
+/** A calendar event on the grid: read-only, striped, so it never reads as a task. */
+const EventView = memo(function EventView({
+  event,
+  top,
+  height,
+  left,
+  width,
+  range,
+  color,
+}: {
+  event: CalendarEvent
+  top: number
+  height: number
+  left: string
+  width: string
+  range: string
+  color: string
+}) {
+  const compact = height < 40
+  const tint = `${color}29`
+  return (
+    <li
+      data-plan-event={event.id}
+      title={[event.title, range, event.location, event.tentative ? 'Tentative' : null, event.busy ? null : 'Free'].filter(Boolean).join(' · ')}
+      // Never starts a drawing or a drag: an event is not Vicu's to move.
+      onPointerDown={(pointer) => pointer.stopPropagation()}
+      style={{
+        top,
+        height,
+        left,
+        width,
+        borderLeftColor: color,
+        backgroundImage: `repeating-linear-gradient(135deg, ${tint} 0 6px, ${color}14 6px 12px)`,
+      }}
+      className={cn(
+        'pointer-events-auto absolute overflow-hidden rounded-control border border-l-[3px] border-border bg-bg-page pl-1.5 pr-1 select-none cursor-default',
+        event.tentative && 'border-dashed',
+        !event.busy && 'opacity-60',
+      )}
+    >
+      <div className={cn('flex h-full min-w-0 flex-col', compact ? 'justify-center' : 'justify-start pt-1')}>
+        <span className="flex min-w-0 items-center gap-1">
+          <CalendarDays className="h-3 w-3 shrink-0" style={{ color }} aria-hidden="true" />
+          <span className="truncate text-meta font-medium text-text">{event.title}</span>
+        </span>
+        <span className={compact ? 'sr-only' : 'block truncate text-caption text-text-secondary'}>
+          {range}
+          {event.location ? ` · ${event.location}` : ''}
+        </span>
+      </div>
+    </li>
+  )
+})
 
 interface BlockViewProps {
   task: Task
@@ -261,6 +344,8 @@ export function Timeline({
   reasonOf,
   note,
   pageTurn,
+  events = NO_EVENTS,
+  eventColor,
 }: TimelineProps) {
   const fmt = useDateFormat()
   const now = useMinuteClock()
@@ -399,11 +484,14 @@ export function Timeline({
   // while something is dragged.
   const singleDay = days[0]
   const singleDayTop = multiDay ? [] : dayTopRow(tasks, singleDay)
-  const dropRowOnly = !multiDay && singleDayTop.length === 0 && dragging && canPlaceOn(singleDay, today)
+  const singleDayAllDay = multiDay ? NO_EVENTS : allDayEventsOn(events, singleDay)
+  const dropRowOnly = !multiDay && singleDayTop.length === 0 && singleDayAllDay.length === 0 && dragging && canPlaceOn(singleDay, today)
   const dayTopRowView = (
     <DayTopRow
       day={singleDay}
       tasks={singleDayTop}
+      allDay={singleDayAllDay}
+      eventColor={eventColor}
       canDrop={canPlaceOn(singleDay, today)}
       canChange={canChange}
       highlighted={topOver === singleDay}
@@ -453,6 +541,8 @@ export function Timeline({
                 key={day}
                 day={day}
                 tasks={dayTopRow(tasks, day)}
+                allDay={allDayEventsOn(events, day)}
+                eventColor={eventColor}
                 canDrop={canPlaceOn(day, today)}
                 canChange={canChange}
                 highlighted={topOver === day}
@@ -484,7 +574,7 @@ export function Timeline({
         </div>
       )}
 
-      {!multiDay && singleDayTop.length > 0 && (
+      {!multiDay && (singleDayTop.length > 0 || singleDayAllDay.length > 0) && (
         <div ref={topRowRef} role="group" aria-label="Tasks without a time" className="flex shrink-0 border-b border-border pr-[var(--scrollbar-size)]">
           <div className={GUTTER_CLASS} />
           {dayTopRowView}
@@ -521,7 +611,8 @@ export function Timeline({
 
           <div ref={gridRef} data-plan-grid className="relative flex min-w-0 flex-1">
             {days.map((day) => {
-              const blocks = dayBlocks(tasks, day)
+              const laid = layoutWithEvents(dayBlocks(tasks, day), timedEventsOn(events, day))
+              const blocks = laid.blocks
               const markers = dayMarkers(tasks, day)
               const placeable = canPlaceOn(day, today)
               const isToday = day === today
@@ -575,7 +666,7 @@ export function Timeline({
                       const color = projectColor.get(task.project_id) ?? null
                       const start = atClock(day, minute)
                       const item: GestureItem = { task, day, range: { startMinute: minute, endMinute: minute + defaultLength }, hasBlock: false }
-                      const overBlock = markerOverBlock(minute, blocks)
+                      const overBlock = markerOverBlock(minute, [...blocks, ...laid.events])
                       return (
                         <li
                           key={task.id}
@@ -603,6 +694,19 @@ export function Timeline({
                         </li>
                       )
                     })}
+
+                    {laid.events.map((placed) => (
+                      <EventView
+                        key={placed.event.id}
+                        event={placed.event}
+                        top={placed.startMinute * PX_PER_MINUTE}
+                        height={placed.drawnMinutes * PX_PER_MINUTE - 1}
+                        left={`calc(${(placed.column / placed.columnCount) * 100}% + 2px)`}
+                        width={`calc(${100 / placed.columnCount}% - 4px)`}
+                        range={formatBlockRange(new Date(placed.event.start), new Date(placed.event.end), fmt)}
+                        color={eventColor?.(placed.event.calendarId) ?? CALENDAR_COLORS[0]}
+                      />
+                    ))}
 
                     {blocks.map((placed) => {
                       const { task, block, startMinute, drawnMinutes, column, columnCount } = placed

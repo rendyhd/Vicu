@@ -16,6 +16,8 @@ import { SourceChips } from '@/components/planner/SourceMenu'
 import type { PageTurn, TurnDirection } from '@/components/planner/use-page-turn'
 import { PlannerOptions } from '@/components/planner/PlannerOptions'
 import { useAppConfig } from '@/hooks/use-app-config'
+import { useCalendarEvents } from '@/hooks/use-calendar-events'
+import { eventBusyOfDay } from '../../shared/calendar-events'
 import { useDateFormat } from '@/hooks/use-date-format'
 import { useFilters } from '@/hooks/use-filters'
 import { useOpenTask } from '@/hooks/use-open-task'
@@ -112,6 +114,12 @@ function PlanScreen() {
   }
 
   const range = usePlanRange(days)
+  const calendar = useCalendarEvents(days)
+  /** Busy time of a day (contract 16.6): its open blocks and the calendar events that count. */
+  const busyOn = (day: LocalDate) => [
+    ...busyOfDay(range.tasks, day),
+    ...eventBusyOfDay(calendar.events, day, calendar.countsAsBusy),
+  ]
   const update = useUpdateTask()
   const create = useCreateTask()
   const openTask = useOpenTask()
@@ -271,7 +279,7 @@ function PlanScreen() {
   }, [inSession])
   useEffect(() => {
     if (newTaskRequestedAt === null || inSession) return
-    const start = nextFreeSlot(new Date(), selectedDay, prefs.hours, prefs.defaultLength, busyOfDay(range.tasks, selectedDay))
+    const start = nextFreeSlot(new Date(), selectedDay, prefs.hours, prefs.defaultLength, busyOn(selectedDay))
     if (start === null) {
       void navigate({ to: '/inbox' })
       return
@@ -288,7 +296,7 @@ function PlanScreen() {
   // Totals of the selected day.
   const now = new Date()
   const planned = plannedMinutes(range.tasks, selectedDay)
-  const free = freeMinutes(now, selectedDay, prefs.hours, busyOfDay(range.tasks, selectedDay))
+  const free = freeMinutes(now, selectedDay, prefs.hours, busyOn(selectedDay))
 
   const listRef = useRef<HTMLElement | null>(null)
   const [gearOpen, setGearOpen] = useState(false)
@@ -301,7 +309,7 @@ function PlanScreen() {
       now: new Date(),
       day: selectedDay,
       hours: prefs.hours,
-      busy: busyOfDay(range.tasks, selectedDay),
+      busy: busyOn(selectedDay),
       lengthOf: (task) => blockOf(task)?.minutes ?? prefs.defaultLength,
     })
     if (fitted.length === 0) {
@@ -519,6 +527,8 @@ function PlanScreen() {
           drawn={drawn}
           drawnRef={drawnRef}
           pageTurn={pageTurn}
+          events={calendar.events}
+          eventColor={calendar.colorOf}
         />
       </div>
       )}

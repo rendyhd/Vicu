@@ -141,6 +141,7 @@ import { registerOfflineQueueIpc } from './offline/ipc'
 import { registerCollaborationIpc } from './collab-ipc'
 import { registerVoiceIpc } from './voice/service'
 import { forgetAiAccountData, registerAiIpc } from './ai/ipc'
+import { registerCalendarIpc } from './calendar/service'
 import { accountChanged, refreshKnownUser, replayPendingActions } from './sync'
 import { claimAccountData, ensureKnownUserId } from './known-user'
 import {
@@ -283,6 +284,7 @@ export function registerIpcHandlers(): void {
   registerCollaborationIpc()
   registerVoiceIpc()
   registerAiIpc()
+  registerCalendarIpc()
 
   // Tasks
   handleTrusted('fetch-tasks', (_event, params: Record<string, unknown>) => {

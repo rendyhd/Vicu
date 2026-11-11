@@ -106,6 +106,44 @@ export function dayBlocks<T extends PlanTaskFields>(tasks: readonly T[], day: Lo
   })
 }
 
+/** A calendar event on a day's grid (proof of concept), clipped to that day. */
+export interface PlacedEvent<E> {
+  event: E
+  startMinute: number
+  endMinute: number
+  drawnMinutes: number
+  column: number
+  columnCount: number
+}
+
+/**
+ * Blocks and calendar events share one overlap layout, so neither hides the other. Events take the
+ * left columns where they tie: they were there first, a block is what you place around them.
+ */
+export function layoutWithEvents<T extends PlanTaskFields, E>(
+  blocks: readonly PlacedBlock<T>[],
+  events: readonly { event: E; startMinute: number; endMinute: number }[],
+): { blocks: PlacedBlock<T>[]; events: PlacedEvent<E>[] } {
+  if (events.length === 0) return { blocks: [...blocks], events: [] }
+  type Item = { startMinute: number; endMinute: number; column: number; columnCount: number; order: number; block?: PlacedBlock<T>; event?: { event: E; startMinute: number; endMinute: number } }
+  const items: Item[] = [
+    ...events.map((event, index) => ({ startMinute: event.startMinute, endMinute: event.endMinute, column: 0, columnCount: 1, order: index, event })),
+    ...blocks.map((block, index) => ({ startMinute: block.startMinute, endMinute: block.endMinute, column: 0, columnCount: 1, order: events.length + index, block })),
+  ]
+  const laid = layoutOverlaps(items, (a, b) => a.order - b.order)
+  const outBlocks: PlacedBlock<T>[] = []
+  const outEvents: PlacedEvent<E>[] = []
+  for (const item of laid) {
+    if (item.block) {
+      outBlocks.push({ ...item.block, column: item.column, columnCount: item.columnCount })
+    } else if (item.event) {
+      const length = item.endMinute - item.startMinute
+      outEvents.push({ ...item.event, drawnMinutes: Math.max(length, Math.min(MIN_ITEM_MINUTES, DAY_MINUTES - item.startMinute)), column: item.column, columnCount: item.columnCount })
+    }
+  }
+  return { blocks: outBlocks, events: outEvents }
+}
+
 /** An open task with a time-of-day due date on `day` and no block: a marker at that time (section 16.7). */
 export function dayMarkers<T extends PlanTaskFields>(tasks: readonly T[], day: LocalDate): { task: T; minute: number }[] {
   const markers: { task: T; minute: number }[] = []

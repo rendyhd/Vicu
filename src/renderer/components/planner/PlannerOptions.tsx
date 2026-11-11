@@ -6,6 +6,7 @@ import { usePlannerPrefs, useSavePlannerConfig } from '@/hooks/use-planner'
 import { formatLength } from '@/lib/planner-timeline'
 import { isRoutinesEnabled } from '@/lib/vikunja-types'
 import { BLOCK_LENGTHS, readPlannerHours } from '../../../shared/time-blocks'
+import { CalendarFeeds } from './CalendarFeeds'
 
 /** The planner's settings, shared by the Plan screen's gear and Settings. */
 export function PlannerOptions() {
@@ -112,6 +113,10 @@ export function PlannerOptions() {
           <span className="text-meta text-text">Show routines on the timeline</span>
         </label>
       )}
+
+      <div className="border-t border-border pt-3">
+        <CalendarFeeds />
+      </div>
     </div>
   )
 }
