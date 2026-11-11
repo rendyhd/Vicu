@@ -1,6 +1,6 @@
 # Events and calendars on the Plan screen: plan
 
-Status: November 2026. Phases 0, 1, 2a and 2c built on the desktop (see each phase). Proof of concept on branch `feat/calendar-poc` (commits `8cf9d84`, `ffd7854`).
+Status: November 2026. Phases 0, 1, 2a, 2c, 2e (without registered clients yet) and 2f built on the desktop (see each phase). Proof of concept on branch `feat/calendar-poc` (commits `8cf9d84`, `ffd7854`).
 Background research: `reports/Calendar sync for Plan screen.md` (not committed).
 
 ## Goal
@@ -174,6 +174,26 @@ client) and poll with sync tokens (no server for push).
 - Decide after release A with real feedback: how many people ask for it that a link or a phone does not
   serve.
 
+Built (desktop, branch `feat/calendar-poc`), waiting for registered clients: `src/main/calendar/oauth.ts`
+(the browser sign-in: authorization code with PKCE S256 and a random state, back to the loopback listener
+on a free port, `http://localhost` for Microsoft, `http://127.0.0.1` for Google; token requests, refresh,
+Microsoft's rotating refresh tokens kept; errors as sentences), `sources/oauth-account.ts` (what both
+share: the sealed config with client and tokens, the window read around the days on screen as for CalDAV,
+each occurrence made into an iCalendar document so the reader, Busy only and the last good copy are the
+same as for every kind), `sources/microsoft.ts` (Graph `/me/calendars` and `calendarView` in UTC, paged)
+and `sources/google.ts` (`calendarList`, `events.list` with `singleEvents`, paged). Free and "working
+elsewhere" are not busy, tentative is tentative, cancelled and declined events are left out (Google:
+working-location entries too). Polling is the window read with a hash of the events, not sync tokens.
+Errors: AADSTS65001, `consent_required`, `interaction_required` and the admin-only codes say "Your
+organisation needs to approve Vicu" with a link to `docs/calendar-it-admins.md`; `invalid_grant` and a
+401 say "Sign in again", which the account offers in Settings (same account checked). Removing a Google
+account revokes its token. The client ids are in one place, `src/main/calendar/oauth-clients.ts`, empty
+until registered (`docs/calendar-oauth-setup.md`); meanwhile the dialog offers "Use my own client"
+(client id, and for Google its secret), sealed per device in `calendar-oauth-clients.json`. Tested
+against a local fake provider (`scripts/ui-verify/fake-calendar-oauth.mjs`): unit test
+`calendar-oauth.test.ts`, harness `calendar-accounts` (CALA), with `VICU_TEST_CALENDAR_ENDPOINTS` read
+only by an unpackaged build. Not yet tried against Microsoft or Google themselves.
+
 ### 2f. Import a calendar file into Events (one time)
 
 For a yearly schedule, school terms, public holidays, or a work schedule where policy allows exporting it.
@@ -182,6 +202,14 @@ For a yearly schedule, school terms, public holidays, or a work schedule where p
   becomes one repeating Event, anything else becomes single Events for the next 12 months; "Busy only"
   drops titles at import.
 - After import they are ordinary Events (synced, changeable); nothing stays linked to the file.
+
+Done (desktop, branch `feat/calendar-poc`): "Import calendar file..." in the Plan gear and in Settings,
+Plan, Events. Main opens the file dialog and reads the file (`calendar:import-file`, 5 MB at most) with
+`importIcsText` (contract 20.10) for today, with and without Busy only; the window shows the preview
+(`ImportCalendarFile.tsx`: counts of repeating and single Events, the titles, Busy only, the note that
+they become ordinary synced Events) and Import writes every `event.<id>` in one synced change with one
+Undo toast. At most 500 Events per import (`MAX_IMPORT_EVENTS`), a larger file is refused with a
+sentence. Harness `calendar-import` (IMP).
 
 ## Not planned
 
