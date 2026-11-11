@@ -72,6 +72,16 @@ export async function eventKitStatus(added: boolean): Promise<EventKitStatusView
   }
 }
 
+/**
+ * macOS answered a request without asking. It refuses to ask for an app whose Info.plist has no
+ * calendar usage string: the development build runs Electron.app, which has none (seen on macOS 27).
+ */
+export function notAskedMessage(): string {
+  return app.isPackaged
+    ? 'macOS did not ask whether Vicu may read your calendars. Allow Vicu in System Settings, Privacy & Security, Calendars.'
+    : 'macOS does not ask for a development build (Electron.app has no calendar usage string). Try a packaged build of Vicu.'
+}
+
 /** System Settings, Privacy & Security, Calendars. */
 export function openCalendarPrivacySettings(): void {
   if (isMac) void shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_Calendars')

@@ -53,7 +53,7 @@ import {
 } from './store'
 import { caldavSource } from './sources/caldav'
 import { icsLinkSource } from './sources/ics-link'
-import { eventKitHelper, eventKitHelperIfAny, eventkitSource, eventKitStatus, openCalendarPrivacySettings } from './eventkit'
+import { eventKitHelper, eventKitHelperIfAny, eventkitSource, eventKitStatus, notAskedMessage, openCalendarPrivacySettings } from './eventkit'
 import { foundCalendars } from './sources/eventkit'
 import { EVENTKIT_DENIED_MESSAGE, type EventKitSaveInput } from '../../shared/calendar-eventkit'
 import { isMac } from '../platform'
@@ -560,6 +560,7 @@ function registerEventKitIpc(): void {
       if (added()) return { success: false, error: 'The calendars of this Mac are already added. Choose which to show in the list.' }
       const helper = eventKitHelper()
       const access = await helper.request()
+      if (access === 'not-determined') return { success: false, error: notAskedMessage() }
       if (access !== 'full') return { success: false, error: (await eventKitStatus(false)).problem ?? EVENTKIT_DENIED_MESSAGE }
       const calendars = foundCalendars(await helper.calendars())
       if (calendars.length === 0) return { success: false, error: 'This Mac has no calendars with events. Add an account in System Settings, Internet Accounts.' }
