@@ -6,8 +6,8 @@ import { startFakeCalendarProvider, type FakeCalendarProvider } from '../../../s
 import { calendarHttp, CalendarReadError, mayCarryBearer, type FetchLike } from '../calendar/http'
 import { occurrencesBetween, parseIcsDocuments, reduceIcs } from '../calendar/ics'
 import { allowTestEndpoints, browserSignIn, oauthProblem, providerEndpoints, type OAuthClient } from '../calendar/oauth'
-import { googleSource } from '../calendar/sources/google'
-import { microsoftSource } from '../calendar/sources/microsoft'
+import { googleEvent, googleSource } from '../calendar/sources/google'
+import { graphEvent, microsoftSource } from '../calendar/sources/microsoft'
 import type { OAuthAccountConfig } from '../calendar/sources/oauth-account'
 import type { CalendarCopy, SourceContext } from '../calendar/sources/types'
 import { accountProblem, checkOwnClient, ORG_APPROVAL_MESSAGE, SIGN_IN_AGAIN_PREFIX } from '../../shared/calendar-accounts'
@@ -279,6 +279,32 @@ describe('a Google account', () => {
 })
 
 describe('the rules around the accounts', () => {
+  it('reads your own answer (20.9): declined is left out, tentative or not answered yet is tentative', () => {
+    const graph = (extra: Record<string, unknown>) =>
+      graphEvent({ id: 'm', subject: 'x', start: { dateTime: '2026-11-10T09:00:00', timeZone: 'UTC' }, end: { dateTime: '2026-11-10T10:00:00', timeZone: 'UTC' }, ...extra })
+    expect(graph({ responseStatus: { response: 'declined' } })).toBeNull()
+    expect(graph({ responseStatus: { response: 'notResponded' } })?.tentative).toBe(true)
+    expect(graph({ responseStatus: { response: 'tentativelyAccepted' } })?.tentative).toBe(true)
+    expect(graph({ responseStatus: { response: 'accepted' } })?.tentative).toBe(false)
+    expect(graph({ responseStatus: { response: 'organizer' } })?.tentative).toBe(false)
+    expect(graph({ showAs: 'tentative' })?.tentative).toBe(true)
+    // Working elsewhere and free are available; away (out of office) is busy.
+    expect(graph({ showAs: 'workingElsewhere' })?.busy).toBe(false)
+    expect(graph({ showAs: 'free' })?.busy).toBe(false)
+    expect(graph({ showAs: 'oof' })?.busy).toBe(true)
+
+    const google = (attendees: { self?: boolean; responseStatus?: string }[], freeBusyOnly = false, extra: Record<string, unknown> = {}) =>
+      googleEvent({ id: 'g', summary: 'Planning', start: { dateTime: '2026-11-10T09:00:00Z' }, end: { dateTime: '2026-11-10T10:00:00Z' }, attendees, ...extra }, freeBusyOnly)
+    expect(google([{ self: true, responseStatus: 'declined' }])).toBeNull()
+    expect(google([{ self: true, responseStatus: 'needsAction' }])?.tentative).toBe(true)
+    expect(google([{ self: true, responseStatus: 'tentative' }])?.tentative).toBe(true)
+    expect(google([{ self: true, responseStatus: 'accepted' }, { responseStatus: 'needsAction' }])?.tentative).toBe(false)
+    // A calendar shared with free/busy only gives no titles: Busy, or Free (20.8).
+    expect(google([], true)?.title).toBe('Busy')
+    expect(google([], true, { transparency: 'transparent' })?.title).toBe('Free')
+    expect(google([], false)?.title).toBe('Planning')
+  })
+
   it('sends an access token only to the API origin', () => {
     expect(mayCarryBearer('https://graph.microsoft.com/v1.0/me/calendars', 'https://graph.microsoft.com')).toBe(true)
     expect(mayCarryBearer('https://evil.example/graph', 'https://graph.microsoft.com')).toBe(false)

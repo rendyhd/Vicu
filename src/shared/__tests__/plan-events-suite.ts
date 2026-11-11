@@ -25,6 +25,7 @@ import {
   readPlanEvent,
   readPlanEvents,
   readRepeat,
+  repeatChoiceDay,
   repeatChoices,
   repeatText,
   skipEventDay,
@@ -63,6 +64,7 @@ interface PlanEventVectors {
   days: Array<{ name: string; event: Stored; from: string; to: string; expect: string[] }>
   times: Array<{ name: string; event: Stored; days: string[]; expect: Occurrence[] }>
   choices: Array<{ day: string; expect: Array<{ label: string; repeat: Stored }> }>
+  choiceDays: Array<{ name: string; event: Stored; day: string; scope: EventScope; expect: string | null }>
   text: Array<{ repeat: Stored; text: string }>
 }
 interface FixtureEvent {
@@ -214,6 +216,14 @@ export function runPlanEventsSuite(options: { zone: string; expectedOffsetMinute
             expect(choiceIndex(choices, choice.repeat)).toBe(index)
             if (choice.repeat.kind !== 'yearly') expect(repeatText(choice.repeat)).toBe(choice.label)
           }
+        })
+      }
+    })
+
+    describe('planEvents.choiceDays', () => {
+      for (const vector of planEvents.choiceDays) {
+        it(vector.name, () => {
+          expect(repeatChoiceDay(eventOf(vector.event), vector.day, vector.scope)).toBe(vector.expect)
         })
       }
     })

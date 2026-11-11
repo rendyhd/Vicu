@@ -417,6 +417,19 @@ export interface EventEdit {
 /** All times, this time only, this and following. */
 export type EventScope = 'all' | 'this' | 'following'
 
+/**
+ * The day whose repeat choices (20.5) a change of the occurrence on `day` offers (20.6): the day the
+ * changed rule starts on. All times, and an Event that does not repeat: its first day. This and
+ * following: the occurrence's day, or the first day when it is all times there (no occurrence
+ * before). This time only changes no repeat: null.
+ */
+export function repeatChoiceDay(event: PlanEvent, day: LocalDate, scope: EventScope): LocalDate | null {
+  if (event.repeat.kind === 'none') return event.start
+  if (scope === 'this') return null
+  if (scope === 'following' && hasOccurrenceBefore(event, day)) return day
+  return event.start
+}
+
 /** Synced preference entries to write: `event.<id>` to an encoded event, or null (deleted). */
 export type EventWrites = Record<string, Record<string, unknown> | null>
 

@@ -11,6 +11,7 @@ import { addLocalDays } from '../../../shared/due-dates'
 import type { CalendarEvent } from '../../../shared/calendar-events'
 import {
   choiceIndex,
+  repeatChoiceDay,
   repeatChoices,
   repeatText,
   type EventEdit,
@@ -126,7 +127,10 @@ function OwnEvent({
   const [time, setTime] = useState(planEvent.time ?? '')
   const [until, setUntil] = useState(planEvent.until ?? '')
   const day = occurrence.day ?? planEvent.start
-  const choices = useMemo(() => repeatChoices(planEvent.start), [planEvent.start])
+  // The choices of the day the changed rule starts on (20.6): the first day for all times, the day
+  // pressed for this and following.
+  const choiceDay = repeatChoiceDay(planEvent, day, repeats ? scope : 'all') ?? planEvent.start
+  const choices = useMemo(() => repeatChoices(choiceDay), [choiceDay])
   const current = choiceIndex(choices, planEvent.repeat)
   // Changing the repeat or the end is never "this time only" (20.6).
   const thisOnly = repeats && scope === 'this'

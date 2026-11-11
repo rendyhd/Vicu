@@ -2036,7 +2036,8 @@ Making an Event on a day offers these repeat choices, in this order:
 | Every year on November 24 | `yearly`, every 1 | always |
 
 Every choice happens on the day it is offered for. A day can have both the fourth and the last
-weekday (24 November 2026); the 29th to the 31st have only the last.
+weekday (24 November 2026); the 29th to the 31st have only the last. Changing an Event offers the
+choices of the day its changed rule starts on (20.6).
 
 How a rule reads, in the list and the popover:
 
@@ -2075,6 +2076,18 @@ is changed for all times without asking.
 weekday, or when the rule said last and the new day is in its month's last seven days. A repeat set
 in the same change is used as it is.
 
+**The repeat choices of a change** are those of 20.5 for the day the changed rule starts on, so the
+times a change is for are chosen before its repeat:
+
+| The change is for | Choices of |
+|---|---|
+| All times, and an Event that does not repeat | the Event's first day (`start`) |
+| This and following | the occurrence's day; the Event's first day when this is "all times" (no occurrence before) |
+| This time only | none: the repeat is not changed this time only |
+
+The rule the Event already has may not be among them; it is shown as it reads (20.5) until another
+choice is made.
+
 Switching to all-day leaves out `time`, `minutes` and `busy` (20.3). An Event given a time without a
 length gets `planner.default_length`.
 
@@ -2110,6 +2123,11 @@ dropped. The calendar's name and colour stay. The desktop does it in the main pr
 before its repository, so no window, cache or log ever holds the title. Importing a file (20.10)
 can do the same.
 
+A calendar that is shared with you as free and busy only gives no titles. Its events read as with
+Busy only, "Busy", or "Free" for a free event, whatever the setting: VFREEBUSY periods in a file or
+on a CalDAV server, a Google calendar whose access is free/busy only, an Android calendar whose
+access level is free/busy. Any other event without a title is "(No title)".
+
 ### 20.9 Connected calendars
 
 - A connected calendar is a setting of the device, never synced: its id differs per device, and its
@@ -2121,6 +2139,14 @@ can do the same.
   access. Each app offers the kinds it has built.
 - The calendar's reader expands recurrence: RRULE, RDATE, EXDATE, overrides (RECURRENCE-ID) and the
   file's own time zones. Cancelled events are left out.
+- **Your own answer.** Where the source tells your own answer to an invitation (the device's
+  calendars, Microsoft 365, Google), an event you declined is left out, and one you accepted as
+  tentative or have not answered yet is tentative. A calendar link or a CalDAV account does not say
+  which attendee is you, so its events are read as they are. An event is also tentative when the
+  calendar marks it so: `STATUS:TENTATIVE`, a tentative availability (Android, EventKit), Microsoft's
+  "show as" Tentative or Google's status tentative.
+- **Microsoft 365 "show as"**: Free and Working elsewhere are free (Outlook's scheduling counts both
+  as available), Tentative is tentative and busy, Busy and Away are busy.
 - Each calendar has: a name; **Shown** (default on; off, it is not read and counts for nothing);
   **Colour**, by default the next of `#7c6cf2`, `#0a84ff`, `#30a46c`, `#e5484d`, `#f76b15`,
   `#12a594` in the order calendars were added; **Counts as busy** (default on); **Busy only**
@@ -2207,7 +2233,8 @@ In `cross-app-semantics-v1.json`, run in three time zones like the other date su
 
 - `planEvents`: `read` (stored values and what is written back), `list`, `days` (the days an Event
   happens on over a range, across month ends and leap years), `times` (wall-clock starts and ends
-  across clock changes and midnight), `choices` (20.5 for a day) and `text`.
+  across clock changes and midnight), `choices` (20.5 for a day), `choiceDays` (the day whose
+  choices a change offers, 20.6) and `text`.
 - `eventBusy`: events of several calendars, what each day shows and its busy time, `free` (16.6 with
   events and a block) and `busyOnly`.
 - `eventChanges`: stored entries, a change to one occurrence, the entries written and Undo.

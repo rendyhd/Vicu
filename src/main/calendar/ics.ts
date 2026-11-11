@@ -152,8 +152,8 @@ function toEvent(
   return {
     id: `${calendarId}:${item.uid}:${startDate.toISOString()}`,
     calendarId,
-    title: item.summary || '(No title)',
-    location: typeof location === 'string' && location ? location : undefined,
+    title: (typeof item.summary === 'string' ? item.summary.trim() : '') || '(No title)',
+    location: typeof location === 'string' && location.trim() ? location.trim() : undefined,
     start: startDate.toISOString(),
     end: endDate.toISOString(),
     allDay,

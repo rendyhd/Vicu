@@ -2773,6 +2773,14 @@
         { "label": "Every year on December 3", "repeat": { "kind": "yearly", "every": 1 } }
       ] }
     ],
+    "choiceDays": [
+      { "name": "all times: the Event's first day", "event": { "title": "x", "start": "2026-11-03", "time": "10:00", "minutes": 30, "repeat": { "kind": "weekly", "every": 1, "days": [2] } }, "day": "2026-11-17", "scope": "all", "expect": "2026-11-03" },
+      { "name": "this and following: the opened day", "event": { "title": "x", "start": "2026-11-03", "time": "10:00", "minutes": 30, "repeat": { "kind": "weekly", "every": 1, "days": [2] } }, "day": "2026-11-17", "scope": "following", "expect": "2026-11-17" },
+      { "name": "this time only: no repeat choices", "event": { "title": "x", "start": "2026-11-03", "time": "10:00", "minutes": 30, "repeat": { "kind": "weekly", "every": 1, "days": [2] } }, "day": "2026-11-17", "scope": "this", "expect": null },
+      { "name": "this and following on the first occurrence is all times: the first day, not a day the rule gives", "event": { "title": "x", "start": "2026-11-01", "time": "10:00", "minutes": 30, "repeat": { "kind": "weekly", "every": 1, "days": [1, 4] } }, "day": "2026-11-02", "scope": "following", "expect": "2026-11-01" },
+      { "name": "skipped days do not count as an occurrence before", "event": { "title": "x", "start": "2026-11-03", "repeat": { "kind": "weekly", "every": 1, "days": [2] }, "skips": ["2026-11-03"] }, "day": "2026-11-10", "scope": "following", "expect": "2026-11-03" },
+      { "name": "an Event that does not repeat: its first day, whatever the scope", "event": { "title": "x", "start": "2026-11-10", "time": "09:00", "minutes": 60 }, "day": "2026-11-10", "scope": "this", "expect": "2026-11-10" }
+    ],
     "text": [
       { "repeat": { "kind": "none" }, "text": "Does not repeat" },
       { "repeat": { "kind": "daily", "every": 1 }, "text": "Every day" },

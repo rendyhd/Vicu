@@ -5,8 +5,9 @@
 // - Events: GET /me/calendars/{id}/calendarView for the window (Graph expands recurrence), in UTC
 //   (Prefer: outlook.timezone="UTC"), paged. All-day events are dates in the event's own zone, which
 //   Graph gives as midnight: the date part is the day.
-// - showAs free or workingElsewhere is not busy (Outlook's scheduling treats both as available),
-//   tentative is tentative; cancelled events and those you declined are left out.
+// - showAs free or workingElsewhere is not busy (Outlook's scheduling treats both as available,
+//   20.9); showAs tentative, or your own answer tentative or not given yet (tentativelyAccepted,
+//   notResponded), is tentative; cancelled events and those you declined are left out.
 // - The account: the ID token's tenant and object id (stable), and its preferred_username.
 
 import type { CalendarHttp } from '../http'
@@ -48,8 +49,9 @@ function dayOf(time: GraphTime | undefined): string | null {
 /** A Graph event as an occurrence, or null when it is cancelled, declined or has no times. */
 export function graphEvent(event: GraphEvent): AccountEvent | null {
   if (!event.id || event.isCancelled === true) return null
-  if (String(event.responseStatus?.response ?? '').toLowerCase() === 'declined') return null
   const showAs = String(event.showAs ?? 'busy').toLowerCase()
+  const answer = String(event.responseStatus?.response ?? '').toLowerCase()
+  if (answer === 'declined') return null
   const allDay = event.isAllDay === true
   const start = allDay ? dayOf(event.start) : utcInstant(event.start)
   const end = allDay ? dayOf(event.end) : utcInstant(event.end)
@@ -63,7 +65,7 @@ export function graphEvent(event: GraphEvent): AccountEvent | null {
     end,
     allDay,
     busy: showAs !== 'free' && showAs !== 'workingelsewhere',
-    tentative: showAs === 'tentative',
+    tentative: showAs === 'tentative' || answer === 'tentativelyaccepted' || answer === 'notresponded',
   }
 }
 

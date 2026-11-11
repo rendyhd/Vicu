@@ -6,8 +6,11 @@
 //   one is named by the account's) is called "Calendar": calendar names are kept in clear.
 // - Events: GET /calendars/{id}/events with singleEvents=true (Google expands recurrence) and
 //   orderBy=startTime for the window, paged. Timed events carry an offset; all-day ones are dates.
-// - transparency "transparent" is not busy, status "tentative" or your own tentative answer is
-//   tentative; cancelled events, those you declined and working-location entries are left out.
+// - transparency "transparent" is not busy; status "tentative", or your own answer tentative or
+//   not given yet (needsAction), is tentative; cancelled events, those you declined and
+//   working-location entries are left out (20.9).
+// - A calendar shared with free/busy only (the list's accessRole freeBusyReader) gives no titles:
+//   its events are "Busy", or "Free" for a free event (20.8).
 // - The account: the primary calendar's id, which is the account's address.
 
 import type { CalendarHttp } from '../http'
@@ -16,7 +19,7 @@ import { checkCount, getJson, oauthAccountSource, type AccountEvent, type FoundC
 
 const PAGE = 2500
 const LIST_FIELDS = 'items(id,summary,summaryOverride,primary,selected,hidden,deleted),nextPageToken'
-const EVENT_FIELDS = 'items(id,status,summary,location,start,end,transparency,eventType,attendees(self,responseStatus)),nextPageToken'
+const EVENT_FIELDS = 'accessRole,items(id,status,summary,location,start,end,transparency,eventType,attendees(self,responseStatus)),nextPageToken'
 
 interface GoogleTime {
   date?: string
@@ -42,7 +45,7 @@ function instant(value: string | undefined): string | null {
 }
 
 /** A Google event as an occurrence, or null when it is cancelled, declined or a working location. */
-export function googleEvent(event: GoogleEvent): AccountEvent | null {
+export function googleEvent(event: GoogleEvent, freeBusyOnly = false): AccountEvent | null {
   if (!event.id || event.status === 'cancelled' || event.eventType === 'workingLocation') return null
   const mine = (event.attendees ?? []).find((attendee) => attendee.self === true)
   if (mine?.responseStatus === 'declined') return null
@@ -50,23 +53,28 @@ export function googleEvent(event: GoogleEvent): AccountEvent | null {
   const start = allDay ? event.start!.date! : instant(event.start?.dateTime)
   const end = allDay ? (event.end?.date ?? event.start!.date!) : instant(event.end?.dateTime)
   if (!start || !end) return null
+  const busy = event.transparency !== 'transparent'
   return {
     id: event.id,
-    title: event.summary,
+    title: freeBusyOnly ? (busy ? 'Busy' : 'Free') : event.summary,
     location: event.location,
     start,
     end,
     allDay,
-    busy: event.transparency !== 'transparent',
-    tentative: event.status === 'tentative' || mine?.responseStatus === 'tentative',
+    busy,
+    tentative: event.status === 'tentative' || mine?.responseStatus === 'tentative' || mine?.responseStatus === 'needsAction',
   }
 }
 
-async function pages<T>(http: CalendarHttp, url: (pageToken?: string) => string, take: (items: T[]) => void): Promise<void> {
+async function pages<T>(
+  http: CalendarHttp,
+  url: (pageToken?: string) => string,
+  take: (items: T[], page: Record<string, unknown>) => void,
+): Promise<void> {
   let token: string | undefined
   for (let page = 0; page < 200; page++) {
     const json = await getJson('google', http, url(token))
-    take(Array.isArray(json.items) ? (json.items as T[]) : [])
+    take(Array.isArray(json.items) ? (json.items as T[]) : [], json)
     token = typeof json.nextPageToken === 'string' && json.nextPageToken ? json.nextPageToken : undefined
     if (!token) return
   }
@@ -118,11 +126,12 @@ export const googleSource = oauthAccountSource({
         if (pageToken) params.set('pageToken', pageToken)
         return `${endpoints.api}/calendars/${encodeURIComponent(calendarId)}/events?${params.toString()}`
       },
-      (items) => {
+      (items, page) => {
         seen += items.length
         checkCount(seen)
+        const freeBusyOnly = page.accessRole === 'freeBusyReader'
         for (const item of items) {
-          const event = googleEvent(item)
+          const event = googleEvent(item, freeBusyOnly)
           if (event) out.push(event)
         }
       },
