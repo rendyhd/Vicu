@@ -1721,6 +1721,7 @@ Each action sends only the fields it changes, as a merge patch.
 |---|---|
 | Drop a task on a time | `start_date`, `end_date`, and the due rule. The length is the block's own if it has one, else `planner.default_length`. |
 | Move a block, on its day or to another | `start_date`, `end_date`, and the due rule. |
+| Move a block to another day (a day picker, or a day in the strip or header) | `start_date` and `end_date` at the same wall-clock times on that day (the end held at midnight), and the due rule. |
 | Drag the bottom edge | `end_date` |
 | Drag the top edge | `start_date` and the due rule. The end stays. |
 | Draw on an empty time | A new task with `title`, `due_date` (that day, date-only), `start_date` and `end_date`, in the project being browsed, else the Inbox. |
@@ -1752,6 +1753,11 @@ A block on any other day stays, and so does a block when only the due date's tim
 - A row with a block shows it with `row.block` (section 8.3), next to its due phrase as usual. A
   date-only due date on the block's own day is left out, because the block already says that day; an
   overdue one stays.
+- **A day's tasks without a time** sit in a row above that day's timeline, on every view of the
+  planner: open tasks whose due date is that local day, date-only (a legacy midnight counts), and
+  that have no block on that day. A task with a due time is a marker instead (16.7), and an overdue
+  task is not in it, because it is not due that day. Dropping a block on the row is "Drop a task on a
+  day without a time" (16.2).
 
 ### 16.5 Reminders
 
@@ -1793,7 +1799,8 @@ every device must agree on it.
 ### 16.10 Vectors
 
 `timeBlocks` in `cross-app-semantics-v1.json` covers what a block is, placing and the due rule, due
-date changes (including the daylight-saving weeks in both test zones), removing the time, the lists,
+date changes (including the daylight-saving weeks in both test zones), moving a block to another day
+(`moveToDay`), a day's tasks without a time (`topRow`), removing the time, the lists,
 the default reminder, the next free slot, free time, fit, the row text and the two preferences.
 `nlp-corpus-v1.json` covers section 5.4 with the new fields `start` and `end`.
 

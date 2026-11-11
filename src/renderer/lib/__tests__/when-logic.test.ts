@@ -192,13 +192,38 @@ describe('text to selection', () => {
       { date: '2026-10-10', time: '09:30' },
       { date: '2026-12-31', time: null },
       { date: '2027-01-04', time: '18:00' },
+      // Yesterday, today and tomorrow are written "Today, Oct 7, 1:00 PM".
+      { date: '2026-10-06', time: '13:00' },
+      { date: '2026-10-07', time: '13:00' },
+      { date: '2026-10-07', time: '13:05' },
+      { date: '2026-10-07', time: null },
+      { date: '2026-10-08', time: '13:00' },
+      { date: '2026-10-08', time: null },
     ]
-    for (const fmt of [US, GB]) {
+    for (const fmt of [US, GB, { locale: 'en-GB', hour12: true }]) {
       for (const pick of picks) {
         const text = whenText(pick, NOW, fmt)
-        expect(parseWhenText(text, NOW, fmt.locale)?.value, `${fmt.locale}: "${text}"`).toEqual(pick)
+        expect(parseWhenText(text, NOW, fmt.locale, pick.date)?.value, `${fmt.locale}: "${text}"`).toEqual(pick)
       }
     }
+  })
+
+  it('keeps the time when the time of today\'s or tomorrow\'s text is edited (vicu-android issue 98)', () => {
+    expect(parseWhenText('Today, Oct 7, 1:05 PM', NOW, 'en-US', '2026-10-07')!.value).toEqual({ date: '2026-10-07', time: '13:05' })
+    expect(parseWhenText('Tomorrow, Oct 8, 1:05 p.m.', NOW, 'en-US', '2026-10-08')!.value).toEqual({ date: '2026-10-08', time: '13:05' })
+    expect(parseWhenText('today, 7 oct, 13:05', NOW, 'en-GB', '2026-10-07')!.value).toEqual({ date: '2026-10-07', time: '13:05' })
+    expect(parseWhenText('Today, Oct 7', NOW, 'en-US', '2026-10-07')!.value).toEqual({ date: '2026-10-07', time: null })
+  })
+
+  it('in the day word text the part that was changed decides the day', () => {
+    // The date after the word was changed: it wins.
+    expect(parseWhenText('Tomorrow, Oct 12, 1:00 PM', NOW, 'en-US', '2026-10-08')!.value).toEqual({ date: '2026-10-12', time: '13:00' })
+    // The word was changed: it wins, and the time stays.
+    expect(parseWhenText('Tomorrow, Oct 7, 1:00 PM', NOW, 'en-US', '2026-10-07')!.value).toEqual({ date: '2026-10-08', time: '13:00' })
+    // Nothing to compare with: the word leads, as in the parser.
+    expect(parseWhenText('Today, Oct 12, 1:00 PM', NOW, 'en-US')!.value).toEqual({ date: '2026-10-07', time: '13:00' })
+    // Yesterday's date stays in this year.
+    expect(parseWhenText('Yesterday, Oct 6, 9:30 AM', NOW, 'en-US', '2026-10-06')!.value).toEqual({ date: '2026-10-06', time: '09:30' })
   })
 })
 

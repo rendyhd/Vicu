@@ -146,6 +146,24 @@ export function placeBlock(due: string | null | undefined, start: Date, minutes:
   }
 }
 
+/**
+ * Move a block to another day (a day picker, or a day in the strip or header): the start at the same
+ * wall-clock time on `day`, the end keeping the block's wall-clock length (held at the midnight that
+ * ends that day), and the due rule. Null when the task has no block.
+ */
+export function moveBlockToDay(task: BlockFields & { due_date?: string | null }, day: LocalDate): BlockChanges | null {
+  const block = blockOf(task)
+  if (!block) return null
+  const from = minutesOfDay(block.start)
+  const start = atClock(day, from)
+  const end = atClock(day, Math.min(from + wallMinutes(block), 24 * 60))
+  return {
+    start_date: start.toISOString(),
+    end_date: end.toISOString(),
+    due_date: dueForBlock(task.due_date, start),
+  }
+}
+
 /** Drag the bottom edge to `end`: only the end changes, kept to at least one step and within 16.1. */
 export function resizeBlockEnd(block: Pick<TimeBlock, 'start'>, end: Date): BlockChanges {
   const earliest = block.start.getTime() + BLOCK_STEP_MINUTES * 60_000
@@ -381,12 +399,27 @@ export function busyOfDay<T extends BlockFields & { done?: boolean }>(tasks: rea
     const block = blockOf(task)
     if (!block || block.day !== day) continue
     const start = minutesOfDay(block.start)
-    ranges.push([start, start + diffMinutes(block)])
+    ranges.push([start, start + wallMinutes(block)])
   }
   return ranges
 }
 
-function diffMinutes(block: TimeBlock): number {
+/**
+ * A day's tasks without a time (section 16.4), the row above its timeline on every view of the
+ * planner: open, due that local day date-only (a legacy midnight counts), and no block on that day.
+ */
+export function dayTopRow<T extends BlockFields & { done?: boolean; due_date?: string | null }>(tasks: readonly T[], day: LocalDate): T[] {
+  return tasks.filter(
+    (task) =>
+      !task.done &&
+      !isNoDueDate(task.due_date) &&
+      isDateOnly(task.due_date as string) &&
+      localDateOf(task.due_date) === day &&
+      blockOf(task)?.day !== day,
+  )
+}
+
+function wallMinutes(block: TimeBlock): number {
   // Wall-clock length, so a block across a clock change still fits the day's grid.
   return block.end.getTime() === nextMidnight(block.start).getTime()
     ? 24 * 60 - minutesOfDay(block.start)

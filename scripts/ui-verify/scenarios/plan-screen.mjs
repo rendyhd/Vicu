@@ -240,9 +240,9 @@ export default async function run(h) {
       await page.locator('[data-plan-next]').click()
       await h.wait(300)
     }
-    await page.locator('[data-plan-source]').click()
+    await page.locator('[data-plan-source-project]').click()
     await h.wait(200)
-    await page.getByLabel('Find a list or project').fill('PLN project')
+    await page.getByLabel('Find a project').fill('PLN project')
     await h.wait(150)
     await h.capture('source-menu')
     await page.locator(`[data-plan-source-item="project:${project.id}"]`).click({ timeout: 4000 })
@@ -262,8 +262,6 @@ export default async function run(h) {
     }
     if (here) created.push(here.id)
     await h.assert('F: drawn while browsing a project, it goes there', () => ({ ok: here?.project_id === project.id, detail: String(here?.project_id) }))
-    await page.locator('[data-plan-source]').click()
-    await h.wait(200)
     await page.locator('[data-plan-source-item="day"]').click()
     await h.wait(400)
 

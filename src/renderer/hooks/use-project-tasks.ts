@@ -9,7 +9,8 @@ import { hasVicuMetadataMarker } from '@/lib/metadata-tasks'
 import { useTaskOrder } from './use-task-order'
 import { sortTasksByOrder } from '../../shared/task-order'
 
-export function useProjectTasks(projectId: number | undefined) {
+/** `fetch: false` reads only what is cached (a count beside a list that is not shown) and never asks the server. */
+export function useProjectTasks(projectId: number | undefined, fetch = true) {
   const matches = useMatches()
   const pathname = matches[matches.length - 1]?.pathname ?? ''
   const completedTasks = useCompletedTasksStore((s) => s.tasks)
@@ -21,7 +22,7 @@ export function useProjectTasks(projectId: number | undefined) {
       if (!result.success) throw new Error(result.error)
       return result.data
     },
-    enabled: !!projectId,
+    enabled: fetch && !!projectId,
     staleTime: Infinity,
     select: (views) => views.find((v) => v.view_kind === 'list'),
   })
@@ -35,7 +36,7 @@ export function useProjectTasks(projectId: number | undefined) {
       if (!result.success) throw new Error(result.error)
       return result.data
     },
-    enabled: !!viewQuery.data?.id,
+    enabled: fetch && !!viewQuery.data?.id,
     // Hidden tasks stay out by their marker, not by `done = false` alone: one someone reopened in
     // the web UI is still hidden (cross-app semantics 10.1).
     select: (tasks) => sortProjectTasks(tasks.filter((task) => !hasVicuMetadataMarker(task.description))),

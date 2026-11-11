@@ -12,7 +12,8 @@ import { Timeline } from '@/components/planner/Timeline'
 import { PlanMyDaySession } from '@/components/planner/PlanMyDay'
 import { BlockPopover } from '@/components/planner/BlockPopover'
 import { DrawTitle } from '@/components/planner/DrawTitle'
-import { SourceMenu } from '@/components/planner/SourceMenu'
+import { SourceChips } from '@/components/planner/SourceMenu'
+import type { PageTurn, TurnDirection } from '@/components/planner/use-page-turn'
 import { PlannerOptions } from '@/components/planner/PlannerOptions'
 import { useAppConfig } from '@/hooks/use-app-config'
 import { useDateFormat } from '@/hooks/use-date-format'
@@ -25,25 +26,23 @@ import { useProjects } from '@/hooks/use-projects'
 import { useTasks } from '@/hooks/use-tasks'
 import { useCreateTask, useUpdateTask } from '@/hooks/use-task-mutations'
 import { api } from '@/lib/api'
-import { formatDateDisplay } from '@/lib/date-display'
+import { formatDateDisplay, midSentence } from '@/lib/date-display'
 import { useCompletedTasksStore } from '@/stores/completed-tasks-store'
 import { useDayKey } from '@/stores/day-store'
 import { announce } from '@/stores/announcer-store'
 import { useNewTaskRequestStore } from '@/stores/new-task-request-store'
 import { toast } from '@/stores/toast-store'
-import { dayWithoutTime, formatLength, plannedMinutes, type GestureRange } from '@/lib/planner-timeline'
+import { canPlaceOn, dayWithoutTime, formatLength, plannedMinutes, type GestureRange } from '@/lib/planner-timeline'
 import {
-  dayListLabel,
   drawTargetProject,
   inNextSevenDays,
   matchesTitleFilter,
   readPlanSource,
-  sourceLists,
   sourceProjectId,
   type PlanSource,
 } from '@/lib/plan-source'
 import { isPlannerEnabled, type CreateTaskPayload, type Task } from '@/lib/vikunja-types'
-import { addLocalDays, dateOnlyDue, isNoDueDate, startOfLocalDay, startOfWeek, toLocalDate, type LocalDate } from '../../shared/due-dates'
+import { addLocalDays, dateOnlyDue, isNoDueDate, localDateOf, startOfLocalDay, startOfWeek, toLocalDate, type LocalDate } from '../../shared/due-dates'
 import { withDefaultReminder } from '../../shared/default-reminder'
 import { withoutNestedSubtasks } from '../../shared/nested-subtasks'
 import {
@@ -52,6 +51,7 @@ import {
   busyOfDay,
   fitTasks,
   freeMinutes,
+  moveBlockToDay,
   nextFreeSlot,
   placeBlock,
   viewDays,
@@ -105,6 +105,11 @@ function PlanScreen() {
     setAnchorDay(today)
     setSelectedDay(today)
   }
+  /** Show a day: selected where it is on screen, else the view moves to it. */
+  const selectDay = (day: LocalDate) => {
+    if (!days.includes(day)) setAnchorDay(day)
+    setSelectedDay(day)
+  }
 
   const range = usePlanRange(days)
   const update = useUpdateTask()
@@ -114,47 +119,116 @@ function PlanScreen() {
   const { data: projects } = useProjects()
   const canWriteProject = (id: number) => (access.get(id)?.permission ?? 1) > 0
 
-  const change = (task: Task, changes: BlockChanges) => {
+  const change = (task: Task, changes: BlockChanges, announceDue = true) => {
     update.mutate({ id: task.id, changes: toTaskChanges(changes), original: task })
+    if (announceDue) announceDueMove(task, changes)
   }
+
+  /**
+   * A block placed or moved whose due rule (16.2) moved the due date to another day says so, with
+   * Undo: the one change nobody dragged. The phone says the same (`PlanViewModel.announceDueMove`).
+   */
+  const announceDueMove = (task: Task, changes: BlockChanges) => {
+    if (!changes.start_date || !changes.due_date || isNoDueDate(task.due_date)) return
+    const from = localDateOf(task.due_date)
+    const to = localDateOf(changes.due_date)
+    if (from === to) return
+    toast.success(`Planned for ${midSentence(dayPhrase(to))}. Due date moved from ${midSentence(dayPhrase(from))}`, {
+      action: {
+        label: 'Undo',
+        onAction: () => {
+          update.mutate({
+            id: task.id,
+            changes: { start_date: task.start_date, end_date: task.end_date, due_date: task.due_date },
+            original: { ...task, ...toTaskChanges(changes) },
+          })
+        },
+      },
+    })
+  }
+
+  /** The popover's Day row (contract 16.2): the same times on that day, which the view then shows. */
+  const moveToDay = (task: Task, day: LocalDate) => {
+    const changes = moveBlockToDay(task, day)
+    if (!changes) return
+    change(task, changes, false)
+    selectDay(day)
+    toast.success(`Moved to ${midSentence(dayPhrase(day))}`, {
+      action: {
+        label: 'Undo',
+        onAction: () => {
+          // The patch is the difference with the task as the move left it: back to what it was.
+          update.mutate({
+            id: task.id,
+            changes: { start_date: task.start_date, end_date: task.end_date, due_date: task.due_date },
+            original: { ...task, ...toTaskChanges(changes) },
+          })
+        },
+      },
+    })
+  }
+
+  // Day view: a drag resting on Back or Forward turns the page, never onto a past day.
+  const prevRef = useRef<HTMLButtonElement>(null)
+  const nextRef = useRef<HTMLButtonElement>(null)
+  const [turnHover, setTurnHover] = useState<TurnDirection | null>(null)
+  const pageTurn: PageTurn | undefined =
+    view === 'day'
+      ? {
+          prevRef,
+          nextRef,
+          canTurn: (direction) => canPlaceOn(addLocalDays(anchorDay, direction), today),
+          onTurn: go,
+          onHover: setTurnHover,
+        }
+      : undefined
 
   // The left panel's list.
   const heldTasks = useCompletedTasksStore((s) => s.tasks)
   const projectSourceId = sourceProjectId(source, inboxId) ?? undefined
   const project = useProjectTasks(projectSourceId)
+  // Only what is cached: a list that is not shown is never fetched for its count.
+  const inboxCached = useProjectTasks(inboxId || undefined, false)
   const upcomingParams = useFilters({ view: 'upcoming' })
   const anytimeParams = useFilters({ view: 'anytime' })
   const upcoming = useTasks(upcomingParams, source === 'next7')
   const anytime = useTasks(anytimeParams, source === 'nodate')
   const [filter, setFilter] = useState('')
 
+  const dayTasks = useMemo(
+    () => withoutNestedSubtasks(dayWithoutTime(range.tasks, selectedDay, new Date(), (task) => heldTasks.has(task.id))),
+    [range.tasks, selectedDay, heldTasks, dayKey],
+  )
+  const nextSevenTasks = useMemo(() => upcoming.data.filter((task) => inNextSevenDays(task.due_date, today)), [upcoming.data, today, dayKey])
+  const noDateTasks = useMemo(
+    () => anytime.data.filter((task) => isNoDueDate(task.due_date) && task.project_id !== inboxId),
+    [anytime.data, inboxId],
+  )
   const sourceTasks = useMemo(() => {
-    const now = new Date()
     switch (source) {
       case 'day':
-        return withoutNestedSubtasks(dayWithoutTime(range.tasks, selectedDay, now, (task) => heldTasks.has(task.id)))
+        return dayTasks
       case 'next7':
-        return upcoming.data.filter((task) => inNextSevenDays(task.due_date, today))
+        return nextSevenTasks
       case 'nodate':
-        return anytime.data.filter((task) => isNoDueDate(task.due_date) && task.project_id !== inboxId)
+        return noDateTasks
       default:
         return project.data
     }
-  }, [source, range.tasks, selectedDay, heldTasks, upcoming.data, anytime.data, project.data, today, dayKey, inboxId])
+  }, [source, dayTasks, nextSevenTasks, noDateTasks, project.data])
   const listed = useMemo(() => sourceTasks.filter((task) => matchesTitleFilter(task.title, filter)), [sourceTasks, filter])
 
-  const dayPhrase = (day: LocalDate) => {
-    const date = startOfLocalDay(day)
-    const phrase = formatDateDisplay('header.day', date, new Date(), true, fmt)
-    return day === today || day === addLocalDays(today, 1) ? phrase : date.toLocaleDateString(fmt.locale, { weekday: 'short', day: 'numeric', month: 'short' })
+  // Each chip's count, where the data is at hand. A list never loaded here or elsewhere has none.
+  const sourceCounts = {
+    day: range.isLoading ? undefined : dayTasks.length,
+    inbox: source === 'inbox' ? (project.isSuccess ? project.data.length : undefined) : inboxCached.isSuccess ? inboxCached.data.length : undefined,
+    next7: upcoming.isSuccess ? nextSevenTasks.length : undefined,
+    nodate: anytime.isSuccess ? noDateTasks.length : undefined,
   }
-  const dayLabel = dayListLabel(dayPhrase(selectedDay))
-  const sourceLabel = useMemo(() => {
-    const list = sourceLists(dayLabel).find((item) => item.source === source)
-    if (list) return list.label
-    const id = sourceProjectId(source, inboxId)
-    return projects?.flat.find((candidate) => candidate.id === id)?.title ?? 'Project'
-  }, [source, dayLabel, projects, inboxId])
+  const sourceProject = source.startsWith('project:') ? projects?.flat.find((candidate) => candidate.id === sourceProjectId(source, inboxId)) : undefined
+
+  /** "Today", "Tomorrow", "Wed 12", "Mon, Nov 23" (the day header phrase, contract 8.3). */
+  const dayPhrase = (day: LocalDate) => formatDateDisplay('header.day', startOfLocalDay(day), new Date(), true, fmt)
 
   const routines = usePlanRoutines(days)
 
@@ -298,13 +372,33 @@ function PlanScreen() {
           ))}
         </div>}
         {!inSession && <div className="flex items-center gap-0.5">
-          <button type="button" aria-label="Back" data-plan-prev onClick={() => go(-1)} className="flex h-7 w-7 items-center justify-center rounded-control text-text-secondary hover:bg-bg-hover">
+          <button
+            ref={prevRef}
+            type="button"
+            aria-label="Back"
+            data-plan-prev
+            onClick={() => go(-1)}
+            className={cn(
+              'flex h-7 w-7 items-center justify-center rounded-control text-text-secondary hover:bg-bg-hover',
+              turnHover === -1 && 'bg-bg-selected text-text',
+            )}
+          >
             <ChevronLeft className="h-4 w-4" aria-hidden="true" />
           </button>
           <button type="button" data-plan-today onClick={goToday} className="rounded-control px-2 py-1 text-meta font-medium text-text hover:bg-bg-hover">
             Today
           </button>
-          <button type="button" aria-label="Forward" data-plan-next onClick={() => go(1)} className="flex h-7 w-7 items-center justify-center rounded-control text-text-secondary hover:bg-bg-hover">
+          <button
+            ref={nextRef}
+            type="button"
+            aria-label="Forward"
+            data-plan-next
+            onClick={() => go(1)}
+            className={cn(
+              'flex h-7 w-7 items-center justify-center rounded-control text-text-secondary hover:bg-bg-hover',
+              turnHover === 1 && 'bg-bg-selected text-text',
+            )}
+          >
             <ChevronRight className="h-4 w-4" aria-hidden="true" />
           </button>
         </div>}
@@ -371,11 +465,12 @@ function PlanScreen() {
           className="flex w-[340px] shrink-0 flex-col border-r border-border"
         >
           <div className="shrink-0 space-y-2 p-3 pb-2">
-            <SourceMenu
+            <SourceChips
               source={source}
-              dayLabel={dayLabel}
-              label={sourceLabel}
-              count={sourceTasks.length}
+              dayLabel={dayPhrase(selectedDay)}
+              counts={sourceCounts}
+              projectLabel={sourceProject?.title}
+              projectCount={project.isSuccess ? project.data.length : undefined}
               inboxId={inboxId}
               onChange={(next: PlanSource) => save({ planner_source: next })}
             />
@@ -423,6 +518,7 @@ function PlanScreen() {
           }}
           drawn={drawn}
           drawnRef={drawnRef}
+          pageTurn={pageTurn}
         />
       </div>
       )}
@@ -436,6 +532,7 @@ function PlanScreen() {
           defaultLength={prefs.defaultLength}
           onChange={change}
           onOpenTask={(task) => openTask(task.id)}
+          onMoveToDay={moveToDay}
           onClose={() => setPressed(null)}
         />
       )}

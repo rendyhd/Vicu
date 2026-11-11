@@ -1,16 +1,11 @@
-import { useEffect, useId, useMemo, useRef, useState, type FocusEvent, type KeyboardEvent } from 'react'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { useId, useMemo, useRef, useState, type FocusEvent, type KeyboardEvent } from 'react'
 import { cn } from '@/lib/cn'
-import { toLocalDate, startOfLocalDay, type LocalDate } from '@/lib/due-dates'
-import { formatFullDateWithYear, formatMonthYear, formatWeekdayShort } from '@/lib/date-display'
+import { toLocalDate, type LocalDate } from '@/lib/due-dates'
 import { useDateFormat } from '@/hooks/use-date-format'
+import { MonthCalendar } from './MonthCalendar'
 import {
   TIME_CHOICES,
   focusStaysInside,
-  addMonths,
-  monthGrid,
-  monthStart,
-  moveGridFocus,
   parseTimeText,
   parseWhenText,
   quickChoices,
@@ -34,8 +29,6 @@ interface WhenPanelProps {
   now?: Date
 }
 
-const MONDAY = new Date(2026, 9, 5)
-
 /**
  * The When panel (card 3.4a1): a text field read by the quick-add parser with a live preview, quick
  * choices, a month grid and a row of times. It has no popover of its own; WhenPopover and the
@@ -55,32 +48,16 @@ export function WhenPanel({ value, onChange, now: nowProp }: WhenPanelProps) {
   const [typed, setTyped] = useState<WhenValue | null>(null)
   const selected = typed ?? value
 
-  const [viewMonth, setViewMonth] = useState(() => monthStart(value.date ?? today))
-  const [focusDate, setFocusDate] = useState<LocalDate>(() => value.date ?? today)
-  const gridRef = useRef<HTMLDivElement>(null)
+  // A day chosen or typed turns the month grid to it.
+  const [reveal, setReveal] = useState<{ date: LocalDate } | null>(null)
   const panelRef = useRef<HTMLDivElement>(null)
-  const focusAfterRender = useRef(false)
 
   const [customTime, setCustomTime] = useState('')
   const [customInvalid, setCustomInvalid] = useState(false)
 
-  useEffect(() => {
-    if (!focusAfterRender.current) return
-    focusAfterRender.current = false
-    gridRef.current?.querySelector<HTMLElement>(`[data-date="${focusDate}"]`)?.focus()
-  }, [focusDate, viewMonth])
-
   const choices = useMemo(() => quickChoices(today, fmt), [today, fmt])
-  const grid = useMemo(() => monthGrid(viewMonth), [viewMonth])
-  const weekdayNames = useMemo(
-    () => Array.from({ length: 7 }, (_, i) => formatWeekdayShort(new Date(MONDAY.getFullYear(), MONDAY.getMonth(), MONDAY.getDate() + i), fmt)),
-    [fmt],
-  )
 
-  const showDay = (date: LocalDate) => {
-    setFocusDate(date)
-    setViewMonth(monthStart(date))
-  }
+  const showDay = (date: LocalDate) => setReveal({ date })
 
   const apply = (next: WhenValue, commit: boolean) => {
     setTyped(null)
@@ -91,7 +68,7 @@ export function WhenPanel({ value, onChange, now: nowProp }: WhenPanelProps) {
 
   const onText = (raw: string) => {
     setText(raw)
-    const parsed = parseWhenText(raw, now, fmt.locale)
+    const parsed = parseWhenText(raw, now, fmt.locale, value.date)
     setTyped(parsed ? parsed.value : null)
     if (parsed?.value.date) showDay(parsed.value.date)
   }
@@ -100,20 +77,6 @@ export function WhenPanel({ value, onChange, now: nowProp }: WhenPanelProps) {
     if (event.key !== 'Enter' || event.nativeEvent.isComposing) return
     event.preventDefault()
     if (typed) apply(typed, true)
-  }
-
-  const onGridKey = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (event.altKey || event.ctrlKey || event.metaKey) return
-    const next = moveGridFocus(focusDate, event.key, event.shiftKey)
-    if (!next) return
-    event.preventDefault()
-    focusAfterRender.current = true
-    showDay(next)
-  }
-
-  const shiftMonth = (months: number) => {
-    setViewMonth(monthStart(addMonths(viewMonth, months)))
-    setFocusDate(addMonths(focusDate, months))
   }
 
   // Enter confirms the typed time. Leaving the field for another control of the same popover (Tab to
@@ -141,7 +104,6 @@ export function WhenPanel({ value, onChange, now: nowProp }: WhenPanelProps) {
     return typed ? `${whenText(typed, now, fmt)}, Enter to set` : 'No date found'
   })()
 
-  const monthLabel = formatMonthYear(startOfLocalDay(viewMonth), fmt)
   const timeIsPreset = selected.time !== null && (TIME_CHOICES as readonly string[]).includes(selected.time)
 
   return (
@@ -184,72 +146,12 @@ export function WhenPanel({ value, onChange, now: nowProp }: WhenPanelProps) {
       </div>
 
       <div className="border-t border-[var(--border-color)] pt-2">
-        <div className="mb-1 flex items-center justify-between">
-          <span className="px-1 text-section text-[var(--text-primary)]" aria-live="polite">{monthLabel}</span>
-          <div className="flex gap-0.5">
-            <button
-              type="button"
-              aria-label="Previous month"
-              onClick={() => shiftMonth(-1)}
-              className="flex h-7 w-7 items-center justify-center rounded-control text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </button>
-            <button
-              type="button"
-              aria-label="Next month"
-              onClick={() => shiftMonth(1)}
-              className="flex h-7 w-7 items-center justify-center rounded-control text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </button>
-          </div>
-        </div>
-
-        <div ref={gridRef} role="grid" aria-label={monthLabel} onKeyDown={onGridKey}>
-          <div role="row" className="grid grid-cols-7">
-            {weekdayNames.map((name) => (
-              <div key={name} role="columnheader" className="py-1 text-center text-caption text-[var(--text-secondary)]">
-                {name}
-              </div>
-            ))}
-          </div>
-          {grid.map((week) => (
-            <div key={week[0].date} role="row" className="grid grid-cols-7">
-              {week.map((day) => {
-                const isSelected = day.date === selected.date
-                const isToday = day.date === today
-                return (
-                  <div key={day.date} role="gridcell" aria-selected={isSelected} className="flex justify-center">
-                    <button
-                      type="button"
-                      data-date={day.date}
-                      tabIndex={day.date === focusDate ? 0 : -1}
-                      aria-label={formatFullDateWithYear(startOfLocalDay(day.date), fmt)}
-                      aria-current={isToday ? 'date' : undefined}
-                      onClick={() => {
-                        setFocusDate(day.date)
-                        apply(withDate(selected, day.date), false)
-                      }}
-                      className={cn(
-                        'flex h-7 w-7 items-center justify-center rounded-full text-meta transition-colors',
-                        isSelected
-                          ? 'bg-accent-fill text-on-accent'
-                          : cn(
-                              'hover:bg-[var(--bg-hover)]',
-                              day.inMonth ? 'text-[var(--text-primary)]' : 'text-[var(--text-secondary)]',
-                            ),
-                        isToday && 'ring-1 ring-inset ring-[var(--accent-blue)]',
-                      )}
-                    >
-                      {Number(day.date.slice(8, 10))}
-                    </button>
-                  </div>
-                )
-              })}
-            </div>
-          ))}
-        </div>
+        <MonthCalendar
+          selected={selected.date}
+          today={today}
+          reveal={reveal}
+          onPick={(date) => apply(withDate(selected, date), false)}
+        />
       </div>
 
       <div className="border-t border-[var(--border-color)] pt-2" role="group" aria-label="Time">

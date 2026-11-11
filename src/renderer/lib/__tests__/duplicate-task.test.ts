@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { duplicatePayload, duplicateTask, duplicationRoots, type DuplicateDeps } from '../duplicate-task'
+import { duplicateMessage, duplicatePayload, duplicateTask, duplicationRoots, type DuplicateDeps } from '../duplicate-task'
 import { NULL_DATE } from '../constants'
 import type { CreateTaskPayload, Label, PersonRef, Task } from '../vikunja-types'
 
@@ -83,10 +83,21 @@ describe('duplicate a task', () => {
 
   it('copies subtasks, nested ones included, and links them', async () => {
     const r = rig({ children: { 1: [task({ id: 2, title: 'Chargers', labels: [] })], 2: [task({ id: 3, title: 'Adapter', labels: [] })] } })
-    const { problems } = await duplicateTask(task({}), r.deps)
+    const { problems, made } = await duplicateTask(task({}), r.deps)
     expect(r.created.map((c) => c.payload.title)).toEqual(['Pack for Lisbon', 'Chargers', 'Adapter'])
     expect(r.relations).toEqual([[101, 102], [100, 101]])
     expect(problems).toEqual([])
+    // Everything made, the copy first, for Undo (vicu-android issue 97).
+    expect(made.map((t) => t.id)).toEqual([100, 101, 102])
+  })
+
+  it('names one copy in the toast, counts several, and leads with a problem', () => {
+    const one = { copy: task({ id: 100, title: 'Call the plumber' }), problems: [], made: [] }
+    expect(duplicateMessage([one], [])).toBe('Duplicated “Call the plumber”')
+    expect(duplicateMessage([one, one], [])).toBe('2 tasks duplicated')
+    expect(duplicateMessage([one], ['A label could not be added to “Call the plumber”.', 'Another'])).toBe(
+      'A label could not be added to “Call the plumber”. (and 1 more)'
+    )
   })
 
   it('ends a relation cycle', async () => {

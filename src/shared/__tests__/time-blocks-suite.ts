@@ -12,9 +12,11 @@ import {
   blockOf,
   clockMinutes,
   clockText,
+  dayTopRow,
   fitTasks,
   freeMinutes,
   isTimeBlock,
+  moveBlockToDay,
   nextFreeSlot,
   placeBlock,
   readDefaultLength,
@@ -49,6 +51,17 @@ interface Vectors {
   defaultHours: PlannerHours
   isBlock: Array<{ name: string; start: string | null; end: string | null; block: boolean; day?: string; minutes?: number }>
   placing: Array<{ name: string; due: string | null; start: string; minutes: number; expectDue: string; expectEnd: string }>
+  moveToDay: Array<{
+    name: string
+    due: string | null
+    start: string
+    end: string
+    day: string
+    expectStart: string
+    expectEnd: string
+    expectDue: string
+  }>
+  topRow: { day: string; tasks: TodayTask[]; expect: number[] }
   dueChange: Array<{
     name: string
     today: string
@@ -141,6 +154,37 @@ export function runTimeBlocksSuite(options: { zone: string; expectedOffsetMinute
           expect(wall(changes.end_date)).toBe(vector.expectEnd)
         })
       }
+    })
+
+    describe('moveToDay', () => {
+      for (const vector of vectors.moveToDay) {
+        it(vector.name, () => {
+          const task = { due_date: iso(vector.due), start_date: iso(vector.start), end_date: iso(vector.end) }
+          const changes = moveBlockToDay(task, vector.day)
+          expect(changes).not.toBeNull()
+          expect(wall(changes?.start_date)).toBe(vector.expectStart)
+          expect(wall(changes?.end_date)).toBe(vector.expectEnd)
+          expect(wall(changes?.due_date)).toBe(vector.expectDue)
+        })
+      }
+
+      it('a task without a block has nothing to move', () => {
+        expect(moveBlockToDay({ due_date: iso('2026-10-06T23:59:59'), start_date: null, end_date: null }, '2026-10-08')).toBeNull()
+      })
+    })
+
+    describe('topRow', () => {
+      it("holds the day's tasks without a time", () => {
+        const { topRow } = vectors
+        const tasks = topRow.tasks.map((t) => ({
+          id: t.id,
+          done: t.done,
+          due_date: iso(t.due),
+          start_date: iso(t.start),
+          end_date: iso(t.end),
+        }))
+        expect(dayTopRow(tasks, topRow.day).map((t) => t.id)).toEqual(topRow.expect)
+      })
     })
 
     describe('dueChange', () => {

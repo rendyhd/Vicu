@@ -245,15 +245,43 @@ export interface WhenParse {
  * What the quick-add parser's date extraction makes of typed text ("tomorrow 9am", "next mon",
  * "oct 20 at 3pm"). A phrase that names no time gives a date-only value. Null when the text has no
  * date in it. Typed text here is nothing but a date, so "3 days" means that, unlike in a task's title.
+ * `previous` is the day the text showed before the edit (see `dayWordPhrase`).
  */
-export function parseWhenText(text: string, now: Date, locale?: string): WhenParse | null {
+export function parseWhenText(text: string, now: Date, locale?: string, previous?: LocalDate | null): WhenParse | null {
   if (!text.trim()) return null
+  const phrase = dayWordPhrase(text, now, locale, previous ?? null)
+  if (phrase) return phrase
   const found = extractDate(text, [], { reference: now, locale, bareAmounts: true })
   if (!found.dueDate) return null
   const date = toLocalDate(found.dueDate)
   const time = found.hasTime ? `${pad2(found.dueDate.getHours())}:${pad2(found.dueDate.getMinutes())}` : null
   const token = found.tokens[0]
   return { value: { date, time }, matched: token ? token.raw : text.trim() }
+}
+
+const DAY_WORD_RE = /^\s*(today|tomorrow|yesterday)\s*,\s*(.*?)\s*$/i
+const DAY_WORD_OFFSET: Record<string, number> = { yesterday: -1, today: 0, tomorrow: 1 }
+
+/**
+ * The panel's own text for yesterday, today and tomorrow: the day word, the date it names and the
+ * time ("Today, Oct 8, 1:00 PM"). The parser takes the word as the date and leaves the time behind,
+ * so editing the time and pressing Enter cleared it (vicu-android issue 98). Read as one value
+ * here: the time from what follows the word, and the day from the word, unless the word still
+ * names `previous` and the date after it was changed. Null when the text is not of that form.
+ */
+function dayWordPhrase(text: string, now: Date, locale: string | undefined, previous: LocalDate | null): WhenParse | null {
+  const match = DAY_WORD_RE.exec(text)
+  if (!match) return null
+  const today = toLocalDate(now)
+  const word = addLocalDays(today, DAY_WORD_OFFSET[match[1].toLowerCase()])
+  // A date before today is read from the word's day, so "Yesterday, Oct 7" stays this year.
+  const reference = word < today ? startOfLocalDay(word) : now
+  const rest = extractDate(match[2], [], { reference, locale, skipTimeOnly: true })
+  if (!rest.dueDate) return null
+  const restDate = toLocalDate(rest.dueDate)
+  const date = previous !== null && word === previous && restDate !== previous ? restDate : word
+  const time = rest.hasTime ? `${pad2(rest.dueDate.getHours())}:${pad2(rest.dueDate.getMinutes())}` : null
+  return { value: { date, time }, matched: text.trim() }
 }
 
 /** A value as short text: "Sat 10 Oct, 15:00" (the chip phrasing). Empty when no day is picked. */

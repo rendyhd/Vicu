@@ -17,6 +17,7 @@ export function sourceProjectId(source: PlanSource, inboxId: number): number | n
   return source.startsWith('project:') ? Number(source.slice('project:'.length)) : null
 }
 
+/** The lists the panel offers; the first is the selected day's tasks without a time, named by its day ("Today"). */
 export function sourceLists(dayLabel: string): { source: PlanSource; label: string }[] {
   return [
     { source: 'day', label: dayLabel },
@@ -24,11 +25,6 @@ export function sourceLists(dayLabel: string): { source: PlanSource; label: stri
     { source: 'next7', label: 'Next 7 days' },
     { source: 'nodate', label: 'No date' },
   ]
-}
-
-/** "Today, no time", "Tomorrow, no time", "Fri 6 Nov, no time". */
-export function dayListLabel(dayPhrase: string): string {
-  return `${dayPhrase}, no time`
 }
 
 /** Due after today and at most seven days on. */

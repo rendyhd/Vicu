@@ -44,6 +44,15 @@ describe('toast store', () => {
     expect(messages[3]).toBe('Failure 7')
   })
 
+  it('carries a second action only alongside a first (Open, then Undo)', () => {
+    const open = { label: 'Open', onAction: vi.fn() }
+    const undo = { label: 'Undo', onAction: vi.fn() }
+    toast.success('Duplicated “Call the plumber”', { action: open, secondAction: undo })
+    expect(useToastStore.getState().toasts[0]).toMatchObject({ action: { label: 'Open' }, secondAction: { label: 'Undo' } })
+    toast.success('Alone', { secondAction: undo })
+    expect(useToastStore.getState().toasts[1].secondAction).toBeUndefined()
+  })
+
   it('shows a success toast with an action and closes it after the action', () => {
     const onAction = vi.fn()
     const id = toast.success('Completed', { action: { label: 'Undo', onAction } })

@@ -18,6 +18,11 @@ export interface ToastAction {
 export interface ToastOptions {
   /** A button on the toast ("Undo"). Clicking it runs `onAction`, then closes the toast. */
   action?: ToastAction
+  /**
+   * A second button after `action` (Open, then Undo, after Duplicate). Same behaviour: it runs, then
+   * the toast closes. Only alongside `action`.
+   */
+  secondAction?: ToastAction
   /** How long it stays once nothing is on it; `null` never expires (its owner closes it). Default 7 s. */
   durationMs?: number | null
   /** The same key shows one toast: a new call updates it in place (and restarts its clock). */
@@ -38,6 +43,7 @@ export interface Toast {
   message: string
   key?: string
   action?: ToastAction
+  secondAction?: ToastAction
   onEngage?: (engaged: boolean) => void
 }
 
@@ -117,6 +123,7 @@ export const useToastStore = create<ToastState>((set, get) => {
     toasts: [],
     push: (kind, message, options = {}) => {
       const { key, action, onEngage, onClose } = options
+      const secondAction = action ? options.secondAction : undefined
       const durationMs = options.durationMs === undefined ? TOAST_LIFETIME_MS : options.durationMs
 
       if (key !== undefined) {
@@ -126,7 +133,7 @@ export const useToastStore = create<ToastState>((set, get) => {
           if (onClose) closers.set(existing.id, onClose)
           else closers.delete(existing.id)
           set((state) => ({
-            toasts: state.toasts.map((t) => (t.id === existing.id ? { ...t, kind, message, action, onEngage } : t)),
+            toasts: state.toasts.map((t) => (t.id === existing.id ? { ...t, kind, message, action, secondAction, onEngage } : t)),
           }))
           startClock(existing.id)
           return existing.id
@@ -145,7 +152,7 @@ export const useToastStore = create<ToastState>((set, get) => {
       if (onClose) closers.set(id, onClose)
       let evicted: Toast[] = []
       set((state) => {
-        const next = [...state.toasts, { id, kind, message, key, action, onEngage }]
+        const next = [...state.toasts, { id, kind, message, key, action, secondAction, onEngage }]
         const kept = withoutEvicted(next)
         evicted = next.filter((t) => !kept.includes(t))
         for (const gone of evicted) forget(gone.id)

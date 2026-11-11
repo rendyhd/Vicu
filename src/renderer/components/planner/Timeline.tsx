@@ -40,6 +40,7 @@ import {
 import type { PlanRoutine } from '@/hooks/use-planner'
 import { useTimelineGesture, type GestureItem, type GestureResult } from './use-timeline-gesture'
 import { PLAN_DROP, lengthWhenPlaced, useTimelineDrop, type PlanDropData } from './use-timeline-drop'
+import { turnAt, usePageTurnWhileDragging, type PageTurn } from './use-page-turn'
 
 export type TimelineRoutine = PlanRoutine
 
@@ -71,6 +72,8 @@ interface TimelineProps {
   reasonOf?: (task: Task) => string | undefined
   /** In place of the hint under the day's name. */
   note?: string
+  /** Day view: resting a drag on Back or Forward turns the page. */
+  pageTurn?: PageTurn
 }
 
 const GUTTER_CLASS = 'w-14 shrink-0'
@@ -90,7 +93,7 @@ function hourLabel(hour: number, fmt: ReturnType<typeof useDateFormat>): string 
   return formatDateDisplay('logbook.time', new Date(2000, 0, 15, hour), new Date(2000, 0, 15), false, fmt)
 }
 
-function TopRowChip({ task, draggable }: { task: Task; draggable: boolean }) {
+function TopRowChip({ task, draggable, wide = false }: { task: Task; draggable: boolean; wide?: boolean }) {
   const { setNodeRef, listeners, isDragging } = useDraggable({
     id: `plan-chip-${task.id}`,
     data: { type: 'task', task },
@@ -104,6 +107,7 @@ function TopRowChip({ task, draggable }: { task: Task; draggable: boolean }) {
       title={task.title}
       className={cn(
         'truncate rounded-chip border border-border bg-bg-card px-1.5 py-0.5 text-caption text-text',
+        wide && 'max-w-[16rem]',
         draggable && 'cursor-grab',
         isDragging && 'opacity-50',
       )}
@@ -119,12 +123,21 @@ function DayTopRow({
   canDrop,
   canChange,
   onDropTasks,
+  highlighted = false,
+  wide = false,
+  emptyText,
 }: {
   day: LocalDate
   tasks: readonly Task[]
   canDrop: boolean
   canChange: (task: Task) => boolean
   onDropTasks: (tasks: Task[]) => void
+  /** A block moved by the timeline's own gesture is over it. */
+  highlighted?: boolean
+  /** The Day view's one column: chips side by side, wrapping. */
+  wide?: boolean
+  /** Shown while it has no tasks (the Day view's drop target during a drag). */
+  emptyText?: string
 }) {
   const data: PlanDropData = { type: PLAN_DROP, drop: onDropTasks }
   const { setNodeRef, isOver } = useDroppable({ id: `plan-day-${day}`, data, disabled: !canDrop })
@@ -132,10 +145,17 @@ function DayTopRow({
     <div
       ref={setNodeRef}
       data-plan-top={day}
-      className={cn('flex max-h-24 min-h-[30px] min-w-0 flex-1 flex-col gap-0.5 overflow-y-auto border-l border-border p-1', isOver && 'bg-bg-selected')}
+      className={cn(
+        'flex max-h-24 min-h-[30px] min-w-0 flex-1 overflow-y-auto border-l border-border p-1',
+        wide ? 'flex-row flex-wrap content-start items-center gap-1' : 'flex-col gap-0.5',
+        (isOver || highlighted) && 'bg-bg-selected',
+      )}
     >
+      {tasks.length === 0 && emptyText && (
+        <span className="flex min-w-0 flex-1 items-center justify-center truncate text-caption text-text-secondary">{emptyText}</span>
+      )}
       {tasks.map((task) => (
-        <TopRowChip key={task.id} task={task} draggable={canChange(task)} />
+        <TopRowChip key={task.id} task={task} draggable={canChange(task)} wide={wide} />
       ))}
     </div>
   )
@@ -240,6 +260,7 @@ export function Timeline({
   draft = false,
   reasonOf,
   note,
+  pageTurn,
 }: TimelineProps) {
   const fmt = useDateFormat()
   const now = useMinuteClock()
@@ -302,6 +323,7 @@ export function Timeline({
     gridRef,
     listRef,
     topRowRef,
+    ignoreAt: (x, y) => turnAt(pageTurn, x, y) !== null,
     onCommit: commit,
     onPress: (item, element) => onPressBlock?.(item.task, element),
   })
@@ -314,6 +336,12 @@ export function Timeline({
     lengthOf: (task) => lengthWhenPlaced(task, defaultLength),
     onPlace: (task, day, start, minutes) => onChange(task, placeBlock(task.due_date, atClock(day, start), minutes)),
   })
+
+  // A block or a task on its way somewhere: the Day view's drop row shows, and Back and Forward turn the page.
+  const dragging = gesture.moving || drop.dragging
+  const draggingRef = useRef(dragging)
+  draggingRef.current = dragging
+  usePageTurnWhileDragging(dragging, multiDay ? undefined : pageTurn)
 
   const setScroller = useCallback(
     (node: HTMLDivElement | null) => {
@@ -329,6 +357,11 @@ export function Timeline({
   useLayoutEffect(() => {
     const scroller = scrollRef.current
     if (!scroller || isLoading || opened.current === openKey) return
+    // A page turned during a drag keeps the hours in view, so the pointer stays over the same time.
+    if (draggingRef.current) {
+      opened.current = openKey
+      return
+    }
     const first = days.includes(today) ? today : selectedDay
     scroller.scrollTop = Math.max(0, openingMinute(first, now, today, clockMinutes(hours[0])) * PX_PER_MINUTE - OPENING_MARGIN_PX)
     opened.current = openKey
@@ -360,6 +393,27 @@ export function Timeline({
   const heading = formatDateDisplay('header.day', startOfLocalDay(selectedDay), now, true, fmt)
   const previewTarget = gesture.preview?.target
   const previewingTask = gesture.preview?.taskId
+  const topOver = previewTarget?.kind === 'top' ? previewTarget.day : null
+
+  // The Day view's row of tasks without a time: shown when the day has some, and as a drop target
+  // while something is dragged.
+  const singleDay = days[0]
+  const singleDayTop = multiDay ? [] : dayTopRow(tasks, singleDay)
+  const dropRowOnly = !multiDay && singleDayTop.length === 0 && dragging && canPlaceOn(singleDay, today)
+  const dayTopRowView = (
+    <DayTopRow
+      day={singleDay}
+      tasks={singleDayTop}
+      canDrop={canPlaceOn(singleDay, today)}
+      canChange={canChange}
+      highlighted={topOver === singleDay}
+      wide
+      emptyText="Drop here to remove the time"
+      onDropTasks={(dropped) => {
+        for (const task of dropped) onChange(task, planForDay(task, singleDay))
+      }}
+    />
+  )
 
   return (
     <section aria-label="Day timeline" className="flex min-h-0 min-w-0 flex-1 flex-col">
@@ -401,6 +455,7 @@ export function Timeline({
                 tasks={dayTopRow(tasks, day)}
                 canDrop={canPlaceOn(day, today)}
                 canChange={canChange}
+                highlighted={topOver === day}
                 onDropTasks={(dropped) => {
                   for (const task of dropped) onChange(task, planForDay(task, day))
                 }}
@@ -411,12 +466,28 @@ export function Timeline({
       )}
 
       {!multiDay && (
-        <div className="flex shrink-0 items-baseline gap-2 border-b border-border px-4 py-2">
-          <h2 className="text-section text-text">{heading}</h2>
-          <span className="truncate text-meta text-text-secondary">
-            {startOfLocalDay(selectedDay).toLocaleDateString(fmt.locale, { weekday: 'short', day: 'numeric', month: 'short' })}
-            {note ? ` · ${note}` : canPlaceOn(selectedDay, today) && onDraw ? ' · drag on an empty slot to add a task' : ''}
-          </span>
+        <div className="relative shrink-0">
+          <div className="flex items-baseline gap-2 border-b border-border px-4 py-2">
+            <h2 className="text-section text-text">{heading}</h2>
+            <span className="truncate text-meta text-text-secondary">
+              {startOfLocalDay(selectedDay).toLocaleDateString(fmt.locale, { weekday: 'short', day: 'numeric', month: 'short' })}
+              {note ? ` · ${note}` : canPlaceOn(selectedDay, today) && onDraw ? ' · drag on an empty slot to add a task' : ''}
+            </span>
+          </div>
+          {/* Laid over the heading while a drag needs it, so the grid under the pointer does not move. */}
+          {dropRowOnly && (
+            <div ref={topRowRef} role="group" aria-label="Tasks without a time" className="absolute inset-0 z-30 flex border-b border-border bg-bg-page pr-[var(--scrollbar-size)]">
+              <div className={GUTTER_CLASS} />
+              {dayTopRowView}
+            </div>
+          )}
+        </div>
+      )}
+
+      {!multiDay && singleDayTop.length > 0 && (
+        <div ref={topRowRef} role="group" aria-label="Tasks without a time" className="flex shrink-0 border-b border-border pr-[var(--scrollbar-size)]">
+          <div className={GUTTER_CLASS} />
+          {dayTopRowView}
         </div>
       )}
 
