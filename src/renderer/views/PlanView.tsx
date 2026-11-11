@@ -17,7 +17,11 @@ import type { PageTurn, TurnDirection } from '@/components/planner/use-page-turn
 import { PlannerOptions } from '@/components/planner/PlannerOptions'
 import { useAppConfig } from '@/hooks/use-app-config'
 import { useCalendarEvents } from '@/hooks/use-calendar-events'
-import { eventBusyOfDay } from '../../shared/calendar-events'
+import { usePlanEventActions, usePlanEvents } from '@/hooks/use-plan-events'
+import { EventPopover } from '@/components/planner/EventPopover'
+import { eventBusyOfDay, type CalendarEvent } from '../../shared/calendar-events'
+import { MY_EVENTS_CALENDAR_ID, MY_EVENTS_COLOR, type EventRepeat } from '../../shared/plan-events'
+import type { DrawnKind } from '@/components/planner/DrawTitle'
 import { useDateFormat } from '@/hooks/use-date-format'
 import { useFilters } from '@/hooks/use-filters'
 import { useOpenTask } from '@/hooks/use-open-task'
@@ -51,6 +55,7 @@ import {
   atClock,
   blockOf,
   busyOfDay,
+  clockText,
   fitTasks,
   freeMinutes,
   moveBlockToDay,
@@ -115,11 +120,19 @@ function PlanScreen() {
 
   const range = usePlanRange(days)
   const calendar = useCalendarEvents(days)
-  /** Busy time of a day (contract 16.6): its open blocks and the calendar events that count. */
+  const planEvents = usePlanEvents(days)
+  const planEventActions = usePlanEventActions()
+  // Your own Events and the connected calendars' events, on one timeline.
+  const allEvents = useMemo(() => [...planEvents.occurrences, ...calendar.events], [planEvents.occurrences, calendar.events])
+  const eventColor = (id: string) => (id === MY_EVENTS_CALENDAR_ID ? MY_EVENTS_COLOR : calendar.colorOf(id))
+  /** Busy time of a day (contract 16.6): its open blocks and the events that count. */
   const busyOn = (day: LocalDate) => [
     ...busyOfDay(range.tasks, day),
-    ...eventBusyOfDay(calendar.events, day, calendar.countsAsBusy),
+    ...eventBusyOfDay(allEvents, day, (id) => id === MY_EVENTS_CALENDAR_ID || calendar.countsAsBusy(id)),
   ]
+  // A pressed event's popover, by occurrence id so it shows the event as it is now.
+  const [pressedEvent, setPressedEvent] = useState<{ id: string; element: HTMLElement } | null>(null)
+  const pressedOccurrence: CalendarEvent | undefined = pressedEvent ? allEvents.find((event) => event.id === pressedEvent.id) : undefined
   const update = useUpdateTask()
   const create = useCreateTask()
   const openTask = useOpenTask()
@@ -251,8 +264,19 @@ function PlanScreen() {
   const [drawn, setDrawn] = useState<{ day: LocalDate; range: GestureRange } | null>(null)
   const drawnRef = useRef<HTMLDivElement | null>(null)
   const drawProject = drawTargetProject(source, inboxId, canWriteProject)
-  const addDrawn = (title: string) => {
+  const addDrawn = (title: string, kind: DrawnKind = 'task', repeat: EventRepeat = { kind: 'none' }) => {
     if (!drawn) return
+    if (kind === 'event') {
+      void planEventActions.add({
+        title,
+        start: drawn.day,
+        time: clockText(drawn.range.startMinute),
+        minutes: drawn.range.endMinute - drawn.range.startMinute,
+        repeat,
+      })
+      setDrawn(null)
+      return
+    }
     const start = atClock(drawn.day, drawn.range.startMinute)
     const end = atClock(drawn.day, drawn.range.endMinute)
     const payload = withDefaultReminder(
@@ -527,8 +551,12 @@ function PlanScreen() {
           drawn={drawn}
           drawnRef={drawnRef}
           pageTurn={pageTurn}
-          events={calendar.events}
-          eventColor={calendar.colorOf}
+          events={allEvents}
+          eventColor={eventColor}
+          onPressEvent={(event, element) => {
+            setPressed(null)
+            setPressedEvent({ id: event.id, element })
+          }}
         />
       </div>
       )}
@@ -547,9 +575,21 @@ function PlanScreen() {
         />
       )}
 
+      {pressedEvent && pressedOccurrence && (
+        <EventPopover
+          key={pressedEvent.id}
+          occurrence={pressedOccurrence}
+          element={pressedEvent.element}
+          planEvent={planEvents.events.find((event) => event.id === pressedOccurrence.planEventId)}
+          calendarName={calendar.feeds.find((feed) => feed.id === pressedOccurrence.calendarId)?.name}
+          onClose={() => setPressedEvent(null)}
+        />
+      )}
+
       {drawn && (
         <DrawTitle
           anchorRef={drawnRef}
+          day={drawn.day}
           start={atClock(drawn.day, drawn.range.startMinute)}
           end={atClock(drawn.day, drawn.range.endMinute)}
           projectName={projects?.flat.find((candidate) => candidate.id === drawProject)?.title}

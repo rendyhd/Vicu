@@ -11,6 +11,7 @@ import { createSyncedDocumentService, type SyncedDocumentCodec, type SyncedDocum
 import { PREFS_CARRIER_SEARCH, PREFS_CARRIER_TITLE, encodePrefsEnvelope, hasPrefsMarker, parsePrefsEnvelope } from './synced-prefs-protocol'
 import { canonicalJson, isOwnTask } from '../shared/hidden-tasks'
 import { TEMPLATE_KEY_PREFIX, readTemplate } from '../shared/task-templates'
+import { EVENT_KEY_PREFIX, readPlanEvent } from '../shared/plan-events'
 import { readSubtaskOrder } from '../shared/subtask-order'
 import {
   INBOX_PROJECT_ID_KEY,
@@ -260,6 +261,8 @@ export function isWritablePref(key: unknown, value: unknown): key is string {
   // A task template (section 18) and the order of a task's subtasks (section 19).
   if (key.startsWith(TEMPLATE_KEY_PREFIX) && key.length > TEMPLATE_KEY_PREFIX.length) return value === null || readTemplate(value) !== null
   if (/^subtask_order\.\d+$/.test(key)) return value === null || (Array.isArray(value) && readSubtaskOrder(value).length === value.length)
+  // An Event of the Plan screen (proof of concept, plan-events.ts).
+  if (key.startsWith(EVENT_KEY_PREFIX) && key.length > EVENT_KEY_PREFIX.length) return value === null || readPlanEvent(value) !== null
   return false
 }
 

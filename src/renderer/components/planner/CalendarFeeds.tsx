@@ -3,7 +3,48 @@ import { RefreshCw, Trash2 } from 'lucide-react'
 import { Button } from '@/components/shared/Button'
 import { Checkbox } from '@/components/shared/Checkbox'
 import { useCalendarFeedActions, useCalendarFeeds } from '@/hooks/use-calendar-events'
+import { usePlanEventActions, usePlanEvents } from '@/hooks/use-plan-events'
+import { formatLength } from '@/lib/planner-timeline'
 import type { CalendarFeedView } from '../../../shared/calendar-events'
+import { MY_EVENTS_COLOR, repeatText, type ListedEvent } from '../../../shared/plan-events'
+
+/** Your own Events, to look over and delete; they are added and changed on the timeline. */
+function MyEvents() {
+  const { events } = usePlanEvents()
+  const actions = usePlanEventActions()
+  return (
+    <div data-plan-my-events className="mb-3">
+      <p className="text-meta font-medium text-text">Events</p>
+      <p className="mt-1 text-caption text-text-secondary">
+        Times you are not available, such as a weekly manager call. Drag on the timeline and pick Event to add one.
+        Shown on Plan only and synced to your devices.
+      </p>
+      {events.length > 0 && (
+        <ul className="mt-2 space-y-1">
+          {events.map((event: ListedEvent) => (
+            <li key={event.id} data-plan-my-event={event.id} className="flex items-center gap-2 rounded-control border border-border px-2 py-1">
+              <span aria-hidden="true" className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: MY_EVENTS_COLOR }} />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-meta text-text">{event.title}</span>
+                <span className="block truncate text-caption text-text-secondary">
+                  {repeatText(event.repeat)} · {event.time === null ? 'all day' : `${event.time}, ${formatLength(event.minutes)}`}
+                </span>
+              </span>
+              <button
+                type="button"
+                aria-label={`Delete ${event.title}`}
+                onClick={() => void actions.remove(event)}
+                className="flex h-6 w-6 shrink-0 items-center justify-center rounded-control text-text-secondary hover:bg-bg-hover"
+              >
+                <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
+}
 
 /** "just now", "4 min ago", "2 h ago". */
 function updatedText(iso?: string): string {
@@ -81,7 +122,8 @@ export function CalendarFeeds() {
 
   return (
     <div data-calendar-feeds>
-      <div className="flex items-center gap-2">
+      <MyEvents />
+      <div className="flex items-center gap-2 border-t border-border pt-3">
         <p className="flex-1 text-meta font-medium text-text">Calendars</p>
         {list.length > 0 && (
           <button

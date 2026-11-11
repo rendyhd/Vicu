@@ -7,6 +7,8 @@
 //      and the free time counts the busy events (not the free or all-day ones).
 //   C. 3 days and Week.
 //   D. "Busy" only hides the titles. Removing the calendar removes its events.
+//   E. Events typed by hand: draw a stretch, pick Event and a repeat; it repeats on the right days,
+//      is a synced preference, opens in a popover, skips one day, is listed in the gear, deletes.
 //
 // Its own throwaway tasks; everything is put back at the end.
 
@@ -164,7 +166,98 @@ export default async function run(h) {
     const busyTitles = await page.locator('[data-plan-event]').evaluateAll((nodes) => nodes.map((node) => node.textContent))
     await h.assert('D: busy only shows no titles', busyTitles.length > 0 && busyTitles.every((t) => /^(Busy|Free)/.test(t) && !t.includes('Design')) && busyTitles.some((t) => t.startsWith('Free')), busyTitles)
     await h.capture('day-busy-only')
+    await page.locator('[data-plan-gear]').click()
+    await h.wait(300)
+    await page.locator('[data-calendar-feed] button[aria-label^="Remove"]').click()
+    await h.key('Escape')
+    await h.wait(800)
+    await h.assert('D: removing the calendar removes its events', (await page.locator('[data-plan-event]').count()) === 0)
+
+    // --- E. Events typed by hand ---------------------------------------------------------------------
+    const today = ymd(localDay(0))
+    const spot = (day, minute) =>
+      page.evaluate(({ day, minute }) => {
+        const scroller = document.querySelector('[data-plan-scroller]')
+        const column = document.querySelector(`[data-plan-column="${day}"]`)
+        scroller.scrollTop = Math.max(0, minute - 200)
+        const box = column.getBoundingClientRect()
+        const top = document.querySelector('[data-plan-grid]').getBoundingClientRect().top
+        return { x: box.left + box.width / 2, y: top + minute }
+      }, { day, minute })
+    const draw = async (fromMinute, toMinute, title, repeatIndex) => {
+      const a = await spot(today, fromMinute)
+      await page.mouse.move(a.x, a.y)
+      await page.mouse.down()
+      await page.mouse.move(a.x, a.y + 6, { steps: 2 })
+      await page.mouse.move(a.x, a.y + (toMinute - fromMinute) - 1, { steps: 8 })
+      await page.mouse.up()
+      await h.wait(400)
+      await page.locator('[data-plan-draw-kind="event"]').click()
+      await h.type(title)
+      await page.selectOption('[data-plan-draw-repeat]', { index: repeatIndex })
+      if (title === 'Manager call') await h.capture('draw-event')
+      await page.locator('[data-plan-draw-title] input').click()
+      await h.key('Enter')
+      await h.wait(800)
+    }
+    const named = (title) => page.locator('[data-plan-event]', { hasText: title })
+
+    await draw(16 * 60, 16 * 60 + 30, 'Manager call', 3)
+    await h.assert('E: the drawn Event is on today', (await named('Manager call').count()) === 1)
+    const stored = await page.evaluate(async () => {
+      const { values } = await window.api.getSyncedPrefs()
+      return Object.entries(values).filter(([key]) => key.startsWith('event.')).map(([, value]) => value)
+    })
+    await h.assert('E: it is a synced preference, weekly on that day', stored.length === 1 && stored[0].repeat.kind === 'weekly' && stored[0].time === '16:00', stored)
+    await draw(17 * 60, 17 * 60 + 15, 'Team sync', 2)
+
+    await page.locator('[data-plan-view="week"]').click()
+    await h.wait(700)
+    await page.locator('[data-plan-next]').click()
+    await h.wait(700)
+    await scrollTo(9)
+    await h.wait(300)
+    await h.assert('E: next week has the weekly one once and the weekday one five times', (await named('Manager call').count()) === 1 && (await named('Team sync').count()) === 5, {
+      manager: await named('Manager call').count(),
+      sync: await named('Team sync').count(),
+    })
+    await scrollTo(14)
+    await h.wait(300)
+    await h.capture('week-events')
+    await page.locator('[data-plan-view="day"]').click()
+    await h.wait(400)
+    await page.locator('[data-plan-today]').click()
+    await h.wait(700)
+
+    await spot(today, 17 * 60)
+    await named('Team sync').click()
+    await h.wait(400)
+    await h.assert('E: a press opens the Event to change it', (await page.locator('[data-plan-event-editor]').count()) === 1)
+    await h.capture('event-popover')
+    await page.locator('[data-plan-event-skip]').click()
+    await h.wait(800)
+    await h.assert('E: Skip this one leaves today out', (await named('Team sync').count()) === 0)
+
+    await page.locator('[data-plan-gear]').click()
+    await h.wait(300)
+    await page.locator('[data-plan-my-events]').scrollIntoViewIfNeeded()
+    await h.assert('E: the gear lists both Events', (await page.locator('[data-plan-my-event]').count()) === 2)
+    await h.capture('gear-events')
+    await h.key('Escape')
+    await h.wait(400)
+
+    await spot(today, 16 * 60)
+    await named('Manager call').click()
+    await h.wait(400)
+    await page.locator('[data-plan-event-delete]').click()
+    await h.wait(800)
+    await h.assert('E: Delete event removes it', (await named('Manager call').count()) === 0)
   } finally {
+    await page.evaluate(async () => {
+      const { values } = await window.api.getSyncedPrefs()
+      const gone = Object.fromEntries(Object.keys(values).filter((key) => key.startsWith('event.')).map((key) => [key, null]))
+      if (Object.keys(gone).length) await window.api.setSyncedPreferences(gone)
+    }).catch(() => {})
     await page.evaluate(async () => {
       for (const feed of await window.api.calendar.list()) await window.api.calendar.remove(feed.id)
       await window.api.saveConfigPatch({ planner_enabled: false, planner_view: 'day', planner_source: 'day' })

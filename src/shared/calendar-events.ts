@@ -22,6 +22,9 @@ export interface CalendarEvent {
   /** Opaque (busy) or transparent (free, TRANSP:TRANSPARENT). */
   busy: boolean
   tentative: boolean
+  /** One of your own Events (plan-events.ts): its synced id and the day of this occurrence. */
+  planEventId?: string
+  day?: string
 }
 
 /** A connected calendar as the windows see it: never its address, which is a secret. */

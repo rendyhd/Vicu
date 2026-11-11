@@ -79,6 +79,8 @@ interface TimelineProps {
   /** Calendar events (proof of concept): read-only, drawn beside the blocks. */
   events?: readonly CalendarEvent[]
   eventColor?: (calendarId: string) => string | undefined
+  /** A press on an event (or Enter on it). */
+  onPressEvent?: (event: CalendarEvent, element: HTMLElement) => void
 }
 
 const NO_EVENTS: readonly CalendarEvent[] = []
@@ -135,12 +137,14 @@ function DayTopRow({
   emptyText,
   allDay = NO_EVENTS,
   eventColor,
+  onPressEvent,
 }: {
   day: LocalDate
   tasks: readonly Task[]
   /** All-day calendar events, before the tasks; never dragged. */
   allDay?: readonly CalendarEvent[]
   eventColor?: (calendarId: string) => string | undefined
+  onPressEvent?: (event: CalendarEvent, element: HTMLElement) => void
   canDrop: boolean
   canChange: (task: Task) => boolean
   onDropTasks: (tasks: Task[]) => void
@@ -164,7 +168,7 @@ function DayTopRow({
       )}
     >
       {allDay.map((event) => (
-        <AllDayChip key={event.id} event={event} color={eventColor?.(event.calendarId)} wide={wide} />
+        <AllDayChip key={event.id} event={event} color={eventColor?.(event.calendarId)} wide={wide} onPress={onPressEvent} />
       ))}
       {tasks.length === 0 && allDay.length === 0 && emptyText && (
         <span className="flex min-w-0 flex-1 items-center justify-center truncate text-caption text-text-secondary">{emptyText}</span>
@@ -176,17 +180,20 @@ function DayTopRow({
   )
 }
 
-function AllDayChip({ event, color, wide }: { event: CalendarEvent; color?: string; wide: boolean }) {
+function AllDayChip({ event, color, wide, onPress }: { event: CalendarEvent; color?: string; wide: boolean; onPress?: (event: CalendarEvent, element: HTMLElement) => void }) {
   return (
-    <div
+    <button
+      type="button"
       data-plan-allday-event={event.id}
+      onPointerDown={(pointer) => pointer.stopPropagation()}
+      onClick={(click) => onPress?.(event, click.currentTarget)}
       title={`${event.title} (all day)`}
-      className={cn('flex min-w-0 items-center gap-1 truncate rounded-chip border border-border px-1.5 py-0.5 text-caption text-text', wide && 'max-w-[16rem]')}
+      className={cn('flex min-w-0 items-center gap-1 truncate rounded-chip border border-border px-1.5 py-0.5 text-left text-caption text-text', wide && 'max-w-[16rem]')}
       style={{ backgroundColor: color ? `${color}24` : undefined, borderColor: color ?? undefined }}
     >
       <CalendarDays className="h-3 w-3 shrink-0" style={{ color }} aria-hidden="true" />
       <span className="truncate">{event.title}</span>
-    </div>
+    </button>
   )
 }
 
@@ -199,6 +206,7 @@ const EventView = memo(function EventView({
   width,
   range,
   color,
+  onPress,
 }: {
   event: CalendarEvent
   top: number
@@ -207,6 +215,7 @@ const EventView = memo(function EventView({
   width: string
   range: string
   color: string
+  onPress?: (event: CalendarEvent, element: HTMLElement) => void
 }) {
   const compact = height < 40
   const tint = `${color}29`
@@ -214,8 +223,11 @@ const EventView = memo(function EventView({
     <li
       data-plan-event={event.id}
       title={[event.title, range, event.location, event.tentative ? 'Tentative' : null, event.busy ? null : 'Free'].filter(Boolean).join(' · ')}
-      // Never starts a drawing or a drag: an event is not Vicu's to move.
-      onPointerDown={(pointer) => pointer.stopPropagation()}
+      // Never starts a drawing or a drag: a press opens it.
+      onPointerDown={(pointer) => {
+        pointer.stopPropagation()
+        if (pointer.button === 0) onPress?.(event, pointer.currentTarget)
+      }}
       style={{
         top,
         height,
@@ -230,7 +242,15 @@ const EventView = memo(function EventView({
         !event.busy && 'opacity-60',
       )}
     >
-      <div className={cn('flex h-full min-w-0 flex-col', compact ? 'justify-center' : 'justify-start pt-1')}>
+      <button
+        type="button"
+        data-plan-focus
+        onClick={(click) => {
+          // By keyboard; a press goes through the pointer handler above.
+          if (click.detail === 0) onPress?.(event, click.currentTarget.closest('li') as HTMLElement)
+        }}
+        className={cn('flex h-full w-full min-w-0 cursor-default flex-col rounded-control text-left focus-visible:-outline-offset-2', compact ? 'justify-center' : 'justify-start pt-1')}
+      >
         <span className="flex min-w-0 items-center gap-1">
           <CalendarDays className="h-3 w-3 shrink-0" style={{ color }} aria-hidden="true" />
           <span className="truncate text-meta font-medium text-text">{event.title}</span>
@@ -239,7 +259,7 @@ const EventView = memo(function EventView({
           {range}
           {event.location ? ` · ${event.location}` : ''}
         </span>
-      </div>
+      </button>
     </li>
   )
 })
@@ -346,6 +366,7 @@ export function Timeline({
   pageTurn,
   events = NO_EVENTS,
   eventColor,
+  onPressEvent,
 }: TimelineProps) {
   const fmt = useDateFormat()
   const now = useMinuteClock()
@@ -492,6 +513,7 @@ export function Timeline({
       tasks={singleDayTop}
       allDay={singleDayAllDay}
       eventColor={eventColor}
+      onPressEvent={onPressEvent}
       canDrop={canPlaceOn(singleDay, today)}
       canChange={canChange}
       highlighted={topOver === singleDay}
@@ -543,6 +565,7 @@ export function Timeline({
                 tasks={dayTopRow(tasks, day)}
                 allDay={allDayEventsOn(events, day)}
                 eventColor={eventColor}
+                onPressEvent={onPressEvent}
                 canDrop={canPlaceOn(day, today)}
                 canChange={canChange}
                 highlighted={topOver === day}
@@ -705,6 +728,7 @@ export function Timeline({
                         width={`calc(${100 / placed.columnCount}% - 4px)`}
                         range={formatBlockRange(new Date(placed.event.start), new Date(placed.event.end), fmt)}
                         color={eventColor?.(placed.event.calendarId) ?? CALENDAR_COLORS[0]}
+                        onPress={onPressEvent}
                       />
                     ))}
 
