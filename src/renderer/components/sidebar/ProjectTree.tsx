@@ -19,6 +19,7 @@ import { CategoryHeader, type OpenCategoryMenu } from './CategoryHeader'
 import type { Project } from '@/lib/vikunja-types'
 import type { ProjectCategory } from '../../../shared/project-categories'
 import { useProjectsWithoutIcon } from '@/hooks/use-project-icons'
+import { useFocus } from '@/hooks/use-focus'
 
 interface MenuState {
   project: Project
@@ -188,13 +189,18 @@ export function ProjectTree() {
   // The top-level projects come from the category layout (cross-app semantics 13.2: the Inbox's
   // subprojects are top-level too), each drawn with its subtree.
   const nodesById = useMemo(() => new Map(flatten(data?.tree ?? []).map(({ node }) => [node.id, node])), [data?.tree])
-  const groups = useMemo(
-    () => layout.map((group) => ({
-      category: group.category,
-      nodes: group.projectIds.flatMap((id) => nodesById.get(id) ?? []),
-    })),
-    [layout, nodesById],
-  )
+  // Pro's focus (21.14): only the projects in focus and their ancestors; without one, all.
+  const { shownProjects } = useFocus()
+  const groups = useMemo(() => {
+    const prune = (node: ProjectTreeNode): ProjectTreeNode[] =>
+      !shownProjects ? [node] : shownProjects.has(node.id) ? [{ ...node, children: node.children.flatMap(prune) }] : []
+    return layout
+      .map((group) => ({
+        category: group.category,
+        nodes: group.projectIds.flatMap((id) => nodesById.get(id) ?? []).flatMap(prune),
+      }))
+      .filter((group) => !shownProjects || group.nodes.length > 0)
+  }, [layout, nodesById, shownProjects])
   const archived = data?.archived ?? []
 
   const openMenu = (project: Project, at: { point: { x: number; y: number } } | { anchor: HTMLElement }, opener: HTMLElement | null) => {

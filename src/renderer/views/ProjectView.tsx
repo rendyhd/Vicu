@@ -18,6 +18,8 @@ import { ListSkeleton } from '@/components/shared/ListSkeleton'
 import { Button } from '@/components/shared/Button'
 import { ProjectHeaderMenu } from '@/components/projects/ProjectHeaderMenu'
 import { useSharedProjectActions } from '@/hooks/use-project-actions'
+import { useAvailabilityView } from '@/hooks/use-availability'
+import { HiddenSummary, ViewSwitch } from '@/components/pro/ViewSwitch'
 
 function findSectionForTask(
   sections: SectionData[],
@@ -57,8 +59,21 @@ export function ProjectView() {
   const archivedProject = projectData?.archived.find((p) => p.id === pid)
   const projectName = activeProject?.title ?? archivedProject?.title ?? 'Project'
 
-  const { data: tasks = [], isLoading: tasksLoading, viewId, order: taskOrder } = useProjectTasks(activeProject?.id)
-  const { sections, hasSections, isLoading: sectionsLoading } = useProjectSections(pid)
+  const { data: allTasks = [], isLoading: tasksLoading, viewId, order: taskOrder } = useProjectTasks(activeProject?.id)
+  const { sections: allSections, hasSections, isLoading: sectionsLoading } = useProjectSections(pid)
+  // Pro: Available, Remaining or All (cross-app semantics 21.2). Off, `filter` keeps every task.
+  const availability = useAvailabilityView(`project.${pid}`)
+  const tasks = useMemo(() => availability.filter(allTasks), [availability, allTasks])
+  const sections = useMemo(() => {
+    if (!availability.on) return allSections
+    const keep = (section: SectionData): SectionData => ({ ...section, tasks: availability.filter(section.tasks), children: section.children.map(keep) })
+    return allSections.map(keep)
+  }, [availability, allSections])
+  const hiddenCount = useMemo(() => {
+    if (!availability.on) return 0
+    const count = (list: SectionData[]): number => list.reduce((sum, section) => sum + availability.hidden(section.tasks) + count(section.children), 0)
+    return availability.hidden(allTasks) + count(allSections)
+  }, [availability, allTasks, allSections])
   const setReorderContext = useReorderStore((s) => s.setReorderContext)
   const clearSectionContexts = useReorderStore((s) => s.clearSectionContexts)
 
@@ -213,7 +228,8 @@ export function ProjectView() {
       sortable
       taskOrder={taskOrder}
       viewId={viewId}
-      empty={tasks.length === 0 && !hasSections}
+      empty={tasks.length === 0 && !hasSections && hiddenCount === 0}
+      headerContent={availability.on ? <ViewSwitch view={availability.view} onChange={availability.setView} /> : undefined}
       emptyTitle="No tasks in this project"
       emptySubtitle="Create a new task to get started"
       headerActions={activeProject && <ProjectHeaderMenu project={activeProject} />}
@@ -246,6 +262,9 @@ export function ProjectView() {
         )}
         <AddSectionButton parentProjectId={pid} siblings={sectionProjects} index={sectionProjects.length} />
       </div>
+      {availability.on && availability.view === 'available' && (
+        <HiddenSummary count={hiddenCount} onShow={() => availability.setView('remaining')} />
+      )}
     </TaskList>
     </RowViewProvider>
   )

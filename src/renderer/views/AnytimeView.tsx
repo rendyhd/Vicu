@@ -12,10 +12,16 @@ import { openCount, showsGroupHeader } from '@/lib/list-sections'
 import { api } from '@/lib/api'
 import type { Task } from '@/lib/vikunja-types'
 import { ListSkeleton } from '@/components/shared/ListSkeleton'
+import { useAvailabilityView } from '@/hooks/use-availability'
+import { HiddenSummary, ViewSwitch } from '@/components/pro/ViewSwitch'
 
 export function AnytimeView() {
   const params = useFilters({ view: 'anytime' })
-  const { data: tasks = [], isLoading } = useTasks(params)
+  const { data: loaded = [], isLoading } = useTasks(params)
+  // Pro: Available, Remaining or All (cross-app semantics 21.2); off, every task as before.
+  const availability = useAvailabilityView('anytime')
+  const tasks = useMemo(() => availability.filter(loaded), [availability, loaded])
+  const hiddenCount = availability.hidden(loaded)
   const { data: projectData, isLoading: projectsLoading } = useProjects()
   const [inboxProjectId, setInboxProjectId] = useState<number | undefined>()
 
@@ -105,6 +111,8 @@ export function AnytimeView() {
       showNewTask={!!inboxProjectId && projectData?.flat.some((project) => project.id === inboxProjectId)}
       emptyTitle="Nothing here"
       emptySubtitle="Open tasks from all projects"
+      empty={availability.on ? groups.length === 0 && hiddenCount === 0 : undefined}
+      headerContent={availability.on ? <ViewSwitch view={availability.view} onChange={availability.setView} /> : undefined}
     >
       {groups.map((group) => {
         const groupTasks = group.subGroups.flatMap((sub) => sub.tasks)
@@ -133,6 +141,9 @@ export function AnytimeView() {
           </div>
         )
       })}
+      {availability.on && availability.view === 'available' && (
+        <HiddenSummary count={hiddenCount} onShow={() => availability.setView('remaining')} />
+      )}
     </TaskList>
   )
 }

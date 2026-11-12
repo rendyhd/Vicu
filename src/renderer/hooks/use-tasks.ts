@@ -5,12 +5,14 @@ import { api } from '@/lib/api'
 import { useCompletedTasksStore } from '@/stores/completed-tasks-store'
 import type { Task, TaskQueryParams } from '@/lib/vikunja-types'
 import { hasVicuMetadataMarker } from '@/lib/metadata-tasks'
+import { useFocusFilter } from './use-focus'
 import { asksForOpenTasksOnly, dropReleasedCompletions, mergeSmartListUndoWindow } from '@/lib/undo-window'
 
 export function useTasks(params: TaskQueryParams, enabled = true) {
   const matches = useMatches()
   const pathname = matches[matches.length - 1]?.pathname ?? ''
   const completedTasks = useCompletedTasksStore((s) => s.tasks)
+  const focusFilter = useFocusFilter()
 
   const query = useQuery({
     queryKey: ['tasks', params],
@@ -39,8 +41,9 @@ export function useTasks(params: TaskQueryParams, enabled = true) {
     const tasks = asksForOpenTasksOnly(params.filter) ? dropReleasedCompletions(loaded, completedTasks, pathname) : loaded
     const merged = mergeSmartListUndoWindow(tasks, completedTasks, pathname, previous.current)
     previous.current = merged
-    return merged
-  }, [query.data, completedTasks, pathname, params])
+    // Pro's focus (21.14): only tasks of projects in focus. Without a focus this is the list itself.
+    return focusFilter(merged)
+  }, [query.data, completedTasks, pathname, params, focusFilter])
 
   return { ...query, data }
 }

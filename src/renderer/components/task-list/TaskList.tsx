@@ -7,6 +7,8 @@ import { DEFAULT_TASK_ORDER, canReorderTask, type TaskOrderKey } from '../../../
 import { verticalListSortingStrategyForeignSafe } from '@/lib/sortable-strategy'
 import { useCompleteTask, useUpdateTask, useDeleteTask } from '@/hooks/use-task-mutations'
 import { useDuplicateTasks } from '@/hooks/use-duplicate-tasks'
+import { useToggleFlags } from '@/hooks/use-flag'
+import { usePro } from '@/hooks/use-pro'
 import { usePasteTasks } from '@/hooks/use-paste-tasks'
 import { useTaskStep } from '@/hooks/use-task-step'
 import { currentExpandedTaskId, useSelectionStore } from '@/stores/selection-store'
@@ -124,6 +126,8 @@ export function TaskList({
   const pasteTasks = usePasteTasks({ projectId, defaultDueDate })
   const completeTask = useCompleteTask()
   const duplicate = useDuplicateTasks()
+  const toggleFlags = useToggleFlags()
+  const flagsOn = usePro().layer('availability')
   const updateTask = useUpdateTask()
   const deleteTask = useDeleteTask()
   const stepTask = useTaskStep()
@@ -262,6 +266,16 @@ export function TaskList({
         e.preventDefault()
         void duplicate(resolveSelectedTasks(qc, selectedTaskIds))
         clearSelection()
+        return
+      }
+
+      // Ctrl+Shift+F / Cmd+Shift+F: Pro's flag on the selection or the focused row (21.4).
+      if (flagsOn && (e.ctrlKey || e.metaKey) && e.shiftKey && !e.altKey && e.key.toLowerCase() === 'f') {
+        const ids = selectedTaskIds.size > 0 ? selectedTaskIds : focusedTaskId ? new Set([focusedTaskId]) : null
+        if (ids) {
+          e.preventDefault()
+          toggleFlags(resolveSelectedTasks(qc, ids))
+        }
         return
       }
 
@@ -477,6 +491,8 @@ export function TaskList({
       setSelectedRange,
       setExpandedTask,
       clearSelection,
+      toggleFlags,
+      flagsOn,
     ]
   )
 

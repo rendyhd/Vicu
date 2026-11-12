@@ -12,6 +12,8 @@ import { TaskList } from '@/components/task-list/TaskList'
 import { ProjectTaskGroup } from '@/components/task-list/ProjectTaskGroup'
 import { RowViewProvider } from '@/components/task-list/RowViewContext'
 import { ListSkeleton } from '@/components/shared/ListSkeleton'
+import { useAvailabilityView } from '@/hooks/use-availability'
+import { HiddenSummary, ViewSwitch } from '@/components/pro/ViewSwitch'
 
 export function TagView() {
   const { labelId } = useParams({ from: '/tag/$labelId' })
@@ -29,13 +31,16 @@ export function TagView() {
   const params = useFilters({ view: 'tag', labelId: lid })
   const { data: tasks = [], isLoading } = useTasks(params)
 
-  const filtered = useMemo(() => {
+  const availability = useAvailabilityView(`tag.${lid}`)
+  const labeledAll = useMemo(() => {
     const activeIds = new Set(projects?.flat.map((project) => project.id) ?? [])
     const labeled = tasks.filter((t) => activeIds.has(t.project_id) && t.labels?.some((l) => l.id === lid))
     // Filter first, then hide nested subtasks: a labeled subtask is shown even when its parent
     // lacks the label, and nests under its parent only when the parent is in the list too.
     return withoutNestedSubtasks(labeled, { hideChildrenOfCompletedParents: false })
   }, [tasks, lid, projects?.flat])
+  const filtered = useMemo(() => availability.filter(labeledAll), [availability, labeledAll])
+  const hiddenCount = availability.hidden(labeledAll)
 
   const groups = useMemo(() => {
     const projectMap = new Map<number, { name: string; color?: string; tasks: typeof filtered }>()
@@ -81,10 +86,15 @@ export function TagView() {
           if (!task.labels?.some((l) => l.id === lid)) addLabel.mutate({ taskId: task.id, labelId: lid })
         }}
         emptyTitle={`No tasks tagged "${labelName}"`}
+        empty={availability.on ? groups.length === 0 && hiddenCount === 0 : undefined}
+        headerContent={availability.on ? <ViewSwitch view={availability.view} onChange={availability.setView} /> : undefined}
       >
         {groups.map((group) => (
           <ProjectTaskGroup key={group.name} level={1} name={group.name} color={group.color} tasks={group.tasks} />
         ))}
+        {availability.on && availability.view === 'available' && (
+          <HiddenSummary count={hiddenCount} onShow={() => availability.setView('remaining')} />
+        )}
       </TaskList>
     </RowViewProvider>
   )

@@ -20,6 +20,8 @@ import {
   Layers,
   ListPlus,
   Plus,
+  ListOrdered,
+  PauseCircle,
 } from 'lucide-react'
 import { Menu, MenuItem, MenuSeparator } from '@/components/overlay/Menu'
 import { Popover, type PopoverCloseReason } from '@/components/overlay/Popover'
@@ -38,6 +40,8 @@ import { parentOptions } from './ProjectDialog'
 import { TaskOrderMenu } from './TaskOrderMenu'
 import { canAddCategoryAbove, groupOfProject, type ProjectCategory } from '../../../shared/project-categories'
 import { useProjectsWithoutIcon } from '@/hooks/use-project-icons'
+import { usePro } from '@/hooks/use-pro'
+import { ProjectStatusMenu, ProjectTypeMenu } from '@/components/pro/ProjectProMenus'
 
 interface ParentPickerProps {
   anchorRef: RefObject<HTMLElement | null>
@@ -162,7 +166,7 @@ export interface ProjectMenuProps {
   onClose: () => void
 }
 
-type Sub = 'move' | 'category' | 'review' | 'sort' | null
+type Sub = 'move' | 'category' | 'review' | 'sort' | 'pro-type' | 'pro-status' | null
 
 /**
  * The one project menu, used by the sidebar (the … button and right-click), the project page
@@ -173,6 +177,10 @@ export function ProjectMenu({ project, surface, anchorRef, anchorPoint, opener =
   const categoryRef = useRef<HTMLButtonElement>(null)
   const reviewRef = useRef<HTMLButtonElement>(null)
   const sortRef = useRef<HTMLButtonElement>(null)
+  const proTypeRef = useRef<HTMLButtonElement>(null)
+  const proStatusRef = useRef<HTMLButtonElement>(null)
+  // Pro's project type and status (21.2), with the availability layer.
+  const proOn = usePro().layer('availability')
   const [sub, setSub] = useState<Sub>(null)
   const { data } = useProjects()
   const { data: config } = useAppConfig()
@@ -304,6 +312,30 @@ export function ProjectMenu({ project, surface, anchorRef, anchorPoint, opener =
         Sort tasks
       </MenuItem>
       {sub === 'sort' && <TaskOrderMenu project={project} anchorRef={sortRef} onClose={closeSub} />}
+      {proOn && !isInbox && (
+        <>
+          <MenuItem
+            ref={proTypeRef}
+            icon={<ListOrdered />}
+            popup="menu"
+            expanded={sub === 'pro-type'}
+            onSelect={() => setSub((s) => (s === 'pro-type' ? null : 'pro-type'))}
+          >
+            Type
+          </MenuItem>
+          {sub === 'pro-type' && <ProjectTypeMenu project={project} anchorRef={proTypeRef} onClose={closeSub} />}
+          <MenuItem
+            ref={proStatusRef}
+            icon={<PauseCircle />}
+            popup="menu"
+            expanded={sub === 'pro-status'}
+            onSelect={() => setSub((s) => (s === 'pro-status' ? null : 'pro-status'))}
+          >
+            Status
+          </MenuItem>
+          {sub === 'pro-status' && <ProjectStatusMenu project={project} anchorRef={proStatusRef} onClose={closeSub} />}
+        </>
+      )}
 
       {(!isInbox || showReview) && <MenuSeparator />}
       {!isInbox && (

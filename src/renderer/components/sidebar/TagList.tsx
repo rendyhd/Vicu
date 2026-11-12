@@ -2,18 +2,20 @@ import { useState, useEffect, useId } from 'react'
 import { SelectionPill } from './SelectionPill'
 import { useNavigate, useMatches } from '@tanstack/react-router'
 import { useDroppable } from '@dnd-kit/core'
-import { Pencil, Trash2, X } from 'lucide-react'
+import { Pencil, Trash2, X, PauseCircle, User } from 'lucide-react'
 import { useLabels } from '@/hooks/use-labels'
 import { useCreateLabel, useUpdateLabel, useDeleteLabel } from '@/hooks/use-task-mutations'
 import { useConfirmDelete } from '@/hooks/use-confirm-delete'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { Dialog } from '@/components/overlay/Dialog'
-import { Menu, MenuItem } from '@/components/overlay/Menu'
+import { Menu, MenuItem, MenuSeparator } from '@/components/overlay/Menu'
 import { useSidebarStore } from '@/stores/sidebar-store'
 import { cn } from '@/lib/cn'
 import { focusTargetOf } from '@/lib/focus-target'
 import type { Label } from '@/lib/vikunja-types'
 import { normalizeHex } from '@/lib/constants'
+import { usePro } from '@/hooks/use-pro'
+import { useProPrefs } from '@/hooks/use-pro-prefs'
 
 function LabelDialog({
   open,
@@ -204,6 +206,9 @@ export function TagList() {
   const deleteLabel = useDeleteLabel()
   const { confirmDelete, dialogProps: deleteDialogProps } = useConfirmDelete()
   const { labelDialogOpen, setLabelDialogOpen } = useSidebarStore()
+  // Pro (21.2, 21.5): a label on hold makes its tasks wait; a person label is someone you work with.
+  const pro = usePro()
+  const proPrefs = useProPrefs()
 
   const [editingLabel, setEditingLabel] = useState<Label | null>(null)
   const [contextMenu, setContextMenu] = useState<{
@@ -251,6 +256,23 @@ export function TagList() {
           >
             Edit
           </MenuItem>
+          {pro.layer('availability') && (
+            <MenuItem
+              icon={<PauseCircle />}
+              onSelect={() => void proPrefs.setLabelOnHold(contextMenu.label.id, !proPrefs.labelOnHold(contextMenu.label.id))}
+            >
+              {proPrefs.labelOnHold(contextMenu.label.id) ? 'Make active' : 'Put on hold'}
+            </MenuItem>
+          )}
+          {pro.layer('promises') && (
+            <MenuItem
+              icon={<User />}
+              onSelect={() => void proPrefs.setPerson(contextMenu.label.id, !proPrefs.isPerson(contextMenu.label.id))}
+            >
+              {proPrefs.isPerson(contextMenu.label.id) ? 'Not a person' : 'This is a person'}
+            </MenuItem>
+          )}
+          {pro.on && <MenuSeparator />}
           <MenuItem
             icon={<Trash2 />}
             danger

@@ -33,6 +33,7 @@ import { ProjectPickerPopover } from './ProjectPickerPopover'
 import { InfoPopover } from './InfoPopover'
 import { AssignPopover } from './AssignPopover'
 import { AvatarStack } from '../shared/Avatar'
+import { ProCardChips } from '../pro/ProCardChips'
 
 /** The one editor of the card that is open, if any. */
 export type CardPopover =
@@ -281,6 +282,7 @@ export function TaskCardBar({
           repeatMode={task.repeat_mode ?? 0}
           onRecurrenceChange={onRecurrenceChange}
           onClose={onClose}
+          taskId={task.id}
         />
       )}
 
@@ -289,6 +291,9 @@ export function TaskCardBar({
         <span className="max-w-[10rem] truncate">{project?.title ?? 'Project'}</span>
       </PropertyButton>
       {is('project') && <ProjectPickerPopover anchorRef={projectRef} currentProjectId={task.project_id} onSelect={onProjectChange} onClose={onClose} />}
+
+      {/* Pro (cross-app semantics 21): start date, estimate, after and flag; nothing while it is off. */}
+      <ProCardChips task={task} />
 
       {canAssign && (
         <PropertyButton

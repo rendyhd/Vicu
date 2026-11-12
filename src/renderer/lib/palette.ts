@@ -5,6 +5,7 @@ import type { Label, Project, Task } from './vikunja-types'
 // action into a navigation or a change.
 
 export type PaletteCommand = 'new-task' | 'new-event' | 'voice' | 'dictate' | 'brain-dump' | 'ask' | 'make-tasks' | 'refresh' | 'toggle-theme' | 'settings'
+  | 'pro-focus' | 'pro-settings' | 'pro-import' | 'pro-copilot' | 'pro-recap'
 
 export type PaletteAction =
   | { type: 'command'; command: PaletteCommand }
@@ -34,6 +35,32 @@ export interface PaletteSources {
   labels: readonly Pick<Label, 'id' | 'title'>[]
   /** The Plan screen is on: "New event" is listed (calendar plan, phase 1). */
   planner?: boolean
+  /** Pro's lists and actions while Pro is on (plan 7.1.11); absent while it is off. */
+  pro?: ProPaletteSources
+}
+
+export interface ProPaletteSources {
+  lists: readonly { id: string; label: string; path: string }[]
+  focus: boolean
+  promises: boolean
+}
+
+/** Pro's actions, by layer. */
+export function proPaletteItems(pro: ProPaletteSources): PaletteItem[] {
+  return [
+    ...(pro.focus
+      ? [{ id: 'cmd:pro-focus', kind: 'Action', title: 'Focus', keywords: 'pro show only projects categories narrow hide', action: { type: 'command', command: 'pro-focus' } } satisfies PaletteItem]
+      : []),
+    ...(pro.promises
+      ? ([
+          { id: 'cmd:pro-import', kind: 'Action', title: 'Import meeting notes', keywords: 'pro paste copilot json promises actions decisions', action: { type: 'command', command: 'pro-import' } },
+          { id: 'cmd:pro-copilot', kind: 'Action', title: 'Ask Copilot', keywords: 'pro prompt meeting mail chat summary export', action: { type: 'command', command: 'pro-copilot' } },
+          { id: 'cmd:pro-recap', kind: 'Action', title: 'Recap', keywords: 'pro summary send people promises meeting', action: { type: 'command', command: 'pro-recap' } },
+        ] satisfies PaletteItem[])
+      : []),
+    { id: 'cmd:pro-settings', kind: 'Action', title: 'Pro settings', keywords: 'pro preferences layers area cap', action: { type: 'command', command: 'pro-settings' } },
+    ...pro.lists.map((list): PaletteItem => ({ id: `list:${list.id}`, kind: 'List', title: list.label, keywords: 'go to pro', action: { type: 'path', path: list.path } })),
+  ]
 }
 
 /** The guided sessions (cross-app semantics 14): found by name, not listed with an empty query. */
@@ -46,7 +73,7 @@ export const GUIDED_PALETTE_ITEMS: readonly PaletteItem[] = [
 ]
 
 /** Everything the palette can run except tasks: actions, smart lists, guided sessions, projects and labels, in that order. */
-export function buildPaletteItems({ smartLists, projects, labels, planner = false }: PaletteSources): PaletteItem[] {
+export function buildPaletteItems({ smartLists, projects, labels, planner = false, pro }: PaletteSources): PaletteItem[] {
   const actions: PaletteItem[] = [
     { id: 'cmd:new-task', kind: 'Action', title: 'New task', keywords: 'add create', action: { type: 'command', command: 'new-task' } },
     // An Event on the Plan screen (contract 20.3), at the selected day's next free time.
@@ -68,6 +95,7 @@ export function buildPaletteItems({ smartLists, projects, labels, planner = fals
   return [
     ...actions,
     ...smartLists.map((list): PaletteItem => ({ id: `list:${list.id}`, kind: 'List', title: list.label, keywords: 'go to', action: { type: 'path', path: list.path } })),
+    ...(pro ? proPaletteItems(pro) : []),
     ...GUIDED_PALETTE_ITEMS,
     ...projects.map((project): PaletteItem => ({ id: `project:${project.id}`, kind: 'Project', title: project.title, keywords: 'go to', action: { type: 'project', id: project.id } })),
     ...labels.map((label): PaletteItem => ({ id: `label:${label.id}`, kind: 'Label', title: label.title, keywords: 'go to tag', action: { type: 'label', id: label.id } })),

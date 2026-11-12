@@ -7,6 +7,7 @@ import {
   getPresetValues,
 } from '@/lib/recurrence'
 import { Popover, type PopoverCloseReason } from '../overlay/Popover'
+import { RepeatRuleFields } from '../pro/RepeatRuleFields'
 
 interface RecurrencePickerPopoverProps {
   anchorRef: RefObject<HTMLElement | null>
@@ -14,6 +15,8 @@ interface RecurrencePickerPopoverProps {
   repeatMode: number
   onRecurrenceChange: (repeatAfter: number, repeatMode: number) => void
   onClose: (reason?: PopoverCloseReason) => void
+  /** The task, for Pro's repeat rule (ends and catching up); without one the rule is not offered. */
+  taskId?: number
 }
 
 type CustomUnit = 'days' | 'weeks'
@@ -27,6 +30,7 @@ export function RecurrencePickerPopover({
   repeatMode,
   onRecurrenceChange,
   onClose,
+  taskId,
 }: RecurrencePickerPopoverProps) {
   const activePreset = detectRecurrencePreset(repeatAfter, repeatMode)
   const hasRecurrence = activePreset !== 'none'
@@ -170,6 +174,7 @@ export function RecurrencePickerPopover({
           </button>
         </div>
       )}
+      {hasRecurrence && taskId !== undefined && taskId > 0 && <RepeatRuleFields taskId={taskId} />}
     </Popover>
   )
 }

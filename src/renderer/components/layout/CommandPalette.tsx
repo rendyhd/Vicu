@@ -7,6 +7,9 @@ import { formatAcceleratorForDisplay } from '@/lib/accelerator'
 import { Dialog } from '@/components/overlay/Dialog'
 import { nextOptionIndex } from '@/components/overlay/popover-logic'
 import { useSmartLists } from '@/components/sidebar/SmartListNav'
+import { useProNavItems } from '@/components/sidebar/ProNav'
+import { usePro } from '@/hooks/use-pro'
+import { useProUiStore } from '@/stores/pro-ui-store'
 import { SmartListIcon } from '@/components/shared/SmartListIcon'
 import type { SmartListId } from '@/lib/smart-list-identity'
 import { useQuickFindTasks } from '@/hooks/use-quick-find'
@@ -82,10 +85,18 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
   const listId = useId()
   const isDark = useIsDark()
   const ai = useAiReady()
+  const pro = usePro()
+  const proLists = useProNavItems()
 
   const items = useMemo(
-    () => buildPaletteItems({ smartLists, projects: projects?.flat ?? [], labels: labels ?? [], planner: isPlannerEnabled(appConfig) }),
-    [smartLists, projects?.flat, labels, appConfig],
+    () => buildPaletteItems({
+      smartLists,
+      projects: projects?.flat ?? [],
+      labels: labels ?? [],
+      planner: isPlannerEnabled(appConfig),
+      pro: pro.on ? { lists: proLists, focus: pro.layer('availability'), promises: pro.layer('promises') } : undefined,
+    }),
+    [smartLists, projects?.flat, labels, appConfig, pro, proLists],
   )
   const shown = useMemo(() => rankPalette(items, query, tasks), [items, query, tasks])
   const activeIndex = shown.length === 0 ? -1 : Math.min(active, shown.length - 1)
@@ -99,6 +110,12 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
   const runCommand = (command: PaletteCommand) => {
     if (command === 'settings') {
       void navigate({ to: '/settings' })
+    } else if (command === 'pro-settings') {
+      void navigate({ to: '/settings', search: { section: 'pro' } })
+    } else if (command === 'pro-focus') {
+      useProUiStore.getState().setFocusPickerOpen(true)
+    } else if (command === 'pro-import' || command === 'pro-copilot' || command === 'pro-recap') {
+      useProUiStore.getState().open(command)
     } else if (command === 'voice') {
       useVoiceStore.getState().begin('command', 'latched')
     } else if (command === 'dictate' || command === 'brain-dump') {

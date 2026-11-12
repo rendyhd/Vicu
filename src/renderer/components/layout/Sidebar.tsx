@@ -2,6 +2,8 @@ import { Plus, Sparkles } from 'lucide-react'
 import { useDroppable } from '@dnd-kit/core'
 import { QuickFind } from '@/components/sidebar/QuickFind'
 import { SmartListNav } from '@/components/sidebar/SmartListNav'
+import { ProNav } from '@/components/sidebar/ProNav'
+import { FocusBanner } from '@/components/pro/FocusBanner'
 import { CustomListNav } from '@/components/sidebar/CustomListNav'
 import { ProjectTree } from '@/components/sidebar/ProjectTree'
 import { TagList } from '@/components/sidebar/TagList'
@@ -82,6 +84,8 @@ export function Sidebar() {
       </div>
 
       <SmartListNav />
+      <FocusBanner />
+      <ProNav />
 
       <div className="mx-4 border-t border-[var(--border-color)]" />
 

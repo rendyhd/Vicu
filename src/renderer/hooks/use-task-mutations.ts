@@ -23,6 +23,7 @@ import { removeFromTaskDetail, restoreTaskDetail, updateTaskDetailDone, updateTa
 import { projectPatch, taskPatch } from '@/lib/merge-patches'
 import { NULL_DATE } from '@/lib/constants'
 import { rememberRepeatCompletion, repeatUndoPatch, takeRepeatSnapshot } from '@/lib/repeat-undo'
+import { afterRepeatCompletion, repeatCompletionFor } from '@/lib/pro/repeat-completion'
 import {
   addLabelOrQueue,
   createTaskOrQueue,
@@ -595,9 +596,19 @@ export async function completeTaskRequest(task: Task): Promise<Task> {
       const outcome = await sendTaskPatch(child.id, { done: true }, child.title)
       completed.push({ task: child, queued: outcome.queued })
     }
+    // Pro's repeat rule (21.13): at its end the repeat goes off first, so the server completes it.
+    const repeatRule = repeatCompletionFor(task)
+    if (repeatRule && repeatRule.plan.patches.length > 1) await sendTaskPatch(task.id, repeatRule.plan.patches[0], task.title)
     const outcome = await sendTaskPatch(task.id, { done: true }, task.title)
     // A repeating task comes back open with its next dates: remember how it was, for Undo.
     rememberRepeatCompletion(task, outcome.task)
+    if (repeatRule) {
+      const catchUp = afterRepeatCompletion(repeatRule, task, outcome.task ?? null)
+      if (catchUp && outcome.task) {
+        const moved = await sendTaskPatch(task.id, catchUp, task.title)
+        return moved.task ?? { ...outcome.task, ...catchUp }
+      }
+    }
     return outcome.task ?? { ...task, done: true }
   } catch (error) {
     await Promise.allSettled(completed.map((entry) => reverseDone(entry, false)))

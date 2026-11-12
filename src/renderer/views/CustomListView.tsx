@@ -17,6 +17,13 @@ import { buildCustomListServerFilter, customListRuleParams, matchesCustomList, t
 import { serverSortParams, sortCustomListTasks } from '@/lib/custom-list-sort'
 import { toLocalDate } from '@/lib/due-dates'
 import { withoutNestedSubtasks } from '@/lib/nested-subtasks'
+import { useAvailability, useAvailabilityView } from '@/hooks/use-availability'
+import { useProLedger } from '@/hooks/use-pro-ledger'
+import { usePro } from '@/hooks/use-pro'
+import { useSyncedPrefs } from '@/hooks/use-synced-prefs'
+import { HiddenSummary, ViewSwitch } from '@/components/pro/ViewSwitch'
+import { projectOnHold } from '../../shared/pro/prefs'
+import { readAvailabilityView } from '../../shared/pro/availability'
 import type { CustomList, Task, TaskQueryParams } from '@/lib/vikunja-types'
 
 // A custom list mixes projects without a header per project, so each row names its project.
@@ -67,10 +74,28 @@ export function CustomListView() {
   // semantics 3.3). Comment signals are already on every task list while something is shared.
   const me = useCollabMe()
   const sharedProjectIds = useSharedProjectIds()
+  // Pro's conditions (section 3.8) are read Pro on or off, with what this device has: off, the
+  // ledger and availability are not loaded, so those conditions count as none (O5).
+  const availabilityState = useAvailability()
+  const { ledger } = useProLedger()
+  const proOn = usePro().on
+  const { snapshot: prefsSnapshot } = useSyncedPrefs()
   const context = useMemo<CustomListContext>(
-    () => ({ me: me?.id ?? null, isShared: (projectId) => sharedProjectIds.has(projectId) }),
-    [me, sharedProjectIds],
+    () => ({
+      me: me?.id ?? null,
+      isShared: (projectId) => sharedProjectIds.has(projectId),
+      pro: {
+        availability: availabilityState.on
+          ? { of: (task) => availabilityState.of(task) ?? { available: true, reasons: [], next: false, blockers: [] }, cycles: availabilityState.cycles as number[] }
+          : null,
+        ledger: proOn ? ledger : null,
+        projectOnHold: (projectId) => projectOnHold(prefsSnapshot.values, projectId),
+      },
+    }),
+    [me, sharedProjectIds, availabilityState, ledger, proOn, prefsSnapshot.values],
   )
+  const listHasView = readAvailabilityView(customList?.filter.availability) !== null
+  const availability = useAvailabilityView(`list.${listId}`)
   // A task of an "unread comments" list whose comments you read here keeps its place until you
   // leave the list, so reading the thread does not pull the row away under you.
   const readHere = useRef<{ listId: string; ids: Set<number> }>({ listId, ids: new Set() })
@@ -106,6 +131,11 @@ export function CustomListView() {
     return withoutNestedSubtasks(sorted, { hideChildrenOfCompletedParents: false })
   }, [tasks, customList, projects?.flat, dayKey, context])
 
+  // The list's own availability condition wins; without one, Pro's switch applies (21.2).
+  const switchOn = availability.on && !listHasView
+  const shownTasks = useMemo(() => (switchOn ? availability.filter(filteredTasks) : filteredTasks), [switchOn, availability, filteredTasks])
+  const hiddenCount = switchOn ? availability.hidden(filteredTasks) : 0
+
   usePrintable(
     useMemo(
       () => ({
@@ -128,7 +158,8 @@ export function CustomListView() {
     <RowViewProvider value={ROW_VIEW}>
     <TaskList
       title={customList?.name ?? 'List'}
-      tasks={filteredTasks}
+      tasks={shownTasks}
+      empty={switchOn ? shownTasks.length === 0 && hiddenCount === 0 : undefined}
       projectId={destinationProjectId}
       showNewTask={!!destinationProjectId}
       onTaskCreated={(task) => {
@@ -145,8 +176,9 @@ export function CustomListView() {
         setCreationNotice(`Task created in ${projectTitle}, but it does not currently match this list's filters.`)
         setTimeout(() => setCreationNotice(null), 6000)
       }}
-      headerContent={creationNotice || showImportNotice ? (
+      headerContent={creationNotice || showImportNotice || switchOn ? (
         <>
+          {switchOn && <ViewSwitch view={availability.view} onChange={availability.setView} />}
           {showImportNotice && (
             <div className="mx-4 mb-2 flex items-start gap-2 rounded-control bg-[var(--bg-hover)] px-3 py-2 text-xs text-[var(--text-secondary)]">
               <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-accent-blue" aria-hidden />
@@ -173,7 +205,11 @@ export function CustomListView() {
       ) : undefined}
       emptyTitle="No matching tasks"
       emptySubtitle="Try adjusting the list filters"
-    />
+    >
+      {switchOn && availability.view === 'available' && (
+        <HiddenSummary count={hiddenCount} onShow={() => availability.setView('remaining')} />
+      )}
+    </TaskList>
     </RowViewProvider>
   )
 }

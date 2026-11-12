@@ -130,6 +130,13 @@ const searchRoute = createRoute({
   }),
 })
 
+// Pro (cross-app semantics 21): every page its own chunk, so Pro adds nothing to the first chunk.
+const flaggedRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/flagged',
+  component: lazyRouteComponent(() => import('@/views/pro/FlaggedView'), 'FlaggedView'),
+})
+
 const routeTree = rootRoute.addChildren([
   indexRoute,
   inboxRoute,
@@ -147,6 +154,7 @@ const routeTree = rootRoute.addChildren([
   customListRoute,
   settingsRoute,
   searchRoute,
+  flaggedRoute,
 ])
 
 // Use hash history for Electron compatibility (file:// URLs don't support browser history)

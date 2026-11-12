@@ -48,6 +48,8 @@ export interface Task {
   repeat_after: number
   repeat_mode: number // 0=default, 1=monthly, 2=from current date
   hex_color: string
+  /** Your favourite mark, per user; Pro's flag (cross-app semantics 21.4). */
+  is_favorite?: boolean
   /** Who the task is assigned to. Read only: changed through the assignee endpoints, never a patch. */
   assignees?: PersonRef[] | null
   /** Only with the collaboration expand (cross-app semantics 9.4); absent means 0. */

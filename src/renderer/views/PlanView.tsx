@@ -55,6 +55,10 @@ import { isPlannerEnabled, type CreateTaskPayload, type Task } from '@/lib/vikun
 import { addLocalDays, dateOnlyDue, isNoDueDate, localDateOf, startOfLocalDay, startOfWeek, toLocalDate, type LocalDate } from '../../shared/due-dates'
 import { withDefaultReminder } from '../../shared/default-reminder'
 import { withoutNestedSubtasks } from '../../shared/nested-subtasks'
+import { useAvailability } from '@/hooks/use-availability'
+import { confirmDelete } from '@/lib/confirm-bridge'
+import { blockReplacesLaterStart, startDateOf } from '../../shared/pro/start-dates'
+import { formatWeekdayDate } from '../../shared/date-display'
 import {
   atClock,
   blockOf,
@@ -196,14 +200,30 @@ function PlanScreen() {
   }
   const update = useUpdateTask()
   const create = useCreateTask()
+  const proStarts = useAvailability().on
+  const dateFormat = useDateFormat()
   const openTask = useOpenTask()
   const access = useProjectAccessMap()
   const { data: projects } = useProjects()
   const canWriteProject = (id: number) => (access.get(id)?.permission ?? 1) > 0
 
   const change = (task: Task, changes: BlockChanges, announceDue = true) => {
-    update.mutate({ id: task.id, changes: toTaskChanges(changes), original: task })
-    if (announceDue) announceDueMove(task, changes)
+    const write = () => {
+      update.mutate({ id: task.id, changes: toTaskChanges(changes), original: task })
+      if (announceDue) announceDueMove(task, changes)
+    }
+    // Pro (decision 17, 21.3): a block replaces a later start date; say so first.
+    const start = proStarts && changes.start_date ? new Date(changes.start_date) : null
+    const later = start ? startDateOf(task) : null
+    if (start && later && blockReplacesLaterStart(task, start)) {
+      void confirmDelete(`This task starts ${formatWeekdayDate(later, new Date(), dateFormat)}. Planning it earlier replaces that date.`, {
+        force: true,
+        confirmLabel: 'Plan it',
+        destructive: false,
+      }).then((ok) => ok && write())
+      return
+    }
+    write()
   }
 
   /**

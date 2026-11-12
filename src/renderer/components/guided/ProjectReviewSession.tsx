@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Archive, ArrowRight, Check, CheckCircle2, Plus, Sparkles, Trash2 } from 'lucide-react'
+import { Archive, ArrowRight, Check, CheckCircle2, PauseCircle, Plus, Sparkles, Trash2 } from 'lucide-react'
+import { usePro } from '@/hooks/use-pro'
+import { useProPrefs } from '@/hooks/use-pro-prefs'
 import { cn } from '@/lib/cn'
 import { confirmDelete } from '@/lib/confirm-bridge'
 import { taskDescendants } from '@/lib/task-hierarchy'
@@ -182,6 +184,10 @@ interface PageProps {
 }
 
 function ReviewPage({ project, data, onLog, onCreated, onReview, onSkip, onArchive }: PageProps) {
+  // Pro (21.2): a project can be put on hold here instead of archived; not the Inbox.
+  const proHold = usePro().layer('availability') && project.id !== data.world?.inboxId
+  const proPrefs = useProPrefs()
+  const held = proPrefs.projectOnHold(project.id)
   const ws = useAiWorkspace()
   const world = data.world!
   const updateTask = useUpdateTask()
@@ -288,7 +294,18 @@ function ReviewPage({ project, data, onLog, onCreated, onReview, onSkip, onArchi
       <section className="mt-6" aria-labelledby="still-working">
         <FieldLabel><span id="still-working">Still working on it?</span></FieldLabel>
         <div className="flex flex-wrap gap-1.5">
-          <Button aria-pressed="true" className="border-accent-blue bg-accent-blue/12">Keep</Button>
+          {proHold ? (
+            <>
+              <Button aria-pressed={!held} className={cn(!held && 'border-accent-blue bg-accent-blue/12')} onClick={() => held && void proPrefs.setProjectOnHold(project.id, false)}>
+                Keep
+              </Button>
+              <Button aria-pressed={held} className={cn(held && 'border-accent-blue bg-accent-blue/12')} onClick={() => !held && void proPrefs.setProjectOnHold(project.id, true)}>
+                <PauseCircle aria-hidden="true" className="h-4 w-4" /> On hold
+              </Button>
+            </>
+          ) : (
+            <Button aria-pressed="true" className="border-accent-blue bg-accent-blue/12">Keep</Button>
+          )}
           {onArchive && (
             <Button onClick={onArchive} aria-keyshortcuts="A">
               <Archive aria-hidden="true" className="h-4 w-4" /> Archive

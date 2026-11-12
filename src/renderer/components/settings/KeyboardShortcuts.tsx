@@ -40,6 +40,13 @@ const shortcuts = [
     { keys: ['Enter'], description: 'Send the message' },
     { keys: [mod, 'Enter'], description: 'Make tasks from the text' },
   ]},
+  { category: 'Pro (when on)', items: [
+    { keys: [mod, 'Shift', 'O'], description: 'Focus on some projects' },
+    { keys: [mod, 'Shift', 'F'], description: 'Flag or unflag the selected tasks' },
+    { keys: [mod, 'Shift', 'M'], description: 'Import meeting notes' },
+    { keys: [mod, 'I'], description: 'Inspector for the selected tasks' },
+    { keys: ['1', '-', '6'], description: 'Verdict on a promise row: Delivered, Late, Not yet, New date, Dropped, Ask me tomorrow' },
+  ]},
   { category: 'Comments', items: [
     { keys: [mod, 'Enter'], description: 'Post the comment' },
     { keys: ['@'], description: 'Mention someone' },

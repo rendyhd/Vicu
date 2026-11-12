@@ -1,5 +1,5 @@
 import { forwardRef, memo, useState, useRef, useEffect, useCallback, useImperativeHandle, useMemo } from 'react'
-import { ListChecks, Bell, Repeat, Paperclip, AlignLeft, ChevronRight, MessageSquare } from 'lucide-react'
+import { ListChecks, Bell, Repeat, Paperclip, AlignLeft, ChevronRight, MessageSquare, Flag } from 'lucide-react'
 import type { Editor } from '@tiptap/react'
 import { useDraggable } from '@dnd-kit/core'
 import { useSortable, defaultAnimateLayoutChanges } from '@dnd-kit/sortable'
@@ -41,6 +41,7 @@ import { TaskInputParser } from '@/components/task-input/TaskInputParser'
 import { useAppConfig } from '@/hooks/use-app-config'
 import { useSubtasks } from '@/hooks/use-subtasks'
 import { useHasLocationReminder } from '@/hooks/use-location-reminders'
+import { useAvailability, useReasonText } from '@/hooks/use-availability'
 import {
   parentTitle,
   subtaskProgress,
@@ -366,6 +367,13 @@ function TaskRowInner({
   const isExpanded = useSelectionStore((s) => s.expandedTaskId === task.id)
   const hasPlaceReminder = useHasLocationReminder(task.id)
   const block = useMemo(() => blockOf(task), [task.start_date, task.end_date])
+  // Pro's availability (cross-app semantics 21.2, design system 9): off, all of this is null.
+  const pro = useAvailability()
+  const reasonText = useReasonText()
+  const availability = pro.on && !task.done ? pro.of(task) : null
+  const unavailableReason = availability && !availability.available ? reasonText(task, availability) : null
+  const isNext = availability?.next === true
+  const flagged = pro.on && task.is_favorite === true
   const isFocused = useSelectionStore((s) => s.focusedTaskId === task.id)
   const isSelected = useSelectionStore((s) => s.selectedTaskIds.has(task.id))
   // Main asked for this task to be shown (a clicked reminder): expand once the row is on screen.
@@ -615,7 +623,9 @@ function TaskRowInner({
     (task.attachments?.length ?? 0) > 0 ||
     commentCount > 0 ||
     (nestedDepth === 0 && !!parentTitle(task)) ||
-    (nestedDepth > 0 && parentProjectId !== undefined && parentProjectId !== task.project_id)
+    (nestedDepth > 0 && parentProjectId !== undefined && parentProjectId !== task.project_id) ||
+    unavailableReason !== null ||
+    isNext
 
   // Collapsed row — entire row is draggable (PointerSensor distance:8 distinguishes click vs drag)
   if (!isExpanded) {
@@ -707,7 +717,7 @@ function TaskRowInner({
             className={cn(
               'text-task-title',
               comfortable ? 'line-clamp-3 break-words' : 'block truncate',
-              task.done ? 'text-text-secondary' : 'text-text'
+              task.done || unavailableReason ? 'text-text-secondary' : 'text-text'
             )}
           >
             {dropError ? (
@@ -716,10 +726,19 @@ function TaskRowInner({
               // The strike is drawn behind the text left to right when the task has just been completed.
               <span className={cn(task.done && 'vicu-strike', task.done && strikePlay && 'vicu-strike-play')}>{task.title}</span>
             )}
+            {flagged && (
+              <Flag role="img" aria-label="Flagged" className="ml-1.5 inline h-3 w-3 -translate-y-px fill-accent-orange text-accent-orange" />
+            )}
           </span>
           {notesLine && <p className="mt-0.5 truncate text-meta font-normal text-text-secondary">{notesLine}</p>}
           {hasMeta && (
             <div className="mt-0.5 flex min-w-0 items-center gap-x-2 overflow-hidden whitespace-nowrap text-meta text-text-secondary">
+              {isNext && (
+                <span className="vicu-chip shrink-0 rounded-chip bg-accent-blue/12 px-2 py-px text-chip leading-tight text-accent-blue" data-pro-next>
+                  Next
+                </span>
+              )}
+              {unavailableReason && <span className="min-w-0 shrink truncate" data-pro-reason>{unavailableReason}</span>}
               {projectSource === 'group' && projectMeta && (
                 <RowProject title={projectMeta.title} color={projectMeta.color} />
               )}

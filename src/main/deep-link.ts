@@ -70,7 +70,7 @@ export function deepLinkFromArgv(argv: readonly string[]): DeepLink | null {
 
 /** The route a view link opens in the main window. */
 export function routeOfView(view: DeepLinkView): string {
-  return `/${view}`
+  return view === 'waiting' ? '/waiting-on' : `/${view}`
 }
 
 /**
