@@ -139,7 +139,8 @@ describe('calendar file', () => {
 
   it('takes the name from the file', () => {
     expect(calendarNameOf('/home/sam/work.ics')).toBe('work')
-    expect(calendarNameOf('C:\\Users\\sam\\My calendar.ICS')).toBe('My calendar')
+    // A path from this device's own dialog, so in its own form (never synced to another system).
+    expect(calendarNameOf(join(tmpdir(), 'sam', 'My calendar.ICS'))).toBe('My calendar')
     expect(calendarNameOf('/tmp/.ics')).toBe('.ics')
   })
 })
