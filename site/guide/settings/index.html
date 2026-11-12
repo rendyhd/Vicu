@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Settings · Vicu guide</title>
+    <meta name="description" content="Every setting in the Vicu desktop and phone apps, what it does, and whether it follows you to your other devices or stays on one." />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#fbfaf8" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#111113" media="(prefers-color-scheme: dark)" />
+    <link rel="icon" href="../../assets/img/brand/vicu-32.png" sizes="32x32" type="image/png" />
+    <link rel="apple-touch-icon" href="../../assets/img/brand/vicu-180.png" />
+    <meta property="og:type" content="article" />
+    <meta property="og:site_name" content="Vicu" />
+    <meta property="og:title" content="Settings · Vicu guide" />
+    <meta property="og:description" content="Every setting in the Vicu desktop and phone apps, what it does, and whether it follows you to your other devices or stays on one." />
+    <meta property="og:url" content="https://vicutodo.app/guide/settings/" />
+    <meta property="og:image" content="https://vicutodo.app/assets/img/og.jpg" />
+    <link rel="canonical" href="https://vicutodo.app/guide/settings/" />
+    <link rel="stylesheet" href="../../assets/css/site.css" />
+    <script>
+      (function () {
+        var d = document.documentElement;
+        d.className = d.className.replace('no-js', 'js');
+        try {
+          var t = localStorage.getItem('vicu-site-theme');
+          if (t === 'light' || t === 'dark') d.setAttribute('data-theme', t);
+        } catch (e) {}
+      })();
+    </script>
+    <script src="../../assets/js/site.js" defer></script>
+    <script src="../../assets/js/guide-index.js" defer></script>
+    <script src="../../assets/js/guide.js" defer></script>
+  </head>
+  <body class="g-body" data-guide-root="../">
+    <svg class="sprite" aria-hidden="true" focusable="false">
+      <symbol id="i-inbox" viewBox="0 0 24 24"><path d="M3.5 13.5 6 5.5h12l2.5 8V18a1.5 1.5 0 0 1-1.5 1.5H5A1.5 1.5 0 0 1 3.5 18Z" /><path d="M3.5 13.5h5l1 2.5h5l1-2.5h5" /></symbol>
+      <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4" /><path d="M12 2.5v2M12 19.5v2M4.6 4.6 6 6M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4 6 18M18 6l1.4-1.4" /></symbol>
+      <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4 8.5 8.5 0 1 0 20 14.5Z" /></symbol>
+      <symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5" /><path d="M3.5 10h17M8 3v4M16 3v4" /></symbol>
+      <symbol id="i-layers" viewBox="0 0 24 24"><path d="m12 3.5 8.5 4.5L12 12.5 3.5 8Z" /><path d="m3.5 12 8.5 4.5 8.5-4.5" /><path d="m3.5 16 8.5 4.5 8.5-4.5" /></symbol>
+      <symbol id="i-check" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" /><path d="m8.2 12.2 2.6 2.6 5-5.3" /></symbol>
+      <symbol id="i-review" viewBox="0 0 24 24"><path d="M19.5 12a7.5 7.5 0 0 1-13 5.1M4.5 12a7.5 7.5 0 0 1 13-5.1" /><path d="M17.8 3.5v3.6h-3.6M6.2 20.5v-3.6h3.6" /></symbol>
+      <symbol id="i-heart" viewBox="0 0 24 24"><path d="M12 19.5s-7.5-4.4-7.5-10A4.2 4.2 0 0 1 12 7a4.2 4.2 0 0 1 7.5 2.5c0 5.6-7.5 10-7.5 10Z" /><path d="M7 12h2.5l1.5-2 2 4 1.5-2H17" /></symbol>
+      <symbol id="i-bolt" viewBox="0 0 24 24"><path d="M13 3 5 13.5h6L10.5 21 19 10.5h-6Z" /></symbol>
+      <symbol id="i-mic" viewBox="0 0 24 24"><rect x="9" y="3.5" width="6" height="11" rx="3" /><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v2.5" /></symbol>
+      <symbol id="i-filter" viewBox="0 0 24 24"><path d="M4 6h16M7 12h10M10 18h4" /></symbol>
+      <symbol id="i-tag" viewBox="0 0 24 24"><path d="M3.5 12.2V4.5a1 1 0 0 1 1-1h7.7l8.3 8.3a1.4 1.4 0 0 1 0 2l-6.7 6.7a1.4 1.4 0 0 1-2 0Z" /><circle cx="8" cy="8" r="1.4" /></symbol>
+      <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3.5 7.5v10A1.5 1.5 0 0 0 5 19h14a1.5 1.5 0 0 0 1.5-1.5V9A1.5 1.5 0 0 0 19 7.5h-7L10 5H5a1.5 1.5 0 0 0-1.5 1.5Z" /></symbol>
+      <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8.5" r="3.2" /><path d="M3 19c.8-3.2 3.2-5 6-5s5.2 1.8 6 5" /><path d="M15.5 5.6a3.2 3.2 0 0 1 0 5.8M17.5 14.3c1.7.6 3 2.2 3.5 4.7" /></symbol>
+      <symbol id="i-chat" viewBox="0 0 24 24"><path d="M4 5.5h16v10.5H10l-6 4.5Z" /><path d="M8.5 10.5h7" /></symbol>
+      <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2h-15Z" /><path d="M10 20.5a2 2 0 0 0 4 0" /></symbol>
+      <symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 21s6.5-5.6 6.5-11a6.5 6.5 0 0 0-13 0c0 5.4 6.5 11 6.5 11Z" /><circle cx="12" cy="10" r="2.3" /></symbol>
+      <symbol id="i-cloud-off" viewBox="0 0 24 24"><path d="M8 18.5H6.5a4 4 0 0 1-.6-8 6 6 0 0 1 9.2-4M18.5 9.5a4.5 4.5 0 0 1-1.5 9h-5" /><path d="m4 3.5 16 17" /></symbol>
+      <symbol id="i-sync" viewBox="0 0 24 24"><path d="M4 12a8 8 0 0 1 14-5.3L20 9" /><path d="M20 4v5h-5" /><path d="M20 12a8 8 0 0 1-14 5.3L4 15" /><path d="M4 20v-5h5" /></symbol>
+      <symbol id="i-keyboard" viewBox="0 0 24 24"><rect x="2.5" y="6" width="19" height="12" rx="2" /><path d="M6 9.5h.01M9 9.5h.01M12 9.5h.01M15 9.5h.01M18 9.5h.01M6 12.5h.01M18 12.5h.01M9 12.5h6M7.5 15.3h9" /></symbol>
+      <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.7 0l3.1-3.1a4 4 0 0 0-5.7-5.7l-1 1" /><path d="M14 10a4 4 0 0 0-5.7 0l-3.1 3.1a4 4 0 0 0 5.7 5.7l1-1" /></symbol>
+      <symbol id="i-phone" viewBox="0 0 24 24"><rect x="6.5" y="2.5" width="11" height="19" rx="2.5" /><path d="M10.5 18.5h3" /></symbol>
+      <symbol id="i-monitor" viewBox="0 0 24 24"><rect x="2.5" y="4" width="19" height="12.5" rx="2" /><path d="M8.5 20.5h7M12 16.5v4" /></symbol>
+      <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4v11M7.5 10.5 12 15l4.5-4.5" /><path d="M4.5 19.5h15" /></symbol>
+      <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z" /><circle cx="12" cy="12" r="2.8" /></symbol>
+      <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="10.5" width="14" height="10" rx="2" /><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5" /></symbol>
+      <symbol id="i-grid" viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="7" height="7" rx="1.8" /><rect x="13.5" y="3.5" width="7" height="7" rx="1.8" /><rect x="3.5" y="13.5" width="7" height="7" rx="1.8" /><rect x="13.5" y="13.5" width="7" height="7" rx="1.8" /></symbol>
+      <symbol id="i-swipe" viewBox="0 0 24 24"><path d="M3.5 7.5h11M11 4l3.5 3.5L11 11" /><path d="M9 21v-6.5a1.5 1.5 0 0 1 3 0V17l3.8.7a1.8 1.8 0 0 1 1.5 2V21" /></symbol>
+      <symbol id="i-share" viewBox="0 0 24 24"><path d="M12 3.5v11M8 7.5l4-4 4 4" /><path d="M7 11H5.5v9.5h13V11H17" /></symbol>
+      <symbol id="i-sort" viewBox="0 0 24 24"><path d="M7 4v16M3.5 16.5 7 20l3.5-3.5" /><path d="M13 6h7.5M13 11h5.5M13 16h3" /></symbol>
+      <symbol id="i-repeat" viewBox="0 0 24 24"><path d="M4 11V9.5A3.5 3.5 0 0 1 7.5 6H19" /><path d="m16 3 3 3-3 3" /><path d="M20 13v1.5a3.5 3.5 0 0 1-3.5 3.5H5" /><path d="m8 21-3-3 3-3" /></symbol>
+      <symbol id="i-clip" viewBox="0 0 24 24"><path d="m20 11.5-7.8 7.8a5 5 0 0 1-7-7.1L13 4.4a3.3 3.3 0 0 1 4.7 4.7l-7.8 7.8a1.7 1.7 0 0 1-2.4-2.4l7.2-7.2" /></symbol>
+      <symbol id="i-flag" viewBox="0 0 24 24"><path d="M5 21V4M5 4.5h12l-2 4 2 4H5" /></symbol>
+      <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5" /><path d="m20 20-4.3-4.3" /></symbol>
+      <symbol id="i-command" viewBox="0 0 24 24"><path d="M9 9V6.5A2.5 2.5 0 1 0 6.5 9H9Zm0 0h6m-6 0v6m6-6V6.5A2.5 2.5 0 1 1 17.5 9H15Zm0 0v6m0 0h-6m6 0v2.5a2.5 2.5 0 1 0 2.5-2.5H15Zm-6 0v2.5A2.5 2.5 0 1 1 6.5 15H9Z" /></symbol>
+      <symbol id="i-sparkle" viewBox="0 0 24 24"><path d="M12 3.5c.6 4.6 3.9 7.9 8.5 8.5-4.6.6-7.9 3.9-8.5 8.5-.6-4.6-3.9-7.9-8.5-8.5 4.6-.6 7.9-3.9 8.5-8.5Z" /></symbol>
+      <symbol id="i-person" viewBox="0 0 24 24"><circle cx="12" cy="5.5" r="2" /><path d="M5 9h14M12 9v5.5M8.5 21l3.5-6.5 3.5 6.5" /></symbol>
+      <symbol id="i-hand" viewBox="0 0 24 24"><path d="M8 12V5.5a1.5 1.5 0 0 1 3 0V11M11 10.5V4a1.5 1.5 0 0 1 3 0v6.5M14 10.5V5.5a1.5 1.5 0 0 1 3 0V14a7 7 0 0 1-7 7h-.5a6 6 0 0 1-5-2.8L3 15.3a1.6 1.6 0 0 1 2.6-1.8L8 15.5" /></symbol>
+      <symbol id="i-sections" viewBox="0 0 24 24"><path d="M4 5.5h16M4 12h16M4 18.5h16" /><path d="M4 5.5v13" /></symbol>
+      <symbol id="i-obsidian" viewBox="0 0 24 24"><path d="M9 2.8 4.8 9.6l3 7.7 5.6 3.9 4.1-3.4L19 9.4 14 3Z" /><path d="m9 2.8 1.6 8.1-2.8 6.4M10.6 10.9 19 9.4M10.6 10.9l2.8 10.3" /></symbol>
+      <symbol id="i-tray" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2.5" /><path d="M3 15h18M7 18h.01M10 18h.01" /></symbol>
+      <symbol id="i-windows" viewBox="0 0 24 24"><path d="M3.5 5.5 10.5 4.5v7h-7ZM12.5 4.2l8-1.2v8.5h-8ZM3.5 12.5h7v7l-7-1ZM12.5 12.5h8V21l-8-1.2Z" /></symbol>
+      <symbol id="i-apple" viewBox="0 0 24 24"><path d="M16.4 12.6c0-2.3 1.9-3.4 2-3.5a4.3 4.3 0 0 0-3.4-1.8c-1.4-.2-2.8.8-3.5.8s-1.8-.8-3-.8a4.5 4.5 0 0 0-3.8 2.3c-1.6 2.8-.4 7 1.2 9.3.8 1.1 1.7 2.4 2.9 2.3 1.2 0 1.6-.7 3-.7s1.8.7 3 .7c1.3 0 2.1-1.1 2.8-2.3a10 10 0 0 0 1.3-2.6 4 4 0 0 1-2.5-3.7ZM14.2 5.8A4 4 0 0 0 15.1 3a4.1 4.1 0 0 0-2.7 1.4 3.8 3.8 0 0 0-1 2.7 3.4 3.4 0 0 0 2.8-1.3Z" /></symbol>
+      <symbol id="i-linux" viewBox="0 0 24 24"><path d="M12 3c-2.2 0-3.4 1.8-3.4 4.4 0 1.7-.6 2.6-1.6 4-1.2 1.6-2.4 3.6-2 6 .2 1.4 1.4 2.6 3 2.6h8c1.6 0 2.8-1.2 3-2.6.4-2.4-.8-4.4-2-6-1-1.4-1.6-2.3-1.6-4C15.4 4.8 14.2 3 12 3Z" /><path d="M10.4 7.6h.01M13.6 7.6h.01M10.7 10h2.6" /></symbol>
+      <symbol id="i-android" viewBox="0 0 24 24"><path d="M5 16V11a7 7 0 0 1 14 0v5Z" /><path d="M8 5 6.5 2.8M16 5l1.5-2.2" /><path d="M9 10h.01M15 10h.01" /><path d="M5 16h14v1.5a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2Z" /></symbol>
+      <symbol id="i-github" viewBox="0 0 24 24"><path d="M9 19c-4 1.3-4-2-5.6-2.5M14.6 21v-3.3a2.9 2.9 0 0 0-.8-2.2c2.7-.3 5.6-1.3 5.6-6a4.6 4.6 0 0 0-1.3-3.2 4.3 4.3 0 0 0-.1-3.2s-1-.3-3.4 1.3a11.6 11.6 0 0 0-6 0C6.5 2.8 5.5 3.1 5.5 3.1a4.3 4.3 0 0 0-.1 3.2A4.6 4.6 0 0 0 4 9.5c0 4.6 2.9 5.7 5.6 6a2.9 2.9 0 0 0-.8 2.2V21" /></symbol>
+      <symbol id="i-coffee" viewBox="0 0 24 24"><path d="M4.5 9.5h12v5a5 5 0 0 1-5 5h-2a5 5 0 0 1-5-5Z" /><path d="M16.5 11h1a2.5 2.5 0 0 1 0 5h-1.3" /><path d="M8.5 3.5v2.5M12.5 3.5v2.5" /></symbol>
+      <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M4 12h15M13.5 6.5 19 12l-5.5 5.5" /></symbol>
+    </svg>
+
+    <a class="skip-link" href="#main">Skip to content</a>
+
+    <header class="site-header">
+      <div class="wrap header-row">
+        <a class="brand" href="../../">
+          <img src="../../assets/img/brand/vicu-64.png" alt="" width="32" height="32" />
+          <span>Vicu</span>
+        </a>
+        <nav class="nav" aria-label="Site">
+          <a href="../../">Home</a>
+          <a href="../">Guide</a>
+          <a href="../pro/">Vicu Pro</a>
+          <a href="../../#download">Download</a>
+        </nav>
+        <div class="header-actions">
+          <button class="icon-btn g-menu-toggle" type="button" aria-controls="g-sidebar" aria-expanded="false" aria-label="Guide contents">
+            <svg aria-hidden="true"><use href="#i-sections" /></svg>
+          </button>
+          <button class="icon-btn theme-toggle" type="button" aria-label="Switch between light and dark">
+            <svg class="icon-moon" aria-hidden="true"><use href="#i-moon" /></svg>
+            <svg class="icon-sun" aria-hidden="true"><use href="#i-sun" /></svg>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <div class="wrap g-layout">
+      <aside class="g-sidebar" id="g-sidebar" aria-label="Guide contents">
+        <form class="g-search" role="search" onsubmit="return false">
+          <label class="visually-hidden" for="g-search-input">Search the guide</label>
+          <svg aria-hidden="true"><use href="#i-search" /></svg>
+          <input id="g-search-input" type="search" placeholder="Search the guide" autocomplete="off" aria-describedby="g-search-hint" />
+          <span id="g-search-hint" class="visually-hidden">Results show below as you type.</span>
+        </form>
+        <ul class="g-search-results" id="g-search-results" aria-live="polite" hidden></ul>
+        <nav class="g-nav" aria-label="Guide pages"><details class="g-nav-section"><summary>Start here</summary><ul><li><a href="../">Guide home</a></li><li><a href="../getting-started/">Get started</a></li><li><a href="../basics/">How Vicu is organized</a></li></ul></details><details class="g-nav-section"><summary>Everyday Vicu</summary><ul><li><a href="../capture/">Add tasks</a></li><li><a href="../tasks/">Work with tasks</a></li><li><a href="../lists/">Smart lists</a></li><li><a href="../projects/">Projects and labels</a></li><li><a href="../custom-lists/">Custom lists</a></li><li><a href="../plan/">Plan your day</a></li><li><a href="../calendars/">Events and calendars</a></li><li><a href="../routines/">Routines</a></li><li><a href="../review/">Review and organizing</a></li><li><a href="../collaboration/">Collaboration</a></li><li><a href="../assistant/">The assistant</a></li></ul></details><details class="g-nav-section" open><summary>Your devices</summary><ul><li><a href="../desktop/">On the desktop</a></li><li><a href="../phone/">On your phone</a></li><li><a href="../sync/">Sync and offline</a></li><li><a href="../settings/" aria-current="page">Settings</a></li></ul></details><details class="g-nav-section"><summary>Vicu Pro</summary><ul><li><a href="../pro/">What Pro is</a></li><li><a href="../pro/available/">Know what you can do now</a></li><li><a href="../pro/promises/">Promises and people</a></li><li><a href="../pro/portfolio/">Portfolio</a></li><li><a href="../pro/power/">Power tools</a></li></ul></details><details class="g-nav-section"><summary>Reference</summary><ul><li><a href="../quick-add/">Quick add</a></li><li><a href="../shortcuts/">Keyboard shortcuts</a></li><li><a href="../faq/">Troubleshooting and FAQ</a></li><li><a href="../glossary/">Glossary</a></li></ul></details></nav>
+      </aside>
+
+      <main id="main" class="g-main">
+        <article class="g-article">
+          <nav class="g-crumbs" aria-label="Breadcrumb"><a href="../">Guide</a> <span aria-hidden="true">/</span> <span>Your devices</span></nav>
+          <h1 class="g-title">Settings</h1>
+          <p class="g-lead">A reference to each settings section on the desktop and on the phone. Every table says which settings are synced through your server and which stay on the device where you set them.</p>
+          <details class="g-toc-inline"><summary>On this page</summary><ul><li><a href="#in-short">In short</a></li><li><a href="#desktop">Desktop</a></li><li><a href="#phone">Phone</a></li><li><a href="#accessibility">Accessibility</a></li><li><a href="#settings-that-always-sync">Settings that always sync</a></li><li><a href="#related">Related</a></li></ul></details>
+          <div class="g-content">
+<h2 id="in-short"><a class="g-anchor" href="#in-short" aria-hidden="true" tabindex="-1">#</a>In short</h2>
+<ul><li><strong>Open Settings</strong> from the sidebar (desktop) or the drawer (phone). The desktop has tabs: <strong>General</strong>, <strong>Projects</strong>, <strong>Quick Entry / View</strong>, <strong>Notifications</strong>, <strong>Assistant</strong>, <strong>Pro</strong> and <strong>Keyboard Shortcuts</strong>. The phone has <strong>General</strong>, <strong>Projects</strong>, <strong>Notifications</strong>, <strong>Gestures</strong> and <strong>Assistant</strong>.</li><li><strong>Most settings are per device.</strong> Look, behavior, notification and shortcut choices stay on the device where you set them. Setting the theme on your phone does not change your computer.</li><li><strong>Some settings are synced.</strong> They live on your server and appear on every device you sign in on: your Inbox, task order, custom lists, categories, templates, planner defaults, and a few more. Tables below mark them <strong>Synced</strong>.</li><li><strong>Settings save as you change them.</strong> There is no Save button.</li><li><strong>Only a few shortcuts can be changed.</strong> See <a href="../shortcuts/">Keyboard shortcuts</a>.</li></ul>
+<p>How to read the tables: <strong>Synced</strong> follows you to every device. <strong>This device</strong> stays where you set it.</p>
+<h2 id="desktop"><a class="g-anchor" href="#desktop" aria-hidden="true" tabindex="-1">#</a>Desktop <span class="g-badge g-badge--desktop"><svg aria-hidden="true"><use href="#i-monitor" /></svg>Desktop</span></h2>
+<h3 id="general"><a class="g-anchor" href="#general" aria-hidden="true" tabindex="-1">#</a>General</h3>
+<h4 id="connection"><a class="g-anchor" href="#connection" aria-hidden="true" tabindex="-1">#</a>Connection</h4>
+<div class="g-table"><table><thead><tr><th scope="col">Setting</th><th scope="col">What it does</th><th scope="col">Follows you</th></tr></thead><tbody><tr><th scope="row">Vikunja URL</th><td>The server Vicu talks to. Shown, not editable, when you signed in with a password or single sign-on.</td><td>This device</td></tr><tr><th scope="row">Sign Out</th><td>Signs out. First sends what is waiting and asks if anything has not reached the server.</td><td>This device</td></tr><tr><th scope="row">API Token and Test Connection</th><td>Only when you signed in with a token. Paste a new one to replace it. <strong>Disconnect</strong> removes it.</td><td>This device</td></tr></tbody></table></div>
+<h4 id="appearance"><a class="g-anchor" href="#appearance" aria-hidden="true" tabindex="-1">#</a>Appearance</h4>
+<div class="g-table"><table><thead><tr><th scope="col">Setting</th><th scope="col">What it does</th><th scope="col">Follows you</th></tr></thead><tbody><tr><th scope="row">Theme</th><td>Light, dark or system</td><td>This device</td></tr><tr><th scope="row">Clock</th><td>System, 12-hour or 24-hour</td><td>This device</td></tr><tr><th scope="row">Task rows</th><td><strong>Compact</strong> (one title line) or <strong>Comfortable</strong> (up to three title lines and a line of notes)</td><td>This device</td></tr></tbody></table></div>
+<h4 id="preferences"><a class="g-anchor" href="#preferences" aria-hidden="true" tabindex="-1">#</a>Preferences</h4>
+<div class="g-table"><table><thead><tr><th scope="col">Setting</th><th scope="col">What it does</th><th scope="col">Follows you</th></tr></thead><tbody><tr><th scope="row">Launch on startup</th><td>Starts Vicu when you sign in to your computer</td><td>This device</td></tr><tr><th scope="row">Start hidden</th><td>Starts without a window. Needs the tray icon.</td><td>This device</td></tr><tr><th scope="row">Confirm before deleting</th><td>Asks before deleting tasks, projects, labels and lists</td><td>This device</td></tr><tr><th scope="row">Subtasks in task lists</th><td><strong>Inside task</strong> keeps them in the task, <strong>Expandable</strong> shows them under the parent</td><td>This device</td></tr><tr><th scope="row">Show today &amp; overdue count on app icon</th><td>A badge with the number of tasks due today and overdue</td><td>This device</td></tr><tr><th scope="row">What does urgent mean?</th><td><strong>Schedule for Today</strong> or <strong>Mark Important</strong>: what the top action in a task's right-click menu does</td><td>This device</td></tr></tbody></table></div>
+<h4 id="plan"><a class="g-anchor" href="#plan" aria-hidden="true" tabindex="-1">#</a>Plan</h4>
+<p>Shown unless you use standalone mode. See <a href="../plan/">Plan your day</a> and <a href="../calendars/">Events and calendars</a>.</p>
+<div class="g-table"><table><thead><tr><th scope="col">Setting</th><th scope="col">What it does</th><th scope="col">Follows you</th></tr></thead><tbody><tr><th scope="row">Show Plan in the sidebar</th><td>Turns the Plan screen on. Off by default. A time you set on a task shows on every device either way.</td><td>This device</td></tr><tr><th scope="row">Default length</th><td>What a task takes when you drop it on a time</td><td>Synced</td></tr><tr><th scope="row">Work hours</th><td>Start and end of your day, used for free time, Fit and Plan my day</td><td>Synced</td></tr><tr><th scope="row">Ask me to plan tomorrow</th><td>An evening notification at the time you choose</td><td>This device</td></tr><tr><th scope="row">Show routines on the timeline</th><td>Routine pills on Plan</td><td>This device</td></tr><tr><th scope="row">Calendars</th><td>Connected calendars, their colors, Busy only, and <strong>Import a calendar file</strong></td><td>This device</td></tr></tbody></table></div>
+<h4 id="sidebar"><a class="g-anchor" href="#sidebar" aria-hidden="true" tabindex="-1">#</a>Sidebar</h4>
+<p>Tick the smart lists you want above your projects. The Inbox always stays. A hidden list still opens from the <a href="../desktop/#the-command-palette">command palette</a>. This choice is per computer.</p>
+<h4 id="task-completion-sound"><a class="g-anchor" href="#task-completion-sound" aria-hidden="true" tabindex="-1">#</a>Task Completion Sound</h4>
+<p>A sound when you complete a task. Pick a file (MP3, WAV, OGG, M4A, AAC or FLAC, up to 10 MB), use <strong>Play</strong> to hear it, or reset to the default. <strong>This device.</strong></p>
+<h4 id="routines"><a class="g-anchor" href="#routines" aria-hidden="true" tabindex="-1">#</a>Routines</h4>
+<div class="g-table"><table><thead><tr><th scope="col">Setting</th><th scope="col">What it does</th><th scope="col">Follows you</th></tr></thead><tbody><tr><th scope="row">Enable routines</th><td>Off hides Routines, its Today section and its reminders. Nothing is deleted.</td><td>This device</td></tr><tr><th scope="row">Show routines in Today</th><td>Lists the routines still open today</td><td>This device</td></tr><tr><th scope="row">Routines shown on Today</th><td>How many due routines show: 1, 2 (the default), 3, 5 or all. The rest wait behind a line such as "2 later today".</td><td>This device</td></tr><tr><th scope="row">Hidden shared routines</th><td>Routines someone shared that you hid, with a way to show them again</td><td>Synced</td></tr></tbody></table></div>
+<p>See <a href="../routines/">Routines</a>.</p>
+<h4 id="task-parser"><a class="g-anchor" href="#task-parser" aria-hidden="true" tabindex="-1">#</a>Task Parser</h4>
+<div class="g-table"><table><thead><tr><th scope="col">Setting</th><th scope="col">What it does</th><th scope="col">Follows you</th></tr></thead><tbody><tr><th scope="row">Parse task metadata from text</th><td>Reads labels, projects, priority, dates and repeats from what you type. Off makes the title plain text.</td><td>This device</td></tr><tr><th scope="row">Syntax Mode</th><td><strong>Todoist</strong> style (<code>#project</code>, <code>@label</code>, <code>p1</code>) or <strong>Vikunja</strong> style (<code>+project</code>, <code>*label</code>, <code>!1</code>)</td><td>This device</td></tr><tr><th scope="row"><code>!</code> in task title sets due date to today</th><td>A lone <code>!</code> before or after a title means due today</td><td>This device</td></tr></tbody></table></div>
+<p>See <a href="../quick-add/">Quick add</a>.</p>
+<h3 id="projects"><a class="g-anchor" href="#projects" aria-hidden="true" tabindex="-1">#</a>Projects</h3>
+<div class="g-table"><table><thead><tr><th scope="col">Setting</th><th scope="col">What it does</th><th scope="col">Follows you</th></tr></thead><tbody><tr><th scope="row">Inbox project</th><td>Where new tasks land. Setup suggests the one another device already chose.</td><td>Synced</td></tr><tr><th scope="row">Project list</th><td>Your projects and categories, with <strong>New project</strong> and <strong>New category</strong>, drag to reorder, and each project's menu</td><td>Synced</td></tr><tr><th scope="row">Sort project tasks by</th><td>The global order: Due date then manual, Due date then priority, Manual, Priority, Title, Newest first, Oldest first. A project can have its own.</td><td>Synced</td></tr><tr><th scope="row">Show project progress in the sidebar</th><td>A ring per project</td><td>This device</td></tr><tr><th scope="row">Show task count in the sidebar</th><td>Open tasks per project. Off until you turn it on.</td><td>This device</td></tr><tr><th scope="row">Enable project review tracking</th><td>Turns the review list on</td><td>This device</td></tr><tr><th scope="row">Default review cadence (days)</th><td>How often projects are due for review. 14 to start.</td><td>This device</td></tr><tr><th scope="row">Exclude Inbox from review list</th><td>Leaves the Inbox out</td><td>This device</td></tr><tr><th scope="row">Excluded from review</th><td>Projects you left out, with <strong>Include again</strong></td><td>Synced (stored with the project)</td></tr><tr><th scope="row">Import saved filters</th><td>Turns your Vikunja saved filters into custom lists</td><td>Synced (the lists)</td></tr></tbody></table></div>
+<p>See <a href="../projects/">Projects and labels</a>, <a href="../custom-lists/">Custom lists</a> and <a href="../review/">Review and guided organizing</a>.</p>
+<h3 id="quick-entry-view"><a class="g-anchor" href="#quick-entry-view" aria-hidden="true" tabindex="-1">#</a>Quick Entry / View</h3>
+<p>All of these are <strong>This device</strong>. See <a href="../desktop/">On the desktop</a>.</p>
+<div class="g-table"><table><thead><tr><th scope="col">Setting</th><th scope="col">What it does</th></tr></thead><tbody><tr><th scope="row">Enable Quick Entry, Enable Quick View</th><td>Each is off until you turn it on</td></tr><tr><th scope="row">Hotkey (Quick Entry)</th><td>Default <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd>, <kbd>Cmd</kbd>+<kbd>Shift</kbd>+<kbd>Space</kbd> on a Mac</td></tr><tr><th scope="row">Default Project</th><td>Where Quick Entry saves</td></tr><tr><th scope="row">Secondary Projects, Project Cycle Modifier</th><td>The projects you can switch to, and the key that does it</td></tr><tr><th scope="row">Hotkey (Quick View)</th><td>Default <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd>, <kbd>Cmd</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd> on a Mac</td></tr><tr><th scope="row">List</th><td>What Quick View shows</td></tr><tr><th scope="row">Include tasks due today from all projects</th><td>Adds today's tasks from every project</td></tr><tr><th scope="row">Browser Integration</th><td><strong>Page Linking</strong>, Chrome Extension ID, <strong>Re-register Bridge</strong></td></tr><tr><th scope="row">Obsidian Integration</th><td><strong>Note Linking</strong>, API Key, Vault Name, Port, <strong>Test Connection</strong>. Not on Linux.</td></tr></tbody></table></div>
+<h3 id="notifications"><a class="g-anchor" href="#notifications" aria-hidden="true" tabindex="-1">#</a>Notifications</h3>
+<p>All <strong>This device</strong>, except the list of places.</p>
+<div class="g-table"><table><thead><tr><th scope="col">Setting</th><th scope="col">What it does</th></tr></thead><tbody><tr><th scope="row">Enable desktop notifications</th><td>The master switch. On a Mac, the first notification asks for permission.</td></tr><tr><th scope="row">Scheduled Reminders</th><td>A <strong>Morning reminder</strong> and an <strong>Afternoon reminder</strong> with a time each. Include <strong>Overdue tasks</strong>, <strong>Tasks due today</strong>, <strong>Tasks due tomorrow</strong>. <strong>Play sound</strong> and <strong>Stay until dismissed</strong>.</td></tr><tr><th scope="row">Task Reminders</th><td><strong>Play sound</strong> and <strong>Stay until dismissed</strong> for reminders you set on tasks</td></tr><tr><th scope="row">Default reminder</th><td>Added to every new task that has a due date and no reminder. Relative to the due, start or end date. Never added to existing tasks.</td></tr><tr><th scope="row">Test Notification</th><td>Sends a test</td></tr><tr><th scope="row">Places</th><td>The places you saved on your phone, read only. Synced.</td></tr></tbody></table></div>
+<h3 id="assistant"><a class="g-anchor" href="#assistant" aria-hidden="true" tabindex="-1">#</a>Assistant</h3>
+<p>All <strong>This device</strong>: the assistant's provider, key and models do not sync. See <a href="../assistant/">The assistant</a>.</p>
+<div class="g-table"><table><thead><tr><th scope="col">Section</th><th scope="col">What it holds</th></tr></thead><tbody><tr><th scope="row">Thinking</th><td><strong>Provider</strong> (OpenAI, Anthropic, Google Gemini, OpenRouter, Ollama, Open WebUI or another compatible server), address, key, <strong>Model</strong>, and <strong>Use a different model for Ask</strong></td></tr><tr><th scope="row">Features</th><td>Switches for <strong>Smart dictation</strong>, <strong>Brain dump</strong>, <strong>Ask</strong> and <strong>Talk</strong>, each with <strong>Try it</strong></td></tr><tr><th scope="row">Hearing</th><td>Speech models to download so voice is recognized on your computer, and the <strong>Language</strong></td></tr><tr><th scope="row">Privacy</th><td><strong>Delete conversations</strong></td></tr></tbody></table></div>
+<h3 id="pro"><a class="g-anchor" href="#pro" aria-hidden="true" tabindex="-1">#</a>Pro</h3>
+<p>Turn Pro on for this device, choose its parts, and set <strong>Assistant help in Pro</strong>. Those choices are per device. The work area, the cap on active initiatives and the escalation rule are synced. See <a href="../pro/">Vicu Pro</a>.</p>
+<h3 id="keyboard-shortcuts"><a class="g-anchor" href="#keyboard-shortcuts" aria-hidden="true" tabindex="-1">#</a>Keyboard Shortcuts</h3>
+<p>Shows the shortcut list, and the <strong>Voice input</strong> shortcut (<strong>This device</strong>, off until you record one). See <a href="../shortcuts/">Keyboard shortcuts</a>.</p>
+<h2 id="phone"><a class="g-anchor" href="#phone" aria-hidden="true" tabindex="-1">#</a>Phone <span class="g-badge g-badge--phone"><svg aria-hidden="true"><use href="#i-phone" /></svg>Phone</span></h2>
+<p>Settings are in the drawer. Everything on the phone is per device unless marked.</p>
+<h3 id="general-2"><a class="g-anchor" href="#general-2" aria-hidden="true" tabindex="-1">#</a>General</h3>
+<div class="g-table"><table><thead><tr><th scope="col">Section</th><th scope="col">What it holds</th><th scope="col">Follows you</th></tr></thead><tbody><tr><th scope="row">Account</th><td>Username, email, auth method, server, <strong>Sign Out</strong></td><td>This device</td></tr><tr><th scope="row">Appearance</th><td><strong>Theme</strong> (System, Light, Dark), <strong>Pure black</strong>, <strong>Use device colours</strong> (<span class="g-badge g-badge--android"><svg aria-hidden="true"><use href="#i-android" /></svg>Android</span> only), <strong>Task rows</strong> (Compact or Comfortable)</td><td>This device</td></tr><tr><th scope="row">Bottom Bar</th><td>The last three slots, <strong>Smart list colours</strong>, <strong>Reset to Defaults</strong></td><td>This device</td></tr><tr><th scope="row">Plan</th><td><strong>Show Plan in the drawer</strong>, and the Plan options (default length and work hours sync, the evening nudge does not)</td><td>Switch: this device. Length and hours: Synced</td></tr><tr><th scope="row">Pro</th><td><strong>Turn on Pro on this device</strong> and its parts</td><td>This device</td></tr><tr><th scope="row">Drawer</th><td>Which views the drawer lists</td><td>This device</td></tr><tr><th scope="row">Widget</th><td><strong>Smart add button</strong>, <strong>Context navigation</strong></td><td>This device</td></tr><tr><th scope="row">Routines</th><td><strong>Enable routines</strong>, <strong>Show routines in Today</strong>, <strong>Routines shown on Today</strong>, <strong>Hidden shared routines</strong></td><td>This device. Hidden shared routines: Synced</td></tr><tr><th scope="row">Logbook</th><td><strong>Hide old completed tasks</strong> and <strong>Keep completed tasks for</strong> a number of days. Nothing is deleted.</td><td>This device</td></tr><tr><th scope="row">Input Parsing</th><td><strong>Natural Language Parsing</strong>, <strong>Syntax Mode</strong> (Todoist or Vikunja), and "Add ! to set the due date to today"</td><td>This device</td></tr><tr><th scope="row">Preferences</th><td><strong>Confirm before deleting</strong>, <strong>Subtasks in task lists</strong>, <strong>Keep add-task open</strong>, <strong>Left-handed add button</strong>, <strong>Play sound when completing a task</strong></td><td>This device</td></tr><tr><th scope="row">Data &amp; Sync</th><td>Status, <strong>Sync Now</strong>, <strong>Retry All</strong>, <strong>Clear Failed</strong>, <strong>Clear Cache &amp; Re-sync</strong>, <strong>Background activity</strong> (<span class="g-badge g-badge--ios"><svg aria-hidden="true"><use href="#i-apple" /></svg>iPhone and iPad</span>)</td><td>n/a</td></tr></tbody></table></div>
+<h3 id="projects-2"><a class="g-anchor" href="#projects-2" aria-hidden="true" tabindex="-1">#</a>Projects</h3>
+<div class="g-table"><table><thead><tr><th scope="col">Section</th><th scope="col">What it holds</th><th scope="col">Follows you</th></tr></thead><tbody><tr><th scope="row">Inbox Project</th><td><strong>Choose inbox project</strong>, and <strong>Move dated tasks out of Inbox</strong></td><td>Inbox: Synced. The move option: This device</td></tr><tr><th scope="row">Display</th><td><strong>Task order</strong> (and <strong>Sort tasks</strong> per project), <strong>Subprojects in project views</strong>, <strong>Show project progress</strong>, <strong>Show task count</strong></td><td>Order: Synced. The rest: This device</td></tr><tr><th scope="row">Review</th><td><strong>Enable project review tracking</strong>, <strong>Default review cadence</strong>, <strong>Exclude Inbox from review</strong>, and the list of excluded projects</td><td>This device</td></tr><tr><th scope="row">Projects, Labels</th><td>Your projects (tap to edit, hold to drag, ⋮ for more) and labels</td><td>Synced</td></tr><tr><th scope="row">Custom Lists</th><td>Your custom lists, and the import of saved filters</td><td>Synced</td></tr></tbody></table></div>
+<h3 id="notifications-2"><a class="g-anchor" href="#notifications-2" aria-hidden="true" tabindex="-1">#</a>Notifications</h3>
+<p>See <a href="../phone/#notifications">Vicu on your phone</a>. <strong>This device</strong>: <strong>Task Reminders</strong>, <strong>Sound</strong>, <strong>Daily Summary</strong> and its times and counts, <strong>Default Reminder</strong>, <strong>Send Test Notification</strong>, the <strong>Quick Add tile</strong> (<span class="g-badge g-badge--android"><svg aria-hidden="true"><use href="#i-android" /></svg>Android</span>) or <strong>Add task control</strong> hint (<span class="g-badge g-badge--ios"><svg aria-hidden="true"><use href="#i-apple" /></svg>iPhone and iPad</span>). <strong>Places</strong> sync by name, and positions stay on the phone.</p>
+<h3 id="gestures"><a class="g-anchor" href="#gestures" aria-hidden="true" tabindex="-1">#</a>Gestures</h3>
+<p><strong>Swipe Right</strong> and <strong>Swipe Left</strong>, each set to one action. <strong>This device.</strong></p>
+<h3 id="assistant-2"><a class="g-anchor" href="#assistant-2" aria-hidden="true" tabindex="-1">#</a>Assistant</h3>
+<p>Provider, key, models, features and speech models. <strong>This device.</strong> Parakeet is the suggested speech model on phones. Downloads wait for Wi-Fi unless you allow mobile data.</p>
+<h2 id="accessibility"><a class="g-anchor" href="#accessibility" aria-hidden="true" tabindex="-1">#</a>Accessibility</h2>
+<p>Vicu follows your system's accessibility settings; there is nothing to turn on in Vicu.</p>
+<ul><li><strong>Keyboard</strong> <span class="g-badge g-badge--desktop"><svg aria-hidden="true"><use href="#i-monitor" /></svg>Desktop</span>: everything works from the keyboard. Lists move with the arrow keys, menus and pickers jump to an item as you type its name, and one focus ring shows where you are. See <a href="../shortcuts/">Keyboard shortcuts</a>.</li><li><strong>Screen readers</strong> <span class="g-badge g-badge--all"><svg aria-hidden="true"><use href="#i-grid" /></svg>All devices</span>: menus, dialogs and lists are real controls with names, and changes such as "Completed" are announced. On the phone, every task row has screen reader actions, such as Complete, Due today and Due tomorrow.</li><li><strong>Less motion</strong> <span class="g-badge g-badge--all"><svg aria-hidden="true"><use href="#i-grid" /></svg>All devices</span>: when your system asks for reduced motion, Vicu replaces movement with simple fades. On Windows that is <strong>Settings, Accessibility, Visual effects, Animation effects</strong>.</li><li><strong>Contrast themes</strong> <span class="g-badge g-badge--desktop"><svg aria-hidden="true"><use href="#i-monitor" /></svg>Desktop</span>: with a Windows contrast theme, Vicu uses the system's colors and keeps every meaning visible by shape or text, not color alone. Priority, for example, is shown by bars and a mark, not only by color.</li><li><strong>Text size</strong> <span class="g-badge g-badge--ios"><svg aria-hidden="true"><use href="#i-apple" /></svg>iPhone and iPad</span>: Vicu follows Dynamic Type.</li></ul>
+<h2 id="settings-that-always-sync"><a class="g-anchor" href="#settings-that-always-sync" aria-hidden="true" tabindex="-1">#</a>Settings that always sync</h2>
+<p>For quick reference, these follow your account to every device:</p>
+<ul><li>The Inbox project</li><li>Task order, global and per project, and subtask order</li><li>Custom lists and imported saved filters</li><li>Project categories and icons</li><li>Task templates</li><li>Plan default length and work hours</li><li>Your own Events</li><li>Saved place names and location reminders</li><li>Hidden shared routines and routine reminder choices</li><li>The date of your last weekly review</li><li>Pro's work area, cap and escalation rule, and Pro data</li></ul>
+<p>Everything else stays on the device. <a href="../sync/">Sync and offline</a> explains how this works.</p>
+<h2 id="related"><a class="g-anchor" href="#related" aria-hidden="true" tabindex="-1">#</a>Related</h2>
+<ul><li><a href="../sync/">Sync and offline</a></li><li><a href="../shortcuts/">Keyboard shortcuts</a></li><li><a href="../quick-add/">Quick add</a></li><li><a href="../desktop/">On the desktop</a></li><li><a href="../phone/">On your phone</a></li></ul>
+          </div>
+          <nav class="g-pager" aria-label="Previous and next page"><a class="g-pager-prev" href="../sync/"><span>Previous</span>Sync and offline</a><a class="g-pager-next" href="../pro/"><span>Next</span>Vicu Pro</a></nav>
+          <p class="g-edit"><a href="https://github.com/rendyhd/Vicu/blob/main/docs/guide/settings.md">Suggest a change to this page</a></p>
+        </article>
+        <nav class="g-toc" aria-label="On this page"><p>On this page</p><ul><li class="g-toc-2"><a href="#in-short">In short</a></li><li class="g-toc-2"><a href="#desktop">Desktop</a></li><li class="g-toc-3"><a href="#general">General</a></li><li class="g-toc-3"><a href="#projects">Projects</a></li><li class="g-toc-3"><a href="#quick-entry-view">Quick Entry / View</a></li><li class="g-toc-3"><a href="#notifications">Notifications</a></li><li class="g-toc-3"><a href="#assistant">Assistant</a></li><li class="g-toc-3"><a href="#pro">Pro</a></li><li class="g-toc-3"><a href="#keyboard-shortcuts">Keyboard Shortcuts</a></li><li class="g-toc-2"><a href="#phone">Phone</a></li><li class="g-toc-3"><a href="#general-2">General</a></li><li class="g-toc-3"><a href="#projects-2">Projects</a></li><li class="g-toc-3"><a href="#notifications-2">Notifications</a></li><li class="g-toc-3"><a href="#gestures">Gestures</a></li><li class="g-toc-3"><a href="#assistant-2">Assistant</a></li><li class="g-toc-2"><a href="#accessibility">Accessibility</a></li><li class="g-toc-2"><a href="#settings-that-always-sync">Settings that always sync</a></li><li class="g-toc-2"><a href="#related">Related</a></li></ul></nav>
+      </main>
+    </div>
+
+    <footer class="site-footer">
+      <div class="wrap footer-row">
+        <a class="brand" href="../../"><img src="../../assets/img/brand/vicu-64.png" alt="" width="28" height="28" /><span>Vicu</span></a>
+        <nav class="footer-links" aria-label="Footer">
+          <a href="https://github.com/rendyhd/Vicu">Desktop on GitHub</a>
+          <a href="https://github.com/rendyhd/Vicu-Mobile">Mobile on GitHub</a>
+          <a href="https://github.com/rendyhd/Vicu/releases">Release notes</a>
+          <a href="https://github.com/rendyhd/Vicu-Mobile/blob/main/docs/privacy-policy.md">Privacy</a>
+          <a href="https://ko-fi.com/rendyhd">Support on Ko-fi</a>
+        </nav>
+        <p>MIT licensed. Vicu is an independent app, not made by the Vikunja team. Screens show made-up tasks.</p>
+      </div>
+    </footer>
+  </body>
+</html>

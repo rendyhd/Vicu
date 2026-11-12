@@ -15,6 +15,33 @@ Then open http://127.0.0.1:8096/ (or pass another port: `node site/tools/serve.m
 Before publishing, run `npm run site:check`. It checks every local link, image, `#anchor` and id
 reference, alt text and image sizes, and that nothing loads from another site.
 
+## The guide
+
+The guide at https://vicutodo.app/guide/ is written in Markdown in `docs/guide/` (one file per page,
+`pro/*.md` for the Pro pages) and turned into static pages by a small generator:
+
+```bash
+npm run site:guide
+```
+
+It writes `site/guide/<page>/index.html` and the search index `assets/js/guide-index.js`; commit
+both with the Markdown. Never edit the generated pages. `npm run site:check` fails when they are out
+of date with `docs/guide/`, when a `guide:` link or `#anchor` points nowhere, or when a page is
+missing from the contents.
+
+- **Contents**: the order and sections are `NAV` at the top of `site/tools/guide.mjs`. A new page
+  needs an entry there.
+- **A page** starts with front matter (`title`, `description`, `lead`, optional `nav` for a shorter
+  sidebar name), opens with `## In short`, then the tasks, then details, and ends with `## Related`.
+- **Syntax** beyond plain Markdown: links between pages as `[text](guide:slug#heading)`, platform
+  badges `{desktop}` `{android}` `{ios}` `{phone}` `{all}` `{pro}`, callouts (`> [!NOTE]`, `TIP`,
+  `PRO`, `WARNING`, `PHONE`, `DESKTOP`), `:::cards` and `:::steps` blocks, and screens as
+  `![alt](screen:desktop-today.webp "caption")` (the dark twin is found by name).
+- **Writing**: plain words, second person, the app's own labels in bold, no emojis. Say where each
+  feature works.
+
+The site workflow also runs on changes to `docs/guide/`.
+
 ## Screens
 
 Screens show the seeded, made-up data of the UI harness (`scripts/ui-verify/seed.mjs`). To replace

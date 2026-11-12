@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Add tasks · Vicu guide</title>
+    <meta name="description" content="Every way to add a task in Vicu: the new task row, Quick Entry, your voice, the share sheet, widgets, pasted lists, templates and duplicates." />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#fbfaf8" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#111113" media="(prefers-color-scheme: dark)" />
+    <link rel="icon" href="../../assets/img/brand/vicu-32.png" sizes="32x32" type="image/png" />
+    <link rel="apple-touch-icon" href="../../assets/img/brand/vicu-180.png" />
+    <meta property="og:type" content="article" />
+    <meta property="og:site_name" content="Vicu" />
+    <meta property="og:title" content="Add tasks · Vicu guide" />
+    <meta property="og:description" content="Every way to add a task in Vicu: the new task row, Quick Entry, your voice, the share sheet, widgets, pasted lists, templates and duplicates." />
+    <meta property="og:url" content="https://vicutodo.app/guide/capture/" />
+    <meta property="og:image" content="https://vicutodo.app/assets/img/og.jpg" />
+    <link rel="canonical" href="https://vicutodo.app/guide/capture/" />
+    <link rel="stylesheet" href="../../assets/css/site.css" />
+    <script>
+      (function () {
+        var d = document.documentElement;
+        d.className = d.className.replace('no-js', 'js');
+        try {
+          var t = localStorage.getItem('vicu-site-theme');
+          if (t === 'light' || t === 'dark') d.setAttribute('data-theme', t);
+        } catch (e) {}
+      })();
+    </script>
+    <script src="../../assets/js/site.js" defer></script>
+    <script src="../../assets/js/guide-index.js" defer></script>
+    <script src="../../assets/js/guide.js" defer></script>
+  </head>
+  <body class="g-body" data-guide-root="../">
+    <svg class="sprite" aria-hidden="true" focusable="false">
+      <symbol id="i-inbox" viewBox="0 0 24 24"><path d="M3.5 13.5 6 5.5h12l2.5 8V18a1.5 1.5 0 0 1-1.5 1.5H5A1.5 1.5 0 0 1 3.5 18Z" /><path d="M3.5 13.5h5l1 2.5h5l1-2.5h5" /></symbol>
+      <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4" /><path d="M12 2.5v2M12 19.5v2M4.6 4.6 6 6M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4 6 18M18 6l1.4-1.4" /></symbol>
+      <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4 8.5 8.5 0 1 0 20 14.5Z" /></symbol>
+      <symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5" /><path d="M3.5 10h17M8 3v4M16 3v4" /></symbol>
+      <symbol id="i-layers" viewBox="0 0 24 24"><path d="m12 3.5 8.5 4.5L12 12.5 3.5 8Z" /><path d="m3.5 12 8.5 4.5 8.5-4.5" /><path d="m3.5 16 8.5 4.5 8.5-4.5" /></symbol>
+      <symbol id="i-check" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" /><path d="m8.2 12.2 2.6 2.6 5-5.3" /></symbol>
+      <symbol id="i-review" viewBox="0 0 24 24"><path d="M19.5 12a7.5 7.5 0 0 1-13 5.1M4.5 12a7.5 7.5 0 0 1 13-5.1" /><path d="M17.8 3.5v3.6h-3.6M6.2 20.5v-3.6h3.6" /></symbol>
+      <symbol id="i-heart" viewBox="0 0 24 24"><path d="M12 19.5s-7.5-4.4-7.5-10A4.2 4.2 0 0 1 12 7a4.2 4.2 0 0 1 7.5 2.5c0 5.6-7.5 10-7.5 10Z" /><path d="M7 12h2.5l1.5-2 2 4 1.5-2H17" /></symbol>
+      <symbol id="i-bolt" viewBox="0 0 24 24"><path d="M13 3 5 13.5h6L10.5 21 19 10.5h-6Z" /></symbol>
+      <symbol id="i-mic" viewBox="0 0 24 24"><rect x="9" y="3.5" width="6" height="11" rx="3" /><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v2.5" /></symbol>
+      <symbol id="i-filter" viewBox="0 0 24 24"><path d="M4 6h16M7 12h10M10 18h4" /></symbol>
+      <symbol id="i-tag" viewBox="0 0 24 24"><path d="M3.5 12.2V4.5a1 1 0 0 1 1-1h7.7l8.3 8.3a1.4 1.4 0 0 1 0 2l-6.7 6.7a1.4 1.4 0 0 1-2 0Z" /><circle cx="8" cy="8" r="1.4" /></symbol>
+      <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3.5 7.5v10A1.5 1.5 0 0 0 5 19h14a1.5 1.5 0 0 0 1.5-1.5V9A1.5 1.5 0 0 0 19 7.5h-7L10 5H5a1.5 1.5 0 0 0-1.5 1.5Z" /></symbol>
+      <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8.5" r="3.2" /><path d="M3 19c.8-3.2 3.2-5 6-5s5.2 1.8 6 5" /><path d="M15.5 5.6a3.2 3.2 0 0 1 0 5.8M17.5 14.3c1.7.6 3 2.2 3.5 4.7" /></symbol>
+      <symbol id="i-chat" viewBox="0 0 24 24"><path d="M4 5.5h16v10.5H10l-6 4.5Z" /><path d="M8.5 10.5h7" /></symbol>
+      <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2h-15Z" /><path d="M10 20.5a2 2 0 0 0 4 0" /></symbol>
+      <symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 21s6.5-5.6 6.5-11a6.5 6.5 0 0 0-13 0c0 5.4 6.5 11 6.5 11Z" /><circle cx="12" cy="10" r="2.3" /></symbol>
+      <symbol id="i-cloud-off" viewBox="0 0 24 24"><path d="M8 18.5H6.5a4 4 0 0 1-.6-8 6 6 0 0 1 9.2-4M18.5 9.5a4.5 4.5 0 0 1-1.5 9h-5" /><path d="m4 3.5 16 17" /></symbol>
+      <symbol id="i-sync" viewBox="0 0 24 24"><path d="M4 12a8 8 0 0 1 14-5.3L20 9" /><path d="M20 4v5h-5" /><path d="M20 12a8 8 0 0 1-14 5.3L4 15" /><path d="M4 20v-5h5" /></symbol>
+      <symbol id="i-keyboard" viewBox="0 0 24 24"><rect x="2.5" y="6" width="19" height="12" rx="2" /><path d="M6 9.5h.01M9 9.5h.01M12 9.5h.01M15 9.5h.01M18 9.5h.01M6 12.5h.01M18 12.5h.01M9 12.5h6M7.5 15.3h9" /></symbol>
+      <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.7 0l3.1-3.1a4 4 0 0 0-5.7-5.7l-1 1" /><path d="M14 10a4 4 0 0 0-5.7 0l-3.1 3.1a4 4 0 0 0 5.7 5.7l1-1" /></symbol>
+      <symbol id="i-phone" viewBox="0 0 24 24"><rect x="6.5" y="2.5" width="11" height="19" rx="2.5" /><path d="M10.5 18.5h3" /></symbol>
+      <symbol id="i-monitor" viewBox="0 0 24 24"><rect x="2.5" y="4" width="19" height="12.5" rx="2" /><path d="M8.5 20.5h7M12 16.5v4" /></symbol>
+      <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4v11M7.5 10.5 12 15l4.5-4.5" /><path d="M4.5 19.5h15" /></symbol>
+      <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z" /><circle cx="12" cy="12" r="2.8" /></symbol>
+      <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="10.5" width="14" height="10" rx="2" /><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5" /></symbol>
+      <symbol id="i-grid" viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="7" height="7" rx="1.8" /><rect x="13.5" y="3.5" width="7" height="7" rx="1.8" /><rect x="3.5" y="13.5" width="7" height="7" rx="1.8" /><rect x="13.5" y="13.5" width="7" height="7" rx="1.8" /></symbol>
+      <symbol id="i-swipe" viewBox="0 0 24 24"><path d="M3.5 7.5h11M11 4l3.5 3.5L11 11" /><path d="M9 21v-6.5a1.5 1.5 0 0 1 3 0V17l3.8.7a1.8 1.8 0 0 1 1.5 2V21" /></symbol>
+      <symbol id="i-share" viewBox="0 0 24 24"><path d="M12 3.5v11M8 7.5l4-4 4 4" /><path d="M7 11H5.5v9.5h13V11H17" /></symbol>
+      <symbol id="i-sort" viewBox="0 0 24 24"><path d="M7 4v16M3.5 16.5 7 20l3.5-3.5" /><path d="M13 6h7.5M13 11h5.5M13 16h3" /></symbol>
+      <symbol id="i-repeat" viewBox="0 0 24 24"><path d="M4 11V9.5A3.5 3.5 0 0 1 7.5 6H19" /><path d="m16 3 3 3-3 3" /><path d="M20 13v1.5a3.5 3.5 0 0 1-3.5 3.5H5" /><path d="m8 21-3-3 3-3" /></symbol>
+      <symbol id="i-clip" viewBox="0 0 24 24"><path d="m20 11.5-7.8 7.8a5 5 0 0 1-7-7.1L13 4.4a3.3 3.3 0 0 1 4.7 4.7l-7.8 7.8a1.7 1.7 0 0 1-2.4-2.4l7.2-7.2" /></symbol>
+      <symbol id="i-flag" viewBox="0 0 24 24"><path d="M5 21V4M5 4.5h12l-2 4 2 4H5" /></symbol>
+      <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5" /><path d="m20 20-4.3-4.3" /></symbol>
+      <symbol id="i-command" viewBox="0 0 24 24"><path d="M9 9V6.5A2.5 2.5 0 1 0 6.5 9H9Zm0 0h6m-6 0v6m6-6V6.5A2.5 2.5 0 1 1 17.5 9H15Zm0 0v6m0 0h-6m6 0v2.5a2.5 2.5 0 1 0 2.5-2.5H15Zm-6 0v2.5A2.5 2.5 0 1 1 6.5 15H9Z" /></symbol>
+      <symbol id="i-sparkle" viewBox="0 0 24 24"><path d="M12 3.5c.6 4.6 3.9 7.9 8.5 8.5-4.6.6-7.9 3.9-8.5 8.5-.6-4.6-3.9-7.9-8.5-8.5 4.6-.6 7.9-3.9 8.5-8.5Z" /></symbol>
+      <symbol id="i-person" viewBox="0 0 24 24"><circle cx="12" cy="5.5" r="2" /><path d="M5 9h14M12 9v5.5M8.5 21l3.5-6.5 3.5 6.5" /></symbol>
+      <symbol id="i-hand" viewBox="0 0 24 24"><path d="M8 12V5.5a1.5 1.5 0 0 1 3 0V11M11 10.5V4a1.5 1.5 0 0 1 3 0v6.5M14 10.5V5.5a1.5 1.5 0 0 1 3 0V14a7 7 0 0 1-7 7h-.5a6 6 0 0 1-5-2.8L3 15.3a1.6 1.6 0 0 1 2.6-1.8L8 15.5" /></symbol>
+      <symbol id="i-sections" viewBox="0 0 24 24"><path d="M4 5.5h16M4 12h16M4 18.5h16" /><path d="M4 5.5v13" /></symbol>
+      <symbol id="i-obsidian" viewBox="0 0 24 24"><path d="M9 2.8 4.8 9.6l3 7.7 5.6 3.9 4.1-3.4L19 9.4 14 3Z" /><path d="m9 2.8 1.6 8.1-2.8 6.4M10.6 10.9 19 9.4M10.6 10.9l2.8 10.3" /></symbol>
+      <symbol id="i-tray" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2.5" /><path d="M3 15h18M7 18h.01M10 18h.01" /></symbol>
+      <symbol id="i-windows" viewBox="0 0 24 24"><path d="M3.5 5.5 10.5 4.5v7h-7ZM12.5 4.2l8-1.2v8.5h-8ZM3.5 12.5h7v7l-7-1ZM12.5 12.5h8V21l-8-1.2Z" /></symbol>
+      <symbol id="i-apple" viewBox="0 0 24 24"><path d="M16.4 12.6c0-2.3 1.9-3.4 2-3.5a4.3 4.3 0 0 0-3.4-1.8c-1.4-.2-2.8.8-3.5.8s-1.8-.8-3-.8a4.5 4.5 0 0 0-3.8 2.3c-1.6 2.8-.4 7 1.2 9.3.8 1.1 1.7 2.4 2.9 2.3 1.2 0 1.6-.7 3-.7s1.8.7 3 .7c1.3 0 2.1-1.1 2.8-2.3a10 10 0 0 0 1.3-2.6 4 4 0 0 1-2.5-3.7ZM14.2 5.8A4 4 0 0 0 15.1 3a4.1 4.1 0 0 0-2.7 1.4 3.8 3.8 0 0 0-1 2.7 3.4 3.4 0 0 0 2.8-1.3Z" /></symbol>
+      <symbol id="i-linux" viewBox="0 0 24 24"><path d="M12 3c-2.2 0-3.4 1.8-3.4 4.4 0 1.7-.6 2.6-1.6 4-1.2 1.6-2.4 3.6-2 6 .2 1.4 1.4 2.6 3 2.6h8c1.6 0 2.8-1.2 3-2.6.4-2.4-.8-4.4-2-6-1-1.4-1.6-2.3-1.6-4C15.4 4.8 14.2 3 12 3Z" /><path d="M10.4 7.6h.01M13.6 7.6h.01M10.7 10h2.6" /></symbol>
+      <symbol id="i-android" viewBox="0 0 24 24"><path d="M5 16V11a7 7 0 0 1 14 0v5Z" /><path d="M8 5 6.5 2.8M16 5l1.5-2.2" /><path d="M9 10h.01M15 10h.01" /><path d="M5 16h14v1.5a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2Z" /></symbol>
+      <symbol id="i-github" viewBox="0 0 24 24"><path d="M9 19c-4 1.3-4-2-5.6-2.5M14.6 21v-3.3a2.9 2.9 0 0 0-.8-2.2c2.7-.3 5.6-1.3 5.6-6a4.6 4.6 0 0 0-1.3-3.2 4.3 4.3 0 0 0-.1-3.2s-1-.3-3.4 1.3a11.6 11.6 0 0 0-6 0C6.5 2.8 5.5 3.1 5.5 3.1a4.3 4.3 0 0 0-.1 3.2A4.6 4.6 0 0 0 4 9.5c0 4.6 2.9 5.7 5.6 6a2.9 2.9 0 0 0-.8 2.2V21" /></symbol>
+      <symbol id="i-coffee" viewBox="0 0 24 24"><path d="M4.5 9.5h12v5a5 5 0 0 1-5 5h-2a5 5 0 0 1-5-5Z" /><path d="M16.5 11h1a2.5 2.5 0 0 1 0 5h-1.3" /><path d="M8.5 3.5v2.5M12.5 3.5v2.5" /></symbol>
+      <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M4 12h15M13.5 6.5 19 12l-5.5 5.5" /></symbol>
+    </svg>
+
+    <a class="skip-link" href="#main">Skip to content</a>
+
+    <header class="site-header">
+      <div class="wrap header-row">
+        <a class="brand" href="../../">
+          <img src="../../assets/img/brand/vicu-64.png" alt="" width="32" height="32" />
+          <span>Vicu</span>
+        </a>
+        <nav class="nav" aria-label="Site">
+          <a href="../../">Home</a>
+          <a href="../">Guide</a>
+          <a href="../pro/">Vicu Pro</a>
+          <a href="../../#download">Download</a>
+        </nav>
+        <div class="header-actions">
+          <button class="icon-btn g-menu-toggle" type="button" aria-controls="g-sidebar" aria-expanded="false" aria-label="Guide contents">
+            <svg aria-hidden="true"><use href="#i-sections" /></svg>
+          </button>
+          <button class="icon-btn theme-toggle" type="button" aria-label="Switch between light and dark">
+            <svg class="icon-moon" aria-hidden="true"><use href="#i-moon" /></svg>
+            <svg class="icon-sun" aria-hidden="true"><use href="#i-sun" /></svg>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <div class="wrap g-layout">
+      <aside class="g-sidebar" id="g-sidebar" aria-label="Guide contents">
+        <form class="g-search" role="search" onsubmit="return false">
+          <label class="visually-hidden" for="g-search-input">Search the guide</label>
+          <svg aria-hidden="true"><use href="#i-search" /></svg>
+          <input id="g-search-input" type="search" placeholder="Search the guide" autocomplete="off" aria-describedby="g-search-hint" />
+          <span id="g-search-hint" class="visually-hidden">Results show below as you type.</span>
+        </form>
+        <ul class="g-search-results" id="g-search-results" aria-live="polite" hidden></ul>
+        <nav class="g-nav" aria-label="Guide pages"><details class="g-nav-section"><summary>Start here</summary><ul><li><a href="../">Guide home</a></li><li><a href="../getting-started/">Get started</a></li><li><a href="../basics/">How Vicu is organized</a></li></ul></details><details class="g-nav-section" open><summary>Everyday Vicu</summary><ul><li><a href="../capture/" aria-current="page">Add tasks</a></li><li><a href="../tasks/">Work with tasks</a></li><li><a href="../lists/">Smart lists</a></li><li><a href="../projects/">Projects and labels</a></li><li><a href="../custom-lists/">Custom lists</a></li><li><a href="../plan/">Plan your day</a></li><li><a href="../calendars/">Events and calendars</a></li><li><a href="../routines/">Routines</a></li><li><a href="../review/">Review and organizing</a></li><li><a href="../collaboration/">Collaboration</a></li><li><a href="../assistant/">The assistant</a></li></ul></details><details class="g-nav-section"><summary>Your devices</summary><ul><li><a href="../desktop/">On the desktop</a></li><li><a href="../phone/">On your phone</a></li><li><a href="../sync/">Sync and offline</a></li><li><a href="../settings/">Settings</a></li></ul></details><details class="g-nav-section"><summary>Vicu Pro</summary><ul><li><a href="../pro/">What Pro is</a></li><li><a href="../pro/available/">Know what you can do now</a></li><li><a href="../pro/promises/">Promises and people</a></li><li><a href="../pro/portfolio/">Portfolio</a></li><li><a href="../pro/power/">Power tools</a></li></ul></details><details class="g-nav-section"><summary>Reference</summary><ul><li><a href="../quick-add/">Quick add</a></li><li><a href="../shortcuts/">Keyboard shortcuts</a></li><li><a href="../faq/">Troubleshooting and FAQ</a></li><li><a href="../glossary/">Glossary</a></li></ul></details></nav>
+      </aside>
+
+      <main id="main" class="g-main">
+        <article class="g-article">
+          <nav class="g-crumbs" aria-label="Breadcrumb"><a href="../">Guide</a> <span aria-hidden="true">/</span> <span>Everyday Vicu</span></nav>
+          <h1 class="g-title">Add tasks</h1>
+          <p class="g-lead">Get a task out of your head and into Vicu in a few seconds, from wherever you are.</p>
+          <details class="g-toc-inline"><summary>On this page</summary><ul><li><a href="#in-short">In short</a></li><li><a href="#add-a-task-in-the-app">Add a task in the app</a></li><li><a href="#quick-entry">Quick Entry</a></li><li><a href="#say-a-task">Say a task</a></li><li><a href="#from-other-apps-and-your-phone">From other apps and your phone</a></li><li><a href="#paste-several-tasks">Paste several tasks</a></li><li><a href="#paste-markdown-into-notes">Paste Markdown into notes</a></li><li><a href="#reuse-a-task">Reuse a task</a></li><li><a href="#related">Related</a></li></ul></details>
+          <div class="g-content">
+<h2 id="in-short"><a class="g-anchor" href="#in-short" aria-hidden="true" tabindex="-1">#</a>In short</h2>
+<ul><li><strong>Type it.</strong> The new task row at the end of a list, <kbd>Ctrl</kbd>+<kbd>N</kbd> (<kbd>Cmd</kbd> on a Mac) or the phone's <strong>+</strong> button. Words like <code>tomorrow 3pm</code> or <code>#work</code> become dates and projects.</li><li><strong>Quick Entry</strong> <span class="g-badge g-badge--desktop"><svg aria-hidden="true"><use href="#i-monitor" /></svg>Desktop</span> is a small window you open with a global hotkey, over any app.</li><li><strong>Say it.</strong> Hold <strong>+</strong> and speak. No setup needed.</li><li><strong>Share it</strong> <span class="g-badge g-badge--phone"><svg aria-hidden="true"><use href="#i-phone" /></svg>Phone</span> from any app, or use a widget, a launcher shortcut or Siri.</li><li><strong>Paste a list</strong> <span class="g-badge g-badge--desktop"><svg aria-hidden="true"><use href="#i-monitor" /></svg>Desktop</span> and get one task per line.</li><li><strong>Reuse a task</strong> with templates and Duplicate.</li></ul>
+<p>New tasks go to the list you are looking at when that makes sense, and to the Inbox otherwise.</p>
+<h2 id="add-a-task-in-the-app"><a class="g-anchor" href="#add-a-task-in-the-app" aria-hidden="true" tabindex="-1">#</a>Add a task in the app</h2>
+<h3 id="on-the-desktop"><a class="g-anchor" href="#on-the-desktop" aria-hidden="true" tabindex="-1">#</a>On the desktop <span class="g-badge g-badge--desktop"><svg aria-hidden="true"><use href="#i-monitor" /></svg>Desktop</span></h3>
+<ol><li>Click <strong>New task</strong> at the end of a list, or press <kbd>Ctrl</kbd>+<kbd>N</kbd>. You can also use <strong>File, New task</strong>.</li><li>Type the title. Vicu highlights what it recognizes and shows it as chips.</li><li>Press <kbd>Enter</kbd>.</li></ol>
+<figure class="g-figure"><img class="only-light" src="../../assets/img/screens/crop-composer.webp" alt="The task composer on the desktop" width="1200" height="419" loading="lazy" /><img class="only-dark" src="../../assets/img/screens/crop-composer-dark.webp" alt="The task composer on the desktop" width="1200" height="419" loading="lazy" /><figcaption>Recognized words become chips.</figcaption></figure>
+<p>Each chip can be removed, and suggestions for projects, labels and dates appear under your cursor as you type. Chips follow what you type unless you set them yourself. The rest of the text is the title. <a href="../quick-add/">Quick add</a> lists everything Vicu reads, including the choice between the Todoist-style syntax (<code>@label</code>, <code>#project</code>) and the Vikunja-style syntax (<code>*label</code>, <code>+project</code>) in <strong>Settings, General, Task Parser</strong>.</p>
+<p>In a project, the task goes to that project. In Today, it is due today. In a custom list, it goes to the list's <strong>Add tasks to</strong> project. In the Inbox, Upcoming, Anytime and a label page, it goes to the Inbox, without a date unless you type one.</p>
+<p>Type <code>!</code> at the start or end of the title to make the task due today. Add <code>for 30m</code> after a time, as in <code>Call Sam tomorrow at 3pm for 30m</code>, to make a time block. See <a href="../plan/">Plan your day</a>.</p>
+<h3 id="on-a-phone"><a class="g-anchor" href="#on-a-phone" aria-hidden="true" tabindex="-1">#</a>On a phone <span class="g-badge g-badge--phone"><svg aria-hidden="true"><use href="#i-phone" /></svg>Phone</span></h3>
+<ol><li>Tap <strong>+</strong>. One sheet opens with the keyboard.</li><li>Type the task. Dates, projects, labels and repeats move into chips as you type.</li><li>Tap <strong>Add</strong>.</li></ol>
+<p>A row of chips under the title holds <strong>When</strong>, <strong>Remind</strong> and <strong>Priority</strong>, plus tags, project and repeat once they are set. Tap a chip to choose from options where the keyboard was. Choose <strong>Expand</strong>, or drag the handle up, for the full editor with notes and a checklist; checklist items become subtasks.</p>
+<p>Nothing is saved until you tap <strong>Add</strong>. The <strong>X</strong> clears the draft and turns into <strong>Undo</strong>. The confirmation after adding has <strong>Open</strong> next to <strong>Undo</strong>. If you want the sheet to stay open for several tasks in a row, turn on <strong>Keep add-task open</strong> in settings.</p>
+<p>You can also drag <strong>+</strong> onto a day or a project in Today, Upcoming, Anytime or a project, and quick add opens with that date or project already set.</p>
+<h2 id="quick-entry"><a class="g-anchor" href="#quick-entry" aria-hidden="true" tabindex="-1">#</a>Quick Entry <span class="g-badge g-badge--desktop"><svg aria-hidden="true"><use href="#i-monitor" /></svg>Desktop</span></h2>
+<p>Quick Entry is a small always-on-top window you open from any app with a global hotkey. Type, press <kbd>Enter</kbd>, and it is gone.</p>
+<p>It is off until you turn it on in <strong>Settings, Quick Entry / View</strong>. The default hotkey is <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd> (<kbd>Cmd</kbd>+<kbd>Shift</kbd>+<kbd>Space</kbd> on a Mac). You can record your own there.</p>
+<figure class="g-figure"><img class="only-light" src="../../assets/img/screens/desktop-quick-entry.webp" alt="Quick Entry" width="1200" height="410" loading="lazy" /><img class="only-dark" src="../../assets/img/screens/desktop-quick-entry-dark.webp" alt="Quick Entry" width="1200" height="410" loading="lazy" /><figcaption>Quick Entry over another app.</figcaption></figure>
+<ul><li>Hold a modifier key and press the arrow keys to switch the project.</li><li>Add notes under the title. Paragraphs are kept.</li><li>Press <kbd>Ctrl</kbd>+<kbd>L</kbd> to link the current Obsidian note or the current browser tab to the task. Set both up in <strong>Settings, Quick Entry / View</strong>. Obsidian detection is not available on Linux.</li><li>It works offline. The task is queued and sent when you are back online.</li></ul>
+<p>Quick View is the companion window: a hotkey (<kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd> by default) that shows any list so you can check things off. See <a href="../desktop/">On the desktop</a>.</p>
+<aside class="g-callout g-callout--note"><p class="g-callout-title">Note</p><p>On Linux with Wayland, global hotkeys depend on your desktop. See <a href="../getting-started/">Get started</a> for the one-time step.</p></aside>
+<h2 id="say-a-task"><a class="g-anchor" href="#say-a-task" aria-hidden="true" tabindex="-1">#</a>Say a task</h2>
+<p>Voice capture works without any assistant.</p>
+<ol><li>Hold the <strong>+</strong> button for a moment.</li><li>Speak. Your words show live, with the date, project and labels highlighted.</li><li>Let go to add the task. Slide away, or press <kbd>Esc</kbd> on the desktop, to cancel.</li></ol>
+<p>A short click or tap on <strong>+</strong> still opens the normal composer. The words are read like quick add, and the task goes to the list you are looking at. A project or date you say wins over the list's default. The default reminder applies.</p>
+<p>On the desktop you can also record a <strong>Voice input</strong> shortcut in <strong>Settings, Keyboard Shortcuts</strong>. Hold it to talk, or tap it to keep listening until you press it again. It works only while Vicu is in front. The command palette's <strong>Say a task</strong> starts listening without holding anything.</p>
+<p>Voice works with the platform's own speech recognizer: Apple's on a Mac, Windows speech recognition on Windows, and the phone's recognizer on Android and iPhone. On Linux, <strong>+</strong> opens the composer instead, because there is no platform recognizer.</p>
+<p>Sliding up from the held <strong>+</strong> keeps the microphone open and hands your words to smart dictation, which can make several tasks from one stretch of talk. See <a href="../assistant/">The assistant</a>.</p>
+<h2 id="from-other-apps-and-your-phone"><a class="g-anchor" href="#from-other-apps-and-your-phone" aria-hidden="true" tabindex="-1">#</a>From other apps and your phone <span class="g-badge g-badge--phone"><svg aria-hidden="true"><use href="#i-phone" /></svg>Phone</span></h2>
+<div class="g-table"><table><thead><tr><th scope="col">Way</th><th scope="col">What it does</th><th scope="col">Where</th></tr></thead><tbody><tr><th scope="row">Share to Vicu</th><td>Share a link, photo or file from any app. Android opens the full task entry. iPhone shows a small sheet with title, notes and attachments, and the task lands in the Inbox the next time Vicu runs.</td><td><span class="g-badge g-badge--android"><svg aria-hidden="true"><use href="#i-android" /></svg>Android</span> <span class="g-badge g-badge--ios"><svg aria-hidden="true"><use href="#i-apple" /></svg>iPhone and iPad</span></td></tr><tr><th scope="row">Quick add widget</th><td>A 2x1 widget with a microphone and a <strong>+</strong> button</td><td><span class="g-badge g-badge--android"><svg aria-hidden="true"><use href="#i-android" /></svg>Android</span></td></tr><tr><th scope="row">Tasks widget</th><td>Any list on your home screen, with tap to complete, plus a microphone and <strong>+</strong> on Android</td><td><span class="g-badge g-badge--android"><svg aria-hidden="true"><use href="#i-android" /></svg>Android</span> <span class="g-badge g-badge--ios"><svg aria-hidden="true"><use href="#i-apple" /></svg>iPhone and iPad</span></td></tr><tr><th scope="row">Routines widget</th><td>Today's routines, tap to log</td><td><span class="g-badge g-badge--android"><svg aria-hidden="true"><use href="#i-android" /></svg>Android</span> <span class="g-badge g-badge--ios"><svg aria-hidden="true"><use href="#i-apple" /></svg>iPhone and iPad</span></td></tr><tr><th scope="row">Launcher shortcuts</th><td>Hold the app icon, then choose <strong>Add task</strong> or <strong>Dictate</strong></td><td><span class="g-badge g-badge--android"><svg aria-hidden="true"><use href="#i-android" /></svg>Android</span> <span class="g-badge g-badge--ios"><svg aria-hidden="true"><use href="#i-apple" /></svg>iPhone and iPad</span></td></tr><tr><th scope="row">Quick Settings tile</th><td>Quick add from the notification shade</td><td><span class="g-badge g-badge--android"><svg aria-hidden="true"><use href="#i-android" /></svg>Android</span></td></tr><tr><th scope="row">Siri</th><td>"Hey Siri, add a task in Vicu". It asks "What's the task?" and works on a locked phone.</td><td><span class="g-badge g-badge--ios"><svg aria-hidden="true"><use href="#i-apple" /></svg>iPhone and iPad</span></td></tr><tr><th scope="row">Control Center and Lock Screen</th><td>An <strong>Add task</strong> control on iOS 18, which you can also put on the Action Button</td><td><span class="g-badge g-badge--ios"><svg aria-hidden="true"><use href="#i-apple" /></svg>iPhone and iPad</span></td></tr></tbody></table></div>
+<p>A task shared from another app is not read for dates on iPhone. When you share text, you can choose <strong>Make tasks</strong> to turn it into task cards if the assistant is set up. See <a href="../phone/">On your phone</a> for widgets and shortcuts in detail.</p>
+<h2 id="paste-several-tasks"><a class="g-anchor" href="#paste-several-tasks" aria-hidden="true" tabindex="-1">#</a>Paste several tasks <span class="g-badge g-badge--desktop"><svg aria-hidden="true"><use href="#i-monitor" /></svg>Desktop</span></h2>
+<p>Copy a list of lines and press <kbd>Ctrl</kbd>+<kbd>V</kbd> in a list, or use <strong>New task from clipboard</strong>. Vicu makes one task per line. Each line is read like quick add.</p>
+<h2 id="paste-markdown-into-notes"><a class="g-anchor" href="#paste-markdown-into-notes" aria-hidden="true" tabindex="-1">#</a>Paste Markdown into notes</h2>
+<p>Markdown you paste into a task's notes becomes formatting. Typing works too. See <a href="../tasks/#notes">Work with tasks</a>.</p>
+<h2 id="reuse-a-task"><a class="g-anchor" href="#reuse-a-task" aria-hidden="true" tabindex="-1">#</a>Reuse a task</h2>
+<h3 id="duplicate"><a class="g-anchor" href="#duplicate" aria-hidden="true" tabindex="-1">#</a>Duplicate</h3>
+<p>Duplicate makes a new open task in the same project with the title, notes, dates, priority, repeat, reminders, labels, assignees and subtasks. A time block is kept too.</p>
+<ul><li>On the desktop: right-click the task and choose <strong>Duplicate</strong>, use the card's More menu, or press <kbd>Ctrl</kbd>+<kbd>D</kbd>. <span class="g-badge g-badge--desktop"><svg aria-hidden="true"><use href="#i-monitor" /></svg>Desktop</span></li><li>On a phone: use the task menu or the selection menu. <span class="g-badge g-badge--phone"><svg aria-hidden="true"><use href="#i-phone" /></svg>Phone</span></li></ul>
+<p>A message offers <strong>Open</strong> for a single copy and <strong>Undo</strong>, which deletes every copy. Created offline, a desktop copy comes without its subtasks and says so.</p>
+<h3 id="templates"><a class="g-anchor" href="#templates" aria-hidden="true" tabindex="-1">#</a>Templates</h3>
+<p>A template is a task you want again and again.</p>
+<ol><li>Open the task's menu and choose <strong>Save as template</strong>. It keeps the project, notes, labels, priority, repeat, subtasks and reminders. A due date is kept as a number of days from today.</li><li>In a new task row, or in the phone's quick add, use the last button, <strong>Template</strong>, to see your templates.</li><li>Choose one. Vicu makes the task and opens it with the title selected.</li></ol>
+<p>Open the arrow beside a template on the desktop, or press and hold it on a phone, for <strong>Edit</strong> and <strong>Remove</strong>. Templates sync to all your devices.</p>
+<h3 id="copy-titles"><a class="g-anchor" href="#copy-titles" aria-hidden="true" tabindex="-1">#</a>Copy titles</h3>
+<p>Select tasks and press <kbd>Ctrl</kbd>+<kbd>C</kbd> to copy their titles, one per line. On a phone, use <strong>Copy titles</strong> in the selection menu.</p>
+<h2 id="related"><a class="g-anchor" href="#related" aria-hidden="true" tabindex="-1">#</a>Related</h2>
+<ul><li><a href="../quick-add/">Quick add</a></li><li><a href="../tasks/">Work with tasks</a></li><li><a href="../desktop/">On the desktop</a></li><li><a href="../phone/">On your phone</a></li><li><a href="../assistant/">The assistant</a></li></ul>
+          </div>
+          <nav class="g-pager" aria-label="Previous and next page"><a class="g-pager-prev" href="../basics/"><span>Previous</span>How Vicu is organized</a><a class="g-pager-next" href="../tasks/"><span>Next</span>Work with tasks</a></nav>
+          <p class="g-edit"><a href="https://github.com/rendyhd/Vicu/blob/main/docs/guide/capture.md">Suggest a change to this page</a></p>
+        </article>
+        <nav class="g-toc" aria-label="On this page"><p>On this page</p><ul><li class="g-toc-2"><a href="#in-short">In short</a></li><li class="g-toc-2"><a href="#add-a-task-in-the-app">Add a task in the app</a></li><li class="g-toc-3"><a href="#on-the-desktop">On the desktop</a></li><li class="g-toc-3"><a href="#on-a-phone">On a phone</a></li><li class="g-toc-2"><a href="#quick-entry">Quick Entry</a></li><li class="g-toc-2"><a href="#say-a-task">Say a task</a></li><li class="g-toc-2"><a href="#from-other-apps-and-your-phone">From other apps and your phone</a></li><li class="g-toc-2"><a href="#paste-several-tasks">Paste several tasks</a></li><li class="g-toc-2"><a href="#paste-markdown-into-notes">Paste Markdown into notes</a></li><li class="g-toc-2"><a href="#reuse-a-task">Reuse a task</a></li><li class="g-toc-3"><a href="#duplicate">Duplicate</a></li><li class="g-toc-3"><a href="#templates">Templates</a></li><li class="g-toc-3"><a href="#copy-titles">Copy titles</a></li><li class="g-toc-2"><a href="#related">Related</a></li></ul></nav>
+      </main>
+    </div>
+
+    <footer class="site-footer">
+      <div class="wrap footer-row">
+        <a class="brand" href="../../"><img src="../../assets/img/brand/vicu-64.png" alt="" width="28" height="28" /><span>Vicu</span></a>
+        <nav class="footer-links" aria-label="Footer">
+          <a href="https://github.com/rendyhd/Vicu">Desktop on GitHub</a>
+          <a href="https://github.com/rendyhd/Vicu-Mobile">Mobile on GitHub</a>
+          <a href="https://github.com/rendyhd/Vicu/releases">Release notes</a>
+          <a href="https://github.com/rendyhd/Vicu-Mobile/blob/main/docs/privacy-policy.md">Privacy</a>
+          <a href="https://ko-fi.com/rendyhd">Support on Ko-fi</a>
+        </nav>
+        <p>MIT licensed. Vicu is an independent app, not made by the Vikunja team. Screens show made-up tasks.</p>
+      </div>
+    </footer>
+  </body>
+</html>

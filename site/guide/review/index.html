@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Review and guided organizing · Vicu guide</title>
+    <meta name="description" content="Keep projects current with project review, sort the Inbox and overdue tasks one decision at a time, and run a weekly review." />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#fbfaf8" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#111113" media="(prefers-color-scheme: dark)" />
+    <link rel="icon" href="../../assets/img/brand/vicu-32.png" sizes="32x32" type="image/png" />
+    <link rel="apple-touch-icon" href="../../assets/img/brand/vicu-180.png" />
+    <meta property="og:type" content="article" />
+    <meta property="og:site_name" content="Vicu" />
+    <meta property="og:title" content="Review and guided organizing · Vicu guide" />
+    <meta property="og:description" content="Keep projects current with project review, sort the Inbox and overdue tasks one decision at a time, and run a weekly review." />
+    <meta property="og:url" content="https://vicutodo.app/guide/review/" />
+    <meta property="og:image" content="https://vicutodo.app/assets/img/og.jpg" />
+    <link rel="canonical" href="https://vicutodo.app/guide/review/" />
+    <link rel="stylesheet" href="../../assets/css/site.css" />
+    <script>
+      (function () {
+        var d = document.documentElement;
+        d.className = d.className.replace('no-js', 'js');
+        try {
+          var t = localStorage.getItem('vicu-site-theme');
+          if (t === 'light' || t === 'dark') d.setAttribute('data-theme', t);
+        } catch (e) {}
+      })();
+    </script>
+    <script src="../../assets/js/site.js" defer></script>
+    <script src="../../assets/js/guide-index.js" defer></script>
+    <script src="../../assets/js/guide.js" defer></script>
+  </head>
+  <body class="g-body" data-guide-root="../">
+    <svg class="sprite" aria-hidden="true" focusable="false">
+      <symbol id="i-inbox" viewBox="0 0 24 24"><path d="M3.5 13.5 6 5.5h12l2.5 8V18a1.5 1.5 0 0 1-1.5 1.5H5A1.5 1.5 0 0 1 3.5 18Z" /><path d="M3.5 13.5h5l1 2.5h5l1-2.5h5" /></symbol>
+      <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4" /><path d="M12 2.5v2M12 19.5v2M4.6 4.6 6 6M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4 6 18M18 6l1.4-1.4" /></symbol>
+      <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4 8.5 8.5 0 1 0 20 14.5Z" /></symbol>
+      <symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5" /><path d="M3.5 10h17M8 3v4M16 3v4" /></symbol>
+      <symbol id="i-layers" viewBox="0 0 24 24"><path d="m12 3.5 8.5 4.5L12 12.5 3.5 8Z" /><path d="m3.5 12 8.5 4.5 8.5-4.5" /><path d="m3.5 16 8.5 4.5 8.5-4.5" /></symbol>
+      <symbol id="i-check" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" /><path d="m8.2 12.2 2.6 2.6 5-5.3" /></symbol>
+      <symbol id="i-review" viewBox="0 0 24 24"><path d="M19.5 12a7.5 7.5 0 0 1-13 5.1M4.5 12a7.5 7.5 0 0 1 13-5.1" /><path d="M17.8 3.5v3.6h-3.6M6.2 20.5v-3.6h3.6" /></symbol>
+      <symbol id="i-heart" viewBox="0 0 24 24"><path d="M12 19.5s-7.5-4.4-7.5-10A4.2 4.2 0 0 1 12 7a4.2 4.2 0 0 1 7.5 2.5c0 5.6-7.5 10-7.5 10Z" /><path d="M7 12h2.5l1.5-2 2 4 1.5-2H17" /></symbol>
+      <symbol id="i-bolt" viewBox="0 0 24 24"><path d="M13 3 5 13.5h6L10.5 21 19 10.5h-6Z" /></symbol>
+      <symbol id="i-mic" viewBox="0 0 24 24"><rect x="9" y="3.5" width="6" height="11" rx="3" /><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v2.5" /></symbol>
+      <symbol id="i-filter" viewBox="0 0 24 24"><path d="M4 6h16M7 12h10M10 18h4" /></symbol>
+      <symbol id="i-tag" viewBox="0 0 24 24"><path d="M3.5 12.2V4.5a1 1 0 0 1 1-1h7.7l8.3 8.3a1.4 1.4 0 0 1 0 2l-6.7 6.7a1.4 1.4 0 0 1-2 0Z" /><circle cx="8" cy="8" r="1.4" /></symbol>
+      <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3.5 7.5v10A1.5 1.5 0 0 0 5 19h14a1.5 1.5 0 0 0 1.5-1.5V9A1.5 1.5 0 0 0 19 7.5h-7L10 5H5a1.5 1.5 0 0 0-1.5 1.5Z" /></symbol>
+      <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8.5" r="3.2" /><path d="M3 19c.8-3.2 3.2-5 6-5s5.2 1.8 6 5" /><path d="M15.5 5.6a3.2 3.2 0 0 1 0 5.8M17.5 14.3c1.7.6 3 2.2 3.5 4.7" /></symbol>
+      <symbol id="i-chat" viewBox="0 0 24 24"><path d="M4 5.5h16v10.5H10l-6 4.5Z" /><path d="M8.5 10.5h7" /></symbol>
+      <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2h-15Z" /><path d="M10 20.5a2 2 0 0 0 4 0" /></symbol>
+      <symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 21s6.5-5.6 6.5-11a6.5 6.5 0 0 0-13 0c0 5.4 6.5 11 6.5 11Z" /><circle cx="12" cy="10" r="2.3" /></symbol>
+      <symbol id="i-cloud-off" viewBox="0 0 24 24"><path d="M8 18.5H6.5a4 4 0 0 1-.6-8 6 6 0 0 1 9.2-4M18.5 9.5a4.5 4.5 0 0 1-1.5 9h-5" /><path d="m4 3.5 16 17" /></symbol>
+      <symbol id="i-sync" viewBox="0 0 24 24"><path d="M4 12a8 8 0 0 1 14-5.3L20 9" /><path d="M20 4v5h-5" /><path d="M20 12a8 8 0 0 1-14 5.3L4 15" /><path d="M4 20v-5h5" /></symbol>
+      <symbol id="i-keyboard" viewBox="0 0 24 24"><rect x="2.5" y="6" width="19" height="12" rx="2" /><path d="M6 9.5h.01M9 9.5h.01M12 9.5h.01M15 9.5h.01M18 9.5h.01M6 12.5h.01M18 12.5h.01M9 12.5h6M7.5 15.3h9" /></symbol>
+      <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.7 0l3.1-3.1a4 4 0 0 0-5.7-5.7l-1 1" /><path d="M14 10a4 4 0 0 0-5.7 0l-3.1 3.1a4 4 0 0 0 5.7 5.7l1-1" /></symbol>
+      <symbol id="i-phone" viewBox="0 0 24 24"><rect x="6.5" y="2.5" width="11" height="19" rx="2.5" /><path d="M10.5 18.5h3" /></symbol>
+      <symbol id="i-monitor" viewBox="0 0 24 24"><rect x="2.5" y="4" width="19" height="12.5" rx="2" /><path d="M8.5 20.5h7M12 16.5v4" /></symbol>
+      <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4v11M7.5 10.5 12 15l4.5-4.5" /><path d="M4.5 19.5h15" /></symbol>
+      <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z" /><circle cx="12" cy="12" r="2.8" /></symbol>
+      <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="10.5" width="14" height="10" rx="2" /><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5" /></symbol>
+      <symbol id="i-grid" viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="7" height="7" rx="1.8" /><rect x="13.5" y="3.5" width="7" height="7" rx="1.8" /><rect x="3.5" y="13.5" width="7" height="7" rx="1.8" /><rect x="13.5" y="13.5" width="7" height="7" rx="1.8" /></symbol>
+      <symbol id="i-swipe" viewBox="0 0 24 24"><path d="M3.5 7.5h11M11 4l3.5 3.5L11 11" /><path d="M9 21v-6.5a1.5 1.5 0 0 1 3 0V17l3.8.7a1.8 1.8 0 0 1 1.5 2V21" /></symbol>
+      <symbol id="i-share" viewBox="0 0 24 24"><path d="M12 3.5v11M8 7.5l4-4 4 4" /><path d="M7 11H5.5v9.5h13V11H17" /></symbol>
+      <symbol id="i-sort" viewBox="0 0 24 24"><path d="M7 4v16M3.5 16.5 7 20l3.5-3.5" /><path d="M13 6h7.5M13 11h5.5M13 16h3" /></symbol>
+      <symbol id="i-repeat" viewBox="0 0 24 24"><path d="M4 11V9.5A3.5 3.5 0 0 1 7.5 6H19" /><path d="m16 3 3 3-3 3" /><path d="M20 13v1.5a3.5 3.5 0 0 1-3.5 3.5H5" /><path d="m8 21-3-3 3-3" /></symbol>
+      <symbol id="i-clip" viewBox="0 0 24 24"><path d="m20 11.5-7.8 7.8a5 5 0 0 1-7-7.1L13 4.4a3.3 3.3 0 0 1 4.7 4.7l-7.8 7.8a1.7 1.7 0 0 1-2.4-2.4l7.2-7.2" /></symbol>
+      <symbol id="i-flag" viewBox="0 0 24 24"><path d="M5 21V4M5 4.5h12l-2 4 2 4H5" /></symbol>
+      <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5" /><path d="m20 20-4.3-4.3" /></symbol>
+      <symbol id="i-command" viewBox="0 0 24 24"><path d="M9 9V6.5A2.5 2.5 0 1 0 6.5 9H9Zm0 0h6m-6 0v6m6-6V6.5A2.5 2.5 0 1 1 17.5 9H15Zm0 0v6m0 0h-6m6 0v2.5a2.5 2.5 0 1 0 2.5-2.5H15Zm-6 0v2.5A2.5 2.5 0 1 1 6.5 15H9Z" /></symbol>
+      <symbol id="i-sparkle" viewBox="0 0 24 24"><path d="M12 3.5c.6 4.6 3.9 7.9 8.5 8.5-4.6.6-7.9 3.9-8.5 8.5-.6-4.6-3.9-7.9-8.5-8.5 4.6-.6 7.9-3.9 8.5-8.5Z" /></symbol>
+      <symbol id="i-person" viewBox="0 0 24 24"><circle cx="12" cy="5.5" r="2" /><path d="M5 9h14M12 9v5.5M8.5 21l3.5-6.5 3.5 6.5" /></symbol>
+      <symbol id="i-hand" viewBox="0 0 24 24"><path d="M8 12V5.5a1.5 1.5 0 0 1 3 0V11M11 10.5V4a1.5 1.5 0 0 1 3 0v6.5M14 10.5V5.5a1.5 1.5 0 0 1 3 0V14a7 7 0 0 1-7 7h-.5a6 6 0 0 1-5-2.8L3 15.3a1.6 1.6 0 0 1 2.6-1.8L8 15.5" /></symbol>
+      <symbol id="i-sections" viewBox="0 0 24 24"><path d="M4 5.5h16M4 12h16M4 18.5h16" /><path d="M4 5.5v13" /></symbol>
+      <symbol id="i-obsidian" viewBox="0 0 24 24"><path d="M9 2.8 4.8 9.6l3 7.7 5.6 3.9 4.1-3.4L19 9.4 14 3Z" /><path d="m9 2.8 1.6 8.1-2.8 6.4M10.6 10.9 19 9.4M10.6 10.9l2.8 10.3" /></symbol>
+      <symbol id="i-tray" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2.5" /><path d="M3 15h18M7 18h.01M10 18h.01" /></symbol>
+      <symbol id="i-windows" viewBox="0 0 24 24"><path d="M3.5 5.5 10.5 4.5v7h-7ZM12.5 4.2l8-1.2v8.5h-8ZM3.5 12.5h7v7l-7-1ZM12.5 12.5h8V21l-8-1.2Z" /></symbol>
+      <symbol id="i-apple" viewBox="0 0 24 24"><path d="M16.4 12.6c0-2.3 1.9-3.4 2-3.5a4.3 4.3 0 0 0-3.4-1.8c-1.4-.2-2.8.8-3.5.8s-1.8-.8-3-.8a4.5 4.5 0 0 0-3.8 2.3c-1.6 2.8-.4 7 1.2 9.3.8 1.1 1.7 2.4 2.9 2.3 1.2 0 1.6-.7 3-.7s1.8.7 3 .7c1.3 0 2.1-1.1 2.8-2.3a10 10 0 0 0 1.3-2.6 4 4 0 0 1-2.5-3.7ZM14.2 5.8A4 4 0 0 0 15.1 3a4.1 4.1 0 0 0-2.7 1.4 3.8 3.8 0 0 0-1 2.7 3.4 3.4 0 0 0 2.8-1.3Z" /></symbol>
+      <symbol id="i-linux" viewBox="0 0 24 24"><path d="M12 3c-2.2 0-3.4 1.8-3.4 4.4 0 1.7-.6 2.6-1.6 4-1.2 1.6-2.4 3.6-2 6 .2 1.4 1.4 2.6 3 2.6h8c1.6 0 2.8-1.2 3-2.6.4-2.4-.8-4.4-2-6-1-1.4-1.6-2.3-1.6-4C15.4 4.8 14.2 3 12 3Z" /><path d="M10.4 7.6h.01M13.6 7.6h.01M10.7 10h2.6" /></symbol>
+      <symbol id="i-android" viewBox="0 0 24 24"><path d="M5 16V11a7 7 0 0 1 14 0v5Z" /><path d="M8 5 6.5 2.8M16 5l1.5-2.2" /><path d="M9 10h.01M15 10h.01" /><path d="M5 16h14v1.5a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2Z" /></symbol>
+      <symbol id="i-github" viewBox="0 0 24 24"><path d="M9 19c-4 1.3-4-2-5.6-2.5M14.6 21v-3.3a2.9 2.9 0 0 0-.8-2.2c2.7-.3 5.6-1.3 5.6-6a4.6 4.6 0 0 0-1.3-3.2 4.3 4.3 0 0 0-.1-3.2s-1-.3-3.4 1.3a11.6 11.6 0 0 0-6 0C6.5 2.8 5.5 3.1 5.5 3.1a4.3 4.3 0 0 0-.1 3.2A4.6 4.6 0 0 0 4 9.5c0 4.6 2.9 5.7 5.6 6a2.9 2.9 0 0 0-.8 2.2V21" /></symbol>
+      <symbol id="i-coffee" viewBox="0 0 24 24"><path d="M4.5 9.5h12v5a5 5 0 0 1-5 5h-2a5 5 0 0 1-5-5Z" /><path d="M16.5 11h1a2.5 2.5 0 0 1 0 5h-1.3" /><path d="M8.5 3.5v2.5M12.5 3.5v2.5" /></symbol>
+      <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M4 12h15M13.5 6.5 19 12l-5.5 5.5" /></symbol>
+    </svg>
+
+    <a class="skip-link" href="#main">Skip to content</a>
+
+    <header class="site-header">
+      <div class="wrap header-row">
+        <a class="brand" href="../../">
+          <img src="../../assets/img/brand/vicu-64.png" alt="" width="32" height="32" />
+          <span>Vicu</span>
+        </a>
+        <nav class="nav" aria-label="Site">
+          <a href="../../">Home</a>
+          <a href="../">Guide</a>
+          <a href="../pro/">Vicu Pro</a>
+          <a href="../../#download">Download</a>
+        </nav>
+        <div class="header-actions">
+          <button class="icon-btn g-menu-toggle" type="button" aria-controls="g-sidebar" aria-expanded="false" aria-label="Guide contents">
+            <svg aria-hidden="true"><use href="#i-sections" /></svg>
+          </button>
+          <button class="icon-btn theme-toggle" type="button" aria-label="Switch between light and dark">
+            <svg class="icon-moon" aria-hidden="true"><use href="#i-moon" /></svg>
+            <svg class="icon-sun" aria-hidden="true"><use href="#i-sun" /></svg>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <div class="wrap g-layout">
+      <aside class="g-sidebar" id="g-sidebar" aria-label="Guide contents">
+        <form class="g-search" role="search" onsubmit="return false">
+          <label class="visually-hidden" for="g-search-input">Search the guide</label>
+          <svg aria-hidden="true"><use href="#i-search" /></svg>
+          <input id="g-search-input" type="search" placeholder="Search the guide" autocomplete="off" aria-describedby="g-search-hint" />
+          <span id="g-search-hint" class="visually-hidden">Results show below as you type.</span>
+        </form>
+        <ul class="g-search-results" id="g-search-results" aria-live="polite" hidden></ul>
+        <nav class="g-nav" aria-label="Guide pages"><details class="g-nav-section"><summary>Start here</summary><ul><li><a href="../">Guide home</a></li><li><a href="../getting-started/">Get started</a></li><li><a href="../basics/">How Vicu is organized</a></li></ul></details><details class="g-nav-section" open><summary>Everyday Vicu</summary><ul><li><a href="../capture/">Add tasks</a></li><li><a href="../tasks/">Work with tasks</a></li><li><a href="../lists/">Smart lists</a></li><li><a href="../projects/">Projects and labels</a></li><li><a href="../custom-lists/">Custom lists</a></li><li><a href="../plan/">Plan your day</a></li><li><a href="../calendars/">Events and calendars</a></li><li><a href="../routines/">Routines</a></li><li><a href="../review/" aria-current="page">Review and organizing</a></li><li><a href="../collaboration/">Collaboration</a></li><li><a href="../assistant/">The assistant</a></li></ul></details><details class="g-nav-section"><summary>Your devices</summary><ul><li><a href="../desktop/">On the desktop</a></li><li><a href="../phone/">On your phone</a></li><li><a href="../sync/">Sync and offline</a></li><li><a href="../settings/">Settings</a></li></ul></details><details class="g-nav-section"><summary>Vicu Pro</summary><ul><li><a href="../pro/">What Pro is</a></li><li><a href="../pro/available/">Know what you can do now</a></li><li><a href="../pro/promises/">Promises and people</a></li><li><a href="../pro/portfolio/">Portfolio</a></li><li><a href="../pro/power/">Power tools</a></li></ul></details><details class="g-nav-section"><summary>Reference</summary><ul><li><a href="../quick-add/">Quick add</a></li><li><a href="../shortcuts/">Keyboard shortcuts</a></li><li><a href="../faq/">Troubleshooting and FAQ</a></li><li><a href="../glossary/">Glossary</a></li></ul></details></nav>
+      </aside>
+
+      <main id="main" class="g-main">
+        <article class="g-article">
+          <nav class="g-crumbs" aria-label="Breadcrumb"><a href="../">Guide</a> <span aria-hidden="true">/</span> <span>Everyday Vicu</span></nav>
+          <h1 class="g-title">Review and guided organizing</h1>
+          <p class="g-lead">It is hard to decide about tasks you have forgotten. Review and guided organizing show you one task or one project at a time, so deciding is quick.</p>
+          <details class="g-toc-inline"><summary>On this page</summary><ul><li><a href="#in-short">In short</a></li><li><a href="#project-review">Project review</a></li><li><a href="#guided-organizing">Guided organizing</a></li><li><a href="#the-weekly-review">The weekly review</a></li><li><a href="#with-the-assistant">With the assistant</a></li><li><a href="#desktop-and-phone">Desktop and phone</a></li><li><a href="#related">Related</a></li></ul></details>
+          <div class="g-content">
+<h2 id="in-short"><a class="g-anchor" href="#in-short" aria-hidden="true" tabindex="-1">#</a>In short</h2>
+<ul><li><strong>Project review</strong> brings each project back on a schedule you set. You look at it, then choose <strong>Mark reviewed</strong>.</li><li><strong>Guided organizing</strong> walks you through tasks one decision at a time: the Inbox, overdue tasks, tasks that have waited a long time, and projects due for review.</li><li><strong>The weekly review</strong> is a checklist in the usual order: Inbox, what is on your mind, last week, overdue, next two weeks, projects, long-waiting tasks.</li><li><strong>You decide everything.</strong> Sessions work without the assistant. With the assistant set up, it suggests a choice for each card, and you still decide.</li><li><strong>Undo all</strong> at the end of a session puts back what it changed. It never brings back a deleted task.</li></ul>
+<h2 id="project-review"><a class="g-anchor" href="#project-review" aria-hidden="true" tabindex="-1">#</a>Project review <span class="g-badge g-badge--all"><svg aria-hidden="true"><use href="#i-grid" /></svg>All devices</span></h2>
+<p>Project review makes sure no project goes stale. Each project has a review cadence, and Vicu tells you when one is due.</p>
+<h3 id="open-the-review-list"><a class="g-anchor" href="#open-the-review-list" aria-hidden="true" tabindex="-1">#</a>Open the Review list</h3>
+<p>Open <strong>Review</strong> from the sidebar or drawer. It has two tabs: <strong>Due</strong>, the projects whose review time has come, and <strong>All tracked</strong>. A project that was never reviewed is "Not reviewed yet". A due project shows as due.</p>
+<p>On the desktop, click a project to look at its tasks in place, and press <kbd>R</kbd> to mark it reviewed. <strong>Start review</strong> at the top begins the guided project review below. On the phone, use <strong>Mark reviewed</strong> on a project's row.</p>
+<h3 id="mark-a-project-reviewed"><a class="g-anchor" href="#mark-a-project-reviewed" aria-hidden="true" tabindex="-1">#</a>Mark a project reviewed</h3>
+<ul><li><strong>Desktop:</strong> the project's menu, <strong>Review</strong>, <strong>Mark reviewed</strong>, or <kbd>R</kbd> in the Review list.</li><li><strong>Phone:</strong> <strong>Mark reviewed</strong> on the project's row in Review, or in the project's menu. It has Undo.</li></ul>
+<p>Vicu records the review as a short line at the end of the project's description (it starts with "Vicu review" and holds the date and cadence). The description is part of the project in Vikunja, so the web app and your other devices see the same status. Leave that line alone.</p>
+<h3 id="set-the-cadence"><a class="g-anchor" href="#set-the-cadence" aria-hidden="true" tabindex="-1">#</a>Set the cadence</h3>
+<p>The default is every 14 days. Change it for one project:</p>
+<p>On the desktop, open the project's menu, then <strong>Review</strong>, then <strong>Review cadence</strong>. On the phone the default cadence is set under <strong>Settings, Projects, Review</strong>.</p>
+<p>On the desktop, leave a project out with <strong>Exclude from review</strong> and put it back with <strong>Include in review</strong>. On the phone, an <strong>Excluded from review</strong> list in <strong>Settings, Projects, Review</strong> lets you include a project again.</p>
+<h3 id="review-settings"><a class="g-anchor" href="#review-settings" aria-hidden="true" tabindex="-1">#</a>Review settings <span class="g-badge g-badge--desktop"><svg aria-hidden="true"><use href="#i-monitor" /></svg>Desktop</span></h3>
+<p><strong>Settings, Projects, Review</strong> has:</p>
+<ul><li><strong>Enable project review tracking</strong></li><li><strong>Default review cadence (days)</strong></li><li><strong>Exclude Inbox from review list</strong></li><li>The list of excluded projects, each with <strong>Include again</strong></li></ul>
+<p>The phone has review settings in the same place, <strong>Settings, Projects, Review</strong>.</p>
+<h2 id="guided-organizing"><a class="g-anchor" href="#guided-organizing" aria-hidden="true" tabindex="-1">#</a>Guided organizing <span class="g-badge g-badge--all"><svg aria-hidden="true"><use href="#i-grid" /></svg>All devices</span></h2>
+<p>A guided session shows one card at a time with how far along you are, such as "4 of 14". The tasks are picked when the session starts. A task finished or deleted elsewhere is passed over. Tasks in archived projects, and in projects shared with you for viewing only, never come up.</p>
+<h3 id="the-four-sessions"><a class="g-anchor" href="#the-four-sessions" aria-hidden="true" tabindex="-1">#</a>The four sessions</h3>
+<div class="g-table"><table><thead><tr><th scope="col">Session</th><th scope="col">What it shows</th><th scope="col">Start it from</th></tr></thead><tbody><tr><th scope="row"><strong>Sort the Inbox</strong></th><td>Every open task in the Inbox, in the Inbox's order</td><td>The Inbox header (desktop) or top bar (phone), the weekly review, Ask</td></tr><tr><th scope="row"><strong>Sort out overdue</strong></th><td>Every open task past its date, oldest first</td><td>The command palette (desktop), the weekly review, Ask</td></tr><tr><th scope="row"><strong>Waiting a long time</strong></th><td>Tasks outside the Inbox without a date or repeat that nobody touched for 60 days or more, up to 30</td><td>The command palette (desktop), the weekly review</td></tr><tr><th scope="row"><strong>Review projects</strong></th><td>Each project due for review, one page each</td><td><strong>Start review</strong> in Review, the weekly review, Ask</td></tr></tbody></table></div>
+<p>On the desktop, press <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>P</kbd> (<kbd>Cmd</kbd> on a Mac) and type the session's name.</p>
+<h3 id="a-card"><a class="g-anchor" href="#a-card" aria-hidden="true" tabindex="-1">#</a>A card</h3>
+<p>A card shows the task's title, project, date and labels, and how long ago it was added. You can:</p>
+<ul><li>Give it a date: <strong>Today</strong>, <strong>Tomorrow</strong>, <strong>This weekend</strong>, <strong>Next week</strong>, a date you pick, or <strong>No date</strong>.</li><li>Move it to another project.</li><li>Change the title on the card.</li><li><strong>Complete</strong> or <strong>Delete</strong> it. Delete asks first when <strong>Confirm before deleting</strong> is on.</li><li><strong>Skip</strong> it.</li></ul>
+<p><strong>Next</strong> saves the card's choices together and shows the next card. If you changed nothing, Next is a Skip. <strong>Back</strong> shows the previous card as the task is now. Changes made offline wait in the queue like any other change.</p>
+<p>At the end a summary says what happened, for example "Sorted 12: 5 scheduled, 4 moved, 2 completed, 1 deleted". <strong>Undo all</strong> puts back every change, except deletes.</p>
+<h3 id="keys"><a class="g-anchor" href="#keys" aria-hidden="true" tabindex="-1">#</a>Keys <span class="g-badge g-badge--desktop"><svg aria-hidden="true"><use href="#i-monitor" /></svg>Desktop</span></h3>
+<div class="g-table"><table><thead><tr><th scope="col">Key</th><th scope="col">Does</th></tr></thead><tbody><tr><th scope="row"><kbd>Enter</kbd></th><td>Next</td></tr><tr><th scope="row"><kbd>Left</kbd></th><td>Back</td></tr><tr><th scope="row"><kbd>S</kbd></th><td>Skip</td></tr><tr><th scope="row"><kbd>1</kbd> to <kbd>4</kbd></th><td>Today, Tomorrow, This weekend, Next week</td></tr><tr><th scope="row"><kbd>D</kbd></th><td>Pick a date</td></tr><tr><th scope="row"><kbd>0</kbd></th><td>No date</td></tr><tr><th scope="row"><kbd>P</kbd></th><td>Project</td></tr><tr><th scope="row"><kbd>E</kbd></th><td>Title</td></tr><tr><th scope="row"><kbd>C</kbd></th><td>Complete</td></tr><tr><th scope="row"><kbd>Delete</kbd></th><td>Delete</td></tr><tr><th scope="row"><kbd>Esc</kbd></th><td>Leave the session</td></tr></tbody></table></div>
+<h3 id="review-projects-session"><a class="g-anchor" href="#review-projects-session" aria-hidden="true" tabindex="-1">#</a>Review projects session</h3>
+<p>Each project due for review gets one page:</p>
+<ol><li>Its name, when it was last reviewed, and a health line such as "7 open · 4 untouched for 30+ days · 1 overdue · last done 6 days ago".</li><li><strong>Still working on it?</strong> Keep it, or Archive it. An archived project is not marked reviewed. The Inbox cannot be archived.</li><li><strong>Untouched for 30+ days:</strong> tasks nobody changed in a month, oldest first, each with the card choices.</li><li><strong>Next step:</strong> the first open task in the project's order, or the one the assistant suggests, with quick dates. Or name a new task and add it to the project.</li><li><strong>Mark reviewed</strong> records the review and goes on. <strong>Skip</strong> goes on without it.</li></ol>
+<p>On the desktop <kbd>R</kbd> marks reviewed, <kbd>S</kbd> skips and <kbd>A</kbd> archives. A subproject is reviewed as a project of its own. <strong>Undo all</strong> at the end also takes back the reviews, the archives and the tasks you added.</p>
+<h2 id="the-weekly-review"><a class="g-anchor" href="#the-weekly-review" aria-hidden="true" tabindex="-1">#</a>The weekly review <span class="g-badge g-badge--all"><svg aria-hidden="true"><use href="#i-grid" /></svg>All devices</span></h2>
+<p>Open <strong>Review</strong>, then <strong>Weekly review</strong>. On the desktop, "Weekly review" is also in the command palette. It is a checklist:</p>
+<ol><li><strong>Sort the Inbox</strong></li><li><strong>Anything on your mind?</strong> Starts a brain dump when smart dictation is set up. Otherwise you add tasks to the Inbox right there.</li><li><strong>Look back:</strong> what you finished in the last 7 days</li><li><strong>Overdue</strong></li><li><strong>Look ahead:</strong> what is due in the next two weeks</li><li><strong>Review projects</strong>, while project review is on</li><li><strong>Waiting a long time</strong></li></ol>
+<p><strong>Next</strong> opens the first step not done yet, and you can open any step. A step is done when its session ends or you choose <strong>Mark done</strong>. A step with nothing in it is done from the start. <strong>Finish</strong> records the day of the review and syncs it, so your other devices know. A week later the assistant offers the weekly review again.</p>
+<aside class="g-callout g-callout--pro"><p class="g-callout-title">Pro</p><p>With <a href="../pro/power/">Pro</a> on, the weekly review adds steps for verdicts, recap, escalations, the portfolio and the value you delivered.</p></aside>
+<h2 id="with-the-assistant"><a class="g-anchor" href="#with-the-assistant" aria-hidden="true" tabindex="-1">#</a>With the assistant <span class="g-badge g-badge--all"><svg aria-hidden="true"><use href="#i-grid" /></svg>All devices</span></h2>
+<p>When the assistant is set up (see <a href="../assistant/">The assistant</a>), each card comes with a suggestion. The choices it would make are filled in with a dashed outline, and its reason is under the title. Change or clear any of it. Nothing is saved until you choose <strong>Next</strong>.</p>
+<ul><li>When it thinks a task is finished or outdated, <strong>Complete</strong> or <strong>Delete</strong> is marked "Suggested". It is never done for you.</li><li>Tasks go to the model 20 at a time, and the next 20 are asked a few cards ahead. You can decide a card before its suggestion arrives.</li><li>If a request fails, the session says so once and goes on without suggestions.</li><li>There is no separate setting. Suggestions use the model you chose for Ask and what you agreed to share for Ask.</li></ul>
+<p>What is sent: the names of your projects, labels and places, today's date, and the session's tasks (title, project, dates, labels, priority, when they were added and changed, and the first 500 characters of their notes). Text from shared projects is treated as data, never as instructions.</p>
+<p>In Ask, an empty conversation begins with what needs a decision (the Inbox, overdue tasks, projects due for review, the weekly review) and each opens its session.</p>
+<h2 id="desktop-and-phone"><a class="g-anchor" href="#desktop-and-phone" aria-hidden="true" tabindex="-1">#</a>Desktop and phone <span class="g-badge g-badge--desktop"><svg aria-hidden="true"><use href="#i-monitor" /></svg>Desktop</span> <span class="g-badge g-badge--phone"><svg aria-hidden="true"><use href="#i-phone" /></svg>Phone</span></h2>
+<p>Both apps use the same rules and pick the same tasks in the same order. Guided sessions arrived on the desktop first. Keys exist on the desktop only. On the phone, use the buttons on each card, and start sessions from the Inbox's top bar, the Review screen or Ask.</p>
+<h2 id="related"><a class="g-anchor" href="#related" aria-hidden="true" tabindex="-1">#</a>Related</h2>
+<ul><li><a href="../projects/">Projects</a></li><li><a href="../plan/">Plan your day</a></li><li><a href="../assistant/">The assistant</a></li><li><a href="../shortcuts/">Shortcuts</a></li></ul>
+          </div>
+          <nav class="g-pager" aria-label="Previous and next page"><a class="g-pager-prev" href="../routines/"><span>Previous</span>Routines</a><a class="g-pager-next" href="../collaboration/"><span>Next</span>Sharing, assignees and comments</a></nav>
+          <p class="g-edit"><a href="https://github.com/rendyhd/Vicu/blob/main/docs/guide/review.md">Suggest a change to this page</a></p>
+        </article>
+        <nav class="g-toc" aria-label="On this page"><p>On this page</p><ul><li class="g-toc-2"><a href="#in-short">In short</a></li><li class="g-toc-2"><a href="#project-review">Project review</a></li><li class="g-toc-3"><a href="#open-the-review-list">Open the Review list</a></li><li class="g-toc-3"><a href="#mark-a-project-reviewed">Mark a project reviewed</a></li><li class="g-toc-3"><a href="#set-the-cadence">Set the cadence</a></li><li class="g-toc-3"><a href="#review-settings">Review settings</a></li><li class="g-toc-2"><a href="#guided-organizing">Guided organizing</a></li><li class="g-toc-3"><a href="#the-four-sessions">The four sessions</a></li><li class="g-toc-3"><a href="#a-card">A card</a></li><li class="g-toc-3"><a href="#keys">Keys</a></li><li class="g-toc-3"><a href="#review-projects-session">Review projects session</a></li><li class="g-toc-2"><a href="#the-weekly-review">The weekly review</a></li><li class="g-toc-2"><a href="#with-the-assistant">With the assistant</a></li><li class="g-toc-2"><a href="#desktop-and-phone">Desktop and phone</a></li><li class="g-toc-2"><a href="#related">Related</a></li></ul></nav>
+      </main>
+    </div>
+
+    <footer class="site-footer">
+      <div class="wrap footer-row">
+        <a class="brand" href="../../"><img src="../../assets/img/brand/vicu-64.png" alt="" width="28" height="28" /><span>Vicu</span></a>
+        <nav class="footer-links" aria-label="Footer">
+          <a href="https://github.com/rendyhd/Vicu">Desktop on GitHub</a>
+          <a href="https://github.com/rendyhd/Vicu-Mobile">Mobile on GitHub</a>
+          <a href="https://github.com/rendyhd/Vicu/releases">Release notes</a>
+          <a href="https://github.com/rendyhd/Vicu-Mobile/blob/main/docs/privacy-policy.md">Privacy</a>
+          <a href="https://ko-fi.com/rendyhd">Support on Ko-fi</a>
+        </nav>
+        <p>MIT licensed. Vicu is an independent app, not made by the Vikunja team. Screens show made-up tasks.</p>
+      </div>
+    </footer>
+  </body>
+</html>

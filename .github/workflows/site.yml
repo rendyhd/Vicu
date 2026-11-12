@@ -4,7 +4,7 @@ name: Website
 on:
   push:
     branches: [main]
-    paths: ['site/**', '.github/workflows/site.yml']
+    paths: ['site/**', 'docs/guide/**', '.github/workflows/site.yml']
   workflow_dispatch:
 
 permissions:
@@ -28,7 +28,7 @@ jobs:
         with:
           node-version: 22
       - name: Check the site
-        run: node site/tools/check-site.mjs
+        run: node site/tools/guide.mjs --check && node site/tools/check-site.mjs
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
