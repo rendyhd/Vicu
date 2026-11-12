@@ -42,6 +42,12 @@ import { useAppConfig } from '@/hooks/use-app-config'
 import { useSubtasks } from '@/hooks/use-subtasks'
 import { useHasLocationReminder } from '@/hooks/use-location-reminders'
 import { useAvailability, useReasonText } from '@/hooks/use-availability'
+import { usePromiseOf } from '@/hooks/use-promises'
+import { usePersonLabels } from '@/hooks/use-people'
+import { PersonMark } from '@/components/pro/PersonMark'
+import { VerdictBar, verdictForKey } from '@/components/pro/VerdictBar'
+import { canSnooze, isSent, readVerdictSnoozes } from '../../../shared/pro/promises'
+import { finalVerdictOf } from '../../../shared/pro/ledger'
 import {
   parentTitle,
   subtaskProgress,
@@ -374,6 +380,16 @@ function TaskRowInner({
   const unavailableReason = availability && !availability.available ? reasonText(task, availability) : null
   const isNext = availability?.next === true
   const flagged = pro.on && task.is_favorite === true
+  // Pro's promises (21.6, design system 9): a promise of theirs shows the person instead of a checkbox.
+  const promise = usePromiseOf()(task)
+  const personLabels = usePersonLabels()
+  const [verdictOpen, setVerdictOpen] = useState(false)
+  // A digit pressed on the row: the verdict bar opens and acts on it (it holds the actions).
+  const [verdictKey, setVerdictKey] = useState<string | null>(null)
+  const promisePerson = promise?.person != null ? personLabels.get(promise.person) : undefined
+  const promiseName = promisePerson?.title ?? 'Someone'
+  const theirs = promise?.dir === 'theirs' && !finalVerdictOf(promise)
+  const mine = promise?.dir === 'mine' && !finalVerdictOf(promise)
   const isFocused = useSelectionStore((s) => s.focusedTaskId === task.id)
   const isSelected = useSelectionStore((s) => s.selectedTaskIds.has(task.id))
   // Main asked for this task to be shown (a clicked reminder): expand once the row is on screen.
@@ -607,7 +623,8 @@ function TaskRowInner({
   )
 
   const labels = task.labels ?? []
-  const metaLabels = rowLabels(labels, rowView)
+  // A promise names its person on the meta line: the person's label chip would say it twice.
+  const metaLabels = rowLabels(labels, rowView).filter((label) => !promise || label.id !== promise.person)
   const projectSource = rowProjectSource(task.project_id, rowView, projectMeta !== undefined)
   const isRepeating = (task.repeat_after ?? 0) > 0 || (task.repeat_mode ?? 0) > 0
   // Comfortable, the notes show as a line of text, which takes the place of their icon (design system section 4).
@@ -625,7 +642,8 @@ function TaskRowInner({
     (nestedDepth === 0 && !!parentTitle(task)) ||
     (nestedDepth > 0 && parentProjectId !== undefined && parentProjectId !== task.project_id) ||
     unavailableReason !== null ||
-    isNext
+    isNext ||
+    !!promise
 
   // Collapsed row — entire row is draggable (PointerSensor distance:8 distinguishes click vs drag)
   if (!isExpanded) {
@@ -694,6 +712,14 @@ function TaskRowInner({
         }}
         onKeyDown={(e) => {
           if (e.key === 'Enter') toggleExpandedTask(task.id)
+          // Keys 1 to 6 give a verdict on a promise of theirs (design system 9).
+          if (theirs && !task.done && e.target === e.currentTarget && !e.ctrlKey && !e.metaKey && !e.altKey) {
+            if (verdictForKey(e.key)) {
+              e.preventDefault()
+              setVerdictKey(e.key)
+              setVerdictOpen(true)
+            }
+          }
         }}
         onDragOver={handleFileDragOver}
         onDragLeave={handleFileDragLeave}
@@ -709,7 +735,11 @@ function TaskRowInner({
         }}
         {...listeners}
       >
-        <TaskCheckbox task={task} suppressTopLevelUndo={nestedDepth > 0} />
+        {theirs ? (
+          <PersonMark name={promiseName} color={promisePerson?.hex_color} expanded={verdictOpen} onClick={() => setVerdictOpen((open) => !open)} />
+        ) : (
+          <TaskCheckbox task={task} suppressTopLevelUndo={nestedDepth > 0} />
+        )}
 
         {/* Line 1 is the title, level with the checkbox; line 2 is the meta line, when there is one. */}
         <div className="min-w-0">
@@ -717,7 +747,7 @@ function TaskRowInner({
             className={cn(
               'text-task-title',
               comfortable ? 'line-clamp-3 break-words' : 'block truncate',
-              task.done || unavailableReason ? 'text-text-secondary' : 'text-text'
+              task.done || (unavailableReason && !theirs) ? 'text-text-secondary' : 'text-text'
             )}
           >
             {dropError ? (
@@ -738,7 +768,13 @@ function TaskRowInner({
                   Next
                 </span>
               )}
-              {unavailableReason && <span className="min-w-0 shrink truncate" data-pro-reason>{unavailableReason}</span>}
+              {unavailableReason && !theirs && <span className="min-w-0 shrink truncate" data-pro-reason>{unavailableReason}</span>}
+              {theirs && <span className="shrink-0" data-pro-promise="theirs">From {promiseName}</span>}
+              {mine && <span className="shrink-0" data-pro-promise="mine">For {promiseName}</span>}
+              {promise?.words && <span className="min-w-0 shrink truncate italic">&ldquo;{promise.words}&rdquo;</span>}
+              {promise && isSent(promise) && (
+                <span className="vicu-chip shrink-0 rounded-chip bg-accent-blue/12 px-2 py-px text-chip leading-tight text-accent-blue">In recap</span>
+              )}
               {projectSource === 'group' && projectMeta && (
                 <RowProject title={projectMeta.title} color={projectMeta.color} />
               )}
@@ -850,6 +886,20 @@ function TaskRowInner({
           )}
           <PriorityMark priority={task.priority} />
         </div>
+        {theirs && verdictOpen && (
+          <div className="col-span-3 pb-1 pl-8 pt-2">
+            <VerdictBar
+              task={task}
+              personName={promiseName}
+              canSnooze={canSnooze(task, promise, readVerdictSnoozes(appConfig?.pro_verdict_snooze)[String(task.id)])}
+              pendingKey={verdictKey}
+              onDone={() => {
+                setVerdictKey(null)
+                setVerdictOpen(false)
+              }}
+            />
+          </div>
+        )}
       </div>
       {contextMenu && (
         <TaskContextMenu

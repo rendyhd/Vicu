@@ -14,6 +14,9 @@ import { RowViewProvider } from '@/components/task-list/RowViewContext'
 import { ListSkeleton } from '@/components/shared/ListSkeleton'
 import { useAvailabilityView } from '@/hooks/use-availability'
 import { HiddenSummary, ViewSwitch } from '@/components/pro/ViewSwitch'
+import { Link } from '@tanstack/react-router'
+import { usePro } from '@/hooks/use-pro'
+import { useProPrefs } from '@/hooks/use-pro-prefs'
 
 export function TagView() {
   const { labelId } = useParams({ from: '/tag/$labelId' })
@@ -32,6 +35,8 @@ export function TagView() {
   const { data: tasks = [], isLoading } = useTasks(params)
 
   const availability = useAvailabilityView(`tag.${lid}`)
+  // Pro (21.5): a person label links to the person's page.
+  const personPage = usePro().layer('promises') && useProPrefs().isPerson(lid)
   const labeledAll = useMemo(() => {
     const activeIds = new Set(projects?.flat.map((project) => project.id) ?? [])
     const labeled = tasks.filter((t) => activeIds.has(t.project_id) && t.labels?.some((l) => l.id === lid))
@@ -87,7 +92,16 @@ export function TagView() {
         }}
         emptyTitle={`No tasks tagged "${labelName}"`}
         empty={availability.on ? groups.length === 0 && hiddenCount === 0 : undefined}
-        headerContent={availability.on ? <ViewSwitch view={availability.view} onChange={availability.setView} /> : undefined}
+        headerContent={availability.on || personPage ? (
+          <>
+            {personPage && (
+              <Link to="/person/$labelId" params={{ labelId: String(lid) }} className="mx-6 mb-2 inline-block text-meta font-medium text-accent-blue hover:underline">
+                Open {labelName}'s page
+              </Link>
+            )}
+            {availability.on && <ViewSwitch view={availability.view} onChange={availability.setView} />}
+          </>
+        ) : undefined}
       >
         {groups.map((group) => (
           <ProjectTaskGroup key={group.name} level={1} name={group.name} color={group.color} tasks={group.tasks} />

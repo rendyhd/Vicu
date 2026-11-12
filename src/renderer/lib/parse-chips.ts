@@ -60,5 +60,21 @@ export function parseChips(result: ParseResult, fmt: DateFormat = getDateFormat(
   if (result.place) {
     chips.push({ type: 'place', label: placeChipName(result.place.trigger, result.place.place.name), key: 'place', source: 'text' })
   }
+  // Pro's phrases (cross-app semantics 5.5); the parser reads them only while Pro is on.
+  const person = result.tokens.find((token) => token.type === 'person')
+  if (result.person && person) {
+    const name = person.raw.replace(/^for\s+/i, '').replace(/:$/, '').trim()
+    chips.push({ type: 'person', label: result.person.mine ? `For ${name}` : `From ${name}`, key: 'person', source: 'text' })
+  }
+  if (result.start && !result.block) {
+    chips.push({ type: 'start', label: `Starts ${formatDateChip(result.start, true, now, fmt)}`, key: 'start', source: 'text' })
+  }
+  if (result.estimate) {
+    const hours = Math.floor(result.estimate / 60)
+    const minutes = result.estimate % 60
+    chips.push({ type: 'estimate', label: `~${hours ? `${hours}h` : ''}${minutes ? `${minutes}m` : ''}`, key: 'estimate', source: 'text' })
+  }
+  if (result.flag) chips.push({ type: 'flag', label: 'Flagged', key: 'flag', source: 'text' })
+  if (result.request) chips.push({ type: 'request', label: 'Request', key: 'request', source: 'text' })
   return chips
 }

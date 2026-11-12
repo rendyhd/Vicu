@@ -1,14 +1,20 @@
 import { useMemo, useRef, useState, type ReactNode, type RefObject } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { CalendarClock, Flag, Hourglass, Link2, Plus, Search, X } from 'lucide-react'
+import { CalendarClock, Flag, Handshake, Hourglass, Link2, Plus, Search, X } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { Popover } from '@/components/overlay/Popover'
 import { Tooltip } from '@/components/overlay/Tooltip'
 import { MonthCalendar } from '@/components/task-list/MonthCalendar'
-import { useUpdateTask } from '@/hooks/use-task-mutations'
 import { useToggleFlags } from '@/hooks/use-flag'
 import { blockersOf, useToggleAfter } from '@/hooks/use-relations'
-import { useProLedger, writeLedger } from '@/hooks/use-pro-ledger'
+import { setRecord, useProLedger, writeLedger } from '@/hooks/use-pro-ledger'
+import { usePro } from '@/hooks/use-pro'
+import { usePromiseOf } from '@/hooks/use-promises'
+import { usePeople, usePersonLabels } from '@/hooks/use-people'
+import { useAddLabel, useUpdateTask } from '@/hooks/use-task-mutations'
+import { promiseOf, readConfirmTitle } from '../../../shared/pro/promises'
+import { matchPerson } from '../../../shared/pro/people'
+import type { PromiseValue } from '../../../shared/pro/ledger'
 import { useTasks } from '@/hooks/use-tasks'
 import { OPEN_TASKS_PARAMS, useAvailability } from '@/hooks/use-availability'
 import { useDateFormat } from '@/hooks/use-date-format'
@@ -26,7 +32,7 @@ const SET = 'border border-[var(--border-color)] text-text hover:bg-bg-hover'
 const UNSET = 'border border-transparent text-text-secondary hover:bg-bg-hover hover:text-text'
 const OPEN = 'border border-transparent bg-bg-selected text-accent-blue'
 
-type Open = 'start' | 'estimate' | 'after' | null
+type Open = 'start' | 'estimate' | 'after' | 'promise' | null
 
 function Chip({ prop, name, value, isSet, open, buttonRef, onClick, icon, unsetLabel, tip, shortcut }: {
   prop: string
@@ -73,7 +79,11 @@ function Chip({ prop, name, value, isSet, open, buttonRef, onClick, icon, unsetL
  * after and flag. Shown only while the availability layer is on.
  */
 export function ProCardChips({ task }: { task: Task }) {
-  const { on } = useAvailability()
+  const { on: availabilityOn } = useAvailability()
+  const promisesOn = usePro().layer('promises')
+  const promiseRef = useRef<HTMLButtonElement>(null)
+  const promise = usePromiseOf()(task)
+  const people = usePersonLabels()
   const [open, setOpen] = useState<Open>(null)
   const startRef = useRef<HTMLButtonElement>(null)
   const estimateRef = useRef<HTMLButtonElement>(null)
@@ -81,7 +91,7 @@ export function ProCardChips({ task }: { task: Task }) {
   const fmt = useDateFormat()
   const toggleFlags = useToggleFlags()
   const { ledger } = useProLedger()
-  if (!on) return null
+  if (!availabilityOn && !promisesOn) return null
 
   const now = new Date()
   const block = blockOf(task)
@@ -91,8 +101,27 @@ export function ProCardChips({ task }: { task: Task }) {
   const toggle = (which: Exclude<Open, null>) => setOpen((current) => (current === which ? null : which))
   const close = () => setOpen(null)
 
+  const promiseName = promise?.person != null ? people.get(promise.person)?.title ?? 'someone' : null
+  const promiseText = promise ? (promise.dir === 'mine' ? `For ${promiseName}` : `From ${promiseName}`) : undefined
+
   return (
     <>
+      {promisesOn && (
+        <Chip
+          prop="pro-promise"
+          name="Promise"
+          tip="A promise to or from someone"
+          value={promiseText}
+          isSet={!!promise}
+          open={open === 'promise'}
+          buttonRef={promiseRef}
+          onClick={() => toggle('promise')}
+          icon={<Handshake className="h-3.5 w-3.5" aria-hidden="true" />}
+          unsetLabel="Promise"
+        />
+      )}
+      {open === 'promise' && <PromisePopover anchorRef={promiseRef} task={task} onClose={close} />}
+      {availabilityOn && (<>
       {/* A block holds the start (21.3): no separate start date while the task has one. */}
       {!block && (
         <Chip
@@ -149,7 +178,79 @@ export function ProCardChips({ task }: { task: Task }) {
         icon={<Flag className="h-3.5 w-3.5 fill-accent-orange text-accent-orange" aria-hidden="true" />}
         unsetLabel="Flag"
       />
+      </>)}
     </>
+  )
+}
+
+/**
+ * Makes the task a promise (21.6): from someone (theirs) or for someone (yours), with their words and
+ * how you will see it is done. A "Confirm with Jan: ..." task offers to become Jan's promise
+ * (decision 31): the title loses the prefix.
+ */
+function PromisePopover({ anchorRef, task, onClose }: { anchorRef: RefObject<HTMLElement | null>; task: Task; onClose: () => void }) {
+  const queryClient = useQueryClient()
+  const update = useUpdateTask()
+  const addLabel = useAddLabel()
+  const people = usePeople()
+  const personLabels = usePersonLabels()
+  const { ledger } = useProLedger()
+  const existing = promiseOf(ledger, task.id)
+  const confirm = readConfirmTitle(task.title)
+  const confirmPerson = confirm ? matchPerson(confirm.name, people).id : null
+  const [dir, setDir] = useState<'theirs' | 'mine'>(existing?.dir === 'mine' ? 'mine' : 'theirs')
+  const [person, setPerson] = useState<number | null>(existing?.person ?? confirmPerson)
+  const [words, setWords] = useState(existing?.words ?? '')
+  const [doneWhen, setDoneWhen] = useState(existing?.done_when ?? '')
+
+  const save = (retitle: boolean) => {
+    if (person === null) return
+    const value: PromiseValue = { ...(existing ?? {}), dir, person }
+    value.words = words.trim() || null
+    value.done_when = doneWhen.trim() || null
+    void writeLedger(queryClient, [setRecord('promises', task.id, value)])
+    if (!(task.labels ?? []).some((label) => label.id === person)) addLabel.mutate({ taskId: task.id, labelId: person })
+    if (retitle && confirm) update.mutate({ id: task.id, changes: { title: confirm.what }, original: task })
+    onClose()
+  }
+
+  return (
+    <Popover anchorRef={anchorRef} onClose={onClose} label="Promise" role="dialog" className="w-80 space-y-2 p-3">
+      {confirm && confirmPerson !== null && !existing && (
+        <button type="button" className="w-full rounded-control bg-accent-blue/12 px-2 py-1.5 text-left text-meta font-medium text-accent-blue" onClick={() => save(true)}>
+          Make it {confirm.name}&apos;s promise
+        </button>
+      )}
+      <div className="flex gap-1" role="radiogroup" aria-label="Direction">
+        {(['theirs', 'mine'] as const).map((value) => (
+          <button
+            key={value}
+            type="button"
+            role="radio"
+            aria-checked={dir === value}
+            onClick={() => setDir(value)}
+            className={dir === value ? 'rounded-chip border border-accent-blue bg-accent-blue/12 px-2 py-0.5 text-meta text-accent-blue' : 'rounded-chip border border-border px-2 py-0.5 text-meta text-text-secondary hover:bg-bg-hover'}
+          >
+            {value === 'theirs' ? 'They promised me' : 'I promised them'}
+          </button>
+        ))}
+      </div>
+      <select value={person ?? ''} onChange={(event) => setPerson(event.target.value ? Number(event.target.value) : null)} aria-label="Person" className="w-full rounded-control border border-border bg-bg-page px-2 py-1 text-meta text-text">
+        <option value="">Choose a person</option>
+        {[...personLabels.values()].map((label) => <option key={label.id} value={label.id}>{label.title}</option>)}
+      </select>
+      {personLabels.size === 0 && <p className="text-caption text-text-secondary">Mark a label as a person first (its menu in the sidebar, or People).</p>}
+      <input value={words} onChange={(event) => setWords(event.target.value)} placeholder={dir === 'theirs' ? 'In their words' : 'What you said'} aria-label="Words" className="w-full rounded-control border border-border bg-bg-page px-2 py-1 text-meta text-text" />
+      <input value={doneWhen} onChange={(event) => setDoneWhen(event.target.value)} placeholder="We will see it is done when" aria-label="Done when" className="w-full rounded-control border border-border bg-bg-page px-2 py-1 text-meta text-text" />
+      <div className="flex justify-between gap-2">
+        {existing ? (
+          <button type="button" className="rounded-control px-2 py-1 text-meta text-danger hover:bg-danger/10" onClick={() => { void writeLedger(queryClient, [setRecord('promises', task.id, null)]); onClose() }}>
+            Not a promise
+          </button>
+        ) : <span />}
+        <button type="button" disabled={person === null} className="rounded-control bg-accent-fill px-3 py-1 text-meta font-medium text-on-accent disabled:opacity-40" onClick={() => save(false)}>Save</button>
+      </div>
+    </Popover>
   )
 }
 

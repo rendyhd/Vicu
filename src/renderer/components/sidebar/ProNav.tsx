@@ -24,7 +24,7 @@ export const PRO_NAV_ITEMS: ProNavItem[] = [
 ]
 
 /** The pages that exist in this build; a list is added here with its route. */
-const BUILT = new Set(['flagged'])
+const BUILT = new Set(['flagged', 'waiting-on', 'people'])
 
 /** The Pro lists that are on (the palette lists them too). Empty while Pro is off. */
 export function useProNavItems(): ProNavItem[] {

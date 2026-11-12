@@ -24,6 +24,7 @@ import {
   talk as fixtureTalk,
   prompts as fixturePrompts,
   messages as fixtureMessages,
+  pro as fixturePro,
 } from '../../../test-fixtures/ai-tools-v1.json'
 
 /** A JSON schema inside the subset every strict mode accepts (section 2.2). */
@@ -260,4 +261,18 @@ export function speechModel(id: string): SpeechModelInfo | undefined {
 /** `https://huggingface.co/<repo>/resolve/<commit>/<file>` (3.5). */
 export function speechModelUrl(model: Pick<SpeechModelInfo, 'repo' | 'commit' | 'file'>): string {
   return `https://huggingface.co/${model.repo}/resolve/${model.commit}/${model.file}`
+}
+
+/**
+ * Pro's assistant pieces (docs/ai-assistant-v1.md section 11): the Copilot prompt (used with any
+ * provider or none: it is copied), the import conversion and promise drafts, the Ask tools and
+ * starters. Used only while Pro's assistant switch is on, except the Copilot prompt.
+ */
+export const PRO_AI = fixturePro as unknown as {
+  limits: { import_items_max: number; import_max_tokens: number; promise_drafts_max: number; get_promises_max: number }
+  copilotPrompt: { kinds: Record<string, string>; lines: Array<string | string[]> }
+  proImport: { prompt: { version: number; lines: string[] }; answerSchema: JsonSchema }
+  promiseDrafts: { prompt: { version: number; lines: string[] }; answerSchema: JsonSchema }
+  askTools: AskTool[]
+  starters: string[]
 }

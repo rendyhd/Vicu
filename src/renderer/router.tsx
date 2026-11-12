@@ -137,6 +137,24 @@ const flaggedRoute = createRoute({
   component: lazyRouteComponent(() => import('@/views/pro/FlaggedView'), 'FlaggedView'),
 })
 
+const waitingOnRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/waiting-on',
+  component: lazyRouteComponent(() => import('@/views/pro/WaitingOnView'), 'WaitingOnView'),
+})
+
+const peopleRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/people',
+  component: lazyRouteComponent(() => import('@/views/pro/PeopleView'), 'PeopleView'),
+})
+
+const personRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/person/$labelId',
+  component: lazyRouteComponent(() => import('@/views/pro/PersonView'), 'PersonView'),
+})
+
 const routeTree = rootRoute.addChildren([
   indexRoute,
   inboxRoute,
@@ -155,6 +173,9 @@ const routeTree = rootRoute.addChildren([
   settingsRoute,
   searchRoute,
   flaggedRoute,
+  waitingOnRoute,
+  peopleRoute,
+  personRoute,
 ])
 
 // Use hash history for Electron compatibility (file:// URLs don't support browser history)

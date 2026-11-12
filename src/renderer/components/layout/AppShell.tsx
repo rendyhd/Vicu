@@ -66,6 +66,7 @@ import { AiHost } from '@/components/ai/AiHost'
 import { ProjectAccessProvider } from '@/hooks/use-project-access'
 import { AvailabilityProvider } from '@/hooks/use-availability'
 import { FocusPickerHost } from '@/components/pro/FocusBanner'
+import { ProDialogHost } from '@/components/pro/ProDialogHost'
 import { APP_CONFIG_QUERY_KEY, useAppConfig } from '@/hooks/use-app-config'
 import { openTaskInApp } from '@/lib/open-task'
 import { toast } from '@/stores/toast-store'
@@ -867,6 +868,7 @@ export function AppShell() {
         <ProjectActionsHost />
         <TemplateEditHost />
         <FocusPickerHost />
+        <ProDialogHost />
         <ToastHost />
         <VoiceHost />
         <DictationHost />

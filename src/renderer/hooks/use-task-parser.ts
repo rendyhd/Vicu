@@ -1,5 +1,6 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react'
 import { useParserConfig } from './use-parser-config'
+import { usePeople } from './use-people'
 import { parse, getPrefixes } from '@/lib/task-parser'
 import type { ParseResult, ParserConfig, PlaceRef, TokenType, SyntaxPrefixes } from '@/lib/task-parser'
 
@@ -30,6 +31,8 @@ const NO_PLACES: readonly PlaceRef[] = []
 /** @param places The saved places "when I get home" may name (section 5.3 of the contract). */
 export function useTaskParser(places: readonly PlaceRef[] = NO_PLACES): UseTaskParserReturn {
   const parserConfig = useParserConfig()
+  // Pro's people (5.5): known person labels and their aliases; empty while Pro is off.
+  const people = usePeople()
   const [inputValue, setInputValueRaw] = useState('')
   const [suppressions, setSuppressions] = useState<SuppressionMap>(new Map())
 
@@ -83,8 +86,8 @@ export function useTaskParser(places: readonly PlaceRef[] = NO_PLACES): UseTaskP
     const config: ParserConfig = suppressTypes.length > 0
       ? { ...parserConfig, suppressTypes: [...(parserConfig.suppressTypes ?? []), ...suppressTypes] }
       : parserConfig
-    return parse(inputValue, config, new Date(), places)
-  }, [inputValue, parserConfig, suppressTypes, places])
+    return parse(inputValue, config, new Date(), places, parserConfig.pro ? people : [])
+  }, [inputValue, parserConfig, suppressTypes, places, people])
 
   // Keep ref in sync
   parseResultRef.current = parseResult

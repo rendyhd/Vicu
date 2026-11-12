@@ -13,6 +13,8 @@ import {
   X,
 } from 'lucide-react'
 import { cn } from '@/lib/cn'
+import { useQueryClient } from '@tanstack/react-query'
+import { finishProCapture, proPersonLabelId, withProFields } from '@/lib/pro/capture'
 import { api } from '@/lib/api'
 import { NULL_DATE } from '@/lib/constants'
 import { replacePendingTokens } from '@/lib/image-tokens'
@@ -143,6 +145,11 @@ export function NewTaskComposer({
   const { data: appConfig } = useAppConfig()
   // The composer reports failures inline (and keeps what the user typed), so no global toast.
   const createTask = useCreateTask({ silent: true })
+  const queryClient = useQueryClient()
+  // Pro (21.6): a person's promise can say it in their words and how you will see it is done.
+  const [promiseWords, setPromiseWords] = useState('')
+  const [promiseDoneWhen, setPromiseDoneWhen] = useState('')
+  const promiseDraft = { words: promiseWords, done_when: promiseDoneWhen }
   const addLabel = useAddLabel({ silent: true })
   const createLabel = useCreateLabel({ silent: true })
   const uploadAttachment = useUploadAttachmentFromPaste({ silent: true })
@@ -249,6 +256,8 @@ export function NewTaskComposer({
   }
 
   const closeAndReset = () => {
+    setPromiseWords('')
+    setPromiseDoneWhen('')
     attachments.forEach((attachment) => { if (attachment.blobUrl) URL.revokeObjectURL(attachment.blobUrl) })
     parser.reset()
     setDescription('')
@@ -405,9 +414,12 @@ export function NewTaskComposer({
       // No reminder picked: the default reminder for the due date, as every create path adds it
       // (src/shared/default-reminder.ts). Reminders the user picked are kept as they are.
       payload = withDefaultReminder(payload, appConfig)
+      // Pro's phrases (5.5): a start date goes in the create; the rest follows once it has an id.
+      payload = withProFields(payload, parsed)
 
       const labelNames = [...new Set(parsed?.labels ?? [])]
-      const explicitLabels = labels.filter((label) => selectedLabelIds.includes(label.id))
+      const personLabelId = proPersonLabelId(parsed)
+      const explicitLabels = labels.filter((label) => selectedLabelIds.includes(label.id) || label.id === personLabelId)
       // If the server cannot be reached the create is queued with its labels and attachments, and
       // the task shows up at once under a temporary id.
       const extras = buildCreateExtras({
@@ -418,6 +430,7 @@ export function NewTaskComposer({
         description: draftDescription,
       })
       const task = await createTask.mutateAsync({ projectId: targetProjectId, task: payload, extras })
+      void finishProCapture(queryClient, task, parsed, promiseDraft)
       const place = parsed?.place
       if (isTempTaskId(task.id)) {
         // A location reminder is written for a server id only (section 11.7).
@@ -553,6 +566,25 @@ export function NewTaskComposer({
           {submitting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
         </button>
       </div>
+
+      {!template && parser.parseResult?.person && (
+        <div className="grid gap-1.5 pb-2 pl-[46px] pr-4 sm:grid-cols-2" data-pro-promise-fields>
+          <input
+            value={promiseWords}
+            onChange={(event) => setPromiseWords(event.target.value)}
+            placeholder={parser.parseResult.person.mine ? 'What you said' : 'In their words'}
+            aria-label={parser.parseResult.person.mine ? 'What you said' : 'In their words'}
+            className="rounded-control border border-border bg-bg-page px-2 py-1 text-meta text-text"
+          />
+          <input
+            value={promiseDoneWhen}
+            onChange={(event) => setPromiseDoneWhen(event.target.value)}
+            placeholder="We'll see it's done when"
+            aria-label="We'll see it's done when"
+            className="rounded-control border border-border bg-bg-page px-2 py-1 text-meta text-text"
+          />
+        </div>
+      )}
 
       {showNotes && (
         <div className="pb-2 pl-[46px] pr-4">

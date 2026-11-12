@@ -7,6 +7,9 @@ import { useDayKey } from '@/stores/day-store'
 import { splitTodayOverdue } from '@/lib/today-overdue'
 import { TaskList } from '@/components/task-list/TaskList'
 import { ListSectionHeader } from '@/components/task-list/ListSectionHeader'
+import { TaskRowGroup } from '@/components/task-list/TaskRowGroup'
+import { TaskRow } from '@/components/task-list/TaskRow'
+import { usePromisesDue } from '@/hooks/use-promises'
 import { ProjectTaskGroup } from '@/components/task-list/ProjectTaskGroup'
 import { openCount } from '@/lib/list-sections'
 import { DueDateContextProvider } from '@/components/task-list/TaskDueBadge'
@@ -63,13 +66,21 @@ export function TodayView() {
     })
   }, [])
 
-  const { overdueTasks, todayTasks } = useMemo(() => {
+  const split = useMemo(() => {
     const activeIds = new Set(projects?.flat.map((project) => project.id) ?? [])
     // Local calendar date: overdue is before today, Today is today whatever the time of day. The
     // same split feeds the app icon badge, so the two cannot disagree.
     const { overdue, today } = splitTodayOverdue(tasks, activeIds, new Date())
-    return { overdueTasks: overdue, todayTasks: today }
+    return { overdue, today }
   }, [tasks, projects?.flat, dayKey])
+  // Pro (21.6, decision 10): promises of theirs that are due come first, to get a verdict. Off,
+  // there are none and the lists are as before.
+  const promises = usePromisesDue(useMemo(() => [...split.overdue, ...split.today], [split]))
+  const { overdueTasks, todayTasks } = useMemo(() => {
+    if (promises.due.length === 0) return { overdueTasks: split.overdue, todayTasks: split.today }
+    const asked = new Set(promises.due.map((task) => task.id))
+    return { overdueTasks: split.overdue.filter((task) => !asked.has(task.id)), todayTasks: split.today.filter((task) => !asked.has(task.id)) }
+  }, [split, promises.due])
 
   const overdueGroups = useMemo(
     () => groupByProject(overdueTasks, projects?.flat),
@@ -103,7 +114,7 @@ export function TodayView() {
 
   // Empty after having had tasks in this visit (the last one was done): All clear warms in and offers
   // the next upcoming task. Empty from the start it simply shows.
-  const empty = overdueTasks.length === 0 && todayTasks.length === 0 && !routinesLeft
+  const empty = overdueTasks.length === 0 && todayTasks.length === 0 && promises.due.length === 0 && !routinesLeft
   const hadTasks = useRef(false)
   if (!empty) hadTasks.current = true
   const justCleared = empty && hadTasks.current
@@ -129,6 +140,14 @@ export function TodayView() {
         emptyExtra={empty ? <NextUpcomingOffer /> : undefined}
       >
         {routinesShown && <RoutineTodaySection onToday />}
+        {promises.due.length > 0 && (
+          <div data-pro-promises-due>
+            <ListSectionHeader level={1} title="Promises due" count={promises.due.length} />
+            <TaskRowGroup>
+              {promises.due.map((task) => <TaskRow key={task.id} task={task} />)}
+            </TaskRowGroup>
+          </div>
+        )}
         {overdueTasks.length > 0 && (
           <div>
             <ListSectionHeader level={1} title="Overdue" count={openCount(overdueTasks)} tone="overdue" />
