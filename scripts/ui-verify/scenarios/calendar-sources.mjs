@@ -123,7 +123,7 @@ export default async function run(h) {
     await h.wait(1200)
   }
   const openCalendarsSettings = async () => {
-    await h.goto('/settings')
+    await h.goto('/settings?section=calendars')
     await page.locator('[data-calendar-feeds]').waitFor({ timeout: 10000 })
     await page.locator('[data-calendar-feeds]').scrollIntoViewIfNeeded()
     await h.wait(300)

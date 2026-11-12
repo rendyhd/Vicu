@@ -16,7 +16,7 @@ import { AddCalendarDialog } from './AddCalendarDialog'
 import { ImportCalendarFileButton, ImportCalendarHost } from './ImportCalendarFile'
 import { AccountError } from './OAuthAccountForm'
 
-// Events and connected calendars (contract 20.3, 20.9) in Settings, General, Plan. The Plan screen's
+// Events and connected calendars (contract 20.3, 20.9) in Settings, Pro, Plan. The Plan screen's
 // gear shows a summary with Manage, which opens them here.
 
 const ICON_BUTTON = 'flex h-6 w-6 shrink-0 items-center justify-center rounded-control text-text-secondary hover:bg-bg-hover'

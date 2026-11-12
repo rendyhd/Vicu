@@ -122,7 +122,7 @@ export default async function run(h) {
     await h.wait(300)
     await h.assert('A: /plan goes to Today while it is off', (await page.evaluate(() => location.hash)).includes('/today'))
 
-    await h.goto('/settings')
+    await h.goto('/settings?section=pro')
     await h.wait(400)
     await page.getByText('Show Plan in the sidebar').click()
     await page.locator('nav[aria-label="Lists"] button', { hasText: /^Plan/ }).waitFor({ timeout: 5000 }).catch(() => {})

@@ -73,7 +73,7 @@ export function SettingsView() {
   }, [section])
   useEffect(() => {
     if (section !== 'calendars' || !fullConfig) return
-    setActiveTab('general')
+    setActiveTab('pro')
     const frame = requestAnimationFrame(() => {
       const target = document.querySelector<HTMLElement>('[data-calendar-feeds]')
       // Only the settings column scrolls: scrollIntoView would also shift the window's own layout.
@@ -288,6 +288,8 @@ export function SettingsView() {
       ) : activeTab === 'pro' ? (
         <div className={SETTINGS_COLUMN}>
           <ProSettings />
+          {/* Plan lives with Pro's tools, but works whether Pro is on or off. */}
+          {fullConfig && !fullConfig.standalone_mode && <PlannerSettings config={fullConfig} onChange={handleQuickEntryChange} />}
         </div>
       ) : activeTab === 'assistant' ? (
         <div className={SETTINGS_COLUMN}>
@@ -613,8 +615,6 @@ export function SettingsView() {
 
           </div>
         </div>
-
-        {fullConfig && !fullConfig.standalone_mode && <PlannerSettings config={fullConfig} onChange={handleQuickEntryChange} />}
 
         {fullConfig && <SidebarSettings config={fullConfig} onChange={handleQuickEntryChange} />}
 

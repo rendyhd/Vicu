@@ -108,7 +108,7 @@ export default async function run(h) {
     const freeBefore = await tomorrowTotals()
 
     // --- A. Connect a calendar through Settings, Add calendar ----------------------------------------
-    await h.goto('/settings')
+    await h.goto('/settings?section=calendars')
     await page.locator('[data-calendar-open-add]').waitFor({ timeout: 10000 })
     await page.locator('[data-calendar-open-add]').scrollIntoViewIfNeeded()
     await page.locator('[data-calendar-open-add]').click()
@@ -160,7 +160,7 @@ export default async function run(h) {
     // --- D. Busy only, then remove -----------------------------------------------------------------
     await page.locator('[data-plan-view="day"]').click()
     await h.wait(300)
-    await h.goto('/settings')
+    await h.goto('/settings?section=calendars')
     await page.locator('[data-calendar-options]').first().scrollIntoViewIfNeeded()
     await page.locator('[data-calendar-options]').first().click()
     await page.locator('[data-calendar-busy-toggle]').click()
@@ -175,7 +175,7 @@ export default async function run(h) {
     const busyTitles = await page.locator('[data-plan-event]:not([data-plan-event^="vicu:events"])').evaluateAll((nodes) => nodes.map((node) => node.textContent))
     await h.assert('D: busy only shows no titles', busyTitles.length > 0 && busyTitles.every((t) => /^(Busy|Free)/.test(t) && !t.includes('Design')) && busyTitles.some((t) => t.startsWith('Free')), busyTitles)
     await h.capture('day-busy-only')
-    await h.goto('/settings')
+    await h.goto('/settings?section=calendars')
     await page.locator('[data-calendar-options]').first().scrollIntoViewIfNeeded()
     await page.locator('[data-calendar-options]').first().click()
     await page.locator('[data-calendar-remove]').click()

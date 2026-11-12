@@ -133,7 +133,7 @@ export default async function run(h) {
     await h.assert('and they leave the timeline', !left.some((text) => text.includes('IMP ')), left)
 
     // --- From Settings; a cancelled file dialog does nothing ---------------------------------------
-    await h.goto('/settings')
+    await h.goto('/settings?section=calendars')
     await page.locator('[data-calendar-feeds]').waitFor({ timeout: 10000 })
     await page.locator('[data-plan-my-events]').scrollIntoViewIfNeeded()
     await pickFile(null)
