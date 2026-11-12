@@ -13,6 +13,11 @@ lead: A time block says when you will do a task. The Plan screen shows your bloc
 - **Plan my day** is a four-step session that takes leftovers from yesterday, lets you pick what to do, arranges it in your free time and writes it only when you accept.
 - **Nothing here needs the assistant.** With the assistant set up, Plan my day can also suggest lengths and an order.
 
+> [!NOTE]
+> Plan's settings sit with Vicu Pro's tools, but Plan does not need Pro: it works the same whether Pro is
+> on or off. With Pro's [Power tools](guide:pro/power) on, Plan my day also uses your estimates and
+> proposes a focus block.
+
 ## Time blocks {all}
 
 A block is the task's own start and end time. Vikunja stores it as the task's start date and end date, so it shows in the Vikunja web app and on every device. A task without a block is a complete task, and nothing moves on its own.
@@ -40,7 +45,7 @@ You need a time of day. `for 30m` on its own stays in the title. More about this
 ## Turn on the Plan screen {all}
 
 :::steps
-1. On the desktop, open **Settings, General, Plan** and turn on **Show Plan in the sidebar**. On the phone, open **Settings, General, Plan**.
+1. On the desktop, open **Settings, Pro, Plan** and turn on **Show Plan in the sidebar**. On the phone, open **Settings, General** and find **Plan** right after Pro.
 2. Open **Plan** from the sidebar (desktop) or the menu or bottom bar (phone). On the phone, Plan can take a slot in the bottom bar.
 :::
 
@@ -132,7 +137,7 @@ On the last step:
 
 - **Undo all** puts back everything the session changed.
 - **Remind me when each block starts** adds a reminder to each block.
-- **Ask me to plan tomorrow** sends one notification each evening at a time you set, on this device. Tapping it opens Plan. You can also set it in the gear or in **Settings, General, Plan**.
+- **Ask me to plan tomorrow** sends one notification each evening at a time you set, on this device. Tapping it opens Plan. You can also set it in the gear or in **Settings, Pro, Plan**.
 
 Events and connected calendars count as busy time, so the draft keeps clear of your meetings. See [Events and calendars](guide:calendars).
 

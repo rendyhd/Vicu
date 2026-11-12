@@ -47,14 +47,14 @@ On the desktop the question appears in a small menu after you let go of a drag, 
 
 ### Delete an Event
 
-Open the Event and choose **Delete event** (on the phone, Delete). On the desktop you can also delete from **Settings, General, Plan** where your Events are listed. Undo brings it back.
+Open the Event and choose **Delete event** (on the phone, Delete). On the desktop you can also delete from **Settings, Pro, Plan** where your Events are listed. Undo brings it back.
 
 ## Connected calendars {all}
 
 ### How to add one {desktop}
 
 :::steps
-1. Open **Settings, General, Plan**, or open the Plan gear and choose **Manage**.
+1. Open **Settings, Pro, Plan**, or open the Plan gear and choose **Manage**.
 2. Under **Calendars**, choose **Add a calendar**.
 3. Pick the kind, follow the form and choose which calendars to show.
 :::

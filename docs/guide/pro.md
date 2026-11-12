@@ -55,6 +55,13 @@ see Pro's data: Ask can look up promises, people and the portfolio, an import ca
 and a meeting can draft promises from what was said. With it off, the assistant sees your tasks as before
 and none of Pro's records.
 
+## Plan and calendars
+
+The [Plan screen](guide:plan) and [Events and calendars](guide:calendars) are listed here too, and their
+settings are in **Settings, Pro, Plan** on the desktop (on the phone, right after Pro in **Settings,
+General**). They do not need Pro: Plan works the same with Pro on or off. With **Power tools** on, Plan
+my day also uses your estimates and proposes a focus block.
+
 ## Turn Pro on
 
 :::steps

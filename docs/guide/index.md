@@ -27,8 +27,6 @@ that are often all you need, then the steps, then the finer points. Badges show 
 - [Smart lists](guide:lists): Inbox, Today, Upcoming, Anytime and Logbook.
 - [Projects and labels](guide:projects): Projects, subprojects, sections, categories and labels.
 - [Custom lists](guide:custom-lists): Lists of your own, made from filters and rules.
-- [Plan your day](guide:plan): Time blocks, the Plan screen and Plan my day.
-- [Events and calendars](guide:calendars): Your own events and your calendars next to your plan.
 - [Routines](guide:routines): Habits and checklists that come back, alone or shared.
 - [Review and guided organizing](guide:review): Keep projects healthy, sort the Inbox, the weekly review.
 - [Work with others](guide:collaboration): Shared projects, assignees and comments.
@@ -56,6 +54,8 @@ Pro only adds; with it off, Vicu is the app you know.
 - [Promises and people](guide:pro/promises): Who promised what, verdicts, Waiting on, 1:1s and meetings.
 - [Portfolio](guide:pro/portfolio): Initiatives, the cap, readiness, escalations and the Sponsor desk.
 - [Power tools](guide:pro/power): Pro lists, the table, the inspector and the weekly review.
+- [Plan your day](guide:plan): Time blocks, the Plan screen and Plan my day. Works with Pro on or off.
+- [Events and calendars](guide:calendars): Your own events and your calendars next to your plan.
 :::
 
 ## Reference
