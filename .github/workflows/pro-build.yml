@@ -1,10 +1,12 @@
 # Pro branch builds
 #
-# Every push to the pro branch (or a manual run) builds the installers and keeps them as workflow
-# artifacts, to install on your own devices. Nothing is published: no tag, no release, no assets on
-# a release (electron-builder runs with --publish never). The version becomes 3.0.0-pro.<run number>
-# for the build only, so Settings shows which build is installed; package.json is not changed.
-# Artifacts are kept for 30 days: Actions, the run, Artifacts.
+# Every push to the pro branch (or a manual run) builds the installers, keeps them as workflow
+# artifacts for 30 days, and puts them on one rolling pre-release, tag `pro-alpha`, replaced on every
+# build: https://github.com/rendyhd/Vicu/releases/tag/pro-alpha. It is never offered as an update:
+# the app's update check reads releases/latest, which never returns a pre-release; release.yml only
+# runs for `v*` tags; the AppImage carries no update information. electron-builder runs with
+# --publish never. The version becomes 3.0.0-pro.<run number> for the build only, so Settings shows
+# which build is installed; package.json is not changed.
 
 name: Pro branch builds
 
@@ -14,7 +16,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: pro-build-${{ github.ref_name }}
@@ -159,3 +161,38 @@ jobs:
           path: dist/*.AppImage
           retention-days: 30
           if-no-files-found: error
+
+  # The rolling pre-release: deleted with its tag and made again at this commit, so the link stays
+  # the same and only the newest build is there.
+  publish-alpha:
+    needs: [windows, macos, linux]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: builds
+          merge-multiple: true
+
+      - name: Replace the pro-alpha pre-release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+        run: |
+          ls -la builds
+          gh release delete pro-alpha --repo "$REPO" --cleanup-tag --yes || true
+          cat > notes.md <<NOTES
+          Alpha builds of Vicu Pro from the \`pro\` branch: version $PRO_VERSION, commit ${SHA::7}.
+
+          This is not an update. Vicu never offers this pre-release; install it by hand. It is replaced by every new alpha build, so this page always has the newest one.
+
+          - Windows: the \`.exe\` installer (unsigned, so Windows may ask before it runs).
+          - macOS: the \`.dmg\`.
+          - Linux: the x64 \`.AppImage\`.
+          - Android: https://github.com/rendyhd/Vicu-Mobile/releases/tag/pro-alpha
+
+          How Pro works: https://vicutodo.app/guide/pro/
+
+          Keep your Vikunja server backed up while you try it. Feedback: https://github.com/rendyhd/Vicu/issues
+          NOTES
+          gh release create pro-alpha builds/* --repo "$REPO" --target "$SHA" --prerelease --latest=false --title "Vicu Pro alpha ($PRO_VERSION)" --notes-file notes.md

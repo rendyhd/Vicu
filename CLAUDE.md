@@ -44,7 +44,7 @@ GitHub Actions workflow at `.github/workflows/release.yml` triggers on tag pushe
 
 Each build job runs `npm run typecheck` and `npm test` before packaging, then uploads into the draft: Windows and macOS with `electron-builder --publish always`, Linux through `scripts/appimage-update-info.mjs`. Windows builds are unsigned. macOS signs and notarizes only when the `BUILD_CERTIFICATE_BASE64` and `APPLE_*` secrets exist; without them the DMG is unsigned.
 
-**Pro branch builds** (`.github/workflows/pro-build.yml`): every push to `pro` (or a manual run) builds the Windows installer, the macOS DMG (signed when the secrets exist) and the x64 AppImage with `--publish never`, version `3.0.0-pro.<run number>` set in CI only, and keeps them as workflow artifacts for 30 days. Nothing is published.
+**Pro branch builds** (`.github/workflows/pro-build.yml`): every push to `pro` (or a manual run) builds the Windows installer, the macOS DMG (signed when the secrets exist) and the x64 AppImage with `--publish never`, version `3.0.0-pro.<run number>` set in CI only, keeps them as workflow artifacts for 30 days, and replaces the rolling pre-release `pro-alpha` (deleted with its tag and made again at the new commit; never `latest`, so the update check, which reads releases/latest, never offers it). No other release is made.
 
 **Do NOT manually create releases or attach build artifacts** — CI handles everything. `create-release` makes the draft first so the three build jobs do not race to create it; a release made by hand will have no assets.
 
