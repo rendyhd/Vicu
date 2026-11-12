@@ -13,6 +13,7 @@ import { useAppConfig } from '@/hooks/use-app-config'
 import { useDateFormat } from '@/hooks/use-date-format'
 import { useOpenTask } from '@/hooks/use-open-task'
 import { useSyncedPrefs } from '@/hooks/use-synced-prefs'
+import { useProToolData } from '@/hooks/use-pro-assistant'
 import {
   useAddLabel,
   useCompleteTask,
@@ -66,8 +67,9 @@ export function AskHost() {
   const reopen = useUncompleteTask()
   const open = useAskStore((s) => s.open)
 
-  const live = useRef({ ws, config, snapshot, pathname, aiSettings })
-  live.current = { ws, config, snapshot, pathname, aiSettings }
+  const proData = useProToolData()
+  const live = useRef({ ws, config, snapshot, pathname, aiSettings, proData })
+  live.current = { ws, config, snapshot, pathname, aiSettings, proData }
   const mutations = useRef({ addDrafts, deleteTask, updateTask, createLabel, addLabel, removeLabel, complete, reopen })
   mutations.current = { addDrafts, deleteTask, updateTask, createLabel, addLabel, removeLabel, complete, reopen }
 
@@ -95,6 +97,7 @@ export function AskHost() {
           return result.success ? result.data : null
         },
         syncedValues: live.current.snapshot.values,
+        pro: live.current.proData,
         review: {
           enabled: live.current.config?.review?.enabled === true,
           defaultCadenceDays: live.current.config?.review?.default_cadence_days ?? 14,

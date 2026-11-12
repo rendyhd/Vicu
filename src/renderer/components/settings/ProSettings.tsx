@@ -89,7 +89,7 @@ export function ProSettings() {
             ))}
             <label className="flex cursor-pointer items-start gap-2 border-t border-[var(--border-color)] pt-3">
               <Checkbox
-                checked={config?.pro_assistant !== false}
+                checked={config?.pro_assistant === true}
                 onChange={(event) => void save({ pro_assistant: event.target.checked })}
               />
               <span>

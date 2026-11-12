@@ -8,8 +8,11 @@ import { useAppConfig } from '@/hooks/use-app-config'
 import { useProPrefs } from '@/hooks/use-pro-prefs'
 import { useAddLabel, useCompleteTask, useCreateLabel, useCreateTask, useDeleteTask, useUncompleteTask, useUpdateTask } from '@/hooks/use-task-mutations'
 import { currentLedger, newLedgerId, restoreRecords, setRecord, writeLedger } from '@/hooks/use-pro-ledger'
-import { usePro } from '@/hooks/use-pro'
 import { useProUiStore } from '@/stores/pro-ui-store'
+import { useProAssistantOn } from '@/hooks/use-pro-assistant'
+import { useAiReady } from '@/hooks/use-ai'
+import { useCollabMe } from '@/hooks/use-project-access'
+import { proImportDocument, proImportUser } from '../../../shared/ai/pro-import'
 import { toast } from '@/stores/toast-store'
 import { isTempTaskId } from '@/lib/pending-cache'
 import { NULL_DATE } from '@/lib/constants'
@@ -54,7 +57,6 @@ interface RowChoice {
 export function ImportDialog({ onClose, initialText = '' }: { onClose: () => void; initialText?: string }) {
   const queryClient = useQueryClient()
   const world = usePromiseWorld()
-  const pro = usePro()
   const { data: projects } = useProjects()
   const { data: config } = useAppConfig()
   const prefs = useProPrefs()
@@ -69,6 +71,14 @@ export function ImportDialog({ onClose, initialText = '' }: { onClose: () => voi
   const [text, setText] = useState(initialText)
   const [choices, setChoices] = useState<Record<number, RowChoice>>({})
   const [working, setWorking] = useState(false)
+  // Converting plain text with the assistant (ai-assistant 11.1): only with Pro's assistant on and Ask ready.
+  const assistantOn = useProAssistantOn()
+  const aiReady = useAiReady()
+  const canConvert = assistantOn && aiReady.ask
+  const me = useCollabMe()
+  const [sourceKind, setSourceKind] = useState<'meeting' | 'mail' | 'chat'>('meeting')
+  const [converting, setConverting] = useState(false)
+  const [convertProblem, setConvertProblem] = useState<string | null>(null)
   const today = toLocalDate(new Date())
 
   const read = useMemo(() => (text.trim() ? readImport(text, today) : null), [text, today])
@@ -89,6 +99,31 @@ export function ImportDialog({ onClose, initialText = '' }: { onClose: () => voi
   const choiceOf = (row: ImportRow): RowChoice => choices[row.index] ?? { on: row.ready, title: row.title ?? row.item.what, person: row.person.id, rememberAlias: false }
   const setChoice = (row: ImportRow, change: Partial<RowChoice>) => setChoices((all) => ({ ...all, [row.index]: { ...choiceOf(row), ...change } }))
   const ticked = match?.rows.filter((row) => choiceOf(row).on) ?? []
+
+  const convert = async () => {
+    setConverting(true)
+    setConvertProblem(null)
+    const people = [...world.people.values()].map((label) => label.title)
+    const initiatives = Object.keys(world.ledger.initiatives).flatMap((id) => projects?.all.find((entry) => entry.id === Number(id))?.title ?? [])
+    const open = world.open.flatMap((task) => {
+      const promise = world.promiseFor(task)
+      return promise ? [{ taskId: task.id, title: task.title, person: world.nameOf(promise.person), dir: String(promise.dir) }] : []
+    })
+    const user = proImportUser({ me: me?.name || me?.username || 'me', people, initiatives, open, text })
+    const result = await window.api.ai.proImport({ requestId: `pro-import-${Date.now()}`, user })
+    setConverting(false)
+    if (!result.success) {
+      setConvertProblem(result.error.message)
+      return
+    }
+    const document = proImportDocument(result.data, { kind: sourceKind, title: '', date: today })
+    if (!document) {
+      setConvertProblem('The assistant found nothing to import.')
+      return
+    }
+    setText(document)
+    setChoices({})
+  }
 
   const apply = async () => {
     if (!match) return
@@ -216,8 +251,20 @@ export function ImportDialog({ onClose, initialText = '' }: { onClose: () => voi
       {read && !read.ok && (
         <p className="mt-2 text-meta text-status-overdue">
           {read.problems[0] ?? 'This is not an import Vicu can read.'}
-          {pro.config?.pro_assistant !== false ? ' Ask the assistant to convert plain notes from Ask.' : ''}
         </p>
+      )}
+      {read && !read.ok && canConvert && (
+        <div className="mt-2 flex flex-wrap items-center gap-2" data-pro-import-convert>
+          <select value={sourceKind} onChange={(event) => setSourceKind(event.target.value as typeof sourceKind)} aria-label="The text is" className="rounded-control border border-border bg-bg-page px-2 py-1 text-meta text-text">
+            <option value="meeting">Meeting notes</option>
+            <option value="mail">A mail thread</option>
+            <option value="chat">A chat</option>
+          </select>
+          <button type="button" disabled={converting} onClick={() => void convert()} className="rounded-control bg-accent-fill px-3 py-1 text-meta font-medium text-on-accent disabled:opacity-40">
+            {converting ? 'Converting…' : 'Convert with the assistant'}
+          </button>
+          {convertProblem && <span className="text-meta text-status-overdue">{convertProblem}</span>}
+        </div>
       )}
       {read?.ok && read.problems.length > 0 && <p className="mt-2 text-meta text-text-secondary">{read.problems.join(' ')}</p>}
       {match && (

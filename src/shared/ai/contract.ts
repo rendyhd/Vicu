@@ -209,7 +209,7 @@ export function enabledAskTools(): AskTool[] {
 }
 
 export function askTool(name: string): AskTool | undefined {
-  return ASK_TOOLS.find((tool) => tool.name === name)
+  return ASK_TOOLS.find((tool) => tool.name === name) ?? PRO_AI.askTools.find((tool) => tool.name === name)
 }
 
 /** Prompts are stored as lines; apps join them with `\n` and send the text exactly (section 8). */

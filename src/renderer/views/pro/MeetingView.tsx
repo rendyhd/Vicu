@@ -16,6 +16,11 @@ import { PersonMark } from '@/components/pro/PersonMark'
 import { ProOffNotice } from '@/components/pro/ProOffNotice'
 import { MeetingDialog } from '@/components/pro/MeetingDialog'
 import { RecapDialog } from '@/components/pro/RecapDialog'
+import { PromiseDrafts } from '@/components/pro/PromiseDrafts'
+import { useProAssistantOn } from '@/hooks/use-pro-assistant'
+import { useAiReady } from '@/hooks/use-ai'
+import { useCollabMe } from '@/hooks/use-project-access'
+import type { PromiseDraft } from '../../../shared/ai/pro-import'
 import { isTempTaskId } from '@/lib/pending-cache'
 import type { Task } from '@/lib/vikunja-types'
 import { addLocalDays, dateOnlyDue, toLocalDate } from '../../../shared/due-dates'
@@ -126,6 +131,24 @@ export function MeetingView() {
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
   }, [round, current])
+
+  // Promise drafts from what was said (ai-assistant 11.2): Pro's assistant on and Ask ready.
+  const assistantOn = useProAssistantOn()
+  const aiReady = useAiReady()
+  const me = useCollabMe()
+  const addDraft = async (person: number, draftValue: PromiseDraft, needs: number[]) => {
+    const label = world.people.get(person)
+    const due = draftValue.due ?? addLocalDays(today, 7)
+    const task = await createTask.mutateAsync({ projectId: config?.inbox_project_id ?? 0, task: { title: draftValue.what, due_date: dateOnlyDue(due) } })
+    if (label && !isTempTaskId(task.id)) addLabel.mutate({ taskId: task.id, labelId: label.id })
+    void writeLedger(queryClient, [setRecord('promises', task.id, {
+      dir: draftValue.mine ? 'mine' : 'theirs',
+      person,
+      ...(draftValue.words ? { words: draftValue.words } : {}),
+      ...(draftValue.done_when ? { done_when: draftValue.done_when } : {}),
+      ...(needs.length ? { needs } : {}),
+    })])
+  }
 
   const addPromise = async () => {
     const title = draft.trim()
@@ -252,6 +275,15 @@ export function MeetingView() {
                   </label>
                   <button type="submit" disabled={!draft.trim()} className="rounded-control border border-border px-2.5 py-1 text-meta text-text hover:bg-bg-hover disabled:opacity-40">Add</button>
                 </form>
+                {assistantOn && aiReady.ask && (
+                  <PromiseDrafts
+                    key={current}
+                    person={world.nameOf(current)}
+                    me={me?.name || me?.username || 'me'}
+                    mine={(byPerson.mine.get(current) ?? []).map((task) => ({ id: task.id, title: task.title }))}
+                    onAdd={(value, needs) => addDraft(current, value, needs)}
+                  />
+                )}
               </>
             )}
             <p className="mt-4 text-caption text-text-secondary">Enter: next. S: skip. A: absent. On a promise: keys 1 to 6 give the verdict.</p>

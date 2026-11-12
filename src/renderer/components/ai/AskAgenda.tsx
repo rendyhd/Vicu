@@ -2,6 +2,8 @@ import { useMemo } from 'react'
 import { useNavigate, useRouterState } from '@tanstack/react-router'
 import { AlarmClock, ChevronRight, Inbox, ListChecks, MessageCircleQuestion, RefreshCw } from 'lucide-react'
 import { startersFor } from '@/lib/ai/starters'
+import { useProAssistantOn } from '@/hooks/use-pro-assistant'
+import { PRO_AI } from '../../../shared/ai/contract'
 import { useGuidedWorld } from '@/hooks/use-guided-world'
 import { askAgenda, type AgendaItemId } from '../../../shared/guided'
 
@@ -28,7 +30,9 @@ export function AskAgenda({ onSend, disabled }: { onSend: (text: string) => void
   const navigate = useNavigate()
   const pathname = useRouterState({ select: (s) => s.location.pathname })
   const items = useMemo(() => (data.world ? askAgenda(data.world, data.weeklyReviewLast) : []), [data.world, data.weeklyReviewLast])
-  const starters = startersFor(pathname, data.world?.inboxId ?? 0)
+  // Pro's starters (ai-assistant 11.3) while Pro's assistant is on, after the list's own.
+  const proStarters = useProAssistantOn() ? PRO_AI.starters : []
+  const starters = [...startersFor(pathname, data.world?.inboxId ?? 0), ...proStarters]
 
   return (
     <div className="space-y-4">

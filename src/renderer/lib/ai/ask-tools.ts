@@ -26,6 +26,8 @@ export interface ToolContext {
   /** The synced preferences (task orders). */
   syncedValues: Readonly<Record<string, unknown>>
   review: { enabled: boolean; defaultCadenceDays: number; excludeInbox: boolean }
+  /** Pro's data for its read tools (ai-assistant 11.3); absent or null while Pro's assistant is off. */
+  pro?: import('./pro-tools').ProToolData | null
 }
 
 export class ToolError extends Error {

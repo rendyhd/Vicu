@@ -340,6 +340,10 @@ export interface ElectronAPI {
      * agreement; checked against `organize.answerSchema` in main. Cancelled with `cancelDictation`.
      */
     organize(input: { requestId: string; user: string }): Promise<AiResult<unknown>>
+    /** Pro: pasted text to an import (docs/ai-assistant-v1.md 11.1); refused while Pro's assistant is off. Cancelled with `cancelDictation`. */
+    proImport(input: { requestId: string; user: string }): Promise<AiResult<unknown>>
+    /** Pro: promise drafts from a meeting card's dictation (11.2); refused while Pro's assistant is off. */
+    promiseDrafts(input: { requestId: string; user: string }): Promise<AiResult<unknown>>
     /** Plan my day's suggestions (docs/ai-assistant-v1.md section 10). Cancelled with `cancelDictation`. */
     planDay(input: { requestId: string; user: string }): Promise<AiResult<unknown>>
     askStart(request: AskTurnRequest): Promise<boolean>

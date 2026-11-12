@@ -5,6 +5,7 @@ import { askContextJson, askRefreshJson, isStaleConversation, needsContextRefres
 import { localDateTimeOf } from '../../shared/ai/dictation'
 import type { AiError, AskTurnEvent, ChatMessage, StoredConversation, ToolCall, ToolResult } from '../../shared/ai/types'
 import { runReadTool, taskIdsIn, ToolError, toolErrorResult, getOverview, type ToolContext } from '@/lib/ai/ask-tools'
+import { PRO_TOOL_NAMES, runProTool } from '@/lib/ai/pro-tools'
 import { buildProposal, DECLINED, applyProposal, proposalSize, type ApplyDeps, type Proposal, type ProposalResult } from '@/lib/ai/proposals'
 import { timeZone, type ListInfo } from '@/lib/ai/workspace'
 import { readSaid } from '@/lib/ai/said-parser'
@@ -180,7 +181,7 @@ export const useAskStore = create<AskState>((set, get) => {
     try {
       if (tool.kind === 'read') {
         set({ status: 'Looking up tasks…' })
-        const value = await runReadTool(call.name, parsed.args, ctx)
+        const value = PRO_TOOL_NAMES.has(call.name) ? await runProTool(call.name, parsed.args, ctx) : await runReadTool(call.name, parsed.args, ctx)
         return { result: { callId: call.id, name: call.name, content: JSON.stringify(value) }, taskIds: taskIdsIn(value) }
       }
       set({ status: null })

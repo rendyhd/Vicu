@@ -1,7 +1,9 @@
 import { handleTrusted } from '../secure-ipc'
+import { loadConfig } from '../config'
+import { isProAssistantOn } from '../../shared/pro/settings'
 import type { AiSettingsPatch, AskTurnRequest, KeptTranscript } from '../../shared/ai/types'
 import { clearAiAccountData, dropKeptTranscript, flushAiLocalData, getConversations, getKeptTranscripts, keepTranscript, saveConversations } from './local-data'
-import { aiAskTurn, aiBrainDump, aiDictate, aiListModels, aiOrganize,
+import { aiAskTurn, aiBrainDump, aiDictate, aiListModels, aiOrganize, aiProImport, aiPromiseDrafts,
   aiPlanDay, aiTestConnection, cancelAllAskTurns, cancelAskTurn } from './service'
 import { providerPreset, type ProviderId } from '../../shared/ai/contract'
 import {
@@ -102,12 +104,28 @@ export function registerAiIpc(): void {
       if (id) dictations.delete(id)
     }
   })
+  // Pro (ai-assistant 11.1, 11.2): only while Pro's assistant switch is on.
+  const proRequest = async (run: typeof aiProImport, input: { requestId?: unknown; user?: unknown }) => {
+    if (!isProAssistantOn(loadConfig())) {
+      return { success: false as const, error: { kind: 'not_set_up' as const, message: "Turn on Pro's assistant in Settings, Pro." } }
+    }
+    const id = typeof input?.requestId === 'string' ? input.requestId : ''
+    const controller = new AbortController()
+    if (id) dictations.set(id, controller)
+    try {
+      return await run({ user: typeof input?.user === 'string' ? input.user : '' }, controller.signal)
+    } finally {
+      if (id) dictations.delete(id)
+    }
+  }
+  handleTrusted('ai:pro-import', (_event, input: { requestId?: unknown; user?: unknown }) => proRequest(aiProImport, input))
+  handleTrusted('ai:promise-drafts', (_event, input: { requestId?: unknown; user?: unknown }) => proRequest(aiPromiseDrafts, input))
   handleTrusted('ai:ask-start', (event, request: AskTurnRequest) => {
     const sender = event.sender
     if (!request || typeof request.turnId !== 'string' || !Array.isArray(request.messages)) return false
     void aiAskTurn(request, (turnEvent) => {
       if (!sender.isDestroyed()) sender.send('ai:ask-event', { turnId: request.turnId, event: turnEvent })
-    })
+    }, { proTools: isProAssistantOn(loadConfig()) })
     return true
   })
   handleTrusted('ai:ask-cancel', (_event, turnId: unknown) => typeof turnId === 'string' && cancelAskTurn(turnId))

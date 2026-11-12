@@ -378,6 +378,8 @@ const api = {
     cancelDictation: (requestId: string) => ipcRenderer.invoke('ai:cancel-dictation', requestId),
     planDay: (input: { requestId: string; user: string }) => ipcRenderer.invoke('ai:plan-day', input),
     organize: (input: { requestId: string; user: string }) => ipcRenderer.invoke('ai:organize', input),
+    proImport: (input: { requestId: string; user: string }) => ipcRenderer.invoke('ai:pro-import', input),
+    promiseDrafts: (input: { requestId: string; user: string }) => ipcRenderer.invoke('ai:promise-drafts', input),
     askStart: (request: AskTurnRequest) => ipcRenderer.invoke('ai:ask-start', request),
     askCancel: (turnId: string) => ipcRenderer.invoke('ai:ask-cancel', turnId),
     onAskEvent: (cb: (envelope: AskTurnEnvelope) => void) => {

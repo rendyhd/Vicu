@@ -12,6 +12,7 @@ import {
   ORGANIZE_ANSWER_SCHEMA,
   PLAN_DAY_ANSWER_SCHEMA,
   PROBE,
+  PRO_AI,
   askSystemPrompt,
   brainDumpSystemPrompt,
   dictationSystemPrompt,
@@ -262,6 +263,31 @@ export function aiOrganize(input: { user: string }, signal?: AbortSignal): Promi
   }, signal)
 }
 
+/**
+ * Pro (section 11): converting pasted text to an import (11.1) and promise drafts in a meeting
+ * (11.2), on Ask's model under Ask's agreement, deterministic. The caller checks Pro's assistant
+ * switch first.
+ */
+export function aiProImport(input: { user: string }, signal?: AbortSignal): Promise<AiResult<unknown>> {
+  return structuredModelAnswer({
+    system: PRO_AI.proImport.prompt.lines.join('\n').replace('{items_max}', String(PRO_AI.limits.import_items_max)),
+    user: input.user,
+    schema: PRO_AI.proImport.answerSchema,
+    maxTokens: PRO_AI.limits.import_max_tokens,
+    feature: 'ask',
+  }, signal)
+}
+
+export function aiPromiseDrafts(input: { user: string }, signal?: AbortSignal): Promise<AiResult<unknown>> {
+  return structuredModelAnswer({
+    system: PRO_AI.promiseDrafts.prompt.lines.join('\n'),
+    user: input.user,
+    schema: PRO_AI.promiseDrafts.answerSchema,
+    maxTokens: DICTATION_MAX_TOKENS,
+    feature: 'ask',
+  }, signal)
+}
+
 /** Plan my day's suggestions (10.1): Ask's model and agreement, like a guided session's. */
 export function aiPlanDay(input: { user: string }, signal?: AbortSignal): Promise<AiResult<unknown>> {
   return structuredModelAnswer({
@@ -276,7 +302,7 @@ export function aiPlanDay(input: { user: string }, signal?: AbortSignal): Promis
 const askTurns = new Map<string, AbortController>()
 
 /** One Ask round (5.1): streams the text, ends with the whole assistant message (tool calls included). */
-export async function aiAskTurn(request: AskTurnRequest, emit: (event: AskTurnEvent) => void): Promise<void> {
+export async function aiAskTurn(request: AskTurnRequest, emit: (event: AskTurnEvent) => void, options: { proTools?: boolean } = {}): Promise<void> {
   const controller = new AbortController()
   askTurns.set(request.turnId, controller)
   try {
@@ -284,7 +310,9 @@ export async function aiAskTurn(request: AskTurnRequest, emit: (event: AskTurnEv
     const connection = connectionOf(settings)
     const model = settings.models.ask
     if (!model) throw new AiFailure('not_set_up', 'Choose an Ask model in Settings, Assistant.')
-    const tools: ToolSpec[] = enabledAskTools().map((tool) => ({ name: tool.name, description: tool.description, parameters: tool.parameters }))
+    // Pro's read tools only while Pro's assistant switch is on (11.3); the caller reads the switch.
+    const offered = options.proTools ? [...enabledAskTools(), ...PRO_AI.askTools.filter((tool) => tool.enabled)] : enabledAskTools()
+    const tools: ToolSpec[] = offered.map((tool) => ({ name: tool.name, description: tool.description, parameters: tool.parameters }))
     // The last round leaves the tools out (5.5); the Messages API needs them defined while the
     // history holds tool blocks, so there they stay with tool_choice none.
     const anthropic = connection.protocol === 'anthropic-messages'

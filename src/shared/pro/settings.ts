@@ -18,6 +18,7 @@ export interface ProSwitches {
   pro_enabled?: boolean
   pro_layers?: Partial<Record<ProLayer, boolean>> | null
   standalone_mode?: boolean
+  pro_assistant?: boolean
 }
 
 /** The layers as stored: a missing or unreadable layer is on. */
@@ -35,6 +36,14 @@ export function readProLayers(value: unknown): ProLayers {
 export function isProEnabled(config: ProSwitches | null | undefined, layer?: ProLayer): boolean {
   if (!config || config.pro_enabled !== true || config.standalone_mode === true) return false
   return layer ? readProLayers(config.pro_layers)[layer] : true
+}
+
+/**
+ * Pro's assistant switch (docs/ai-assistant-v1.md section 11, decision 20): per device, off by
+ * default, and only while Pro is on. Off, no ledger data goes into any assistant request.
+ */
+export function isProAssistantOn(config: ProSwitches | null | undefined): boolean {
+  return isProEnabled(config) && config?.pro_assistant === true
 }
 
 // --- The area (section 21.1) ------------------------------------------------------------------
