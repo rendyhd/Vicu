@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Sync and offline · Vicu guide</title>
+    <meta name="description" content="How Vicu keeps your devices in step through your Vikunja server, what syncs and what stays on one device, and what happens when you are offline." />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#fbfaf8" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#111113" media="(prefers-color-scheme: dark)" />
+    <link rel="icon" href="../../assets/img/brand/vicu-32.png" sizes="32x32" type="image/png" />
+    <link rel="apple-touch-icon" href="../../assets/img/brand/vicu-180.png" />
+    <meta property="og:type" content="article" />
+    <meta property="og:site_name" content="Vicu" />
+    <meta property="og:title" content="Sync and offline · Vicu guide" />
+    <meta property="og:description" content="How Vicu keeps your devices in step through your Vikunja server, what syncs and what stays on one device, and what happens when you are offline." />
+    <meta property="og:url" content="https://vicutodo.app/guide/sync/" />
+    <meta property="og:image" content="https://vicutodo.app/assets/img/og.jpg" />
+    <link rel="canonical" href="https://vicutodo.app/guide/sync/" />
+    <link rel="stylesheet" href="../../assets/css/site.css" />
+    <script>
+      (function () {
+        var d = document.documentElement;
+        d.className = d.className.replace('no-js', 'js');
+        try {
+          var t = localStorage.getItem('vicu-site-theme');
+          if (t === 'light' || t === 'dark') d.setAttribute('data-theme', t);
+        } catch (e) {}
+      })();
+    </script>
+    <script src="../../assets/js/site.js" defer></script>
+    <script src="../../assets/js/guide-index.js" defer></script>
+    <script src="../../assets/js/guide.js" defer></script>
+  </head>
+  <body class="g-body" data-guide-root="../">
+    <svg class="sprite" aria-hidden="true" focusable="false">
+      <symbol id="i-inbox" viewBox="0 0 24 24"><path d="M3.5 13.5 6 5.5h12l2.5 8V18a1.5 1.5 0 0 1-1.5 1.5H5A1.5 1.5 0 0 1 3.5 18Z" /><path d="M3.5 13.5h5l1 2.5h5l1-2.5h5" /></symbol>
+      <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4" /><path d="M12 2.5v2M12 19.5v2M4.6 4.6 6 6M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4 6 18M18 6l1.4-1.4" /></symbol>
+      <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4 8.5 8.5 0 1 0 20 14.5Z" /></symbol>
+      <symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5" /><path d="M3.5 10h17M8 3v4M16 3v4" /></symbol>
+      <symbol id="i-layers" viewBox="0 0 24 24"><path d="m12 3.5 8.5 4.5L12 12.5 3.5 8Z" /><path d="m3.5 12 8.5 4.5 8.5-4.5" /><path d="m3.5 16 8.5 4.5 8.5-4.5" /></symbol>
+      <symbol id="i-check" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" /><path d="m8.2 12.2 2.6 2.6 5-5.3" /></symbol>
+      <symbol id="i-review" viewBox="0 0 24 24"><path d="M19.5 12a7.5 7.5 0 0 1-13 5.1M4.5 12a7.5 7.5 0 0 1 13-5.1" /><path d="M17.8 3.5v3.6h-3.6M6.2 20.5v-3.6h3.6" /></symbol>
+      <symbol id="i-heart" viewBox="0 0 24 24"><path d="M12 19.5s-7.5-4.4-7.5-10A4.2 4.2 0 0 1 12 7a4.2 4.2 0 0 1 7.5 2.5c0 5.6-7.5 10-7.5 10Z" /><path d="M7 12h2.5l1.5-2 2 4 1.5-2H17" /></symbol>
+      <symbol id="i-bolt" viewBox="0 0 24 24"><path d="M13 3 5 13.5h6L10.5 21 19 10.5h-6Z" /></symbol>
+      <symbol id="i-mic" viewBox="0 0 24 24"><rect x="9" y="3.5" width="6" height="11" rx="3" /><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v2.5" /></symbol>
+      <symbol id="i-filter" viewBox="0 0 24 24"><path d="M4 6h16M7 12h10M10 18h4" /></symbol>
+      <symbol id="i-tag" viewBox="0 0 24 24"><path d="M3.5 12.2V4.5a1 1 0 0 1 1-1h7.7l8.3 8.3a1.4 1.4 0 0 1 0 2l-6.7 6.7a1.4 1.4 0 0 1-2 0Z" /><circle cx="8" cy="8" r="1.4" /></symbol>
+      <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3.5 7.5v10A1.5 1.5 0 0 0 5 19h14a1.5 1.5 0 0 0 1.5-1.5V9A1.5 1.5 0 0 0 19 7.5h-7L10 5H5a1.5 1.5 0 0 0-1.5 1.5Z" /></symbol>
+      <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8.5" r="3.2" /><path d="M3 19c.8-3.2 3.2-5 6-5s5.2 1.8 6 5" /><path d="M15.5 5.6a3.2 3.2 0 0 1 0 5.8M17.5 14.3c1.7.6 3 2.2 3.5 4.7" /></symbol>
+      <symbol id="i-chat" viewBox="0 0 24 24"><path d="M4 5.5h16v10.5H10l-6 4.5Z" /><path d="M8.5 10.5h7" /></symbol>
+      <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2h-15Z" /><path d="M10 20.5a2 2 0 0 0 4 0" /></symbol>
+      <symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 21s6.5-5.6 6.5-11a6.5 6.5 0 0 0-13 0c0 5.4 6.5 11 6.5 11Z" /><circle cx="12" cy="10" r="2.3" /></symbol>
+      <symbol id="i-cloud-off" viewBox="0 0 24 24"><path d="M8 18.5H6.5a4 4 0 0 1-.6-8 6 6 0 0 1 9.2-4M18.5 9.5a4.5 4.5 0 0 1-1.5 9h-5" /><path d="m4 3.5 16 17" /></symbol>
+      <symbol id="i-sync" viewBox="0 0 24 24"><path d="M4 12a8 8 0 0 1 14-5.3L20 9" /><path d="M20 4v5h-5" /><path d="M20 12a8 8 0 0 1-14 5.3L4 15" /><path d="M4 20v-5h5" /></symbol>
+      <symbol id="i-keyboard" viewBox="0 0 24 24"><rect x="2.5" y="6" width="19" height="12" rx="2" /><path d="M6 9.5h.01M9 9.5h.01M12 9.5h.01M15 9.5h.01M18 9.5h.01M6 12.5h.01M18 12.5h.01M9 12.5h6M7.5 15.3h9" /></symbol>
+      <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.7 0l3.1-3.1a4 4 0 0 0-5.7-5.7l-1 1" /><path d="M14 10a4 4 0 0 0-5.7 0l-3.1 3.1a4 4 0 0 0 5.7 5.7l1-1" /></symbol>
+      <symbol id="i-phone" viewBox="0 0 24 24"><rect x="6.5" y="2.5" width="11" height="19" rx="2.5" /><path d="M10.5 18.5h3" /></symbol>
+      <symbol id="i-monitor" viewBox="0 0 24 24"><rect x="2.5" y="4" width="19" height="12.5" rx="2" /><path d="M8.5 20.5h7M12 16.5v4" /></symbol>
+      <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4v11M7.5 10.5 12 15l4.5-4.5" /><path d="M4.5 19.5h15" /></symbol>
+      <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z" /><circle cx="12" cy="12" r="2.8" /></symbol>
+      <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="10.5" width="14" height="10" rx="2" /><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5" /></symbol>
+      <symbol id="i-grid" viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="7" height="7" rx="1.8" /><rect x="13.5" y="3.5" width="7" height="7" rx="1.8" /><rect x="3.5" y="13.5" width="7" height="7" rx="1.8" /><rect x="13.5" y="13.5" width="7" height="7" rx="1.8" /></symbol>
+      <symbol id="i-swipe" viewBox="0 0 24 24"><path d="M3.5 7.5h11M11 4l3.5 3.5L11 11" /><path d="M9 21v-6.5a1.5 1.5 0 0 1 3 0V17l3.8.7a1.8 1.8 0 0 1 1.5 2V21" /></symbol>
+      <symbol id="i-share" viewBox="0 0 24 24"><path d="M12 3.5v11M8 7.5l4-4 4 4" /><path d="M7 11H5.5v9.5h13V11H17" /></symbol>
+      <symbol id="i-sort" viewBox="0 0 24 24"><path d="M7 4v16M3.5 16.5 7 20l3.5-3.5" /><path d="M13 6h7.5M13 11h5.5M13 16h3" /></symbol>
+      <symbol id="i-repeat" viewBox="0 0 24 24"><path d="M4 11V9.5A3.5 3.5 0 0 1 7.5 6H19" /><path d="m16 3 3 3-3 3" /><path d="M20 13v1.5a3.5 3.5 0 0 1-3.5 3.5H5" /><path d="m8 21-3-3 3-3" /></symbol>
+      <symbol id="i-clip" viewBox="0 0 24 24"><path d="m20 11.5-7.8 7.8a5 5 0 0 1-7-7.1L13 4.4a3.3 3.3 0 0 1 4.7 4.7l-7.8 7.8a1.7 1.7 0 0 1-2.4-2.4l7.2-7.2" /></symbol>
+      <symbol id="i-flag" viewBox="0 0 24 24"><path d="M5 21V4M5 4.5h12l-2 4 2 4H5" /></symbol>
+      <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5" /><path d="m20 20-4.3-4.3" /></symbol>
+      <symbol id="i-command" viewBox="0 0 24 24"><path d="M9 9V6.5A2.5 2.5 0 1 0 6.5 9H9Zm0 0h6m-6 0v6m6-6V6.5A2.5 2.5 0 1 1 17.5 9H15Zm0 0v6m0 0h-6m6 0v2.5a2.5 2.5 0 1 0 2.5-2.5H15Zm-6 0v2.5A2.5 2.5 0 1 1 6.5 15H9Z" /></symbol>
+      <symbol id="i-sparkle" viewBox="0 0 24 24"><path d="M12 3.5c.6 4.6 3.9 7.9 8.5 8.5-4.6.6-7.9 3.9-8.5 8.5-.6-4.6-3.9-7.9-8.5-8.5 4.6-.6 7.9-3.9 8.5-8.5Z" /></symbol>
+      <symbol id="i-person" viewBox="0 0 24 24"><circle cx="12" cy="5.5" r="2" /><path d="M5 9h14M12 9v5.5M8.5 21l3.5-6.5 3.5 6.5" /></symbol>
+      <symbol id="i-hand" viewBox="0 0 24 24"><path d="M8 12V5.5a1.5 1.5 0 0 1 3 0V11M11 10.5V4a1.5 1.5 0 0 1 3 0v6.5M14 10.5V5.5a1.5 1.5 0 0 1 3 0V14a7 7 0 0 1-7 7h-.5a6 6 0 0 1-5-2.8L3 15.3a1.6 1.6 0 0 1 2.6-1.8L8 15.5" /></symbol>
+      <symbol id="i-sections" viewBox="0 0 24 24"><path d="M4 5.5h16M4 12h16M4 18.5h16" /><path d="M4 5.5v13" /></symbol>
+      <symbol id="i-obsidian" viewBox="0 0 24 24"><path d="M9 2.8 4.8 9.6l3 7.7 5.6 3.9 4.1-3.4L19 9.4 14 3Z" /><path d="m9 2.8 1.6 8.1-2.8 6.4M10.6 10.9 19 9.4M10.6 10.9l2.8 10.3" /></symbol>
+      <symbol id="i-tray" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2.5" /><path d="M3 15h18M7 18h.01M10 18h.01" /></symbol>
+      <symbol id="i-windows" viewBox="0 0 24 24"><path d="M3.5 5.5 10.5 4.5v7h-7ZM12.5 4.2l8-1.2v8.5h-8ZM3.5 12.5h7v7l-7-1ZM12.5 12.5h8V21l-8-1.2Z" /></symbol>
+      <symbol id="i-apple" viewBox="0 0 24 24"><path d="M16.4 12.6c0-2.3 1.9-3.4 2-3.5a4.3 4.3 0 0 0-3.4-1.8c-1.4-.2-2.8.8-3.5.8s-1.8-.8-3-.8a4.5 4.5 0 0 0-3.8 2.3c-1.6 2.8-.4 7 1.2 9.3.8 1.1 1.7 2.4 2.9 2.3 1.2 0 1.6-.7 3-.7s1.8.7 3 .7c1.3 0 2.1-1.1 2.8-2.3a10 10 0 0 0 1.3-2.6 4 4 0 0 1-2.5-3.7ZM14.2 5.8A4 4 0 0 0 15.1 3a4.1 4.1 0 0 0-2.7 1.4 3.8 3.8 0 0 0-1 2.7 3.4 3.4 0 0 0 2.8-1.3Z" /></symbol>
+      <symbol id="i-linux" viewBox="0 0 24 24"><path d="M12 3c-2.2 0-3.4 1.8-3.4 4.4 0 1.7-.6 2.6-1.6 4-1.2 1.6-2.4 3.6-2 6 .2 1.4 1.4 2.6 3 2.6h8c1.6 0 2.8-1.2 3-2.6.4-2.4-.8-4.4-2-6-1-1.4-1.6-2.3-1.6-4C15.4 4.8 14.2 3 12 3Z" /><path d="M10.4 7.6h.01M13.6 7.6h.01M10.7 10h2.6" /></symbol>
+      <symbol id="i-android" viewBox="0 0 24 24"><path d="M5 16V11a7 7 0 0 1 14 0v5Z" /><path d="M8 5 6.5 2.8M16 5l1.5-2.2" /><path d="M9 10h.01M15 10h.01" /><path d="M5 16h14v1.5a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2Z" /></symbol>
+      <symbol id="i-github" viewBox="0 0 24 24"><path d="M9 19c-4 1.3-4-2-5.6-2.5M14.6 21v-3.3a2.9 2.9 0 0 0-.8-2.2c2.7-.3 5.6-1.3 5.6-6a4.6 4.6 0 0 0-1.3-3.2 4.3 4.3 0 0 0-.1-3.2s-1-.3-3.4 1.3a11.6 11.6 0 0 0-6 0C6.5 2.8 5.5 3.1 5.5 3.1a4.3 4.3 0 0 0-.1 3.2A4.6 4.6 0 0 0 4 9.5c0 4.6 2.9 5.7 5.6 6a2.9 2.9 0 0 0-.8 2.2V21" /></symbol>
+      <symbol id="i-coffee" viewBox="0 0 24 24"><path d="M4.5 9.5h12v5a5 5 0 0 1-5 5h-2a5 5 0 0 1-5-5Z" /><path d="M16.5 11h1a2.5 2.5 0 0 1 0 5h-1.3" /><path d="M8.5 3.5v2.5M12.5 3.5v2.5" /></symbol>
+      <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M4 12h15M13.5 6.5 19 12l-5.5 5.5" /></symbol>
+    </svg>
+
+    <a class="skip-link" href="#main">Skip to content</a>
+
+    <header class="site-header">
+      <div class="wrap header-row">
+        <a class="brand" href="../../">
+          <img src="../../assets/img/brand/vicu-64.png" alt="" width="32" height="32" />
+          <span>Vicu</span>
+        </a>
+        <nav class="nav" aria-label="Site">
+          <a href="../../">Home</a>
+          <a href="../">Guide</a>
+          <a href="../pro/">Vicu Pro</a>
+          <a href="../../#download">Download</a>
+        </nav>
+        <div class="header-actions">
+          <button class="icon-btn g-menu-toggle" type="button" aria-controls="g-sidebar" aria-expanded="false" aria-label="Guide contents">
+            <svg aria-hidden="true"><use href="#i-sections" /></svg>
+          </button>
+          <button class="icon-btn theme-toggle" type="button" aria-label="Switch between light and dark">
+            <svg class="icon-moon" aria-hidden="true"><use href="#i-moon" /></svg>
+            <svg class="icon-sun" aria-hidden="true"><use href="#i-sun" /></svg>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <div class="wrap g-layout">
+      <aside class="g-sidebar" id="g-sidebar" aria-label="Guide contents">
+        <form class="g-search" role="search" onsubmit="return false">
+          <label class="visually-hidden" for="g-search-input">Search the guide</label>
+          <svg aria-hidden="true"><use href="#i-search" /></svg>
+          <input id="g-search-input" type="search" placeholder="Search the guide" autocomplete="off" aria-describedby="g-search-hint" />
+          <span id="g-search-hint" class="visually-hidden">Results show below as you type.</span>
+        </form>
+        <ul class="g-search-results" id="g-search-results" aria-live="polite" hidden></ul>
+        <nav class="g-nav" aria-label="Guide pages"><details class="g-nav-section"><summary>Start here</summary><ul><li><a href="../">Guide home</a></li><li><a href="../getting-started/">Get started</a></li><li><a href="../basics/">How Vicu is organized</a></li></ul></details><details class="g-nav-section"><summary>Everyday Vicu</summary><ul><li><a href="../capture/">Add tasks</a></li><li><a href="../tasks/">Work with tasks</a></li><li><a href="../lists/">Smart lists</a></li><li><a href="../projects/">Projects and labels</a></li><li><a href="../custom-lists/">Custom lists</a></li><li><a href="../plan/">Plan your day</a></li><li><a href="../calendars/">Events and calendars</a></li><li><a href="../routines/">Routines</a></li><li><a href="../review/">Review and organizing</a></li><li><a href="../collaboration/">Collaboration</a></li><li><a href="../assistant/">The assistant</a></li></ul></details><details class="g-nav-section" open><summary>Your devices</summary><ul><li><a href="../desktop/">On the desktop</a></li><li><a href="../phone/">On your phone</a></li><li><a href="../sync/" aria-current="page">Sync and offline</a></li><li><a href="../settings/">Settings</a></li></ul></details><details class="g-nav-section"><summary>Vicu Pro</summary><ul><li><a href="../pro/">What Pro is</a></li><li><a href="../pro/available/">Know what you can do now</a></li><li><a href="../pro/promises/">Promises and people</a></li><li><a href="../pro/portfolio/">Portfolio</a></li><li><a href="../pro/power/">Power tools</a></li></ul></details><details class="g-nav-section"><summary>Reference</summary><ul><li><a href="../quick-add/">Quick add</a></li><li><a href="../shortcuts/">Keyboard shortcuts</a></li><li><a href="../faq/">Troubleshooting and FAQ</a></li><li><a href="../glossary/">Glossary</a></li></ul></details></nav>
+      </aside>
+
+      <main id="main" class="g-main">
+        <article class="g-article">
+          <nav class="g-crumbs" aria-label="Breadcrumb"><a href="../">Guide</a> <span aria-hidden="true">/</span> <span>Your devices</span></nav>
+          <h1 class="g-title">Sync and offline</h1>
+          <p class="g-lead">Your Vikunja server is the one source of truth. Every device reads from it and writes to it, so you see the same tasks and lists everywhere. When the connection drops, Vicu keeps working and catches up later.</p>
+          <details class="g-toc-inline"><summary>On this page</summary><ul><li><a href="#in-short">In short</a></li><li><a href="#how-devices-stay-in-step">How devices stay in step</a></li><li><a href="#what-syncs-and-what-stays-on-one-device">What syncs and what stays on one device</a></li><li><a href="#the-offline-queue">The offline queue</a></li><li><a href="#signing-out-and-signing-in-as-someone-else">Signing out and signing in as someone else</a></li><li><a href="#standalone-mode">Standalone mode</a></li><li><a href="#sessions-in-vikunja">Sessions in Vikunja</a></li><li><a href="#details">Details</a></li><li><a href="#related">Related</a></li></ul></details>
+          <div class="g-content">
+<h2 id="in-short"><a class="g-anchor" href="#in-short" aria-hidden="true" tabindex="-1">#</a>In short</h2>
+<ul><li><strong>The server holds your data.</strong> Vicu has no server of its own. Each device keeps a copy to work from and stays in step with your Vikunja server.</li><li><strong>Tasks, lists and many settings follow you.</strong> Custom lists, your Inbox choice, categories, templates, task order, Events and more sync. Look and behavior settings stay on each device.</li><li><strong>Offline works.</strong> You can add, edit and complete tasks without a connection. The changes wait in a queue and go out in order when you are back.</li><li><strong>Only what you changed is sent.</strong> An edit on your phone never undoes one you made on your computer.</li><li><strong>You can see what is waiting.</strong> On the desktop, a status button appears in the sidebar. On the phone, a banner and <strong>Settings, General</strong> show it.</li></ul>
+<h2 id="how-devices-stay-in-step"><a class="g-anchor" href="#how-devices-stay-in-step" aria-hidden="true" tabindex="-1">#</a>How devices stay in step</h2>
+<p>Each Vicu app asks the server for fresh data and sends your changes to it.</p>
+<ul><li><span class="g-badge g-badge--desktop"><svg aria-hidden="true"><use href="#i-monitor" /></svg>Desktop</span> Vicu refreshes when you return to the window (at most every 30 seconds), every 5 minutes while you look at it, after your computer wakes up, and at midnight so Today rolls over. Press <kbd>F5</kbd> to refresh the page on request.</li><li><span class="g-badge g-badge--phone"><svg aria-hidden="true"><use href="#i-phone" /></svg>Phone</span> The app syncs when you open it, when you pull down on a list, and in the background: about every 30 minutes on Android, and when iOS allows it on iPhone and iPad.</li></ul>
+<p>Reminders and widgets update after each sync.</p>
+<h2 id="what-syncs-and-what-stays-on-one-device"><a class="g-anchor" href="#what-syncs-and-what-stays-on-one-device" aria-hidden="true" tabindex="-1">#</a>What syncs and what stays on one device</h2>
+<p><strong>Follows you to every device and to the Vikunja web app</strong> (stored in your server's own fields): tasks, projects, labels, due and start dates, reminders, attachments, comments and assignees.</p>
+<p><strong>Follows you to every device through Vicu</strong> (stored on your server in hidden tasks, see below):</p>
+<ul><li>Custom lists</li><li>Routines and their history</li><li>Your Inbox project</li><li>Task order, per project and global, and the order of subtasks</li><li>Project categories and project icons</li><li>Task templates</li><li>Your own Events, the Plan default length and your work hours</li><li>Saved places (names only) and location reminders</li><li>The date of your last weekly review</li><li>Which shared routines you hid or muted</li><li>Vicu Pro data, while you use it</li></ul>
+<p><strong>Stays on each device:</strong></p>
+<ul><li>Theme, clock, task row density and the other look settings</li><li>Quick-add syntax, notification choices, hotkeys, Quick Entry and Quick View</li><li>Whether Plan, Pro and the assistant are turned on, and the assistant's provider and key</li><li>Connected calendars and which ones you show</li><li>On the phone: the bottom bar, widgets and swipes</li><li>Where a saved place is. Only its name travels.</li></ul>
+<p><a href="../settings/">Settings</a> marks every setting as synced or per device.</p>
+<h3 id="the-hidden-tasks"><a class="g-anchor" href="#the-hidden-tasks" aria-hidden="true" tabindex="-1">#</a>The hidden tasks</h3>
+<p>Vikunja has no place for an app's own data, so Vicu keeps custom lists, routines, synced settings and Pro records in tasks that it marks done and hides everywhere in Vicu. You may see them in other Vikunja apps. Names include "Vicu preferences (sync metadata — do not delete)". Leave them in place. Deleting one deletes that data.</p>
+<p>Each person's Vicu reads only the hidden tasks that person created, so sharing an Inbox with someone does not mix your settings.</p>
+<h2 id="the-offline-queue"><a class="g-anchor" href="#the-offline-queue" aria-hidden="true" tabindex="-1">#</a>The offline queue</h2>
+<p>Without a connection, Vicu keeps working from the copy it holds. The app opens with your last lists, and these changes wait in a queue: creating, editing, completing and deleting tasks, labels, pasted images and files, comments, assignees, and project edits.</p>
+<ul><li>Changes go out in the order you made them, one at a time.</li><li>A task created offline gets a temporary id and is sent first, with its labels and files after it.</li><li><span class="g-badge g-badge--desktop"><svg aria-hidden="true"><use href="#i-monitor" /></svg>Desktop</span> If a send fails because of the network or the server, Vicu retries after 5 seconds, then 15 seconds, then every minute.</li><li><span class="g-badge g-badge--phone"><svg aria-hidden="true"><use href="#i-phone" /></svg>Phone</span> Waiting changes are sent within seconds of getting a connection back.</li><li>A create that timed out may already have reached the server. Vicu says so and asks you to check before trying again.</li></ul>
+<p>Some things need a connection: sharing a project or a routine, uploading a file to a comment, and creating new projects from a brain dump.</p>
+<h3 id="the-sync-status-button"><a class="g-anchor" href="#the-sync-status-button" aria-hidden="true" tabindex="-1">#</a>The sync status button</h3>
+<p><span class="g-badge g-badge--desktop"><svg aria-hidden="true"><use href="#i-monitor" /></svg>Desktop</span> When something is waiting or has failed, a button appears at the bottom of the sidebar. It shows how many changes are waiting, how many failed, and whether you need to sign in again. Click it to open <strong>Sync status</strong>.</p>
+<ul><li><strong>Waiting to sync</strong> lists changes not sent yet, with <strong>Sync now</strong>.</li><li><strong>Failed</strong> lists changes the server refused, with the reason, and <strong>Retry all</strong> and <strong>Discard all</strong> (or the same for one change). The server refuses a change when, for example, the task was deleted elsewhere, a file is too large, you may no longer edit that project, or your API token is not allowed to do it.</li><li><strong>Lists and settings</strong> shows custom-list and settings changes that have not reached the server, with <strong>Sync now</strong> and <strong>Discard</strong>. Discard sets them back to what the server holds.</li><li>If your session expired, it asks you to sign in again. Waiting changes are kept and sent once you are in.</li></ul>
+<p>When everything is synced the panel says "Everything is synced" and the button hides.</p>
+<h3 id="on-the-phone"><a class="g-anchor" href="#on-the-phone" aria-hidden="true" tabindex="-1">#</a>On the phone <span class="g-badge g-badge--phone"><svg aria-hidden="true"><use href="#i-phone" /></svg>Phone</span></h3>
+<p><strong>Settings, General, Data &amp; Sync</strong> shows whether you are <strong>Connected</strong> or <strong>Offline</strong> and how many changes are pending or failed. <strong>Sync Now</strong> sends them, <strong>Retry All</strong> tries the failed ones again, and <strong>Clear Failed</strong> drops them. <strong>Clear Cache &amp; Re-sync</strong> deletes the local data and fetches everything from the server, with an option to discard unsynced changes too. A failed change is dropped after 14 days.</p>
+<p>The <a href="../phone/#the-connection-banner">connection banner</a> tells you when the phone is offline.</p>
+<h2 id="signing-out-and-signing-in-as-someone-else"><a class="g-anchor" href="#signing-out-and-signing-in-as-someone-else" aria-hidden="true" tabindex="-1">#</a>Signing out and signing in as someone else</h2>
+<ul><li><strong>Signing out</strong> first tries to send what is waiting. If something has not reached the server, Vicu asks before it signs you out. Unsynced custom-list and settings edits would be lost. Queued task changes stay for the next sign-in to the same account.</li><li><strong>A different user or server.</strong> Signing in as someone else clears the previous account's custom lists, Inbox choice and synced data, so two people on one computer never see each other's lists. Device settings such as the theme stay. Changes made for one account are never sent to another.</li><li><strong>Sign-in expired.</strong> If your session runs out, Vicu keeps your changes and asks you to sign in again. Sign in the same way you did before. If you used the browser sign-in, it starts that way again.</li></ul>
+<h2 id="standalone-mode"><a class="g-anchor" href="#standalone-mode" aria-hidden="true" tabindex="-1">#</a>Standalone mode</h2>
+<p><span class="g-badge g-badge--desktop"><svg aria-hidden="true"><use href="#i-monitor" /></svg>Desktop</span> Earlier versions of the desktop app could keep tasks on the computer only, without a server. New setups always connect to a server, but if you still use that mode, it keeps working: it has no Plan screen, no time blocks, no Pro, and no synced settings. When you later connect to a server, Vicu offers to upload the local tasks to your Inbox.</p>
+<h2 id="sessions-in-vikunja"><a class="g-anchor" href="#sessions-in-vikunja" aria-hidden="true" tabindex="-1">#</a>Sessions in Vikunja</h2>
+<p>Each device that signs in appears under <strong>Settings, Sessions</strong> in Vikunja, named like "Vicu/3.0.0 (Windows; HOSTNAME)" or "Vicu/3.0.0 (Android; Pixel 8)", so you can tell them apart and end one. Password and single sign-on logins also create a backup API token titled "Vicu — host [id]", valid for 365 days. Signing out revokes it.</p>
+<h2 id="details"><a class="g-anchor" href="#details" aria-hidden="true" tabindex="-1">#</a>Details</h2>
+<ul><li><strong>No overwrites.</strong> Each edit sends only the fields you changed. An edit made on another device in the meantime stays.</li><li><strong>Writes go one at a time</strong>, because Vikunja's default database answers parallel writes with "database is locked".</li><li><strong>Many tasks at once.</strong> If the network fails partway through a bulk change, the remaining tasks go straight to the queue instead of each waiting for a timeout.</li><li><strong>Servers with a broken search.</strong> Some Vikunja servers answer searches with an error. Custom lists, settings and routines still load.</li></ul>
+<h2 id="related"><a class="g-anchor" href="#related" aria-hidden="true" tabindex="-1">#</a>Related</h2>
+<ul><li><a href="../settings/">Settings</a></li><li><a href="../phone/">Vicu on your phone</a></li><li><a href="../desktop/">Vicu on the desktop</a></li><li><a href="../faq/">Troubleshooting and FAQ</a></li></ul>
+          </div>
+          <nav class="g-pager" aria-label="Previous and next page"><a class="g-pager-prev" href="../phone/"><span>Previous</span>Vicu on your phone</a><a class="g-pager-next" href="../settings/"><span>Next</span>Settings</a></nav>
+          <p class="g-edit"><a href="https://github.com/rendyhd/Vicu/blob/main/docs/guide/sync.md">Suggest a change to this page</a></p>
+        </article>
+        <nav class="g-toc" aria-label="On this page"><p>On this page</p><ul><li class="g-toc-2"><a href="#in-short">In short</a></li><li class="g-toc-2"><a href="#how-devices-stay-in-step">How devices stay in step</a></li><li class="g-toc-2"><a href="#what-syncs-and-what-stays-on-one-device">What syncs and what stays on one device</a></li><li class="g-toc-3"><a href="#the-hidden-tasks">The hidden tasks</a></li><li class="g-toc-2"><a href="#the-offline-queue">The offline queue</a></li><li class="g-toc-3"><a href="#the-sync-status-button">The sync status button</a></li><li class="g-toc-3"><a href="#on-the-phone">On the phone</a></li><li class="g-toc-2"><a href="#signing-out-and-signing-in-as-someone-else">Signing out and signing in as someone else</a></li><li class="g-toc-2"><a href="#standalone-mode">Standalone mode</a></li><li class="g-toc-2"><a href="#sessions-in-vikunja">Sessions in Vikunja</a></li><li class="g-toc-2"><a href="#details">Details</a></li><li class="g-toc-2"><a href="#related">Related</a></li></ul></nav>
+      </main>
+    </div>
+
+    <footer class="site-footer">
+      <div class="wrap footer-row">
+        <a class="brand" href="../../"><img src="../../assets/img/brand/vicu-64.png" alt="" width="28" height="28" /><span>Vicu</span></a>
+        <nav class="footer-links" aria-label="Footer">
+          <a href="https://github.com/rendyhd/Vicu">Desktop on GitHub</a>
+          <a href="https://github.com/rendyhd/Vicu-Mobile">Mobile on GitHub</a>
+          <a href="https://github.com/rendyhd/Vicu/releases">Release notes</a>
+          <a href="https://github.com/rendyhd/Vicu-Mobile/blob/main/docs/privacy-policy.md">Privacy</a>
+          <a href="https://ko-fi.com/rendyhd">Support on Ko-fi</a>
+        </nav>
+        <p>MIT licensed. Vicu is an independent app, not made by the Vikunja team. Screens show made-up tasks.</p>
+      </div>
+    </footer>
+  </body>
+</html>

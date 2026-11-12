@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>How Vicu is organized · Vicu guide</title>
+    <meta name="description" content="The ideas behind Vicu: the Inbox, smart lists, projects, sections, categories, labels and custom lists, and a short tour of the main window and the phone layout." />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#fbfaf8" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#111113" media="(prefers-color-scheme: dark)" />
+    <link rel="icon" href="../../assets/img/brand/vicu-32.png" sizes="32x32" type="image/png" />
+    <link rel="apple-touch-icon" href="../../assets/img/brand/vicu-180.png" />
+    <meta property="og:type" content="article" />
+    <meta property="og:site_name" content="Vicu" />
+    <meta property="og:title" content="How Vicu is organized · Vicu guide" />
+    <meta property="og:description" content="The ideas behind Vicu: the Inbox, smart lists, projects, sections, categories, labels and custom lists, and a short tour of the main window and the phone layout." />
+    <meta property="og:url" content="https://vicutodo.app/guide/basics/" />
+    <meta property="og:image" content="https://vicutodo.app/assets/img/og.jpg" />
+    <link rel="canonical" href="https://vicutodo.app/guide/basics/" />
+    <link rel="stylesheet" href="../../assets/css/site.css" />
+    <script>
+      (function () {
+        var d = document.documentElement;
+        d.className = d.className.replace('no-js', 'js');
+        try {
+          var t = localStorage.getItem('vicu-site-theme');
+          if (t === 'light' || t === 'dark') d.setAttribute('data-theme', t);
+        } catch (e) {}
+      })();
+    </script>
+    <script src="../../assets/js/site.js" defer></script>
+    <script src="../../assets/js/guide-index.js" defer></script>
+    <script src="../../assets/js/guide.js" defer></script>
+  </head>
+  <body class="g-body" data-guide-root="../">
+    <svg class="sprite" aria-hidden="true" focusable="false">
+      <symbol id="i-inbox" viewBox="0 0 24 24"><path d="M3.5 13.5 6 5.5h12l2.5 8V18a1.5 1.5 0 0 1-1.5 1.5H5A1.5 1.5 0 0 1 3.5 18Z" /><path d="M3.5 13.5h5l1 2.5h5l1-2.5h5" /></symbol>
+      <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4" /><path d="M12 2.5v2M12 19.5v2M4.6 4.6 6 6M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4 6 18M18 6l1.4-1.4" /></symbol>
+      <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4 8.5 8.5 0 1 0 20 14.5Z" /></symbol>
+      <symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5" /><path d="M3.5 10h17M8 3v4M16 3v4" /></symbol>
+      <symbol id="i-layers" viewBox="0 0 24 24"><path d="m12 3.5 8.5 4.5L12 12.5 3.5 8Z" /><path d="m3.5 12 8.5 4.5 8.5-4.5" /><path d="m3.5 16 8.5 4.5 8.5-4.5" /></symbol>
+      <symbol id="i-check" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" /><path d="m8.2 12.2 2.6 2.6 5-5.3" /></symbol>
+      <symbol id="i-review" viewBox="0 0 24 24"><path d="M19.5 12a7.5 7.5 0 0 1-13 5.1M4.5 12a7.5 7.5 0 0 1 13-5.1" /><path d="M17.8 3.5v3.6h-3.6M6.2 20.5v-3.6h3.6" /></symbol>
+      <symbol id="i-heart" viewBox="0 0 24 24"><path d="M12 19.5s-7.5-4.4-7.5-10A4.2 4.2 0 0 1 12 7a4.2 4.2 0 0 1 7.5 2.5c0 5.6-7.5 10-7.5 10Z" /><path d="M7 12h2.5l1.5-2 2 4 1.5-2H17" /></symbol>
+      <symbol id="i-bolt" viewBox="0 0 24 24"><path d="M13 3 5 13.5h6L10.5 21 19 10.5h-6Z" /></symbol>
+      <symbol id="i-mic" viewBox="0 0 24 24"><rect x="9" y="3.5" width="6" height="11" rx="3" /><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v2.5" /></symbol>
+      <symbol id="i-filter" viewBox="0 0 24 24"><path d="M4 6h16M7 12h10M10 18h4" /></symbol>
+      <symbol id="i-tag" viewBox="0 0 24 24"><path d="M3.5 12.2V4.5a1 1 0 0 1 1-1h7.7l8.3 8.3a1.4 1.4 0 0 1 0 2l-6.7 6.7a1.4 1.4 0 0 1-2 0Z" /><circle cx="8" cy="8" r="1.4" /></symbol>
+      <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3.5 7.5v10A1.5 1.5 0 0 0 5 19h14a1.5 1.5 0 0 0 1.5-1.5V9A1.5 1.5 0 0 0 19 7.5h-7L10 5H5a1.5 1.5 0 0 0-1.5 1.5Z" /></symbol>
+      <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8.5" r="3.2" /><path d="M3 19c.8-3.2 3.2-5 6-5s5.2 1.8 6 5" /><path d="M15.5 5.6a3.2 3.2 0 0 1 0 5.8M17.5 14.3c1.7.6 3 2.2 3.5 4.7" /></symbol>
+      <symbol id="i-chat" viewBox="0 0 24 24"><path d="M4 5.5h16v10.5H10l-6 4.5Z" /><path d="M8.5 10.5h7" /></symbol>
+      <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2h-15Z" /><path d="M10 20.5a2 2 0 0 0 4 0" /></symbol>
+      <symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 21s6.5-5.6 6.5-11a6.5 6.5 0 0 0-13 0c0 5.4 6.5 11 6.5 11Z" /><circle cx="12" cy="10" r="2.3" /></symbol>
+      <symbol id="i-cloud-off" viewBox="0 0 24 24"><path d="M8 18.5H6.5a4 4 0 0 1-.6-8 6 6 0 0 1 9.2-4M18.5 9.5a4.5 4.5 0 0 1-1.5 9h-5" /><path d="m4 3.5 16 17" /></symbol>
+      <symbol id="i-sync" viewBox="0 0 24 24"><path d="M4 12a8 8 0 0 1 14-5.3L20 9" /><path d="M20 4v5h-5" /><path d="M20 12a8 8 0 0 1-14 5.3L4 15" /><path d="M4 20v-5h5" /></symbol>
+      <symbol id="i-keyboard" viewBox="0 0 24 24"><rect x="2.5" y="6" width="19" height="12" rx="2" /><path d="M6 9.5h.01M9 9.5h.01M12 9.5h.01M15 9.5h.01M18 9.5h.01M6 12.5h.01M18 12.5h.01M9 12.5h6M7.5 15.3h9" /></symbol>
+      <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.7 0l3.1-3.1a4 4 0 0 0-5.7-5.7l-1 1" /><path d="M14 10a4 4 0 0 0-5.7 0l-3.1 3.1a4 4 0 0 0 5.7 5.7l1-1" /></symbol>
+      <symbol id="i-phone" viewBox="0 0 24 24"><rect x="6.5" y="2.5" width="11" height="19" rx="2.5" /><path d="M10.5 18.5h3" /></symbol>
+      <symbol id="i-monitor" viewBox="0 0 24 24"><rect x="2.5" y="4" width="19" height="12.5" rx="2" /><path d="M8.5 20.5h7M12 16.5v4" /></symbol>
+      <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4v11M7.5 10.5 12 15l4.5-4.5" /><path d="M4.5 19.5h15" /></symbol>
+      <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z" /><circle cx="12" cy="12" r="2.8" /></symbol>
+      <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="10.5" width="14" height="10" rx="2" /><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5" /></symbol>
+      <symbol id="i-grid" viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="7" height="7" rx="1.8" /><rect x="13.5" y="3.5" width="7" height="7" rx="1.8" /><rect x="3.5" y="13.5" width="7" height="7" rx="1.8" /><rect x="13.5" y="13.5" width="7" height="7" rx="1.8" /></symbol>
+      <symbol id="i-swipe" viewBox="0 0 24 24"><path d="M3.5 7.5h11M11 4l3.5 3.5L11 11" /><path d="M9 21v-6.5a1.5 1.5 0 0 1 3 0V17l3.8.7a1.8 1.8 0 0 1 1.5 2V21" /></symbol>
+      <symbol id="i-share" viewBox="0 0 24 24"><path d="M12 3.5v11M8 7.5l4-4 4 4" /><path d="M7 11H5.5v9.5h13V11H17" /></symbol>
+      <symbol id="i-sort" viewBox="0 0 24 24"><path d="M7 4v16M3.5 16.5 7 20l3.5-3.5" /><path d="M13 6h7.5M13 11h5.5M13 16h3" /></symbol>
+      <symbol id="i-repeat" viewBox="0 0 24 24"><path d="M4 11V9.5A3.5 3.5 0 0 1 7.5 6H19" /><path d="m16 3 3 3-3 3" /><path d="M20 13v1.5a3.5 3.5 0 0 1-3.5 3.5H5" /><path d="m8 21-3-3 3-3" /></symbol>
+      <symbol id="i-clip" viewBox="0 0 24 24"><path d="m20 11.5-7.8 7.8a5 5 0 0 1-7-7.1L13 4.4a3.3 3.3 0 0 1 4.7 4.7l-7.8 7.8a1.7 1.7 0 0 1-2.4-2.4l7.2-7.2" /></symbol>
+      <symbol id="i-flag" viewBox="0 0 24 24"><path d="M5 21V4M5 4.5h12l-2 4 2 4H5" /></symbol>
+      <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5" /><path d="m20 20-4.3-4.3" /></symbol>
+      <symbol id="i-command" viewBox="0 0 24 24"><path d="M9 9V6.5A2.5 2.5 0 1 0 6.5 9H9Zm0 0h6m-6 0v6m6-6V6.5A2.5 2.5 0 1 1 17.5 9H15Zm0 0v6m0 0h-6m6 0v2.5a2.5 2.5 0 1 0 2.5-2.5H15Zm-6 0v2.5A2.5 2.5 0 1 1 6.5 15H9Z" /></symbol>
+      <symbol id="i-sparkle" viewBox="0 0 24 24"><path d="M12 3.5c.6 4.6 3.9 7.9 8.5 8.5-4.6.6-7.9 3.9-8.5 8.5-.6-4.6-3.9-7.9-8.5-8.5 4.6-.6 7.9-3.9 8.5-8.5Z" /></symbol>
+      <symbol id="i-person" viewBox="0 0 24 24"><circle cx="12" cy="5.5" r="2" /><path d="M5 9h14M12 9v5.5M8.5 21l3.5-6.5 3.5 6.5" /></symbol>
+      <symbol id="i-hand" viewBox="0 0 24 24"><path d="M8 12V5.5a1.5 1.5 0 0 1 3 0V11M11 10.5V4a1.5 1.5 0 0 1 3 0v6.5M14 10.5V5.5a1.5 1.5 0 0 1 3 0V14a7 7 0 0 1-7 7h-.5a6 6 0 0 1-5-2.8L3 15.3a1.6 1.6 0 0 1 2.6-1.8L8 15.5" /></symbol>
+      <symbol id="i-sections" viewBox="0 0 24 24"><path d="M4 5.5h16M4 12h16M4 18.5h16" /><path d="M4 5.5v13" /></symbol>
+      <symbol id="i-obsidian" viewBox="0 0 24 24"><path d="M9 2.8 4.8 9.6l3 7.7 5.6 3.9 4.1-3.4L19 9.4 14 3Z" /><path d="m9 2.8 1.6 8.1-2.8 6.4M10.6 10.9 19 9.4M10.6 10.9l2.8 10.3" /></symbol>
+      <symbol id="i-tray" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2.5" /><path d="M3 15h18M7 18h.01M10 18h.01" /></symbol>
+      <symbol id="i-windows" viewBox="0 0 24 24"><path d="M3.5 5.5 10.5 4.5v7h-7ZM12.5 4.2l8-1.2v8.5h-8ZM3.5 12.5h7v7l-7-1ZM12.5 12.5h8V21l-8-1.2Z" /></symbol>
+      <symbol id="i-apple" viewBox="0 0 24 24"><path d="M16.4 12.6c0-2.3 1.9-3.4 2-3.5a4.3 4.3 0 0 0-3.4-1.8c-1.4-.2-2.8.8-3.5.8s-1.8-.8-3-.8a4.5 4.5 0 0 0-3.8 2.3c-1.6 2.8-.4 7 1.2 9.3.8 1.1 1.7 2.4 2.9 2.3 1.2 0 1.6-.7 3-.7s1.8.7 3 .7c1.3 0 2.1-1.1 2.8-2.3a10 10 0 0 0 1.3-2.6 4 4 0 0 1-2.5-3.7ZM14.2 5.8A4 4 0 0 0 15.1 3a4.1 4.1 0 0 0-2.7 1.4 3.8 3.8 0 0 0-1 2.7 3.4 3.4 0 0 0 2.8-1.3Z" /></symbol>
+      <symbol id="i-linux" viewBox="0 0 24 24"><path d="M12 3c-2.2 0-3.4 1.8-3.4 4.4 0 1.7-.6 2.6-1.6 4-1.2 1.6-2.4 3.6-2 6 .2 1.4 1.4 2.6 3 2.6h8c1.6 0 2.8-1.2 3-2.6.4-2.4-.8-4.4-2-6-1-1.4-1.6-2.3-1.6-4C15.4 4.8 14.2 3 12 3Z" /><path d="M10.4 7.6h.01M13.6 7.6h.01M10.7 10h2.6" /></symbol>
+      <symbol id="i-android" viewBox="0 0 24 24"><path d="M5 16V11a7 7 0 0 1 14 0v5Z" /><path d="M8 5 6.5 2.8M16 5l1.5-2.2" /><path d="M9 10h.01M15 10h.01" /><path d="M5 16h14v1.5a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2Z" /></symbol>
+      <symbol id="i-github" viewBox="0 0 24 24"><path d="M9 19c-4 1.3-4-2-5.6-2.5M14.6 21v-3.3a2.9 2.9 0 0 0-.8-2.2c2.7-.3 5.6-1.3 5.6-6a4.6 4.6 0 0 0-1.3-3.2 4.3 4.3 0 0 0-.1-3.2s-1-.3-3.4 1.3a11.6 11.6 0 0 0-6 0C6.5 2.8 5.5 3.1 5.5 3.1a4.3 4.3 0 0 0-.1 3.2A4.6 4.6 0 0 0 4 9.5c0 4.6 2.9 5.7 5.6 6a2.9 2.9 0 0 0-.8 2.2V21" /></symbol>
+      <symbol id="i-coffee" viewBox="0 0 24 24"><path d="M4.5 9.5h12v5a5 5 0 0 1-5 5h-2a5 5 0 0 1-5-5Z" /><path d="M16.5 11h1a2.5 2.5 0 0 1 0 5h-1.3" /><path d="M8.5 3.5v2.5M12.5 3.5v2.5" /></symbol>
+      <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M4 12h15M13.5 6.5 19 12l-5.5 5.5" /></symbol>
+    </svg>
+
+    <a class="skip-link" href="#main">Skip to content</a>
+
+    <header class="site-header">
+      <div class="wrap header-row">
+        <a class="brand" href="../../">
+          <img src="../../assets/img/brand/vicu-64.png" alt="" width="32" height="32" />
+          <span>Vicu</span>
+        </a>
+        <nav class="nav" aria-label="Site">
+          <a href="../../">Home</a>
+          <a href="../">Guide</a>
+          <a href="../pro/">Vicu Pro</a>
+          <a href="../../#download">Download</a>
+        </nav>
+        <div class="header-actions">
+          <button class="icon-btn g-menu-toggle" type="button" aria-controls="g-sidebar" aria-expanded="false" aria-label="Guide contents">
+            <svg aria-hidden="true"><use href="#i-sections" /></svg>
+          </button>
+          <button class="icon-btn theme-toggle" type="button" aria-label="Switch between light and dark">
+            <svg class="icon-moon" aria-hidden="true"><use href="#i-moon" /></svg>
+            <svg class="icon-sun" aria-hidden="true"><use href="#i-sun" /></svg>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <div class="wrap g-layout">
+      <aside class="g-sidebar" id="g-sidebar" aria-label="Guide contents">
+        <form class="g-search" role="search" onsubmit="return false">
+          <label class="visually-hidden" for="g-search-input">Search the guide</label>
+          <svg aria-hidden="true"><use href="#i-search" /></svg>
+          <input id="g-search-input" type="search" placeholder="Search the guide" autocomplete="off" aria-describedby="g-search-hint" />
+          <span id="g-search-hint" class="visually-hidden">Results show below as you type.</span>
+        </form>
+        <ul class="g-search-results" id="g-search-results" aria-live="polite" hidden></ul>
+        <nav class="g-nav" aria-label="Guide pages"><details class="g-nav-section" open><summary>Start here</summary><ul><li><a href="../">Guide home</a></li><li><a href="../getting-started/">Get started</a></li><li><a href="../basics/" aria-current="page">How Vicu is organized</a></li></ul></details><details class="g-nav-section"><summary>Everyday Vicu</summary><ul><li><a href="../capture/">Add tasks</a></li><li><a href="../tasks/">Work with tasks</a></li><li><a href="../lists/">Smart lists</a></li><li><a href="../projects/">Projects and labels</a></li><li><a href="../custom-lists/">Custom lists</a></li><li><a href="../plan/">Plan your day</a></li><li><a href="../calendars/">Events and calendars</a></li><li><a href="../routines/">Routines</a></li><li><a href="../review/">Review and organizing</a></li><li><a href="../collaboration/">Collaboration</a></li><li><a href="../assistant/">The assistant</a></li></ul></details><details class="g-nav-section"><summary>Your devices</summary><ul><li><a href="../desktop/">On the desktop</a></li><li><a href="../phone/">On your phone</a></li><li><a href="../sync/">Sync and offline</a></li><li><a href="../settings/">Settings</a></li></ul></details><details class="g-nav-section"><summary>Vicu Pro</summary><ul><li><a href="../pro/">What Pro is</a></li><li><a href="../pro/available/">Know what you can do now</a></li><li><a href="../pro/promises/">Promises and people</a></li><li><a href="../pro/portfolio/">Portfolio</a></li><li><a href="../pro/power/">Power tools</a></li></ul></details><details class="g-nav-section"><summary>Reference</summary><ul><li><a href="../quick-add/">Quick add</a></li><li><a href="../shortcuts/">Keyboard shortcuts</a></li><li><a href="../faq/">Troubleshooting and FAQ</a></li><li><a href="../glossary/">Glossary</a></li></ul></details></nav>
+      </aside>
+
+      <main id="main" class="g-main">
+        <article class="g-article">
+          <nav class="g-crumbs" aria-label="Breadcrumb"><a href="../">Guide</a> <span aria-hidden="true">/</span> <span>Start here</span></nav>
+          <h1 class="g-title">How Vicu is organized</h1>
+          <p class="g-lead">Vicu is organized around when you will do something, not where it is filed. This page shows the pieces and how they fit.</p>
+          <details class="g-toc-inline"><summary>On this page</summary><ul><li><a href="#in-short">In short</a></li><li><a href="#the-idea">The idea</a></li><li><a href="#the-pieces">The pieces</a></li><li><a href="#the-task-card">The task card</a></li><li><a href="#a-tour-of-the-main-window">A tour of the main window</a></li><li><a href="#a-tour-of-the-phone">A tour of the phone</a></li><li><a href="#what-syncs-and-what-stays-on-one-device">What syncs and what stays on one device</a></li><li><a href="#related">Related</a></li></ul></details>
+          <div class="g-content">
+<h2 id="in-short"><a class="g-anchor" href="#in-short" aria-hidden="true" tabindex="-1">#</a>In short</h2>
+<ul><li><strong>New tasks land in the Inbox.</strong> You sort them later, or not at all.</li><li><strong>Smart lists answer "when".</strong> Today, Upcoming, Anytime and Logbook are built from your tasks' dates. You do not fill them by hand.</li><li><strong>Projects answer "where".</strong> Projects can hold subprojects and sections, and top-level projects can be grouped under categories.</li><li><strong>Labels cut across projects.</strong> A label such as <code>errand</code> can be on tasks in any project.</li><li><strong>Custom lists are your own views.</strong> A list is a saved set of conditions, and it is the same on every device.</li><li><strong>Everything is stored on your Vikunja server.</strong> Vicu is a window onto it.</li></ul>
+<h2 id="the-idea"><a class="g-anchor" href="#the-idea" aria-hidden="true" tabindex="-1">#</a>The idea</h2>
+<p>A task starts in the Inbox. You give it a day, and it shows up in Today when that day comes. When you finish it, it goes to the Logbook. You do not have to file it in a project first, and Vicu has no boards or Gantt charts.</p>
+<p>Projects, labels and custom lists exist for the times when you want to look at your work by topic or by a rule of your own.</p>
+<h2 id="the-pieces"><a class="g-anchor" href="#the-pieces" aria-hidden="true" tabindex="-1">#</a>The pieces</h2>
+<div class="g-table"><table><thead><tr><th scope="col">Piece</th><th scope="col">What it is</th><th scope="col">Where you find it</th></tr></thead><tbody><tr><th scope="row">Inbox</th><td>The project where new tasks land. You choose it once, and it syncs.</td><td>First in the sidebar or drawer</td></tr><tr><th scope="row">Today</th><td>Everything due before tomorrow starts: overdue and due today</td><td>Smart list</td></tr><tr><th scope="row">Upcoming</th><td>Everything due from tomorrow on, grouped by day</td><td>Smart list</td></tr><tr><th scope="row">Anytime</th><td>Every open task outside the Inbox, with or without a date</td><td>Smart list</td></tr><tr><th scope="row">Logbook</th><td>Tasks you have completed, by the day you finished them</td><td>Smart list</td></tr><tr><th scope="row">Projects</th><td>Groups of tasks, which can hold subprojects and sections</td><td>Projects in the sidebar or drawer</td></tr><tr><th scope="row">Categories</th><td>Named headers that group your top-level projects</td><td>Between projects in the sidebar</td></tr><tr><th scope="row">Labels</th><td>Colored tags you put on tasks</td><td>Tags in the sidebar; Labels in the phone drawer</td></tr><tr><th scope="row">Custom lists</th><td>Your own lists made from conditions</td><td>Under the smart lists</td></tr></tbody></table></div>
+<p>Read <a href="../lists/">Smart lists</a> for the five lists, <a href="../projects/">Projects and labels</a> for the organization tools, and <a href="../custom-lists/">Custom lists</a> for lists of your own.</p>
+<h3 id="projects-subprojects-and-sections"><a class="g-anchor" href="#projects-subprojects-and-sections" aria-hidden="true" tabindex="-1">#</a>Projects, subprojects and sections</h3>
+<p>A project can hold other projects. A top-level project acts like an area, with the projects below it. Inside a project, <strong>sections</strong> split a long list into collapsible groups with headers and counts.</p>
+<p>The Inbox does not appear among the projects, because it has its own place at the top.</p>
+<h3 id="categories"><a class="g-anchor" href="#categories" aria-hidden="true" tabindex="-1">#</a>Categories</h3>
+<p>If you have many top-level projects, you can group them under named headers called categories. They are optional. Without a category, the sidebar is a plain list of projects.</p>
+<h3 id="labels"><a class="g-anchor" href="#labels" aria-hidden="true" tabindex="-1">#</a>Labels</h3>
+<p>A label is a colored tag. Each label has its own page that shows every task with that label, across all projects. You can put several labels on one task.</p>
+<h3 id="custom-lists"><a class="g-anchor" href="#custom-lists" aria-hidden="true" tabindex="-1">#</a>Custom lists</h3>
+<p>A custom list is a saved view: for example "high priority tasks due this week in Work". It is stored on your server, so every device shows the same list. See <a href="../custom-lists/">Custom lists</a>.</p>
+<h2 id="the-task-card"><a class="g-anchor" href="#the-task-card" aria-hidden="true" tabindex="-1">#</a>The task card</h2>
+<p>Everything about one task lives in its card on the desktop, or in the task editor on a phone. It holds the title, notes, dates, reminders, repeat, priority, labels, subtasks, checklists and files. Properties you have set show as chips. Properties you have not set show as quiet buttons you can click to add them. See <a href="../tasks/">Work with tasks</a>.</p>
+<h2 id="a-tour-of-the-main-window"><a class="g-anchor" href="#a-tour-of-the-main-window" aria-hidden="true" tabindex="-1">#</a>A tour of the main window <span class="g-badge g-badge--desktop"><svg aria-hidden="true"><use href="#i-monitor" /></svg>Desktop</span></h2>
+<p>The desktop window has a sidebar on the left and the content on the right.</p>
+<ul><li><strong>Top of the sidebar:</strong> the search box, called Quick find, with the Ask button next to it when the assistant is set up.</li><li><strong>Smart lists:</strong> Inbox, Today, Upcoming, Anytime and Logbook. Routines, Review and Plan appear here when you turn them on.</li><li><strong>Custom lists</strong>, and a <strong>+</strong> button to make one.</li><li><strong>Projects</strong>, in a tree, with progress rings. Subprojects fold under their parent.</li><li><strong>Tags:</strong> your labels.</li><li><strong>The sync button</strong>, which opens a panel with changes that are waiting to reach the server.</li></ul>
+<p>Click a task to open its card inside the list. Press <kbd>Escape</kbd> to close it. Right-click a task for its menu. Press <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>P</kbd> (<kbd>Cmd</kbd> on a Mac) to open the command palette, where you can jump to any list or run any command.</p>
+<figure class="g-figure"><img class="only-light" src="../../assets/img/screens/desktop-inbox.webp" alt="The Inbox on the desktop" width="1600" height="1000" loading="lazy" /><img class="only-dark" src="../../assets/img/screens/desktop-inbox-dark.webp" alt="The Inbox on the desktop" width="1600" height="1000" loading="lazy" /><figcaption>The sidebar on the left, the Inbox on the right.</figcaption></figure>
+<h2 id="a-tour-of-the-phone"><a class="g-anchor" href="#a-tour-of-the-phone" aria-hidden="true" tabindex="-1">#</a>A tour of the phone <span class="g-badge g-badge--phone"><svg aria-hidden="true"><use href="#i-phone" /></svg>Phone</span></h2>
+<p>The phone has the same pieces in a different layout.</p>
+<ul><li><strong>The bottom bar</strong> holds the Inbox first, then three slots you choose: smart lists, projects or custom lists. <span class="g-badge g-badge--android"><svg aria-hidden="true"><use href="#i-android" /></svg>Android</span> <span class="g-badge g-badge--ios"><svg aria-hidden="true"><use href="#i-apple" /></svg>iPhone and iPad</span></li><li><strong>The drawer</strong> opens from the menu button and lists everything: smart lists, custom lists, projects and labels. Smart lists you hide in settings disappear from it.</li><li><strong>The + button</strong> adds a task. Hold it to say a task.</li><li><strong>A task opens as a sheet</strong> over the list. Pull it down to close it.</li><li><strong>Swipe a row</strong> to complete it or to choose a day. You can change what each swipe does in <strong>Settings, Gestures</strong>.</li><li><strong>Search</strong> is at the top of every list, with the Ask button next to it when the assistant is set up.</li></ul>
+<figure class="g-figure g-figure--tall"><img class="only-light" src="../../assets/img/screens/android-today-light.webp" alt="Today on Android" width="780" height="1734" loading="lazy" /><img class="only-dark" src="../../assets/img/screens/android-today-dark.webp" alt="Today on Android" width="780" height="1734" loading="lazy" /><figcaption>Today on Android.</figcaption></figure>
+<h2 id="what-syncs-and-what-stays-on-one-device"><a class="g-anchor" href="#what-syncs-and-what-stays-on-one-device" aria-hidden="true" tabindex="-1">#</a>What syncs and what stays on one device</h2>
+<p>Your tasks, projects, labels and comments live on your server. Vicu also saves some of its own data there, in a way other Vikunja apps do not show you: custom lists, the Inbox choice, project categories and order, templates and routines. These follow you to every device.</p>
+<p>Choices about how the app looks stay on the device: the theme, the clock, hotkeys and which smart lists show. <a href="../sync/">Sync and offline</a> and <a href="../settings/">Settings</a> have the full lists.</p>
+<aside class="g-callout g-callout--note"><p class="g-callout-title">Note</p><p>Vicu keeps some data in tasks it hides, such as custom lists and routines. If you open your Vikunja server in another app, you may see tasks with names like "Vicu preferences (sync metadata — do not delete)". Leave them alone.</p></aside>
+<h2 id="related"><a class="g-anchor" href="#related" aria-hidden="true" tabindex="-1">#</a>Related</h2>
+<ul><li><a href="../getting-started/">Get started</a></li><li><a href="../capture/">Add tasks</a></li><li><a href="../lists/">Smart lists</a></li><li><a href="../projects/">Projects and labels</a></li><li><a href="../custom-lists/">Custom lists</a></li></ul>
+          </div>
+          <nav class="g-pager" aria-label="Previous and next page"><a class="g-pager-prev" href="../getting-started/"><span>Previous</span>Get started</a><a class="g-pager-next" href="../capture/"><span>Next</span>Add tasks</a></nav>
+          <p class="g-edit"><a href="https://github.com/rendyhd/Vicu/blob/main/docs/guide/basics.md">Suggest a change to this page</a></p>
+        </article>
+        <nav class="g-toc" aria-label="On this page"><p>On this page</p><ul><li class="g-toc-2"><a href="#in-short">In short</a></li><li class="g-toc-2"><a href="#the-idea">The idea</a></li><li class="g-toc-2"><a href="#the-pieces">The pieces</a></li><li class="g-toc-3"><a href="#projects-subprojects-and-sections">Projects, subprojects and sections</a></li><li class="g-toc-3"><a href="#categories">Categories</a></li><li class="g-toc-3"><a href="#labels">Labels</a></li><li class="g-toc-3"><a href="#custom-lists">Custom lists</a></li><li class="g-toc-2"><a href="#the-task-card">The task card</a></li><li class="g-toc-2"><a href="#a-tour-of-the-main-window">A tour of the main window</a></li><li class="g-toc-2"><a href="#a-tour-of-the-phone">A tour of the phone</a></li><li class="g-toc-2"><a href="#what-syncs-and-what-stays-on-one-device">What syncs and what stays on one device</a></li><li class="g-toc-2"><a href="#related">Related</a></li></ul></nav>
+      </main>
+    </div>
+
+    <footer class="site-footer">
+      <div class="wrap footer-row">
+        <a class="brand" href="../../"><img src="../../assets/img/brand/vicu-64.png" alt="" width="28" height="28" /><span>Vicu</span></a>
+        <nav class="footer-links" aria-label="Footer">
+          <a href="https://github.com/rendyhd/Vicu">Desktop on GitHub</a>
+          <a href="https://github.com/rendyhd/Vicu-Mobile">Mobile on GitHub</a>
+          <a href="https://github.com/rendyhd/Vicu/releases">Release notes</a>
+          <a href="https://github.com/rendyhd/Vicu-Mobile/blob/main/docs/privacy-policy.md">Privacy</a>
+          <a href="https://ko-fi.com/rendyhd">Support on Ko-fi</a>
+        </nav>
+        <p>MIT licensed. Vicu is an independent app, not made by the Vikunja team. Screens show made-up tasks.</p>
+      </div>
+    </footer>
+  </body>
+</html>

@@ -27,7 +27,8 @@
     "speech:lib": "node scripts/build-speech.mjs --if-stale",
     "ui:verify": "node scripts/ui-verify/desktop.mjs",
     "site": "node site/tools/serve.mjs",
-    "site:check": "node site/tools/check-site.mjs"
+    "site:guide": "node site/tools/guide.mjs",
+    "site:check": "node site/tools/guide.mjs --check && node site/tools/check-site.mjs"
   },
   "author": "rendyhd",
   "license": "MIT",

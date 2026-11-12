@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Quick add syntax · Vicu guide</title>
+    <meta name="description" content="Every word Vicu reads in a task's title: dates, times, repeats, time blocks, projects, labels, priority and places, with examples of what each one produces." />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#fbfaf8" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#111113" media="(prefers-color-scheme: dark)" />
+    <link rel="icon" href="../../assets/img/brand/vicu-32.png" sizes="32x32" type="image/png" />
+    <link rel="apple-touch-icon" href="../../assets/img/brand/vicu-180.png" />
+    <meta property="og:type" content="article" />
+    <meta property="og:site_name" content="Vicu" />
+    <meta property="og:title" content="Quick add syntax · Vicu guide" />
+    <meta property="og:description" content="Every word Vicu reads in a task's title: dates, times, repeats, time blocks, projects, labels, priority and places, with examples of what each one produces." />
+    <meta property="og:url" content="https://vicutodo.app/guide/quick-add/" />
+    <meta property="og:image" content="https://vicutodo.app/assets/img/og.jpg" />
+    <link rel="canonical" href="https://vicutodo.app/guide/quick-add/" />
+    <link rel="stylesheet" href="../../assets/css/site.css" />
+    <script>
+      (function () {
+        var d = document.documentElement;
+        d.className = d.className.replace('no-js', 'js');
+        try {
+          var t = localStorage.getItem('vicu-site-theme');
+          if (t === 'light' || t === 'dark') d.setAttribute('data-theme', t);
+        } catch (e) {}
+      })();
+    </script>
+    <script src="../../assets/js/site.js" defer></script>
+    <script src="../../assets/js/guide-index.js" defer></script>
+    <script src="../../assets/js/guide.js" defer></script>
+  </head>
+  <body class="g-body" data-guide-root="../">
+    <svg class="sprite" aria-hidden="true" focusable="false">
+      <symbol id="i-inbox" viewBox="0 0 24 24"><path d="M3.5 13.5 6 5.5h12l2.5 8V18a1.5 1.5 0 0 1-1.5 1.5H5A1.5 1.5 0 0 1 3.5 18Z" /><path d="M3.5 13.5h5l1 2.5h5l1-2.5h5" /></symbol>
+      <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4" /><path d="M12 2.5v2M12 19.5v2M4.6 4.6 6 6M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4 6 18M18 6l1.4-1.4" /></symbol>
+      <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4 8.5 8.5 0 1 0 20 14.5Z" /></symbol>
+      <symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5" /><path d="M3.5 10h17M8 3v4M16 3v4" /></symbol>
+      <symbol id="i-layers" viewBox="0 0 24 24"><path d="m12 3.5 8.5 4.5L12 12.5 3.5 8Z" /><path d="m3.5 12 8.5 4.5 8.5-4.5" /><path d="m3.5 16 8.5 4.5 8.5-4.5" /></symbol>
+      <symbol id="i-check" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" /><path d="m8.2 12.2 2.6 2.6 5-5.3" /></symbol>
+      <symbol id="i-review" viewBox="0 0 24 24"><path d="M19.5 12a7.5 7.5 0 0 1-13 5.1M4.5 12a7.5 7.5 0 0 1 13-5.1" /><path d="M17.8 3.5v3.6h-3.6M6.2 20.5v-3.6h3.6" /></symbol>
+      <symbol id="i-heart" viewBox="0 0 24 24"><path d="M12 19.5s-7.5-4.4-7.5-10A4.2 4.2 0 0 1 12 7a4.2 4.2 0 0 1 7.5 2.5c0 5.6-7.5 10-7.5 10Z" /><path d="M7 12h2.5l1.5-2 2 4 1.5-2H17" /></symbol>
+      <symbol id="i-bolt" viewBox="0 0 24 24"><path d="M13 3 5 13.5h6L10.5 21 19 10.5h-6Z" /></symbol>
+      <symbol id="i-mic" viewBox="0 0 24 24"><rect x="9" y="3.5" width="6" height="11" rx="3" /><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v2.5" /></symbol>
+      <symbol id="i-filter" viewBox="0 0 24 24"><path d="M4 6h16M7 12h10M10 18h4" /></symbol>
+      <symbol id="i-tag" viewBox="0 0 24 24"><path d="M3.5 12.2V4.5a1 1 0 0 1 1-1h7.7l8.3 8.3a1.4 1.4 0 0 1 0 2l-6.7 6.7a1.4 1.4 0 0 1-2 0Z" /><circle cx="8" cy="8" r="1.4" /></symbol>
+      <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3.5 7.5v10A1.5 1.5 0 0 0 5 19h14a1.5 1.5 0 0 0 1.5-1.5V9A1.5 1.5 0 0 0 19 7.5h-7L10 5H5a1.5 1.5 0 0 0-1.5 1.5Z" /></symbol>
+      <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8.5" r="3.2" /><path d="M3 19c.8-3.2 3.2-5 6-5s5.2 1.8 6 5" /><path d="M15.5 5.6a3.2 3.2 0 0 1 0 5.8M17.5 14.3c1.7.6 3 2.2 3.5 4.7" /></symbol>
+      <symbol id="i-chat" viewBox="0 0 24 24"><path d="M4 5.5h16v10.5H10l-6 4.5Z" /><path d="M8.5 10.5h7" /></symbol>
+      <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2h-15Z" /><path d="M10 20.5a2 2 0 0 0 4 0" /></symbol>
+      <symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 21s6.5-5.6 6.5-11a6.5 6.5 0 0 0-13 0c0 5.4 6.5 11 6.5 11Z" /><circle cx="12" cy="10" r="2.3" /></symbol>
+      <symbol id="i-cloud-off" viewBox="0 0 24 24"><path d="M8 18.5H6.5a4 4 0 0 1-.6-8 6 6 0 0 1 9.2-4M18.5 9.5a4.5 4.5 0 0 1-1.5 9h-5" /><path d="m4 3.5 16 17" /></symbol>
+      <symbol id="i-sync" viewBox="0 0 24 24"><path d="M4 12a8 8 0 0 1 14-5.3L20 9" /><path d="M20 4v5h-5" /><path d="M20 12a8 8 0 0 1-14 5.3L4 15" /><path d="M4 20v-5h5" /></symbol>
+      <symbol id="i-keyboard" viewBox="0 0 24 24"><rect x="2.5" y="6" width="19" height="12" rx="2" /><path d="M6 9.5h.01M9 9.5h.01M12 9.5h.01M15 9.5h.01M18 9.5h.01M6 12.5h.01M18 12.5h.01M9 12.5h6M7.5 15.3h9" /></symbol>
+      <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.7 0l3.1-3.1a4 4 0 0 0-5.7-5.7l-1 1" /><path d="M14 10a4 4 0 0 0-5.7 0l-3.1 3.1a4 4 0 0 0 5.7 5.7l1-1" /></symbol>
+      <symbol id="i-phone" viewBox="0 0 24 24"><rect x="6.5" y="2.5" width="11" height="19" rx="2.5" /><path d="M10.5 18.5h3" /></symbol>
+      <symbol id="i-monitor" viewBox="0 0 24 24"><rect x="2.5" y="4" width="19" height="12.5" rx="2" /><path d="M8.5 20.5h7M12 16.5v4" /></symbol>
+      <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4v11M7.5 10.5 12 15l4.5-4.5" /><path d="M4.5 19.5h15" /></symbol>
+      <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z" /><circle cx="12" cy="12" r="2.8" /></symbol>
+      <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="10.5" width="14" height="10" rx="2" /><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5" /></symbol>
+      <symbol id="i-grid" viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="7" height="7" rx="1.8" /><rect x="13.5" y="3.5" width="7" height="7" rx="1.8" /><rect x="3.5" y="13.5" width="7" height="7" rx="1.8" /><rect x="13.5" y="13.5" width="7" height="7" rx="1.8" /></symbol>
+      <symbol id="i-swipe" viewBox="0 0 24 24"><path d="M3.5 7.5h11M11 4l3.5 3.5L11 11" /><path d="M9 21v-6.5a1.5 1.5 0 0 1 3 0V17l3.8.7a1.8 1.8 0 0 1 1.5 2V21" /></symbol>
+      <symbol id="i-share" viewBox="0 0 24 24"><path d="M12 3.5v11M8 7.5l4-4 4 4" /><path d="M7 11H5.5v9.5h13V11H17" /></symbol>
+      <symbol id="i-sort" viewBox="0 0 24 24"><path d="M7 4v16M3.5 16.5 7 20l3.5-3.5" /><path d="M13 6h7.5M13 11h5.5M13 16h3" /></symbol>
+      <symbol id="i-repeat" viewBox="0 0 24 24"><path d="M4 11V9.5A3.5 3.5 0 0 1 7.5 6H19" /><path d="m16 3 3 3-3 3" /><path d="M20 13v1.5a3.5 3.5 0 0 1-3.5 3.5H5" /><path d="m8 21-3-3 3-3" /></symbol>
+      <symbol id="i-clip" viewBox="0 0 24 24"><path d="m20 11.5-7.8 7.8a5 5 0 0 1-7-7.1L13 4.4a3.3 3.3 0 0 1 4.7 4.7l-7.8 7.8a1.7 1.7 0 0 1-2.4-2.4l7.2-7.2" /></symbol>
+      <symbol id="i-flag" viewBox="0 0 24 24"><path d="M5 21V4M5 4.5h12l-2 4 2 4H5" /></symbol>
+      <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5" /><path d="m20 20-4.3-4.3" /></symbol>
+      <symbol id="i-command" viewBox="0 0 24 24"><path d="M9 9V6.5A2.5 2.5 0 1 0 6.5 9H9Zm0 0h6m-6 0v6m6-6V6.5A2.5 2.5 0 1 1 17.5 9H15Zm0 0v6m0 0h-6m6 0v2.5a2.5 2.5 0 1 0 2.5-2.5H15Zm-6 0v2.5A2.5 2.5 0 1 1 6.5 15H9Z" /></symbol>
+      <symbol id="i-sparkle" viewBox="0 0 24 24"><path d="M12 3.5c.6 4.6 3.9 7.9 8.5 8.5-4.6.6-7.9 3.9-8.5 8.5-.6-4.6-3.9-7.9-8.5-8.5 4.6-.6 7.9-3.9 8.5-8.5Z" /></symbol>
+      <symbol id="i-person" viewBox="0 0 24 24"><circle cx="12" cy="5.5" r="2" /><path d="M5 9h14M12 9v5.5M8.5 21l3.5-6.5 3.5 6.5" /></symbol>
+      <symbol id="i-hand" viewBox="0 0 24 24"><path d="M8 12V5.5a1.5 1.5 0 0 1 3 0V11M11 10.5V4a1.5 1.5 0 0 1 3 0v6.5M14 10.5V5.5a1.5 1.5 0 0 1 3 0V14a7 7 0 0 1-7 7h-.5a6 6 0 0 1-5-2.8L3 15.3a1.6 1.6 0 0 1 2.6-1.8L8 15.5" /></symbol>
+      <symbol id="i-sections" viewBox="0 0 24 24"><path d="M4 5.5h16M4 12h16M4 18.5h16" /><path d="M4 5.5v13" /></symbol>
+      <symbol id="i-obsidian" viewBox="0 0 24 24"><path d="M9 2.8 4.8 9.6l3 7.7 5.6 3.9 4.1-3.4L19 9.4 14 3Z" /><path d="m9 2.8 1.6 8.1-2.8 6.4M10.6 10.9 19 9.4M10.6 10.9l2.8 10.3" /></symbol>
+      <symbol id="i-tray" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2.5" /><path d="M3 15h18M7 18h.01M10 18h.01" /></symbol>
+      <symbol id="i-windows" viewBox="0 0 24 24"><path d="M3.5 5.5 10.5 4.5v7h-7ZM12.5 4.2l8-1.2v8.5h-8ZM3.5 12.5h7v7l-7-1ZM12.5 12.5h8V21l-8-1.2Z" /></symbol>
+      <symbol id="i-apple" viewBox="0 0 24 24"><path d="M16.4 12.6c0-2.3 1.9-3.4 2-3.5a4.3 4.3 0 0 0-3.4-1.8c-1.4-.2-2.8.8-3.5.8s-1.8-.8-3-.8a4.5 4.5 0 0 0-3.8 2.3c-1.6 2.8-.4 7 1.2 9.3.8 1.1 1.7 2.4 2.9 2.3 1.2 0 1.6-.7 3-.7s1.8.7 3 .7c1.3 0 2.1-1.1 2.8-2.3a10 10 0 0 0 1.3-2.6 4 4 0 0 1-2.5-3.7ZM14.2 5.8A4 4 0 0 0 15.1 3a4.1 4.1 0 0 0-2.7 1.4 3.8 3.8 0 0 0-1 2.7 3.4 3.4 0 0 0 2.8-1.3Z" /></symbol>
+      <symbol id="i-linux" viewBox="0 0 24 24"><path d="M12 3c-2.2 0-3.4 1.8-3.4 4.4 0 1.7-.6 2.6-1.6 4-1.2 1.6-2.4 3.6-2 6 .2 1.4 1.4 2.6 3 2.6h8c1.6 0 2.8-1.2 3-2.6.4-2.4-.8-4.4-2-6-1-1.4-1.6-2.3-1.6-4C15.4 4.8 14.2 3 12 3Z" /><path d="M10.4 7.6h.01M13.6 7.6h.01M10.7 10h2.6" /></symbol>
+      <symbol id="i-android" viewBox="0 0 24 24"><path d="M5 16V11a7 7 0 0 1 14 0v5Z" /><path d="M8 5 6.5 2.8M16 5l1.5-2.2" /><path d="M9 10h.01M15 10h.01" /><path d="M5 16h14v1.5a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2Z" /></symbol>
+      <symbol id="i-github" viewBox="0 0 24 24"><path d="M9 19c-4 1.3-4-2-5.6-2.5M14.6 21v-3.3a2.9 2.9 0 0 0-.8-2.2c2.7-.3 5.6-1.3 5.6-6a4.6 4.6 0 0 0-1.3-3.2 4.3 4.3 0 0 0-.1-3.2s-1-.3-3.4 1.3a11.6 11.6 0 0 0-6 0C6.5 2.8 5.5 3.1 5.5 3.1a4.3 4.3 0 0 0-.1 3.2A4.6 4.6 0 0 0 4 9.5c0 4.6 2.9 5.7 5.6 6a2.9 2.9 0 0 0-.8 2.2V21" /></symbol>
+      <symbol id="i-coffee" viewBox="0 0 24 24"><path d="M4.5 9.5h12v5a5 5 0 0 1-5 5h-2a5 5 0 0 1-5-5Z" /><path d="M16.5 11h1a2.5 2.5 0 0 1 0 5h-1.3" /><path d="M8.5 3.5v2.5M12.5 3.5v2.5" /></symbol>
+      <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M4 12h15M13.5 6.5 19 12l-5.5 5.5" /></symbol>
+    </svg>
+
+    <a class="skip-link" href="#main">Skip to content</a>
+
+    <header class="site-header">
+      <div class="wrap header-row">
+        <a class="brand" href="../../">
+          <img src="../../assets/img/brand/vicu-64.png" alt="" width="32" height="32" />
+          <span>Vicu</span>
+        </a>
+        <nav class="nav" aria-label="Site">
+          <a href="../../">Home</a>
+          <a href="../">Guide</a>
+          <a href="../pro/">Vicu Pro</a>
+          <a href="../../#download">Download</a>
+        </nav>
+        <div class="header-actions">
+          <button class="icon-btn g-menu-toggle" type="button" aria-controls="g-sidebar" aria-expanded="false" aria-label="Guide contents">
+            <svg aria-hidden="true"><use href="#i-sections" /></svg>
+          </button>
+          <button class="icon-btn theme-toggle" type="button" aria-label="Switch between light and dark">
+            <svg class="icon-moon" aria-hidden="true"><use href="#i-moon" /></svg>
+            <svg class="icon-sun" aria-hidden="true"><use href="#i-sun" /></svg>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <div class="wrap g-layout">
+      <aside class="g-sidebar" id="g-sidebar" aria-label="Guide contents">
+        <form class="g-search" role="search" onsubmit="return false">
+          <label class="visually-hidden" for="g-search-input">Search the guide</label>
+          <svg aria-hidden="true"><use href="#i-search" /></svg>
+          <input id="g-search-input" type="search" placeholder="Search the guide" autocomplete="off" aria-describedby="g-search-hint" />
+          <span id="g-search-hint" class="visually-hidden">Results show below as you type.</span>
+        </form>
+        <ul class="g-search-results" id="g-search-results" aria-live="polite" hidden></ul>
+        <nav class="g-nav" aria-label="Guide pages"><details class="g-nav-section"><summary>Start here</summary><ul><li><a href="../">Guide home</a></li><li><a href="../getting-started/">Get started</a></li><li><a href="../basics/">How Vicu is organized</a></li></ul></details><details class="g-nav-section"><summary>Everyday Vicu</summary><ul><li><a href="../capture/">Add tasks</a></li><li><a href="../tasks/">Work with tasks</a></li><li><a href="../lists/">Smart lists</a></li><li><a href="../projects/">Projects and labels</a></li><li><a href="../custom-lists/">Custom lists</a></li><li><a href="../plan/">Plan your day</a></li><li><a href="../calendars/">Events and calendars</a></li><li><a href="../routines/">Routines</a></li><li><a href="../review/">Review and organizing</a></li><li><a href="../collaboration/">Collaboration</a></li><li><a href="../assistant/">The assistant</a></li></ul></details><details class="g-nav-section"><summary>Your devices</summary><ul><li><a href="../desktop/">On the desktop</a></li><li><a href="../phone/">On your phone</a></li><li><a href="../sync/">Sync and offline</a></li><li><a href="../settings/">Settings</a></li></ul></details><details class="g-nav-section"><summary>Vicu Pro</summary><ul><li><a href="../pro/">What Pro is</a></li><li><a href="../pro/available/">Know what you can do now</a></li><li><a href="../pro/promises/">Promises and people</a></li><li><a href="../pro/portfolio/">Portfolio</a></li><li><a href="../pro/power/">Power tools</a></li></ul></details><details class="g-nav-section" open><summary>Reference</summary><ul><li><a href="../quick-add/" aria-current="page">Quick add</a></li><li><a href="../shortcuts/">Keyboard shortcuts</a></li><li><a href="../faq/">Troubleshooting and FAQ</a></li><li><a href="../glossary/">Glossary</a></li></ul></details></nav>
+      </aside>
+
+      <main id="main" class="g-main">
+        <article class="g-article">
+          <nav class="g-crumbs" aria-label="Breadcrumb"><a href="../">Guide</a> <span aria-hidden="true">/</span> <span>Reference</span></nav>
+          <h1 class="g-title">Quick add syntax</h1>
+          <p class="g-lead">Type a task the way you would say it. Vicu picks out the dates, projects, labels, priority and repeats, shows them as chips, and keeps the rest as the title.</p>
+          <details class="g-toc-inline"><summary>On this page</summary><ul><li><a href="#in-short">In short</a></li><li><a href="#dates">Dates</a></li><li><a href="#repeats">Repeats</a></li><li><a href="#time-blocks">Time blocks</a></li><li><a href="#projects-and-labels">Projects and labels</a></li><li><a href="#priority">Priority</a></li><li><a href="#places">Places</a></li><li><a href="#pro-phrases">Pro phrases</a></li><li><a href="#examples">Examples</a></li><li><a href="#where-it-works">Where it works</a></li><li><a href="#related">Related</a></li></ul></details>
+          <div class="g-content">
+<h2 id="in-short"><a class="g-anchor" href="#in-short" aria-hidden="true" tabindex="-1">#</a>In short</h2>
+<ul><li><strong>Type naturally.</strong> <code>Call Ana tomorrow 3pm #work @call p2</code> makes a task called "Call Ana", due tomorrow at 3 PM, in the Work project, with the label call and high priority.</li><li><strong>Everything Vicu reads is highlighted and shown as a chip.</strong> Remove a chip and that text stays in the title. The rest of what you typed is the title.</li><li><strong>The same rules everywhere.</strong> The desktop, Android and iPhone read titles identically. It works in the new-task row, Quick Entry, pasted lines, voice and the phone's quick add sheet.</li><li><strong>Pick your style.</strong> Todoist style (<code>#project</code>, <code>@label</code>, <code>p1</code>) is the default. Vikunja style (<code>+project</code>, <code>*label</code>, <code>!1</code>) is in <strong>Settings, General, Task Parser</strong> on the desktop and <strong>Settings, General, Input Parsing</strong> on the phone. Parsing can be turned off there too.</li><li><strong>Suggestions appear as you type.</strong> After <code>#</code> or <code>@</code> (or <code>+</code> or <code>*</code> in Vikunja style), Vicu lists your projects or labels.</li></ul>
+<h2 id="dates"><a class="g-anchor" href="#dates" aria-hidden="true" tabindex="-1">#</a>Dates</h2>
+<p>A date can be anywhere in the title.</p>
+<div class="g-table"><table><thead><tr><th scope="col">You type</th><th scope="col">What you get</th></tr></thead><tbody><tr><th scope="row"><code>today</code>, <code>tomorrow</code></th><td>That day</td></tr><tr><th scope="row"><code>friday</code>, <code>this friday</code></th><td>The next Friday, today included</td></tr><tr><th scope="row"><code>next friday</code></th><td>Friday of next week. On a Tuesday, <code>next friday</code> is the Friday after this one.</td></tr><tr><th scope="row"><code>friday next week</code></th><td>The same as <code>next friday</code></td></tr><tr><th scope="row"><code>next week</code></th><td>The Monday of next week</td></tr><tr><th scope="row"><code>next month</code></th><td>The same day next month</td></tr><tr><th scope="row"><code>in 3 days</code>, <code>in 2 weeks</code></th><td>That long from today</td></tr><tr><th scope="row"><code>jan 15</code>, <code>15 jan</code>, <code>march 3rd</code></th><td>That date. If it already passed this year, it means next year.</td></tr><tr><th scope="row"><code>10/15</code></th><td>In your system's order: month first for US English, day first for most other regions. If the first number cannot be a month, the order flips.</td></tr><tr><th scope="row"><code>2026-10-15</code></th><td>That date, unambiguously</td></tr></tbody></table></div>
+<p>A date without a time is due at the end of that day and shows without a time.</p>
+<h3 id="times"><a class="g-anchor" href="#times" aria-hidden="true" tabindex="-1">#</a>Times</h3>
+<div class="g-table"><table><thead><tr><th scope="col">You type</th><th scope="col">What you get</th></tr></thead><tbody><tr><th scope="row"><code>3pm</code>, <code>3:30pm</code>, <code>3 p.m.</code></th><td>That time</td></tr><tr><th scope="row"><code>at 14:00</code></th><td>That time</td></tr><tr><th scope="row"><code>tomorrow at 3pm</code>, <code>friday 3pm</code>, <code>jan 15 9:30am</code></th><td>The date with the time</td></tr><tr><th scope="row"><code>in 2 hours</code>, <code>in 30 minutes</code></th><td>That long from now, to the minute</td></tr></tbody></table></div>
+<p>A time with no date means today if it is still ahead, otherwise tomorrow.</p>
+<h3 id="what-vicu-does-not-read-as-a-date"><a class="g-anchor" href="#what-vicu-does-not-read-as-a-date" aria-hidden="true" tabindex="-1">#</a>What Vicu does not read as a date</h3>
+<p>These stay in the title, so a task keeps its words:</p>
+<ul><li><code>weekend</code> and <code>weekday</code>: "Plan the weekend" has no date.</li><li>The past: <code>yesterday</code>, <code>last friday</code>, <code>last week</code>, <code>2 days ago</code>.</li><li>An amount of time on its own: "Call 30m" or "Rest 3 days". An amount counts only right after <code>in</code>.</li><li>Three-letter weekdays by themselves: "Buy sun cream" has no date. <code>mon</code>, <code>tue</code>, <code>wed</code>, <code>thu</code>, <code>fri</code>, <code>sat</code> and <code>sun</code> count after <code>on</code>, <code>next</code>, <code>this</code>, <code>by</code> or <code>due</code>, or with a time (<code>wed 3pm</code>). Full names always count.</li><li>A date inside another word or bracket: "Monday's report", "(tomorrow)", "Plan Friday/Saturday".</li><li><code>now</code>.</li></ul>
+<h3 id="more-than-one-date"><a class="g-anchor" href="#more-than-one-date" aria-hidden="true" tabindex="-1">#</a>More than one date</h3>
+<ul><li>The first date is the due date. "Book Friday dinner tomorrow" is due Friday.</li><li>A weekday right before another date stays in the title: "Call Ana about Saturday tomorrow at 3pm" is due tomorrow at 3 PM.</li><li>There are no ranges. "Trip friday to sunday" is due Friday, and the title is "Trip to sunday".</li><li>A label, project or priority in the middle of a date splits it: "Call tomorrow @home 3pm" is due tomorrow with the title "Call 3pm".</li></ul>
+<h3 id="words-that-go-with-a-date"><a class="g-anchor" href="#words-that-go-with-a-date" aria-hidden="true" tabindex="-1">#</a>Words that go with a date</h3>
+<p><code>on</code>, <code>by</code> and <code>due</code> before a date, and <code>at</code> before a time, leave with the date. "Submit report by friday" becomes "Submit report", and "Taxes due tomorrow" becomes "Taxes".</p>
+<h3 id="due-today-with-an-exclamation-mark"><a class="g-anchor" href="#due-today-with-an-exclamation-mark" aria-hidden="true" tabindex="-1">#</a>Due today with an exclamation mark</h3>
+<p>A lone <code>!</code> at the start or end makes a task due today: <code>Buy milk !</code> or <code>! buy milk</code>. A <code>!</code> inside the text ("Hello! world") does nothing. It works even when parsing is turned off. On the desktop you can turn it off in <strong>Settings, General, Task Parser</strong>.</p>
+<h2 id="repeats"><a class="g-anchor" href="#repeats" aria-hidden="true" tabindex="-1">#</a>Repeats</h2>
+<div class="g-table"><table><thead><tr><th scope="col">You type</th><th scope="col">What you get</th></tr></thead><tbody><tr><th scope="row"><code>every day</code>, <code>daily</code></th><td>Every day</td></tr><tr><th scope="row"><code>every week</code>, <code>weekly</code></th><td>Every week</td></tr><tr><th scope="row"><code>every month</code>, <code>monthly</code></th><td>Every month</td></tr><tr><th scope="row"><code>every year</code>, <code>yearly</code>, <code>annually</code></th><td>Every year</td></tr><tr><th scope="row"><code>every 3 days</code>, <code>every 2 weeks</code></th><td>Every N days, weeks, months or years</td></tr><tr><th scope="row"><code>biweekly</code>, <code>fortnightly</code></th><td>Every 2 weeks</td></tr><tr><th scope="row"><code>every monday</code></th><td>Every week, and the due date is the next Monday. A time after it applies: <code>every monday 10am</code>.</td></tr></tbody></table></div>
+<p><code>daily</code>, <code>weekly</code> and the other one-word forms count only as the last word. "Water plants daily" repeats. "Weekly standup" and "Daily review tomorrow" do not, because the word describes the task.</p>
+<p>If you also give a date, it is the first due date: <code>every friday starting oct 20</code> starts on October 20.</p>
+<h2 id="time-blocks"><a class="g-anchor" href="#time-blocks" aria-hidden="true" tabindex="-1">#</a>Time blocks</h2>
+<p><code>for</code> and a length, together with a time of day, set aside that time for the task.</p>
+<div class="g-table"><table><thead><tr><th scope="col">You type</th><th scope="col">What you get</th></tr></thead><tbody><tr><th scope="row"><code>Call Sam tomorrow at 3pm for 30m</code></th><td>A block tomorrow from 3:00 to 3:30 PM</td></tr><tr><th scope="row"><code>Write report at 9am for 2 hours</code></th><td>Today from 9 to 11 AM, or tomorrow if 9 AM has passed</td></tr><tr><th scope="row"><code>Review at 10am for 1h30m</code></th><td>From 10:00 to 11:30 AM</td></tr></tbody></table></div>
+<ul><li>Lengths are <code>30m</code>, <code>90 min</code>, <code>2 hours</code>, <code>1h30m</code> or <code>1h 30m</code>, from 1 minute to 12 hours.</li><li>Without a time of day, the words stay in the title: "Call tomorrow for 30m" is due tomorrow with the title "Call tomorrow for 30m". "Gift for mum" and "Table for 4" are never read as lengths.</li><li><code>for 3 days</code> and <code>for 3 months</code> are never dates.</li></ul>
+<p>See <a href="../plan/">Plan your day</a> for what a time block does.</p>
+<h2 id="projects-and-labels"><a class="g-anchor" href="#projects-and-labels" aria-hidden="true" tabindex="-1">#</a>Projects and labels</h2>
+<div class="g-table"><table><thead><tr><th scope="col">Style</th><th scope="col">Project</th><th scope="col">Label</th></tr></thead><tbody><tr><th scope="row">Todoist (default)</th><td><code>#work</code>, <code>#&quot;side project&quot;</code></td><td><code>@errand</code>, <code>@&quot;grocery list&quot;</code></td></tr><tr><th scope="row">Vikunja</th><td><code>+work</code>, <code>+&quot;side project&quot;</code></td><td><code>*errand</code>, <code>*&quot;grocery list&quot;</code></td></tr></tbody></table></div>
+<ul><li>Put a name with spaces in double quotes.</li><li>A project name starts with a letter, so <code>review PR #142</code> keeps "#142" in the title.</li><li>Vicu does not check that the project or label exists. Pick from the suggestions to be sure.</li><li>In Vikunja style, <code>@john</code> stays in the title.</li></ul>
+<h2 id="priority"><a class="g-anchor" href="#priority" aria-hidden="true" tabindex="-1">#</a>Priority</h2>
+<div class="g-table"><table><thead><tr><th scope="col">Priority</th><th scope="col">Todoist style</th><th scope="col">Vikunja style</th><th scope="col">Words (both styles)</th></tr></thead><tbody><tr><th scope="row">Urgent</th><td><code>p1</code></td><td><code>!4</code></td><td><code>!urgent</code>, <code>!critical</code></td></tr><tr><th scope="row">High</th><td><code>p2</code></td><td><code>!3</code></td><td><code>!high</code></td></tr><tr><th scope="row">Medium</th><td><code>p3</code></td><td><code>!2</code></td><td><code>!medium</code>, <code>!med</code></td></tr><tr><th scope="row">Low</th><td><code>p4</code></td><td><code>!1</code></td><td><code>!low</code></td></tr></tbody></table></div>
+<p><code>p1</code> is the most urgent in Todoist style, as in Todoist. A word such as <code>p2p</code> is not a priority.</p>
+<h2 id="places"><a class="g-anchor" href="#places" aria-hidden="true" tabindex="-1">#</a>Places</h2>
+<p>If you saved places on your phone, a phrase that names one sets a location reminder. <span class="g-badge g-badge--phone"><svg aria-hidden="true"><use href="#i-phone" /></svg>Phone</span> <span class="g-badge g-badge--desktop"><svg aria-hidden="true"><use href="#i-monitor" /></svg>Desktop</span></p>
+<div class="g-table"><table><thead><tr><th scope="col">You type</th><th scope="col">What you get</th></tr></thead><tbody><tr><th scope="row"><code>Call mom when I get home</code></th><td>Title "Call mom", with a reminder when you arrive at Home</td></tr><tr><th scope="row"><code>Buy stamps when I leave work</code></th><td>A reminder when you leave Work</td></tr><tr><th scope="row"><code>When I'm at the office, send the report</code></th><td>With a saved place called Office: title "send the report", reminder on arriving there</td></tr></tbody></table></div>
+<ul><li>Arriving phrases include <code>when I get</code>, <code>when I arrive at</code>, <code>when I'm at</code>, <code>when I get back to</code>, <code>once I get</code>, <code>arriving at</code>. Leaving phrases include <code>when I leave</code>, <code>when I'm leaving</code>, <code>once I leave</code> and <code>leaving</code>.</li><li>Vicu reads it only for a place you saved, and only whole words: "when I get homework done" names no place.</li><li>The reminder is created once the task reaches the server. A task created offline on the desktop gets none, and the composer tells you so.</li></ul>
+<p>See <a href="../phone/#location-reminders-and-places">Vicu on your phone</a>.</p>
+<h2 id="pro-phrases"><a class="g-anchor" href="#pro-phrases" aria-hidden="true" tabindex="-1">#</a>Pro phrases <span class="g-badge g-badge--pro"><svg aria-hidden="true"><use href="#i-sparkle" /></svg>Pro</span></h2>
+<p>When <a href="../pro/">Pro</a> is on, a few more words are read. With Pro off they stay in the title.</p>
+<div class="g-table"><table><thead><tr><th scope="col">You type</th><th scope="col">What you get</th></tr></thead><tbody><tr><th scope="row"><code>Jan: send the deck friday</code></th><td>A promise from Jan to you. Jan must be someone you marked as a person.</td></tr><tr><th scope="row"><code>for Jan: review the budget</code></th><td>Your promise to Jan</td></tr><tr><th scope="row"><code>starts monday</code></th><td>A start date. The task stays out of Available until then.</td></tr><tr><th scope="row"><code>~30m</code>, <code>~1h30</code>, <code>~45min</code></th><td>An estimate of 30 minutes, 1 hour 30 minutes or 45 minutes</td></tr><tr><th scope="row"><code>!flag</code></th><td>Flags the task</td></tr><tr><th scope="row"><code>req: can you add a report</code></th><td>Marks a request for triage. The triage tools are on the desktop.</td></tr></tbody></table></div>
+<p>Names for people are matched by their name, a name they go by, or an unambiguous first name. An unknown or ambiguous name stays in the title. See <a href="../pro/promises/">Promises and people</a>.</p>
+<h2 id="examples"><a class="g-anchor" href="#examples" aria-hidden="true" tabindex="-1">#</a>Examples</h2>
+<div class="g-table"><table><thead><tr><th scope="col">You type</th><th scope="col">The task</th></tr></thead><tbody><tr><th scope="row"><code>Buy groceries tomorrow 3pm #shopping @errands p3</code></th><td>"Buy groceries", due tomorrow 3 PM, project Shopping, label errands, medium priority</td></tr><tr><th scope="row"><code>Submit report by fri</code></th><td>"Submit report", due Friday</td></tr><tr><th scope="row"><code>Weekly standup every monday 10am @work</code></th><td>"Weekly standup", repeats weekly, next Monday at 10:00, label work</td></tr><tr><th scope="row"><code>Water plants daily</code></th><td>"Water plants", repeats every day</td></tr><tr><th scope="row"><code>Call Sam tomorrow at 3pm for 30m</code></th><td>"Call Sam", a block tomorrow from 3:00 to 3:30 PM</td></tr><tr><th scope="row"><code>Dentist jan 15 9:30am</code></th><td>"Dentist", due January 15 at 9:30 AM</td></tr><tr><th scope="row"><code>Call dentist !</code></th><td>"Call dentist", due today</td></tr><tr><th scope="row"><code>Pay rent in 3 days</code></th><td>"Pay rent", due 3 days from now</td></tr><tr><th scope="row"><code>Review PR #142</code></th><td>The title is kept whole, with no project</td></tr><tr><th scope="row"><code>Plan the weekend</code></th><td>No date: "weekend" is not a date</td></tr><tr><th scope="row"><code>Notes from last friday</code></th><td>No date: the past is not read</td></tr><tr><th scope="row"><code>Trip friday to sunday</code></th><td>"Trip to sunday", due Friday</td></tr><tr><th scope="row"><code>Call mom when I get home</code></th><td>"Call mom", with a location reminder at Home</td></tr><tr><th scope="row"><code>Task +inbox *urgent !4</code></th><td>In Vikunja style: "Task", project inbox, label urgent, urgent priority</td></tr></tbody></table></div>
+<h2 id="where-it-works"><a class="g-anchor" href="#where-it-works" aria-hidden="true" tabindex="-1">#</a>Where it works</h2>
+<p>Quick add text is read in the new-task row on every list, the title editor, <a href="../desktop/#quick-entry">Quick Entry</a>, pasted lines (one task per line), voice, and the phone's quick add sheet. On the phone, typed words move into chips as you type. On iOS, a title shared from another app is not parsed.</p>
+<h2 id="related"><a class="g-anchor" href="#related" aria-hidden="true" tabindex="-1">#</a>Related</h2>
+<ul><li><a href="../capture/">Add tasks</a></li><li><a href="../plan/">Plan your day</a></li><li><a href="../pro/">Vicu Pro</a></li><li><a href="../settings/">Settings</a></li><li><a href="../shortcuts/">Keyboard shortcuts</a></li></ul>
+          </div>
+          <nav class="g-pager" aria-label="Previous and next page"><a class="g-pager-prev" href="../pro/power/"><span>Previous</span>Power tools</a><a class="g-pager-next" href="../shortcuts/"><span>Next</span>Keyboard shortcuts</a></nav>
+          <p class="g-edit"><a href="https://github.com/rendyhd/Vicu/blob/main/docs/guide/quick-add.md">Suggest a change to this page</a></p>
+        </article>
+        <nav class="g-toc" aria-label="On this page"><p>On this page</p><ul><li class="g-toc-2"><a href="#in-short">In short</a></li><li class="g-toc-2"><a href="#dates">Dates</a></li><li class="g-toc-3"><a href="#times">Times</a></li><li class="g-toc-3"><a href="#what-vicu-does-not-read-as-a-date">What Vicu does not read as a date</a></li><li class="g-toc-3"><a href="#more-than-one-date">More than one date</a></li><li class="g-toc-3"><a href="#words-that-go-with-a-date">Words that go with a date</a></li><li class="g-toc-3"><a href="#due-today-with-an-exclamation-mark">Due today with an exclamation mark</a></li><li class="g-toc-2"><a href="#repeats">Repeats</a></li><li class="g-toc-2"><a href="#time-blocks">Time blocks</a></li><li class="g-toc-2"><a href="#projects-and-labels">Projects and labels</a></li><li class="g-toc-2"><a href="#priority">Priority</a></li><li class="g-toc-2"><a href="#places">Places</a></li><li class="g-toc-2"><a href="#pro-phrases">Pro phrases</a></li><li class="g-toc-2"><a href="#examples">Examples</a></li><li class="g-toc-2"><a href="#where-it-works">Where it works</a></li><li class="g-toc-2"><a href="#related">Related</a></li></ul></nav>
+      </main>
+    </div>
+
+    <footer class="site-footer">
+      <div class="wrap footer-row">
+        <a class="brand" href="../../"><img src="../../assets/img/brand/vicu-64.png" alt="" width="28" height="28" /><span>Vicu</span></a>
+        <nav class="footer-links" aria-label="Footer">
+          <a href="https://github.com/rendyhd/Vicu">Desktop on GitHub</a>
+          <a href="https://github.com/rendyhd/Vicu-Mobile">Mobile on GitHub</a>
+          <a href="https://github.com/rendyhd/Vicu/releases">Release notes</a>
+          <a href="https://github.com/rendyhd/Vicu-Mobile/blob/main/docs/privacy-policy.md">Privacy</a>
+          <a href="https://ko-fi.com/rendyhd">Support on Ko-fi</a>
+        </nav>
+        <p>MIT licensed. Vicu is an independent app, not made by the Vikunja team. Screens show made-up tasks.</p>
+      </div>
+    </footer>
+  </body>
+</html>

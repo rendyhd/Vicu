@@ -11,16 +11,16 @@ or the Vikunja web app keeps Pro's data safe even where Pro is off.
 
 ## Turning it on
 
-Settings, Pro. Turn on **Pro**, then choose the parts you want. Each part works on its own:
+Settings, Pro. Turn on **Turn on Pro on this device**, then choose the parts you want. Each part works on its own:
 
 | Part | What it adds |
 |---|---|
 | **Know what you can do now** | Available, Remaining and All on your lists; start dates; "After" (wait for another task); sequential projects; projects and labels on hold; flags; Focus |
-| **Keep track of promises** | People, promises both ways, verdicts, Waiting on, the person page, recaps, import from Copilot |
-| **Steer the portfolio** | Initiatives with a cap, ranking and parking; readiness; escalations; the Sponsor desk; request triage; meetings |
-| **Work fast, look back** | Pro conditions and grouping in custom lists, the table, the inspector, estimates in Plan my day, the daily focus block, the weekly execution review, the quarterly impact |
+| **Promises and people** | People, promises both ways, verdicts, Waiting on, the person page, recaps, meetings, import from Copilot |
+| **Portfolio** | Initiatives with a cap, ranking and parking; readiness; escalations; the Sponsor desk; request triage |
+| **Power tools** | Pro conditions and grouping in custom lists, the table, the inspector, estimates in Plan my day, the daily focus block, the weekly execution review, the quarterly impact |
 
-**Pro's assistant** (off by default) lets the assistant see Pro's data: Ask gets tools for
+**Assistant help in Pro** (off by default) lets the assistant see Pro's data: Ask gets tools for
 promises, people and the portfolio, the import can convert plain notes, and a meeting card can
 draft promises from what was said. With it off, the assistant sees your tasks as before and none
 of Pro's data.
@@ -42,28 +42,33 @@ of Pro's data.
 - **Focus** (Mod+Shift+O). Shows one area of your projects everywhere until you leave it.
 - **Repeat rules.** A repeating task can end after a number of times or on a date.
 
-## Keep track of promises
+## Promises and people
 
 - **People.** Right-click a label in the sidebar and choose This is a person. A person can have
   other names they go by.
 - **Capture.** `Jan: send the deck friday` is Jan's promise to you; `for Jan: review the budget`
   is your promise to Jan. On a promise, the row shows the person instead of a checkbox, because it is
   not yours to tick.
-- **Verdicts.** When a promise is due, give it a verdict: Delivered, Late, Not yet (with a new
-  date), Renegotiated, Dropped, or Taken over. Keys 1 to 6 on the row. Promises due today are at the
+- **Verdicts.** When a promise is due, give it a verdict: Delivered, Late, Not yet (with a date to
+  ask again), New date, or Dropped, or Ask me tomorrow. Keys 1 to 6 on the row. A promise the person
+  completed themselves asks once: delivered by them, or I did it. Promises due today are at the
   top of Today. Undo works on every verdict.
 - **Waiting on** lists what others owe you, by person.
 - **The person page** has their open promises both ways, how the last 90 days went in plain words
   (never a score), and a 1:1 agenda you can copy.
 - **Recap.** Copy what was agreed as text for mail or chat; the promises in it are marked as sent.
 - **Import** (Mod+Shift+M, or paste anywhere in a list or in Quick Entry). Copy the Copilot prompt
-  from a person, an initiative or a meeting, run it in Microsoft 365 Copilot or another assistant on
+  (Ask Copilot, on a person's page or in the command palette), run it in Microsoft 365 Copilot or another assistant on
   your meeting notes or a mail thread, and paste its answer. Vicu shows every item with what it
   will do; nothing is added until you choose Add. Mod+Shift+I stays the developer tools.
+- **Meetings.** On People, New meeting: a name, the people in their order and a rhythm. Start round
+  goes through the people one card at a time, in any order and without a timer (Enter next, S skip,
+  A absent); verdicts and new promises are written as they happen. End meeting writes the round and
+  opens its recap.
 
-## Steer the portfolio
+## Portfolio
 
-- **Initiatives.** In a project's menu, Initiative, Start. The portfolio has a cap (four unless you
+- **Initiatives.** In a project's menu, Initiative, Make this an initiative. The portfolio has a cap (four unless you
   agree on another), a rank you change with the arrows, and Park with a reason. A parked
   initiative's tasks leave Today and Upcoming until you start it again.
 - **Readiness.** An initiative's panel (on its project page) has nine items: sponsor, owner, why,
@@ -77,12 +82,8 @@ of Pro's data.
 - **Requests.** `req:` in quick add, or Treat as request on a row, opens triage next to the ranked
   portfolio: Accept into an initiative, Delegate, Decline (logged), or Ask the sponsor. The reply to
   send back is copied.
-- **Meetings.** On People, New meeting: a name, the people in their order and a rhythm. Start round
-  goes through the people one card at a time, in any order and without a timer (Enter next, S skip,
-  A absent); verdicts and new promises are written as they happen. End meeting writes the round and
-  opens its recap.
 
-## Work fast, look back
+## Power tools
 
 - **Pro lists.** The list editor has a Pro section: Show (Available now, Remaining), Flagged,
   Estimate at most, Project status, Promise, People, Group by and Rows show, with a live count of
