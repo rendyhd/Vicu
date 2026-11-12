@@ -129,6 +129,25 @@ export interface DeleteCommentAction extends ActionBase {
 
 export type CommentAction = CreateCommentAction | UpdateCommentAction | DeleteCommentAction
 
+/**
+ * A relation between two tasks, Pro's "after" (`blocked`, cross-app semantics 21.2 and decision 24).
+ * Either id may be a temp id of a create still in the queue; the replay rewrites both.
+ */
+export interface AddRelationAction extends ActionBase {
+  type: 'add-relation'
+  taskId: number
+  otherTaskId: number
+  /** Vikunja's relation kind, such as `blocked`. */
+  kind: string
+}
+
+export interface RemoveRelationAction extends ActionBase {
+  type: 'remove-relation'
+  taskId: number
+  otherTaskId: number
+  kind: string
+}
+
 export type QueuedAction =
   | CreateAction
   | UpdateAction
@@ -141,6 +160,8 @@ export type QueuedAction =
   | CreateCommentAction
   | UpdateCommentAction
   | DeleteCommentAction
+  | AddRelationAction
+  | RemoveRelationAction
 
 export type DependentAction = Exclude<QueuedAction, CreateAction>
 

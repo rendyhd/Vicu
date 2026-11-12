@@ -36,6 +36,7 @@ import { mapLimited } from './map-limited'
 import { isBrokenSearch } from '../shared/error-classify'
 import { isOwnTask } from '../shared/hidden-tasks'
 import { PREFS_CARRIER_SEARCH, hasPrefsMarker } from './synced-prefs-protocol'
+import { PRO_ARCHIVE_SEARCH, PRO_LEDGER_SEARCH, hasProArchiveMarker, hasProLedgerMarker } from './pro-ledger-protocol'
 import {
   ROUTINE_ARCHIVE_SEARCH,
   ROUTINE_CARRIER_SEARCH,
@@ -52,9 +53,9 @@ const DIRECT_FETCH_CONCURRENCY = 4
 
 export const CARRIER_IDS_FILENAME = 'carrier-ids.json'
 
-export type CarrierKind = 'routine' | 'routine-archive' | 'custom-lists' | 'prefs'
+export type CarrierKind = 'routine' | 'routine-archive' | 'custom-lists' | 'prefs' | 'pro' | 'pro-archive'
 
-const CARRIER_KINDS: readonly CarrierKind[] = ['routine', 'routine-archive', 'custom-lists', 'prefs']
+const CARRIER_KINDS: readonly CarrierKind[] = ['routine', 'routine-archive', 'custom-lists', 'prefs', 'pro', 'pro-archive']
 
 export interface CarrierTask {
   id: number
@@ -100,6 +101,20 @@ export const PREFS_CARRIER_SPEC: CarrierSpec = {
   kind: 'prefs',
   search: PREFS_CARRIER_SEARCH,
   isCarrier: (task) => hasPrefsMarker(task.description),
+}
+
+/** The Pro ledger (contract section 21.7). */
+export const PRO_LEDGER_SPEC: CarrierSpec = {
+  kind: 'pro',
+  search: PRO_LEDGER_SEARCH,
+  isCarrier: (task) => hasProLedgerMarker(task.description),
+}
+
+/** The Pro ledger's archive parts, read on demand. */
+export const PRO_ARCHIVE_SPEC: CarrierSpec = {
+  kind: 'pro-archive',
+  search: PRO_ARCHIVE_SEARCH,
+  isCarrier: (task) => hasProArchiveMarker(task.description),
 }
 
 /** By the marker only: a task the user titled like the carrier stays theirs (section 10.1). */

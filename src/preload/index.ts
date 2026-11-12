@@ -55,6 +55,9 @@ const api = {
     ipcRenderer.invoke('remove-project-share', projectId, username),
   fetchAvatar: (username: string, size: number) =>
     ipcRenderer.invoke('fetch-avatar', username, size),
+  // Pro's "after" (blocked by), through the write gate and the offline queue.
+  addAfter: (taskId: number, otherTaskId: number, options?: TaskWriteOptions) => ipcRenderer.invoke('pro:add-after', taskId, otherTaskId, options),
+  removeAfter: (taskId: number, otherTaskId: number, options?: TaskWriteOptions) => ipcRenderer.invoke('pro:remove-after', taskId, otherTaskId, options),
   addTaskAssignee: (taskId: number, userId: number, options?: TaskWriteOptions) =>
     ipcRenderer.invoke('add-task-assignee', taskId, userId, options),
   removeTaskAssignee: (taskId: number, userId: number, options?: TaskWriteOptions) =>
@@ -137,6 +140,23 @@ const api = {
     return () => { ipcRenderer.removeListener('synced-prefs-sync-status', handler) }
   },
   getCustomListSyncStatus: () => ipcRenderer.invoke('custom-lists:status'),
+  // Pro (cross-app semantics section 21)
+  getProLedger: () => ipcRenderer.invoke('pro-ledger:get'),
+  mutateProLedger: (operations: unknown[]) => ipcRenderer.invoke('pro-ledger:mutate', operations),
+  syncProLedger: () => ipcRenderer.invoke('pro-ledger:sync'),
+  getProLedgerStatus: () => ipcRenderer.invoke('pro-ledger:status'),
+  readProArchive: () => ipcRenderer.invoke('pro-ledger:archive'),
+  onProLedgerChanged: (cb: (snapshot: unknown) => void) => {
+    const handler = (_: unknown, snapshot: unknown) => cb(snapshot)
+    ipcRenderer.on('pro-ledger-changed', handler)
+    return () => { ipcRenderer.removeListener('pro-ledger-changed', handler) }
+  },
+  onProLedgerStatus: (cb: (status: unknown) => void) => {
+    const handler = (_: unknown, status: unknown) => cb(status)
+    ipcRenderer.on('pro-ledger-sync-status', handler)
+    return () => { ipcRenderer.removeListener('pro-ledger-sync-status', handler) }
+  },
+  writeClipboardRich: (text: string, html?: string) => ipcRenderer.invoke('clipboard:write-rich', text, html),
   getSavedFilterState: () => ipcRenderer.invoke('saved-filters:state'),
   previewSavedFilters: (ids?: number[]) => ipcRenderer.invoke('saved-filters:preview', ids),
   importSavedFilters: (ids: number[]) => ipcRenderer.invoke('saved-filters:import', ids),

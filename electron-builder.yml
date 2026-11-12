@@ -2,6 +2,13 @@ appId: com.rendyhd.vicu
 productName: Vicu
 copyright: Copyright (c) 2024-2026 rendyhd
 
+# vicu:// links (src/main/deep-link.ts): the Windows installer registers the scheme, macOS reads it
+# from CFBundleURLTypes, and the Linux desktop entry gets MimeType=x-scheme-handler/vicu.
+protocols:
+  - name: Vicu
+    schemes:
+      - vicu
+
 directories:
   buildResources: build
   output: dist

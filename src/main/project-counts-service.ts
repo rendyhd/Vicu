@@ -1,6 +1,7 @@
 import { fetchProjectTaskTotal } from './api-client'
-import { loadCustomListCarriers, loadPrefsCarriers, loadRoutineArchiveParts, loadRoutineCarriers } from './carrier-service'
+import { loadCustomListCarriers, loadPrefsCarriers, loadProArchiveParts, loadProLedgerCarriers, loadRoutineArchiveParts, loadRoutineCarriers } from './carrier-service'
 import { loadConfig } from './config'
+import { isProEnabled } from '../shared/pro/settings'
 import { normalizeServerUrl } from './offline/owner'
 import { countCarriersByProject, createProjectCounts, type ProjectCounts } from './project-task-counts'
 
@@ -17,7 +18,10 @@ function getCounts(): ProjectCounts {
       // Every hidden done task of the user's that the app knows: routine carriers, archive parts and
       // the custom-list and preferences carriers (cross-app semantics 10.1).
       carrierCounts: async () => {
-        const loads = await Promise.all([loadRoutineCarriers(), loadRoutineArchiveParts(), loadCustomListCarriers(), loadPrefsCarriers()])
+        // The Pro ledger and its archive parts only while Pro is on: a device with Pro off sends what
+        // it sent before Pro (cross-app semantics 21.1, O1).
+        const pro = isProEnabled(loadConfig()) ? [loadProLedgerCarriers(), loadProArchiveParts()] : []
+        const loads = await Promise.all([loadRoutineCarriers(), loadRoutineArchiveParts(), loadCustomListCarriers(), loadPrefsCarriers(), ...pro])
         const failed = loads.find((result) => !result.success)
         if (failed && !failed.success) return failed
         return { success: true, data: countCarriersByProject(loads.flatMap((result) => (result.success ? result.data : []))) }

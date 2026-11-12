@@ -55,6 +55,7 @@ export function classifyReplayFailure(failure: FailureLike, actionType: OfflineA
         actionType === 'delete' ||
         actionType === 'remove-label' ||
         actionType === 'remove-assignee' ||
+        actionType === 'remove-relation' ||
         actionType === 'delete-comment'
       ) {
         return { kind: 'done' }
@@ -62,7 +63,8 @@ export function classifyReplayFailure(failure: FailureLike, actionType: OfflineA
       return { kind: 'drop', reason: actionType === 'create' || actionType === 'update-comment' ? 'not-found' : 'task-gone' }
     }
     if (status === 409) {
-      return actionType === 'add-label' ? { kind: 'done' } : { kind: 'drop', reason: 'conflict' }
+      // The same label or relation is already there (Vikunja answers 409, code 4008 for a relation).
+      return actionType === 'add-label' || actionType === 'add-relation' ? { kind: 'done' } : { kind: 'drop', reason: 'conflict' }
     }
     if (status === 400 || status === 422) return { kind: 'drop', reason: 'rejected' }
     // Too large for the server, and it will say so every time: a kept action would stop the replay

@@ -1,3 +1,4 @@
+import { remapProLedgerTask } from './pro-ledger-service'
 import { loadConfig } from './config'
 import {
   fetchTasks,
@@ -13,6 +14,8 @@ import {
   uploadTaskAttachment,
   addTaskAssignee,
   removeTaskAssignee,
+  createTaskRelation,
+  deleteTaskRelation,
   createTaskComment,
   updateTaskComment,
   deleteTaskComment,
@@ -57,6 +60,8 @@ const api: ReplayApi = {
   },
   addTaskAssignee: (taskId, userId) => sendSerially(() => addTaskAssignee(taskId, userId)),
   removeTaskAssignee: (taskId, userId) => sendSerially(() => removeTaskAssignee(taskId, userId)),
+  createTaskRelation: (taskId, otherTaskId, kind) => sendSerially(() => createTaskRelation(taskId, otherTaskId, kind)),
+  deleteTaskRelation: (taskId, kind, otherTaskId) => sendSerially(() => deleteTaskRelation(taskId, kind, otherTaskId)),
   createTaskComment: (taskId, html) => sendSerially(() => createTaskComment(taskId, html)),
   updateTaskComment: (taskId, commentId, html) => sendSerially(() => updateTaskComment(taskId, commentId, html)),
   deleteTaskComment: (taskId, commentId) => sendSerially(() => deleteTaskComment(taskId, commentId)),
@@ -77,6 +82,8 @@ const retry = createReplayRetry(() => {
 
 const runReplay = createReplayRunner(async () => {
   const event = await replayQueue(getOfflineQueue(), api)
+  // Tasks created offline that the Pro ledger names under their temporary id (section 21.7).
+  for (const [tempId, realId] of Object.entries(event.idMap)) remapProLedgerTask(Number(tempId), realId)
   announce(event)
   return event
 })

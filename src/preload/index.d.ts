@@ -42,6 +42,8 @@ import type { IcsImportPreview } from '../shared/ics-import'
 import type { EventKitFoundCalendar, EventKitSaveInput, EventKitStatusView } from '../shared/calendar-eventkit'
 import type { SavedFilterImportOutcome, SavedFilterPreview, SavedFilterState } from '../shared/saved-filter-import'
 import type { SyncedPrefsSnapshot } from '../shared/synced-prefs'
+import type { ArchiveRecords } from '../shared/pro/ledger'
+import type { ProLedgerOperation, ProLedgerSnapshot } from '../shared/pro/ledger-ipc'
 import type {
   OfflineCreateInput,
   OfflineCreateResult,
@@ -114,6 +116,9 @@ export interface ElectronAPI {
   removeProjectShare(projectId: number, username: string): Promise<ApiResult<void>>
   /** A data URL of the user's avatar. */
   fetchAvatar(username: string, size: number): Promise<ApiResult<string>>
+  /** Pro's "after": `taskId` waits on `otherTaskId` (a `blocked` relation), queued offline. */
+  addAfter(taskId: number, otherTaskId: number, options?: TaskWriteOptions): Promise<ApiResult<unknown> | QueuedWriteReply>
+  removeAfter(taskId: number, otherTaskId: number, options?: TaskWriteOptions): Promise<ApiResult<unknown> | QueuedWriteReply>
   addTaskAssignee(taskId: number, userId: number, options?: TaskWriteOptions): Promise<ApiResult<unknown> | QueuedWriteReply>
   removeTaskAssignee(taskId: number, userId: number, options?: TaskWriteOptions): Promise<ApiResult<void> | QueuedWriteReply>
   /** A page of the thread, newest first, with queued comment changes laid over it. */
@@ -175,6 +180,18 @@ export interface ElectronAPI {
   /** Setup: the account's synced Inbox and Vikunja's default project, read before asking for an Inbox. */
   readSetupPreferences(url: string, token?: string): Promise<{ inboxProjectId: number | null; defaultProjectId: number | null }>
   onSyncedPrefsChanged(cb: (snapshot: SyncedPrefsSnapshot) => void): () => void
+  // Pro (cross-app semantics section 21)
+  getProLedger(): Promise<ProLedgerSnapshot>
+  /** Changes applied by main to its current copy; returns the new snapshot. */
+  mutateProLedger(operations: ProLedgerOperation[]): Promise<ProLedgerSnapshot>
+  syncProLedger(): Promise<CustomListSyncStatus>
+  getProLedgerStatus(): Promise<CustomListSyncStatus>
+  /** Every archive part's records, merged (read on demand). */
+  readProArchive(): Promise<ArchiveRecords>
+  onProLedgerChanged(cb: (snapshot: ProLedgerSnapshot) => void): () => void
+  onProLedgerStatus(cb: (status: CustomListSyncStatus) => void): () => void
+  /** Puts a plain text and, when given, an HTML version on the clipboard. */
+  writeClipboardRich(text: string, html?: string): Promise<boolean>
   onSyncedPrefsStatus(cb: (status: CustomListSyncStatus) => void): () => void
   /** Custom-list and settings changes that have not reached the server, with their sync status. */
   getUnsyncedDocuments(): Promise<UnsyncedDocuments>

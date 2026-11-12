@@ -32,6 +32,7 @@ import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { registerConfirm } from '@/lib/confirm-bridge'
 import { resolveSelectedTasks } from '@/lib/task-selection'
 import { useSyncedPrefsEvents } from '@/hooks/use-synced-prefs'
+import { useProLedgerEvents } from '@/hooks/use-pro-ledger'
 import { useReorderStore } from '@/stores/reorder-store'
 import { api } from '@/lib/api'
 import { applyTheme } from '@/lib/theme'
@@ -162,6 +163,7 @@ export function AppShell() {
   const addLabel = useAddLabel()
   // Another device's synced settings (the Inbox, the task order) arrive here.
   useSyncedPrefsEvents()
+  useProLedgerEvents()
   const reducedMotion = useReducedMotion()
   // The drop travels into the slot over fade.base with the enter curve; reduced motion has none. A
   // task sent somewhere else lands there instead: handleDragEnd says where, before the animation runs.

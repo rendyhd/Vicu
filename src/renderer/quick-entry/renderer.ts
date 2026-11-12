@@ -45,7 +45,7 @@ declare global {
       fetchPlaces(): Promise<Array<{ id: string; name: string }>>
       addLabelToTask(taskId: number, labelId: number): Promise<{ success: boolean; error?: string; statusCode?: number }>
       createLabel(label: { title: string; hex_color?: string }): Promise<{ success: boolean; error?: string; statusCode?: number; data?: { id: number; title: string } }>
-      onShowWindow(callback: () => void): void
+      onShowWindow(callback: (prefill: string | null) => void): void
       onHideWindow(callback: () => void): void
       onSyncCompleted(callback: () => void): void
       onDragHover(callback: (hovering: boolean) => void): void
@@ -720,8 +720,13 @@ function applyConfig(cfg: QuickEntryConfig): void {
 }
 
 // When the main process signals the window is shown
-window.quickEntryApi.onShowWindow(() => {
+window.quickEntryApi.onShowWindow((prefill) => {
   resetInput()
+  // A `vicu://add` link fills the field; the person still presses Enter (never created silently).
+  if (prefill) {
+    input.value = prefill
+    input.dispatchEvent(new Event('input'))
+  }
 
   // Apply cached config synchronously for instant UI
   if (lastConfig) applyConfig(lastConfig)

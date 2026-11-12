@@ -171,6 +171,8 @@ export type CustomListSyncStatus =
 export interface UnsyncedDocuments {
   customLists: CustomListSyncStatus | null
   preferences: CustomListSyncStatus | null
+  /** The Pro ledger (cross-app semantics 21.7); null while Pro is off. */
+  proLedger?: CustomListSyncStatus | null
 }
 
 // --- Quick View, review, connection ----------------------------------------------------------

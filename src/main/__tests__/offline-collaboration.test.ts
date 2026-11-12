@@ -205,6 +205,8 @@ describe('queue and replay end to end', () => {
       findRecentCreate: async () => ok(null),
       addTaskAssignee: async (taskId, userId) => (calls.push(`assign ${taskId} ${userId}`), ok(null)),
       removeTaskAssignee: async (taskId, userId) => (calls.push(`unassign ${taskId} ${userId}`), ok(undefined)),
+      createTaskRelation: async (taskId, otherTaskId, kind) => (calls.push(`relate ${taskId} ${kind} ${otherTaskId}`), ok(null)),
+      deleteTaskRelation: async (taskId, kind, otherTaskId) => (calls.push(`unrelate ${taskId} ${kind} ${otherTaskId}`), ok(undefined)),
       createTaskComment: async (taskId, html) => {
         const id = nextComment++
         calls.push(`comment ${taskId} ${html} -> ${id}`)

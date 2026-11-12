@@ -95,6 +95,34 @@ export const taskWrites = {
       enqueue: () => queue.enqueueAddLabel(taskId, label.title ? { id: label.id, title: label.title } : { id: label.id }, titleMeta(title)),
     }
   },
+  addRelation(
+    queue: OfflineQueue,
+    api: { createTaskRelation(taskId: number, otherTaskId: number, kind: string): Promise<ApiResult<unknown>> },
+    taskId: number,
+    otherTaskId: number,
+    kind: string,
+    title?: string
+  ): TaskWriteSpec {
+    return {
+      taskId,
+      send: () => api.createTaskRelation(taskId, otherTaskId, kind),
+      enqueue: () => queue.enqueueAddRelation(taskId, otherTaskId, kind, titleMeta(title)),
+    }
+  },
+  removeRelation(
+    queue: OfflineQueue,
+    api: { deleteTaskRelation(taskId: number, kind: string, otherTaskId: number): Promise<ApiResult<unknown>> },
+    taskId: number,
+    otherTaskId: number,
+    kind: string,
+    title?: string
+  ): TaskWriteSpec {
+    return {
+      taskId,
+      send: () => api.deleteTaskRelation(taskId, kind, otherTaskId),
+      enqueue: () => queue.enqueueRemoveRelation(taskId, otherTaskId, kind, titleMeta(title)),
+    }
+  },
   addAssignee(
     queue: OfflineQueue,
     api: { addTaskAssignee(taskId: number, userId: number): Promise<ApiResult<unknown>> },

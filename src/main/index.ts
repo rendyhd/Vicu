@@ -25,6 +25,9 @@ import { flushTaskCache } from './cache'
 import { syncCustomLists } from './custom-list-service'
 import { startSavedFilterImport } from './saved-filter-service'
 import { syncSyncedPrefs } from './synced-preferences'
+import { syncProLedger } from './pro-ledger-service'
+import { DEEP_LINK_SCHEME, deepLinkFromArgv, parseDeepLink, quickEntryText, routeOfView, type DeepLink } from './deep-link'
+import { isProEnabled } from '../shared/pro/settings'
 import { parseHiddenArg, shouldStartHidden } from './login-item-settings'
 import { applyLaunchOnStartup } from './launch-on-startup'
 import { startupEnv } from './startup-env'
@@ -113,7 +116,7 @@ let quickViewShowTime = 0
 const BLUR_DEBOUNCE_MS = 300
 
 // --- Quick Entry show/hide ---
-async function showQuickEntry(): Promise<void> {
+async function showQuickEntry(prefill?: string): Promise<void> {
   if (!quickEntryWindow) return
   const config = loadConfig()
 
@@ -185,7 +188,7 @@ async function showQuickEntry(): Promise<void> {
   quickEntryWindow.show()
   quickEntryWindow.focus()
   quickEntryShowTime = Date.now()
-  quickEntryWindow.webContents.send('window-shown')
+  quickEntryWindow.webContents.send('window-shown', prefill ?? null)
   startDragHoverPolling()
 
   // 8. Await PowerShell result (already running in background with correct HWND)
@@ -422,6 +425,7 @@ function createAndWireMainWindow(config: AppConfig | null, options: { startHidde
     lastCustomListFocusSync = Date.now()
     void syncCustomLists()
     void syncSyncedPrefs()
+    void syncProLedger()
   })
 
   // Unified close policy, evaluated at close time (not startup time):
@@ -640,6 +644,43 @@ function parseIntent(argv: readonly string[]): 'quick-entry' | 'quick-view' | nu
   return null
 }
 let startupIntent: 'quick-entry' | 'quick-view' | null = parseIntent(process.argv)
+// A `vicu://` link the app was started with (Windows and Linux pass it in argv), acted on once the
+// windows exist; macOS sends `open-url`, which can arrive before `ready`.
+let startupLink: DeepLink | null = deepLinkFromArgv(process.argv)
+let appReady = false
+
+/** Acts on a `vicu://` link (deep-link.ts). Never creates anything: an add link only fills Quick Entry. */
+function handleDeepLink(link: DeepLink): void {
+  const config = loadConfig()
+  if (link.kind === 'add') {
+    if (!quickEntryWindow) return
+    const prefix = config?.nlp_syntax_mode === 'vikunja' ? '+' : '#'
+    void showQuickEntry(quickEntryText(link, prefix))
+    return
+  }
+  // Pro's own lists answer only while Pro is on (21.1, O1).
+  if (link.kind === 'view' && (link.view === 'flagged' || link.view === 'waiting') && !isProEnabled(config)) return
+  if (!mainWindow || mainWindow.isDestroyed()) mainWindow = createAndWireMainWindow(config)
+  const win = mainWindow
+  const send = () => {
+    if (win.isDestroyed()) return
+    if (link.kind === 'task') win.webContents.send('navigate-to-task', link.id)
+    else win.webContents.send('navigate', routeOfView(link.view))
+  }
+  if (win.webContents.isLoading()) win.webContents.once('did-finish-load', send)
+  else send()
+  win.show()
+  if (win.isMinimized()) win.restore()
+  win.focus()
+}
+
+app.on('open-url', (event, url) => {
+  event.preventDefault()
+  const link = parseDeepLink(url)
+  if (!link) return
+  if (appReady) handleDeepLink(link)
+  else startupLink = link
+})
 
 // Single instance lock — quit if another instance is already running
 const gotLock = app.requestSingleInstanceLock()
@@ -650,6 +691,12 @@ if (!gotLock) {
     // If the second instance was launched with --quick-entry/--quick-view
     // (typically from a DE keyboard-shortcut binding on Wayland), show that
     // window and do NOT raise the main window.
+    const link = deepLinkFromArgv(argv)
+    if (link) {
+      if (appReady) handleDeepLink(link)
+      else startupLink = link
+      return
+    }
     const intent = parseIntent(argv)
     if (intent === 'quick-entry') {
       showQuickEntry()
@@ -762,6 +809,7 @@ if (!gotLock) {
       void replayPendingActions()
       void syncCustomLists()
       void syncSyncedPrefs()
+      void syncProLedger()
     })
 
     // Replay any offline-queued actions: once shortly after startup, then
@@ -775,6 +823,9 @@ if (!gotLock) {
     // The synced preferences (the Inbox, the task order) sync whenever custom lists do.
     setTimeout(() => { void syncSyncedPrefs() }, 12_000)
     setInterval(() => { void syncSyncedPrefs() }, 5 * 60_000)
+    // The Pro ledger, only while Pro is on (syncProLedger does nothing otherwise).
+    setTimeout(() => { void syncProLedger() }, 12_000)
+    setInterval(() => { void syncProLedger() }, 5 * 60_000)
 
     // Auto-register browser native messaging hosts on startup so manifests
     // always point to the current app's bridge (important when switching
@@ -829,6 +880,17 @@ if (!gotLock) {
       showQuickView()
     }
     startupIntent = null
+    appReady = true
+    // Registered only for an installed build with the real profile: a dev run or a throwaway
+    // profile (VICU_USER_DATA_DIR) must not take the scheme from the installed app.
+    if (app.isPackaged && !process.env.VICU_USER_DATA_DIR && !app.isDefaultProtocolClient(DEEP_LINK_SCHEME)) {
+      app.setAsDefaultProtocolClient(DEEP_LINK_SCHEME)
+    }
+    if (startupLink) {
+      const link = startupLink
+      startupLink = null
+      handleDeepLink(link)
+    }
   })
 
   app.on('window-all-closed', () => {

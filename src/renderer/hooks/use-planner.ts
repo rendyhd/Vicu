@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import type { AppConfig, Task, TaskQueryParams } from '@/lib/vikunja-types'
 import { NULL_DATE } from '@/lib/constants'
-import { planRangeFilter } from '@/lib/planner-timeline'
+import { inPlanRange, planRangeFilter } from '@/lib/planner-timeline'
 import { useDayKey } from '@/stores/day-store'
 import { APP_CONFIG_QUERY_KEY, useAppConfig } from './use-app-config'
 import { useProjects } from './use-projects'
@@ -81,8 +81,8 @@ export function usePlanRange(days: readonly LocalDate[]) {
   const tasks = useMemo(() => {
     if (!projects) return []
     const active = new Set(projects.flat.map((project) => project.id))
-    return query.data.filter((task) => active.has(task.project_id))
-  }, [query.data, projects])
+    return query.data.filter((task) => active.has(task.project_id) && inPlanRange(task, days, today))
+  }, [query.data, projects, key, today])
   return { tasks, isLoading: query.isLoading, isFetching: query.isFetching }
 }
 

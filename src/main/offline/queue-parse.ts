@@ -78,6 +78,10 @@ export function normalizeAction(raw: unknown): QueuedAction | null {
         ...(raw.addImageToken === true ? { addImageToken: true } : {}),
         ...(raw.uploaded === true ? { uploaded: true } : {}),
       }
+    case 'add-relation':
+    case 'remove-relation':
+      if (!isInt(raw.taskId) || !isInt(raw.otherTaskId) || !isString(raw.kind) || !/^[a-z_]{1,32}$/.test(raw.kind)) return null
+      return { ...base, type: raw.type, taskId: raw.taskId, otherTaskId: raw.otherTaskId, kind: raw.kind }
     case 'add-assignee':
     case 'remove-assignee':
       if (!isInt(raw.taskId) || !isInt(raw.userId) || raw.userId <= 0) return null

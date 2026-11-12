@@ -13,6 +13,16 @@ import { canonicalJson, isOwnTask } from '../shared/hidden-tasks'
 import { TEMPLATE_KEY_PREFIX, readTemplate } from '../shared/task-templates'
 import { EVENT_KEY_PREFIX, readPlanEvent } from '../shared/plan-events'
 import { readSubtaskOrder } from '../shared/subtask-order'
+import { PRO_AREA_KEY, readProArea } from '../shared/pro/settings'
+import {
+  LABEL_KIND_KEY_PREFIX,
+  LABEL_STATUS_KEY_PREFIX,
+  PROJECT_MODE_KEY_PREFIX,
+  PROJECT_STATUS_KEY_PREFIX,
+  REPEAT_RULE_KEY_PREFIX,
+  idOfProKey,
+  readRepeatRule,
+} from '../shared/pro/prefs'
 import {
   INBOX_PROJECT_ID_KEY,
   emptySyncedPrefs,
@@ -263,6 +273,12 @@ export function isWritablePref(key: unknown, value: unknown): key is string {
   if (/^subtask_order\.\d+$/.test(key)) return value === null || (Array.isArray(value) && readSubtaskOrder(value).length === value.length)
   // An Event of the Plan screen (proof of concept, plan-events.ts).
   if (key.startsWith(EVENT_KEY_PREFIX) && key.length > EVENT_KEY_PREFIX.length) return value === null || readPlanEvent(value) !== null
+  // Pro (section 21): the area, project types and statuses, label statuses and kinds, repeat rules.
+  if (key === PRO_AREA_KEY) return value === null || (Array.isArray(value) && readProArea(value).length === value.length)
+  if (idOfProKey(key, PROJECT_MODE_KEY_PREFIX) !== null) return value === null || value === 'sequential' || value === 'single'
+  if (idOfProKey(key, PROJECT_STATUS_KEY_PREFIX) !== null || idOfProKey(key, LABEL_STATUS_KEY_PREFIX) !== null) return value === null || value === 'on_hold'
+  if (idOfProKey(key, LABEL_KIND_KEY_PREFIX) !== null) return value === null || value === 'person'
+  if (idOfProKey(key, REPEAT_RULE_KEY_PREFIX) !== null) return value === null || readRepeatRule(value) !== null
   return false
 }
 

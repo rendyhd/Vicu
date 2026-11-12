@@ -16,6 +16,7 @@ export interface UnsyncedDocumentItem {
 const LABELS: Record<keyof UnsyncedDocuments, string> = {
   customLists: 'Custom list changes',
   preferences: 'Settings changes (the Inbox, the task order, location reminders)',
+  proLedger: 'Pro changes (promises, verdicts, initiatives, meetings)',
 }
 
 function statusNote(status: CustomListSyncStatus): string {
@@ -50,7 +51,7 @@ export function stalledDocumentsLabel(documents: UnsyncedDocuments | undefined):
   const stalled = (status: CustomListSyncStatus | null | undefined) =>
     !!status && (status.state === 'offline' || status.state === 'error' || status.state === 'update_required')
   const lists = stalled(documents?.customLists)
-  const settings = stalled(documents?.preferences)
+  const settings = stalled(documents?.preferences) || stalled(documents?.proLedger)
   if (lists && settings) return 'Lists and settings waiting'
   if (lists) return 'Custom lists waiting'
   if (settings) return 'Settings waiting'

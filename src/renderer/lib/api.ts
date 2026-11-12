@@ -138,6 +138,12 @@ export const api = {
   fetchAvatar: (username: string, size: number) =>
     window.api.fetchAvatar(username, size) as Promise<ApiResult<string>>,
 
+  /** Pro's "after" (cross-app semantics 21.2): `taskId` waits on `otherTaskId`; queued offline (decision 24). */
+  addAfter: (taskId: number, otherTaskId: number, taskTitle?: string) =>
+    window.api.addAfter(taskId, otherTaskId, queueOptions(taskTitle)) as Promise<ApiResult<unknown> | QueuedWriteReply>,
+  removeAfter: (taskId: number, otherTaskId: number, taskTitle?: string) =>
+    window.api.removeAfter(taskId, otherTaskId, queueOptions(taskTitle)) as Promise<ApiResult<unknown> | QueuedWriteReply>,
+
   addTaskAssigneeOrQueue: (taskId: number, user: PersonRef, taskTitle?: string) =>
     window.api.addTaskAssignee(taskId, user.id, { ...queueOptions(taskTitle), username: user.username }) as Promise<
       ApiResult<unknown> | QueuedWriteReply
@@ -252,6 +258,13 @@ export const api = {
     window.api.onSavedFiltersChanged(cb),
   onSavedFiltersImported: (cb: (outcome: import('../../shared/saved-filter-import').SavedFilterImportOutcome) => void) =>
     window.api.onSavedFiltersImported(cb),
+  // Pro (cross-app semantics section 21)
+  getProLedger: () => window.api.getProLedger(),
+  mutateProLedger: (operations: import('../../shared/pro/ledger-ipc').ProLedgerOperation[]) => window.api.mutateProLedger(operations),
+  syncProLedger: () => window.api.syncProLedger(),
+  readProArchive: () => window.api.readProArchive(),
+  onProLedgerChanged: (cb: (snapshot: import('../../shared/pro/ledger-ipc').ProLedgerSnapshot) => void) => window.api.onProLedgerChanged(cb),
+  writeClipboardRich: (text: string, html?: string) => window.api.writeClipboardRich(text, html),
   getUnsyncedDocuments: () => window.api.getUnsyncedDocuments(),
   discardUnsyncedDocuments: () => window.api.discardUnsyncedDocuments(),
   onSyncedPrefsStatus: (cb: (status: import('./vikunja-types').CustomListSyncStatus) => void) =>

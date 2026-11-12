@@ -19,6 +19,8 @@ import { isSameOwner, type OfflineOwner } from './owner'
 import {
   cancelPatchKeys,
   mergeAddAssignee,
+  mergeAddRelation,
+  mergeRemoveRelation,
   mergeAddLabel,
   mergeCreateComment,
   mergeDelete,
@@ -39,6 +41,8 @@ import {
   hasTaskId,
   pendingIdFor,
   type AddAssigneeAction,
+  type AddRelationAction,
+  type RemoveRelationAction,
   type AddLabelAction,
   type CreateAction,
   type CreateCommentAction,
@@ -339,6 +343,28 @@ export class OfflineQueue {
     const taskId = this.requireTask(ref)
     const action: RemoveLabelAction = { ...this.stamp(meta), type: 'remove-label', taskId, labelId }
     const outcome = mergeRemoveLabel(this.data.actions, action, this.inFlightId)
+    if (outcome.noop && outcome.removed.length === 0) return { actionId: '', taskId, folded: true }
+    await this.apply(outcome)
+    return { actionId: action.id, taskId, folded: !outcome.appended }
+  }
+
+  /** A relation between two tasks (decision 24); either may be a temp id. Cancels a queued removal of it. */
+  async enqueueAddRelation(ref: number | string, otherRef: number | string, kind: string, meta: Meta = {}): Promise<OfflineEnqueueResult> {
+    const taskId = this.requireTask(ref)
+    const otherTaskId = this.requireTask(otherRef)
+    const action: AddRelationAction = { ...this.stamp(meta), type: 'add-relation', taskId, otherTaskId, kind }
+    const outcome = mergeAddRelation(this.data.actions, action, this.inFlightId)
+    if (outcome.noop && outcome.removed.length === 0) return { actionId: '', taskId, folded: true }
+    await this.apply(outcome)
+    return { actionId: action.id, taskId, folded: !outcome.appended }
+  }
+
+  /** A relation's removal. Cancels a queued add of it. */
+  async enqueueRemoveRelation(ref: number | string, otherRef: number | string, kind: string, meta: Meta = {}): Promise<OfflineEnqueueResult> {
+    const taskId = this.requireTask(ref)
+    const otherTaskId = this.requireTask(otherRef)
+    const action: RemoveRelationAction = { ...this.stamp(meta), type: 'remove-relation', taskId, otherTaskId, kind }
+    const outcome = mergeRemoveRelation(this.data.actions, action, this.inFlightId)
     if (outcome.noop && outcome.removed.length === 0) return { actionId: '', taskId, folded: true }
     await this.apply(outcome)
     return { actionId: action.id, taskId, folded: !outcome.appended }

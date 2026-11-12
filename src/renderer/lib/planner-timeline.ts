@@ -226,6 +226,27 @@ export function planRangeFilter(days: readonly LocalDate[], today: LocalDate): s
   return `(start_date >= '${from}' && start_date < '${to}') || (done = false && (${due}${overdue}))`
 }
 
+/**
+ * What the request of a view may only match on the server: a start date that is not a block (a lone
+ * start date, cross-app semantics 21.3) passes the `start_date` clause. A row belongs to the view
+ * when it is a block in the range, or open and due in it (or overdue while today is shown).
+ */
+export function inPlanRange(
+  task: BlockFields & { due_date?: string | null; done?: boolean },
+  days: readonly LocalDate[],
+  today: LocalDate,
+): boolean {
+  if (days.length === 0) return false
+  const from = startOfLocalDay(days[0]).getTime()
+  const to = startOfLocalDay(addLocalDays(days[days.length - 1], 1)).getTime()
+  const block = blockOf(task)
+  if (block && block.start.getTime() >= from && block.start.getTime() < to) return true
+  if (task.done || isNoDueDate(task.due_date)) return false
+  const due = new Date(task.due_date as string).getTime()
+  if (due >= from && due < to) return true
+  return days.includes(today) && due < startOfLocalDay(today).getTime()
+}
+
 // --- Gestures ------------------------------------------------------------------------------------
 
 export type GestureMode = 'move' | 'start' | 'end' | 'draw'

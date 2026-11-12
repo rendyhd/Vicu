@@ -42,8 +42,9 @@ contextBridge.exposeInMainWorld('quickEntryApi', {
   onDateFormatChanged: (callback: (format: { locale: string; hour12: boolean }) => void) => {
     ipcRenderer.on('date-format-changed', (_event, format: { locale: string; hour12: boolean }) => callback(format))
   },
-  onShowWindow: (callback: () => void) => {
-    ipcRenderer.on('window-shown', () => callback())
+  // `prefill` is the text of a `vicu://add` link, else null.
+  onShowWindow: (callback: (prefill: string | null) => void) => {
+    ipcRenderer.on('window-shown', (_event, prefill: unknown) => callback(typeof prefill === 'string' ? prefill : null))
   },
   onHideWindow: (callback: () => void) => {
     ipcRenderer.on('window-hidden', () => callback())

@@ -116,7 +116,9 @@ const settingsRoute = createRoute({
   path: '/settings',
   component: lazyRouteComponent(() => import('@/views/SettingsView'), 'SettingsView'),
   // `section=calendars` opens General at the Plan settings' calendars (the Plan gear's Manage).
-  validateSearch: (search: Record<string, unknown>): { section?: 'calendars' } => (search.section === 'calendars' ? { section: 'calendars' } : {}),
+  // `section=pro` opens the Pro tab (the palette's Pro settings).
+  validateSearch: (search: Record<string, unknown>): { section?: 'calendars' | 'pro' } =>
+    search.section === 'calendars' ? { section: 'calendars' } : search.section === 'pro' ? { section: 'pro' } : {},
 })
 
 const searchRoute = createRoute({

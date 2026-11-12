@@ -10,6 +10,8 @@ import type {
   RemoveLabelAction,
   UpdateAction,
   UpdateCommentAction,
+  AddRelationAction,
+  RemoveRelationAction,
 } from './types'
 import { hasTaskId } from './types'
 
@@ -343,9 +345,30 @@ export function cancelPatchKeys(
  */
 export function remapTempId(actions: QueuedAction[], tempId: number, realId: number, title?: string): QueuedAction[] {
   return actions.map((a) => {
-    if (!hasTaskId(a) || a.taskId !== tempId) return a
-    const remapped = { ...a, taskId: realId } as QueuedAction
-    if (title && !remapped.title) remapped.title = title
+    // A relation names a second task, which may be the one just created.
+    const other = (a.type === 'add-relation' || a.type === 'remove-relation') && a.otherTaskId === tempId
+    if (!hasTaskId(a) || (a.taskId !== tempId && !other)) return a
+    const remapped = { ...a, ...(a.taskId === tempId ? { taskId: realId } : {}), ...(other ? { otherTaskId: realId } : {}) } as QueuedAction
+    if (title && !remapped.title && a.taskId === tempId) remapped.title = title
     return remapped
   })
+}
+
+const sameRelation = (a: { taskId: number; otherTaskId: number; kind: string }, b: { taskId: number; otherTaskId: number; kind: string }) =>
+  a.taskId === b.taskId && a.otherTaskId === b.otherTaskId && a.kind === b.kind
+
+/** Queue a relation. Cancels a queued removal of the same relation (decision 24). */
+export function mergeAddRelation(actions: QueuedAction[], next: AddRelationAction, inFlightId: string | null): MergeOutcome {
+  if (actions.some((a) => a.type === 'add-relation' && sameRelation(a, next))) return outcome(actions, {})
+  const removal = actions.find((a): a is RemoveRelationAction => a.type === 'remove-relation' && sameRelation(a, next) && a.id !== inFlightId)
+  if (removal) return outcome(actions.filter((a) => a.id !== removal.id), { removed: [removal] })
+  return outcome([...actions, next], { appended: true })
+}
+
+/** Queue a relation's removal. Cancels a queued add of the same relation. */
+export function mergeRemoveRelation(actions: QueuedAction[], next: RemoveRelationAction, inFlightId: string | null): MergeOutcome {
+  if (actions.some((a) => a.type === 'remove-relation' && sameRelation(a, next))) return outcome(actions, {})
+  const addition = actions.find((a): a is AddRelationAction => a.type === 'add-relation' && sameRelation(a, next) && a.id !== inFlightId)
+  if (addition) return outcome(actions.filter((a) => a.id !== addition.id), { removed: [addition] })
+  return outcome([...actions, next], { appended: true })
 }

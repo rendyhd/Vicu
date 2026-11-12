@@ -28,6 +28,8 @@ export interface ReplayApi {
    */
   findRecentCreate(projectId: number, fields: Record<string, unknown>, since: string): Promise<ApiResult<{ id: number } | null>>
   addTaskAssignee(taskId: number, userId: number): Promise<ApiResult<unknown>>
+  createTaskRelation(taskId: number, otherTaskId: number, kind: string): Promise<ApiResult<unknown>>
+  deleteTaskRelation(taskId: number, kind: string, otherTaskId: number): Promise<ApiResult<unknown>>
   removeTaskAssignee(taskId: number, userId: number): Promise<ApiResult<unknown>>
   createTaskComment(taskId: number, html: string): Promise<ApiResult<unknown>>
   updateTaskComment(taskId: number, commentId: number, html: string): Promise<ApiResult<unknown>>
@@ -233,6 +235,17 @@ async function sendAction(queue: OfflineQueue, api: ReplayApi, action: QueuedAct
     }
     case 'upload-attachment':
       return sendUpload(queue, api, action, taskId)
+    case 'add-relation':
+    case 'remove-relation': {
+      // The other task was created offline and its create never made it: nothing to relate to.
+      if (action.otherTaskId < 0) {
+        return { kind: 'broken', reason: 'dependency-failed', error: 'The other task was never created' }
+      }
+      const result = action.type === 'add-relation'
+        ? await api.createTaskRelation(taskId, action.otherTaskId, action.kind)
+        : await api.deleteTaskRelation(taskId, action.kind, action.otherTaskId)
+      return result.success ? { kind: 'ok' } : fail(result)
+    }
     case 'add-assignee': {
       const result = await api.addTaskAssignee(taskId, action.userId)
       return result.success ? { kind: 'ok' } : fail(result)

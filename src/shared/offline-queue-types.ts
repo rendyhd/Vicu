@@ -26,6 +26,8 @@ export type OfflineActionType =
   | 'create-comment'
   | 'update-comment'
   | 'delete-comment'
+  | 'add-relation'
+  | 'remove-relation'
 
 export type OfflineFailureReason =
   | 'rejected' // 400 / 413 / 422: the server refused the data

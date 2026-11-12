@@ -11,6 +11,24 @@ import type {
 } from '../shared/config-types'
 import { isCategoryId } from '../shared/project-categories'
 import { todayRoutinesLimit } from '../shared/today-routines'
+import { readProFocus } from '../shared/pro/focus'
+import { PRO_LAYERS } from '../shared/pro/settings'
+
+/** Stored layers: only `false` is kept (a missing layer is on). */
+function normalizeProLayers(value: unknown): AppConfig['pro_layers'] {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined
+  const layers: NonNullable<AppConfig['pro_layers']> = {}
+  for (const layer of PRO_LAYERS) if ((value as Record<string, unknown>)[layer] === false) layers[layer] = false
+  return Object.keys(layers).length ? layers : undefined
+}
+
+/** A map of string keys whose values pass `keep`; undefined when empty. */
+function normalizeStringMap<T>(value: unknown, keep: (value: unknown) => boolean): Record<string, T> | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined
+  const kept: Record<string, T> = {}
+  for (const [key, entry] of Object.entries(value as Record<string, unknown>)) if (keep(entry)) kept[key] = entry as T
+  return Object.keys(kept).length ? kept : undefined
+}
 
 // The config types are shared with the renderer (src/shared/config-types.ts).
 export type {
@@ -248,6 +266,20 @@ export function normalizeConfig(raw: Record<string, unknown>): AppConfig {
     planner_source: typeof raw.planner_source === 'string' ? raw.planner_source : undefined,
     planner_show_routines: raw.planner_show_routines !== false,
     planner_nudge: typeof raw.planner_nudge === 'string' && /^\d{2}:\d{2}$/.test(raw.planner_nudge) ? raw.planner_nudge : null,
+    // Pro (cross-app semantics section 21), per device.
+    pro_enabled: raw.pro_enabled === true,
+    pro_layers: normalizeProLayers(raw.pro_layers),
+    pro_list_views: normalizeStringMap(raw.pro_list_views, (value) => value === 'available' || value === 'remaining' || value === 'all'),
+    pro_list_layouts: normalizeStringMap(raw.pro_list_layouts, (value) =>
+      !!value && typeof value === 'object' && ((value as { layout?: unknown }).layout === 'rows' || (value as { layout?: unknown }).layout === 'columns')),
+    pro_focus: readProFocus(raw.pro_focus),
+    pro_assistant: raw.pro_assistant === true,
+    pro_verdict_snooze: normalizeStringMap(raw.pro_verdict_snooze, (value) =>
+      !!value && typeof value === 'object' && typeof (value as { due?: unknown }).due === 'string' && typeof (value as { until?: unknown }).until === 'string'),
+    pro_onboarding_seen: raw.pro_onboarding_seen === true,
+    pro_ledger_sync: raw.pro_ledger_sync && typeof raw.pro_ledger_sync === 'object'
+      ? raw.pro_ledger_sync as AppConfig['pro_ledger_sync']
+      : undefined,
   }
 }
 
@@ -319,6 +351,7 @@ const ACCOUNT_SPECIFIC_KEYS = [
   'custom_lists_sync',
   'saved_filters',
   'synced_prefs_sync',
+  'pro_ledger_sync',
   'known_user',
   'account_owner',
   'quick_entry_default_project_id',
@@ -344,7 +377,7 @@ export function connectionKeysIn(patch: object): string[] {
 }
 
 /** Owned by main (the custom list service with its own IPCs and sync, the known user); never taken from a renderer patch. */
-const MAIN_OWNED_KEYS: ReadonlySet<string> = new Set(['custom_lists', 'custom_lists_sync', 'saved_filters', 'synced_prefs_sync', 'known_user', 'account_owner'])
+const MAIN_OWNED_KEYS: ReadonlySet<string> = new Set(['custom_lists', 'custom_lists_sync', 'saved_filters', 'synced_prefs_sync', 'pro_ledger_sync', 'known_user', 'account_owner'])
 
 /** Every key of AppConfig, derived from the normalizer so the two cannot drift apart. */
 const CONFIG_KEYS: ReadonlySet<string> = new Set(Object.keys(normalizeConfig({})))

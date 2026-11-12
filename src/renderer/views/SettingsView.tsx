@@ -31,8 +31,9 @@ import { checkUnsyncedWork, signOutWarning } from '@/lib/sign-out-check'
 import type { AppConfig, Project } from '@/lib/vikunja-types'
 
 import type { ThemeOption } from '@/lib/theme'
+import { ProSettings } from '@/components/settings/ProSettings'
 
-type SettingsTab = 'general' | 'projects' | 'integrations' | 'notifications' | 'assistant' | 'shortcuts'
+type SettingsTab = 'general' | 'projects' | 'integrations' | 'notifications' | 'assistant' | 'pro' | 'shortcuts'
 
 /** Every tab's content sits in the same column, left-aligned with the tab bar. */
 const SETTINGS_COLUMN = 'mx-6 max-w-[640px] space-y-6 pb-8 pt-4'
@@ -67,6 +68,9 @@ export function SettingsView() {
   const [fullConfig, setFullConfig] = useState<AppConfig | null>(null)
 
   // Manage in the Plan gear: the calendars of the Plan settings, once they are drawn.
+  useEffect(() => {
+    if (section === 'pro') setActiveTab('pro')
+  }, [section])
   useEffect(() => {
     if (section !== 'calendars' || !fullConfig) return
     setActiveTab('general')
@@ -252,6 +256,7 @@ export function SettingsView() {
           { key: 'integrations' as const, label: 'Quick Entry / View' },
           { key: 'notifications' as const, label: 'Notifications' },
           { key: 'assistant' as const, label: 'Assistant' },
+          { key: 'pro' as const, label: 'Pro' },
           { key: 'shortcuts' as const, label: 'Keyboard Shortcuts' },
         ]).map((tab) => (
           <button
@@ -279,6 +284,10 @@ export function SettingsView() {
       ) : activeTab === 'projects' ? (
         <div className={SETTINGS_COLUMN}>
           {fullConfig && <ProjectSettings config={fullConfig} onChange={handleQuickEntryChange} />}
+        </div>
+      ) : activeTab === 'pro' ? (
+        <div className={SETTINGS_COLUMN}>
+          <ProSettings />
         </div>
       ) : activeTab === 'assistant' ? (
         <div className={SETTINGS_COLUMN}>

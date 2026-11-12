@@ -1,4 +1,13 @@
-import { shell, dialog, app, nativeTheme } from 'electron'
+import {
+  discardUnsyncedProLedgerChanges,
+  getProLedger,
+  getProLedgerStatus,
+  hasUnsyncedProLedgerChanges,
+  mutateProLedger,
+  readProArchive,
+  syncProLedger,
+} from './pro-ledger-service'
+import { shell, dialog, app, nativeTheme, clipboard as electronClipboard, ClipboardItem as ElectronClipboardItem } from 'electron'
 import { handleTrusted } from './secure-ipc'
 import { tokenForConnectionTest } from './connection-test-token'
 import { isExternalAllowed } from './web-security-policy'
@@ -508,6 +517,8 @@ export function registerIpcHandlers(): void {
     if ('inbox_project_id' in patch && next.inbox_project_id > 0 && next.inbox_project_id !== latest.inbox_project_id && !next.standalone_mode && next.vikunja_url) {
       setSyncedPreference('inbox_project_id', next.inbox_project_id)
     }
+    // Pro was just turned on: read the account's ledger.
+    if (next.pro_enabled && !latest.pro_enabled) void syncProLedger()
   })
 
   // Setup, OIDC/password login and disconnect: only the connection fields change, every
@@ -530,8 +541,9 @@ export function registerIpcHandlers(): void {
   handleTrusted('custom-lists:delete', (_event, id: string) => deleteCustomList(id))
   handleTrusted('custom-lists:reorder', (_event, ids: string[]) => reorderCustomLists(ids))
   handleTrusted('custom-lists:sync', () => {
-    // The synced preferences sync whenever custom lists do.
+    // The synced preferences and the Pro ledger (while Pro is on) sync whenever custom lists do.
     void syncSyncedPrefs()
+    void syncProLedger()
     return syncCustomLists()
   })
   handleTrusted('custom-lists:status', () => getCustomListSyncStatus())
@@ -565,11 +577,32 @@ export function registerIpcHandlers(): void {
   handleTrusted('synced-documents:unsynced', (): UnsyncedDocuments => ({
     customLists: hasUnsyncedCustomListChanges() ? getCustomListSyncStatus() : null,
     preferences: hasUnsyncedPreferenceChanges() ? getSyncedPrefsStatus() : null,
+    proLedger: hasUnsyncedProLedgerChanges() ? getProLedgerStatus() : null,
   }))
   handleTrusted('synced-documents:discard', () => ({
     customLists: discardUnsyncedCustomListChanges(),
     preferences: discardUnsyncedPreferenceChanges(),
+    proLedger: discardUnsyncedProLedgerChanges(),
   }))
+
+  // The Pro ledger (cross-app semantics 21.7): read, change (main applies the operations to its
+  // current copy), sync, and the archive parts on demand.
+  handleTrusted('pro-ledger:get', () => getProLedger())
+  handleTrusted('pro-ledger:mutate', (_event, operations: unknown) => mutateProLedger(operations))
+  handleTrusted('pro-ledger:sync', () => syncProLedger())
+  handleTrusted('pro-ledger:status', () => getProLedgerStatus())
+  handleTrusted('pro-ledger:archive', () => readProArchive())
+
+  // A recap copied with both a plain text and an HTML version (cross-app semantics 21.8).
+  handleTrusted('clipboard:write-rich', async (_event, text: unknown, html: unknown) => {
+    if (typeof text !== 'string' || text.length > 1_000_000) throw new Error('Invalid text')
+    if (typeof html === 'string' && html.length <= 2_000_000) {
+      await electronClipboard.write([new ElectronClipboardItem({ 'text/plain': text, 'text/html': html })])
+    } else {
+      await electronClipboard.writeText(text)
+    }
+    return true
+  })
   // Setup reads the account's synced Inbox before it asks for one (section 11.4). An API-token
   // setup passes its token (nothing is saved yet); a sign-in uses the session it just stored.
   handleTrusted('synced-prefs:read-for-setup', async (_event, url: unknown, token: unknown) => {
