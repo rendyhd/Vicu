@@ -1,0 +1,161 @@
+# Pro branch builds
+#
+# Every push to the pro branch (or a manual run) builds the installers and keeps them as workflow
+# artifacts, to install on your own devices. Nothing is published: no tag, no release, no assets on
+# a release (electron-builder runs with --publish never). The version becomes 3.0.0-pro.<run number>
+# for the build only, so Settings shows which build is installed; package.json is not changed.
+# Artifacts are kept for 30 days: Actions, the run, Artifacts.
+
+name: Pro branch builds
+
+on:
+  push:
+    branches: [pro]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pro-build-${{ github.ref_name }}
+  cancel-in-progress: true
+
+env:
+  PRO_VERSION: 3.0.0-pro.${{ github.run_number }}
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Cache Electron
+        uses: actions/cache@v4
+        with:
+          path: ~/AppData/Local/electron/Cache
+          key: electron-x64-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            electron-x64-
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
+
+      - name: Set the build version
+        run: npm version "$env:PRO_VERSION" --no-git-tag-version --allow-same-version
+
+      - name: Build
+        run: npm run build && npm run speech:lib && npx electron-builder --win --publish never
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vicu-${{ env.PRO_VERSION }}-windows
+          path: dist/*.exe
+          retention-days: 30
+          if-no-files-found: error
+
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # Signed and notarized like a release when the secrets exist (release.yml), else unsigned.
+      - name: Import signing certificate
+        if: env.BUILD_CERTIFICATE_BASE64 != ''
+        env:
+          BUILD_CERTIFICATE_BASE64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
+          P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        run: |
+          CERTIFICATE_PATH=$RUNNER_TEMP/build_certificate.p12
+          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+
+          echo -n "$BUILD_CERTIFICATE_BASE64" | base64 --decode -o $CERTIFICATE_PATH
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+
+          security import $CERTIFICATE_PATH -P "$P12_PASSWORD" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
+          security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          security list-keychain -d user -s $KEYCHAIN_PATH
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
+
+      - name: Set the build version
+        run: npm version "$PRO_VERSION" --no-git-tag-version --allow-same-version
+
+      - name: Build
+        run: npm run dist:mac -- --publish never
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: ${{ secrets.BUILD_CERTIFICATE_BASE64 != '' && 'true' || 'false' }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+
+      - name: Cleanup keychain
+        if: always()
+        run: |
+          if [ -f "$RUNNER_TEMP/app-signing.keychain-db" ]; then
+            security delete-keychain $RUNNER_TEMP/app-signing.keychain-db
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vicu-${{ env.PRO_VERSION }}-macos
+          path: dist/*.dmg
+          retention-days: 30
+          if-no-files-found: error
+
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
+
+      - name: Set the build version
+        run: npm version "$PRO_VERSION" --no-git-tag-version --allow-same-version
+
+      # No update information: an AppImage manager would point it at the releases, which this
+      # build is not one of.
+      - name: Build
+        run: npm run build && npm run speech:lib && npx electron-builder --linux AppImage:x64 --publish never
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vicu-${{ env.PRO_VERSION }}-linux-x64
+          path: dist/*.AppImage
+          retention-days: 30
+          if-no-files-found: error
