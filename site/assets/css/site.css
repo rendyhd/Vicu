@@ -648,6 +648,7 @@ figcaption { font-size: 13.5px; color: var(--muted); margin-top: 12px; text-alig
 
 .g-figure { display: grid; gap: 8px; justify-items: center; margin: 4px 0; }
 .g-figure img { border-radius: 12px; border: 1px solid var(--line-strong); box-shadow: var(--shadow); max-height: 560px; width: auto; }
+.g-video video { display: block; width: 100%; height: auto; border-radius: 12px; border: 1px solid var(--line-strong); box-shadow: var(--shadow); background: var(--surface-2); }
 .g-figure--tall img { max-height: 520px; border-radius: 22px; }
 .g-figure figcaption { font-size: 13.5px; color: var(--muted); text-align: center; }
 
