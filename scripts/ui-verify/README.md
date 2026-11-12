@@ -83,6 +83,7 @@ npm run ui:verify -- --scenario baseline --theme dark
 | `--run NAME` | Folder name under `out/` (default: time stamp, scenarios, theme). |
 | `--build` | Run `npm run build` first. |
 | `--list` | List the scenarios with their ids and waves. |
+| `--video` | Record the main window to `<run>/video/*.webm` (written when the app closes). `pro-intro-video` (PROV) is the Vicu Pro walkthrough made this way: it writes the start and end times to `video-times.json` for cutting with ffmpeg. |
 
 With neither `--scenario` nor `--wave`, `baseline` runs. Scenarios mutate the shared test server
 (they complete, move, reschedule and delete tasks), so a `--wave N` run re-seeds first by default

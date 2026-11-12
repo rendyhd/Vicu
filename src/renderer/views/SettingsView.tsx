@@ -248,8 +248,8 @@ export function SettingsView() {
     <ReadingScroll className="bg-[var(--bg-primary)]" columnClassName="flex flex-col">
       <PageHeader title="Settings" inScroll />
 
-      {/* Tab bar */}
-      <div className="flex gap-1 border-b border-[var(--border-color)] px-6">
+      {/* Tab bar: one line; a narrow window scrolls it sideways instead of wrapping a label (macOS type is wider). */}
+      <div className="flex gap-1 overflow-x-auto border-b border-[var(--border-color)] px-6">
         {([
           { key: 'general' as const, label: 'General' },
           { key: 'projects' as const, label: 'Projects' },
@@ -264,7 +264,7 @@ export function SettingsView() {
             type="button"
             onClick={() => setActiveTab(tab.key)}
             className={cn(
-              'px-3 py-2 text-sm font-medium transition-colors',
+              'shrink-0 whitespace-nowrap px-3 py-2 text-sm font-medium transition-colors',
               activeTab === tab.key
                 ? 'border-b-2 border-accent-blue text-accent-blue'
                 : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'

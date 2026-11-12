@@ -18,6 +18,7 @@
 //   --no-reseed                with --wave: skip the reseed that wave runs do by default
 //   --build                    run `npm run build` first
 //   --list                     list the scenarios and exit
+//   --video                    record the main window to <run>/video/*.webm (h.videoTime() marks a moment)
 //
 // Needs: the test server (README.md), `node scripts/ui-verify/seed.mjs` once, and a built app
 // (`npm run build`). Exit code 1 when a scenario threw or an assertion failed.
@@ -49,6 +50,7 @@ const { values: opt } = parseArgs({
     'no-reseed': { type: 'boolean', default: false },
     build: { type: 'boolean', default: false },
     list: { type: 'boolean', default: false },
+    video: { type: 'boolean', default: false },
   },
   strict: true,
 })
@@ -203,6 +205,8 @@ const app = await electron.launch({
     VICU_UI_REQUEST_LOG: REQUEST_LOG,
   },
   timeout: 60000,
+  // --video: Playwright records each window; the file is written when the app closes.
+  ...(opt.video ? { recordVideo: { dir: join(RUN_DIR, 'video'), size: { width: SIZE.width * SCALE, height: SIZE.height * SCALE } } } : {}),
 })
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
@@ -215,6 +219,11 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 async function shutdown() {
   const proc = app.process()
   if (proc.exitCode !== null) return
+  // A recording is only finished by a regular close.
+  if (opt.video) {
+    await Promise.race([app.close().catch(() => {}), sleep(15000)])
+    if (proc.exitCode !== null) return
+  }
   const exited = new Promise((resolve) => proc.once('exit', resolve))
   await app.evaluate(({ app: a }) => a.exit(0)).catch(() => {})
   await Promise.race([exited, sleep(8000)])
@@ -265,6 +274,8 @@ async function waitForWindow(match, timeout = 20000) {
 
 const isMain = (u) => u.includes('/renderer/index.html')
 const page = await waitForWindow(isMain)
+// The recording of the main window starts about when the window does.
+const VIDEO_T0 = Date.now()
 if (!page) {
   await shutdown()
   fail('The main window did not open.')
@@ -371,6 +382,8 @@ const h = {
   emit,
   settle,
   wait: (ms) => sleep(ms),
+  /** Seconds since the main window's recording began (--video), to cut the video later. */
+  videoTime: () => (Date.now() - VIDEO_T0) / 1000,
 
   /** Opens a route of the main window: goto('/today'), goto('#/project/12'). */
   async goto(route) {
