@@ -8,9 +8,10 @@ Test vectors live in `test-fixtures/` in both repos and must stay byte-identical
 
 | Fixture | Covers |
 |---|---|
-| `cross-app-semantics-v1.json` | due-date rules, smart lists, weeks, custom-list windows, rules and sorting, saved-filter import, review math, completion hold, date display, collaboration, hidden tasks, synced preferences, task order, project categories, guided organizing, routines on Today, time blocks, Events and calendars |
+| `cross-app-semantics-v1.json` | due-date rules, smart lists, weeks, custom-list windows, rules and sorting, saved-filter import, review math, completion hold, date display, collaboration, hidden tasks, synced preferences, task order, project categories, guided organizing, routines on Today, time blocks, Events and calendars, Pro |
 | `nlp-corpus-v1.json` | quick-add parsing |
 | `routine-archive-v1.json` | routine merge, pruning and archive rules |
+| `ai-tools-v1.json` | the assistant (see `ai-assistant-v1.md`) and Pro's Copilot prompt (section 21.12) |
 | `design-tokens-v1.json` | colour roles, type, radii and motion (see `design-system-v1.md`) |
 
 Both test suites load these files. When behavior changes, change the fixture first, in both
@@ -339,6 +340,28 @@ Vectors: `savedFilterImport.filters` gives saved filters as `GET filters/{n}` re
 the list each becomes (`filter`, `savedFilterId`, `status`, `reasons`), and
 `savedFilterImport.duplicates` gives lists with `savedFilterId` and the ids kept.
 
+### 3.8 Pro conditions
+
+Lists can hold Pro's conditions (section 21). They are written only when set, evaluated by every
+version that knows them whether Pro is on or off (decision 23), kept unchanged by versions that do
+not (section 10.8), and never sent to the server: the server filter stays a superset.
+
+| Key | Values | Matches |
+|---|---|---|
+| `availability` | `available`, `remaining`, `all` | `available`: open tasks without a reason of section 21.2; `remaining`: open tasks; `all` (or another value): no condition |
+| `flagged` | `true`, `false` | `is_favorite` equals it; another type is no condition |
+| `estimate_max` | minutes, a whole number of 1 or more | tasks with an estimate (21.7) of at most that; no estimate does not match |
+| `project_status` | `active`, `on_hold`, `any` | the task's project is not on hold, or is (21.2, by status only) |
+| `promise` | `theirs`, `mine`, `any` | an open promise of that direction (`any`: either) |
+| `person` | label ids | the open promise's person, or one of the task's labels, is one of them |
+| `group_by` | `project`, `label`, `person`, `due`, `start`, `flagged`, `none` | how the list groups its rows; another value is `none` |
+| `row_fields` | an array of `project`, `labels`, `due`, `start`, `estimate`, `flag`, `notes` | what rows show, in that order; unknown entries are left out |
+
+A device that does not have what a condition reads yet (the ledger, the synced preferences) treats
+it as no condition, like a version that does not know it (O5). The list editor shows the Pro section
+for a list that has any of these conditions, also on a device with Pro off. Vectors:
+`customListPro` (the matches with and without that data, `hasCondition`, `rowFields`, `groupBy`).
+
 ---
 
 ## 4. Project review
@@ -489,6 +512,28 @@ off, the words stay in the title. The corpus parses every case with its `places`
 - `for` with a number and `days`, `nights`, `weeks`, `months` or `years` is never a date phrase and
   stays in the title. "Pay for 3 months" has no due date.
 - A time without a length is still a due time. "Call at 3pm" is due at 15:00 and has no start date.
+
+### 5.5 Pro phrases
+
+Only with Pro on (decision 26, the parser option `pro`). With Pro off the same text is read as
+before: these words stay in the title.
+
+- **A person** (decision 8): the title starts with a known person's name and a colon, then a space:
+  `Jan: send the plan`. The name is one to three words and is matched by section 21.5 (title, alias,
+  unique first name); an unknown or ambiguous name stays in the title. The prefix leaves the title,
+  the result has `person` (the label id) and the task becomes that person's promise to you.
+  `for Jan:` at the start makes it your promise to them (`personMine`). Nothing else is read as a
+  person.
+- **A start date:** `starts` and a date phrase (`starts monday`, `starts next week`, `starts 3 Nov
+  9am`) gives `start`: the date, at local midnight without a time. The phrase is not read as a due
+  date and leaves the title. A start date and a length (section 5.4) in one text: the length's block
+  wins and `start` is the block's start.
+- **An estimate:** `~` and a length without spaces: `~10m`, `~45min`, `~1h`, `~1h30`, `~1h30m`, `~2h`
+  (1 minute to 24 hours) gives `estimate` in minutes and leaves the title. `~` before anything else
+  stays.
+- **A flag:** the word `!flag` (any case) gives `flag: true` and leaves the title.
+- **A request:** `req:` at the very start gives `request: true` (triage, section 21.10) and leaves
+  the title.
 
 ---
 
@@ -1099,7 +1144,8 @@ usernames and, when `pick` is set, the text and caret after picking that usernam
 
 Vicu keeps the data that must reach every device in ordinary Vikunja tasks that both apps hide
 ("hidden tasks", "carriers"): the custom-list carrier (section 3), routine carriers and archive
-parts (section 6) and the preferences carrier (section 11). These rules hold for every kind.
+parts (section 6), the preferences carrier (section 11) and the Pro ledger and its archive parts
+(section 21.7). These rules hold for every kind.
 
 ### 10.1 Marker and hiding
 
@@ -1254,6 +1300,12 @@ A key is added here, in both repos, in the release that starts writing it.
 | `weekly_review.last` | the local date the last weekly review was finished, `"YYYY-MM-DD"`; section 14.7 | never done |
 | `planner.default_length` | the length of a new block in minutes: 15, 30, 45, 60, 75 or 90. Any other value acts as the default and is kept; section 16.2 | 30 |
 | `planner.hours` | the work hours, `["HH:mm", "HH:mm"]` in 24-hour local time, the start before the end. Any other value acts as the default and is kept; section 16.6 | `["08:00", "18:00"]` |
+| `pro.area` | Pro's area: an array of project category ids, or `null`; section 21.1 | every project |
+| `project_mode.<projectId>` | `"sequential"` or `"single"`, or `null`. Any other value acts as the default and is kept; section 21.2 | parallel |
+| `project_status.<projectId>` | `"on_hold"`, or `null`; section 21.2 | active |
+| `label_status.<labelId>` | `"on_hold"`, or `null`; section 21.2 | active |
+| `label_kind.<labelId>` | `"person"`, or `null`; section 21.5 | a label |
+| `repeat_rule.<taskId>` | `{"until"?, "count"?, "catch_up"?}`, or `null`; section 21.13 | no end |
 
 ### 11.4 The Inbox
 
@@ -1585,6 +1637,9 @@ A checklist of steps in this order:
 - The weekly review is **due** when `weekly_review.last` is missing, unreadable, or at least
   `weekly_due_days` days before today.
 
+With Pro on, Pro's steps come first (section 21.11). A project review session offers On hold
+beside Keep and Archive while Pro's availability layer is on (`project_status.<id>`).
+
 ### 14.8 Ask's agenda
 
 When Ask opens on a conversation without messages, it lists these, in this order, each only when
@@ -1712,7 +1767,9 @@ task without a block is a complete task, and nothing moves on its own.
   and the end is no later than the midnight that ends the start's local day.
 - The block's day is the local date of its start.
 - Anything else in those fields (a start date alone, several days, a Gantt bar from Vikunja's web
-  app) is not a block. It is ignored by this section and never rewritten.
+  app) is not a block. It is ignored by this section and never rewritten. With Pro, a start date
+  alone means the task is not available before it (section 21.3); every reader of `start_date`
+  goes through this test first.
 
 ### 16.2 Changing a block
 
@@ -2240,3 +2297,339 @@ In `cross-app-semantics-v1.json`, run in three time zones like the other date su
 - `eventChanges`: stored entries, a change to one occurrence, the entries written and Undo.
 - `icsImport`: calendar files as lines of text, an import day and the Events made; `expectByZone`
   for times with a zone. The desktop reads them with ical.js, Android with its own reader.
+
+---
+
+## 21. Pro
+
+Pro is an optional layer for people who run work they do not control: what can be done now,
+promises other people made, a portfolio of initiatives, and fast views. It only adds. A device with
+Pro off shows exactly what a version without Pro shows, and every device keeps Pro's data safe.
+
+**Server checks (Vikunja 2.4.0, 2026-11-12).** `is_favorite` is per user, set by merge patch, present
+in collection responses, and setting it moves `updated`. A lone `start_date` is stored with
+`end_date` at the null date, survives a due-date patch, and `null` clears it. Completing a repeating
+task moves a lone start date with the due date in repeat modes 0, 1 and 2. A `blocked` relation
+creates the inverse `blocking`; related entries carry `done` and come with collection responses;
+deleting a task removes its relations. Adding the same relation twice answers 409 (code 4008),
+removing a missing one 404. A server filter on `start_date` with `filter_include_nulls` answers 400,
+so availability is decided on the device. A 512 KB description is stored intact on SQLite.
+
+### 21.1 The switch, layers and area
+
+- **The switch** is per device (desktop `pro_enabled`, mobile the same key in its behaviour
+  settings), off by default, and never on in standalone mode. It is not synced: each device decides.
+- **Layers**, per device, all on while Pro is on until turned off: `availability` (start dates,
+  on hold, after, sequential projects, flags, focus, estimates, repeat ends), `promises` (people,
+  promises, verdicts, recaps, meetings, import), `portfolio` (initiatives, cap, readiness,
+  escalations, sponsor desk, triage, logs) and `power` (Pro list conditions in the editor, columns,
+  the batch inspector, the focus block, the weekly execution review).
+- **The area** is the synced key `pro.area`: an array of project category ids (section 13).
+  Promises and the portfolio apply to projects whose top-level project is in one of those
+  categories; no area (absent, `null`, empty or unreadable) means every project. Availability
+  applies everywhere.
+- **Off.** With the switch off (O1) every list, count, card, parser result, reminder and screen is
+  what a version without Pro shows. Turning Pro off never writes anything (O2). Pro writes only
+  `is_favorite`, a lone `start_date`, `blocked` relations, the synced keys of section 11.3 marked
+  Pro, the ledger (21.7), custom-list keys of section 3.8 and device settings (O3). It never writes
+  a description marker in a task or project, and never changes a due date, position or order on
+  its own (a verdict with a new date moves the due date because the person chose it).
+- **Others keep Pro data safe** (O4): merge patches send changed fields only, so a lone start date,
+  a favourite and relations survive edits from any device; unknown synced keys, list keys and
+  documents are kept (sections 10.8, 11.2).
+- **Unknown shows more** (O5): a version that does not know a Pro list condition ignores it.
+
+### 21.2 Availability
+
+An open task is **available** when none of these reasons applies; a row shows the first one.
+
+| Reason | When |
+|---|---|
+| `starts` | It has a start date (21.3) later than now. |
+| `on_hold` | Its project or an ancestor is on hold (`project_status.<id>` is `"on_hold"`), or is an initiative whose ledger status is `parked` (21.10). |
+| `waiting` | One of its labels is on hold (`label_status.<id>` is `"on_hold"`). |
+| `after` | It is blocked by (`related_tasks.blocked`) a task that is open. The device's own copy of that task decides when it has one, else the relation's `done`. |
+| `sequence` | Its project is sequential (`project_mode.<id>` is `"sequential"`) and it is not the project's first task. |
+| `theirs` | It is an open promise of someone else's (21.6). |
+
+- **Sequential first:** among the project's open tasks that are not hidden, those whose parent
+  (`related_tasks.parenttask`) is not an open task of the same project are the top-level ones. They
+  are sorted by the project's task order (section 12.3, positions of the project's list view); the
+  first is the project's first task and shows "Next". A subtask follows its top-level ancestor in
+  the project: available (sequence-wise) only under the first. `single` projects (single actions)
+  and projects without a mode (parallel) have no `sequence` reason.
+- **Loops.** Blocked-by relations that form a loop among open tasks (including a task blocked by
+  itself) are ignored for those tasks, which are reported so the person can fix them.
+- **Views:** Available (open tasks without a reason), Remaining (open tasks), All (open and the done
+  tasks the list loaded). Anytime, project, label and custom-list screens offer them while the
+  availability layer is on; the default is Available, per device and list.
+- A done task never blocks. A hidden task is never a project's first task.
+
+### 21.3 Start dates and blocks
+
+- A **start date** is `start_date` when the task's dates are not a time block (section 16.1). A
+  block is not a start date: a task with a block is available whatever the block's time.
+- "Starts Monday" without a time stores that day's local midnight; with a time, that moment.
+- **A block replaces a start date** (decision 17): placing a block writes its start to
+  `start_date`. When the task has a start date later than the block's start, Pro warns before
+  placing ("This task starts Mon 17 Nov. Planning it earlier replaces that date."). Removing the
+  time of a block clears `start_date` and `end_date` (section 16.2), so the start date is gone too.
+- Repeating tasks: the server moves a lone start date with the due date (no app code).
+- **Upcoming** (Pro on) also lists, on the day it starts, each open task whose start day is after
+  today ("Starts").
+- A start date already set in Vikunja's web app counts the same. On first turning Pro on, the app
+  says how many open tasks have one, with a way to see them.
+
+### 21.4 Flags
+
+A flag is the task's `is_favorite`, which is per user. Flagging writes `{ "is_favorite": true }`
+only. It moves `updated`, so the "Changed" list condition (section 3.3) counts it. The Flagged list
+shows open flagged tasks; Vikunja's own Favorites pseudo-project (-1) is not used.
+
+### 21.5 People
+
+- A **person** is a label with `label_kind.<id>` = `"person"`. Its title is the name.
+- **Aliases** live in the ledger (`people.<labelId>.aliases`), added when an import or capture maps
+  a name to that person (decision 32).
+- **Matching a name** (`pro.personMatch`): spacing and case are ignored; the title first, then an
+  alias, then a unique first name (the name's first word equals the first word of exactly one
+  person's title, and the name is one word or the start of that title). Two people with that title
+  or alias, or that first word, is ambiguous: no match.
+- **Counts over 90 days** (decision 9, `pro.personPattern`): over the local days from today back 89
+  days, the person's promises of theirs closed by a final verdict in the window (delivered on time,
+  late, dropped, done by you), and their `renegotiated` and `not_yet` verdicts given in the window;
+  plus the open promises both ways. No score: the **pattern** is two plain sentences, "Kept 5 of 7
+  on time in the last 90 days, 2 late." and "Asked for a new date twice and missed a date once."
+  (counts as once, twice, N times); "No promises closed in the last 90 days." when none closed.
+
+### 21.6 Promises
+
+- A **promise** is an ordinary task with a ledger record keyed by the task id: `dir` `theirs`
+  (someone promised it to you) or `mine` (you owe it to them), `person`, the optional `words` (their
+  words of a clear yes), `done_when`, `initiative` (a project id), `needs` (task ids of your
+  promises it waits on), `sent` and `verdicts`. The task carries the person's label, so devices
+  without Pro still see who it is about.
+- **No stages** (decision 6): a promise is promised, then it gets a verdict.
+- **Verdicts:** `delivered`, `late` (delivered after the date), `not_yet` (with an optional new
+  date and blocker), `renegotiated` (a new date agreed before it was due), `dropped`, and
+  `taken_over` ("I did it myself"). Final verdicts (`delivered`, `late`, `dropped`, `taken_over`)
+  close the promise. A verdict has an `id`, `at` (UTC) and its fields; Undo marks it `undone: true`
+  (it stays, so merging cannot bring it back).
+- **What a verdict writes to the task:** a final verdict on an open task completes it with
+  `{ "done": true }`; a new date sets the due date to that day, date-only, through the usual due
+  change (section 16.3), unless it is already that date. `taken_over` on a done task writes nothing.
+- **Misses** are the active `not_yet` verdicts, counted, never stored.
+- **Effective due day:** the last active verdict's `new_due` when it is `not_yet` or
+  `renegotiated`; a `not_yet` without a date asks again the day after it was given; otherwise the
+  task's due day.
+- **A verdict is due** (decision 10) for an open promise of theirs without a final verdict whose
+  effective due day is today or earlier. Today shows these before its other tasks.
+- **Ask me tomorrow:** once per effective due day, per device (`pro_verdict_snooze`:
+  `{ "<taskId>": { "due", "until" } }`); not asked again until `until`.
+- **Completed elsewhere:** a promise of theirs whose task is done without a final verdict is asked
+  about once: "Delivered by Jan, or did you do it?" (`delivered` or `taken_over`).
+- **Sent** (decision 7): copying a recap that holds the promise adds the time to `sent`. The weekly
+  review counts open promises without one.
+- **Confirm tasks** (decision 31): when a promise has no clear yes, the person's own task is titled
+  `Confirm with <name>: <what>` and carries the person's label.
+- **Waiting on** (`pro.waitingOn`): open promises of theirs and open tasks with an on-hold label,
+  grouped by person (the promise's person, else the task's first person label, else none), groups
+  by their earliest effective due day (none last) then label id, the group without a person last;
+  tasks by effective due day (none last) then id.
+
+### 21.7 The ledger
+
+- One hidden carrier per account (section 10): title `Vicu Pro ledger (sync metadata — do not
+  delete)`, marker `vicu-pro:v1`, search text `vicu-pro`. Created in the Inbox only when it holds
+  something.
+- Payload:
+
+```json
+{
+  "version": 1,
+  "promises": { "<taskId>": { "value": { "dir": "theirs", "person": 42, "verdicts": [] }, "revision": {} } },
+  "initiatives": { "<projectId>": { "value": { "rank": 1, "status": "active" }, "revision": {} } },
+  "log": { "<id>": { "value": { "kind": "decision", "text": "", "at": "YYYY-MM-DD" }, "revision": {} } },
+  "owed": { "<id>": { "value": { "what": "", "opened": "YYYY-MM-DD", "resolved": null }, "revision": {} } },
+  "escalations": { "<id>": { "value": { "promise": 0, "a": 0, "b": null, "status": "drafted", "draft": "", "opened": "YYYY-MM-DD" }, "revision": {} } },
+  "meetings": { "<id>": { "value": { "name": "", "people": [], "initiatives": [], "rhythm": null }, "revision": {} } },
+  "rounds": { "<id>": { "value": { "meeting": "<id>", "at": "YYYY-MM-DD", "discussed": [], "skipped": [], "absent": [], "not_discussed": [] }, "revision": {} } },
+  "people": { "<labelId>": { "value": { "aliases": [] }, "revision": {} } },
+  "estimates": { "<taskId>": [45, 1794421060] },
+  "settings": { "value": { "cap": 4, "cap_agreed": null, "rule_agreed_on": null, "threshold": 2 }, "revision": {} }
+}
+```
+
+- Records are `{ value, revision }` (section 10.6); `"value": null` is a tombstone. Unknown fields
+  are kept at every level (section 10.8). Ids of log, owed, escalation, meeting and round records
+  are random strings.
+- **Merge** (`pro.ledgerMerge`): per record the newer revision wins and equal revisions keep the
+  server's; when both sides hold a value of the same promise, the result's `verdicts` are the union
+  by `id` (an undone verdict wins over the same verdict not undone, else the winner's), sorted by
+  `at` then `id`, and `sent` the sorted union. `estimates`: per task the entry with the later wall
+  time (seconds) wins, equal keeps the server's; `[null, t]` clears an estimate. `settings` is one
+  record. Unknown top-level fields: the union, the server's kept.
+- **Pruning:** tombstones and cleared estimates older than 90 days (section 10.6). Pro devices
+  remove the promise and estimate of a task that is gone or done for 30 days.
+- **A task created offline** has a temporary id until the replay creates it; its ledger keys and the
+  ids in `needs`, escalations and log tasks are renamed then.
+- **Archive parts** (`pro.archive`): a record closed more than 180 days ago moves to an archive part
+  of the quarter it closed in: marker `vicu-pro-archive:v1`, title `Vicu Pro archive <quarter>
+  (sync metadata — do not delete)`, search `vicu-pro-archive`, payload `{ "version": 1, "quarter":
+  "2026-Q2", "promises": {...}, ... }` with the record collections only. The part is written first,
+  then the records are tombstoned in the ledger. Closed: a promise on its final verdict's local day,
+  an initiative with status `closed` on `closed_on`, a log entry of kind `unknown` on `resolved` and
+  any other on `at`, owed decisions and escalations on `resolved`, a round on `at`. Meetings and
+  people never close. Archive parts are read on demand (the quarterly summary), never by the person
+  page.
+- **Size:** the ledger's JSON stays within the 384 KiB write cap; the sync status warns from 70
+  percent.
+
+### 21.8 Recaps
+
+- **Items** (`pro.recapText`), for a range of local days and an ordered list of people: a promise
+  of theirs is **Delivered** when its final verdict, `delivered` or `late`, was given in the range;
+  **Agreed** when its task was created in the range and it has no verdict; **Changed** when its last
+  verdict, `not_yet` or `renegotiated`, was given in the range; else **Open** while its task is open.
+  With "include what I owe", open promises of yours to those people are **I owe**. A promise is in
+  one section.
+- **Order:** the sections in that order; in a section by the people's order, then effective due day
+  (none last), then task id.
+- **Text:** `<title>, <weekday date>` (section 8's weekday date, the year only when not this year),
+  a blank line when anything follows, then each section's title and its items as `- <name>: <task
+  title>`: Delivered adds ` (late)`; Changed adds `, new date <weekday date>` or `, not yet`, then
+  ` (<blocker>)` when there is one; the others add `, by <weekday date>` when there is a due day.
+  With quotes, the promise's words follow on the next line, indented two spaces, in double quotes.
+  Then `Not discussed: <names>` and `Absent: <names>` when there are any.
+- **HTML:** the same, the title in `<strong>`, section titles as `<p><strong>`, items in `<ul><li>`,
+  quotes as `<br><em>"…"</em>`; text escaped (`&`, `<`, `>`, `"`). Copying puts both on the
+  clipboard (decision 13) and marks the promises in it as sent.
+
+### 21.9 Meeting rounds
+
+- A meeting (ledger `meetings`) has a name, its people in order, initiatives and a rhythm. A round
+  goes through the people in any order, with your own card last (decision 12; no timer).
+- **Steps** (`pro.meetingRound`): Next marks the person on screen discussed and goes to the next
+  person in the order (wrapping) who is not discussed, skipped or absent; Skip marks them skipped and
+  goes on; Absent marks anyone absent (and goes on when it is the person on screen); picking someone
+  shows them and takes them out of skipped, absent and discussed. A name twice counts once.
+- **End:** the person on screen counts as discussed. The round record holds discussed, skipped,
+  absent and not discussed (everyone else), in the meeting's order, without your own card.
+- Everything is written as it happens (promises, verdicts, tasks), so ending early loses nothing.
+
+### 21.10 Portfolio
+
+- An **initiative** is a project in the area with a ledger record: `rank`, `status` (`active`,
+  `parked`, `closed`), `sponsor` and `owner` (person label ids), readiness items, `parked` (`on`,
+  `reason`), `closed_on`, `log_anyway`.
+- **Rank** (`pro.portfolio`): active initiatives by `rank`, then project id; shown as 1 to n. A move
+  renumbers every active initiative 1 to n. Parking drops the rank; making it active again puts it
+  last.
+- **The cap** is the ledger setting `cap` (4 until agreed; a whole number of 1 or more), with
+  `cap_agreed` `{ by, on }` when the sponsor agreed it (decision 14). At the cap, making another
+  initiative active asks to park one first.
+- **Readiness** (`pro.readiness`, decision 16): nine items: sponsor, owner, why, done looks like,
+  smallest useful step, not doing, who decides what, capacity agreed (`{ by, on }`), stop if. Text
+  counts when not blank. Capturing into an initiative that is not ready asks "Log anyway?" and counts
+  `log_anyway`.
+- **Parked initiatives** put their tasks on hold (21.2) and leave Today, Upcoming and meetings.
+- **Escalation** (decision 15, `pro.escalationDraft`): when an open promise of theirs reaches
+  `threshold` misses (2 unless set) and has no escalation, a draft is made: option A is that
+  promise; option B is the same person's other open promise of theirs in another initiative, the
+  best-ranked first (then earliest effective due day, then lowest id). The draft text is fixed by
+  the vectors; with no B it asks for help with A. It is only a draft until the person accepts it
+  (status `accepted`), and `resolved` with a decision.
+- **Owed decisions** (`owed`) and the **log** (`decision`, `value`, `unknown` with who to ask)
+  belong to an initiative or none.
+
+### 21.11 Weekly execution review and the focus block
+
+- With Pro on, the weekly review (section 14.7) starts with Pro's steps for the layers that are on
+  (`pro.weeklyPro`): Give verdicts (verdicts due), Send what was agreed (open promises never sent),
+  Escalations and decisions (drafted or accepted escalations plus open owed decisions), Check the
+  portfolio (initiatives not ready, one more when over the cap, and active initiatives with no
+  available task), Note the value delivered (initiatives closed in the last 7 days without a value
+  entry). A step with nothing is listed with 0.
+- **The mirror:** over the last 7 local days, promises you took over, workdays (Monday to Friday)
+  with a focus block, open tasks you hold against open promises others hold, and open confirm tasks,
+  in the sentence the vectors fix.
+- **The focus block** (`pro.focusBlock`): one block of 60 to 90 minutes a day for the top
+  initiatives. Candidates are tasks available now in ranked initiatives (best rank first), then
+  flagged tasks outside them; within that flagged first, then due day (none last), priority (high
+  first), id; at most five. Its length is the candidates' estimates added up, rounded up to 15
+  minutes, held between 60 and 90 (60 without estimates). A day had one when a task of a ranked
+  initiative had a block of at least 60 minutes that day and is done.
+
+### 21.12 Import and export
+
+- **Format** `vicu-import/1`: `{ "format", "source": { "kind", "title", "date" }, "items": [...] }`.
+  Item types and their fields: `promise` (`owner`, `what`, `due`, `initiative`, `in_their_words`,
+  `done_when`, `needs`), `action` (`owner` "me", `what`, `due`, `for`, `initiative`), `update` (`id`
+  `t-<taskId>`, or `owner` with `about`; `status` `delivered`, `late`, `not_yet`, `renegotiated`,
+  `dropped`; `new_due`, `blocker`), `open_item` (`what`, `ask`, `initiative`), `decision` (`what`,
+  `by`, `initiative`, `date`), `decision_needed` (`what`, `from`, `initiative`), `value` (`what`,
+  `where`, `initiative`).
+- **Reading** (`pro.importRead`): code fences are removed, the text between the first `{` and the
+  last `}` is taken, and a comma before `}` or `]` outside a string is dropped. Not JSON, or no
+  items, is "not readable". A different or missing format, an unknown type (left out), unknown
+  fields (ignored), an item without `what` (left out, except updates) and dates that are not read
+  are reported in fixed sentences; the rest is read. Statuses are read without case, spaces or
+  hyphens (`done`, `completed` are delivered; `delayed`, `missed` not yet; `cancelled` dropped).
+- **Dates** (`pro.importDates`), relative to the source date (else today): `YYYY-MM-DD` (a time
+  after it is ignored), `today`, `tomorrow`, a weekday (full or three letters, optionally after
+  `on`, `this` or `next`: the first such day after the reference), `next week` (Monday of next
+  week), `end of week` (the first Friday on or after it), `end of month`, `in N days`, `in N weeks`.
+- **Matching** (`pro.importMatch`): people by 21.5 (`me` is you); initiatives by project title
+  (case ignored) among the area's initiatives; an update by its id among open promises, else among
+  the owner's open promises by wording: the share of the `about` (or `what`) words of two or more
+  letters or digits found in the promise title, at least 0.6, the highest (then the lowest id), shown
+  as "check". A promise without `in_their_words` becomes a confirm task (21.6). Rows that need a
+  person, a target or a status start unticked. **Not mentioned:** open promises of theirs, of people
+  the import names, that no update is about.
+- **Nothing changes until Add** (decision 30): tasks are created through the usual create path, then
+  ledger records once they have ids (queued offline with temporary ids); updates become verdicts;
+  open items become `unknown` log entries with an "Ask <name>: <what>" task; decisions and values
+  log entries; decisions needed owed records. One Undo takes back the whole import.
+- **Export** (`pro.exportOpen`, decision 33): open promises as `vicu-import/1` with `"kind":
+  "export"` and ids `t-<taskId>`, sorted by id.
+- **The Copilot prompt** is `pro.copilotPrompt` of `ai-tools-v1.json` (`pro.copilotPrompt` vectors
+  here): fixed lines with placeholders; an optional block is left out when one of its placeholders
+  is empty.
+
+### 21.13 Repeat rules
+
+- `repeat_rule.<taskId>`: `{ "until"?: "YYYY-MM-DD", "count"?: n, "catch_up"?: true }`, beside
+  Vikunja's own repeat; a value without any of the three reads as none (`pro.prefs.repeatRule`).
+  `count` is the occurrences left, this one included.
+- **Completing** (`pro.repeatRule`): the end is reached when `count` is 1 or the next due day is
+  after `until` (mode 0 adds the interval, mode 1 a month, mode 2 counts from now). Then the app
+  sends `{ "repeat_after": 0, "repeat_mode": 0 }` first and `{ "done": true }` second, and removes
+  the rule. Otherwise `{ "done": true }` only, with `count` lowered by one.
+- **Catching up:** after the server moved the task, while its due day is before today it moves again
+  (mode 0 by the interval, mode 1 by a month; never mode 2), start and end by the same amount, in one
+  patch; not past `until`.
+- A device without Pro keeps repeating past the end; the next Pro device that completes it applies
+  the rule.
+
+### 21.14 Focus
+
+`pro_focus` (device only, never synced): `{ "categories": [...], "projects": [...] }`. A project is
+in focus when it or an ancestor is a focused project or its top-level project's category is a
+focused category; the Inbox always is. The sidebar shows the projects in focus and their ancestors;
+lists, counts, the palette and Quick View show tasks of projects in focus only (`pro.focus`).
+
+### 21.15 The assistant
+
+Pro data (promise words, verdicts, patterns, initiatives, people) reaches the assistant only while
+the person turned on Pro's assistant switch (decision 20), with any configured provider. Tasks
+themselves are visible to Ask as before. The prompts, schemas and Ask tools are `pro` in
+`ai-tools-v1.json`.
+
+### 21.16 Vectors
+
+`pro` in `cross-app-semantics-v1.json`, run in three time zones: `settings`, `prefs`, `availability`,
+`startVsBlock`, `ledgerMerge`, `ledgerPrune`, `archive`, `promises`, `waitingOn`, `personMatch`,
+`personPattern`, `recapText`, `meetingRound`, `portfolio`, `readiness`, `escalationDraft`,
+`importDates`, `importRead`, `importMatch`, `exportOpen`, `copilotPrompt`, `repeatRule`, `focus`,
+`focusBlock`, `weeklyPro`; and `customListPro` (section 3.8). `nlp-corpus-v1.json` covers section
+5.5 with cases marked `"pro": true`.

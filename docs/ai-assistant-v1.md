@@ -914,3 +914,43 @@ order. Vectors: `planDay.checks`.
 - *Ready*: nothing.
 - A failed request is said once ("No suggestions: …") and the session goes on with first free slots
   and the default length. With the switch off, nothing is sent and nothing is shown.
+
+## 11. Pro
+
+Pro (cross-app semantics section 21) adds three uses of the assistant. All of them, and every piece
+of Pro data in any request (promise words, verdicts, patterns, people, initiatives, logs), need the
+person's **Pro assistant** switch (`pro_assistant`, per device, off by default) on top of the usual
+set-up and consent (section 7). With it off, Ask still sees tasks as before but no ledger data, and
+the Pro tools below are not offered. Any configured provider may be used (decision 20).
+
+### 11.1 Converting pasted text to an import
+
+When pasted text is not a `vicu-import/1` document, the import screen offers "Convert with the
+assistant". The request uses Ask's model, the prompt `pro.proImport.prompt` (with `{items_max}` from
+`pro.limits.import_items_max`) and the schema `pro.proImport.answerSchema`, at most
+`pro.limits.import_max_tokens` tokens, deterministic. The user message holds `<me>`, `<people>`,
+`<initiatives>`, `<open>` (open promises with `t-<taskId>` ids) and `<text>`. The answer's items
+(null fields dropped) become a `vicu-import/1` document with the source the person chose and go
+through the same reading, matching and review (cross-app semantics 21.12); nothing is written
+without Add.
+
+### 11.2 Promise drafts in a meeting
+
+Dictation on a meeting card (desktop) uses `pro.promiseDrafts.prompt` and its schema, with
+`<person>`, `<me>` and `<mine>` (your open promises to that person). Each draft is checked like a
+dictation draft (section 4): `due_said` is read by the quick-add date rules in dates-only mode, a
+`words` value that does not appear in the transcript is dropped, at most
+`pro.limits.promise_drafts_max` drafts. Drafts are shown on the card and added only on a tap.
+
+### 11.3 Ask's Pro tools
+
+While the switch is on, Ask also has the read tools `pro.askTools` (`get_promises`, `get_person`,
+`get_portfolio`, `get_initiative`), run on the device against its own data, and the starters
+`pro.starters` in an empty conversation. `get_promises` returns at most
+`pro.limits.get_promises_max` promises.
+
+### 11.4 The Copilot prompt
+
+The text the person copies to Microsoft 365 Copilot (or any other assistant) is not a request of
+Vicu's: it is `pro.copilotPrompt`, filled on the device (cross-app semantics 21.12).
+

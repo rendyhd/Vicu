@@ -2,7 +2,7 @@
 
 This document defines the exact parser behavior that BOTH Vicu (desktop) and Vicu Android must implement identically. Both apps must produce the same `ParseResult` for the same input string and the same `ParserConfig`.
 
-The date and recurrence rules are the contract in `docs/cross-app-semantics-v1.md` section 5, and the test is the shared corpus `test-fixtures/nlp-corpus-v1.json` (154 cases, reference time Tue 2026-10-06 10:00 local; both apps run the same file). If this document and the corpus disagree, the corpus wins. The desktop implementation is `src/renderer/lib/task-parser/`: there is one parser (the main window, the task title editor and Quick Entry all call it), and the date work is done by chrono-node plus the rules below.
+The date and recurrence rules are the contract in `docs/cross-app-semantics-v1.md` section 5, and the test is the shared corpus `test-fixtures/nlp-corpus-v1.json` (179 cases, reference time Tue 2026-10-06 10:00 local; both apps run the same file). If this document and the corpus disagree, the corpus wins. The desktop implementation is `src/renderer/lib/task-parser/`: there is one parser (the main window, the task title editor and Quick Entry all call it), and the date work is done by chrono-node plus the rules below.
 
 ---
 
@@ -10,7 +10,8 @@ The date and recurrence rules are the contract in `docs/cross-app-semantics-v1.m
 
 ```typescript
 type SyntaxMode = 'todoist' | 'vikunja'
-type TokenType = 'date' | 'priority' | 'label' | 'project' | 'recurrence'
+type TokenType = 'date' | 'priority' | 'label' | 'project' | 'recurrence' | 'length' | 'place'
+  | 'person' | 'start' | 'estimate' | 'flag' | 'request'   // Pro only
 
 interface ParserConfig {
   enabled: boolean        // Master toggle — when false, parse() returns raw input as title, nothing extracted
@@ -18,6 +19,7 @@ interface ParserConfig {
   bangToday?: boolean     // The `!` -> today shortcut (setting "exclamation_today", default on)
   locale?: string         // Slash-date order; defaults to the device/system locale
   suppressTypes?: TokenType[]  // Token types the user dismissed: that extractor is skipped
+  pro?: boolean           // Pro's phrases (contract section 5.5); off unless true, and then nothing changes
 }
 
 const DEFAULT_PARSER_CONFIG: ParserConfig = {
@@ -93,6 +95,12 @@ interface ParseResult {
     place: { id: string; name: string }
     trigger: 'arrive' | 'leave'
   } | null
+  // Pro (contract section 5.5), only with config.pro; otherwise null / false
+  person: { id: number; mine: boolean } | null  // "Jan:" (theirs) or "for Jan:" (mine) at the start
+  start: Date | null         // "starts monday": a start date, local midnight without a time
+  estimate: number | null    // "~1h30": minutes
+  flag: boolean              // "!flag"
+  request: boolean           // "req:" at the start
   rawInput: string           // Original input for debugging
   tokens: ParsedToken[]      // All detected tokens with positions (for highlighting)
 }
@@ -115,7 +123,8 @@ export function parse(
   input: string,
   config: ParserConfig = DEFAULT_PARSER_CONFIG,
   reference: Date = new Date(),  // "now": relative dates and the `!` shortcut; tests pass the corpus reference
-  places: { id: string; name: string }[] = []   // saved places a place phrase may name; none reads no place
+  places: { id: string; name: string }[] = [],  // saved places a place phrase may name; none reads no place
+  people: { id: number; title: string; aliases?: string[] }[] = []  // Pro's people "Jan:" may name
 ): ParseResult
 ```
 
@@ -203,11 +212,13 @@ function buildPriorityPatterns(mode: SyntaxMode): Array<{ regex: RegExp; value: 
 
 The parser MUST extract tokens in this exact order:
 
+0. **Pro** (only with `config.pro`, contract section 5.5): `req:` at the start, then a person's `Jan:` / `for Jan:` at the start, then `!flag`, then `~1h30`
 0. **Place** ("when I get home" for a saved place, contract section 5.3) — only when places are passed
 1. **Labels** (prefix-based: `@` or `*`) — extract and remove first
 2. **Projects** (prefix-based: `#` or `+`) — extract and remove
 3. **Priority** (mode-dependent short form + shared word form) — extract and remove
 4. **Recurrence** (`every ...`, `daily`, `weekly`, etc.) — extract and remove
+5. **Start date** (Pro only): `starts` and the date phrase right after it, read by the date rules and never as the due date
 5. **Dates** (the date rules below on the remaining text) — extract and remove
 6. **`!` today shortcut** — on the title that is left, when no date was found
 7. **Title** — everything remaining, trimmed and collapsed whitespace
@@ -270,6 +281,15 @@ text also has a time of day. Contract section 5.4 has the rules; the corpus pins
 label, project or priority, a length does not split a date phrase: "Call tomorrow for 1h at 9am" is
 tomorrow at 09:00. chrono reads `for 30m` as 30 minutes from now and `for 3 months` as a date, so
 desktop blanks these words before chrono runs.
+
+### Pro phrases
+
+Only with `config.pro` (contract section 5.5; the corpus cases marked `"pro": true`, parsed with the
+corpus `people`). A person's name and a colon at the very start (`Jan: send the plan`, `for Priya:
+review`) names a known person by contract section 21.5; an unknown or ambiguous name stays. `starts`
+and a date phrase is a start date; a block made by `for 30m` wins over it. `~10m`, `~1h30` are
+estimates; `!flag` flags; `req:` at the start marks a request. With Pro off all of these stay in the
+title, exactly as before.
 
 ### Slash dates
 

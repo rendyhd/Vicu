@@ -3494,5 +3494,468 @@
       { "address": "https://example.com/api/v2", "hint": false },
       { "address": "https://example.com/llm/V1", "hint": false }
     ]
+  },
+  "pro": {
+    "about": "Pro (cross-app semantics section 21; docs/ai-assistant-v1.md section 11). Used only while the person turned on Pro's assistant (pro_assistant).",
+    "limits": {
+      "import_items_max": 60,
+      "import_max_tokens": 8000,
+      "promise_drafts_max": 20,
+      "get_promises_max": 50
+    },
+    "copilotPrompt": {
+      "kinds": {
+        "meeting": "this meeting",
+        "mail": "this mail thread",
+        "chat": "this chat"
+      },
+      "lines": [
+        "From {from_this}, list every agreement, action, update and open item for Vicu.",
+        "Answer with JSON only, in exactly the format below, and nothing else.",
+        "",
+        "Rules",
+        [
+          "- People: use these names: {people}."
+        ],
+        "- Use \"me\" for {me}. Use the full name for anyone else.",
+        [
+          "- Initiatives: {initiatives}."
+        ],
+        "- It was on {date}. Write dates as YYYY-MM-DD. Leave a date out when nobody said one. Never guess.",
+        "- \"promise\": someone other than me commits to deliver something. Put their exact words in \"in_their_words\" only when they clearly said yes. Put how we will see it is done in \"done_when\" when it was said.",
+        "- \"action\": something I will do. Add \"for\" when it is for someone.",
+        "- \"update\": news about a promise listed under \"Open going in\". Keep its \"id\". \"status\" is delivered, late, not_yet, renegotiated or dropped; add \"new_due\" and \"blocker\" when they were said.",
+        "- \"open_item\": a question nobody could answer yet, and who could (\"ask\").",
+        "- \"decision\": something decided, and by whom (\"by\").",
+        "- \"decision_needed\": a choice someone still has to make, and who (\"from\").",
+        "- \"value\": a result worth noting, and where it showed (\"where\").",
+        "- Do not invent owners, dates or commitments.",
+        [
+          "",
+          "Open going in",
+          "{open}"
+        ],
+        "",
+        "Format",
+        "{\"format\":\"vicu-import/1\",",
+        " \"source\":{\"kind\":\"{kind}\",\"title\":\"\",\"date\":\"{date}\"},",
+        " \"items\":[{\"type\":\"promise|action|update|open_item|decision|decision_needed|value\", ...}]}"
+      ]
+    },
+    "proImport": {
+      "prompt": {
+        "version": 1,
+        "lines": [
+          "You turn meeting notes, a mail thread or a chat into a list of items for Vicu, a task manager. The person pasted the text in <text>.",
+          "- <me> is the person using Vicu. <people> are names they work with; use those names when the text means them, and the full name for anyone else.",
+          "- <initiatives> are their projects; set \"initiative\" only to one of them.",
+          "- <open> lists promises already open, with ids. An item about one of them is an \"update\" with that \"id\".",
+          "- \"promise\": someone other than <me> commits to deliver something. \"in_their_words\" holds their exact words only when they clearly said yes; otherwise null.",
+          "- \"action\": something <me> will do; \"owner\" is \"me\"; \"for\" the person it is for.",
+          "- \"open_item\": a question nobody could answer yet; \"ask\" who could. \"decision\": something decided; \"by\" who. \"decision_needed\": a choice still to make; \"from\" who. \"value\": a result worth noting.",
+          "- Dates as they were said (\"Friday\", \"2026-11-20\"); null when none was said. Never guess an owner, a date or a commitment.",
+          "- At most {items_max} items. Leave out small talk."
+        ]
+      },
+      "answerSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "description": "The items, in the order they came up.",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "type",
+                "owner",
+                "what",
+                "due",
+                "initiative",
+                "in_their_words",
+                "done_when",
+                "for",
+                "id",
+                "status",
+                "new_due",
+                "blocker",
+                "ask",
+                "by",
+                "from",
+                "where"
+              ],
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "promise",
+                    "action",
+                    "update",
+                    "open_item",
+                    "decision",
+                    "decision_needed",
+                    "value"
+                  ],
+                  "description": "What the item is."
+                },
+                "owner": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Who: a promise's or update's person, \"me\" for an action; else null."
+                },
+                "what": {
+                  "type": "string",
+                  "description": "What was agreed, done, asked or decided, in a few words."
+                },
+                "due": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The date that was said, as written; else null. Never guess."
+                },
+                "initiative": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The initiative it belongs to, one of <initiatives>; else null."
+                },
+                "in_their_words": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "A promise's exact words, only when the person clearly said yes; else null."
+                },
+                "done_when": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "How everyone will see it is done, when it was said; else null."
+                },
+                "for": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "An action's person it is for; else null."
+                },
+                "id": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "An update's id from <open>; else null."
+                },
+                "status": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "delivered",
+                        "late",
+                        "not_yet",
+                        "renegotiated",
+                        "dropped"
+                      ]
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "An update's status; else null."
+                },
+                "new_due": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "An update's new date as said; else null."
+                },
+                "blocker": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "What stands in the way, when said; else null."
+                },
+                "ask": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "An open item's person who could answer; else null."
+                },
+                "by": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "A decision's person who decided; else null."
+                },
+                "from": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "A needed decision's person who must make it; else null."
+                },
+                "where": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Where a value showed; else null."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "promiseDrafts": {
+      "prompt": {
+        "version": 1,
+        "lines": [
+          "You turn what the person said in a meeting into promises for Vicu. <person> is the person whose card is open; <me> is the person speaking.",
+          "- A promise of <person> to <me>: \"mine\" false. Something <me> will do for <person>: \"mine\" true.",
+          "- \"words\" holds <person>'s exact words only when they clearly said yes; otherwise null.",
+          "- \"due_said\" is the date as said, or null. \"needs\" lists the titles of <me>'s promises it waits on, from <mine>.",
+          "- Never invent a promise, a date or a yes."
+        ]
+      },
+      "answerSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "promises"
+        ],
+        "properties": {
+          "promises": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "what",
+                "mine",
+                "due_said",
+                "words",
+                "done_when",
+                "needs"
+              ],
+              "properties": {
+                "what": {
+                  "type": "string",
+                  "description": "What is promised, in a few words."
+                },
+                "mine": {
+                  "type": "boolean",
+                  "description": "True when the speaker owes it."
+                },
+                "due_said": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The date as said; else null."
+                },
+                "words": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The person's exact words of a clear yes; else null."
+                },
+                "done_when": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "How everyone will see it is done; else null."
+                },
+                "needs": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Titles from <mine> it waits on."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "askTools": [
+      {
+        "name": "get_promises",
+        "kind": "read",
+        "enabled": true,
+        "description": "Open promises with their person, direction, due date, misses and verdicts. Filter by person name, direction and whether a verdict is due.",
+        "parameters": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "person",
+            "direction",
+            "verdict_due"
+          ],
+          "properties": {
+            "person": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "A person's name, or null for everyone."
+            },
+            "direction": {
+              "type": "string",
+              "enum": [
+                "theirs",
+                "mine",
+                "any"
+              ],
+              "description": "theirs: promised to the user; mine: the user owes it."
+            },
+            "verdict_due": {
+              "type": "boolean",
+              "description": "Only promises that need a verdict today."
+            }
+          }
+        }
+      },
+      {
+        "name": "get_person",
+        "kind": "read",
+        "enabled": true,
+        "description": "One person: open promises both ways, the 90-day counts and the pattern in words, and the 1:1 agenda.",
+        "parameters": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "name"
+          ],
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "The person's name."
+            }
+          }
+        }
+      },
+      {
+        "name": "get_portfolio",
+        "kind": "read",
+        "enabled": true,
+        "description": "The ranked initiatives with status, readiness, the cap and whether it was agreed, parked initiatives with their reason, open escalations and decisions owed.",
+        "parameters": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [],
+          "properties": {}
+        }
+      },
+      {
+        "name": "get_initiative",
+        "kind": "read",
+        "enabled": true,
+        "description": "One initiative: rank, sponsor, owner, readiness items, the decision and value log, owed decisions and its open promises.",
+        "parameters": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "name"
+          ],
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "The initiative's project name."
+            }
+          }
+        }
+      }
+    ],
+    "starters": [
+      "Who has missed a date twice this month?",
+      "Which initiatives have no agreed capacity?",
+      "What should my focus block be tomorrow?"
+    ]
   }
 }

@@ -387,6 +387,14 @@ export function formatWeekdayDay(value: Date, fmt: DateFormat): string {
   return phrasesFor(fmt.locale).weekdayDay(value)
 }
 
+/**
+ * The weekday with the short date, the year only when it is not `now`'s year ("Fri, Nov 20",
+ * "Fri 20 Nov"): a day in a text someone else reads later, such as a Pro recap, so never "Tomorrow".
+ */
+export function formatWeekdayDate(value: Date, now: Date, fmt: DateFormat): string {
+  return weekdayDate(value, now, phrasesFor(fmt.locale))
+}
+
 /** The month with its year ("October 2026"). */
 export function formatMonthYear(value: Date, fmt: DateFormat): string {
   return phrasesFor(fmt.locale).monthYear(value)

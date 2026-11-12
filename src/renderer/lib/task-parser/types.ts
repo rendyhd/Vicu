@@ -6,7 +6,20 @@ export type SyntaxMode = 'todoist' | 'vikunja'
  * `place` is "when I get home" for a saved place (section 5.3), read only when the caller passes
  * places. `length` is `for 30m` when it makes a time block (section 5.4).
  */
-export type TokenType = 'label' | 'project' | 'priority' | 'recurrence' | 'date' | 'length' | 'place'
+export type TokenType =
+  | 'label'
+  | 'project'
+  | 'priority'
+  | 'recurrence'
+  | 'date'
+  | 'length'
+  | 'place'
+  // Pro (section 5.5), only with `pro` on
+  | 'person'
+  | 'start'
+  | 'estimate'
+  | 'flag'
+  | 'request'
 
 export interface ParsedToken {
   type: TokenType
@@ -41,6 +54,17 @@ export interface ParseResult {
   recurrence: ParsedRecurrence | null
   /** A saved place the text names with "when I get home", for a location reminder. */
   place: PlaceMatch | null
+  // Pro (section 5.5): always present, set only while `config.pro` is on.
+  /** `Jan:` at the start: that person's promise to you; `for Jan:`: yours to them. */
+  person: { id: number; mine: boolean } | null
+  /** `starts monday`: a start date (local midnight without a time). Null when a block holds the start. */
+  start: Date | null
+  /** `~1h30`: minutes. */
+  estimate: number | null
+  /** `!flag` */
+  flag: boolean
+  /** `req:` at the start: a request to triage. */
+  request: boolean
   tokens: ParsedToken[]
 }
 
@@ -59,6 +83,8 @@ export interface ParserConfig {
    * en-GB). Defaults to the system locale (`navigator.language`).
    */
   locale?: string
+  /** Pro's phrases (section 5.5). Off unless true; with it off the text is read as before. */
+  pro?: boolean
 }
 
 const SYNTAX_PREFIXES: Record<SyntaxMode, SyntaxPrefixes> = {

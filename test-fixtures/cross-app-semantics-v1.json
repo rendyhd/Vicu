@@ -3200,5 +3200,864 @@
           ]
         } }
     ]
+  },
+  "pro": {
+    "about": "Contract section 21 and 3.8. Times are local wall-clock times (converted in the zone under test) unless they end in Z. Ledger values in vectors are given without revisions; suites add them. A ledger record in ledgerMerge is { v: value, r: [wall_time_ms, counter, device_id] } plus any unknown fields.",
+    "now": "2026-11-12T10:00:00",
+    "today": "2026-11-12",
+    "settings": {
+      "enabled": [
+        { "name": "off by default", "config": {}, "layer": null, "expect": false },
+        { "name": "the switch", "config": { "pro_enabled": true }, "layer": null, "expect": true },
+        { "name": "never in standalone mode", "config": { "pro_enabled": true, "standalone_mode": true }, "layer": null, "expect": false },
+        { "name": "a layer turned off", "config": { "pro_enabled": true, "pro_layers": { "promises": false } }, "layer": "promises", "expect": false },
+        { "name": "the other layers stay on", "config": { "pro_enabled": true, "pro_layers": { "promises": false } }, "layer": "availability", "expect": true },
+        { "name": "layers without the switch", "config": { "pro_enabled": false, "pro_layers": { "availability": true } }, "layer": "availability", "expect": false },
+        { "name": "only true turns it on", "config": { "pro_enabled": "yes" }, "layer": null, "expect": false }
+      ],
+      "area": {
+        "projects": [{ "id": 10 }, { "id": 12, "parent_project_id": 10 }, { "id": 20 }, { "id": 30 }],
+        "categories": { "10": "c1", "20": "c2" },
+        "cases": [
+          { "name": "no area: every project", "area": null, "project": 20, "expect": true },
+          { "name": "a subproject goes by its top-level project", "area": ["c1"], "project": 12, "expect": true },
+          { "name": "another category", "area": ["c1"], "project": 20, "expect": false },
+          { "name": "no category", "area": ["c1"], "project": 30, "expect": false },
+          { "name": "an unreadable area is no area", "area": "c1", "project": 30, "expect": true }
+        ]
+      }
+    },
+    "prefs": {
+      "keys": [
+        { "key": "project_mode.12", "pro": true },
+        { "key": "project_mode.0", "pro": false },
+        { "key": "project_mode.012", "pro": false },
+        { "key": "label_kind.7", "pro": true },
+        { "key": "label_status.7", "pro": true },
+        { "key": "project_status.3", "pro": true },
+        { "key": "repeat_rule.abc", "pro": false },
+        { "key": "repeat_rule.55", "pro": true },
+        { "key": "task_order.project.5", "pro": false }
+      ],
+      "projectMode": [
+        { "value": "sequential", "expect": "sequential" },
+        { "value": "single", "expect": "single" },
+        { "value": "parallel", "expect": "parallel" },
+        { "value": null, "expect": "parallel" },
+        { "value": 3, "expect": "parallel" },
+        { "value": "Sequential", "expect": "parallel" }
+      ],
+      "onHold": [
+        { "value": "on_hold", "expect": true },
+        { "value": "active", "expect": false },
+        { "value": true, "expect": false },
+        { "value": null, "expect": false }
+      ],
+      "repeatRule": [
+        { "value": { "until": "2026-12-31" }, "expect": { "until": "2026-12-31" } },
+        { "value": { "count": 3, "catch_up": true }, "expect": { "count": 3, "catch_up": true } },
+        { "value": { "count": 0 }, "expect": null },
+        { "value": { "until": "31-12-2026" }, "expect": null },
+        { "value": { "count": 2, "x": 1 }, "expect": { "count": 2, "x": 1 } },
+        { "value": "weekly", "expect": null },
+        { "value": { "catch_up": false }, "expect": null }
+      ]
+    },
+    "availability": [
+      {
+        "name": "reasons",
+        "now": "2026-11-12T10:00:00",
+        "projects": [{ "id": 1 }, { "id": 3 }, { "id": 4 }, { "id": 5 }, { "id": 6, "parent_project_id": 5 }],
+        "prefs": { "project_status.5": "on_hold", "label_status.20": "on_hold", "project_mode.3": "sequential", "task_order.project.3": "manual" },
+        "ledger": {
+          "promises": { "110": { "dir": "theirs", "person": 40 }, "111": { "dir": "mine", "person": 40 }, "113": { "dir": "theirs", "person": 41 },
+            "116": { "dir": "theirs", "person": 41, "verdicts": [{ "id": "v1", "at": "2026-11-11T09:00:00Z", "kind": "delivered" }] } },
+          "initiatives": { "4": { "status": "parked", "parked": { "on": "2026-11-01", "reason": "later" } } }
+        },
+        "tasks": [
+          { "id": 101, "project_id": 1, "expect": [] },
+          { "id": 102, "project_id": 1, "start": "2026-11-16T00:00:00", "expect": ["starts"] },
+          { "id": 103, "project_id": 1, "start": "2026-11-10T00:00:00", "expect": [] },
+          { "id": 104, "project_id": 1, "start": "2026-11-12T15:00:00", "end": "2026-11-12T16:00:00", "expect": [] },
+          { "id": 105, "project_id": 6, "expect": ["on_hold"] },
+          { "id": 106, "project_id": 1, "labels": [20], "expect": ["waiting"] },
+          { "id": 107, "project_id": 1, "blocked": [[101, false]], "expect": ["after"], "blockers": [101] },
+          { "id": 108, "project_id": 1, "blocked": [[900, true]], "expect": [] },
+          { "id": 109, "project_id": 1, "blocked": [[901, false]], "expect": ["after"], "blockers": [901] },
+          { "id": 110, "project_id": 1, "expect": ["theirs"] },
+          { "id": 111, "project_id": 1, "expect": [] },
+          { "id": 112, "project_id": 4, "expect": ["on_hold"] },
+          { "id": 113, "project_id": 1, "start": "2026-11-20T09:00:00", "labels": [20, 41], "expect": ["starts", "waiting", "theirs"] },
+          { "id": 114, "project_id": 1, "done": true, "expect": [] },
+          { "id": 115, "project_id": 1, "blocked": [[114, false]], "expect": [] },
+          { "id": 116, "project_id": 1, "expect": [] },
+          { "id": 301, "project_id": 3, "position": 2, "expect": ["sequence"] },
+          { "id": 302, "project_id": 3, "position": 1, "expect": [], "next": true },
+          { "id": 303, "project_id": 3, "position": 3, "expect": ["sequence"] },
+          { "id": 304, "project_id": 3, "position": 0, "parent": 302, "expect": [] },
+          { "id": 305, "project_id": 3, "position": 0, "parent": 301, "expect": ["sequence"] },
+          { "id": 306, "project_id": 3, "position": 0, "done": true, "expect": [] }
+        ],
+        "cycles": [],
+        "views": {
+          "available": [101, 103, 104, 108, 111, 115, 116, 302, 304],
+          "remaining": [101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 115, 116, 301, 302, 303, 304, 305],
+          "all": [101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 301, 302, 303, 304, 305, 306]
+        }
+      },
+      {
+        "name": "a blocked-by loop is ignored and reported",
+        "now": "2026-11-12T10:00:00",
+        "projects": [{ "id": 1 }],
+        "prefs": {},
+        "tasks": [
+          { "id": 201, "project_id": 1, "blocked": [[202, false]], "expect": [] },
+          { "id": 202, "project_id": 1, "blocked": [[201, false]], "expect": [] },
+          { "id": 203, "project_id": 1, "blocked": [[201, false]], "expect": ["after"], "blockers": [201] },
+          { "id": 204, "project_id": 1, "blocked": [[204, false]], "expect": [] }
+        ],
+        "cycles": [201, 202, 204]
+      },
+      {
+        "name": "sequential projects use the project's order",
+        "now": "2026-11-12T10:00:00",
+        "projects": [{ "id": 7 }, { "id": 8 }, { "id": 9, "parent_project_id": 8 }],
+        "prefs": { "project_mode.7": "sequential", "project_mode.9": "sequential", "task_order.project.8": "manual" },
+        "tasks": [
+          { "id": 701, "project_id": 7, "due": "2026-11-20T23:59:59", "position": 1, "expect": ["sequence"] },
+          { "id": 702, "project_id": 7, "due": "2026-11-15T23:59:59", "position": 2, "expect": [], "next": true },
+          { "id": 703, "project_id": 7, "position": 0, "expect": ["sequence"] },
+          { "id": 901, "project_id": 9, "due": "2026-11-13T23:59:59", "position": 5, "expect": ["sequence"] },
+          { "id": 902, "project_id": 9, "position": 1, "expect": [], "next": true }
+        ],
+        "cycles": []
+      }
+    ],
+    "startVsBlock": {
+      "cases": [
+        { "name": "a start date alone", "start": "2026-11-16T00:00:00", "end": null, "now": "2026-11-12T10:00:00", "startDay": "2026-11-16", "startsLater": true, "blockStart": "2026-11-13T09:00:00", "warn": true },
+        { "name": "a start date that has passed", "start": "2026-11-10T00:00:00", "end": null, "now": "2026-11-12T10:00:00", "startDay": "2026-11-10", "startsLater": false, "blockStart": "2026-11-13T09:00:00", "warn": false },
+        { "name": "a block is not a start date", "start": "2026-11-13T09:00:00", "end": "2026-11-13T10:00:00", "now": "2026-11-12T10:00:00", "startDay": null, "startsLater": false, "blockStart": "2026-11-12T14:00:00", "warn": false },
+        { "name": "a range over days (Gantt) is a start date", "start": "2026-11-13T09:00:00", "end": "2026-11-15T09:00:00", "now": "2026-11-12T10:00:00", "startDay": "2026-11-13", "startsLater": true, "blockStart": "2026-11-12T14:00:00", "warn": true },
+        { "name": "no start date", "start": null, "end": null, "now": "2026-11-12T10:00:00", "startDay": null, "startsLater": false, "blockStart": "2026-11-12T14:00:00", "warn": false },
+        { "name": "later today", "start": "2026-11-12T14:00:00", "end": null, "now": "2026-11-12T10:00:00", "startDay": "2026-11-12", "startsLater": true, "blockStart": "2026-11-12T09:00:00", "warn": true }
+      ],
+      "dateOnlyStart": [
+        { "day": "2026-11-16", "expect": "2026-11-16T00:00:00" },
+        { "day": "2027-03-28", "expect": "2027-03-28T00:00:00" }
+      ],
+      "upcoming": {
+        "now": "2026-11-12T10:00:00",
+        "tasks": [
+          { "id": 1, "start": "2026-11-16T00:00:00" },
+          { "id": 2, "start": "2026-11-12T15:00:00" },
+          { "id": 3, "start": "2026-11-14T09:00:00", "end": "2026-11-14T10:00:00" },
+          { "id": 4, "start": "2026-11-13T08:00:00" },
+          { "id": 5, "start": "2026-11-13T00:00:00", "done": true },
+          { "id": 6, "start": "2026-11-13T00:00:00" }
+        ],
+        "expect": [{ "id": 4, "day": "2026-11-13" }, { "id": 6, "day": "2026-11-13" }, { "id": 1, "day": "2026-11-16" }]
+      }
+    },
+    "ledgerMerge": [
+      {
+        "name": "the newer record wins; equal revisions keep the server's",
+        "local": { "promises": { "7": { "v": { "dir": "theirs", "person": 40, "words": "local" }, "r": [2000, 0, "a"] }, "8": { "v": { "dir": "mine", "person": 41, "words": "local8" }, "r": [1000, 0, "a"] } } },
+        "server": { "promises": { "7": { "v": { "dir": "theirs", "person": 40, "words": "server" }, "r": [1000, 0, "b"] }, "8": { "v": { "dir": "mine", "person": 41, "words": "server8" }, "r": [1000, 0, "a"] } } },
+        "expect": { "promises": { "7": { "v": { "dir": "theirs", "person": 40, "words": "local" }, "r": [2000, 0, "a"] }, "8": { "v": { "dir": "mine", "person": 41, "words": "server8" }, "r": [1000, 0, "a"] } } }
+      },
+      {
+        "name": "verdicts and sent marks are unions",
+        "local": { "promises": { "7": { "v": { "dir": "theirs", "person": 40, "verdicts": [{ "id": "v1", "at": "2026-11-10T09:00:00Z", "kind": "not_yet", "new_due": "2026-11-13" }], "sent": ["2026-11-10T15:00:00Z"] }, "r": [3000, 0, "a"] } } },
+        "server": { "promises": { "7": { "v": { "dir": "theirs", "person": 40, "words": "I will", "verdicts": [{ "id": "v2", "at": "2026-11-12T09:00:00Z", "kind": "delivered" }], "sent": ["2026-11-11T15:00:00Z"] }, "r": [2000, 0, "b"] } } },
+        "expect": { "promises": { "7": { "v": { "dir": "theirs", "person": 40, "verdicts": [{ "id": "v1", "at": "2026-11-10T09:00:00Z", "kind": "not_yet", "new_due": "2026-11-13" }, { "id": "v2", "at": "2026-11-12T09:00:00Z", "kind": "delivered" }], "sent": ["2026-11-10T15:00:00Z", "2026-11-11T15:00:00Z"] }, "r": [3000, 0, "a"] } } }
+      },
+      {
+        "name": "an undone verdict stays undone",
+        "local": { "promises": { "7": { "v": { "dir": "theirs", "person": 40, "verdicts": [{ "id": "v1", "at": "2026-11-10T09:00:00Z", "kind": "delivered", "undone": true }] }, "r": [1000, 0, "a"] } } },
+        "server": { "promises": { "7": { "v": { "dir": "theirs", "person": 40, "words": "w", "verdicts": [{ "id": "v1", "at": "2026-11-10T09:00:00Z", "kind": "delivered" }] }, "r": [2000, 0, "b"] } } },
+        "expect": { "promises": { "7": { "v": { "dir": "theirs", "person": 40, "words": "w", "verdicts": [{ "id": "v1", "at": "2026-11-10T09:00:00Z", "kind": "delivered", "undone": true }] }, "r": [2000, 0, "b"] } } }
+      },
+      {
+        "name": "a newer tombstone wins without a union",
+        "local": { "promises": { "7": { "v": null, "r": [3000, 0, "a"] } } },
+        "server": { "promises": { "7": { "v": { "dir": "theirs", "person": 40, "verdicts": [{ "id": "v2", "at": "2026-11-12T09:00:00Z", "kind": "delivered" }] }, "r": [2000, 0, "b"] } } },
+        "expect": { "promises": { "7": { "v": null, "r": [3000, 0, "a"] } } }
+      },
+      {
+        "name": "estimates: the newer wall time wins",
+        "local": { "estimates": { "7": [30, 1000], "8": [null, 2000] } },
+        "server": { "estimates": { "7": [45, 999], "8": [20, 1500], "9": [15, 100] } },
+        "expect": { "estimates": { "7": [30, 1000], "8": [null, 2000], "9": [15, 100] } }
+      },
+      {
+        "name": "unknown fields are kept",
+        "local": { "future": { "a": 1 }, "promises": { "7": { "v": { "dir": "theirs", "person": 40, "x": 1 }, "r": [1, 0, "a"], "note": "keep" } } },
+        "server": { "future": { "b": 2 }, "other": 3 },
+        "expect": { "future": { "b": 2 }, "other": 3, "promises": { "7": { "v": { "dir": "theirs", "person": 40, "x": 1 }, "r": [1, 0, "a"], "note": "keep" } } }
+      },
+      {
+        "name": "settings: the newer revision wins",
+        "local": { "settings": { "v": { "cap": 3 }, "r": [5, 0, "a"] } },
+        "server": { "settings": { "v": { "cap": 5, "cap_agreed": { "by": 51, "on": "2026-11-03" } }, "r": [4, 0, "b"] } },
+        "expect": { "settings": { "v": { "cap": 3 }, "r": [5, 0, "a"] } }
+      }
+    ],
+    "ledgerPrune": {
+      "nowMs": 1794441600000,
+      "ledger": {
+        "promises": { "1": { "v": null, "r": [1786579200000, 0, "a"] }, "2": { "v": null, "r": [1786752000000, 0, "a"] }, "3": { "v": { "dir": "mine", "person": 1 }, "r": [1000, 0, "a"] } },
+        "estimates": { "4": [null, 1786579200], "5": [null, 1794355200], "6": [30, 1000] }
+      },
+      "keptPromises": ["2", "3"],
+      "keptEstimates": ["5", "6"]
+    },
+    "archive": {
+      "today": "2026-11-12",
+      "ledger": {
+        "promises": {
+          "1": { "dir": "theirs", "person": 40, "verdicts": [{ "id": "a", "at": "2026-05-01T10:00:00Z", "kind": "delivered" }] },
+          "2": { "dir": "theirs", "person": 40, "verdicts": [{ "id": "b", "at": "2026-06-01T10:00:00Z", "kind": "delivered" }] },
+          "3": { "dir": "theirs", "person": 40, "verdicts": [{ "id": "c", "at": "2026-01-01T10:00:00Z", "kind": "not_yet" }] },
+          "4": { "dir": "theirs", "person": 40, "verdicts": [{ "id": "d", "at": "2026-01-05T12:00:00Z", "kind": "delivered", "undone": true }] }
+        },
+        "log": {
+          "a": { "kind": "decision", "text": "x", "at": "2026-03-31" },
+          "b": { "kind": "unknown", "text": "y", "at": "2026-01-01", "resolved": null },
+          "c": { "kind": "unknown", "text": "z", "at": "2026-01-01", "resolved": "2026-04-02" }
+        },
+        "owed": { "d": { "what": "w", "opened": "2025-10-01", "resolved": "2025-12-31" } },
+        "escalations": { "e": { "promise": 3, "a": 3, "b": null, "status": "resolved", "draft": "", "opened": "2026-05-01", "resolved": "2026-05-20" } },
+        "rounds": { "f": { "meeting": "m", "at": "2026-05-15", "discussed": [], "skipped": [], "absent": [], "not_discussed": [] } },
+        "initiatives": { "17": { "status": "closed", "closed_on": "2026-02-01" }, "18": { "status": "closed" } },
+        "meetings": { "m": { "name": "Steering", "people": [40] } }
+      },
+      "parts": {
+        "2025-Q4": { "owed": ["d"] },
+        "2026-Q1": { "initiatives": ["17"], "log": ["a"] },
+        "2026-Q2": { "log": ["c"], "promises": ["1"], "rounds": ["f"] }
+      },
+      "moved": ["initiatives/17", "log/a", "log/c", "owed/d", "promises/1", "rounds/f"]
+    },
+    "promises": {
+      "today": "2026-11-12",
+      "verdictDue": [
+        { "name": "due today", "task": { "due": "2026-11-12T23:59:59" }, "promise": { "dir": "theirs" }, "due": "2026-11-12", "needs": true, "canSnooze": true },
+        { "name": "due tomorrow", "task": { "due": "2026-11-13T23:59:59" }, "promise": { "dir": "theirs" }, "due": "2026-11-13", "needs": false },
+        { "name": "not yet, with a new date", "task": { "due": "2026-11-10T23:59:59" }, "promise": { "dir": "theirs", "verdicts": [{ "id": "v", "at": "2026-11-10T16:00:00Z", "kind": "not_yet", "new_due": "2026-11-14" }] }, "due": "2026-11-14", "needs": false, "misses": 1 },
+        { "name": "not yet without a date asks again the next day", "task": { "due": "2026-11-10T23:59:59" }, "promise": { "dir": "theirs", "verdicts": [{ "id": "v", "at": "2026-11-11T08:00:00Z", "kind": "not_yet" }] }, "due": "2026-11-12", "needs": true },
+        { "name": "renegotiated to today", "task": { "due": "2026-11-10T23:59:59" }, "promise": { "dir": "theirs", "verdicts": [{ "id": "v", "at": "2026-11-09T08:00:00Z", "kind": "renegotiated", "new_due": "2026-11-12" }] }, "due": "2026-11-12", "needs": true, "misses": 0 },
+        { "name": "delivered", "task": { "due": "2026-11-10T23:59:59" }, "promise": { "dir": "theirs", "verdicts": [{ "id": "v", "at": "2026-11-10T08:00:00Z", "kind": "delivered" }] }, "due": "2026-11-10", "needs": false },
+        { "name": "your own promise is not asked", "task": { "due": "2026-11-10T23:59:59" }, "promise": { "dir": "mine" }, "due": "2026-11-10", "needs": false },
+        { "name": "completed elsewhere", "task": { "due": "2026-11-10T23:59:59", "done": true }, "promise": { "dir": "theirs" }, "due": "2026-11-10", "needs": false, "completedElsewhere": true },
+        { "name": "completed with a verdict", "task": { "due": "2026-11-10T23:59:59", "done": true }, "promise": { "dir": "theirs", "verdicts": [{ "id": "v", "at": "2026-11-10T08:00:00Z", "kind": "taken_over" }] }, "due": "2026-11-10", "needs": false, "completedElsewhere": false },
+        { "name": "snoozed for this due day", "task": { "due": "2026-11-11T23:59:59" }, "promise": { "dir": "theirs" }, "snooze": { "due": "2026-11-11", "until": "2026-11-13" }, "due": "2026-11-11", "needs": false, "canSnooze": false },
+        { "name": "a snooze for an earlier due day", "task": { "due": "2026-11-11T23:59:59" }, "promise": { "dir": "theirs" }, "snooze": { "due": "2026-11-10", "until": "2026-11-11" }, "due": "2026-11-11", "needs": true, "canSnooze": true },
+        { "name": "no due date", "task": { "due": null }, "promise": { "dir": "theirs" }, "due": null, "needs": false, "canSnooze": false },
+        { "name": "an undone verdict does not count", "task": { "due": "2026-11-10T23:59:59" }, "promise": { "dir": "theirs", "verdicts": [{ "id": "v", "at": "2026-11-10T16:00:00Z", "kind": "not_yet", "new_due": "2026-11-20", "undone": true }] }, "due": "2026-11-10", "needs": true, "misses": 0 },
+        { "name": "misses count active not-yet verdicts", "task": { "due": "2026-11-20T23:59:59" }, "promise": { "dir": "theirs", "verdicts": [
+          { "id": "a", "at": "2026-11-01T09:00:00Z", "kind": "not_yet", "new_due": "2026-11-05" },
+          { "id": "b", "at": "2026-11-05T09:00:00Z", "kind": "not_yet", "new_due": "2026-11-09" },
+          { "id": "c", "at": "2026-11-09T09:00:00Z", "kind": "renegotiated", "new_due": "2026-11-16" },
+          { "id": "d", "at": "2026-11-10T09:00:00Z", "kind": "not_yet", "new_due": "2026-11-20", "undone": true }] }, "due": "2026-11-16", "needs": false, "misses": 2 }
+      ],
+      "build": [
+        { "name": "delivered completes the task", "task": { "due": "2026-11-12T23:59:59" }, "kind": "delivered", "verdict": { "id": "v", "at": "2026-11-12T09:00:00Z", "kind": "delivered" }, "patch": { "done": true } },
+        { "name": "not yet moves the due date", "task": { "due": "2026-11-12T23:59:59" }, "kind": "not_yet", "newDue": "2026-11-19", "blocker": " Finance lead on leave ", "verdict": { "id": "v", "at": "2026-11-12T09:00:00Z", "kind": "not_yet", "new_due": "2026-11-19", "blocker": "Finance lead on leave" }, "patch": { "due_date": "2026-11-19T23:59:59" } },
+        { "name": "renegotiated to the same date changes nothing on the task", "task": { "due": "2026-11-19T23:59:59" }, "kind": "renegotiated", "newDue": "2026-11-19", "verdict": { "id": "v", "at": "2026-11-12T09:00:00Z", "kind": "renegotiated", "new_due": "2026-11-19" }, "patch": null },
+        { "name": "not yet without a date", "task": { "due": "2026-11-12T23:59:59" }, "kind": "not_yet", "verdict": { "id": "v", "at": "2026-11-12T09:00:00Z", "kind": "not_yet" }, "patch": null },
+        { "name": "an answer about a completed task", "task": { "due": "2026-11-12T23:59:59", "done": true }, "kind": "taken_over", "verdict": { "id": "v", "at": "2026-11-12T09:00:00Z", "kind": "taken_over" }, "patch": null },
+        { "name": "dropped completes the task", "task": { "due": null }, "kind": "dropped", "verdict": { "id": "v", "at": "2026-11-12T09:00:00Z", "kind": "dropped" }, "patch": { "done": true } }
+      ],
+      "confirmTitles": [
+        { "name": "Sander Bakker", "what": "Input on the HR questions", "title": "Confirm with Sander Bakker: Input on the HR questions" },
+        { "title": "Call Jan", "read": null },
+        { "title": "Confirm with Ana: Training plan: rooms", "read": { "name": "Ana", "what": "Training plan: rooms" } }
+      ]
+    },
+    "waitingOn": {
+      "onHoldLabels": [20],
+      "people": [40, 41],
+      "ledger": { "promises": {
+        "1": { "dir": "theirs", "person": 40 },
+        "2": { "dir": "theirs", "person": 41 },
+        "5": { "dir": "theirs", "person": 40, "verdicts": [{ "id": "v", "at": "2026-11-10T08:00:00Z", "kind": "delivered" }] },
+        "6": { "dir": "theirs", "person": 40 },
+        "7": { "dir": "mine", "person": 40 },
+        "8": { "dir": "theirs", "person": 40, "sent": ["2026-11-11T15:00:00Z"] }
+      } },
+      "tasks": [
+        { "id": 1, "due": "2026-11-14T23:59:59" },
+        { "id": 2, "due": "2026-11-13T23:59:59" },
+        { "id": 3, "labels": [20, 41] },
+        { "id": 4, "due": "2026-11-12T23:59:59", "labels": [20] },
+        { "id": 5 },
+        { "id": 6, "done": true },
+        { "id": 7 },
+        { "id": 8, "due": "2026-11-20T23:59:59" }
+      ],
+      "groups": [{ "person": 41, "tasks": [2, 3] }, { "person": 40, "tasks": [1, 8] }, { "person": null, "tasks": [4] }],
+      "unsent": [1, 2, 7]
+    },
+    "personMatch": {
+      "people": [
+        { "id": 40, "title": "Jan de Vries", "aliases": ["JdV"] },
+        { "id": 41, "title": "Ana Silva" },
+        { "id": 42, "title": "Ana Costa" },
+        { "id": 43, "title": "Priya" },
+        { "id": 44, "title": "Marco Rossi", "aliases": ["Marc"] }
+      ],
+      "cases": [
+        { "name": "Jan de Vries", "id": 40, "match": "title" },
+        { "name": "  jan   de vries ", "id": 40, "match": "title" },
+        { "name": "JdV", "id": 40, "match": "alias" },
+        { "name": "Jan", "id": 40, "match": "first" },
+        { "name": "Jan de", "id": 40, "match": "first" },
+        { "name": "Jan Jansen", "id": null, "match": "none" },
+        { "name": "Ana", "id": null, "match": "ambiguous" },
+        { "name": "Ana Silva", "id": 41, "match": "title" },
+        { "name": "priya", "id": 43, "match": "title" },
+        { "name": "Marc", "id": 44, "match": "alias" },
+        { "name": "Sander Bakker", "id": null, "match": "none" },
+        { "name": "", "id": null, "match": "none" }
+      ],
+      "aliases": [
+        { "aliases": [], "add": "Jan  de Vries", "expect": ["Jan de Vries"] },
+        { "aliases": ["JdV"], "add": "jdv", "expect": ["JdV"] },
+        { "aliases": ["JdV"], "add": " ", "expect": ["JdV"] }
+      ]
+    },
+    "personPattern": {
+      "texts": [
+        { "counts": { "delivered": 0, "late": 0, "dropped": 0, "takenOver": 0, "renegotiated": 0, "missed": 0 }, "text": "No promises closed in the last 90 days." },
+        { "counts": { "delivered": 5, "late": 2, "dropped": 0, "takenOver": 0, "renegotiated": 0, "missed": 0 }, "text": "Kept 5 of 7 on time in the last 90 days, 2 late." },
+        { "counts": { "delivered": 3, "late": 0, "dropped": 1, "takenOver": 1, "renegotiated": 2, "missed": 1 }, "text": "Kept 3 of 5 on time in the last 90 days, 1 dropped, 1 done by you. Asked for a new date twice and missed a date once." },
+        { "counts": { "delivered": 0, "late": 0, "dropped": 0, "takenOver": 0, "renegotiated": 0, "missed": 3 }, "text": "No promises closed in the last 90 days. Missed a date 3 times." }
+      ],
+      "counts": {
+        "today": "2026-11-12",
+        "person": 40,
+        "openTasks": [3, 5, 6],
+        "ledger": { "promises": {
+          "1": { "dir": "theirs", "person": 40, "verdicts": [{ "id": "a", "at": "2026-11-01T10:00:00Z", "kind": "delivered" }] },
+          "2": { "dir": "theirs", "person": 40, "verdicts": [{ "id": "b", "at": "2026-10-01T10:00:00Z", "kind": "not_yet" }, { "id": "c", "at": "2026-10-10T10:00:00Z", "kind": "late" }] },
+          "3": { "dir": "theirs", "person": 40, "verdicts": [{ "id": "d", "at": "2026-11-05T10:00:00Z", "kind": "renegotiated", "new_due": "2026-11-20" }] },
+          "4": { "dir": "theirs", "person": 40, "verdicts": [{ "id": "e", "at": "2026-08-01T10:00:00Z", "kind": "delivered" }] },
+          "5": { "dir": "mine", "person": 40 },
+          "6": { "dir": "theirs", "person": 41 },
+          "7": { "dir": "theirs", "person": 40 },
+          "8": { "dir": "theirs", "person": 40, "verdicts": [{ "id": "f", "at": "2026-11-11T10:00:00Z", "kind": "taken_over" }] },
+          "9": { "dir": "theirs", "person": 40, "verdicts": [{ "id": "g", "at": "2026-08-15T12:00:00Z", "kind": "delivered" }] }
+        } },
+        "expect": { "delivered": 2, "late": 1, "dropped": 0, "takenOver": 1, "renegotiated": 1, "missed": 1, "openTheirs": 1, "openMine": 1 },
+        "text": "Kept 2 of 4 on time in the last 90 days, 1 late, 1 done by you. Asked for a new date once and missed a date once."
+      }
+    },
+    "recapText": {
+      "now": "2026-11-12T16:00:00",
+      "names": { "40": "Jan", "41": "Ana", "43": "Priya", "44": "Marco" },
+      "tasks": [
+        { "id": 1, "title": "Sign-off from all three leads", "due": "2026-11-13T23:59:59", "created": "2026-11-01T08:00:00Z" },
+        { "id": 2, "title": "Pilot plan", "due": "2026-11-10T23:59:59", "created": "2026-11-01T08:00:00Z" },
+        { "id": 3, "title": "Budget draft", "due": "2026-11-20T23:59:59", "created": "2026-11-12T08:00:00Z" },
+        { "id": 4, "title": "Claims KPI inventory", "due": "2026-11-24T23:59:59", "created": "2026-11-01T08:00:00Z" },
+        { "id": 5, "title": "AI shortlist", "due": "2026-11-11T23:59:59", "created": "2026-11-01T08:00:00Z" },
+        { "id": 6, "title": "Data access list", "due": "2026-11-16T23:59:59", "created": "2026-11-01T08:00:00Z" },
+        { "id": 7, "title": "Book a slot with the Finance lead", "due": "2026-11-18T23:59:59", "created": "2026-11-12T08:00:00Z" },
+        { "id": 8, "title": "Not in scope", "due": null, "created": "2026-11-12T08:00:00Z" },
+        { "id": 9, "title": "Delivered last week", "due": null, "created": "2026-11-01T08:00:00Z" },
+        { "id": 10, "title": "Data catalogue structure", "due": null, "created": "2026-10-01T08:00:00Z" }
+      ],
+      "ledger": { "promises": {
+        "1": { "dir": "theirs", "person": 40, "verdicts": [{ "id": "a", "at": "2026-11-12T08:00:00Z", "kind": "delivered" }] },
+        "2": { "dir": "theirs", "person": 41, "verdicts": [{ "id": "b", "at": "2026-11-12T08:00:00Z", "kind": "late" }] },
+        "3": { "dir": "theirs", "person": 40, "words": "I'll have the budget draft by the 20th." },
+        "4": { "dir": "theirs", "person": 41, "verdicts": [{ "id": "c", "at": "2026-11-12T08:00:00Z", "kind": "not_yet", "new_due": "2026-11-24", "blocker": "Finance lead on leave" }] },
+        "5": { "dir": "theirs", "person": 43, "verdicts": [{ "id": "d", "at": "2026-11-12T08:00:00Z", "kind": "not_yet" }] },
+        "6": { "dir": "theirs", "person": 43 },
+        "7": { "dir": "mine", "person": 40 },
+        "8": { "dir": "theirs", "person": 44 },
+        "9": { "dir": "theirs", "person": 40, "verdicts": [{ "id": "e", "at": "2026-11-05T08:00:00Z", "kind": "delivered" }] },
+        "10": { "dir": "theirs", "person": 40 }
+      } },
+      "doneTasks": [1, 2, 9],
+      "cases": [
+        {
+          "name": "a meeting with everything",
+          "title": "Data steering", "date": "2026-11-12", "locale": "en-GB", "hour12": false,
+          "scope": { "from": "2026-11-12", "to": "2026-11-12", "people": [40, 41, 43], "includeMine": true },
+          "includeQuotes": true, "notDiscussed": ["Marco"], "absent": ["Lee"],
+          "sections": { "delivered": [1, 2], "agreed": [3], "changed": [4, 5], "open": [10, 6], "mine": [7] },
+          "text": ["Data steering, Thu 12 Nov", "", "Delivered", "- Jan: Sign-off from all three leads", "- Ana: Pilot plan (late)", "Agreed", "- Jan: Budget draft, by Fri 20 Nov", "  \"I'll have the budget draft by the 20th.\"", "Changed", "- Ana: Claims KPI inventory, new date Tue 24 Nov (Finance lead on leave)", "- Priya: AI shortlist, not yet", "Open", "- Jan: Data catalogue structure", "- Priya: Data access list, by Mon 16 Nov", "I owe", "- Jan: Book a slot with the Finance lead, by Wed 18 Nov", "Not discussed: Marco", "Absent: Lee"],
+          "html": "<p><strong>Data steering</strong>, Thu 12 Nov</p><p><strong>Delivered</strong></p><ul><li>Jan: Sign-off from all three leads</li><li>Ana: Pilot plan (late)</li></ul><p><strong>Agreed</strong></p><ul><li>Jan: Budget draft, by Fri 20 Nov<br><em>\"I'll have the budget draft by the 20th.\"</em></li></ul><p><strong>Changed</strong></p><ul><li>Ana: Claims KPI inventory, new date Tue 24 Nov (Finance lead on leave)</li><li>Priya: AI shortlist, not yet</li></ul><p><strong>Open</strong></p><ul><li>Jan: Data catalogue structure</li><li>Priya: Data access list, by Mon 16 Nov</li></ul><p><strong>I owe</strong></p><ul><li>Jan: Book a slot with the Finance lead, by Wed 18 Nov</li></ul><p>Not discussed: Marco</p><p>Absent: Lee</p>",
+          "taskIds": [1, 2, 3, 4, 5, 6, 7, 10]
+        },
+        {
+          "name": "one person, without quotes or what I owe, in en-US",
+          "title": "1:1 Ana", "date": "2026-11-12", "locale": "en-US", "hour12": true,
+          "scope": { "from": "2026-11-12", "to": "2026-11-12", "people": [41], "includeMine": false },
+          "includeQuotes": false, "notDiscussed": [], "absent": [],
+          "sections": { "delivered": [2], "changed": [4] },
+          "text": ["1:1 Ana, Thu, Nov 12", "", "Delivered", "- Ana: Pilot plan (late)", "Changed", "- Ana: Claims KPI inventory, new date Tue, Nov 24 (Finance lead on leave)"],
+          "html": "<p><strong>1:1 Ana</strong>, Thu, Nov 12</p><p><strong>Delivered</strong></p><ul><li>Ana: Pilot plan (late)</li></ul><p><strong>Changed</strong></p><ul><li>Ana: Claims KPI inventory, new date Tue, Nov 24 (Finance lead on leave)</li></ul>",
+          "taskIds": [2, 4]
+        },
+        {
+          "name": "nothing to say",
+          "title": "Steering", "date": "2026-11-12", "locale": "en-GB", "hour12": false,
+          "scope": { "from": "2026-11-12", "to": "2026-11-12", "people": [99], "includeMine": true },
+          "includeQuotes": true, "notDiscussed": [], "absent": [],
+          "sections": {},
+          "text": ["Steering, Thu 12 Nov"],
+          "html": "<p><strong>Steering</strong>, Thu 12 Nov</p>",
+          "taskIds": []
+        }
+      ]
+    },
+    "meetingRound": [
+      {
+        "name": "any order, skip, absent, back to a skipped person",
+        "people": [40, 41, 42, 43], "withMe": true,
+        "start": { "current": 40, "discussed": [], "skipped": [], "absent": [] },
+        "steps": [
+          { "op": "next", "expect": { "current": 41, "discussed": [40], "skipped": [], "absent": [] } },
+          { "op": "skip", "expect": { "current": 42, "discussed": [40], "skipped": [41], "absent": [] } },
+          { "op": "absent", "person": 43, "expect": { "current": 42, "discussed": [40], "skipped": [41], "absent": [43] } },
+          { "op": "next", "expect": { "current": 0, "discussed": [40, 42], "skipped": [41], "absent": [43] } },
+          { "op": "next", "expect": { "current": null, "discussed": [40, 42, 0], "skipped": [41], "absent": [43] } },
+          { "op": "pick", "person": 41, "expect": { "current": 41, "discussed": [40, 42, 0], "skipped": [], "absent": [43] } },
+          { "op": "next", "expect": { "current": null, "discussed": [40, 42, 0, 41], "skipped": [], "absent": [43] } }
+        ],
+        "round": { "meeting": "m1", "at": "2026-11-12", "discussed": [40, 41, 42], "skipped": [], "absent": [43], "not_discussed": [] }
+      },
+      {
+        "name": "ending early: the person on screen counts as discussed",
+        "people": [40, 41, 42, 43], "withMe": true,
+        "start": { "current": 40, "discussed": [], "skipped": [], "absent": [] },
+        "steps": [
+          { "op": "pick", "person": 42, "expect": { "current": 42, "discussed": [], "skipped": [], "absent": [] } },
+          { "op": "next", "expect": { "current": 43, "discussed": [42], "skipped": [], "absent": [] } }
+        ],
+        "round": { "meeting": "m1", "at": "2026-11-12", "discussed": [42, 43], "skipped": [], "absent": [], "not_discussed": [40, 41] }
+      },
+      {
+        "name": "without your card; a name twice counts once",
+        "people": [40, 40, 41], "withMe": false,
+        "start": { "current": 40, "discussed": [], "skipped": [], "absent": [] },
+        "steps": [
+          { "op": "skip", "expect": { "current": 41, "discussed": [], "skipped": [40], "absent": [] } },
+          { "op": "skip", "expect": { "current": null, "discussed": [], "skipped": [40, 41], "absent": [] } }
+        ],
+        "round": { "meeting": "m1", "at": "2026-11-12", "discussed": [], "skipped": [40, 41], "absent": [], "not_discussed": [] }
+      }
+    ],
+    "portfolio": {
+      "ledger": {
+        "initiatives": {
+          "17": { "rank": 2, "status": "active" },
+          "18": { "rank": 1, "status": "active" },
+          "19": { "rank": 1, "status": "active" },
+          "20": { "status": "parked", "parked": { "on": "2026-10-02", "reason": "after the data strategy" } },
+          "21": { "status": "closed", "closed_on": "2026-10-01" },
+          "22": { "status": "active" }
+        }
+      },
+      "ranked": [18, 19, 17, 22],
+      "moves": [
+        { "project": 17, "to": 0, "ranks": { "17": 1, "18": 2, "19": 3, "22": 4 } },
+        { "project": 18, "to": 10, "ranks": { "19": 1, "17": 2, "22": 3, "18": 4 } },
+        { "project": 20, "to": 0, "ranks": {} }
+      ],
+      "cap": [
+        { "settings": null, "expect": { "active": 4, "cap": 4, "agreed": false, "full": true } },
+        { "settings": { "cap": 5, "cap_agreed": { "by": 51, "on": "2026-11-03" } }, "expect": { "active": 4, "cap": 5, "agreed": true, "full": false } },
+        { "settings": { "cap": 0 }, "expect": { "active": 4, "cap": 4, "agreed": false, "full": true } }
+      ],
+      "park": { "value": { "rank": 3, "status": "active", "sponsor": 51 }, "on": "2026-11-12", "reason": " after the data strategy ", "expect": { "status": "parked", "sponsor": 51, "parked": { "on": "2026-11-12", "reason": "after the data strategy" } } },
+      "unpark": { "value": { "status": "parked", "sponsor": 51, "parked": { "on": "2026-11-12", "reason": "r" } }, "expect": { "status": "active", "sponsor": 51, "rank": 5 } }
+    },
+    "readiness": [
+      { "name": "ready", "value": { "sponsor": 51, "owner": 44, "ready": { "why": "a", "done_looks_like": "b", "smallest": "c", "not_doing": "d", "decision_rights": "e", "capacity": { "by": 51, "on": "2026-11-10" }, "stop_if": "f" } }, "done": 9, "missing": [] },
+      { "name": "partly", "value": { "sponsor": 51, "ready": { "why": "a", "done_looks_like": "  ", "capacity": { "by": null, "on": "2026-11-10" } } }, "done": 3, "missing": ["owner", "done_looks_like", "smallest", "not_doing", "decision_rights", "stop_if"] },
+      { "name": "nothing yet", "value": {}, "done": 0, "missing": ["sponsor", "owner", "why", "done_looks_like", "smallest", "not_doing", "decision_rights", "capacity", "stop_if"] }
+    ],
+    "escalationDraft": {
+      "today": "2026-11-12",
+      "now": "2026-11-12T10:00:00",
+      "locale": "en-GB",
+      "names": { "40": "Jan", "41": "Ana" },
+      "projects": { "17": "Service redesign", "18": "Data strategy", "19": "Customer data" },
+      "tasks": [
+        { "id": 100, "title": "Data ownership model sign-off", "due": "2026-11-19T23:59:59" },
+        { "id": 101, "title": "Claims KPI inventory", "due": "2026-11-25T23:59:59" },
+        { "id": 102, "title": "Customer ID mapping", "due": "2026-11-14T23:59:59" },
+        { "id": 103, "title": "Glossary", "due": null },
+        { "id": 104, "title": "Pilot region", "due": "2026-11-20T23:59:59" },
+        { "id": 105, "title": "Old thing", "due": null }
+      ],
+      "ledger": {
+        "initiatives": { "17": { "rank": 1, "status": "active" }, "18": { "rank": 2, "status": "active" }, "19": { "rank": 3, "status": "active" } },
+        "promises": {
+          "100": { "dir": "theirs", "person": 40, "initiative": 18, "verdicts": [{ "id": "a", "at": "2026-11-05T09:00:00Z", "kind": "not_yet", "new_due": "2026-11-12" }, { "id": "b", "at": "2026-11-12T09:00:00Z", "kind": "not_yet", "new_due": "2026-11-19" }] },
+          "101": { "dir": "theirs", "person": 40, "initiative": 17 },
+          "102": { "dir": "theirs", "person": 40, "initiative": 19 },
+          "103": { "dir": "theirs", "person": 40, "initiative": 18 },
+          "104": { "dir": "theirs", "person": 41, "initiative": 17, "verdicts": [{ "id": "c", "at": "2026-11-05T09:00:00Z", "kind": "not_yet", "new_due": "2026-11-12" }, { "id": "d", "at": "2026-11-12T09:00:00Z", "kind": "not_yet", "new_due": "2026-11-20" }] },
+          "105": { "dir": "theirs", "person": 40, "initiative": 17, "verdicts": [{ "id": "e", "at": "2026-11-01T09:00:00Z", "kind": "delivered" }] }
+        }
+      },
+      "due": [{ "task": 100, "expect": true }, { "task": 101, "expect": false }, { "task": 104, "expect": true }],
+      "drafts": [
+        { "task": 100, "expect": { "promise": 100, "a": 100, "b": 101, "status": "drafted", "draft": "Jan has missed \"Data ownership model sign-off\" (Data strategy) twice; it is now due Thu 19 Nov. Jan is also working on \"Claims KPI inventory\" (Service redesign). Which comes first? A: \"Data ownership model sign-off\". B: \"Claims KPI inventory\".", "decision": null, "opened": "2026-11-12", "resolved": null } },
+        { "task": 104, "expect": { "promise": 104, "a": 104, "b": null, "status": "drafted", "draft": "Ana has missed \"Pilot region\" (Service redesign) twice; it is now due Fri 20 Nov. Can you help unblock it, or should we change what was agreed?", "decision": null, "opened": "2026-11-12", "resolved": null } }
+      ],
+      "afterDraft": { "task": 100, "expect": false }
+    },
+    "importDates": [
+      { "ref": "2026-11-12", "text": "2026-11-20", "expect": "2026-11-20" },
+      { "ref": "2026-11-12", "text": "2026-11-20T09:00:00Z", "expect": "2026-11-20" },
+      { "ref": "2026-11-12", "text": "2026-02-30", "expect": null },
+      { "ref": "2026-11-12", "text": "today", "expect": "2026-11-12" },
+      { "ref": "2026-11-12", "text": "Tomorrow", "expect": "2026-11-13" },
+      { "ref": "2026-11-12", "text": "friday", "expect": "2026-11-13" },
+      { "ref": "2026-11-12", "text": "fri", "expect": "2026-11-13" },
+      { "ref": "2026-11-12", "text": "thursday", "expect": "2026-11-19" },
+      { "ref": "2026-11-12", "text": "next monday", "expect": "2026-11-16" },
+      { "ref": "2026-11-12", "text": "on Wednesday", "expect": "2026-11-18" },
+      { "ref": "2026-11-12", "text": "next week", "expect": "2026-11-16" },
+      { "ref": "2026-11-12", "text": "end of week", "expect": "2026-11-13" },
+      { "ref": "2026-11-14", "text": "end of the week", "expect": "2026-11-20" },
+      { "ref": "2026-11-12", "text": "end of month", "expect": "2026-11-30" },
+      { "ref": "2026-11-12", "text": "in 3 days", "expect": "2026-11-15" },
+      { "ref": "2026-11-12", "text": "in 2 weeks", "expect": "2026-11-26" },
+      { "ref": "2026-11-12", "text": "after the summer", "expect": null },
+      { "ref": "2026-11-12", "text": "20/11", "expect": null }
+    ],
+    "importRead": [
+      {
+        "name": "fences, prose around it, trailing commas, unknown types and fields",
+        "today": "2026-11-12",
+        "input": ["Here is the JSON:", "```json", "{", "  \"format\": \"vicu-import/1\",", "  \"source\": { \"kind\": \"Meeting\", \"title\": \"Data steering\", \"date\": \"2026-11-12\" },", "  \"items\": [", "    { \"type\": \"promise\", \"owner\": \"Ana\", \"what\": \"Claims KPI inventory\", \"due\": \"2026-11-27\", \"initiative\": \"Service redesign\", \"in_their_words\": \"I'll have it by the 27th.\", },", "    { \"type\": \"update\", \"id\": \"t-100\", \"status\": \"Not yet\", \"new_due\": \"next friday\", \"blocker\": \"Finance lead on leave\" },", "    { \"type\": \"note\", \"what\": \"Lunch was good\" },", "    { \"type\": \"action\", \"owner\": \"me\", \"what\": \"Book a slot\", \"for\": \"Jan\", \"due\": \"tomorrow\", \"priority\": \"high\" },", "    { \"type\": \"decision\", \"what\": \"Simple claims only\", \"by\": \"Marieke\" },", "    { \"type\": \"promise\", \"owner\": \"Lee\", \"due\": \"after the summer\", \"what\": \"Catalogue\" },", "    { \"type\": \"value\", \"what\": \"\" },", "  ],", "}", "```", "Done."],
+        "ok": true,
+        "source": { "kind": "meeting", "title": "Data steering", "date": "2026-11-12" },
+        "items": [
+          { "index": 1, "type": "promise", "what": "Claims KPI inventory", "owner": "Ana", "initiative": "Service redesign", "in_their_words": "I'll have it by the 27th.", "due": "2026-11-27" },
+          { "index": 2, "type": "update", "what": "", "id": "t-100", "blocker": "Finance lead on leave", "new_due": "2026-11-13", "status": "not_yet" },
+          { "index": 4, "type": "action", "what": "Book a slot", "owner": "me", "for": "Jan", "due": "2026-11-13" },
+          { "index": 5, "type": "decision", "what": "Simple claims only", "by": "Marieke" },
+          { "index": 6, "type": "promise", "what": "Catalogue", "owner": "Lee" }
+        ],
+        "problems": ["Item 3: unknown type \"note\"; left out.", "Item 4: \"priority\" ignored.", "Item 6: due \"after the summer\" not read.", "Item 7: no \"what\"; left out."]
+      },
+      {
+        "name": "not JSON",
+        "today": "2026-11-12",
+        "input": ["Jan will send the plan by Friday."],
+        "ok": false,
+        "source": { "kind": "meeting", "title": "", "date": null },
+        "items": [],
+        "problems": ["The text is not a vicu-import/1 document."]
+      },
+      {
+        "name": "no format and no items",
+        "today": "2026-11-12",
+        "input": ["{\"items\": []}"],
+        "ok": false,
+        "source": { "kind": "meeting", "title": "", "date": null },
+        "items": [],
+        "problems": ["No format given; read as vicu-import/1.", "No items found."]
+      },
+      {
+        "name": "a newer format and a source date in words",
+        "today": "2026-11-12",
+        "input": ["{\"format\":\"vicu-import/2\",\"source\":{\"date\":\"tomorrow\"},\"items\":[{\"type\":\"open_item\",\"what\":\"Legal review needed?\",\"ask\":\"Lee\"}]}"],
+        "ok": true,
+        "source": { "kind": "meeting", "title": "", "date": "2026-11-13" },
+        "items": [{ "index": 1, "type": "open_item", "what": "Legal review needed?", "ask": "Lee" }],
+        "problems": ["Written as vicu-import/2; read as vicu-import/1."]
+      },
+      {
+        "name": "commas and brackets inside strings stay",
+        "today": "2026-11-12",
+        "input": ["{\"format\":\"vicu-import/1\",\"items\":[{\"type\":\"decision\",\"what\":\"Use \\\"A, ]\\\" format\",}]}"],
+        "ok": true,
+        "source": { "kind": "meeting", "title": "", "date": null },
+        "items": [{ "index": 1, "type": "decision", "what": "Use \"A, ]\" format" }],
+        "problems": []
+      }
+    ],
+    "importMatch": {
+      "world": {
+        "people": [
+          { "id": 40, "title": "Jan de Vries", "aliases": ["JdV"] },
+          { "id": 41, "title": "Ana Silva" },
+          { "id": 42, "title": "Ana Costa" },
+          { "id": 43, "title": "Priya" },
+          { "id": 45, "title": "Lee Wong" },
+          { "id": 46, "title": "Marieke" }
+        ],
+        "initiatives": [{ "id": 17, "title": "Service redesign" }, { "id": 18, "title": "Data strategy" }],
+        "openPromises": [
+          { "taskId": 100, "person": 40, "title": "Data ownership model signed off by the three domain leads", "dir": "theirs" },
+          { "taskId": 101, "person": 40, "title": "Draft budget", "dir": "theirs" },
+          { "taskId": 102, "person": 43, "title": "AI use-case shortlist", "dir": "theirs" },
+          { "taskId": 103, "person": 41, "title": "Training plan", "dir": "theirs" },
+          { "taskId": 104, "person": 40, "title": "Data access request", "dir": "mine" }
+        ]
+      },
+      "items": [
+        { "index": 1, "type": "update", "what": "", "id": "t-102", "status": "delivered" },
+        { "index": 2, "type": "update", "what": "", "owner": "Jan", "about": "ownership model sign off", "status": "renegotiated", "new_due": "2026-11-27" },
+        { "index": 3, "type": "promise", "what": "Claims KPI inventory", "owner": "Ana Silva", "due": "2026-11-27", "initiative": "Service redesign", "in_their_words": "yes" },
+        { "index": 4, "type": "promise", "what": "Input on HR questions", "owner": "Sander Bakker" },
+        { "index": 5, "type": "action", "what": "Book a slot", "owner": "me", "for": "Jan", "due": "2026-11-18" },
+        { "index": 6, "type": "action", "what": "Write summary", "owner": "me" },
+        { "index": 7, "type": "open_item", "what": "Legal review needed?", "ask": "Lee", "initiative": "Unknown thing" },
+        { "index": 8, "type": "decision", "what": "Simple claims only", "by": "Marieke" },
+        { "index": 9, "type": "decision_needed", "what": "Pilot region", "from": "Marieke" },
+        { "index": 10, "type": "value", "what": "Saved two days per claim" },
+        { "index": 11, "type": "update", "what": "", "owner": "Priya", "about": "something unrelated", "status": "delivered" },
+        { "index": 12, "type": "update", "what": "", "id": "t-999", "owner": "Ana Silva", "about": "training plan", "status": "not_yet" }
+      ],
+      "rows": [
+        { "index": 1, "action": "verdict", "name": null, "person": { "id": null, "match": "none" }, "initiative": null, "initiativeName": null, "target": 102, "check": false, "title": null, "due": null, "ready": true },
+        { "index": 2, "action": "verdict", "name": "Jan", "person": { "id": 40, "match": "first" }, "initiative": null, "initiativeName": null, "target": 100, "check": true, "title": null, "due": "2026-11-27", "ready": true },
+        { "index": 3, "action": "their_promise", "name": "Ana Silva", "person": { "id": 41, "match": "title" }, "initiative": 17, "initiativeName": null, "target": null, "check": false, "title": "Claims KPI inventory", "due": "2026-11-27", "ready": true },
+        { "index": 4, "action": "confirm", "name": "Sander Bakker", "person": { "id": null, "match": "none" }, "initiative": null, "initiativeName": null, "target": null, "check": false, "title": "Confirm with Sander Bakker: Input on HR questions", "due": null, "ready": false },
+        { "index": 5, "action": "my_task", "name": "Jan", "person": { "id": 40, "match": "first" }, "initiative": null, "initiativeName": null, "target": null, "check": false, "title": "Book a slot", "due": "2026-11-18", "ready": true },
+        { "index": 6, "action": "my_task", "name": null, "person": { "id": null, "match": "none" }, "initiative": null, "initiativeName": null, "target": null, "check": false, "title": "Write summary", "due": null, "ready": true },
+        { "index": 7, "action": "open_item", "name": "Lee", "person": { "id": 45, "match": "first" }, "initiative": null, "initiativeName": "Unknown thing", "target": null, "check": false, "title": "Ask Lee: Legal review needed?", "due": null, "ready": true },
+        { "index": 8, "action": "decision", "name": "Marieke", "person": { "id": 46, "match": "title" }, "initiative": null, "initiativeName": null, "target": null, "check": false, "title": null, "due": null, "ready": true },
+        { "index": 9, "action": "owed", "name": "Marieke", "person": { "id": 46, "match": "title" }, "initiative": null, "initiativeName": null, "target": null, "check": false, "title": null, "due": null, "ready": true },
+        { "index": 10, "action": "value", "name": null, "person": { "id": null, "match": "none" }, "initiative": null, "initiativeName": null, "target": null, "check": false, "title": null, "due": null, "ready": true },
+        { "index": 11, "action": "verdict", "name": "Priya", "person": { "id": 43, "match": "title" }, "initiative": null, "initiativeName": null, "target": null, "check": false, "title": null, "due": null, "ready": false },
+        { "index": 12, "action": "verdict", "name": "Ana Silva", "person": { "id": 41, "match": "title" }, "initiative": null, "initiativeName": null, "target": 103, "check": true, "title": null, "due": null, "ready": true }
+      ],
+      "notMentioned": [101]
+    },
+    "exportOpen": {
+      "title": "Data steering",
+      "date": "2026-11-12",
+      "promises": [
+        { "taskId": 102, "owner": "Priya", "what": "AI use-case shortlist", "due": "2026-11-11", "initiative": "AI use cases" },
+        { "taskId": 100, "owner": "Jan", "what": "Data ownership model", "due": null, "initiative": null }
+      ],
+      "expect": { "format": "vicu-import/1", "source": { "kind": "export", "title": "Data steering", "date": "2026-11-12" }, "items": [
+        { "type": "promise", "id": "t-100", "owner": "Jan", "what": "Data ownership model" },
+        { "type": "promise", "id": "t-102", "owner": "Priya", "what": "AI use-case shortlist", "due": "2026-11-11", "initiative": "AI use cases" }
+      ] }
+    },
+    "copilotPrompt": [
+      {
+        "name": "a meeting with people, initiatives and open promises",
+        "input": { "kind": "meeting", "date": "2026-11-12", "me": "Rendy", "people": ["Jan", "Priya"], "initiatives": ["Data strategy", "AI use cases"],
+          "open": [{ "taskId": 102, "owner": "Priya", "what": "AI use-case shortlist", "due": "2026-11-11", "initiative": null }, { "taskId": 100, "owner": "Jan", "what": "Data ownership model", "due": null, "initiative": null }] },
+        "text": [
+          "From this meeting, list every agreement, action, update and open item for Vicu.",
+          "Answer with JSON only, in exactly the format below, and nothing else.",
+          "",
+          "Rules",
+          "- People: use these names: Jan, Priya.",
+          "- Use \"me\" for Rendy. Use the full name for anyone else.",
+          "- Initiatives: Data strategy, AI use cases.",
+          "- It was on 2026-11-12. Write dates as YYYY-MM-DD. Leave a date out when nobody said one. Never guess.",
+          "- \"promise\": someone other than me commits to deliver something. Put their exact words in \"in_their_words\" only when they clearly said yes. Put how we will see it is done in \"done_when\" when it was said.",
+          "- \"action\": something I will do. Add \"for\" when it is for someone.",
+          "- \"update\": news about a promise listed under \"Open going in\". Keep its \"id\". \"status\" is delivered, late, not_yet, renegotiated or dropped; add \"new_due\" and \"blocker\" when they were said.",
+          "- \"open_item\": a question nobody could answer yet, and who could (\"ask\").",
+          "- \"decision\": something decided, and by whom (\"by\").",
+          "- \"decision_needed\": a choice someone still has to make, and who (\"from\").",
+          "- \"value\": a result worth noting, and where it showed (\"where\").",
+          "- Do not invent owners, dates or commitments.",
+          "",
+          "Open going in",
+          "[{\"id\":\"t-100\",\"owner\":\"Jan\",\"what\":\"Data ownership model\"},{\"id\":\"t-102\",\"owner\":\"Priya\",\"what\":\"AI use-case shortlist\",\"due\":\"2026-11-11\"}]",
+          "",
+          "Format",
+          "{\"format\":\"vicu-import/1\",",
+          " \"source\":{\"kind\":\"meeting\",\"title\":\"\",\"date\":\"2026-11-12\"},",
+          " \"items\":[{\"type\":\"promise|action|update|open_item|decision|decision_needed|value\", ...}]}"
+        ]
+      },
+      {
+        "name": "a mail thread with nothing else known",
+        "input": { "kind": "mail", "date": "2026-11-12", "me": "Rendy", "people": [], "initiatives": [], "open": [] },
+        "text": [
+          "From this mail thread, list every agreement, action, update and open item for Vicu.",
+          "Answer with JSON only, in exactly the format below, and nothing else.",
+          "",
+          "Rules",
+          "- Use \"me\" for Rendy. Use the full name for anyone else.",
+          "- It was on 2026-11-12. Write dates as YYYY-MM-DD. Leave a date out when nobody said one. Never guess.",
+          "- \"promise\": someone other than me commits to deliver something. Put their exact words in \"in_their_words\" only when they clearly said yes. Put how we will see it is done in \"done_when\" when it was said.",
+          "- \"action\": something I will do. Add \"for\" when it is for someone.",
+          "- \"update\": news about a promise listed under \"Open going in\". Keep its \"id\". \"status\" is delivered, late, not_yet, renegotiated or dropped; add \"new_due\" and \"blocker\" when they were said.",
+          "- \"open_item\": a question nobody could answer yet, and who could (\"ask\").",
+          "- \"decision\": something decided, and by whom (\"by\").",
+          "- \"decision_needed\": a choice someone still has to make, and who (\"from\").",
+          "- \"value\": a result worth noting, and where it showed (\"where\").",
+          "- Do not invent owners, dates or commitments.",
+          "",
+          "Format",
+          "{\"format\":\"vicu-import/1\",",
+          " \"source\":{\"kind\":\"mail\",\"title\":\"\",\"date\":\"2026-11-12\"},",
+          " \"items\":[{\"type\":\"promise|action|update|open_item|decision|decision_needed|value\", ...}]}"
+        ]
+      }
+    ],
+    "repeatRule": {
+      "now": "2026-11-12T10:00:00",
+      "today": "2026-11-12",
+      "completion": [
+        { "name": "no rule", "task": { "due": "2026-11-12T23:59:59", "repeat_after": 604800, "repeat_mode": 0 }, "rule": null, "patches": [{ "done": true }], "ruleAfter": "unchanged", "catchUp": false },
+        { "name": "count goes down", "task": { "due": "2026-11-12T23:59:59", "repeat_after": 604800, "repeat_mode": 0 }, "rule": { "count": 3 }, "patches": [{ "done": true }], "ruleAfter": { "count": 2 }, "catchUp": false },
+        { "name": "the last time ends the repeat", "task": { "due": "2026-11-12T23:59:59", "repeat_after": 604800, "repeat_mode": 0 }, "rule": { "count": 1 }, "patches": [{ "repeat_after": 0, "repeat_mode": 0 }, { "done": true }], "ruleAfter": null, "catchUp": false },
+        { "name": "the next one would be after the end day", "task": { "due": "2026-11-12T23:59:59", "repeat_after": 604800, "repeat_mode": 0 }, "rule": { "until": "2026-11-18" }, "patches": [{ "repeat_after": 0, "repeat_mode": 0 }, { "done": true }], "ruleAfter": null, "catchUp": false },
+        { "name": "the next one is on the end day", "task": { "due": "2026-11-12T23:59:59", "repeat_after": 604800, "repeat_mode": 0 }, "rule": { "until": "2026-11-19" }, "patches": [{ "done": true }], "ruleAfter": "unchanged", "catchUp": false },
+        { "name": "catch up", "task": { "due": "2026-11-12T23:59:59", "repeat_after": 604800, "repeat_mode": 0 }, "rule": { "catch_up": true }, "patches": [{ "done": true }], "ruleAfter": "unchanged", "catchUp": true },
+        { "name": "repeating from the completion never catches up", "task": { "due": "2026-11-12T23:59:59", "repeat_after": 604800, "repeat_mode": 2 }, "rule": { "catch_up": true }, "patches": [{ "done": true }], "ruleAfter": "unchanged", "catchUp": false },
+        { "name": "a rule on a task that does not repeat", "task": { "due": "2026-11-12T23:59:59", "repeat_after": 0, "repeat_mode": 0 }, "rule": { "count": 2 }, "patches": [{ "done": true }], "ruleAfter": "unchanged", "catchUp": false },
+        { "name": "monthly within the end", "task": { "due": "2026-11-30T23:59:59", "repeat_after": 0, "repeat_mode": 1 }, "rule": { "until": "2026-12-31" }, "patches": [{ "done": true }], "ruleAfter": "unchanged", "catchUp": false },
+        { "name": "from the completion, past the end", "task": { "due": "2026-11-12T23:59:59", "repeat_after": 86400, "repeat_mode": 2 }, "rule": { "until": "2026-11-12" }, "patches": [{ "repeat_after": 0, "repeat_mode": 0 }, { "done": true }], "ruleAfter": null, "catchUp": false }
+      ],
+      "catchUp": [
+        { "name": "daily, three behind", "task": { "due": "2026-11-09T09:00:00", "repeat_after": 86400, "repeat_mode": 0 }, "patch": { "due_date": "2026-11-12T09:00:00" } },
+        { "name": "weekly with a block", "task": { "due": "2026-11-02T23:59:59", "start": "2026-11-02T09:00:00", "end": "2026-11-02T10:00:00", "repeat_after": 604800, "repeat_mode": 0 }, "patch": { "due_date": "2026-11-16T23:59:59", "start_date": "2026-11-16T09:00:00", "end_date": "2026-11-16T10:00:00" } },
+        { "name": "already from today", "task": { "due": "2026-11-12T08:00:00", "repeat_after": 86400, "repeat_mode": 0 }, "patch": null },
+        { "name": "from the completion", "task": { "due": "2026-11-01T08:00:00", "repeat_after": 86400, "repeat_mode": 2 }, "patch": null },
+        { "name": "monthly", "task": { "due": "2026-09-15T12:00:00", "repeat_after": 0, "repeat_mode": 1 }, "patch": { "due_date": "2026-11-15T12:00:00" } },
+        { "name": "not past the end", "task": { "due": "2026-11-02T23:59:59", "repeat_after": 604800, "repeat_mode": 0 }, "until": "2026-11-15", "patch": null }
+      ]
+    },
+    "focus": {
+      "projects": [{ "id": 1 }, { "id": 2, "parent_project_id": 1 }, { "id": 3 }, { "id": 4 }, { "id": 5, "parent_project_id": 3 }, { "id": 10 }],
+      "categories": { "1": "c1", "3": "c2" },
+      "inbox": 10,
+      "focus": { "categories": ["c1"], "projects": [5] },
+      "inFocus": { "1": true, "2": true, "3": false, "4": false, "5": true, "10": true },
+      "shown": [1, 2, 3, 5, 10],
+      "read": [
+        { "value": { "categories": [], "projects": [] }, "expect": null },
+        { "value": { "categories": ["c1", 3], "projects": [5, "6", 0] }, "expect": { "categories": ["c1"], "projects": [5] } },
+        { "value": "c1", "expect": null }
+      ]
+    },
+    "focusBlock": {
+      "ranks": { "17": 1, "18": 2 },
+      "tasks": [
+        { "id": 1, "project_id": 18, "due": "2026-11-13T23:59:59" },
+        { "id": 2, "project_id": 17 },
+        { "id": 3, "project_id": 17, "flagged": true, "due": "2026-11-20T23:59:59" },
+        { "id": 4, "project_id": 5, "flagged": true },
+        { "id": 5, "project_id": 5 },
+        { "id": 6, "project_id": 17, "due": "2026-11-13T23:59:59", "priority": 3 },
+        { "id": 7, "project_id": 17, "due": "2026-11-13T23:59:59", "priority": 1 },
+        { "id": 8, "project_id": 18, "flagged": true }
+      ],
+      "candidates": [3, 6, 7, 2, 8],
+      "minutes": [
+        { "estimates": [], "expect": 60 },
+        { "estimates": [30, null], "expect": 60 },
+        { "estimates": [45, 30], "expect": 75 },
+        { "estimates": [50, 50], "expect": 90 },
+        { "estimates": [40, 30], "expect": 75 }
+      ]
+    },
+    "weeklyPro": {
+      "today": "2026-11-12",
+      "stalledInitiatives": 1,
+      "ledger": {
+        "promises": {
+          "1": { "dir": "theirs", "person": 40 },
+          "2": { "dir": "theirs", "person": 40, "sent": ["2026-11-10T10:00:00Z"] },
+          "3": { "dir": "mine", "person": 41 },
+          "10": { "dir": "theirs", "person": 41, "verdicts": [{ "id": "v", "at": "2026-11-09T12:00:00Z", "kind": "taken_over" }] }
+        },
+        "initiatives": {
+          "17": { "rank": 1, "status": "active" },
+          "18": { "rank": 2, "status": "active", "sponsor": 51, "owner": 44, "ready": { "why": "a", "done_looks_like": "b", "smallest": "c", "not_doing": "d", "decision_rights": "e", "capacity": { "by": 51, "on": "2026-11-10" }, "stop_if": "f" } },
+          "21": { "status": "closed", "closed_on": "2026-11-10" },
+          "22": { "status": "closed", "closed_on": "2026-11-08" },
+          "23": { "status": "closed", "closed_on": "2026-10-01" }
+        },
+        "log": { "x": { "kind": "value", "text": "Saved time", "at": "2026-11-08", "initiative": 22 } },
+        "escalations": { "e1": { "promise": 1, "a": 1, "b": null, "status": "drafted", "draft": "", "opened": "2026-11-10" }, "e2": { "promise": 2, "a": 2, "b": null, "status": "resolved", "draft": "", "opened": "2026-11-01", "resolved": "2026-11-05" } },
+        "owed": { "o1": { "what": "Pilot region", "opened": "2026-11-03", "resolved": null }, "o2": { "what": "Budget", "opened": "2026-10-03", "resolved": "2026-10-20" } }
+      },
+      "tasks": [
+        { "id": 1, "project_id": 17, "title": "Sign-off", "due": "2026-11-11T23:59:59" },
+        { "id": 2, "project_id": 17, "title": "Budget draft", "due": "2026-11-20T23:59:59" },
+        { "id": 3, "project_id": 17, "title": "Data access request" },
+        { "id": 4, "project_id": 1, "title": "Confirm with Ana: Training plan" },
+        { "id": 5, "project_id": 1, "title": "Water the plants" },
+        { "id": 6, "project_id": 17, "title": "Focus", "done": true, "start": "2026-11-10T09:00:00", "end": "2026-11-10T10:30:00" },
+        { "id": 7, "project_id": 17, "title": "Short", "done": true, "start": "2026-11-11T09:00:00", "end": "2026-11-11T09:30:00" },
+        { "id": 8, "project_id": 99, "title": "Elsewhere", "done": true, "start": "2026-11-09T09:00:00", "end": "2026-11-09T11:00:00" },
+        { "id": 9, "project_id": 18, "title": "Sunday", "done": true, "start": "2026-11-08T09:00:00", "end": "2026-11-08T10:00:00" },
+        { "id": 10, "project_id": 17, "title": "Taken over", "done": true }
+      ],
+      "steps": [{ "id": "verdicts", "count": 1 }, { "id": "unsent", "count": 2 }, { "id": "escalations", "count": 2 }, { "id": "portfolio", "count": 2 }, { "id": "value", "count": 1 }],
+      "stepsWithoutPromises": [{ "id": "escalations", "count": 2 }, { "id": "portfolio", "count": 2 }, { "id": "value", "count": 1 }],
+      "mirror": { "rescues": 1, "focusDays": 1, "workdays": 5, "youHold": 3, "othersHold": 2, "unconfirmed": 1 },
+      "mirrorText": "Last 7 days: you took over 1 promise and had a focus block on 1 of 5 workdays. You hold 3 open tasks; others hold 2 promises to you. 1 still to confirm."
+    }
+  },
+  "customListPro": {
+    "about": "Contract section 3.8. Every filter also has due_date_filter all. A case with noContext runs without what Pro's conditions read (a device without the data): they are no condition.",
+    "now": "2026-11-12T10:00:00",
+    "projects": [{ "id": 1 }, { "id": 2 }],
+    "prefs": { "project_status.2": "on_hold" },
+    "ledger": {
+      "promises": {
+        "5": { "dir": "theirs", "person": 40 },
+        "6": { "dir": "mine", "person": 41 },
+        "7": { "dir": "theirs", "person": 40, "verdicts": [{ "id": "v", "at": "2026-11-11T09:00:00Z", "kind": "delivered" }] }
+      },
+      "estimates": { "1": [15, 1000], "2": [45, 1000] }
+    },
+    "tasks": [
+      { "id": 1, "project_id": 1, "flagged": true },
+      { "id": 2, "project_id": 1 },
+      { "id": 3, "project_id": 2, "flagged": true },
+      { "id": 4, "project_id": 1, "start": "2026-11-20T00:00:00" },
+      { "id": 5, "project_id": 1 },
+      { "id": 6, "project_id": 1 },
+      { "id": 7, "project_id": 1 },
+      { "id": 8, "project_id": 1, "labels": [41] },
+      { "id": 9, "project_id": 1, "flagged": true, "done": true }
+    ],
+    "cases": [
+      { "filter": { "availability": "available" }, "expect": [1, 2, 6, 7, 8] },
+      { "filter": { "availability": "remaining" }, "expect": [1, 2, 3, 4, 5, 6, 7, 8] },
+      { "filter": { "availability": "all", "include_done": true }, "expect": [1, 2, 3, 4, 5, 6, 7, 8, 9] },
+      { "filter": { "flagged": true }, "expect": [1, 3] },
+      { "filter": { "flagged": false }, "expect": [2, 4, 5, 6, 7, 8] },
+      { "filter": { "estimate_max": 30 }, "expect": [1] },
+      { "filter": { "project_status": "on_hold" }, "expect": [3] },
+      { "filter": { "project_status": "active" }, "expect": [1, 2, 4, 5, 6, 7, 8] },
+      { "filter": { "promise": "theirs" }, "expect": [5] },
+      { "filter": { "promise": "mine" }, "expect": [6] },
+      { "filter": { "promise": "any" }, "expect": [5, 6] },
+      { "filter": { "person": [41] }, "expect": [6, 8] },
+      { "filter": { "person": [40], "promise": "theirs" }, "expect": [5] },
+      { "filter": { "availability": "bogus", "flagged": "yes", "group_by": "person", "row_fields": ["due", "x"] }, "expect": [1, 2, 3, 4, 5, 6, 7, 8] },
+      { "filter": { "availability": "available", "estimate_max": 30, "promise": "any", "project_status": "on_hold" }, "noContext": true, "expect": [1, 2, 3, 4, 5, 6, 7, 8] }
+    ],
+    "hasCondition": [
+      { "filter": {}, "expect": false },
+      { "filter": { "availability": "all" }, "expect": true },
+      { "filter": { "group_by": "project" }, "expect": false },
+      { "filter": { "person": [] }, "expect": false },
+      { "filter": { "flagged": false }, "expect": true },
+      { "filter": { "estimate_max": 0 }, "expect": false }
+    ],
+    "rowFields": [
+      { "value": ["due", "x", "estimate"], "expect": ["due", "estimate"] },
+      { "value": "due", "expect": null }
+    ],
+    "groupBy": [
+      { "value": "person", "expect": "person" },
+      { "value": "colour", "expect": "none" }
+    ]
   }
 }

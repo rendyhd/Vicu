@@ -299,7 +299,27 @@ Haptics follow the system touch feedback setting.
   `surfaceContainerLow` and, for priority, `surfaceContainer`. On `surfaceContainerHigh` and
   above, set text in `onSurface` or `onSurfaceVariant` instead.
 
-## 9. Files and tests
+## 9. Pro
+
+Pro (cross-app semantics section 21) uses the existing roles; it adds no token.
+
+- **Promise rows.** A promise of theirs shows the person's mark (a circle with their initials, the
+  avatar size of section 4) where the checkbox is, because it is not yours to tick; tapping it opens
+  the verdict buttons. Below the title: the effective due phrase, then the person's quote in
+  `text.secondary` italics when there is one, and an "In recap" mark (a chip in `accent` tint)
+  once it was sent. Your own promise keeps its checkbox and shows "For Jan" on the meta line.
+- **Verdict buttons** are text buttons in a row: Delivered, Late, Not yet, New date, Dropped, Ask
+  me tomorrow; keys 1 to 6 on desktop. Not yet opens a date and a blocker inline. Colour never
+  carries the meaning alone: each button has its word.
+- **Unavailable rows** (Remaining and All views) keep the normal row with the title in
+  `text.secondary` and one reason on the meta line ("Starts Mon 17 Nov", "After: Budget draft",
+  "Waiting", "On hold"); the first task of a sequential project shows a "Next" chip.
+- **Flags** are a filled flag icon in `accent-orange` after the title, with the accessible name
+  "Flagged".
+- **The Pro sidebar section** sits between the smart lists and the projects, with the same row
+  anatomy as smart lists.
+
+## 10. Files and tests
 
 | File | Role |
 |---|---|

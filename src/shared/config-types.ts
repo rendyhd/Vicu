@@ -9,6 +9,7 @@
 // --- Custom lists ----------------------------------------------------------------------------
 
 /** The sort keys a custom list may use, in the order the editor offers them (same as Android). */
+import type { ProLedger } from './pro/ledger'
 import type { SyncedPrefsDocument } from './synced-prefs'
 import type { TodayRoutinesLimit } from './today-routines'
 
@@ -125,6 +126,22 @@ export interface CustomListFilter {
   rule_include_nulls?: boolean
   /** Sort keys after sort_by (section 3.6). */
   then_by?: Array<{ sort_by: string; order_by: string }>
+  // Pro (section 3.8): written only when set, evaluated Pro on or off, kept by every version.
+  /** 'available', 'remaining' or 'all'. */
+  availability?: string
+  flagged?: boolean
+  /** Minutes; a whole number of 1 or more. */
+  estimate_max?: number
+  /** 'active', 'on_hold' or 'any'. */
+  project_status?: string
+  /** 'project', 'label', 'person', 'due', 'start', 'flagged' or 'none'. */
+  group_by?: string
+  /** What rows show, in order: 'project', 'labels', 'due', 'start', 'estimate', 'flag', 'notes'. */
+  row_fields?: string[]
+  /** 'theirs', 'mine' or 'any'. */
+  promise?: string
+  /** Label ids of people. */
+  person?: number[]
   [unknownField: string]: unknown
 }
 
@@ -277,6 +294,15 @@ export interface AppConfig {
     last_synced_at?: string
     moved?: boolean
   }
+  /** The Pro ledger's local copy (cross-app semantics 21.7; owned by main, `src/main/pro-ledger-service.ts`). */
+  pro_ledger_sync?: {
+    device_id: string
+    document: ProLedger
+    dirty: boolean
+    carrier_task_id?: number
+    last_synced_at?: string
+    synced_document?: ProLedger
+  }
   /**
    * The signed-in Vikunja user, as `GET user` answered it (owned by main, `src/main/known-user.ts`).
    * Hidden tasks are read and written only when they belong to this user (cross-app semantics 10.3).
@@ -383,6 +409,23 @@ export interface AppConfig {
   planner_show_routines?: boolean
   /** A notification in the evening to plan tomorrow; off unless true. Local time, `HH:MM`. */
   planner_nudge?: string | null
+  // Pro (cross-app semantics section 21): per device, never synced.
+  /** The switch; off by default and never on in standalone mode (`isProEnabled`). */
+  pro_enabled?: boolean
+  /** The layers; a missing one is on. */
+  pro_layers?: Partial<Record<'availability' | 'promises' | 'portfolio' | 'power', boolean>>
+  /** Available, Remaining or All, per list key (`anytime`, `project:12`, `tag:4`, `list:<id>`). */
+  pro_list_views?: Record<string, 'available' | 'remaining' | 'all'>
+  /** Rows or columns per list key, with the visible columns. */
+  pro_list_layouts?: Record<string, { layout: 'rows' | 'columns'; columns?: string[] }>
+  /** Focus (section 21.14). */
+  pro_focus?: { categories: string[]; projects: number[] } | null
+  /** Pro data reaches the assistant only while this is on (decision 20). */
+  pro_assistant?: boolean
+  /** "Ask me tomorrow", once per due day (section 21.6). */
+  pro_verdict_snooze?: Record<string, { due: string; until: string }>
+  /** The first-run notice about existing start dates was shown. */
+  pro_onboarding_seen?: boolean
 }
 
 // --- Defaults every reader shares -------------------------------------------------------------

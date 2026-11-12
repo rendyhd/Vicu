@@ -20,6 +20,7 @@
  * This file only imports its sibling helpers, so any tsconfig can include it.
  */
 
+import { matchesProConditions, type ProListContext, type ProListTask } from './pro/list-conditions'
 import { compileRule, ruleUsesLike, validateRule, type RuleTask } from './custom-list-rule'
 import {
   addLocalDays,
@@ -66,6 +67,13 @@ export interface CustomListFilterInput {
   rule?: string
   /** Whether the rule's terms also match a task without a value for their field. */
   rule_include_nulls?: boolean
+  // Pro's conditions (section 3.8), evaluated Pro on or off.
+  availability?: string
+  flagged?: boolean
+  estimate_max?: number
+  project_status?: string
+  promise?: string
+  person?: number[]
 }
 
 /** The fields of a Vikunja task the evaluator reads (the rule reads more, all optional). */
@@ -89,6 +97,8 @@ export interface CustomListContext {
   me?: number | null
   /** Whether a project is shared: its members include someone besides you. Absent: none is. */
   isShared?: (projectId: number) => boolean
+  /** What Pro's conditions read (section 3.8); absent: they are no condition. */
+  pro?: ProListContext
 }
 
 /** The assigned values this version knows. */
@@ -246,7 +256,8 @@ function matchesForm(
     if (!labelIds.some((id) => taskLabels.some((label) => label.id === id))) return false
   }
 
-  return matchesActivity(task, filter, day, context)
+  if (!matchesActivity(task, filter, day, context)) return false
+  return matchesProConditions(task as ProListTask, filter, context.pro)
 }
 
 /** The tasks of `tasks` that match, in their original order. */

@@ -32,6 +32,13 @@ interface CorpusCase {
   project?: string | null
   recurrence?: { interval: number; unit: string } | null
   place?: { id: string; trigger: string } | null
+  /** Pro on, with `people` (section 5.5). */
+  pro?: boolean
+  person?: { id: number; mine: boolean } | null
+  proStart?: string | null
+  estimate?: number | null
+  flag?: boolean
+  request?: boolean
 }
 
 interface Corpus {
@@ -39,6 +46,8 @@ interface Corpus {
   reference: string
   /** The saved places every case is parsed with (section 5.3). */
   places: Array<{ id: string; name: string }>
+  /** Pro's people `Jan:` may name (section 5.5). */
+  people: Array<{ id: number; title: string; aliases?: string[] }>
   cases: CorpusCase[]
 }
 
@@ -68,7 +77,7 @@ export function runNlpCorpusSuite(options: { zone: string; expectedOffsetMinutes
   describe(`nlp corpus v1 in ${options.zone}`, () => {
     it('is running in the requested time zone', () => {
       expect(corpus.contractVersion).toBe(1)
-      expect(corpus.cases.length).toBe(154)
+      expect(corpus.cases.length).toBe(179)
       if (options.expectedOffsetMinutesInOctober !== undefined) {
         expect(new Date(2026, 9, 6).getTimezoneOffset()).toBe(options.expectedOffsetMinutesInOctober)
       }
@@ -79,6 +88,7 @@ export function runNlpCorpusSuite(options: { zone: string; expectedOffsetMinutes
         testCase.mode ? `mode ${testCase.mode}` : null,
         testCase.locale ? testCase.locale : null,
         testCase.parserEnabled === false ? 'parser off' : null,
+        testCase.pro ? 'Pro' : null,
       ].filter(Boolean)
       const label = `${JSON.stringify(testCase.input)}${flags.length ? ` (${flags.join(', ')})` : ''}`
 
@@ -89,8 +99,9 @@ export function runNlpCorpusSuite(options: { zone: string; expectedOffsetMinutes
           syntaxMode: testCase.mode ?? 'todoist',
           bangToday: true,
           locale: testCase.locale ?? 'en-US',
+          pro: testCase.pro === true,
         }
-        const result = parse(testCase.input, config, local(corpus.reference), corpus.places)
+        const result = parse(testCase.input, config, local(corpus.reference), corpus.places, corpus.people)
 
         // The stored value, as the composer, title editor and Quick Entry build it.
         const due = result.dueDate ? wall(parsedDue(result.dueDate, result.dueHasTime)) : null
@@ -105,6 +116,11 @@ export function runNlpCorpusSuite(options: { zone: string; expectedOffsetMinutes
           project: result.project,
           recurrence: result.recurrence,
           place: result.place ? { id: result.place.place.id, trigger: result.place.trigger } : null,
+          person: result.person,
+          proStart: result.start ? wall(result.start.toISOString()) : null,
+          estimate: result.estimate,
+          flag: result.flag,
+          request: result.request,
         }).toEqual({
           title: testCase.title,
           due: testCase.due ?? null,
@@ -115,6 +131,11 @@ export function runNlpCorpusSuite(options: { zone: string; expectedOffsetMinutes
           project: testCase.project ?? null,
           recurrence: testCase.recurrence ?? null,
           place: testCase.place ?? null,
+          person: testCase.person ?? null,
+          proStart: testCase.proStart ?? null,
+          estimate: testCase.estimate ?? null,
+          flag: testCase.flag ?? false,
+          request: testCase.request ?? false,
         })
       })
     }

@@ -9,6 +9,8 @@ export default defineConfig({
   },
   test: {
     globals: false,
+    // The guard tests scan every file under src/renderer; on a busy machine that passes 5 s.
+    testTimeout: 30_000,
     exclude: [...configDefaults.exclude, '**/out/**', '**/.claude/**'],
   },
 })
