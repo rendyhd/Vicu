@@ -24,6 +24,7 @@ declare global {
       fetchTaskAttachments(taskId: number): Promise<{ success: boolean; data?: Array<{ id: number }>; error?: string; statusCode?: number }>
       updateTask(taskId: number, task: Record<string, unknown>): Promise<{ success: boolean; error?: string; statusCode?: number; data?: unknown }>
       closeWindow(): Promise<void>
+      openImport(text: string): Promise<boolean>
       // The locale and clock dates are phrased with (system locale, Settings clock choice).
       getDateFormat(): Promise<{ locale: string; hour12: boolean }>
       onDateFormatChanged(callback: (format: { locale: string; hour12: boolean }) => void): void
@@ -69,10 +70,13 @@ interface QuickEntryConfig {
   standalone_mode: boolean
   nlp_enabled: boolean
   nlp_syntax_mode: 'todoist' | 'vikunja'
+  /** Pro's promises layer is on: a pasted import goes to the main window's review. */
+  pro_import?: boolean
 }
 
 import { blockFields, parse, getParserConfig, recurrenceToVikunja, extractBangToday } from '../lib/task-parser'
-import { dueToday, parsedDue } from '../lib/due-dates'
+import { dueToday, parsedDue, toLocalDate } from '../lib/due-dates'
+import { readImport } from '../../shared/pro/import'
 import { followColorScheme } from '../lib/theme'
 import { parseChips } from '../lib/parse-chips'
 import { motionMs, motionSpringCurve, travelStart } from '../lib/motion'
@@ -914,6 +918,16 @@ async function handleImagePaste(e: ClipboardEvent): Promise<void> {
 }
 
 input.addEventListener('paste', handleImagePaste)
+
+// Pro (plan 7.1.9): a pasted import (Copilot's JSON, a Vicu export) opens its review in the main
+// window instead of becoming the title. Only while Pro's promises layer is on.
+input.addEventListener('paste', (e: ClipboardEvent) => {
+  if (!lastConfig?.pro_import) return
+  const text = e.clipboardData?.getData('text/plain') ?? ''
+  if (!text.includes('{') || !readImport(text, toLocalDate(new Date())).ok) return
+  e.preventDefault()
+  void window.quickEntryApi.openImport(text)
+})
 descriptionInput.addEventListener('paste', handleImagePaste)
 
 // Obsidian badge remove button

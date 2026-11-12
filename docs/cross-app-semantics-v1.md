@@ -2440,8 +2440,8 @@ shows open flagged tasks; Vikunja's own Favorites pseudo-project (-1) is not use
 ### 21.7 The ledger
 
 - One hidden carrier per account (section 10): title `Vicu Pro ledger (sync metadata — do not
-  delete)`, marker `vicu-pro:v1`, search text `vicu-pro`. Created in the Inbox only when it holds
-  something.
+  delete)`, marker `vicu-pro:v1`, search text `vicu-pro:v` (so the search does not also find the
+  archive parts, `vicu-pro-archive`). Created in the Inbox only when it holds something.
 - Payload:
 
 ```json

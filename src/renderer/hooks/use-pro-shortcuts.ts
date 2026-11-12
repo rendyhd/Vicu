@@ -35,4 +35,10 @@ export function useProShortcuts(): void {
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
   }, [focusOn, promisesOn, powerOn])
+
+  // An import pasted in Quick Entry (plan 7.1.9) opens its review here.
+  useEffect(() => {
+    if (!promisesOn) return
+    return window.api.onProOpenImport((text) => useProUiStore.getState().open('pro-import', { text }))
+  }, [promisesOn])
 }

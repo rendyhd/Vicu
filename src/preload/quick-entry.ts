@@ -24,6 +24,7 @@ contextBridge.exposeInMainWorld('quickEntryApi', {
   updateTask: (taskId: number, task: Record<string, unknown>) =>
     ipcRenderer.invoke('update-task', taskId, task),
   closeWindow: () => ipcRenderer.invoke('qe:close-window'),
+  openImport: (text: string) => ipcRenderer.invoke('qe:open-import', text),
   setHeight: (height: number) => ipcRenderer.invoke('qe:set-height', height),
   getConfig: () => ipcRenderer.invoke('qe:get-config'),
   getPendingCount: () => ipcRenderer.invoke('qe:get-pending-count'),

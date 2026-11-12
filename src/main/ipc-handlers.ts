@@ -8,6 +8,7 @@ import {
   syncProLedger,
 } from './pro-ledger-service'
 import { shell, dialog, app, nativeTheme, clipboard as electronClipboard, ClipboardItem as ElectronClipboardItem } from 'electron'
+import { isProEnabled } from '../shared/pro/settings'
 import { handleTrusted } from './secure-ipc'
 import { tokenForConnectionTest } from './connection-test-token'
 import { isExternalAllowed } from './web-security-policy'
@@ -765,6 +766,19 @@ export function registerIpcHandlers(): void {
     hideQuickEntry()
   })
 
+  // Pro (plan 7.1.9): an import pasted in Quick Entry opens its review in the main window.
+  handleTrusted('qe:open-import', (_event, text: unknown) => {
+    if (typeof text !== 'string' || !text.trim() || !isProEnabled(loadConfig(), 'promises')) return false
+    const win = getMainWindow()
+    if (!win || win.isDestroyed()) return false
+    if (win.isMinimized()) win.restore()
+    win.show()
+    win.focus()
+    win.webContents.send('pro:open-import', text)
+    hideQuickEntry()
+    return true
+  })
+
   handleTrusted('qe:get-config', () => {
     const config = loadConfig()
     if (!config) return null
@@ -778,6 +792,7 @@ export function registerIpcHandlers(): void {
       standalone_mode: config.standalone_mode === true,
       nlp_enabled: config.nlp_enabled,
       nlp_syntax_mode: config.nlp_syntax_mode,
+      pro_import: isProEnabled(config, 'promises'),
     }
   })
 

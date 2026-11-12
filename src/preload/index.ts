@@ -468,6 +468,11 @@ const api = {
     ipcRenderer.on('navigate', handler)
     return () => { ipcRenderer.removeListener('navigate', handler) }
   },
+  onProOpenImport: (cb: (text: string) => void) => {
+    const handler = (_: unknown, text: string) => cb(text)
+    ipcRenderer.on('pro:open-import', handler)
+    return () => { ipcRenderer.removeListener('pro:open-import', handler) }
+  },
   // File > New Task (Ctrl+N). The menu accelerator takes the key before the page sees it.
   onNewTask: (cb: () => void) => {
     const handler = () => cb()

@@ -407,6 +407,8 @@ export interface ElectronAPI {
   onWindowMaximizedChange(cb: (maximized: boolean) => void): () => void
   onTasksChanged(cb: () => void): () => void
   onNavigate(cb: (path: string) => void): () => void
+  /** Pro: an import pasted in Quick Entry, for the import review (plan 7.1.9). */
+  onProOpenImport(cb: (text: string) => void): () => void
   onNavigateToTask(cb: (taskId: number) => void): () => void
   onNewTask(cb: () => void): () => void
   onRefreshView(cb: () => void): () => void
