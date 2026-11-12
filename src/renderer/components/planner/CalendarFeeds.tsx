@@ -227,7 +227,7 @@ function AccountRepair({ connection }: { connection: CalendarConnectionView }) {
 
 function ConnectionBlock({ connection }: { connection: CalendarConnectionView }) {
   const { remove, refresh } = useCalendarActions()
-  if (connection.kind === 'ics') {
+  if (connection.kind === 'ics' || connection.kind === 'ics-file') {
     const feed = connection.calendars[0]
     if (!feed) return null
     return <CalendarRow feed={feed} onRemove={() => remove.mutate(connection.id)} />

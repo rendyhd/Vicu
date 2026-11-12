@@ -2192,17 +2192,20 @@ access level is free/busy. Any other event without a title is "(No title)".
 - Kinds: a **calendar link** (an `https://` or `http://` address of an iCalendar file; `webcal://`
   is read as `https://`), a **CalDAV account** (server, user name, app password), the **device's own
   calendars** (Android's calendar provider, `CalendarContract` instances, with whatever the phone
-  syncs; iOS and macOS EventKit), and **Microsoft 365** and **Google** accounts with read-only
-  access. Each app offers the kinds it has built.
+  syncs; iOS and macOS EventKit), **Microsoft 365** and **Google** accounts with read-only
+  access, a **calendar file on this computer** (an iCalendar file another program keeps up to date,
+  read again when it changes; desktop), and **classic Outlook** on Windows (read through Outlook's
+  own automation only while it is open, never started by Vicu; the new Outlook cannot be read this
+  way). Each app offers the kinds it has built.
 - The calendar's reader expands recurrence: RRULE, RDATE, EXDATE, overrides (RECURRENCE-ID) and the
   file's own time zones. Cancelled events are left out.
 - **Your own answer.** Where the source tells your own answer to an invitation (the device's
-  calendars, Microsoft 365, Google), an event you declined is left out, and one you accepted as
+  calendars, Microsoft 365, Google, classic Outlook), an event you declined is left out, and one you accepted as
   tentative or have not answered yet is tentative. A calendar link or a CalDAV account does not say
   which attendee is you, so its events are read as they are. An event is also tentative when the
   calendar marks it so: `STATUS:TENTATIVE`, a tentative availability (Android, EventKit), Microsoft's
   "show as" Tentative or Google's status tentative.
-- **Microsoft 365 "show as"**: Free and Working elsewhere are free (Outlook's scheduling counts both
+- **Microsoft 365 and classic Outlook "show as"**: Free and Working elsewhere are free (Outlook's scheduling counts both
   as available), Tentative is tentative and busy, Busy and Away are busy.
 - Each calendar has: a name; **Shown** (default on; off, it is not read and counts for nothing);
   **Colour**, by default the next of `#7c6cf2`, `#0a84ff`, `#30a46c`, `#e5484d`, `#f76b15`,
@@ -2210,7 +2213,8 @@ access level is free/busy. Any other event without a title is "(No title)".
   (default off, 20.8).
 - Calendars are read when the Plan screen opens and at most every 5 minutes per calendar while it
   stays open, and at once on a manual refresh. A calendar the device itself keeps (Android's
-  provider, EventKit) is read again when it says it changed.
+  provider, EventKit) is read again when it says it changed, and a calendar file when the file
+  changes.
 - A calendar that cannot be read keeps its last good copy on screen, says when it was last read and
   why the read failed. An error never empties it.
 - Read-only: Vicu never adds, changes or deletes a calendar's events, never answers an invitation,

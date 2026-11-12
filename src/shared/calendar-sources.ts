@@ -7,8 +7,33 @@
 
 import type { CalendarFeedView } from './calendar-events'
 
-/** The kinds this app has built ('eventkit' on macOS only). */
-export type CalendarSourceKind = 'ics' | 'caldav' | 'microsoft' | 'google' | 'eventkit'
+/**
+ * The kinds this app has built: 'eventkit' on macOS only, 'outlook' (classic Outlook) on Windows
+ * only; 'ics-file' is a calendar file on this computer, read again when it changes.
+ */
+export type CalendarSourceKind = 'ics' | 'caldav' | 'microsoft' | 'google' | 'eventkit' | 'ics-file' | 'outlook'
+
+/** Add a calendar file on this computer: the main process asks for the file itself. */
+export interface AddCalendarFileInput {
+  /** Empty: the file's name without its extension. */
+  name?: string
+  busyOnly?: boolean
+}
+
+/** Classic Outlook on this PC: not on this system, not installed, installed but closed, or open. */
+export type OutlookState = 'unsupported' | 'missing' | 'closed' | 'running'
+
+export interface OutlookStatusView {
+  state: OutlookState
+  /** Classic Outlook is already added (there is one such connection). */
+  added: boolean
+  /** What to do, in a sentence, when it cannot be read now. */
+  problem?: string
+}
+
+export const OUTLOOK_MISSING_MESSAGE =
+  'Classic Outlook is not installed on this PC. The new Outlook cannot be read by other apps: add the calendar as a Microsoft 365 account or a calendar link instead.'
+export const OUTLOOK_CLOSED_MESSAGE = 'Open classic Outlook to read its calendars. Vicu reads them only while Outlook is open, and never starts it.'
 
 /** How the stored links and passwords are protected (auth/secret-storage.ts). */
 export type CalendarSecretLevel = 'encrypted' | 'obfuscated' | 'plaintext'

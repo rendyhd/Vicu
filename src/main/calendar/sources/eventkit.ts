@@ -72,10 +72,11 @@ export function isTentative(event: HelperEvent): boolean {
 /**
  * One occurrence as an iCalendar document; null when it is not shown. An all-day event's days are
  * this Mac's local dates (EventKit gives local midnights): its end is the day after its last day.
+ * Classic Outlook (outlook.ts) builds the same documents from its appointments.
  */
-export function eventToIcs(event: HelperEvent): string | null {
+export function eventToIcs(event: HelperEvent, product = 'Mac calendars'): string | null {
   if (!isShown(event)) return null
-  const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Vicu//Mac calendars//EN', 'BEGIN:VEVENT', `UID:${escapeText(event.key)}`]
+  const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', `PRODID:-//Vicu//${product}//EN`, 'BEGIN:VEVENT', `UID:${escapeText(event.key)}`]
   if (event.allDay) {
     const first = new Date(event.start)
     const firstDay = new Date(first.getFullYear(), first.getMonth(), first.getDate())
@@ -95,7 +96,7 @@ export function eventToIcs(event: HelperEvent): string | null {
   return lines.join('\r\n')
 }
 
-function hashOf(documents: readonly CopyDocument[]): string {
+export function hashOf(documents: readonly CopyDocument[]): string {
   const hash = createHash('sha256')
   for (const doc of documents) hash.update(doc.key).update('\0').update(doc.ics).update('\0')
   return hash.digest('hex')

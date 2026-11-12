@@ -4,7 +4,9 @@
 //   sources/types.ts   what a kind of source implements, and how to add one (read it first)
 //   sources/*.ts       the kinds: a calendar link (ics-link.ts), a CalDAV account (caldav.ts),
 //                      Microsoft 365 and Google accounts (microsoft.ts, google.ts on oauth-account.ts),
-//                      the Mac's calendars (eventkit.ts, through ../eventkit.ts and its helper)
+//                      the Mac's calendars (eventkit.ts, through ../eventkit.ts and its helper),
+//                      a calendar file on this computer (ics-file.ts, watched here), classic
+//                      Outlook on Windows (outlook.ts, through ../outlook.ts and its script)
 //   oauth.ts           the browser sign-in (PKCE, loopback) and the tokens of those accounts
 //   oauth-clients.ts   Vicu's registered OAuth clients, and "Use my own client" per device
 //   oauth-ipc.ts       their IPC: sign in, cancel, sign in again, the own client
@@ -26,8 +28,11 @@
 // - Secrets never reach a window, a log line or the config: the windows get CalendarSourcesView.
 // - Nothing leaves the device: no Vikunja, no synced preferences, no assistant (it gets free time).
 
-import { BrowserWindow, net } from 'electron'
+import { BrowserWindow, dialog, net } from 'electron'
 import { randomUUID } from 'crypto'
+import { watch, type FSWatcher } from 'fs'
+import { readFile, stat } from 'fs/promises'
+import { basename, dirname } from 'path'
 import { handleTrusted } from '../secure-ipc'
 import { isPlainSecret, openSecret, sealSecret, secretStorageLevel } from '../safe-storage'
 import {
@@ -36,6 +41,12 @@ import {
   type CalendarEventsResult,
   type CalendarFeedView,
 } from '../../shared/calendar-events'
+import {
+  OUTLOOK_CLOSED_MESSAGE,
+  OUTLOOK_MISSING_MESSAGE,
+  type AddCalendarFileInput,
+  type OutlookStatusView,
+} from '../../shared/calendar-sources'
 import type {
   AddCalendarLinkInput,
   CaldavDiscoverInput,
@@ -66,8 +77,14 @@ import { registerCalendarImportIpc } from './import-ipc'
 import { eventKitHelper, eventKitHelperIfAny, eventkitSource, eventKitStatus, notAskedMessage, openCalendarPrivacySettings } from './eventkit'
 import { foundCalendars } from './sources/eventkit'
 import { EVENTKIT_DENIED_MESSAGE, type EventKitSaveInput } from '../../shared/calendar-eventkit'
-import { isMac } from '../platform'
+import { isMac, isWindows } from '../platform'
+import { createIcsFileSource, type FileConfig } from './sources/ics-file'
+import { createOutlookSource, outlookState } from './sources/outlook'
+import { powershellOutlookRunner } from './outlook'
 import type { CalendarCopy, CalendarSource, ConnectResult, ReadOutcome, RemoteCalendar, SourceContext } from './sources/types'
+
+const icsFileSource = createIcsFileSource({ stat, readFile: (path) => readFile(path, 'utf8') })
+const outlookSource = createOutlookSource(() => powershellOutlookRunner)
 
 /** Every kind this app has built. A new kind is registered here (see sources/types.ts). */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- each kind has its own config type
@@ -77,7 +94,12 @@ const SOURCES: Record<CalendarSourceKind, CalendarSource<any>> = {
   microsoft: microsoftSource,
   google: googleSource,
   eventkit: eventkitSource,
+  'ics-file': icsFileSource,
+  outlook: outlookSource,
 }
+
+/** The kinds that are one file: their one calendar is the connection. */
+const SINGLE_FILE = new Set<CalendarSourceKind>(['ics', 'ics-file'])
 
 /** A calendar is read at most this often unless a refresh asks (20.9). */
 export const FRESH_MS = 5 * 60_000
@@ -263,7 +285,7 @@ async function refreshCalendar(connection: StoredConnection, calendar: StoredCal
       if (outcome.status !== 'changed') return false
       const kept = new Set<unknown>(previous?.busyOnly === current.busyOnly ? previous.documents : [])
       const documents = reduceDocuments(outcome.documents, current.busyOnly, kept)
-      if (connection.kind === 'ics' && outcome.documents.length > 0 && documents.length === 0) {
+      if (SINGLE_FILE.has(connection.kind) && outcome.documents.length > 0 && documents.length === 0) {
         throw new CalendarReadError('The calendar could not be read: it is not a valid calendar file.', 'format')
       }
       setCopy(current, state, { documents, validators: outcome.validators, fetchedAt: Date.now(), busyOnly: current.busyOnly })
@@ -426,13 +448,14 @@ async function removeConnection(id: string): Promise<void> {
   connectionErrors.delete(connection.id)
   await writeCalendarStore({ ...readCalendarStore(), connections: readCalendarStore().connections.filter((c) => c.id !== connection.id) })
   syncEventKitWatch()
+  void syncFileWatches()
 }
 
 /** The calendars an account has now: new ones are added, not shown; gone ones are removed. */
 async function relist(connection: StoredConnection): Promise<void> {
   const source = SOURCES[connection.kind]
   const config = await configOf(connection)
-  if (!config || connection.kind === 'ics') return
+  if (!config || SINGLE_FILE.has(connection.kind)) return
   let listed: { config: unknown; calendars: RemoteCalendar[] }
   try {
     listed = await source.listCalendars(config, ctx)
@@ -480,6 +503,7 @@ async function refreshAll(connectionId?: string): Promise<void> {
 async function eventsBetween(from: Date, to: Date): Promise<CalendarEventsResult> {
   const store = readCalendarStore()
   syncEventKitWatch()
+  void syncFileWatches()
   const shown = store.connections.flatMap((connection) => connection.calendars.filter((c) => c.enabled).map((calendar) => ({ connection, calendar })))
   await Promise.all(shown.map(({ calendar }) => ensureLoaded(calendar)))
   const waits: Promise<boolean>[] = []
@@ -618,6 +642,128 @@ function registerEventKitIpc(): void {
   handleTrusted('calendar:eventkit-open-settings', () => openCalendarPrivacySettings())
 }
 
+// --- Calendar files on this computer -------------------------------------------------------------
+// A calendar file is read again when it changes (20.9), past the 5-minute rule. The folder is watched,
+// not the file: an editor or an export often writes a new file and renames it over the old one,
+// which a watch on the file itself would not survive. Changes come in bursts: read once they settle.
+
+const FILE_SETTLE_MS = 800
+const fileWatches = new Map<string, { watcher: FSWatcher; timer?: ReturnType<typeof setTimeout> }>()
+let syncingFiles: Promise<void> | null = null
+
+function syncFileWatches(): Promise<void> {
+  if (!syncingFiles) {
+    syncingFiles = doSyncFileWatches().finally(() => {
+      syncingFiles = null
+    })
+  }
+  return syncingFiles
+}
+
+async function doSyncFileWatches(): Promise<void> {
+  const files = readCalendarStore().connections.filter((connection) => connection.kind === 'ics-file')
+  const ids = new Set(files.map((connection) => connection.id))
+  for (const [id, entry] of fileWatches) {
+    if (ids.has(id)) continue
+    entry.watcher.close()
+    if (entry.timer) clearTimeout(entry.timer)
+    fileWatches.delete(id)
+  }
+  for (const connection of files) {
+    if (fileWatches.has(connection.id)) continue
+    const config = (await configOf(connection)) as FileConfig | null
+    if (!config || fileWatches.has(connection.id)) continue
+    const name = basename(config.path)
+    const same = (changed: string) => (isWindows ? changed.toLowerCase() === name.toLowerCase() : changed === name)
+    try {
+      const entry: { watcher: FSWatcher; timer?: ReturnType<typeof setTimeout> } = {
+        watcher: watch(dirname(config.path), { persistent: false }, (_event, changed) => {
+          if (changed && !same(String(changed))) return
+          if (entry.timer) clearTimeout(entry.timer)
+          entry.timer = setTimeout(() => {
+            entry.timer = undefined
+            void rereadFile(connection.id)
+          }, FILE_SETTLE_MS)
+        }),
+      }
+      entry.watcher.on('error', () => {
+        entry.watcher.close()
+        fileWatches.delete(connection.id)
+      })
+      fileWatches.set(connection.id, entry)
+    } catch {
+      // The folder is gone: the next read says so, and a later sync watches it again.
+    }
+  }
+}
+
+async function rereadFile(connectionId: string): Promise<void> {
+  const connection = readCalendarStore().connections.find((c) => c.id === connectionId)
+  if (!connection) return
+  await Promise.all(connection.calendars.filter((c) => c.enabled).map((calendar) => refreshCalendar(connection, calendar, null, true)))
+  // Also when the read failed: the windows show why.
+  announceChanged()
+}
+
+async function addCalendarFile(event: Electron.IpcMainInvokeEvent, input: AddCalendarFileInput) {
+  const parent = BrowserWindow.fromWebContents(event.sender)
+  const options: Electron.OpenDialogOptions = {
+    title: 'Choose a calendar file',
+    buttonLabel: 'Choose',
+    filters: [
+      { name: 'Calendar files', extensions: ['ics', 'ical', 'icalendar', 'ifb'] },
+      { name: 'All files', extensions: ['*'] },
+    ],
+    properties: ['openFile'],
+  }
+  const picked = parent ? await dialog.showOpenDialog(parent, options) : await dialog.showOpenDialog(options)
+  const path = picked.canceled ? undefined : picked.filePaths[0]
+  if (!path) return { success: true as const, data: null }
+  try {
+    for (const connection of readCalendarStore().connections.filter((c) => c.kind === 'ics-file')) {
+      const config = (await configOf(connection)) as FileConfig | null
+      if (config && (isWindows ? config.path.toLowerCase() === path.toLowerCase() : config.path === path)) {
+        return { success: false as const, error: `${basename(path)} is already added as ${connection.name}.` }
+      }
+    }
+    const result = await icsFileSource.connect({ path, name: input?.name }, ctx)
+    const connection = await addConnection('ics-file', result, () => true, input?.busyOnly === true)
+    void syncFileWatches()
+    announceChanged()
+    return { success: true as const, data: await connectionView(connection) }
+  } catch (error) {
+    return { success: false as const, error: messageOf(error) }
+  }
+}
+
+// --- Classic Outlook (Windows) --------------------------------------------------------------------
+// Read while Outlook is open, through its script. One connection holds its calendars, picked like an
+// account's: a draft, then calendar:caldav-save.
+
+const outlookAdded = () => readCalendarStore().connections.some((connection) => connection.kind === 'outlook')
+
+async function outlookStatus(): Promise<OutlookStatusView> {
+  if (!isWindows) return { state: 'unsupported', added: false }
+  const state = await outlookState(powershellOutlookRunner)
+  return {
+    state,
+    added: outlookAdded(),
+    problem: state === 'missing' ? OUTLOOK_MISSING_MESSAGE : state === 'closed' ? OUTLOOK_CLOSED_MESSAGE : undefined,
+  }
+}
+
+async function discoverOutlook() {
+  pruneDrafts()
+  if (!isWindows) return { success: false as const, error: 'Classic Outlook can only be read on Windows.' }
+  if (outlookAdded()) return { success: false as const, error: 'Classic Outlook is already added. Choose which of its calendars to show in the list.' }
+  try {
+    const result = await outlookSource.connect(undefined, ctx)
+    return { success: true as const, data: saveDraft('outlook', result) }
+  } catch (error) {
+    return { success: false as const, error: messageOf(error) }
+  }
+}
+
 // --- IPC ------------------------------------------------------------------------------------------
 
 export function registerCalendarIpc(): void {
@@ -693,4 +839,8 @@ export function registerCalendarIpc(): void {
   })
 
   registerEventKitIpc()
+
+  handleTrusted('calendar:file-add', (event, input: AddCalendarFileInput) => addCalendarFile(event, input))
+  handleTrusted('calendar:outlook-status', () => outlookStatus())
+  handleTrusted('calendar:outlook-discover', () => discoverOutlook())
 }

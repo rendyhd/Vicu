@@ -3,8 +3,10 @@
 // (../store.ts), the per-calendar choices, the last good copy on disk (../cache.ts), Busy only, the
 // 5-minute rule, the limits, the IPC. A kind only knows how to reach its calendars.
 //
-// The kinds built: ics-link.ts, caldav.ts, microsoft.ts and google.ts (on oauth-account.ts), and
-// eventkit.ts (macOS only, through ../eventkit.ts and its helper). To add a kind:
+// The kinds built: ics-link.ts, caldav.ts, microsoft.ts and google.ts (on oauth-account.ts),
+// eventkit.ts (macOS only, through ../eventkit.ts and its helper), ics-file.ts (a file on this
+// computer, its folder watched by the service) and outlook.ts (classic Outlook, Windows only,
+// through ../outlook.ts and its script). To add a kind:
 //   1. Add its name to `CalendarSourceKind` in src/shared/calendar-sources.ts.
 //   2. Write `sources/<kind>.ts` exporting a `CalendarSource<YourConfig>`:
 //      - `parseConfig`: read back the config the store unsealed; null when unusable.

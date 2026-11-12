@@ -348,6 +348,13 @@ const api = {
     oauthCancel: () => ipcRenderer.invoke('calendar:oauth-cancel'),
     oauthReconnect: (connectionId: string) => ipcRenderer.invoke('calendar:oauth-reconnect', connectionId),
     importFile: () => ipcRenderer.invoke('calendar:import-file'),
+    // A calendar file on this computer: the main process asks for the file.
+    addFile: (input: { name?: string; busyOnly?: boolean }) => ipcRenderer.invoke('calendar:file-add', input),
+    // Classic Outlook on this PC (Windows); its calendars are picked with caldavSave.
+    outlook: {
+      status: () => ipcRenderer.invoke('calendar:outlook-status'),
+      discover: () => ipcRenderer.invoke('calendar:outlook-discover'),
+    },
     // The Mac's calendars (EventKit), macOS only.
     eventkit: {
       status: () => ipcRenderer.invoke('calendar:eventkit-status'),

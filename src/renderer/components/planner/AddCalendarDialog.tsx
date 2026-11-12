@@ -10,12 +10,14 @@ import { CALDAV_PRESETS, caldavPreset, type CaldavDraft, type CaldavPresetId } f
 import { CALENDAR_ACCOUNT_PROVIDERS } from '../../../shared/calendar-accounts'
 import { OAuthAccountForm } from './OAuthAccountForm'
 import { PickCalendars } from './PickCalendars'
+import { CalendarFileForm, isWindowsPlatform, OutlookForm } from './LocalCalendarForms'
 
-// Add a calendar (contract 20.9): a calendar link, a CalDAV account, or a Microsoft 365 or Google
-// account. The link, the password and the tokens stay in the main process and are never read back;
-// nothing is saved until the calendar was read (a link) or the calendars were picked (an account).
+// Add a calendar (contract 20.9): a calendar link, a CalDAV account, a Microsoft 365 or Google
+// account, the Mac's calendars, a calendar file on this computer, or classic Outlook on Windows. The
+// link, the password and the tokens stay in the main process and are never read back; nothing is
+// saved until the calendar was read (a link, a file) or the calendars were picked (an account).
 
-type Kind = 'link' | 'account' | 'microsoft' | 'google' | 'mac'
+type Kind = 'link' | 'account' | 'microsoft' | 'google' | 'mac' | 'file' | 'outlook'
 
 /** The kinds the dialog offers, in order. */
 const KINDS: { value: Kind; label: string; summary: string }[] = [
@@ -29,10 +31,21 @@ const KINDS: { value: Kind; label: string; summary: string }[] = [
     summary:
       'The calendars in macOS Calendar: iCloud, Google, Exchange and every account in System Settings, Internet Accounts. No sign-in in Vicu; they stay on this Mac.',
   },
+  {
+    value: 'outlook',
+    label: 'Classic Outlook',
+    summary: 'The calendars of classic Outlook on this PC, read while Outlook is open. They stay on this PC.',
+  },
+  {
+    value: 'file',
+    label: 'Calendar file',
+    summary:
+      'An .ics file on this computer that another program keeps up to date: Thunderbird, a script, an export. Read again whenever the file changes; it stays on this computer.',
+  },
 ]
 
-/** The kinds offered on this computer: Mac calendars only on macOS. */
-const kindsHere = () => KINDS.filter((k) => k.value !== 'mac' || isMacPlatform())
+/** The kinds offered on this computer: Mac calendars only on macOS, classic Outlook only on Windows. */
+const kindsHere = () => KINDS.filter((k) => (k.value !== 'mac' || isMacPlatform()) && (k.value !== 'outlook' || isWindowsPlatform()))
 
 const INPUT =
   'w-full rounded-control border border-border bg-transparent px-2 py-1 text-meta text-text placeholder:text-text-secondary'
@@ -263,6 +276,8 @@ export function AddCalendarDialog({ open, onClose }: { open: boolean; onClose: (
         {kind === 'account' && <AccountForm onDone={onClose} onCancel={onClose} />}
         {(kind === 'microsoft' || kind === 'google') && <OAuthAccountForm key={kind} provider={kind} onDone={onClose} onCancel={onClose} />}
         {kind === 'mac' && <MacCalendarsForm onDone={onClose} onCancel={onClose} />}
+        {kind === 'file' && <CalendarFileForm onDone={onClose} onCancel={onClose} />}
+        {kind === 'outlook' && <OutlookForm onDone={onClose} onCancel={onClose} />}
       </div>
     </Dialog>
   )

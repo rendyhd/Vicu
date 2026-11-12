@@ -5,7 +5,7 @@ import { useCalendarActions } from '@/hooks/use-calendar-events'
 import type { CaldavDraft } from '../../../shared/calendar-sources'
 
 /** A signed-in account's calendars, to pick which to show (CalDAV, Microsoft 365, Google). */
-export function PickCalendars({ draft, onBack, onDone }: { draft: CaldavDraft; onBack: () => void; onDone: () => void }) {
+export function PickCalendars({ draft, onBack, onDone, intro }: { draft: CaldavDraft; onBack: () => void; onDone: () => void; intro?: React.ReactNode }) {
   const { saveAccount } = useCalendarActions()
   // What the account itself hides (a Google calendar unticked there) starts unticked.
   const [shown, setShown] = useState<Set<string>>(() => new Set(draft.calendars.filter((c) => c.suggested !== false).map((c) => c.remoteId)))
@@ -26,7 +26,12 @@ export function PickCalendars({ draft, onBack, onDone }: { draft: CaldavDraft; o
       }}
     >
       <p className="text-meta text-text">
-        Signed in as <span className="font-medium" data-calendar-signed-in>{draft.detail}</span>. Pick the calendars to show.
+        {intro ?? (
+          <>
+            Signed in as <span className="font-medium" data-calendar-signed-in>{draft.detail}</span>.
+          </>
+        )}{' '}
+        Pick the calendars to show.
       </p>
       <ul className="max-h-56 overflow-y-auto" data-calendar-found>
         {draft.calendars.map((calendar) => (

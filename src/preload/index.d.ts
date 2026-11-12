@@ -30,12 +30,14 @@ import type {
 import type { TaskPatch } from '../shared/merge-patches'
 import type { CalendarEventsResult, CalendarFeedView } from '../shared/calendar-events'
 import type {
+  AddCalendarFileInput,
   AddCalendarLinkInput,
   CaldavDiscoverInput,
   CaldavDraft,
   CaldavSaveInput,
   CalendarConnectionView,
   CalendarSourcesView,
+  OutlookStatusView,
 } from '../shared/calendar-sources'
 import type { CalendarAccountProvider, OAuthClientsView, OwnOAuthClientInput } from '../shared/calendar-accounts'
 import type { IcsImportPreview } from '../shared/ics-import'
@@ -304,6 +306,14 @@ export interface ElectronAPI {
     oauthReconnect(connectionId: string): Promise<ApiResult<CalendarSourcesView>>
     /** Pick a calendar file and read it into a preview of Events (null when the dialog was cancelled). */
     importFile(): Promise<ApiResult<IcsImportPreview | null>>
+    /** Choose a calendar file on this computer and add it as a live calendar (null when the dialog was cancelled). */
+    addFile(input: AddCalendarFileInput): Promise<ApiResult<CalendarConnectionView | null>>
+    /** Classic Outlook on this PC (Windows): never starts Outlook; its calendars are picked with caldavSave. */
+    outlook: {
+      status(): Promise<OutlookStatusView>
+      /** List the calendars of the open Outlook, as a draft to pick from. */
+      discover(): Promise<ApiResult<CaldavDraft>>
+    }
     /** The Mac's calendars (EventKit), macOS only; nothing is saved until `save`. */
     eventkit: {
       /** Whether the kind is offered and what macOS allows; never asks. */
