@@ -21,7 +21,7 @@ describe('what the first chunk loads', () => {
 
   it('loads every Pro page through a lazy route', () => {
     const router = read('router.tsx')
-    for (const view of ['FlaggedView', 'WaitingOnView', 'PeopleView', 'PersonView']) {
+    for (const view of ['FlaggedView', 'WaitingOnView', 'PeopleView', 'PersonView', 'MeetingView', 'PortfolioView', 'SponsorView']) {
       expect(staticImport(router, `@/views/pro/${view}`)).toBe(false)
       expect(router).toContain(`import('@/views/pro/${view}')`)
     }

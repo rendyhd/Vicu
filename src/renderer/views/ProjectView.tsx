@@ -20,6 +20,7 @@ import { ProjectHeaderMenu } from '@/components/projects/ProjectHeaderMenu'
 import { useSharedProjectActions } from '@/hooks/use-project-actions'
 import { useAvailabilityView } from '@/hooks/use-availability'
 import { HiddenSummary, ViewSwitch } from '@/components/pro/ViewSwitch'
+import { InitiativePanel } from '@/components/pro/InitiativePanel'
 
 function findSectionForTask(
   sections: SectionData[],
@@ -229,7 +230,12 @@ export function ProjectView() {
       taskOrder={taskOrder}
       viewId={viewId}
       empty={tasks.length === 0 && !hasSections && hiddenCount === 0}
-      headerContent={availability.on ? <ViewSwitch view={availability.view} onChange={availability.setView} /> : undefined}
+      headerContent={availability.on || activeProject ? (
+        <>
+          <InitiativePanel projectId={pid} />
+          {availability.on && <ViewSwitch view={availability.view} onChange={availability.setView} />}
+        </>
+      ) : undefined}
       emptyTitle="No tasks in this project"
       emptySubtitle="Create a new task to get started"
       headerActions={activeProject && <ProjectHeaderMenu project={activeProject} />}

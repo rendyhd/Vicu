@@ -6,6 +6,7 @@ import { usePro, useSaveProConfig } from './use-pro'
 import { useProPrefs } from './use-pro-prefs'
 import { useProjects } from './use-projects'
 import { toast } from '@/stores/toast-store'
+import { draftEscalationIfDue } from '@/lib/pro/escalation'
 import { NULL_DATE } from '@/lib/constants'
 import type { Task } from '@/lib/vikunja-types'
 import { toLocalDate, type LocalDate } from '../../shared/due-dates'
@@ -67,7 +68,8 @@ export function usePromiseActions() {
   const complete = useCompleteTask()
   const uncomplete = useUncompleteTask()
   const update = useUpdateTask()
-  const { config } = usePro()
+  const { config, layer } = usePro()
+  const portfolioOn = layer('portfolio')
   const save = useSaveProConfig()
 
   const verdict = useCallback(
@@ -75,7 +77,11 @@ export function usePromiseActions() {
       const before = promiseOf(currentLedger(queryClient), task.id)
       if (!before) return
       const change = buildVerdict(task, kind, { id: newLedgerId(), at: new Date().toISOString(), ...options })
-      void writeLedger(queryClient, [setRecord('promises', task.id, withVerdict(before, change.verdict))])
+      const after = withVerdict(before, change.verdict)
+      void writeLedger(queryClient, [setRecord('promises', task.id, after)]).then((ok) => {
+        // Decision 15: a second miss drafts an escalation for the Sponsor desk.
+        if (ok && kind === 'not_yet' && portfolioOn) void draftEscalationIfDue(queryClient, currentLedger(queryClient), task.id)
+      })
       const oldDue = task.due_date
       if (change.taskPatch?.done) complete.mutate(task)
       else if (typeof change.taskPatch?.due_date === 'string') update.mutate({ id: task.id, changes: { due_date: change.taskPatch.due_date }, original: task })
@@ -91,7 +97,7 @@ export function usePromiseActions() {
         },
       })
     },
-    [queryClient, complete, uncomplete, update],
+    [queryClient, complete, uncomplete, update, portfolioOn],
   )
 
   /** "Ask me tomorrow", once per due day (decision 10). */

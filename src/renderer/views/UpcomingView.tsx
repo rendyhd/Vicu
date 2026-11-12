@@ -18,6 +18,7 @@ import { ListSkeleton } from '@/components/shared/ListSkeleton'
 import { TaskRowGroup } from '@/components/task-list/TaskRowGroup'
 import { TaskRow } from '@/components/task-list/TaskRow'
 import { OPEN_TASKS_PARAMS, useAvailability } from '@/hooks/use-availability'
+import { useParkedFilter } from '@/hooks/use-parked'
 import { dateOnlyStart, startsEntries } from '../../shared/pro/start-dates'
 
 function formatDateHeader(dateStr: string, fmt: DateFormat): string {
@@ -59,7 +60,10 @@ export function UpcomingView() {
   // Recomputes the groups when the local day rolls over (Today / Tomorrow / weekday headings).
   const dayKey = useDayKey()
   const dateFormat = useDateFormat()
-  const { data: tasks = [], isLoading } = useTasks(params)
+  const { data: loadedTasks = [], isLoading } = useTasks(params)
+  // Pro (21.10): a parked initiative's tasks wait; off, every task.
+  const withoutParked = useParkedFilter()
+  const tasks = useMemo(() => withoutParked(loadedTasks), [withoutParked, loadedTasks])
   const { data: projects } = useProjects()
   // Pro: the day a task starts is listed too (cross-app semantics 21.3). Off, nothing is fetched.
   const proOn = useAvailability().on

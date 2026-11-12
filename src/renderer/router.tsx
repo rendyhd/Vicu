@@ -155,6 +155,24 @@ const personRoute = createRoute({
   component: lazyRouteComponent(() => import('@/views/pro/PersonView'), 'PersonView'),
 })
 
+const meetingRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/meeting/$meetingId',
+  component: lazyRouteComponent(() => import('@/views/pro/MeetingView'), 'MeetingView'),
+})
+
+const portfolioRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/portfolio',
+  component: lazyRouteComponent(() => import('@/views/pro/PortfolioView'), 'PortfolioView'),
+})
+
+const sponsorRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/sponsor',
+  component: lazyRouteComponent(() => import('@/views/pro/SponsorView'), 'SponsorView'),
+})
+
 const routeTree = rootRoute.addChildren([
   indexRoute,
   inboxRoute,
@@ -176,6 +194,9 @@ const routeTree = rootRoute.addChildren([
   waitingOnRoute,
   peopleRoute,
   personRoute,
+  meetingRoute,
+  portfolioRoute,
+  sponsorRoute,
 ])
 
 // Use hash history for Electron compatibility (file:// URLs don't support browser history)

@@ -15,6 +15,12 @@ import {
 import { cn } from '@/lib/cn'
 import { useQueryClient } from '@tanstack/react-query'
 import { finishProCapture, proPersonLabelId, withProFields } from '@/lib/pro/capture'
+import { useProUiStore } from '@/stores/pro-ui-store'
+import { currentLedger, setRecord, writeLedger } from '@/hooks/use-pro-ledger'
+import { confirmDelete } from '@/lib/confirm-bridge'
+import { isProEnabled } from '../../../shared/pro/settings'
+import { recordValue } from '../../../shared/pro/ledger'
+import { readiness, withLogAnyway } from '../../../shared/pro/portfolio'
 import { api } from '@/lib/api'
 import { NULL_DATE } from '@/lib/constants'
 import { replacePendingTokens } from '@/lib/image-tokens'
@@ -403,6 +409,24 @@ export function NewTaskComposer({
       // The same rules the buttons and chips show: the text, unless a control was used.
       const saved = parser.parserConfig.enabled ? fields : resolveWith(parsed)
       const targetProjectId = saved.projectId
+      // Pro (decision 16): capturing into an initiative that is not ready asks first, and counts it.
+      if (isProEnabled(appConfig ?? null, 'portfolio')) {
+        const ledger = currentLedger(queryClient)
+        const initiative = recordValue(ledger.initiatives, targetProjectId)
+        const ready = initiative && initiative.status === 'active' ? readiness(initiative) : null
+        if (initiative && ready && !ready.ready) {
+          const ok = await confirmDelete(`This initiative is not ready yet (${ready.done} of ${ready.total}). Log the task anyway?`, {
+            force: true,
+            confirmLabel: 'Log anyway',
+            destructive: false,
+          })
+          if (!ok) {
+            setSubmitting(false)
+            return
+          }
+          void writeLedger(queryClient, [setRecord('initiatives', targetProjectId, withLogAnyway(initiative))])
+        }
+      }
       let payload: CreateTaskPayload = { title }
       const draftDescription = description.trim()
       if (draftDescription) payload.description = draftDescription
@@ -431,6 +455,8 @@ export function NewTaskComposer({
       })
       const task = await createTask.mutateAsync({ projectId: targetProjectId, task: payload, extras })
       void finishProCapture(queryClient, task, parsed, promiseDraft)
+      // `req:` (5.5): the new task opens in triage, next to the portfolio.
+      if (parsed?.request) useProUiStore.getState().setTriageTask(task)
       const place = parsed?.place
       if (isTempTaskId(task.id)) {
         // A location reminder is written for a server id only (section 11.7).

@@ -5,6 +5,7 @@ import { useProPrefs } from '@/hooks/use-pro-prefs'
 import { useTaskOrderResolver, useTaskOrderSettings } from '@/hooks/use-task-order'
 import type { Project } from '@/lib/vikunja-types'
 import type { ProjectMode } from '../../../shared/pro/prefs'
+import { usePortfolio } from '@/hooks/use-portfolio'
 
 const MODES: Array<{ mode: ProjectMode; label: string }> = [
   { mode: 'parallel', label: 'Parallel' },
@@ -57,6 +58,33 @@ export function ProjectStatusMenu({ project, anchorRef, onClose }: SubProps) {
       <MenuRadioItem checked={held} onSelect={() => void prefs.setProjectOnHold(project.id, true)}>
         On hold
       </MenuRadioItem>
+    </Menu>
+  )
+}
+
+/**
+ * The initiative entries of a project's menu (21.10): make it one (at the cap the park dialog asks
+ * for one to park first), park or reactivate, close, or stop treating it as one.
+ */
+export function InitiativeMenu({ project, anchorRef, onClose, onAtCap }: SubProps & { onAtCap: (projectId: number) => void }) {
+  const portfolio = usePortfolio()
+  const value = portfolio.initiative(project.id)
+  return (
+    <Menu anchorRef={anchorRef} placement="right-start" label="Initiative" onClose={onClose}>
+      {!value || value.status === 'closed' ? (
+        <MenuItem onSelect={() => (portfolio.cap.full ? onAtCap(project.id) : void portfolio.start(project.id))}>Make this an initiative</MenuItem>
+      ) : (
+        <>
+          {value.status === 'parked' ? (
+            <MenuItem onSelect={() => (portfolio.cap.full ? onAtCap(project.id) : void portfolio.unpark(project.id))}>Make active</MenuItem>
+          ) : (
+            <MenuItem onSelect={() => void portfolio.park(project.id, '')}>Park</MenuItem>
+          )}
+          <MenuItem onSelect={() => void portfolio.close(project.id)}>Close (done)</MenuItem>
+          <MenuSeparator />
+          <MenuItem onSelect={() => void portfolio.stop(project.id)}>Not an initiative</MenuItem>
+        </>
+      )}
     </Menu>
   )
 }

@@ -10,6 +10,7 @@ import { ListSectionHeader } from '@/components/task-list/ListSectionHeader'
 import { TaskRowGroup } from '@/components/task-list/TaskRowGroup'
 import { TaskRow } from '@/components/task-list/TaskRow'
 import { usePromisesDue } from '@/hooks/use-promises'
+import { useParkedFilter } from '@/hooks/use-parked'
 import { ProjectTaskGroup } from '@/components/task-list/ProjectTaskGroup'
 import { openCount } from '@/lib/list-sections'
 import { DueDateContextProvider } from '@/components/task-list/TaskDueBadge'
@@ -66,13 +67,14 @@ export function TodayView() {
     })
   }, [])
 
+  const withoutParked = useParkedFilter()
   const split = useMemo(() => {
     const activeIds = new Set(projects?.flat.map((project) => project.id) ?? [])
     // Local calendar date: overdue is before today, Today is today whatever the time of day. The
     // same split feeds the app icon badge, so the two cannot disagree.
-    const { overdue, today } = splitTodayOverdue(tasks, activeIds, new Date())
+    const { overdue, today } = splitTodayOverdue(withoutParked(tasks), activeIds, new Date())
     return { overdue, today }
-  }, [tasks, projects?.flat, dayKey])
+  }, [tasks, projects?.flat, dayKey, withoutParked])
   // Pro (21.6, decision 10): promises of theirs that are due come first, to get a verdict. Off,
   // there are none and the lists are as before.
   const promises = usePromisesDue(useMemo(() => [...split.overdue, ...split.today], [split]))

@@ -41,7 +41,8 @@ import { TaskOrderMenu } from './TaskOrderMenu'
 import { canAddCategoryAbove, groupOfProject, type ProjectCategory } from '../../../shared/project-categories'
 import { useProjectsWithoutIcon } from '@/hooks/use-project-icons'
 import { usePro } from '@/hooks/use-pro'
-import { ProjectStatusMenu, ProjectTypeMenu } from '@/components/pro/ProjectProMenus'
+import { InitiativeMenu, ProjectStatusMenu, ProjectTypeMenu } from '@/components/pro/ProjectProMenus'
+import { useProUiStore } from '@/stores/pro-ui-store'
 
 interface ParentPickerProps {
   anchorRef: RefObject<HTMLElement | null>
@@ -166,7 +167,7 @@ export interface ProjectMenuProps {
   onClose: () => void
 }
 
-type Sub = 'move' | 'category' | 'review' | 'sort' | 'pro-type' | 'pro-status' | null
+type Sub = 'move' | 'category' | 'review' | 'sort' | 'pro-type' | 'pro-status' | 'pro-initiative' | null
 
 /**
  * The one project menu, used by the sidebar (the … button and right-click), the project page
@@ -181,6 +182,8 @@ export function ProjectMenu({ project, surface, anchorRef, anchorPoint, opener =
   const proStatusRef = useRef<HTMLButtonElement>(null)
   // Pro's project type and status (21.2), with the availability layer.
   const proOn = usePro().layer('availability')
+  const portfolioOn = usePro().layer('portfolio')
+  const proInitiativeRef = useRef<HTMLButtonElement>(null)
   const [sub, setSub] = useState<Sub>(null)
   const { data } = useProjects()
   const { data: config } = useAppConfig()
@@ -334,6 +337,22 @@ export function ProjectMenu({ project, surface, anchorRef, anchorPoint, opener =
             Status
           </MenuItem>
           {sub === 'pro-status' && <ProjectStatusMenu project={project} anchorRef={proStatusRef} onClose={closeSub} />}
+        </>
+      )}
+      {portfolioOn && !isInbox && (
+        <>
+          <MenuItem
+            ref={proInitiativeRef}
+            icon={<Layers />}
+            popup="menu"
+            expanded={sub === 'pro-initiative'}
+            onSelect={() => setSub((s) => (s === 'pro-initiative' ? null : 'pro-initiative'))}
+          >
+            Initiative
+          </MenuItem>
+          {sub === 'pro-initiative' && (
+            <InitiativeMenu project={project} anchorRef={proInitiativeRef} onClose={closeSub} onAtCap={(id) => useProUiStore.getState().setAtCapStart(id)} />
+          )}
         </>
       )}
 

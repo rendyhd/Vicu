@@ -7,6 +7,8 @@ import { PageHeader } from '@/components/shared/PageHeader'
 import { ReadingScroll } from '@/components/layout/ReadingScroll'
 import { PersonMark } from '@/components/pro/PersonMark'
 import { ProOffNotice } from '@/components/pro/ProOffNotice'
+import { MeetingDialog } from '@/components/pro/MeetingDialog'
+import { recordValue } from '../../../shared/pro/ledger'
 import { toLocalDate } from '../../../shared/due-dates'
 import { effectiveDue } from '../../../shared/pro/promises'
 import { finalVerdictOf } from '../../../shared/pro/ledger'
@@ -18,6 +20,7 @@ export function PeopleView() {
   const { data: labels = [] } = useLabels()
   const prefs = useProPrefs()
   const [adding, setAdding] = useState('')
+  const [newMeeting, setNewMeeting] = useState(false)
   const today = toLocalDate(new Date())
 
   const rows = useMemo(() => {
@@ -68,6 +71,30 @@ export function PeopleView() {
             </li>
           ))}
         </ul>
+        <section className="mt-8" data-pro-meetings>
+          <div className="mb-2 flex items-center justify-between">
+            <h2 className="text-section text-text">Meetings</h2>
+            <button type="button" className="text-meta font-medium text-accent-blue hover:underline" onClick={() => setNewMeeting(true)}>New meeting</button>
+          </div>
+          {Object.keys(world.ledger.meetings).filter((id) => recordValue(world.ledger.meetings, id)).length === 0 && (
+            <p className="text-meta text-text-secondary">A meeting goes round its people one at a time: what they promised, what you owe them, what is new.</p>
+          )}
+          <ul className="divide-y divide-border">
+            {Object.keys(world.ledger.meetings).flatMap((id) => {
+              const meeting = recordValue(world.ledger.meetings, id)
+              if (!meeting) return []
+              return [(
+                <li key={id}>
+                  <button type="button" className="flex w-full items-center gap-3 px-2 py-2.5 text-left hover:bg-bg-hover" onClick={() => navigate({ to: '/meeting/$meetingId', params: { meetingId: id } })}>
+                    <span className="min-w-0 flex-1 truncate text-task-title text-text">{meeting.name}</span>
+                    <span className="text-meta text-text-secondary">{meeting.people.map((person) => world.nameOf(person)).join(', ')}</span>
+                  </button>
+                </li>
+              )]
+            })}
+          </ul>
+        </section>
+        {newMeeting && <MeetingDialog onClose={() => setNewMeeting(false)} />}
         {candidates.length > 0 && (
           <div className="mt-6 flex items-center gap-2">
             <select value={adding} onChange={(event) => setAdding(event.target.value)} aria-label="Label" className="rounded-control border border-border bg-bg-page px-3 py-1.5 text-sm text-text">

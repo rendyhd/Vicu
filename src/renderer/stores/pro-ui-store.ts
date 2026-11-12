@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import type { Task } from '@/lib/vikunja-types'
 
 /**
  * Pro's dialogs and pickers that the palette and shortcuts open from anywhere (plan 7.1.11).
@@ -14,6 +15,12 @@ interface ProUiState {
   dialogInput: { text?: string; personId?: number; roundId?: string; projectId?: number } | null
   open: (dialog: ProDialog, input?: ProUiState['dialogInput']) => void
   close: () => void
+  /** An initiative to start once one is parked (the cap is full). */
+  atCapStart: number | null
+  setAtCapStart: (projectId: number | null) => void
+  /** A request being triaged (21.10). */
+  triageTask: Task | null
+  setTriageTask: (task: Task | null) => void
 }
 
 export const useProUiStore = create<ProUiState>((set) => ({
@@ -23,4 +30,8 @@ export const useProUiStore = create<ProUiState>((set) => ({
   dialogInput: null,
   open: (dialog, input = null) => set({ dialog, dialogInput: input }),
   close: () => set({ dialog: null, dialogInput: null }),
+  atCapStart: null,
+  setAtCapStart: (projectId) => set({ atCapStart: projectId }),
+  triageTask: null,
+  setTriageTask: (task) => set({ triageTask: task }),
 }))

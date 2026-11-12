@@ -2,6 +2,7 @@ import { useState, useRef, useMemo } from 'react'
 import type { PopoverCloseReason } from '../overlay/Popover'
 import {
   Flag,
+  Inbox as InboxIcon,
   ArrowDown,
   ArrowUp,
   CalendarClock,
@@ -49,6 +50,7 @@ import { useAiReady } from '@/hooks/use-ai'
 import { breakIntoSteps } from '@/lib/ai/break-into-steps'
 import { usePro } from '@/hooks/use-pro'
 import { flagActionLabel, useToggleFlags } from '@/hooks/use-flag'
+import { useProUiStore } from '@/stores/pro-ui-store'
 
 interface TaskContextMenuProps {
   /** The right-clicked row — guarantees at least one target if the cache can't resolve the selection. */
@@ -94,6 +96,7 @@ export function TaskContextMenu({ fallbackTask, x, y, reorderable = false, onClo
   const templateActions = useTemplateActions()
   // Pro's flag (21.4), in the availability layer.
   const flagsOn = usePro().layer('availability')
+  const triageOn = usePro().layer('portfolio')
   const toggleFlags = useToggleFlags()
   const clearSelection = useSelectionStore((s) => s.clearSelection)
 
@@ -324,6 +327,11 @@ export function TaskContextMenu({ fallbackTask, x, y, reorderable = false, onClo
       {anyNotDone && (
         <MenuItem icon={<CheckCircle2 />} shortcut={hint('Mod+K')} onSelect={actions.completeAll}>
           {multi ? 'Complete tasks' : 'Complete task'}
+        </MenuItem>
+      )}
+      {triageOn && !multi && !fallbackTask.done && (
+        <MenuItem icon={<InboxIcon />} onSelect={() => useProUiStore.getState().setTriageTask(fallbackTask)}>
+          Treat as request
         </MenuItem>
       )}
       {flagsOn && (
