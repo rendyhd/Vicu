@@ -45,19 +45,6 @@ How to read the tables: **Synced** follows you to every device. **This device** 
 | Show today & overdue count on app icon | A badge with the number of tasks due today and overdue | This device |
 | What does urgent mean? | **Schedule for Today** or **Mark Important**: what the top action in a task's right-click menu does | This device |
 
-#### Plan
-
-Shown unless you use standalone mode. See [Plan your day](guide:plan) and [Events and calendars](guide:calendars).
-
-| Setting | What it does | Follows you |
-|---|---|---|
-| Show Plan in the sidebar | Turns the Plan screen on. Off by default. A time you set on a task shows on every device either way. | This device |
-| Default length | What a task takes when you drop it on a time | Synced |
-| Work hours | Start and end of your day, used for free time, Fit and Plan my day | Synced |
-| Ask me to plan tomorrow | An evening notification at the time you choose | This device |
-| Show routines on the timeline | Routine pills on Plan | This device |
-| Calendars | Connected calendars, their colors, Busy only, and **Import a calendar file** | This device |
-
 #### Sidebar
 
 Tick the smart lists you want above your projects. The Inbox always stays. A hidden list still opens from the [command palette](guide:desktop#the-command-palette). This choice is per computer.
@@ -147,6 +134,20 @@ All **This device**: the assistant's provider, key and models do not sync. See [
 ### Pro
 
 Turn Pro on for this device, choose its parts, and set **Assistant help in Pro**. Those choices are per device. The work area, the cap on active initiatives and the escalation rule are synced. See [Vicu Pro](guide:pro).
+
+
+#### Plan
+
+Plan sits on the Pro tab, but works whether Pro is on or off. Shown unless you use standalone mode. See [Plan your day](guide:plan) and [Events and calendars](guide:calendars).
+
+| Setting | What it does | Follows you |
+|---|---|---|
+| Show Plan in the sidebar | Turns the Plan screen on. Off by default. A time you set on a task shows on every device either way. | This device |
+| Default length | What a task takes when you drop it on a time | Synced |
+| Work hours | Start and end of your day, used for free time, Fit and Plan my day | Synced |
+| Ask me to plan tomorrow | An evening notification at the time you choose | This device |
+| Show routines on the timeline | Routine pills on Plan | This device |
+| Calendars | Connected calendars, their colors, Busy only, and **Import a calendar file** | This device |
 
 ### Keyboard Shortcuts
 
