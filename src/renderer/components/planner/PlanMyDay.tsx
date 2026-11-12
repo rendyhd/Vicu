@@ -235,6 +235,22 @@ function ChooseStep({ session }: { session: PlanSession }) {
         )}
       </div>
 
+      {session.focusBlock && (
+        <div className="grid gap-1 rounded-control border border-accent-blue/40 bg-accent-blue/8 p-2" data-plan-focus-block>
+          <div className="flex items-center gap-2">
+            <p className="min-w-0 flex-1 text-meta font-medium text-text">Focus block · {formatLength(session.focusBlock.minutes)}</p>
+            {session.focusBlock.tasks.every((task) => session.ticked.has(task.id)) ? (
+              <span className="text-caption text-text-secondary">Added</span>
+            ) : (
+              <button type="button" onClick={session.addFocusBlock} className="rounded-chip border border-accent-blue px-2 py-0.5 text-caption text-accent-blue hover:bg-accent-blue/12">
+                Add
+              </button>
+            )}
+          </div>
+          <p className="text-caption text-text-secondary">For the work that moves your top initiatives: {session.focusBlock.tasks.map((task) => task.title).join(', ')}</p>
+        </div>
+      )}
+
       <GroupHeading>{name}</GroupHeading>
       {session.onDay.length === 0 && <p className="px-1.5 text-caption text-text-secondary">Nothing yet.</p>}
       {session.onDay.map((task) => (

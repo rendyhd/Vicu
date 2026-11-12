@@ -9,6 +9,7 @@ import { ReadingScroll } from '@/components/layout/ReadingScroll'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { ProOffNotice } from '@/components/pro/ProOffNotice'
 import { ParkDialog } from '@/components/pro/ParkDialog'
+import { ImpactSummary } from '@/components/pro/ImpactSummary'
 import { readiness } from '../../../shared/pro/portfolio'
 import { recordValue } from '../../../shared/pro/ledger'
 
@@ -24,6 +25,8 @@ export function PortfolioView() {
   const people = usePersonLabels()
   const navigate = useNavigate()
   const [parking, setParking] = useState<number | null>(null)
+  const [impactOpen, setImpactOpen] = useState(false)
+  const powerOn = pro.layer('power')
   if (!pro.layer('portfolio')) return <ProOffNotice title="Portfolio" />
 
   const others = Object.keys(portfolio.ledger.initiatives).flatMap((id) => {
@@ -37,7 +40,16 @@ export function PortfolioView() {
 
   return (
     <ReadingScroll className="bg-[var(--bg-primary)]" columnClassName="flex flex-col">
-      <PageHeader title="Portfolio" inScroll />
+      <PageHeader
+        title="Portfolio"
+        inScroll
+        actions={powerOn ? (
+          <button type="button" className="inline-flex items-center gap-1.5 rounded-control border border-border px-2.5 py-1 text-meta text-text hover:bg-bg-hover" onClick={() => setImpactOpen(true)}>
+            Quarterly impact
+          </button>
+        ) : undefined}
+      />
+      {impactOpen && <ImpactSummary onClose={() => setImpactOpen(false)} />}
       <div className="mx-auto w-full max-w-reading px-6 pb-10">
         <div className="mb-4" data-pro-cap>
           <div className="mb-1 flex items-center justify-between text-meta text-text">

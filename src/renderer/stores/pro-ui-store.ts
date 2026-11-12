@@ -21,6 +21,9 @@ interface ProUiState {
   /** A request being triaged (21.10). */
   triageTask: Task | null
   setTriageTask: (task: Task | null) => void
+  /** The selection's inspector (Mod+I, plan 7.7.2). */
+  inspectorOpen: boolean
+  setInspectorOpen: (open: boolean) => void
 }
 
 export const useProUiStore = create<ProUiState>((set) => ({
@@ -34,4 +37,6 @@ export const useProUiStore = create<ProUiState>((set) => ({
   setAtCapStart: (projectId) => set({ atCapStart: projectId }),
   triageTask: null,
   setTriageTask: (task) => set({ triageTask: task }),
+  inspectorOpen: false,
+  setInspectorOpen: (open) => set({ inspectorOpen: open }),
 }))

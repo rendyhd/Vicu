@@ -14,9 +14,23 @@ export interface RowView {
    * `projectMeta` to the row.
    */
   showProject?: boolean
+  /**
+   * What the rows show (a custom list's `row_fields`, cross-app semantics 3.8): `project`, `labels`,
+   * `due`, `start`, `estimate`, `flag`, `notes`. Absent, rows show what they always did.
+   */
+  fields?: readonly string[]
 }
 
 export const NO_ROW_VIEW: RowView = {}
+
+/**
+ * Whether a row shows a field. Without `fields` every usual field shows and the Pro extras (`start`,
+ * `estimate`) do not; with them, exactly the listed ones.
+ */
+export function rowFieldShown(view: RowView, field: string): boolean {
+  if (!view.fields) return field !== 'start' && field !== 'estimate'
+  return view.fields.includes(field)
+}
 
 /** Where the project on a row comes from, if it shows at all. */
 export type RowProjectSource = 'group' | 'lookup' | 'none'

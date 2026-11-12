@@ -14,6 +14,7 @@ import {
   windowHonorsIncludeOverdue,
 } from '@/lib/custom-list-filter'
 import type { CustomList, CustomListFilter } from '@/lib/vikunja-types'
+import { ListStarters, ProListSection, useShowsProSection } from '@/components/pro/ProListSection'
 import { ruleFromDisplay, ruleToDisplay, suggestRule, type Named } from '../../../shared/rule-editing'
 
 interface CustomListDialogProps {
@@ -117,6 +118,8 @@ export function CustomListDialog({ open, list, onSave, onClose }: CustomListDial
   const { data: projectData } = useProjects()
   const { data: labels } = useLabels()
   const sharedProjectIds = useSharedProjectIds()
+  // Pro (3.8): the section shows with the power layer, or for a list that has a Pro key on any device.
+  const showsPro = useShowsProSection(filter)
   const [ruleText, setRuleText] = useState('')
   const [ruleCursor, setRuleCursor] = useState(0)
   const [ruleFocused, setRuleFocused] = useState(false)
@@ -265,6 +268,16 @@ export function CustomListDialog({ open, list, onSave, onClose }: CustomListDial
             <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-accent-blue" aria-hidden />
             Imported from a Vikunja saved filter. Changes here stay in Vicu and won't update the saved filter on your server.
           </p>
+        )}
+
+        {!list && (
+          <ListStarters
+            onPick={(starter) => {
+              setName(starter.name)
+              setIcon(starter.icon)
+              setFilter({ ...DEFAULT_FILTER, ...starter.filter })
+            }}
+          />
         )}
 
         {/* Name */}
@@ -567,6 +580,8 @@ export function CustomListDialog({ open, list, onSave, onClose }: CustomListDial
             </p>
           </fieldset>
         )}
+
+        {showsPro && <ProListSection filter={filter} onChange={setFilter} />}
 
         {/* Rule (section 3.5) */}
         <div>

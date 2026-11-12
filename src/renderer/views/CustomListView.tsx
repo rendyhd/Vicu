@@ -8,7 +8,6 @@ import { useTasks } from '@/hooks/use-tasks'
 import { useProjects } from '@/hooks/use-projects'
 import { useCustomList } from '@/hooks/use-custom-lists'
 import { useAppConfig } from '@/hooks/use-app-config'
-import { useCollabMe, useSharedProjectIds } from '@/hooks/use-project-access'
 import { usePrintable } from '@/stores/print-store'
 import { useDayKey } from '@/stores/day-store'
 import { TaskList } from '@/components/task-list/TaskList'
@@ -17,17 +16,24 @@ import { buildCustomListServerFilter, customListRuleParams, matchesCustomList, t
 import { serverSortParams, sortCustomListTasks } from '@/lib/custom-list-sort'
 import { toLocalDate } from '@/lib/due-dates'
 import { withoutNestedSubtasks } from '@/lib/nested-subtasks'
-import { useAvailability, useAvailabilityView } from '@/hooks/use-availability'
+import { useAvailabilityView } from '@/hooks/use-availability'
 import { useProLedger } from '@/hooks/use-pro-ledger'
-import { usePro } from '@/hooks/use-pro'
-import { useSyncedPrefs } from '@/hooks/use-synced-prefs'
+import { useCustomListContext } from '@/hooks/use-custom-list-context'
 import { HiddenSummary, ViewSwitch } from '@/components/pro/ViewSwitch'
-import { projectOnHold } from '../../shared/pro/prefs'
 import { readAvailabilityView } from '../../shared/pro/availability'
+import { readGroupBy, readRowFields } from '../../shared/pro/list-conditions'
+import { finalVerdictOf, recordValue } from '../../shared/pro/ledger'
+import { groupListTasks } from '@/lib/pro/list-groups'
+import { usePersonLabels } from '@/hooks/use-people'
+import { TaskRowGroup } from '@/components/task-list/TaskRowGroup'
+import { TaskRow } from '@/components/task-list/TaskRow'
+import { ListSectionHeader } from '@/components/task-list/ListSectionHeader'
+import { TaskTable } from '@/components/task-list/TaskTable'
+import { usePro } from '@/hooks/use-pro'
+import { useSelectionStore } from '@/stores/selection-store'
+import { cn } from '@/lib/cn'
 import type { CustomList, Task, TaskQueryParams } from '@/lib/vikunja-types'
 
-// A custom list mixes projects without a header per project, so each row names its project.
-const ROW_VIEW = { showProject: true }
 
 /**
  * The server filter is only a superset built from local-day boundaries; the exact window is
@@ -50,6 +56,17 @@ function taskMatchesCustomList(task: Task, list: CustomList, activeProjectIds: S
   return activeProjectIds.has(task.project_id) && matchesCustomList(task, list.filter, toLocalDate(new Date()), context)
 }
 
+const TABLE_MODE_KEY = 'vicu-pro-list-table'
+
+function readTableModes(): Record<string, boolean> {
+  try {
+    const value: unknown = JSON.parse(localStorage.getItem(TABLE_MODE_KEY) ?? '{}')
+    return value && typeof value === 'object' ? (value as Record<string, boolean>) : {}
+  } catch {
+    return {}
+  }
+}
+
 export function CustomListView() {
   const { listId } = useParams({ from: '/list/$listId' })
   const { data: customList, isLoading: isListLoading } = useCustomList(listId)
@@ -70,30 +87,9 @@ export function CustomListView() {
   // params are built, so the day is a dependency: after midnight the filter (and with it the query
   // key) changes instead of reusing yesterday's window.
   const dayKey = useDayKey()
-  // Who you are and which projects are shared, for the collaboration conditions (cross-app
-  // semantics 3.3). Comment signals are already on every task list while something is shared.
-  const me = useCollabMe()
-  const sharedProjectIds = useSharedProjectIds()
-  // Pro's conditions (section 3.8) are read Pro on or off, with what this device has: off, the
-  // ledger and availability are not loaded, so those conditions count as none (O5).
-  const availabilityState = useAvailability()
+  // What the conditions read besides the task (3.3, 3.8).
+  const context = useCustomListContext()
   const { ledger } = useProLedger()
-  const proOn = usePro().on
-  const { snapshot: prefsSnapshot } = useSyncedPrefs()
-  const context = useMemo<CustomListContext>(
-    () => ({
-      me: me?.id ?? null,
-      isShared: (projectId) => sharedProjectIds.has(projectId),
-      pro: {
-        availability: availabilityState.on
-          ? { of: (task) => availabilityState.of(task) ?? { available: true, reasons: [], next: false, blockers: [] }, cycles: availabilityState.cycles as number[] }
-          : null,
-        ledger: proOn ? ledger : null,
-        projectOnHold: (projectId) => projectOnHold(prefsSnapshot.values, projectId),
-      },
-    }),
-    [me, sharedProjectIds, availabilityState, ledger, proOn, prefsSnapshot.values],
-  )
   const listHasView = readAvailabilityView(customList?.filter.availability) !== null
   const availability = useAvailabilityView(`list.${listId}`)
   // A task of an "unread comments" list whose comments you read here keeps its place until you
@@ -136,6 +132,46 @@ export function CustomListView() {
   const shownTasks = useMemo(() => (switchOn ? availability.filter(filteredTasks) : filteredTasks), [switchOn, availability, filteredTasks])
   const hiddenCount = switchOn ? availability.hidden(filteredTasks) : 0
 
+  // Group by and what rows show (3.8): read on every version that knows them, Pro on or off.
+  const groupBy = readGroupBy(customList?.filter.group_by)
+  const rowFields = readRowFields(customList?.filter.row_fields)
+  // A list mixes projects without a header per project, so each row names its project, unless the
+  // groups are projects.
+  const rowView = useMemo(
+    () => ({ showProject: groupBy !== 'project', ...(rowFields ? { fields: rowFields } : {}) }),
+    [groupBy, rowFields?.join(',')],
+  )
+  const personLabels = usePersonLabels()
+  // Pro's table (plan 7.7.2): per list and per device; off, the list is rows as always.
+  const powerOn = usePro().layer('power')
+  const [tableStore, setTableStore] = useState<Record<string, boolean>>(() => readTableModes())
+  const table = powerOn && tableStore[listId] === true
+  const setTable = (on: boolean) => {
+    const next = { ...tableStore, [listId]: on }
+    setTableStore(next)
+    try {
+      localStorage.setItem(TABLE_MODE_KEY, JSON.stringify(next))
+    } catch {
+      // Remembering the mode is a convenience.
+    }
+  }
+  const groups = useMemo(() => {
+    const projectsById = new Map((projects?.flat ?? []).map((project) => [project.id, project]))
+    return groupListTasks(shownTasks, groupBy, {
+      today: toLocalDate(new Date()),
+      projectTitle: (id) => projectsById.get(id)?.title ?? 'Project',
+      projectColor: (id) => projectsById.get(id)?.hex_color,
+      personOf: (task) => {
+        const promise = recordValue(ledger.promises, task.id)
+        const id = promise && !finalVerdictOf(promise) && typeof promise.person === 'number'
+          ? promise.person
+          : (task.labels ?? []).find((label) => personLabels.has(label.id))?.id
+        const label = typeof id === 'number' ? personLabels.get(id) : undefined
+        return label ? { id: label.id, title: label.title } : null
+      },
+    })
+  }, [shownTasks, groupBy, projects?.flat, ledger.promises, personLabels, dayKey])
+
   usePrintable(
     useMemo(
       () => ({
@@ -155,11 +191,11 @@ export function CustomListView() {
   }
 
   return (
-    <RowViewProvider value={ROW_VIEW}>
+    <RowViewProvider value={rowView}>
     <TaskList
       title={customList?.name ?? 'List'}
-      tasks={shownTasks}
-      empty={switchOn ? shownTasks.length === 0 && hiddenCount === 0 : undefined}
+      tasks={groups || table ? [] : shownTasks}
+      empty={groups || table || switchOn ? shownTasks.length === 0 && hiddenCount === 0 : undefined}
       projectId={destinationProjectId}
       showNewTask={!!destinationProjectId}
       onTaskCreated={(task) => {
@@ -176,8 +212,26 @@ export function CustomListView() {
         setCreationNotice(`Task created in ${projectTitle}, but it does not currently match this list's filters.`)
         setTimeout(() => setCreationNotice(null), 6000)
       }}
-      headerContent={creationNotice || showImportNotice || switchOn ? (
+      headerContent={creationNotice || showImportNotice || switchOn || powerOn ? (
         <>
+          {powerOn && (
+            <div className="mx-4 mb-2 flex justify-end">
+              <div role="radiogroup" aria-label="Show as" className="flex rounded-control border border-border p-0.5">
+                {(['rows', 'table'] as const).map((mode) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    role="radio"
+                    aria-checked={(mode === 'table') === table}
+                    onClick={() => setTable(mode === 'table')}
+                    className={cn('rounded-control px-2 py-0.5 text-meta', (mode === 'table') === table ? 'bg-bg-selected text-text' : 'text-text-secondary hover:bg-bg-hover')}
+                  >
+                    {mode === 'rows' ? 'Rows' : 'Table'}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           {switchOn && <ViewSwitch view={availability.view} onChange={availability.setView} />}
           {showImportNotice && (
             <div className="mx-4 mb-2 flex items-start gap-2 rounded-control bg-[var(--bg-hover)] px-3 py-2 text-xs text-[var(--text-secondary)]">
@@ -206,6 +260,23 @@ export function CustomListView() {
       emptyTitle="No matching tasks"
       emptySubtitle="Try adjusting the list filters"
     >
+      {table && shownTasks.length > 0 && (
+        <TaskTable
+          tasks={shownTasks}
+          onOpen={(task) => {
+            setTable(false)
+            useSelectionStore.getState().requestOpenTask(task.id)
+          }}
+        />
+      )}
+      {!table && groups?.map((group) => (
+        <div key={group.key} data-list-group={group.key}>
+          <ListSectionHeader level={1} title={group.title} count={group.tasks.filter((task) => !task.done).length} {...(group.color !== undefined ? { dotColor: group.color ?? '' } : {})} />
+          <TaskRowGroup>
+            {group.tasks.map((task) => <TaskRow key={task.id} task={task} />)}
+          </TaskRowGroup>
+        </div>
+      ))}
       {switchOn && availability.view === 'available' && (
         <HiddenSummary count={hiddenCount} onShow={() => availability.setView('remaining')} />
       )}

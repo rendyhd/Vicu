@@ -28,7 +28,7 @@ export function PersonMark({ name, color, onClick, expanded, className }: {
   const content = initialsOf(name)
   if (!onClick) {
     return (
-      <span role="img" aria-label={name} style={style} className={cn('inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-accent-teal/20 text-chip font-semibold leading-none tracking-tight text-accent-teal', className)}>
+      <span role="img" aria-label={name} style={style} className={cn('inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-accent-blue/12 text-chip font-semibold leading-none tracking-tight text-accent-blue', className)}>
         {content}
       </span>
     )
@@ -44,7 +44,7 @@ export function PersonMark({ name, color, onClick, expanded, className }: {
       aria-expanded={expanded}
       style={style}
       data-pro-person-mark
-      className={cn('inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-accent-teal/20 text-chip font-semibold leading-none tracking-tight text-accent-teal hover:ring-2 hover:ring-accent-teal/40', className)}
+      className={cn('inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-accent-blue/12 text-chip font-semibold leading-none tracking-tight text-accent-blue hover:ring-2 hover:ring-accent-blue/40', className)}
     >
       {content}
     </button>

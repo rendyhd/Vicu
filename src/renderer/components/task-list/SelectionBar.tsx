@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { CalendarClock, CheckCircle2, FolderInput, Tag, Trash2, UserPlus, X } from 'lucide-react'
 import { useSelectionStore } from '@/stores/selection-store'
 import { useSelectedTasks } from '@/hooks/use-selected-tasks'
@@ -12,6 +12,10 @@ import { WhenPopover } from './WhenPopover'
 import { ProjectPickerPopover } from './ProjectPickerPopover'
 import { LabelPickerPopover } from './LabelPickerPopover'
 import { BulkAssignPopover } from './BulkAssignPopover'
+import { BatchInspector } from '@/components/pro/BatchInspector'
+import { usePro } from '@/hooks/use-pro'
+import { useProUiStore } from '@/stores/pro-ui-store'
+import { SlidersHorizontal } from 'lucide-react'
 
 type Picker = 'date' | 'project' | 'label' | 'assign' | null
 
@@ -34,6 +38,16 @@ export function SelectionBar() {
   const labelRef = useRef<HTMLButtonElement>(null)
   const assignRef = useRef<HTMLButtonElement>(null)
   const access = useProjectAccessMap()
+  // Pro's inspector (plan 7.7.2): start, estimate and flag for the selection; off, the bar is as it was.
+  const powerOn = usePro().layer('power')
+  const inspectorOpen = useProUiStore((s) => s.inspectorOpen)
+  const setInspectorOpen = useProUiStore((s) => s.setInspectorOpen)
+  const inspectorRef = useRef<HTMLButtonElement>(null)
+  // The inspector closes with the selection, so it does not come back on the next one.
+  const enough = selectedTaskIds.size >= 2
+  useEffect(() => {
+    if (!enough && inspectorOpen) setInspectorOpen(false)
+  }, [enough, inspectorOpen, setInspectorOpen])
 
   const setFocusedTask = useSelectionStore((s) => s.setFocusedTask)
 
@@ -118,6 +132,16 @@ export function SelectionBar() {
         )}
         {picker === 'assign' && canAssign && (
           <BulkAssignPopover anchorRef={assignRef} taskIds={selectedTaskIds} onClose={() => setPicker(null)} />
+        )}
+
+        {powerOn && (
+          <button ref={inspectorRef} type="button" className={cn(BUTTON, inspectorOpen && 'bg-bg-selected')} aria-haspopup="dialog" aria-expanded={inspectorOpen} onClick={() => setInspectorOpen(!inspectorOpen)}>
+            <SlidersHorizontal className="h-3.5 w-3.5" aria-hidden="true" />
+            Inspector
+          </button>
+        )}
+        {powerOn && inspectorOpen && (
+          <BatchInspector anchorRef={inspectorRef} tasks={tasks} onClose={() => setInspectorOpen(false)} />
         )}
 
         <button type="button" className={cn(BUTTON, 'text-danger hover:bg-danger/10')} onClick={() => void deleteSelected()}>

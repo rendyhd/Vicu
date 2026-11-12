@@ -17,7 +17,7 @@ import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { dueToday, parsedDue } from '@/lib/due-dates'
 import { labelChipStyle } from '@/lib/label-style'
 import { normalizeHex } from '@/lib/constants'
-import { checklistLabel, rowLabels, rowProjectSource } from '@/lib/row-anatomy'
+import { checklistLabel, rowFieldShown, rowLabels, rowProjectSource } from '@/lib/row-anatomy'
 import { useIsDark } from '@/hooks/use-is-dark'
 import type { Task, TaskReminder } from '@/lib/vikunja-types'
 import { TaskCheckbox } from './TaskCheckbox'
@@ -47,7 +47,12 @@ import { usePersonLabels } from '@/hooks/use-people'
 import { PersonMark } from '@/components/pro/PersonMark'
 import { VerdictBar, verdictForKey } from '@/components/pro/VerdictBar'
 import { canSnooze, isSent, readVerdictSnoozes } from '../../../shared/pro/promises'
-import { finalVerdictOf } from '../../../shared/pro/ledger'
+import { estimateOf, finalVerdictOf } from '../../../shared/pro/ledger'
+import { useProLedger } from '@/hooks/use-pro-ledger'
+import { formatLength } from '@/lib/planner-timeline'
+import { useDateFormat } from '@/hooks/use-date-format'
+import { formatWeekdayDate } from '../../../shared/date-display'
+import { startDateOf } from '../../../shared/pro/start-dates'
 import {
   parentTitle,
   subtaskProgress,
@@ -354,6 +359,22 @@ function RowProject({ title, color }: { title: string; color?: string }) {
 }
 
 /** The project of a row in a list that mixes projects without headers (Search, custom lists). */
+/** A list's `row_fields` asked for the start date (21.3); a block is its own start and shows already. */
+function RowStart({ task }: { task: Task }) {
+  const fmt = useDateFormat()
+  const start = startDateOf(task)
+  if (!start) return null
+  return <span className="shrink-0" data-row-start>Starts {formatWeekdayDate(start, new Date(), fmt)}</span>
+}
+
+/** A list's `row_fields` asked for the estimate (21.7). */
+function RowEstimate({ taskId }: { taskId: number }) {
+  const { ledger } = useProLedger()
+  const minutes = estimateOf(ledger, taskId)
+  if (minutes === null) return null
+  return <span className="shrink-0" data-row-estimate>{formatLength(minutes)}</span>
+}
+
 function RowProjectLookup({ projectId }: { projectId: number }) {
   const { data } = useProjects()
   const project = data?.flat.find((candidate) => candidate.id === projectId)
@@ -624,13 +645,17 @@ function TaskRowInner({
 
   const labels = task.labels ?? []
   // A promise names its person on the meta line: the person's label chip would say it twice.
-  const metaLabels = rowLabels(labels, rowView).filter((label) => !promise || label.id !== promise.person)
-  const projectSource = rowProjectSource(task.project_id, rowView, projectMeta !== undefined)
+  const metaLabels = rowFieldShown(rowView, 'labels') ? rowLabels(labels, rowView).filter((label) => !promise || label.id !== promise.person) : []
+  const projectSource = rowFieldShown(rowView, 'project') ? rowProjectSource(task.project_id, rowView, projectMeta !== undefined) : 'none'
+  const showStart = rowFieldShown(rowView, 'start') && startDateOf(task) !== null
+  const showEstimate = rowFieldShown(rowView, 'estimate')
   const isRepeating = (task.repeat_after ?? 0) > 0 || (task.repeat_mode ?? 0) > 0
   // Comfortable, the notes show as a line of text, which takes the place of their icon (design system section 4).
   const comfortable = appConfig?.row_density === 'comfortable'
-  const notesLine = comfortable ? notesPreview(task.description) : ''
-  const showNotesIcon = notesLine === '' && hasNotesContent(task.description)
+  // A list that names its row fields shows the notes line only when it lists `notes` (3.8).
+  const notesShown = rowView.fields ? rowView.fields.includes('notes') : true
+  const notesLine = notesShown && (comfortable || rowView.fields !== undefined) ? notesPreview(task.description) : ''
+  const showNotesIcon = notesShown && notesLine === '' && hasNotesContent(task.description)
   const hasMeta =
     projectSource !== 'none' ||
     metaLabels.length > 0 ||
@@ -643,6 +668,8 @@ function TaskRowInner({
     (nestedDepth > 0 && parentProjectId !== undefined && parentProjectId !== task.project_id) ||
     unavailableReason !== null ||
     isNext ||
+    showStart ||
+    showEstimate ||
     !!promise
 
   // Collapsed row — entire row is draggable (PointerSensor distance:8 distinguishes click vs drag)
@@ -756,7 +783,7 @@ function TaskRowInner({
               // The strike is drawn behind the text left to right when the task has just been completed.
               <span className={cn(task.done && 'vicu-strike', task.done && strikePlay && 'vicu-strike-play')}>{task.title}</span>
             )}
-            {flagged && (
+            {flagged && rowFieldShown(rowView, 'flag') && (
               <Flag role="img" aria-label="Flagged" className="ml-1.5 inline h-3 w-3 -translate-y-px fill-accent-orange text-accent-orange" />
             )}
           </span>
@@ -779,6 +806,8 @@ function TaskRowInner({
                 <RowProject title={projectMeta.title} color={projectMeta.color} />
               )}
               {projectSource === 'lookup' && <RowProjectLookup projectId={task.project_id} />}
+              {showStart && <RowStart task={task} />}
+              {showEstimate && <RowEstimate taskId={task.id} />}
               {metaLabels.map((l) => (
                 <span
                   key={l.id}
@@ -879,7 +908,7 @@ function TaskRowInner({
           <TaskSyncIcon taskId={task.id} />
           <TaskLinkIcon description={task.description} />
           {/* A date-only due date on the block's own day would repeat its day phrase (contract 16.4). */}
-          {!(block && dueRepeatsBlockDay(task.due_date, block)) && <TaskDueBadge dueDate={task.due_date} />}
+          {rowFieldShown(rowView, 'due') && !(block && dueRepeatsBlockDay(task.due_date, block)) && <TaskDueBadge dueDate={task.due_date} />}
           {block && <TaskBlockBadge block={block} />}
           {((task.reminders?.length ?? 0) > 0 || hasPlaceReminder) && (
             <Bell className="h-3 w-3 text-text-secondary" aria-label="Has a reminder" />

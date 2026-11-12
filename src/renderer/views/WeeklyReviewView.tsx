@@ -18,6 +18,8 @@ import { PageHeader } from '@/components/shared/PageHeader'
 import { ReadingScroll } from '@/components/layout/ReadingScroll'
 import { NewTaskComposer } from '@/components/task-list/NewTaskComposer'
 import { TaskDueBadge } from '@/components/task-list/TaskDueBadge'
+import { WeeklyProSteps } from '@/components/pro/WeeklyProSteps'
+import type { Task } from '@/lib/vikunja-types'
 import { ago, weeklyReviewAge, weeklySteps, type WeeklyStep, type WeeklyStepId } from '../../shared/guided'
 import { WEEKLY_REVIEW_LAST_KEY } from '../../shared/synced-prefs'
 
@@ -118,6 +120,7 @@ export function WeeklyReviewView() {
       />
       <ReadingScroll columnClassName="flex flex-col px-6 pb-8 pt-2">
         {data.isLoading && <p className="py-4 text-meta text-[var(--text-secondary)]" role="status">Loading your tasks…</p>}
+        {data.world && <WeeklyProSteps tasks={data.world.tasks as Task[]} today={today} />}
         <ol className="flex flex-col gap-2" aria-label="Steps">
           {steps.map((step, i) => {
             const stepDone = isDone(step)

@@ -9,6 +9,10 @@ import { useTasks } from './use-tasks'
 import { useCompleteTask, useUncompleteTask, useUpdateTask } from './use-task-mutations'
 import { usePlanSuggestions } from './use-plan-suggestions'
 import { usePlanBusy } from './use-plan-busy'
+import { usePro } from './use-pro'
+import { useProLedger } from './use-pro-ledger'
+import { useFocusBlock } from './use-focus-block'
+import { estimateOf, type ProLedger } from '../../shared/pro/ledger'
 import { NULL_DATE } from '@/lib/constants'
 import type { Task, TaskQueryParams } from '@/lib/vikunja-types'
 import { addLocalDays, startOfLocalDay, toLocalDate, type LocalDate } from '../../shared/due-dates'
@@ -49,6 +53,15 @@ interface LogEntry {
   before: Task
   after: Partial<Task>
   completed: boolean
+}
+
+function estimatesOf(tasks: readonly Task[], ledger: ProLedger): Map<number, number> {
+  const map = new Map<number, number>()
+  for (const task of tasks) {
+    const minutes = estimateOf(ledger, task.id)
+    if (minutes !== null) map.set(task.id, minutes)
+  }
+  return map
 }
 
 function leftoversFilter(today: LocalDate): string {
@@ -107,6 +120,13 @@ export function usePlanSession() {
   const busy = usePlanBusy(days)
   const eventBusy = useMemo(() => busy.eventBusyOn(day), [busy, day])
 
+  // Pro (plan 7.7.3 and 7.7.4): estimates give a task its length and the focus block comes first.
+  // Off, neither is read.
+  const powerOn = usePro().layer('power')
+  const { ledger } = useProLedger()
+  const estimateFor = useCallback((id: number) => (powerOn ? estimateOf(ledger, id) : null), [powerOn, ledger])
+  const focusBlock = useFocusBlock(canChange)
+
   const leftovers = useMemo(() => leftoversQueue(leftoverQuery.data.filter(canChange), now), [leftoverQuery.data, canChange, today])
   const onDay = useMemo(() => onDayTasks(range.tasks.filter(canChange), day, now), [range.tasks, canChange, day, today])
   const inboxTasks = useMemo(() => withoutTasks(inboxCandidates(inbox.data.filter(canChange), inboxId), onDay), [inbox.data, canChange, inboxId, onDay])
@@ -119,9 +139,9 @@ export function usePlanSession() {
 
   const byId = useMemo(() => {
     const map = new Map<number, Task>()
-    for (const list of [fromProject, inboxTasks, comingUp, leftovers, onDay]) for (const task of list) map.set(task.id, task)
+    for (const list of [focusBlock?.tasks ?? [], fromProject, inboxTasks, comingUp, leftovers, onDay]) for (const task of list) map.set(task.id, task)
     return map
-  }, [fromProject, inboxTasks, comingUp, leftovers, onDay])
+  }, [focusBlock, fromProject, inboxTasks, comingUp, leftovers, onDay])
 
   // The assistant.
   const assistantReady = ready.ask
@@ -140,6 +160,7 @@ export function usePlanSession() {
       routineMinutes: routines.map((routine) => routine.minute),
       leftovers,
       candidates: [...onDay, ...inboxTasks, ...comingUp],
+      ...(powerOn ? { estimates: estimatesOf([...onDay, ...inboxTasks, ...comingUp, ...leftovers], ledger) } : {}),
     }),
   })
   const answer = suggestions.result
@@ -154,8 +175,8 @@ export function usePlanSession() {
   )
 
   const lengthOf = useCallback(
-    (id: number) => lengths.get(id) ?? pickOf.get(id)?.minutes ?? prefs.defaultLength,
-    [lengths, pickOf, prefs.defaultLength],
+    (id: number) => lengths.get(id) ?? pickOf.get(id)?.minutes ?? estimateFor(id) ?? prefs.defaultLength,
+    [lengths, pickOf, estimateFor, prefs.defaultLength],
   )
   const lengthIsSuggested = useCallback((id: number) => !lengths.has(id) && typeof pickOf.get(id)?.minutes === 'number', [lengths, pickOf])
 
@@ -209,6 +230,12 @@ export function usePlanSession() {
       write(task, leftoverChanges(task, action, new Date()))
     }
     setHandled((prev) => new Map(prev).set(task.id, { task, label: HANDLED_LABEL[action] }))
+  }
+
+  /** Ticks the focus block's tasks (21.11). */
+  const addFocusBlock = () => {
+    if (!focusBlock) return
+    setPicked(new Set([...ticked, ...focusBlock.tasks.map((task) => task.id)]))
   }
 
   const toggleTick = (id: number) => {
@@ -388,6 +415,8 @@ export function usePlanSession() {
     setProjectId,
     ticked,
     toggleTick,
+    focusBlock,
+    addFocusBlock,
     chosen,
     meter,
     pickOf,
