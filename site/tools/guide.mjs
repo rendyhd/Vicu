@@ -14,6 +14,7 @@
 //   **bold**, *italic*, `code`, [text](link), <kbd>…</kbd> and other inline HTML pass through
 //   {desktop} {android} {ios} {phone} {all} {pro}                      platform badges
 //   ![alt](../assets/img/screens/x.webp "caption")                    image; size read from the file
+//   ![alt](video:name.mp4 "caption")                                 video in assets/video, poster name.webp
 //   :::cards ... :::                    a grid of "- [Title](link): text" items
 //   :::steps ... :::                    a numbered list drawn as steps
 // Links between guide pages use the page's slug: [Today](guide:lists#today).
@@ -115,6 +116,7 @@ function webpSize(file) {
 function image(alt, srcIn, caption, ctx) {
   // screen:<name> is a file in assets/img/screens, whatever the page's depth.
   const depth = ctx.slug === '' ? 0 : ctx.slug.split('/').length
+  if (srcIn.startsWith('video:')) return video(alt, srcIn.slice(6), caption, ctx, depth)
   const src = srcIn.startsWith('screen:') ? `${'../'.repeat(depth + 1)}assets/img/screens/${srcIn.slice(7)}` : srcIn
   const here = (s) => join(OUT, ...ctx.slug.split('/').filter(Boolean), s)
   const file = here(src)
@@ -129,6 +131,23 @@ function image(alt, srcIn, caption, ctx) {
   const img = (s, cls) => `<img${cls ? ` class="${cls}"` : ''} src="${esc(s)}" alt="${esc(alt)}" width="${w}" height="${h}" loading="lazy" />`
   const pics = hasDark ? img(src, 'only-light') + img(dark, 'only-dark') : img(src, '')
   return `<span class="g-figure${h > w ? ' g-figure--tall' : ''}">${pics}${caption ? `<span class="g-caption">${inline(caption, ctx)}</span>` : ''}</span>`
+}
+
+/**
+ * video:<name>.mp4 is a file in assets/video with its poster <name>.webp next to it (which gives the
+ * size). Nothing loads until the reader presses play.
+ */
+function video(alt, name, caption, ctx, depth) {
+  const src = `${'../'.repeat(depth + 1)}assets/video/${name}`
+  const poster = src.replace(/\.mp4$/, '.webp')
+  const here = (s) => join(OUT, ...ctx.slug.split('/').filter(Boolean), s)
+  if (!name.endsWith('.mp4') || !existsSync(here(src)) || !existsSync(here(poster))) {
+    ctx.problems.push(`${ctx.slug}: missing video or its poster ${name}`)
+    return ''
+  }
+  const [w, h] = webpSize(here(poster))
+  const player = `<video controls preload="none" playsinline poster="${esc(poster)}" width="${w}" height="${h}" aria-label="${esc(alt)}"><source src="${esc(src)}" type="video/mp4" /></video>`
+  return `<span class="g-figure g-video">${player}${caption ? `<span class="g-caption">${inline(caption, ctx)}</span>` : ''}</span>`
 }
 
 function table(lines, ctx) {

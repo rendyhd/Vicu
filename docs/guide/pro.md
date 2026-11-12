@@ -17,6 +17,13 @@ lead: Vicu stays simple for everyone. Pro is a switch for the times your work is
   data safe and follows it.
 - **This is an alpha.** Things will change. Keep your Vikunja server backed up while you try it.
 
+## Watch the tour
+
+![Getting started with Vicu Pro: a tour of the four parts](video:pro-getting-started.mp4 "Getting started with Vicu Pro, about five minutes. No sound: the captions are in the picture.")
+
+The tour takes one part at a time: turning Pro on, what you can do now, promises and people, the
+portfolio, and the power tools. You do not need all of it on day one.
+
 ## Why Pro exists
 
 Vicu is built to be calm: a few lists, quick capture, a clear Today. That suits most days. But some

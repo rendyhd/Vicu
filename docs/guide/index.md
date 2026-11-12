@@ -46,7 +46,7 @@ that are often all you need, then the steps, then the finer points. Badges show 
 
 Vicu stays simple for everyone. **Vicu Pro** is an optional switch for more complex work: what you can
 do right now, promises people made you, initiatives you steer, and faster ways through many tasks.
-Pro only adds; with it off, Vicu is the app you know.
+Pro only adds; with it off, Vicu is the app you know. New to it? [Watch the five-minute tour](guide:pro#watch-the-tour).
 
 :::cards
 - [What Pro is](guide:pro): Who it is for, its four parts, and how to try it safely.

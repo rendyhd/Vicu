@@ -53,6 +53,10 @@ for (const page of pages) {
     const file = join(dirname(page), url.split(/[?#]/)[0])
     if (!existsSync(file)) fail(where, `missing file for <${tag}>: ${url}`)
   }
+  for (const [, url] of html.matchAll(/<video\b[^>]*?\sposter="([^"]+)"/g)) {
+    if (isExternal(url)) fail(where, `<video> poster loads from another site: ${url}`)
+    else if (!existsSync(join(dirname(page), url))) fail(where, `missing video poster ${url}`)
+  }
   for (const [, url] of html.matchAll(/<meta\s+property="og:image"\s+content="([^"]+)"/g)) {
     if (!isExternal(url) && !existsSync(join(dirname(page), url))) fail(where, `missing og:image ${url}`)
   }
