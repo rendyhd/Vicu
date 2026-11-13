@@ -130,7 +130,9 @@ export function listenForCallback(options: LoopbackCallbackOptions): Promise<Loo
       return
     }
     const state = url.searchParams.get('state')
-    if (state !== null && state !== expectedState) {
+    // A redirect that carries an error but not this login's state could be anyone's: it must not
+    // end the sign-in, or any page could cancel it with one request to this port.
+    if ((state !== null || url.searchParams.has('error')) && state !== expectedState) {
       // A tab left over from an earlier attempt: answer it, but keep waiting for this one.
       send(res, 400, callbackPage('Sign-in expired', 'This page belongs to an earlier sign-in. Use the newest sign-in tab, or start again in Vicu.'))
       return

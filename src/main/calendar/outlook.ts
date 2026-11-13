@@ -10,6 +10,7 @@ import { existsSync } from 'fs'
 import { join } from 'path'
 import { app } from 'electron'
 import { isWindows } from '../platform'
+import { powershellPath } from '../system-tools'
 import { CalendarReadError } from './http'
 import type { OutlookRunner } from './sources/outlook'
 
@@ -45,7 +46,7 @@ export const powershellOutlookRunner: OutlookRunner = (command, args = {}) => {
   const extra = Object.entries(args).flatMap(([key, value]) => [`-${key}`, String(value)])
   return new Promise((resolve, reject) => {
     execFile(
-      'powershell.exe',
+      powershellPath(),
       ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', path, '-Command', command, ...extra],
       { timeout: TIMEOUT_MS, maxBuffer: MAX_OUTPUT_BYTES, windowsHide: true, encoding: 'utf8' },
       (error, stdout) => {

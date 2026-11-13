@@ -97,4 +97,14 @@ describe('calendar ICS reading', () => {
     expect(normaliseFeedUrl('file:///etc/passwd')).toBeNull()
     expect(normaliseFeedUrl('not a link')).toBeNull()
   })
+  it('caps the total work of one read when many tiny rules repeat every second', () => {
+    const events = Array.from({ length: 3000 }, (_, n) =>
+      ['BEGIN:VEVENT', `UID:tiny-${n}`, 'DTSTAMP:20200101T000000Z', 'DTSTART:20200101T000000Z', 'DTEND:20200101T000001Z', 'RRULE:FREQ=SECONDLY', `SUMMARY:Tick ${n}`, 'END:VEVENT'].join('\r\n'),
+    )
+    const text = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//test//EN', ...events, 'END:VCALENDAR'].join('\r\n')
+    const started = Date.now()
+    const found = occurrencesBetween(parseIcs(text), 'cal', new Date('2026-01-01T00:00:00Z'), new Date('2026-01-02T00:00:00Z'), 100)
+    expect(found.length).toBeLessThanOrEqual(100)
+    expect(Date.now() - started).toBeLessThan(10_000)
+  })
 })

@@ -111,6 +111,10 @@ describe('interpretRedirect', () => {
     expect(result).toEqual({ kind: 'error', error: 'access_denied', description: 'User said no', message: 'OIDC login failed: access_denied — User said no' })
   })
 
+  it('still reports an error in the sign-in window whatever state it carries (the loopback listener decides for itself)', () => {
+    expect(interpretRedirect(`${REDIRECT}?error=access_denied&state=other`, REDIRECT, 's').kind).toBe('error')
+  })
+
   it('reports an error without a description', () => {
     const result = interpretRedirect(`${REDIRECT}?error=server_error`, REDIRECT, 's')
     expect(result.kind).toBe('error')

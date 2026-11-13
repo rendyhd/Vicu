@@ -3,6 +3,7 @@ import * as crypto from 'node:crypto'
 import { execFile } from 'child_process'
 import { loadConfig } from './config'
 import { isWindows, isMac } from './platform'
+import { OSASCRIPT_PATH } from './system-tools'
 import { decodeUtf8Chunks } from './response-body'
 import {
   describeActiveNote,
@@ -243,7 +244,7 @@ const JXA_FOREGROUND_SCRIPT = `(() => {
 
 function getForegroundAppMacOS(): Promise<{processName: string, bundleId: string} | null> {
   return new Promise((resolve) => {
-    execFile('osascript', ['-l', 'JavaScript', '-e', JXA_FOREGROUND_SCRIPT],
+    execFile(OSASCRIPT_PATH, ['-l', 'JavaScript', '-e', JXA_FOREGROUND_SCRIPT],
       { timeout: 2000 }, (err, stdout) => {
         if (err) { resolve(null); return }
         try {

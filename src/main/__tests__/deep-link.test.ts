@@ -28,6 +28,12 @@ describe('vicu:// links', () => {
     expect(parseDeepLink('not a link')).toBeNull()
   })
 
+  it('returns null for a bad percent-escape instead of throwing', () => {
+    expect(parseDeepLink('vicu://task/%E0')).toBeNull()
+    expect(parseDeepLink('vicu://%E0/5')).toBeNull()
+    expect(deepLinkFromArgv(['vicu://task/%E0'])).toBeNull()
+  })
+
   it('finds the link among launch arguments', () => {
     expect(deepLinkFromArgv(['C:\Vicu\Vicu.exe', '--hidden', 'vicu://task/7'])).toEqual({ kind: 'task', id: 7 })
     expect(deepLinkFromArgv(['vicu', '--quick-entry'])).toBeNull()

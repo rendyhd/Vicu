@@ -35,7 +35,13 @@ export function parseDeepLink(raw: string): DeepLink | null {
   }
   if (url.protocol !== `${DEEP_LINK_SCHEME}:`) return null
   // `vicu://task/12` puts "task" in the host; `vicu:task/12` in the path. Both read the same.
-  const parts = [url.hostname, ...url.pathname.split('/')].map((part) => decodeURIComponent(part).trim()).filter(Boolean)
+  let parts: string[]
+  try {
+    parts = [url.hostname, ...url.pathname.split('/')].map((part) => decodeURIComponent(part).trim()).filter(Boolean)
+  } catch {
+    // A bad percent-escape such as `%E0` is not a link we know; it must never throw into the app.
+    return null
+  }
   const [route, arg] = parts
   switch (route?.toLowerCase()) {
     case 'task': {

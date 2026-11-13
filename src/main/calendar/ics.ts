@@ -31,6 +31,12 @@ export interface ParsedFeed {
 /** Occurrences looked at per recurring event at most, so a broken rule cannot hang the main process. */
 const MAX_OCCURRENCES = 20_000
 
+/** Iterator steps across all recurring events of one read, so many tiny rules cannot add up to a hang. */
+export const MAX_TOTAL_STEPS = 200_000
+
+/** Events taken from one calendar; the rest are left out. */
+export const MAX_FEED_EVENTS = 20_000
+
 /** The VCALENDAR components of a text (a file may hold several). */
 function rootsOf(text: string): ICAL.Component[] {
   const parsed = ICAL.parse(text) as unknown[]
@@ -58,6 +64,7 @@ export function parseIcsDocuments(texts: readonly string[]): ParsedFeed {
   const masters = new Map<string, ICAL.Event>()
   const overrides: ICAL.Event[] = []
   const busy: FreeBusyPeriod[] = []
+  let count = 0
   for (const text of texts) {
     for (const root of rootsOf(text)) {
       // The file's own VTIMEZONEs first: Outlook names its zones the Windows way ("W. Europe Standard Time").
@@ -72,6 +79,8 @@ export function parseIcsDocuments(texts: readonly string[]): ParsedFeed {
 
       // An override (RECURRENCE-ID) belongs to its series; one without a series stands on its own.
       for (const component of root.getAllSubcomponents('vevent')) {
+        if (count >= MAX_FEED_EVENTS) break
+        count++
         const event = new ICAL.Event(component)
         if (event.isRecurrenceException()) overrides.push(event)
         else masters.set(event.uid, event)
@@ -169,6 +178,7 @@ export function occurrencesBetween(feed: ParsedFeed, calendarId: string, from: D
   const overlaps = (event: CalendarEvent) =>
     new Date(event.start).getTime() < toMs && (new Date(event.end).getTime() > fromMs || event.start === event.end && new Date(event.start).getTime() >= fromMs)
   const out: CalendarEvent[] = []
+  let steps = 0
 
   for (const event of feed.events) {
     if (!event.isRecurring()) {
@@ -177,7 +187,8 @@ export function occurrencesBetween(feed: ParsedFeed, calendarId: string, from: D
       continue
     }
     const iterator = event.iterator()
-    for (let i = 0; i < MAX_OCCURRENCES; i++) {
+    for (let i = 0; i < MAX_OCCURRENCES && steps < MAX_TOTAL_STEPS; i++) {
+      steps++
       const next = iterator.next()
       if (!next) break
       if (next.toJSDate().getTime() >= toMs) break

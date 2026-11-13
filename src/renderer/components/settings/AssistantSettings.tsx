@@ -17,6 +17,7 @@ import {
 import { startTalk, useAskStore } from '@/stores/ask-store'
 import { useDictationStore } from '@/stores/dictation-store'
 import { toast } from '@/stores/toast-store'
+import { SecretStorageNotice } from './SecretStorageNotice'
 import { AI_MESSAGES, PROVIDER_PRESETS, SPEECH, providerPreset } from '../../../shared/ai/contract'
 import {
   canRunFeature,
@@ -274,6 +275,7 @@ function ThinkingCard({ settings, tests }: { settings: AiSettingsView; tests: Mo
               <p className="mt-1 text-xs text-[var(--text-secondary)]">
                 Kept in this computer’s secret store, like your Vikunja sign-in. It is never synced or shown again.
               </p>
+              <SecretStorageNotice subject="key" />
             </div>
 
             <ModelFields settings={settings} tests={tests} />
