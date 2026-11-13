@@ -239,9 +239,67 @@ must not silently replace or overwrite a different newer server document.
 Local acknowledgements are correlated to one pending emission or revision;
 they are not inferred from an unbounded history of HTML values.
 
-Vikunja updates always send the latest complete task object. The editor body is
-merged into the latest task state so remote labels, dates, reminders, project,
-priority, and relations are not overwritten by stale values.
+A task update sends only the fields that changed, so an edit of the notes never
+carries stale labels, dates, reminders, project, priority or relations. For
+every field but the notes, the later send wins: when two devices change the
+same field, the server keeps the value it received last.
+
+### Notes changed in two places
+
+Notes are the one field where the later send would throw away writing, so both
+versions are kept. No question is asked, because a queued edit is sent when
+nobody is looking.
+
+A notes edit remembers the description it started from, as the server stored it
+(the base). Before the edit is sent, at once or from the offline queue, the app
+reads the task and compares three texts: the base, the description to save
+(local) and the description the server holds now (server). They are compared as
+stored, with the spaces, tabs and line ends at both ends left out and nothing
+else normalised; a missing description is the empty text.
+
+1. Local equals server, or local equals the base: no description is sent.
+2. Server equals the base: local is sent.
+3. Otherwise the merged description below is made. When it equals server, no
+   description is sent. When it equals local, local is sent. Otherwise the
+   merged description is sent and the app says once: "Notes were also changed
+   on another device. Both versions are kept."
+
+The merged description is built on the stored text, without an HTML parser, so
+every platform gives the same result. Each description is taken apart:
+
+- **Link pairs**: every match of a `notelink` or `pagelink` comment with the
+  anchor paragraph that follows it, when there is one, is taken out, in order.
+- **Image lines**: of what is left, every line (split at `\n`) that, with the
+  spaces, tabs and line ends at its ends left out, is exactly one
+  `[[image:ID]]` or `[[image-pending:UUID]]` token is taken out, in order. A
+  token inside other text stays where it is.
+- **Body**: the remaining lines joined by `\n`, ends left out as above.
+
+and put together again:
+
+- **Body**: the server's body, `<hr>`, this device's body. One body alone when
+  the two are equal or one is empty. The server's body alone when it already
+  ends with `<hr>` and this device's body (an earlier send of the merged notes
+  arrived and only its answer was lost).
+- **Image lines**: the server's, then this device's that the server lacks.
+- **Link pairs**: the server's, then this device's that the server lacks.
+
+The parts that are not empty are joined by `\n`: the body, each image line, the
+link pairs written one after the other.
+
+Further rules:
+
+- Edits of one task that fold into one queued change keep the base of the first.
+- An edit without a base (a queue entry of an older version, a writer that
+  never read the notes) is sent as it is.
+- When the task cannot be read because the server cannot be reached, the edit
+  waits in the queue with its base. Any other failed read sends the edit as it
+  is, and the send's own answer decides what happens to it.
+- After a send the base is the description the server answered with.
+- A task created on this device and not yet on the server has no other version:
+  its notes are sent as they are.
+
+The `notesConflict` vectors of `description-format-v1.json` pin the rule.
 
 ## Compatibility invariants
 

@@ -4,6 +4,7 @@ import {
   uncompleteTaskRequest,
   updateProjectRequest,
   updateTaskRequest,
+  updateTaskWithResult,
 } from '../use-task-mutations'
 import { PROJECT_WRITABLE_FIELDS } from '@/lib/merge-patches'
 import { NULL_DATE } from '@/lib/constants'
@@ -134,6 +135,29 @@ describe('updateTaskRequest', () => {
     await updateTaskRequest({ id: 5, changes: { description: '<p>patched</p>' } })
 
     expect(updateTask).toHaveBeenCalledWith(5, { description: '<p>patched</p>' }, expect.objectContaining({ queue: true }))
+  })
+
+  it('sends the notes the caller read as the base of a notes change (description format)', async () => {
+    await updateTaskRequest({ id: 1, changes: { description: '<p>mine</p>' }, original: task(1) })
+
+    expect(updateTask).toHaveBeenCalledWith(1, { description: '<p>mine</p>' }, expect.objectContaining({ baseDescription: '<p>notes</p>' }))
+  })
+
+  it('prefers the base the caller passes, and sends none without notes in the patch', async () => {
+    await updateTaskRequest({ id: 1, changes: { description: '<p>mine</p>' }, original: task(1), baseDescription: '<p>loaded</p>' })
+    expect(updateTask).toHaveBeenLastCalledWith(1, { description: '<p>mine</p>' }, expect.objectContaining({ baseDescription: '<p>loaded</p>' }))
+
+    await updateTaskRequest({ id: 1, changes: { priority: 3 }, original: task(1), baseDescription: '<p>loaded</p>' })
+    expect(updateTask.mock.calls[1][2]).not.toHaveProperty('baseDescription')
+  })
+
+  it('reports merged notes with the server task', async () => {
+    updateTask.mockResolvedValueOnce({ success: true, data: { ...task(1), description: '<p>b</p><hr><p>a</p>' }, notesMerged: true })
+
+    const result = await updateTaskWithResult({ id: 1, changes: { description: '<p>a</p>' }, original: task(1) })
+
+    expect(result.notesMerged).toBe(true)
+    expect(result.task?.description).toBe('<p>b</p><hr><p>a</p>')
   })
 
   it('throws the server error', async () => {

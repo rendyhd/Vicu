@@ -7,6 +7,11 @@ export interface ReplayHandlerDeps {
   /** Move selection / undo-window state from temp ids to the real ids. */
   remapStores(idMap: ReadonlyMap<number, number>): void
   refreshReminders(): void
+  /**
+   * Queued notes edits of these tasks went out with both versions, because another device changed
+   * the notes too (description format, "Notes changed in two places"): say so, once per replay.
+   */
+  notesMerged?(taskIds: number[]): void
 }
 
 /**
@@ -35,4 +40,5 @@ export function handleReplayed(qc: QueryClient, event: OfflineReplayEvent, deps:
   if (event.counts.pending === 0 && (event.applied > 0 || event.failed > 0)) invalidateTaskData(qc)
   if (event.applied > 0) deps.refreshReminders()
   if (event.applied > 0 || event.failed > 0) void qc.invalidateQueries({ queryKey: ['task-comments'] })
+  if (event.notesMerged && event.notesMerged.length > 0) deps.notesMerged?.(event.notesMerged)
 }

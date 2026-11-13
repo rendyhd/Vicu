@@ -315,7 +315,8 @@ export function NewTaskComposer({
       const patched = replacePendingTokens(currentDescription, mapping)
       if (patched !== currentDescription) {
         try {
-          await updateTask.mutateAsync({ id: taskId, changes: { description: patched } })
+          // The base is the notes the task was just created with (description format, "Notes changed in two places").
+          await updateTask.mutateAsync({ id: taskId, changes: { description: patched }, baseDescription: currentDescription })
           currentDescription = patched
         } catch {
           // The files already exist remotely, so retain only the description patch for
@@ -337,6 +338,8 @@ export function NewTaskComposer({
     let descriptionPatch = partialFailure.descriptionPatch
     if (descriptionPatch) {
       try {
+        // No base: the patch was made from the notes the task was created with, which are not kept
+        // for the retry, and the read above is not where the patch started.
         await updateTask.mutateAsync({ id: partialFailure.taskId, changes: { description: descriptionPatch } })
         currentDescription = descriptionPatch
         descriptionPatch = undefined

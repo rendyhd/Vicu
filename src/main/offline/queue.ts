@@ -302,7 +302,12 @@ export class OfflineQueue {
   async enqueueUpdate(
     ref: number | string,
     patch: Record<string, unknown>,
-    meta: Meta & { /** The due date a completion of a repeating task completed (cross-app semantics 7.5). */ completedDue?: string | null } = {}
+    meta: Meta & {
+      /** The due date a completion of a repeating task completed (cross-app semantics 7.5). */
+      completedDue?: string | null
+      /** The description a notes edit started from (description format, "Notes changed in two places"). */
+      baseDescription?: string
+    } = {}
   ): Promise<OfflineEnqueueResult> {
     const taskId = this.requireTask(ref)
     const clean = { ...sanitizeTaskPatch(patch) }
@@ -312,6 +317,7 @@ export class OfflineQueue {
       taskId,
       patch: clean,
       ...(meta.completedDue !== undefined && clean.done === true ? { completedDue: meta.completedDue } : {}),
+      ...(typeof meta.baseDescription === 'string' && 'description' in clean ? { baseDescription: meta.baseDescription } : {}),
     }
     const outcome = mergeUpdate(this.data.actions, action, this.inFlightId)
     if (outcome.noop && outcome.removed.length === 0) return { actionId: '', taskId, folded: true }

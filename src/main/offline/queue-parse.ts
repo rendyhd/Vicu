@@ -57,6 +57,8 @@ export function normalizeAction(raw: unknown): QueuedAction | null {
         patch: raw.patch,
         // The due date a queued completion of a repeating task completed (cross-app semantics 7.5).
         ...(typeof raw.completedDue === 'string' || raw.completedDue === null ? { completedDue: raw.completedDue } : {}),
+        // The description a queued notes edit started from (description format, "Notes changed in two places").
+        ...(typeof raw.baseDescription === 'string' ? { baseDescription: raw.baseDescription } : {}),
       }
     case 'delete':
       if (!isInt(raw.taskId)) return null

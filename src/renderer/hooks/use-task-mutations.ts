@@ -267,14 +267,33 @@ export interface UpdateTaskVariables {
   // view-tasks/section-tasks invalidation. Don't read it here; it's
   // consumed in onSettled.
   deferInvalidation?: boolean
+  /**
+   * With a notes change: the description the edit started from, as the server stored it
+   * (description format, "Notes changed in two places"). Defaults to `original.description`, the
+   * notes the caller read; the open card passes the base its editor keeps.
+   */
+  baseDescription?: string
 }
 
-/** Send an edit as a minimal merge patch; skip the request when nothing differs. */
-export async function updateTaskRequest({
+/** What an update did: the task to show, and whether its notes were merged with another device's. */
+export interface UpdateTaskResult {
+  task: Task | null
+  notesMerged: boolean
+}
+
+/** The base a notes change carries: the caller's own, else the notes of the task it read. */
+function notesBaseOf({ baseDescription, original }: Pick<UpdateTaskVariables, 'baseDescription' | 'original'>): string | undefined {
+  if (baseDescription !== undefined) return baseDescription
+  return typeof original?.description === 'string' ? original.description : undefined
+}
+
+/** `updateTaskRequest`, also saying whether the notes were merged with another device's. */
+export async function updateTaskWithResult({
   id,
   changes,
   original,
-}: Pick<UpdateTaskVariables, 'id' | 'changes' | 'original'>): Promise<Task | null> {
+  baseDescription,
+}: Pick<UpdateTaskVariables, 'id' | 'changes' | 'original' | 'baseDescription'>): Promise<UpdateTaskResult> {
   // Position is per-view in Vikunja and only honored by /tasks/{id}/position
   // (see useReorderTask). Strip it from the regular update body so it
   // can't be written to an unintended view; we still keep it on `changes`
@@ -283,11 +302,30 @@ export async function updateTaskRequest({
   const patch = taskPatch(original ?? null, writable)
   // Nothing differs from what the server already has (e.g. setting today's
   // date on a task that is already due today): skip the request.
-  if (Object.keys(patch).length === 0) return original ?? null
+  if (Object.keys(patch).length === 0) return { task: original ?? null, notesMerged: false }
   const title = original?.title ?? (typeof changes.title === 'string' ? changes.title : undefined)
-  const outcome = await sendTaskPatch(id, patch, title)
+  const base = 'description' in patch ? notesBaseOf({ baseDescription, original }) : undefined
+  const outcome = await sendTaskPatch(id, patch, title, base !== undefined ? { baseDescription: base } : {})
   // A queued change has no server response; the optimistic cache already holds its result.
-  return outcome.task ?? (original ? { ...original, ...changes } : null)
+  return { task: outcome.task ?? (original ? { ...original, ...changes } : null), notesMerged: outcome.notesMerged === true }
+}
+
+/** Send an edit as a minimal merge patch; skip the request when nothing differs. */
+export async function updateTaskRequest(
+  variables: Pick<UpdateTaskVariables, 'id' | 'changes' | 'original' | 'baseDescription'>,
+): Promise<Task | null> {
+  return (await updateTaskWithResult(variables)).task
+}
+
+/**
+ * The server answered a notes save with other notes than were sent (merged with another device's):
+ * every cache gets the server's notes at once (a refetch may wait for the offline queue), so an open
+ * card without unsaved text shows them.
+ */
+function applyServerNotes(qc: ReturnType<typeof useQueryClient>, id: number, task: Task | null): void {
+  if (!task || typeof task.description !== 'string') return
+  const description = task.description
+  mapTaskInCaches(qc, id, (cached) => ({ ...cached, description }))
 }
 
 
@@ -295,7 +333,16 @@ export function useUpdateTask(options?: MutationHookOptions) {
   const qc = useQueryClient()
 
   return useMutation({
-    mutationFn: (variables: UpdateTaskVariables) => updateTaskRequest(withDueRules(variables)),
+    mutationFn: async (variables: UpdateTaskVariables) => {
+      const result = await updateTaskWithResult(withDueRules(variables))
+      // The server's notes differ from the ones saved (merged with another device's, or it already
+      // held all of them): the caches take the server's at once.
+      const sent = variables.changes.description
+      if (result.notesMerged || (typeof sent === 'string' && typeof result.task?.description === 'string' && result.task.description !== sent)) {
+        applyServerNotes(qc, variables.id, result.task)
+      }
+      return result.task
+    },
     onMutate: async (variables) => {
       const { id, changes, original } = withDueRules(variables)
       await qc.cancelQueries({ queryKey: ['tasks'] })

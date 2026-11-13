@@ -22,7 +22,7 @@ declare global {
       ): Promise<{ success: boolean; cached?: boolean; error?: string; mayExist?: boolean; data?: { id: number } }>
       uploadAttachment(taskId: number, fileData: Uint8Array, fileName: string, mimeType: string): Promise<{ success: boolean; error?: string; statusCode?: number }>
       fetchTaskAttachments(taskId: number): Promise<{ success: boolean; data?: Array<{ id: number }>; error?: string; statusCode?: number }>
-      updateTask(taskId: number, task: Record<string, unknown>): Promise<{ success: boolean; error?: string; statusCode?: number; data?: unknown }>
+      updateTask(taskId: number, task: Record<string, unknown>, options?: { baseDescription?: string }): Promise<{ success: boolean; error?: string; statusCode?: number; data?: unknown }>
       closeWindow(): Promise<void>
       openImport(text: string): Promise<boolean>
       // The locale and clock dates are phrased with (system locale, Settings clock choice).

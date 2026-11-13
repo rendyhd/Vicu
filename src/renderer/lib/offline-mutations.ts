@@ -2,6 +2,8 @@ import { api } from './api'
 import { isQueueableFailure, maybeCreatedMessage } from './error-classify'
 import { ApiError, apiError } from './mutation-errors'
 import { isTempTaskId, pendingTaskFromCreate } from './pending-cache'
+import { NOTES_MERGED_MESSAGE } from './notes-merged'
+import { toast } from '@/stores/toast-store'
 import type { TaskPatch } from './merge-patches'
 import type { CreateTaskPayload, Label, Task } from './vikunja-types'
 import type { OfflineImageInput, OfflineLabelRef, OfflineQueueResult, QueuedWriteReply } from '../../shared/offline-queue-types'
@@ -54,6 +56,17 @@ export interface PatchOutcome {
    * already, and `task` is the server's task as it is (cross-app semantics 7.5).
    */
   repeatSkipped?: boolean
+  /**
+   * The notes were also changed on another device since the edit's base: both versions were sent,
+   * `task` is the server's task with them, and the user has been told (description format, "Notes
+   * changed in two places").
+   */
+  notesMerged?: boolean
+}
+
+/** Tell the user that a notes edit kept another device's change too. */
+export function sayNotesMerged(): void {
+  toast.info(NOTES_MERGED_MESSAGE)
 }
 
 /** Send a minimal task patch, or queue it. */
@@ -61,18 +74,31 @@ export async function sendTaskPatch(
   id: number,
   patch: TaskPatch,
   title?: string,
-  /** `completedDue`: with `{ done: true }` of a task held as repeating, the due date it completed (cross-app semantics 7.5). */
-  options: { completedDue?: string | null } = {},
+  /**
+   * `completedDue`: with `{ done: true }` of a task held as repeating, the due date it completed
+   * (cross-app semantics 7.5). `baseDescription`: with a patch that holds `description`, the
+   * description the edit started from, as the server stored it (description format, "Notes
+   * changed in two places"); leave it out when the writer never read the notes.
+   */
+  options: { completedDue?: string | null; baseDescription?: string } = {},
 ): Promise<PatchOutcome> {
   if (isTempTaskId(id)) {
-    // A pending create is not on the server: no other device can have completed it.
+    // A pending create is not on the server: no other device can have completed it or changed its notes.
     await queueChange(() => api.offlineQueue.enqueueUpdate(id, patch, titleMeta(title)))
     return { queued: true, task: null }
   }
-  const result = await api.updateTaskOrQueue(id, patch, title, options.completedDue !== undefined ? { completedDue: options.completedDue } : {})
+  const extra = {
+    ...(options.completedDue !== undefined ? { completedDue: options.completedDue } : {}),
+    ...(options.baseDescription !== undefined && 'description' in patch ? { baseDescription: options.baseDescription } : {}),
+  }
+  const result = await api.updateTaskOrQueue(id, patch, title, extra)
   if (!result.success) throw apiError(result)
   if (isQueuedReply(result)) return { queued: true, task: null }
   if ((result as { repeatSkipped?: unknown }).repeatSkipped === true) return { queued: false, task: result.data, repeatSkipped: true }
+  if ((result as { notesMerged?: unknown }).notesMerged === true) {
+    sayNotesMerged()
+    return { queued: false, task: result.data, notesMerged: true }
+  }
   return { queued: false, task: result.data }
 }
 

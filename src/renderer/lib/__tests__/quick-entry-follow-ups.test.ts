@@ -41,7 +41,7 @@ describe('applyQuickEntryFollowUps (labels and images after an online create)', 
     expect(api.createLabel).toHaveBeenCalledWith({ title: 'Garden' })
     expect(api.addLabelToTask).toHaveBeenCalledWith(42, 77)
     expect(api.uploadAttachment).toHaveBeenCalledWith(42, bytes, 'a.png', 'image/png')
-    expect(api.updateTask).toHaveBeenCalledWith(42, { description: '[[image:901]]\n[[image:902]]' })
+    expect(api.updateTask).toHaveBeenCalledWith(42, { description: '[[image:901]]\n[[image:902]]' }, { baseDescription: '' })
     expect(api.queueFollowUps).not.toHaveBeenCalled()
     expect(outcome).toEqual({ queuedLabels: 0, queuedImages: 0, dropped: 0 })
   })
@@ -96,7 +96,8 @@ describe('applyQuickEntryFollowUps (labels and images after an online create)', 
       images: [{ name: 'a.png', mime: 'image/png', bytes }, { name: 'b.png', mime: 'image/png', bytes: second }],
     }))
 
-    expect(api.updateTask).toHaveBeenCalledWith(42, { description: 'notes\n[[image:901]]' })
+    // The base is the notes the task was created with (description format, "Notes changed in two places").
+    expect(api.updateTask).toHaveBeenCalledWith(42, { description: 'notes\n[[image:901]]' }, { baseDescription: 'notes' })
     expect(api.queueFollowUps).toHaveBeenCalledWith(42, { labels: [], images: [{ name: 'b.png', mime: 'image/png', bytes: second }] }, 'Water plants')
     expect(outcome.queuedImages).toBe(1)
   })

@@ -7,7 +7,7 @@ import type {
 import type { ApiResult } from '../api-result'
 import { isQueueableFailure } from '../../shared/error-classify'
 import { classifyReplayFailure, refusedWhileSignedIn, type ReplayDecision } from './classify'
-import { planRepeatCompletion } from './repeat-completion-step'
+import { planTaskUpdate } from './notes-save-step'
 import { createFields, type OfflineQueue } from './queue'
 import { hasTaskId, type QueuedAction } from './types'
 
@@ -54,7 +54,14 @@ export const MAX_UNKNOWN_ATTEMPTS = 5
 const imageToken = (attachmentId: number): string => `[[image:${attachmentId}]]`
 
 type Step =
-  | { kind: 'ok'; realId?: number; /** An earlier, unconfirmed attempt had already created the task. */ adopted?: boolean }
+  | {
+      kind: 'ok'
+      realId?: number
+      /** An earlier, unconfirmed attempt had already created the task. */
+      adopted?: boolean
+      /** The task whose notes went out with both versions (another device changed them too). */
+      notesMerged?: number
+    }
   | { kind: 'failure'; failure: FailureLike }
   /** Removed from the queue while the replay was preparing its request: nothing was sent. */
   | { kind: 'cancelled' }
@@ -97,6 +104,7 @@ async function decideFailure(api: ReplayApi, failure: FailureLike, actionType: Q
  */
 export async function replayQueue(queue: OfflineQueue, api: ReplayApi): Promise<OfflineReplayEvent> {
   const idMap: Record<string, number> = {}
+  const notesMerged: number[] = []
   const startFailed = queue.counts().failed
   let applied = 0
   let stopped: OfflineReplayStop | null = null
@@ -122,6 +130,7 @@ export async function replayQueue(queue: OfflineQueue, api: ReplayApi): Promise<
         if (step.kind === 'ok') {
           await queue.completeAction(action.id, { realId: step.realId, adopted: step.adopted })
           if (action.type === 'create' && step.realId !== undefined) idMap[String(action.tempId)] = step.realId
+          if (step.notesMerged !== undefined && !notesMerged.includes(step.notesMerged)) notesMerged.push(step.notesMerged)
           applied++
           queue.setAuthProblem(null)
         } else if (step.kind === 'cancelled') {
@@ -184,6 +193,7 @@ export async function replayQueue(queue: OfflineQueue, api: ReplayApi): Promise<
     ...(stopError ? { error: stopError } : {}),
     idMap,
     counts: queue.counts(),
+    ...(notesMerged.length > 0 ? { notesMerged } : {}),
   }
 }
 
@@ -231,13 +241,23 @@ async function sendAction(queue: OfflineQueue, api: ReplayApi, action: QueuedAct
   switch (action.type) {
     case 'update': {
       // A queued completion of a repeating task goes out only while the server still holds the
-      // occurrence it completed (cross-app semantics 7.5). A read that fails waits like the change.
-      const plan = await planRepeatCompletion(action.patch, action.completedDue, () => api.fetchTaskById(taskId))
+      // occurrence it completed (cross-app semantics 7.5); a queued notes edit keeps both versions
+      // when the server's notes changed since its base (description format, "Notes changed in two
+      // places"). A read that fails on the network waits like the change.
+      const plan = await planTaskUpdate(
+        action.patch,
+        {
+          ...(action.completedDue !== undefined ? { completedDue: action.completedDue } : {}),
+          ...(action.baseDescription !== undefined ? { baseDescription: action.baseDescription } : {}),
+        },
+        () => api.fetchTaskById(taskId)
+      )
       if (plan.kind === 'failed') return fail(plan.failure)
-      if (plan.kind === 'skip') return { kind: 'ok' }
+      if (plan.kind === 'answer') return { kind: 'ok' }
       if (!queue.isQueued(action.id)) return { kind: 'cancelled' }
       const result = await api.updateTask(taskId, plan.patch)
-      return result.success ? { kind: 'ok' } : fail(result)
+      if (!result.success) return fail(result)
+      return plan.notesMerged ? { kind: 'ok', notesMerged: taskId } : { kind: 'ok' }
     }
     case 'delete': {
       const result = await api.deleteTask(taskId)

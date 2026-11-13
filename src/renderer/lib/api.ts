@@ -88,8 +88,12 @@ export const api = {
   updateTask: (id: number, task: UpdateTaskPayload) =>
     window.api.updateTask(id, task) as Promise<ApiResult<Task>>,
 
-  /** `extra.completedDue`: the due date a repeating task's completion completed (cross-app semantics 7.5). */
-  updateTaskOrQueue: (id: number, task: UpdateTaskPayload, title?: string, extra: Pick<TaskWriteOptions, 'completedDue'> = {}) =>
+  /**
+   * `extra.completedDue`: the due date a repeating task's completion completed (cross-app semantics
+   * 7.5). `extra.baseDescription`: the description a notes edit started from (description format,
+   * "Notes changed in two places"); the answer then may carry `notesMerged`.
+   */
+  updateTaskOrQueue: (id: number, task: UpdateTaskPayload, title?: string, extra: Pick<TaskWriteOptions, 'completedDue' | 'baseDescription'> = {}) =>
     window.api.updateTask(id, task, { ...queueOptions(title), ...extra }) as Promise<ApiResult<Task> | QueuedWriteReply>,
 
   deleteTask: (id: number) =>

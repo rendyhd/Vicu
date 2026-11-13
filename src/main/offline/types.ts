@@ -52,6 +52,13 @@ export interface UpdateAction extends ActionBase {
    * still holds that occurrence (cross-app semantics 7.5). Missing: sent as before.
    */
   completedDue?: string | null
+  /**
+   * Set while `patch` holds `description` and the edit knew the description it started from (the
+   * base, as the server stored it). The replay reads the task first and keeps both versions when the
+   * server's notes changed since (description format, "Notes changed in two places"). When edits fold
+   * into one action the first base stays. Missing: sent as it is.
+   */
+  baseDescription?: string
 }
 
 export interface DeleteAction extends ActionBase {

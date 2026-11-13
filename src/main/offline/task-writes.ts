@@ -2,7 +2,7 @@ import { isQueueableFailure, isUnreachableFailure } from '../../shared/error-cla
 import type { QueuedWriteReply, TaskWriteOptions } from '../../shared/offline-queue-types'
 import type { ApiError, ApiResult, ApiSuccess } from '../api-result'
 import type { OfflineQueue } from './queue'
-import { planRepeatCompletion } from './repeat-completion-step'
+import { needsRead, planTaskUpdate, type TaskUpdateChecks } from './notes-save-step'
 
 // The one place where a change to an existing task decides between "send it now" and "queue it".
 //
@@ -75,8 +75,10 @@ export const taskWrites = {
   /**
    * A change to a task's fields. `completedDue` (string or null) says the app holds the task as
    * repeating and the patch completes it: the task is read first and the completion is sent only
-   * when the server still holds that occurrence, else skipped (cross-app semantics 7.5). A queued
-   * completion keeps it for the replay, which decides the same way.
+   * when the server still holds that occurrence, else skipped (cross-app semantics 7.5).
+   * `baseDescription` is the description a notes edit started from: the task is read first and,
+   * when the server's notes changed since, both versions are sent (description format, "Notes
+   * changed in two places"). A queued change keeps both for the replay, which decides the same way.
    */
   update(
     queue: OfflineQueue,
@@ -87,20 +89,37 @@ export const taskWrites = {
     taskId: number,
     patch: Record<string, unknown>,
     title?: string,
-    options: { completedDue?: string | null } = {}
+    options: TaskUpdateChecks = {}
   ): TaskWriteSpec {
-    const { completedDue } = options
-    const checks = completedDue !== undefined && patch.done === true && !!api.fetchTaskById
+    const { completedDue, baseDescription } = options
+    // A task that is not on the server yet (a temp id) has no other version to read.
+    const checks = taskId > 0 && needsRead(patch, options) && !!api.fetchTaskById
     return {
       taskId,
       send: () => api.updateTask(taskId, patch),
-      enqueue: () => queue.enqueueUpdate(taskId, patch, { ...titleMeta(title), ...(completedDue !== undefined ? { completedDue } : {}) }),
+      enqueue: () =>
+        queue.enqueueUpdate(taskId, patch, {
+          ...titleMeta(title),
+          ...(completedDue !== undefined ? { completedDue } : {}),
+          ...(baseDescription !== undefined ? { baseDescription } : {}),
+        }),
       ...(checks
         ? {
             beforeSend: async (): Promise<BeforeSend> => {
-              const plan = await planRepeatCompletion(patch, completedDue, () => api.fetchTaskById!(taskId))
+              const plan = await planTaskUpdate(patch, options, () => api.fetchTaskById!(taskId))
               if (plan.kind === 'failed') return { kind: 'failed', result: plan.failure }
-              if (plan.kind === 'skip') return { kind: 'answer', result: { success: true, data: plan.task, repeatSkipped: true } }
+              if (plan.kind === 'answer') {
+                return { kind: 'answer', result: { success: true, data: plan.task, ...(plan.repeatSkipped ? { repeatSkipped: true as const } : {}) } }
+              }
+              if (plan.notesMerged) {
+                return {
+                  kind: 'send',
+                  send: async () => {
+                    const result = await api.updateTask(taskId, plan.patch)
+                    return result.success ? { ...result, notesMerged: true as const } : result
+                  },
+                }
+              }
               return plan.patch === patch ? { kind: 'send' } : { kind: 'send', send: () => api.updateTask(taskId, plan.patch) }
             },
           }
@@ -426,5 +445,6 @@ export function parseTaskWriteOptions(value: unknown): TaskWriteOptions {
   if (typeof raw.labelTitle === 'string' && raw.labelTitle) options.labelTitle = raw.labelTitle
   if (typeof raw.username === 'string' && raw.username) options.username = raw.username
   if (typeof raw.completedDue === 'string' || raw.completedDue === null) options.completedDue = raw.completedDue
+  if (typeof raw.baseDescription === 'string') options.baseDescription = raw.baseDescription
   return options
 }

@@ -1,5 +1,27 @@
 import { describe, expect, it } from 'vitest'
-import { hasUnsavedNotes, notesAfterServerChange } from '../notes-sync'
+import { hasUnsavedNotes, notesAfterServerChange, notesBaseAfterSave, notesBaseAfterServerChange } from '../notes-sync'
+
+describe('the base of a notes save (description format, "Notes changed in two places")', () => {
+  it('follows the server while the editor holds no unsaved text', () => {
+    expect(notesBaseAfterServerChange({ edit: '<p>a</p>', baseline: '<p>a</p>' }, '<p>a</p>', '<p>a and b</p>')).toBe('<p>a and b</p>')
+    expect(notesBaseAfterServerChange({ edit: '<p>old</p>', baseline: null }, '<p>old</p>', '<p>new</p>')).toBe('<p>new</p>')
+  })
+
+  it('keeps the base unsaved text was typed on', () => {
+    expect(notesBaseAfterServerChange({ edit: '<p>a, mine</p>', baseline: '<p>a</p>' }, '<p>a</p>', '<p>a, theirs</p>')).toBe('<p>a</p>')
+  })
+
+  it('after a save is what the server answered, or what was saved when it was queued', () => {
+    expect(notesBaseAfterSave('<p>a</p>', '<p>a</p>', false)).toBe('<p>a</p>')
+    expect(notesBaseAfterSave('<p>b</p><hr><p>a</p>', '<p>a</p>', false)).toBe('<p>b</p><hr><p>a</p>')
+    expect(notesBaseAfterSave(null, '<p>a</p>', false)).toBe('<p>a</p>')
+  })
+
+  it('stays what was saved when the server holds other notes and newer text is still unsaved', () => {
+    expect(notesBaseAfterSave('<p>b</p><hr><p>a</p>', '<p>a</p>', true)).toBe('<p>a</p>')
+    expect(notesBaseAfterSave('<p>a</p>', '<p>a</p>', true)).toBe('<p>a</p>')
+  })
+})
 
 describe('notesAfterServerChange (description format, Synchronization)', () => {
   it('a clean editor takes the newer notes, and they become its baseline', () => {

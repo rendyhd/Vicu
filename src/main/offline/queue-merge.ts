@@ -96,6 +96,17 @@ function withCompletedDue(action: UpdateAction, completedDue: string | null | un
 }
 
 /**
+ * An update with the description a notes edit started from (description format, "Notes changed in
+ * two places"): kept only while the patch still holds `description`.
+ */
+function withBaseDescription(action: UpdateAction, baseDescription: string | undefined): UpdateAction {
+  const next = { ...action }
+  if (typeof baseDescription === 'string' && 'description' in next.patch) next.baseDescription = baseDescription
+  else delete next.baseDescription
+  return next
+}
+
+/**
  * Queue a change to a task's fields.
  *
  * - Pending create: fold into it (update + create = create with merged fields; a completion
@@ -120,7 +131,13 @@ export function mergeUpdate(actions: QueuedAction[], next: UpdateAction, inFligh
     const existing = actions[existingIndex] as UpdateAction
     // The completed due belongs to the newest `done` in the patch (cross-app semantics 7.5).
     const completedDue = 'done' in next.patch ? next.completedDue : existing.completedDue
-    const merged: UpdateAction = withCompletedDue({ ...existing, patch: { ...existing.patch, ...next.patch } }, completedDue)
+    // Edits of the notes that fold into one change keep the base of the first (description format,
+    // "Notes changed in two places"); a first edit without a base keeps none.
+    const baseDescription = 'description' in existing.patch ? existing.baseDescription : next.baseDescription
+    const merged: UpdateAction = withBaseDescription(
+      withCompletedDue({ ...existing, patch: { ...existing.patch, ...next.patch } }, completedDue),
+      baseDescription
+    )
     if (next.title !== undefined) merged.title = next.title
     return outcome(replaceAt(actions, existingIndex, merged), { foldedInto: existing.id })
   }
@@ -329,7 +346,7 @@ export function cancelPatchKeys(
       }
       cancelled = true
       if (Object.keys(patch).length === 0) removed.push(action)
-      else next.push(withCompletedDue({ ...action, patch }, 'done' in patch ? action.completedDue : undefined))
+      else next.push(withBaseDescription(withCompletedDue({ ...action, patch }, 'done' in patch ? action.completedDue : undefined), action.baseDescription))
     } else if (action.type === 'create') {
       const fields = { ...action.fields }
       let touched = false

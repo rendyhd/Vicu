@@ -328,10 +328,14 @@ export function registerIpcHandlers(): void {
   // queue a newer one joins the queue instead of overtaking them, and with `options.queue` a change
   // the server cannot take is queued here (see offline/task-writes.ts).
   handleTrusted('update-task', async (event, id: number, patch: Record<string, unknown>, options?: unknown) => {
-    const { queue, title, completedDue } = parseTaskWriteOptions(options)
+    const { queue, title, completedDue, baseDescription } = parseTaskWriteOptions(options)
     const deps = taskWriteDeps()
-    // A completion of a repeating task reads the task first (cross-app semantics 7.5).
-    const spec = taskWrites.update(deps.queue, { updateTask, fetchTaskById }, id, patch, title, { completedDue })
+    // A completion of a repeating task (cross-app semantics 7.5) and a notes edit with its base
+    // (description format, "Notes changed in two places") read the task first.
+    const spec = taskWrites.update(deps.queue, { updateTask, fetchTaskById }, id, patch, title, {
+      ...(completedDue !== undefined ? { completedDue } : {}),
+      ...(baseDescription !== undefined ? { baseDescription } : {}),
+    })
     const outcome = await writeTask(deps, spec, { queue })
     if (outcome.kind === 'sent') {
       notifyViewerSync()
@@ -948,13 +952,15 @@ export function registerIpcHandlers(): void {
     return quickViewPatch(quickActionDeps(), rawTaskId, withDueChangeRules(taskData, { due_date: null }, new Date()), taskData)
   })
 
-  handleTrusted('qv:update-task', async (_event, rawTaskId: number | string, patch: Record<string, unknown>) => {
+  handleTrusted('qv:update-task', async (_event, rawTaskId: number | string, patch: Record<string, unknown>, baseDescription?: unknown) => {
     const config = loadConfig()
     if (config?.standalone_mode) {
       const task = updateStandaloneTask(String(rawTaskId), patch)
       return task ? { success: true, task } : { success: false, error: 'Task not found' }
     }
-    return quickViewPatch(quickActionDeps(), rawTaskId, patch)
+    // A notes edit carries the description the row was loaded with (description format, "Notes
+    // changed in two places").
+    return quickViewPatch(quickActionDeps(), rawTaskId, patch, undefined, typeof baseDescription === 'string' ? { baseDescription } : {})
   })
 
   handleTrusted('qv:open-task-in-browser', (_event, taskId: number) => {

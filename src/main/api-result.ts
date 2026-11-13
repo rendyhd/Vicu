@@ -6,6 +6,12 @@ export interface ApiSuccess<T> {
    * that occurrence already (cross-app semantics 7.5): `data` is the server's task as it is.
    */
   repeatSkipped?: true
+  /**
+   * Only on a task update whose notes were also changed on another device since this one read them
+   * (description format, "Notes changed in two places"): both versions were sent, and `data` is the
+   * server's task with the merged notes.
+   */
+  notesMerged?: true
 }
 
 export interface ApiError {

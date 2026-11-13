@@ -7,7 +7,7 @@ declare global {
       markTaskUndone(taskId: number | string, taskData: Record<string, unknown>): Promise<ActionResult>
       scheduleTaskToday(taskId: number | string, taskData: Record<string, unknown>): Promise<ActionResult>
       removeDueDate(taskId: number | string, taskData: Record<string, unknown>): Promise<ActionResult>
-      updateTask(taskId: number | string, patch: TaskPatch): Promise<ActionResult>
+      updateTask(taskId: number | string, patch: TaskPatch, baseDescription?: string): Promise<ActionResult>
       openTaskInBrowser(taskId: number): Promise<void>
       openTaskInApp(taskId: number): Promise<void>
       closeWindow(): Promise<void>
@@ -52,9 +52,13 @@ interface FetchResult {
 interface ActionResult {
   success: boolean
   task?: TaskData
+  /** The server's task, when the change reached it. */
+  data?: unknown
   error?: string
   cached?: boolean
   cancelledPending?: boolean
+  /** The notes were also changed on another device: both versions were sent, `data` holds them. */
+  notesMerged?: boolean
 }
 
 interface QuickViewConfig {
@@ -65,6 +69,7 @@ interface QuickViewConfig {
 
 import { extractTaskLink, stripNoteLink, stripPageLink, extractNoteLinkHtml, extractPageLinkHtml } from '@/lib/note-link'
 import { sanitizeTaskHtml } from '@/lib/sanitize-html'
+import { NOTES_MERGED_MESSAGE } from '@/lib/notes-merged'
 import { taskPatch, type TaskPatch } from '@/lib/merge-patches'
 import { diffLocalDays, dueToday, isDateOnly, isNoDueDate, toLocalDate } from '@/lib/due-dates'
 import { followColorScheme, followConfiguredTheme } from '@/lib/theme'
@@ -571,14 +576,19 @@ async function saveEdit(item: HTMLElement, newTitle: string, newDescription: str
   }
   // Send only what changed so a stale cached row cannot revert other edits (D-REN-2).
   const patch = taskPatch(taskData, { title: trimmedTitle, description: finalDescription })
+  // A notes edit carries the description the row was loaded with, so a change made on another
+  // device since is kept too (description format, "Notes changed in two places").
   const result: ActionResult = Object.keys(patch).length === 0
     ? { success: true }
-    : await window.quickViewApi.updateTask(taskId, patch)
+    : await window.quickViewApi.updateTask(taskId, patch, 'description' in patch ? taskData.description || '' : undefined)
 
   if (result.success) {
     lastFetchResult = null
     taskData.title = trimmedTitle
-    taskData.description = finalDescription
+    // The server's notes when it answered (merged, or kept as they were), else what was saved.
+    const answered = result.data && typeof result.data === 'object' ? (result.data as { description?: unknown }).description : undefined
+    taskData.description = typeof answered === 'string' ? answered : finalDescription
+    if (result.notesMerged) showError(NOTES_MERGED_MESSAGE)
     item.dataset.task = JSON.stringify(taskData)
     exitEditMode(item)
     const newItem = buildTaskItemDOM(taskData)

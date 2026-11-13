@@ -21,8 +21,10 @@ contextBridge.exposeInMainWorld('quickEntryApi', {
     ipcRenderer.invoke('upload-task-attachment', taskId, fileData, fileName, mimeType),
   fetchTaskAttachments: (taskId: number) =>
     ipcRenderer.invoke('fetch-task-attachments', taskId),
-  updateTask: (taskId: number, task: Record<string, unknown>) =>
-    ipcRenderer.invoke('update-task', taskId, task),
+  // `options.baseDescription`: the notes the change started from (description format, "Notes
+  // changed in two places"). Without `queue` the change needs the server's answer.
+  updateTask: (taskId: number, task: Record<string, unknown>, options?: { baseDescription?: string }) =>
+    ipcRenderer.invoke('update-task', taskId, task, typeof options?.baseDescription === 'string' ? { baseDescription: options.baseDescription } : undefined),
   closeWindow: () => ipcRenderer.invoke('qe:close-window'),
   openImport: (text: string) => ipcRenderer.invoke('qe:open-import', text),
   setHeight: (height: number) => ipcRenderer.invoke('qe:set-height', height),

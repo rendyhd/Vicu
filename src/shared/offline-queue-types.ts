@@ -157,6 +157,8 @@ export interface OfflineReplayEvent {
   /** Temp id -> real id for every task created during this replay. */
   idMap: Record<string, number>
   counts: OfflineQueueCounts
+  /** Tasks whose queued notes edit was sent with both versions, because another device changed the notes too. */
+  notesMerged?: number[]
 }
 
 export type OfflineQueueResult<T> = { success: true; data: T } | { success: false; error: string }
@@ -201,6 +203,13 @@ export interface TaskWriteOptions {
    * (cross-app semantics 7.5). Leave it out for a task that does not repeat.
    */
   completedDue?: string | null
+  /**
+   * With a patch that holds `description`: the description the edit started from, as the server
+   * stored it (the base). Main reads the task first; when the server's notes changed since, both
+   * versions are sent and the answer carries `notesMerged` (description format, "Notes changed in
+   * two places"). Leave it out for a writer that never read the notes.
+   */
+  baseDescription?: string
 }
 
 /** What a queue-aware task write answers when the change went into the offline queue instead of the server. */

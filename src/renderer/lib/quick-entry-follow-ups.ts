@@ -29,7 +29,8 @@ export interface FollowUpApi {
   createLabel(label: { title: string }): Promise<ApiLike & { data?: { id: number } }>
   uploadAttachment(taskId: number, bytes: Uint8Array, name: string, mime: string): Promise<ApiLike>
   fetchTaskAttachments(taskId: number): Promise<ApiLike & { data?: Array<{ id: number }> }>
-  updateTask(taskId: number, patch: Record<string, unknown>): Promise<ApiLike>
+  /** `options.baseDescription`: the notes the change started from (description format, "Notes changed in two places"). */
+  updateTask(taskId: number, patch: Record<string, unknown>, options?: { baseDescription?: string }): Promise<ApiLike>
   queueFollowUps(
     taskId: number,
     extras: { labels: FollowUpLabel[]; images: FollowUpImage[] },
@@ -112,7 +113,10 @@ export async function applyQuickEntryFollowUps(api: FollowUpApi, input: FollowUp
     const ids = (after as { data?: Array<{ id: number }> }).data?.map((a) => a.id).sort((a, b) => a - b) ?? []
     if (after.success && ids.length > 0) {
       const tokens = ids.map((id) => imageToken(id)).join('\n')
-      await attempt(() => api.updateTask(input.taskId, { description: input.description ? `${input.description}\n${tokens}` : tokens }))
+      // The base is the notes the task was created with, so an edit made elsewhere in between is kept.
+      await attempt(() =>
+        api.updateTask(input.taskId, { description: input.description ? `${input.description}\n${tokens}` : tokens }, { baseDescription: input.description })
+      )
     }
   }
 

@@ -7,6 +7,7 @@ import { useOfflineStore } from '@/stores/offline-store'
 import { useSelectionStore } from '@/stores/selection-store'
 import { useCompletedTasksStore } from '@/stores/completed-tasks-store'
 import { toast } from '@/stores/toast-store'
+import { sayNotesMerged } from '@/lib/offline-mutations'
 
 /** The queue sends one change event per step of a replay; the full snapshot is fetched at most this often. */
 const SNAPSHOT_DEBOUNCE_MS = 150
@@ -76,6 +77,7 @@ export function useOfflineQueueSync(): void {
         refreshReminders: () => {
           void api.refreshTaskReminders()
         },
+        notesMerged: () => sayNotesMerged(),
       })
       scheduleSnapshot()
     })

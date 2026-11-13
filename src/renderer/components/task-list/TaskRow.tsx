@@ -8,7 +8,8 @@ import { CSS } from '@dnd-kit/utilities'
 import { cn } from '@/lib/cn'
 import { useSelectionStore } from '@/stores/selection-store'
 import { orderedTaskIds } from '@/lib/task-selection'
-import { notesAfterServerChange } from '@/lib/notes-sync'
+import { hasUnsavedNotes, notesAfterServerChange, notesBaseAfterSave, notesBaseAfterServerChange } from '@/lib/notes-sync'
+import { isTempTaskId } from '@/lib/pending-cache'
 import { useUpdateTask, useCompleteTask, useDeleteTask, useUploadAttachmentFromDrop, useAddLabel, useCreateLabel } from '@/hooks/use-task-mutations'
 import { useCompletionHoldEngagement } from '@/hooks/use-completion-hold'
 import { useCompletionCollapse } from '@/hooks/use-completion-collapse'
@@ -514,11 +515,16 @@ function TaskRowInner({
   // and its baseline stay, so the next save still goes out (notes-sync.ts, review C-5).
   const editDescriptionRef = useRef(editDescription)
   editDescriptionRef.current = editDescription
+  // The base of a notes save: the raw description the editor's text was loaded from, kept while the
+  // editor holds unsaved text, then what the server answered (notes-sync.ts; description format,
+  // "Notes changed in two places").
+  const descBaseRef = useRef<string>(task.description ?? '')
+  const rawDescriptionRef = useRef<string>(task.description ?? '')
+  rawDescriptionRef.current = task.description ?? ''
   useEffect(() => {
-    const next = notesAfterServerChange(
-      { edit: editDescriptionRef.current, baseline: descBaselineRef.current },
-      stripPageLink(stripNoteLink(task.description)),
-    )
+    const state = { edit: editDescriptionRef.current, baseline: descBaselineRef.current }
+    descBaseRef.current = notesBaseAfterServerChange(state, descBaseRef.current, task.description ?? '')
+    const next = notesAfterServerChange(state, stripPageLink(stripNoteLink(task.description)))
     descBaselineRef.current = next.baseline
     setEditDescription(next.edit)
   }, [task.description])
@@ -534,15 +540,32 @@ function TaskRowInner({
     // opening a task shouldn't trigger a save just because TipTap re-serializes whitespace.
     const baseline = descBaselineRef.current
     const descChanged = baseline !== null && editDescription !== baseline
+    let saved: string | null = null
     if (descChanged) {
       const fullDescription = noteLinkHtml
         ? (editDescription ? editDescription + noteLinkHtml : noteLinkHtml)
         : editDescription
       changes.description = fullDescription
       descBaselineRef.current = editDescription
+      saved = fullDescription
     }
     if (Object.keys(changes).length > 0) {
-      updateTask.mutate({ id: task.id, changes, original: task })
+      if (saved === null) {
+        updateTask.mutate({ id: task.id, changes, original: task })
+        return
+      }
+      const sent = saved
+      updateTask.mutate(
+        // The base the editor kept: if the server's notes changed since, main keeps both versions.
+        { id: task.id, changes, original: task, baseDescription: descBaseRef.current },
+        {
+          onSuccess: (answer) => {
+            const answered = answer && typeof answer.description === 'string' && !isTempTaskId(answer.id) ? answer.description : null
+            const unsaved = hasUnsavedNotes({ edit: editDescriptionRef.current, baseline: descBaselineRef.current })
+            descBaseRef.current = notesBaseAfterSave(answered, sent, unsaved)
+          },
+        },
+      )
     }
   }, [editDescription, noteLinkHtml, task, updateTask])
 
@@ -1039,6 +1062,8 @@ function TaskRowInner({
           }}
           onReady={(normalized) => {
             descBaselineRef.current = normalized
+            // The editor's text was loaded from these notes: they are the base of its next save.
+            descBaseRef.current = rawDescriptionRef.current
             setEditDescription(normalized)
           }}
           editorRef={descEditorRef}

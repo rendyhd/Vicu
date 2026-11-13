@@ -204,17 +204,21 @@ export async function quickViewPatch(
   deps: QuickActionDeps,
   rawTaskId: number | string,
   patch: Record<string, unknown>,
-  taskData?: Record<string, unknown>
+  taskData?: Record<string, unknown>,
+  /** `baseDescription`: with a notes edit, the description it started from (description format, "Notes changed in two places"). */
+  checks: { baseDescription?: string } = {}
 ): Promise<QuickActionResult> {
   const target = targetOf(deps.queue, rawTaskId)
   if (target.kind === 'unknown') return STALE_QUEUED_TASK
   const meta = titleMeta(taskData ?? patch)
   if (target.kind === 'queued') {
+    // A task that is not on the server yet has no other version of its notes.
     await deps.queue.enqueueUpdate(target.ref, patch, meta)
     return { success: true, cached: true }
   }
 
-  const outcome = await writeTask(deps, taskWrites.update(deps.queue, deps.api, target.id, patch, meta.title), { queue: true })
+  const options = checks.baseDescription !== undefined ? { baseDescription: checks.baseDescription } : {}
+  const outcome = await writeTask(deps, taskWrites.update(deps.queue, deps.api, target.id, patch, meta.title, options), { queue: true })
   if (outcome.kind === 'sent') {
     deps.notifyMainWindow()
     return outcome.result

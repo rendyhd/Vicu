@@ -9,6 +9,8 @@ import {
 import { ApiError } from '../mutation-errors'
 import { useOfflineStore } from '@/stores/offline-store'
 import { NULL_DATE } from '../constants'
+import { NOTES_MERGED_MESSAGE } from '../notes-merged'
+import { useToastStore } from '@/stores/toast-store'
 
 const ok = (data: unknown = {}) => ({ success: true as const, data })
 const fail = (error: string, statusCode?: number) => ({ success: false as const, error, statusCode })
@@ -64,6 +66,25 @@ describe('mutation helpers with the offline queue (D-SYNC-6, decision 4)', () =>
 
       expect(updateTask).toHaveBeenCalledWith(5, { done: true }, { queue: true, title: 'Take pills', completedDue: '2026-11-13T22:59:59Z' })
       expect(result).toEqual({ queued: false, task: { id: 5, done: false }, repeatSkipped: true })
+    })
+
+    it('passes the base of a notes edit, reports merged notes and says so once (description format)', async () => {
+      useToastStore.setState({ toasts: [] })
+      updateTask.mockResolvedValueOnce({ success: true, data: { id: 5, description: '<p>b</p><hr><p>a</p>' }, notesMerged: true })
+
+      const result = await sendTaskPatch(5, { description: '<p>a</p>' }, 'Notes', { baseDescription: '<p>x</p>' })
+
+      expect(updateTask).toHaveBeenCalledWith(5, { description: '<p>a</p>' }, { queue: true, title: 'Notes', baseDescription: '<p>x</p>' })
+      expect(result).toEqual({ queued: false, task: { id: 5, description: '<p>b</p><hr><p>a</p>' }, notesMerged: true })
+      expect(useToastStore.getState().toasts.map((t) => t.message)).toEqual([NOTES_MERGED_MESSAGE])
+    })
+
+    it('sends no base with a patch that does not hold the notes, nor for a task not on the server yet', async () => {
+      await sendTaskPatch(5, { priority: 2 }, 'Pay rent', { baseDescription: '<p>x</p>' })
+      expect(updateTask).toHaveBeenCalledWith(5, { priority: 2 }, { queue: true, title: 'Pay rent' })
+
+      await sendTaskPatch(-4, { description: '<p>a</p>' }, 'Draft', { baseDescription: '<p>x</p>' })
+      expect(queue.enqueueUpdate).toHaveBeenCalledWith(-4, { description: '<p>a</p>' }, { title: 'Draft' })
     })
 
     it('reports a queued change (the server was unreachable, or changes for the task were waiting) without a task', async () => {
