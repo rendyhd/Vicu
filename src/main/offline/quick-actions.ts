@@ -1,6 +1,7 @@
 import { withDefaultReminder, type DefaultReminderSettings } from '../../shared/default-reminder'
 import { isQueueableFailure, maybeCreatedMessage } from '../../shared/error-classify'
 import { isTimeBlock } from '../../shared/time-blocks'
+import { completedDueFor } from '../../shared/repeat-completion'
 import type { ApiResult } from '../api-result'
 import type { OfflineQueue } from './queue'
 import { parseQueuedImages, parseQueuedLabels } from './parse-input'
@@ -14,6 +15,8 @@ import { sendSerially, taskWrites, writeTask } from './task-writes'
 export interface QuickActionApi {
   createTask(projectId: number, payload: Record<string, unknown>): Promise<ApiResult<unknown>>
   updateTask(id: number, patch: Record<string, unknown>): Promise<ApiResult<unknown>>
+  /** Reads a repeating task before its completion is sent (cross-app semantics 7.5). */
+  fetchTaskById?(id: number): Promise<ApiResult<unknown>>
 }
 
 export interface QuickActionDeps {
@@ -242,8 +245,10 @@ export async function quickViewComplete(
   const cleanTask = withoutCompletionMetadata(taskData)
   const autoCompleted = taskDescendants(cleanTask).filter((task) => task.done !== true)
   const changed: Array<{ task: Record<string, unknown>; queued: boolean }> = []
+  // A repeating task's completion carries the due date this list showed, so it is not sent again
+  // for an occurrence another device completed already (cross-app semantics 7.5).
   const complete = (id: number, task: Record<string, unknown>) =>
-    writeTask(deps, taskWrites.update(queue, api, id, { done: true }, titleMeta(task).title), { queue: true })
+    writeTask(deps, taskWrites.update(queue, api, id, { done: true }, titleMeta(task).title, { completedDue: completedDueFor(task) }), { queue: true })
   const undoChanged = async () => {
     for (const entry of changed.reverse()) {
       const id = entry.task.id as number

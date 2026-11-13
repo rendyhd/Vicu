@@ -2,7 +2,8 @@ import { useId, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { AlertTriangle, LogIn, RefreshCw, X } from 'lucide-react'
 import { api } from '@/lib/api'
-import { refreshTasks } from '@/lib/task-refresh'
+import { invalidateTaskData, refreshTasks } from '@/lib/task-refresh'
+import { removePendingTasks } from '@/lib/pending-cache'
 import { confirmDelete } from '@/lib/confirm-bridge'
 import { toast } from '@/stores/toast-store'
 import { formatAbsoluteDateTime } from '@/lib/date-utils'
@@ -37,6 +38,8 @@ export function failureReasonLabel(reason: OfflineFailureReason): string {
       return 'You are no longer allowed to make this change in the project.'
     case 'token-permission':
       return 'Your API token is not allowed to make this change.'
+    case 'no-write-access':
+      return 'You no longer have write access to this project, so the server refused this change.'
   }
 }
 
@@ -111,13 +114,15 @@ export function SyncPanel({ onClose }: { onClose: () => void }) {
   const pending = snapshot?.pending ?? []
   const documents = unsyncedDocumentItems(unsyncedDocuments)
 
-  const run = async (action: () => Promise<{ success: boolean; error?: string }>, failure: string) => {
+  const run = async (action: () => Promise<{ success: boolean; error?: string }>, failure: string): Promise<boolean> => {
     setBusy(true)
     try {
       const result = await action()
       if (!result.success) toast.error(`${failure}: ${result.error ?? 'unknown error'}`)
+      return result.success
     } catch (err) {
       toast.error(`${failure}: ${err instanceof Error ? err.message : String(err)}`)
+      return false
     } finally {
       setBusy(false)
     }
@@ -135,6 +140,28 @@ export function SyncPanel({ onClose }: { onClose: () => void }) {
       confirmLabel: 'Discard',
     })
     if (ok) await discard()
+  }
+  // Waiting changes can be dropped too (E-1), for example one the server keeps refusing. A discarded
+  // create takes the changes made to that task with it; its row leaves the lists at once, and the
+  // lists are read again so they stop showing what was discarded.
+  const discardWaiting = async (ids?: string[]) => {
+    const targets = ids ? pending.filter((item) => ids.includes(item.id)) : pending
+    if (targets.length === 0) return
+    const ok = await run(() => api.offlineQueue.discardPending(targets.map((item) => item.id)), 'Could not discard')
+    if (!ok) return
+    removePendingTasks(qc, targets.flatMap((item) => (item.create ? [item.create.tempId] : [])))
+    const after = await api.offlineQueue.snapshot().catch(() => null)
+    // With nothing left waiting the server is the truth again; otherwise the lists refresh once the
+    // remaining changes are sent (a refetch now would hide their optimistic state).
+    if (after?.success && after.data.pending.length === 0) invalidateTaskData(qc)
+    else refreshTasks(qc)
+  }
+  const discardAllWaiting = async () => {
+    const ok = await confirmDelete(`Discard ${counts.pending} waiting change${counts.pending === 1 ? '' : 's'}? They will not be sent.`, {
+      force: true,
+      confirmLabel: 'Discard',
+    })
+    if (ok) await discardWaiting()
   }
   const syncDocuments = () => run(() => api.syncCustomLists().then(() => ({ success: true })), 'Could not sync')
   const discardDocuments = async () => {
@@ -198,10 +225,29 @@ export function SyncPanel({ onClose }: { onClose: () => void }) {
                 >
                   <RefreshCw className={replaying ? 'h-3 w-3 animate-spin' : 'h-3 w-3'} /> {replaying ? 'Syncing' : 'Sync now'}
                 </button>
+                <button
+                  type="button"
+                  disabled={busy || replaying}
+                  onClick={() => void discardAllWaiting()}
+                  className="rounded-control border border-[var(--border-color)] px-2 py-0.5 text-[11px] text-danger hover:bg-[var(--bg-hover)] disabled:opacity-50"
+                >
+                  Discard all
+                </button>
               </div>
               <ul className="px-4 pb-3 text-[12px] text-[var(--text-secondary)]">
                 {pending.slice(0, 50).map((item) => (
-                  <li key={item.id} className="break-words py-0.5">{item.summary}</li>
+                  <li key={item.id} className="flex items-start gap-2 py-0.5">
+                    <span className="min-w-0 flex-1 break-words">{item.summary}</span>
+                    <button
+                      type="button"
+                      disabled={busy || replaying}
+                      onClick={() => void discardWaiting([item.id])}
+                      aria-label={`Discard ${item.summary}`}
+                      className="shrink-0 rounded-control border border-[var(--border-color)] px-2 py-0.5 text-[11px] text-danger hover:bg-[var(--bg-hover)] disabled:opacity-50"
+                    >
+                      Discard
+                    </button>
+                  </li>
                 ))}
                 {pending.length > 50 && <li className="py-0.5 opacity-70">and {pending.length - 50} more</li>}
               </ul>

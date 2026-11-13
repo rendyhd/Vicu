@@ -13,6 +13,7 @@ const FAILURE_REASONS: ReadonlySet<string> = new Set<OfflineFailureReason>([
   'other-account',
   'forbidden',
   'token-permission',
+  'no-write-access',
 ])
 
 const isRecord = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v)
@@ -49,7 +50,14 @@ export function normalizeAction(raw: unknown): QueuedAction | null {
       }
     case 'update':
       if (!isInt(raw.taskId) || !isRecord(raw.patch)) return null
-      return { ...base, type: 'update', taskId: raw.taskId, patch: raw.patch }
+      return {
+        ...base,
+        type: 'update',
+        taskId: raw.taskId,
+        patch: raw.patch,
+        // The due date a queued completion of a repeating task completed (cross-app semantics 7.5).
+        ...(typeof raw.completedDue === 'string' || raw.completedDue === null ? { completedDue: raw.completedDue } : {}),
+      }
     case 'delete':
       if (!isInt(raw.taskId)) return null
       return { ...base, type: 'delete', taskId: raw.taskId }

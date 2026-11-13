@@ -10,18 +10,21 @@ export class ApiError extends Error {
   readonly mayExist: boolean
   /** The API token lacks the permission for this request (cross-app semantics 9.7): the message says which. */
   readonly tokenPermission: boolean
+  /** Something in front of Vikunja (a sign-in proxy) answered with a web page: the message says what to do. */
+  readonly notApiResponse: boolean
 
-  constructor(message: string, statusCode?: number, mayExist = false, tokenPermission = false) {
+  constructor(message: string, statusCode?: number, mayExist = false, tokenPermission = false, notApiResponse = false) {
     super(message)
     this.name = 'ApiError'
     this.statusCode = statusCode
     this.mayExist = mayExist
     this.tokenPermission = tokenPermission
+    this.notApiResponse = notApiResponse
   }
 }
 
-export function apiError(result: { error: string; statusCode?: number; mayExist?: boolean; tokenPermission?: boolean }): ApiError {
-  return new ApiError(result.error, result.statusCode, result.mayExist === true, result.tokenPermission === true)
+export function apiError(result: { error: string; statusCode?: number; mayExist?: boolean; tokenPermission?: boolean; notApiResponse?: boolean }): ApiError {
+  return new ApiError(result.error, result.statusCode, result.mayExist === true, result.tokenPermission === true, result.notApiResponse === true)
 }
 
 export type FailureKind = 'offline' | 'auth' | 'forbidden' | 'not-found' | 'rate-limit' | 'server' | 'rejected' | 'unknown'
@@ -54,6 +57,8 @@ export function describeMutationError(error: unknown): MutationFailure {
   if (error instanceof ApiError && error.mayExist && text) return { kind: 'unknown', message: text }
   // The session works; the token lacks this one permission, and the message says how to give it.
   if (error instanceof ApiError && error.tokenPermission && text) return { kind: 'forbidden', message: text }
+  // A sign-in page in front of Vikunja answered: like being offline, with the message that says to sign in there.
+  if (error instanceof ApiError && error.notApiResponse && text) return { kind: 'offline', message: text }
 
   if (status === 401 || isAuthError(raw)) {
     return { kind: 'auth', message: 'Your session has expired. Sign in again to keep syncing.' }

@@ -11,7 +11,8 @@ import { shell, dialog, app, nativeTheme, clipboard as electronClipboard, Clipbo
 import { isProEnabled } from '../shared/pro/settings'
 import { handleTrusted } from './secure-ipc'
 import { tokenForConnectionTest } from './connection-test-token'
-import { isDeepLinkAllowed } from './web-security-policy'
+import { isDeepLinkAllowed, safeExternalUrl } from './web-security-policy'
+import { markFromInternet } from './attachment-origin'
 import { readUploadAnswer } from '../shared/attachment-upload'
 import { isRiskyAttachment, sanitizeAttachmentFileName } from './attachment-safety'
 import { ensureAttachmentTempDir } from './attachment-temp'
@@ -194,7 +195,7 @@ function requestReplay(): void {
 function quickActionDeps(): QuickActionDeps {
   return {
     queue: getOfflineQueue(),
-    api: { createTask, updateTask },
+    api: { createTask, updateTask, fetchTaskById },
     notifyMainWindow: () => {
       // Every Quick Entry create and Quick View completion or reopening ends here on success, and
       // each one moves a project's counts; the project is not known at this level.
@@ -327,9 +328,11 @@ export function registerIpcHandlers(): void {
   // queue a newer one joins the queue instead of overtaking them, and with `options.queue` a change
   // the server cannot take is queued here (see offline/task-writes.ts).
   handleTrusted('update-task', async (event, id: number, patch: Record<string, unknown>, options?: unknown) => {
-    const { queue, title } = parseTaskWriteOptions(options)
+    const { queue, title, completedDue } = parseTaskWriteOptions(options)
     const deps = taskWriteDeps()
-    const outcome = await writeTask(deps, taskWrites.update(deps.queue, { updateTask }, id, patch, title), { queue })
+    // A completion of a repeating task reads the task first (cross-app semantics 7.5).
+    const spec = taskWrites.update(deps.queue, { updateTask, fetchTaskById }, id, patch, title, { completedDue })
+    const outcome = await writeTask(deps, spec, { queue })
     if (outcome.kind === 'sent') {
       notifyViewerSync()
       notifyMainWindow(event.sender.id)
@@ -608,13 +611,15 @@ export function registerIpcHandlers(): void {
   // setup passes its token (nothing is saved yet); a sign-in uses the session it just stored.
   handleTrusted('synced-prefs:read-for-setup', async (_event, url: unknown, token: unknown) => {
     if (typeof url !== 'string' || !url) return { inboxProjectId: null, defaultProjectId: null }
-    let useToken = typeof token === 'string' ? token : ''
-    if (!useToken) {
-      const config = loadConfig()
-      if (config?.auth_method === 'api_token') useToken = getAPIToken() || config.api_token
-      else useToken = authManager.getTokenSync() ?? (await authManager.getToken().catch(() => '')) ?? ''
+    // The saved token or session only goes to the server it was saved for, as in test-connection (S-14).
+    const config = loadConfig()
+    const typed = typeof token === 'string' ? token : ''
+    let saved: string | null = null
+    if (!typed.trim() && config?.vikunja_url) {
+      if (config.auth_method === 'api_token') saved = getAPIToken() || config.api_token || null
+      else saved = authManager.getTokenSync() ?? (await authManager.getToken().catch(() => '')) ?? null
     }
-    return readSetupPreferences(url, useToken)
+    return readSetupPreferences(url, tokenForConnectionTest(url, typed, config?.vikunja_url ?? '', saved))
   })
 
   handleTrusted('set-task-badge', (_event, count: number, dataUrl: string | null) => {
@@ -1133,9 +1138,11 @@ export function registerIpcHandlers(): void {
         return { success: false, error: 'Invalid attachment filename' }
       }
       fs.writeFileSync(filePath, result.data, { mode: 0o600 })
+      // The copy came from the server: mark it so the system treats it as a download (S-3).
+      await markFromInternet(filePath, loadConfig()?.vikunja_url)
 
-      // The copy has no Mark-of-the-Web, so executables, scripts, shortcuts and
-      // macro documents are shown in the file manager instead of being run.
+      // Executables, scripts, shortcuts and macro documents are shown in the file manager
+      // instead of being run: the mark above is not kept by every file system or honoured by every app.
       if (isRiskyAttachment(safeName)) {
         shell.showItemInFolder(filePath)
         return { success: true, data: undefined }
@@ -1163,6 +1170,7 @@ export function registerIpcHandlers(): void {
       },
       download: () => downloadTaskAttachment(taskId, attachmentId),
       writeFile: (filePath, data) => fs.promises.writeFile(filePath, data),
+      markFile: (filePath) => markFromInternet(filePath, loadConfig()?.vikunja_url),
     })
   })
 
@@ -1230,7 +1238,7 @@ export function registerIpcHandlers(): void {
   // --- Obsidian IPC ---
   handleTrusted('open-deep-link', (_event, url: string) => {
     if (isDeepLinkAllowed(url)) {
-      shell.openExternal(url).catch(() => { /* no handler for the scheme */ })
+      shell.openExternal(safeExternalUrl(url)).catch(() => { /* no handler for the scheme */ })
     }
   })
 

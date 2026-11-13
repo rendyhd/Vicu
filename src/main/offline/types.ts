@@ -46,6 +46,12 @@ export interface UpdateAction extends ActionBase {
   taskId: number
   /** A `TaskPatch`: complete = `{ done }`, schedule = `{ due_date }`, clear date = `{ due_date: null }`. */
   patch: Record<string, unknown>
+  /**
+   * Set with `patch.done === true` when the app held the task as repeating: the due date it completed
+   * (`null` for none). The replay reads the task first and sends the completion only when the server
+   * still holds that occurrence (cross-app semantics 7.5). Missing: sent as before.
+   */
+  completedDue?: string | null
 }
 
 export interface DeleteAction extends ActionBase {

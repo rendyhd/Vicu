@@ -10,6 +10,7 @@ interface ApiLike {
   success: boolean
   error?: string
   statusCode?: number
+  notApiResponse?: boolean
 }
 
 export interface FollowUpLabel {
@@ -66,7 +67,7 @@ async function attempt<T extends ApiLike>(call: () => Promise<T>): Promise<T | F
 }
 
 const queueable = (result: ApiLike): boolean =>
-  isQueueableFailure({ error: result.error ?? '', statusCode: result.statusCode }, 'change')
+  isQueueableFailure({ error: result.error ?? '', statusCode: result.statusCode, notApiResponse: result.notApiResponse }, 'change')
 
 export async function applyQuickEntryFollowUps(api: FollowUpApi, input: FollowUpInput): Promise<FollowUpOutcome> {
   const queuedLabels: FollowUpLabel[] = []

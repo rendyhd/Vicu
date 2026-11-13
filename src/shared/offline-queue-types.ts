@@ -40,6 +40,7 @@ export type OfflineFailureReason =
   | 'other-account' // queued for a different server or user than the one signed in now
   | 'forbidden' // 403 on an assignee or comment change: the user may no longer change the project, or the comment is not theirs
   | 'token-permission' // an assignee or comment change the API token is not allowed (cross-app semantics 9.7)
+  | 'no-write-access' // 403 on another change while the session still works: the user can no longer change the project
 
 /** Why a replay stopped before the queue was empty. `null` means it finished. */
 export type OfflineReplayStop = 'auth' | 'network' | 'server' | 'rate-limit' | 'config' | 'unknown'
@@ -193,6 +194,13 @@ export interface TaskWriteOptions {
   labelTitle?: string
   /** A person's username, kept with a queued assign or unassign for the sync panel's summary line. */
   username?: string
+  /**
+   * With a completion (`{ done: true }`) of a task the app holds as repeating: the due date it
+   * completed, `null` for none. Main reads the task first and sends the completion only when the
+   * server still holds that occurrence; otherwise it is skipped and the answer is the server's task
+   * (cross-app semantics 7.5). Leave it out for a task that does not repeat.
+   */
+  completedDue?: string | null
 }
 
 /** What a queue-aware task write answers when the change went into the offline queue instead of the server. */

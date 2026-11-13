@@ -24,6 +24,7 @@ import { projectPatch, taskPatch } from '@/lib/merge-patches'
 import { NULL_DATE } from '@/lib/constants'
 import { rememberRepeatCompletion, repeatUndoPatch, takeRepeatSnapshot } from '@/lib/repeat-undo'
 import { afterRepeatCompletion, repeatCompletionFor } from '@/lib/pro/repeat-completion'
+import { completedDueFor } from '../../shared/repeat-completion'
 import {
   addLabelOrQueue,
   createTaskOrQueue,
@@ -593,13 +594,19 @@ export async function completeTaskRequest(task: Task): Promise<Task> {
     // Children first prevents the server from ever exposing them as standalone
     // work while the parent completion is in flight.
     for (const child of [...autoCompleted].reverse()) {
-      const outcome = await sendTaskPatch(child.id, { done: true }, child.title)
+      const outcome = await sendTaskPatch(child.id, { done: true }, child.title, { completedDue: completedDueFor(child) })
       completed.push({ task: child, queued: outcome.queued })
     }
     // Pro's repeat rule (21.13): at its end the repeat goes off first, so the server completes it.
     const repeatRule = repeatCompletionFor(task)
     if (repeatRule && repeatRule.plan.patches.length > 1) await sendTaskPatch(task.id, repeatRule.plan.patches[0], task.title)
-    const outcome = await sendTaskPatch(task.id, { done: true }, task.title)
+    // A repeating task's completion carries the due date it completed, so main sends it only while
+    // the server still holds that occurrence (cross-app semantics 7.5); otherwise the answer is the
+    // server's task, already moved on by another device.
+    const outcome = await sendTaskPatch(task.id, { done: true }, task.title, { completedDue: completedDueFor(task) })
+    // Skipped: nothing was completed here, so there is nothing to undo and no rule to apply. The
+    // server's task is shown as it is (the hold and the next refresh bring the list up to date).
+    if (outcome.repeatSkipped && outcome.task) return outcome.task
     // A repeating task comes back open with its next dates: remember how it was, for Undo.
     rememberRepeatCompletion(task, outcome.task)
     if (repeatRule) {

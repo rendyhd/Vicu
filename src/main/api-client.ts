@@ -23,6 +23,7 @@ import {
   type TaskCommentPage,
 } from './api-v2'
 import { sanitizeProjectPatch, sanitizeTaskPatch } from '../shared/merge-patches'
+import { NOT_API_RESPONSE_MESSAGE, SESSION_ENDED_MESSAGE } from '../shared/error-classify'
 import type { ApiError, ApiResult } from './api-result'
 import { collectAllPages } from './paginate'
 import { decodeUtf8Chunks } from './response-body'
@@ -45,7 +46,9 @@ function notifyAuthRequired(): void {
   }
 }
 
-const REQUEST_TIMEOUT = 10_000
+// A request fails after this long WITHOUT data (connecting, waiting for the answer, or between two
+// chunks of it), not after this long in total (C-11).
+const REQUEST_IDLE_TIMEOUT = 10_000
 // A download is cut off after this long WITHOUT data, not after this long in total, so a large file
 // on a slow link still arrives as long as it keeps moving (D-API-3).
 const DOWNLOAD_IDLE_TIMEOUT = 60_000
@@ -120,6 +123,21 @@ function validateHttpUrl(url: string): { valid: true; parsed: URL } | { valid: f
   }
 }
 
+/**
+ * The answer of a 2xx response. An empty body (204, some PUT and DELETE answers) is a success with
+ * `data: null`. A body that is not JSON is not the API at all: a sign-in proxy in front of Vikunja
+ * answers its login page with 200. That is a failure marked `notApiResponse`, handled like an
+ * unreachable server, never a success: a change "saved" that way would silently be lost (C-1).
+ */
+export function readSuccessBody<T>(responseBody: string): ApiResult<T> {
+  if (responseBody.trim() === '') return { success: true, data: null as T }
+  try {
+    return { success: true, data: JSON.parse(responseBody) as T }
+  } catch {
+    return { success: false, error: NOT_API_RESPONSE_MESSAGE, notApiResponse: true }
+  }
+}
+
 function request<T>(
   method: string,
   url: string,
@@ -134,10 +152,13 @@ function request<T>(
 
   return new Promise((resolve) => {
     let req: Electron.ClientRequest | null = null
-    const timeout = setTimeout(() => {
+    // A limit on time without data (connecting included), not on the whole answer: a page of 1,000
+    // tasks from a slow server keeps arriving as long as it moves (C-11). "timed out" is what
+    // `isRetriableError` looks for.
+    const idle = createIdleTimeout(REQUEST_IDLE_TIMEOUT, () => {
       try { req?.abort() } catch { /* ignore */ }
-      resolve({ success: false, error: `Request timed out (${REQUEST_TIMEOUT / 1000}s)` })
-    }, REQUEST_TIMEOUT)
+      resolve({ success: false, error: `Request timed out (no answer for ${REQUEST_IDLE_TIMEOUT / 1000}s)` })
+    })
 
     try {
       req = net.request({ method, url })
@@ -150,23 +171,20 @@ function request<T>(
       let statusCode = 0
 
       req.on('response', (response) => {
+        idle.touch()
         statusCode = response.statusCode
 
         response.on('data', (chunk) => {
+          idle.touch()
           bodyChunks.push(Buffer.from(chunk))
         })
 
         response.on('end', () => {
-          clearTimeout(timeout)
+          idle.clear()
           const responseBody = decodeUtf8Chunks(bodyChunks)
 
           if (statusCode >= 200 && statusCode < 300) {
-            try {
-              const data = JSON.parse(responseBody) as T
-              resolve({ success: true, data })
-            } catch {
-              resolve({ success: true, data: null as T })
-            }
+            resolve(readSuccessBody<T>(responseBody))
           } else {
             let errorCode: number | undefined
             try {
@@ -184,7 +202,7 @@ function request<T>(
       })
 
       req.on('error', (err) => {
-        clearTimeout(timeout)
+        idle.clear()
         resolve({ success: false, error: err.message || 'Network error' })
       })
 
@@ -193,7 +211,7 @@ function request<T>(
       }
       req.end()
     } catch (err: unknown) {
-      clearTimeout(timeout)
+      idle.clear()
       const message = err instanceof Error ? err.message : 'Request failed'
       resolve({ success: false, error: message })
     }
@@ -223,13 +241,39 @@ async function requestWithRetry<T>(
   if (!result.success && isExpiredTokenError(result)) {
     try {
       const newToken = await authManager.getToken()
-      return await request<T>(method, url, newToken, body, contentType)
+      return sessionAware(await request<T>(method, url, newToken, body, contentType))
     } catch {
-      return result
+      return sessionAware(result)
     }
   }
 
-  return result
+  return sessionAware(result)
+}
+
+/** How long one sign-in prompt covers further 401s, so a burst of refused requests asks once. */
+const AUTH_PROMPT_QUIET_MS = 60_000
+let authPromptAt: number | null = null
+
+/** Whether the saved connection signs in with a password or OIDC (a session), not an API token. */
+function usesSession(): boolean {
+  const method = loadConfig()?.auth_method
+  return method === 'oidc' || method === 'password'
+}
+
+/**
+ * The final answer of a request made with the saved connection (after the one refresh and retry).
+ * For a password or OIDC sign-in a 401 means the session ended: say so instead of "API token is
+ * invalid", and raise the sign-in prompt, at most once a minute however many requests are refused
+ * (C-12). API tokens keep their own message: there is nothing to sign in to.
+ */
+export function sessionAware<T>(result: ApiResult<T>): ApiResult<T> {
+  if (result.success || result.statusCode !== 401 || result.tokenPermission || !usesSession()) return result
+  const now = Date.now()
+  if (authPromptAt === null || now - authPromptAt >= AUTH_PROMPT_QUIET_MS) {
+    authPromptAt = now
+    notifyAuthRequired()
+  }
+  return { ...result, error: SESSION_ENDED_MESSAGE }
 }
 
 /**
@@ -251,7 +295,7 @@ async function requestPaginatedWithRetry<T>(
 ): Promise<ApiResult<T[]>> {
   const result = await requestWithRetry<PaginatedResponse<T>>('GET', url, token)
   if (!result.success) return result
-  return { success: true, data: result.data.items ?? [] }
+  return { success: true, data: result.data?.items ?? [] }
 }
 
 /**
@@ -289,13 +333,13 @@ async function requestMultipartWithRetry<T>(
   if (!result.success && isExpiredTokenError(result)) {
     try {
       const newToken = await authManager.getToken()
-      return await requestMultipart<T>(method, url, newToken, fileBuffer, fileName, mimeType)
+      return sessionAware(await requestMultipart<T>(method, url, newToken, fileBuffer, fileName, mimeType))
     } catch {
-      return result
+      return sessionAware(result)
     }
   }
 
-  return result
+  return sessionAware(result)
 }
 
 async function requestBinaryWithRetry(
@@ -307,13 +351,13 @@ async function requestBinaryWithRetry(
   if (!result.success && isExpiredTokenError(result)) {
     try {
       const newToken = await authManager.getToken()
-      return await requestBinary(url, newToken)
+      return sessionAware(await requestBinary(url, newToken))
     } catch {
-      return result
+      return sessionAware(result)
     }
   }
 
-  return result
+  return sessionAware(result)
 }
 
 /** Where requests go and with which token; `apiToken` when that is an API token, not a session. */
@@ -673,7 +717,7 @@ export function testConnection(
     token
   ).then((result): ApiResult<unknown[]> => {
     if (!result.success) return result
-    return { success: true, data: result.data.items ?? [] }
+    return { success: true, data: result.data?.items ?? [] }
   })
 }
 
@@ -687,7 +731,7 @@ export function searchTasksAt(url: string, token: string, q: string): Promise<Ap
   return request<PaginatedResponse<unknown>>('GET', `${cleanUrl}${API_BASE_PATH}/tasks?${qs.toString()}`, token)
     .then((result): ApiResult<unknown[]> => {
       if (!result.success) return result
-      return { success: true, data: result.data.items ?? [] }
+      return { success: true, data: result.data?.items ?? [] }
     })
 }
 
@@ -742,12 +786,7 @@ function requestMultipart<T>(
           clearTimeout(timeout)
           const responseBody = decodeUtf8Chunks(bodyChunks)
           if (statusCode >= 200 && statusCode < 300) {
-            try {
-              const data = JSON.parse(responseBody) as T
-              resolve({ success: true, data })
-            } catch {
-              resolve({ success: true, data: null as T })
-            }
+            resolve(readSuccessBody<T>(responseBody))
           } else {
             console.error(`[upload] HTTP ${statusCode} for ${method} ${url}:`, responseBody)
             let errorCode: number | undefined
@@ -993,6 +1032,29 @@ async function tokenReadsProjects(url: string, token: string): Promise<boolean> 
   if (result.success) workingToken = { token, at: now }
   else if (refused) workingToken = null
   return !refused
+}
+
+/**
+ * Whether the saved connection still works, for a change the server refused with 403 (C-2): the
+ * same check `collabResult` makes, one project from the project list. `works` means only that
+ * change was refused (the user lost write access to its project); `refused` means the session or
+ * token itself is gone; `unknown` means the check got no answer (offline, server trouble).
+ */
+export async function connectionState(): Promise<'works' | 'refused' | 'unknown'> {
+  const c = await getConfigOrFail()
+  if ('success' in c) return 'refused'
+  const now = Date.now()
+  if (workingToken && workingToken.token === c.token && now - workingToken.at < TOKEN_CHECK_FRESH_MS) return 'works'
+  const result = await request<unknown>('GET', `${c.url}${API_BASE_PATH}/projects?per_page=1&page=1`, c.token)
+  if (result.success) {
+    workingToken = { token: c.token, at: now }
+    return 'works'
+  }
+  if (result.statusCode === 401 || result.statusCode === 403) {
+    workingToken = null
+    return 'refused'
+  }
+  return 'unknown'
 }
 
 /**

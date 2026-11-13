@@ -1,6 +1,11 @@
 import { describe, it, expect } from 'vitest'
 import {
   CREATE_MAY_EXIST_TIMEOUT_MESSAGE,
+  NOT_API_RESPONSE_MESSAGE,
+  SESSION_ENDED_MESSAGE,
+  isUnreachableFailure,
+  isQueueableFailure as queueable,
+  isAuthError as authError,
   isRetriableError,
   isConnectionError,
   isAuthError,
@@ -67,5 +72,19 @@ describe('maybeCreatedMessage', () => {
     ]) {
       expect(maybeCreatedMessage(failure)).toBeNull()
     }
+  })
+})
+
+describe('a web page instead of the API and an ended session', () => {
+  it('reads a web page as unreachable by its marker, not its text', () => {
+    expect(isUnreachableFailure({ error: NOT_API_RESPONSE_MESSAGE, notApiResponse: true })).toBe(true)
+    expect(isUnreachableFailure({ error: NOT_API_RESPONSE_MESSAGE })).toBe(false)
+    expect(isUnreachableFailure({ error: 'Request timed out (no answer for 10s)' })).toBe(true)
+    expect(queueable({ error: 'x', notApiResponse: true }, 'create')).toBe(true)
+  })
+
+  it('reads the ended-session message as an auth problem, not queueable', () => {
+    expect(authError(SESSION_ENDED_MESSAGE)).toBe(true)
+    expect(queueable({ error: SESSION_ENDED_MESSAGE, statusCode: 401 }, 'change')).toBe(false)
   })
 })

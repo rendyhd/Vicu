@@ -51,7 +51,7 @@ export async function collectAllPages<T>(
     const result = await fetchPage(page)
     if (!result.success) return result
 
-    const batch = result.data.items ?? []
+    const batch = result.data?.items ?? []
     if (batch.length === 0) return { success: true, data: all }
 
     let added = 0

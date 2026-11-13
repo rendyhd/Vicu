@@ -1,7 +1,8 @@
-import { isQueueableFailure, isRetriableError } from '../../shared/error-classify'
+import { isQueueableFailure, isUnreachableFailure } from '../../shared/error-classify'
 import type { QueuedWriteReply, TaskWriteOptions } from '../../shared/offline-queue-types'
 import type { ApiError, ApiResult, ApiSuccess } from '../api-result'
 import type { OfflineQueue } from './queue'
+import { planRepeatCompletion } from './repeat-completion-step'
 
 // The one place where a change to an existing task decides between "send it now" and "queue it".
 //
@@ -30,7 +31,21 @@ export interface TaskWriteSpec {
    * provably never reached the server, as for a task create. Default 'change'.
    */
   kind?: 'change' | 'create'
+  /**
+   * Run before sending, inside the task's turn: it may answer without sending (the server already
+   * has the change), send something else, or fail like the change would (a repeating task's
+   * completion reads the task first, cross-app semantics 7.5).
+   */
+  beforeSend?: () => Promise<BeforeSend>
 }
+
+export type BeforeSend =
+  /** Send; `send` replaces the spec's own request when given. */
+  | { kind: 'send'; send?: () => Promise<ApiResult<unknown>> }
+  /** Nothing to send: this is the answer. */
+  | { kind: 'answer'; result: ApiSuccess<unknown> }
+  /** Could not decide: handled like a failure of the change (queued when the server cannot be reached). */
+  | { kind: 'failed'; result: ApiError }
 
 export type TaskWriteOutcome =
   /** The server took the change. */
@@ -57,17 +72,39 @@ const titleMeta = (title?: string): { title?: string } => (title ? { title } : {
 
 /** Specs for the writes the app makes to an existing task (its fields, labels, assignees and comments). */
 export const taskWrites = {
+  /**
+   * A change to a task's fields. `completedDue` (string or null) says the app holds the task as
+   * repeating and the patch completes it: the task is read first and the completion is sent only
+   * when the server still holds that occurrence, else skipped (cross-app semantics 7.5). A queued
+   * completion keeps it for the replay, which decides the same way.
+   */
   update(
     queue: OfflineQueue,
-    api: { updateTask(id: number, patch: Record<string, unknown>): Promise<ApiResult<unknown>> },
+    api: {
+      updateTask(id: number, patch: Record<string, unknown>): Promise<ApiResult<unknown>>
+      fetchTaskById?(id: number): Promise<ApiResult<unknown>>
+    },
     taskId: number,
     patch: Record<string, unknown>,
-    title?: string
+    title?: string,
+    options: { completedDue?: string | null } = {}
   ): TaskWriteSpec {
+    const { completedDue } = options
+    const checks = completedDue !== undefined && patch.done === true && !!api.fetchTaskById
     return {
       taskId,
       send: () => api.updateTask(taskId, patch),
-      enqueue: () => queue.enqueueUpdate(taskId, patch, titleMeta(title)),
+      enqueue: () => queue.enqueueUpdate(taskId, patch, { ...titleMeta(title), ...(completedDue !== undefined ? { completedDue } : {}) }),
+      ...(checks
+        ? {
+            beforeSend: async (): Promise<BeforeSend> => {
+              const plan = await planRepeatCompletion(patch, completedDue, () => api.fetchTaskById!(taskId))
+              if (plan.kind === 'failed') return { kind: 'failed', result: plan.failure }
+              if (plan.kind === 'skip') return { kind: 'answer', result: { success: true, data: plan.task, repeatSkipped: true } }
+              return plan.patch === patch ? { kind: 'send' } : { kind: 'send', send: () => api.updateTask(taskId, plan.patch) }
+            },
+          }
+        : {}),
     }
   },
   delete(
@@ -248,11 +285,12 @@ export const NOT_SENT_AFTER_NETWORK_FAILURE: ApiError = {
   error: 'Network error: the server could not be reached, so this change was not sent (ENETUNREACH)',
 }
 
-/** Whether a result is a failure to reach the server (no HTTP status, a retriable error text). */
+/** Whether a result is a failure to reach the server (no HTTP status and a retriable error, or a web page instead of the API). */
 function isNetworkFailure(result: unknown): boolean {
   if (!result || typeof result !== 'object') return false
   const r = result as { success?: unknown; error?: unknown; statusCode?: unknown }
-  return r.success === false && typeof r.error === 'string' && r.statusCode === undefined && isRetriableError(r.error)
+  if (r.success !== false || typeof r.error !== 'string') return false
+  return isUnreachableFailure(r as { error: string; statusCode?: number; notApiResponse?: boolean })
 }
 
 /**
@@ -339,9 +377,25 @@ export function writeTask(deps: TaskWriteDeps, spec: TaskWriteSpec, options: Pic
       return enqueue('behind-queue')
     }
 
+    let send = spec.send
+    if (spec.beforeSend) {
+      let before: BeforeSend
+      try {
+        before = await spec.beforeSend()
+      } catch (err) {
+        before = { kind: 'failed', result: { success: false, error: err instanceof Error ? err.message : String(err) } }
+      }
+      if (before.kind === 'answer') return { kind: 'sent', result: before.result }
+      if (before.kind === 'failed') {
+        if (canQueue && isQueueableFailure(before.result, spec.kind ?? 'change')) return enqueue('unreachable', before.result)
+        return { kind: 'refused', result: before.result }
+      }
+      if (before.send) send = before.send
+    }
+
     let result: ApiResult<unknown>
     try {
-      result = await sendSerially(spec.send)
+      result = await sendSerially(send)
     } catch (err) {
       result = { success: false, error: err instanceof Error ? err.message : String(err) }
     }
@@ -371,5 +425,6 @@ export function parseTaskWriteOptions(value: unknown): TaskWriteOptions {
   if (typeof raw.title === 'string' && raw.title) options.title = raw.title
   if (typeof raw.labelTitle === 'string' && raw.labelTitle) options.labelTitle = raw.labelTitle
   if (typeof raw.username === 'string' && raw.username) options.username = raw.username
+  if (typeof raw.completedDue === 'string' || raw.completedDue === null) options.completedDue = raw.completedDue
   return options
 }

@@ -235,3 +235,35 @@ export function restoreTaskCaches(qc: QueryClient, snapshot: TaskCacheSnapshot):
     for (const [key, data] of group) qc.setQueryData(key, data)
   }
 }
+
+/**
+ * Take tasks that only existed as pending creates out of every cached list: the user discarded their
+ * create from the sync panel, so they will never reach the server (E-1).
+ */
+export function removePendingTasks(qc: QueryClient, tempIds: Iterable<number>): void {
+  const ids = new Set<number>()
+  for (const id of tempIds) if (isTempTaskId(id)) ids.add(id)
+  if (ids.size === 0) return
+  const dropFrom = (list: Task[] | undefined): Task[] | undefined => {
+    if (!list || !list.some((t) => ids.has(t.id))) return list
+    return list.filter((t) => !ids.has(t.id))
+  }
+  for (const key of ['tasks', 'view-tasks', 'task-detail'] as const) {
+    qc.setQueriesData<Task[]>({ queryKey: [key] }, dropFrom)
+  }
+  qc.setQueriesData<SectionTaskCacheEntry[]>({ queryKey: ['section-tasks'] }, (old) => {
+    if (!old) return old
+    let changed = false
+    const next = old.map((entry) => {
+      const tasks = dropFrom(entry.tasks)
+      if (tasks === entry.tasks) return entry
+      changed = true
+      return { ...entry, tasks: tasks! }
+    })
+    return changed ? next : old
+  })
+  for (const id of ids) {
+    qc.removeQueries({ queryKey: ['task-detail', id] })
+    qc.removeQueries({ queryKey: ['task-attachments', id] })
+  }
+}

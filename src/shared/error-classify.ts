@@ -40,6 +40,21 @@ export function isAuthError(error: string): boolean {
 }
 
 /**
+ * What a password or OIDC sign-in hears when the server answers 401 after the one refresh and retry.
+ * Starts with "Session expired" so `isAuthError` recognises it.
+ */
+export const SESSION_ENDED_MESSAGE = 'Session expired. Your sign-in has ended; sign in again to keep syncing.'
+
+/**
+ * Said when the server answered a request with a status of 2xx but a web page (or anything else that
+ * is not JSON) instead of the Vikunja API. Usually a sign-in proxy in front of Vikunja (Authelia,
+ * Authentik, Cloudflare Access) whose session ran out: nothing reached Vikunja. The result carries
+ * `notApiResponse: true`; classifiers look at that, never at this text.
+ */
+export const NOT_API_RESPONSE_MESSAGE =
+  'The server answered with a web page instead of the Vikunja API. If a sign-in page protects your Vikunja server, sign in there in your browser, then try again.'
+
+/**
  * Whether the server answered a `q` search with this failure while the session still works: the
  * server's search is broken, not the connection or the sign-in. A ParadeDB `pg_search` extension
  * older than the library Postgres loads answers every search with a 500 ("function
@@ -56,6 +71,17 @@ export interface FailureLike {
   statusCode?: number
   /** A 403 that stands for an API token without this permission (cross-app semantics 9.7). */
   tokenPermission?: boolean
+  /** The server answered with a page that is not the API (`NOT_API_RESPONSE_MESSAGE`): handled like an unreachable server. */
+  notApiResponse?: boolean
+}
+
+/**
+ * Whether a failure means the server could not be reached (or something in front of it answered
+ * instead): reads may fall back to the cache, changes may be queued.
+ */
+export function isUnreachableFailure(failure: FailureLike): boolean {
+  if (failure.notApiResponse) return true
+  return failure.statusCode === undefined && isRetriableError(failure.error)
 }
 
 /**
@@ -70,6 +96,9 @@ export interface FailureLike {
  * request, and 429 means the server refused it, so those are safe.
  */
 export function isQueueableFailure(failure: FailureLike, kind: 'change' | 'create'): boolean {
+  // A page from something in front of Vikunja (a sign-in proxy): nothing reached Vikunja, so even a
+  // create is safe to queue.
+  if (failure.notApiResponse) return true
   const status = failure.statusCode
   if (status === 401 || status === 403) return false
   if (isAuthError(failure.error)) return false

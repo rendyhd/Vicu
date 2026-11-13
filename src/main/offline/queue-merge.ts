@@ -85,6 +85,17 @@ function replaceAt(actions: QueuedAction[], index: number, next: QueuedAction): 
 }
 
 /**
+ * An update with the completed due of a repeating task's completion (cross-app semantics 7.5): kept
+ * only while the patch still completes the task.
+ */
+function withCompletedDue(action: UpdateAction, completedDue: string | null | undefined): UpdateAction {
+  const next = { ...action }
+  if (completedDue !== undefined && next.patch.done === true) next.completedDue = completedDue
+  else delete next.completedDue
+  return next
+}
+
+/**
  * Queue a change to a task's fields.
  *
  * - Pending create: fold into it (update + create = create with merged fields; a completion
@@ -107,7 +118,9 @@ export function mergeUpdate(actions: QueuedAction[], next: UpdateAction, inFligh
   const existingIndex = actions.findIndex((a) => a.type === 'update' && a.taskId === next.taskId && a.id !== inFlightId)
   if (existingIndex !== -1) {
     const existing = actions[existingIndex] as UpdateAction
-    const merged: UpdateAction = { ...existing, patch: { ...existing.patch, ...next.patch } }
+    // The completed due belongs to the newest `done` in the patch (cross-app semantics 7.5).
+    const completedDue = 'done' in next.patch ? next.completedDue : existing.completedDue
+    const merged: UpdateAction = withCompletedDue({ ...existing, patch: { ...existing.patch, ...next.patch } }, completedDue)
     if (next.title !== undefined) merged.title = next.title
     return outcome(replaceAt(actions, existingIndex, merged), { foldedInto: existing.id })
   }
@@ -316,7 +329,7 @@ export function cancelPatchKeys(
       }
       cancelled = true
       if (Object.keys(patch).length === 0) removed.push(action)
-      else next.push({ ...action, patch })
+      else next.push(withCompletedDue({ ...action, patch }, 'done' in patch ? action.completedDue : undefined))
     } else if (action.type === 'create') {
       const fields = { ...action.fields }
       let touched = false

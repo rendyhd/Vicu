@@ -5,6 +5,7 @@ import {
   mapTaskInCaches,
   pendingTaskFromCreate,
   remapTempTaskIds,
+  removePendingTasks,
   taskMayMatchServerFilter,
 } from '../pending-cache'
 import { NULL_DATE } from '../constants'
@@ -182,5 +183,24 @@ describe('mapTaskInCaches', () => {
     expect((qc.getQueryData(['tasks', {}]) as Task[])[1].labels).toHaveLength(0)
     expect((qc.getQueryData(['view-tasks', 7, 70]) as Task[])[0].labels).toHaveLength(1)
     expect((qc.getQueryData(['section-tasks', 1, [7]]) as Array<{ tasks: Task[] }>)[0].tasks[0].labels).toHaveLength(1)
+  })
+})
+
+describe('removePendingTasks (E-1)', () => {
+  it('takes discarded pending creates out of every cached list and leaves real tasks', () => {
+    const qc = new QueryClient()
+    const pending = pendingTaskFromCreate(-3, 1, { title: 'Discarded' })
+    const real = { ...pendingTaskFromCreate(-1, 1, { title: 'Real' }), id: 8 }
+    qc.setQueryData(['tasks', { filter: 'done = false' }], [pending, real])
+    qc.setQueryData(['view-tasks', 1, 2], [real, pending])
+    qc.setQueryData(['section-tasks', 1], [{ id: 1, tasks: [pending] }])
+    qc.setQueryData(['task-detail', -3], [pending])
+
+    removePendingTasks(qc, [-3, 8])
+
+    expect(qc.getQueryData<Task[]>(['tasks', { filter: 'done = false' }])?.map((t) => t.id)).toEqual([8])
+    expect(qc.getQueryData<Task[]>(['view-tasks', 1, 2])?.map((t) => t.id)).toEqual([8])
+    expect(qc.getQueryData<Array<{ tasks: Task[] }>>(['section-tasks', 1])?.[0].tasks).toEqual([])
+    expect(qc.getQueryData(['task-detail', -3])).toBeUndefined()
   })
 })

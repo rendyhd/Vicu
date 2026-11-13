@@ -24,6 +24,8 @@ const hoisted = vi.hoisted(() => {
     replay: vi.fn(async () => null),
     api: {} as Record<string, ReturnType<typeof vi.fn>>,
     queue,
+    config: null as null | Record<string, unknown>,
+    readSetup: vi.fn(async (..._args: unknown[]) => ({ inboxProjectId: null, defaultProjectId: null })),
   }
 })
 
@@ -40,7 +42,7 @@ vi.mock('../secure-ipc', () => ({
   },
 }))
 vi.mock('../api-client', () => {
-  const entries = Object.fromEntries(['updateTask', 'patchTaskJson', 'deleteTask', 'addLabelToTask', 'removeLabelFromTask', 'createTask', 'updateTaskPosition', 'createTaskRelation', 'deleteTaskRelation'].map((name) => {
+  const entries = Object.fromEntries(['updateTask', 'fetchTaskById', 'patchTaskJson', 'deleteTask', 'addLabelToTask', 'removeLabelFromTask', 'createTask', 'updateTaskPosition', 'createTaskRelation', 'deleteTaskRelation'].map((name) => {
     const fn = vi.fn(async (..._args: unknown[]): Promise<unknown> => ({ success: true, data: { id: 5 } }))
     hoisted.api[name] = fn
     return [name, fn]
@@ -62,7 +64,7 @@ vi.mock('../carrier-service', () => ({
   rememberCreatedTask: () => undefined,
 }))
 vi.mock('../config', () => ({
-  loadConfig: () => null,
+  loadConfig: () => hoisted.config,
   saveConfig: () => undefined,
   applyConfigPatch: (c: unknown) => c,
   applyConnectionFields: (c: unknown) => c,
@@ -74,7 +76,11 @@ vi.mock('../auth/oidc-discovery', () => ({}))
 vi.mock('../auth/user-info', () => ({}))
 vi.mock('../auth/auth-manager', () => ({ authManager: {} }))
 vi.mock('../auth/oidc-login', () => ({ OidcTotpRequiredError: class extends Error {} }))
-vi.mock('../auth/token-store', () => ({ API_TOKEN_NO_EXPIRY: 0 }))
+vi.mock('../auth/token-store', () => ({ API_TOKEN_NO_EXPIRY: 0, getAPIToken: () => 'saved-token' }))
+vi.mock('../synced-preferences', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../synced-preferences')>()),
+  readSetupPreferences: hoisted.readSetup,
+}))
 vi.mock('../notifications', () => ({}))
 vi.mock('../badge', () => ({ setTaskBadge: () => undefined, clearTaskBadge: () => undefined }))
 vi.mock('../obsidian-client', () => ({}))
@@ -118,6 +124,8 @@ describe('task writes go through the write gate', () => {
     }
     hoisted.queue.waiting = false
     hoisted.queue.pending = 0
+    hoisted.config = null
+    hoisted.readSetup.mockClear()
     registerIpcHandlers()
   })
 
@@ -181,6 +189,26 @@ describe('task writes go through the write gate', () => {
       expect(hoisted.api.updateTask).not.toHaveBeenCalled()
       expect(hoisted.queue.enqueueUpdate).toHaveBeenCalledWith(5, { title: 'EDIT2' }, { title: 'T' })
       expect(hoisted.viewerSend).not.toHaveBeenCalled()
+    })
+
+    it('reads a repeating task before its completion and skips a completion another device made (contract 7.5)', async () => {
+      hoisted.api.fetchTaskById.mockResolvedValueOnce({
+        success: true,
+        data: { id: 5, done: false, due_date: '2026-11-14T22:59:59Z', repeat_after: 86400, repeat_mode: 0 },
+      })
+
+      const result = await call('update-task', 5, { done: true }, { queue: true, completedDue: '2026-11-13T22:59:59Z' })
+
+      expect(hoisted.api.fetchTaskById).toHaveBeenCalledWith(5)
+      expect(hoisted.api.updateTask).not.toHaveBeenCalled()
+      expect(result).toMatchObject({ success: true, repeatSkipped: true, data: { due_date: '2026-11-14T22:59:59Z' } })
+    })
+
+    it('completes a task without completedDue without reading it', async () => {
+      await call('update-task', 5, { done: true }, { queue: true })
+
+      expect(hoisted.api.fetchTaskById).not.toHaveBeenCalled()
+      expect(hoisted.api.updateTask).toHaveBeenCalledWith(5, { done: true })
     })
 
     it('queues a change the server cannot take', async () => {
@@ -295,5 +323,30 @@ describe('task writes go through the write gate', () => {
         expect(hoisted.api[name]).toHaveBeenCalledTimes(1)
       }
     })
+  })
+})
+
+describe('synced-prefs:read-for-setup (S-14)', () => {
+  beforeEach(() => {
+    hoisted.handlers.clear()
+    hoisted.readSetup.mockClear()
+    hoisted.config = { vikunja_url: 'https://tasks.example.com', auth_method: 'api_token', api_token: '' }
+    registerIpcHandlers()
+  })
+  afterEach(() => {
+    hoisted.config = null
+  })
+
+  it('sends the saved token only to the saved server', async () => {
+    await call('synced-prefs:read-for-setup', 'https://tasks.example.com/', undefined)
+    expect(hoisted.readSetup).toHaveBeenLastCalledWith('https://tasks.example.com/', 'saved-token')
+
+    await call('synced-prefs:read-for-setup', 'https://elsewhere.example.net', undefined)
+    expect(hoisted.readSetup).toHaveBeenLastCalledWith('https://elsewhere.example.net', '')
+  })
+
+  it('uses a token passed with the call', async () => {
+    await call('synced-prefs:read-for-setup', 'https://elsewhere.example.net', 'typed')
+    expect(hoisted.readSetup).toHaveBeenLastCalledWith('https://elsewhere.example.net', 'typed')
   })
 })

@@ -88,8 +88,9 @@ export const api = {
   updateTask: (id: number, task: UpdateTaskPayload) =>
     window.api.updateTask(id, task) as Promise<ApiResult<Task>>,
 
-  updateTaskOrQueue: (id: number, task: UpdateTaskPayload, title?: string) =>
-    window.api.updateTask(id, task, queueOptions(title)) as Promise<ApiResult<Task> | QueuedWriteReply>,
+  /** `extra.completedDue`: the due date a repeating task's completion completed (cross-app semantics 7.5). */
+  updateTaskOrQueue: (id: number, task: UpdateTaskPayload, title?: string, extra: Pick<TaskWriteOptions, 'completedDue'> = {}) =>
+    window.api.updateTask(id, task, { ...queueOptions(title), ...extra }) as Promise<ApiResult<Task> | QueuedWriteReply>,
 
   deleteTask: (id: number) =>
     window.api.deleteTask(id) as Promise<ApiResult<void>>,

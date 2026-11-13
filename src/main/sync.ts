@@ -20,6 +20,7 @@ import {
   updateTaskComment,
   deleteTaskComment,
   fetchTaskComments,
+  connectionState,
 } from './api-client'
 import { findQueuedComment } from './offline/comment-overlay'
 import { OFFLINE_EVENTS, forgetKnownUser, getOfflineQueue, knownUserIdFor, rememberKnownUser, sendToAppWindows } from './offline/service'
@@ -72,6 +73,7 @@ const api: ReplayApi = {
     const me = config?.vikunja_url ? knownUserIdFor(config.vikunja_url) : undefined
     return { success: true, data: findQueuedComment(page.data.items, html, since, me) }
   },
+  connectionState: () => connectionState(),
 }
 
 // After a replay stopped on a server or network problem, try again soon instead of waiting for the

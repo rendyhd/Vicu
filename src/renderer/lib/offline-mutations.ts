@@ -49,17 +49,30 @@ export interface PatchOutcome {
   queued: boolean
   /** The server's task, or null when the change was queued. */
   task: Task | null
+  /**
+   * A repeating task's completion was not sent: another device had completed that occurrence
+   * already, and `task` is the server's task as it is (cross-app semantics 7.5).
+   */
+  repeatSkipped?: boolean
 }
 
 /** Send a minimal task patch, or queue it. */
-export async function sendTaskPatch(id: number, patch: TaskPatch, title?: string): Promise<PatchOutcome> {
+export async function sendTaskPatch(
+  id: number,
+  patch: TaskPatch,
+  title?: string,
+  /** `completedDue`: with `{ done: true }` of a task held as repeating, the due date it completed (cross-app semantics 7.5). */
+  options: { completedDue?: string | null } = {},
+): Promise<PatchOutcome> {
   if (isTempTaskId(id)) {
+    // A pending create is not on the server: no other device can have completed it.
     await queueChange(() => api.offlineQueue.enqueueUpdate(id, patch, titleMeta(title)))
     return { queued: true, task: null }
   }
-  const result = await api.updateTaskOrQueue(id, patch, title)
+  const result = await api.updateTaskOrQueue(id, patch, title, options.completedDue !== undefined ? { completedDue: options.completedDue } : {})
   if (!result.success) throw apiError(result)
   if (isQueuedReply(result)) return { queued: true, task: null }
+  if ((result as { repeatSkipped?: unknown }).repeatSkipped === true) return { queued: false, task: result.data, repeatSkipped: true }
   return { queued: false, task: result.data }
 }
 

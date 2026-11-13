@@ -57,6 +57,15 @@ describe('mutation helpers with the offline queue (D-SYNC-6, decision 4)', () =>
       expect(result).toEqual({ queued: false, task: { id: 5 } })
     })
 
+    it('passes the completed due of a repeating completion and reports a skipped one (contract 7.5)', async () => {
+      updateTask.mockResolvedValueOnce({ success: true, data: { id: 5, done: false }, repeatSkipped: true })
+
+      const result = await sendTaskPatch(5, { done: true }, 'Take pills', { completedDue: '2026-11-13T22:59:59Z' })
+
+      expect(updateTask).toHaveBeenCalledWith(5, { done: true }, { queue: true, title: 'Take pills', completedDue: '2026-11-13T22:59:59Z' })
+      expect(result).toEqual({ queued: false, task: { id: 5, done: false }, repeatSkipped: true })
+    })
+
     it('reports a queued change (the server was unreachable, or changes for the task were waiting) without a task', async () => {
       updateTask.mockResolvedValueOnce(queuedReply)
 
