@@ -823,6 +823,31 @@ of the sequence. Events: `complete`, `hoverStart`, `hoverEnd`, `focusIn`, `focus
 fires first. `held` and `collapsed` are row ids in ascending order, `toast` is the text shown or
 `null`. Rows in the vectors start open.
 
+### 7.5 A repeating task completed on two devices
+
+Vikunja moves a repeating task on (a new due date, open again) from the dates it holds when
+`{ done: true }` arrives. A second completion of the same occurrence, sent later by a device that
+was offline or showed an old copy, would move it on again and skip an occurrence. So:
+
+- A completion remembers the **completed due**: the task's `due_date` as the app held it when
+  the user completed it. A queued completion stores it with the change.
+- Before the completion of a task the app holds as repeating (`repeat_after` above 0, or
+  `repeat_mode` not 0) is sent, directly or from the queue, the app reads the task and decides
+  (`repeatCompletion` vectors):
+  - the server's task is done: **skip**;
+  - the server's task does not repeat: **send**;
+  - the server's `due_date` is the same instant as the completed due (no date on both sides is
+    the same): **send**;
+  - otherwise: **skip**. Another device completed this occurrence already.
+- **Skip** sends nothing, counts the change as done, and the app shows the server's task. It is
+  not an error and is not reported to the user.
+- When the task cannot be read because the server cannot be reached, a direct completion is
+  queued and a queued one waits, as for any change. A 404 is handled as for any change.
+- A task the app holds as not repeating is completed without the read. A queued completion
+  without a completed due (written by an older version) is sent as before.
+- Dates are compared as instants, never as text. `null`, an empty string and
+  `0001-01-01T00:00:00Z` are all "no date".
+
 ---
 
 ## 8. Date display

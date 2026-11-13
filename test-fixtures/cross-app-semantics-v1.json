@@ -579,6 +579,25 @@
       }
     ]
   },
+  "repeatCompletion": {
+    "about": "Vectors for docs/cross-app-semantics-v1.md section 7.5: whether the completion of a repeating task is still sent. completedDue is the due date the app held when the user completed the task; server is the task as just read. expect is send or skip. Dates are compared as instants; null, an empty string and 0001-01-01T00:00:00Z are no date.",
+    "vectors": [
+      { "name": "same occurrence", "completedDue": "2026-11-13T22:59:59Z", "server": { "done": false, "due_date": "2026-11-13T22:59:59Z", "repeat_after": 86400, "repeat_mode": 0 }, "expect": "send" },
+      { "name": "same instant, another offset", "completedDue": "2026-11-13T22:59:59Z", "server": { "done": false, "due_date": "2026-11-13T23:59:59+01:00", "repeat_after": 86400, "repeat_mode": 0 }, "expect": "send" },
+      { "name": "same instant, fraction of a second", "completedDue": "2026-11-13T22:59:59Z", "server": { "done": false, "due_date": "2026-11-13T22:59:59.000Z", "repeat_after": 86400, "repeat_mode": 0 }, "expect": "send" },
+      { "name": "moved on by another device", "completedDue": "2026-11-13T22:59:59Z", "server": { "done": false, "due_date": "2026-11-14T22:59:59Z", "repeat_after": 86400, "repeat_mode": 0 }, "expect": "skip" },
+      { "name": "moved on, monthly", "completedDue": "2026-11-13T22:59:59Z", "server": { "done": false, "due_date": "2026-12-13T22:59:59Z", "repeat_after": 0, "repeat_mode": 1 }, "expect": "skip" },
+      { "name": "moved on, from completion", "completedDue": "2026-11-13T22:59:59Z", "server": { "done": false, "due_date": "2026-11-20T09:12:40Z", "repeat_after": 604800, "repeat_mode": 2 }, "expect": "skip" },
+      { "name": "moved back by an edit", "completedDue": "2026-11-13T22:59:59Z", "server": { "done": false, "due_date": "2026-11-12T22:59:59Z", "repeat_after": 86400, "repeat_mode": 0 }, "expect": "skip" },
+      { "name": "already done on the server", "completedDue": "2026-11-13T22:59:59Z", "server": { "done": true, "due_date": "2026-11-13T22:59:59Z", "repeat_after": 86400, "repeat_mode": 0 }, "expect": "skip" },
+      { "name": "no longer repeats", "completedDue": "2026-11-13T22:59:59Z", "server": { "done": false, "due_date": "2026-11-20T22:59:59Z", "repeat_after": 0, "repeat_mode": 0 }, "expect": "send" },
+      { "name": "no date on both sides", "completedDue": "0001-01-01T00:00:00Z", "server": { "done": false, "due_date": "0001-01-01T00:00:00Z", "repeat_after": 86400, "repeat_mode": 0 }, "expect": "send" },
+      { "name": "no date as null and as the zero time", "completedDue": null, "server": { "done": false, "due_date": "0001-01-01T00:00:00Z", "repeat_after": 86400, "repeat_mode": 0 }, "expect": "send" },
+      { "name": "no date as an empty string", "completedDue": "", "server": { "done": false, "due_date": null, "repeat_after": 86400, "repeat_mode": 0 }, "expect": "send" },
+      { "name": "a date where there was none", "completedDue": null, "server": { "done": false, "due_date": "2026-11-14T22:59:59Z", "repeat_after": 86400, "repeat_mode": 0 }, "expect": "skip" },
+      { "name": "the date was removed", "completedDue": "2026-11-13T22:59:59Z", "server": { "done": false, "due_date": "0001-01-01T00:00:00Z", "repeat_after": 86400, "repeat_mode": 0 }, "expect": "skip" }
+    ]
+  },
   "dateDisplay": {
     "about": "Vectors for the date display rules of docs/cross-app-semantics-v1.md section 8. now and due are local wall-clock times in zone; for the logbook contexts due is the completion time and dateOnly is false. Expected strings are built from names and patterns (never from platform locale data): they use plain ASCII spaces, Sep for September, am/pm in lower case in en-GB and AM/PM in en-US.",
     "names": {
