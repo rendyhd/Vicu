@@ -5,6 +5,7 @@ import { pathToFileURL } from 'url'
 import {
   decideNavigation,
   isAppUrl,
+  isDeepLinkAllowed,
   isExternalAllowed,
   isTrustedSender,
   type AppOrigin,
@@ -117,11 +118,15 @@ describe('isAppUrl (development)', () => {
 })
 
 describe('isExternalAllowed', () => {
-  it('allows web, mail and Obsidian links', () => {
+  it('allows web and mail links', () => {
     expect(isExternalAllowed('https://vikunja.io/docs')).toBe(true)
     expect(isExternalAllowed('http://example.com')).toBe(true)
     expect(isExternalAllowed('mailto:someone@example.com')).toBe(true)
-    expect(isExternalAllowed('obsidian://open?vault=Notes&file=Inbox')).toBe(true)
+  })
+
+  it('never allows an Obsidian address, whatever its shape', () => {
+    expect(isExternalAllowed('obsidian://open?vault=Notes&file=Inbox')).toBe(false)
+    expect(isExternalAllowed('obsidian://advanced-uri?vault=Notes&commandid=app%3Adelete-file')).toBe(false)
   })
 
   it('drops schemes that can run local code or read local files', () => {
@@ -138,6 +143,31 @@ describe('isExternalAllowed', () => {
     expect(isExternalAllowed('example.com')).toBe(false)
     expect(isExternalAllowed(42)).toBe(false)
     expect(isExternalAllowed(undefined)).toBe(false)
+  })
+})
+
+describe('isDeepLinkAllowed', () => {
+  it('opens web and mail links and the note links Vicu writes', () => {
+    expect(isDeepLinkAllowed('https://example.com/page')).toBe(true)
+    expect(isDeepLinkAllowed('mailto:someone@example.com')).toBe(true)
+    expect(isDeepLinkAllowed('obsidian://open?vault=Notes&file=Inbox')).toBe(true)
+    expect(isDeepLinkAllowed('obsidian://advanced-uri?vault=Notes&uid=42')).toBe(true)
+  })
+
+  it('refuses an Obsidian address that does more than open a note', () => {
+    expect(isDeepLinkAllowed('obsidian://advanced-uri?vault=Notes&commandid=shell-commands%3Arun')).toBe(false)
+    expect(isDeepLinkAllowed('obsidian://advanced-uri?vault=Notes&uid=42&commandid=app%3Adelete-file')).toBe(false)
+    expect(isDeepLinkAllowed('obsidian://advanced-uri?vault=Notes&filepath=a.md&data=x&mode=overwrite')).toBe(false)
+    expect(isDeepLinkAllowed('obsidian://new?vault=Notes&file=Inbox')).toBe(false)
+    expect(isDeepLinkAllowed('obsidian://open?vault=Notes&path=%2Fetc%2Fpasswd')).toBe(false)
+  })
+
+  it('refuses what no link button holds', () => {
+    expect(isDeepLinkAllowed('file:///C:/Windows/System32/calc.exe')).toBe(false)
+    expect(isDeepLinkAllowed('javascript:alert(1)')).toBe(false)
+    expect(isDeepLinkAllowed('vicu://task/1')).toBe(false)
+    expect(isDeepLinkAllowed('')).toBe(false)
+    expect(isDeepLinkAllowed(undefined)).toBe(false)
   })
 })
 

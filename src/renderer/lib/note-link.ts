@@ -1,3 +1,5 @@
+import { isAllowedNoteLink } from '../../shared/note-links'
+
 export interface NoteLink {
   url: string
   name: string
@@ -8,13 +10,20 @@ function unescapeHtml(str: string): string {
   return str.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"')
 }
 
+/**
+ * The note link a task offers to open. Anyone who may edit the task can write the marker, so only
+ * the two shapes Vicu writes are offered (`isAllowedNoteLink`, description format "Task links");
+ * any other `obsidian:` address gives no link. The marker itself stays in the description.
+ */
 export function extractNoteLink(description: string | undefined | null): NoteLink | null {
   if (!description) return null
   const match = description.match(/<!-- notelink:(obsidian:\/\/[^">\s]+) -->/)
   if (!match) return null
+  const url = unescapeHtml(match[1])
+  if (!isAllowedNoteLink(url)) return null
   const nameMatch = description.match(/\u{1F4CE}\s*([^<]+)<\/a>/u)
   const name = nameMatch ? nameMatch[1].trim() : 'Obsidian note'
-  return { url: unescapeHtml(match[1]), name, app: 'obsidian' }
+  return { url, name, app: 'obsidian' }
 }
 
 /** Remove the notelink HTML comment + anchor tag from a description */

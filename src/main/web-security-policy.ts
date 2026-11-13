@@ -2,6 +2,8 @@
 // here touches Electron, so it can be unit-tested directly. The Electron glue
 // lives in web-security.ts.
 
+import { isAllowedNoteLink } from '../shared/note-links'
+
 /**
  * Session partition used by the OIDC sign-in and silent-reauth windows. Those
  * windows load third-party identity-provider pages, have no preload and are
@@ -20,8 +22,12 @@ export interface AppOrigin {
   caseInsensitivePaths?: boolean
 }
 
-/** Schemes that may be handed to the operating system via shell.openExternal. */
-const EXTERNAL_PROTOCOLS: ReadonlySet<string> = new Set(['http:', 'https:', 'mailto:', 'obsidian:'])
+/**
+ * Schemes that may be handed to the operating system via shell.openExternal. `obsidian:` is not
+ * one of them: an Obsidian address can run commands and write files, so only a task's note link in
+ * one of the shapes Vicu writes is opened, and only through `isDeepLinkAllowed`.
+ */
+const EXTERNAL_PROTOCOLS: ReadonlySet<string> = new Set(['http:', 'https:', 'mailto:'])
 
 function parseUrl(url: unknown): URL | null {
   if (typeof url !== 'string' || url.length === 0) return null
@@ -78,12 +84,22 @@ export function isAppUrl(url: unknown, origin: AppOrigin): boolean {
 
 /**
  * True when `url` may be opened in the user's default handler (browser, mail
- * client, Obsidian). Anything else (file:, javascript:, data:, custom schemes)
+ * client). Anything else (file:, javascript:, data:, custom schemes, obsidian:)
  * is dropped.
  */
 export function isExternalAllowed(url: unknown): boolean {
   const parsed = parseUrl(url)
   return !!parsed && EXTERNAL_PROTOCOLS.has(parsed.protocol)
+}
+
+/**
+ * True when the link button of a task row may open `url`: a web or mail address, or a note link in
+ * one of the two shapes Vicu writes (description format, "Task links"). The marker a link is read
+ * from can be written by anyone who may edit the task, so the renderer's own test is not enough:
+ * main decides again before the address reaches the system.
+ */
+export function isDeepLinkAllowed(url: unknown): boolean {
+  return isExternalAllowed(url) || isAllowedNoteLink(url)
 }
 
 export type NavigationDecision = 'allow' | 'external' | 'block'

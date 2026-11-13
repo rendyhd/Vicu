@@ -11,7 +11,7 @@ import { shell, dialog, app, nativeTheme, clipboard as electronClipboard, Clipbo
 import { isProEnabled } from '../shared/pro/settings'
 import { handleTrusted } from './secure-ipc'
 import { tokenForConnectionTest } from './connection-test-token'
-import { isExternalAllowed } from './web-security-policy'
+import { isDeepLinkAllowed } from './web-security-policy'
 import { readUploadAnswer } from '../shared/attachment-upload'
 import { isRiskyAttachment, sanitizeAttachmentFileName } from './attachment-safety'
 import { ensureAttachmentTempDir } from './attachment-temp'
@@ -1229,7 +1229,7 @@ export function registerIpcHandlers(): void {
 
   // --- Obsidian IPC ---
   handleTrusted('open-deep-link', (_event, url: string) => {
-    if (isExternalAllowed(url)) {
+    if (isDeepLinkAllowed(url)) {
       shell.openExternal(url).catch(() => { /* no handler for the scheme */ })
     }
   })

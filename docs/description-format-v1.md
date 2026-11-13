@@ -203,6 +203,34 @@ Content between delimiters is read by the same rules. `isMarkdown` is true when
 any block other than a paragraph was made, or any inline rule except 3 and 6
 applied.
 
+## Task links
+
+A `notelink` or `pagelink` pair is kept through every edit, whatever address it
+holds (compatibility invariant 6). Whether an app offers to open the address is
+a separate rule, because anyone who may edit the task can write the pair, and
+an `obsidian:` address can do more than open a note (run a command, write a
+file).
+
+- A `pagelink` address is offered when it starts with `http://` or `https://`.
+- A `notelink` address is offered only in one of the two shapes Vicu writes,
+  compared as text after the HTML entities of the comment are decoded:
+  - `obsidian://open?` with the parameters `vault` and `file`;
+  - `obsidian://advanced-uri?` with the parameters `vault` and `uid`.
+
+  Exactly those two parameters, each once, in either order, as `name=value`
+  joined by `&`. The scheme, the action and the names are lower case and never
+  percent-encoded. `file` and `uid` are not empty; `vault` may be. The address
+  holds no `#`, `"`, `<`, `>`, space or control character and is at most 2048
+  characters long.
+
+Any other Obsidian address (another action, a third parameter such as
+`commandid`, `data`, `mode`, `eval`, `path` or `filepath`, the
+`obsidian://vault/...` short form) is not offered: no link icon is shown and
+nothing is opened. The pair stays in the description. The same test runs again
+where the address is handed to the system, not only where the icon is drawn.
+
+The `noteLinks` vectors of `description-format-v1.json` pin the rule.
+
 ## Synchronization
 
 An editor session tracks a server revision, a baseline document, a draft, and

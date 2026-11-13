@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { hasNotesContent, notesPreview } from '../note-link'
+import { extractNoteLink, extractNoteLinkHtml, extractTaskLink, hasNotesContent, notesPreview, stripNoteLink } from '../note-link'
 
 describe('notesPreview', () => {
   it('is the plain text on one line', () => {
@@ -32,5 +32,47 @@ describe('notesPreview', () => {
     expect(notesPreview(null)).toBe('')
     expect(notesPreview('')).toBe('')
     expect(notesPreview('<p></p>')).toBe('')
+  })
+})
+
+describe('extractNoteLink', () => {
+  const pair = (url: string, name = 'Runbook') => {
+    const escaped = url.replace(/&/g, '&amp;')
+    return `<p>Body</p><!-- notelink:${escaped} --><p><a href="${escaped}">\u{1F4CE} ${name}</a></p>`
+  }
+
+  it('reads the two links Vicu writes', () => {
+    expect(extractNoteLink(pair('obsidian://open?vault=Personal&file=Tasks%2FRunbook'))).toEqual({
+      url: 'obsidian://open?vault=Personal&file=Tasks%2FRunbook',
+      name: 'Runbook',
+      app: 'obsidian',
+    })
+    expect(extractNoteLink(pair('obsidian://advanced-uri?vault=Personal&uid=42'))?.url).toBe(
+      'obsidian://advanced-uri?vault=Personal&uid=42',
+    )
+  })
+
+  it('gives no link for an Obsidian address that does more than open a note', () => {
+    for (const url of [
+      'obsidian://advanced-uri?vault=Personal&commandid=shell-commands%3Arun',
+      'obsidian://advanced-uri?vault=Personal&uid=42&commandid=app%3Adelete-file',
+      'obsidian://advanced-uri?vault=Personal&filepath=a.md&data=x&mode=overwrite',
+      'obsidian://new?vault=Personal&file=Inbox&content=x&overwrite=true',
+      'obsidian://open?vault=Ops',
+    ]) {
+      expect(extractNoteLink(pair(url, 'Meeting notes'))).toBeNull()
+      expect(extractTaskLink(pair(url, 'Meeting notes'))).toBeNull()
+    }
+  })
+
+  it('keeps a refused marker in the description', () => {
+    const refused = pair('obsidian://advanced-uri?vault=Personal&commandid=x')
+    expect(extractNoteLinkHtml(refused)).toContain('notelink:obsidian://advanced-uri')
+    expect(stripNoteLink(refused)).toBe('<p>Body</p>')
+  })
+
+  it('still offers the page link of a task whose note link is refused', () => {
+    const both = `${pair('obsidian://new?vault=V&file=a')}<!-- pagelink:https://example.com/a --><p><a href="https://example.com/a">\u{1F517} A page</a></p>`
+    expect(extractTaskLink(both)).toMatchObject({ kind: 'page', url: 'https://example.com/a' })
   })
 })
