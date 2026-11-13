@@ -12,6 +12,9 @@ resources/voice/vicu-speech-macos
 # Built by scripts/build-calendar-helper.mjs (npm run calendar:helper)
 resources/calendar/
 
+# Built by scripts/build-bridge-helper.mjs (npm run bridge:helper)
+resources/bridge/
+
 # Local files
 .DS_Store
 .claude/settings.local.json

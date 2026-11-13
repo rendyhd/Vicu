@@ -14,8 +14,8 @@
     "start": "electron-vite preview",
     "dist": "npm run build && npm run speech:lib && electron-builder --win",
     "dist:publish": "npm run build && npm run speech:lib && electron-builder --win --publish always",
-    "dist:mac": "npm run build && npm run voice:helper && npm run calendar:helper && npm run speech:lib && electron-builder --mac",
-    "dist:mac:publish": "npm run build && npm run voice:helper && npm run calendar:helper && npm run speech:lib && electron-builder --mac --publish always",
+    "dist:mac": "npm run build && npm run voice:helper && npm run calendar:helper && npm run bridge:helper && npm run speech:lib && electron-builder --mac",
+    "dist:mac:publish": "npm run build && npm run voice:helper && npm run calendar:helper && npm run bridge:helper && npm run speech:lib && electron-builder --mac --publish always",
     "dist:linux": "npm run build && npm run speech:lib && electron-builder --linux && node scripts/appimage-update-info.mjs --optional",
     "typecheck": "tsc --noEmit --composite false -p tsconfig.node.json --pretty false && tsc --noEmit --composite false -p tsconfig.web.json --pretty false && tsc --noEmit --composite false -p tsconfig.vite.json --pretty false",
     "verify": "npm run typecheck && npm test && npm run build",
@@ -24,6 +24,7 @@
     "tokens": "node scripts/gen-tokens.mjs",
     "voice:helper": "node scripts/build-voice-helper.mjs",
     "calendar:helper": "node scripts/build-calendar-helper.mjs",
+    "bridge:helper": "node scripts/build-bridge-helper.mjs",
     "speech:lib": "node scripts/build-speech.mjs --if-stale",
     "ui:verify": "node scripts/ui-verify/desktop.mjs",
     "site": "node site/tools/serve.mjs",
@@ -59,6 +60,7 @@
     "zustand": "^4.5.0"
   },
   "devDependencies": {
+    "@electron/fuses": "^1.8.0",
     "@tailwindcss/typography": "^0.5.19",
     "@types/dompurify": "^3.0.5",
     "@types/react": "^18.3.0",

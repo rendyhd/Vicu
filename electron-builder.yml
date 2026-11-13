@@ -40,6 +40,13 @@ extraResources:
 asarUnpack:
   - "node_modules/koffi/**"
 
+# Electron fuses, set right before signing (review 2026-11-13, S-4). On macOS the packaged app does
+# not run as Node, ignores NODE_OPTIONS and --inspect, and loads only the checked app.asar; the
+# hook refuses a Mac build without the browser link tool (resources/bridge/, npm run
+# bridge:helper). Windows and Linux are unchanged until their browser bridge stops running the app
+# binary as Node. The hook says what it did in the build log.
+afterPack: ./scripts/electron-fuses.mjs
+
 win:
   icon: build/icon.ico
   target:

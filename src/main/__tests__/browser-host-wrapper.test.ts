@@ -4,7 +4,9 @@ import { describe, expect, it } from 'vitest'
 import {
   buildPosixWrapper,
   buildWindowsWrapper,
+  chooseHostLaunch,
   hostRegistryKey,
+  isStaleBridgeLaunch,
   registryAddArgs,
   registryDeleteArgs,
   resolveHostExecutable,
@@ -27,6 +29,61 @@ describe('resolveHostExecutable', () => {
 
   it('ignores an empty APPIMAGE value', () => {
     expect(resolveHostExecutable({ platform: 'linux', execPath: '/opt/Vicu/vicu', appImage: '' })).toBe('/opt/Vicu/vicu')
+  })
+})
+
+describe('chooseHostLaunch', () => {
+  const helperPath = '/Applications/Vicu.app/Contents/Resources/resources/bridge/vicu-bridge-macos'
+
+  it('names the signed bridge tool on macOS, packaged or not', () => {
+    expect(chooseHostLaunch({ platform: 'darwin', packaged: true, helperPath, helperExists: true })).toEqual({ kind: 'helper', path: helperPath })
+    expect(chooseHostLaunch({ platform: 'darwin', packaged: false, helperPath: '/src/vicu/resources/bridge/vicu-bridge-macos', helperExists: true })).toEqual({
+      kind: 'helper',
+      path: '/src/vicu/resources/bridge/vicu-bridge-macos',
+    })
+  })
+
+  it('registers nothing for a packaged Mac build without the tool: its wrapper would start the whole app', () => {
+    const launch = chooseHostLaunch({ platform: 'darwin', packaged: true, helperPath, helperExists: false })
+    expect(launch.kind).toBe('none')
+    expect(launch.kind === 'none' && launch.reason).toContain('vicu-bridge-macos')
+  })
+
+  it('falls back to the wrapper for an unpackaged run on a Mac, where Electron still runs as Node', () => {
+    expect(chooseHostLaunch({ platform: 'darwin', packaged: false, helperPath, helperExists: false })).toEqual({ kind: 'wrapper' })
+  })
+
+  it('keeps the wrapper on Windows and Linux, whatever is on disk', () => {
+    for (const platform of ['win32', 'linux'] as const) {
+      for (const packaged of [true, false]) {
+        for (const helperExists of [true, false]) {
+          expect(chooseHostLaunch({ platform, packaged, helperPath, helperExists })).toEqual({ kind: 'wrapper' })
+        }
+      }
+    }
+  })
+})
+
+describe('isStaleBridgeLaunch', () => {
+  it('recognises the app started by an old wrapper, with the bridge script as its argument', () => {
+    expect(
+      isStaleBridgeLaunch([
+        '/Applications/Vicu.app/Contents/MacOS/Vicu',
+        '/Applications/Vicu.app/Contents/Resources/resources/native-messaging-host/vicu-bridge.js',
+      ]),
+    ).toBe(true)
+    expect(isStaleBridgeLaunch(['C:\\Vicu\\Vicu.exe', 'C:\\Vicu\\resources\\resources\\native-messaging-host\\vicu-bridge.js'])).toBe(true)
+    expect(isStaleBridgeLaunch(['/opt/Vicu/vicu', '/home/u/.config/vicu/vicu-bridge.js', 'chrome-extension://abc/'])).toBe(true)
+  })
+
+  it('leaves every ordinary start alone', () => {
+    expect(isStaleBridgeLaunch(['/Applications/Vicu.app/Contents/MacOS/Vicu'])).toBe(false)
+    expect(isStaleBridgeLaunch(['/opt/Vicu/vicu', '--hidden'])).toBe(false)
+    expect(isStaleBridgeLaunch(['/opt/Vicu/vicu', '--quick-entry'])).toBe(false)
+    expect(isStaleBridgeLaunch(['C:\\Vicu\\Vicu.exe', 'vicu://add?title=vicu-bridge.js'])).toBe(false)
+    expect(isStaleBridgeLaunch(['/usr/bin/electron', '.', '/tmp/not-vicu-bridge.js'])).toBe(false)
+    // The binary's own path is not an argument.
+    expect(isStaleBridgeLaunch(['/odd/vicu-bridge.js'])).toBe(false)
   })
 })
 
@@ -135,5 +192,11 @@ describe('browser-host-registration.ts source', () => {
 
   it('no longer looks up a system node', () => {
     expect(source).not.toContain('which node')
+  })
+
+  it('writes every manifest with the path the launch decision gives, never the wrapper directly', () => {
+    expect(source.match(/const hostPath = resolveHostPath\(\)/g)?.length).toBe(6)
+    expect(source).not.toMatch(/const hostPath = ensureWrapper\(\)/)
+    expect(source.match(/ensureWrapper\(\)/g)?.length).toBe(2) // its definition and resolveHostPath
   })
 })

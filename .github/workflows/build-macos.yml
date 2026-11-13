@@ -65,6 +65,11 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      # The browser link's host on macOS (native/bridge-macos), built before the tests so they run
+      # against the real tool; the afterPack hook refuses a Mac build without it.
+      - name: Build the browser link helper
+        run: npm run bridge:helper
+
       - name: Test
         run: npm test
 

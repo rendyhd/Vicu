@@ -7,6 +7,7 @@ import { isMac, isWindows, isLinux } from './platform'
 import {
   buildPosixWrapper,
   buildWindowsWrapper,
+  chooseHostLaunch,
   hostRegistryKey,
   registryAddArgs,
   registryDeleteArgs,
@@ -45,9 +46,17 @@ export function getBridgePath(): string {
   return candidates[0] // fallback, even if non-existent, so the error is visible
 }
 
-// The wrapper the browser launches lives in userData, never inside the install directory: that
-// may be read-only (Program Files) and, on macOS, writing into the .app would break its signature.
-// It runs the bridge with the app's own binary as Node (ELECTRON_RUN_AS_NODE), so no system
+// macOS: the browser starts the bridge tool itself (native/bridge-macos, built into
+// resources/bridge/ by `npm run bridge:helper` and signed with the app). The packaged app does not
+// run as Node there (scripts/electron-fuses.mjs), so there is no wrapper.
+export function getBridgeHelperPath(): string {
+  if (app.isPackaged) return join(process.resourcesPath, 'resources', 'bridge', 'vicu-bridge-macos')
+  return join(dirname(dirname(getBridgePath())), 'bridge', 'vicu-bridge-macos')
+}
+
+// Windows and Linux (and an unpackaged run on a Mac without the tool): the wrapper the browser
+// launches lives in userData, never inside the install directory: that may be read-only (Program
+// Files). It runs the bridge with the app's own binary as Node (ELECTRON_RUN_AS_NODE), so no system
 // Node.js is needed (D-BRW-1). It is rewritten whenever its content changes (the app was moved or
 // updated), unlike the old static .bat that was only created once.
 function getWrapperPath(): string {
@@ -95,6 +104,30 @@ function ensureWrapper(): string | null {
     console.error('Could not write the browser host wrapper:', err)
     return null
   }
+}
+
+/**
+ * Removes the wrapper a version before the bridge tool left in userData. A browser manifest that
+ * still names it would start the whole app (see isStaleBridgeLaunch in browser-host-wrapper.ts).
+ */
+export function removeBridgeWrapper(): void {
+  try { unlinkSync(getWrapperPath()) } catch { /* not there */ }
+}
+
+/** What the manifests name as the host on this platform, or null when nothing can be registered. */
+function resolveHostPath(): string | null {
+  const helperPath = getBridgeHelperPath()
+  const launch = chooseHostLaunch({
+    platform: process.platform,
+    packaged: app.isPackaged,
+    helperPath,
+    helperExists: isMac && existsSync(helperPath),
+  })
+  if (launch.kind === 'wrapper') return ensureWrapper()
+  removeBridgeWrapper()
+  if (launch.kind === 'helper') return launch.path
+  console.error(`Could not register the browser host: ${launch.reason}`)
+  return null
 }
 
 // reg.exe is run with an argument array (no shell, so a path with quotes or spaces cannot change
@@ -169,7 +202,7 @@ function getLinuxFirefoxHostDir(): string {
 
 export function registerChromeHost(extensionId: string): void {
   if (isMac) {
-    const hostPath = ensureWrapper()
+    const hostPath = resolveHostPath()
     if (!hostPath) return
     const manifest = {
       name: HOST_NAME,
@@ -192,7 +225,7 @@ export function registerChromeHost(extensionId: string): void {
   }
 
   if (isLinux) {
-    const hostPath = ensureWrapper()
+    const hostPath = resolveHostPath()
     if (!hostPath) return
     const manifest = {
       name: HOST_NAME,
@@ -213,7 +246,7 @@ export function registerChromeHost(extensionId: string): void {
   }
 
   if (!isWindows) return
-  const hostPath = ensureWrapper()
+  const hostPath = resolveHostPath()
   if (!hostPath) return
   const manifestPath = getChromeHostManifestPath()
   const manifest = {
@@ -232,7 +265,7 @@ export function registerChromeHost(extensionId: string): void {
 
 export function registerFirefoxHost(): void {
   if (isMac) {
-    const hostPath = ensureWrapper()
+    const hostPath = resolveHostPath()
     if (!hostPath) return
     const firefoxDir = getMacFirefoxHostDir()
     mkdirSync(firefoxDir, { recursive: true })
@@ -260,7 +293,7 @@ export function registerFirefoxHost(): void {
   }
 
   if (isLinux) {
-    const hostPath = ensureWrapper()
+    const hostPath = resolveHostPath()
     if (!hostPath) return
     const firefoxDir = getLinuxFirefoxHostDir()
     try {
@@ -294,7 +327,7 @@ export function registerFirefoxHost(): void {
   }
 
   if (!isWindows) return
-  const hostPath = ensureWrapper()
+  const hostPath = resolveHostPath()
   if (!hostPath) return
 
   // Vicu's own future Firefox extension
@@ -332,8 +365,8 @@ export function unregisterHosts(): void {
     // Firefox: remove both Vicu and VQE compat manifests
     try { unlinkSync(getMacManifestPath(getMacFirefoxHostDir(), HOST_NAME)) } catch { /* ignore */ }
     try { unlinkSync(getMacManifestPath(getMacFirefoxHostDir(), VQE_HOST_NAME)) } catch { /* ignore */ }
-    // Remove shell wrapper
-    try { unlinkSync(getWrapperPath()) } catch { /* ignore */ }
+    // The wrapper of an unpackaged run, or of a version before the bridge tool
+    removeBridgeWrapper()
     return
   }
 

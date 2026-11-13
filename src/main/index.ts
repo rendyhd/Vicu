@@ -12,7 +12,8 @@ import { getObsidianContext, getForegroundProcessName, getForegroundWindowHandle
 import { foregroundNeeds, lookUpForeground } from './quick-entry/foreground-gate'
 import { getBrowserContext, type BrowserContext } from './browser-client'
 import { getBrowserUrlFromWindow, prewarmUrlReader, shutdownUrlReader, BROWSER_PROCESSES } from './window-url-reader'
-import { isRegistered, unregisterHosts, registerHosts } from './browser-host-registration'
+import { isRegistered, unregisterHosts, registerHosts, removeBridgeWrapper } from './browser-host-registration'
+import { isStaleBridgeLaunch } from './browser-host-wrapper'
 import { checkForUpdates } from './update-checker'
 import { startUpdateChecks, type UpdateChecksHandle } from './update-schedule'
 import { isMac, isWindows, isLinux } from './platform'
@@ -613,6 +614,17 @@ app.setName('vicu')
 // write or lock against the real one. Must run before the single-instance lock.
 if (process.env.VICU_USER_DATA_DIR) {
   app.setPath('userData', process.env.VICU_USER_DATA_DIR)
+}
+
+// A browser that still has the wrapper of an older version starts this binary with the bridge
+// script as its argument. Where the app no longer runs as Node (macOS, scripts/electron-fuses.mjs)
+// that would open Vicu every time the extension reconnects. Remove the wrapper and leave at once;
+// the next real start writes manifests that name the bridge tool. Before the instance lock, so a
+// running Vicu is not brought to the front either.
+if (isStaleBridgeLaunch(process.argv)) {
+  removeBridgeWrapper()
+  app.exit(0)
+  process.exit(0)
 }
 
 // Navigation, window-open and webview guards for every WebContents (D-SEC-1).

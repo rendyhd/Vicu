@@ -3,10 +3,58 @@
  * the arguments for the Windows registry tool. Kept free of Electron and the file system so they
  * can be tested.
  *
- * The host is the bundled vicu-bridge.js. It used to run with whatever `node` was on PATH, so
- * Browser Link silently did nothing without Node.js installed (D-BRW-1). The wrapper now runs the
- * script with the app's own binary and ELECTRON_RUN_AS_NODE=1, which is Node inside Electron.
+ * On Windows and Linux the host is the bundled vicu-bridge.js. It used to run with whatever `node`
+ * was on PATH, so Browser Link silently did nothing without Node.js installed (D-BRW-1). The
+ * wrapper now runs the script with the app's own binary and ELECTRON_RUN_AS_NODE=1, which is Node
+ * inside Electron.
+ *
+ * On macOS the packaged app cannot run as Node (the RunAsNode fuse is off, review 2026-11-13 S-4,
+ * scripts/electron-fuses.mjs), so the host is a small signed tool of its own,
+ * resources/bridge/vicu-bridge-macos, and the browser's manifest names it directly.
  */
+
+import { basename } from 'path'
+
+/** What a browser's manifest points at on this platform. */
+export type HostLaunch =
+  /** The signed bridge tool, started by the browser as it is (macOS). */
+  | { kind: 'helper'; path: string }
+  /** The generated wrapper that runs vicu-bridge.js with the app binary as Node. */
+  | { kind: 'wrapper' }
+  /** Nothing can be registered; `reason` is for the log. */
+  | { kind: 'none'; reason: string }
+
+export interface HostLaunchEnv {
+  platform: NodeJS.Platform
+  /** app.isPackaged */
+  packaged: boolean
+  /** Where the macOS bridge tool is in this build. */
+  helperPath: string
+  helperExists: boolean
+}
+
+/**
+ * macOS uses the bridge tool. A packaged Mac build without it registers nothing: its wrapper would
+ * start the whole app, because that binary no longer runs as Node. Only an unpackaged run on a Mac
+ * (plain Electron, where the fuse is still on) falls back to the wrapper, so `npm run dev` works
+ * before `npm run bridge:helper` was run. Windows and Linux use the wrapper.
+ */
+export function chooseHostLaunch(env: HostLaunchEnv): HostLaunch {
+  if (env.platform !== 'darwin') return { kind: 'wrapper' }
+  if (env.helperExists) return { kind: 'helper', path: env.helperPath }
+  if (!env.packaged) return { kind: 'wrapper' }
+  return { kind: 'none', reason: 'the browser link helper (vicu-bridge-macos) is missing from this build' }
+}
+
+/**
+ * True when the app itself was started the way the wrapper starts the bridge: with vicu-bridge.js
+ * as an argument. That only happens where the binary does not run as Node any more and a browser
+ * still has a wrapper from an older version (a Mac updated from before the bridge tool, until the
+ * new version has started once and rewritten the manifests). The app must not open then.
+ */
+export function isStaleBridgeLaunch(argv: readonly string[]): boolean {
+  return argv.slice(1).some((arg) => basename(arg.replace(/\\/g, '/')) === 'vicu-bridge.js')
+}
 
 export interface HostRuntime {
   /** The binary that runs the bridge: the app executable (or the AppImage file on Linux). */
