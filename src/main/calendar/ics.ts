@@ -31,8 +31,20 @@ export interface ParsedFeed {
 /** Occurrences looked at per recurring event at most, so a broken rule cannot hang the main process. */
 const MAX_OCCURRENCES = 20_000
 
-/** Iterator steps across all recurring events of one read, so many tiny rules cannot add up to a hang. */
-export const MAX_TOTAL_STEPS = 200_000
+/**
+ * The work of one read across all repeating events, so many tiny rules cannot add up to a hang: a
+ * count of iterator steps, and a time. An ordinary calendar stays far below both (a daily event that
+ * started ten years ago takes about 3,650 steps); past either, the remaining repeating events are
+ * left out of this read.
+ */
+export const MAX_TOTAL_STEPS = 2_000_000
+export const MAX_EXPAND_MS = 2_000
+
+/** The budget of one read; tests pass a small one. */
+export interface ExpandBudget {
+  steps: number
+  ms: number
+}
 
 /** Events taken from one calendar; the rest are left out. */
 export const MAX_FEED_EVENTS = 20_000
@@ -172,13 +184,22 @@ function toEvent(
 }
 
 /** Every occurrence that overlaps [from, to), sorted by start; at most `limit` of them. */
-export function occurrencesBetween(feed: ParsedFeed, calendarId: string, from: Date, to: Date, limit = Infinity): CalendarEvent[] {
+export function occurrencesBetween(
+  feed: ParsedFeed,
+  calendarId: string,
+  from: Date,
+  to: Date,
+  limit = Infinity,
+  budget: ExpandBudget = { steps: MAX_TOTAL_STEPS, ms: MAX_EXPAND_MS },
+): CalendarEvent[] {
   const fromMs = from.getTime()
   const toMs = to.getTime()
   const overlaps = (event: CalendarEvent) =>
     new Date(event.start).getTime() < toMs && (new Date(event.end).getTime() > fromMs || event.start === event.end && new Date(event.start).getTime() >= fromMs)
   const out: CalendarEvent[] = []
   let steps = 0
+  const deadline = Date.now() + budget.ms
+  let spent = false
 
   for (const event of feed.events) {
     if (!event.isRecurring()) {
@@ -187,8 +208,10 @@ export function occurrencesBetween(feed: ParsedFeed, calendarId: string, from: D
       continue
     }
     const iterator = event.iterator()
-    for (let i = 0; i < MAX_OCCURRENCES && steps < MAX_TOTAL_STEPS; i++) {
+    for (let i = 0; i < MAX_OCCURRENCES && !spent; i++) {
       steps++
+      // The clock is read every 256 steps: often enough to stop in time, rare enough to cost nothing.
+      if (steps >= budget.steps || ((steps & 255) === 0 && Date.now() > deadline)) spent = true
       const next = iterator.next()
       if (!next) break
       if (next.toJSDate().getTime() >= toMs) break

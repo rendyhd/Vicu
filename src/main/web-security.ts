@@ -7,6 +7,7 @@ import {
   isAppUrl,
   isExternalAllowed,
   isTrustedSender,
+  safeExternalUrl,
   type AppOrigin,
   type SenderEventLike,
 } from './web-security-policy'
@@ -27,7 +28,7 @@ export function getAppOrigin(): AppOrigin {
 }
 
 function openExternally(url: string): void {
-  shell.openExternal(url).catch((err: unknown) => {
+  shell.openExternal(safeExternalUrl(url)).catch((err: unknown) => {
     console.warn('[WebSecurity] openExternal failed:', err instanceof Error ? err.message : err)
   })
 }

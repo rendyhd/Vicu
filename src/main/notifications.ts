@@ -15,7 +15,7 @@ import { getOfflineQueue } from './offline/service'
 import { createTaskReminderScheduler } from './task-reminders'
 import { notificationCategory, notificationFilters, overdueDays } from './notification-windows'
 import { addLocalDays, startOfLocalDay, toLocalDate } from '../shared/due-dates'
-import { isSharedRoutine, parseRoutineEnvelope, routineOccurrenceKey, scheduledDateOn, type RoutinePayload } from '../shared/routines'
+import { isSharedRoutine, parseRoutineEnvelope, preferOwnRoutineCarriers, routineOccurrenceKey, scheduledDateOn, type RoutinePayload } from '../shared/routines'
 import { isPlannerEnabled, isRoutinesEnabled } from '../shared/config-types'
 
 const NULL_DATE = '0001-01-01T00:00:00Z'
@@ -111,10 +111,17 @@ export async function refreshRoutineReminders(): Promise<void> {
   const tasks = result.data as unknown as Array<Record<string, unknown>>
   const context = await reminderContext(tasks)
 
-  for (const task of tasks) {
-    // Archive parts and malformed carriers have no payload and are skipped here.
-    const payload = parseRoutineEnvelope(typeof task.description === 'string' ? task.description : '').payload
-    if (!payload || payload.definition.archived) continue
+  // Archive parts and malformed carriers have no payload and are skipped. Where another member's
+  // carrier has the id of one of the user's own routines, only the user's own reminds (review S-5).
+  const carriers = preferOwnRoutineCarriers(
+    tasks.flatMap((task) => {
+      const payload = parseRoutineEnvelope(typeof task.description === 'string' ? task.description : '').payload
+      return payload ? [{ task: task as Record<string, unknown> & { id: number; created_by?: { id?: unknown } | null }, payload }] : []
+    }),
+    context.me,
+  )
+  for (const { task, payload } of carriers) {
+    if (payload.definition.archived) continue
     if (!routineRemindsHere(task, payload, context)) continue
     const taskId = typeof task.id === 'number' ? task.id : 0
     for (let offset = 0; offset <= 21; offset += 1) {

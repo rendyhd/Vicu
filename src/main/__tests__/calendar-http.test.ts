@@ -36,6 +36,89 @@ describe('the calendar HTTP', () => {
     expect(seen).toEqual([`Basic ${Buffer.from('sam:pw').toString('base64')}`, null, null, null])
   })
 
+  describe('redirects, followed by hand', () => {
+    const basic = `Basic ${Buffer.from('sam:pw').toString('base64')}`
+    function server(routes: Record<string, () => Response>) {
+      const seen: { url: string; method: string; auth: string | null; redirect?: string; body?: unknown }[] = []
+      const base: FetchLike = async (url, init) => {
+        seen.push({ url, method: String(init?.method), auth: new Headers(init?.headers).get('authorization'), redirect: init?.redirect, body: init?.body })
+        const route = routes[url]
+        return route ? route() : new Response('not here', { status: 404 })
+      }
+      return { base, seen }
+    }
+    const moved = (location: string, status = 301) => () => new Response(null, { status, headers: { location } })
+
+    it('drops the sign-in on a redirect to another origin, even of the same site', async () => {
+      const { base, seen } = server({
+        'https://caldav.example.com/dav/': moved('https://other.example.com/dav/'),
+        'https://other.example.com/dav/': () => ok('<multistatus/>'),
+      })
+      const http = calendarHttp({ base, auth: { username: 'sam', password: 'pw', origin: 'https://caldav.example.com/' } })
+      const response = await http.fetch('https://caldav.example.com/dav/', { method: 'PROPFIND', body: '<propfind/>' })
+      expect(await response.text()).toBe('<multistatus/>')
+      expect(response.url).toBe('https://other.example.com/dav/')
+      expect(seen.map((s) => [s.url, s.auth])).toEqual([
+        ['https://caldav.example.com/dav/', basic],
+        ['https://other.example.com/dav/', null],
+      ])
+      // Every request asked the base not to follow, and the PROPFIND kept its method and body.
+      expect(seen.every((s) => s.redirect === 'manual')).toBe(true)
+      expect(seen[1]).toMatchObject({ method: 'PROPFIND', body: '<propfind/>' })
+    })
+
+    it('keeps the sign-in on a redirect within the same origin, relative Location included', async () => {
+      const { base, seen } = server({
+        'https://caldav.example.com/.well-known/caldav': moved('/dav/', 308),
+        'https://caldav.example.com/dav/': () => ok('yes'),
+      })
+      const http = calendarHttp({ base, auth: { username: 'sam', password: 'pw', origin: 'https://caldav.example.com/' } })
+      await http.fetch('https://caldav.example.com/.well-known/caldav', { method: 'PROPFIND' })
+      expect(seen.map((s) => s.auth)).toEqual([basic, basic])
+    })
+
+    it('never sends the sign-in to plain http or another port on a redirect', async () => {
+      const { base, seen } = server({
+        'https://caldav.example.com/a': moved('http://caldav.example.com/b'),
+        'http://caldav.example.com/b': moved('https://caldav.example.com:8443/c'),
+        'https://caldav.example.com:8443/c': () => ok(''),
+      })
+      const http = calendarHttp({ base, auth: { username: 'sam', password: 'pw', origin: 'https://caldav.example.com/' } })
+      await http.fetch('https://caldav.example.com/a')
+      expect(seen.map((s) => s.auth)).toEqual([basic, null, null])
+    })
+
+    it('keeps a bearer token to its own origin only', async () => {
+      const { base, seen } = server({
+        'https://graph.microsoft.com/v1.0/me/calendars': moved('https://graph.microsoft.com/v1.0/me/calendars?page=2', 302),
+        'https://graph.microsoft.com/v1.0/me/calendars?page=2': moved('https://evil.example.com/collect', 307),
+        'https://evil.example.com/collect': () => ok('{}'),
+      })
+      const http = calendarHttp({ base, bearer: { token: 't0k', origin: 'https://graph.microsoft.com' } })
+      await http.fetch('https://graph.microsoft.com/v1.0/me/calendars')
+      expect(seen.map((s) => s.auth)).toEqual(['Bearer t0k', 'Bearer t0k', null])
+    })
+
+    it('stops after five redirects, and never leaves http and https', async () => {
+      const loop = server({ 'https://example.com/a': moved('https://example.com/a', 302) })
+      await expect(calendarHttp({ base: loop.base }).fetch('https://example.com/a')).rejects.toThrow('too many')
+      expect(loop.seen).toHaveLength(6)
+
+      const away = server({ 'https://example.com/a': moved('file:///etc/passwd') })
+      await expect(calendarHttp({ base: away.base }).fetch('https://example.com/a')).rejects.toThrow('not a web address')
+      expect(away.seen).toHaveLength(1)
+    })
+
+    it('asks again with GET after a 303', async () => {
+      const { base, seen } = server({
+        'https://example.com/a': moved('https://example.com/b', 303),
+        'https://example.com/b': () => ok('x'),
+      })
+      await calendarHttp({ base }).fetch('https://example.com/a', { method: 'REPORT', body: '<q/>' })
+      expect(seen[1]).toMatchObject({ method: 'GET', body: undefined })
+    })
+  })
+
   it('knows sites', () => {
     expect(siteOf('p52-caldav.icloud.com')).toBe('icloud.com')
     expect(siteOf('dav.example.co.uk')).toBe('example.co.uk')

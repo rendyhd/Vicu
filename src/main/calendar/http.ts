@@ -7,6 +7,10 @@
 // - A CalDAV sign-in is added here and only to the account's own site over the account's scheme,
 //   so a server cannot send the password to another host or over plain http. An OAuth access token
 //   goes only to the API's own origin over https (plain http only to this computer, for tests).
+// - Redirects are followed here (at most MAX_REDIRECTS), never by the network stack: the base is
+//   asked with `redirect: 'manual'` and must hand back the 3xx answer with its Location
+//   (net-fetch.ts does that over Electron's net.request). The sign-in or token goes along a
+//   redirect only to exactly the origin of the first request.
 // - No cookies: the app's session is never sent to a calendar host.
 // - Failures become plain sentences (`CalendarReadError`); a URL, user name or password is never in
 //   one, so the message can be shown and logged.
@@ -76,7 +80,12 @@ export function siteOf(host: string): string {
   return labels.slice(-take).join('.')
 }
 
-/** Whether a request to `target` may carry the sign-in given for `origin`. */
+/**
+ * Whether a request the source makes itself (the address the user gave, or an address the server
+ * named in a CalDAV answer) may carry the sign-in given for `origin`. The same site is enough here,
+ * because CalDAV servers name hosts of their own: iCloud's discovery at caldav.icloud.com answers
+ * with calendars at p52-caldav.icloud.com. A redirect is stricter (`mayFollowWithSignIn`).
+ */
 export function mayCarrySignIn(target: string, origin: string): boolean {
   try {
     const to = new URL(target)
@@ -88,6 +97,23 @@ export function mayCarrySignIn(target: string, origin: string): boolean {
     return false
   }
 }
+
+/**
+ * Whether a redirect from `first` (the request that carried a sign-in or token) to `target` may
+ * carry it on: only to exactly the same origin (scheme, host and port). A server that sends Vicu
+ * to another host, even one of the same site, gets the request without it.
+ */
+export function mayFollowWithSignIn(target: string, first: string): boolean {
+  try {
+    return new URL(target).origin === new URL(first).origin
+  } catch {
+    return false
+  }
+}
+
+/** Redirects followed for one request at most. */
+export const MAX_REDIRECTS = 5
+const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308])
 
 function basicHeader(auth: BasicAuth): string {
   return `Basic ${Buffer.from(`${auth.username}:${auth.password}`, 'utf8').toString('base64')}`
@@ -111,24 +137,59 @@ export function calendarHttp(options: CalendarHttpOptions): CalendarHttp {
   const run: FetchLike = async (url, init = {}) => {
     const method = String(init.method ?? 'GET').toUpperCase()
     if (!READ_METHODS.has(method)) throw new CalendarReadError('Vicu only reads calendars.', 'other')
-    const headers = new Headers(init.headers ?? {})
-    headers.delete('authorization')
-    if (options.auth && mayCarrySignIn(url, options.auth.origin)) headers.set('Authorization', basicHeader(options.auth))
-    else if (options.bearer && mayCarryBearer(url, options.bearer.origin)) headers.set('Authorization', `Bearer ${options.bearer.token}`)
+    const plain = new Headers(init.headers ?? {})
+    plain.delete('authorization')
+    let signIn: string | null = null
+    if (options.auth && mayCarrySignIn(url, options.auth.origin)) signIn = basicHeader(options.auth)
+    else if (options.bearer && mayCarryBearer(url, options.bearer.origin)) signIn = `Bearer ${options.bearer.token}`
+    // The caller asked to see a redirect itself: it is handed back, not followed.
+    const followRedirects = init.redirect !== 'manual'
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), timeoutMs)
     const outer = init.signal
     const onAbort = () => controller.abort()
     outer?.addEventListener('abort', onAbort)
     try {
+      // Redirects are followed here, one hop at a time, so that the sign-in or token goes along
+      // only to exactly the origin of the first request (never by trusting the network stack to
+      // drop it), and only read methods over http or https are ever sent.
+      let current = url
+      let currentMethod = method
+      let requestBody = init.body
       let response: Response
-      try {
-        response = await options.base(url, { ...init, method, headers, signal: controller.signal, credentials: 'omit' })
-      } catch (error) {
-        if (controller.signal.aborted) throw new CalendarReadError('The server took too long to answer.', 'timeout')
-        throw networkMessage(error)
+      for (let hop = 0; ; hop++) {
+        const headers = new Headers(plain)
+        if (signIn && (hop === 0 || mayFollowWithSignIn(current, url))) headers.set('Authorization', signIn)
+        try {
+          response = await options.base(current, {
+            ...init, method: currentMethod, body: requestBody, headers, signal: controller.signal, credentials: 'omit', redirect: 'manual',
+          })
+        } catch (error) {
+          if (controller.signal.aborted) throw new CalendarReadError('The server took too long to answer.', 'timeout')
+          throw networkMessage(error)
+        }
+        statuses.push(response.status)
+        const location = response.headers.get('location')
+        if (!followRedirects || !REDIRECT_STATUSES.has(response.status) || !location) break
+        await response.body?.cancel().catch(() => {})
+        if (hop + 1 > MAX_REDIRECTS) throw new CalendarReadError('The server sent Vicu to too many other addresses.', 'other')
+        let next: URL
+        try {
+          next = new URL(location, current)
+        } catch {
+          throw new CalendarReadError('The server sent Vicu to an address that does not work.', 'other')
+        }
+        if (next.protocol !== 'https:' && next.protocol !== 'http:') {
+          throw new CalendarReadError('The server sent Vicu to an address that is not a web address.', 'other')
+        }
+        // 303 asks for the new address with GET (HEAD stays HEAD); every other redirect keeps the
+        // read method and its body (PROPFIND and REPORT carry an XML body).
+        if (response.status === 303 && currentMethod !== 'HEAD') {
+          currentMethod = 'GET'
+          requestBody = undefined
+        }
+        current = next.href
       }
-      statuses.push(response.status)
       // A redirect handed back (redirect: 'manual') has no body to read.
       if (response.type === 'opaqueredirect' || response.status === 0) return response
       const length = Number(response.headers.get('content-length') ?? '')
@@ -146,7 +207,7 @@ export function calendarHttp(options: CalendarHttpOptions): CalendarHttp {
       if (budget < 0) throw new CalendarReadError('The calendar is too large to read.', 'too-large')
       const nullBody = response.status === 204 || response.status === 304 || method === 'HEAD'
       const copy = new Response(nullBody ? null : body, { status: response.status, statusText: response.statusText, headers: response.headers })
-      Object.defineProperty(copy, 'url', { value: response.url || url })
+      Object.defineProperty(copy, 'url', { value: response.url || current })
       return copy
     } finally {
       clearTimeout(timer)

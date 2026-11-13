@@ -15,7 +15,8 @@
 //   cache.ts           the last good copy of each calendar, encrypted (calendar-cache/)
 //   ics.ts             iCalendar into occurrences, VFREEBUSY, reducing a copy to what may be kept
 //   timezones.ts       zones a file names without defining them (Windows names)
-//   http.ts            the read-only HTTP every kind uses (net.fetch, limits, the sign-in, messages)
+//   http.ts            the read-only HTTP every kind uses (limits, the sign-in, redirects, messages)
+//   net-fetch.ts       its base: Electron's net.request, handing redirects back to http.ts
 //
 // This file is what is the same for every kind:
 // - Calendars are read when a window asks for days and the last attempt is older than 5 minutes
@@ -57,6 +58,7 @@ import type {
   CalendarSourcesView,
 } from '../../shared/calendar-sources'
 import { calendarHttp, CalendarReadError } from './http'
+import { manualRedirectFetch, type ClientRequestLike } from './net-fetch'
 import { occurrencesBetween, parseIcsDocuments, reduceIcs, type ParsedFeed } from './ics'
 import { dropCopy, loadCopy, saveCopy } from './cache'
 import {
@@ -130,7 +132,8 @@ const connectionErrors = new Map<string, string>()
 const drafts = new Map<string, { kind: CalendarSourceKind; result: ConnectResult<unknown>; expires: number }>()
 
 const ctx: SourceContext = {
-  http: (options) => calendarHttp({ base: (url, init) => net.fetch(url, init), ...options }),
+  // net.request rather than net.fetch: http.ts follows redirects itself (see net-fetch.ts).
+  http: (options) => calendarHttp({ base: manualRedirectFetch((request) => net.request(request) as unknown as ClientRequestLike), ...options }),
   // OAuth token requests (oauth.ts): Node's fetch, so no Origin header goes with them.
   signInFetch: (url, init) => fetch(url, init),
   now: () => Date.now(),

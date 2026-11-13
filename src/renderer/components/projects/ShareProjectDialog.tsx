@@ -5,6 +5,7 @@ import { Button } from '@/components/shared/Button'
 import { Avatar } from '@/components/shared/Avatar'
 import { displayName } from '@/lib/collaboration'
 import { normalizeHex } from '@/lib/constants'
+import { useAppConfig } from '@/hooks/use-app-config'
 import { useCurrentUser } from '@/hooks/use-current-user'
 import { findUserByUsername, useProjectShares, useShareProject } from '@/hooks/use-project-shares'
 import { announce } from '@/stores/announcer-store'
@@ -45,6 +46,9 @@ export function ShareProjectDialog({ project, returnFocusTo, onClose }: SharePro
   const usernameId = useId()
   const statusId = useId()
   const { data: me } = useCurrentUser()
+  const { data: config } = useAppConfig()
+  // Vicu's hidden carriers (custom lists, synced settings, Pro ledger) live in the Inbox (review S-5).
+  const isInbox = (config?.inbox_project_id ?? 0) > 0 && config?.inbox_project_id === project.id
   const { data: shares, isLoading, isError } = useProjectShares(project.id)
   const share = useShareProject(project.id)
   const [username, setUsername] = useState('')
@@ -143,6 +147,11 @@ export function ShareProjectDialog({ project, returnFocusTo, onClose }: SharePro
         <p className="mb-3.5 mt-2 text-meta leading-[19px] text-text-secondary [text-wrap:pretty]">
           People you add see every task in this project. Assignees and comments appear on its tasks once it is shared. Your other projects stay private.
         </p>
+        {isInbox && (
+          <p className="-mt-1.5 mb-3.5 text-meta leading-[19px] text-text [text-wrap:pretty]">
+            This is your Inbox, which also holds Vicu’s own synced settings and lists: the people you share it with can read and change them.
+          </p>
+        )}
 
         <form
           className="flex gap-2"

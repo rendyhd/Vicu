@@ -1,5 +1,6 @@
 import { join } from 'path'
 import type { ApiResult } from './api-result'
+import { markFromInternet } from './attachment-origin'
 import { sanitizeAttachmentFileName } from './attachment-safety'
 
 export interface SaveAttachmentDeps {
@@ -8,6 +9,11 @@ export interface SaveAttachmentDeps {
   /** The attachment's bytes from the server. */
   download(): Promise<ApiResult<Buffer>>
   writeFile(filePath: string, data: Buffer): Promise<void>
+  /**
+   * Marks the written file as downloaded from the internet (review S-3). Defaults to
+   * `markFromInternet` without the server's address.
+   */
+  markFile?(filePath: string): Promise<void>
 }
 
 export interface SavedAttachment {
@@ -38,5 +44,8 @@ export async function saveAttachment(
   } catch (err: unknown) {
     return { success: false, error: err instanceof Error ? err.message : 'Could not save the file' }
   }
+  // The file holds bytes anyone on a shared project could have uploaded: the system should warn
+  // before running it, as it would for a browser download.
+  await (deps.markFile ?? ((filePath: string) => markFromInternet(filePath)))(target)
   return { success: true, data: { saved: true, path: target } }
 }

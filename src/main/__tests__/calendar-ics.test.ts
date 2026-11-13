@@ -97,14 +97,19 @@ describe('calendar ICS reading', () => {
     expect(normaliseFeedUrl('file:///etc/passwd')).toBeNull()
     expect(normaliseFeedUrl('not a link')).toBeNull()
   })
-  it('caps the total work of one read when many tiny rules repeat every second', () => {
-    const events = Array.from({ length: 3000 }, (_, n) =>
-      ['BEGIN:VEVENT', `UID:tiny-${n}`, 'DTSTAMP:20200101T000000Z', 'DTSTART:20200101T000000Z', 'DTEND:20200101T000001Z', 'RRULE:FREQ=SECONDLY', `SUMMARY:Tick ${n}`, 'END:VEVENT'].join('\r\n'),
+  it('stops expanding repeating events when the budget of one read is spent', () => {
+    const events = Array.from({ length: 50 }, (_, n) =>
+      ['BEGIN:VEVENT', `UID:tiny-${n}`, 'DTSTAMP:20200101T000000Z', 'DTSTART:20251231T235000Z', 'DTEND:20251231T235001Z', 'RRULE:FREQ=SECONDLY', `SUMMARY:Tick ${n}`, 'END:VEVENT'].join('\r\n'),
     )
     const text = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//test//EN', ...events, 'END:VCALENDAR'].join('\r\n')
-    const started = Date.now()
-    const found = occurrencesBetween(parseIcs(text), 'cal', new Date('2026-01-01T00:00:00Z'), new Date('2026-01-02T00:00:00Z'), 100)
-    expect(found.length).toBeLessThanOrEqual(100)
-    expect(Date.now() - started).toBeLessThan(10_000)
+    const feed = parseIcs(text)
+    const day = [new Date('2026-01-01T00:00:00Z'), new Date('2026-01-02T00:00:00Z')] as const
+    // Each event needs 600 steps to reach the day. A budget of 1,000 steps ends inside the second one.
+    const small = occurrencesBetween(feed, 'cal', day[0], day[1], Infinity, { steps: 1000, ms: 60_000 })
+    expect(small.length).toBeGreaterThan(0)
+    expect(small.length).toBeLessThan(1000)
+    expect(new Set(small.map((event) => event.title)).size).toBeLessThanOrEqual(2)
+    // A time budget that is already spent stops at the first check, 256 steps in.
+    expect(occurrencesBetween(feed, 'cal', day[0], day[1], Infinity, { steps: 1e9, ms: -1 }).length).toBe(0)
   })
 })

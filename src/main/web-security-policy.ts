@@ -92,6 +92,35 @@ export function isExternalAllowed(url: unknown): boolean {
   return !!parsed && EXTERNAL_PROTOCOLS.has(parsed.protocol)
 }
 
+/** The `mailto:` parameters a mail client is given; anything else (`attach`, `to` ...) is dropped. */
+const MAILTO_KEPT_PARAMS: ReadonlySet<string> = new Set(['subject', 'body', 'cc', 'bcc'])
+
+/**
+ * The address handed to the system for `url`: a `mailto:` link keeps only its address and the
+ * `subject`, `body`, `cc` and `bcc` parameters (review S-17; some mail clients take `attach` and
+ * similar parameters, which would let a link in a shared task attach a local file to a mail).
+ * The kept parameters are passed on exactly as written. Every other address is returned as it is.
+ */
+export function safeExternalUrl(url: string): string {
+  if (!/^mailto:/i.test(url)) return url
+  const question = url.indexOf('?')
+  if (question < 0) return url
+  const address = url.slice(0, question)
+  let query = url.slice(question + 1)
+  const hash = query.indexOf('#')
+  if (hash >= 0) query = query.slice(0, hash)
+  const kept = query.split('&').filter((part) => {
+    const equals = part.indexOf('=')
+    const rawKey = equals < 0 ? part : part.slice(0, equals)
+    try {
+      return MAILTO_KEPT_PARAMS.has(decodeURIComponent(rawKey).trim().toLowerCase())
+    } catch {
+      return false
+    }
+  })
+  return kept.length > 0 ? `${address}?${kept.join('&')}` : address
+}
+
 /**
  * True when the link button of a task row may open `url`: a web or mail address, or a note link in
  * one of the two shapes Vicu writes (description format, "Task links"). The marker a link is read

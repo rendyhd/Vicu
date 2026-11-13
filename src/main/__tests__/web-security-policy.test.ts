@@ -8,8 +8,32 @@ import {
   isDeepLinkAllowed,
   isExternalAllowed,
   isTrustedSender,
+  safeExternalUrl,
   type AppOrigin,
 } from '../web-security-policy'
+
+describe('safeExternalUrl', () => {
+  it('keeps the address, subject, body, cc and bcc of a mail link exactly as written', () => {
+    expect(safeExternalUrl('mailto:a@example.com')).toBe('mailto:a@example.com')
+    expect(safeExternalUrl('mailto:a@example.com?subject=Hi%20there&body=Line%0A2&cc=b@x.org&bcc=c@x.org'))
+      .toBe('mailto:a@example.com?subject=Hi%20there&body=Line%0A2&cc=b@x.org&bcc=c@x.org')
+  })
+
+  it('drops every other parameter, whatever its case', () => {
+    expect(safeExternalUrl('mailto:a@example.com?subject=Hi&attach=C:%5CUsers%5Cme%5Csecret.txt'))
+      .toBe('mailto:a@example.com?subject=Hi')
+    expect(safeExternalUrl('MAILTO:a@example.com?Attachment=/etc/passwd&BODY=x&to=evil@x.org'))
+      .toBe('MAILTO:a@example.com?BODY=x')
+    expect(safeExternalUrl('mailto:a@example.com?attach=x')).toBe('mailto:a@example.com')
+    expect(safeExternalUrl('mailto:a@example.com?%61ttach=x&%62ody=y')).toBe('mailto:a@example.com?%62ody=y')
+    expect(safeExternalUrl('mailto:a@example.com?subject=x#frag')).toBe('mailto:a@example.com?subject=x')
+    expect(safeExternalUrl('mailto:a@example.com?%E0%A4%A=x')).toBe('mailto:a@example.com')
+  })
+
+  it('leaves web addresses alone', () => {
+    expect(safeExternalUrl('https://example.com/?attach=1')).toBe('https://example.com/?attach=1')
+  })
+})
 
 const rendererDir = join(tmpdir(), 'vicu-app', 'out', 'renderer')
 const rendererDirUrl = `${pathToFileURL(rendererDir).href}/`

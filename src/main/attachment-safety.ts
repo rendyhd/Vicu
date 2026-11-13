@@ -1,7 +1,7 @@
 // Safety helpers for task attachments that come from the Vikunja server (D-IPC-2).
 // Any collaborator on a shared project can upload a file, and the temp copy we
-// write has no Mark-of-the-Web, so opening it would run executables and macro
-// documents without the usual operating-system warnings. Pure functions only.
+// write is marked as downloaded (attachment-origin.ts), but that mark is best effort, so
+// executables, scripts and macro documents are still never opened directly. Pure functions only.
 
 /** Cap on a single binary download from the server (attachments, previews). */
 export const MAX_BINARY_DOWNLOAD_BYTES = 100 * 1024 * 1024
@@ -13,18 +13,23 @@ export const MAX_BINARY_DOWNLOAD_BYTES = 100 * 1024 * 1024
 export const BLOCKED_ATTACHMENT_EXTENSIONS: ReadonlySet<string> = new Set([
   // Windows executables, installers and packages
   'exe', 'com', 'scr', 'pif', 'msi', 'msp', 'mst', 'msix', 'msixbundle', 'appx', 'appxbundle',
-  'application', 'gadget', 'cpl', 'dll', 'ocx', 'sys', 'drv', 'xll',
+  'application', 'gadget', 'cpl', 'dll', 'ocx', 'sys', 'drv', 'xll', 'appinstaller', 'ppkg', 'xbap',
+  'vsto', 'wsb',
   // Windows scripts and script hosts
   'bat', 'cmd', 'btm', 'ps1', 'ps1xml', 'ps2', 'ps2xml', 'psc1', 'psc2', 'psd1', 'psm1',
   'vbs', 'vbe', 'vb', 'js', 'jse', 'wsf', 'wsh', 'wsc', 'ws', 'sct', 'hta', 'msc', 'reg', 'rgs',
   'inf', 'ins', 'isp', 'job', 'pyw', 'py', 'pyc', 'pyz',
+  'msh', 'msh1', 'msh2', 'mshxml', 'msh1xml', 'msh2xml',
   // Shortcuts and launchers
   'lnk', 'url', 'scf', 'rdp', 'jnlp', 'desktop', 'terminal', 'website', 'appref-ms',
-  'settingcontent-ms', 'library-ms', 'searchconnector-ms', 'diagcab',
-  // Compiled help (runs script)
-  'chm', 'hlp',
-  // Macro-enabled Office documents and Access databases
+  'settingcontent-ms', 'library-ms', 'searchconnector-ms', 'search-ms', 'diagcab', 'theme', 'themepack',
+  'fileloc', 'inetloc',
+  // Compiled help (runs script), saved web archives
+  'chm', 'hlp', 'mht', 'mhtml',
+  // Macro-enabled Office documents, the older Office formats that can also carry macros,
+  // and Access databases
   'docm', 'dotm', 'xlsm', 'xltm', 'xlam', 'pptm', 'potm', 'ppam', 'ppsm', 'sldm',
+  'doc', 'dot', 'xls', 'xlt', 'xlsb', 'xla', 'xlm', 'ppt', 'pot', 'pps', 'ppa', 'rtf',
   'slk', 'iqy', 'mdb', 'mde', 'ade', 'adp',
   // Disk images that mount without Mark-of-the-Web
   'iso', 'img', 'vhd', 'vhdx',
@@ -36,6 +41,15 @@ export const BLOCKED_ATTACHMENT_EXTENSIONS: ReadonlySet<string> = new Set([
   // Linux and Unix
   'sh', 'bash', 'zsh', 'csh', 'ksh', 'fish', 'run', 'bin', 'out', 'elf', 'appimage',
   'deb', 'rpm', 'apk',
+])
+
+/**
+ * Archives that are not opened on macOS: opening one unpacks it with Archive Utility, and an app
+ * inside it can then start without the Gatekeeper question when the archive itself had no
+ * quarantine mark. Elsewhere opening an archive only shows its contents.
+ */
+export const MAC_BLOCKED_ARCHIVE_EXTENSIONS: ReadonlySet<string> = new Set([
+  'zip', 'xip', 'tar', 'tgz', 'tbz', 'tbz2', 'gz', 'bz2', 'xz', '7z', 'rar', 'cpio', 'cpgz',
 ])
 
 // Characters with no business in a file name: ASCII control characters, bidi
@@ -75,15 +89,16 @@ export function sanitizeAttachmentFileName(name: unknown, fallback = 'attachment
 
 /**
  * True when the attachment must not be opened directly: blocked extension, or
- * no extension at all (the system would have to guess how to run it).
+ * no extension at all (the system would have to guess how to run it). On macOS archives count too.
  */
-export function isRiskyAttachment(fileName: unknown): boolean {
+export function isRiskyAttachment(fileName: unknown, platform: string = process.platform): boolean {
   const name = sanitizeAttachmentFileName(fileName, '')
   if (name === '') return true
   const dot = name.lastIndexOf('.')
   if (dot <= 0 || dot === name.length - 1) return true
   const ext = name.slice(dot + 1).toLowerCase()
-  return BLOCKED_ATTACHMENT_EXTENSIONS.has(ext)
+  if (BLOCKED_ATTACHMENT_EXTENSIONS.has(ext)) return true
+  return platform === 'darwin' && MAC_BLOCKED_ARCHIVE_EXTENSIONS.has(ext)
 }
 
 /** Parse a Content-Length header value. Returns null when absent or invalid. */

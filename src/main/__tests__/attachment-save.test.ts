@@ -7,6 +7,7 @@ function deps(overrides: Partial<SaveAttachmentDeps> = {}): SaveAttachmentDeps {
     chooseFile: vi.fn(async (defaultPath: string) => defaultPath),
     download: vi.fn(async () => ({ success: true as const, data: Buffer.from('pdf bytes') })),
     writeFile: vi.fn(async () => undefined),
+    markFile: vi.fn(async () => undefined),
     ...overrides,
   }
 }
@@ -21,6 +22,26 @@ describe('saveAttachment', () => {
     expect(d.chooseFile).toHaveBeenCalledWith(expected)
     expect(d.writeFile).toHaveBeenCalledWith(expected, Buffer.from('pdf bytes'))
     expect(result).toEqual({ success: true, data: { saved: true, path: expected } })
+  })
+
+  it('marks the saved file as downloaded from the internet, after writing it', async () => {
+    const order: string[] = []
+    const d = deps({
+      writeFile: vi.fn(async () => { order.push('write') }),
+      markFile: vi.fn(async (path: string) => { order.push(`mark ${path}`) }),
+    })
+
+    await saveAttachment('a.exe', 7, '/Users/me/Downloads', d)
+
+    expect(order).toEqual(['write', `mark ${join('/Users/me/Downloads', 'a.exe')}`])
+  })
+
+  it('does not mark a file it could not write', async () => {
+    const d = deps({ writeFile: vi.fn(async () => { throw new Error('EACCES') }) })
+
+    await saveAttachment('a.txt', 7, '/tmp', d)
+
+    expect(d.markFile).not.toHaveBeenCalled()
   })
 
   it('keeps a server-supplied name inside the folder', async () => {

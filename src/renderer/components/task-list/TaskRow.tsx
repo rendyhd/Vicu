@@ -8,6 +8,7 @@ import { CSS } from '@dnd-kit/utilities'
 import { cn } from '@/lib/cn'
 import { useSelectionStore } from '@/stores/selection-store'
 import { orderedTaskIds } from '@/lib/task-selection'
+import { notesAfterServerChange } from '@/lib/notes-sync'
 import { useUpdateTask, useCompleteTask, useDeleteTask, useUploadAttachmentFromDrop, useAddLabel, useCreateLabel } from '@/hooks/use-task-mutations'
 import { useCompletionHoldEngagement } from '@/hooks/use-completion-hold'
 import { useCompletionCollapse } from '@/hooks/use-completion-collapse'
@@ -509,9 +510,23 @@ function TaskRowInner({
     }
   }, [uploadFromDrop.isError, uploadFromDrop.failureCount, uploadFromDrop.error])
 
+  // Newer notes in the cache reach the editor only while it holds no unsaved text; unsaved text
+  // and its baseline stay, so the next save still goes out (notes-sync.ts, review C-5).
+  const editDescriptionRef = useRef(editDescription)
+  editDescriptionRef.current = editDescription
   useEffect(() => {
-    setEditDescription(stripPageLink(stripNoteLink(task.description)))
+    const next = notesAfterServerChange(
+      { edit: editDescriptionRef.current, baseline: descBaselineRef.current },
+      stripPageLink(stripNoteLink(task.description)),
+    )
+    descBaselineRef.current = next.baseline
+    setEditDescription(next.edit)
   }, [task.description])
+  // A closed card has no editor: its baseline is set again by the editor's onReady when it opens,
+  // and until then newer notes are always taken.
+  useEffect(() => {
+    if (!isExpanded) descBaselineRef.current = null
+  }, [isExpanded])
 
   const saveTaskChanges = useCallback((titleChanges: Partial<Task> = {}) => {
     const changes: Partial<Task> = { ...titleChanges }
