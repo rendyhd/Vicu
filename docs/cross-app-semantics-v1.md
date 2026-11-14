@@ -768,6 +768,55 @@ per time), so a day with many routines stays short:
   syncs, like the other folding sections (13.3).
 - The `todayRoutines` vectors of the fixture pin the rows, their order, the limit and the line.
 
+### 6.11 Routine trend
+
+A routine's history (opened from the routine; nothing of it shows on the routine's card or on
+Today) starts with a summary line and a month of days, one mark per day, and for a `calendar`
+routine twelve weekly bars. Both apps work it out from the definition as it is now, the routine's
+whole history (section 6.4) and the local day:
+
+- **The day of a record.** A record counts on its `scheduledDate`. For an `after_completion`
+  routine a `COMPLETED` record counts on its completion date instead (section 6.5): the day it
+  was done, which may be later than the day it fell due.
+- **What a day holds, `calendar`.** On a day up to today: one occurrence for each slot of the
+  definition when the schedule runs that day and the day is not before `activeFrom`, and one for
+  any other slot with a record that day. An occurrence has its record's status; without a record,
+  or still `PENDING`, it is missed before today (Not logged, section 6.7) and open on today. A
+  day after today holds nothing.
+- **The state of a day, `calendar`**, from its occurrences:
+  - `none`: no occurrences.
+  - `skipped`: every occurrence was skipped.
+  - `done`: at least one was completed, and none is missed or open (a skipped time beside a
+    completed one does not count against the day).
+  - `part`: at least one was completed and at least one is missed or open.
+  - `open`: none completed and at least one open (today, still to do).
+  - `missed`: none completed and at least one missed.
+- **The state of a day, `after_completion`**: `done` when a completion counts on it; else
+  `skipped` when a `SKIPPED` record does; else `open` when the day is today, the due date (6.5)
+  is today or earlier and no `SKIPPED` record is scheduled on that due date; else `none`. There
+  is no `missed` and no `part`.
+- **In a row** (`calendar` only): walk back from today to the routine's first day (the earlier
+  of `activeFrom` and its earliest record). A `done` day adds one. A `none`, `skipped` or `open`
+  day, and today while it is `part`, is passed over. A `missed` day, or a `part` day before
+  today, ends the walk. An `after_completion` routine has no run.
+- **The last 30 days** (today and the 29 days before it): `done` is the number of completed
+  occurrences, `expected` is `done` plus the missed ones. Skipped and open occurrences are in
+  neither. For an `after_completion` routine `done` is the number of completions that count on
+  those days, and nothing is expected.
+- **Weeks** (`calendar` only): the twelve Monday weeks that end with today's week, each with the
+  same `done` and `expected`. A bar is `done / expected` high; a week that expects nothing has
+  none.
+- **The summary line**, `calendar`: `No history yet` while `done` and `expected` are both 0;
+  else `{done} of {expected} in the last 30 days`, with `{n} in a row · ` before it when the run
+  is 2 or more. `after_completion`: `No history yet` while it was never completed; else
+  `Not done in the last 30 days`, `Done once in the last 30 days` or
+  `Done {n} times in the last 30 days`.
+- Marks use the routine's own colour (the Routines colour without one): filled for `done`, a pale
+  fill for `part`, a ring for `skipped`, a small neutral dot for `missed`, nothing for `open` and
+  `none`. Today is outlined. The day picked lists its occurrences under the month, in time order.
+- The `trend` vectors of `routine-archive-v1.json` pin the day states, the run, the counts, the
+  weeks and the line.
+
 ---
 
 ## 7. Completion hold

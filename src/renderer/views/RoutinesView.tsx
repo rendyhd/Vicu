@@ -7,7 +7,6 @@ import {
   Archive,
   Bell,
   BellOff,
-  Check,
   EyeOff,
   ChevronRight,
   Download,
@@ -43,6 +42,8 @@ import { RoutineShareField, SharedRoutineLabel, useRoutineSharing, type RoutineS
 import { useCollabMe, useProjectAccess } from '@/hooks/use-project-access'
 import { useSetSyncedPreference, useSyncedPrefs } from '@/hooks/use-synced-prefs'
 import { loggedByText } from '@/lib/routine-sharing'
+import { MonthCalendar, type DayMark } from '@/components/task-list/MonthCalendar'
+import { routineTrend } from '../../shared/routine-trend'
 import { routineHiddenKey, routineRemindersKey, routineRemindersOn } from '../../shared/synced-prefs'
 
 const FIELD = 'h-9 w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 text-sm text-[var(--text-primary)] transition'
@@ -217,39 +218,114 @@ function RoutineEditor({
   )
 }
 
+/** White or near-black, whichever reads better on a stored routine colour. */
+function readableOn(hex: string): string {
+  const match = /^#?([0-9a-f]{6})$/i.exec(hex.trim())
+  if (!match) return '#FFFFFF'
+  const value = parseInt(match[1], 16)
+  const channel = (shift: number) => {
+    const part = ((value >> shift) & 0xff) / 255
+    return part <= 0.03928 ? part / 12.92 : ((part + 0.055) / 1.055) ** 2.4
+  }
+  const luminance = 0.2126 * channel(16) + 0.7152 * channel(8) + 0.0722 * channel(0)
+  return luminance > 0.5 ? '#1C1C1E' : '#FFFFFF'
+}
+
+const STATUS_WORDS: Record<string, string> = { COMPLETED: 'Done', SKIPPED: 'Skipped', NOT_LOGGED: 'Not logged', PENDING: 'To do' }
+
+/**
+ * A routine's history (cross-app semantics 6.11, the rules in shared/routine-trend.ts): the summary
+ * line, a month with a mark on each day, what the day picked holds, and for a schedule twelve
+ * weeks of bars. Android's history dialog draws the same.
+ */
 function HistoryDialog({ carrier, onClose }: { carrier: RoutineCarrier<Task>; onClose: () => void }) {
   const dateFormat = useDateFormat()
   const sharing = useRoutineSharing(carrier)
   const me = useCollabMe()
   const members = useProjectAccess(carrier.task.project_id).members
   const { records, loadingArchive, archiveError } = useRoutineHistory(carrier)
-  const logged = records.filter((record) => record.status !== 'PENDING')
-  const completed = logged.filter((record) => record.status === 'COMPLETED').length
-  const adherence = logged.length ? Math.round((completed / logged.length) * 100) : 0
+  const definition = carrier.payload.definition
+  const today = localDateString()
+  const trend = useMemo(() => routineTrend(definition, records, today), [definition, records, today])
+  const [picked, setPicked] = useState(today)
+  const color = definition.color || STORED_ROUTINE_COLORS[0]
+  const occurrences = trend.occurrencesOn(picked)
+
+  const dayMark = (date: string, inMonth: boolean): DayMark => {
+    const opacity = inMonth ? 1 : 0.4
+    switch (trend.state(date)) {
+      case 'done':
+        return { style: { backgroundColor: color, color: readableOn(color), opacity }, note: 'done' }
+      case 'part':
+        return { style: { backgroundColor: `color-mix(in srgb, ${color} 26%, transparent)`, opacity }, note: 'partly done' }
+      case 'skipped':
+        return { style: { boxShadow: `inset 0 0 0 1.5px ${color}`, opacity }, note: 'skipped' }
+      case 'missed':
+        return { style: { opacity }, dot: true, note: 'not logged' }
+      case 'open':
+        return { style: { opacity }, note: 'to do' }
+      default:
+        return { style: { color: 'var(--text-secondary)', opacity: opacity * 0.8 } }
+    }
+  }
+
+  const weeks = trend.weeks
+  const thisWeek = weeks?.[weeks.length - 1]
   return (
-    <DialogFrame title={carrier.payload.definition.name} onClose={onClose}>
+    <DialogFrame title={definition.name} onClose={onClose}>
       <div className="overflow-y-auto p-5">
-        <div className="mb-5 grid grid-cols-2 gap-3">
-          <div className="rounded-card bg-[var(--bg-secondary)] p-4"><div className="text-2xl font-semibold text-[var(--text-primary)]">{adherence}%</div><div className="text-xs text-[var(--text-secondary)]">Logged adherence</div></div>
-          <div className="rounded-card bg-[var(--bg-secondary)] p-4"><div className="text-2xl font-semibold text-[var(--text-primary)]">{completed}</div><div className="text-xs text-[var(--text-secondary)]">Completions</div></div>
-        </div>
-        <h3 className="mb-2 text-caption uppercase tracking-wide text-[var(--text-secondary)]">History</h3>
+        <p className="mb-4 text-sm text-[var(--text-secondary)]">{trend.summary}</p>
         {loadingArchive && <p className="mb-2 text-xs text-[var(--text-secondary)]">Loading earlier history...</p>}
         {archiveError && <p className="mb-2 text-xs text-danger">Could not load earlier history: {archiveError}</p>}
-        {records.length === 0 ? <p className="py-8 text-center text-sm text-[var(--text-secondary)]">No check-ins yet.</p> : (
-          <div className="divide-y divide-[var(--border-color)]">
-            {records.slice(0, 100).map((record) => (
-              <div key={record.key} className="flex items-center gap-3 py-2.5">
-                <div className={cn('flex h-6 w-6 items-center justify-center rounded-full', record.status === 'COMPLETED' ? 'bg-status-done/15 text-status-done' : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)]')}>
-                  {record.status === 'COMPLETED' ? <Check className="h-3.5 w-3.5" /> : <X className="h-3.5 w-3.5" />}
+        <div className="grid gap-6 sm:grid-cols-[17rem_minmax(0,1fr)]">
+          <MonthCalendar selected={picked} today={today} onPick={setPicked} dayMark={dayMark} />
+          <div className="min-w-0">
+            {weeks && (
+              <div
+                className="mb-4"
+                role="img"
+                aria-label={`Last ${weeks.length} weeks${thisWeek && thisWeek.expected > 0 ? `. This week ${thisWeek.done} of ${thisWeek.expected}` : ''}`}
+              >
+                <div className="flex h-8 items-end gap-1">
+                  {weeks.map((week, index) => (
+                    <div key={index} className="relative flex h-full flex-1 items-end">
+                      {/* The line every bar stands on, so a week with nothing done still has its place. */}
+                      <div className="absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-[var(--border-color)]" />
+                      {week.expected > 0 && week.done > 0 && (
+                        <div
+                          className="relative w-full rounded-t-control"
+                          style={{ height: `${Math.max(8, Math.round((week.done / week.expected) * 100))}%`, backgroundColor: color }}
+                        />
+                      )}
+                    </div>
+                  ))}
                 </div>
-                <div className="min-w-0 flex-1"><div className="text-sm text-[var(--text-primary)]">{formatDateChip(new Date(`${record.scheduledDate}T12:00:00`), true, new Date(), dateFormat)}</div><div className="text-meta text-[var(--text-secondary)]">{formatMinutesOfDay(record.scheduledMinutes, dateFormat)}</div></div>
-                {sharing.shared && loggedByText(record.status, record, me?.id, members) && <span className="text-meta text-[var(--text-secondary)]">{loggedByText(record.status, record, me?.id, members)}</span>}
-                <span className="text-meta capitalize text-[var(--text-secondary)]">{record.status.toLowerCase().replace('_', ' ')}</span>
+                <div className="mt-1 flex justify-between text-caption text-[var(--text-secondary)]">
+                  <span>{weeks.length} weeks ago</span>
+                  <span>This week</span>
+                </div>
               </div>
-            ))}
+            )}
+            <h3 className="mb-1 text-sm font-semibold text-[var(--text-primary)]">
+              {formatDateChip(new Date(`${picked}T12:00:00`), true, new Date(), dateFormat)}
+            </h3>
+            {occurrences.length === 0 ? (
+              <p className="text-sm text-[var(--text-secondary)]">{picked > today ? 'Still to come' : 'Nothing scheduled'}</p>
+            ) : (
+              <div className="divide-y divide-[var(--border-color)]">
+                {occurrences.map((occurrence) => (
+                  <div key={occurrence.slotId} className="flex items-center justify-between gap-3 py-2 text-sm">
+                    <span className="text-[var(--text-secondary)]">{formatMinutesOfDay(occurrence.minutes, dateFormat)}</span>
+                    <span className="text-[var(--text-primary)]">
+                      {/* "Done by Maya" on a shared routine, else the plain status. */}
+                      {(sharing.shared && loggedByText(occurrence.status, occurrence.record, me?.id, members)) || STATUS_WORDS[occurrence.status]}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
-        )}
+        </div>
       </div>
     </DialogFrame>
   )

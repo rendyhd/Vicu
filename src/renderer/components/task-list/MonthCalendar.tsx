@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { startOfLocalDay, type LocalDate } from '@/lib/due-dates'
@@ -18,6 +18,18 @@ interface MonthCalendarProps {
   onPick: (date: LocalDate) => void
   /** A day that cannot be picked (a past day for a time block). */
   isDisabled?: (date: LocalDate) => boolean
+  /**
+   * For a calendar that shows something about each day (a routine's history): how the day's number
+   * is drawn, a small dot under it, and words read after the date. The picked day then stands on a
+   * soft ground and today is outlined, so neither hides the day's own mark.
+   */
+  dayMark?: (date: LocalDate, inMonth: boolean) => DayMark
+}
+
+export interface DayMark {
+  style?: CSSProperties
+  dot?: boolean
+  note?: string
 }
 
 const MONDAY = new Date(2026, 9, 5)
@@ -26,7 +38,7 @@ const MONDAY = new Date(2026, 9, 5)
  * A month of six Monday-first weeks (`monthGrid`, the same grid as Android's MonthCalendar) with the
  * month arrows and arrow-key movement. The When panel and the planner's day picker use it.
  */
-export function MonthCalendar({ selected, today, reveal, onPick, isDisabled }: MonthCalendarProps) {
+export function MonthCalendar({ selected, today, reveal, onPick, isDisabled, dayMark }: MonthCalendarProps) {
   const fmt = useDateFormat()
   const opening = reveal?.date ?? selected ?? today
   const [viewMonth, setViewMonth] = useState(() => monthStart(opening))
@@ -115,33 +127,48 @@ export function MonthCalendar({ selected, today, reveal, onPick, isDisabled }: M
               const isSelected = day.date === selected
               const isToday = day.date === today
               const disabled = isDisabled?.(day.date) === true
+              const mark = dayMark?.(day.date, day.inMonth)
+              const fullDate = formatFullDateWithYear(startOfLocalDay(day.date), fmt)
               return (
-                <div key={day.date} role="gridcell" aria-selected={isSelected} className="flex justify-center">
-                  <button
-                    type="button"
-                    data-date={day.date}
-                    tabIndex={day.date === focusDate ? 0 : -1}
-                    aria-label={formatFullDateWithYear(startOfLocalDay(day.date), fmt)}
-                    aria-current={isToday ? 'date' : undefined}
-                    aria-disabled={disabled || undefined}
-                    onClick={() => {
-                      setFocusDate(day.date)
-                      if (!disabled) onPick(day.date)
-                    }}
+                <div key={day.date} role="gridcell" aria-selected={isSelected} className={cn('flex justify-center', dayMark && 'py-0.5')}>
+                  <span
                     className={cn(
-                      'flex h-7 w-7 items-center justify-center rounded-full text-meta transition-colors',
-                      disabled && 'cursor-not-allowed opacity-50',
-                      isSelected
-                        ? 'bg-accent-fill text-on-accent'
-                        : cn(
-                            !disabled && 'hover:bg-[var(--bg-hover)]',
-                            day.inMonth ? 'text-[var(--text-primary)]' : 'text-[var(--text-secondary)]',
-                          ),
-                      isToday && 'ring-1 ring-inset ring-[var(--accent-blue)]',
+                      dayMark && 'flex h-9 w-9 items-center justify-center rounded-control',
+                      dayMark && isSelected && 'bg-[var(--bg-hover)]',
                     )}
                   >
-                    {Number(day.date.slice(8, 10))}
-                  </button>
+                    <button
+                      type="button"
+                      data-date={day.date}
+                      tabIndex={day.date === focusDate ? 0 : -1}
+                      aria-label={mark?.note ? `${fullDate}, ${mark.note}` : fullDate}
+                      aria-current={isToday ? 'date' : undefined}
+                      aria-disabled={disabled || undefined}
+                      onClick={() => {
+                        setFocusDate(day.date)
+                        if (!disabled) onPick(day.date)
+                      }}
+                      style={mark?.style}
+                      className={cn(
+                        'relative flex h-7 w-7 items-center justify-center rounded-full text-meta transition-colors',
+                        disabled && 'cursor-not-allowed opacity-50',
+                        dayMark
+                          ? cn('text-[var(--text-primary)]', isToday && 'outline outline-1 outline-offset-2 outline-[var(--text-primary)]')
+                          : cn(
+                              isSelected
+                                ? 'bg-accent-fill text-on-accent'
+                                : cn(
+                                    !disabled && 'hover:bg-[var(--bg-hover)]',
+                                    day.inMonth ? 'text-[var(--text-primary)]' : 'text-[var(--text-secondary)]',
+                                  ),
+                              isToday && 'ring-1 ring-inset ring-[var(--accent-blue)]',
+                            ),
+                      )}
+                    >
+                      {Number(day.date.slice(8, 10))}
+                      {mark?.dot && <span aria-hidden className="absolute -bottom-0.5 h-1 w-1 rounded-full bg-[var(--text-secondary)]" />}
+                    </button>
+                  </span>
                 </div>
               )
             })}

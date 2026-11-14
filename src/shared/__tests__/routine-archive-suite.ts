@@ -17,6 +17,8 @@ import {
   type RoutineOccurrenceRecord,
   type RoutinePayload,
 } from '../routines'
+import { addLocalDays } from '../due-dates'
+import { routineTrend, TREND_WEEKS, TREND_WINDOW_DAYS } from '../routine-trend'
 
 /**
  * Runs every vector of test-fixtures/routine-archive-v1.json (docs/cross-app-semantics-v1.md,
@@ -73,6 +75,28 @@ interface Fixture {
     occurrences: CompactOccurrence[]
     expectDue: string
   }>
+  trend: {
+    windowDays: number
+    weeks: number
+    cases: Array<{
+      name: string
+      today: string
+      schedule?: RoutineDefinition['schedule']
+      slots?: string[]
+      activeFrom?: string
+      occurrences: Array<{ date: string; status: OccurrenceStatus; slot?: string; loggedAt?: string; timeZoneId?: string }>
+      from: string
+      to: string
+      expect: {
+        days: Record<string, string>
+        streak: number | null
+        done: number
+        expected: number | null
+        weeks: Array<[number, number]> | null
+        summary: string
+      }
+    }>
+  }
 }
 
 function loadFixture(): Fixture {
@@ -236,6 +260,75 @@ export function runRoutineArchiveSuite(options: { zone: string; expectedOffsetMi
           expect(routineDueDate(source)).toBe(vector.expectDue)
         })
       }
+    })
+
+    describe('trend (section 6.11)', () => {
+      it('uses the fixture constants', () => {
+        expect(TREND_WINDOW_DAYS).toBe(fixture.trend.windowDays)
+        expect(TREND_WEEKS).toBe(fixture.trend.weeks)
+      })
+
+      function trendOf(vector: Fixture['trend']['cases'][number]) {
+        const base = fixture.baseDefinition
+        const schedule = vector.schedule ?? base.schedule
+        const definition: RoutineDefinition = {
+          ...base,
+          kind: schedule.type === 'after_completion' ? 'CHORE' : base.kind,
+          schedule,
+          slots: (vector.slots ?? ['s1']).map((id, index) => ({
+            ...base.slots[0],
+            id,
+            reminderMinutes: base.slots[0].reminderMinutes + index * 60,
+          })),
+          activeFrom: vector.activeFrom ?? base.activeFrom,
+        }
+        const records: RoutineOccurrenceRecord[] = vector.occurrences.map((occurrence) => ({
+          key: `r1:${occurrence.date}:${occurrence.slot ?? 's1'}`,
+          routineId: 'r1',
+          slotId: occurrence.slot ?? 's1',
+          scheduledDate: occurrence.date,
+          scheduledMinutes: 480,
+          timeZoneId: occurrence.timeZoneId ?? 'UTC',
+          status: occurrence.status,
+          loggedAt: occurrence.loggedAt ?? '',
+          modifiedAt: '2026-11-13T08:00:00.000Z',
+          modifiedBy: 'a',
+          note: '',
+        }))
+        return routineTrend(definition, records, vector.today)
+      }
+
+      for (const vector of fixture.trend.cases) {
+        it(vector.name, () => {
+          const trend = trendOf(vector)
+          const days: Record<string, string> = {}
+          for (let date = vector.from; date <= vector.to; date = addLocalDays(date, 1)) {
+            const state = trend.state(date)
+            if (state !== 'none') days[date] = state
+          }
+          expect(days).toEqual(vector.expect.days)
+          expect(trend.streak).toBe(vector.expect.streak)
+          expect(trend.window.done).toBe(vector.expect.done)
+          // Nothing is expected of an after-completion routine: its tally then counts only what was done.
+          expect(trend.window.expected).toBe(vector.expect.expected ?? trend.window.done)
+          expect(trend.weeks?.map((week) => [week.done, week.expected]) ?? null).toEqual(vector.expect.weeks)
+          expect(trend.summary).toBe(vector.expect.summary)
+        })
+      }
+
+      it('lists every time of the day picked, in time order', () => {
+        const vector = fixture.trend.cases.find((entry) => entry.slots?.length === 2)!
+        const trend = trendOf(vector)
+        // 10 November: the first time was done, the second has no record and is missed.
+        const day = trend.occurrencesOn('2026-11-10')
+        expect(day.map((entry) => entry.slotId)).toEqual(['s1', 's2'])
+        expect(day.map((entry) => entry.status)).toEqual(['COMPLETED', 'NOT_LOGGED'])
+        expect(day.map((entry) => entry.record !== undefined)).toEqual([true, false])
+        // Today the second time is still to do; the day before the routine started holds nothing.
+        expect(trend.occurrencesOn('2026-11-13').at(-1)?.status).toBe('PENDING')
+        expect(trend.occurrencesOn('2026-11-08')).toEqual([])
+        expect(trend.occurrencesOn('2026-11-14')).toEqual([])
+      })
     })
   })
 }

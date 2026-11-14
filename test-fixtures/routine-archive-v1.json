@@ -1,6 +1,6 @@
 {
   "contractVersion": 1,
-  "about": "Routine merge, pruning, archive and after-completion vectors for docs/cross-app-semantics-v1.md section 6. Occurrences are written compactly; expand each to a full record with key '<routineId>:<date>:<slotId>', routineId 'r1', slotId 's1', scheduledDate = date, scheduledMinutes 480, timeZoneId 'UTC' unless given, loggedAt '' unless given, note ''. A prune vector may override the definition schedule with \"schedule\" (then kind is CHORE). A compact occurrence may also give \"note\" and \"loggedBy\". writeKeep (section 6.8): merge local into remote, then keep the server's record where the result has the same status and note; expect gives each date's modifiedBy in what is sent. sharedVisibility (section 6.9): useCarriers and useParts are the ids an app signed in as me reads. loggedBy (section 6.9): expectUserId is the person named, or null. Keep this file identical in vicu and vicu-android.",
+  "about": "Routine merge, pruning, archive and after-completion vectors for docs/cross-app-semantics-v1.md section 6. Occurrences are written compactly; expand each to a full record with key '<routineId>:<date>:<slotId>', routineId 'r1', slotId 's1', scheduledDate = date, scheduledMinutes 480, timeZoneId 'UTC' unless given, loggedAt '' unless given, note ''. A prune vector may override the definition schedule with \"schedule\" (then kind is CHORE). A compact occurrence may also give \"note\" and \"loggedBy\". writeKeep (section 6.8): merge local into remote, then keep the server's record where the result has the same status and note; expect gives each date's modifiedBy in what is sent. sharedVisibility (section 6.9): useCarriers and useParts are the ids an app signed in as me reads. loggedBy (section 6.9): expectUserId is the person named, or null. trend (section 6.11): the definition is baseDefinition with the case's schedule, slots (slot ids; one slot 's1' unless given) and activeFrom; a trend occurrence gives date, status, slot ('s1' unless given), loggedAt ('' unless given) and timeZoneId ('UTC' unless given). expect.days gives the state of every day from 'from' to 'to' that is not 'none'; streak is the run of done days or null; done and expected count the last windowDays days (expected null when nothing is expected of the routine); weeks is [done, expected] for each of the 12 Monday weeks ending with today's, or null; summary is the line both apps show. Keep this file identical in vicu and vicu-android.",
   "baseDefinition": {
     "id": "r1",
     "name": "Vitamin D",
@@ -277,5 +277,182 @@
       "occurrences": [ { "date": "2026-10-01", "status": "COMPLETED", "loggedAt": "2026-10-03T23:30:00.000Z", "timeZoneId": "Asia/Tokyo", "modifiedAt": "2026-10-03T23:30:00.000Z", "modifiedBy": "a" } ],
       "expectDue": "2026-10-07"
     }
-  ]
+  ],
+  "trend": {
+    "windowDays": 30,
+    "weeks": 12,
+    "cases": [
+      {
+        "name": "a month of a daily routine: a missed day ends the run, a skipped day does not",
+        "today": "2026-11-13",
+        "activeFrom": "2026-11-01",
+        "occurrences": [
+          { "date": "2026-11-01", "status": "COMPLETED" },
+          { "date": "2026-11-02", "status": "COMPLETED" },
+          { "date": "2026-11-03", "status": "COMPLETED" },
+          { "date": "2026-11-05", "status": "COMPLETED" },
+          { "date": "2026-11-06", "status": "SKIPPED" },
+          { "date": "2026-11-07", "status": "COMPLETED" },
+          { "date": "2026-11-08", "status": "COMPLETED" },
+          { "date": "2026-11-09", "status": "COMPLETED" },
+          { "date": "2026-11-10", "status": "COMPLETED" },
+          { "date": "2026-11-11", "status": "COMPLETED" },
+          { "date": "2026-11-12", "status": "COMPLETED" }
+        ],
+        "from": "2026-10-25",
+        "to": "2026-11-20",
+        "expect": {
+          "days": { "2026-11-01": "done", "2026-11-02": "done", "2026-11-03": "done", "2026-11-04": "missed", "2026-11-05": "done", "2026-11-06": "skipped", "2026-11-07": "done", "2026-11-08": "done", "2026-11-09": "done", "2026-11-10": "done", "2026-11-11": "done", "2026-11-12": "done", "2026-11-13": "open" },
+          "streak": 7,
+          "done": 10,
+          "expected": 11,
+          "weeks": [[0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [1, 1], [5, 6], [4, 4]],
+          "summary": "7 in a row · 10 of 11 in the last 30 days"
+        }
+      },
+      {
+        "name": "two times a day: part of a day, a skipped time, and today half done",
+        "today": "2026-11-13",
+        "slots": ["s1", "s2"],
+        "activeFrom": "2026-11-09",
+        "occurrences": [
+          { "date": "2026-11-09", "status": "COMPLETED", "slot": "s1" },
+          { "date": "2026-11-09", "status": "COMPLETED", "slot": "s2" },
+          { "date": "2026-11-10", "status": "COMPLETED", "slot": "s1" },
+          { "date": "2026-11-11", "status": "SKIPPED", "slot": "s1" },
+          { "date": "2026-11-11", "status": "COMPLETED", "slot": "s2" },
+          { "date": "2026-11-12", "status": "SKIPPED", "slot": "s1" },
+          { "date": "2026-11-12", "status": "SKIPPED", "slot": "s2" },
+          { "date": "2026-11-13", "status": "COMPLETED", "slot": "s1" }
+        ],
+        "from": "2026-11-08",
+        "to": "2026-11-14",
+        "expect": {
+          "days": { "2026-11-09": "done", "2026-11-10": "part", "2026-11-11": "done", "2026-11-12": "skipped", "2026-11-13": "part" },
+          "streak": 1,
+          "done": 5,
+          "expected": 6,
+          "weeks": [[0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [5, 6]],
+          "summary": "5 of 6 in the last 30 days"
+        }
+      },
+      {
+        "name": "some weekdays: other days are empty, a placeholder is a missed day, a record on a day off still counts",
+        "today": "2026-11-13",
+        "schedule": { "type": "calendar", "weekdays": [1, 3, 5], "weekInterval": 1, "anchorDate": "2025-01-01" },
+        "activeFrom": "2026-11-02",
+        "occurrences": [
+          { "date": "2026-11-02", "status": "COMPLETED" },
+          { "date": "2026-11-04", "status": "NOT_LOGGED" },
+          { "date": "2026-11-06", "status": "COMPLETED" },
+          { "date": "2026-11-07", "status": "COMPLETED" },
+          { "date": "2026-11-09", "status": "COMPLETED" },
+          { "date": "2026-11-11", "status": "COMPLETED" },
+          { "date": "2026-11-13", "status": "COMPLETED" }
+        ],
+        "from": "2026-11-01",
+        "to": "2026-11-13",
+        "expect": {
+          "days": { "2026-11-02": "done", "2026-11-04": "missed", "2026-11-06": "done", "2026-11-07": "done", "2026-11-09": "done", "2026-11-11": "done", "2026-11-13": "done" },
+          "streak": 5,
+          "done": 6,
+          "expected": 7,
+          "weeks": [[0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [3, 4], [3, 3]],
+          "summary": "5 in a row · 6 of 7 in the last 30 days"
+        }
+      },
+      {
+        "name": "a routine that starts today has no history yet",
+        "today": "2026-11-13",
+        "activeFrom": "2026-11-13",
+        "occurrences": [],
+        "from": "2026-11-10",
+        "to": "2026-11-15",
+        "expect": {
+          "days": { "2026-11-13": "open" },
+          "streak": 0,
+          "done": 0,
+          "expected": 0,
+          "weeks": [[0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0]],
+          "summary": "No history yet"
+        }
+      },
+      {
+        "name": "after completion: a dot on the day it was done, in the record's time zone; no run and no weeks",
+        "today": "2026-11-13",
+        "schedule": { "type": "after_completion", "intervalDays": 7, "firstDueDate": "2026-10-20" },
+        "activeFrom": "2026-10-20",
+        "occurrences": [
+          { "date": "2026-10-20", "status": "COMPLETED", "loggedAt": "2026-10-22T09:00:00.000Z" },
+          { "date": "2026-10-29", "status": "COMPLETED", "loggedAt": "2026-10-29T22:30:00.000Z", "timeZoneId": "Pacific/Auckland" },
+          { "date": "2026-11-06", "status": "SKIPPED" }
+        ],
+        "from": "2026-10-15",
+        "to": "2026-11-13",
+        "expect": {
+          "days": { "2026-10-22": "done", "2026-10-30": "done", "2026-11-06": "skipped" },
+          "streak": null,
+          "done": 2,
+          "expected": null,
+          "weeks": null,
+          "summary": "Done 2 times in the last 30 days"
+        }
+      },
+      {
+        "name": "after completion: due and not done shows on today only",
+        "today": "2026-11-13",
+        "schedule": { "type": "after_completion", "intervalDays": 7, "firstDueDate": "2026-10-20" },
+        "activeFrom": "2026-10-20",
+        "occurrences": [
+          { "date": "2026-10-20", "status": "COMPLETED" }
+        ],
+        "from": "2026-10-15",
+        "to": "2026-11-13",
+        "expect": {
+          "days": { "2026-10-20": "done", "2026-11-13": "open" },
+          "streak": null,
+          "done": 1,
+          "expected": null,
+          "weeks": null,
+          "summary": "Done once in the last 30 days"
+        }
+      },
+      {
+        "name": "after completion: done, but not in the last 30 days",
+        "today": "2026-11-13",
+        "schedule": { "type": "after_completion", "intervalDays": 30, "firstDueDate": "2026-09-01" },
+        "activeFrom": "2026-09-01",
+        "occurrences": [
+          { "date": "2026-09-01", "status": "COMPLETED" }
+        ],
+        "from": "2026-11-01",
+        "to": "2026-11-13",
+        "expect": {
+          "days": { "2026-11-13": "open" },
+          "streak": null,
+          "done": 0,
+          "expected": null,
+          "weeks": null,
+          "summary": "Not done in the last 30 days"
+        }
+      },
+      {
+        "name": "after completion: never done and not due yet",
+        "today": "2026-11-13",
+        "schedule": { "type": "after_completion", "intervalDays": 30, "firstDueDate": "2026-11-20" },
+        "activeFrom": "2026-11-01",
+        "occurrences": [],
+        "from": "2026-11-01",
+        "to": "2026-11-20",
+        "expect": {
+          "days": {},
+          "streak": null,
+          "done": 0,
+          "expected": null,
+          "weeks": null,
+          "summary": "No history yet"
+        }
+      }
+    ]
+  }
 }
