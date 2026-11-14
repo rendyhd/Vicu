@@ -109,6 +109,7 @@ Paste an image into the notes on the desktop and on Android. On iPhone, use **Ad
 
 - Fit the image or see it at its own size.
 - Press <kbd>Left</kbd> and <kbd>Right</kbd> to go through the task's images.
+- On the desktop, **Copy** (or Ctrl+C, Cmd+C on a Mac) puts the image on the clipboard, ready to paste anywhere.
 - **Open in default app** and **Save** are there too.
 
 HEIC and TIFF images open in your default app instead.

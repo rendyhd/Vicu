@@ -157,6 +157,7 @@ const api = {
     return () => { ipcRenderer.removeListener('pro-ledger-sync-status', handler) }
   },
   writeClipboardRich: (text: string, html?: string) => ipcRenderer.invoke('clipboard:write-rich', text, html),
+  writeClipboardImage: (bytes: Uint8Array) => ipcRenderer.invoke('clipboard:write-image', bytes),
   getSavedFilterState: () => ipcRenderer.invoke('saved-filters:state'),
   previewSavedFilters: (ids?: number[]) => ipcRenderer.invoke('saved-filters:preview', ids),
   importSavedFilters: (ids: number[]) => ipcRenderer.invoke('saved-filters:import', ids),

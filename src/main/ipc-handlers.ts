@@ -7,7 +7,7 @@ import {
   readProArchive,
   syncProLedger,
 } from './pro-ledger-service'
-import { shell, dialog, app, nativeTheme, clipboard as electronClipboard, ClipboardItem as ElectronClipboardItem } from 'electron'
+import { shell, dialog, app, nativeTheme, nativeImage, clipboard as electronClipboard, ClipboardItem as ElectronClipboardItem } from 'electron'
 import { isProEnabled } from '../shared/pro/settings'
 import { handleTrusted } from './secure-ipc'
 import { tokenForConnectionTest } from './connection-test-token'
@@ -611,6 +611,19 @@ export function registerIpcHandlers(): void {
       await electronClipboard.writeText(text)
     }
     return true
+  })
+  // An image attachment copied from the viewer: PNG or JPEG bytes (the window converts other
+  // formats to PNG first), put on the clipboard as a picture.
+  handleTrusted('clipboard:write-image', async (_event, bytes: unknown) => {
+    if (!(bytes instanceof Uint8Array) || bytes.byteLength === 0 || bytes.byteLength > 100 * 1024 * 1024) {
+      return { success: false, error: 'Invalid image' }
+    }
+    const image = nativeImage.createFromBuffer(Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength))
+    if (image.isEmpty()) return { success: false, error: 'This image cannot be copied' }
+    // The clipboard takes a picture as PNG; a JPEG is decoded and encoded again here.
+    const png = new Blob([new Uint8Array(image.toPNG())],{ type: 'image/png' })
+    await electronClipboard.write([new ElectronClipboardItem({ 'image/png': png })])
+    return { success: true, data: undefined }
   })
   // Setup reads the account's synced Inbox before it asks for one (section 11.4). An API-token
   // setup passes its token (nothing is saved yet); a sign-in uses the session it just stored.

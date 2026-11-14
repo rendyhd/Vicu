@@ -194,6 +194,8 @@ export interface ElectronAPI {
   onProLedgerStatus(cb: (status: CustomListSyncStatus) => void): () => void
   /** Puts a plain text and, when given, an HTML version on the clipboard. */
   writeClipboardRich(text: string, html?: string): Promise<boolean>
+  /** Puts a PNG or JPEG image on the clipboard. */
+  writeClipboardImage(bytes: Uint8Array): Promise<ApiResult<void>>
   onSyncedPrefsStatus(cb: (status: CustomListSyncStatus) => void): () => void
   /** Custom-list and settings changes that have not reached the server, with their sync status. */
   getUnsyncedDocuments(): Promise<UnsyncedDocuments>

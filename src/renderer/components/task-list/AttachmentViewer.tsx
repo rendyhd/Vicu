@@ -1,5 +1,5 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
-import { ChevronLeft, ChevronRight, Download, ExternalLink, ImageOff, Loader2, Maximize2, Minimize2, X } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Copy, Download, ExternalLink, ImageOff, Loader2, Maximize2, Minimize2, X } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { stepImage, type ViewerImage } from '@/lib/attachment-preview'
 import { useAttachmentBlobUrl } from '@/hooks/use-attachment-bytes'
@@ -20,15 +20,15 @@ const ICON_BUTTON =
 
 /**
  * A task's image attachments in a modal over the app: the image fitted to the window (a click shows
- * it at its own size when it is larger), Left and Right between the task's images, Open in the
- * default app and Save. Render it where it was opened from (inside the attachment list's popover,
+ * it at its own size when it is larger), Left and Right between the task's images, Copy (also
+ * Mod+C), Open in the default app and Save. Render it where it was opened from (inside the attachment list's popover,
  * which then stays open behind it); Escape and Close return there.
  */
 export function AttachmentViewer({ taskId, images, startId, onClose }: AttachmentViewerProps) {
   const titleId = useId()
   const rootRef = useRef<HTMLDivElement>(null)
   const [index, setIndex] = useState(() => Math.max(0, images.findIndex((image) => image.id === startId)))
-  const { notice, clearNotice, savingId, open, save } = useAttachmentActions(taskId)
+  const { notice, clearNotice, savingId, open, save, copyImage } = useAttachmentActions(taskId)
   const image = images[Math.min(index, images.length - 1)]
   const many = images.length > 1
 
@@ -52,6 +52,14 @@ export function AttachmentViewer({ taskId, images, startId, onClose }: Attachmen
   }
 
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    // Mod+C copies the image, unless text in the viewer (its name) is selected.
+    if ((event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'c') {
+      if (window.getSelection()?.toString()) return
+      event.preventDefault()
+      event.stopPropagation()
+      void copyImage(image.id, image.name, image.mime)
+      return
+    }
     if (!many || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return
     if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return
     event.preventDefault()
@@ -82,6 +90,15 @@ export function AttachmentViewer({ taskId, images, startId, onClose }: Attachmen
               {index + 1} of {images.length}
             </span>
           )}
+          <button
+            type="button"
+            onClick={() => void copyImage(image.id, image.name, image.mime)}
+            aria-label={`Copy ${image.name}`}
+            title="Copy image"
+            className={ICON_BUTTON}
+          >
+            <Copy className="h-4 w-4" />
+          </button>
           <button
             type="button"
             onClick={() => void open(image.id, image.name)}

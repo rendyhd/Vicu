@@ -270,6 +270,7 @@ export const api = {
   readProArchive: () => window.api.readProArchive(),
   onProLedgerChanged: (cb: (snapshot: import('../../shared/pro/ledger-ipc').ProLedgerSnapshot) => void) => window.api.onProLedgerChanged(cb),
   writeClipboardRich: (text: string, html?: string) => window.api.writeClipboardRich(text, html),
+  writeClipboardImage: (bytes: Uint8Array) => window.api.writeClipboardImage(bytes) as Promise<ApiResult<void>>,
   getUnsyncedDocuments: () => window.api.getUnsyncedDocuments(),
   discardUnsyncedDocuments: () => window.api.discardUnsyncedDocuments(),
   onSyncedPrefsStatus: (cb: (status: import('./vikunja-types').CustomListSyncStatus) => void) =>

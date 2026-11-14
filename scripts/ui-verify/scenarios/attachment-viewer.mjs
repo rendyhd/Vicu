@@ -187,6 +187,31 @@ export default async function run(h) {
     v = await viewer(page)
     await h.assert('D: Left goes back round to the last', { ok: v?.title === 'small.png', detail: v?.title })
 
+    // ---- D2. Copy image ---------------------------------------------------------------------
+    const clipboardImage = () => h.app.evaluate(async ({ clipboard, nativeImage }) => {
+      const items = await clipboard.read()
+      const item = items.find((entry) => entry.types.includes('image/png'))
+      if (!item) return { types: items.flatMap((entry) => entry.types) }
+      const blob = await item.getType('image/png')
+      const size = nativeImage.createFromBuffer(Buffer.from(await blob.arrayBuffer())).getSize()
+      return { types: item.types, ...size }
+    })
+    await h.app.evaluate(({ clipboard }) => clipboard.writeText('before'))
+    await page.locator('dialog[open] button[title="Copy image"]').click()
+    await page.waitForFunction(() => document.querySelector('dialog[open] [role="status"]')?.textContent === 'Image copied', null, { timeout: 10000 }).catch(() => {})
+    let clip = await clipboardImage()
+    await h.assert('D2: Copy puts the image on the clipboard at its own size', { ok: clip.width === 320 && clip.height === 200, detail: JSON.stringify(clip) })
+    await h.capture(`viewer-copied-${theme}`)
+    await h.app.evaluate(({ clipboard }) => clipboard.writeText('before'))
+    await h.key('ArrowRight')
+    await page.waitForFunction(() => [...document.querySelectorAll('dialog[open] img')].at(-1)?.naturalWidth === 2400, null, { timeout: 15000 }).catch(() => {})
+    await h.key(process.platform === 'darwin' ? 'Meta+c' : 'Control+c')
+    await page.waitForFunction(() => document.querySelector('dialog[open] [role="status"]')?.textContent === 'Image copied', null, { timeout: 10000 }).catch(() => {})
+    clip = await clipboardImage()
+    await h.assert('D2: Mod+C copies the image shown', { ok: clip.width === 2400, detail: JSON.stringify(clip) })
+    await h.key('ArrowLeft')
+    await h.wait(400)
+
     // ---- E. Escape --------------------------------------------------------------------------
     await h.key('Escape')
     await h.wait(400)

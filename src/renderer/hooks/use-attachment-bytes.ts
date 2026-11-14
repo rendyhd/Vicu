@@ -6,6 +6,23 @@ const PREVIEW_STALE_TIME = 5 * 60 * 1000
 // An original can be a full-size phone photo: keep it only a little while after the viewer closes.
 const ORIGINAL_GC_TIME = 60 * 1000
 
+/** The query that holds an attachment's bytes, so another reader (Copy image) shares the cache. */
+export function attachmentBytesQuery(taskId: number, attachmentId: number, size: 'preview' | 'original') {
+  return {
+    queryKey: size === 'preview'
+      ? ['attachment-preview-bytes', taskId, attachmentId]
+      : ['attachment-original-bytes', taskId, attachmentId],
+    queryFn: async (): Promise<Uint8Array> => {
+      const result = await api.fetchTaskAttachmentBytes(taskId, attachmentId, size)
+      if (!result.success) throw new Error(result.error)
+      if (result.data.byteLength === 0) throw new Error('Attachment preview was empty')
+      return result.data
+    },
+    staleTime: PREVIEW_STALE_TIME,
+    gcTime: size === 'preview' ? 1000 * 60 * 10 : ORIGINAL_GC_TIME,
+  }
+}
+
 /**
  * Fetches the bytes for a task attachment and returns an object URL suitable for
  * <img src>. The URL is revoked when the component unmounts or the attachment
@@ -23,18 +40,8 @@ export function useAttachmentBlobUrl(
 ): { url: string | null; isLoading: boolean; error: unknown; retry: () => Promise<void> } {
   const enabled = taskId != null && attachmentId != null
   const query = useQuery<Uint8Array>({
-    queryKey: size === 'preview'
-      ? ['attachment-preview-bytes', taskId, attachmentId]
-      : ['attachment-original-bytes', taskId, attachmentId],
-    queryFn: async () => {
-      const result = await api.fetchTaskAttachmentBytes(taskId as number, attachmentId as number, size)
-      if (!result.success) throw new Error(result.error)
-      if (result.data.byteLength === 0) throw new Error('Attachment preview was empty')
-      return result.data
-    },
+    ...attachmentBytesQuery(taskId as number, attachmentId as number, size),
     enabled,
-    staleTime: PREVIEW_STALE_TIME,
-    gcTime: size === 'preview' ? 1000 * 60 * 10 : ORIGINAL_GC_TIME,
   })
 
   // Create + revoke the URL inside the same effect so strict-mode double-invoke
