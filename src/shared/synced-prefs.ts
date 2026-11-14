@@ -16,6 +16,7 @@ import {
 } from './hidden-tasks'
 import { DEFAULT_TASK_ORDER, GLOBAL_TASK_ORDER_KEY, parseTaskOrder, type TaskOrderKey } from './task-order'
 import { readDefaultLength, readPlannerHours } from './time-blocks'
+import { WEEK_START_KEY, readWeekStart } from './week-start'
 import {
   CATEGORY_KEY_PREFIX,
   categoryIdOfKey,
@@ -347,6 +348,7 @@ export function readSyncedPref(values: Readonly<Record<string, unknown>>, key: s
   if (key === INBOX_PROJECT_ID_KEY) return readInboxProjectId(value)
   if (key === GLOBAL_TASK_ORDER_KEY) return readTaskOrderPref(value)
   if (key === WEEKLY_REVIEW_LAST_KEY) return readWeeklyReviewLast(value)
+  if (key === WEEK_START_KEY) return readWeekStart(value)
   if (key === PLANNER_DEFAULT_LENGTH_KEY) return readDefaultLength(value)
   if (key === PLANNER_HOURS_KEY) return readPlannerHours(value)
   if (/^task_order\.project\.\d+$/.test(key)) return value === undefined || value === null ? null : parseTaskOrder(value)

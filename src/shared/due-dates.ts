@@ -6,15 +6,18 @@
  * - A due date without a time ("date-only") is stored as local 23:59:59 of that date (ms 0).
  * - Legacy values at local 00:00:00 are read as date-only too; they are not rewritten in bulk.
  * - Any other local time is an explicit time and is kept as typed.
- * - "Today" is the device's local calendar date; weeks start on Monday.
+ * - "Today" is the device's local calendar date; weeks start on Monday unless the account chose
+ *   another week start (section 2.1, `week-start.ts`).
  *
  * Calendar dates travel as local `YYYY-MM-DD` strings and all day arithmetic is done on them
  * (via UTC components), never on instants, so a DST change or a zone far from UTC cannot shift
  * a date. Only the helpers that return an instant (`dateOnlyDue`, the boundary helpers) touch
  * the process time zone, because "local" is the whole point of those.
  *
- * This file must stay free of imports so any tsconfig can include it.
+ * This file imports only `week-start.ts`, a sibling without imports, so any tsconfig can include it.
  */
+
+import { daysIntoWeek, getWeekStart, type WeekStart } from './week-start'
 
 /** Vikunja's null date. Duplicated here on purpose to keep this file import-free. */
 const NULL_DUE_DATE = '0001-01-01T00:00:00Z'
@@ -76,19 +79,37 @@ export function isoWeekday(localDate: LocalDate): number {
   return new Date(Date.UTC(year, month - 1, day)).getUTCDay() || 7
 }
 
-/** The Monday of the week containing `localDate` (weeks start on Monday). */
-export function startOfWeek(localDate: LocalDate): LocalDate {
-  return addLocalDays(localDate, 1 - isoWeekday(localDate))
+// Weeks start on Monday unless the account chose another week start (section 2.1). Every week
+// function takes it last and uses the one this process holds when it is left out. A caller that
+// counts the weeks of a schedule passes 'monday': a repeat rule never follows the setting.
+
+/** The first day of the week containing `localDate`: its Monday, or the day `weekStart` names. */
+export function startOfWeek(localDate: LocalDate, weekStart: WeekStart = getWeekStart()): LocalDate {
+  return addLocalDays(localDate, -daysIntoWeek(isoWeekday(localDate), weekStart))
 }
 
-/** The Sunday ending the week that contains `localDate` (on a Sunday: that day). */
-export function endOfWeek(localDate: LocalDate): LocalDate {
-  return addLocalDays(localDate, 7 - isoWeekday(localDate))
+/** The last day of the week that contains `localDate`: with Monday weeks its Sunday (on a Sunday: that day). */
+export function endOfWeek(localDate: LocalDate, weekStart: WeekStart = getWeekStart()): LocalDate {
+  return addLocalDays(startOfWeek(localDate, weekStart), 6)
 }
 
-/** The Monday after `localDate`: strictly in the future, so a Monday gives the next week's. */
-export function nextWeekStart(localDate: LocalDate): LocalDate {
-  return addLocalDays(endOfWeek(localDate), 1)
+/** The first day of the week after the one `localDate` is in: strictly in the future, so a Monday gives the Monday after. */
+export function nextWeekStart(localDate: LocalDate, weekStart: WeekStart = getWeekStart()): LocalDate {
+  return addLocalDays(endOfWeek(localDate, weekStart), 1)
+}
+
+/** An ISO weekday (1 Monday to 7 Sunday) in the week after the one `localDate` is in ("next friday"). */
+export function inNextWeek(localDate: LocalDate, weekday: number, weekStart: WeekStart = getWeekStart()): LocalDate {
+  return addLocalDays(nextWeekStart(localDate, weekStart), daysIntoWeek(weekday, weekStart))
+}
+
+/**
+ * The day "Next week" means as a date: the Monday in the week after the one `localDate` is in.
+ * With Monday weeks that is `nextWeekStart`; with Sunday weeks a Sunday is already in the new week,
+ * so it gives the Monday eight days on.
+ */
+export function nextWeekDay(localDate: LocalDate, weekStart: WeekStart = getWeekStart()): LocalDate {
+  return inNextWeek(localDate, 1, weekStart)
 }
 
 /** The last day of the month `localDate` is in. */
@@ -149,9 +170,9 @@ export function dueTomorrow(now: Date = new Date()): string {
   return dateOnlyDue(addLocalDays(toLocalDate(now), 1))
 }
 
-/** "Next week": the Monday of next week (on a Sunday: the next day), date-only. */
-export function dueNextWeek(now: Date = new Date()): string {
-  return dateOnlyDue(nextWeekStart(toLocalDate(now)))
+/** "Next week": the Monday of next week (with Monday weeks, on a Sunday: the next day), date-only. */
+export function dueNextWeek(now: Date = new Date(), weekStart: WeekStart = getWeekStart()): string {
+  return dateOnlyDue(nextWeekDay(toLocalDate(now), weekStart))
 }
 
 /**

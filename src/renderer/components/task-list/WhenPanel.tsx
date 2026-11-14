@@ -15,6 +15,7 @@ import {
   withTime,
   type WhenValue,
 } from '@/lib/when-logic'
+import { useWeekStart } from '@/hooks/use-week-start'
 
 export interface WhenPanelChange {
   /** True when the pick finishes the job (a quick choice, Enter in the text field). */
@@ -55,7 +56,8 @@ export function WhenPanel({ value, onChange, now: nowProp }: WhenPanelProps) {
   const [customTime, setCustomTime] = useState('')
   const [customInvalid, setCustomInvalid] = useState(false)
 
-  const choices = useMemo(() => quickChoices(today, fmt), [today, fmt])
+  const weekStart = useWeekStart()
+  const choices = useMemo(() => quickChoices(today, fmt, weekStart), [today, fmt, weekStart])
 
   const showDay = (date: LocalDate) => setReveal({ date })
 

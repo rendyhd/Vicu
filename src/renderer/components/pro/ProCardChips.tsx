@@ -21,7 +21,7 @@ import { useDateFormat } from '@/hooks/use-date-format'
 import { formatLength } from '@/lib/planner-timeline'
 import { NULL_DATE } from '@/lib/constants'
 import type { Task } from '@/lib/vikunja-types'
-import { addLocalDays, startOfWeek, toLocalDate } from '../../../shared/due-dates'
+import { addLocalDays, nextWeekDay, toLocalDate } from '../../../shared/due-dates'
 import { dateOnlyStart, startDateOf, startDayOf } from '../../../shared/pro/start-dates'
 import { estimateOf } from '../../../shared/pro/ledger'
 import { formatWeekdayDate } from '../../../shared/date-display'
@@ -262,7 +262,7 @@ function StartPopover({ anchorRef, task, onClose }: { anchorRef: RefObject<HTMLE
     update.mutate({ id: task.id, changes: { start_date: day ? dateOnlyStart(day) : NULL_DATE }, original: task })
     onClose()
   }
-  const nextMonday = addLocalDays(startOfWeek(today), 7)
+  const nextMonday = nextWeekDay(today)
   const choices: Array<{ label: string; day: string }> = [
     { label: 'Tomorrow', day: addLocalDays(today, 1) },
     { label: 'Next week', day: nextMonday },

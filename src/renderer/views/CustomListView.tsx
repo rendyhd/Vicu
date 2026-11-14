@@ -33,6 +33,8 @@ import { usePro } from '@/hooks/use-pro'
 import { useSelectionStore } from '@/stores/selection-store'
 import { cn } from '@/lib/cn'
 import type { CustomList, Task, TaskQueryParams } from '@/lib/vikunja-types'
+import { useWeekStart } from '@/hooks/use-week-start'
+import type { WeekStart } from '../../shared/week-start'
 
 
 /**
@@ -40,10 +42,10 @@ import type { CustomList, Task, TaskQueryParams } from '@/lib/vikunja-types'
  * applied by `matchesCustomList`. Nested subtasks stay in the result so the list can filter
  * first and hide them afterwards.
  */
-function buildQueryParams(list: CustomList): TaskQueryParams {
+function buildQueryParams(list: CustomList, weekStart: WeekStart): TaskQueryParams {
   const { filter } = list
   return {
-    filter: buildCustomListServerFilter(filter),
+    filter: buildCustomListServerFilter(filter, new Date(), weekStart),
     // The rule's dates are read in this device's zone (section 3.5).
     ...customListRuleParams(filter),
     // The order shown is applied below (sortCustomListTasks); the server only gets a sort it accepts.
@@ -97,10 +99,11 @@ export function CustomListView() {
   const readHere = useRef<{ listId: string; ids: Set<number> }>({ listId, ids: new Set() })
   if (readHere.current.listId !== listId) readHere.current = { listId, ids: new Set() }
 
+  const weekStart = useWeekStart()
   const queryParams = useMemo(() => {
     if (!customList) return { filter: 'done = false', keep_nested_subtasks: true }
-    return buildQueryParams(customList)
-  }, [customList, dayKey])
+    return buildQueryParams(customList, weekStart)
+  }, [customList, dayKey, weekStart])
 
   const { data: tasks = [], isLoading } = useTasks(queryParams, !!customList)
 

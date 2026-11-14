@@ -1,3 +1,4 @@
+import type { WeekStart } from '../../../shared/week-start'
 import type { PlaceMatch } from './place-phrases'
 
 export type SyntaxMode = 'todoist' | 'vikunja'
@@ -85,6 +86,8 @@ export interface ParserConfig {
   locale?: string
   /** Pro's phrases (section 5.5). Off unless true; with it off the text is read as before. */
   pro?: boolean
+  /** The day weeks start on (section 2.1): which week `next week` means. Defaults to the account's. */
+  weekStart?: WeekStart
 }
 
 const SYNTAX_PREFIXES: Record<SyntaxMode, SyntaxPrefixes> = {

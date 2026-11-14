@@ -1,5 +1,6 @@
 import * as chrono from 'chrono-node'
-import { nextWeekStart, startOfLocalDay, toLocalDate } from '../due-dates'
+import { inNextWeek, nextWeekDay, startOfLocalDay, toLocalDate } from '../due-dates'
+import { getWeekStart, type WeekStart } from '../../../shared/week-start'
 import type { ParsedToken } from './types'
 
 /**
@@ -31,6 +32,9 @@ import type { ParsedToken } from './types'
  *   "for 3 months" and "plan the week" as that long from now); sections 5.1 and 5.4.
  */
 
+/** A weekday phrase that means the following week: "next friday", "on next fri", "friday next week". */
+const NEXT_WEEKDAY_RE = /^(?:on\s+)?next\b|\bnext\s+week\b/i
+
 export interface ExtractDateOptions {
   /** "Now" for relative phrases. Defaults to the current time. */
   reference?: Date
@@ -47,6 +51,8 @@ export interface ExtractDateOptions {
    * text is nothing but a date; in a task's text those words are the title (section 5.1).
    */
   bareAmounts?: boolean
+  /** The day weeks start on: which week `next week` and `next friday` mean (section 2.1). Defaults to the account's. */
+  weekStart?: WeekStart
 }
 
 /** The locale of the running app: the renderer's, falling back to en-US (tests, main process). */
@@ -153,10 +159,23 @@ export function extractDate(
     )
   }
 
-  // "next week" is the Monday of the following week (chrono says "in 7 days").
+  const weekStart = options.weekStart ?? getWeekStart()
+
+  // "next week" is the Monday in the following week (chrono says "in 7 days").
   if (/^next\s+week\b/i.test(result.text) && !result.start.isCertain('weekday')) {
-    const [y, m, d] = nextWeekStart(toLocalDate(reference)).split('-').map(Number)
+    const [y, m, d] = nextWeekDay(toLocalDate(reference), weekStart).split('-').map(Number)
     dueDate = new Date(y, m - 1, d, dueDate.getHours(), dueDate.getMinutes(), dueDate.getSeconds(), 0)
+  }
+
+  // "next friday" and "friday next week" are that weekday in the following week. chrono counts
+  // Monday weeks, which is the contract's rule for a Monday week start; any other week start
+  // (section 2.1) is counted here.
+  if (weekStart !== 'monday' && result.start.isCertain('weekday') && NEXT_WEEKDAY_RE.test(result.text)) {
+    const weekday = result.start.get('weekday')
+    if (typeof weekday === 'number') {
+      const [y, m, d] = inNextWeek(toLocalDate(reference), weekday === 0 ? 7 : weekday, weekStart).split('-').map(Number)
+      dueDate = new Date(y, m - 1, d, dueDate.getHours(), dueDate.getMinutes(), dueDate.getSeconds(), 0)
+    }
   }
 
   const span = phraseSpan(result)

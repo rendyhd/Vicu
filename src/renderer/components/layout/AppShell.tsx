@@ -32,6 +32,7 @@ import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { registerConfirm } from '@/lib/confirm-bridge'
 import { resolveSelectedTasks } from '@/lib/task-selection'
 import { useSyncedPrefsEvents } from '@/hooks/use-synced-prefs'
+import { useWeekStart } from '@/hooks/use-week-start'
 import { useProLedgerEvents } from '@/hooks/use-pro-ledger'
 import { useProShortcuts } from '@/hooks/use-pro-shortcuts'
 import { useRepeatRuleBridge } from '@/hooks/use-repeat-rules'
@@ -168,6 +169,8 @@ export function AppShell() {
   const addLabel = useAddLabel()
   // Another device's synced settings (the Inbox, the task order) arrive here.
   useSyncedPrefsEvents()
+  // The account's week start, for every week this window computes (contract section 2.1).
+  useWeekStart()
   useProLedgerEvents()
   useProShortcuts()
   useRepeatRuleBridge()

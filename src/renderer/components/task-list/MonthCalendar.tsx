@@ -5,6 +5,8 @@ import { startOfLocalDay, type LocalDate } from '@/lib/due-dates'
 import { formatFullDateWithYear, formatMonthYear, formatWeekdayShort } from '@/lib/date-display'
 import { useDateFormat } from '@/hooks/use-date-format'
 import { addMonths, monthGrid, monthStart, moveGridFocus } from '@/lib/when-logic'
+import { useWeekStart } from '@/hooks/use-week-start'
+import { weekdaysOf } from '../../../shared/week-start'
 
 interface MonthCalendarProps {
   /** The picked day, ringed in the accent fill. */
@@ -62,10 +64,12 @@ export function MonthCalendar({ selected, today, reveal, onPick, isDisabled, day
     gridRef.current?.querySelector<HTMLElement>(`[data-date="${focusDate}"]`)?.focus()
   }, [focusDate, viewMonth])
 
-  const grid = useMemo(() => monthGrid(viewMonth), [viewMonth])
+  const weekStart = useWeekStart()
+  const grid = useMemo(() => monthGrid(viewMonth, weekStart), [viewMonth, weekStart])
+  // The column names in the order of the account's week (contract section 2.1).
   const weekdayNames = useMemo(
-    () => Array.from({ length: 7 }, (_, i) => formatWeekdayShort(new Date(MONDAY.getFullYear(), MONDAY.getMonth(), MONDAY.getDate() + i), fmt)),
-    [fmt],
+    () => weekdaysOf(weekStart).map((iso) => formatWeekdayShort(new Date(MONDAY.getFullYear(), MONDAY.getMonth(), MONDAY.getDate() + iso - 1), fmt)),
+    [fmt, weekStart],
   )
 
   const showDay = (date: LocalDate) => {

@@ -19,6 +19,7 @@ import {
 } from '../routines'
 import { addLocalDays } from '../due-dates'
 import { routineTrend, TREND_WEEKS, TREND_WINDOW_DAYS } from '../routine-trend'
+import { readWeekStart } from '../week-start'
 
 /**
  * Runs every vector of test-fixtures/routine-archive-v1.json (docs/cross-app-semantics-v1.md,
@@ -87,6 +88,8 @@ interface Fixture {
       occurrences: Array<{ date: string; status: OccurrenceStatus; slot?: string; loggedAt?: string; timeZoneId?: string }>
       from: string
       to: string
+      /** The week start the weekly counts use (section 2.1); Monday when absent. */
+      weekStart?: string
       expect: {
         days: Record<string, string>
         streak: number | null
@@ -295,7 +298,7 @@ export function runRoutineArchiveSuite(options: { zone: string; expectedOffsetMi
           modifiedBy: 'a',
           note: '',
         }))
-        return routineTrend(definition, records, vector.today)
+        return routineTrend(definition, records, vector.today, readWeekStart(vector.weekStart))
       }
 
       for (const vector of fixture.trend.cases) {

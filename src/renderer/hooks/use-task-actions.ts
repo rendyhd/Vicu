@@ -54,7 +54,8 @@ export function useTaskActions(tasks: Task[], options: { returnFocusTo?: HTMLEle
   )
 
   const postponeNextMonday = useCallback(
-    () => patch({ due_date: dueNextWeek() }),
+    // The action names the day, so it is the coming Monday whatever the week start.
+    () => patch({ due_date: dueNextWeek(new Date(), 'monday') }),
     [patch]
   )
 

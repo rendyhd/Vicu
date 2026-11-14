@@ -152,7 +152,7 @@ export function parse(
   }
 
   // Pro: `starts <date>` is a start date, read before the due date and never as one.
-  const dateOptions = { reference, locale: config.locale, hidden: forPhrases.hidden }
+  const dateOptions = { reference, locale: config.locale, hidden: forPhrases.hidden, weekStart: config.weekStart }
   if (pro && !suppress.has('start')) {
     for (const words of findStartsWords(rawInput, consumed)) {
       const before = { start: 0, end: words.phrase }

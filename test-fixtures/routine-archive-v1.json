@@ -311,6 +311,35 @@
         }
       },
       {
+        "name": "the same month with weeks that start on Sunday: only the weekly counts move",
+        "today": "2026-11-13",
+        "weekStart": "sunday",
+        "activeFrom": "2026-11-01",
+        "occurrences": [
+          { "date": "2026-11-01", "status": "COMPLETED" },
+          { "date": "2026-11-02", "status": "COMPLETED" },
+          { "date": "2026-11-03", "status": "COMPLETED" },
+          { "date": "2026-11-05", "status": "COMPLETED" },
+          { "date": "2026-11-06", "status": "SKIPPED" },
+          { "date": "2026-11-07", "status": "COMPLETED" },
+          { "date": "2026-11-08", "status": "COMPLETED" },
+          { "date": "2026-11-09", "status": "COMPLETED" },
+          { "date": "2026-11-10", "status": "COMPLETED" },
+          { "date": "2026-11-11", "status": "COMPLETED" },
+          { "date": "2026-11-12", "status": "COMPLETED" }
+        ],
+        "from": "2026-10-25",
+        "to": "2026-11-20",
+        "expect": {
+          "days": { "2026-11-01": "done", "2026-11-02": "done", "2026-11-03": "done", "2026-11-04": "missed", "2026-11-05": "done", "2026-11-06": "skipped", "2026-11-07": "done", "2026-11-08": "done", "2026-11-09": "done", "2026-11-10": "done", "2026-11-11": "done", "2026-11-12": "done", "2026-11-13": "open" },
+          "streak": 7,
+          "done": 10,
+          "expected": 11,
+          "weeks": [[0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [5, 6], [5, 5]],
+          "summary": "7 in a row · 10 of 11 in the last 30 days"
+        }
+      },
+      {
         "name": "two times a day: part of a day, a skipped time, and today half done",
         "today": "2026-11-13",
         "slots": ["s1", "s2"],

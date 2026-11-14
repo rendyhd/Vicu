@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Navigate, useNavigate } from '@tanstack/react-router'
 import { ChevronLeft, ChevronRight, Settings2, Sun } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
@@ -75,6 +75,7 @@ import {
   type BlockChanges,
   type PlanViewKind,
 } from '../../shared/time-blocks'
+import { useWeekStart } from '@/hooks/use-week-start'
 
 const VIEWS: { value: PlanViewKind; label: string }[] = [
   { value: 'day', label: 'Day' },
@@ -106,7 +107,10 @@ function PlanScreen() {
   const view: PlanViewKind = config?.planner_view === '3days' || config?.planner_view === 'week' ? config.planner_view : 'day'
   const [anchorDay, setAnchorDay] = useState(today)
   const [selectedDay, setSelectedDay] = useState(today)
-  const days = useMemo(() => viewDays(view, anchorDay, startOfWeek), [view, anchorDay])
+  // The week view shows the account's week (contract section 2.1).
+  const weekStart = useWeekStart()
+  const weekOf = useCallback((day: LocalDate) => startOfWeek(day, weekStart), [weekStart])
+  const days = useMemo(() => viewDays(view, anchorDay, weekOf), [view, anchorDay, weekOf])
   const source = readPlanSource(config?.planner_source)
 
   const setView = (next: PlanViewKind) => {
@@ -114,9 +118,9 @@ function PlanScreen() {
     save({ planner_view: next })
   }
   const go = (direction: 1 | -1) => {
-    const next = addLocalDays(view === 'week' ? startOfWeek(anchorDay) : anchorDay, direction * STEP[view])
+    const next = addLocalDays(view === 'week' ? weekOf(anchorDay) : anchorDay, direction * STEP[view])
     setAnchorDay(next)
-    setSelectedDay(view === 'week' ? (viewDays('week', next, startOfWeek).includes(today) ? today : next) : next)
+    setSelectedDay(view === 'week' ? (viewDays('week', next, weekOf).includes(today) ? today : next) : next)
   }
   const goToday = () => {
     setAnchorDay(today)

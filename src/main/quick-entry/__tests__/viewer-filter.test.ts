@@ -6,6 +6,7 @@ import type { CustomList } from '../../../shared/config-types'
 import { buildViewerFilterParams } from '../filter-builder'
 import { resolveViewerFilter, selectQuickViewTasks, selectViewerTasks } from '../viewer-filter'
 import { compileServerFilter } from '../../../shared/__tests__/server-filter-eval'
+import { DEFAULT_WEEK_START, readWeekStart, setWeekStart } from '../../../shared/week-start'
 
 const originalTz = process.env.TZ
 afterEach(() => {
@@ -259,7 +260,7 @@ describe('"this week" ends on Sunday (D-WEEK-1)', () => {
 // --- The Quick View runs the same vectors as the main window -----------------------------
 
 interface FixtureTask { id: number; projectId: number; due: string | null; done: boolean; priority: number; labelIds: number[] }
-interface Vector { name: string; today: string; filter: Partial<CustomList['filter']>; expect: number[] }
+interface Vector { name: string; today: string; filter: Partial<CustomList['filter']>; expect: number[]; weekStart?: string }
 interface ActivityTask {
   id: number
   projectId: number
@@ -296,6 +297,8 @@ describe.each(['America/New_York', 'Pacific/Auckland'])('Quick View custom lists
     }))
 
     for (const vector of fixture.customLists) {
+      // The Quick View reads the week start this process holds (contract section 2.1).
+      setWeekStart(readWeekStart(vector.weekStart))
       const now = local(`${vector.today}T10:00:00`)
       const custom: CustomList = {
         id: 'list-1',
@@ -311,6 +314,7 @@ describe.each(['America/New_York', 'Pacific/Auckland'])('Quick View custom lists
         expect(passesServerFilter(t), `${vector.name}: task ${t.id}`).toBe(true)
       }
     }
+    setWeekStart(DEFAULT_WEEK_START)
   })
 })
 

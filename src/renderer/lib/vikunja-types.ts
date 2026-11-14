@@ -269,6 +269,8 @@ export interface VikunjaUser {
   username: string
   email: string
   name: string
+  /** Vikunja's own week start, 0 Sunday to 6 Saturday; only read, for the "Week starts on" offer. */
+  week_start?: number
 }
 
 export type AuthCheckResult =

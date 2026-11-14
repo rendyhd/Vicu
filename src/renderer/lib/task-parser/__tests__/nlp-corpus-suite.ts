@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { parse } from '../index'
 import type { ParserConfig, SyntaxMode } from '../types'
 import { parsedDue } from '../../due-dates'
+import { readWeekStart } from '../../../../shared/week-start'
 
 /**
  * Runs every case of test-fixtures/nlp-corpus-v1.json (docs/cross-app-semantics-v1.md section 5,
@@ -22,6 +23,8 @@ interface CorpusCase {
   title: string
   mode?: SyntaxMode
   locale?: string
+  /** The week start the case is parsed with (section 2.1); Monday when absent. */
+  weekStart?: string
   parserEnabled?: boolean
   due?: string | null
   /** The time block `for 30m` makes (section 5.4). */
@@ -77,7 +80,7 @@ export function runNlpCorpusSuite(options: { zone: string; expectedOffsetMinutes
   describe(`nlp corpus v1 in ${options.zone}`, () => {
     it('is running in the requested time zone', () => {
       expect(corpus.contractVersion).toBe(1)
-      expect(corpus.cases.length).toBe(179)
+      expect(corpus.cases.length).toBe(189)
       if (options.expectedOffsetMinutesInOctober !== undefined) {
         expect(new Date(2026, 9, 6).getTimezoneOffset()).toBe(options.expectedOffsetMinutesInOctober)
       }
@@ -87,6 +90,7 @@ export function runNlpCorpusSuite(options: { zone: string; expectedOffsetMinutes
       const flags = [
         testCase.mode ? `mode ${testCase.mode}` : null,
         testCase.locale ? testCase.locale : null,
+        testCase.weekStart ? `weeks start on ${testCase.weekStart}` : null,
         testCase.parserEnabled === false ? 'parser off' : null,
         testCase.pro ? 'Pro' : null,
       ].filter(Boolean)
@@ -100,6 +104,7 @@ export function runNlpCorpusSuite(options: { zone: string; expectedOffsetMinutes
           bangToday: true,
           locale: testCase.locale ?? 'en-US',
           pro: testCase.pro === true,
+          weekStart: readWeekStart(testCase.weekStart),
         }
         const result = parse(testCase.input, config, local(corpus.reference), corpus.places, corpus.people)
 

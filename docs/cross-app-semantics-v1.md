@@ -52,7 +52,7 @@ Every place that sets a date-only due date uses one helper per app (desktop
 |---|---|
 | Today | 2026-10-06 23:59:59 |
 | Tomorrow | 2026-10-07 23:59:59 |
-| Next week | Monday of next week, 2026-10-12 23:59:59 (on a Sunday: the next day) |
+| Next week | Monday of next week, 2026-10-12 23:59:59 (on a Sunday: the next day). With another week start, the Monday in next week (section 2.1) |
 | Pick a date (calendar) | that local date at 23:59:59, built from the local calendar date, never from UTC millis |
 | "!" shortcut | today, 23:59:59 |
 | Postpone / move by N days | adds N calendar days and keeps the time of day; a legacy 00:00 value becomes 23:59:59 |
@@ -66,7 +66,8 @@ Reminders relative to the due date ("1 hour before") are computed from the store
 
 - "Today" is the device's local calendar date. A task is due today when the local date of its
   due date equals today, whatever the time of day.
-- Weeks start on **Monday** and end on **Sunday**.
+- Weeks start on **Monday** and end on **Sunday**, unless the account chose another week start
+  (section 2.1).
 - **Today list**: open tasks with a due date whose local date is today or earlier, and open tasks
   with a time block that starts today (section 16), whatever their due date.
   - Overdue section: a due date whose local date is before today.
@@ -79,6 +80,38 @@ Reminders relative to the due date ("1 hour before") are computed from the store
   more than the window (the client filters exactly), never less. The Today list's filter is
   `done = false && ((due_date != '<null date>' && due_date < '<local tomorrow>') || (start_date >= '<local today>' && start_date < '<local tomorrow>'))`.
 - Every count of the Today list (badges, widgets) uses the same rule.
+
+### 2.1 Week start
+
+- The synced preference `week_start` (section 11.3) is the day a week starts on: `"monday"` (the
+  default, written as `null`), `"sunday"` or `"saturday"`. Any other value acts as the default and
+  is kept. A week is that day and the six days after it. It is the same on every device of the
+  account and never follows the device's region.
+- It decides:
+  - the first column of every month calendar and the order of the weekday buttons in an editor;
+  - the `this_week` window (sections 3.1 and 17) and `/w` in a rule (section 3.5);
+  - which week "next week" is: the Next week setter (section 1.3) and the quick-add phrases
+    `next week`, `next <weekday>` and `<weekday> next week` (section 5);
+  - the weeks of a routine's trend (section 6.11) and of the planner's week view;
+  - `week_starts` in what the assistant is told (`docs/ai-assistant-v1.md`).
+- **Next week as a date** is the Monday in next week: the first Monday on or after the first day
+  of the week after today's. With `monday` that is the rule of section 1.3 unchanged. With
+  `sunday`, on Wed 2026-11-18 it is Mon 2026-11-23, and on Sun 2026-11-22, whose week has just
+  started, Mon 2026-11-30.
+- **It never changes a schedule.** "Every 2 weeks" in a routine (section 6.5) and in an Event
+  (section 20.4), and the `WKST` of an imported calendar file (section 20.10), count their weeks
+  as before, whatever the setting: a shared routine falls on the same days for everyone, and
+  nothing moves when the setting changes. Workdays are Monday to Friday. Text that counts days
+  ("3 weeks ago", the weekly review's 7 days) does not read it.
+- **Vikunja's own setting** (`settings.week_start` of `GET user`: 0 Sunday, 1 Monday, up to 6
+  Saturday) is never written and never followed by itself: an account that never set it reads 0.
+  An app may read it to offer it. While it names one of the three days and differs from the week
+  start in use, the setting shows "Vikunja is set to Sunday." with "Use Sunday", which writes the
+  preference. Nothing changes until the person chooses.
+- Vectors: the `weekStart` block of the fixture (reading the value, the offer, the month grid,
+  the order of weekdays), and every vector of `weeks`, `dueDates.setters`, `customLists`,
+  `searchFilters` and `customListRule`, every corpus case and every `trend` case that has a
+  `weekStart`. A vector without one runs with Monday.
 
 ---
 
@@ -124,7 +157,7 @@ With today = T (local date):
 | `all` | no date condition |
 | `overdue` | local due date < T |
 | `today` | local due date = T |
-| `this_week` | T ≤ local due date ≤ Sunday of T's week (on a Sunday: T only) |
+| `this_week` | T ≤ local due date ≤ the last day of T's week: Sunday (on a Sunday: T only), or the day before the week start of section 2.1 |
 | `this_month` | T ≤ local due date ≤ last day of T's month |
 | `has_due_date` | any due date |
 | `no_due_date` | null date (or empty) |
@@ -257,8 +290,8 @@ server but not here (section 3.7 drops them on import).
   of steps. A step is `+N<unit>` or `-N<unit>` (N whole, 1 when left out) or `/<unit>`, which
   rounds down to the start of that unit. Units: `y` year, `M` month, `w` week, `d` day, `h` or
   `H` hour, `m` minute, `s` second, and `b` business day (Monday to Friday, only after `+` or
-  `-`: each step moves one day and skips Saturdays and Sundays). Weeks start on Monday. A value
-  with `||` must be quoted.
+  `-`: each step moves one day and skips Saturdays and Sundays). Weeks start on Monday, or on the
+  week start of section 2.1. A value with `||` must be quoted.
 
 `now` and local wall-clock times are read in the **device's time zone**, so `now/d` is the start
 of the local day. (The server reads them in the filter's time zone; section 2 rules here.)
@@ -274,7 +307,8 @@ condition.
 **The server.** When a list asks the server for tasks, apps send `(<the usual superset>) &&
 (<rule>)` as `filter`, with `filter_timezone` set to the device's zone and `filter_include_nulls`
 set from `rule_include_nulls`, unless the rule uses `like`: the server's case rules depend on its
-database, so such a rule is left to the device. The device's check stays the exact one.
+database, so such a rule is left to the device. So is a rule that rounds to a week (`/w`) while
+the week start is not Monday: the server has its own week. The device's check stays the exact one.
 
 Vectors: the `customListRule` block of the fixture. `tasks` use local wall-clock times; each
 vector gives `now`, the `rule`, `includeNulls` and the ids that match, in task order. `invalid`
@@ -406,10 +440,11 @@ the date and recurrence rules.
 - Weekdays:
   - A bare weekday or `this <weekday>` is the next occurrence on or after today (today
     included). `<weekday> this week` is the same as `this <weekday>`.
-  - `next <weekday>` is that weekday in the following Monday-start week. On Tue 2026-10-06,
-    `next friday` is 2026-10-16; on Sun 2026-10-04, `next monday` is 2026-10-05.
-    `<weekday> next week` is the same as `next <weekday>`.
-  - `next week` is the Monday of the following week.
+  - `next <weekday>` is that weekday in the following week (Monday-start, or by the week start
+    of section 2.1). On Tue 2026-10-06, `next friday` is 2026-10-16; on Sun 2026-10-04,
+    `next monday` is 2026-10-05. With `sunday`, on Tue 2026-10-06 `next sunday` is 2026-10-11,
+    not 2026-10-18. `<weekday> next week` is the same as `next <weekday>`.
+  - `next week` is the Monday in the following week (section 2.1).
   - A weekday directly followed by another date (only spaces or a comma between them) is part
     of the title, and the other date is the due date: "Call Ana about Saturday tomorrow at 3pm"
     is due tomorrow at 15:00 with the title "Call Ana about Saturday", and "Party Saturday
@@ -803,7 +838,8 @@ whole history (section 6.4) and the local day:
   occurrences, `expected` is `done` plus the missed ones. Skipped and open occurrences are in
   neither. For an `after_completion` routine `done` is the number of completions that count on
   those days, and nothing is expected.
-- **Weeks** (`calendar` only): the twelve Monday weeks that end with today's week, each with the
+- **Weeks** (`calendar` only): the twelve weeks that end with today's week (Monday weeks, or by
+  the week start of section 2.1; a case's `weekStart` in the vectors), each with the
   same `done` and `expected`. A bar is `done / expected` high; a week that expects nothing has
   none.
 - **The summary line**, `calendar`: `No history yet` while `done` and `expected` are both 0;
@@ -1371,6 +1407,7 @@ A key is added here, in both repos, in the release that starts writing it.
 | `template.<id>` | a task template, or `null` (removed); section 18 | none |
 | `subtask_order.<taskId>` | the ids of a task's subtasks in the order the person dragged them, or `null`; section 19 | the server's order |
 | `event.<id>` | one of your Events (`title`, `start`, `time`, `minutes`, `repeat`, `until`, `skips`, `busy`), or `null` (deleted); section 20.3 | none |
+| `week_start` | `"sunday"` or `"saturday"`: the day weeks start on, or `null`. Any other value acts as the default and is kept; section 2.1 | `"monday"` |
 | `weekly_review.last` | the local date the last weekly review was finished, `"YYYY-MM-DD"`; section 14.7 | never done |
 | `planner.default_length` | the length of a new block in minutes: 15, 30, 45, 60, 75 or 90. Any other value acts as the default and is kept; section 16.2 | 30 |
 | `planner.hours` | the work hours, `["HH:mm", "HH:mm"]` in 24-hour local time, the start before the end. Any other value acts as the default and is kept; section 16.6 | `["08:00", "18:00"]` |
@@ -2139,7 +2176,7 @@ are numbered 0 (Sunday) to 6 (Saturday).
 |---|---|---|
 | `none` | | the first day only |
 | `daily` | | every `every` days from the first day |
-| `weekly` | `days`: one or more weekdays | those weekdays, in every `every`th week counted from the week of the first day. Weeks start on Monday |
+| `weekly` | `days`: one or more weekdays | those weekdays, in every `every`th week counted from the week of the first day. Weeks start on Monday, whatever the week start of section 2.1 |
 | `monthly-date` | `date`, 1 to 31 | that date, in every `every`th month counted from the first day's month. A month without the date (the 31st in April, the 30th in February) has none |
 | `monthly-weekday` | `week`: 1 to 4, or -1; `weekday` | the `week`th such weekday of the month (the 1st to 7th are the first week, the 8th to 14th the second, and so on), or with -1 the last one, in the month's last seven days; in every `every`th month |
 | `yearly` | | the first day's month and date, every `every` years. 29 February happens only in leap years |
@@ -2656,7 +2693,7 @@ shows open flagged tasks; Vikunja's own Favorites pseudo-project (-1) is not use
 - **Dates** (`pro.importDates`), relative to the source date (else today): `YYYY-MM-DD` (a time
   after it is ignored), `today`, `tomorrow`, a weekday (full or three letters, optionally after
   `on`, `this` or `next`: the first such day after the reference), `next week` (Monday of next
-  week), `end of week` (the first Friday on or after it), `end of month`, `in N days`, `in N weeks`.
+  week, always counted from Monday: an import reads the same on every account), `end of week` (the first Friday on or after it), `end of month`, `in N days`, `in N weeks`.
 - **Matching** (`pro.importMatch`): people by 21.5 (`me` is you); initiatives by project title
   (case ignored) among the area's initiatives; an update by its id among open promises, else among
   the owner's open promises by wording: the share of the `about` (or `what`) words of two or more

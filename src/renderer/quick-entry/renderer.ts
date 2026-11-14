@@ -72,11 +72,14 @@ interface QuickEntryConfig {
   nlp_syntax_mode: 'todoist' | 'vikunja'
   /** Pro's promises layer is on: a pasted import goes to the main window's review. */
   pro_import?: boolean
+  /** The account's week start (contract section 2.1): which week "next week" means. */
+  week_start?: string
 }
 
 import { blockFields, parse, getParserConfig, recurrenceToVikunja, extractBangToday } from '../lib/task-parser'
 import { dueToday, parsedDue, toLocalDate } from '../lib/due-dates'
 import { readImport } from '../../shared/pro/import'
+import { readWeekStart, setWeekStart } from '../../shared/week-start'
 import { followColorScheme } from '../lib/theme'
 import { parseChips } from '../lib/parse-chips'
 import { motionMs, motionSpringCurve, travelStart } from '../lib/motion'
@@ -719,6 +722,7 @@ function applyConfig(cfg: QuickEntryConfig): void {
   projectCycleModifier = cfg.project_cycle_modifier || 'ctrl'
   buildProjectCycle(cfg)
   parserConfig = getParserConfig({ nlp_enabled: cfg.nlp_enabled, nlp_syntax_mode: cfg.nlp_syntax_mode, exclamation_today: cfg.exclamation_today, standalone_mode: cfg.standalone_mode })
+  setWeekStart(readWeekStart(cfg.week_start))
   autocomplete.setSyntaxMode(parserConfig.syntaxMode)
   autocomplete.setEnabled(parserConfig.enabled)
 }

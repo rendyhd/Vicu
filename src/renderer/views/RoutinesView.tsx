@@ -45,6 +45,8 @@ import { loggedByText } from '@/lib/routine-sharing'
 import { MonthCalendar, type DayMark } from '@/components/task-list/MonthCalendar'
 import { routineTrend } from '../../shared/routine-trend'
 import { routineHiddenKey, routineRemindersKey, routineRemindersOn } from '../../shared/synced-prefs'
+import { useWeekStart } from '@/hooks/use-week-start'
+import { weekdaysOf } from '../../shared/week-start'
 
 const FIELD = 'h-9 w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 text-sm text-[var(--text-primary)] transition'
 const LABEL = 'mb-1.5 block text-caption uppercase tracking-wide text-[var(--text-secondary)]'
@@ -114,6 +116,8 @@ function RoutineEditor({
   onClose: () => void
 }) {
   const [draft, setDraft] = useState<RoutineDraft>(() => carrier ? draftFor(carrier) : emptyDraft())
+  // The weekday buttons in the order of the account's week (contract section 2.1); what is saved is unchanged.
+  const weekOrder = weekdaysOf(useWeekStart()).map((iso) => WEEKDAYS[iso - 1])
   // What saving does about sharing; null while "Keep in" still needs a choice (section 6.9).
   const [share, setShare] = useState<RoutineShareChoice | null>({ kind: 'keep' })
   const updateSlot = (id: string, patch: Partial<RoutineSlot>) => setDraft((current) => ({
@@ -157,7 +161,7 @@ function RoutineEditor({
             {calendar ? (
               <div className="space-y-3 rounded-card border border-[var(--border-color)] p-3">
                 <div className="flex gap-1.5">
-                  {WEEKDAYS.map((day) => {
+                  {weekOrder.map((day) => {
                     const selected = calendar.weekdays.includes(day.id)
                     return (
                       <button key={day.id} type="button" onClick={() => setDraft({ ...draft, schedule: { ...calendar, weekdays: selected ? calendar.weekdays.filter((id) => id !== day.id) : [...calendar.weekdays, day.id].sort() } })} className={cn('h-8 w-8 rounded-full text-xs font-semibold', selected ? 'bg-accent-fill text-on-accent' : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)]')}>{day.label}</button>
@@ -246,7 +250,8 @@ function HistoryDialog({ carrier, onClose }: { carrier: RoutineCarrier<Task>; on
   const { records, loadingArchive, archiveError } = useRoutineHistory(carrier)
   const definition = carrier.payload.definition
   const today = localDateString()
-  const trend = useMemo(() => routineTrend(definition, records, today), [definition, records, today])
+  const weekStart = useWeekStart()
+  const trend = useMemo(() => routineTrend(definition, records, today, weekStart), [definition, records, today, weekStart])
   const [picked, setPicked] = useState(today)
   const color = definition.color || STORED_ROUTINE_COLORS[0]
   const occurrences = trend.occurrencesOn(picked)

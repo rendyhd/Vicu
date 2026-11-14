@@ -6,6 +6,7 @@
  */
 
 import { addLocalDays, startOfWeek, type LocalDate } from './due-dates'
+import { getWeekStart, type WeekStart } from './week-start'
 import {
   completionDate,
   isCalendarScheduled,
@@ -81,6 +82,8 @@ export function routineTrend(
   definition: RoutineDefinition,
   records: readonly RoutineOccurrenceRecord[],
   today: LocalDate,
+  /** Only moves the weekly counts (section 2.1). */
+  weekStart: WeekStart = getWeekStart(),
 ): RoutineTrend {
   const schedule = definition.schedule
   const calendar = schedule.type === 'calendar' ? schedule : null
@@ -180,11 +183,11 @@ export function routineTrend(
 
   let weeks: TrendTally[] | null = null
   if (calendar) {
-    const thisMonday = startOfWeek(today)
+    const thisWeek = startOfWeek(today, weekStart)
     weeks = []
     for (let back = TREND_WEEKS - 1; back >= 0; back--) {
-      const monday = addLocalDays(thisMonday, -7 * back)
-      weeks.push(tally(monday, addLocalDays(monday, 6)))
+      const first = addLocalDays(thisWeek, -7 * back)
+      weeks.push(tally(first, addLocalDays(first, 6)))
     }
   }
 

@@ -10,6 +10,7 @@
  * stays pure and import-light.
  */
 import { addLocalDays, type LocalDate } from '../due-dates'
+import { getWeekStart } from '../week-start'
 import { AI_LIMITS, DICTATION_FIELDS, type DraftField } from './contract'
 import type { BrainDumpDraft } from './brain-dump'
 
@@ -450,7 +451,7 @@ export function dictationContextJson(input: DictationContextInput): string {
     now,
     weekday: weekdayName(now.slice(0, 10)),
     time_zone: input.timeZone,
-    week_starts: 'monday',
+    week_starts: getWeekStart(),
     list: input.list,
     default_project_id: input.default_project_id,
     projects: [...input.projects]

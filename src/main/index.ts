@@ -25,7 +25,7 @@ import { flushOfflineQueue } from './offline/service'
 import { flushTaskCache } from './cache'
 import { syncCustomLists } from './custom-list-service'
 import { startSavedFilterImport } from './saved-filter-service'
-import { syncSyncedPrefs } from './synced-preferences'
+import { applyWeekStart, syncSyncedPrefs } from './synced-preferences'
 import { syncProLedger } from './pro-ledger-service'
 import { DEEP_LINK_SCHEME, deepLinkFromArgv, parseDeepLink, quickEntryText, routeOfView, type DeepLink } from './deep-link'
 import { isProEnabled } from '../shared/pro/settings'
@@ -784,6 +784,8 @@ if (!gotLock) {
     }
 
     const config = loadConfig()
+    // The account's week start (contract section 2.1), before anything computes a week.
+    applyWeekStart()
     // Start in the tray when launched at login with "Start hidden" (or with --hidden), but only
     // when there is a way back: the tray icon exists when Quick Entry or Quick View is on, and
     // macOS always has the dock.

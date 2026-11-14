@@ -6,6 +6,7 @@
  */
 import { buildCustomListServerFilter, inDateWindow, type CustomListTask } from './custom-list-filter'
 import { addLocalDays, localDateOf, startOfLocalDay, toLocalDate, type LocalDate } from './due-dates'
+import { getWeekStart, type WeekStart } from './week-start'
 
 export type SearchDate = 'all' | 'overdue' | 'today' | 'this_week' | 'this_month' | 'no_due_date' | 'range'
 export type SearchStatus = 'all' | 'open' | 'done'
@@ -33,7 +34,12 @@ function rangeOf(filters: SearchFilters): { first: LocalDate; last: LocalDate } 
   return filters.from <= filters.to ? { first: filters.from, last: filters.to } : { first: filters.to, last: filters.from }
 }
 
-export function matchesSearchFilters(task: CustomListTask, filters: SearchFilters, today: LocalDate | Date = new Date()): boolean {
+export function matchesSearchFilters(
+  task: CustomListTask,
+  filters: SearchFilters,
+  today: LocalDate | Date = new Date(),
+  weekStart: WeekStart = getWeekStart(),
+): boolean {
   const day = typeof today === 'string' ? today : toLocalDate(today)
   const status = filters.status ?? 'all'
   if (status === 'open' && task.done) return false
@@ -43,7 +49,7 @@ export function matchesSearchFilters(task: CustomListTask, filters: SearchFilter
   if (filters.date === 'range') {
     const range = rangeOf(filters)
     if (!range || due === '' || due < range.first || due > range.last) return false
-  } else if (!inDateWindow(due, filters.date ?? 'all', false, day)) {
+  } else if (!inDateWindow(due, filters.date ?? 'all', false, day, weekStart)) {
     return false
   }
 

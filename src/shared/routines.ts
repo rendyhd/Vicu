@@ -375,7 +375,7 @@ function laterDate(left: string, right: string): string {
 export function isCalendarScheduled(schedule: Extract<RoutineSchedule, { type: 'calendar' }>, date: string): boolean {
   if (date < schedule.anchorDate) return false
   if (schedule.weekdays.length > 0 && !schedule.weekdays.includes(isoWeekday(date))) return false
-  const weeks = Math.floor(diffLocalDays(startOfWeek(schedule.anchorDate), startOfWeek(date)) / 7)
+  const weeks = Math.floor(diffLocalDays(startOfWeek(schedule.anchorDate, 'monday'), startOfWeek(date, 'monday')) / 7)
   return weeks % Math.max(1, schedule.weekInterval) === 0
 }
 

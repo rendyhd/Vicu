@@ -11,6 +11,7 @@ import { createSyncedDocumentService, type SyncedDocumentCodec, type SyncedDocum
 import { PREFS_CARRIER_SEARCH, PREFS_CARRIER_TITLE, encodePrefsEnvelope, hasPrefsMarker, parsePrefsEnvelope } from './synced-prefs-protocol'
 import { canonicalJson, isOwnTask } from '../shared/hidden-tasks'
 import { TEMPLATE_KEY_PREFIX, readTemplate } from '../shared/task-templates'
+import { DEFAULT_WEEK_START, WEEK_START_KEY, readWeekStart, setWeekStart } from '../shared/week-start'
 import { EVENT_KEY_PREFIX, readPlanEvent } from '../shared/plan-events'
 import { readSubtaskOrder } from '../shared/subtask-order'
 import { PRO_AREA_KEY, readProArea } from '../shared/pro/settings'
@@ -111,10 +112,19 @@ function sendToWindows(channel: string, payload: unknown): void {
 }
 
 function snapshotOf(config: AppConfig): SyncedPrefsSnapshot {
+  const values = syncedPrefValues(ensureState(config).document)
+  // The week helpers of this process follow the setting (section 2.1): the Quick View's lists.
+  setWeekStart(readWeekStart(values[WEEK_START_KEY]))
   return {
-    values: syncedPrefValues(ensureState(config).document),
+    values,
     inboxProjectId: config.inbox_project_id,
   }
+}
+
+/** Reads the account's week start into this process, at start: before any window asked for the preferences. */
+export function applyWeekStart(): void {
+  const config = loadConfig()
+  setWeekStart(config ? readWeekStart(syncedPrefValues(ensureState(config).document)[WEEK_START_KEY]) : DEFAULT_WEEK_START)
 }
 
 function rememberBaseline(config: AppConfig | null): void {
@@ -250,6 +260,8 @@ export function isWritablePref(key: unknown, value: unknown): key is string {
   // The planner's default length and work hours (section 16).
   if (key === PLANNER_DEFAULT_LENGTH_KEY) return value === null || (BLOCK_LENGTHS as readonly unknown[]).includes(value)
   if (key === PLANNER_HOURS_KEY) return value === null || canonicalJson(readPlannerHours(value)) === canonicalJson(value)
+  // The day weeks start on (section 2.1): Monday is the default, written as null.
+  if (key === WEEK_START_KEY) return value === null || value === 'sunday' || value === 'saturday'
   // The day the last weekly review was finished (section 14.7).
   if (key === WEEKLY_REVIEW_LAST_KEY) return value === null || readWeeklyReviewLast(value) !== null
   // A task's location reminder at a place a phone saved (section 11.7). The desktop never creates,

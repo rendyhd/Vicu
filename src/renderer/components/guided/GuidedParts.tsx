@@ -10,6 +10,7 @@ import { useDayKey } from '@/stores/day-store'
 import { Button } from '@/components/shared/Button'
 import { WhenPopover } from '@/components/task-list/WhenPopover'
 import { ProjectPickerPopover } from '@/components/task-list/ProjectPickerPopover'
+import { useWeekStart } from '@/hooks/use-week-start'
 
 // The pieces every guided session draws (docs/cross-app-semantics-v1.md section 14; the focus
 // stepper of design_handoff_review_flow, Direction C): a header with how far along the person is,
@@ -132,7 +133,7 @@ export function WhenChoices({ value, onChange, suggested, pickerOpen, onPickerOp
   const open = pickerOpen ?? ownOpen
   const setOpen = onPickerOpenChange ?? setOwnOpen
   const day = localDateOf(value)
-  const choices = quickChoices(today, fmt)
+  const choices = quickChoices(today, fmt, useWeekStart())
   const quick = choices.find((choice) => choice.date === day)
   const hasDate = day !== ''
   const size = compact ? 'min-h-7 px-2.5 text-meta' : ''

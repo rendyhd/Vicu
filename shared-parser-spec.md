@@ -2,7 +2,7 @@
 
 This document defines the exact parser behavior that BOTH Vicu (desktop) and Vicu Android must implement identically. Both apps must produce the same `ParseResult` for the same input string and the same `ParserConfig`.
 
-The date and recurrence rules are the contract in `docs/cross-app-semantics-v1.md` section 5, and the test is the shared corpus `test-fixtures/nlp-corpus-v1.json` (179 cases, reference time Tue 2026-10-06 10:00 local; both apps run the same file). If this document and the corpus disagree, the corpus wins. The desktop implementation is `src/renderer/lib/task-parser/`: there is one parser (the main window, the task title editor and Quick Entry all call it), and the date work is done by chrono-node plus the rules below.
+The date and recurrence rules are the contract in `docs/cross-app-semantics-v1.md` section 5, and the test is the shared corpus `test-fixtures/nlp-corpus-v1.json` (189 cases, reference time Tue 2026-10-06 10:00 local; both apps run the same file). If this document and the corpus disagree, the corpus wins. The desktop implementation is `src/renderer/lib/task-parser/`: there is one parser (the main window, the task title editor and Quick Entry all call it), and the date work is done by chrono-node plus the rules below.
 
 ---
 
@@ -245,9 +245,9 @@ Contract: `docs/cross-app-semantics-v1.md` section 5.1; corpus: `test-fixtures/n
 ### Weekdays
 
 - A bare weekday or `this <weekday>` is the next occurrence on or after today (today included). A date-only phrase is judged against the start of the day, so "tuesday" typed on a Tuesday afternoon is today, not next week.
-- `next <weekday>` is that weekday in the following Monday-start week (Tue 2026-10-06: `next friday` = 2026-10-16; Sun 2026-10-04: `next monday` = 2026-10-05).
+- `next <weekday>` is that weekday in the following week: a Monday-start week, or the account's week start (contract section 2.1; a corpus case's `weekStart`). Tue 2026-10-06: `next friday` = 2026-10-16; Sun 2026-10-04: `next monday` = 2026-10-05; with weeks that start on Sunday, Tue 2026-10-06: `next sunday` = 2026-10-11. chrono counts Monday weeks, so any other week start is counted in `extract-dates.ts` (`inNextWeek`).
 - `<weekday> this week` and `<weekday> next week` are one phrase, the same as `this <weekday>` and `next <weekday>` ("Meet friday next week" is 2026-10-16). chrono reads them that way itself.
-- `next week` is the Monday of the following week (chrono itself says "in 7 days"; do not use that). `next month` is the same day next month.
+- `next week` is the Monday in the following week, counted by the week start (`nextWeekDay`; chrono itself says "in 7 days"; do not use that). `next month` is the same day next month.
 - **Three-letter abbreviations** (`mon`, `tue`, `tues`, `wed`, `thu`, `thur`, `thurs`, `fri`, `sat`, `sun`) only count as dates when the previous word is `on`, `next`, `this`, `by` or `due`, or when a time follows (`mon 9am`, `wed at 3pm`, `fri 14:00`). Otherwise they are plain words: "Buy sun cream", "Notes we sat on" and "Plan wed anniversary" have no date. Full weekday names always count.
 - `weekend` and `weekday` are words, not dates: "Plan the weekend" has no date. (chrono reads them as Saturday and the next working day; desktop blanks them before chrono runs.)
 - An amount of time is a date only right after `in`. "Call 30m", "Rest 3 days", "Plan the week", "Renew within 3 days" and "Review 3 days from now" keep their words and have no date. (chrono reads them all as that long from now; desktop marks them before chrono runs, so they also keep two date phrases apart. The When field is the exception on desktop: typed text there is nothing but a date, so "3 days" means that.)

@@ -123,7 +123,8 @@ export function readImportDate(text: string, ref: LocalDate): LocalDate | null {
   }
   if (value === 'today') return ref
   if (value === 'tomorrow') return addLocalDays(ref, 1)
-  if (value === 'next week') return nextWeekStart(ref)
+  // Always the Monday of a Monday week: an import reads the same on every account (section 21).
+  if (value === 'next week') return nextWeekStart(ref, 'monday')
   if (value === 'end of month') return endOfMonth(ref)
   if (value === 'end of week' || value === 'end of the week') {
     const offset = (5 - isoWeekday(ref) + 7) % 7

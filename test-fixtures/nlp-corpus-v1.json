@@ -1,6 +1,6 @@
 {
   "contractVersion": 1,
-  "about": "Quick-add parser corpus for docs/cross-app-semantics-v1.md section 5 and shared-parser-spec.md. reference is a local wall-clock time (Tuesday). due is a local wall-clock time; date-only results are 23:59:59. Defaults per case: mode todoist, locale en-US, parserEnabled true, due null, priority null, labels [], project null, recurrence null, place null, start null, end null. Every case is parsed with the saved places in places (section 5.3); place is the id and trigger of the place read. Cases with pro true are parsed with Pro on and the people in people (section 5.5); their defaults are person null, proStart null, estimate null, flag false, request false, and every other case is parsed with Pro off. Keep this file identical in vicu and vicu-android.",
+  "about": "Quick-add parser corpus for docs/cross-app-semantics-v1.md section 5 and shared-parser-spec.md. reference is a local wall-clock time (Tuesday). due is a local wall-clock time; date-only results are 23:59:59. Defaults per case: mode todoist, locale en-US, weekStart monday (section 2.1), parserEnabled true, due null, priority null, labels [], project null, recurrence null, place null, start null, end null. Every case is parsed with the saved places in places (section 5.3); place is the id and trigger of the place read. Cases with pro true are parsed with Pro on and the people in people (section 5.5); their defaults are person null, proStart null, estimate null, flag false, request false, and every other case is parsed with Pro off. Keep this file identical in vicu and vicu-android.",
   "reference": "2026-10-06T10:00:00",
   "places": [
     { "id": "z-home", "name": "HOME" },
@@ -42,6 +42,16 @@
     { "input": "Pay rent friday", "title": "Pay rent", "due": "2026-10-09T23:59:59" },
     { "input": "Standup tuesday", "title": "Standup", "due": "2026-10-06T23:59:59" },
     { "input": "Plan next week", "title": "Plan", "due": "2026-10-12T23:59:59" },
+    { "input": "Plan next week", "weekStart": "sunday", "title": "Plan", "due": "2026-10-12T23:59:59" },
+    { "input": "Plan next week", "weekStart": "saturday", "title": "Plan", "due": "2026-10-12T23:59:59" },
+    { "input": "Brunch next sunday", "title": "Brunch", "due": "2026-10-18T23:59:59" },
+    { "input": "Brunch next sunday", "weekStart": "sunday", "title": "Brunch", "due": "2026-10-11T23:59:59" },
+    { "input": "Brunch next sunday", "weekStart": "saturday", "title": "Brunch", "due": "2026-10-11T23:59:59" },
+    { "input": "Market next saturday", "weekStart": "sunday", "title": "Market", "due": "2026-10-17T23:59:59" },
+    { "input": "Market next saturday", "weekStart": "saturday", "title": "Market", "due": "2026-10-10T23:59:59" },
+    { "input": "Pay rent next friday", "weekStart": "sunday", "title": "Pay rent", "due": "2026-10-16T23:59:59" },
+    { "input": "Meet friday next week", "weekStart": "saturday", "title": "Meet", "due": "2026-10-16T23:59:59" },
+    { "input": "Brunch sunday", "weekStart": "sunday", "title": "Brunch", "due": "2026-10-11T23:59:59" },
     { "input": "Plan next month", "title": "Plan", "due": "2026-11-06T23:59:59" },
 
     { "input": "Buy sun cream", "title": "Buy sun cream" },

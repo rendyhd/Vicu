@@ -6,7 +6,7 @@ import {
   endOfWeek,
   isDateOnly,
   isNoDueDate,
-  nextWeekStart,
+  nextWeekDay,
   startOfLocalDay,
   startOfWeek,
   toLocalDate,
@@ -19,6 +19,7 @@ import {
   type DateFormat,
 } from './date-display'
 import { formatMinutesOfDay } from './date-utils'
+import { getWeekStart, type WeekStart } from '../../shared/week-start'
 import { extractDate } from './task-parser/extract-dates'
 
 // The pure rules of the When panel (card 3.4a1): what a picked day and time mean as a due date,
@@ -154,10 +155,13 @@ export interface GridDay {
   inMonth: boolean
 }
 
-/** Six weeks starting on Monday that cover the month of `month`; always six rows so the grid keeps its height. */
-export function monthGrid(month: LocalDate): GridDay[][] {
+/**
+ * Six weeks that cover the month of `month`; always six rows so the grid keeps its height. Weeks
+ * start on the account's week start (contract section 2.1), Monday by default.
+ */
+export function monthGrid(month: LocalDate, weekStart: WeekStart = getWeekStart()): GridDay[][] {
   const first = monthStart(month)
-  const start = startOfWeek(first)
+  const start = startOfWeek(first, weekStart)
   const prefix = first.slice(0, 7)
   const rows: GridDay[][] = []
   for (let r = 0; r < 6; r++) {
@@ -216,14 +220,17 @@ export function comingSaturday(today: LocalDate): LocalDate {
 
 function diffWeekdayFromMonday(date: LocalDate): number {
   // 0 = Monday ... 6 = Sunday
-  return diffLocalDays(startOfWeek(date), date)
+  return diffLocalDays(startOfWeek(date, 'monday'), date)
 }
 
-/** Today, Tomorrow, This weekend (the coming Saturday) and Next week (the coming Monday), from `today`. */
-export function quickChoices(today: LocalDate, fmt: DateFormat): QuickChoice[] {
+/**
+ * Today, Tomorrow, This weekend (the coming Saturday) and Next week (the Monday in next week,
+ * `nextWeekDay`), from `today`.
+ */
+export function quickChoices(today: LocalDate, fmt: DateFormat, weekStart: WeekStart = getWeekStart()): QuickChoice[] {
   const tomorrow = addLocalDays(today, 1)
   const weekend = comingSaturday(today)
-  const nextWeek = nextWeekStart(today)
+  const nextWeek = nextWeekDay(today, weekStart)
   const day = (date: LocalDate) => startOfLocalDay(date)
   return [
     { id: 'today', label: 'Today', hint: formatWeekdayShort(day(today), fmt), date: today },

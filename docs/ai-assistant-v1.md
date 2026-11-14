@@ -289,7 +289,7 @@ Voice has two ways in, and both stay available:
 | `now` | the reference time: when the recording ended, `YYYY-MM-DDTHH:mm` |
 | `weekday` | the reference day's English weekday name |
 | `time_zone` | the IANA zone name |
-| `week_starts` | `"monday"` |
+| `week_starts` | the account's week start: `"monday"`, `"sunday"` or `"saturday"` (contract section 2.1) |
 | `list` | the name of the list the user is in (`"Today"`, a project's title, ...) |
 | `default_project_id` | the project the list gives a new task, else the Inbox |
 | `projects` | `[{"id", "title", "path"}]`: projects the user can write to, not archived, ordered by lowercased `path`; `path` is the titles from the top, joined with ` / ` |

@@ -13,9 +13,13 @@ import {
   isDueToday,
   isOverdue,
   isUpcoming,
+  isoWeekday,
+  nextWeekDay,
   nextWeekStart,
   postponeDays,
+  startOfWeek,
 } from '../due-dates'
+import { daysIntoWeek, readWeekStart } from '../week-start'
 import {
   buildCustomListServerFilter,
   filterCustomList,
@@ -56,9 +60,19 @@ interface SetterVector {
   date?: string
   days?: number
   from?: string
+  /** The week start the vector runs with (section 2.1); Monday when absent. */
+  weekStart?: string
   expect: string
 }
-interface WeekVector { today: string; thisWeekEnd: string; thisMonthEnd: string; nextWeekStart: string }
+interface WeekVector {
+  today: string
+  thisWeekEnd: string
+  thisMonthEnd: string
+  nextWeekStart: string
+  /** The day "Next week" gives: the Monday in next week. */
+  nextWeek: string
+  weekStart?: string
+}
 interface FixtureTask {
   id: number
   projectId: number
@@ -72,6 +86,7 @@ interface CustomListVector {
   today: string
   filter: CustomListFilterInput
   expect: number[]
+  weekStart?: string
 }
 interface ActivityTask {
   id: number
@@ -117,7 +132,7 @@ interface RuleFixtureTask {
 }
 interface RuleBlock {
   tasks: RuleFixtureTask[]
-  vectors: Array<{ name: string; now: string; rule: string; includeNulls: boolean; expect: number[] }>
+  vectors: Array<{ name: string; now: string; rule: string; includeNulls: boolean; expect: number[]; weekStart?: string }>
   invalid: string[]
 }
 interface SortBlock {
@@ -192,7 +207,7 @@ export function runCrossAppSemanticsSuite(options: { zone: string; expectedOffse
 
     describe('dueDates.setters', () => {
       for (const vector of fixture.dueDates.setters) {
-        const label = `${vector.action}${vector.days ? ` ${vector.days}d` : ''}${vector.date ? ` ${vector.date}` : ''} from ${vector.from ?? vector.reference} -> ${vector.expect}`
+        const label = `${vector.action}${vector.days ? ` ${vector.days}d` : ''}${vector.date ? ` ${vector.date}` : ''} from ${vector.from ?? vector.reference}${vector.weekStart ? ` (weeks start on ${vector.weekStart})` : ''} -> ${vector.expect}`
         it(label, () => {
           const now = local(vector.reference)
           let result: string
@@ -205,7 +220,7 @@ export function runCrossAppSemanticsSuite(options: { zone: string; expectedOffse
               result = dueTomorrow(now)
               break
             case 'nextWeek':
-              result = dueNextWeek(now)
+              result = dueNextWeek(now, readWeekStart(vector.weekStart))
               break
             case 'pickDate':
               result = dateOnlyDue(vector.date!)
@@ -220,12 +235,19 @@ export function runCrossAppSemanticsSuite(options: { zone: string; expectedOffse
     })
 
     describe('weeks', () => {
+      it('has vectors for every week start', () => {
+        expect(fixture.weeks.some((vector) => vector.weekStart === 'sunday')).toBe(true)
+        expect(fixture.weeks.some((vector) => vector.weekStart === 'saturday')).toBe(true)
+      })
       for (const vector of fixture.weeks) {
-        it(`week and month ends for ${vector.today}`, () => {
-          expect(endOfWeek(vector.today)).toBe(vector.thisWeekEnd)
+        const weekStart = readWeekStart(vector.weekStart)
+        it(`week and month ends for ${vector.today}, weeks start on ${weekStart}`, () => {
+          expect(endOfWeek(vector.today, weekStart)).toBe(vector.thisWeekEnd)
           expect(endOfMonth(vector.today)).toBe(vector.thisMonthEnd)
-          expect(nextWeekStart(vector.today)).toBe(vector.nextWeekStart)
+          expect(nextWeekStart(vector.today, weekStart)).toBe(vector.nextWeekStart)
+          expect(nextWeekDay(vector.today, weekStart)).toBe(vector.nextWeek)
           expect(addLocalDays(vector.thisWeekEnd, 1)).toBe(vector.nextWeekStart)
+          expect(daysIntoWeek(isoWeekday(startOfWeek(vector.today, weekStart)), weekStart)).toBe(0)
         })
       }
     })
@@ -272,13 +294,15 @@ export function runCrossAppSemanticsSuite(options: { zone: string; expectedOffse
           it(`${vector.name} at ${clock}`, () => {
             const now = local(`${vector.today}T${clock}`)
             const tasks = fixture.tasks.map(asTask)
+            const weekStart = readWeekStart(vector.weekStart)
+            const context = { weekStart }
 
-            expect(filterCustomList(tasks, vector.filter, now).map((task) => task.id)).toEqual(vector.expect)
-            expect(filterCustomList(tasks, vector.filter, vector.today).map((task) => task.id)).toEqual(vector.expect)
+            expect(filterCustomList(tasks, vector.filter, now, context).map((task) => task.id)).toEqual(vector.expect)
+            expect(filterCustomList(tasks, vector.filter, vector.today, context).map((task) => task.id)).toEqual(vector.expect)
 
             // The server filter is a superset: it never drops a task the list accepts.
-            const serverFilter = buildCustomListServerFilter(vector.filter, now)
-            for (const task of filterCustomList(tasks, vector.filter, now)) {
+            const serverFilter = buildCustomListServerFilter(vector.filter, now, weekStart)
+            for (const task of filterCustomList(tasks, vector.filter, now, context)) {
               expect(evaluateServerFilter(serverFilter, task), `task ${task.id} vs ${serverFilter}`).toBe(true)
             }
           })
@@ -360,10 +384,11 @@ export function runCrossAppSemanticsSuite(options: { zone: string; expectedOffse
       for (const vector of fixture.customListRule.vectors) {
         it(vector.name, () => {
           expect(validateRule(vector.rule)).toBeNull()
-          const match = compileRule(vector.rule, vector.includeNulls, local(vector.now))
+          const weekStart = readWeekStart(vector.weekStart)
+          const match = compileRule(vector.rule, vector.includeNulls, local(vector.now), weekStart)
           expect(ruleTasks().filter(match).map((task) => task.id), vector.rule).toEqual(vector.expect)
           const filter = { include_done: true, rule: vector.rule, rule_include_nulls: vector.includeNulls }
-          const viaList = filterCustomList(ruleTasks() as unknown as Parameters<typeof filterCustomList>[0], filter, vector.now.slice(0, 10), {}, local(vector.now))
+          const viaList = filterCustomList(ruleTasks() as unknown as Parameters<typeof filterCustomList>[0], filter, vector.now.slice(0, 10), { weekStart }, local(vector.now))
           expect(viaList.map((task) => task.id)).toEqual(vector.expect)
         })
       }

@@ -15,6 +15,10 @@
       { "reference": "2026-10-06T10:00:00", "action": "nextWeek", "expect": "2026-10-12T23:59:59" },
       { "reference": "2026-10-11T10:00:00", "action": "nextWeek", "expect": "2026-10-12T23:59:59" },
       { "reference": "2026-10-12T10:00:00", "action": "nextWeek", "expect": "2026-10-19T23:59:59" },
+      { "reference": "2026-10-06T10:00:00", "action": "nextWeek", "weekStart": "sunday", "expect": "2026-10-12T23:59:59" },
+      { "reference": "2026-10-11T10:00:00", "action": "nextWeek", "weekStart": "sunday", "expect": "2026-10-19T23:59:59" },
+      { "reference": "2026-10-09T10:00:00", "action": "nextWeek", "weekStart": "saturday", "expect": "2026-10-12T23:59:59" },
+      { "reference": "2026-10-10T10:00:00", "action": "nextWeek", "weekStart": "saturday", "expect": "2026-10-19T23:59:59" },
       { "reference": "2026-10-06T23:30:00", "action": "today", "expect": "2026-10-06T23:59:59" },
       { "reference": "2026-10-06T00:30:00", "action": "today", "expect": "2026-10-06T23:59:59" },
       { "reference": "2026-10-06T10:00:00", "action": "pickDate", "date": "2026-10-20", "expect": "2026-10-20T23:59:59" },
@@ -25,12 +29,52 @@
     ]
   },
   "weeks": [
-    { "today": "2026-10-06", "thisWeekEnd": "2026-10-11", "thisMonthEnd": "2026-10-31", "nextWeekStart": "2026-10-12" },
-    { "today": "2026-10-11", "thisWeekEnd": "2026-10-11", "thisMonthEnd": "2026-10-31", "nextWeekStart": "2026-10-12" },
-    { "today": "2026-10-12", "thisWeekEnd": "2026-10-18", "thisMonthEnd": "2026-10-31", "nextWeekStart": "2026-10-19" },
-    { "today": "2026-10-31", "thisWeekEnd": "2026-11-01", "thisMonthEnd": "2026-10-31", "nextWeekStart": "2026-11-02" },
-    { "today": "2026-12-28", "thisWeekEnd": "2027-01-03", "thisMonthEnd": "2026-12-31", "nextWeekStart": "2027-01-04" }
+    { "today": "2026-10-06", "thisWeekEnd": "2026-10-11", "thisMonthEnd": "2026-10-31", "nextWeekStart": "2026-10-12", "nextWeek": "2026-10-12" },
+    { "today": "2026-10-11", "thisWeekEnd": "2026-10-11", "thisMonthEnd": "2026-10-31", "nextWeekStart": "2026-10-12", "nextWeek": "2026-10-12" },
+    { "today": "2026-10-12", "thisWeekEnd": "2026-10-18", "thisMonthEnd": "2026-10-31", "nextWeekStart": "2026-10-19", "nextWeek": "2026-10-19" },
+    { "today": "2026-10-31", "thisWeekEnd": "2026-11-01", "thisMonthEnd": "2026-10-31", "nextWeekStart": "2026-11-02", "nextWeek": "2026-11-02" },
+    { "today": "2026-12-28", "thisWeekEnd": "2027-01-03", "thisMonthEnd": "2026-12-31", "nextWeekStart": "2027-01-04", "nextWeek": "2027-01-04" },
+    { "today": "2026-10-06", "weekStart": "sunday", "thisWeekEnd": "2026-10-10", "thisMonthEnd": "2026-10-31", "nextWeekStart": "2026-10-11", "nextWeek": "2026-10-12" },
+    { "today": "2026-10-10", "weekStart": "sunday", "thisWeekEnd": "2026-10-10", "thisMonthEnd": "2026-10-31", "nextWeekStart": "2026-10-11", "nextWeek": "2026-10-12" },
+    { "today": "2026-10-11", "weekStart": "sunday", "thisWeekEnd": "2026-10-17", "thisMonthEnd": "2026-10-31", "nextWeekStart": "2026-10-18", "nextWeek": "2026-10-19" },
+    { "today": "2026-12-28", "weekStart": "sunday", "thisWeekEnd": "2027-01-02", "thisMonthEnd": "2026-12-31", "nextWeekStart": "2027-01-03", "nextWeek": "2027-01-04" },
+    { "today": "2026-10-06", "weekStart": "saturday", "thisWeekEnd": "2026-10-09", "thisMonthEnd": "2026-10-31", "nextWeekStart": "2026-10-10", "nextWeek": "2026-10-12" },
+    { "today": "2026-10-09", "weekStart": "saturday", "thisWeekEnd": "2026-10-09", "thisMonthEnd": "2026-10-31", "nextWeekStart": "2026-10-10", "nextWeek": "2026-10-12" },
+    { "today": "2026-10-10", "weekStart": "saturday", "thisWeekEnd": "2026-10-16", "thisMonthEnd": "2026-10-31", "nextWeekStart": "2026-10-17", "nextWeek": "2026-10-19" },
+    { "today": "2026-10-11", "weekStart": "saturday", "thisWeekEnd": "2026-10-16", "thisMonthEnd": "2026-10-31", "nextWeekStart": "2026-10-17", "nextWeek": "2026-10-19" }
   ],
+  "weekStart": {
+    "about": "Section 2.1. read: the stored week_start value and the week start it gives. offer: settings.week_start of the Vikunja account, the week start in use, and the day the setting offers (null: no offer). grid: the first and last day of the six-week grid of the month. weekdays: ISO weekday numbers (1 Monday to 7 Sunday) in the order of a week.",
+    "read": [
+      { "value": "sunday", "expect": "sunday" },
+      { "value": "saturday", "expect": "saturday" },
+      { "value": "monday", "expect": "monday" },
+      { "value": null, "expect": "monday" },
+      { "value": "friday", "expect": "monday" },
+      { "value": "Sunday", "expect": "monday" },
+      { "value": 0, "expect": "monday" }
+    ],
+    "offer": [
+      { "vikunja": 0, "inUse": "monday", "expect": "sunday" },
+      { "vikunja": 0, "inUse": "sunday", "expect": null },
+      { "vikunja": 1, "inUse": "sunday", "expect": "monday" },
+      { "vikunja": 1, "inUse": "monday", "expect": null },
+      { "vikunja": 6, "inUse": "monday", "expect": "saturday" },
+      { "vikunja": 3, "inUse": "monday", "expect": null },
+      { "vikunja": null, "inUse": "sunday", "expect": null }
+    ],
+    "grid": [
+      { "month": "2026-11-01", "weekStart": "monday", "first": "2026-10-26", "last": "2026-12-06" },
+      { "month": "2026-11-01", "weekStart": "sunday", "first": "2026-11-01", "last": "2026-12-12" },
+      { "month": "2026-11-01", "weekStart": "saturday", "first": "2026-10-31", "last": "2026-12-11" },
+      { "month": "2026-10-01", "weekStart": "sunday", "first": "2026-09-27", "last": "2026-11-07" }
+    ],
+    "weekdays": [
+      { "weekStart": "monday", "expect": [1, 2, 3, 4, 5, 6, 7] },
+      { "weekStart": "sunday", "expect": [7, 1, 2, 3, 4, 5, 6] },
+      { "weekStart": "saturday", "expect": [6, 7, 1, 2, 3, 4, 5] }
+    ]
+  },
   "tasks": [
     { "id": 1, "projectId": 10, "due": "2026-10-01T23:59:59", "done": false, "priority": 0, "labelIds": [] },
     { "id": 2, "projectId": 10, "due": "2026-10-06T23:59:59", "done": false, "priority": 0, "labelIds": [] },
@@ -85,7 +129,11 @@
     { "name": "this_week on a Sunday without overdue", "today": "2026-10-11", "filter": { "due_date_filter": "this_week", "include_overdue": false }, "expect": [6] },
     { "name": "this_week on a Monday without overdue", "today": "2026-10-12", "filter": { "due_date_filter": "this_week", "include_overdue": false }, "expect": [7] },
     { "name": "this_month near month end without overdue", "today": "2026-10-30", "filter": { "due_date_filter": "this_month", "include_overdue": false }, "expect": [8] },
-    { "name": "this_month on the first without overdue", "today": "2026-11-01", "filter": { "due_date_filter": "this_month", "include_overdue": false }, "expect": [9] }
+    { "name": "this_month on the first without overdue", "today": "2026-11-01", "filter": { "due_date_filter": "this_month", "include_overdue": false }, "expect": [9] },
+    { "name": "this_week, weeks start on Sunday: the week ends on Saturday", "today": "2026-10-06", "weekStart": "sunday", "filter": { "due_date_filter": "this_week", "include_overdue": false }, "expect": [2, 3, 4, 5, 13] },
+    { "name": "this_week on a Sunday, weeks start on Sunday: the whole new week", "today": "2026-10-11", "weekStart": "sunday", "filter": { "due_date_filter": "this_week", "include_overdue": false }, "expect": [6, 7] },
+    { "name": "this_week, weeks start on Saturday: the week ends on Friday", "today": "2026-10-06", "weekStart": "saturday", "filter": { "due_date_filter": "this_week", "include_overdue": false }, "expect": [2, 3, 4, 5, 13] },
+    { "name": "this_week on a Saturday, weeks start on Saturday, with overdue", "today": "2026-10-10", "weekStart": "saturday", "filter": { "due_date_filter": "this_week" }, "expect": [1, 2, 3, 4, 5, 6, 7, 12, 13] }
   ],
   "searchFilters": [
     { "name": "no filter", "today": "2026-10-06", "filters": {}, "expect": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13] },
@@ -94,6 +142,7 @@
     { "name": "today, open", "today": "2026-10-06", "filters": { "date": "today", "status": "open" }, "expect": [2, 3, 13] },
     { "name": "today, done", "today": "2026-10-06", "filters": { "date": "today", "status": "done" }, "expect": [11] },
     { "name": "this week leaves overdue out", "today": "2026-10-06", "filters": { "date": "this_week" }, "expect": [2, 3, 4, 5, 6, 11, 13] },
+    { "name": "this week, weeks start on Sunday", "today": "2026-10-06", "weekStart": "sunday", "filters": { "date": "this_week" }, "expect": [2, 3, 4, 5, 11, 13] },
     { "name": "this month leaves overdue out", "today": "2026-10-06", "filters": { "date": "this_month" }, "expect": [2, 3, 4, 5, 6, 7, 8, 11, 13] },
     { "name": "no date", "today": "2026-10-06", "filters": { "date": "no_due_date" }, "expect": [10] },
     { "name": "range, both days included", "today": "2026-10-06", "filters": { "date": "range", "from": "2026-10-07", "to": "2026-10-12" }, "expect": [4, 5, 6, 7] },
@@ -258,6 +307,8 @@
       {"name": "labels not in", "now": "2026-10-06T10:00:00", "rule": "labels not in 1, 2", "includeNulls": false, "expect": [3, 5, 6, 7]},
       {"name": "before tomorrow", "now": "2026-10-06T10:00:00", "rule": "due_date < now/d+1d && done = false", "includeNulls": false, "expect": [1, 6]},
       {"name": "this week", "now": "2026-10-06T10:00:00", "rule": "due_date >= now/w && due_date < now/w+1w", "includeNulls": false, "expect": [1, 2, 6, 7]},
+      {"name": "this week, weeks start on Sunday", "now": "2026-10-06T10:00:00", "weekStart": "sunday", "rule": "due_date >= now/w && due_date < now/w+1w", "includeNulls": false, "expect": [1, 2, 6]},
+      {"name": "this week, weeks start on Saturday", "now": "2026-10-06T10:00:00", "weekStart": "saturday", "rule": "due_date >= now/w && due_date < now/w+1w", "includeNulls": false, "expect": [1, 2, 4, 6]},
       {"name": "before now", "now": "2026-10-06T10:00:00", "rule": "due_date < now", "includeNulls": false, "expect": [4, 6]},
       {"name": "later, without a value", "now": "2026-10-06T10:00:00", "rule": "due_date > now+5d", "includeNulls": true, "expect": [3, 5, 7]},
       {"name": "later", "now": "2026-10-06T10:00:00", "rule": "due_date > now+5d", "includeNulls": false, "expect": [5, 7]},

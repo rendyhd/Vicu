@@ -6,6 +6,7 @@ import { usePro } from './use-pro'
 import { useSyncedPrefs } from './use-synced-prefs'
 import type { CustomListContext } from '@/lib/custom-list-filter'
 import { projectOnHold } from '../../shared/pro/prefs'
+import { WEEK_START_KEY, readWeekStart } from '../../shared/week-start'
 
 /**
  * What a custom list's conditions read besides the task: who you are and which projects are shared
@@ -30,6 +31,9 @@ export function useCustomListContext(): CustomListContext {
         ledger: proOn ? ledger : null,
         projectOnHold: (projectId) => projectOnHold(prefsSnapshot.values, projectId),
       },
+      // Where "this week" ends and what `/w` rounds to (section 2.1). A change of the setting is a new
+      // context, so every list that reads it is evaluated again.
+      weekStart: readWeekStart(prefsSnapshot.values[WEEK_START_KEY]),
     }),
     [me, sharedProjectIds, availabilityState, ledger, proOn, prefsSnapshot.values],
   )

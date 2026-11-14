@@ -21,7 +21,8 @@
  */
 
 import { matchesProConditions, type ProListContext, type ProListTask } from './pro/list-conditions'
-import { compileRule, ruleUsesLike, validateRule, type RuleTask } from './custom-list-rule'
+import { compileRule, ruleUsesLike, ruleUsesWeekRounding, validateRule, type RuleTask } from './custom-list-rule'
+import { getWeekStart, type WeekStart } from './week-start'
 import {
   addLocalDays,
   diffLocalDays,
@@ -99,6 +100,8 @@ export interface CustomListContext {
   isShared?: (projectId: number) => boolean
   /** What Pro's conditions read (section 3.8); absent: they are no condition. */
   pro?: ProListContext
+  /** The day weeks start on (section 2.1): where `this_week` ends and what `/w` rounds to. Absent: the account's. */
+  weekStart?: WeekStart
 }
 
 /** The assigned values this version knows. */
@@ -183,6 +186,7 @@ export function inDateWindow(
   window: string | undefined,
   includeOverdue: boolean,
   today: LocalDate,
+  weekStart: WeekStart = getWeekStart(),
 ): boolean {
   switch (window) {
     case 'overdue':
@@ -190,7 +194,7 @@ export function inDateWindow(
     case 'today':
       return due !== '' && (due === today || (includeOverdue && due < today))
     case 'this_week':
-      return due !== '' && ((due >= today && due <= endOfWeek(today)) || (includeOverdue && due < today))
+      return due !== '' && ((due >= today && due <= endOfWeek(today, weekStart)) || (includeOverdue && due < today))
     case 'this_month':
       return due !== '' && ((due >= today && due <= endOfMonth(today)) || (includeOverdue && due < today))
     case 'has_due_date':
@@ -204,8 +208,8 @@ export function inDateWindow(
 }
 
 /** The list's rule as a predicate at `now` (section 3.5); every task when there is none. */
-function ruleOf(filter: CustomListFilterInput, now: Date): (task: CustomListTask) => boolean {
-  return compileRule(filter.rule, filter.rule_include_nulls === true, now) as (task: CustomListTask) => boolean
+function ruleOf(filter: CustomListFilterInput, now: Date, weekStart: WeekStart): (task: CustomListTask) => boolean {
+  return compileRule(filter.rule, filter.rule_include_nulls === true, now, weekStart) as (task: CustomListTask) => boolean
 }
 
 /**
@@ -220,7 +224,7 @@ export function matchesCustomList(
   context: CustomListContext = {},
   now: Date = new Date(),
 ): boolean {
-  return matchesForm(task, filter, dayOf(today), context) && ruleOf(filter, now)(task)
+  return matchesForm(task, filter, dayOf(today), context) && ruleOf(filter, now, context.weekStart ?? getWeekStart())(task)
 }
 
 /** The conditions of sections 3.1 to 3.3, without the rule. */
@@ -235,7 +239,7 @@ function matchesForm(
   if (!filter.include_done && task.done) return false
 
   const due = localDateOf(task.due_date)
-  if (!inDateWindow(due, filter.due_date_filter, overdueToo, day)) return false
+  if (!inDateWindow(due, filter.due_date_filter, overdueToo, day, context.weekStart ?? getWeekStart())) return false
 
   const projectIds = filter.project_ids ?? []
   if (projectIds.length > 0) {
@@ -269,7 +273,7 @@ export function filterCustomList<T extends CustomListTask>(
   now: Date = new Date(),
 ): T[] {
   const day = dayOf(today)
-  const rule = ruleOf(filter, now)
+  const rule = ruleOf(filter, now, context.weekStart ?? getWeekStart())
   return tasks.filter((task) => matchesForm(task, filter, day, context) && rule(task))
 }
 
@@ -280,7 +284,12 @@ export function filterCustomList<T extends CustomListTask>(
  * boundaries (`due_date < '<start of the day after the window end>'`). Null when the window
  * has no date condition.
  */
-function dateWindowClause(window: string | undefined, includeOverdue: boolean, now: Date): string | null {
+function dateWindowClause(
+  window: string | undefined,
+  includeOverdue: boolean,
+  now: Date,
+  weekStart: WeekStart = getWeekStart(),
+): string | null {
   const today = toLocalDate(now)
   const notNull = `due_date != '${NULL_DUE_DATE}'`
   // Start of the day after the window's last day, as a UTC instant.
@@ -297,7 +306,7 @@ function dateWindowClause(window: string | undefined, includeOverdue: boolean, n
     case 'today':
       return bounded(today)
     case 'this_week':
-      return bounded(endOfWeek(today))
+      return bounded(endOfWeek(today, weekStart))
     case 'this_month':
       return bounded(endOfMonth(today))
     case 'has_due_date':
@@ -317,7 +326,11 @@ function dateWindowClause(window: string | undefined, includeOverdue: boolean, n
  * which projects are shared). Callers must still apply `filterCustomList`. Undefined when the
  * list has no server-side condition.
  */
-export function buildCustomListServerFilter(filter: CustomListFilterInput, now: Date = new Date()): string | undefined {
+export function buildCustomListServerFilter(
+  filter: CustomListFilterInput,
+  now: Date = new Date(),
+  weekStart: WeekStart = getWeekStart(),
+): string | undefined {
   const parts: string[] = []
   if (!filter.include_done) parts.push('done = false')
 
@@ -334,25 +347,27 @@ export function buildCustomListServerFilter(filter: CustomListFilterInput, now: 
     }
   }
 
-  const dateClause = dateWindowClause(filter.due_date_filter, includesOverdue(filter), now)
+  const dateClause = dateWindowClause(filter.due_date_filter, includesOverdue(filter), now, weekStart)
   if (dateClause) parts.push(dateClause)
 
   const days = changedWithinDays(filter)
   if (days !== null) parts.push(`updated >= '${startOfLocalDayIso(-(days - 1), now)}'`)
 
   const base = parts.join(' && ')
-  const rule = serverRule(filter)
+  const rule = serverRule(filter, weekStart)
   if (rule !== null) return base === '' ? `(${rule})` : `(${base}) && (${rule})`
   return parts.length > 0 ? base : undefined
 }
 
 /**
- * The rule when the server can be asked for it (section 3.5): valid, and without `like`, whose
- * case rules depend on the server's database. Null otherwise.
+ * The rule when the server can be asked for it (section 3.5): valid, without `like`, whose case
+ * rules depend on the server's database, and without `/w` while the week does not start on Monday,
+ * because the server rounds to its own week. Null otherwise.
  */
-function serverRule(filter: CustomListFilterInput): string | null {
+function serverRule(filter: CustomListFilterInput, weekStart: WeekStart = getWeekStart()): string | null {
   const rule = filter.rule?.trim() ?? ''
   if (rule === '' || validateRule(rule) !== null || ruleUsesLike(rule)) return null
+  if (weekStart !== 'monday' && ruleUsesWeekRounding(rule)) return null
   return rule
 }
 
