@@ -15,6 +15,7 @@ import { markdownPasteContent } from '@/lib/markdown-input'
 import type { EditorView } from '@tiptap/pm/view'
 import { LinkDialog } from '@/components/rich-text/LinkDialog'
 import { MoveListItem, canMoveListItem, isInListItem, moveListItem, type MoveDirection } from '@/components/rich-text/move-list-item'
+import { shortcutHint } from '@/lib/shortcut-hint'
 
 /** How long after Shift+Mod+V a paste counts as "paste as plain text". */
 const PLAIN_PASTE_WINDOW_MS = 1000
@@ -175,6 +176,18 @@ export function RichTextEditor({
     equalityFn: (a, b) => a?.canUp === b?.canUp && a?.canDown === b?.canDown,
   })
 
+  const listRow = useEditorState({
+    editor,
+    selector: ({ editor: e }): ActiveLists | null =>
+      e?.isFocused
+        ? { taskList: e.isActive('taskList'), bulletList: e.isActive('bulletList'), orderedList: e.isActive('orderedList') }
+        : null,
+    equalityFn: (a, b) =>
+      a === b ||
+      (a != null && b != null && a.taskList === b.taskList && a.bulletList === b.bulletList && a.orderedList === b.orderedList),
+  })
+  const rowShown = useShownWhileFocused(listRow != null)
+
   if (!editor) return null
 
   const moveLine = (direction: MoveDirection) => {
@@ -228,27 +241,7 @@ export function RichTextEditor({
           <CodeIcon className="h-3.5 w-3.5" />
         </ToolbarButton>
         <span className="mx-0.5 h-4 w-px bg-[var(--border-color)]" />
-        <ToolbarButton
-          onClick={() => editor.chain().focus().toggleBulletList().run()}
-          active={editor.isActive('bulletList')}
-          title="Bullet list"
-        >
-          <List className="h-3.5 w-3.5" />
-        </ToolbarButton>
-        <ToolbarButton
-          onClick={() => editor.chain().focus().toggleOrderedList().run()}
-          active={editor.isActive('orderedList')}
-          title="Numbered list"
-        >
-          <ListOrdered className="h-3.5 w-3.5" />
-        </ToolbarButton>
-        <ToolbarButton
-          onClick={() => editor.chain().focus().toggleTaskList().run()}
-          active={editor.isActive('taskList')}
-          title="Checklist"
-        >
-          <ListChecks className="h-3.5 w-3.5" />
-        </ToolbarButton>
+        <ListButtons editor={editor} active={listRow ?? NO_LIST} />
         {listLine && (
           <>
             <ToolbarButton onClick={() => moveLine(-1)} disabled={!listLine.canUp} title="Move line up (Alt+Up)">
@@ -272,6 +265,13 @@ export function RichTextEditor({
         </ToolbarButton>
       </BubbleMenu>
       <EditorContent editor={editor} />
+      {rowShown && (
+        // While the notes are being written: the list buttons, so a checklist can be started on an
+        // empty line, where the selection menu never shows (the phone's toolbar starts the same way).
+        <div className="-ml-1 mt-1 flex items-center gap-0.5" data-testid="notes-list-row">
+          <ListButtons editor={editor} active={listRow ?? NO_LIST} />
+        </div>
+      )}
       <LinkDialog
         open={linkDialog.open}
         initialUrl={linkDialog.initialUrl}
@@ -288,6 +288,90 @@ export function RichTextEditor({
       />
     </>
   )
+}
+
+interface ActiveLists {
+  taskList: boolean
+  bulletList: boolean
+  orderedList: boolean
+}
+
+const NO_LIST: ActiveLists = { taskList: false, bulletList: false, orderedList: false }
+
+/** Checklist, Bullet list, Numbered list, in the phone toolbar's order; the shortcuts are TipTap's own. */
+function ListButtons({ editor, active }: { editor: Editor; active: ActiveLists }) {
+  const mac = window.api.platform === 'darwin'
+  return (
+    <>
+      <ToolbarButton
+        onClick={() => editor.chain().focus().toggleTaskList().run()}
+        active={active.taskList}
+        title={`Checklist (${shortcutHint('Mod+Shift+9', mac)})`}
+      >
+        <ListChecks className="h-3.5 w-3.5" />
+      </ToolbarButton>
+      <ToolbarButton
+        onClick={() => editor.chain().focus().toggleBulletList().run()}
+        active={active.bulletList}
+        title={`Bullet list (${shortcutHint('Mod+Shift+8', mac)})`}
+      >
+        <List className="h-3.5 w-3.5" />
+      </ToolbarButton>
+      <ToolbarButton
+        onClick={() => editor.chain().focus().toggleOrderedList().run()}
+        active={active.orderedList}
+        title={`Numbered list (${shortcutHint('Mod+Shift+7', mac)})`}
+      >
+        <ListOrdered className="h-3.5 w-3.5" />
+      </ToolbarButton>
+    </>
+  )
+}
+
+/**
+ * Follows `focused`, except that leaving with a mouse press waits until the button comes up. The press
+ * that blurs the notes is the start of a click elsewhere in the card; taking the row away at once would
+ * move what is under the pointer before the click lands, and the click would miss it.
+ */
+function useShownWhileFocused(focused: boolean): boolean {
+  const [shown, setShown] = useState(focused)
+  const pointerDown = useRef(false)
+
+  useEffect(() => {
+    const down = () => { pointerDown.current = true }
+    const up = () => { pointerDown.current = false }
+    window.addEventListener('pointerdown', down, true)
+    window.addEventListener('pointerup', up, true)
+    window.addEventListener('pointercancel', up, true)
+    return () => {
+      window.removeEventListener('pointerdown', down, true)
+      window.removeEventListener('pointerup', up, true)
+      window.removeEventListener('pointercancel', up, true)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (focused) {
+      setShown(true)
+      return
+    }
+    if (!pointerDown.current) {
+      setShown(false)
+      return
+    }
+    let timer: ReturnType<typeof setTimeout> | undefined
+    // The click follows the pointerup in the same task, so a timeout started there runs after it.
+    const release = () => { timer = setTimeout(() => setShown(false), 0) }
+    window.addEventListener('pointerup', release, { once: true })
+    window.addEventListener('pointercancel', release, { once: true })
+    return () => {
+      window.removeEventListener('pointerup', release)
+      window.removeEventListener('pointercancel', release)
+      if (timer) clearTimeout(timer)
+    }
+  }, [focused])
+
+  return shown
 }
 
 interface ToolbarButtonProps {
