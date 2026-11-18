@@ -84,12 +84,18 @@ The **Icon** picker shows the icons themselves. On the desktop use the arrow key
 
 ## Vikunja saved filters
 
-In Vikunja, saved filters used to show up in Vicu as empty projects. Vicu now imports every saved filter it can read as a custom list. The import happens the first time a device syncs its custom lists. An import is a copy: the list says so once, and later changes in Vikunja do not change it. Two devices never import the same filter twice.
+In Vikunja, saved filters used to show up in Vicu as empty projects. Vicu now imports every saved filter it can read as a custom list. The import happens the first time a device syncs its custom lists. An import is a copy: the list says so once, and changing the list never changes the filter in Vikunja. Two devices never import the same filter twice.
 
-To bring in filters you made later, or to import them again:
+To bring in filters you made later, project views, or to import a filter again:
 
-- On the desktop, open **Settings, Projects, Saved filters** and choose **Import saved filters**. {desktop}
-- On a phone, open **Settings, Projects, Custom Lists** and tap **Import saved filters**. {phone}
+- On the desktop, open **Settings, Projects, Saved filters and views** and choose **Import saved filters and views**. {desktop}
+- On a phone, open **Settings, Projects, Custom Lists** and tap **Import saved filters and views**. {phone}
+
+The sheet lists your saved filters and, under **Project views**, the views of your projects that have their own filter or sort (Vikunja's own List, Table and Gantt views and Kanban boards are left out). A view becomes a list of its project's tasks, named for the project and the view.
+
+Importing a filter or view that already has a list never adds a second list. The sheet says whether it changed in Vikunja, in Vicu or in both, and for each one you tick, Vicu shows what differs and asks: **Overwrite** takes Vikunja's name, rule and sort, **Skip** keeps your list as it is. The icon, its place and the list's other conditions stay either way, and **Undo** puts everything back.
+
+When a saved filter you imported changes in Vikunja, Vicu says so after a sync, next to new filters. **Not now** hides that until the filter changes again.
 
 ## Sync between devices
 

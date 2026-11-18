@@ -503,7 +503,7 @@ export async function fetchProjects(includeArchived = false): Promise<ApiResult<
 /** The real projects, and the pseudo-projects (negative ids) Vikunja lists among them. */
 export async function fetchProjectsAndSavedFilters(
   includeArchived = false,
-): Promise<ApiResult<{ projects: unknown[]; pseudo: Array<{ id: number; title?: string }> }>> {
+): Promise<ApiResult<{ projects: unknown[]; pseudo: Array<{ id: number; title?: string; updated?: string }> }>> {
   const c = await getConfigOrFail()
   if ('success' in c) return c
 
@@ -511,7 +511,7 @@ export async function fetchProjectsAndSavedFilters(
   if (!result.success) return result
   const idOf = (project: unknown) => (project as { id?: unknown })?.id
   const projects = result.data.filter((project) => typeof idOf(project) !== 'number' || (idOf(project) as number) > 0)
-  const pseudo = result.data.filter((project) => typeof idOf(project) === 'number' && (idOf(project) as number) < 0) as Array<{ id: number; title?: string }>
+  const pseudo = result.data.filter((project) => typeof idOf(project) === 'number' && (idOf(project) as number) < 0) as Array<{ id: number; title?: string; updated?: string }>
   return { success: true, data: { projects, pseudo } }
 }
 

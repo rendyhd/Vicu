@@ -210,9 +210,17 @@ export function importedSavedFilterIds(): number[] {
   return config.custom_lists_sync?.document.imported_saved_filters ?? []
 }
 
+/** The lists as synced values, unknown fields included (what an import again starts from). */
+export function getCustomListWires(): CustomListWire[] {
+  const config = loadConfig()
+  if (!config) return []
+  return activeLists(ensureSyncState(config).document)
+}
+
 /**
  * Adds `lists` at the end and records `filterIds` as imported, in one change; the change syncs
- * at once. Lists without a name are skipped.
+ * at once. A list whose id is there already is rewritten in place and keeps its place in the order
+ * (importing a source again, section 3.7).
  */
 export function importCustomLists(lists: CustomListWire[], filterIds: number[]): CustomList[] {
   if (lists.length === 0 && filterIds.length === 0) return getCustomLists()
@@ -232,7 +240,31 @@ export function importCustomLists(lists: CustomListWire[], filterIds: number[]):
   return config.custom_lists ?? []
 }
 
-/** Turns lists that repeat another list's saved filter into tombstones; false when there were none. */
+/**
+ * Undo of an import: deletes `removeIds` and writes `restore` back as they were, in one change.
+ */
+export function restoreCustomLists(removeIds: string[], restore: CustomListWire[]): CustomList[] {
+  if (removeIds.length === 0 && restore.length === 0) return getCustomLists()
+  const config = service.mutate((document, deviceId) => {
+    for (const id of removeIds) {
+      document.lists[id] = { value: null, revision: nextRevision(document, deviceId) }
+    }
+    for (const value of restore) {
+      const normalized = normalizeWireList(value)
+      document.lists[normalized.id] = { value: normalized, revision: nextRevision(document, deviceId) }
+    }
+    const removed = new Set(removeIds)
+    const added = restore.map((list) => list.id).filter((id) => !document.order.ids.includes(id))
+    document.order = {
+      ids: [...document.order.ids.filter((id) => !removed.has(id)), ...added],
+      revision: nextRevision(document, deviceId),
+    }
+    return document
+  })
+  return config.custom_lists ?? []
+}
+
+/** Turns lists that repeat another list's source into tombstones; false when there were none. */
 export function dropDuplicateCustomListImports(): boolean {
   const config = loadConfig()
   if (!config?.custom_lists_sync || duplicateImports(config.custom_lists_sync.document).length === 0) return false

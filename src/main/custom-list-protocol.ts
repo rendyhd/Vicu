@@ -111,7 +111,8 @@ export function pruneTombstones(document: CustomListSyncDocumentV1, now = Date.n
   return { ...document, lists }
 }
 
-const KNOWN_LIST_KEYS: ReadonlySet<string> = new Set(['id', 'name', 'icon', 'filter', 'saved_filter_id'])
+const KNOWN_LIST_KEYS: ReadonlySet<string> = new Set(['id', 'name', 'icon', 'filter', 'saved_filter_id', 'project_view', 'import_base'])
+const KNOWN_BASE_KEYS: ReadonlySet<string> = new Set(['updated', 'name', 'rule', 'rule_include_nulls', 'sort_by', 'order_by', 'then_by'])
 const KNOWN_FILTER_KEYS: ReadonlySet<string> = new Set([
   'project_ids',
   'project_filter_mode',
@@ -156,6 +157,37 @@ function unknownFields(source: object, known: ReadonlySet<string>): Record<strin
 }
 
 /**
+ * `project_view` in its canonical form (section 3.9): `{ project_id, view_id }` of whole numbers.
+ * Anything else is kept as it came, so a shape from a newer app is not lost.
+ */
+function normalizeProjectView(value: unknown): unknown {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return value
+  const ref = value as Record<string, unknown>
+  if (!Number.isInteger(ref.project_id) || !Number.isInteger(ref.view_id)) return value
+  return { project_id: ref.project_id, view_id: ref.view_id, ...unknownFields(ref, new Set(['project_id', 'view_id'])) }
+}
+
+/**
+ * `import_base` in its canonical form (section 3.7): `updated`, `name`, `sort_by` and `order_by`
+ * always, `rule`, `rule_include_nulls` and `then_by` only when set, and unknown keys kept.
+ */
+function normalizeImportBase(value: unknown): unknown {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return value
+  const base = value as Record<string, unknown>
+  const thenBy = normalizeThenBy(base.then_by)
+  return {
+    updated: typeof base.updated === 'string' ? base.updated : '',
+    name: typeof base.name === 'string' ? base.name.trim() : '',
+    ...(typeof base.rule === 'string' && base.rule.trim() !== '' ? { rule: base.rule } : {}),
+    ...(base.rule_include_nulls === true ? { rule_include_nulls: true } : {}),
+    sort_by: typeof base.sort_by === 'string' && base.sort_by !== '' ? base.sort_by : 'due_date',
+    order_by: base.order_by === 'desc' ? 'desc' : 'asc',
+    ...(thenBy.length > 0 ? { then_by: thenBy } : {}),
+    ...unknownFields(base, KNOWN_BASE_KEYS),
+  }
+}
+
+/**
  * The canonical form of a synced list: known fields are validated and defaulted, and unknown
  * fields (list value and filter) are carried over untouched so a field added by another app
  * survives a round trip through this one. `include_overdue` is only written when it was set;
@@ -193,6 +225,12 @@ export function normalizeWireList(value: CustomListWire): CustomListWire {
       ...unknownFields(value.filter, KNOWN_FILTER_KEYS),
     },
     ...(typeof savedFilterId === 'number' && Number.isInteger(savedFilterId) ? { saved_filter_id: savedFilterId } : {}),
+    ...(value.project_view !== undefined && value.project_view !== null
+      ? { project_view: normalizeProjectView(value.project_view) as CustomListWire['project_view'] }
+      : {}),
+    ...(value.import_base !== undefined && value.import_base !== null
+      ? { import_base: normalizeImportBase(value.import_base) as CustomListWire['import_base'] }
+      : {}),
     ...unknownFields(value, KNOWN_LIST_KEYS),
   }
 }
@@ -262,19 +300,30 @@ export function activeLists(document: CustomListSyncDocumentV1): CustomListWire[
   return withoutDuplicateImports([...result, ...missing.map((record) => normalizeWireList(record.value))])
 }
 
+/** What a list was imported from, as one key; null for a list made in Vicu (sections 3.7 and 3.9). */
+export function importSourceKey(list: { saved_filter_id?: unknown; project_view?: unknown }): string | null {
+  if (typeof list.saved_filter_id === 'number') return `filter:${list.saved_filter_id}`
+  const view = list.project_view as { view_id?: unknown } | null | undefined
+  if (view && typeof view === 'object' && typeof view.view_id === 'number') return `view:${view.view_id}`
+  return null
+}
+
 /**
- * `lists` without the ones that repeat another list's saved filter: per `saved_filter_id`, the
- * list whose id sorts first stays (section 3.7).
+ * `lists` without the ones that repeat another list's source: per `saved_filter_id`, and per
+ * `project_view.view_id`, the list whose id sorts first stays (sections 3.7 and 3.9).
  */
 export function withoutDuplicateImports(lists: CustomListWire[]): CustomListWire[] {
-  const winners = new Map<number, string>()
+  const winners = new Map<string, string>()
   for (const list of lists) {
-    const filterId = list.saved_filter_id
-    if (typeof filterId !== 'number') continue
-    const current = winners.get(filterId)
-    if (current === undefined || compareStrings(list.id, current) < 0) winners.set(filterId, list.id)
+    const key = importSourceKey(list)
+    if (key === null) continue
+    const current = winners.get(key)
+    if (current === undefined || compareStrings(list.id, current) < 0) winners.set(key, list.id)
   }
-  return lists.filter((list) => typeof list.saved_filter_id !== 'number' || winners.get(list.saved_filter_id) === list.id)
+  return lists.filter((list) => {
+    const key = importSourceKey(list)
+    return key === null || winners.get(key) === list.id
+  })
 }
 
 /** The lists `activeLists` hides as duplicate imports, which the next write turns into tombstones. */

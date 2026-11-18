@@ -78,7 +78,8 @@ export function CustomListView() {
   const { data: savedFilters } = useSavedFilters()
   const queryClient = useQueryClient()
   // An imported list says once, on this device, that it is a copy (section 3.7).
-  const showImportNotice = typeof customList?.saved_filter_id === 'number'
+  const fromView = !!customList?.project_view
+  const showImportNotice = (typeof customList?.saved_filter_id === 'number' || fromView)
     && savedFilters !== undefined
     && !savedFilters.notice_closed.includes(customList.id)
   const closeImportNotice = () => {
@@ -241,8 +242,8 @@ export function CustomListView() {
               <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-accent-blue" aria-hidden />
               <p className="flex-1">
                 <span className="block font-medium text-[var(--text-primary)]">Imported from your server</span>
-                This list is a copy of the saved filter &ldquo;{customList?.name}&rdquo;. Changes you make here stay in Vicu
-                and won&apos;t update the filter on your server.
+                This list is a copy of the {fromView ? 'project view' : 'saved filter'} &ldquo;{customList?.name}&rdquo;.
+                Changes you make here stay in Vicu and won&apos;t update it on your server.
               </p>
               <button
                 type="button"

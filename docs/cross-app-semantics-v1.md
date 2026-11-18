@@ -132,12 +132,15 @@ these fields:
 | `then_by` | array, optional | Further sort keys after `sort_by` and `order_by`, each `{ "sort_by", "order_by" }` (section 3.6). Absent means none. |
 
 The list value (next to `id`, `name`, `icon` and `filter`) gains `saved_filter_id`, a whole
-number, when the list was imported from a Vikunja saved filter (section 3.7). The custom-list
-document gains `imported_saved_filters` at its top level: the ids of every saved filter any device
-imported, as an array of whole numbers (section 3.7).
+number, when the list was imported from a Vikunja saved filter (section 3.7); `project_view`, an
+object `{ "project_id", "view_id" }` of whole numbers, when it was imported from a project view
+(section 3.9); and `import_base`, an object, what the import took from Vikunja (section 3.7). The
+custom-list document gains `imported_saved_filters` at its top level: the ids of every saved filter
+any device imported, as an array of whole numbers (section 3.7).
 
 Apps write `assigned`, `comments`, `shared_only`, `changed_within_days`, `rule`,
-`rule_include_nulls`, `then_by` and `saved_filter_id` only when they are set. A string value of `assigned` or `comments` that this version does not know is kept as it
+`rule_include_nulls`, `then_by`, `saved_filter_id`, `project_view` and `import_base` only when they
+are set. A string value of `assigned` or `comments` that this version does not know is kept as it
 is and is no condition, like a `due_date_filter` from a newer app.
 
 Both apps' protocol normalizers must **preserve unknown fields** in list values and filters
@@ -365,14 +368,69 @@ syncing the custom lists, and adds their ids there. After that, a saved filter n
 `imported_saved_filters` is offered, and the person may import any filter again.
 
 **Duplicates.** `imported_saved_filters` merges as the union of both sides, in ascending order.
-When two lists with values hold the same `saved_filter_id`, the one whose `id` sorts first (as a
-string) is the list; apps hide the others and write a tombstone for each at their next write.
-An imported list is an ordinary list: changing it never changes the saved filter, and the saved
-filter is never changed or deleted.
+When two lists with values hold the same `saved_filter_id`, or the same `project_view.view_id`
+(section 3.9), the one whose `id` sorts first (as a string) is the list; apps hide the others and
+write a tombstone for each at their next write. An imported list is an ordinary list: changing it
+never changes the saved filter, and the saved filter is never changed or deleted.
+
+**The import base.** Every import writes `import_base` on the list it makes, and keeps it up to
+date as below (written only when set; a version that does not know it keeps it as an unknown
+field, section 10.8). It holds what the import took from Vikunja: `updated`, the source's `updated`
+exactly as the server wrote it (empty when the server sent none), and the four **parts** as the
+import made them:
+
+| Part | Base keys | Equal when |
+|---|---|---|
+| `name` | `name` | the strings are equal |
+| `rule` | `rule`, absent when none | both are absent, or the strings are equal |
+| `include_nulls` | `rule_include_nulls`, written only when true | both are true or both are not |
+| `sort` | `sort_by`, `order_by`, `then_by` (only when not empty) | all three are equal; an absent `then_by` equals an empty one |
+
+A list imported by a version without this has no base.
+
+**Importing again.** Importing a source that already has a list never adds a second list. The app
+makes a *new import* of the source (the list and base an import would make now) and compares it
+with the list, part by part, giving each part a state:
+
+- `same`: the list's value equals the new import's;
+- otherwise, with a base: `vicu` when the new import's value equals the base (only the list
+  changed), `vikunja` when the list's value equals the base (only the source changed), and `both`
+  when neither does;
+- otherwise, without a base: `differs`.
+
+The source's **status** is `same` when every part is `same`; else `differs` when a part is
+`differs`; else `both` when a part is `both`, or one part is `vikunja` and another is `vicu`; else
+`vikunja` when a part is `vikunja`; else `vicu`. The other conditions of a list (projects, labels,
+dates, Pro's keys, ...) are not parts and never change a status.
+
+The review sheet shows each source that has a list with its status. `vikunja`, `both` and `differs`
+start ticked, `vicu` starts unticked, and `same` cannot be ticked. A ticked source that was imported
+before but has no list now (it was deleted) imports a new list as on first import. For each ticked
+source that has a list, the app shows the parts that are not `same`, with their state and both
+values, and asks:
+
+- **Overwrite**: the four parts take the new import's values and `import_base` becomes the new
+  import's. Everything else stays: the list's `id`, `icon`, place in the order, its other conditions,
+  Pro's keys and unknown fields.
+- **Skip**: the list stays as it is and `import_base` becomes the new import's, so the same change
+  is not offered again. A part that differs then reads `vicu`.
+
+One answer can be given for every remaining source. The answers are written as one change, with
+one Undo that puts every list and base back as it was.
+
+**Changed in Vikunja.** `GET projects` moves a saved filter's pseudo-project `updated` with every
+change of the filter. After a sync, a device reads each saved filter that has a list with a base
+whose `updated` differs from the pseudo-project's, once per new `updated` value, and offers the
+filters whose status is `vikunja` or `both` (with the new filters, when there are any). Not now hides
+the offer until a filter changes again. A list without a base is never offered this way; the review
+sheet still shows it.
 
 Vectors: `savedFilterImport.filters` gives saved filters as `GET filters/{n}` returns them and
-the list each becomes (`filter`, `savedFilterId`, `status`, `reasons`), and
-`savedFilterImport.duplicates` gives lists with `savedFilterId` and the ids kept.
+the list each becomes (`filter`, `savedFilterId`, `status`, `reasons`, and `importBase` where it is
+checked), `savedFilterImport.duplicates` gives lists with `savedFilterId` or `projectViewId` and the
+ids kept, `savedFilterImport.compare` gives a list (with or without `importBase`) and a new import,
+and the state of each part and the status, and `savedFilterImport.answers` gives a list, a new
+import, and the list after Overwrite and after Skip.
 
 ### 3.8 Pro conditions
 
@@ -395,6 +453,35 @@ A device that does not have what a condition reads yet (the ledger, the synced p
 it as no condition, like a version that does not know it (O5). The list editor shows the Pro section
 for a list that has any of these conditions, also on a device with Pro off. Vectors:
 `customListPro` (the matches with and without that data, `hasCondition`, `rowFields`, `groupBy`).
+
+### 3.9 Project views
+
+A Vikunja project has views (`GET projects/{id}/views`), each with its own filter and sort. Vicu's
+project screen shows a project's open tasks and does not read them; instead the review sheet of
+section 3.7 also offers views, which import as custom lists.
+
+**Offered.** A view is offered when its project is a real project (id 1 or more) that is not
+archived, its `view_kind` is `list`, `table` or `gantt` (never `kanban`), and it is not one Vikunja
+makes by default. The defaults are a `list` view whose `filter.filter` is `done = false` (trimmed)
+and a `table` or `gantt` view whose `filter.filter` is empty; in both, `filter.s` is empty, there is
+no `sort_by` and `filter_include_nulls` is false. A view whose `filter` is absent or null reads as an
+empty one. Views are offered only in the review sheet: never on first connect and never after a
+sync.
+
+**Importing.** A view becomes a list as a saved filter does (section 3.7, with the view's `filter`
+in place of `filters`, and the same status and reasons), and:
+
+- `name` is the project's title, `: ` and the view's title (both trimmed): `Shopping: All items`;
+- `project_ids` is the view's project with `project_filter_mode` `include` (a view shows its own
+  project's tasks, not its subprojects'), and `add_to_project_id` is that project;
+- `project_view` is `{"project_id": p, "view_id": v}`, in place of `saved_filter_id`;
+- the base's `updated` is the view's.
+
+Importing a view again works as in section 3.7. No document records imported views: a view is
+imported while a list holds its `project_view.view_id`.
+
+Vectors: `savedFilterImport.views` gives a project, a view as the server returns it, whether it is
+offered, and the list it becomes with its status and reasons.
 
 ---
 

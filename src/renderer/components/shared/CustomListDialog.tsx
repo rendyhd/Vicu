@@ -24,7 +24,7 @@ interface CustomListDialogProps {
   onClose: () => void
 }
 
-const SORT_OPTIONS = [
+export const SORT_OPTIONS = [
   { value: 'due_date', label: 'Due date' },
   { value: 'start_date', label: 'Start date' },
   { value: 'end_date', label: 'End date' },
@@ -162,7 +162,11 @@ export function CustomListDialog({ open, list, onSave, onClose }: CustomListDial
     const trimmed = name.trim()
     if (!trimmed || 'problem' in savedRule) return
     const { rule: _rule, rule_include_nulls: includeNulls, ...rest } = filter
+    // What the editor does not show (where the list was imported from, its import base, fields
+    // from a newer app) stays as it was (cross-app semantics 3 and 3.7).
+    const { id: _id, name: _name, icon: _icon, filter: _filter, ...kept }: Partial<CustomList> = list ?? {}
     onSave({
+      ...kept,
       id: list?.id ?? crypto.randomUUID(),
       name: trimmed,
       icon,
@@ -171,7 +175,6 @@ export function CustomListDialog({ open, list, onSave, onClose }: CustomListDial
         ...(savedRule.rule ? { rule: savedRule.rule } : {}),
         ...(savedRule.rule && includeNulls ? { rule_include_nulls: true } : {}),
       },
-      ...(typeof list?.saved_filter_id === 'number' ? { saved_filter_id: list.saved_filter_id } : {}),
     })
   }
 
@@ -263,10 +266,12 @@ export function CustomListDialog({ open, list, onSave, onClose }: CustomListDial
       </div>
 
       <div className="space-y-4 p-5">
-        {typeof list?.saved_filter_id === 'number' && (
+        {(typeof list?.saved_filter_id === 'number' || list?.project_view) && (
           <p className="flex gap-2 rounded-control bg-[var(--bg-secondary)] px-3 py-2 text-xs text-[var(--text-secondary)]">
             <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-accent-blue" aria-hidden />
-            Imported from a Vikunja saved filter. Changes here stay in Vicu and won't update the saved filter on your server.
+            {list?.project_view
+              ? "Imported from a Vikunja project view. Changes here stay in Vicu and won't update the view on your server."
+              : "Imported from a Vikunja saved filter. Changes here stay in Vicu and won't update the saved filter on your server."}
           </p>
         )}
 

@@ -87,7 +87,7 @@ See [Quick add](guide:quick-add).
 | Default review cadence (days) | How often projects are due for review. 14 to start. | This device |
 | Exclude Inbox from review list | Leaves the Inbox out | This device |
 | Excluded from review | Projects you left out, with **Include again** | Synced (stored with the project) |
-| Import saved filters | Turns your Vikunja saved filters into custom lists | Synced (the lists) |
+| Import saved filters and views | Turns your Vikunja saved filters and project views into custom lists, and updates lists imported before | Synced (the lists) |
 
 See [Projects and labels](guide:projects), [Custom lists](guide:custom-lists) and [Review and guided organizing](guide:review).
 

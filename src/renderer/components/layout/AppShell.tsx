@@ -71,6 +71,7 @@ import { ProDialogHost } from '@/components/pro/ProDialogHost'
 import { APP_CONFIG_QUERY_KEY, useAppConfig } from '@/hooks/use-app-config'
 import { openTaskInApp } from '@/lib/open-task'
 import { toast } from '@/stores/toast-store'
+import { importOutcomeText } from '../../../shared/saved-filter-import'
 import { useOfflineQueueSync } from '@/hooks/use-offline-queue'
 import { useFreshness } from '@/hooks/use-freshness'
 import { useManualRefresh } from '@/hooks/use-manual-refresh'
@@ -653,12 +654,21 @@ export function AppShell() {
     })
   }, [navigate])
 
-  // Saved filters imported as lists (first connect or Settings, cross-app semantics 3.7): say so,
-  // with Open for the first one.
+  // Saved filters and project views imported as lists (first connect or Settings, cross-app
+  // semantics 3.7 and 3.9): say so, with Open for the first one, or with Undo when lists that were
+  // imported before were updated or skipped.
   useEffect(() => {
-    return api.onSavedFiltersImported(({ count, list_id: listId }) => {
-      if (count < 1) return
-      const message = count === 1 ? 'Imported 1 saved filter as a list' : `Imported ${count} saved filters as lists`
+    return api.onSavedFiltersImported((outcome) => {
+      const { count, list_id: listId, undo_id: undoId } = outcome
+      if (count < 1 && !undoId) return
+      const message = importOutcomeText(outcome)
+      if (undoId) {
+        toast.success(message, {
+          key: 'saved-filters-imported',
+          action: { label: 'Undo', onAction: () => void api.undoSavedFilterImport(undoId) },
+        })
+        return
+      }
       toast.success(message, {
         key: 'saved-filters-imported',
         ...(listId ? { action: { label: 'Open', onAction: () => navigate({ to: '/list/$listId', params: { listId } }) } } : {}),

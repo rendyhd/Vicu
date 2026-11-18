@@ -12,6 +12,7 @@
 import type { ProLedger } from './pro/ledger'
 import type { SyncedPrefsDocument } from './synced-prefs'
 import type { TodayRoutinesLimit } from './today-routines'
+import type { ImportBase } from './saved-filter-import'
 
 export const CUSTOM_LIST_SORT_FIELDS = [
   'due_date',
@@ -76,6 +77,10 @@ export interface CustomListWire {
   filter: CustomListWireFilter
   /** The Vikunja saved filter the list was imported from (section 3.7). */
   saved_filter_id?: number
+  /** The Vikunja project view the list was imported from (section 3.9). */
+  project_view?: { project_id: number; view_id: number }
+  /** What the last import took from Vikunja (section 3.7, "The import base"). */
+  import_base?: ImportBase
   [unknownField: string]: unknown
 }
 
@@ -152,6 +157,10 @@ export interface CustomList {
   filter: CustomListFilter
   /** The Vikunja saved filter the list was imported from (section 3.7). */
   saved_filter_id?: number
+  /** The Vikunja project view the list was imported from (section 3.9). */
+  project_view?: { project_id: number; view_id: number }
+  /** What the last import took from Vikunja (section 3.7, "The import base"). */
+  import_base?: ImportBase
   [unknownField: string]: unknown
 }
 
@@ -267,13 +276,18 @@ export interface AppConfig {
   /**
    * What this device knows about the account's Vikunja saved filters (cross-app semantics 3.7):
    * the filters the last project read found, whether the first connect imported them, the ones
-   * put off with Not now, and the imported lists whose first-open notice was closed. Owned by main.
+   * put off with Not now, and the imported lists whose first-open notice was closed; and, per
+   * filter id, the `updated` this device last read an imported filter at (`checked`), found it
+   * changed in Vikunja at (`changed`) and put that change off at (`changed_dismissed`). Owned by main.
    */
   saved_filters?: {
-    known: Array<{ id: number; title: string }>
+    known: Array<{ id: number; title: string; updated?: string }>
     first_connect_done?: boolean
     dismissed?: number[]
     notice_closed?: string[]
+    checked?: Record<string, string>
+    changed?: Record<string, string>
+    changed_dismissed?: Record<string, string>
   }
   /** Owned by the custom list service in the main process; the renderer never writes it. */
   custom_lists_sync?: {

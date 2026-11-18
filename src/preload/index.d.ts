@@ -42,7 +42,7 @@ import type {
 import type { CalendarAccountProvider, OAuthClientsView, OwnOAuthClientInput } from '../shared/calendar-accounts'
 import type { IcsImportPreview } from '../shared/ics-import'
 import type { EventKitFoundCalendar, EventKitSaveInput, EventKitStatusView } from '../shared/calendar-eventkit'
-import type { SavedFilterImportOutcome, SavedFilterPreview, SavedFilterState } from '../shared/saved-filter-import'
+import type { ImportAnswer, SavedFilterImportOutcome, SavedFilterPreview, SavedFilterState } from '../shared/saved-filter-import'
 import type { SyncedPrefsSnapshot } from '../shared/synced-prefs'
 import type { ArchiveRecords } from '../shared/pro/ledger'
 import type { ProLedgerOperation, ProLedgerSnapshot } from '../shared/pro/ledger-ipc'
@@ -164,8 +164,10 @@ export interface ElectronAPI {
   getCustomListSyncStatus(): Promise<CustomListSyncStatus>
   getSavedFilterState(): Promise<SavedFilterState>
   previewSavedFilters(ids?: number[]): Promise<SavedFilterPreview[] | null>
-  importSavedFilters(ids: number[]): Promise<SavedFilterImportOutcome | null>
-  dismissSavedFilters(ids: number[]): Promise<SavedFilterState>
+  previewProjectViews(): Promise<SavedFilterPreview[] | null>
+  applySavedFilterImport(request: { add: string[]; answers: Array<{ key: string; answer: ImportAnswer }> }): Promise<SavedFilterImportOutcome | null>
+  undoSavedFilterImport(undoId: string): Promise<boolean>
+  dismissSavedFilters(ids: number[], changed?: number[]): Promise<SavedFilterState>
   closeSavedFilterNotice(listId: string): Promise<SavedFilterState>
   onSavedFiltersChanged(cb: (state: SavedFilterState) => void): () => void
   onSavedFiltersImported(cb: (outcome: SavedFilterImportOutcome) => void): () => void

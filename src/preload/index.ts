@@ -160,8 +160,11 @@ const api = {
   writeClipboardImage: (bytes: Uint8Array) => ipcRenderer.invoke('clipboard:write-image', bytes),
   getSavedFilterState: () => ipcRenderer.invoke('saved-filters:state'),
   previewSavedFilters: (ids?: number[]) => ipcRenderer.invoke('saved-filters:preview', ids),
-  importSavedFilters: (ids: number[]) => ipcRenderer.invoke('saved-filters:import', ids),
-  dismissSavedFilters: (ids: number[]) => ipcRenderer.invoke('saved-filters:dismiss', ids),
+  previewProjectViews: () => ipcRenderer.invoke('saved-filters:preview-views'),
+  applySavedFilterImport: (request: { add: string[]; answers: Array<{ key: string; answer: string }> }) =>
+    ipcRenderer.invoke('saved-filters:apply', request),
+  undoSavedFilterImport: (undoId: string) => ipcRenderer.invoke('saved-filters:undo', undoId),
+  dismissSavedFilters: (ids: number[], changed?: number[]) => ipcRenderer.invoke('saved-filters:dismiss', ids, changed),
   closeSavedFilterNotice: (listId: string) => ipcRenderer.invoke('saved-filters:close-notice', listId),
   onSavedFiltersChanged: (cb: (state: unknown) => void) => {
     const handler = (_: unknown, state: unknown) => cb(state)

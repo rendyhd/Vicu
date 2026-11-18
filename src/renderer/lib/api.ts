@@ -256,8 +256,11 @@ export const api = {
   getCustomListSyncStatus: () => window.api.getCustomListSyncStatus(),
   getSavedFilterState: () => window.api.getSavedFilterState(),
   previewSavedFilters: (ids?: number[]) => window.api.previewSavedFilters(ids),
-  importSavedFilters: (ids: number[]) => window.api.importSavedFilters(ids),
-  dismissSavedFilters: (ids: number[]) => window.api.dismissSavedFilters(ids),
+  previewProjectViews: () => window.api.previewProjectViews(),
+  applySavedFilterImport: (request: { add: string[]; answers: Array<{ key: string; answer: import('../../shared/saved-filter-import').ImportAnswer }> }) =>
+    window.api.applySavedFilterImport(request),
+  undoSavedFilterImport: (undoId: string) => window.api.undoSavedFilterImport(undoId),
+  dismissSavedFilters: (ids: number[], changed?: number[]) => window.api.dismissSavedFilters(ids, changed),
   closeSavedFilterNotice: (listId: string) => window.api.closeSavedFilterNotice(listId),
   onSavedFiltersChanged: (cb: (state: import('../../shared/saved-filter-import').SavedFilterState) => void) =>
     window.api.onSavedFiltersChanged(cb),

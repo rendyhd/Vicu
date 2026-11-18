@@ -90,17 +90,36 @@ import { readSyncedPlaces } from '../shared/synced-prefs'
 import { quickEntryLocationReminder } from './quick-entry/location-reminder'
 import type { CustomListWire } from './custom-list-protocol'
 import {
+  applySavedFilterImport,
   closeImportNotice,
   dismissSavedFilters,
   getSavedFilterState,
-  importSavedFilters,
+  previewProjectViews,
   previewSavedFilters,
   recordKnownSavedFilters,
+  undoSavedFilterImport,
 } from './saved-filter-service'
+import type { ImportAnswer } from '../shared/saved-filter-import'
 
 /** A list of saved-filter ids from the renderer: at most 500 whole numbers of 0 or more. */
 function isIdList(value: unknown): value is number[] {
   return Array.isArray(value) && value.length <= 500 && value.every((id) => typeof id === 'number' && Number.isInteger(id) && id >= 0)
+}
+
+/** A row key of the import sheet: `filter:<id>` or `view:<id>`. */
+function isSourceKey(value: unknown): value is string {
+  return typeof value === 'string' && /^(filter|view):\d{1,12}$/.test(value)
+}
+
+/** The sheet's Import from the renderer: at most 500 keys to add and 500 answers. */
+function isImportRequest(value: unknown): value is { add: string[]; answers: Array<{ key: string; answer: ImportAnswer }> } {
+  if (!value || typeof value !== 'object') return false
+  const { add, answers } = value as { add?: unknown; answers?: unknown }
+  return Array.isArray(add) && add.length <= 500 && add.every(isSourceKey)
+    && Array.isArray(answers) && answers.length <= 500
+    && answers.every((entry) => !!entry && typeof entry === 'object'
+      && isSourceKey((entry as { key?: unknown }).key)
+      && ((entry as { answer?: unknown }).answer === 'overwrite' || (entry as { answer?: unknown }).answer === 'skip'))
 }
 import type { UnsyncedDocuments } from '../shared/config-types'
 import { hasVicuMetadataMarker } from './custom-list-protocol'
@@ -563,8 +582,13 @@ export function registerIpcHandlers(): void {
     if (ids !== undefined && !isIdList(ids)) return null
     return previewSavedFilters(ids as number[] | undefined)
   })
-  handleTrusted('saved-filters:import', (_event, ids: unknown) => (isIdList(ids) ? importSavedFilters(ids) : null))
-  handleTrusted('saved-filters:dismiss', (_event, ids: unknown) => (isIdList(ids) ? dismissSavedFilters(ids) : getSavedFilterState()))
+  handleTrusted('saved-filters:preview-views', () => previewProjectViews())
+  handleTrusted('saved-filters:apply', (_event, request: unknown) =>
+    (isImportRequest(request) ? applySavedFilterImport(request.add, request.answers) : null))
+  handleTrusted('saved-filters:undo', (_event, undoId: unknown) =>
+    (typeof undoId === 'string' && undoId !== '' ? undoSavedFilterImport(undoId) : false))
+  handleTrusted('saved-filters:dismiss', (_event, ids: unknown, changed: unknown) =>
+    (isIdList(ids) && (changed === undefined || isIdList(changed)) ? dismissSavedFilters(ids, changed ?? []) : getSavedFilterState()))
   handleTrusted('saved-filters:close-notice', (_event, listId: unknown) =>
     (typeof listId === 'string' && listId !== '' ? closeImportNotice(listId) : getSavedFilterState()))
 

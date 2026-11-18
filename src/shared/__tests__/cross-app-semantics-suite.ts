@@ -30,7 +30,17 @@ import {
 import { computeStatus, type ReviewMetadata } from '../review-metadata'
 import { compileRule, validateRule, type RuleTask } from '../custom-list-rule'
 import { sortCustomListTasks } from '../custom-list-sort'
-import { convertSavedFilter, type SavedFilterDto } from '../saved-filter-import'
+import {
+  compareImport,
+  convertProjectView,
+  convertSavedFilter,
+  isViewOffered,
+  overwriteImport,
+  skipImport,
+  type ImportResult,
+  type ProjectViewDto,
+  type SavedFilterDto,
+} from '../saved-filter-import'
 import {
   activeLists,
   documentFromLists,
@@ -139,16 +149,47 @@ interface SortBlock {
   tasks: Array<{ id: number; title: string; done: boolean; priority: number; due: string | null; position: number }>
   vectors: Array<{ name: string; filter: { sort_by: string; order_by: string; then_by?: Array<{ sort_by: string; order_by: string }> }; expect: number[] }>
 }
+interface ImportedListVector {
+  name: string
+  icon: string
+  savedFilterId?: number
+  projectView?: { project_id: number; view_id: number }
+  filter: Record<string, unknown>
+  importBase?: Record<string, unknown>
+}
 interface ImportBlock {
   filters: Array<{
     name: string
     savedFilter: SavedFilterDto
-    list: { name: string; icon: string; savedFilterId: number; filter: Record<string, unknown> } | null
+    list: ImportedListVector | null
     status: string
     reasons: string[]
   }>
-  duplicates: Array<{ name: string; lists: Array<{ id: string; savedFilterId?: number }>; kept: string[] }>
+  duplicates: Array<{ name: string; lists: Array<{ id: string; savedFilterId?: number; projectViewId?: number }>; kept: string[] }>
   union: Array<{ left: number[]; right: number[]; merged: number[] }>
+  compare: Array<{
+    name: string
+    list: Record<string, unknown>
+    fresh: Record<string, unknown>
+    parts: Record<string, string>
+    status: string
+  }>
+  answers: Array<{
+    name: string
+    list: Record<string, unknown>
+    fresh: Record<string, unknown>
+    overwrite: Record<string, unknown>
+    skip: Record<string, unknown>
+  }>
+  views: Array<{
+    name: string
+    project: { id: number; title: string; archived: boolean }
+    view: ProjectViewDto
+    offered: boolean
+    list?: ImportedListVector | null
+    status?: string
+    reasons?: string[]
+  }>
 }
 interface Fixture {
   contractVersion: number
@@ -417,8 +458,29 @@ export function runCrossAppSemanticsSuite(options: { zone: string; expectedOffse
       }
     })
 
-    describe('savedFilterImport (section 3.7)', () => {
+    describe('savedFilterImport (sections 3.7 and 3.9)', () => {
       const defaults = normalizeWireList({ id: 'new', name: 'x', icon: '', filter: {} } as unknown as CustomListWire).filter
+      /** A vector's list (only what it reads, the rest a new list's defaults) as a synced value. */
+      const wire = (value: Record<string, unknown>, id = 'x'): CustomListWire => normalizeWireList({
+        id,
+        icon: '',
+        ...value,
+        filter: { ...defaults, ...(value.filter as Record<string, unknown> | undefined) },
+      } as unknown as CustomListWire)
+      const checkImported = (result: ImportResult, vector: ImportedListVector) => {
+        expect(result.list?.name).toBe(vector.name)
+        expect(result.list?.icon).toBe(vector.icon)
+        expect(result.list?.saved_filter_id).toBe(vector.savedFilterId)
+        expect(result.list?.project_view).toEqual(vector.projectView)
+        const made = normalizeWireList({ id: 'new', name: 'x', icon: '', filter: { ...result.list?.filter } } as unknown as CustomListWire).filter
+        const want = normalizeWireList({ id: 'new', name: 'x', icon: '', filter: { ...defaults, ...vector.filter } } as unknown as CustomListWire).filter
+        expect(made).toEqual(want)
+        if (vector.importBase) {
+          expect(result.list?.import_base).toEqual(vector.importBase)
+          // The base survives the protocol's normalizer unchanged.
+          expect(wire(result.list as unknown as Record<string, unknown>).import_base).toEqual(vector.importBase)
+        }
+      }
       for (const vector of fixture.savedFilterImport.filters) {
         it(vector.name, () => {
           const result = convertSavedFilter(vector.savedFilter, 'new')
@@ -428,14 +490,14 @@ export function runCrossAppSemanticsSuite(options: { zone: string; expectedOffse
             expect(result.list).toBeNull()
             return
           }
-          expect(result.list?.name).toBe(vector.list.name)
-          expect(result.list?.icon).toBe(vector.list.icon)
-          expect(result.list?.saved_filter_id).toBe(vector.list.savedFilterId)
-          const made = normalizeWireList({ id: 'new', name: 'x', icon: '', filter: { ...result.list?.filter } } as unknown as CustomListWire).filter
-          const want = normalizeWireList({ id: 'new', name: 'x', icon: '', filter: { ...defaults, ...vector.list.filter } } as unknown as CustomListWire).filter
-          expect(made).toEqual(want)
+          checkImported(result, vector.list)
+          // Every import records its base, whether or not the vector spells it out.
+          expect(result.list?.import_base).toBeDefined()
         })
       }
+      it('the base is checked by at least two vectors', () => {
+        expect(fixture.savedFilterImport.filters.filter((vector) => vector.list?.importBase).length).toBeGreaterThanOrEqual(2)
+      })
       for (const vector of fixture.savedFilterImport.duplicates) {
         it(vector.name, () => {
           const lists = vector.lists.map((list) => ({
@@ -444,6 +506,7 @@ export function runCrossAppSemanticsSuite(options: { zone: string; expectedOffse
             icon: '',
             filter: { ...defaults },
             ...(list.savedFilterId !== undefined ? { saved_filter_id: list.savedFilterId } : {}),
+            ...(list.projectViewId !== undefined ? { project_view: { project_id: 1, view_id: list.projectViewId } } : {}),
           }) as CustomListWire)
           const document = documentFromLists(lists, 'device', 1000)
           expect(activeLists(document).map((list) => list.id)).toEqual(vector.kept)
@@ -463,6 +526,45 @@ export function runCrossAppSemanticsSuite(options: { zone: string; expectedOffse
             ...(ids.length ? { imported_saved_filters: ids } : {}),
           })
           expect(mergeCustomListDocuments(doc(vector.left), doc(vector.right)).imported_saved_filters).toEqual(vector.merged)
+        })
+      }
+      it('has the compare, answers and views vectors', () => {
+        expect(fixture.savedFilterImport.compare.length).toBeGreaterThanOrEqual(10)
+        expect(fixture.savedFilterImport.answers.length).toBeGreaterThanOrEqual(2)
+        expect(fixture.savedFilterImport.views.length).toBeGreaterThanOrEqual(10)
+      })
+      for (const vector of fixture.savedFilterImport.compare) {
+        it(`compare: ${vector.name}`, () => {
+          const result = compareImport(wire(vector.list), wire(vector.fresh))
+          expect(result.parts).toEqual(vector.parts)
+          expect(result.status).toBe(vector.status)
+        })
+      }
+      for (const vector of fixture.savedFilterImport.answers) {
+        it(`answers: ${vector.name}`, () => {
+          const list = wire(vector.list)
+          const fresh = wire(vector.fresh, list.id)
+          const overwritten = normalizeWireList(overwriteImport(list, fresh))
+          expect(overwritten).toEqual(wire(vector.overwrite))
+          expect(normalizeWireList(skipImport(list, fresh))).toEqual(wire(vector.skip))
+          // Unknown fields of the list and of its filter are kept.
+          expect(overwritten.pinned).toEqual(list.pinned)
+          expect(overwritten.filter.availability).toEqual(list.filter.availability)
+          expect(compareImport(overwritten, fresh).status).toBe('same')
+        })
+      }
+      for (const vector of fixture.savedFilterImport.views) {
+        it(`views: ${vector.name}`, () => {
+          expect(isViewOffered(vector.project, vector.view)).toBe(vector.offered)
+          if (!vector.offered) return
+          const result = convertProjectView(vector.project, vector.view, 'new')
+          expect(result.status).toBe(vector.status)
+          expect(result.reasons).toEqual(vector.reasons ?? [])
+          if (!vector.list) {
+            expect(result.list).toBeNull()
+            return
+          }
+          checkImported(result, vector.list)
         })
       }
     })
