@@ -107,6 +107,7 @@ import { hasVicuMetadataMarker } from './custom-list-protocol'
 import { discoverProviders, discoverAuthMethods } from './auth/oidc-discovery'
 import { fetchCurrentUser } from './auth/user-info'
 import { WEEK_START_KEY, readWeekStart } from '../shared/week-start'
+import { WHEN_TIMES_KEY, readTimes } from '../shared/when-choices'
 import { authManager } from './auth/auth-manager'
 import { OidcPasskeyUnavailableError, OidcTotpRequiredError } from './auth/oidc-login'
 import { cancelBrowserLogin } from './auth/oidc-browser-login'
@@ -817,6 +818,7 @@ export function registerIpcHandlers(): void {
       nlp_syntax_mode: config.nlp_syntax_mode,
       pro_import: isProEnabled(config, 'promises'),
       week_start: readWeekStart(getSyncedPrefs().values[WEEK_START_KEY]),
+      when_times: readTimes(getSyncedPrefs().values[WHEN_TIMES_KEY]),
     }
   })
 

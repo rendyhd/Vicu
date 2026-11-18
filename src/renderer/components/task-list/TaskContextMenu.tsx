@@ -51,6 +51,11 @@ import { breakIntoSteps } from '@/lib/ai/break-into-steps'
 import { usePro } from '@/hooks/use-pro'
 import { flagActionLabel, useToggleFlags } from '@/hooks/use-flag'
 import { useProUiStore } from '@/stores/pro-ui-store'
+import { useWhenChoices } from '@/hooks/use-when-choices'
+import { useDateFormat } from '@/hooks/use-date-format'
+import { formatWeekdayDay } from '@/lib/date-display'
+import { localDateOf, startOfLocalDay, toLocalDate } from '@/lib/due-dates'
+import { moveDay, moveStep, type MoveStepId } from '../../../shared/when-choices'
 
 interface TaskContextMenuProps {
   /** The right-clicked row — guarantees at least one target if the cache can't resolve the selection. */
@@ -62,10 +67,12 @@ interface TaskContextMenuProps {
   onClose: () => void
 }
 
-type SubMenu = 'date' | 'project' | 'label' | 'assign' | null
+type SubMenu = 'postpone' | 'date' | 'project' | 'label' | 'assign' | null
 
 export function TaskContextMenu({ fallbackTask, x, y, reorderable = false, onClose }: TaskContextMenuProps) {
   const scheduleRef = useRef<HTMLButtonElement>(null)
+  const postponeRef = useRef<HTMLButtonElement>(null)
+  const whenChoices = useWhenChoices()
   const projectRef = useRef<HTMLButtonElement>(null)
   const assignRef = useRef<HTMLButtonElement>(null)
   const access = useProjectAccessMap()
@@ -134,6 +141,14 @@ export function TaskContextMenu({ fallbackTask, x, y, reorderable = false, onClo
   )
 
   const hint = (spec: string) => shortcutHint(spec, window.api.platform === 'darwin')
+  const fmt = useDateFormat()
+  // "+1 week" for a selection (each moves from its own date), "+1 week · Fri 27" for one task.
+  const moveByLabel = (step: MoveStepId) => {
+    const label = moveStep(step).label
+    if (multi || isNullDate(tasks[0].due_date)) return label
+    const day = moveDay(localDateOf(tasks[0].due_date), step, toLocalDate(new Date()))
+    return `${label} \u00b7 ${formatWeekdayDay(startOfLocalDay(day), fmt)}`
+  }
   // The assistant's "Break into steps" (docs/ai-assistant-v1.md section 4): one saved task.
   const ai = useAiReady()
   const canBreak = ai.dictation && !multi && fallbackTask.id > 0 && !fallbackTask.done
@@ -156,12 +171,34 @@ export function TaskContextMenu({ fallbackTask, x, y, reorderable = false, onClo
           Set Today
         </MenuItem>
       )}
-      <MenuItem icon={<Sunrise />} onSelect={actions.postponeTomorrow}>
-        Postpone to tomorrow
+      <MenuItem
+        ref={postponeRef}
+        icon={<Sunrise />}
+        popup="menu"
+        expanded={sub === 'postpone'}
+        onSelect={() => setSub((s) => (s === 'postpone' ? null : 'postpone'))}
+      >
+        Postpone
       </MenuItem>
-      <MenuItem icon={<CalendarRange />} onSelect={actions.postponeNextMonday}>
-        Postpone to next Monday
-      </MenuItem>
+      {sub === 'postpone' && (
+        // Tomorrow and Next week keep each task's time; Move by moves each from its own due date
+        // (cross-app semantics 22.3). Rendered inside the menu, so it is a nested layer.
+        <Menu anchorRef={postponeRef} placement="right-start" label="Postpone" onClose={closeSubAndMenu}>
+          <MenuItem icon={<Sunrise />} onSelect={actions.postponeTomorrow}>
+            Tomorrow
+          </MenuItem>
+          <MenuItem icon={<CalendarRange />} onSelect={actions.postponeNextWeek}>
+            Next week
+          </MenuItem>
+          {anyHasDate && whenChoices.moveBy.length > 0 && <MenuSeparator />}
+          {anyHasDate &&
+            whenChoices.moveBy.map((step) => (
+              <MenuItem key={step} icon={<CalendarClock />} onSelect={() => actions.moveTasksBy(step)}>
+                {moveByLabel(step)}
+              </MenuItem>
+            ))}
+        </Menu>
+      )}
       <MenuItem
         ref={scheduleRef}
         icon={<CalendarClock />}
@@ -176,6 +213,7 @@ export function TaskContextMenu({ fallbackTask, x, y, reorderable = false, onClo
           anchorRef={scheduleRef}
           placement="right-start"
           currentDate={datePickerCurrent}
+          offerMoveBy={!multi}
           onDateChange={actions.setDueDateIso}
           onClose={closeSubAndMenu}
         />

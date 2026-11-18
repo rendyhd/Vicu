@@ -224,6 +224,7 @@ export function TaskCardBar({
         <WhenPopover
           anchorRef={dateRef}
           currentDate={task.due_date}
+          offerMoveBy={task.id > 0}
           onDateChange={onDateChange}
           onClose={onClose}
           repeatAfter={task.repeat_after ?? 0}

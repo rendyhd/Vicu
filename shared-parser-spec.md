@@ -2,7 +2,7 @@
 
 This document defines the exact parser behavior that BOTH Vicu (desktop) and Vicu Android must implement identically. Both apps must produce the same `ParseResult` for the same input string and the same `ParserConfig`.
 
-The date and recurrence rules are the contract in `docs/cross-app-semantics-v1.md` section 5, and the test is the shared corpus `test-fixtures/nlp-corpus-v1.json` (189 cases, reference time Tue 2026-10-06 10:00 local; both apps run the same file). If this document and the corpus disagree, the corpus wins. The desktop implementation is `src/renderer/lib/task-parser/`: there is one parser (the main window, the task title editor and Quick Entry all call it), and the date work is done by chrono-node plus the rules below.
+The date and recurrence rules are the contract in `docs/cross-app-semantics-v1.md` section 5, and the test is the shared corpus `test-fixtures/nlp-corpus-v1.json` (213 cases, reference time Tue 2026-10-06 10:00 local; both apps run the same file). If this document and the corpus disagree, the corpus wins. The desktop implementation is `src/renderer/lib/task-parser/`: there is one parser (the main window, the task title editor and Quick Entry all call it), and the date work is done by chrono-node plus the rules below.
 
 ---
 
@@ -251,6 +251,13 @@ Contract: `docs/cross-app-semantics-v1.md` section 5.1; corpus: `test-fixtures/n
 - **Three-letter abbreviations** (`mon`, `tue`, `tues`, `wed`, `thu`, `thur`, `thurs`, `fri`, `sat`, `sun`) only count as dates when the previous word is `on`, `next`, `this`, `by` or `due`, or when a time follows (`mon 9am`, `wed at 3pm`, `fri 14:00`). Otherwise they are plain words: "Buy sun cream", "Notes we sat on" and "Plan wed anniversary" have no date. Full weekday names always count.
 - `weekend` and `weekday` are words, not dates: "Plan the weekend" has no date. (chrono reads them as Saturday and the next working day; desktop blanks them before chrono runs.)
 - An amount of time is a date only right after `in`. "Call 30m", "Rest 3 days", "Plan the week", "Renew within 3 days" and "Review 3 days from now" keep their words and have no date. (chrono reads them all as that long from now; desktop marks them before chrono runs, so they also keep two date phrases apart. The When field is the exception on desktop: typed text there is nothing but a date, so "3 days" means that.)
+
+### Times of day
+
+- The account's times of day (contract sections 5.6 and 22.1; Morning 09:00, Noon 12:00, Afternoon 15:00 and Evening 18:00 by default, a corpus case's `times`) are time words. A name right after a date is its time ("Gym tomorrow morning" is tomorrow at 09:00; "Lunch friday at noon"), `at <name>` is a time like `at 3pm` ("Call at noon", "at noon tomorrow"), `this <name>` is today at that time even when it has passed, and `tonight` is today at the evening time. A bare or `this` weekday that is today moves to next week when the time has passed ("Tuesday morning standup" at 10:00 on a Tuesday).
+- A name on its own ("Morning run"), before a date ("Call MORNING tomorrow") or after a phrase that has a time ("Call tomorrow 3pm evening") is a word of the title. A name that is a date word of section 5.1 is never read.
+- chrono's own words (`morning`, `afternoon`, `evening`, `night`, `tonight`, `noon`, `midday`, `midnight`) are never read by chrono: desktop marks them and the names before chrono runs and reads the names itself (`findTimeNames`, `timePhrases` in `extract-dates.ts`), so "Read at midnight" has no date and "Lunch tomorrow noon" without a Noon is date-only.
+- The times come from `getTimesOfDay` (`src/shared/when-choices.ts`), which `useWhenChoices` and the Quick Entry window's config keep in step with the synced setting.
 
 ### Words that are not dates
 

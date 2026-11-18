@@ -1,3 +1,4 @@
+import { DEFAULT_TIMES, setTimesOfDay } from '../../../../shared/when-choices'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
@@ -25,6 +26,8 @@ interface CorpusCase {
   locale?: string
   /** The week start the case is parsed with (section 2.1); Monday when absent. */
   weekStart?: string
+  /** The times of day the case is parsed with (section 5.6); the default ones when absent. */
+  times?: Array<{ name: string; time: string }>
   parserEnabled?: boolean
   due?: string | null
   /** The time block `for 30m` makes (section 5.4). */
@@ -80,7 +83,7 @@ export function runNlpCorpusSuite(options: { zone: string; expectedOffsetMinutes
   describe(`nlp corpus v1 in ${options.zone}`, () => {
     it('is running in the requested time zone', () => {
       expect(corpus.contractVersion).toBe(1)
-      expect(corpus.cases.length).toBe(189)
+      expect(corpus.cases.length).toBe(213)
       if (options.expectedOffsetMinutesInOctober !== undefined) {
         expect(new Date(2026, 9, 6).getTimezoneOffset()).toBe(options.expectedOffsetMinutesInOctober)
       }
@@ -106,7 +109,9 @@ export function runNlpCorpusSuite(options: { zone: string; expectedOffsetMinutes
           pro: testCase.pro === true,
           weekStart: readWeekStart(testCase.weekStart),
         }
+        setTimesOfDay(testCase.times ?? DEFAULT_TIMES)
         const result = parse(testCase.input, config, local(corpus.reference), corpus.places, corpus.people)
+        setTimesOfDay(DEFAULT_TIMES)
 
         // The stored value, as the composer, title editor and Quick Entry build it.
         const due = result.dueDate ? wall(parsedDue(result.dueDate, result.dueHasTime)) : null

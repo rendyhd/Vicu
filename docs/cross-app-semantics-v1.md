@@ -8,7 +8,7 @@ Test vectors live in `test-fixtures/` in both repos and must stay byte-identical
 
 | Fixture | Covers |
 |---|---|
-| `cross-app-semantics-v1.json` | due-date rules, smart lists, weeks, custom-list windows, rules and sorting, saved-filter import, review math, completion hold, date display, collaboration, hidden tasks, synced preferences, task order, project categories, guided organizing, routines on Today, time blocks, Events and calendars, Pro |
+| `cross-app-semantics-v1.json` | due-date rules, smart lists, weeks, custom-list windows, rules and sorting, saved-filter import, review math, completion hold, date display, collaboration, hidden tasks, synced preferences, task order, project categories, guided organizing, routines on Today, time blocks, Events and calendars, Pro, When choices |
 | `nlp-corpus-v1.json` | quick-add parsing |
 | `routine-archive-v1.json` | routine merge, pruning and archive rules |
 | `ai-tools-v1.json` | the assistant (see `ai-assistant-v1.md`) and Pro's Copilot prompt (section 21.12) |
@@ -55,7 +55,7 @@ Every place that sets a date-only due date uses one helper per app (desktop
 | Next week | Monday of next week, 2026-10-12 23:59:59 (on a Sunday: the next day). With another week start, the Monday in next week (section 2.1) |
 | Pick a date (calendar) | that local date at 23:59:59, built from the local calendar date, never from UTC millis |
 | "!" shortcut | today, 23:59:59 |
-| Postpone / move by N days | adds N calendar days and keeps the time of day; a legacy 00:00 value becomes 23:59:59 |
+| Postpone / move by N days | adds N calendar days and keeps the time of day; a legacy 00:00 value becomes 23:59:59. The When pickers' Move by counts an overdue task from today (section 22.3) |
 
 Reminders relative to the due date ("1 hour before") are computed from the stored value, so
 "1 hour before" a date-only task fires at 22:59:59 that day.
@@ -569,6 +569,32 @@ before: these words stay in the title.
 - **A flag:** the word `!flag` (any case) gives `flag: true` and leaves the title.
 - **A request:** `req:` at the very start gives `request: true` (triage, section 21.10) and leaves
   the title.
+
+### 5.6 Times of day
+
+The names of the account's times of day (section 22.1, `Morning`, `Noon`, `Afternoon` and `Evening`
+by default) are time words. A name is matched without regard to case, as whole words (a name of
+more than one word matches those words with single spaces between them).
+
+- **After a date:** a name directly after a date phrase (only spaces between, or `at`) is that
+  date's time: "Gym tomorrow morning" is due tomorrow at 09:00 with the title "Gym", and "Lunch
+  friday at noon" is due on Friday at 12:00. A bare or `this` weekday whose day is today moves to
+  next week when that time has passed, as with "friday 9am" (section 5.1).
+- **After `at`:** `at <name>` without a date is a time, like "at 3pm": "Call at noon" is today at
+  12:00 when that is still ahead, otherwise tomorrow. It can stand before a date: "at noon
+  tomorrow".
+- **`this <name>`** is today at that time, also when it has passed: "Call this afternoon" is due
+  today at 15:00.
+- **`tonight`** is today at the evening time (section 22.1). Without an evening time it is a word
+  of the title.
+- **On its own** a name is a word of the title: "Morning run" and "Call mom evening" have no due
+  date. A name after a phrase that already has a time stays in the title too: "Call tomorrow 3pm
+  evening" is due tomorrow at 15:00 with the title "Call evening".
+- A name that is also a word of section 5.1 (`today`, `tomorrow`, `tonight`, `now`, a weekday or a
+  month, `next`, `this`, `last`, `in`, `at`, `on`, `by`, `due`) is never read as a time of day.
+- No other word is a time of day: `midnight`, `midday` and `night`, and `noon` or `morning` once
+  they are no longer names, are words of the title.
+- Cases in `nlp-corpus-v1.json` are parsed with the default times of day unless they give `times`.
 
 ---
 
@@ -1417,6 +1443,9 @@ A key is added here, in both repos, in the release that starts writing it.
 | `label_status.<labelId>` | `"on_hold"`, or `null`; section 21.2 | active |
 | `label_kind.<labelId>` | `"person"`, or `null`; section 21.5 | a label |
 | `repeat_rule.<taskId>` | `{"until"?, "count"?, "catch_up"?}`, or `null`; section 21.13 | no end |
+| `when.times` | the times of day, `[{"name", "time"}]`, or `null`. Any other value acts as the default and is kept; section 22.1 | Morning 09:00, Noon 12:00, Afternoon 15:00, Evening 18:00 |
+| `when.days` | the When pickers' day choices, an array of choice ids, or `null`. Any other value acts as the default and is kept; section 22.2 | `["today", "this_evening", "tomorrow", "this_weekend", "next_week"]` |
+| `when.move_by` | the When pickers' Move by steps, an array of step ids, or `null`. Any other value acts as the default and is kept; section 22.3 | `["1d", "2d", "1w", "1m"]` |
 
 ### 11.4 The Inbox
 
@@ -2748,3 +2777,76 @@ themselves are visible to Ask as before. The prompts, schemas and Ask tools are 
 `importDates`, `importRead`, `importMatch`, `exportOpen`, `copilotPrompt`, `repeatRule`, `focus`,
 `focusBlock`, `weeklyPro`; and `customListPro` (section 3.8). `nlp-corpus-v1.json` covers section
 5.5 with cases marked `"pro": true`.
+
+---
+
+## 22. When choices
+
+What the When pickers offer (the quick-add When tray and the When sheet on the phone, the When
+panel and the task menu's Postpone on the desktop) is the account's choice, synced as three
+preferences (section 11.3). Each one only changes what is offered: a due date is still stored by
+section 1. A guided session's When step keeps its four quick choices (section 14.3).
+
+### 22.1 Times of day (`when.times`)
+
+- One to five entries `{"name": "Morning", "time": "09:00"}`. `name` is one to twenty characters
+  (letters, digits and single spaces, no space at either end); `time` is `HH:mm`, 24-hour local
+  time. No two entries share a name (ignoring case) or a time.
+- Any other value (not an array, empty, more than five entries, an entry that breaks the rules
+  above) acts as the default and is kept. A device writes only a value that keeps the rules, in time
+  order; choosing the default writes `null`.
+- Default: Morning 09:00, Noon 12:00, Afternoon 15:00, Evening 18:00, the four times both apps
+  offered before.
+- The pickers show them in time order as chips that say both: "Morning 9:00" (section 8 clock).
+- **The morning time** is the earliest time before 12:00, and **the evening time** the latest time
+  at 17:00 or later. Either can be missing. This evening, Tomorrow morning and `tonight` (section
+  5.6) use them.
+
+### 22.2 Day choices (`when.days`)
+
+- An array of at most six choice ids, without duplicates, in the order they are shown. An id this
+  version does not know is skipped, and left out when this version writes the setting. An empty
+  array offers no day choices. Any other value acts as the default and is kept.
+- Default: `["today", "this_evening", "tomorrow", "this_weekend", "next_week"]`.
+- The choices, from today's local date and the local time now:
+
+| Id | Label | Day | Time | Offered |
+|---|---|---|---|---|
+| `today` | Today | today | kept | always |
+| `this_evening` | This evening | today | the evening time | while there is an evening time and now is before it |
+| `tomorrow` | Tomorrow | today + 1 | kept | always |
+| `tomorrow_morning` | Tomorrow morning | today + 1 | the morning time | while there is a morning time |
+| `this_weekend` | This weekend | the coming Saturday; on a Saturday, the next one | kept | always |
+| `next_week` | Next week | the Monday in next week (section 2.1) | kept | always |
+| `in_2_days` | In 2 days | today + 2 | kept | always |
+| `in_3_days` | In 3 days | today + 3 | kept | always |
+| `next_month` | Next month | the same day next month; a day the month lacks is its last day | kept | always |
+
+- "Kept" means the choice sets the day and keeps the time already picked, as the quick choices did
+  before; a choice with a time sets both.
+- The quick-add When tray ends with No date, which is not a day choice and is always there.
+
+### 22.3 Move by (`when.move_by`)
+
+- An array of at most four step ids, without duplicates, in the order shown: `1d`, `2d`, `3d`
+  (days), `1w`, `2w` (weeks), `1m` (a month). An unknown id is skipped, as in 22.2; any other value
+  acts as the default and is kept. Default: `["1d", "2d", "1w", "1m"]`.
+- Move by is offered only for a task that has a due date, next to the day choices, and each step
+  says the day it lands on ("+1 week · Fri 27"). It is never offered while a new task is entered.
+- **From:** the local day of the due date, or today when that day is before today: an overdue task
+  moves from today.
+- **By:** days and weeks add calendar days (seven per week). A month adds one calendar month; a day
+  the new month lacks becomes its last day (31 January + 1 month is 28 or 29 February).
+- **Time:** a date-only due date stays date-only (23:59:59, a legacy 00:00 included); a timed one
+  keeps its local clock time, also across a daylight saving change.
+- The desktop's task menu has Postpone with Tomorrow and Next week (the day choices `tomorrow` and
+  `next_week`, the time kept), then the Move by steps. For several selected tasks each moves from
+  its own due date; a task without one is left alone by Move by.
+
+### 22.4 Vectors
+
+`whenChoices` in `cross-app-semantics-v1.json`, run in three time zones: `readTimes` (a stored value
+and the times it gives), `readDays` and `readMoveBy` (a stored value and the ids used),
+`morningEvening` (times of day and the morning and evening times), `days` (a reference time, times of
+day and ids, and each offered choice's day and time), and `moveBy` (a due date, today and a step,
+and the due date after). `nlp-corpus-v1.json` covers section 5.6.

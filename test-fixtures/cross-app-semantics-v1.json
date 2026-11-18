@@ -4129,5 +4129,128 @@
       { "value": "person", "expect": "person" },
       { "value": "colour", "expect": "none" }
     ]
+  },
+  "whenChoices": {
+    "about": "Section 22. Times are local wall-clock times without an offset; a date-only due date is 23:59:59. readTimes, readDays, readMoveBy: a stored value (absent: no entry) and what it gives. morningEvening: times of day and the morning and evening times (null: none). days: the local time now, the times of day (default when absent), the week start (monday when absent), the choice ids, and each offered choice in order with its day and its time (null: the time is kept). moveBy: a due date, today and a step, and the due date after. Run in Pacific/Auckland, America/New_York and a third zone.",
+    "defaultTimes": [{ "name": "Morning", "time": "09:00" }, { "name": "Noon", "time": "12:00" }, { "name": "Afternoon", "time": "15:00" }, { "name": "Evening", "time": "18:00" }],
+    "defaultDays": ["today", "this_evening", "tomorrow", "this_weekend", "next_week"],
+    "defaultMoveBy": ["1d", "2d", "1w", "1m"],
+    "readTimes": [
+      { "name": "no entry", "expect": [{ "name": "Morning", "time": "09:00" }, { "name": "Noon", "time": "12:00" }, { "name": "Afternoon", "time": "15:00" }, { "name": "Evening", "time": "18:00" }] },
+      { "name": "null", "value": null, "expect": [{ "name": "Morning", "time": "09:00" }, { "name": "Noon", "time": "12:00" }, { "name": "Afternoon", "time": "15:00" }, { "name": "Evening", "time": "18:00" }] },
+      { "name": "two times", "value": [{ "name": "Early", "time": "07:30" }, { "name": "Late", "time": "22:00" }], "expect": [{ "name": "Early", "time": "07:30" }, { "name": "Late", "time": "22:00" }] },
+      { "name": "read in time order", "value": [{ "name": "Late", "time": "22:00" }, { "name": "Early", "time": "07:30" }], "expect": [{ "name": "Early", "time": "07:30" }, { "name": "Late", "time": "22:00" }] },
+      { "name": "a name of two words", "value": [{ "name": "After work", "time": "17:30" }], "expect": [{ "name": "After work", "time": "17:30" }] },
+      { "name": "empty", "value": [], "expect": [{ "name": "Morning", "time": "09:00" }, { "name": "Noon", "time": "12:00" }, { "name": "Afternoon", "time": "15:00" }, { "name": "Evening", "time": "18:00" }] },
+      { "name": "not an array", "value": "morning", "expect": [{ "name": "Morning", "time": "09:00" }, { "name": "Noon", "time": "12:00" }, { "name": "Afternoon", "time": "15:00" }, { "name": "Evening", "time": "18:00" }] },
+      { "name": "six entries", "value": [{ "name": "A", "time": "06:00" }, { "name": "B", "time": "07:00" }, { "name": "C", "time": "08:00" }, { "name": "D", "time": "09:00" }, { "name": "E", "time": "10:00" }, { "name": "F", "time": "11:00" }], "expect": [{ "name": "Morning", "time": "09:00" }, { "name": "Noon", "time": "12:00" }, { "name": "Afternoon", "time": "15:00" }, { "name": "Evening", "time": "18:00" }] },
+      { "name": "the same time twice", "value": [{ "name": "Early", "time": "07:00" }, { "name": "Dawn", "time": "07:00" }], "expect": [{ "name": "Morning", "time": "09:00" }, { "name": "Noon", "time": "12:00" }, { "name": "Afternoon", "time": "15:00" }, { "name": "Evening", "time": "18:00" }] },
+      { "name": "the same name in another case", "value": [{ "name": "Early", "time": "07:00" }, { "name": "EARLY", "time": "08:00" }], "expect": [{ "name": "Morning", "time": "09:00" }, { "name": "Noon", "time": "12:00" }, { "name": "Afternoon", "time": "15:00" }, { "name": "Evening", "time": "18:00" }] },
+      { "name": "an hour of one digit", "value": [{ "name": "Early", "time": "7:00" }], "expect": [{ "name": "Morning", "time": "09:00" }, { "name": "Noon", "time": "12:00" }, { "name": "Afternoon", "time": "15:00" }, { "name": "Evening", "time": "18:00" }] },
+      { "name": "not a time", "value": [{ "name": "Late", "time": "24:00" }], "expect": [{ "name": "Morning", "time": "09:00" }, { "name": "Noon", "time": "12:00" }, { "name": "Afternoon", "time": "15:00" }, { "name": "Evening", "time": "18:00" }] },
+      { "name": "an empty name", "value": [{ "name": "", "time": "07:00" }], "expect": [{ "name": "Morning", "time": "09:00" }, { "name": "Noon", "time": "12:00" }, { "name": "Afternoon", "time": "15:00" }, { "name": "Evening", "time": "18:00" }] },
+      { "name": "a space at the start", "value": [{ "name": " Early", "time": "07:00" }], "expect": [{ "name": "Morning", "time": "09:00" }, { "name": "Noon", "time": "12:00" }, { "name": "Afternoon", "time": "15:00" }, { "name": "Evening", "time": "18:00" }] },
+      { "name": "two spaces", "value": [{ "name": "After  work", "time": "17:30" }], "expect": [{ "name": "Morning", "time": "09:00" }, { "name": "Noon", "time": "12:00" }, { "name": "Afternoon", "time": "15:00" }, { "name": "Evening", "time": "18:00" }] },
+      { "name": "twenty-one characters", "value": [{ "name": "Abcdefghijklmnopqrstu", "time": "07:00" }], "expect": [{ "name": "Morning", "time": "09:00" }, { "name": "Noon", "time": "12:00" }, { "name": "Afternoon", "time": "15:00" }, { "name": "Evening", "time": "18:00" }] },
+      { "name": "punctuation", "value": [{ "name": "Lunch!", "time": "12:30" }], "expect": [{ "name": "Morning", "time": "09:00" }, { "name": "Noon", "time": "12:00" }, { "name": "Afternoon", "time": "15:00" }, { "name": "Evening", "time": "18:00" }] },
+      { "name": "an entry without a time", "value": [{ "name": "Early" }], "expect": [{ "name": "Morning", "time": "09:00" }, { "name": "Noon", "time": "12:00" }, { "name": "Afternoon", "time": "15:00" }, { "name": "Evening", "time": "18:00" }] }
+    ],
+    "morningEvening": [
+      { "times": [{ "name": "Morning", "time": "09:00" }, { "name": "Noon", "time": "12:00" }, { "name": "Afternoon", "time": "15:00" }, { "name": "Evening", "time": "18:00" }], "morning": "09:00", "evening": "18:00" },
+      { "times": [{ "name": "Lunch", "time": "12:00" }], "morning": null, "evening": null },
+      { "times": [{ "name": "A", "time": "05:00" }, { "name": "B", "time": "11:59" }, { "name": "C", "time": "17:00" }, { "name": "D", "time": "23:00" }], "morning": "05:00", "evening": "23:00" },
+      { "times": [{ "name": "Noon", "time": "12:00" }, { "name": "Tea", "time": "16:59" }], "morning": null, "evening": null },
+      { "times": [{ "name": "Dusk", "time": "17:00" }], "morning": null, "evening": "17:00" }
+    ],
+    "readDays": [
+      { "name": "no entry", "expect": ["today", "this_evening", "tomorrow", "this_weekend", "next_week"] },
+      { "name": "null", "value": null, "expect": ["today", "this_evening", "tomorrow", "this_weekend", "next_week"] },
+      { "name": "the user's order", "value": ["tomorrow", "today"], "expect": ["tomorrow", "today"] },
+      { "name": "empty: no day choices", "value": [], "expect": [] },
+      { "name": "an unknown id is skipped", "value": ["today", "someday", "next_month"], "expect": ["today", "next_month"] },
+      { "name": "a duplicate", "value": ["today", "today"], "expect": ["today", "this_evening", "tomorrow", "this_weekend", "next_week"] },
+      { "name": "seven ids", "value": ["today", "this_evening", "tomorrow", "tomorrow_morning", "this_weekend", "next_week", "in_2_days"], "expect": ["today", "this_evening", "tomorrow", "this_weekend", "next_week"] },
+      { "name": "not an array", "value": "today", "expect": ["today", "this_evening", "tomorrow", "this_weekend", "next_week"] },
+      { "name": "not text", "value": [1], "expect": ["today", "this_evening", "tomorrow", "this_weekend", "next_week"] }
+    ],
+    "readMoveBy": [
+      { "name": "no entry", "expect": ["1d", "2d", "1w", "1m"] },
+      { "name": "null", "value": null, "expect": ["1d", "2d", "1w", "1m"] },
+      { "name": "one step", "value": ["1w"], "expect": ["1w"] },
+      { "name": "empty", "value": [], "expect": [] },
+      { "name": "an unknown step is skipped", "value": ["1d", "5d"], "expect": ["1d"] },
+      { "name": "five steps", "value": ["1d", "2d", "3d", "1w", "2w"], "expect": ["1d", "2d", "1w", "1m"] },
+      { "name": "a duplicate", "value": ["1d", "1d"], "expect": ["1d", "2d", "1w", "1m"] },
+      { "name": "not an array", "value": { "1d": true }, "expect": ["1d", "2d", "1w", "1m"] }
+    ],
+    "days": [
+      { "name": "every choice on a Tuesday morning", "now": "2026-10-06T10:00:00", "ids": ["today", "this_evening", "tomorrow", "tomorrow_morning", "this_weekend", "next_week", "in_2_days", "in_3_days", "next_month"], "expect": [
+        { "id": "today", "day": "2026-10-06", "time": null },
+        { "id": "this_evening", "day": "2026-10-06", "time": "18:00" },
+        { "id": "tomorrow", "day": "2026-10-07", "time": null },
+        { "id": "tomorrow_morning", "day": "2026-10-07", "time": "09:00" },
+        { "id": "this_weekend", "day": "2026-10-10", "time": null },
+        { "id": "next_week", "day": "2026-10-12", "time": null },
+        { "id": "in_2_days", "day": "2026-10-08", "time": null },
+        { "id": "in_3_days", "day": "2026-10-09", "time": null },
+        { "id": "next_month", "day": "2026-11-06", "time": null }
+      ] },
+      { "name": "the default choices", "now": "2026-10-06T10:00:00", "ids": ["today", "this_evening", "tomorrow", "this_weekend", "next_week"], "expect": [
+        { "id": "today", "day": "2026-10-06", "time": null },
+        { "id": "this_evening", "day": "2026-10-06", "time": "18:00" },
+        { "id": "tomorrow", "day": "2026-10-07", "time": null },
+        { "id": "this_weekend", "day": "2026-10-10", "time": null },
+        { "id": "next_week", "day": "2026-10-12", "time": null }
+      ] },
+      { "name": "this evening has passed", "now": "2026-10-06T18:30:00", "ids": ["today", "this_evening", "tomorrow"], "expect": [
+        { "id": "today", "day": "2026-10-06", "time": null },
+        { "id": "tomorrow", "day": "2026-10-07", "time": null }
+      ] },
+      { "name": "at the evening time itself", "now": "2026-10-06T18:00:00", "ids": ["this_evening"], "expect": [] },
+      { "name": "the user's order", "now": "2026-10-06T10:00:00", "ids": ["next_week", "today"], "expect": [
+        { "id": "next_week", "day": "2026-10-12", "time": null },
+        { "id": "today", "day": "2026-10-06", "time": null }
+      ] },
+      { "name": "on a Saturday the weekend is the next one", "now": "2026-10-10T10:00:00", "ids": ["this_weekend"], "expect": [
+        { "id": "this_weekend", "day": "2026-10-17", "time": null }
+      ] },
+      { "name": "on a Sunday", "now": "2026-10-11T10:00:00", "ids": ["this_weekend", "next_week"], "expect": [
+        { "id": "this_weekend", "day": "2026-10-17", "time": null },
+        { "id": "next_week", "day": "2026-10-12", "time": null }
+      ] },
+      { "name": "next week with Sunday weeks", "now": "2026-10-11T10:00:00", "weekStart": "sunday", "ids": ["next_week"], "expect": [
+        { "id": "next_week", "day": "2026-10-19", "time": null }
+      ] },
+      { "name": "next month from the 31st", "now": "2026-01-31T10:00:00", "ids": ["next_month"], "expect": [
+        { "id": "next_month", "day": "2026-02-28", "time": null }
+      ] },
+      { "name": "no morning or evening time", "now": "2026-10-06T10:00:00", "times": [{ "name": "Noon", "time": "12:00" }], "ids": ["this_evening", "tomorrow_morning", "today"], "expect": [
+        { "id": "today", "day": "2026-10-06", "time": null }
+      ] },
+      { "name": "the account's own times", "now": "2026-10-06T18:30:00", "times": [{ "name": "Early", "time": "07:30" }, { "name": "Late", "time": "20:00" }], "ids": ["this_evening", "tomorrow_morning"], "expect": [
+        { "id": "this_evening", "day": "2026-10-06", "time": "20:00" },
+        { "id": "tomorrow_morning", "day": "2026-10-07", "time": "07:30" }
+      ] },
+      { "name": "an unknown id", "now": "2026-10-06T10:00:00", "ids": ["someday", "today"], "expect": [
+        { "id": "today", "day": "2026-10-06", "time": null }
+      ] }
+    ],
+    "moveBy": [
+      { "name": "a day", "due": "2026-10-09T23:59:59", "today": "2026-10-06", "step": "1d", "expect": "2026-10-10T23:59:59" },
+      { "name": "two days", "due": "2026-10-09T23:59:59", "today": "2026-10-06", "step": "2d", "expect": "2026-10-11T23:59:59" },
+      { "name": "three days", "due": "2026-10-09T23:59:59", "today": "2026-10-06", "step": "3d", "expect": "2026-10-12T23:59:59" },
+      { "name": "a week from a Wednesday is the next Wednesday, not Next week", "due": "2026-10-07T23:59:59", "today": "2026-10-06", "step": "1w", "expect": "2026-10-14T23:59:59" },
+      { "name": "two weeks", "due": "2026-10-07T23:59:59", "today": "2026-10-06", "step": "2w", "expect": "2026-10-21T23:59:59" },
+      { "name": "a time is kept", "due": "2026-10-09T09:30:00", "today": "2026-10-06", "step": "2d", "expect": "2026-10-11T09:30:00" },
+      { "name": "a legacy midnight stays date-only", "due": "2026-10-09T00:00:00", "today": "2026-10-06", "step": "1d", "expect": "2026-10-10T23:59:59" },
+      { "name": "overdue: from today", "due": "2026-10-01T23:59:59", "today": "2026-10-06", "step": "1d", "expect": "2026-10-07T23:59:59" },
+      { "name": "overdue with a time: from today, the time kept", "due": "2026-10-01T09:00:00", "today": "2026-10-06", "step": "1w", "expect": "2026-10-13T09:00:00" },
+      { "name": "due today at a time that has passed is not overdue by day", "due": "2026-10-06T08:00:00", "today": "2026-10-06", "step": "1d", "expect": "2026-10-07T08:00:00" },
+      { "name": "a month", "due": "2026-10-09T23:59:59", "today": "2026-10-06", "step": "1m", "expect": "2026-11-09T23:59:59" },
+      { "name": "a month from the 31st", "due": "2026-01-31T23:59:59", "today": "2026-01-20", "step": "1m", "expect": "2026-02-28T23:59:59" },
+      { "name": "a month into a leap February", "due": "2028-01-31T23:59:59", "today": "2028-01-10", "step": "1m", "expect": "2028-02-29T23:59:59" },
+      { "name": "across a daylight saving change the clock time is kept", "due": "2026-10-30T09:00:00", "today": "2026-10-20", "step": "3d", "expect": "2026-11-02T09:00:00" },
+      { "name": "two weeks across a daylight saving change", "due": "2026-03-20T09:00:00", "today": "2026-03-01", "step": "2w", "expect": "2026-04-03T09:00:00" }
+    ]
   }
 }
