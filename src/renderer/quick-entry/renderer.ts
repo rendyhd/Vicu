@@ -44,6 +44,11 @@ declare global {
       fetchProjects(): Promise<{ success: boolean; data?: Array<{ id: number; title: string }> }>
       // The places saved on a phone (synced preferences), for "when I get home".
       fetchPlaces(): Promise<Array<{ id: string; name: string }>>
+      // Pro's person labels and their aliases (5.5); empty while the promises layer is off.
+      fetchPeople(): Promise<Array<{ id: number; aliases: string[] }>>
+      // `$Lalith` naming nobody yet: the label that is or becomes that person (21.5).
+      ensurePerson(name: string): Promise<{ success: true; data: { id: number; title: string } } | { success: false; error: string }>
+      addPromise(taskId: number, person: number, mine: boolean): Promise<boolean>
       addLabelToTask(taskId: number, labelId: number): Promise<{ success: boolean; error?: string; statusCode?: number }>
       createLabel(label: { title: string; hex_color?: string }): Promise<{ success: boolean; error?: string; statusCode?: number; data?: { id: number; title: string } }>
       onShowWindow(callback: (prefill: string | null) => void): void
@@ -85,6 +90,7 @@ import { parseChips } from '../lib/parse-chips'
 import { motionMs, motionSpringCurve, travelStart } from '../lib/motion'
 import { initDateFormat, subscribeDateFormat } from '../lib/date-format'
 import type { ParseResult, ParserConfig, ParsedToken, TokenType } from '../lib/task-parser'
+import type { Person } from '../../shared/pro/people'
 import { getClipboardImages, fileToUint8Array } from '../lib/clipboard-images'
 import { AutocompleteDropdown } from './autocomplete'
 import { cache } from './vikunja-cache'
@@ -133,6 +139,23 @@ let parserConfig: ParserConfig = { enabled: true, syntaxMode: 'todoist' }
 let cachedLabels: Array<{ id: number; title: string }> = []
 let cachedProjects: Array<{ id: number; title: string }> = []
 let cachedPlaces: Array<{ id: string; name: string }> = []
+// Pro's person labels and aliases (5.5), named with the label titles in `people()`.
+let cachedPeopleRefs: Array<{ id: number; aliases: string[] }> = []
+let peopleOn = false
+
+/** Pro's people for `$` and `Jan:`; empty while the promises layer is off. */
+function people(): Person[] {
+  if (!peopleOn) return []
+  const titles = new Map(cachedLabels.map((label) => [label.id, label.title]))
+  return cachedPeopleRefs.flatMap((ref) => {
+    const title = titles.get(ref.id)
+    return title ? [{ id: ref.id, title, aliases: ref.aliases }] : []
+  })
+}
+
+function refreshPeopleSuggestions(): void {
+  autocomplete.setPeople(peopleOn ? people().map((person) => ({ id: person.id, title: person.title })) : null)
+}
 let lastParseResult: ParseResult | null = null
 let isComposing = false
 let suppressedTypes: Map<TokenType, string[]> = new Map()
@@ -150,9 +173,14 @@ let pendingImages: PendingImage[] = []
 // --- Autocomplete ---
 const autocomplete = new AutocompleteDropdown('autocomplete-container', (item, triggerStart, prefix) => {
   const val = input.value
-  // Find the end of the current token (next space or end of string)
+  // Find the end of the current token (next space or end of string); a quoted one (`$"Jan de`)
+  // runs to its closing quote or the cursor.
   let tokenEnd = val.indexOf(' ', triggerStart)
   if (tokenEnd === -1) tokenEnd = val.length
+  if (val[triggerStart + prefix.length] === '"') {
+    const close = val.indexOf('"', triggerStart + prefix.length + 1)
+    tokenEnd = close === -1 ? Math.max(input.selectionStart ?? val.length, triggerStart + prefix.length + 1) : close + 1
+  }
 
   const hasSpaces = item.title.includes(' ')
   const replacement = hasSpaces ? `${prefix}"${item.title}" ` : `${prefix}${item.title} `
@@ -184,7 +212,7 @@ function showError(msg: string, visibleMs = 3000): void {
   }, visibleMs)
 }
 
-function showOfflineMessage(message = 'Saved offline \u2014 will sync when connected'): void {
+function showOfflineMessage(message = 'Saved offline \u2014 will sync when connected', visibleMs = 1200): void {
   errorMessage.textContent = message
   errorMessage.hidden = false
   errorMessage.classList.add('offline')
@@ -199,7 +227,7 @@ function showOfflineMessage(message = 'Saved offline \u2014 will sync when conne
       errorMessage.classList.remove('offline')
       window.quickEntryApi.closeWindow()
     }, 200)
-  }, 1200)
+  }, visibleMs)
 }
 
 function clearError(): void {
@@ -398,6 +426,7 @@ function refreshLabelsAndProjects(): void {
     if (labelsResult.success && labelsResult.data) {
       cachedLabels = labelsResult.data
       cache.setLabels(labelsResult.data)
+      refreshPeopleSuggestions()
     }
     if (projectsResult.success && projectsResult.data) {
       cachedProjects = projectsResult.data
@@ -411,6 +440,12 @@ function refreshLabelsAndProjects(): void {
     cachedPlaces = places
   }).catch(() => {
     // Keep the places already read
+  })
+  window.quickEntryApi.fetchPeople().then((refs) => {
+    cachedPeopleRefs = refs
+    refreshPeopleSuggestions()
+  }).catch(() => {
+    // Keep the people already read
   })
 }
 
@@ -618,6 +653,9 @@ async function saveTask(): Promise<void> {
   let projectId = projectCycle.length > 0 ? projectCycle[currentProjectIndex].id : null
   let parsedLabels: string[] = []
   let location: { place: string; trigger: 'arrive' | 'leave' } | undefined
+  // Pro (5.5): the person a capture names, as a label id once known.
+  let person: { id: number; title: string; mine: boolean } | null = null
+  let personNotMade: string | null = null
 
   if (parserConfig.enabled && lastParseResult) {
     title = lastParseResult.title
@@ -648,6 +686,25 @@ async function saveTask(): Promise<void> {
 
     parsedLabels = lastParseResult.labels
     if (lastParseResult.place) location = { place: lastParseResult.place.place.id, trigger: lastParseResult.place.trigger }
+
+    const named = lastParseResult.person
+    if (named && named.id !== null) {
+      const label = cachedLabels.find((entry) => entry.id === named.id)
+      if (label) person = { id: label.id, title: label.title, mine: named.mine }
+    } else if (named) {
+      // `$Lalith` naming nobody yet (21.5): made now; without the server the phrase stays in the title.
+      input.disabled = true
+      const made = await window.quickEntryApi.ensurePerson(named.name).catch((err: unknown) => ({ success: false as const, error: err instanceof Error ? err.message : String(err) }))
+      if (made.success) {
+        person = { id: made.data.id, title: made.data.title, mine: named.mine }
+        cachedPeopleRefs = [...cachedPeopleRefs.filter((ref) => ref.id !== made.data.id), { id: made.data.id, aliases: [] }]
+        if (!cachedLabels.some((label) => label.id === made.data.id)) cachedLabels = [...cachedLabels, { id: made.data.id, title: made.data.title }]
+      } else {
+        personNotMade = named.name
+        const withoutPerson = parse(input.value.trim(), { ...parserConfig, suppressTypes: [...(parserConfig.suppressTypes ?? []), ...suppressedTypes.keys(), 'person'] }, new Date(), cachedPlaces, people())
+        title = withoutPerson.title
+      }
+    }
   } else {
     // Parser off: only the `!` → today shortcut applies, with the same rule as the other entry
     // points (standalone, leading or trailing `!`; a `!` inside the text is not a date).
@@ -671,12 +728,15 @@ async function saveTask(): Promise<void> {
     const match = cachedLabels.find((l) => l.title.toLowerCase() === name.toLowerCase())
     return match ? { id: match.id, title: match.title } : { title: name }
   })
+  // The promise's person rides along as a label (21.6), so devices without Pro see who it is about.
+  if (person && !labelRefs.some((ref) => ref.id === person!.id)) labelRefs.push({ id: person.id, title: person.title })
   const imageInputs = pendingImages.map((img) => ({ name: img.name, mime: img.mime, bytes: img.bytes }))
   const result = await window.quickEntryApi.saveTask(title, description || null, dueDate, projectId, priority, repeatAfter, repeatMode, { labels: labelRefs, images: imageInputs, location, block: parserConfig.enabled ? blockFields(lastParseResult) : null })
 
   if (result.success) {
     const createdTask = result.data as (Record<string, unknown> & { id?: number }) | undefined
     const taskId = createdTask?.id
+    if (taskId && person) await window.quickEntryApi.addPromise(taskId, person.id, person.mine).catch(() => false)
 
     // Labels and images go on after the create. A step the network drops is queued, not lost.
     let queuedFollowUps = false
@@ -691,7 +751,10 @@ async function saveTask(): Promise<void> {
       queuedFollowUps = outcome.queuedLabels + outcome.queuedImages > 0 && !outcome.queueError
     }
 
-    if (result.cached || queuedFollowUps) {
+    if (personNotMade) {
+      // The task is saved; the person could not be made, so the name stayed in the title.
+      showOfflineMessage(`Task saved — ${personNotMade} could not be made a person, so the name stays in the title`, 4000)
+    } else if (result.cached || queuedFollowUps) {
       showOfflineMessage(queuedFollowUps && !result.cached ? 'Task saved \u2014 labels and images will sync when connected' : undefined)
     } else {
       window.quickEntryApi.closeWindow()
@@ -721,7 +784,12 @@ function applyConfig(cfg: QuickEntryConfig): void {
   exclamationTodayEnabled = cfg.exclamation_today !== false
   projectCycleModifier = cfg.project_cycle_modifier || 'ctrl'
   buildProjectCycle(cfg)
-  parserConfig = getParserConfig({ nlp_enabled: cfg.nlp_enabled, nlp_syntax_mode: cfg.nlp_syntax_mode, exclamation_today: cfg.exclamation_today, standalone_mode: cfg.standalone_mode })
+  // Pro (5.5): Quick Entry reads a person (`$Lalith`, `Jan:`) while the promises layer is on. The
+  // other Pro phrases are not applied here, so they stay in the title as before.
+  peopleOn = cfg.pro_import === true && !cfg.standalone_mode
+  const base = getParserConfig({ nlp_enabled: cfg.nlp_enabled, nlp_syntax_mode: cfg.nlp_syntax_mode, exclamation_today: cfg.exclamation_today, standalone_mode: cfg.standalone_mode, pro_enabled: peopleOn })
+  parserConfig = peopleOn ? { ...base, suppressTypes: [...(base.suppressTypes ?? []), 'start', 'estimate', 'flag', 'request'] } : base
+  refreshPeopleSuggestions()
   setWeekStart(readWeekStart(cfg.week_start))
   autocomplete.setSyntaxMode(parserConfig.syntaxMode)
   autocomplete.setEnabled(parserConfig.enabled)
@@ -868,7 +936,7 @@ function handleInputChange(): void {
   const configWithSuppress: ParserConfig = suppressedTypes.size > 0
     ? { ...parserConfig, suppressTypes: [...(parserConfig.suppressTypes ?? []), ...suppressedTypes.keys()] }
     : parserConfig
-  const result = parse(raw, configWithSuppress, new Date(), cachedPlaces)
+  const result = parse(raw, configWithSuppress, new Date(), cachedPlaces, people())
   lastParseResult = result
   renderHighlights(raw, result.tokens)
   renderParsePreview(result)

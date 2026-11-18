@@ -4,7 +4,7 @@ import { formatDateChip } from './date-utils'
 import { detectRecurrencePreset, formatRecurrenceLabel } from './recurrence'
 import { blockFields, recurrenceToVikunja, type ParseResult } from './task-parser'
 import { formatBlockRange, type DateFormat } from './date-display'
-import { placeChipName, priorityChipName, recurrenceChipName, type ChipData, type ChipSource } from './parse-chips'
+import { personChip, placeChipName, priorityChipName, recurrenceChipName, type ChipData, type ChipSource } from './parse-chips'
 
 // One source of truth for the new-task composer (card 3.5). A field shows, and saves, what the
 // parser read from the typed text unless the user set that field with its own control (a picker),
@@ -182,5 +182,7 @@ export function composerChips({ fields, parsed, chipLabels, projectTitle, fmt, n
   if (parsed?.place) {
     chips.push({ type: 'place', key: 'place', source: 'text', label: placeChipName(parsed.place.trigger, parsed.place.place.name) })
   }
+  const person = parsed ? personChip(parsed) : null
+  if (person) chips.push(person)
   return chips
 }

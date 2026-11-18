@@ -35,6 +35,9 @@ export interface ParsedRecurrence {
   unit: 'day' | 'week' | 'month' | 'year'
 }
 
+/** A known person (`id`), or a new one a `$` phrase names (`id` null, made when the task is saved). */
+export type ParsedPerson = { id: number; mine: boolean } | { id: null; name: string; mine: boolean }
+
 export interface ParseResult {
   title: string
   dueDate: Date | null
@@ -56,8 +59,11 @@ export interface ParseResult {
   /** A saved place the text names with "when I get home", for a location reminder. */
   place: PlaceMatch | null
   // Pro (section 5.5): always present, set only while `config.pro` is on.
-  /** `Jan:` at the start: that person's promise to you; `for Jan:`: yours to them. */
-  person: { id: number; mine: boolean } | null
+  /**
+   * `Jan:` at the start or `$Jan` anywhere: that person's promise to you; `for Jan:` / `for $Jan`:
+   * yours to them. A `$` name that matches nobody is a new person (`id` null, `name`), made on save.
+   */
+  person: ParsedPerson | null
   /** `starts monday`: a start date (local midnight without a time). Null when a block holds the start. */
   start: Date | null
   /** `~1h30`: minutes. */

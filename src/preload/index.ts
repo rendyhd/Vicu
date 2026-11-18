@@ -143,6 +143,7 @@ const api = {
   // Pro (cross-app semantics section 21)
   getProLedger: () => ipcRenderer.invoke('pro-ledger:get'),
   mutateProLedger: (operations: unknown[]) => ipcRenderer.invoke('pro-ledger:mutate', operations),
+  ensurePerson: (name: string) => ipcRenderer.invoke('pro:ensure-person', name),
   syncProLedger: () => ipcRenderer.invoke('pro-ledger:sync'),
   getProLedgerStatus: () => ipcRenderer.invoke('pro-ledger:status'),
   readProArchive: () => ipcRenderer.invoke('pro-ledger:archive'),

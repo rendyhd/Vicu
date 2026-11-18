@@ -7,7 +7,10 @@ interface AutocompleteItem {
   title: string
 }
 
-type ItemType = 'project' | 'label'
+type ItemType = 'project' | 'label' | 'person'
+
+/** Pro's people (contract 5.5): `$` in both syntax modes. */
+export const PERSON_PREFIX = '$'
 
 export interface AutocompleteHandle {
   handleKeyDown: (e: React.KeyboardEvent) => boolean
@@ -26,6 +29,8 @@ interface AutocompleteDropdownProps {
   prefixes: SyntaxPrefixes
   projects: AutocompleteItem[]
   labels: AutocompleteItem[]
+  /** Pro's people, offered after `$`; leave it out while Pro's promises are off. */
+  people?: AutocompleteItem[]
   onSelect: (item: AutocompleteItem, triggerStart: number, prefix: string) => void
   enabled: boolean
   /** The input the list belongs to; the list opens under the start of the word being typed. */
@@ -49,8 +54,9 @@ function findTrigger(
   // If the query contains the prefix again, no trigger
   if (query.includes(prefix)) return null
 
-  const type: ItemType = prefix === prefixes.project ? 'project' : 'label'
-  return { start: lastIdx, query, prefix, type }
+  const type: ItemType = prefix === PERSON_PREFIX ? 'person' : prefix === prefixes.project ? 'project' : 'label'
+  // A quoted name (`$"Jan de`) is matched without its quote.
+  return { start: lastIdx, query: type === 'person' ? query.replace(/^"/, '') : query, prefix, type }
 }
 
 /** Where the text before `index` ends, in pixels from the left edge of a single-line input. */
@@ -70,7 +76,7 @@ function caretOffset(input: HTMLInputElement | HTMLTextAreaElement, index: numbe
  * its `aria-activedescendant`), so typing and the arrow keys keep working.
  */
 export const AutocompleteDropdown = forwardRef<AutocompleteHandle, AutocompleteDropdownProps>(
-  function AutocompleteDropdown({ inputValue, cursorPosition, prefixes, projects, labels, onSelect, enabled, inputElement, onAriaChange }, ref) {
+  function AutocompleteDropdown({ inputValue, cursorPosition, prefixes, projects, labels, people, onSelect, enabled, inputElement, onAriaChange }, ref) {
     const listboxId = useId()
     const anchorRef = useRef<HTMLSpanElement>(null)
     const [items, setItems] = useState<AutocompleteItem[]>([])
@@ -92,12 +98,13 @@ export const AutocompleteDropdown = forwardRef<AutocompleteHandle, AutocompleteD
       const projTrigger = findTrigger(beforeCursor, prefixes.project, prefixes)
       const labelTrigger = findTrigger(beforeCursor, prefixes.label, prefixes)
 
-      let trigger: ReturnType<typeof findTrigger> = null
-      if (projTrigger && labelTrigger) {
-        trigger = projTrigger.start > labelTrigger.start ? projTrigger : labelTrigger
-      } else {
-        trigger = projTrigger || labelTrigger
-      }
+      const personTrigger = people ? findTrigger(beforeCursor, PERSON_PREFIX, prefixes) : null
+
+      // The trigger nearest the cursor wins.
+      const trigger = [projTrigger, labelTrigger, personTrigger].reduce<ReturnType<typeof findTrigger>>(
+        (best, next) => (next && (!best || next.start > best.start) ? next : best),
+        null,
+      )
 
       if (!trigger) {
         setVisible(false)
@@ -109,7 +116,7 @@ export const AutocompleteDropdown = forwardRef<AutocompleteHandle, AutocompleteD
       setTriggerStart(trigger.start)
       setItemType(trigger.type)
 
-      const source = trigger.type === 'project' ? projects : labels
+      const source = trigger.type === 'project' ? projects : trigger.type === 'person' ? people ?? [] : labels
       const q = trigger.query.toLowerCase()
       const filtered = q
         ? source.filter((item) => item.title.toLowerCase().includes(q)).slice(0, MAX_ITEMS)
@@ -123,7 +130,7 @@ export const AutocompleteDropdown = forwardRef<AutocompleteHandle, AutocompleteD
       setItems(filtered)
       setSelectedIndex(0)
       setVisible(true)
-    }, [inputValue, cursorPosition, prefixes, projects, labels, enabled])
+    }, [inputValue, cursorPosition, prefixes, projects, labels, people, enabled])
 
     const selectItem = useCallback((index: number) => {
       const item = items[index]
@@ -177,10 +184,10 @@ export const AutocompleteDropdown = forwardRef<AutocompleteHandle, AutocompleteD
     }, [visible, listboxId, activeId, onAriaChange])
     useEffect(() => () => onAriaChange?.(null), [onAriaChange])
 
-    const typeLabel = itemType === 'project' ? 'project' : 'label'
-    const colorMap = {
+    const colorMap: Record<ItemType, string> = {
       project: 'bg-accent-blue/8 dark:bg-accent-blue/15',
       label: 'bg-accent-orange/8 dark:bg-accent-orange/15',
+      person: 'bg-accent-teal/8 dark:bg-accent-teal/15',
     }
 
     // The anchor is an empty box at the start of the word, as tall as the input. A textarea (the
@@ -202,7 +209,7 @@ export const AutocompleteDropdown = forwardRef<AutocompleteHandle, AutocompleteD
             id={listboxId}
             anchorRef={anchorRef}
             onClose={() => setVisible(false)}
-            label={itemType === 'project' ? 'Project suggestions' : 'Label suggestions'}
+            label={itemType === 'project' ? 'Project suggestions' : itemType === 'person' ? 'People suggestions' : 'Label suggestions'}
             role="listbox"
             initialFocus="none"
             className="min-w-48 max-w-80 py-1"
@@ -214,7 +221,7 @@ export const AutocompleteDropdown = forwardRef<AutocompleteHandle, AutocompleteD
                 role="option"
                 aria-selected={i === selectedIndex}
                 className={`cursor-pointer px-3 py-1.5 text-[12px] text-[var(--text-primary)] transition-colors ${
-                  i === selectedIndex ? colorMap[typeLabel] : 'hover:bg-[var(--bg-hover)]'
+                  i === selectedIndex ? colorMap[itemType] : 'hover:bg-[var(--bg-hover)]'
                 }`}
                 onMouseDown={(e) => {
                   e.preventDefault()

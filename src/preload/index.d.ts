@@ -188,6 +188,8 @@ export interface ElectronAPI {
   getProLedger(): Promise<ProLedgerSnapshot>
   /** Changes applied by main to its current copy; returns the new snapshot. */
   mutateProLedger(operations: ProLedgerOperation[]): Promise<ProLedgerSnapshot>
+  /** `$Lalith` in quick add (21.5): the label that is or becomes that person. */
+  ensurePerson(name: string): Promise<ApiResult<{ id: number; title: string; created: boolean; label: Label }>>
   syncProLedger(): Promise<CustomListSyncStatus>
   getProLedgerStatus(): Promise<CustomListSyncStatus>
   /** Every archive part's records, merged (read on demand). */

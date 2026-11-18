@@ -269,6 +269,7 @@ export const api = {
   // Pro (cross-app semantics section 21)
   getProLedger: () => window.api.getProLedger(),
   mutateProLedger: (operations: import('../../shared/pro/ledger-ipc').ProLedgerOperation[]) => window.api.mutateProLedger(operations),
+  ensurePerson: (name: string) => window.api.ensurePerson(name),
   syncProLedger: () => window.api.syncProLedger(),
   readProArchive: () => window.api.readProArchive(),
   onProLedgerChanged: (cb: (snapshot: import('../../shared/pro/ledger-ipc').ProLedgerSnapshot) => void) => window.api.onProLedgerChanged(cb),

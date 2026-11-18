@@ -644,8 +644,19 @@ before: these words stay in the title.
   `Jan: send the plan`. The name is one to three words and is matched by section 21.5 (title, alias,
   unique first name); an unknown or ambiguous name stays in the title. The prefix leaves the title,
   the result has `person` (the label id) and the task becomes that person's promise to you.
-  `for Jan:` at the start makes it your promise to them (`personMine`). Nothing else is read as a
-  person.
+  `for Jan:` at the start makes it your promise to them (`personMine`). An unknown name here stays
+  in the title; only `$` (below) makes a new person.
+- **A person with `$`**, in both syntax modes and anywhere in the text: `$` right after the start or
+  a space, then a name that starts with a letter (`$Lalith`) or a quoted name (`$"Jan de Vries"`),
+  ending at a space, the end or one of `. , ; : ! ? )`; a `:` right after the name belongs to the
+  phrase (`$Lalith: call back` is "call back"). `$50` and `US$` stay. `for` and spaces just
+  before it (`for $Priya`) make it your promise to them; otherwise it is their promise to you. The
+  name is matched by section 21.5: one match gives `person` with that id; no match gives a **new
+  person**, `person` with `id` null and `name` (the name as written, quotes removed, spacing
+  collapsed), made when the task is saved (section 21.5); an ambiguous name stays in the title.
+  Only the first `$` phrase is read, and none after a `Jan:` prefix; the rest stay in the title.
+  The phrase leaves the title. Apps offer the people as suggestions after a typed `$`; picking one
+  writes `$Name`, or `$"Full Name"` when it has a space.
 - **A start date:** `starts` and a date phrase (`starts monday`, `starts next week`, `starts 3 Nov
   9am`) gives `start`: the date, at local midnight without a time. The phrase is not read as a due
   date and leaves the title. A start date and a length (section 5.4) in one text: the length's block
@@ -2597,6 +2608,12 @@ shows open flagged tasks; Vikunja's own Favorites pseudo-project (-1) is not use
   alias, then a unique first name (the name's first word equals the first word of exactly one
   person's title, and the name is one word or the start of that title). Two people with that title
   or alias, or that first word, is ambiguous: no match.
+- **Making a person from quick add** (`$Lalith`, section 5.5): when the task is saved, the label whose
+  title equals the name (spacing and case ignored; the lowest id when there are several) becomes the
+  person (`label_kind.<id>` = `"person"`); without one, a label with that title is created and
+  marked. The task then gets that label and the promise like any capture. It needs the server: with
+  no connection the task is saved with the `$` phrase back in its title and the app says the person
+  was not made.
 - **Counts over 90 days** (decision 9, `pro.personPattern`): over the local days from today back 89
   days, the person's promises of theirs closed by a final verdict in the window (delivered on time,
   late, dropped, done by you), and their `renegotiated` and `not_yet` verdicts given in the window;

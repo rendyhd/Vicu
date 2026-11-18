@@ -64,6 +64,23 @@ export function matchPerson(name: string, people: readonly Person[]): PersonMatc
   return { id: null, match: 'none' }
 }
 
+/**
+ * Section 21.5, making a person from quick add (`$Lalith`): the label whose title is the name
+ * (spacing and case ignored; the lowest id of several) becomes the person, or null when a label with
+ * that title has to be created.
+ */
+export function labelForNewPerson(labels: ReadonlyArray<{ id: number; title: string }>, name: string): number | null {
+  const wanted = normalizeName(name)
+  if (!wanted) return null
+  const ids = labels.filter((label) => normalizeName(label.title) === wanted).map((label) => label.id)
+  return ids.length ? Math.min(...ids) : null
+}
+
+/** The title a new person's label gets: the name as written, spacing collapsed. */
+export function newPersonTitle(name: string): string {
+  return name.trim().replace(/\s+/g, ' ')
+}
+
 /** Decision 32: remembering an alias, once, for a person. */
 export function withAlias(aliases: readonly string[] | undefined, alias: string): string[] {
   const list = [...(aliases ?? [])]

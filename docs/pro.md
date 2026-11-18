@@ -46,8 +46,9 @@ of Pro's data.
 
 - **People.** Right-click a label in the sidebar and choose This is a person. A person can have
   other names they go by.
-- **Capture.** `Jan: send the deck friday` is Jan's promise to you; `for Jan: review the budget`
-  is your promise to Jan. On a promise, the row shows the person instead of a checkbox, because it is
+- **Capture.** `$Jan send the deck friday` (anywhere in the title, suggestions after `$`) or
+  `Jan: send the deck friday` is Jan's promise to you; `for $Jan` or `for Jan:` makes it your promise
+  to Jan. A `$` name that is nobody yet becomes a person when you save (Quick Entry too). On a promise, the row shows the person instead of a checkbox, because it is
   not yours to tick.
 - **Verdicts.** When a promise is due, give it a verdict: Delivered, Late, Not yet (with a date to
   ask again), New date, or Dropped, or Ask me tomorrow. Keys 1 to 6 on the row. A promise the person

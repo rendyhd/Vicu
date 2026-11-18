@@ -57,7 +57,40 @@ export function extractPersonPrefix(
   return { person, tokens: [{ type: 'person', start, end, value: person, raw: input.slice(start, end).trim() }] }
 }
 
-const ESTIMATE = /(?<=^|\s)~(?:(\d{1,2})h(?:(\d{1,2})(?:m|min)?)?|(\d{1,4})(?:m|min))(?=[\s.,!?;)]|$)/gi
+export type DollarPerson =
+  | { id: number; mine: boolean; start: number; end: number }
+  | { id: null; name: string; mine: boolean; start: number; end: number }
+
+// `for` (optional), `$`, then a quoted name or a name starting with a letter; a `:` right after the
+// name belongs to the phrase. The name ends at a space, the end or one of . , ; : ! ? )
+const DOLLAR_PERSON = /(?<=^|\s)(for\s+)?\$(?:"([^"\n]+)"|(\p{L}[\p{L}\p{N}_'-]*(?:\.[\p{L}\p{N}_'-]+)*))(:)?(?=[\s.,;:!?)]|$)/giu
+
+/**
+ * `$Lalith`, `$"Jan de Vries"` or `for $Priya` anywhere (section 5.5): the first one only, and none
+ * after a `Jan:` prefix. A name that matches nobody is a new person; an ambiguous one stays.
+ */
+export function extractDollarPerson(
+  input: string,
+  people: readonly Person[],
+  consumed: Region[],
+): { person: DollarPerson | null; tokens: ParsedToken[] } {
+  for (const match of input.matchAll(DOLLAR_PERSON)) {
+    const start = match.index
+    const end = start + match[0].length
+    if (overlaps(consumed, start, end)) continue
+    const name = (match[2] ?? match[3]).trim().replace(/\s+/g, ' ')
+    if (!name) return { person: null, tokens: [] }
+    const found = matchPerson(name, people)
+    if (found.match === 'ambiguous') return { person: null, tokens: [] }
+    const mine = !!match[1]
+    const person: DollarPerson = found.id !== null ? { id: found.id, mine, start, end } : { id: null, name, mine, start, end }
+    consumed.push({ start, end })
+    return { person, tokens: [{ type: 'person', start, end, value: person, raw: match[0] }] }
+  }
+  return { person: null, tokens: [] }
+}
+
+const ESTIMATE =/(?<=^|\s)~(?:(\d{1,2})h(?:(\d{1,2})(?:m|min)?)?|(\d{1,4})(?:m|min))(?=[\s.,!?;)]|$)/gi
 
 /** `~10m`, `~45min`, `~1h`, `~1h30`, `~1h30m`: minutes, 1 to 1440. */
 export function extractEstimate(input: string, consumed: Region[]): { estimate: number | null; tokens: ParsedToken[] } {

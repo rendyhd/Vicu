@@ -10,7 +10,7 @@ import { findForPhrases } from './extract-length'
 import { matchPlacePhrase, type PlaceRef } from './place-phrases'
 import { isTimeBlock } from '../../../shared/time-blocks'
 import type { Person } from '../../../shared/pro/people'
-import { extractEstimate, extractFlag, extractPersonPrefix, extractRequest, findStartsWords } from './extract-pro'
+import { extractDollarPerson, extractEstimate, extractFlag, extractPersonPrefix, extractRequest, findStartsWords } from './extract-pro'
 
 export type { ParseResult, ParserConfig, ParsedToken, ParsedRecurrence, SyntaxMode, TokenType, SyntaxPrefixes } from './types'
 export { DEFAULT_PARSER_CONFIG, getPrefixes } from './types'
@@ -92,6 +92,12 @@ export function parse(
       const found = extractPersonPrefix(rawInput, people, consumed)
       if (found.person) result.person = { id: found.person.id, mine: found.person.mine }
       result.tokens.push(...found.tokens)
+      if (!found.person) {
+        const dollar = extractDollarPerson(rawInput, people, consumed)
+        const person = dollar.person
+        if (person) result.person = person.id !== null ? { id: person.id, mine: person.mine } : { id: null, name: person.name, mine: person.mine }
+        result.tokens.push(...dollar.tokens)
+      }
     }
     if (!suppress.has('flag')) {
       const found = extractFlag(rawInput, consumed)

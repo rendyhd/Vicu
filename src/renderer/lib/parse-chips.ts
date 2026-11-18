@@ -61,11 +61,8 @@ export function parseChips(result: ParseResult, fmt: DateFormat = getDateFormat(
     chips.push({ type: 'place', label: placeChipName(result.place.trigger, result.place.place.name), key: 'place', source: 'text' })
   }
   // Pro's phrases (cross-app semantics 5.5); the parser reads them only while Pro is on.
-  const person = result.tokens.find((token) => token.type === 'person')
-  if (result.person && person) {
-    const name = person.raw.replace(/^for\s+/i, '').replace(/:$/, '').trim()
-    chips.push({ type: 'person', label: result.person.mine ? `For ${name}` : `From ${name}`, key: 'person', source: 'text' })
-  }
+  const person = personChip(result)
+  if (person) chips.push(person)
   if (result.start && !result.block) {
     chips.push({ type: 'start', label: `Starts ${formatDateChip(result.start, true, now, fmt)}`, key: 'start', source: 'text' })
   }
@@ -77,4 +74,18 @@ export function parseChips(result: ParseResult, fmt: DateFormat = getDateFormat(
   if (result.flag) chips.push({ type: 'flag', label: 'Flagged', key: 'flag', source: 'text' })
   if (result.request) chips.push({ type: 'request', label: 'Request', key: 'request', source: 'text' })
   return chips
+}
+
+/**
+ * The person a capture names (cross-app semantics 5.5): "From Jan" or "For Jan", and "(new person)"
+ * for a `$` name that matches nobody yet, which becomes a person when the task is saved (21.5).
+ */
+export function personChip(result: Pick<ParseResult, 'person' | 'tokens'>): ChipData | null {
+  const token = result.tokens.find((entry) => entry.type === 'person')
+  if (!result.person || !token) return null
+  const name = result.person.id === null
+    ? result.person.name
+    : token.raw.replace(/^for\s+/i, '').replace(/:$/, '').replace(/^\$/, '').replace(/^"(.*)"$/, '$1').trim()
+  const label = result.person.mine ? `For ${name}` : `From ${name}`
+  return { type: 'person', label: result.person.id === null ? `${label} (new person)` : label, key: 'person', source: 'text' }
 }

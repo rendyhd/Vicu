@@ -2,7 +2,7 @@
 
 This document defines the exact parser behavior that BOTH Vicu (desktop) and Vicu Android must implement identically. Both apps must produce the same `ParseResult` for the same input string and the same `ParserConfig`.
 
-The date and recurrence rules are the contract in `docs/cross-app-semantics-v1.md` section 5, and the test is the shared corpus `test-fixtures/nlp-corpus-v1.json` (189 cases, reference time Tue 2026-10-06 10:00 local; both apps run the same file). If this document and the corpus disagree, the corpus wins. The desktop implementation is `src/renderer/lib/task-parser/`: there is one parser (the main window, the task title editor and Quick Entry all call it), and the date work is done by chrono-node plus the rules below.
+The date and recurrence rules are the contract in `docs/cross-app-semantics-v1.md` section 5, and the test is the shared corpus `test-fixtures/nlp-corpus-v1.json` (203 cases, reference time Tue 2026-10-06 10:00 local; both apps run the same file). If this document and the corpus disagree, the corpus wins. The desktop implementation is `src/renderer/lib/task-parser/`: there is one parser (the main window, the task title editor and Quick Entry all call it), and the date work is done by chrono-node plus the rules below.
 
 ---
 
@@ -48,6 +48,7 @@ When `enabled` is `false`:
 | **Recurrence** | `every X`, `daily`, `weekly` (identical) | `every X`, `daily`, `weekly` (identical) |
 | **`!` today shortcut** | `!` alone → today | `!` alone → today |
 | **Autocomplete triggers** | `#` projects, `@` labels | `+` projects, `*` labels |
+| **People (Pro)** | `$name` or `$"multi word"` | `$name` or `$"multi word"` |
 
 ### Why two modes?
 
@@ -96,7 +97,9 @@ interface ParseResult {
     trigger: 'arrive' | 'leave'
   } | null
   // Pro (contract section 5.5), only with config.pro; otherwise null / false
-  person: { id: number; mine: boolean } | null  // "Jan:" (theirs) or "for Jan:" (mine) at the start
+  person: { id: number; mine: boolean }        // "Jan:" or "$Jan" (theirs), "for Jan:" or "for $Jan" (mine)
+    | { id: null; name: string; mine: boolean }  // "$Lalith" naming nobody yet: a new person, made on save
+    | null
   start: Date | null         // "starts monday": a start date, local midnight without a time
   estimate: number | null    // "~1h30": minutes
   flag: boolean              // "!flag"
@@ -124,7 +127,7 @@ export function parse(
   config: ParserConfig = DEFAULT_PARSER_CONFIG,
   reference: Date = new Date(),  // "now": relative dates and the `!` shortcut; tests pass the corpus reference
   places: { id: string; name: string }[] = [],  // saved places a place phrase may name; none reads no place
-  people: { id: number; title: string; aliases?: string[] }[] = []  // Pro's people "Jan:" may name
+  people: { id: number; title: string; aliases?: string[] }[] = []  // Pro's people "Jan:" and "$Jan" may name
 ): ParseResult
 ```
 
@@ -212,7 +215,7 @@ function buildPriorityPatterns(mode: SyntaxMode): Array<{ regex: RegExp; value: 
 
 The parser MUST extract tokens in this exact order:
 
-0. **Pro** (only with `config.pro`, contract section 5.5): `req:` at the start, then a person's `Jan:` / `for Jan:` at the start, then `!flag`, then `~1h30`
+0. **Pro** (only with `config.pro`, contract section 5.5): `req:` at the start, then a person's `Jan:` / `for Jan:` at the start (else the first `$Jan` / `for $Jan`), then `!flag`, then `~1h30`
 0. **Place** ("when I get home" for a saved place, contract section 5.3) — only when places are passed
 1. **Labels** (prefix-based: `@` or `*`) — extract and remove first
 2. **Projects** (prefix-based: `#` or `+`) — extract and remove
@@ -286,7 +289,11 @@ desktop blanks these words before chrono runs.
 
 Only with `config.pro` (contract section 5.5; the corpus cases marked `"pro": true`, parsed with the
 corpus `people`). A person's name and a colon at the very start (`Jan: send the plan`, `for Priya:
-review`) names a known person by contract section 21.5; an unknown or ambiguous name stays. `starts`
+review`) names a known person by contract section 21.5; an unknown or ambiguous name stays. In both
+syntax modes `$` names a person anywhere (`$Lalith`, `$"Jan de Vries"`, `for $Priya` for your promise
+to them; a `:` right after the name goes with it): a known person by 21.5, an ambiguous name stays,
+and any other name is a new person (`{ id: null, name }`) that the app makes when the task is saved.
+`$50` is not a person. Only the first `$` phrase is read, and none after a `Jan:` prefix. `starts`
 and a date phrase is a start date; a block made by `for 30m` wins over it. `~10m`, `~1h30` are
 estimates; `!flag` flags; `req:` at the start marks a request. With Pro off all of these stay in the
 title, exactly as before.
@@ -474,6 +481,8 @@ interface VikunjaTaskPayload {
 |------|------------------------------|---------------------------|
 | Todoist | typing `#` | typing `@` |
 | Vikunja | typing `+` | typing `*` |
+
+With Pro's promises on, typing `$` opens the people in both modes.
 
 ---
 

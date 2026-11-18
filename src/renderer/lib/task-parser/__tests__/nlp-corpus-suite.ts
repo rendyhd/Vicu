@@ -37,7 +37,7 @@ interface CorpusCase {
   place?: { id: string; trigger: string } | null
   /** Pro on, with `people` (section 5.5). */
   pro?: boolean
-  person?: { id: number; mine: boolean } | null
+  person?: { id: number; mine: boolean } | { id: null; name: string; mine: boolean } | null
   proStart?: string | null
   estimate?: number | null
   flag?: boolean
@@ -49,7 +49,7 @@ interface Corpus {
   reference: string
   /** The saved places every case is parsed with (section 5.3). */
   places: Array<{ id: string; name: string }>
-  /** Pro's people `Jan:` may name (section 5.5). */
+  /** Pro's people `Jan:` and `$Jan` may name (section 5.5). */
   people: Array<{ id: number; title: string; aliases?: string[] }>
   cases: CorpusCase[]
 }
@@ -80,7 +80,7 @@ export function runNlpCorpusSuite(options: { zone: string; expectedOffsetMinutes
   describe(`nlp corpus v1 in ${options.zone}`, () => {
     it('is running in the requested time zone', () => {
       expect(corpus.contractVersion).toBe(1)
-      expect(corpus.cases.length).toBe(189)
+      expect(corpus.cases.length).toBe(203)
       if (options.expectedOffsetMinutesInOctober !== undefined) {
         expect(new Date(2026, 9, 6).getTimezoneOffset()).toBe(options.expectedOffsetMinutesInOctober)
       }

@@ -33,6 +33,7 @@ import { useDateFormat } from '@/hooks/use-date-format'
 import { buildCreateExtras, withLabels } from '@/lib/composer-queue'
 import { isTempTaskId } from '@/lib/pending-cache'
 import { useTaskParser } from '@/hooks/use-task-parser'
+import { usePeople } from '@/hooks/use-people'
 import { useLocationReminders } from '@/hooks/use-location-reminders'
 import { toast } from '@/stores/toast-store'
 import { DEFAULT_LOCATION_RADIUS } from '../../../shared/synced-prefs'
@@ -145,6 +146,8 @@ export function NewTaskComposer({
   // location reminder (contract section 5.3).
   const locations = useLocationReminders()
   const parser = useTaskParser(locations.places)
+  // Pro's people, suggested after `$` (contract 5.5); empty while the promises layer is off.
+  const people = usePeople()
   const dateFormat = useDateFormat()
   const { data: labels = [] } = useLabels()
   const { data: projects } = useProjects()
@@ -405,7 +408,23 @@ export function NewTaskComposer({
     try {
       // With the parser off nothing is extracted except the `!` today shortcut, which has one rule
       // (extractBangToday, applied by parse()) in every entry point.
-      const parsed = parser.parserConfig.enabled ? parser.parseResult : parse(rawTitle, parser.parserConfig)
+      let parsed = parser.parserConfig.enabled ? parser.parseResult : parse(rawTitle, parser.parserConfig)
+      // `$Lalith` naming nobody yet (21.5): the person is made first; without the server the
+      // phrase goes back into the title and nothing else changes.
+      let newPersonLabel: Label | null = null
+      if (parsed?.person && parsed.person.id === null) {
+        const name = parsed.person.name
+        const made = await api.ensurePerson(name).catch((err: unknown) => ({ success: false as const, error: err instanceof Error ? err.message : String(err) }))
+        if (made.success) {
+          newPersonLabel = made.data.label
+          parsed = { ...parsed, person: { id: made.data.id, mine: parsed.person.mine } }
+          void queryClient.invalidateQueries({ queryKey: ['labels'] })
+        } else {
+          const withoutPerson = parse(rawTitle, { ...parser.parserConfig, suppressTypes: [...(parser.parserConfig.suppressTypes ?? []), 'person'] }, new Date(), locations.places)
+          parsed = { ...parsed, person: null, title: withoutPerson.title }
+          toast.info(`${name} could not be made a person (${made.error}), so the name stays in the title.`)
+        }
+      }
       const title = parsed?.title.trim() || (parser.enabled ? rawTitle : '')
       if (!title) throw new Error('Enter a task title')
 
@@ -447,6 +466,7 @@ export function NewTaskComposer({
       const labelNames = [...new Set(parsed?.labels ?? [])]
       const personLabelId = proPersonLabelId(parsed)
       const explicitLabels = labels.filter((label) => selectedLabelIds.includes(label.id) || label.id === personLabelId)
+      if (newPersonLabel && !explicitLabels.some((label) => label.id === newPersonLabel!.id)) explicitLabels.push(newPersonLabel)
       // If the server cannot be reached the create is queued with its labels and attachments, and
       // the task shows up at once under a temporary id.
       const extras = buildCreateExtras({
@@ -579,6 +599,7 @@ export function NewTaskComposer({
           enabled={!template && parser.enabled}
           projects={projectItems}
           labels={labelItems}
+          people={parser.parserConfig.pro ? people : undefined}
           inputRef={inputRef}
           placeholder="New task"
           showBangTodayHint={!template && !parser.enabled && !!parser.parserConfig.bangToday}

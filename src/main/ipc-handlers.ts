@@ -9,6 +9,9 @@ import {
 } from './pro-ledger-service'
 import { shell, dialog, app, nativeTheme, nativeImage, clipboard as electronClipboard, ClipboardItem as ElectronClipboardItem } from 'electron'
 import { isProEnabled } from '../shared/pro/settings'
+import { ensurePerson } from './pro-people'
+import { personLabelIds } from '../shared/pro/prefs'
+import { recordValue } from '../shared/pro/ledger'
 import { handleTrusted } from './secure-ipc'
 import { tokenForConnectionTest } from './connection-test-token'
 import { isDeepLinkAllowed, safeExternalUrl } from './web-security-policy'
@@ -625,6 +628,12 @@ export function registerIpcHandlers(): void {
   handleTrusted('pro-ledger:sync', () => syncProLedger())
   handleTrusted('pro-ledger:status', () => getProLedgerStatus())
   handleTrusted('pro-ledger:archive', () => readProArchive())
+  // `$Lalith` in quick add (21.5): the label with that name becomes a person, or one is made.
+  handleTrusted('pro:ensure-person', async (_event, name: unknown) => {
+    const config = loadConfig()
+    if (!isProEnabled(config, 'promises') || config?.standalone_mode) return { success: false, error: 'Pro promises are off' }
+    return refreshViewerOnSuccess(await ensurePerson(name, { fetchLabels, createLabel, setPrefs: setSyncedPreferences }))
+  })
 
   // A recap copied with both a plain text and an HTML version (cross-app semantics 21.8).
   handleTrusted('clipboard:write-rich', async (_event, text: unknown, html: unknown) => {
@@ -808,6 +817,25 @@ export function registerIpcHandlers(): void {
 
   // The places saved on a phone, by name, for "when I get home" in Quick Entry.
   handleTrusted('qe:get-places', () => readSyncedPlaces(getSyncedPrefs().values))
+
+  // Pro's people for `$` and `Jan:` in Quick Entry (5.5): the person labels and their aliases;
+  // none while the promises layer is off. The window has the labels' titles.
+  handleTrusted('qe:get-people', () => {
+    const config = loadConfig()
+    if (!isProEnabled(config, 'promises') || config?.standalone_mode) return []
+    const ledger = getProLedger().ledger
+    return [...personLabelIds(getSyncedPrefs().values)].map((id) => ({ id, aliases: recordValue(ledger.people, id)?.aliases ?? [] }))
+  })
+  // The promise a Quick Entry capture names (21.6), once the task has an id (a temporary one
+  // offline: the ledger is remapped when the create replays).
+  handleTrusted('qe:add-promise', (_event, taskId: unknown, person: unknown, mine: unknown) => {
+    const config = loadConfig()
+    if (!isProEnabled(config, 'promises') || config?.standalone_mode) return false
+    if (typeof taskId !== 'number' || !Number.isInteger(taskId) || taskId === 0) return false
+    if (typeof person !== 'number' || !Number.isInteger(person) || person <= 0) return false
+    mutateProLedger([{ op: 'set', collection: 'promises', id: String(taskId), value: { dir: mine === true ? 'mine' : 'theirs', person } }])
+    return true
+  })
 
   handleTrusted('qe:close-window', () => {
     hideQuickEntry()

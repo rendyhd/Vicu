@@ -10,7 +10,8 @@ lead: Work with others runs on promises: "I'll send it Friday." This part of Pro
 - **People** are labels you mark as a person. Nothing new to set up: the labels you already use for
   people work.
 - **A promise** is a task with a direction: someone promised it to you, or you promised it to them. Type
-  `Jan: send the deck friday` or `for Jan: review the budget`.
+  `$Jan send the deck friday` or `for $Jan review the budget`. A name Vicu does not know yet becomes a
+  person when you save.
 - **When a promise is due**, Vicu asks for a **verdict**: Delivered, Late, Not yet, New date or Dropped.
   Promises due are at the top of Today.
 - **Waiting on** lists what others owe you; **the person page** has everything with one person and the
@@ -36,16 +37,24 @@ place.
 
 ## Note a promise {desktop} {phone}
 
-The quickest way is the title, with the person's name and a colon at the very start:
+The quickest way is the title. Type `$` and the person's name anywhere in it. As soon as you type
+`$`, the people you have are suggested; pick one with Tab or Enter.
 
 | You type | You get |
 |---|---|
-| `Jan: send the deck friday` | Jan's promise to you, due Friday |
-| `for Jan: review the budget` | Your promise to Jan |
-| `Priya de Boer: share the numbers tomorrow` | Priya's promise, due tomorrow |
+| `$Jan send the deck friday` | Jan's promise to you, due Friday. It shows under **Waiting on**. |
+| `review the budget for $Jan` | Your promise to Jan |
+| `$"Priya de Boer" share the numbers tomorrow` | Priya's promise, due tomorrow. Quotes keep a name with spaces together. |
+| `$Lalith: follow up on printing` | Lalith's promise. If Lalith is not a person yet, Vicu makes Lalith one when you save. |
 
-The name must be a person Vicu knows (a label marked as a person, one of their other names, or a first
-name only one person has). An unknown name stays in the title. The person's label is added to the task.
+A name is matched to the people you have by their name, one of their other names, or a first name
+only one person has. A name that matches nobody makes a new person when you save: a label with that
+name is marked as a person, or a new label is made. Making a person needs a connection; offline, the
+task is saved with the name left in its title. A first name two people share stays in the title, so
+pick the one you mean from the suggestions. The person's label is added to the task.
+
+The older form still works for people Vicu already knows: the name and a colon at the very start, as
+in `Jan: send the deck friday` or `for Jan: review the budget`. It never makes a new person.
 
 You can also turn any task into a promise: open it and use **Promise**. Choose **They promised me** or
 **I promised them**, the person, and optionally:

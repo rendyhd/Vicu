@@ -4,6 +4,7 @@
  * Trigger characters depend on the active syntax mode:
  *   - Todoist: # → project, @ → label
  *   - Vikunja: + → project, * → label
+ *   - Both, with Pro's promises on: $ → person (contract 5.5)
  */
 
 import { cache } from './vikunja-cache'
@@ -15,7 +16,10 @@ interface AutocompleteItem {
   title: string
 }
 
-type ItemType = 'project' | 'label'
+type ItemType = 'project' | 'label' | 'person'
+
+const PERSON_PREFIX = '$'
+const MAX_PEOPLE = 8
 
 type OnSelectCallback = (
   item: AutocompleteItem,
@@ -29,6 +33,8 @@ export class AutocompleteDropdown {
   private onSelect: OnSelectCallback
   private syntaxMode: SyntaxMode = 'todoist'
   private enabled = true
+  /** Pro's people for `$`; null while the promises layer is off. */
+  private people: AutocompleteItem[] | null = null
   private items: AutocompleteItem[] = []
   private itemType: ItemType | null = null
   private activePrefix: string | null = null
@@ -51,6 +57,10 @@ export class AutocompleteDropdown {
     this.syntaxMode = mode
   }
 
+  setPeople(people: AutocompleteItem[] | null): void {
+    this.people = people
+  }
+
   setEnabled(enabled: boolean): void {
     this.enabled = enabled
     if (!enabled) this.hide()
@@ -71,13 +81,12 @@ export class AutocompleteDropdown {
     const projTrigger = this.findTrigger(beforeCursor, prefixes.project)
     const labelTrigger = this.findTrigger(beforeCursor, prefixes.label)
 
+    const personTrigger = this.people ? this.findTrigger(beforeCursor, PERSON_PREFIX) : null
+
     // Pick whichever trigger is closer to the cursor (later position)
     let trigger: { start: number; query: string; prefix: string; type: ItemType } | null = null
-
-    if (projTrigger && labelTrigger) {
-      trigger = projTrigger.start > labelTrigger.start ? projTrigger : labelTrigger
-    } else {
-      trigger = projTrigger || labelTrigger
+    for (const next of [projTrigger, labelTrigger, personTrigger]) {
+      if (next && (!trigger || next.start > trigger.start)) trigger = next
     }
 
     if (!trigger) {
@@ -89,9 +98,15 @@ export class AutocompleteDropdown {
     this.triggerStart = trigger.start
     this.itemType = trigger.type
 
-    this.items = trigger.type === 'project'
-      ? cache.searchProjects(trigger.query)
-      : cache.searchLabels(trigger.query)
+    if (trigger.type === 'person') {
+      // A quoted name (`$"Jan de`) is matched without its quote.
+      const query = trigger.query.replace(/^"/, '').toLowerCase()
+      this.items = (this.people ?? []).filter((person) => person.title.toLowerCase().includes(query)).slice(0, MAX_PEOPLE)
+    } else {
+      this.items = trigger.type === 'project'
+        ? cache.searchProjects(trigger.query)
+        : cache.searchLabels(trigger.query)
+    }
 
     if (this.items.length === 0) {
       this.hide()
@@ -175,7 +190,7 @@ export class AutocompleteDropdown {
   }
 
   private render(): void {
-    const typeLabel = this.itemType === 'project' ? 'project' : 'label'
+    const typeLabel = this.itemType ?? 'label'
     this.listEl.innerHTML = this.items
       .map((item, i) => {
         const active = i === this.selectedIndex ? ' active' : ''
@@ -211,7 +226,7 @@ export class AutocompleteDropdown {
     if (query.includes(prefix)) return null
 
     const prefixes = getPrefixes(this.syntaxMode)
-    const type: ItemType = prefix === prefixes.project ? 'project' : 'label'
+    const type: ItemType = prefix === PERSON_PREFIX ? 'person' : prefix === prefixes.project ? 'project' : 'label'
 
     return { start: lastIdx, query, prefix, type }
   }
