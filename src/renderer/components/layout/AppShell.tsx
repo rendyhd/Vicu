@@ -85,6 +85,9 @@ import { canReorderTask, type TaskOrderKey } from '../../../shared/task-order'
 import { usePrintStore } from '@/stores/print-store'
 import { buildPrintHtml } from '@/lib/print-template'
 import { sanitizeTaskHtml } from '@/lib/sanitize-html'
+import { settingsMenuInSidebar } from '@/lib/settings-menu'
+import { useSettingsNavStore } from '@/stores/settings-nav-store'
+import { SettingsMenu } from '@/components/settings/SettingsMenu'
 
 const MIN_WIDTH = 180
 const MAX_WIDTH = 360
@@ -192,7 +195,21 @@ export function AppShell() {
   const startX = useRef(0)
   const startWidth = useRef(0)
   const sidebarRef = useRef<HTMLDivElement>(null)
+  // A narrow Settings page puts its menu in the sidebar's place (lib/settings-menu.ts). The region
+  // right of the sidebar is measured: it keeps its width when the menu moves, and a side pane counts.
+  const contentColumnRef = useRef<HTMLDivElement>(null)
+  const settingsMenuHere = useSettingsNavStore((s) => s.inSidebar)
   const [appState, setAppState] = useState<AppState>('loading')
+  useEffect(() => {
+    const column = contentColumnRef.current
+    if (!column) return
+    const observer = new ResizeObserver(([entry]) => {
+      useSettingsNavStore.getState().setInSidebar(settingsMenuInSidebar(entry.contentRect.width))
+    })
+    observer.observe(column)
+    return () => observer.disconnect()
+    // The column exists only once the app is ready (setup and sign-in draw other pages).
+  }, [appState])
   const [reauthInfo, setReauthInfo] = useState<ReauthInfo | null>(null)
   const [dragItem, setDragItem] = useState<DragItem | null>(null)
   // The grabbing cursor, over everything, while something is dragged (index.css).
@@ -855,7 +872,7 @@ export function AppShell() {
         >
           <div className="h-8 shrink-0" />
           <div className="flex-1 overflow-hidden">
-            <Sidebar />
+            {settingsMenuHere && routePath === '/settings' ? <SettingsMenu variant="sidebar" /> : <Sidebar />}
           </div>
         </aside>
 
@@ -866,7 +883,7 @@ export function AppShell() {
           aria-orientation="vertical"
         />
 
-        <div className="flex flex-1 flex-col overflow-hidden bg-[var(--bg-primary)]">
+        <div ref={contentColumnRef} className="flex flex-1 flex-col overflow-hidden bg-[var(--bg-primary)]">
           <div className="h-8 shrink-0" />
           <UpdateBanner />
           <ContentArea>

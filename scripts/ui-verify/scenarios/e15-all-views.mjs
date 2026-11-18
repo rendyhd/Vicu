@@ -129,7 +129,8 @@ export default async function run(h) {
         await page.getByRole('button', { name: section, exact: true }).click()
         await h.wait(500)
       },
-      /settings/i,
+      // The page is titled by the open section (the Settings menu names the page).
+      new RegExp(section.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&'), 'i'),
     ]),
   ]
 

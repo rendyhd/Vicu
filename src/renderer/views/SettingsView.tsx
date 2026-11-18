@@ -33,17 +33,20 @@ import type { AppConfig, Project } from '@/lib/vikunja-types'
 
 import type { ThemeOption } from '@/lib/theme'
 import { ProSettings } from '@/components/settings/ProSettings'
+import { SettingsMenu } from '@/components/settings/SettingsMenu'
+import { currentSectionIndex, settingsTabLabel, SETTINGS_MENU_WIDTH } from '@/lib/settings-menu'
+import { useSettingsNavStore } from '@/stores/settings-nav-store'
 
-type SettingsTab = 'general' | 'projects' | 'integrations' | 'notifications' | 'assistant' | 'pro' | 'shortcuts'
-
-/** Every tab's content sits in the same column, left-aligned with the tab bar. */
+/** Every tab's content sits in the same column, left-aligned with the page title. */
 const SETTINGS_COLUMN = 'mx-6 max-w-[640px] space-y-6 pb-8 pt-4'
 
 export function SettingsView() {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const router = useRouter()
-  const [activeTab, setActiveTab] = useState<SettingsTab>('general')
+  const activeTab = useSettingsNavStore((s) => s.tab)
+  const setActiveTab = useSettingsNavStore((s) => s.setTab)
+  const menuInSidebar = useSettingsNavStore((s) => s.inSidebar)
   const { section } = useSearch({ from: '/settings' })
   const [url, setUrl] = useState('')
   const [token, setToken] = useState('')
@@ -86,6 +89,57 @@ export function SettingsView() {
     })
     return () => cancelAnimationFrame(frame)
   }, [section, fullConfig])
+
+  // The menu lists the open tab's section headings (h2, not those of a dialog), marks the one being
+  // read and scrolls to one on a click. Read from the page, so a section that comes and goes (Pro on
+  // or off, a setting that needs another) is followed without a list to keep in step.
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const contentRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const scroller = scrollRef.current
+    const content = contentRef.current
+    if (!scroller || !content) return
+    const { setSections, setCurrent, setJumpTo } = useSettingsNavStore.getState()
+    let headings: HTMLElement[] = []
+    const follow = (): void => {
+      const top = scroller.getBoundingClientRect().top
+      const atEnd = scroller.scrollTop > 0 && scroller.scrollTop >= scroller.scrollHeight - scroller.clientHeight - 2
+      setCurrent(currentSectionIndex(headings.map((h) => h.getBoundingClientRect().top - top), atEnd))
+    }
+    const collect = (): void => {
+      headings = Array.from(content.querySelectorAll<HTMLElement>('h2')).filter((h) => !h.closest('dialog, [popover]'))
+      setSections(headings.map((h) => h.textContent?.trim() || 'Section'))
+      follow()
+    }
+    let frame = 0
+    const schedule = (): void => {
+      if (!frame) frame = requestAnimationFrame(() => { frame = 0; collect() })
+    }
+    collect()
+    const observer = new MutationObserver(schedule)
+    observer.observe(content, { childList: true, subtree: true, characterData: true })
+    scroller.addEventListener('scroll', follow, { passive: true })
+    setJumpTo((index) => {
+      const heading = headings[index]
+      if (!heading) return
+      // Only the settings scroll: scrollIntoView would also shift the window's own layout.
+      scroller.scrollTop += heading.getBoundingClientRect().top - scroller.getBoundingClientRect().top - 16
+      heading.tabIndex = -1
+      heading.focus({ preventScroll: true })
+    })
+    return () => {
+      cancelAnimationFrame(frame)
+      observer.disconnect()
+      scroller.removeEventListener('scroll', follow)
+      setJumpTo(null)
+      setSections([])
+      setCurrent(-1)
+    }
+  }, [activeTab])
+  // A tab opens at its top.
+  useEffect(() => {
+    if (scrollRef.current) scrollRef.current.scrollTop = 0
+  }, [activeTab])
   const configLoadedRef = useRef(false)
 
   // Auto-save with debounce. Only the keys edited since the last save are sent: main
@@ -246,36 +300,17 @@ export function SettingsView() {
   }
 
   return (
-    <ReadingScroll className="bg-[var(--bg-primary)]" columnClassName="flex flex-col">
-      <PageHeader title="Settings" inScroll />
+    <div className="flex min-h-0 flex-1">
+      {/* The menu: a column here, or the app sidebar's place when the page is narrow (AppShell). */}
+      {!menuInSidebar && (
+        <div className="shrink-0 border-r border-[var(--border-color)]" style={{ width: SETTINGS_MENU_WIDTH }}>
+          <SettingsMenu variant="column" />
+        </div>
+      )}
+    <ReadingScroll ref={scrollRef} className="bg-[var(--bg-primary)]" columnClassName="mx-0 flex flex-col">
+      <PageHeader title={settingsTabLabel(activeTab)} inScroll />
 
-      {/* Tab bar: one line; a narrow window scrolls it sideways instead of wrapping a label (macOS type is wider). */}
-      <div className="flex gap-1 overflow-x-auto border-b border-[var(--border-color)] px-6">
-        {([
-          { key: 'general' as const, label: 'General' },
-          { key: 'projects' as const, label: 'Projects' },
-          { key: 'integrations' as const, label: 'Quick Entry / View' },
-          { key: 'notifications' as const, label: 'Notifications' },
-          { key: 'assistant' as const, label: 'Assistant' },
-          { key: 'pro' as const, label: 'Pro' },
-          { key: 'shortcuts' as const, label: 'Keyboard Shortcuts' },
-        ]).map((tab) => (
-          <button
-            key={tab.key}
-            type="button"
-            onClick={() => setActiveTab(tab.key)}
-            className={cn(
-              'shrink-0 whitespace-nowrap px-3 py-2 text-sm font-medium transition-colors',
-              activeTab === tab.key
-                ? 'border-b-2 border-accent-blue text-accent-blue'
-                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-            )}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
-
+      <div ref={contentRef}>
       {/* One column width for every tab (SETTINGS_COLUMN). */}
       {activeTab === 'shortcuts' ? (
         <div className={SETTINGS_COLUMN}>
@@ -780,6 +815,8 @@ export function SettingsView() {
         )}
       </div>
       ) : null}
+      </div>
     </ReadingScroll>
+    </div>
   )
 }

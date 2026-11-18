@@ -6,7 +6,7 @@ lead: A reference to each settings section on the desktop and on the phone. Ever
 
 ## In short
 
-- **Open Settings** from the sidebar (desktop) or the drawer (phone). The desktop has tabs: **General**, **Projects**, **Quick Entry / View**, **Notifications**, **Assistant**, **Pro** and **Keyboard Shortcuts**. The phone has **General**, **Projects**, **Notifications**, **Gestures** and **Assistant**.
+- **Open Settings** from the sidebar (desktop) or the drawer (phone). The desktop has a menu on the left: **General**, **Projects** and **Notifications**, then the features **Quick Entry / View**, **Assistant**, **Pro** and **Keyboard Shortcuts**. The page you are on lists its sections under its name; click one to go to it. In a narrow window the menu takes the sidebar's place, and **Back to app** brings your lists back. The phone has **General**, **Projects**, **Notifications**, **Gestures** and **Assistant**.
 - **Most settings are per device.** Look, behavior, notification and shortcut choices stay on the device where you set them. Setting the theme on your phone does not change your computer.
 - **Some settings are synced.** They live on your server and appear on every device you sign in on: your Inbox, task order, custom lists, categories, templates, planner defaults, and a few more. Tables below mark them **Synced**.
 - **Settings save as you change them.** There is no Save button.
