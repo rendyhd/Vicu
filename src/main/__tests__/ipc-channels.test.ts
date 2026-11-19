@@ -29,10 +29,13 @@ function channels(files: string[], pattern: RegExp): Set<string> {
   return found
 }
 
-const invoked = channels(
-  sourceFiles(join(srcDir, 'preload'), (name) => name.endsWith('.ts') && !name.endsWith('.d.ts')),
-  /ipcRenderer\.invoke\(\s*['"]([^'"]+)['"]/g,
-)
+// The main window's channels are written once, in src/shared/api-factory.ts (the preload and the web
+// host both build `window.api` from it); Quick Entry and Quick View have preload scripts of their own.
+const preloadFiles = [
+  ...sourceFiles(join(srcDir, 'preload'), (name) => name.endsWith('.ts') && !name.endsWith('.d.ts')),
+  join(srcDir, 'shared', 'api-factory.ts'),
+]
+const invoked = channels(preloadFiles, /\binvoke\(\s*['"]([^'"]+)['"]/g)
 const handled = channels(
   sourceFiles(join(srcDir, 'main'), (name) => name.endsWith('.ts')),
   /handleTrusted\(\s*['"]([^'"]+)['"]/g,
@@ -43,13 +46,10 @@ const handled = channels(
 // nothing received it, F5).
 const mainFiles = sourceFiles(join(srcDir, 'main'), (name) => name.endsWith('.ts'))
 const sent = channels(mainFiles, /\.send\(\s*['"]([^'"]+)['"]/g)
-for (const channel of channels(mainFiles, /sendToAppWindows\(\s*['"]([^'"]+)['"]/g)) sent.add(channel)
+for (const channel of channels(mainFiles, /sendTo(?:App|All)Windows\(\s*['"]([^'"]+)['"]/g)) sent.add(channel)
 // The offline queue's events are named once, in an object.
 for (const channel of channels([join(srcDir, 'main', 'offline', 'service.ts')], /(?:changed|replayed|authProblem):\s*['"]([^'"]+)['"]/g)) sent.add(channel)
-const listened = channels(
-  sourceFiles(join(srcDir, 'preload'), (name) => name.endsWith('.ts') && !name.endsWith('.d.ts')),
-  /ipcRenderer\.on(?:ce)?\(\s*['"]([^'"]+)['"]/g,
-)
+const listened = channels(preloadFiles, /(?:ipcRenderer\.on(?:ce)?|\bon)\(\s*['"]([^'"]+)['"]/g)
 
 describe('IPC channels', () => {
   it('finds the channels at all', () => {
