@@ -5,7 +5,7 @@ import { loadConfig, saveConfigQuietly, type AppConfig, DEFAULT_QUICK_ENTRY_HOTK
 import { closeAction, isQuickEntryEnabled, isQuickViewEnabled, wantsTray } from '../shared/config-types'
 import { authManager } from './auth/auth-manager'
 import { createTray, destroyTray, hasTray, updateTrayMenu } from './tray'
-import { returnFocusToPreviousWindow, destroyDummyWindow } from './focus'
+import { destroyDummyWindow, forgetForegroundWindow, giveFocusBack, nudgeFocusAway, prewarmFocusReturn, rememberForegroundWindow, type PopupKind } from './focus'
 import { registerQuickEntryState } from './quick-entry-state'
 import { initNotifications, refreshTaskRemindersOnFocus, rescheduleNotifications, stopNotifications, setNotificationsMainWindow } from './notifications'
 import { getObsidianContext, getForegroundProcessName, getForegroundWindowHandle, prewarmForegroundCheck, rememberShownObsidianContext, type ObsidianNoteContext } from './obsidian-client'
@@ -120,6 +120,8 @@ const BLUR_DEBOUNCE_MS = 300
 // --- Quick Entry show/hide ---
 async function showQuickEntry(prefill?: string): Promise<void> {
   if (!quickEntryWindow) return
+  // The window to give focus back to when it hides (Windows; before anything can move focus).
+  if (!quickEntryWindow.isVisible()) rememberForegroundWindow('entry')
   const config = loadConfig()
 
   // 1. Detect foreground app — must happen before we steal focus, so it cannot move after show().
@@ -227,13 +229,38 @@ function centerQuickEntry(): void {
   quickEntryWindow.setPosition(Math.round((sw - winW) / 2), Math.round(sh * 0.3))
 }
 
+/** A popup being hidden: giving focus back makes it lose focus, and its blur handler must not hide it again. */
+const hidingPopups = new Set<PopupKind>()
+
+/**
+ * Hide a popup and give focus back to the window that was in front before it showed, but only
+ * when the popup still has focus (Escape, Enter, the hotkey); after a click elsewhere focus is
+ * already where the user put it. Giving it back first, while our process owns the foreground, is
+ * what keeps Windows from bringing the main window forward instead (focus.ts).
+ */
+function hidePopup(kind: PopupKind, win: BrowserWindow, hide: () => void): void {
+  if (hidingPopups.has(kind)) return
+  hidingPopups.add(kind)
+  try {
+    const hadFocus = win.isVisible() && win.isFocused()
+    const focusReturned = hadFocus && giveFocusBack(kind)
+    if (!hadFocus) forgetForegroundWindow(kind)
+    hide()
+    if (hadFocus && !focusReturned) nudgeFocusAway()
+  } finally {
+    hidingPopups.delete(kind)
+  }
+}
+
 function hideQuickEntry(): void {
-  if (!quickEntryWindow) return
-  rememberShownObsidianContext(null)
-  quickEntryWindow.webContents.send('window-hidden')
-  quickEntryWindow.hide()
-  stopDragHoverPolling()
-  returnFocusToPreviousWindow()
+  const win = quickEntryWindow
+  if (!win) return
+  hidePopup('entry', win, () => {
+    rememberShownObsidianContext(null)
+    win.webContents.send('window-hidden')
+    win.hide()
+    stopDragHoverPolling()
+  })
 }
 
 function toggleQuickEntry(): void {
@@ -254,6 +281,7 @@ function setQuickEntryHeight(height: number): void {
 // --- Quick View show/hide ---
 function showQuickView(): void {
   if (!quickViewWindow) return
+  if (!quickViewWindow.isVisible()) rememberForegroundWindow('viewer')
   const config = loadConfig()
 
   // Pre-size to desired height
@@ -294,11 +322,13 @@ function centerQuickView(): void {
 }
 
 function hideQuickView(): void {
-  if (!quickViewWindow) return
-  quickViewWindow.webContents.send('viewer-hidden')
-  quickViewWindow.hide()
-  stopDragHoverPolling()
-  returnFocusToPreviousWindow()
+  const win = quickViewWindow
+  if (!win) return
+  hidePopup('viewer', win, () => {
+    win.webContents.send('viewer-hidden')
+    win.hide()
+    stopDragHoverPolling()
+  })
 }
 
 function toggleQuickView(): void {
@@ -781,7 +811,10 @@ if (!gotLock) {
       updateTrayMenu()
     })
     registerIpcHandlers()
-    if (isWindows) prewarmForegroundCheck()
+    if (isWindows) {
+      prewarmForegroundCheck()
+      prewarmFocusReturn()
+    }
     // Don't block window creation on auth recovery (up to 15s offline).
     // authManager has single-flight refresh, so the renderer's auth:check
     // joins any in-flight recovery instead of racing it; AppShell already
