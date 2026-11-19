@@ -1,15 +1,6 @@
-import {
-  discardUnsyncedProLedgerChanges,
-  getProLedger,
-  getProLedgerStatus,
-  hasUnsyncedProLedgerChanges,
-  mutateProLedger,
-  readProArchive,
-  syncProLedger,
-} from './pro-ledger-service'
+import { getProLedger, mutateProLedger, syncProLedger } from './pro-ledger-service'
 import { shell, dialog, app, nativeTheme, nativeImage, clipboard as electronClipboard, ClipboardItem as ElectronClipboardItem } from 'electron'
 import { isProEnabled } from '../shared/pro/settings'
-import { ensurePerson } from './pro-people'
 import { personLabelIds } from '../shared/pro/prefs'
 import { recordValue } from '../shared/pro/ledger'
 import { handleTrusted } from './secure-ipc'
@@ -22,37 +13,7 @@ import { ensureAttachmentTempDir } from './attachment-temp'
 import { saveAttachment } from './attachment-save'
 import * as fs from 'fs'
 import * as path from 'path'
-import {
-  fetchTasks,
-  createTask,
-  updateTask,
-  patchTaskJson,
-  deleteTask,
-  fetchTaskById,
-  createTaskRelation,
-  deleteTaskRelation,
-  fetchProjects,
-  fetchProjectsAndSavedFilters,
-  fetchProjectById,
-  createProject,
-  updateProject,
-  deleteProject,
-  fetchLabels,
-  addLabelToTask,
-  removeLabelFromTask,
-  createLabel,
-  updateLabel,
-  deleteLabel,
-  testConnection,
-  fetchProjectViews,
-  fetchViewTasks,
-  updateTaskPosition,
-  fetchTaskAttachments,
-  uploadTaskAttachment,
-  checkUploadSize as checkSize,
-  deleteTaskAttachment,
-  downloadTaskAttachment,
-} from './api-client'
+import { fetchTasks, createTask, updateTask, fetchTaskById, testConnection, fetchProjectViews, fetchViewTasks, uploadTaskAttachment, checkUploadSize as checkSize, downloadTaskAttachment } from './api-client'
 import { loadFileForUpload } from './upload-file'
 import { PickedFiles } from './picked-files'
 import { getLaunchOnStartupSupport } from './launch-on-startup'
@@ -70,63 +31,11 @@ import {
   type ConnectionFields,
 } from './config'
 import { directoryFromSelectedFile, resolveDialogDefaultPath } from './dialog-path'
-import {
-  deleteCustomList,
-  getCustomLists,
-  discardUnsyncedCustomListChanges,
-  getCustomListSyncStatus,
-  hasUnsyncedCustomListChanges,
-  reorderCustomLists,
-  syncCustomLists,
-  upsertCustomList,
-} from './custom-list-service'
-import {
-  discardUnsyncedPreferenceChanges,
-  getSyncedPrefs,
-  getSyncedPrefsStatus,
-  hasUnsyncedPreferenceChanges,
-  inboxChosenAtSetup,
-  readSetupPreferences,
-  setSyncedPreference,
-  setSyncedPreferences,
-  syncSyncedPrefs,
-} from './synced-preferences'
+import { syncCustomLists } from './custom-list-service'
+import { getSyncedPrefs, inboxChosenAtSetup, readSetupPreferences, setSyncedPreference } from './synced-preferences'
 import { readSyncedPlaces } from '../shared/synced-prefs'
 import { quickEntryLocationReminder } from './quick-entry/location-reminder'
-import type { CustomListWire } from './custom-list-protocol'
-import {
-  applySavedFilterImport,
-  closeImportNotice,
-  dismissSavedFilters,
-  getSavedFilterState,
-  previewProjectViews,
-  previewSavedFilters,
-  recordKnownSavedFilters,
-  undoSavedFilterImport,
-} from './saved-filter-service'
-import type { ImportAnswer } from '../shared/saved-filter-import'
 
-/** A list of saved-filter ids from the renderer: at most 500 whole numbers of 0 or more. */
-function isIdList(value: unknown): value is number[] {
-  return Array.isArray(value) && value.length <= 500 && value.every((id) => typeof id === 'number' && Number.isInteger(id) && id >= 0)
-}
-
-/** A row key of the import sheet: `filter:<id>` or `view:<id>`. */
-function isSourceKey(value: unknown): value is string {
-  return typeof value === 'string' && /^(filter|view):\d{1,12}$/.test(value)
-}
-
-/** The sheet's Import from the renderer: at most 500 keys to add and 500 answers. */
-function isImportRequest(value: unknown): value is { add: string[]; answers: Array<{ key: string; answer: ImportAnswer }> } {
-  if (!value || typeof value !== 'object') return false
-  const { add, answers } = value as { add?: unknown; answers?: unknown }
-  return Array.isArray(add) && add.length <= 500 && add.every(isSourceKey)
-    && Array.isArray(answers) && answers.length <= 500
-    && answers.every((entry) => !!entry && typeof entry === 'object'
-      && isSourceKey((entry as { key?: unknown }).key)
-      && ((entry as { answer?: unknown }).answer === 'overwrite' || (entry as { answer?: unknown }).answer === 'skip'))
-}
-import type { UnsyncedDocuments } from '../shared/config-types'
 import { hasVicuMetadataMarker } from './custom-list-protocol'
 import { discoverProviders, discoverAuthMethods } from './auth/oidc-discovery'
 import { fetchCurrentUser } from './auth/user-info'
@@ -136,14 +45,13 @@ import { OidcPasskeyUnavailableError, OidcTotpRequiredError } from './auth/oidc-
 import { cancelBrowserLogin } from './auth/oidc-browser-login'
 import { BrowserSignInCancelledError } from './auth/loopback-callback'
 import { buildViewerFilterParams } from './quick-entry/filter-builder'
-import { forgetDeletedTask, loadRoutineCarriers, rememberCreatedTask } from './carrier-service'
-import { countProjectTasks, invalidateProjectCounts } from './project-counts-service'
+import { invalidateProjectCounts } from './project-counts-service'
 import { dueToday } from '../shared/due-dates'
 import { withDueChangeRules } from '../shared/time-blocks'
 import { COLLAB_SIGNALS_PARAM, KEEP_NESTED_SUBTASKS_PARAM } from './api-v2'
 import { hasCollaborationCondition, needsCommentSignals, type CustomListContext } from '../shared/custom-list-filter'
 import { fetchPositionSortedTasks } from './quick-entry/position-sort'
-import { activeProjects, invalidateViewerCaches, projectListViewIds, viewerCollab } from './quick-entry/viewer-caches'
+import { activeProjects, projectListViewIds, viewerCollab } from './quick-entry/viewer-caches'
 import { cachedFallback } from './quick-entry/fetch-fallback'
 import { resolveViewerFilter, selectQuickViewTasks } from './quick-entry/viewer-filter'
 import {
@@ -175,11 +83,12 @@ import { uploadStandaloneTasks } from './standalone-upload'
 import { getOfflineQueue, knownUserIdFor, rememberKnownUser } from './offline/service'
 import { registerOfflineQueueIpc } from './offline/ipc'
 import { registerCollaborationIpc } from './collab-ipc'
+import { registerPortableHandlers } from './handlers/portable'
 import { registerVoiceIpc } from './voice/service'
 import { forgetAiAccountData, registerAiIpc } from './ai/ipc'
 import { registerCalendarIpc } from './calendar/service'
 import { accountChanged, refreshKnownUser, replayPendingActions } from './sync'
-import { claimAccountData, ensureKnownUserId } from './known-user'
+import { claimAccountData } from './known-user'
 import {
   createFromQuickEntry,
   quickEntryTaskPayload,
@@ -189,7 +98,7 @@ import {
   quickViewReopen,
   type QuickActionDeps,
 } from './offline/quick-actions'
-import { parseTaskWriteOptions, sendSerially, taskWriteReply, taskWrites, writeTask } from './offline/task-writes'
+import { taskWrites, writeTask } from './offline/task-writes'
 import {
   setCachedTasks,
   getCachedTasks,
@@ -229,16 +138,6 @@ function quickActionDeps(): QuickActionDeps {
     },
     requestReplay,
   }
-}
-
-const JSON_PATCH_OPS: ReadonlySet<string> = new Set(['test', 'replace', 'add', 'remove'])
-
-/** A JSON Patch the renderer may send: a short list of `test`/`replace`/`add`/`remove` on top-level fields. */
-function isJsonPatch(value: unknown): value is Array<{ op: string; path: string; value?: unknown }> {
-  return Array.isArray(value) && value.length > 0 && value.length <= 32 && value.every((op) =>
-    !!op && typeof op === 'object' && !Array.isArray(op) &&
-    JSON_PATCH_OPS.has((op as { op?: unknown }).op as string) &&
-    typeof (op as { path?: unknown }).path === 'string' && /^\/[a-z_]+$/.test((op as { path: string }).path))
 }
 
 /** Every change to an existing task goes through the write gate (see offline/task-writes.ts). */
@@ -311,212 +210,23 @@ async function claimAccountDataFor(connection: ConnectionFields): Promise<void> 
   if (user) claimAccountData(url, user.id)
 }
 
-/** The project of a task as the server returned it, or undefined (then every project is asked again). */
-function projectIdOf(task: unknown): number | undefined {
-  const id = (task as { project_id?: unknown } | null)?.project_id
-  return typeof id === 'number' && Number.isInteger(id) && id > 0 ? id : undefined
-}
-
 export function registerIpcHandlers(): void {
   registerOfflineQueueIpc()
-  registerCollaborationIpc()
+  // The handlers that need nothing from Electron or Node (handlers/portable.ts, collab-ipc.ts).
+  registerPortableHandlers(handleTrusted, { taskWriteDeps, notifyViewerSync, notifyMainWindow })
+  registerCollaborationIpc(handleTrusted, {
+    taskWriteDeps,
+    currentUserId: () => {
+      const config = loadConfig()
+      return config?.vikunja_url ? knownUserIdFor(config.vikunja_url) : undefined
+    },
+  })
   registerVoiceIpc()
   registerAiIpc()
   registerCalendarIpc()
 
-  // Tasks
-  handleTrusted('fetch-tasks', (_event, params: Record<string, unknown>) => {
-    return fetchTasks(params)
-  })
-
-  // The routine carriers (hidden done tasks): fetched by their remembered ids, new ones found with
-  // a marker search, never by listing every done task (D-NOTIF-3, D-RT-2).
-  handleTrusted('fetch-routine-carriers', () => {
-    return loadRoutineCarriers()
-  })
-
-  // Hidden tasks are read and written only when the signed-in user created them (cross-app
-  // semantics 10.3); the renderer's routine archive asks who that is.
-  handleTrusted('account:own-user-id', async () => (await ensureKnownUserId()) ?? null)
-
-  handleTrusted('create-task', async (_event, projectId: number, task: Record<string, unknown>) => {
-    const result = await sendSerially(() => createTask(projectId, task))
-    if (result.success) {
-      notifyViewerSync()
-      // A new routine or custom-list carrier changes what the counts subtract: everything is asked again.
-      invalidateProjectCounts(rememberCreatedTask(result.data) ? undefined : projectId)
-    }
-    return result
-  })
-
-  // `patch` holds only the writable fields that changed (see src/shared/merge-patches.ts);
-  // the API client reduces it to the PATCH schema once more before sending. Like the other task
-  // writes below, it goes through the write gate: while changes for the task wait in the offline
-  // queue a newer one joins the queue instead of overtaking them, and with `options.queue` a change
-  // the server cannot take is queued here (see offline/task-writes.ts).
-  handleTrusted('update-task', async (event, id: number, patch: Record<string, unknown>, options?: unknown) => {
-    const { queue, title, completedDue, baseDescription } = parseTaskWriteOptions(options)
-    const deps = taskWriteDeps()
-    // A completion of a repeating task (cross-app semantics 7.5) and a notes edit with its base
-    // (description format, "Notes changed in two places") read the task first.
-    const spec = taskWrites.update(deps.queue, { updateTask, fetchTaskById }, id, patch, title, {
-      ...(completedDue !== undefined ? { completedDue } : {}),
-      ...(baseDescription !== undefined ? { baseDescription } : {}),
-    })
-    const outcome = await writeTask(deps, spec, { queue })
-    if (outcome.kind === 'sent') {
-      notifyViewerSync()
-      notifyMainWindow(event.sender.id)
-      // A completion, a reopening or a move changes the progress of the task's project (both
-      // projects after a move, which the response does not tell: everything is asked again).
-      if ('project_id' in patch) invalidateProjectCounts()
-      else if ('done' in patch) invalidateProjectCounts(projectIdOf(outcome.result.data))
-    }
-    return taskWriteReply(outcome)
-  })
-
-  // A JSON Patch of a routine carrier or archive part (cross-app semantics 6.8): a test of the
-  // description the renderer read, then the new values. It needs the server's answer (a 422 means
-  // another device wrote the task since, and the renderer reads, merges and sends again), so it is
-  // never queued and is refused while changes for the task wait in the queue.
-  handleTrusted('patch-task-json', async (event, id: unknown, operations: unknown) => {
-    if (typeof id !== 'number' || !Number.isInteger(id) || id <= 0 || !isJsonPatch(operations)) {
-      return { success: false as const, error: 'Invalid task patch' }
-    }
-    const deps = taskWriteDeps()
-    const outcome = await writeTask(deps, {
-      taskId: id,
-      send: () => patchTaskJson(id, operations),
-      enqueue: () => Promise.reject(new Error('A routine write is never queued')),
-    })
-    if (outcome.kind === 'sent') {
-      notifyViewerSync()
-      notifyMainWindow(event.sender.id)
-      // A routine that moved between projects changes what both projects' counts subtract.
-      invalidateProjectCounts(operations.some((op) => op.path === '/project_id') ? undefined : projectIdOf(outcome.result.data))
-    }
-    return taskWriteReply(outcome)
-  })
-
-  handleTrusted('delete-task', async (_event, id: number, options?: unknown) => {
-    const { queue, title } = parseTaskWriteOptions(options)
-    const deps = taskWriteDeps()
-    const outcome = await writeTask(deps, taskWrites.delete(deps.queue, { deleteTask }, id, title), { queue })
-    if (outcome.kind === 'sent') {
-      notifyViewerSync()
-      forgetDeletedTask(id)
-      invalidateProjectCounts()
-    }
-    return taskWriteReply(outcome)
-  })
-
-  handleTrusted('fetch-task-by-id', (_event, id: number) => {
-    return fetchTaskById(id)
-  })
-
   // Print
   handleTrusted('print-html', (_event, html: string) => printHtml(html))
-
-  // Relations, labels, attachments and projects all change what Quick View shows (subtasks that
-  // block completing, label filters, hidden projects), so each successful change refreshes it the
-  // same way a task change does (D-IPC-4).
-  handleTrusted('create-task-relation', async (_event, taskId: number, otherTaskId: number, relationKind: string) => {
-    return refreshViewerOnSuccess(await sendSerially(() => createTaskRelation(taskId, otherTaskId, relationKind)))
-  })
-
-  handleTrusted('delete-task-relation', async (_event, taskId: number, relationKind: string, otherTaskId: number) => {
-    return refreshViewerOnSuccess(await sendSerially(() => deleteTaskRelation(taskId, relationKind, otherTaskId)))
-  })
-
-  // Sidebar progress rings: how many tasks of a project are (not) done, from one one-task page
-  // (the envelope's `total`), minus the known hidden carrier tasks; cached for ten minutes.
-  handleTrusted('count-project-tasks', (_event, projectId: unknown, done: unknown) => {
-    if (typeof projectId !== 'number' || !Number.isInteger(projectId) || projectId <= 0 || typeof done !== 'boolean') {
-      return { success: false as const, error: 'Invalid project count request' }
-    }
-    return countProjectTasks(projectId, done)
-  })
-
-  // Projects
-  handleTrusted('fetch-projects', async (_event, includeArchived = false) => {
-    // The read also lists the saved filters (negative ids), which are kept apart and never shown
-    // as projects (cross-app semantics 3.7).
-    const result = await fetchProjectsAndSavedFilters(includeArchived === true)
-    if (!result.success) return result
-    recordKnownSavedFilters(result.data.pseudo)
-    return { success: true as const, data: result.data.projects }
-  })
-
-  handleTrusted('fetch-project', (_event, id: number) => {
-    return fetchProjectById(id)
-  })
-
-  // Quick View remembers the active projects and their list views for a moment; a project change
-  // makes that out of date.
-  handleTrusted('create-project', async (_event, project: Record<string, unknown>) => {
-    const result = await createProject(project)
-    if (result.success) invalidateViewerCaches()
-    return refreshViewerOnSuccess(result)
-  })
-
-  handleTrusted('update-project', async (_event, id: number, project: Record<string, unknown>) => {
-    const result = await updateProject(id, project)
-    if (result.success) invalidateViewerCaches()
-    return refreshViewerOnSuccess(result)
-  })
-
-  handleTrusted('delete-project', async (_event, id: number) => {
-    const result = await deleteProject(id)
-    if (result.success) invalidateViewerCaches()
-    return refreshViewerOnSuccess(result)
-  })
-
-  // Labels
-  handleTrusted('fetch-labels', () => {
-    return fetchLabels()
-  })
-
-  handleTrusted('add-label-to-task', async (_event, taskId: number, labelId: number, options?: unknown) => {
-    const { queue, title, labelTitle } = parseTaskWriteOptions(options)
-    const deps = taskWriteDeps()
-    const label = labelTitle ? { id: labelId, title: labelTitle } : { id: labelId }
-    const outcome = await writeTask(deps, taskWrites.addLabel(deps.queue, { addLabelToTask }, taskId, label, title), { queue })
-    if (outcome.kind === 'sent') notifyViewerSync()
-    return taskWriteReply(outcome)
-  })
-
-  handleTrusted('remove-label-from-task', async (_event, taskId: number, labelId: number, options?: unknown) => {
-    const { queue, title } = parseTaskWriteOptions(options)
-    const deps = taskWriteDeps()
-    const outcome = await writeTask(deps, taskWrites.removeLabel(deps.queue, { removeLabelFromTask }, taskId, labelId, title), { queue })
-    if (outcome.kind === 'sent') notifyViewerSync()
-    return taskWriteReply(outcome)
-  })
-
-  handleTrusted('create-label', async (_event, label: Record<string, unknown>) => {
-    return refreshViewerOnSuccess(await createLabel(label))
-  })
-
-  handleTrusted('update-label', async (_event, id: number, label: Record<string, unknown>) => {
-    return refreshViewerOnSuccess(await updateLabel(id, label))
-  })
-
-  handleTrusted('delete-label', async (_event, id: number) => {
-    return refreshViewerOnSuccess(await deleteLabel(id))
-  })
-
-  // Project Views
-  handleTrusted('fetch-project-views', (_event, projectId: number) => {
-    return fetchProjectViews(projectId)
-  })
-
-  handleTrusted('fetch-view-tasks', (_event, projectId: number, viewId: number, params: Record<string, unknown>) => {
-    return fetchViewTasks(projectId, viewId, params)
-  })
-
-  handleTrusted('update-task-position', (_event, taskId: number, viewId: number, position: number) => {
-    return sendSerially(() => updateTaskPosition(taskId, viewId, position))
-  })
 
   // Config
   handleTrusted('get-config', () => {
@@ -572,74 +282,6 @@ export function registerIpcHandlers(): void {
     void replayPendingActions()
     // Setup's Inbox answer is written as the synced entry unless it is the one setup just read.
     if (connection.vikunja_url && connection.inbox_project_id) inboxChosenAtSetup(connection.vikunja_url, connection.inbox_project_id)
-  })
-
-  handleTrusted('custom-lists:get', () => getCustomLists())
-  handleTrusted('custom-lists:upsert', (_event, list: CustomListWire) => upsertCustomList(list))
-  handleTrusted('custom-lists:delete', (_event, id: string) => deleteCustomList(id))
-  handleTrusted('custom-lists:reorder', (_event, ids: string[]) => reorderCustomLists(ids))
-  handleTrusted('custom-lists:sync', () => {
-    // The synced preferences and the Pro ledger (while Pro is on) sync whenever custom lists do.
-    void syncSyncedPrefs()
-    void syncProLedger()
-    return syncCustomLists()
-  })
-  handleTrusted('custom-lists:status', () => getCustomListSyncStatus())
-
-  // Vikunja saved filters as custom lists (cross-app semantics 3.7).
-  handleTrusted('saved-filters:state', () => getSavedFilterState())
-  handleTrusted('saved-filters:preview', (_event, ids: unknown) => {
-    if (ids !== undefined && !isIdList(ids)) return null
-    return previewSavedFilters(ids as number[] | undefined)
-  })
-  handleTrusted('saved-filters:preview-views', () => previewProjectViews())
-  handleTrusted('saved-filters:apply', (_event, request: unknown) =>
-    (isImportRequest(request) ? applySavedFilterImport(request.add, request.answers) : null))
-  handleTrusted('saved-filters:undo', (_event, undoId: unknown) =>
-    (typeof undoId === 'string' && undoId !== '' ? undoSavedFilterImport(undoId) : false))
-  handleTrusted('saved-filters:dismiss', (_event, ids: unknown, changed: unknown) =>
-    (isIdList(ids) && (changed === undefined || isIdList(changed)) ? dismissSavedFilters(ids, changed ?? []) : getSavedFilterState()))
-  handleTrusted('saved-filters:close-notice', (_event, listId: unknown) =>
-    (typeof listId === 'string' && listId !== '' ? closeImportNotice(listId) : getSavedFilterState()))
-
-  // Synced preferences (cross-app semantics section 11): the Inbox and the task order.
-  handleTrusted('synced-prefs:get', () => getSyncedPrefs())
-  handleTrusted('synced-prefs:set', (_event, key: unknown, value: unknown) => {
-    if (typeof key !== 'string') throw new Error('Invalid synced preference')
-    return setSyncedPreference(key, value)
-  })
-  handleTrusted('synced-prefs:set-many', (_event, values: unknown) => {
-    if (!values || typeof values !== 'object' || Array.isArray(values)) throw new Error('Invalid synced preferences')
-    return setSyncedPreferences(values as Record<string, unknown>)
-  })
-  handleTrusted('synced-prefs:sync', () => syncSyncedPrefs())
-  handleTrusted('synced-prefs:status', () => getSyncedPrefsStatus())
-
-  // Custom-list and settings changes that have not reached the server (they are not in the offline
-  // queue). The sync panel shows them and can discard them: each goes back to the server's copy.
-  handleTrusted('synced-documents:unsynced', (): UnsyncedDocuments => ({
-    customLists: hasUnsyncedCustomListChanges() ? getCustomListSyncStatus() : null,
-    preferences: hasUnsyncedPreferenceChanges() ? getSyncedPrefsStatus() : null,
-    proLedger: hasUnsyncedProLedgerChanges() ? getProLedgerStatus() : null,
-  }))
-  handleTrusted('synced-documents:discard', () => ({
-    customLists: discardUnsyncedCustomListChanges(),
-    preferences: discardUnsyncedPreferenceChanges(),
-    proLedger: discardUnsyncedProLedgerChanges(),
-  }))
-
-  // The Pro ledger (cross-app semantics 21.7): read, change (main applies the operations to its
-  // current copy), sync, and the archive parts on demand.
-  handleTrusted('pro-ledger:get', () => getProLedger())
-  handleTrusted('pro-ledger:mutate', (_event, operations: unknown) => mutateProLedger(operations))
-  handleTrusted('pro-ledger:sync', () => syncProLedger())
-  handleTrusted('pro-ledger:status', () => getProLedgerStatus())
-  handleTrusted('pro-ledger:archive', () => readProArchive())
-  // `$Lalith` in quick add (21.5): the label with that name becomes a person, or one is made.
-  handleTrusted('pro:ensure-person', async (_event, name: unknown) => {
-    const config = loadConfig()
-    if (!isProEnabled(config, 'promises') || config?.standalone_mode) return { success: false, error: 'Pro promises are off' }
-    return refreshViewerOnSuccess(await ensurePerson(name, { fetchLabels, createLabel, setPrefs: setSyncedPreferences }))
   })
 
   // A recap copied with both a plain text and an HTML version (cross-app semantics 21.8).
@@ -1168,41 +810,6 @@ export function registerIpcHandlers(): void {
   })
 
   // --- Attachments IPC ---
-  handleTrusted('fetch-task-attachments', (_event, taskId: number) => {
-    return fetchTaskAttachments(taskId)
-  })
-
-  handleTrusted('upload-task-attachment', async (_event, taskId: number, fileData: Uint8Array, fileName: string, mimeType: string, options?: unknown) => {
-    const { queue, title } = parseTaskWriteOptions(options)
-    if (!queue) return refreshViewerOnSuccess(await uploadTaskAttachment(taskId, Buffer.from(fileData), fileName, mimeType))
-    // The editor's drop and paste: offline, the file waits in the queue (issue 104).
-    const inline = !!options && typeof options === 'object' && (options as { inline?: unknown }).inline === true
-    const deps = taskWriteDeps()
-    const outcome = await writeTask(
-      deps,
-      taskWrites.upload(deps.queue, { uploadTaskAttachment }, taskId, { bytes: fileData, name: fileName, mime: mimeType }, { inline, title }),
-      { queue: true }
-    )
-    return outcome.kind === 'sent' ? refreshViewerOnSuccess(outcome.result) : taskWriteReply(outcome)
-  })
-
-  handleTrusted('delete-task-attachment', async (_event, taskId: number, attachmentId: number) => {
-    return refreshViewerOnSuccess(await deleteTaskAttachment(taskId, attachmentId))
-  })
-
-  handleTrusted('fetch-task-attachment-bytes', async (_event, taskId: number, attachmentId: number, size?: unknown) => {
-    // Inline task-note images only need a bounded preview. Fetching full-size
-    // phone photos here can exhaust the renderer/IPC budget before <img> decodes.
-    // The image viewer asks for the original of the one image it shows.
-    const original = size === 'original'
-    const result = await downloadTaskAttachment(taskId, attachmentId, original ? undefined : 'lg')
-    if (!result.success) return result
-    if (result.data.length === 0) {
-      return { success: false, error: original ? 'Attachment was empty' : 'Attachment preview was empty' }
-    }
-    return { success: true, data: new Uint8Array(result.data) }
-  })
-
   handleTrusted('open-task-attachment', async (_event, taskId: number, attachmentId: number, fileName: string) => {
     if (!Number.isSafeInteger(taskId) || !Number.isSafeInteger(attachmentId)) {
       return { success: false, error: 'Invalid attachment' }
@@ -1423,12 +1030,6 @@ function notifyMainWindow(excludeWebContentsId?: number): void {
       win.webContents.send('tasks-changed')
     }
   } catch { /* ignore */ }
-}
-
-// Helper: tell Quick View to refresh after a change that went through, and pass the result on.
-function refreshViewerOnSuccess<T extends { success: boolean }>(result: T): T {
-  if (result.success) notifyViewerSync()
-  return result
 }
 
 const pickedFiles = new PickedFiles()

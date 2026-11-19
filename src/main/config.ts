@@ -64,6 +64,14 @@ const DEFAULT_CONFIG: AppConfig = {
 // mutating a returned config object must not leak into the cache.
 let cachedConfig: AppConfig | null | undefined
 
+/**
+ * Forget the in-memory copy, so the next `loadConfig` reads the stored config again. For a host
+ * where someone else can write it: on the web another tab of the same browser does.
+ */
+export function dropConfigCache(): void {
+  cachedConfig = undefined
+}
+
 export function loadConfig(): AppConfig | null {
   if (cachedConfig === undefined) {
     cachedConfig = readConfigFromDisk()

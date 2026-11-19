@@ -1,7 +1,7 @@
 import { isQueueableFailure, isUnreachableFailure } from '../../shared/error-classify'
 import type { QueuedWriteReply, TaskWriteOptions } from '../../shared/offline-queue-types'
 import type { ApiError, ApiResult, ApiSuccess } from '../api-result'
-import type { OfflineQueue } from './queue'
+import type { WriteQueue } from '../handlers/write-queue'
 import { needsRead, planTaskUpdate, type TaskUpdateChecks } from './notes-save-step'
 
 // The one place where a change to an existing task decides between "send it now" and "queue it".
@@ -63,7 +63,7 @@ export const WAITING_TO_SYNC_ERROR =
   'This task has changes waiting to sync, so it was not changed on the server. Try again once they have synced.'
 
 export interface TaskWriteDeps {
-  queue: OfflineQueue
+  queue: WriteQueue
   /** Ask for a replay soon: the server just answered, or a change joined a queue that is waiting. */
   requestReplay?: () => void
 }
@@ -81,7 +81,7 @@ export const taskWrites = {
    * changed in two places"). A queued change keeps both for the replay, which decides the same way.
    */
   update(
-    queue: OfflineQueue,
+    queue: WriteQueue,
     api: {
       updateTask(id: number, patch: Record<string, unknown>): Promise<ApiResult<unknown>>
       fetchTaskById?(id: number): Promise<ApiResult<unknown>>
@@ -127,7 +127,7 @@ export const taskWrites = {
     }
   },
   delete(
-    queue: OfflineQueue,
+    queue: WriteQueue,
     api: { deleteTask(id: number): Promise<ApiResult<unknown>> },
     taskId: number,
     title?: string
@@ -139,7 +139,7 @@ export const taskWrites = {
     }
   },
   addLabel(
-    queue: OfflineQueue,
+    queue: WriteQueue,
     api: { addLabelToTask(taskId: number, labelId: number): Promise<ApiResult<unknown>> },
     taskId: number,
     label: { id: number; title?: string },
@@ -152,7 +152,7 @@ export const taskWrites = {
     }
   },
   addRelation(
-    queue: OfflineQueue,
+    queue: WriteQueue,
     api: { createTaskRelation(taskId: number, otherTaskId: number, kind: string): Promise<ApiResult<unknown>> },
     taskId: number,
     otherTaskId: number,
@@ -166,7 +166,7 @@ export const taskWrites = {
     }
   },
   removeRelation(
-    queue: OfflineQueue,
+    queue: WriteQueue,
     api: { deleteTaskRelation(taskId: number, kind: string, otherTaskId: number): Promise<ApiResult<unknown>> },
     taskId: number,
     otherTaskId: number,
@@ -180,7 +180,7 @@ export const taskWrites = {
     }
   },
   addAssignee(
-    queue: OfflineQueue,
+    queue: WriteQueue,
     api: { addTaskAssignee(taskId: number, userId: number): Promise<ApiResult<unknown>> },
     taskId: number,
     user: { id: number; username?: string },
@@ -193,7 +193,7 @@ export const taskWrites = {
     }
   },
   removeAssignee(
-    queue: OfflineQueue,
+    queue: WriteQueue,
     api: { removeTaskAssignee(taskId: number, userId: number): Promise<ApiResult<unknown>> },
     taskId: number,
     user: { id: number; username?: string },
@@ -206,7 +206,7 @@ export const taskWrites = {
     }
   },
   createComment(
-    queue: OfflineQueue,
+    queue: WriteQueue,
     api: { createTaskComment(taskId: number, html: string): Promise<ApiResult<unknown>> },
     taskId: number,
     html: string,
@@ -220,7 +220,7 @@ export const taskWrites = {
     }
   },
   updateComment(
-    queue: OfflineQueue,
+    queue: WriteQueue,
     api: { updateTaskComment(taskId: number, commentId: number, html: string): Promise<ApiResult<unknown>> },
     taskId: number,
     commentId: number,
@@ -234,7 +234,7 @@ export const taskWrites = {
     }
   },
   deleteComment(
-    queue: OfflineQueue,
+    queue: WriteQueue,
     api: { deleteTaskComment(taskId: number, commentId: number): Promise<ApiResult<unknown>> },
     taskId: number,
     commentId: number,
@@ -247,7 +247,7 @@ export const taskWrites = {
     }
   },
   removeLabel(
-    queue: OfflineQueue,
+    queue: WriteQueue,
     api: { removeLabelFromTask(taskId: number, labelId: number): Promise<ApiResult<unknown>> },
     taskId: number,
     labelId: number,
@@ -265,7 +265,7 @@ export const taskWrites = {
    * create. `inline` puts the image at the end of the notes once the queued upload goes through.
    */
   upload(
-    queue: OfflineQueue,
+    queue: WriteQueue,
     api: { uploadTaskAttachment(taskId: number, bytes: Uint8Array, name: string, mime: string): Promise<ApiResult<unknown>> },
     taskId: number,
     file: { bytes: Uint8Array; name: string; mime: string },
@@ -342,9 +342,9 @@ export async function sendSerially<T>(send: () => Promise<T>): Promise<T> {
 }
 
 // One chain of pending writes per task and queue. Entries remove themselves when the chain drains.
-const chains = new WeakMap<OfflineQueue, Map<number, Promise<void>>>()
+const chains = new WeakMap<WriteQueue, Map<number, Promise<void>>>()
 
-function runInOrder<T>(queue: OfflineQueue, taskId: number, step: () => Promise<T>): Promise<T> {
+function runInOrder<T>(queue: WriteQueue, taskId: number, step: () => Promise<T>): Promise<T> {
   let byTask = chains.get(queue)
   if (!byTask) {
     byTask = new Map()

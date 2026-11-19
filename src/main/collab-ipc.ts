@@ -1,4 +1,3 @@
-import { handleTrusted } from './secure-ipc'
 import {
   addTaskAssignee,
   createTaskRelation,
@@ -23,10 +22,10 @@ import {
 import type { ApiError, ApiResult } from './api-result'
 import { loadConfig } from './config'
 import { overlayComments } from './offline/comment-overlay'
-import { getOfflineQueue, knownUserIdFor } from './offline/service'
-import { parseTaskWriteOptions, taskWriteReply, taskWrites, writeTask, type TaskWriteOutcome } from './offline/task-writes'
+import { parseTaskWriteOptions, taskWriteReply, taskWrites, writeTask, type TaskWriteDeps, type TaskWriteOutcome } from './offline/task-writes'
 import { normalizeServerUrl } from './offline/owner'
-import { replayPendingActions } from './sync'
+import type { Handle } from './handlers/types'
+import type { WriteQueue } from './handlers/write-queue'
 import type { QueuedCommentReply, QueuedWriteReply } from '../shared/offline-queue-types'
 
 // Assignees, comments, project sharing, subscriptions and avatars (docs/cross-app-semantics-v1.md
@@ -41,23 +40,9 @@ const isPermission = (v: unknown): v is 0 | 1 | 2 => v === 0 || v === 1 || v ===
 const isUsername = (v: unknown): v is string => typeof v === 'string' && v.trim().length > 0 && v.length <= 250
 const isHtml = (v: unknown): v is string => typeof v === 'string' && v.trim().length > 0 && v.length <= 100_000
 
-function writeDeps() {
-  return {
-    queue: getOfflineQueue(),
-    requestReplay: () => {
-      void replayPendingActions()
-    },
-  }
-}
-
 /** A temp id whose create has replayed since the window last looked becomes the real id. */
-function taskIdFor(queue: ReturnType<typeof getOfflineQueue>, taskId: number): number {
+function taskIdFor(queue: WriteQueue, taskId: number): number {
   return queue.resolveTaskRef(taskId) ?? taskId
-}
-
-function currentUserId(): number | undefined {
-  const config = loadConfig()
-  return config?.vikunja_url ? knownUserIdFor(config.vikunja_url) : undefined
 }
 
 // At most a few member lookups at once: the sidebar asks for every project when the app starts.
@@ -105,16 +90,26 @@ function commentCreateReply(outcome: TaskWriteOutcome): ApiResult<unknown> | Que
   return taskWriteReply(outcome) as ApiResult<unknown>
 }
 
-export function registerCollaborationIpc(): void {
+export interface CollabDeps {
+  /** The write gate's queue and how to ask for a replay (offline/task-writes.ts). */
+  taskWriteDeps(): TaskWriteDeps
+  /** The signed-in user's id when it is known (the desktop reads it for the configured server). */
+  currentUserId(): number | undefined
+}
+
+export function registerCollaborationIpc(handle: Handle, deps: CollabDeps): void {
+  const writeDeps = (): TaskWriteDeps => deps.taskWriteDeps()
+  const { currentUserId } = deps
+
   // --- People and sharing ---
 
-  handleTrusted('search-project-users', (_event, projectId: unknown) => {
+  handle('search-project-users', (_event, projectId: unknown) => {
     if (!isPositiveId(projectId)) return invalid('project')
     return limited(() => searchProjectUsers(projectId))
   })
 
   /** The direct user shares and the team shares of one project, for permissions and the Share dialog. */
-  handleTrusted('fetch-project-shares', async (_event, projectId: unknown) => {
+  handle('fetch-project-shares', async (_event, projectId: unknown) => {
     if (!isPositiveId(projectId)) return invalid('project')
     const [users, teams] = await Promise.all([fetchProjectUserShares(projectId), fetchProjectTeamShares(projectId)])
     if (!users.success) return users
@@ -122,34 +117,34 @@ export function registerCollaborationIpc(): void {
     return { success: true, data: { users: users.data, teams: teams.data } }
   })
 
-  handleTrusted('search-users', (_event, query: unknown) => {
+  handle('search-users', (_event, query: unknown) => {
     if (!isUsername(query)) return invalid('search')
     return searchUsers(query.trim())
   })
 
-  handleTrusted('share-project', (_event, projectId: unknown, username: unknown, permission: unknown) => {
+  handle('share-project', (_event, projectId: unknown, username: unknown, permission: unknown) => {
     if (!isPositiveId(projectId) || !isUsername(username) || !isPermission(permission)) return invalid('share')
     return shareProjectWithUser(projectId, username.trim(), permission)
   })
 
-  handleTrusted('update-project-share', (_event, projectId: unknown, username: unknown, permission: unknown) => {
+  handle('update-project-share', (_event, projectId: unknown, username: unknown, permission: unknown) => {
     if (!isPositiveId(projectId) || !isUsername(username) || !isPermission(permission)) return invalid('share')
     return updateProjectUserShare(projectId, username, permission)
   })
 
-  handleTrusted('remove-project-share', (_event, projectId: unknown, username: unknown) => {
+  handle('remove-project-share', (_event, projectId: unknown, username: unknown) => {
     if (!isPositiveId(projectId) || !isUsername(username)) return invalid('share')
     return removeProjectUserShare(projectId, username)
   })
 
-  handleTrusted('fetch-avatar', (_event, username: unknown, size: unknown) => {
+  handle('fetch-avatar', (_event, username: unknown, size: unknown) => {
     if (!isUsername(username) || typeof size !== 'number' || !Number.isFinite(size) || size < 1 || size > 512) return invalid('avatar')
     return avatarFor(username, Math.round(size))
   })
 
   // --- Assignees (never a field of a task patch) ---
 
-  handleTrusted('add-task-assignee', async (_event, taskId: unknown, userId: unknown, options?: unknown) => {
+  handle('add-task-assignee', async (_event, taskId: unknown, userId: unknown, options?: unknown) => {
     if (!isId(taskId) || !isPositiveId(userId)) return invalid('assignee')
     const { queue, title, username } = parseTaskWriteOptions(options)
     const deps = writeDeps()
@@ -157,7 +152,7 @@ export function registerCollaborationIpc(): void {
     return taskWriteReply(await writeTask(deps, spec, { queue })) as ApiResult<unknown> | QueuedWriteReply
   })
 
-  handleTrusted('remove-task-assignee', async (_event, taskId: unknown, userId: unknown, options?: unknown) => {
+  handle('remove-task-assignee', async (_event, taskId: unknown, userId: unknown, options?: unknown) => {
     if (!isId(taskId) || !isPositiveId(userId)) return invalid('assignee')
     const { queue, title, username } = parseTaskWriteOptions(options)
     const deps = writeDeps()
@@ -168,7 +163,7 @@ export function registerCollaborationIpc(): void {
   // --- Pro's "after" (cross-app semantics 21.2, decision 24): a blocked-by relation through the
   // write gate, queued offline. Subtask relations keep `create-task-relation`, which is not queued.
 
-  handleTrusted('pro:add-after', async (_event, taskId: unknown, otherTaskId: unknown, options?: unknown) => {
+  handle('pro:add-after', async (_event, taskId: unknown, otherTaskId: unknown, options?: unknown) => {
     if (!isId(taskId) || !isId(otherTaskId) || taskId === otherTaskId) return invalid('relation')
     const { queue, title } = parseTaskWriteOptions(options)
     const deps = writeDeps()
@@ -183,7 +178,7 @@ export function registerCollaborationIpc(): void {
     return taskWriteReply(await writeTask(deps, spec, { queue })) as ApiResult<unknown> | QueuedWriteReply
   })
 
-  handleTrusted('pro:remove-after', async (_event, taskId: unknown, otherTaskId: unknown, options?: unknown) => {
+  handle('pro:remove-after', async (_event, taskId: unknown, otherTaskId: unknown, options?: unknown) => {
     if (!isId(taskId) || !isId(otherTaskId)) return invalid('relation')
     const { queue, title } = parseTaskWriteOptions(options)
     const deps = writeDeps()
@@ -203,9 +198,9 @@ export function registerCollaborationIpc(): void {
    * One page of a task's thread, newest first, with the queued comment changes laid over it. A task
    * that only exists offline has no thread on the server yet: just the queued comments.
    */
-  handleTrusted('fetch-task-comments', async (_event, taskId: unknown, page: unknown) => {
+  handle('fetch-task-comments', async (_event, taskId: unknown, page: unknown) => {
     if (!isId(taskId) || !isPositiveId(page)) return invalid('comments request')
-    const queue = getOfflineQueue()
+    const queue = writeDeps().queue
     const realId = queue.resolveTaskRef(taskId)
     const me = currentUserId()
     if (realId === null || realId < 0) {
@@ -218,7 +213,7 @@ export function registerCollaborationIpc(): void {
     return { success: true, data: { ...result.data, items } }
   })
 
-  handleTrusted('create-task-comment', async (_event, taskId: unknown, html: unknown, options?: unknown) => {
+  handle('create-task-comment', async (_event, taskId: unknown, html: unknown, options?: unknown) => {
     if (!isId(taskId) || !isHtml(html)) return invalid('comment')
     const { queue, title } = parseTaskWriteOptions(options)
     const deps = writeDeps()
@@ -226,7 +221,7 @@ export function registerCollaborationIpc(): void {
     return commentCreateReply(await writeTask(deps, spec, { queue }))
   })
 
-  handleTrusted('update-task-comment', async (_event, taskId: unknown, commentId: unknown, html: unknown, options?: unknown) => {
+  handle('update-task-comment', async (_event, taskId: unknown, commentId: unknown, html: unknown, options?: unknown) => {
     if (!isId(taskId) || !isId(commentId) || !isHtml(html)) return invalid('comment')
     const { queue, title } = parseTaskWriteOptions(options)
     const deps = writeDeps()
@@ -238,7 +233,7 @@ export function registerCollaborationIpc(): void {
     return taskWriteReply(await writeTask(deps, spec, { queue }))
   })
 
-  handleTrusted('delete-task-comment', async (_event, taskId: unknown, commentId: unknown, options?: unknown) => {
+  handle('delete-task-comment', async (_event, taskId: unknown, commentId: unknown, options?: unknown) => {
     if (!isId(taskId) || !isId(commentId)) return invalid('comment')
     const { queue, title } = parseTaskWriteOptions(options)
     const deps = writeDeps()
@@ -250,12 +245,12 @@ export function registerCollaborationIpc(): void {
 
   // --- Read and subscriptions (online only, cross-app semantics 9.6) ---
 
-  handleTrusted('mark-task-read', (_event, taskId: unknown) => {
+  handle('mark-task-read', (_event, taskId: unknown) => {
     if (!isPositiveId(taskId)) return invalid('task')
     return markTaskRead(taskId)
   })
 
-  handleTrusted('set-task-subscription', (_event, taskId: unknown, subscribed: unknown) => {
+  handle('set-task-subscription', (_event, taskId: unknown, subscribed: unknown) => {
     if (!isPositiveId(taskId) || typeof subscribed !== 'boolean') return invalid('subscription')
     return subscribed ? subscribeToTask(taskId) : unsubscribeFromTask(taskId)
   })

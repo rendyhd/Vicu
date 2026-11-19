@@ -38,7 +38,7 @@ const preloadFiles = [
 const invoked = channels(preloadFiles, /\binvoke\(\s*['"]([^'"]+)['"]/g)
 const handled = channels(
   sourceFiles(join(srcDir, 'main'), (name) => name.endsWith('.ts')),
-  /handleTrusted\(\s*['"]([^'"]+)['"]/g,
+  /(?:handleTrusted|\bhandle)\(\s*['"]([^'"]+)['"]/g,
 )
 
 // What main sends to a window must have a listener in a preload script, or the message is dropped
