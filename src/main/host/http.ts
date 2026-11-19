@@ -14,6 +14,22 @@ import { uploadTimeoutMs } from '../upload-limits'
 // src/web/host/http.ts, which does the same three jobs with `fetch`. Both answer an `ApiResult`
 // read by api-answers.ts.
 
+/** What `hostFetch` takes: the small part of `fetch` the app's own reads use. */
+export interface HostFetchInit {
+  method?: string
+  headers?: Record<string, string>
+  body?: string
+  signal?: AbortSignal
+}
+
+/**
+ * A plain fetch through Chromium's network stack with Vicu's User-Agent, for the small reads made
+ * outside the client (who the signed-in user is).
+ */
+export function hostFetch(url: string, init: HostFetchInit = {}): Promise<Response> {
+  return net.fetch(url, { ...init, headers: { ...init.headers, 'User-Agent': vikunjaUserAgent() } })
+}
+
 // A request fails after this long WITHOUT data (connecting, waiting for the answer, or between two
 // chunks of it), not after this long in total (C-11).
 const REQUEST_IDLE_TIMEOUT = 10_000

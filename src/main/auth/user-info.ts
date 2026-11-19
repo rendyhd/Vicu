@@ -1,5 +1,4 @@
-import { net } from 'electron'
-import { vikunjaUserAgent } from '../user-agent'
+import { hostFetch } from '@host/http'
 
 export interface VikunjaUser {
   id: number
@@ -31,8 +30,8 @@ export async function fetchCurrentUser(
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT)
 
-    const response = await net.fetch(`${baseUrl}/api/v2/user`, {
-      headers: { Authorization: `Bearer ${token}`, 'User-Agent': vikunjaUserAgent() },
+    const response = await hostFetch(`${baseUrl}/api/v2/user`, {
+      headers: { Authorization: `Bearer ${token}` },
       signal: controller.signal,
     })
     clearTimeout(timer)
