@@ -10,6 +10,9 @@
   "scripts": {
     "dev": "electron-vite dev",
     "build": "node scripts/clean-out.mjs && electron-vite build",
+    "dev:web": "vite --config vite.web.config.ts",
+    "build:web": "vite build --config vite.web.config.ts",
+    "start:web": "vite preview --config vite.web.config.ts",
     "preview": "electron-vite preview",
     "start": "electron-vite preview",
     "dist": "npm run build && npm run speech:lib && electron-builder --win",
@@ -17,7 +20,7 @@
     "dist:mac": "npm run build && npm run voice:helper && npm run calendar:helper && npm run bridge:helper && npm run speech:lib && electron-builder --mac",
     "dist:mac:publish": "npm run build && npm run voice:helper && npm run calendar:helper && npm run bridge:helper && npm run speech:lib && electron-builder --mac --publish always",
     "dist:linux": "npm run build && npm run speech:lib && electron-builder --linux && node scripts/appimage-update-info.mjs --optional",
-    "typecheck": "tsc --noEmit --composite false -p tsconfig.node.json --pretty false && tsc --noEmit --composite false -p tsconfig.web.json --pretty false && tsc --noEmit --composite false -p tsconfig.vite.json --pretty false",
+    "typecheck": "tsc --noEmit --composite false -p tsconfig.node.json --pretty false && tsc --noEmit --composite false -p tsconfig.web.json --pretty false && tsc --noEmit --composite false -p tsconfig.vite.json --pretty false && tsc --noEmit --composite false -p tsconfig.webhost.json --pretty false",
     "verify": "npm run typecheck && npm test && npm run build",
     "test": "vitest run",
     "test:watch": "vitest",

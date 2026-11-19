@@ -1,4 +1,5 @@
 import { isQueueableFailure, isUnreachableFailure } from '../../shared/error-classify'
+import { oneWriterAtATime } from '@host/serial'
 import type { QueuedWriteReply, TaskWriteOptions } from '../../shared/offline-queue-types'
 import type { ApiError, ApiResult, ApiSuccess } from '../api-result'
 import type { WriteQueue } from '../handlers/write-queue'
@@ -326,7 +327,7 @@ export async function sendSerially<T>(send: () => Promise<T>): Promise<T> {
   }
   let unreachable = false
   try {
-    const result = await send()
+    const result = await oneWriterAtATime(send)
     unreachable = isNetworkFailure(result)
     return result
   } finally {

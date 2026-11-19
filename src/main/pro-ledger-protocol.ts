@@ -1,3 +1,4 @@
+import { base64ToBytes, bytesToBase64Url, bytesToUtf8, utf8Bytes } from '../shared/bytes'
 import { HIDDEN_TASK_READ_MAX_BYTES, HIDDEN_TASK_WRITE_MAX_BYTES, kindMarkerPattern } from '../shared/hidden-tasks'
 import { PRO_LEDGER_VERSION, normalizeLedger, type ProArchivePart, type ProLedger } from '../shared/pro/ledger'
 
@@ -38,9 +39,9 @@ export function hasProArchiveMarker(description?: string | null): boolean {
 function decode(marker: RegExpMatchArray, what: string): { version: number; json?: unknown; error?: string } {
   const version = Number(marker[1])
   try {
-    const bytes = Buffer.from(marker[2].replace(/-/g, '+').replace(/_/g, '/'), 'base64')
+    const bytes = base64ToBytes(marker[2])
     if (bytes.byteLength > HIDDEN_TASK_READ_MAX_BYTES) return { version, error: `${what} is too large` }
-    return { version, json: JSON.parse(bytes.toString('utf8')) }
+    return { version, json: JSON.parse(bytesToUtf8(bytes)) }
   } catch {
     return { version, error: `Cannot decode ${what}` }
   }
@@ -65,9 +66,9 @@ export function parseProLedgerEnvelope(description?: string | null): ParsedEnvel
 }
 
 function encode(kind: 'pro' | 'pro-archive', document: unknown, what: string): string {
-  const bytes = Buffer.from(JSON.stringify(document), 'utf8')
+  const bytes = utf8Bytes(JSON.stringify(document))
   if (bytes.byteLength > HIDDEN_TASK_WRITE_MAX_BYTES) throw new Error(`${what} is too large`)
-  return `<!-- vicu-${kind}:v${PRO_LEDGER_VERSION}:${bytes.toString('base64url')} -->`
+  return `<!-- vicu-${kind}:v${PRO_LEDGER_VERSION}:${bytesToBase64Url(bytes)} -->`
 }
 
 export function encodeProLedgerEnvelope(document: ProLedger): string {

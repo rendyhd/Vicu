@@ -1,3 +1,4 @@
+import { osPlatform } from '@host/env'
 // Safety helpers for task attachments that come from the Vikunja server (D-IPC-2).
 // Any collaborator on a shared project can upload a file, and the temp copy we
 // write is marked as downloaded (attachment-origin.ts), but that mark is best effort, so
@@ -91,7 +92,7 @@ export function sanitizeAttachmentFileName(name: unknown, fallback = 'attachment
  * True when the attachment must not be opened directly: blocked extension, or
  * no extension at all (the system would have to guess how to run it). On macOS archives count too.
  */
-export function isRiskyAttachment(fileName: unknown, platform: string = process.platform): boolean {
+export function isRiskyAttachment(fileName: unknown, platform: string = osPlatform): boolean {
   const name = sanitizeAttachmentFileName(fileName, '')
   if (name === '') return true
   const dot = name.lastIndexOf('.')

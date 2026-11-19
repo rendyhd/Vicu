@@ -1,4 +1,5 @@
 // The shapes live with the config types so the renderer sees the same ones (D-CFG-3).
+import { base64ToBytes, bytesToBase64Url, bytesToUtf8, utf8Bytes } from '../shared/bytes'
 import type {
   CustomList,
   CustomListRevision,
@@ -429,9 +430,9 @@ export function parseCustomListEnvelope(description?: string | null): ParsedCust
     return { isCarrier: true, body, version, error: `Custom-list metadata version ${version} is not supported` }
   }
   try {
-    const bytes = Buffer.from(marker[2].replace(/-/g, '+').replace(/_/g, '/'), 'base64')
+    const bytes = base64ToBytes(marker[2])
     if (bytes.byteLength > CUSTOM_LIST_SYNC_MAX_BYTES) throw new Error('Custom-list metadata is too large')
-    const document = JSON.parse(bytes.toString('utf8')) as unknown
+    const document = JSON.parse(bytesToUtf8(bytes)) as unknown
     // A v1 marker around a document of a newer version: written by a newer app, so "update
     // required" rather than malformed (cross-app semantics 10.7).
     const payloadVersion = (document as { version?: unknown } | null)?.version
@@ -447,7 +448,7 @@ export function parseCustomListEnvelope(description?: string | null): ParsedCust
 
 export function encodeCustomListEnvelope(document: CustomListSyncDocumentV1): string {
   validateCustomListDocument(document)
-  const bytes = Buffer.from(JSON.stringify(normalizeDocument(document)), 'utf8')
+  const bytes = utf8Bytes(JSON.stringify(normalizeDocument(document)))
   if (bytes.byteLength > CUSTOM_LIST_SYNC_MAX_BYTES) throw new Error('Custom-list metadata is too large')
-  return `<!-- vicu-custom-lists:v1:${bytes.toString('base64url')} -->`
+  return `<!-- vicu-custom-lists:v1:${bytesToBase64Url(bytes)} -->`
 }

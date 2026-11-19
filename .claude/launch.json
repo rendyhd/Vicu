@@ -6,6 +6,12 @@
       "runtimeExecutable": "node",
       "runtimeArgs": ["site/tools/serve.mjs"],
       "port": 8098
+    },
+    {
+      "name": "web",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["node_modules/vite/bin/vite.js", "preview", "--config", "vite.web.config.ts"],
+      "port": 5175
     }
   ]
 }
