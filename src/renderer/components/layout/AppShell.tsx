@@ -834,7 +834,13 @@ export function AppShell() {
   if (appState === 'setup') {
     return (
       <Suspense fallback={<div className="flex h-screen w-screen items-center justify-center bg-[var(--bg-primary)]" />}>
-        <SetupView onComplete={() => setAppState('ready')} />
+        <SetupView
+          onComplete={() => {
+            // Setup just saved the connection and the Inbox: the config read before it is out of date.
+            void queryClient.invalidateQueries({ queryKey: APP_CONFIG_QUERY_KEY })
+            setAppState('ready')
+          }}
+        />
       </Suspense>
     )
   }

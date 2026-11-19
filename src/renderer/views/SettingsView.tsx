@@ -365,12 +365,15 @@ export function SettingsView() {
 
           {authMethod === 'oidc' || authMethod === 'password' ? (
             <div className="space-y-3">
+              {/* The web version is served next to its server: there is no address to show. */}
+              {can('serverChoice') && (
               <div>
                 <label className="mb-1 block text-xs text-[var(--text-secondary)]">{t('settings.connection.url')}</label>
                 <div className="rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-secondary)]">
                   {url}
                 </div>
               </div>
+              )}
 
               <div className="flex items-center gap-2">
                 <span className="inline-block h-2 w-2 rounded-full bg-status-done" />
@@ -568,7 +571,7 @@ export function SettingsView() {
           <h2 className="mb-4 text-sm font-semibold text-[var(--text-primary)]">{t('settings.preferences.title')}</h2>
 
           <div className="space-y-3">
-            {launchOnStartupSupported && (
+            {launchOnStartupSupported && can('windowControls') && (
               <>
                 <label className="flex cursor-pointer items-center gap-2">
                   <Checkbox
