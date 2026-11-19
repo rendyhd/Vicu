@@ -95,7 +95,7 @@ import { initDateFormat, subscribeDateFormat } from '../lib/date-format'
 import { initLanguage } from '../lib/language'
 import type { ParseResult, ParserConfig, ParsedToken, TokenType } from '../lib/task-parser'
 import type { Person } from '../../shared/pro/people'
-import { getClipboardImages, fileToUint8Array } from '../lib/clipboard-images'
+import { getClipboardImages, getTitlePasteImages, fileToUint8Array, type ClipboardImage } from '../lib/clipboard-images'
 import { AutocompleteDropdown } from './autocomplete'
 import { cache } from './vikunja-cache'
 import { applyQuickEntryFollowUps } from '../lib/quick-entry-follow-ups'
@@ -970,9 +970,9 @@ input.addEventListener('input', () => {
   handleInputChange()
 })
 
-// Image paste — works on both title and description; auto-expands description.
-async function handleImagePaste(e: ClipboardEvent): Promise<void> {
-  const images = getClipboardImages(e)
+// Image paste — works on both title and description; auto-expands description. In the title a
+// paste with text is the text (Office apps add a picture of copied text).
+async function handleImagePaste(e: ClipboardEvent, images: ClipboardImage[]): Promise<void> {
   if (images.length === 0) return // allow native text paste
   e.preventDefault()
   if (!isDescriptionExpanded()) expandDescription()
@@ -993,7 +993,7 @@ async function handleImagePaste(e: ClipboardEvent): Promise<void> {
   }
 }
 
-input.addEventListener('paste', handleImagePaste)
+input.addEventListener('paste', (e) => void handleImagePaste(e, getTitlePasteImages(e)))
 
 // Pro (plan 7.1.9): a pasted import (Copilot's JSON, a Vicu export) opens its review in the main
 // window instead of becoming the title. Only while Pro's promises layer is on.
@@ -1004,7 +1004,7 @@ input.addEventListener('paste', (e: ClipboardEvent) => {
   e.preventDefault()
   void window.quickEntryApi.openImport(text)
 })
-descriptionInput.addEventListener('paste', handleImagePaste)
+descriptionInput.addEventListener('paste', (e) => void handleImagePaste(e, getClipboardImages(e)))
 
 // Obsidian badge remove button
 obsidianBadgeRemove.addEventListener('click', () => {

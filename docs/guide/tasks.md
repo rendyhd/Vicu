@@ -105,7 +105,7 @@ A long note folds at about half the visible height, with **Show all**. On the de
 
 ### Images
 
-Paste an image into the notes on the desktop and on Android. On iPhone, use **Add image**. Click or tap a picture in the notes, or an image attachment, to open the viewer:
+Paste an image into the notes on the desktop and on Android. On the desktop you can also paste it while typing the title: it goes into the notes and uploads, and you keep typing. On iPhone, use **Add image**. Click or tap a picture in the notes, or an image attachment, to open the viewer:
 
 - Fit the image or see it at its own size.
 - Press <kbd>Left</kbd> and <kbd>Right</kbd> to go through the task's images.

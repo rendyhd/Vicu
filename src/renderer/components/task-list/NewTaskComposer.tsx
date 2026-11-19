@@ -23,7 +23,8 @@ import { recordValue } from '../../../shared/pro/ledger'
 import { readiness, withLogAnyway } from '../../../shared/pro/portfolio'
 import { api } from '@/lib/api'
 import { NULL_DATE } from '@/lib/constants'
-import { replacePendingTokens } from '@/lib/image-tokens'
+import { joinDescriptionImages, replacePendingTokens, splitDescriptionImages } from '@/lib/image-tokens'
+import { getTitlePasteImages, type ClipboardImage } from '@/lib/clipboard-images'
 import { parse, type ParseResult } from '@/lib/task-parser'
 import { dateOnlyDue, isDateOnly, toLocalDate } from '@/lib/due-dates'
 import { composerChips, resolveComposerFields } from '@/lib/composer-fields'
@@ -53,7 +54,7 @@ import {
 import type { CreateTaskPayload, Label, Task, TaskReminder } from '@/lib/vikunja-types'
 import type { ChipData } from '@/lib/parse-chips'
 import { TaskInputParser } from '@/components/task-input/TaskInputParser'
-import { TaskDescription, type PendingImage } from './TaskDescription'
+import { TaskDescription, toPendingImage, type PendingImage } from './TaskDescription'
 import { WhenPopover } from './WhenPopover'
 import { PriorityPickerPopover, PRIORITY_OPTIONS } from './PriorityPickerPopover'
 import { ProjectPickerPopover } from './ProjectPickerPopover'
@@ -165,6 +166,12 @@ export function NewTaskComposer({
   const updateTask = useUpdateTask({ silent: true })
   const [description, setDescription] = useState(template?.notes ?? '')
   const [showNotes, setShowNotes] = useState(!!template?.notes)
+  // Notes opened by an image pasted in the title leave the focus in the title.
+  const [notesTakeFocus, setNotesTakeFocus] = useState(true)
+  const openNotes = (takeFocus: boolean) => {
+    setNotesTakeFocus(takeFocus)
+    setShowNotes(true)
+  }
   const templates = useTaskTemplates()
   const templateButtonRef = useRef<HTMLButtonElement>(null)
   const [subtaskTitles, setSubtaskTitles] = useState<string[]>(() => (template?.subtasks ?? []).map((subtask) => subtask.title))
@@ -540,9 +547,11 @@ export function NewTaskComposer({
     }
   }
 
+  const refuseTemplateImages = () => toast.info("A template can't hold images.")
+
   const stagePendingImage = (image: PendingImage) => {
     if (template) {
-      toast.info("A template can't hold images.")
+      refuseTemplateImages()
       return
     }
     setAttachments((current) => [...current, {
@@ -553,6 +562,29 @@ export function NewTaskComposer({
       pendingToken: image.uuid,
       blobUrl: image.blobUrl,
     }])
+  }
+
+  // An image pasted in the title is staged like one pasted in the notes, and the notes open to show it.
+  const pasteImagesFromTitle = async (images: ClipboardImage[]) => {
+    if (template) {
+      refuseTemplateImages()
+      return
+    }
+    const staged: PendingImage[] = []
+    for (const image of images) {
+      try {
+        staged.push(await toPendingImage(image))
+      } catch {
+        // A clipboard file that cannot be read is left out.
+      }
+    }
+    if (staged.length === 0) return
+    for (const image of staged) stagePendingImage(image)
+    setDescription((current) => {
+      const { text, images: existing } = splitDescriptionImages(current)
+      return joinDescriptionImages(text, [...existing, ...staged.map((image) => ({ kind: 'pending' as const, uuid: image.uuid }))])
+    })
+    if (!showNotes) openNotes(false)
   }
 
   const stageFiles = async (files: FileList | null) => {
@@ -584,14 +616,22 @@ export function NewTaskComposer({
         onBlurOutside?.()
       }}
     >
-      <div className="flex items-start gap-3 px-4 py-2.5">
+      <div
+        className="flex items-start gap-3 px-4 py-2.5"
+        onPaste={(event) => {
+          const images = getTitlePasteImages(event)
+          if (images.length === 0) return
+          event.preventDefault()
+          void pasteImagesFromTitle(images)
+        }}
+      >
         <div className="mt-[7px] h-[18px] w-[18px] shrink-0 rounded-full border border-control-ring" />
         <TaskInputParser
           value={parser.inputValue}
           onChange={parser.setInputValue}
           onSubmit={() => { void submit() }}
           onCancel={() => { closeAndReset(); onCancel() }}
-          onTab={() => setShowNotes(true)}
+          onTab={() => openNotes(true)}
           parseResult={template ? null : parser.parseResult}
           parserConfig={parser.parserConfig}
           onSuppressType={parser.suppressType}
@@ -651,7 +691,7 @@ export function NewTaskComposer({
               blobUrl: attachment.blobUrl!,
             }]))}
             placeholder="Notes"
-            autoFocus
+            autoFocus={notesTakeFocus}
             onKeyDown={(event) => {
               if (event.key === 'Escape') (inputRef as React.RefObject<HTMLInputElement> | undefined)?.current?.focus()
               if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') { event.preventDefault(); void submit() }
@@ -716,7 +756,7 @@ export function NewTaskComposer({
           </ActionButton>
           {openPicker === 'project' && <ProjectPickerPopover anchorRef={projectButtonRef} currentProjectId={fields.projectId} onSelect={(id) => { setSelectedProjectId(id); setProjectTouched(true); parser.pinType('project') }} onClose={() => setOpenPicker(null)} />}
         </div>
-        <ActionButton active={showNotes || !!description} label="Notes" onClick={() => setShowNotes((value) => !value)}>
+        <ActionButton active={showNotes || !!description} label="Notes" onClick={() => (showNotes ? setShowNotes(false) : openNotes(true))}>
           <AlignLeft className="h-3.5 w-3.5" /> Notes
         </ActionButton>
         {!template && (

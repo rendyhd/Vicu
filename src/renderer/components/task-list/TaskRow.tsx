@@ -30,7 +30,8 @@ import { blockOf, dueRepeatsBlockDay } from '../../../shared/time-blocks'
 import { useRowView } from './RowViewContext'
 import { PriorityMark } from '@/components/shared/PriorityMark'
 import { SubtaskList } from './SubtaskList'
-import { TaskDescription } from './TaskDescription'
+import { TaskDescription, type TaskDescriptionImages } from './TaskDescription'
+import { getTitlePasteImages, type ClipboardImage } from '@/lib/clipboard-images'
 import { TaskContextMenu } from './TaskContextMenu'
 import { TaskLinkIcon } from '@/components/TaskLinkIcon'
 import { TaskSyncIcon } from '@/components/task-list/TaskSyncIcon'
@@ -166,10 +167,12 @@ interface TaskTitleEditorProps {
   onSave: (changes: Partial<Task>) => void
   onSubmit: () => void
   onCancel: () => void
+  /** An image pasted in the title goes to the notes. */
+  onPasteImages: (images: ClipboardImage[]) => void
 }
 
 const TaskTitleEditor = forwardRef<TaskTitleEditorHandle, TaskTitleEditorProps>(
-  function TaskTitleEditor({ task, onSave, onSubmit, onCancel }, ref) {
+  function TaskTitleEditor({ task, onSave, onSubmit, onCancel, onPasteImages }, ref) {
     const addLabel = useAddLabel()
     const createLabel = useCreateLabel()
     const parser = useTaskParser()
@@ -310,6 +313,12 @@ const TaskTitleEditor = forwardRef<TaskTitleEditorHandle, TaskTitleEditorProps>(
         onBlur={(e) => {
           if (e.currentTarget.contains(e.relatedTarget as Node)) return
           save()
+        }}
+        onPaste={(e) => {
+          const images = getTitlePasteImages(e)
+          if (images.length === 0) return
+          e.preventDefault()
+          onPasteImages(images)
         }}
       >
         <TaskInputParser
@@ -501,6 +510,10 @@ function TaskRowInner({
   const titleEditorRef = useRef<TaskTitleEditorHandle>(null)
   const descEditorRef = useRef<Editor | null>(null)
   const descBaselineRef = useRef<string | null>(null)
+  const descImagesRef = useRef<TaskDescriptionImages | null>(null)
+  // Images pasted in the title land in the notes after their upload; the notes are saved then,
+  // because the title's own save only sends the notes when the title changed too.
+  const [saveNotesAfterPaste, setSaveNotesAfterPaste] = useState(0)
 
   // Flash red border briefly when drag-drop upload fails, show error message
   useEffect(() => {
@@ -574,6 +587,16 @@ function TaskRowInner({
       saveTaskChanges()
     }
   }, [saveTaskChanges])
+
+  const pasteImagesFromTitle = useCallback((images: ClipboardImage[]) => {
+    const notes = descImagesRef.current
+    if (!notes) return
+    void notes.addImages(images).then(() => setSaveNotesAfterPaste((n) => n + 1))
+  }, [])
+  // Runs after the render that holds the new notes, so the save sees them; only when a paste finished.
+  useEffect(() => {
+    if (saveNotesAfterPaste > 0) saveTaskChanges()
+  }, [saveNotesAfterPaste])
 
   const handleDateChange = useCallback(
     (isoDate: string) => {
@@ -1023,6 +1046,7 @@ function TaskRowInner({
           onSave={saveTaskChanges}
           onSubmit={() => descEditorRef.current?.commands.focus('end')}
           onCancel={collapseAll}
+          onPasteImages={pasteImagesFromTitle}
         />
         <TaskSyncIcon taskId={task.id} />
         <TaskLinkIcon description={task.description} />
@@ -1067,6 +1091,7 @@ function TaskRowInner({
             setEditDescription(normalized)
           }}
           editorRef={descEditorRef}
+          imagesRef={descImagesRef}
           placeholder="Notes"
         />
         </FoldedNotes>

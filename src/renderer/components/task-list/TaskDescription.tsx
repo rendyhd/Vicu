@@ -3,7 +3,7 @@ import { X } from 'lucide-react'
 import type { Editor } from '@tiptap/react'
 import { cn } from '@/lib/cn'
 import { splitDescriptionImages, joinDescriptionImages, type DescriptionImage } from '@/lib/image-tokens'
-import { getClipboardImages, fileToUint8Array } from '@/lib/clipboard-images'
+import { getClipboardImages, fileToUint8Array, type ClipboardImage } from '@/lib/clipboard-images'
 import {
   useTaskAttachments,
   useAttachPastedImage,
@@ -25,6 +25,18 @@ export interface PendingImage {
 }
 
 type ImageRef = DescriptionImage
+
+/** Adds images to the notes from outside the editor (an image pasted in the title). */
+export interface TaskDescriptionImages {
+  addImages: (images: ClipboardImage[]) => Promise<void>
+}
+
+/** A pasted image staged for a task that does not exist yet; the caller owns its `blobUrl`. */
+export async function toPendingImage(img: ClipboardImage): Promise<PendingImage> {
+  const bytes = await fileToUint8Array(img.file)
+  const blobUrl = URL.createObjectURL(new Blob([bytes as BlobPart], { type: img.mime }))
+  return { uuid: crypto.randomUUID().slice(0, 8), blobUrl, bytes, name: img.name, mime: img.mime }
+}
 
 type Props = {
   value: string
@@ -50,6 +62,8 @@ type Props = {
   editorRef?: React.MutableRefObject<Editor | null>
   /** Fired once with the initial value as the editor writes it: its normalized HTML, then the image tokens. */
   onReady?: (normalizedValue: string) => void
+  /** Lets the title hand pasted images to the notes, which upload or stage them like a paste here. */
+  imagesRef?: React.MutableRefObject<TaskDescriptionImages | null>
 }
 
 function imageRefKey(img: ImageRef): string {
@@ -70,6 +84,7 @@ export function TaskDescription({
   autoFocus = false,
   editorRef,
   onReady,
+  imagesRef: imagesHandleRef,
 }: Props) {
   const [uploadError, setUploadError] = useState<string | null>(null)
   const uploadMutation = useAttachPastedImage()
@@ -137,42 +152,54 @@ export function TaskDescription({
     [onChange, taskId, deleteMutation, onRemovePending]
   )
 
+  const addImages = useCallback(
+    async (clipboardImages: ClipboardImage[]): Promise<void> => {
+      const added: ImageRef[] = []
+      for (const img of clipboardImages) {
+        try {
+          if (taskId != null) {
+            const bytes = await fileToUint8Array(img.file)
+            const result = await uploadMutation.mutateAsync({
+              taskId,
+              fileData: bytes,
+              fileName: img.name,
+              mimeType: img.mime,
+            })
+            // Offline the image waits in the queue and joins the notes once uploaded (issue 104).
+            if ('attachmentId' in result) added.push({ kind: 'image', attachmentId: result.attachmentId })
+          } else if (onStagePending) {
+            const pending = await toPendingImage(img)
+            onStagePending(pending)
+            added.push({ kind: 'pending', uuid: pending.uuid })
+          }
+        } catch (err) {
+          setUploadError(err instanceof Error ? err.message : 'Upload failed')
+        }
+      }
+      if (added.length === 0) return
+      // Read the notes after the uploads: the text may have changed while they ran.
+      onChangeRef.current(joinDescriptionImages(textRef.current, [...imagesRef.current, ...added]))
+    },
+    [taskId, onStagePending, uploadMutation]
+  )
+
+  useEffect(() => {
+    if (!imagesHandleRef) return
+    imagesHandleRef.current = { addImages }
+    return () => {
+      imagesHandleRef.current = null
+    }
+  }, [imagesHandleRef, addImages])
+
   const handlePaste = useCallback(
     (e: ClipboardEvent): boolean => {
       const clipboardImages = getClipboardImages(e)
       if (clipboardImages.length === 0) return false // allow native text/HTML paste
       e.preventDefault()
-      void (async () => {
-        const next = imagesRef.current.slice()
-        for (const img of clipboardImages) {
-          try {
-            const bytes = await fileToUint8Array(img.file)
-            if (taskId != null) {
-              const result = await uploadMutation.mutateAsync({
-                taskId,
-                fileData: bytes,
-                fileName: img.name,
-                mimeType: img.mime,
-              })
-              // Offline the image waits in the queue and joins the notes once uploaded (issue 104).
-              if ('attachmentId' in result) next.push({ kind: 'image', attachmentId: result.attachmentId })
-            } else if (onStagePending) {
-              const uuid = crypto.randomUUID().slice(0, 8)
-              const blobUrl = URL.createObjectURL(
-                new Blob([bytes as BlobPart], { type: img.mime })
-              )
-              onStagePending({ uuid, blobUrl, bytes, name: img.name, mime: img.mime })
-              next.push({ kind: 'pending', uuid })
-            }
-          } catch (err) {
-            setUploadError(err instanceof Error ? err.message : 'Upload failed')
-          }
-        }
-        onChangeRef.current(joinDescriptionImages(textRef.current, next))
-      })()
+      void addImages(clipboardImages)
       return true
     },
-    [taskId, onStagePending, uploadMutation]
+    [addImages]
   )
 
   return (
