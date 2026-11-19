@@ -118,6 +118,7 @@ Turn pasted notes or an email into task cards.
 Turn meeting notes, handwritten pages, PDFs and photos of whiteboards into tasks. It uses smart dictation's model, so turn that on first.
 
 - **Desktop:** choose **Make tasks from notes** in the command palette, or drop files on the Vicu window. Add typed or pasted text, PDFs, and pictures (JPEG, PNG, WebP; HEIC on a Mac only).
+- **Phone:** choose **Make tasks from notes** in the drawer, or share pictures, PDFs or text to Vicu and choose **Tasks from notes**. **Scan pages** uses the camera: a document scanner where the phone has one, else one photo per page.
 
 Give the notes a title and the date they were written: a date in the notes such as "Friday" is read from that day. Each file or picture becomes a page you can reorder, edit or remove.
 
@@ -206,7 +207,7 @@ The key is stored encrypted on the device and never written to a log.
 | Smart dictation | Tap the voice shortcut, slide up from **+**, **Dictate tasks** | Slide up from **+**, app icon **Dictate** |
 | Ask | Button next to Search, <kbd>Ctrl</kbd>+<kbd>J</kbd>, **Ask Vicu** | Sparkle next to Search on any list |
 | Make tasks from text | Command palette | Share text to Vicu |
-| Make tasks from notes | Command palette, or drop files on the window | |
+| Make tasks from notes | Command palette, or drop files on the window | Drawer, or share pictures, PDFs or text to Vicu |
 | Break into steps | Right-click a task | Task menu |
 | Speech models | Whisper Turbo suggested | Parakeet suggested |
 
