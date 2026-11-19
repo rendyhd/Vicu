@@ -1,0 +1,41 @@
+# Vicu web next to a Vikunja server. Copy, change the two secrets and the public address, and put
+# your reverse proxy (TLS) in front of the `vicu` service only: it serves the app and passes /api/
+# on to Vikunja, so one address is all a browser needs.
+#
+#   docker compose -f docker-compose.example.yml up -d
+#   open http://localhost:8080
+
+services:
+  vicu:
+    image: ghcr.io/rendyhd/vicu-web:latest
+    # Or build it from a checkout of the repository:
+    # build:
+    #   context: ../..
+    #   dockerfile: docker/web/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      # How this container reaches Vikunja (the service name below), not the public address.
+      VIKUNJA_URL: http://vikunja:3456
+      # The largest attachment; keep it at or above Vikunja's own limit.
+      VICU_MAX_UPLOAD: 25m
+    depends_on:
+      - vikunja
+
+  vikunja:
+    image: vikunja/vikunja:2.4.0
+    restart: unless-stopped
+    environment:
+      # The address people open in their browser: the Vicu container's public address.
+      VIKUNJA_SERVICE_PUBLICURL: http://localhost:8080/
+      VIKUNJA_SERVICE_JWTSECRET: change-me-to-a-long-random-text
+      VIKUNJA_DATABASE_TYPE: sqlite
+      VIKUNJA_DATABASE_PATH: /db/vikunja.db
+    volumes:
+      - vikunja-db:/db
+      - vikunja-files:/app/vikunja/files
+
+volumes:
+  vikunja-db:
+  vikunja-files:

@@ -1,0 +1,72 @@
+# Vicu web: the built page at the root and the Vikunja API on the same origin.
+#
+# The page and the API must share one origin: the app sends its requests to its own address, and
+# the session cookie Vikunja sets is only sent back there. So /api/ is forwarded to VIKUNJA_URL and
+# everything else is the app. Put TLS in front of this container (your reverse proxy); it listens on
+# plain HTTP, port 8080, as an unprivileged user.
+
+# The scheme the visitor used, as the proxy in front reports it (plain HTTP without one).
+map $http_x_forwarded_proto $vicu_forwarded_proto {
+  default $http_x_forwarded_proto;
+  ""      $scheme;
+}
+
+server {
+  listen 8080;
+  listen [::]:8080;
+  server_name _;
+  server_tokens off;
+
+  root /usr/share/nginx/html;
+  index index.html;
+
+  # The largest attachment that may be uploaded; keep it at or above Vikunja's own limit
+  # (files.maxsize, 20 MB by default).
+  client_max_body_size ${VICU_MAX_UPLOAD};
+
+  gzip on;
+  gzip_types text/css text/javascript application/javascript application/json image/svg+xml;
+  gzip_min_length 1024;
+
+  include /etc/nginx/vicu/security-headers.conf;
+
+  # For the container's health check and your monitoring: answers without touching Vikunja.
+  location = /healthz {
+    access_log off;
+    default_type text/plain;
+    return 200 "ok\n";
+  }
+
+  # The Vikunja API, as the server itself answers it.
+  location /api/ {
+    proxy_pass ${VIKUNJA_URL};
+    proxy_http_version 1.1;
+    proxy_set_header Host $http_host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $vicu_forwarded_proto;
+    proxy_set_header Connection "";
+    # An upload goes straight through instead of being written to disk here first.
+    proxy_request_buffering off;
+    proxy_connect_timeout 10s;
+    proxy_read_timeout 120s;
+    proxy_send_timeout 120s;
+  }
+
+  # Built files carry a hash of their content in their name: cached for good, and a name that does
+  # not exist is an error, never the app's page (a stale tab then reloads itself).
+  location /assets/ {
+    include /etc/nginx/vicu/security-headers.conf;
+    add_header Cache-Control "public, max-age=31536000, immutable" always;
+    try_files $uri =404;
+  }
+
+  # Everything else is the app: its own files, and its page for any other address (an OIDC sign-in
+  # comes back to /auth/openid/<provider>). The page itself is never cached, so a new version shows
+  # on the next load.
+  location / {
+    include /etc/nginx/vicu/security-headers.conf;
+    add_header Cache-Control "no-cache" always;
+    try_files $uri /index.html;
+  }
+}

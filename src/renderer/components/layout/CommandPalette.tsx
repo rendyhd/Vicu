@@ -31,6 +31,7 @@ import { useAiReady } from '@/hooks/use-ai'
 import { can } from '@/lib/capabilities'
 import { buildPaletteItems, rankPalette, type PaletteCommand, type PaletteItem, type PaletteKind } from '@/lib/palette'
 import { shortcutHint } from '@/lib/shortcut-hint'
+import { newEventShortcut, newTaskShortcut } from '@/lib/host-shortcuts'
 import { useUIStore } from '@/stores/ui-store'
 import { useNewTaskRequestStore } from '@/stores/new-task-request-store'
 import { useNewEventRequestStore } from '@/stores/new-event-request-store'
@@ -189,8 +190,8 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
 
   const detailOf = ({ action, kind }: PaletteItem): string => {
     if (action.type === 'task') return projects?.all.find((p) => p.id === action.task.project_id)?.title ?? kind
-    if (action.type === 'command' && action.command === 'new-task') return shortcutHint('Mod+N', window.api.platform === 'darwin')
-    if (action.type === 'command' && action.command === 'new-event') return shortcutHint('Mod+Shift+N', window.api.platform === 'darwin')
+    if (action.type === 'command' && action.command === 'new-task') return shortcutHint(newTaskShortcut(), window.api.platform === 'darwin')
+    if (action.type === 'command' && action.command === 'new-event') return shortcutHint(newEventShortcut(), window.api.platform === 'darwin')
     if (action.type === 'command' && action.command === 'refresh') return window.api.platform === 'darwin' ? shortcutHint('Mod+R', true) : 'F5'
     if (action.type === 'command' && action.command === 'voice' && appConfig?.voice_hotkey) return formatAcceleratorForDisplay(appConfig.voice_hotkey, window.api.platform === 'darwin')
     return kind

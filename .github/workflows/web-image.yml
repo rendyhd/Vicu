@@ -1,0 +1,124 @@
+# Vicu web: the container image (docker/web/Dockerfile, docs/web.md).
+#
+# A push to main that touches the web version builds the image and checks that it starts and
+# serves the page with its security headers; nothing is published. A manual run with "publish"
+# ticked also pushes it to ghcr.io/<owner>/vicu-web, tagged with the version in package.json and
+# `latest` (and `edge` instead of both when run from a branch other than main).
+#
+# To publish with every release as well, add `tags: ['v*']` under `push` and publish when
+# `github.ref_type == 'tag'`.
+
+name: Web image
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'locales/**'
+      - 'docker/web/**'
+      - 'vite.web.config.ts'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/web-image.yml'
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: Push the image to ghcr.io
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: web-image-${{ github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Typecheck and test
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: 1
+        run: |
+          npm ci --ignore-scripts
+          npm run typecheck
+          npm test
+
+      - name: Read the version
+        id: version
+        run: echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build the image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/web/Dockerfile
+          load: true
+          tags: vicu-web:check
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Check that it starts and serves the page
+        run: |
+          docker run -d --name vicu-web-check -p 8080:8080 -e VIKUNJA_URL=http://127.0.0.1:9 vicu-web:check
+          for attempt in $(seq 1 20); do
+            curl -fsS http://127.0.0.1:8080/healthz && break
+            sleep 1
+          done
+          curl -fsS -D headers.txt -o page.html http://127.0.0.1:8080/
+          grep -qi '^content-security-policy:' headers.txt
+          grep -qi '^x-content-type-options: nosniff' headers.txt
+          grep -q '<div id="root">' page.html
+          # An address that is no file is the app's page (an OIDC sign-in comes back to one).
+          curl -fsS -o back.html http://127.0.0.1:8080/auth/openid/example
+          grep -q '<div id="root">' back.html
+          # A built file that does not exist is an error, never the page.
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8080/assets/missing.js)" = "404"
+          docker rm -f vicu-web-check
+
+      - name: Sign in to ghcr.io
+        if: github.event_name == 'workflow_dispatch' && inputs.publish
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Name the image
+        if: github.event_name == 'workflow_dispatch' && inputs.publish
+        id: names
+        run: |
+          image="ghcr.io/$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')/vicu-web"
+          if [ "${{ github.ref_name }}" = "main" ]; then
+            echo "tags=$image:${{ steps.version.outputs.version }},$image:latest" >> "$GITHUB_OUTPUT"
+          else
+            echo "tags=$image:edge" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publish for x64 and arm64
+        if: github.event_name == 'workflow_dispatch' && inputs.publish
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/web/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.names.outputs.tags }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.version=${{ steps.version.outputs.version }}
+            org.opencontainers.image.licenses=${{ github.event.repository.license.spdx_id }}
+          cache-from: type=gha

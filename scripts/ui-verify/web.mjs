@@ -73,7 +73,11 @@ const context = await browser.newContext({
 /** What went wrong in a page without an assertion noticing: thrown errors, console errors, failed scripts. */
 const problems = []
 function watch(page, name) {
-  page.on('pageerror', (err) => problems.push(`${name}: ${err.message}`))
+  page.on('pageerror', (err) => {
+    // A view transition that a newer one replaced rejects its promise; nothing went wrong.
+    if (/Transition was skipped/.test(err.message)) return
+    problems.push(`${name}: ${err.message}`)
+  })
   page.on('console', (message) => {
     if (message.type() !== 'error') return
     const text = message.text()
@@ -178,7 +182,7 @@ step('views', async () => {
 step('hidden-features', async () => {
   await goto(page, '/settings')
   const settings = await text(page)
-  for (const gone of ['Assistant', 'Quick Entry', 'Launch on startup', 'Check for updates']) {
+  for (const gone of ['Assistant', 'Quick Entry', 'Launch on startup', 'Vikunja URL']) {
     assert(`Settings shows no "${gone}"`, !settings.includes(gone))
   }
   assert('no Ask button in the sidebar', (await page.locator('button[aria-label="Ask Vicu"]').count()) === 0)
@@ -197,8 +201,10 @@ async function serverTask(title) {
 
 step('task', async () => {
   await goto(page, '/inbox')
-  await page.locator('button[aria-label="New task"]').first().click()
-  await sleep(400)
+  assert('the Inbox is known after setup (its New task button is there)', (await page.locator('button[aria-label="New task"]').count()) > 0)
+  // Alt+N: the browser keeps Ctrl+N for a new window.
+  await page.keyboard.press('Alt+KeyN')
+  await sleep(500)
   await page.keyboard.type(`${TASK_TITLE} tomorrow`, { delay: 10 })
   await page.keyboard.press('Enter')
   await settle(page, 1500)
@@ -209,6 +215,67 @@ step('task', async () => {
   await goto(page, '/upcoming')
   assert('the new task shows in Upcoming', await visible(page, TASK_TITLE), await text(page))
   await capture(page, 'task-created')
+})
+
+// --- Reminders, links and printing under the container's policy ------------------------------
+
+step('page-guards', async () => {
+  await goto(page, '/today')
+  // No permission was given to this browser, so a reminder shows inside the page.
+  const permission = await page.evaluate(() => window.api.notificationPermission())
+  assert('the page can ask how notifications stand', ['granted', 'denied', 'default', 'unsupported'].includes(permission), permission)
+  if (permission !== 'granted') {
+    const shown = await page.evaluate(() => new Promise((done) => {
+      const off = window.api.onInPageNotification((notice) => {
+        off()
+        done(notice)
+      })
+      setTimeout(() => done(null), 5000)
+      void window.api.testNotification()
+    }))
+    assert('a reminder without permission is shown in the page', !!shown && typeof shown.title === 'string', JSON.stringify(shown))
+  }
+
+  // A link in a task's notes opens in another tab; the app stays where it is.
+  await context.route('https://example.org/**', (route) => route.fulfill({ contentType: 'text/html', body: '<p>elsewhere</p>' }))
+  await page.evaluate(() => {
+    const link = document.createElement('a')
+    link.id = 'harness-link'
+    link.href = 'https://example.org/somewhere'
+    link.textContent = 'harness link'
+    link.style.cssText = 'position:fixed;left:8px;bottom:8px;z-index:99999'
+    document.body.appendChild(link)
+  })
+  const [opened] = await Promise.all([context.waitForEvent('page', { timeout: 8000 }).catch(() => null), page.locator('#harness-link').click()])
+  assert('a link to another site opens in a new tab', !!opened && opened.url().startsWith('https://example.org/'), opened?.url())
+  assert('the app stays in its tab', page.url().startsWith(server.url) && page.url().includes('#/today'), page.url())
+  await opened?.close()
+  // A scheme a browser would hand to another program is not followed at all.
+  await page.evaluate(() => document.getElementById('harness-link')?.setAttribute('href', 'obsidian://open?vault=a&file=b'))
+  const before = context.pages().length
+  await page.locator('#harness-link').click()
+  await sleep(400)
+  assert('an obsidian: link is not followed', context.pages().length === before && page.url().includes('#/today'))
+  await page.evaluate(() => document.getElementById('harness-link')?.remove())
+
+  // The print frame loads under the policy (the print dialog itself is not opened here).
+  const framed = await page.evaluate(() => new Promise((done) => {
+    const frame = document.createElement('iframe')
+    frame.setAttribute('sandbox', 'allow-same-origin allow-modals')
+    frame.style.display = 'none'
+    frame.addEventListener('load', () => {
+      const ok = frame.contentDocument?.body?.textContent === 'print me'
+      frame.remove()
+      done(ok)
+    })
+    setTimeout(() => done(false), 4000)
+    frame.srcdoc = '<p>print me</p>'
+    document.body.appendChild(frame)
+  }))
+  assert('a print frame loads under the page policy', framed === true)
+
+  const headers = await page.evaluate(() => fetch('/', { cache: 'no-store' }).then((r) => [r.headers.get('content-security-policy'), r.headers.get('x-content-type-options')]))
+  assert('the page is served with the container policy', typeof headers[0] === 'string' && headers[0].includes("default-src 'self'") && headers[1] === 'nosniff', JSON.stringify(headers))
 })
 
 // --- A second tab and a reload ---------------------------------------------------------------
@@ -261,13 +328,14 @@ step('setup-token', async () => {
   assert('an API token reaches the Inbox choice', await visible(page, 'Save & Continue', 15000), await text(page))
   await page.getByText('Save & Continue').click()
   await settle(page, 1500)
+  await goto(page, '/today')
   assert('an API-token setup ends in the app', await page.locator('[data-task-id]').first().waitFor({ timeout: 15000 }).then(() => true, () => false), await text(page))
   const kept = await page.evaluate(() => [sessionStorage.getItem('vicu-web-api-token') !== null, localStorage.getItem('vicu-web-remember-token')])
   assert('the token is kept for this tab only unless asked', kept[0] === true && kept[1] === null, JSON.stringify(kept))
   await goto(page, '/settings')
-  await page.getByText('Sign Out', { exact: true }).first().click()
+  await page.getByRole('button', { name: 'Disconnect' }).first().click()
   await sleep(500)
-  const confirm = page.locator('dialog[open] button', { hasText: 'Sign Out' })
+  const confirm = page.locator('dialog[open] button', { hasText: /Disconnect|Sign Out/ })
   if (await confirm.count()) await confirm.first().click()
   await visible(page, 'Use API Token instead', 15000)
   assert('signing out forgets the token', (await page.evaluate(() => sessionStorage.getItem('vicu-web-api-token'))) === null)

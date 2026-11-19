@@ -1,5 +1,7 @@
+import { startGuards } from './guards'
 import { initStorage } from './host/storage'
 import { finishOidcRedirect, initSession } from './session'
+import { startShortcuts } from './shortcuts'
 
 // The web version's entry point. The order matters:
 //
@@ -9,6 +11,8 @@ import { finishOidcRedirect, initSession } from './session'
 // 4. Only then the renderer is loaded; it reads `window.api` while its modules are evaluated.
 
 async function boot(): Promise<void> {
+  startGuards()
+  startShortcuts()
   await initStorage()
   initSession()
   await finishOidcRedirect()

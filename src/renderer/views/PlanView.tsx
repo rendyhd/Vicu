@@ -26,6 +26,7 @@ import { MY_EVENTS_CALENDAR_ID, type EventEdit, type EventRepeat, type EventScop
 import type { DrawnKind, DrawnPlace } from '@/components/planner/DrawTitle'
 import type { GesturePoint } from '@/components/planner/use-timeline-gesture'
 import { useNewEventRequestStore } from '@/stores/new-event-request-store'
+import { isNewEventKey } from '@/lib/host-shortcuts'
 import { useDateFormat } from '@/hooks/use-date-format'
 import { useFilters } from '@/hooks/use-filters'
 import { useOpenTask } from '@/hooks/use-open-task'
@@ -405,7 +406,7 @@ function PlanScreen() {
   const newEventRequestedAt = useNewEventRequestStore((s) => s.requestedAt)
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if ((event.ctrlKey || event.metaKey) && event.shiftKey && !event.altKey && event.key.toLowerCase() === 'n') {
+      if (isNewEventKey(event)) {
         event.preventDefault()
         useNewEventRequestStore.getState().request()
       }

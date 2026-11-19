@@ -33,7 +33,7 @@ const EDIT_BASE = 'https://github.com/rendyhd/Vicu/blob/main/docs/guide/'
 const NAV = [
   { title: 'Start here', pages: ['', 'getting-started', 'basics'] },
   { title: 'Everyday Vicu', pages: ['capture', 'tasks', 'lists', 'projects', 'custom-lists', 'routines', 'review', 'collaboration', 'assistant'] },
-  { title: 'Your devices', pages: ['desktop', 'phone', 'sync', 'settings'] },
+  { title: 'Your devices', pages: ['desktop', 'phone', 'web', 'sync', 'settings'] },
   { title: 'Vicu Pro', pages: ['pro', 'pro/available', 'pro/promises', 'pro/portfolio', 'pro/power', 'plan', 'calendars'] },
   { title: 'Reference', pages: ['quick-add', 'shortcuts', 'faq', 'glossary'] },
 ]

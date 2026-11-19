@@ -1,9 +1,12 @@
 import { useTranslation } from 'react-i18next'
 import type { TranslationKey } from '../../../shared/i18n'
 import { can } from '@/lib/capabilities'
+import { hasModT, newEventShortcut, newTaskShortcut } from '@/lib/host-shortcuts'
 
 const isMac = window.api.platform === 'darwin'
 const mod = isMac ? '\u2318' : 'Ctrl'
+/** A spec such as "Mod+Shift+N" as the keys of a row. */
+const keysOf = (spec: string): string[] => spec.split('+').map((part) => (part === 'Mod' ? mod : part))
 
 const shortcuts: { category: TranslationKey; items: { keys: string[]; description: TranslationKey }[] }[] = [
   { category: 'settings.shortcuts.categories.navigation', items: [
@@ -13,7 +16,7 @@ const shortcuts: { category: TranslationKey; items: { keys: string[]; descriptio
     { keys: ['Escape'], description: 'settings.shortcuts.items.collapseTask' },
   ]},
   { category: 'settings.shortcuts.categories.taskActions', items: [
-    { keys: [mod, 'N'], description: 'settings.shortcuts.items.newTask' },
+    { keys: keysOf(newTaskShortcut()), description: 'settings.shortcuts.items.newTask' },
     { keys: [mod, 'V'], description: 'settings.shortcuts.items.newTaskFromClipboard' },
     { keys: [mod, 'Enter'], description: 'settings.shortcuts.items.saveAndClose' },
     { keys: [mod, 'K'], description: 'settings.shortcuts.items.completeSelected' },
@@ -21,11 +24,11 @@ const shortcuts: { category: TranslationKey; items: { keys: string[]; descriptio
     { keys: [mod, 'C'], description: 'settings.shortcuts.items.copyTitles' },
   ]},
   { category: 'settings.shortcuts.categories.scheduling', items: [
-    { keys: [mod, 'T'], description: 'settings.shortcuts.items.dueToday' },
+    ...(hasModT() ? [{ keys: [mod, 'T'], description: 'settings.shortcuts.items.dueToday' as const }] : []),
     { keys: ['!'], description: 'settings.shortcuts.items.dueToday' },
   ]},
   { category: 'settings.shortcuts.categories.plan', items: [
-    { keys: [mod, 'Shift', 'N'], description: 'settings.shortcuts.items.newEvent' },
+    { keys: keysOf(newEventShortcut()), description: 'settings.shortcuts.items.newEvent' },
     { keys: ['Alt', 'Shift', 'Up'], description: 'settings.shortcuts.items.moveEarlier' },
     { keys: ['Alt', 'Shift', 'Down'], description: 'settings.shortcuts.items.moveLater' },
     { keys: ['Shift', 'Up'], description: 'settings.shortcuts.items.shorter' },
@@ -36,7 +39,7 @@ const shortcuts: { category: TranslationKey; items: { keys: string[]; descriptio
     { keys: ['Escape'], description: 'settings.shortcuts.items.saveAndClose' },
     { keys: [mod, 'Enter'], description: 'settings.shortcuts.items.saveAndClose' },
     { keys: [mod, 'K'], description: 'settings.shortcuts.items.completeAndClose' },
-    { keys: [mod, 'T'], description: 'settings.shortcuts.items.dueToday' },
+    ...(hasModT() ? [{ keys: [mod, 'T'], description: 'settings.shortcuts.items.dueToday' as const }] : []),
     { keys: [mod, 'Shift', 'C'], description: 'settings.shortcuts.items.toggleComments' },
   ]},
   { category: 'settings.shortcuts.categories.assistant', items: [
