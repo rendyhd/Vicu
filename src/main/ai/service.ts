@@ -9,6 +9,7 @@ import {
   AI_MESSAGES,
   BRAIN_DUMP_ANSWER_SCHEMA,
   DICTATION_ANSWER_SCHEMA,
+  NOTES_ANSWER_SCHEMA,
   ORGANIZE_ANSWER_SCHEMA,
   PLAN_DAY_ANSWER_SCHEMA,
   PROBE,
@@ -17,12 +18,14 @@ import {
   brainDumpSystemPrompt,
   dictationSystemPrompt,
   enabledAskTools,
+  notesSystemPrompt,
   promptText,
   providerPreset,
   type JsonSchema,
   type StructuredMode,
 } from '../../shared/ai/contract'
-import { ADDRESS_HINT_STATUSES, capabilitiesOf, effectiveAddress, hasConsent, isSetUp, mayLackVersionPath, modelKey } from '../../shared/ai/settings'
+import { ADDRESS_HINT_STATUSES, capabilitiesOf, effectiveAddress, hasConsent, hasImagesConsent, isSetUp, mayLackVersionPath, modelKey, readingModel } from '../../shared/ai/settings'
+import { readPageAnswer, readPageUserText } from '../../shared/ai/notes'
 import { extractJsonObject } from '../../shared/ai/schema'
 import type {
   AiError,
@@ -30,6 +33,7 @@ import type {
   AiSettings,
   AskTurnEvent,
   AskTurnRequest,
+  ChatImage,
   ConnectionTestResult,
   ToolSpec,
 } from '../../shared/ai/types'
@@ -47,6 +51,8 @@ export const BRAIN_DUMP_MAX_TOKENS = AI_LIMITS.brain_dump_max_tokens
 /** One batch of a guided session's suggestions (9.1). */
 export const ORGANIZE_MAX_TOKENS = AI_LIMITS.organize_max_tokens
 const PROBE_MAX_TOKENS = 2048
+/** One page read from an image (4.9.2). */
+export const NOTES_READ_MAX_TOKENS = AI_LIMITS.notes_read_max_tokens
 
 let transport: Transport = nodeTransport
 
@@ -187,6 +193,8 @@ export function aiTestConnection(model: string): Promise<AiResult<ConnectionTest
       result.tool = { ok: false, error: toAiError(err).message }
       hint ||= lacksVersionPath(settings, err)
     }
+    // Reading images (2.4): never needed to switch a feature on.
+    if (result.structured.ok) result.vision = await visionProbe(connection, settings, name, result.structured.mode ?? 'json_schema')
     if (hint) result.hint = AI_MESSAGES.addressVersionHint
 
     result.features = {
@@ -196,9 +204,62 @@ export function aiTestConnection(model: string): Promise<AiResult<ConnectionTest
     }
     await updateAiSettings((current) => ({
       ...current,
-      tested: { ...current.tested, [modelKey(current, name)]: { structured: result.structured.mode, tools: result.tool.ok } },
+      tested: {
+        ...current.tested,
+        [modelKey(current, name)]: { structured: result.structured.mode, tools: result.tool.ok, ...(result.vision ? { vision: result.vision.ok } : {}) },
+      },
     }))
     return result
+  })
+}
+
+/** The word of the image probe, compared ignoring case and spaces at either end (2.4). */
+function sameWord(actual: unknown, expected: string): boolean {
+  return typeof actual === 'string' && actual.trim().toLowerCase() === expected.trim().toLowerCase()
+}
+
+/** Whether the model reads the probe image (2.4), in its structured mode. */
+async function visionProbe(connection: ProviderConnection, settings: AiSettings, model: string, mode: StructuredMode): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const answer = await structuredAnswer(connection, {
+      model,
+      system: '',
+      user: PROBE.vision.user,
+      images: [PROBE.vision.image],
+      schema: PROBE.vision.schema,
+      mode,
+      maxTokens: PROBE_MAX_TOKENS,
+    }, { transport, idleTimeoutMs: ASK_IDLE_MS, refused: refusedFor(settings, model), onRefused: rememberRefused(model) }) as { word?: unknown; number?: unknown }
+    if (sameWord(answer.word, PROBE.vision.expect.word) && answer.number === PROBE.vision.expect.number) return { ok: true }
+    return { ok: false, error: `The answer was ${JSON.stringify(answer)}.` }
+  } catch (err) {
+    return { ok: false, error: toAiError(err).message }
+  }
+}
+
+/**
+ * Asks a model whether it reads images (2.4), for a model tested before that check (4.9.1), and
+ * keeps the result. A model without a structured result is tested whole first.
+ */
+export function aiTestVision(model: string): Promise<AiResult<{ ok: boolean; error?: string }>> {
+  return wrap(async () => {
+    const settings = getAiSettings()
+    const connection = connectionOf(settings)
+    const name = model.trim()
+    if (!name) throw new AiFailure('bad_request', 'Choose a model first.')
+    const caps = capabilitiesOf(settings, name)
+    if (!caps?.structured) {
+      const tested = await aiTestConnection(name)
+      if (!tested.success) throw new AiFailure(tested.error.kind, tested.error.message, tested.error.status)
+      return tested.data.vision ?? { ok: false, error: tested.data.structured.error ?? 'The model gave no structured answer.' }
+    }
+    const vision = await visionProbe(connection, settings, name, caps.structured)
+    await updateAiSettings((current) => {
+      const key = modelKey(current, name)
+      const known = current.tested[key]
+      return known ? { ...current, tested: { ...current.tested, [key]: { ...known, vision: vision.ok } } } : current
+    })
+    return vision
   })
 }
 
@@ -236,6 +297,39 @@ export function aiDictate(input: { edit: boolean; user: string }, signal?: Abort
     schema: DICTATION_ANSWER_SCHEMA,
     maxTokens: DICTATION_MAX_TOKENS,
   }, signal)
+}
+
+/** One batch of notes (4.9.4) or its Update (4.9.8), with the dictation model. */
+export function aiNotes(input: { edit: boolean; user: string }, signal?: AbortSignal): Promise<AiResult<unknown>> {
+  return structuredModelAnswer({
+    system: notesSystemPrompt(input.edit),
+    user: input.user,
+    schema: NOTES_ANSWER_SCHEMA,
+    maxTokens: BRAIN_DUMP_MAX_TOKENS,
+  }, signal)
+}
+
+/**
+ * Reads one page image as text (4.9.2): the `notesRead` prompt on the reading model (4.9.1),
+ * deterministic, plain text back. Needs the agreement for images (7.1).
+ */
+export function aiReadPage(input: { image: ChatImage; page: number; pages: number; title: string }, signal?: AbortSignal): Promise<AiResult<{ text: string; model: string }>> {
+  return wrap(async () => {
+    const settings = getAiSettings()
+    const connection = connectionOf(settings)
+    if (!hasImagesConsent(settings)) throw new AiFailure('no_consent', 'Agree to sending images of pages first.')
+    const { model } = readingModel(settings)
+    if (!model) throw new AiFailure('not_set_up', 'No model that reads images is set up. Choose one in Settings, Assistant.')
+    const { message } = await runChat(connection, {
+      model,
+      system: promptText('notesRead'),
+      messages: [{ role: 'user', text: readPageUserText(input.page, input.pages, input.title), images: [input.image] }],
+      tools: [],
+      deterministic: true,
+      maxTokens: NOTES_READ_MAX_TOKENS,
+    }, { transport, idleTimeoutMs: ASK_IDLE_MS, signal, refused: refusedFor(settings, model), onRefused: rememberRefused(model) })
+    return { text: readPageAnswer(message.text), model }
+  })
 }
 
 /** One brain dump request: Organize (4.8.1) or Update (4.8.4), with the dictation model. */

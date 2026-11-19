@@ -85,6 +85,7 @@ export function SettingsView() {
   // Manage in the Plan gear: the calendars of the Plan settings, once they are drawn.
   useEffect(() => {
     if (section === 'pro') setActiveTab('pro')
+    if (section === 'assistant') setActiveTab('assistant')
   }, [section])
   useEffect(() => {
     if (section !== 'calendars' || !fullConfig) return

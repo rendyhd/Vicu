@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useRouterState } from '@tanstack/react-router'
 import { Loader2, Mic, Sparkles, Trash2, X } from 'lucide-react'
 import { Button } from '@/components/shared/Button'
@@ -19,6 +19,11 @@ import { UNDO_TOAST_MS, toast, useToastStore } from '@/stores/toast-store'
 import { setDictationDeps, useDictationStore, type CardDraft, type DraftCard, type DictationPhase } from '@/stores/dictation-store'
 import { useVoiceListStore } from '@/stores/voice-list-store'
 import { BrainDumpSwitch, DumpEditor, PlanView, UpdateField } from './BrainDumpViews'
+import { NotesCardBar, NotesDecisions, NotesPlanBar, cardChoice, useAddNotesPlan, useNotesWorld } from './NotesPlanViews'
+import { useTranslation } from 'react-i18next'
+import { usePro } from '@/hooks/use-pro'
+import { useNotesStore } from '@/stores/notes-store'
+import { canUpdateNotes } from '../../../shared/ai/notes'
 import { planProjectPath } from '../../../shared/ai/brain-dump'
 import { instantOfLocal } from '../../../shared/ai/dictation'
 import type { DraftField } from '../../../shared/ai/contract'
@@ -121,8 +126,22 @@ function DictationPanel() {
   const deleteProject = useDeleteProject()
   const addVoiceTask = useAddVoiceTask()
   const panelRef = useRef<HTMLElement>(null)
+  const { t } = useTranslation()
+  const notes = state.notes
+  const notesWorld = useNotesWorld(notes?.agreed ?? false)
+  const addNotes = useAddNotesPlan(ws, notesWorld)
+  const pro = usePro()
+  const [notesToLog, setNotesToLog] = useState(false)
 
-  const close = useCallback((discard = true) => useDictationStore.getState().close({ discard }), [])
+  // A plan of notes is never thrown away by closing: it goes back to the pages (4.9.9).
+  const close = useCallback((discard = true) => {
+    if (useDictationStore.getState().notes) {
+      useDictationStore.getState().close({ discard: false })
+      useNotesStore.getState().backToPages()
+      return
+    }
+    useDictationStore.getState().close({ discard })
+  }, [])
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -192,6 +211,7 @@ function DictationPanel() {
   }
 
   const addAll = async () => {
+    if (useDictationStore.getState().notes) return addNotes({ toLog: notesToLog && pro.layer('portfolio') })
     if (useDictationStore.getState().brainDump) return addPlan()
     const drafts = useDictationStore.getState().cards.map((card) => card.draft)
     if (drafts.length === 0) return
@@ -255,7 +275,21 @@ function DictationPanel() {
     () => projects.map((project) => ({ ref: project.ref, label: planProjectPath(project.ref, projects, (id) => pathOf(ws, id)) })),
     [projects, ws],
   )
-  const renderCard = (card: DraftCard) => <DraftCardView card={card} disabled={phase === 'adding'} ws={ws} newProjects={newProjects} />
+  const notesTicked = notes ? cards.filter((card) => cardChoice(card, notes, notesWorld).ticked).length : 0
+  const shownHeading = notes && (phase === 'cards' || phase === 'adding') ? (notes.title.trim() || t('notes.title')) : heading
+  const renderCard = (card: DraftCard) => {
+    const ticked = notes ? cardChoice(card, notes, notesWorld).ticked : true
+    return (
+      <DraftCardView
+        card={card}
+        disabled={phase === 'adding'}
+        ws={ws}
+        newProjects={newProjects}
+        dimmed={!ticked}
+        extra={notes ? <NotesCardBar card={card} notes={notes} world={notesWorld} disabled={phase === 'adding'} /> : null}
+      />
+    )
+  }
 
   return (
     <div className="pointer-events-none fixed inset-x-0 bottom-6 z-[55] flex justify-center px-4">
@@ -263,18 +297,21 @@ function DictationPanel() {
         ref={panelRef}
         role="dialog"
         aria-modal="false"
-        aria-label={brainDump ? 'Brain dump' : 'Dictated tasks'}
+        aria-label={notes ? t('notes.title') : brainDump ? 'Brain dump' : 'Dictated tasks'}
         data-dictation-panel=""
         data-phase={phase}
-        className="vicu-voice-card pointer-events-auto flex max-h-[72vh] w-full max-w-xl flex-col rounded-card border border-[var(--border-color)] bg-[var(--bg-primary)] shadow-lg"
+        className={cn(
+          'vicu-voice-card pointer-events-auto flex w-full flex-col rounded-card border border-[var(--border-color)] bg-[var(--bg-primary)] shadow-lg',
+          notes ? 'max-h-[86vh] max-w-3xl' : 'max-h-[72vh] max-w-xl',
+        )}
       >
         <header className="flex items-center gap-2 border-b border-[var(--border-color)] px-4 py-3">
           <Sparkles className="h-4 w-4 text-accent-blue" aria-hidden="true" />
-          <h2 className="flex-1 text-card-title text-[var(--text-primary)]">{heading}</h2>
+          <h2 className="flex-1 text-card-title text-[var(--text-primary)]">{shownHeading}</h2>
           {phase !== 'adding' && <MicToggle />}
           <button
             type="button"
-            aria-label="Close"
+            aria-label={notes ? t('notes.plan.backToPages') : 'Close'}
             onClick={() => close(phase !== 'failed')}
             className="inline-flex h-7 w-7 items-center justify-center rounded-control text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
           >
@@ -326,10 +363,12 @@ function DictationPanel() {
                 </p>
               )}
               {edit.error && <p className="text-meta text-danger" role="alert">{edit.error}</p>}
+              {notes && <NotesPlanBar notes={notes} world={notesWorld} cards={cards} disabled={phase === 'adding'} />}
               <PlanView ws={ws} disabled={phase === 'adding'} renderCard={renderCard} />
+              {notes && <NotesDecisions notes={notes} toLog={notesToLog} onToLog={setNotesToLog} showLog={pro.layer('portfolio')} />}
               {unclear.length > 0 && <UnclearNotes notes={unclear} />}
-              {phase === 'cards' && <HeardLine phase={phase} brainDump />}
-              <UpdateField disabled={phase === 'adding'} />
+              {phase === 'cards' && !notes && <HeardLine phase={phase} brainDump />}
+              {(!notes || canUpdateNotes(notes.batches, cards.length)) && <UpdateField disabled={phase === 'adding'} />}
             </div>
           )}
 
@@ -369,7 +408,17 @@ function DictationPanel() {
             <Button variant="primary" disabled={dump.trim() === ''} onClick={() => useDictationStore.getState().organize()}>Organize</Button>
           )}
           {phase === 'live' && !brainDump && micOn && <Button variant="primary" onClick={() => stopOpenMic()}>Done</Button>}
-          {(phase === 'cards' || phase === 'adding') && (
+          {(phase === 'cards' || phase === 'adding') && notes && (
+            <>
+              <Button variant="quiet" danger disabled={phase === 'adding'} onClick={() => useNotesStore.getState().discard()}>{t('notes.discard')}</Button>
+              <Button variant="quiet" disabled={phase === 'adding'} onClick={() => close(false)}>{t('notes.plan.backToPages')}</Button>
+              {micOn && phase === 'cards' && <Button variant="secondary" onClick={() => stopOpenMic()}>{t('notes.plan.done')}</Button>}
+              <Button variant="primary" disabled={phase === 'adding' || notesTicked === 0} onClick={() => void addAll()}>
+                {phase === 'adding' ? t('notes.plan.adding') : t('notes.plan.add', { count: notesTicked })}
+              </Button>
+            </>
+          )}
+          {(phase === 'cards' || phase === 'adding') && !notes && (
             <>
               <Button variant="quiet" onClick={() => close(true)}>Cancel</Button>
               {micOn && phase === 'cards' && <Button variant="secondary" onClick={() => stopOpenMic()}>Done</Button>}
@@ -444,10 +493,16 @@ interface DraftCardProps {
   ws: ReturnType<typeof useAiWorkspace>
   /** A brain dump's new projects (4.8.5), offered after the context's projects. */
   newProjects: ReadonlyArray<{ ref: string; label: string }>
+  /** Shown above the card's fields (a plan of notes: the tick and who it is for). */
+  extra?: ReactNode
+  /** Drawn quieter: a card of notes that is not ticked. */
+  dimmed?: boolean
 }
 
-function DraftCardView({ card, disabled, ws, newProjects }: DraftCardProps) {
-  const { draft, changed, dropped } = card
+function DraftCardView({ card, disabled, ws, newProjects, extra, dimmed = false }: DraftCardProps) {
+  const { draft, changed } = card
+  // Where a line of notes came from (4.9.5) is only for the source line; a wrong one is left out quietly.
+  const dropped = card.dropped.filter((d) => d.field !== 'from' && d.field !== 'page')
   const update = (change: Partial<CardDraft>) => useDictationStore.getState().updateDraft(draft.ref, change)
   const fmt = useDateFormat()
   const guessed = (field: DraftField) => draft.guessed.includes(field)
@@ -470,8 +525,10 @@ function DraftCardView({ card, disabled, ws, newProjects }: DraftCardProps) {
     <article
       aria-label={draft.title}
       data-draft-ref={draft.ref}
-      className={cn('rounded-card border border-[var(--border-color)] p-3', highlight('title') && 'ring-2 ring-accent-blue/40')}
+      data-dimmed={dimmed || undefined}
+      className={cn('rounded-card border border-[var(--border-color)] p-3', highlight('title') && 'ring-2 ring-accent-blue/40', dimmed && 'opacity-60')}
     >
+      {extra}
       <div className="flex items-start gap-2">
         <input
           aria-label="Title"

@@ -28,9 +28,16 @@ export interface ToolResult {
  * their signatures included), and they are sent back as they came.
  */
 export type ChatMessage =
-  | { role: 'user'; text: string }
+  /** `images` (4.9.2): pictures sent before the text, base64 without the `data:` prefix. */
+  | { role: 'user'; text: string; images?: ChatImage[] }
   | { role: 'assistant'; text: string; toolCalls: ToolCall[]; raw?: unknown[] }
   | { role: 'tool'; results: ToolResult[] }
+
+/** A picture in a user message (4.9.2): `image/jpeg` or `image/png`, base64. */
+export interface ChatImage {
+  media_type: string
+  data: string
+}
 
 export interface ToolSpec {
   name: string
@@ -65,12 +72,24 @@ export interface ModelCapabilities {
   structured: StructuredMode | null
   /** The model called the probe tool. */
   tools: boolean
+  /** The model read the probe image (2.4); undefined: not asked yet. */
+  vision?: boolean
 }
 
 /** What a preset was set to: its address and models (7.2). */
 export interface ProviderSetup {
   address: string
-  models: { dictation: string; ask: string }
+  models: AiModels
+}
+
+/**
+ * The models of a preset: dictation's (the main one), Ask's, and the one that reads page images
+ * (4.9.1), empty while the dictation or Ask model does that.
+ */
+export interface AiModels {
+  dictation: string
+  ask: string
+  read?: string
 }
 
 /** The assistant's settings on this device (7.2): never synced, never in the prefs carrier. */
@@ -78,7 +97,7 @@ export interface AiSettings {
   provider: ProviderId | null
   /** The address requests go to, without a trailing `/`. */
   address: string
-  models: { dictation: string; ask: string }
+  models: AiModels
   features: { dictation: boolean; ask: boolean; talk: boolean }
   /** What Test connection found, per `provider|address|model`. */
   tested: Record<string, ModelCapabilities>
@@ -118,6 +137,8 @@ export interface ConnectionTestResult {
   models: { ok: boolean; count: number; error?: string }
   structured: { ok: boolean; mode: StructuredMode | null; error?: string }
   tool: { ok: boolean; error?: string }
+  /** Reading the probe image (2.4). */
+  vision?: { ok: boolean; error?: string }
   /** Which features the model can run. */
   features: { dictation: boolean; ask: boolean; talk: boolean }
   /** `messages.addressVersionHint` when a step failed in a way that points at a missing version path (2.4). */

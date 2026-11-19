@@ -27,6 +27,7 @@ import type {
   TaskComment,
   TaskCommentPage,
 } from '../renderer/lib/vikunja-types'
+import type { NotesPickResult } from '../shared/notes-import-types'
 import type { TaskPatch } from '../shared/merge-patches'
 import type { CalendarEventsResult, CalendarFeedView } from '../shared/calendar-events'
 import type {
@@ -66,6 +67,7 @@ import type {
   AiSettingsView,
   AskTurnEnvelope,
   AskTurnRequest,
+  ChatImage,
   ConnectionTestResult,
   KeptTranscript,
   SpeechDownloadProgress,
@@ -355,7 +357,11 @@ export interface ElectronAPI {
      * One dictation request; the answer is checked against the schema (and repaired once) in main.
      * `brainDump`: a brain dump's Organize or Update (4.8) instead.
      */
-    dictate(input: { requestId: string; edit: boolean; user: string; brainDump?: boolean }): Promise<AiResult<unknown>>
+    dictate(input: { requestId: string; edit: boolean; user: string; brainDump?: boolean; notes?: boolean }): Promise<AiResult<unknown>>
+    /** Reads one page image as text (4.9.2) on the reading model; needs the agreement for images. Cancelled with `cancelDictation`. */
+    readPage(input: { requestId: string; image: ChatImage; page: number; pages: number; title: string }): Promise<AiResult<{ text: string; model: string }>>
+    /** Asks a model whether it reads images (2.4) and keeps the answer. */
+    testVision(model: string): Promise<AiResult<{ ok: boolean; error?: string }>>
     cancelDictation(requestId: string): Promise<boolean>
     /**
      * Suggestions for one batch of a guided session (section 9), from Ask's model under Ask's
@@ -376,6 +382,13 @@ export interface ElectronAPI {
     getKeptTranscripts(): Promise<KeptTranscript[]>
     keepTranscript(entry: KeptTranscript): Promise<boolean>
     dropKeptTranscript(id: string): Promise<boolean>
+  }
+  /** Notes to tasks (docs/ai-assistant-v1.md 4.9): note files from main's open dialog, and the open notes kept on the device. */
+  notes: {
+    pickFiles(): Promise<NotesPickResult>
+    getSession(): Promise<unknown>
+    saveSession(session: unknown): Promise<boolean>
+    clearSession(): Promise<boolean>
   }
 
   /** Local speech (docs/ai-assistant-v1.md section 3). */

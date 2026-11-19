@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { SseReader } from '../ai/sse'
-import { anthropicMessages, openAiChat, type ChatRequest } from '../ai/wire'
+import { anthropicMessages, openAiChat, refusedOptionalField, type ChatRequest } from '../ai/wire'
 import { AiFailure, listModels, runChat, type ProviderConnection } from '../ai/client'
 import { structuredAnswer } from '../ai/structured'
 import type { HttpRequest, HttpResponse, Transport } from '../ai/transport'
 import { DICTATION_ANSWER_SCHEMA, PROBE, promptModeSystem } from '../../shared/ai/contract'
+import { readFileSync } from 'fs'
+import { join } from 'path'
 
 // docs/ai-assistant-v1.md section 2: both wire protocols against recorded (made-up) streams, tool
 // calls assembled per id, structured answers and the one repair request, the optional fields a
@@ -278,5 +280,27 @@ describe('structured answers and repair', () => {
   it('reads a prompt-mode answer from the first { to the last }', async () => {
     const { transport } = fakeTransport([{ body: answer('Here you go: {"answer": 5}. Done') }])
     expect(await structuredAnswer(openai, { model: 'm', system: 'S', user: 'q', schema: PROBE.structured.schema, mode: 'prompt', maxTokens: 100 }, { transport, idleTimeoutMs: 1000 })).toEqual({ answer: 5 })
+  })
+})
+
+describe('pictures in a user message (4.9.2, notes.wire vectors)', () => {
+  const fixture = JSON.parse(readFileSync(join(__dirname, '../../../test-fixtures/ai-tools-v1.json'), 'utf8'))
+  for (const vector of fixture.notes.wire) {
+    it(`${vector.protocol}${vector.omit.length ? ` without ${vector.omit.join(', ')}` : ''}`, () => {
+      const request: ChatRequest = { ...baseRequest, system: 's', messages: [vector.message] }
+      const body = (vector.protocol === 'openai-chat' ? openAiChat : anthropicMessages).body(request, new Set(vector.omit)) as { messages: unknown[] }
+      expect(body.messages[vector.protocol === 'openai-chat' ? 1 : 0]).toEqual(vector.expect)
+    })
+  }
+
+  it('leaves "detail" out after a 400 that names it', () => {
+    const request: ChatRequest = { ...baseRequest, messages: [{ role: 'user', text: 'x', images: [{ media_type: 'image/png', data: 'AA' }] }] }
+    const sent = openAiChat.body(request, new Set())
+    expect(refusedOptionalField("Unrecognized request argument supplied: detail", 'openai-chat', sent)).toBe('detail')
+    expect(refusedOptionalField('Unrecognized request argument supplied: detail', 'openai-chat', openAiChat.body(baseRequest, new Set()))).toBeNull()
+  })
+
+  it('sends a plain string when there are no pictures', () => {
+    expect((openAiChat.body(baseRequest, new Set()) as { messages: Array<{ content: unknown }> }).messages[1].content).toBe('hi')
   })
 })

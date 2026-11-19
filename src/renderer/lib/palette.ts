@@ -1,10 +1,11 @@
 import { fuzzyRank } from './fuzzy'
+import { t } from '../../shared/i18n'
 import type { Label, Project, Task } from './vikunja-types'
 
 // What the command palette lists and how a query picks from it. Pure: the component turns an
 // action into a navigation or a change.
 
-export type PaletteCommand = 'new-task' | 'new-event' | 'voice' | 'dictate' | 'brain-dump' | 'ask' | 'make-tasks' | 'refresh' | 'toggle-theme' | 'settings'
+export type PaletteCommand = 'new-task' | 'new-event' | 'voice' | 'dictate' | 'brain-dump' | 'ask' | 'make-tasks' | 'notes' | 'refresh' | 'toggle-theme' | 'settings'
   | 'pro-focus' | 'pro-settings' | 'pro-import' | 'pro-copilot' | 'pro-recap'
 
 export type PaletteAction =
@@ -88,6 +89,8 @@ export function buildPaletteItems({ smartLists, projects, labels, planner = fals
     { id: 'cmd:brain-dump', kind: 'Action', title: 'Brain dump', keywords: 'assistant ai voice dictation ramble organize organise projects think type', action: { type: 'command', command: 'brain-dump' } },
     { id: 'cmd:ask', kind: 'Action', title: 'Ask Vicu', keywords: 'assistant ai chat question talk', action: { type: 'command', command: 'ask' } },
     { id: 'cmd:make-tasks', kind: 'Action', title: 'Make tasks from text', keywords: 'assistant ai paste notes email split', action: { type: 'command', command: 'make-tasks' } },
+    // Notes, PDFs and pictures of pages made into tasks (docs/ai-assistant-v1.md 4.9).
+    { id: 'cmd:notes', kind: 'Action', title: t('notes.palette'), keywords: 'assistant ai notes meeting offsite pdf picture photo scan handwriting pages action items', action: { type: 'command', command: 'notes' } },
     { id: 'cmd:refresh', kind: 'Action', title: 'Refresh', keywords: 'reload sync update', action: { type: 'command', command: 'refresh' } },
     { id: 'cmd:toggle-theme', kind: 'Action', title: 'Toggle theme', keywords: 'dark light mode', action: { type: 'command', command: 'toggle-theme' } },
     { id: 'cmd:settings', kind: 'Action', title: 'Settings', keywords: 'preferences options', action: { type: 'command', command: 'settings' } },

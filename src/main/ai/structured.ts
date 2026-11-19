@@ -6,13 +6,15 @@
  */
 import { AI_LIMITS, repairMessage, type JsonSchema, type StructuredMode } from '../../shared/ai/contract'
 import { extractJsonObject, firstSchemaProblem } from '../../shared/ai/schema'
-import type { ChatMessage } from '../../shared/ai/types'
+import type { ChatImage, ChatMessage } from '../../shared/ai/types'
 import { AiFailure, runChat, type ProviderConnection, type RunChatOptions } from './client'
 
 export interface StructuredRequest {
   model: string
   system: string
   user: string
+  /** Pictures before the user text (the image probe, 2.4). */
+  images?: ChatImage[]
   schema: JsonSchema
   mode: StructuredMode
   maxTokens: number
@@ -34,7 +36,7 @@ export async function structuredAnswer(
   request: StructuredRequest,
   options: Omit<RunChatOptions, 'onText'>,
 ): Promise<unknown> {
-  const messages: ChatMessage[] = [{ role: 'user', text: request.user }]
+  const messages: ChatMessage[] = [{ role: 'user', text: request.user, ...(request.images?.length ? { images: request.images } : {}) }]
   for (let attempt = 0; attempt <= AI_LIMITS.repair_attempts; attempt++) {
     const { message } = await runChat(connection, {
       model: request.model,

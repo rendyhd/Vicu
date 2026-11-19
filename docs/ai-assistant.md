@@ -101,6 +101,25 @@ stays on screen. One message says what was added ("Added 2 projects and 14 tasks
 which removes the tasks and then the projects. If organizing fails, the dump is kept, also across
 a restart: **Retry** sends it again, **Edit** goes back to it.
 
+## Make tasks from notes
+
+Choose "Make tasks from notes" in the command palette, or drop files on the window, to turn
+meeting notes into tasks: typed or pasted text, PDFs (their text, or a page read as a picture),
+and pictures of pages (JPEG, PNG, WebP, and HEIC on a Mac). It needs smart dictation. Give the
+notes a title and the date they were written; dates such as "Friday" are read from that day.
+
+Pictures are read first, one request per page, by the dictation model when it reads pictures,
+else Ask's, else a reading model you pick under Settings, Assistant (Test connection says whether a
+model reads pictures). A provider in the cloud is asked about pictures once, apart from the
+assistant's first agreement. Organize then sends the pages as text, in parts of about 8,000
+characters, and the plan opens in the brain dump's sheet: each card shows its page and line, who
+it is for (you, someone who shares the project, a Pro person as a promise or a task to confirm
+with them, or a name kept in the title) and a tick, chosen by the Tick filter. Decisions and open
+questions are listed with Copy (and can go to Pro's log). Add creates the ticked tasks with a
+source line at the end of their notes, and only the new projects that hold one; Undo takes it all
+back. The pages are kept on this computer (`notes-import.json`) until they are added or discarded,
+and cleared at sign-out.
+
 ## Ask and Talk
 
 Press the **Ask** button (the sparkle) next to Search at the top of the sidebar, Mod+J (Cmd+J on a

@@ -83,13 +83,34 @@ function refOf(value: unknown): string | null {
   return typeof value === 'string' && value !== '' ? value : null
 }
 
+/** A new project an earlier batch of notes made (4.9): named by its ref in `<projects_so_far>`. */
+export interface KnownProject {
+  ref: string
+  title: string
+  /** Its path: its parent's path, ` / `, its title. */
+  path: string
+}
+
+/** How notes (4.9) run the checks of 4.8.3 on one batch. */
+export interface BrainDumpCheckOptions {
+  /** The new projects of earlier batches: a `parent_ref` or `project_ref` may name one, and a same path merges into it. */
+  known?: readonly KnownProject[]
+  /** Every kept project is numbered `p<n>`, `p<n+1>`, ... (after the known ones), whatever its ref was. */
+  firstProjectNumber?: number
+  /** Fields of the answer's task added to each kept draft (see `TaskCheckOptions.extendDraft`). */
+  extendDraft?: (task: Record<string, unknown>) => Record<string, unknown>
+}
+
 /**
  * The checks of 4.8.3 on a brain dump's answer: the projects (limit, refs, title, parent, the same
  * project twice), then the tasks by 4.3 with `brain_dump_tasks_max`, without the list's default due
- * date, and with `project_ref` resolved before step 5. `ctx.defaultDue` is not used.
+ * date, and with `project_ref` resolved before step 5. `ctx.defaultDue` is not used. Notes (4.9)
+ * pass the projects of earlier batches and the first free project number.
  */
-export function checkBrainDumpAnswer(answer: BrainDumpAnswer, ctx: CheckContext): BrainDumpResult {
+export function checkBrainDumpAnswer(answer: BrainDumpAnswer, ctx: CheckContext, options: BrainDumpCheckOptions = {}): BrainDumpResult {
   const dropped: DroppedField[] = []
+  const known = options.known ?? []
+  const knownByRef = new Map(known.map((project) => [project.ref, project]))
   const all = Array.isArray(answer.projects) ? answer.projects : []
 
   // 1. Projects: at most 12; refs renumbered by position when any is empty or repeated. A ref
@@ -113,7 +134,8 @@ export function checkBrainDumpAnswer(answer: BrainDumpAnswer, ctx: CheckContext)
   const keptPaths = new Map<string, string>()
 
   given.forEach((project, index) => {
-    const ref = renumber ? `p${index + 1}` : project.ref
+    const numbered = options.firstProjectNumber !== undefined
+    const ref = numbered ? `p${options.firstProjectNumber! + kept.length}` : renumber ? `p${index + 1}` : project.ref
 
     // 2. Title.
     const flat = (typeof project.title === 'string' ? project.title : '').replace(lineBreaks, ' ').trim()
@@ -130,7 +152,9 @@ export function checkBrainDumpAnswer(answer: BrainDumpAnswer, ctx: CheckContext)
     if (parentRef !== null) {
       const at = firstWithRef.get(parentRef)
       const outcome = at !== undefined && at < index ? outcomes[at] : undefined
+      const earlier = at === undefined ? knownByRef.get(parentRef) : undefined
       if (outcome?.target) parent = { target: outcome.target, path: outcome.path }
+      else if (earlier) parent = { target: { ref: earlier.ref }, path: earlier.path }
       else dropped.push({ ref, field: 'parent', value: project.parent_ref })
     } else if (project.parent_id !== null && project.parent_id !== undefined) {
       const context = ctx.projects.find((p) => p.id === project.parent_id)
@@ -144,6 +168,11 @@ export function checkBrainDumpAnswer(answer: BrainDumpAnswer, ctx: CheckContext)
     const existing = ctx.projects.find((p) => p.path.toLowerCase() === key)
     if (existing) {
       outcomes.push({ target: { id: existing.id }, path: existing.path })
+      return
+    }
+    const sameKnown = known.find((p) => p.path.toLowerCase() === key)
+    if (sameKnown) {
+      outcomes.push({ target: { ref: sameKnown.ref }, path: sameKnown.path })
       return
     }
     for (const [keptRef, keptPath] of keptPaths) {
@@ -168,8 +197,11 @@ export function checkBrainDumpAnswer(answer: BrainDumpAnswer, ctx: CheckContext)
     noDefaultDue: true,
     projectRef: (ref) => {
       const at = firstWithRef.get(ref)
-      return at !== undefined ? outcomes[at]?.target ?? null : null
+      if (at !== undefined) return outcomes[at]?.target ?? null
+      const earlier = knownByRef.get(ref)
+      return earlier ? { ref: earlier.ref } : null
     },
+    extendDraft: options.extendDraft,
   })
   return { projects: kept, drafts: tasks.drafts, dropped: [...dropped, ...tasks.dropped], unclear: unclearNotes(answer.unclear) }
 }

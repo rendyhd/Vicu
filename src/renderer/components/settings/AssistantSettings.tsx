@@ -17,6 +17,7 @@ import {
 } from '@/hooks/use-ai'
 import { startTalk, useAskStore } from '@/stores/ask-store'
 import { useDictationStore } from '@/stores/dictation-store'
+import { useNotesStore } from '@/stores/notes-store'
 import { toast } from '@/stores/toast-store'
 import { SecretStorageNotice } from './SecretStorageNotice'
 import { AI_MESSAGES, PROVIDER_PRESETS, SPEECH, providerPreset } from '../../../shared/ai/contract'
@@ -30,6 +31,7 @@ import {
   hasConsent,
   isCleartextToRemoteHost,
   isSetUp,
+  readingModel,
   sameAddress,
   savedAddressesOf,
   untestedModels,
@@ -524,6 +526,7 @@ function ModelFields({ settings, tests }: { settings: AiSettingsView; tests: Mod
           </p>
         </div>
       )}
+      <ReadingModelField settings={settings} listId={listId} onSave={(read) => saveModels({ read })} />
 
       <div>
         <Button variant="primary" disabled={!setUp || testing.length > 0 || shownModels.length === 0} onClick={() => void tests.run(settings, shownModels)}>
@@ -616,6 +619,14 @@ function FeaturesCard({ settings, tests }: { settings: AiSettingsView; tests: Mo
           onTry={ready.dictation ? () => useDictationStore.getState().startLive({ brainDump: true }) : null}
         />
         <FeatureRow
+          label={t('settings.assistant.features.notes')}
+          how={t('settings.assistant.features.notesHow')}
+          blocked={dictation.blocked ?? (!settings.features.dictation || !dictation.can ? t('settings.assistant.features.turnOnDictation') : null)}
+          testing={null}
+          problem={null}
+          onTry={ready.dictation ? () => useNotesStore.getState().openNotes() : null}
+        />
+        <FeatureRow
           label={t('settings.assistant.features.ask')}
           how={t('settings.assistant.features.askHow', { keys: askKeys })}
           blocked={ask.blocked}
@@ -677,6 +688,38 @@ function FeatureRow({ label, how, blocked, testing, problem, checked, onChange, 
   )
 }
 
+/**
+ * The model that reads pictures of notes (docs/ai-assistant-v1.md 4.9.2): the models in use when one
+ * of them reads pictures, else one of its own (`models.read`), shown once neither does.
+ */
+function ReadingModelField({ settings, listId, onSave }: { settings: AiSettingsView; listId: string; onSave: (model: string) => void }) {
+  const { t } = useTranslation()
+  const picked = settings.models.read ?? ''
+  const [value, setValue] = useState(picked)
+  useEffect(() => setValue(picked), [picked])
+  const reading = readingModel(settings)
+  const own = picked.trim() !== ''
+  if (!own && reading.model) return <p className="text-xs text-[var(--text-secondary)]">{t('settings.assistant.model.readUsed', { model: reading.model })}</p>
+  if (!own && reading.untested.length > 0) return null
+  return (
+    <div>
+      <label className={LABEL} htmlFor="ai-model-read">{t('settings.assistant.model.readModel')}</label>
+      <input
+        id="ai-model-read"
+        list={listId}
+        value={value}
+        placeholder={t('settings.assistant.model.modelName')}
+        onChange={(e) => setValue(e.target.value)}
+        onBlur={() => { if (value.trim() !== picked) onSave(value.trim()) }}
+        className={INPUT}
+      />
+      <p className="mt-1 text-xs text-[var(--text-secondary)]">
+        {reading.model ? t('settings.assistant.model.readUsed', { model: reading.model }) : own ? t('settings.assistant.model.readNone') : t('settings.assistant.model.readHelp')}
+      </p>
+    </div>
+  )
+}
+
 function TestResult({ model, result }: { model: string; result: ConnectionTestResult | string }) {
   const { t, i18n } = useTranslation()
   if (typeof result === 'string') return <p className="mt-2 text-xs text-danger">{model}: {result}</p>
@@ -694,6 +737,7 @@ function TestResult({ model, result }: { model: string; result: ConnectionTestRe
       <ul className="space-y-0.5">
         {row(result.models.ok, result.models.ok ? t('settings.assistant.result.modelList', { n: result.models.count }) : t('settings.assistant.result.modelListError', { error: result.models.error ?? t('settings.assistant.result.notAvailable') }))}
         {row(result.structured.ok, result.structured.ok ? (result.structured.mode === 'prompt' ? t('settings.assistant.result.structuredPrompt') : t('settings.assistant.result.structuredStrict')) : t('settings.assistant.result.structuredError', { error: result.structured.error ?? t('settings.assistant.result.failedShort') }))}
+        {result.vision && row(result.vision.ok, result.vision.ok ? t('settings.assistant.result.vision') : t('settings.assistant.result.visionError', { error: result.vision.error ?? t('settings.assistant.result.failedShort') }))}
         {row(result.tool.ok, result.tool.ok ? t('settings.assistant.result.toolCall') : t('settings.assistant.result.toolCallError', { error: result.tool.error ?? t('settings.assistant.result.failedShort') }))}
       </ul>
       <p className="mt-1 text-[var(--text-secondary)]">{features.length ? t('settings.assistant.result.canRun', { features: new Intl.ListFormat(i18n.language === 'en' ? 'en-GB' : i18n.language, { type: 'unit' }).format(features) }) : t('settings.assistant.result.canRunNone')}</p>
@@ -714,6 +758,7 @@ function ConsentDialog({ open, providerName, onAgree, onCancel }: { open: boolea
         <ul className="list-disc space-y-1 pl-5 text-xs">
           <li><Trans i18nKey="settings.assistant.consent.dictation" components={{ strong: <strong /> }} /></li>
           <li><Trans i18nKey="settings.assistant.consent.ask" components={{ strong: <strong /> }} /></li>
+          <li><Trans i18nKey="settings.assistant.consent.notes" components={{ strong: <strong /> }} /></li>
         </ul>
         <p className="text-xs text-[var(--text-secondary)]">
           {t('settings.assistant.consent.neverSent')}

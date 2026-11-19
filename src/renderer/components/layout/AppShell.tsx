@@ -62,6 +62,7 @@ import { VoiceHost } from '@/components/voice/VoiceHost'
 import { CommentsPaneHost } from '@/components/comments/CommentsPane'
 import { AskHost } from '@/components/ai/AskPane'
 import { DictationHost } from '@/components/ai/DictationHost'
+import { NotesHost } from '@/components/ai/NotesImportDialog'
 import { MakeTasksDialog } from '@/components/ai/MakeTasksDialog'
 import { AiHost } from '@/components/ai/AiHost'
 import { ProjectAccessProvider } from '@/hooks/use-project-access'
@@ -902,6 +903,7 @@ export function AppShell() {
         <ToastHost />
         <VoiceHost />
         <DictationHost />
+        <NotesHost />
         <MakeTasksDialog />
         <AiHost />
         <CommandPalette />

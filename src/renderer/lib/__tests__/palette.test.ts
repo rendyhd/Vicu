@@ -19,7 +19,7 @@ const ids = (list: { id: string }[]) => list.map((i) => i.id)
 
 describe('buildPaletteItems', () => {
   it('lists actions first, then smart lists, guided sessions, projects and labels', () => {
-    expect(ids(items).map((id) => id.split(':')[0])).toEqual(['cmd', 'cmd', 'cmd', 'cmd', 'cmd', 'cmd', 'cmd', 'cmd', 'cmd', 'list', 'list', 'list', 'guided', 'guided', 'guided', 'guided', 'guided', 'project', 'project', 'label'])
+    expect(ids(items).map((id) => id.split(':')[0])).toEqual(['cmd', 'cmd', 'cmd', 'cmd', 'cmd', 'cmd', 'cmd', 'cmd', 'cmd', 'cmd', 'list', 'list', 'list', 'guided', 'guided', 'guided', 'guided', 'guided', 'project', 'project', 'label'])
   })
 
   it('lists New event after New task only while the Plan screen is on', () => {
@@ -30,8 +30,8 @@ describe('buildPaletteItems', () => {
     expect(rankPalette(planner, 'meeting', []).map((i) => i.id)).toContain('cmd:new-event')
   })
 
-  it('has the New task, Say a task, Dictate tasks, Brain dump, Ask, Make tasks, Refresh, Toggle theme and Settings actions', () => {
-    expect(items.filter((i) => i.kind === 'Action').map((i) => i.title)).toEqual(['New task', 'Say a task', 'Dictate tasks', 'Brain dump', 'Ask Vicu', 'Make tasks from text', 'Refresh', 'Toggle theme', 'Settings'])
+  it('has the New task, Say a task, Dictate tasks, Brain dump, Ask, Make tasks, Make tasks from notes, Refresh, Toggle theme and Settings actions', () => {
+    expect(items.filter((i) => i.kind === 'Action').map((i) => i.title)).toEqual(['New task', 'Say a task', 'Dictate tasks', 'Brain dump', 'Ask Vicu', 'Make tasks from text', 'Make tasks from notes', 'Refresh', 'Toggle theme', 'Settings'])
   })
 })
 
@@ -39,7 +39,7 @@ describe('rankPalette', () => {
   it('shows only actions and smart lists with no query', () => {
     const shown = rankPalette(items, '', [task(1, 'x')])
     expect(shown.every((i) => i.kind === 'Action' || i.kind === 'List')).toBe(true)
-    expect(shown).toHaveLength(12)
+    expect(shown).toHaveLength(13)
   })
 
   it('puts the Logbook list first for "logbook"', () => {

@@ -35,7 +35,7 @@ export interface ChatRequest {
 }
 
 /** Optional fields a model may refuse with a 400; left out for that model afterwards. */
-export const OPTIONAL_FIELDS = ['temperature', 'reasoning_effort', 'effort'] as const
+export const OPTIONAL_FIELDS = ['temperature', 'reasoning_effort', 'effort', 'detail'] as const
 export type OptionalField = (typeof OPTIONAL_FIELDS)[number]
 
 export class ProviderAnswerError extends Error {
@@ -99,7 +99,17 @@ export const openAiChat: WireProtocolImpl = {
     if (system) messages.push({ role: 'system', content: system })
     for (const message of request.messages) {
       if (message.role === 'user') {
-        messages.push({ role: 'user', content: message.text })
+        // Pictures (4.9.2) make the content a list of parts: the images, then the text.
+        if (message.images && message.images.length > 0) {
+          const parts: unknown[] = message.images.map((image) => ({
+            type: 'image_url',
+            image_url: { url: `data:${image.media_type};base64,${image.data}`, ...(omit.has('detail') ? {} : { detail: 'high' }) },
+          }))
+          parts.push({ type: 'text', text: message.text })
+          messages.push({ role: 'user', content: parts })
+        } else {
+          messages.push({ role: 'user', content: message.text })
+        }
       } else if (message.role === 'assistant') {
         const entry: Record<string, unknown> = {
           role: 'assistant',
@@ -212,7 +222,8 @@ export const anthropicMessages: WireProtocolImpl = {
     }
     for (const message of request.messages) {
       if (message.role === 'user') {
-        add('user', [textBlock(message.text || ' ')])
+        const images = (message.images ?? []).map((image) => ({ type: 'image', source: { type: 'base64', media_type: image.media_type, data: image.data } }))
+        add('user', [...images, textBlock(message.text || ' ')])
       } else if (message.role === 'assistant') {
         if (message.raw && message.raw.length > 0) {
           add('assistant', message.raw)
@@ -381,6 +392,7 @@ export function refusedOptionalField(message: string, protocol: WireProtocol, se
   if (protocol === 'openai-chat') {
     if ('reasoning_effort' in sent && (text.includes('reasoning_effort') || text.includes('reasoning effort'))) return 'reasoning_effort'
     if ('temperature' in sent && text.includes('temperature')) return 'temperature'
+    if (text.includes('detail') && JSON.stringify(sent.messages ?? []).includes('"detail":"high"')) return 'detail'
     return null
   }
   const config = asObject(sent.output_config)

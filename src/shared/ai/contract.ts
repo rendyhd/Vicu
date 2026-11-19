@@ -18,6 +18,7 @@ import {
   speech as fixtureSpeech,
   dictation as fixtureDictation,
   brainDump as fixtureBrainDump,
+  notes as fixtureNotes,
   organize as fixtureOrganize,
   planDay as fixturePlanDay,
   ask as fixtureAsk,
@@ -148,12 +149,23 @@ export const AI_LIMITS = fixtureLimits as unknown as Readonly<{
   plan_day_minutes_max: number
   plan_day_max_tokens: number
   saved_addresses_max: number
+  notes_pages_max: number
+  notes_tasks_max: number
+  notes_batch_chars: number
+  notes_read_max_tokens: number
+  notes_read_parallel: number
+  notes_image_long_edge: number
+  notes_file_max_mb: number
+  notes_owner_max_chars: number
+  notes_from_max_chars: number
 }>
 export const PROTOCOLS = fixtureProtocols as unknown as Record<WireProtocol, { chat: string; models: string }>
 export const PROVIDER_PRESETS = fixtureProviders as unknown as ProviderPreset[]
 export const PROBE = fixtureProbe as unknown as {
   structured: { user: string; schema: JsonSchema; expect: Record<string, unknown> }
   tool: { user: string; tool: { name: string; description: string; parameters: JsonSchema }; expectArguments: Record<string, unknown> }
+  /** Reading an image (2.4, 4.9.1): a small PNG with a printed word and number; the word is compared ignoring case. */
+  vision: { user: string; image: { media_type: string; data: string }; schema: JsonSchema; expect: { word: string; number: number } }
 }
 export const SPEECH = fixtureSpeech as unknown as {
   audio: { sample_rate_hz: number; channels: number; bits: number; max_seconds: number }
@@ -175,6 +187,8 @@ export const DICTATION_ANSWER_SCHEMA = fixtureDictation.answerSchema as unknown 
 /** The draft fields in their order (`guessed` and `unsure` use these names). */
 export const DICTATION_FIELDS = fixtureDictation.fields as unknown as DraftField[]
 export const BRAIN_DUMP_ANSWER_SCHEMA = fixtureBrainDump.answerSchema as unknown as JsonSchema
+/** The answer of a notes request (4.9.5). */
+export const NOTES_ANSWER_SCHEMA = fixtureNotes.answerSchema as unknown as JsonSchema
 /** The answer of a guided session's suggestions (section 9.2). */
 export const ORGANIZE_ANSWER_SCHEMA = fixtureOrganize.answerSchema as unknown as JsonSchema
 export const PLAN_DAY_ANSWER_SCHEMA = fixturePlanDay.answerSchema as unknown as JsonSchema
@@ -188,7 +202,7 @@ export type StarterKind = 'today' | 'upcoming' | 'inbox' | 'project' | 'other'
 /** Ask's starters by the kind of list it was opened from (5.7); one is sent exactly as written. */
 export const ASK_STARTERS = fixtureAsk.starters as unknown as Record<StarterKind, string[]>
 export const TALK_CONFIRM = fixtureTalk.confirm as unknown as Record<string, { yes: string[]; no: string[] }>
-export const PROMPTS = fixturePrompts as unknown as Record<'dictation' | 'dictationEdit' | 'brainDump' | 'brainDumpEdit' | 'ask' | 'talk' | 'organize' | 'planDay', Prompt>
+export const PROMPTS = fixturePrompts as unknown as Record<'dictation' | 'dictationEdit' | 'brainDump' | 'brainDumpEdit' | 'notes' | 'notesRead' | 'ask' | 'talk' | 'organize' | 'planDay', Prompt>
 export const AI_MESSAGES = fixtureMessages as unknown as {
   promptSchemaIntro: string
   repair: string
@@ -228,6 +242,15 @@ export function dictationSystemPrompt(edit: boolean): string {
  */
 export function brainDumpSystemPrompt(edit: boolean): string {
   const organize = `${promptText('dictation')}\n\n${promptText('brainDump')}`
+  return edit ? `${organize}\n\n${promptText('brainDumpEdit')}` : organize
+}
+
+/**
+ * System text of a notes request (4.9.4): the brain dump's (`dictation`, `brainDump`), a blank line
+ * and the `notes` prompt; an Update (4.9.8) appends the `brainDumpEdit` prompt after another.
+ */
+export function notesSystemPrompt(edit: boolean): string {
+  const organize = `${brainDumpSystemPrompt(false)}\n\n${promptText('notes')}`
   return edit ? `${organize}\n\n${promptText('brainDumpEdit')}` : organize
 }
 

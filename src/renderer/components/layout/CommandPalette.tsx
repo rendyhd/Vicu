@@ -24,6 +24,8 @@ import { applyTheme } from '@/lib/theme'
 import { useAskStore } from '@/stores/ask-store'
 import { useAiUiStore } from '@/stores/ai-ui-store'
 import { useDictationStore } from '@/stores/dictation-store'
+import { useNotesStore } from '@/stores/notes-store'
+import { t } from '../../../shared/i18n'
 import { toast } from '@/stores/toast-store'
 import { useAiReady } from '@/hooks/use-ai'
 import { buildPaletteItems, rankPalette, type PaletteCommand, type PaletteItem, type PaletteKind } from '@/lib/palette'
@@ -125,6 +127,9 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
       useAskStore.getState().setOpen(true)
     } else if (command === 'make-tasks') {
       useAiUiStore.getState().openMakeTasks()
+    } else if (command === 'notes') {
+      if (ai.dictation) useNotesStore.getState().openNotes()
+      else toast.info(t('notes.notReady'))
     } else if (command === 'new-event') {
       // The Plan screen takes it once it is on screen.
       useNewEventRequestStore.getState().request()
@@ -195,7 +200,7 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
     if (action.type === 'command' && action.command === 'refresh') return RefreshCw
     if (action.type === 'command' && action.command === 'new-event') return CalendarPlus
     if (action.type === 'command' && action.command === 'voice') return Mic
-    if (action.type === 'command' && (action.command === 'ask' || action.command === 'make-tasks' || action.command === 'dictate' || action.command === 'brain-dump')) return Sparkles
+    if (action.type === 'command' && (action.command === 'ask' || action.command === 'make-tasks' || action.command === 'notes' || action.command === 'dictate' || action.command === 'brain-dump')) return Sparkles
     return ICONS[kind]
   }
 

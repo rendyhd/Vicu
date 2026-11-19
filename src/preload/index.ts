@@ -398,7 +398,9 @@ const api = {
     removeSavedAddress: (address: string) => ipcRenderer.invoke('ai:remove-saved-address', address),
     listModels: () => ipcRenderer.invoke('ai:list-models'),
     testConnection: (model: string) => ipcRenderer.invoke('ai:test-connection', model),
-    dictate: (input: { requestId: string; edit: boolean; user: string; brainDump?: boolean }) => ipcRenderer.invoke('ai:dictate', input),
+    dictate: (input: { requestId: string; edit: boolean; user: string; brainDump?: boolean; notes?: boolean }) => ipcRenderer.invoke('ai:dictate', input),
+    readPage: (input: { requestId: string; image: { media_type: string; data: string }; page: number; pages: number; title: string }) => ipcRenderer.invoke('ai:read-page', input),
+    testVision: (model: string) => ipcRenderer.invoke('ai:test-vision', model),
     cancelDictation: (requestId: string) => ipcRenderer.invoke('ai:cancel-dictation', requestId),
     planDay: (input: { requestId: string; user: string }) => ipcRenderer.invoke('ai:plan-day', input),
     organize: (input: { requestId: string; user: string }) => ipcRenderer.invoke('ai:organize', input),
@@ -416,6 +418,14 @@ const api = {
     getKeptTranscripts: () => ipcRenderer.invoke('ai:get-kept-transcripts'),
     keepTranscript: (entry: KeptTranscript) => ipcRenderer.invoke('ai:keep-transcript', entry),
     dropKeptTranscript: (id: string) => ipcRenderer.invoke('ai:drop-kept-transcript', id),
+  },
+
+  // Notes to tasks (docs/ai-assistant-v1.md 4.9): files from main's open dialog, the open notes kept.
+  notes: {
+    pickFiles: () => ipcRenderer.invoke('notes:pick-files'),
+    getSession: () => ipcRenderer.invoke('notes:session-get'),
+    saveSession: (session: unknown) => ipcRenderer.invoke('notes:session-save', session),
+    clearSession: () => ipcRenderer.invoke('notes:session-clear'),
   },
 
   // Local speech (docs/ai-assistant-v1.md section 3): one recording at a time, run in main.

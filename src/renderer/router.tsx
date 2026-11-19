@@ -116,9 +116,10 @@ const settingsRoute = createRoute({
   path: '/settings',
   component: lazyRouteComponent(() => import('@/views/SettingsView'), 'SettingsView'),
   // `section=calendars` opens Pro at the Plan settings' calendars (the Plan gear's Manage).
-  // `section=pro` opens the Pro tab (the palette's Pro settings).
-  validateSearch: (search: Record<string, unknown>): { section?: 'calendars' | 'pro' } =>
-    search.section === 'calendars' ? { section: 'calendars' } : search.section === 'pro' ? { section: 'pro' } : {},
+  // `section=pro` opens the Pro tab (the palette's Pro settings); `section=assistant` the Assistant
+  // tab (the notes screen, when no model reads pictures).
+  validateSearch: (search: Record<string, unknown>): { section?: 'calendars' | 'pro' | 'assistant' } =>
+    search.section === 'calendars' ? { section: 'calendars' } : search.section === 'pro' ? { section: 'pro' } : search.section === 'assistant' ? { section: 'assistant' } : {},
 })
 
 const searchRoute = createRoute({
