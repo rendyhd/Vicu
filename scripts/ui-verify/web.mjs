@@ -3,6 +3,7 @@
 //
 //   node scripts/ui-verify/web.mjs [--build] [--run NAME] [--theme light|dark] [--size 1280x820]
 //                                  [--browser chrome|msedge|<path>] [--headed] [--only a,b]
+//                                  [--url http://127.0.0.1:8087]   (a running container instead)
 //
 // It signs in with the seeded test account (password, then API token), walks the views, makes and
 // completes a task, checks a second tab, a reload and what the web version hides, and writes PNG
@@ -29,6 +30,7 @@ const { values: opt } = parseArgs({
     headed: { type: 'boolean', default: false },
     only: { type: 'string' },
     port: { type: 'string', default: '5176' },
+    url: { type: 'string' },
   },
 })
 
@@ -38,7 +40,7 @@ const RUN = opt.run ?? `web-${opt.theme}-${new Date().toISOString().replace(/[:.
 const RUN_DIR = join(OUT, RUN)
 const RESULTS = join(RUN_DIR, 'results.jsonl')
 
-if (opt.build || !existsSync(join(REPO, 'out', 'web', 'index.html'))) {
+if (!opt.url && (opt.build || !existsSync(join(REPO, 'out', 'web', 'index.html')))) {
   const built = spawnSync('npm', ['run', 'build:web'], { cwd: REPO, stdio: 'inherit', shell: true })
   if (built.status !== 0) process.exit(1)
 }
@@ -60,7 +62,10 @@ function assert(check, ok, detail = '') {
 const credentials = loadOrCreateCredentials()
 const ids = readSeedIds()
 const serverApi = createApi(readApiToken())
-const server = await startWebServer({ port: Number(opt.port), api: SERVER_URL })
+// --url tests a page that is already served, such as the container; else the built page is served here.
+const server = opt.url
+  ? { url: opt.url.replace(/\/+$/, ''), close: async () => {} }
+  : await startWebServer({ port: Number(opt.port), api: SERVER_URL })
 const launch = /[\\/]/.test(opt.browser) ? { executablePath: opt.browser } : { channel: opt.browser }
 const browser = await chromium.launch({ ...launch, headless: !opt.headed })
 const context = await browser.newContext({

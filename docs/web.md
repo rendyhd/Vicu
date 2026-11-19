@@ -50,7 +50,7 @@ docker run -d --name vicu-web -p 8080:8080 \
   ghcr.io/rendyhd/vicu-web:latest
 ```
 
-Or build the image from a checkout:
+Or build the image from a checkout (the only way until an image has been published to `ghcr.io`):
 
 ```
 docker build -f docker/web/Dockerfile -t vicu-web .

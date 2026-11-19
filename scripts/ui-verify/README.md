@@ -152,7 +152,36 @@ The helpers on `h`:
 A text target matches visible text exactly; anything that looks like a selector (`[data-task-id]`,
 `.class`, `css=...`, `role=...`) is used as a selector.
 
-## 5. Tools
+## 5. The web version
+
+`web.mjs` does for Vicu web (`src/web`, `docs/web.md`) what `desktop.mjs` does for the app, in a
+real browser (`playwright-core` with the Chrome or Edge that is installed) against the same seeded
+server:
+
+```
+npm run build:web
+node scripts/ui-verify/web.mjs [--build] [--run NAME] [--theme light|dark] [--size 1280x820]
+                               [--browser chrome|msedge|<path>] [--headed] [--only step,step]
+                               [--url http://127.0.0.1:8087]
+```
+
+It serves `out/web` itself (`web-server.mjs`: the page at the root, `/api/` forwarded to the test
+server, the headers of `docker/web/security-headers.conf`), signs in with the seeded account
+(password, then API token), walks the views, makes and completes a task, and checks a second tab, a
+reload, reminders without permission, links, the print frame and what the web version hides.
+Captures and `results.jsonl` go to `out/<run>/`; exit code 1 when a check failed or the page threw.
+With `--url` it tests a page that is already served, such as the container:
+
+```
+docker build -f docker/web/Dockerfile -t vicu-web:dev .
+docker run -d --name vicu-web-try -p 8087:8080 -e VIKUNJA_URL=http://host.docker.internal:3456 vicu-web:dev
+node scripts/ui-verify/web.mjs --url http://127.0.0.1:8087
+```
+
+The steps live in `web.mjs` itself; the desktop scenarios are not run against the web version. An
+OIDC sign-in is not covered (the test server has no provider).
+
+## 6. Tools
 
 - `tools/contrast.mjs`: WCAG contrast of colour pairs from the command line or a JSON list.
 - `tools/springs.mjs`: damping and stiffness to a CSS `linear()` easing curve and duration.
