@@ -73,6 +73,10 @@ export function manualRedirectFetch(request: (options: RequestOptionsLike) => Cl
       })
       req.on('response', (response) => {
         incoming = response
+        // A network error after the headers also destroys the response with it. The body stream of
+        // `Readable.toWeb` hears it and fails the read; a null body has nobody else listening, and an
+        // unheard error is an uncaught exception in main. The request's error settles a pending fetch.
+        response.on('error', () => {})
         const headers = new Headers()
         for (const [name, value] of Object.entries(response.headers)) {
           headers.set(name, Array.isArray(value) ? value.join(', ') : value)

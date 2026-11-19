@@ -23,7 +23,7 @@ import {
   type TaskCommentPage,
 } from './api-v2'
 import { sanitizeProjectPatch, sanitizeTaskPatch } from '../shared/merge-patches'
-import { NOT_API_RESPONSE_MESSAGE, SESSION_ENDED_MESSAGE, isNotApiErrorAnswer, notApiErrorMessage } from '../shared/error-classify'
+import { NOT_API_RESPONSE_MESSAGE, SESSION_ENDED_MESSAGE, answerCutOffMessage, isNotApiErrorAnswer, notApiErrorMessage } from '../shared/error-classify'
 import type { ApiError, ApiResult } from './api-result'
 import { collectAllPages } from './paginate'
 import { decodeUtf8Chunks } from './response-body'
@@ -193,10 +193,25 @@ function request<T>(
 
       const bodyChunks: Buffer[] = []
       let statusCode = 0
+      let answered = false
+
+      // A network error after the answer began reaches both the request and the response (Electron
+      // destroys the response with it); either way the request settles once. After the headers it
+      // says the server got the request, so it is not a connection error (`answerCutOffMessage`).
+      const fail = (err: Error): void => {
+        idle.clear()
+        const message = err.message || 'Network error'
+        resolve({ success: false, error: answered ? answerCutOffMessage(message) : message })
+      }
 
       req.on('response', (response) => {
         idle.touch()
+        answered = true
         statusCode = response.statusCode
+
+        // Without a listener the response's error is an uncaught exception in main (the
+        // "JavaScript error occurred in the main process" dialog on ERR_NETWORK_CHANGED).
+        response.on('error', fail)
 
         response.on('data', (chunk) => {
           idle.touch()
@@ -215,10 +230,7 @@ function request<T>(
         })
       })
 
-      req.on('error', (err) => {
-        idle.clear()
-        resolve({ success: false, error: err.message || 'Network error' })
-      })
+      req.on('error', fail)
 
       if (body !== undefined) {
         req.write(JSON.stringify(body))
@@ -788,9 +800,20 @@ function requestMultipart<T>(
 
       const bodyChunks: Buffer[] = []
       let statusCode = 0
+      let answered = false
+
+      // Settles once, from the request or the response (see `request`).
+      const fail = (err: Error): void => {
+        clearTimeout(timeout)
+        console.error(`[upload] Network error for ${method} ${url}:`, err.message)
+        const message = err.message || 'Upload failed'
+        resolve({ success: false, error: answered ? answerCutOffMessage(message) : message })
+      }
 
       req.on('response', (response) => {
+        answered = true
         statusCode = response.statusCode
+        response.on('error', fail)
 
         response.on('data', (chunk) => {
           bodyChunks.push(Buffer.from(chunk))
@@ -808,11 +831,7 @@ function requestMultipart<T>(
         })
       })
 
-      req.on('error', (err) => {
-        clearTimeout(timeout)
-        console.error(`[upload] Network error for ${method} ${url}:`, err.message)
-        resolve({ success: false, error: err.message || 'Upload failed' })
-      })
+      req.on('error', fail)
 
       // Send complete body in one call to avoid chunked transfer issues
       req.end(body)
@@ -860,9 +879,17 @@ function requestBinary(
         resolve({ success: false, error: describeDownloadLimit(MAX_BINARY_DOWNLOAD_BYTES) })
       }
 
+      // Settles once, from the request or the response (see `request`). A read, so a cut-off answer
+      // needs no message of its own.
+      const fail = (err: Error): void => {
+        idle.clear()
+        resolve({ success: false, error: err.message || 'Download failed' })
+      }
+
       req.on('response', (response) => {
         idle.touch()
         statusCode = response.statusCode
+        response.on('error', fail)
 
         // Refuse oversized downloads up front when the server declares a length,
         // and again while streaming in case it did not (D-IPC-2).
@@ -894,10 +921,7 @@ function requestBinary(
         })
       })
 
-      req.on('error', (err) => {
-        idle.clear()
-        resolve({ success: false, error: err.message || 'Download failed' })
-      })
+      req.on('error', fail)
 
       req.end()
     } catch (err: unknown) {

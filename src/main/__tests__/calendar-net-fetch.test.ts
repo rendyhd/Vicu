@@ -60,6 +60,35 @@ describe('manualRedirectFetch', () => {
     expect(made[0].aborted).toBe(true)
   })
 
+  it('survives a network error after the headers of an answer without a body', async () => {
+    // Electron destroys the response with the error and then fails the request. With nobody
+    // listening on the response, that error was an uncaught exception in main.
+    let answered: IncomingLike | null = null
+    const { request, made } = fakeRequest((req) => {
+      answered = Object.assign(new Readable({ read() {} }), { statusCode: 304, statusMessage: 'Not Modified', headers: {} }) as IncomingLike
+      req.emit('response', answered)
+    })
+    const response = await manualRedirectFetch(request)('https://dav.example.com/cal.ics')
+    expect(response.status).toBe(304)
+    const error = new Error('net::ERR_NETWORK_CHANGED')
+    expect(() => answered!.emit('error', error)).not.toThrow()
+    expect(() => made[0].emit('error', error)).not.toThrow()
+  })
+
+  it('fails the body read when the answer is cut off', async () => {
+    let answered: IncomingLike | null = null
+    const { request, made } = fakeRequest((req) => {
+      answered = Object.assign(new Readable({ read() {} }), { statusCode: 200, statusMessage: 'OK', headers: {} }) as IncomingLike
+      req.emit('response', answered)
+    })
+    const response = await manualRedirectFetch(request)('https://dav.example.com/cal.ics')
+    const body = response.text()
+    const error = new Error('net::ERR_NETWORK_CHANGED')
+    answered!.destroy(error)
+    made[0].emit('error', error)
+    await expect(body).rejects.toBeTruthy()
+  })
+
   it('passes a network error on', async () => {
     const { request } = fakeRequest((req) => req.emit('error', new Error('net::ERR_NAME_NOT_RESOLVED')))
     await expect(manualRedirectFetch(request)('https://nowhere.invalid/')).rejects.toThrow('ERR_NAME_NOT_RESOLVED')

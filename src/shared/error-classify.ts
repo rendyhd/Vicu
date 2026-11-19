@@ -1,6 +1,26 @@
+/**
+ * Said when the connection failed after the server had begun its answer (the status line and
+ * headers were in, the body was not): a network change (`net::ERR_NETWORK_CHANGED` when a Mac
+ * wakes, Wi-Fi switches or a VPN connects), a reset, a proxy that cut the answer off. The server
+ * received the request and very likely carried it out, so this is never "the request did not reach
+ * the server", whatever the network error says.
+ */
+export const ANSWER_CUT_OFF_MESSAGE = 'The connection dropped while the server was answering'
+
+/** The failure of a request whose answer was cut off; `netError` is Electron's message (`net::ERR_...`). */
+export function answerCutOffMessage(netError: string): string {
+  return netError ? `${ANSWER_CUT_OFF_MESSAGE} (${netError}).` : `${ANSWER_CUT_OFF_MESSAGE}.`
+}
+
+/** Whether a failure is an answer cut off after the server began it (`answerCutOffMessage`). */
+export function isAnswerCutOff(error: string): boolean {
+  return !!error && error.startsWith(ANSWER_CUT_OFF_MESSAGE)
+}
+
 /** Errors worth retrying later / serving cache for (network-ish failures). */
 export function isRetriableError(error: string): boolean {
   if (!error) return false
+  if (isAnswerCutOff(error)) return true
   const patterns = [
     'timed out', 'Network error', 'network error', 'net::',
     'ECONNREFUSED', 'ENOTFOUND', 'ETIMEDOUT', 'ECONNRESET',
@@ -16,7 +36,8 @@ export function isRetriableError(error: string): boolean {
  * Errors where the request provably never reached the server (safe to queue
  * a non-idempotent create for replay without risking a duplicate).
  * Note: timeouts and resets are deliberately excluded — those requests may
- * have been received and applied server-side.
+ * have been received and applied server-side. So is any error that came after the server began
+ * its answer (`isAnswerCutOff`), even `ERR_NETWORK_CHANGED`.
  *
  * A certificate that does not verify (`net::ERR_CERT_...`) counts: the TLS handshake failed, so the
  * request was never sent. A network that puts its sign-in page in front of every HTTPS address (a
@@ -24,6 +45,8 @@ export function isRetriableError(error: string): boolean {
  */
 export function isConnectionError(error: string): boolean {
   if (!error) return false
+  // The server had begun to answer, so the request reached it, whichever network error ended it.
+  if (isAnswerCutOff(error)) return false
   const patterns = [
     'ECONNREFUSED', 'ENOTFOUND', 'ENETUNREACH', 'EHOSTUNREACH',
     'ERR_NAME_NOT_RESOLVED', 'ERR_CONNECTION_REFUSED',

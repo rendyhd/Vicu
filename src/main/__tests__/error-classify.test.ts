@@ -3,6 +3,8 @@ import {
   CREATE_MAY_EXIST_TIMEOUT_MESSAGE,
   NOT_API_RESPONSE_MESSAGE,
   SESSION_ENDED_MESSAGE,
+  answerCutOffMessage,
+  isAnswerCutOff,
   isUnreachableFailure,
   isQueueableFailure as queueable,
   isAuthError as authError,
@@ -153,5 +155,31 @@ describe('a web page instead of the API and an ended session', () => {
   it('reads the ended-session message as an auth problem, not queueable', () => {
     expect(authError(SESSION_ENDED_MESSAGE)).toBe(true)
     expect(queueable({ error: SESSION_ENDED_MESSAGE, statusCode: 401 }, 'change')).toBe(false)
+  })
+})
+
+describe('an answer cut off after the server began it', () => {
+  const cut = answerCutOffMessage('net::ERR_NETWORK_CHANGED')
+
+  it('is a network failure, but never one where the request did not reach the server', () => {
+    expect(isAnswerCutOff(cut)).toBe(true)
+    expect(isRetriableError(cut)).toBe(true)
+    expect(isConnectionError(cut)).toBe(false)
+    expect(isUnreachableFailure({ error: cut })).toBe(true)
+    // Whatever the network error says.
+    expect(isConnectionError(answerCutOffMessage('net::ERR_INTERNET_DISCONNECTED'))).toBe(false)
+    expect(isRetriableError(answerCutOffMessage(''))).toBe(true)
+  })
+
+  it('a change is queued, a create is not and says it may exist', () => {
+    expect(queueable({ error: cut }, 'change')).toBe(true)
+    expect(queueable({ error: cut }, 'create')).toBe(false)
+    expect(maybeCreatedMessage({ error: cut })).toContain('may already have been created')
+  })
+
+  it('the same network error before any answer stays a connection error', () => {
+    expect(isAnswerCutOff('net::ERR_NETWORK_CHANGED')).toBe(false)
+    expect(isConnectionError('net::ERR_NETWORK_CHANGED')).toBe(true)
+    expect(queueable({ error: 'net::ERR_NETWORK_CHANGED' }, 'create')).toBe(true)
   })
 })
