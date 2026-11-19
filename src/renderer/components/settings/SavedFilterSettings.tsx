@@ -1,6 +1,8 @@
 import { useId, useMemo, useRef, useState } from 'react'
 import { ListFilter, X } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
+import { useTranslation } from 'react-i18next'
+import { currentLanguage, t, type TranslationKey } from '../../../shared/i18n'
 import { Button } from '@/components/shared/Button'
 import { Checkbox } from '@/components/shared/Checkbox'
 import { Dialog } from '@/components/overlay/Dialog'
@@ -23,58 +25,70 @@ import {
   type SavedFilterPreview,
 } from '../../../shared/saved-filter-import'
 
-const REASON_TEXT: Record<ImportReason, string> = {
-  kanban_column: 'the kanban column',
-  other_field: "a condition Vicu can't check",
-  manual_order: 'the manual order',
-  sort_key: 'a sort order',
+const REASON_TEXT: Record<ImportReason, TranslationKey> = {
+  kanban_column: 'settings.savedFilters.reason.kanbanColumn',
+  other_field: 'settings.savedFilters.reason.otherField',
+  manual_order: 'settings.savedFilters.reason.manualOrder',
+  sort_key: 'settings.savedFilters.reason.sortKey',
 }
 
-const PART_LABEL: Record<ImportPart, string> = {
-  name: 'Name',
-  rule: 'Rule',
-  include_nulls: 'Tasks without a value',
-  sort: 'Sort',
+const PART_LABEL: Record<ImportPart, TranslationKey> = {
+  name: 'settings.savedFilters.part.name',
+  rule: 'settings.savedFilters.part.rule',
+  include_nulls: 'settings.savedFilters.part.includeNulls',
+  sort: 'settings.savedFilters.part.sort',
+}
+
+/** The reasons as one list in the language shown ("a, b and c"; English keeps no serial comma). */
+function listOf(items: string[]): string {
+  const language = currentLanguage()
+  return new Intl.ListFormat(language === 'en' ? 'en-GB' : language, { style: 'long', type: 'conjunction' }).format(items)
 }
 
 /** What an import will do, in words for the sheet; the same on Android (`importStatusText`). */
 export function importStatusText(preview: SavedFilterPreview, checked: boolean): string {
   const { result } = preview
-  if (result.list === null) return "Can't import: Vicu can't read this yet"
+  if (result.list === null) return t('settings.savedFilters.status.cannot')
   switch (preview.comparison?.status) {
-    case 'same': return 'Same as your list'
-    case 'vikunja': return 'Changed in Vikunja since you imported it'
-    case 'both': return 'Changed in Vikunja and in Vicu'
-    case 'vicu': return "Your list differs from Vikunja's"
-    case 'differs': return 'Differs from Vikunja'
+    case 'same': return t('settings.savedFilters.status.same')
+    case 'vikunja': return t('settings.savedFilters.status.vikunja')
+    case 'both': return t('settings.savedFilters.status.both')
+    case 'vicu': return t('settings.savedFilters.status.vicu')
+    case 'differs': return t('settings.savedFilters.status.differs')
   }
-  if (preview.imported_before && !checked) return 'Imported before'
-  if (result.status === 'exact') return 'Imports exactly'
-  const parts = result.reasons.map((reason) => REASON_TEXT[reason])
-  const joined = parts.length <= 1 ? parts.join('') : `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`
-  return `Leaves out ${joined}`
+  if (preview.imported_before && !checked) return t('settings.savedFilters.status.importedBefore')
+  if (result.status === 'exact') return t('settings.savedFilters.status.exact')
+  const things = listOf(result.reasons.map((reason) => t(REASON_TEXT[reason])))
+  return t('settings.savedFilters.status.leavesOut', { things })
 }
 
 /** Who changed a part, in words (Android: `changeText`). */
 export function changeText(change: ImportChange): string {
   switch (change) {
-    case 'vikunja': return 'Changed in Vikunja'
-    case 'vicu': return 'Changed in Vicu'
-    case 'both': return 'Changed in both'
-    case 'differs': return 'Differs'
-    case 'same': return 'Same'
+    case 'vikunja': return t('settings.savedFilters.change.vikunja')
+    case 'vicu': return t('settings.savedFilters.change.vicu')
+    case 'both': return t('settings.savedFilters.change.both')
+    case 'differs': return t('settings.savedFilters.change.differs')
+    case 'same': return t('settings.savedFilters.change.same')
   }
 }
 
 /** The words under the question's title (Android: `questionText`). */
 export function questionText(preview: SavedFilterPreview): string {
-  const source = preview.view ? `the project view "${preview.title}"` : `the saved filter "${preview.title}"`
-  const Source = source.charAt(0).toUpperCase() + source.slice(1)
+  const title = preview.title
+  if (preview.view) {
+    switch (preview.comparison?.status) {
+      case 'vikunja': return t('settings.savedFilters.question.viewVikunja', { title })
+      case 'both': return t('settings.savedFilters.question.viewBoth', { title })
+      case 'vicu': return t('settings.savedFilters.question.viewVicu', { title })
+      default: return t('settings.savedFilters.question.viewDefault', { title })
+    }
+  }
   switch (preview.comparison?.status) {
-    case 'vikunja': return `${Source} changed in Vikunja since you imported it.`
-    case 'both': return `${Source} changed in Vikunja, and the list changed in Vicu.`
-    case 'vicu': return `Your list differs from ${source}. Overwrite puts Vikunja's version back.`
-    default: return `Your list differs from ${source}. Vicu can't tell which side changed.`
+    case 'vikunja': return t('settings.savedFilters.question.filterVikunja', { title })
+    case 'both': return t('settings.savedFilters.question.filterBoth', { title })
+    case 'vicu': return t('settings.savedFilters.question.filterVicu', { title })
+    default: return t('settings.savedFilters.question.filterDefault', { title })
   }
 }
 
@@ -82,17 +96,17 @@ export function questionText(preview: SavedFilterPreview): string {
 export function offerText(added: number, changed: number): [string, string] {
   if (changed === 0) {
     return [
-      added === 1 ? '1 new saved filter on your server' : `${added} new saved filters on your server`,
-      added === 1 ? 'Import it as a custom list to use it in Vicu.' : 'Import them as custom lists to use them in Vicu.',
+      t('settings.savedFilters.offer.addedTitle', { count: added }),
+      t('settings.savedFilters.offer.addedBody', { count: added }),
     ]
   }
   if (added === 0) {
     return [
-      changed === 1 ? '1 saved filter changed in Vikunja' : `${changed} saved filters changed in Vikunja`,
-      'See what changed and choose whether to update your lists.',
+      t('settings.savedFilters.offer.changedTitle', { count: changed }),
+      t('settings.savedFilters.offer.changedBody'),
     ]
   }
-  return [`${added} new and ${changed} changed saved filters on your server`, 'Review them to import or update your lists.']
+  return [t('settings.savedFilters.offer.bothTitle', { added, changed }), t('settings.savedFilters.offer.bothBody')]
 }
 
 /** A list's sort in words: "Priority, highest first, then Due date, soonest first". */
@@ -100,12 +114,15 @@ export function sortText(list: ComparableList): string {
   const one = (sortBy: string, order: string) => {
     const name = SORT_OPTIONS.find((option) => option.value === sortBy)?.label ?? sortBy
     const label = orderOptions(sortBy).find((option) => option.value === order)?.label.toLowerCase() ?? order
-    return `${name}, ${label}`
+    return t('settings.savedFilters.sortPart', { name, order: label })
   }
   const sortBy = typeof list.filter.sort_by === 'string' && list.filter.sort_by !== '' ? list.filter.sort_by : 'due_date'
   const order = list.filter.order_by === 'desc' ? 'desc' : 'asc'
   const thenBy = Array.isArray(list.filter.then_by) ? (list.filter.then_by as Array<{ sort_by: string; order_by?: string }>) : []
-  return [one(sortBy, order), ...thenBy.map((key) => one(key.sort_by, key.order_by === 'desc' ? 'desc' : 'asc'))].join(', then ')
+  return thenBy.reduce(
+    (text, key) => t('settings.savedFilters.sortThen', { first: text, next: one(key.sort_by, key.order_by === 'desc' ? 'desc' : 'asc') }),
+    one(sortBy, order),
+  )
 }
 
 interface Named { labels: Array<{ id: number; name: string }>; projects: Array<{ id: number; name: string }> }
@@ -118,8 +135,8 @@ function showRule(rule: unknown, named: Named): string {
 function partText(list: ComparableList, part: ImportPart, named: Named): string {
   switch (part) {
     case 'name': return list.name
-    case 'rule': return showRule(list.filter.rule, named) || 'No rule'
-    case 'include_nulls': return list.filter.rule_include_nulls === true ? 'Included' : 'Left out'
+    case 'rule': return showRule(list.filter.rule, named) || t('settings.savedFilters.noRule')
+    case 'include_nulls': return list.filter.rule_include_nulls === true ? t('settings.savedFilters.included') : t('settings.savedFilters.leftOut')
     case 'sort': return sortText(list)
   }
 }
@@ -157,6 +174,7 @@ interface Asking {
  * views is always there. A source imported before is updated in place after a question.
  */
 export function SavedFilterSettings() {
+  const { t } = useTranslation()
   const titleId = useId()
   const queryClient = useQueryClient()
   const { data: state } = useSavedFilters()
@@ -182,13 +200,13 @@ export function SavedFilterSettings() {
     const update = (change: (current: Sheet) => Sheet) =>
       setSheet((current) => (current === null || opened.current !== token ? current : change(current)))
     void api.previewSavedFilters().then((previews) => update((current) => {
-      if (!previews) return { ...current, loading: false, error: "Vicu couldn't read the saved filters. Check the connection and try again." }
+      if (!previews) return { ...current, loading: false, error: t('settings.savedFilters.readFailed') }
       const checked = new Set(current.checked)
       for (const preview of previews) if (ticked(preview)) checked.add(preview.key)
       return { ...current, loading: false, rows: previews, checked }
     }))
     void api.previewProjectViews().then((previews) => update((current) => {
-      if (!previews) return { ...current, viewsLoading: false, viewsError: "Vicu couldn't read the project views." }
+      if (!previews) return { ...current, viewsLoading: false, viewsError: t('settings.savedFilters.viewsReadFailed') }
       const checked = new Set(current.checked)
       for (const preview of previews) if (ticked(preview)) checked.add(preview.key)
       return { ...current, viewsLoading: false, views: previews, checked }
@@ -302,11 +320,11 @@ export function SavedFilterSettings() {
 
   return (
     <div className="rounded-card border border-[var(--border-color)] bg-[var(--bg-primary)] p-5">
-      <h2 className="mb-1 text-sm font-semibold text-[var(--text-primary)]">Saved filters and views</h2>
+      <h2 className="mb-1 text-sm font-semibold text-[var(--text-primary)]">{t('settings.savedFilters.title')}</h2>
       <p className="mb-3 text-xs text-[var(--text-secondary)]">
         {state.known.length === 0
-          ? 'Import a saved filter or a project view from Vikunja as a custom list.'
-          : `Your server has ${state.known.length === 1 ? 'a saved filter' : `${state.known.length} saved filters`}. Imported filters and project views become custom lists.`}
+          ? t('settings.savedFilters.introNone')
+          : t('settings.savedFilters.introSome', { count: state.known.length })}
       </p>
 
       {(offer.length > 0 || changedOffer.length > 0) && (
@@ -317,21 +335,21 @@ export function SavedFilterSettings() {
             <p className="text-xs text-[var(--text-secondary)]">{offerBody}</p>
           </div>
           <div className="flex shrink-0 gap-1">
-            <Button variant="quiet" onClick={notNow}>Not now</Button>
-            <Button variant="secondary" onClick={open}>Review</Button>
+            <Button variant="quiet" onClick={notNow}>{t('settings.savedFilters.notNow')}</Button>
+            <Button variant="secondary" onClick={open}>{t('settings.savedFilters.review')}</Button>
           </div>
         </div>
       )}
 
-      <Button variant="secondary" onClick={open}>Import saved filters and views</Button>
+      <Button variant="secondary" onClick={open}>{t('settings.savedFilters.importButton')}</Button>
 
       {sheet && (
         <Dialog open onClose={close} labelledBy={titleId} className="w-[520px] max-w-[calc(100%-2rem)]">
           <div className="flex items-center justify-between border-b border-[var(--border-color)] px-5 py-3">
-            <h2 id={titleId} className="text-sm font-semibold text-[var(--text-primary)]">Import saved filters and views</h2>
+            <h2 id={titleId} className="text-sm font-semibold text-[var(--text-primary)]">{t('settings.savedFilters.importButton')}</h2>
             <button
               type="button"
-              aria-label="Close"
+              aria-label={t('settings.savedFilters.close')}
               onClick={close}
               className="rounded-control p-1 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
             >
@@ -339,26 +357,26 @@ export function SavedFilterSettings() {
             </button>
           </div>
           <p className="px-5 pt-3 text-xs text-[var(--text-secondary)]">
-            Each becomes a custom list in Vicu. Changes you make to these lists won&apos;t change anything on your server.
+            {t('settings.savedFilters.sheetNote')}
           </p>
           <div className="max-h-[420px] overflow-y-auto px-3 py-2">
-            {sheet.loading && <p className="px-2 py-6 text-center text-xs text-[var(--text-secondary)]">Reading the saved filters...</p>}
+            {sheet.loading && <p className="px-2 py-6 text-center text-xs text-[var(--text-secondary)]">{t('settings.savedFilters.reading')}</p>}
             {!sheet.loading && sheet.error !== null && <p className="px-2 py-3 text-xs text-danger">{sheet.error}</p>}
             {!sheet.loading && sheet.error === null && (
               <>
                 {sheet.rows.length > 0 && (
                   <section aria-labelledby={`${titleId}-filters`}>
-                    <h3 id={`${titleId}-filters`} className="px-2 pb-1 pt-2 text-xs font-semibold text-accent-blue">Saved filters</h3>
+                    <h3 id={`${titleId}-filters`} className="px-2 pb-1 pt-2 text-xs font-semibold text-accent-blue">{t('settings.savedFilters.filtersHeading')}</h3>
                     {sheet.rows.map(renderRow)}
                   </section>
                 )}
                 <section aria-labelledby={`${titleId}-views`}>
-                  <h3 id={`${titleId}-views`} className="px-2 pb-1 pt-3 text-xs font-semibold text-accent-blue">Project views</h3>
-                  {sheet.viewsLoading && <p className="px-2 py-2 text-xs text-[var(--text-secondary)]">Reading the project views...</p>}
+                  <h3 id={`${titleId}-views`} className="px-2 pb-1 pt-3 text-xs font-semibold text-accent-blue">{t('settings.savedFilters.viewsHeading')}</h3>
+                  {sheet.viewsLoading && <p className="px-2 py-2 text-xs text-[var(--text-secondary)]">{t('settings.savedFilters.readingViews')}</p>}
                   {!sheet.viewsLoading && sheet.viewsError !== null && <p className="px-2 py-2 text-xs text-danger">{sheet.viewsError}</p>}
                   {!sheet.viewsLoading && sheet.viewsError === null && sheet.views.length === 0 && (
                     <p className="px-2 py-2 text-xs text-[var(--text-secondary)]">
-                      No project has a view of its own yet. A view with its own filter or sort shows up here.
+                      {t('settings.savedFilters.noViews')}
                     </p>
                   )}
                   {!sheet.viewsLoading && sheet.viewsError === null && sheet.views.map(renderRow)}
@@ -367,9 +385,9 @@ export function SavedFilterSettings() {
             )}
           </div>
           <div className="flex justify-end gap-2 border-t border-[var(--border-color)] px-5 py-3">
-            <Button variant="secondary" onClick={close}>Cancel</Button>
+            <Button variant="secondary" onClick={close}>{t('settings.savedFilters.cancel')}</Button>
             <Button variant="primary" disabled={checkedCount === 0} onClick={importChecked}>
-              {checkedCount === 0 ? 'Import' : `Import ${checkedCount}`}
+              {checkedCount === 0 ? t('settings.savedFilters.import') : t('settings.savedFilters.importCount', { count: checkedCount })}
             </Button>
           </div>
         </Dialog>
@@ -406,6 +424,7 @@ function UpdateQuestion({
   onAnswer: (answer: ImportAnswer, forAll: boolean) => void
   onClose: () => void
 }) {
+  const { t } = useTranslation()
   const titleId = useId()
   const textId = useId()
   const [forAll, setForAll] = useState(false)
@@ -428,16 +447,16 @@ function UpdateQuestion({
     >
       <div className="p-5">
         <h2 id={titleId} className="mb-1 text-sm font-semibold text-[var(--text-primary)]">
-          Update &ldquo;{list.name}&rdquo; from Vikunja?
+          {t('settings.savedFilters.updateTitle', { name: list.name })}
         </h2>
         <p id={textId} className="mb-4 text-xs text-[var(--text-secondary)]">{questionText(preview)}</p>
 
         <table className="mb-3 w-full table-fixed border-collapse text-left text-xs">
           <thead>
             <tr className="border-b border-[var(--border-color)] text-[var(--text-secondary)]">
-              <th scope="col" className="w-[30%] py-1.5 pr-2 font-medium"><span className="sr-only">Part</span></th>
-              <th scope="col" className="py-1.5 pr-2 font-medium">Your list</th>
-              <th scope="col" className="py-1.5 font-medium">Vikunja now</th>
+              <th scope="col" className="w-[30%] py-1.5 pr-2 font-medium"><span className="sr-only">{t('settings.savedFilters.colPart')}</span></th>
+              <th scope="col" className="py-1.5 pr-2 font-medium">{t('settings.savedFilters.colYours')}</th>
+              <th scope="col" className="py-1.5 font-medium">{t('settings.savedFilters.colVikunja')}</th>
             </tr>
           </thead>
           <tbody>
@@ -449,7 +468,7 @@ function UpdateQuestion({
               return (
                 <tr key={part} className="border-b border-[var(--border-color)] align-top">
                   <th scope="row" className="py-2 pr-2 font-normal">
-                    <span className="block font-medium text-[var(--text-primary)]">{PART_LABEL[part]}</span>
+                    <span className="block font-medium text-[var(--text-primary)]">{t(PART_LABEL[part])}</span>
                     <span className="block text-caption text-[var(--text-secondary)]">{changeText(change)}</span>
                   </th>
                   <td className="py-1 pr-2">
@@ -469,21 +488,21 @@ function UpdateQuestion({
         </table>
 
         <p className="mb-3 rounded-control bg-[var(--bg-secondary)] px-3 py-2 text-xs text-[var(--text-secondary)]">
-          Kept either way: the icon, its place and the list&apos;s other conditions.
+          {t('settings.savedFilters.keptNote')}
         </p>
 
         {remaining > 0 && (
           <label className="mb-4 flex cursor-pointer items-center gap-2">
             <Checkbox checked={forAll} onChange={(event) => setForAll(event.target.checked)} />
             <span className="text-sm text-[var(--text-primary)]">
-              {remaining === 1 ? 'Same for the next one' : `Same for the next ${remaining}`}
+              {t('settings.savedFilters.sameForNext', { count: remaining })}
             </span>
           </label>
         )}
 
         <div className="flex justify-end gap-2">
-          <Button variant="secondary" data-autofocus onClick={() => onAnswer('skip', forAll)}>Skip</Button>
-          <Button variant="primary" onClick={() => onAnswer('overwrite', forAll)}>Overwrite</Button>
+          <Button variant="secondary" data-autofocus onClick={() => onAnswer('skip', forAll)}>{t('settings.savedFilters.skip')}</Button>
+          <Button variant="primary" onClick={() => onAnswer('overwrite', forAll)}>{t('settings.savedFilters.overwrite')}</Button>
         </div>
       </div>
     </Dialog>

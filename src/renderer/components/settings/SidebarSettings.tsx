@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { Checkbox } from '@/components/shared/Checkbox'
 import { SmartListIcon } from '@/components/shared/SmartListIcon'
 import { useSmartLists } from '@/components/sidebar/SmartListNav'
@@ -21,13 +22,14 @@ const isHideable = (id: string): id is SidebarHideableList => (SIDEBAR_HIDEABLE_
  * and Review are offered while they are on; the Inbox always stays. A hidden list keeps working.
  */
 export function SidebarSettings({ config, onChange }: SidebarSettingsProps) {
+  const { t } = useTranslation()
   const lists = useSmartLists().flatMap((item) => (isHideable(item.id) ? [{ ...item, id: item.id }] : []))
 
   return (
     <div className="rounded-card border border-[var(--border-color)] bg-[var(--bg-primary)] p-5">
-      <h2 className="mb-1 text-sm font-semibold text-[var(--text-primary)]">Sidebar</h2>
+      <h2 className="mb-1 text-sm font-semibold text-[var(--text-primary)]">{t('settings.sidebar.title')}</h2>
       <p className="mb-4 text-xs text-[var(--text-secondary)]">
-        The lists shown above your projects. A hidden list keeps working and stays in the command palette.
+        {t('settings.sidebar.note')}
       </p>
 
       <div className="space-y-3">

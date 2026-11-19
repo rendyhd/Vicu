@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { Checkbox } from '@/components/shared/Checkbox'
 import { Switch } from '@/components/shared/Switch'
 import { isRoutinesEnabled, type AppConfig } from '@/lib/vikunja-types'
@@ -12,15 +13,16 @@ interface RoutinesSettingsPanelProps {
 }
 
 export function RoutinesSettingsPanel({ config, onChange }: RoutinesSettingsPanelProps) {
+  const { t } = useTranslation()
   const enabled = isRoutinesEnabled(config)
   const inToday = config.routines_in_today !== false
   const limit = todayRoutinesLimit(config.routines_today_limit)
 
   return (
     <div className="rounded-card border border-[var(--border-color)] bg-[var(--bg-primary)] p-5">
-      <h2 className="mb-1 text-sm font-semibold text-[var(--text-primary)]">Routines</h2>
+      <h2 className="mb-1 text-sm font-semibold text-[var(--text-primary)]">{t('settings.routines.title')}</h2>
       <p className="mb-4 text-xs text-[var(--text-secondary)]">
-        What you do regularly. Turning them off hides them and stops their reminders; your routines and their history are kept.
+        {t('settings.routines.note')}
       </p>
 
       <div className="space-y-3">
@@ -29,7 +31,7 @@ export function RoutinesSettingsPanel({ config, onChange }: RoutinesSettingsPane
             checked={enabled}
             onCheckedChange={(checked) => onChange({ routines_enabled: checked })}
           />
-          <span className="text-sm text-[var(--text-primary)]">Enable routines</span>
+          <span className="text-sm text-[var(--text-primary)]">{t('settings.routines.enable')}</span>
         </label>
 
         <label className="flex cursor-pointer items-start gap-2">
@@ -40,18 +42,18 @@ export function RoutinesSettingsPanel({ config, onChange }: RoutinesSettingsPane
             className="mt-0.5"
           />
           <div>
-            <div className="text-sm text-[var(--text-primary)]">Show routines in Today</div>
+            <div className="text-sm text-[var(--text-primary)]">{t('settings.routines.inToday')}</div>
             <p className="text-xs text-[var(--text-secondary)]">
-              Lists the routines still open today above your tasks. Finished ones are left out.
+              {t('settings.routines.inTodayNote')}
             </p>
           </div>
         </label>
 
         {enabled && inToday && (
           <div className="pl-6">
-            <label htmlFor="routines-today-limit" className="text-sm text-[var(--text-primary)]">Routines shown on Today</label>
+            <label htmlFor="routines-today-limit" className="text-sm text-[var(--text-primary)]">{t('settings.routines.limit')}</label>
             <p className="mb-2 mt-0.5 text-xs text-[var(--text-secondary)]">
-              How many routines due in the next two hours show at once. The rest wait behind one line.
+              {t('settings.routines.limitNote')}
             </p>
             <select
               id="routines-today-limit"
@@ -61,7 +63,7 @@ export function RoutinesSettingsPanel({ config, onChange }: RoutinesSettingsPane
             >
               {TODAY_ROUTINES_LIMITS.map((choice) => (
                 <option key={choice} value={String(choice)}>
-                  {choice === 'all' ? 'All' : choice}
+                  {choice === 'all' ? t('settings.routines.all') : choice}
                 </option>
               ))}
             </select>
@@ -76,13 +78,14 @@ export function RoutinesSettingsPanel({ config, onChange }: RoutinesSettingsPane
 
 /** The shared routines this account hid (section 6.9), to show again. Nothing while there are none. */
 function HiddenSharedRoutines() {
+  const { t } = useTranslation()
   const { hiddenShared } = useRoutines()
   const setPref = useSetSyncedPreference()
   if (hiddenShared.length === 0) return null
   return (
     <div className="mt-5 border-t border-[var(--border-color)] pt-4">
-      <h3 className="mb-1 text-sm font-medium text-[var(--text-primary)]">Hidden shared routines</h3>
-      <p className="mb-3 text-xs text-[var(--text-secondary)]">Routines someone shared with you that you hid. They stay shared; only you do not see them.</p>
+      <h3 className="mb-1 text-sm font-medium text-[var(--text-primary)]">{t('settings.routines.hidden.title')}</h3>
+      <p className="mb-3 text-xs text-[var(--text-secondary)]">{t('settings.routines.hidden.note')}</p>
       <ul className="space-y-1.5">
         {hiddenShared.map((carrier) => (
           <li key={carrier.payload.definition.id} className="flex items-center gap-2">
@@ -92,7 +95,7 @@ function HiddenSharedRoutines() {
               onClick={() => setPref.mutate({ key: routineHiddenKey(carrier.payload.definition.id), value: null })}
               className="rounded-control px-2 py-1 text-xs font-medium text-accent-blue hover:bg-[var(--bg-hover)]"
             >
-              Show
+              {t('settings.routines.hidden.show')}
             </button>
           </li>
         ))}

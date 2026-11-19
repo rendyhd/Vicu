@@ -1,6 +1,8 @@
 import { Fragment, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { ChevronRight, Folder, GripVertical, MoreHorizontal, Plus, RefreshCw, RotateCcw } from 'lucide-react'
 import { useDraggable, useDroppable } from '@dnd-kit/core'
+import { useTranslation } from 'react-i18next'
+import type { TranslationKey } from '../../../shared/i18n'
 import { Button } from '@/components/shared/Button'
 import { Checkbox } from '@/components/shared/Checkbox'
 import { ReviewSettingsPanel } from '@/components/review/ReviewSettingsPanel'
@@ -24,12 +26,22 @@ import { groupsWithInbox } from '@/lib/project-groups'
 import { projectActions, useProjectActionsStore } from '@/stores/project-actions-store'
 import { useCategoryDropActive, useRootDropActive, useRowDropZone } from '@/stores/project-drop-store'
 import type { AppConfig, Project } from '@/lib/vikunja-types'
-import { TASK_ORDER_KEYS, TASK_ORDER_LABELS, parseTaskOrder } from '../../../shared/task-order'
+import { TASK_ORDER_KEYS, parseTaskOrder, type TaskOrderKey } from '../../../shared/task-order'
 import type { ProjectCategory } from '../../../shared/project-categories'
 import { useProjectsWithoutIcon } from '@/hooks/use-project-icons'
 import { SavedFilterSettings } from './SavedFilterSettings'
 
 const ROOT_ID = 'project-root-settings'
+
+const ORDER_LABELS: Record<TaskOrderKey, TranslationKey> = {
+  due_date_first: 'settings.projects.order.dueDateFirst',
+  due_date_priority: 'settings.projects.order.dueDatePriority',
+  manual: 'settings.projects.order.manual',
+  priority: 'settings.projects.order.priority',
+  title: 'settings.projects.order.title',
+  newest: 'settings.projects.order.newest',
+  oldest: 'settings.projects.order.oldest',
+}
 
 type OpenMenu = (project: Project, at: { point: { x: number; y: number } } | { anchor: HTMLElement }, opener: HTMLElement | null) => void
 
@@ -44,6 +56,7 @@ interface RowProps {
 
 /** One active project in the Settings list: click to edit, drag to move, … for everything else. */
 function ProjectRow({ node, depth, inboxId, menuOpenFor, renamingId, onOpenMenu }: RowProps) {
+  const { t } = useTranslation()
   const rowRef = useRef<HTMLDivElement | null>(null)
   const moreRef = useRef<HTMLButtonElement>(null)
   const isInbox = node.id === inboxId
@@ -123,14 +136,14 @@ function ProjectRow({ node, depth, inboxId, menuOpenFor, renamingId, onOpenMenu 
             {showIcon && <Folder aria-hidden="true" className="h-4 w-4 shrink-0" style={{ color: color || 'var(--text-secondary)' }} />}
             <span className="min-w-0 flex-1 truncate text-sm text-[var(--text-primary)]">{node.title}</span>
             {isInbox && (
-              <span className="vicu-chip rounded-chip bg-[var(--bg-secondary)] px-1.5 py-0.5 text-caption text-[var(--text-secondary)]">Inbox</span>
+              <span className="vicu-chip rounded-chip bg-[var(--bg-secondary)] px-1.5 py-0.5 text-caption text-[var(--text-secondary)]">{t('nav.inbox')}</span>
             )}
           </div>
         )}
         <button
           ref={moreRef}
           type="button"
-          aria-label={`${node.title} actions`}
+          aria-label={t('settings.projects.actions', { name: node.title })}
           aria-haspopup="menu"
           aria-expanded={menuOpen}
           onClick={openMenuAtButton}
@@ -161,6 +174,7 @@ type OpenCategoryMenu = (category: ProjectCategory, at: { point: { x: number; y:
  * the sidebar's, and its menu. A dragged project dropped on it goes to the start of the category.
  */
 function CategoryRow({ category, menuOpen, onOpenMenu }: { category: ProjectCategory; menuOpen: boolean; onOpenMenu: OpenCategoryMenu }) {
+  const { t } = useTranslation()
   const moreRef = useRef<HTMLButtonElement>(null)
   const dndId = `project-category-settings-${category.id}`
   const { setNodeRef } = useDroppable({ id: dndId, data: { type: 'project-category', categoryId: category.id } })
@@ -180,12 +194,12 @@ function CategoryRow({ category, menuOpen, onOpenMenu }: { category: ProjectCate
     >
       <span className="min-w-0 flex-1 truncate text-group font-medium text-text-secondary">
         {category.name}
-        <span className="sr-only">, category</span>
+        <span className="sr-only">{t('settings.projects.categorySuffix')}</span>
       </span>
       <button
         ref={moreRef}
         type="button"
-        aria-label={`${category.name} actions`}
+        aria-label={t('settings.projects.actions', { name: category.name })}
         aria-haspopup="menu"
         aria-expanded={menuOpen}
         onClick={() => moreRef.current && onOpenMenu(category, { anchor: moreRef.current }, moreRef.current)}
@@ -233,6 +247,7 @@ function ArchivedRow({
 }) {
   const moreRef = useRef<HTMLButtonElement>(null)
   const restoreRef = useRef<HTMLButtonElement>(null)
+  const { t } = useTranslation()
   const showIcon = !useProjectsWithoutIcon().has(node.id)
   return (
     <>
@@ -246,14 +261,14 @@ function ArchivedRow({
       >
         {showIcon && <Folder aria-hidden="true" className="h-4 w-4 shrink-0 opacity-60" style={{ color: normalizeHex(node.hex_color) || 'var(--text-secondary)' }} />}
         <span className="min-w-0 flex-1 truncate text-sm text-[var(--text-secondary)]">{node.title}</span>
-        <Button ref={restoreRef} variant="quiet" onClick={onRestore} aria-label={`Restore ${node.title}`}>
+        <Button ref={restoreRef} variant="quiet" onClick={onRestore} aria-label={t('settings.projects.restoreLabel', { name: node.title })}>
           <RotateCcw aria-hidden="true" className="h-3.5 w-3.5" />
-          Restore
+          {t('settings.projects.restore')}
         </Button>
         <button
           ref={moreRef}
           type="button"
-          aria-label={`${node.title} actions`}
+          aria-label={t('settings.projects.actions', { name: node.title })}
           aria-haspopup="menu"
           aria-expanded={menuOpen}
           onClick={() => moreRef.current && onOpenMenu(node, { anchor: moreRef.current }, restoreRef.current)}
@@ -268,6 +283,7 @@ function ArchivedRow({
 }
 
 function InboxCard() {
+  const { t } = useTranslation()
   const selectId = useId()
   const { data } = useProjects()
   const { data: config } = useAppConfig()
@@ -279,11 +295,11 @@ function InboxCard() {
 
   return (
     <div className="rounded-card border border-[var(--border-color)] bg-[var(--bg-primary)] p-5">
-      <h2 className="mb-1 text-sm font-semibold text-[var(--text-primary)]">Inbox</h2>
+      <h2 className="mb-1 text-sm font-semibold text-[var(--text-primary)]">{t('nav.inbox')}</h2>
       <p className="mb-3 text-xs text-[var(--text-secondary)]">
-        Tasks without a project land here. It shows as Inbox in the sidebar, not among the projects.
+        {t('settings.projects.inbox.note')}
       </p>
-      <label htmlFor={selectId} className="mb-1 block text-xs text-[var(--text-secondary)]">Inbox project</label>
+      <label htmlFor={selectId} className="mb-1 block text-xs text-[var(--text-secondary)]">{t('settings.projects.inbox.project')}</label>
       <select
         id={selectId}
         value={inboxId}
@@ -293,7 +309,7 @@ function InboxCard() {
         }}
         className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)]"
       >
-        {(inboxId === 0 || missing) && <option value={inboxId}>Select a project...</option>}
+        {(inboxId === 0 || missing) && <option value={inboxId}>{t('settings.projects.inbox.select')}</option>}
         {options.map(({ project, depth }) => (
           <option key={project.id} value={project.id}>
             {'   '.repeat(depth)}
@@ -303,7 +319,7 @@ function InboxCard() {
       </select>
       {missing && (
         <p className="mt-1 text-xs text-danger">
-          The configured Inbox project is archived or unavailable. Select an active project.
+          {t('settings.projects.inbox.missing')}
         </p>
       )}
     </div>
@@ -311,6 +327,7 @@ function InboxCard() {
 }
 
 function ProjectListCard() {
+  const { t } = useTranslation()
   const { data, isLoading, isFetching, error, refetch } = useProjects()
   const { data: config } = useAppConfig()
   const renaming = useProjectActionsStore((s) => s.renaming)
@@ -357,15 +374,15 @@ function ProjectListCard() {
         className={cn('flex items-center gap-2 border-b border-[var(--border-color)] px-4 py-3', rootActive && INTO_CLASSES)}
       >
         <div className="min-w-0 flex-1">
-          <h2 className="text-sm font-semibold text-[var(--text-primary)]">Projects</h2>
+          <h2 className="text-sm font-semibold text-[var(--text-primary)]">{t('settings.projects.list.title')}</h2>
           <p className="text-xs text-[var(--text-secondary)]">
-            Drag a project to reorder it, onto another project to put it inside, or onto a category. Right-click or use … for more.
+            {t('settings.projects.list.note')}
           </p>
         </div>
         <button
           type="button"
-          title="Refresh projects"
-          aria-label="Refresh projects"
+          title={t('settings.projects.list.refresh')}
+          aria-label={t('settings.projects.list.refresh')}
           onClick={() => refetch()}
           disabled={isFetching}
           className="rounded-control p-2 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] disabled:opacity-50"
@@ -374,16 +391,16 @@ function ProjectListCard() {
         </button>
         <Button variant="secondary" onClick={(event) => projectActions.openDialog({ kind: 'category-new' }, event.currentTarget)}>
           <Plus aria-hidden="true" className="h-3.5 w-3.5" />
-          New category
+          {t('settings.projects.list.newCategory')}
         </Button>
         <Button variant="primary" onClick={(event) => projectActions.openDialog({ kind: 'create', parentId: 0 }, event.currentTarget)}>
           <Plus aria-hidden="true" className="h-3.5 w-3.5" />
-          New project
+          {t('settings.projects.list.newProject')}
         </Button>
       </div>
 
       {isLoading ? (
-        <p className="px-4 py-5 text-sm text-[var(--text-secondary)]">Loading projects…</p>
+        <p className="px-4 py-5 text-sm text-[var(--text-secondary)]">{t('settings.projects.list.loading')}</p>
       ) : error ? (
         <p className="px-4 py-5 text-sm text-danger">{error.message}</p>
       ) : data?.tree.length || categories.length > 0 ? (
@@ -406,7 +423,7 @@ function ProjectListCard() {
           </Fragment>
         ))
       ) : (
-        <p className="px-4 py-5 text-sm text-[var(--text-secondary)]">No active projects</p>
+        <p className="px-4 py-5 text-sm text-[var(--text-secondary)]">{t('settings.projects.list.empty')}</p>
       )}
 
       {archivedCount > 0 && (
@@ -421,7 +438,7 @@ function ProjectListCard() {
               aria-hidden="true"
               className={cn('h-3.5 w-3.5 transition-transform duration-fade-fast motion-reduce:transition-none', archivedOpen && 'rotate-90')}
             />
-            Archived
+            {t('settings.projects.list.archived')}
             <span className="font-semibold normal-case tracking-normal">{archivedCount}</span>
           </button>
           {archivedOpen && <ArchivedRows nodes={archivedTree} depth={0} menuOpenFor={menuOpenFor} onOpenMenu={openMenu} />}
@@ -466,6 +483,7 @@ interface ProjectSettingsProps {
  * custom lists keep their own order.
  */
 function TaskOrderSetting() {
+  const { t } = useTranslation()
   const selectId = useId()
   const { global, setGlobal, projectsWithOwnOrder, resetProjects } = useTaskOrderSettings()
   const { data: projects } = useProjects()
@@ -474,7 +492,7 @@ function TaskOrderSetting() {
   const ownCount = projectsWithOwnOrder.filter((id) => known.has(id)).length
   return (
     <div className="mt-4">
-      <label htmlFor={selectId} className="mb-1 block text-xs text-[var(--text-secondary)]">Sort project tasks by</label>
+      <label htmlFor={selectId} className="mb-1 block text-xs text-[var(--text-secondary)]">{t('settings.projects.sortBy')}</label>
       <select
         id={selectId}
         value={global}
@@ -482,23 +500,23 @@ function TaskOrderSetting() {
         className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)]"
       >
         {TASK_ORDER_KEYS.map((key) => (
-          <option key={key} value={key}>{TASK_ORDER_LABELS[key]}</option>
+          <option key={key} value={key}>{t(ORDER_LABELS[key])}</option>
         ))}
       </select>
       <p className="mt-1 text-xs text-[var(--text-secondary)]">
-        Projects and the Inbox, on every device. A project can choose its own under Sort tasks in its menu.
+        {t('settings.projects.sortNote')}
       </p>
       {ownCount > 0 && (
         <div className="mt-2 flex items-center justify-between gap-3">
           <p className="text-xs text-[var(--text-secondary)]">
-            {ownCount === 1 ? '1 project has its own order.' : `${ownCount} projects have their own order.`}
+            {t('settings.projects.ownOrder', { count: ownCount })}
           </p>
           <button
             type="button"
             onClick={resetProjects}
             className="rounded-control px-2 py-1 text-xs text-[var(--accent-blue)] hover:bg-[var(--bg-hover)]"
           >
-            Reset
+            {t('settings.projects.reset')}
           </button>
         </div>
       )}
@@ -508,26 +526,27 @@ function TaskOrderSetting() {
 
 /** Settings → Projects: the Inbox, the project list, how projects show in the sidebar, Review. */
 export function ProjectSettings({ config, onChange }: ProjectSettingsProps) {
+  const { t } = useTranslation()
   return (
     <>
       <InboxCard />
       <ProjectListCard />
 
       <div className="rounded-card border border-[var(--border-color)] bg-[var(--bg-primary)] p-5">
-        <h2 className="mb-3 text-sm font-semibold text-[var(--text-primary)]">Display</h2>
+        <h2 className="mb-3 text-sm font-semibold text-[var(--text-primary)]">{t('settings.projects.display.title')}</h2>
         <label className="flex cursor-pointer items-center gap-2">
           <Checkbox
             checked={config.show_project_progress !== false}
             onChange={(event) => onChange({ show_project_progress: event.target.checked })}
           />
-          <span className="text-sm text-[var(--text-primary)]">Show project progress in the sidebar</span>
+          <span className="text-sm text-[var(--text-primary)]">{t('settings.projects.display.progress')}</span>
         </label>
         <label className="mt-2 flex cursor-pointer items-center gap-2">
           <Checkbox
             checked={config.show_project_task_count === true}
             onChange={(event) => onChange({ show_project_task_count: event.target.checked })}
           />
-          <span className="text-sm text-[var(--text-primary)]">Show task count in the sidebar</span>
+          <span className="text-sm text-[var(--text-primary)]">{t('settings.projects.display.taskCount')}</span>
         </label>
         <TaskOrderSetting />
       </div>

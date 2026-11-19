@@ -21,6 +21,10 @@ const savedHidden = (page) => page.evaluate(async () => (await window.api.getCon
 
 export default async function run(h) {
   const page = h.page
+  const openGeneral = async () => {
+    await page.getByRole('navigation', { name: 'Settings' }).getByRole('button', { name: 'General', exact: true }).click()
+    await h.wait(400)
+  }
   await h.resize(1280, 820)
   await page.evaluate(() => window.api.saveConfigPatch({ sidebar_hidden_lists: [] }))
   await h.goto('/today')
@@ -36,6 +40,8 @@ export default async function run(h) {
   // ---- B. Hide two in Settings ----------------------------------------------------------------
   await h.goto('/settings')
   await h.wait(600)
+  // Settings opens on the tab that was open last (settings-menu leaves another one open).
+  await openGeneral()
   const card = page.locator('div.rounded-card', { has: page.locator('h2', { hasText: /^Sidebar$/ }) })
   await card.scrollIntoViewIfNeeded()
   const offered = await card.locator('label').allInnerTexts()
@@ -90,6 +96,8 @@ export default async function run(h) {
   // ---- D. Show them again ---------------------------------------------------------------------
   await h.goto('/settings')
   await h.wait(600)
+  // Settings opens on the tab that was open last (settings-menu leaves another one open).
+  await openGeneral()
   await card.scrollIntoViewIfNeeded()
   await card.getByLabel('Logbook', { exact: true }).check()
   await card.getByLabel('Anytime', { exact: true }).check()

@@ -1,56 +1,59 @@
+import { useTranslation } from 'react-i18next'
+import type { TranslationKey } from '../../../shared/i18n'
+
 const isMac = window.api.platform === 'darwin'
 const mod = isMac ? '\u2318' : 'Ctrl'
 
-const shortcuts = [
-  { category: 'Navigation', items: [
-    { keys: ['Up'], description: 'Move to previous task' },
-    { keys: ['Down'], description: 'Move to next task' },
-    { keys: ['Enter'], description: 'Expand / open task' },
-    { keys: ['Escape'], description: 'Collapse task / clear focus' },
+const shortcuts: { category: TranslationKey; items: { keys: string[]; description: TranslationKey }[] }[] = [
+  { category: 'settings.shortcuts.categories.navigation', items: [
+    { keys: ['Up'], description: 'settings.shortcuts.items.previousTask' },
+    { keys: ['Down'], description: 'settings.shortcuts.items.nextTask' },
+    { keys: ['Enter'], description: 'settings.shortcuts.items.openTask' },
+    { keys: ['Escape'], description: 'settings.shortcuts.items.collapseTask' },
   ]},
-  { category: 'Task Actions', items: [
-    { keys: [mod, 'N'], description: 'New task' },
-    { keys: [mod, 'V'], description: 'New task from clipboard' },
-    { keys: [mod, 'Enter'], description: 'Save and close task' },
-    { keys: [mod, 'K'], description: 'Complete selected task' },
-    { keys: [mod, 'D'], description: 'Duplicate selected task' },
-    { keys: [mod, 'C'], description: 'Copy selected task titles' },
+  { category: 'settings.shortcuts.categories.taskActions', items: [
+    { keys: [mod, 'N'], description: 'settings.shortcuts.items.newTask' },
+    { keys: [mod, 'V'], description: 'settings.shortcuts.items.newTaskFromClipboard' },
+    { keys: [mod, 'Enter'], description: 'settings.shortcuts.items.saveAndClose' },
+    { keys: [mod, 'K'], description: 'settings.shortcuts.items.completeSelected' },
+    { keys: [mod, 'D'], description: 'settings.shortcuts.items.duplicateSelected' },
+    { keys: [mod, 'C'], description: 'settings.shortcuts.items.copyTitles' },
   ]},
-  { category: 'Scheduling', items: [
-    { keys: [mod, 'T'], description: 'Set due date to today' },
-    { keys: ['!'], description: 'Set due date to today' },
+  { category: 'settings.shortcuts.categories.scheduling', items: [
+    { keys: [mod, 'T'], description: 'settings.shortcuts.items.dueToday' },
+    { keys: ['!'], description: 'settings.shortcuts.items.dueToday' },
   ]},
-  { category: 'Plan', items: [
-    { keys: [mod, 'Shift', 'N'], description: 'New event' },
-    { keys: ['Alt', 'Shift', 'Up'], description: 'Move a block or your event 15 minutes earlier' },
-    { keys: ['Alt', 'Shift', 'Down'], description: 'Move a block or your event 15 minutes later' },
-    { keys: ['Shift', 'Up'], description: 'Make a block or your event 15 minutes shorter' },
-    { keys: ['Shift', 'Down'], description: 'Make a block or your event 15 minutes longer' },
+  { category: 'settings.shortcuts.categories.plan', items: [
+    { keys: [mod, 'Shift', 'N'], description: 'settings.shortcuts.items.newEvent' },
+    { keys: ['Alt', 'Shift', 'Up'], description: 'settings.shortcuts.items.moveEarlier' },
+    { keys: ['Alt', 'Shift', 'Down'], description: 'settings.shortcuts.items.moveLater' },
+    { keys: ['Shift', 'Up'], description: 'settings.shortcuts.items.shorter' },
+    { keys: ['Shift', 'Down'], description: 'settings.shortcuts.items.longer' },
   ]},
-  { category: 'Editing (while task is open)', items: [
-    { keys: ['Enter'], description: 'Move focus to notes' },
-    { keys: ['Escape'], description: 'Save and close task' },
-    { keys: [mod, 'Enter'], description: 'Save and close task' },
-    { keys: [mod, 'K'], description: 'Complete and close task' },
-    { keys: [mod, 'T'], description: 'Set due date to today' },
-    { keys: [mod, 'Shift', 'C'], description: 'Show or hide comments (shared projects)' },
+  { category: 'settings.shortcuts.categories.editing', items: [
+    { keys: ['Enter'], description: 'settings.shortcuts.items.focusNotes' },
+    { keys: ['Escape'], description: 'settings.shortcuts.items.saveAndClose' },
+    { keys: [mod, 'Enter'], description: 'settings.shortcuts.items.saveAndClose' },
+    { keys: [mod, 'K'], description: 'settings.shortcuts.items.completeAndClose' },
+    { keys: [mod, 'T'], description: 'settings.shortcuts.items.dueToday' },
+    { keys: [mod, 'Shift', 'C'], description: 'settings.shortcuts.items.toggleComments' },
   ]},
-  { category: 'Assistant', items: [
-    { keys: [mod, 'J'], description: 'Show or hide Ask' },
-    { keys: ['Enter'], description: 'Send the message' },
-    { keys: [mod, 'Enter'], description: 'Make tasks from the text' },
+  { category: 'settings.shortcuts.categories.assistant', items: [
+    { keys: [mod, 'J'], description: 'settings.shortcuts.items.toggleAsk' },
+    { keys: ['Enter'], description: 'settings.shortcuts.items.sendMessage' },
+    { keys: [mod, 'Enter'], description: 'settings.shortcuts.items.makeTasks' },
   ]},
-  { category: 'Pro (when on)', items: [
-    { keys: [mod, 'Shift', 'O'], description: 'Focus on some projects' },
-    { keys: [mod, 'Shift', 'F'], description: 'Flag or unflag the selected tasks' },
-    { keys: [mod, 'Shift', 'M'], description: 'Import meeting notes' },
-    { keys: [mod, 'I'], description: 'Inspector for the selected tasks' },
-    { keys: ['1', '-', '6'], description: 'Verdict on a promise row: Delivered, Late, Not yet, New date, Dropped, Ask me tomorrow' },
+  { category: 'settings.shortcuts.categories.pro', items: [
+    { keys: [mod, 'Shift', 'O'], description: 'settings.shortcuts.items.focusProjects' },
+    { keys: [mod, 'Shift', 'F'], description: 'settings.shortcuts.items.flag' },
+    { keys: [mod, 'Shift', 'M'], description: 'settings.shortcuts.items.importMeeting' },
+    { keys: [mod, 'I'], description: 'settings.shortcuts.items.inspector' },
+    { keys: ['1', '-', '6'], description: 'settings.shortcuts.items.verdict' },
   ]},
-  { category: 'Comments', items: [
-    { keys: [mod, 'Enter'], description: 'Post the comment' },
-    { keys: ['@'], description: 'Mention someone' },
-    { keys: ['Escape'], description: 'Close comments' },
+  { category: 'settings.shortcuts.categories.comments', items: [
+    { keys: [mod, 'Enter'], description: 'settings.shortcuts.items.postComment' },
+    { keys: ['@'], description: 'settings.shortcuts.items.mention' },
+    { keys: ['Escape'], description: 'settings.shortcuts.items.closeComments' },
   ]},
 ]
 
@@ -63,15 +66,16 @@ function Kbd({ children }: { children: string }) {
 }
 
 export function KeyboardShortcuts() {
+  const { t } = useTranslation()
   return (
     <div className="space-y-6">
       {shortcuts.map((section) => (
         <div
-          key={section.category}
+          key={t(section.category)}
           className="rounded-card border border-[var(--border-color)] bg-[var(--bg-primary)] p-5"
         >
           <h2 className="mb-3 text-sm font-semibold text-[var(--text-primary)]">
-            {section.category}
+            {t(section.category)}
           </h2>
           <div className="space-y-2">
             {section.items.map((item, i) => (
@@ -80,7 +84,7 @@ export function KeyboardShortcuts() {
                 className="flex items-center justify-between py-1"
               >
                 <span className="text-xs text-[var(--text-secondary)]">
-                  {item.description}
+                  {t(item.description)}
                 </span>
                 <div className="flex items-center gap-1">
                   {item.keys.map((key, j) => (

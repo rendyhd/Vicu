@@ -63,5 +63,802 @@
     "quickEntry": "Quick Entry",
     "quickView": "Quick View",
     "quit": "Afsluiten"
+  },
+  "settings": {
+    "sectionFallback": "Onderdeel",
+    "save": {
+      "saving": "Opslaan...",
+      "saved": "Instellingen opgeslagen",
+      "failedNote": "De instellingen konden niet worden opgeslagen. Je wijzigingen blijven bewaard en worden bij de volgende wijziging opnieuw opgeslagen.",
+      "failed": "Kan instellingen niet opslaan",
+      "failedWithReason": "Kan instellingen niet opslaan: {{reason}}"
+    },
+    "connection": {
+      "title": "Verbinding",
+      "url": "Vikunja-URL",
+      "signedInSso": "Ingelogd via SSO",
+      "signedInAs": "Ingelogd als {{name}}",
+      "signedIn": "Ingelogd",
+      "syncing": "Synchroniseren...",
+      "signOut": "Uitloggen",
+      "apiToken": "API-token",
+      "tokenPlaceholder": "Voer je API-token in",
+      "showToken": "Tonen",
+      "hideToken": "Verbergen",
+      "savedToken": "Gebruikt het opgeslagen token. Plak een nieuw token om het te vervangen.",
+      "testing": "Testen...",
+      "test": "Verbinding testen",
+      "success": "Verbinding geslaagd",
+      "failed": "Verbinding mislukt",
+      "notSaved": "Verbonden, maar de verbindingsinstellingen konden niet worden opgeslagen. Probeer het opnieuw.",
+      "disconnect": "Verbinding verbreken"
+    },
+    "appearance": {
+      "title": "Weergave",
+      "theme": "Thema",
+      "themeLight": "Licht",
+      "themeDark": "Donker",
+      "themeSystem": "Systeem",
+      "clock": "Klok",
+      "clockSystem": "Systeem",
+      "clock12": "12-uurs",
+      "clock24": "24-uurs",
+      "clockNote": "Systeem volgt je regio. Kies 12-uurs of 24-uurs als je systeem een aangepaste tijdnotatie gebruikt. Geldt voor elk Vicu-venster.",
+      "rows": "Taakregels",
+      "rowsCompact": "Compact",
+      "rowsComfortable": "Ruim",
+      "rowsNote": "Ruim toont langere titels en een regel notities."
+    },
+    "preferences": {
+      "title": "Voorkeuren",
+      "launchOnStartup": "Openen bij opstarten",
+      "launchOnStartupNote": "(aanbevolen voor Quick Entry / View)",
+      "startHidden": "Verborgen starten",
+      "startHiddenMac": "(geen venster bij inloggen)",
+      "startHiddenMinimized": "(start geminimaliseerd op de taakbalk)",
+      "startHiddenTray": "(geen venster bij inloggen; heeft het pictogram in het systeemvak nodig)",
+      "confirmDelete": "Bevestigen voor verwijderen",
+      "subtasks": "Subtaken in takenlijsten",
+      "subtasksNote": "Houd ze in de taakdetails, of klap ze uit onder de bovenliggende taak.",
+      "subtasksInside": "In de taak",
+      "subtasksExpandable": "Uitklapbaar",
+      "badge": "Aantal taken voor vandaag en achterstallige taken op het app-pictogram tonen",
+      "badgeMacNote": "macOS toont het aantal alleen zolang Vicu meldingen met badges mag sturen.",
+      "notificationSettings": "Meldingsinstellingen",
+      "urgent": "Wat betekent dringend?",
+      "urgentToday": "Plannen voor vandaag",
+      "urgentImportant": "Markeren als belangrijk",
+      "urgentNote": "Bepaalt wat de bovenste actie in het rechtermuisknopmenu van een taak doet."
+    },
+    "parser": {
+      "title": "Taakherkenning",
+      "parse": "Taakgegevens uit tekst herkennen",
+      "parseNote": "Haal labels, projecten, prioriteit, datums en herhaling uit je invoer",
+      "syntaxMode": "Syntaxis",
+      "todoistNote": "Vertrouwde voorvoegsels in Todoist-stijl",
+      "vikunjaNote": "Eigen voorvoegsels in Vikunja-stijl",
+      "exclamation": "<mark>!</mark> in de taaktitel zet de vervaldatum op vandaag",
+      "exclamationNote": "Zet ! voor of na een taaktitel om de taak op vandaag te zetten (bijv. \"boodschappen doen !\" of \"! boodschappen doen\")"
+    },
+    "quickEntry": {
+      "title": "Quick Entry & Quick View",
+      "hotkey": "Sneltoets",
+      "enableEntry": "Quick Entry inschakelen",
+      "enableView": "Quick View inschakelen",
+      "hotkeyFailure": {
+        "linux": "Registreren mislukt. Onder Wayland koppelt Electron sneltoetsen via het desktopportaal — accepteer het toestemmingsvenster als dat verschijnt, of gebruik de oplossing hieronder.",
+        "other": "Registreren mislukt — de sneltoets wordt mogelijk al door een andere app gebruikt"
+      },
+      "wayland": {
+        "title": "Wayland: globale sneltoets registreren mislukt",
+        "intro": "Onder Wayland gebruikt Vicu het GlobalShortcuts-portaal. Verscheen er een toestemmingsvenster, accepteer het dan en probeer het opnieuw. Lukt het registreren nog steeds niet, koppel dan in je desktopomgeving een sneltoets die Vicu met een opdrachtregelvlag start:",
+        "step1": "Open <gnome>Instellingen → Toetsenbord → Aangepaste sneltoetsen</gnome> (GNOME) of <kde>Systeeminstellingen → Sneltoetsen → Aangepaste sneltoetsen</kde> (KDE).",
+        "step2": "Voeg een nieuwe sneltoets toe. Plak de opdracht hieronder als <field>Opdracht</field>.",
+        "step3": "Stel de toetscombinatie in (bijvoorbeeld <combo>Alt+Shift+V</combo>).",
+        "step4": "Laat Vicu in het systeemvak draaien — de sneltoets wekt de draaiende instantie.",
+        "loading": "Opdracht laden…",
+        "devNotice": "<notice>Melding ontwikkelversie:</notice> de opdracht hieronder verwijst naar de niet-verpakte broncode en werkt niet buiten deze ontwikkelsessie. Gebruik deze functie vanuit de geïnstalleerde AppImage voor echte sneltoetsen.",
+        "entryCommand": "Opdracht voor Quick Entry:",
+        "viewCommand": "Opdracht voor Quick View:",
+        "copy": "Kopiëren",
+        "copied": "Gekopieerd"
+      },
+      "entry": {
+        "title": "Quick Entry",
+        "hotkeyLabel": "Sneltoets voor Quick Entry",
+        "defaultProject": {
+          "label": "Standaardproject",
+          "aria": "Standaardproject",
+          "placeholder": "Kies een project...",
+          "archived": "Het opgeslagen standaardproject is gearchiveerd. Quick Entry gebruikt een actief alternatief totdat je een ander project kiest."
+        },
+        "secondary": {
+          "label": "Extra projecten (wissel met de modificatietoets + pijltjestoetsen)",
+          "remove": "Verwijderen",
+          "archivedHidden_one": "{{count}} gearchiveerd project verborgen uit de projectcyclus.",
+          "archivedHidden_other": "{{count}} gearchiveerde projecten verborgen uit de projectcyclus.",
+          "addAria": "Een project aan de cyclus toevoegen",
+          "addPlaceholder": "Een project toevoegen..."
+        },
+        "modifier": {
+          "label": "Modificatietoets voor de projectcyclus"
+        }
+      },
+      "view": {
+        "title": "Quick View",
+        "hotkeyLabel": "Sneltoets voor Quick View",
+        "list": {
+          "label": "Lijst",
+          "aria": "Lijst",
+          "allProjects": "Alle projecten",
+          "views": "Weergaven",
+          "today": "Vandaag",
+          "upcoming": "Binnenkort",
+          "anytime": "Wanneer dan ook",
+          "projects": "Projecten",
+          "lists": "Lijsten",
+          "archived": "Het opgeslagen project is gearchiveerd. Quick View laat het weg totdat je een actief project kiest of het herstelt."
+        },
+        "includeToday": "Taken voor vandaag uit alle projecten opnemen"
+      }
+    },
+    "browser": {
+      "title": "Browserintegratie",
+      "titleDisabled": "Browserintegratie (vereist Quick Entry)",
+      "reRegisterHint": "Klik daarna hierboven op “Brug opnieuw registreren”",
+      "pageLinking": {
+        "label": "Pagina's koppelen",
+        "off": "Uit",
+        "ask": "Vragen ({{shortcut}})",
+        "always": "Altijd automatisch koppelen"
+      },
+      "extensionId": {
+        "label": "Chrome-extensie-ID (optioneel)",
+        "placeholder": "Voor directe detectie — laat leeg om automatische detectie te gebruiken"
+      },
+      "bridge": {
+        "chromeRegistered": "Chrome-brug: Geregistreerd",
+        "chromeNotRegistered": "Chrome-brug: Niet geregistreerd",
+        "firefoxRegistered": "Firefox-brug: Geregistreerd",
+        "firefoxNotRegistered": "Firefox-brug: Niet geregistreerd",
+        "registering": "Registreren...",
+        "reRegister": "Brug opnieuw registreren"
+      },
+      "setup": {
+        "toggle": "Hoe stel je dit in {{arrow}}",
+        "howItWorks": "Hoe het werkt",
+        "introMac": "Vicu leest de URL van het actieve browsertabblad via AppleScript wanneer Quick Entry opent. Dit werkt met Chrome, Safari, Edge, Brave, Opera, Vivaldi en Arc. Firefox wordt beperkt ondersteund. Browserextensies zorgen voor directe detectie (<1 ms); zonder extensie valt Vicu terug op AppleScript (~300 ms).",
+        "introOther": "Vicu leest automatisch de adresbalk van het actieve browservenster wanneer Quick Entry opent. Dit werkt met Chrome, Firefox, Edge, Brave, Opera en Vivaldi. Browserextensies zorgen voor directe detectie (<1 ms); zonder extensie valt Vicu terug op de toegankelijkheids-API's van Windows (~300 ms).",
+        "macNoSetup": "Voor Chrome, Safari, Edge, Brave, Vivaldi en Arc hoef je niets in te stellen. Bij het eerste gebruik vraagt macOS of Vicu de browser mag bedienen.",
+        "hint": "Open Quick Entry terwijl een browsertabblad actief is om de koppelingstip te zien."
+      },
+      "firefox": {
+        "title": "Firefox (extensie voor directe detectie)",
+        "macWarning": "Terugvaldetectie van Firefox via AppleScript is onbetrouwbaar op macOS. Het wordt sterk aangeraden de extensie te installeren voor Firefox-ondersteuning.",
+        "step1": "Open de map <folder>extensions/browser</folder> en zoek het <code>.xpi</code>-bestand",
+        "step2": "Open Firefox en ga naar <code>about:addons</code>",
+        "step3": "Klik op het tandwielpictogram → “Add-on installeren vanuit bestand…”",
+        "step4": "Selecteer het <code>.xpi</code>-bestand en klik op “Toevoegen”"
+      },
+      "chrome": {
+        "title": "Chrome (optionele extensie voor directe detectie)",
+        "intro": "Chrome werkt zonder de extensie, maar met de extensie krijg je directe detectie (<1 ms) in plaats van de terugval van ~300 ms.",
+        "step1": "Open <code>chrome://extensions</code>",
+        "step2": "Schakel “Ontwikkelaarsmodus” in (schakelaar rechtsboven)",
+        "step3": "Klik op “Uitgepakte extensie laden” → selecteer de map <folder>extensions/browser</folder>",
+        "step4": "Kopieer de extensie-ID die op de kaart staat en plak die in het veld hierboven"
+      },
+      "others": {
+        "titleMac": "Safari, Arc, Edge, Brave, Opera, Vivaldi",
+        "titleOther": "Edge, Brave, Opera, Vivaldi",
+        "autoMac": "Je hoeft niets in te stellen. Vicu detecteert URL's automatisch via AppleScript.",
+        "autoOther": "Je hoeft niets in te stellen. Vicu detecteert URL's automatisch via toegankelijkheids-API's."
+      }
+    },
+    "obsidian": {
+      "title": "Obsidian-integratie",
+      "titleDisabled": "Obsidian-integratie (vereist Quick Entry)",
+      "noteLinking": {
+        "label": "Notities koppelen",
+        "off": "Uit",
+        "ask": "Vragen ({{shortcut}})",
+        "always": "Altijd automatisch koppelen"
+      },
+      "setup": {
+        "toggle": "Hoe stel je Obsidian in {{arrow}}",
+        "rest": {
+          "title": "<name>1. Local REST API</name> (door Adam Coddington)",
+          "step1": "Open Obsidian → Instellingen (tandwielpictogram, linksonder) → Community-plugins → Bladeren",
+          "step2": "Zoek “Local REST API” → Installeren → Inschakelen",
+          "step3": "Ga terug naar Instellingen → scrol naar “Local REST API” onder Community-plugins",
+          "step4": "De API-sleutel staat bovenaan het instellingenpaneel van de plugin — klik op de kopieerknop en plak de sleutel hieronder",
+          "step5": "Laat alle andere instellingen op hun standaardwaarden (HTTPS op poort 27124)"
+        },
+        "uri": {
+          "title": "<name>2. Advanced URI</name> (door Vinzent03)",
+          "step1": "Dezelfde stappen — zoek “Advanced URI” in Community-plugins → Installeren → Inschakelen",
+          "step2": "Zet in de plugininstellingen “Use UID instead of file paths” aan",
+          "step3": "Hierdoor blijven notitielinks werken als bestanden worden hernoemd. Alle andere instellingen kunnen op hun standaardwaarden blijven.",
+          "step4": "Vicu voegt alleen een eigenschap <prop>uid</prop> toe aan een notitie wanneer je een taak opslaat die eraan gekoppeld is; notities die je niet koppelt, worden nooit gewijzigd."
+        },
+        "done": "Zodra beide plugins zijn ingeschakeld en Obsidian draait, klik je hieronder op Verbinding testen om dit te controleren."
+      },
+      "apiKey": {
+        "label": "API-sleutel",
+        "placeholder": "Obsidian > Instellingen > Local REST API > API-sleutel kopiëren",
+        "hide": "Verbergen",
+        "show": "Tonen"
+      },
+      "vaultName": {
+        "label": "Kluisnaam",
+        "placeholder": "Staat in de titelbalk van Obsidian"
+      },
+      "port": {
+        "label": "Poort"
+      },
+      "test": {
+        "button": "Verbinding testen",
+        "testing": "Testen...",
+        "connected": "Verbonden",
+        "failed": "Verbinding mislukt"
+      }
+    },
+    "secretNotice": {
+      "keyPlaintext": "De sleutel is niet versleuteld",
+      "keyObfuscated": "De sleutel is versluierd, niet versleuteld",
+      "tokenPlaintext": "Het inlogtoken is niet versleuteld",
+      "tokenObfuscated": "Het inlogtoken is versluierd, niet versleuteld",
+      "keyPlaintextBody": "Dit systeem biedt Vicu geen veilige opslag, dus je providersleutel staat als gewone tekst in de gegevensmap van Vicu. Iedereen die je gebruikersprofiel kan lezen, kan hem lezen. Alleen de rechten van het bestand beschermen hem.",
+      "tokenPlaintextBody": "Dit systeem biedt Vicu geen veilige opslag, dus je inlogtoken staat als gewone tekst in de gegevensmap van Vicu. Iedereen die je gebruikersprofiel kan lezen, kan hem lezen. Alleen de rechten van het bestand beschermen hem.",
+      "keyObfuscatedBody": "Je providersleutel staat in een bestand in de gegevensmap van Vicu dat alleen versluierd is en niet door een sleutel beschermd wordt. Iedereen die je gebruikersprofiel kan lezen, kan hem terughalen. Alleen de rechten van het bestand beschermen hem.",
+      "tokenObfuscatedBody": "Je inlogtoken staat in een bestand in de gegevensmap van Vicu dat alleen versluierd is en niet door een sleutel beschermd wordt. Iedereen die je gebruikersprofiel kan lezen, kan hem terughalen. Alleen de rechten van het bestand beschermen hem.",
+      "keyObfuscatedBodyLinux": "Op Linux gebruikt Vicu de sleutelhanger van het systeem niet. Je providersleutel staat in een bestand in de gegevensmap van Vicu dat alleen versluierd is en niet door een sleutel beschermd wordt. Iedereen die je gebruikersprofiel kan lezen, kan hem terughalen. Alleen de rechten van het bestand beschermen hem.",
+      "tokenObfuscatedBodyLinux": "Op Linux gebruikt Vicu de sleutelhanger van het systeem niet. Je inlogtoken staat in een bestand in de gegevensmap van Vicu dat alleen versluierd is en niet door een sleutel beschermd wordt. Iedereen die je gebruikersprofiel kan lezen, kan hem terughalen. Alleen de rechten van het bestand beschermen hem."
+    },
+    "voice": {
+      "checking": "Spraakinvoer controleren…",
+      "unavailable": "Spraakinvoer is op dit systeem niet beschikbaar.",
+      "engineMacos": "macOS-spraakherkenning",
+      "engineWindows": "Windows-spraakherkenning",
+      "onDevice": "Gebruikt {{engine}}, op deze computer: wat je zegt wordt nergens naartoe gestuurd.",
+      "servers": "Gebruikt {{engine}}. Je taal wordt herkend door de servers van Apple.",
+      "title": "Spraakinvoer",
+      "intro": "Houd de +-knop ingedrukt en zeg een taak, zoals “Call mom tomorrow 3pm” (datums en tijden in het Engels). Laat los om hem toe te voegen, druk op Esc om te annuleren. Hij komt terecht waar de lijst die je bekijkt nieuwe taken neerzet, tenzij je een project of datum noemt. Met hieronder een sneltoets ingesteld houd je die op dezelfde manier ingedrukt, of tik je erop om te blijven luisteren tot je nogmaals drukt of op Enter drukt. “Zeg een taak” in het opdrachtenpalet werkt zonder iets ingedrukt te houden.",
+      "smart": "Als slim dicteren aan staat (Instellingen, Assistent), start tikken op de sneltoets of omhoog schuiven vanaf een ingedrukte + in plaats daarvan slim dicteren: blijf praten en de taken verschijnen als kaarten.",
+      "shortcut": "Sneltoets (terwijl Vicu op de voorgrond staat)",
+      "notSet": "Niet ingesteld",
+      "shortcutLabel": "Sneltoets voor spraakinvoer"
+    },
+    "hotkey": {
+      "label": "Sneltoets",
+      "pressKeys": "Druk op toetsen...",
+      "record": "Opnemen",
+      "clear": "Wissen"
+    },
+    "assistant": {
+      "testFailed": "De test is mislukt.",
+      "address": "Adres",
+      "remove": "Verwijderen",
+      "cancel": "Annuleren",
+      "cleartext": "Dit adres is niet versleuteld (http) en ligt buiten je lokale netwerk: je sleutel en wat je verstuurt kunnen onderweg worden gelezen. Gebruik https.",
+      "languages": {
+        "auto": "Per zin detecteren",
+        "en": "Engels",
+        "nl": "Nederlands",
+        "de": "Duits",
+        "fr": "Frans",
+        "es": "Spaans",
+        "it": "Italiaans",
+        "pt": "Portugees",
+        "sv": "Zweeds",
+        "da": "Deens",
+        "pl": "Pools",
+        "cs": "Tsjechisch",
+        "fi": "Fins",
+        "ja": "Japans",
+        "zh": "Chinees",
+        "ko": "Koreaans",
+        "ru": "Russisch",
+        "uk": "Oekraïens"
+      },
+      "thinking": {
+        "title": "Denken",
+        "intro": "Het model dat je woorden in taken omzet en je vragen beantwoordt. Het draait bij je provider.",
+        "requests": "Verzoeken gaan rechtstreeks van deze computer naar de provider die je kiest, met je sleutel; Vicu heeft er geen server tussen en toont geen prijzen.",
+        "provider": "Provider",
+        "off": "Uit",
+        "key": "Sleutel",
+        "keyOptional": "Sleutel (optioneel)",
+        "keyPlaceholderSaved": "Er is een sleutel opgeslagen. Plak een nieuwe om hem te vervangen.",
+        "keyPlaceholder": "Plak je sleutel",
+        "hide": "Verbergen",
+        "show": "Tonen",
+        "saveKey": "Sleutel opslaan",
+        "keyNote": "Bewaard in de geheime opslag van deze computer, net als je Vikunja-login. Hij wordt nooit gesynchroniseerd of opnieuw getoond.",
+        "keySaved": "Sleutel opgeslagen",
+        "keyRemoved": "Sleutel verwijderd"
+      },
+      "typed": {
+        "newAddress": "Nieuw adres",
+        "saveAddress": "Adres opslaan",
+        "edit": "Bewerken",
+        "addAddress": "Adres toevoegen",
+        "savedAddresses": "Opgeslagen adressen",
+        "inUse": "in gebruik",
+        "removeAddress": "{{address}} verwijderen"
+      },
+      "model": {
+        "loading": "Laden…",
+        "load": "Modellen laden",
+        "count_one": "{{count}} model",
+        "count_other": "{{count}} modellen",
+        "loadError": "{{error}} Je kunt nog steeds een modelnaam typen.",
+        "model": "Model",
+        "modelName": "Modelnaam",
+        "usedDictation": "Gebruikt voor slim dicteren.",
+        "usedAll": "Gebruikt voor slim dicteren, Ask en Talk.",
+        "useDifferent": "Een ander model gebruiken voor Ask",
+        "askModel": "Model voor Ask",
+        "usedAsk": "Gebruikt voor Ask en Talk.",
+        "usedAskSuggested": "Gebruikt voor Ask en Talk. Voorgesteld: {{model}}.",
+        "testing": "Testen…",
+        "test": "Verbinding testen",
+        "saveKeyFirst": "Sla eerst een sleutel op.",
+        "enterAddressFirst": "Vul eerst een adres in.",
+        "testingModels": "{{models}} testen…",
+        "autoTest": "Een model test zichzelf zodra je het kiest."
+      },
+      "features": {
+        "blockedProvider": "Kies eerst een provider onder Denken.",
+        "blockedKey": "Sla eerst een sleutel op onder Denken.",
+        "blockedAddress": "Vul eerst een adres in onder Denken.",
+        "blockedModel": "Kies eerst een model onder Denken.",
+        "turnOnAsk": "Zet eerst Ask aan.",
+        "turnOnDictation": "Zet eerst Slim dicteren aan.",
+        "title": "Functies",
+        "intro": "De + (of de spraaksneltoets) ingedrukt houden en loslaten voegt altijd direct één taak toe, zonder het model.",
+        "dictation": "Slim dicteren",
+        "dictationHow": "Tik op de spraaksneltoets, of houd + ingedrukt en schuif omhoog naar de fonkeling, en blijf dan praten: taken verschijnen als kaarten terwijl je praat. Ook Opdelen in stappen (rechtsklik op een taak) en Taken maken uit tekst (opdrachtenpalet).",
+        "brainDump": "Brain dump",
+        "brainDumpHow": "Schuif omhoog vanaf een ingedrukte + of tik op de spraaksneltoets, en zet dan Brain dump aan in het venster (of kies Brain dump in het opdrachtenpalet). Praat of typ zo lang je wilt; Organiseren sorteert alles in projecten, subprojecten, taken, subtaken en notities, zodat jij het kunt controleren.",
+        "ask": "Ask",
+        "askHow": "Druk op de Ask-knop naast Zoeken, of op {{keys}}. Wijzigingen worden voorgesteld op kaarten die je toepast.",
+        "talk": "Talk",
+        "talkHow": "Zet de microfoon aan in Ask en praat gewoon; antwoorden worden voorgelezen en het blijft luisteren.",
+        "testing": "{{model}} testen…",
+        "tryLabel": "{{label}} proberen",
+        "tryIt": "Probeer het"
+      },
+      "result": {
+        "passed": "Geslaagd:",
+        "failed": "Mislukt:",
+        "dictation": "Dicteren",
+        "ask": "Ask",
+        "talk": "Talk",
+        "modelList": "Modellijst ({{n}})",
+        "modelListError": "Modellijst: {{error}}",
+        "notAvailable": "niet beschikbaar",
+        "structuredPrompt": "Gestructureerd antwoord (uit de prompt)",
+        "structuredStrict": "Gestructureerd antwoord (strikt schema)",
+        "structuredError": "Gestructureerd antwoord: {{error}}",
+        "failedShort": "mislukt",
+        "toolCall": "Toolaanroep",
+        "toolCallError": "Toolaanroep: {{error}}",
+        "canRun": "Kan uitvoeren: {{features}}",
+        "canRunNone": "Dit model kan geen van de functies uitvoeren."
+      },
+      "consent": {
+        "theProvider": "de provider",
+        "title": "Gegevens naar {{provider}} sturen?",
+        "intro": "De assistent stuurt dit met je sleutel naar {{provider}}, en alleen wanneer je hem gebruikt:",
+        "dictation": "<strong>Dicteren</strong>: de tekst van wat je zei of plakte (nooit audio), de namen van je projecten, labels en plaatsen, de lijst waarin je zit, en de datum, tijd en tijdzone.",
+        "ask": "<strong>Ask en Talk</strong>: je berichten, een overzicht (aantallen, namen van projecten, labels en eigen lijsten) en de taken die het opzoekt, inclusief de namen van mensen in gedeelde projecten.",
+        "neverSent": "Nooit verstuurd: audio (spraak wordt op deze computer herkend), verborgen taken, reactieteksten, bijlagen, je Vikunja-token, je serveradres, plaatsposities.",
+        "agree": "Akkoord"
+      },
+      "speech": {
+        "title": "Horen",
+        "intro": "Zet je stem om in tekst op deze computer; audio verlaat hem nooit. Zonder gedownload model wordt de spraakherkenning van het systeem gebruikt.",
+        "introLinux": "Zet je stem om in tekst op deze computer; audio verlaat hem nooit. Zonder gedownload model wordt de spraakherkenning van het systeem gebruikt (Linux heeft die niet).",
+        "usedBy": "Gebruikt door elke spraakfunctie: snel vastleggen, slim dicteren en Talk. Alleen de tekst gaat naar het model onder Denken.",
+        "notInBuild": "Lokale spraak maakt geen deel uit van deze build van Vicu.",
+        "use": "{{label}} gebruiken",
+        "suggested": "Voorgesteld",
+        "inUse": "In gebruik",
+        "europeanLanguages_one": "{{count}} Europese taal",
+        "europeanLanguages_other": "{{count}} Europese talen",
+        "languages_one": "{{count}} taal",
+        "languages_other": "{{count}} talen",
+        "downloading": "Downloaden {{percent}}%",
+        "pausedAt": "Gepauzeerd op {{percent}}%",
+        "deleteLabel": "{{label}} verwijderen",
+        "delete": "Verwijderen",
+        "pause": "Pauzeren",
+        "resume": "Hervatten",
+        "download": "Downloaden",
+        "language": "Taal",
+        "parakeet": "Parakeet-modellen herkennen de taal zelf."
+      },
+      "privacy": {
+        "deleted": "Gesprekken verwijderd",
+        "title": "Privacy",
+        "text": "Gesprekken (de laatste vijf) en transcripties die na een mislukt verzoek bewaard zijn, blijven op deze computer en worden verwijderd als je uitlogt. De instellingen en de sleutel van de assistent blijven bij deze computer.",
+        "delete": "Gesprekken verwijderen"
+      }
+    },
+    "shortcuts": {
+      "categories": {
+        "navigation": "Navigatie",
+        "taskActions": "Taakacties",
+        "scheduling": "Plannen",
+        "plan": "Planning",
+        "editing": "Bewerken (terwijl een taak open is)",
+        "assistant": "Assistent",
+        "pro": "Pro (wanneer aan)",
+        "comments": "Reacties"
+      },
+      "items": {
+        "previousTask": "Naar vorige taak",
+        "nextTask": "Naar volgende taak",
+        "openTask": "Taak uitklappen / openen",
+        "collapseTask": "Taak invouwen / focus wissen",
+        "newTask": "Nieuwe taak",
+        "newTaskFromClipboard": "Nieuwe taak van klembord",
+        "saveAndClose": "Taak opslaan en sluiten",
+        "completeSelected": "Geselecteerde taak voltooien",
+        "duplicateSelected": "Geselecteerde taak dupliceren",
+        "copyTitles": "Titels van geselecteerde taken kopiëren",
+        "dueToday": "Vervaldatum op vandaag zetten",
+        "newEvent": "Nieuwe afspraak",
+        "moveEarlier": "Een blok of je afspraak 15 minuten eerder zetten",
+        "moveLater": "Een blok of je afspraak 15 minuten later zetten",
+        "shorter": "Een blok of je afspraak 15 minuten korter maken",
+        "longer": "Een blok of je afspraak 15 minuten langer maken",
+        "focusNotes": "Focus naar notities",
+        "completeAndClose": "Taak voltooien en sluiten",
+        "toggleComments": "Reacties tonen of verbergen (gedeelde projecten)",
+        "toggleAsk": "Ask tonen of verbergen",
+        "sendMessage": "Het bericht versturen",
+        "makeTasks": "Taken maken uit de tekst",
+        "focusProjects": "Focussen op enkele projecten",
+        "flag": "De geselecteerde taken markeren of de markering weghalen",
+        "importMeeting": "Vergadernotities importeren",
+        "inspector": "Inspector voor de geselecteerde taken",
+        "verdict": "Oordeel over een beloftenrij: Geleverd, Te laat, Nog niet, Nieuwe datum, Laten vallen, Vraag het me morgen",
+        "postComment": "De reactie plaatsen",
+        "mention": "Iemand vermelden",
+        "closeComments": "Reacties sluiten"
+      }
+    },
+    "notifications": {
+      "enable": "Bureaubladmeldingen inschakelen",
+      "macNote": "Op macOS vraagt de eerste melding of je meldingen van Vicu wilt toestaan.",
+      "playSound": "Geluid afspelen",
+      "stay": "Blijven staan tot ze gesloten worden",
+      "scheduled": {
+        "title": "Geplande herinneringen",
+        "note": "Dagelijkse meldingen met een overzicht van je achterstallige taken, taken voor vandaag en komende taken.",
+        "morning": "Ochtendherinnering",
+        "morningTime": "Tijd van de ochtendherinnering",
+        "afternoon": "Middagherinnering",
+        "afternoonTime": "Tijd van de middagherinnering",
+        "include": "Opnemen",
+        "overdue": "Achterstallige taken",
+        "dueToday": "Taken voor vandaag",
+        "dueTomorrow": "Taken voor morgen"
+      },
+      "task": {
+        "title": "Taakherinneringen",
+        "note": "Herinneringen die je met het belletje op afzonderlijke taken instelt.",
+        "defaultReminder": "Standaardherinnering",
+        "defaultNote": "Wordt toegevoegd aan elke nieuwe taak met een vervaldatum en zonder eigen herinnering (niet als je de datum van een bestaande taak wijzigt).",
+        "relativeLabel": "Standaardherinnering ten opzichte van",
+        "relativeDue": "Ten opzichte van de vervaldatum",
+        "relativeStart": "Ten opzichte van de startdatum",
+        "relativeEnd": "Ten opzichte van de einddatum"
+      },
+      "offset": {
+        "none": "Geen",
+        "atDue": "Op het tijdstip zelf",
+        "min5": "5 min ervoor",
+        "min15": "15 min ervoor",
+        "min30": "30 min ervoor",
+        "hour1": "1 uur ervoor",
+        "hour3": "3 uur ervoor",
+        "day1": "1 dag ervoor"
+      },
+      "places": {
+        "title": "Plaatsen",
+        "note": "Laat je herinneren wanneer je op een plaats aankomt of die verlaat: kies de plaats in de herinneringen van een taak. Je telefoon herinnert je er dan aan.",
+        "empty": "Sla plaatsen op in Vicu op je telefoon: Instellingen > Meldingen > Plaatsen."
+      },
+      "test": "Testmelding",
+      "testSent": "Melding verzonden"
+    },
+    "pro": {
+      "title": "Pro",
+      "note": "Extra hulpmiddelen voor zwaarder werk: wat je nu kunt doen, beloftes aan en van mensen, een portfolio van initiatieven. Pro voegt alleen toe. Zet je het uit, dan is Vicu zoals het was; er wordt niets verwijderd. Deze keuze geldt voor dit apparaat.",
+      "turnOn": "Pro aanzetten op dit apparaat",
+      "standalone": "Pro heeft een Vikunja-server nodig; het is niet beschikbaar in zelfstandige modus.",
+      "layers": {
+        "availability": {
+          "name": "Weten wat je nu kunt doen",
+          "note": "Startdatums, in de wacht, daarna, opeenvolgende projecten, markeringen, focus, schattingen en einde van herhaling."
+        },
+        "promises": {
+          "name": "Beloftes en mensen",
+          "note": "Mensen, wat jij beloofd hebt en wat zij beloofd hebben, terugblikken, vergaderingen en import."
+        },
+        "portfolio": {
+          "name": "Portfolio",
+          "note": "Initiatieven, het maximum, gereedheid, escalaties, het sponsorbureau en de logboeken."
+        },
+        "power": {
+          "name": "Krachtige hulpmiddelen",
+          "note": "Pro-lijstvoorwaarden, kolommen, de batch-inspector, het focusblok en de wekelijkse uitvoeringsreview."
+        }
+      },
+      "assistant": {
+        "title": "Assistent-hulp in Pro",
+        "note": "Conceptbeloftes, import uit willekeurige tekst en de Pro-vragen in Ask, met het model dat bij Assistent is ingesteld. Werktekst gaat naar die provider; controleer of je werkgever dat toestaat."
+      },
+      "startDates": {
+        "title": "Startdatums",
+        "none": "Met Pro wacht een taak met een startdatum tot die dag. Geen van je openstaande taken heeft er al een.",
+        "some_one": "Met Pro wacht een taak met een startdatum tot die dag. {{count}} openstaande taak heeft er al een, ingesteld in de webapp van Vikunja of op een ander apparaat.",
+        "some_other": "Met Pro wacht een taak met een startdatum tot die dag. {{count}} openstaande taken hebben er al een, ingesteld in de webapp van Vikunja of op een ander apparaat.",
+        "show": "Toon ze",
+        "gotIt": "Begrepen"
+      },
+      "area": {
+        "title": "Werkgebied",
+        "note": "Beloftes, mensen en het portfolio gelden voor projecten in deze categorieën. Als er geen is aangevinkt, gelden ze voor elk project. Gedeeld met je andere apparaten.",
+        "empty": "Je hebt geen projectcategorieën. Voeg er een toe bij Instellingen, Projecten om Pro daartoe te beperken."
+      },
+      "portfolio": {
+        "title": "Portfolio",
+        "note": "Gedeeld met je andere apparaten.",
+        "cap": "Maximaal aantal actieve initiatieven",
+        "agreedWith": "Afgesproken met",
+        "notAgreed": "Nog niet afgesproken",
+        "outsider": "Iemand die niet in Vicu zit",
+        "agreedOn": "Afgesproken op {{date}}.",
+        "threshold": "Maak een escalatieconcept na zoveel gemiste afspraken",
+        "ruleAgreedOn": "Escalatieregel afgesproken op"
+      }
+    },
+    "projects": {
+      "actions": "Acties voor {{name}}",
+      "categorySuffix": ", categorie",
+      "restore": "Herstellen",
+      "restoreLabel": "{{name}} herstellen",
+      "sortBy": "Taken van projecten sorteren op",
+      "sortNote": "Projecten en de Inbox, op elk apparaat. Een project kan een eigen volgorde kiezen onder Taken sorteren in het menu.",
+      "ownOrder_one": "{{count}} project heeft een eigen volgorde.",
+      "ownOrder_other": "{{count}} projecten hebben een eigen volgorde.",
+      "reset": "Opnieuw instellen",
+      "order": {
+        "manual": "Handmatig",
+        "priority": "Prioriteit",
+        "title": "Titel",
+        "newest": "Nieuwste eerst",
+        "oldest": "Oudste eerst",
+        "dueDateFirst": "Vervaldatum, dan handmatig",
+        "dueDatePriority": "Vervaldatum, dan prioriteit"
+      },
+      "inbox": {
+        "note": "Taken zonder project komen hier terecht. Het staat in de zijbalk als Inbox, niet tussen de projecten.",
+        "project": "Inbox-project",
+        "select": "Kies een project...",
+        "missing": "Het ingestelde Inbox-project is gearchiveerd of niet beschikbaar. Kies een actief project."
+      },
+      "list": {
+        "title": "Projecten",
+        "note": "Sleep een project om het te verplaatsen, naar een ander project om het erin te zetten, of naar een categorie. Klik met rechts of gebruik … voor meer.",
+        "refresh": "Projecten vernieuwen",
+        "newCategory": "Nieuwe categorie",
+        "newProject": "Nieuw project",
+        "loading": "Projecten laden…",
+        "empty": "Geen actieve projecten",
+        "archived": "Gearchiveerd"
+      },
+      "display": {
+        "title": "Weergave",
+        "progress": "Voortgang van projecten tonen in de zijbalk",
+        "taskCount": "Aantal taken tonen in de zijbalk"
+      }
+    },
+    "savedFilters": {
+      "title": "Opgeslagen filters en weergaven",
+      "introNone": "Importeer een opgeslagen filter of een projectweergave uit Vikunja als eigen lijst.",
+      "introSome_one": "Je server heeft een opgeslagen filter. Geïmporteerde filters en projectweergaven worden eigen lijsten.",
+      "introSome_other": "Je server heeft {{count}} opgeslagen filters. Geïmporteerde filters en projectweergaven worden eigen lijsten.",
+      "notNow": "Niet nu",
+      "review": "Bekijken",
+      "importButton": "Opgeslagen filters en weergaven importeren",
+      "close": "Sluiten",
+      "sheetNote": "Elk wordt een eigen lijst in Vicu. Wijzigingen die je in deze lijsten maakt, veranderen niets op je server.",
+      "reading": "De opgeslagen filters lezen...",
+      "readingViews": "De projectweergaven lezen...",
+      "readFailed": "Vicu kon de opgeslagen filters niet lezen. Controleer de verbinding en probeer het opnieuw.",
+      "viewsReadFailed": "Vicu kon de projectweergaven niet lezen.",
+      "filtersHeading": "Opgeslagen filters",
+      "viewsHeading": "Projectweergaven",
+      "noViews": "Nog geen project heeft een eigen weergave. Een weergave met een eigen filter of sortering verschijnt hier.",
+      "cancel": "Annuleren",
+      "import": "Importeren",
+      "importCount": "{{count}} importeren",
+      "updateTitle": "“{{name}}” bijwerken vanuit Vikunja?",
+      "colPart": "Onderdeel",
+      "colYours": "Jouw lijst",
+      "colVikunja": "Vikunja nu",
+      "keptNote": "Blijft hoe dan ook behouden: het pictogram, de plek en de overige voorwaarden van de lijst.",
+      "sameForNext_one": "Hetzelfde voor de volgende",
+      "sameForNext_other": "Hetzelfde voor de volgende {{count}}",
+      "skip": "Overslaan",
+      "overwrite": "Overschrijven",
+      "noRule": "Geen regel",
+      "included": "Meegenomen",
+      "leftOut": "Weggelaten",
+      "sortPart": "{{name}}, {{order}}",
+      "sortThen": "{{first}}, dan {{next}}",
+      "reason": {
+        "kanbanColumn": "de kanbankolom",
+        "otherField": "een voorwaarde die Vicu niet kan controleren",
+        "manualOrder": "de handmatige volgorde",
+        "sortKey": "een sortering"
+      },
+      "part": {
+        "name": "Naam",
+        "rule": "Regel",
+        "sort": "Sortering",
+        "includeNulls": "Taken zonder waarde"
+      },
+      "status": {
+        "cannot": "Importeren kan niet: Vicu kan dit nog niet lezen",
+        "same": "Gelijk aan je lijst",
+        "vikunja": "Gewijzigd in Vikunja sinds je het importeerde",
+        "both": "Gewijzigd in Vikunja en in Vicu",
+        "vicu": "Je lijst wijkt af van die in Vikunja",
+        "differs": "Wijkt af van Vikunja",
+        "importedBefore": "Eerder geïmporteerd",
+        "exact": "Wordt exact geïmporteerd",
+        "leavesOut": "Laat {{things}} weg"
+      },
+      "change": {
+        "vikunja": "Gewijzigd in Vikunja",
+        "vicu": "Gewijzigd in Vicu",
+        "both": "Gewijzigd in beide",
+        "differs": "Verschilt",
+        "same": "Gelijk"
+      },
+      "question": {
+        "viewVikunja": "De projectweergave \"{{title}}\" is gewijzigd in Vikunja sinds je haar importeerde.",
+        "viewBoth": "De projectweergave \"{{title}}\" is gewijzigd in Vikunja, en de lijst is gewijzigd in Vicu.",
+        "viewVicu": "Je lijst wijkt af van de projectweergave \"{{title}}\". Overschrijven zet de versie van Vikunja terug.",
+        "viewDefault": "Je lijst wijkt af van de projectweergave \"{{title}}\". Vicu kan niet zien welke kant gewijzigd is.",
+        "filterVikunja": "Het opgeslagen filter \"{{title}}\" is gewijzigd in Vikunja sinds je het importeerde.",
+        "filterBoth": "Het opgeslagen filter \"{{title}}\" is gewijzigd in Vikunja, en de lijst is gewijzigd in Vicu.",
+        "filterVicu": "Je lijst wijkt af van het opgeslagen filter \"{{title}}\". Overschrijven zet de versie van Vikunja terug.",
+        "filterDefault": "Je lijst wijkt af van het opgeslagen filter \"{{title}}\". Vicu kan niet zien welke kant gewijzigd is."
+      },
+      "offer": {
+        "addedTitle_one": "{{count}} nieuw opgeslagen filter op je server",
+        "addedTitle_other": "{{count}} nieuwe opgeslagen filters op je server",
+        "addedBody_one": "Importeer het als eigen lijst om het in Vicu te gebruiken.",
+        "addedBody_other": "Importeer ze als eigen lijsten om ze in Vicu te gebruiken.",
+        "changedTitle_one": "{{count}} opgeslagen filter gewijzigd in Vikunja",
+        "changedTitle_other": "{{count}} opgeslagen filters gewijzigd in Vikunja",
+        "changedBody": "Bekijk wat er veranderd is en kies of je je lijsten wilt bijwerken.",
+        "bothTitle": "{{added}} nieuwe en {{changed}} gewijzigde opgeslagen filters op je server",
+        "bothBody": "Bekijk ze om je lijsten te importeren of bij te werken."
+      }
+    },
+    "completionSound": {
+      "title": "Geluid bij voltooien van een taak",
+      "enable": "Een geluid afspelen bij het voltooien van een taak",
+      "current": "Huidig geluid:",
+      "default": "(standaard)",
+      "playLabel": "Het voltooiingsgeluid afspelen",
+      "play": "Afspelen",
+      "choose": "Bestand kiezen...",
+      "reset": "Standaard herstellen",
+      "supported": "Ondersteund: MP3, WAV, OGG, M4A, AAC, FLAC (max. 10 MB)",
+      "cannotPlay": "Dit geluid kan niet worden afgespeeld. Kies een ander bestand."
+    },
+    "planner": {
+      "title": "Planning",
+      "note": "Een scherm om taken een tijd op een tijdlijn te geven. Een tijd die je instelt, zie je op elk apparaat, of dit nu aan staat of niet.",
+      "show": "Planning tonen in de zijbalk"
+    },
+    "closeAction": {
+      "label": "Bij het sluiten van het venster",
+      "minimize": "Minimaliseren naar de taakbalk",
+      "tray": "Verbergen in het systeemvak",
+      "quit": "Vicu afsluiten",
+      "minimizeNote": "Vicu houdt zijn knop in de taakbalk, met het aantal taken als dat aanstaat.",
+      "trayNote": "Vicu blijft draaien in het systeemvak; met het pictogram haal je het venster terug.",
+      "quitNote": "Vicu stopt, en Quick Entry en Quick View ermee."
+    },
+    "menu": {
+      "title": "Instellingen",
+      "backToApp": "Terug naar de app",
+      "groupAccount": "Account en app",
+      "groupFeatures": "Functies",
+      "general": "Algemeen",
+      "projects": "Projecten",
+      "notifications": "Meldingen",
+      "integrations": "Quick Entry / View",
+      "assistant": "Assistent",
+      "pro": "Pro",
+      "shortcuts": "Sneltoetsen",
+      "sectionsOf": "Onderdelen van {{tab}}",
+      "sectionAria": "Onderdeel {{section}}"
+    },
+    "sidebar": {
+      "title": "Zijbalk",
+      "note": "De lijsten die boven je projecten staan. Een verborgen lijst blijft werken en blijft in het opdrachtenpalet."
+    },
+    "weekStart": {
+      "label": "De week begint op",
+      "monday": "Maandag",
+      "sunday": "Zondag",
+      "saturday": "Zaterdag",
+      "note": "Agenda's, Deze week en Volgende week volgen dit. Wordt gesynchroniseerd met je andere apparaten.",
+      "vikunjaIs": "Vikunja staat op {{day}}.",
+      "use": "{{day}} gebruiken",
+      "inText": {
+        "monday": "maandag",
+        "sunday": "zondag",
+        "saturday": "zaterdag"
+      }
+    },
+    "review": {
+      "title": "Review",
+      "note": "Periodieke projectreview, in GTD-stijl. De markering staat in de beschrijving van elk project, zodat ze met andere apps synchroniseert.",
+      "enable": "Projectreviews bijhouden",
+      "cadence": "Standaardinterval voor reviews (dagen)",
+      "cadenceNote": "Hoe vaak projecten een review krijgen, tenzij een project een eigen interval heeft.",
+      "cadenceAria": "Standaardinterval voor reviews in dagen",
+      "excludeInbox": "Inbox uitsluiten van de reviewlijst",
+      "excludeInboxNote": "Je Inbox is om dingen vast te leggen, niet voor periodieke review.",
+      "excluded": {
+        "title": "Uitgesloten van review",
+        "note": "Projecten die je uit de reviewlijst hebt gehaald. Neem er een weer op om het opnieuw bij te houden.",
+        "include": "Weer opnemen",
+        "includeLabel": "Weer opnemen: {{name}}"
+      }
+    },
+    "routines": {
+      "title": "Routines",
+      "note": "Wat je regelmatig doet. Zet je ze uit, dan worden ze verborgen en stoppen hun herinneringen; je routines en hun geschiedenis blijven bewaard.",
+      "enable": "Routines inschakelen",
+      "inToday": "Routines tonen in Vandaag",
+      "inTodayNote": "Toont de routines die vandaag nog openstaan boven je taken. Afgeronde routines worden weggelaten.",
+      "limit": "Routines in Vandaag",
+      "limitNote": "Hoeveel routines voor de komende twee uur tegelijk worden getoond. De rest wacht achter één regel.",
+      "all": "Alle",
+      "hidden": {
+        "title": "Verborgen gedeelde routines",
+        "note": "Routines die iemand met je heeft gedeeld en die je hebt verborgen. Ze blijven gedeeld; alleen jij ziet ze niet.",
+        "show": "Tonen"
+      }
+    },
+    "tokenPermissions": {
+      "label": "Informatie over tokenrechten",
+      "intro": "Je API-token heeft deze rechten nodig:",
+      "route": "Route",
+      "permission": "Recht",
+      "usedFor": "Gebruikt voor",
+      "uses": {
+        "tasks": "Taken beheren",
+        "projects": "Projecten beheren",
+        "labels": "Labels beheren",
+        "taskLabels": "Labels toevoegen en verwijderen",
+        "taskRelations": "Subtaken en relaties",
+        "taskAttachments": "Bijlagen",
+        "projectViews": "Sorteren op positie"
+      }
+    }
   }
 }

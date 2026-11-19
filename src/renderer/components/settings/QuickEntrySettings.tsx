@@ -1,5 +1,6 @@
 import { Checkbox } from '@/components/shared/Checkbox'
 import { useEffect, useState } from 'react'
+import { Trans, useTranslation } from 'react-i18next'
 import { api } from '@/lib/api'
 import { cn } from '@/lib/cn'
 import { HotkeyRecorder } from './HotkeyRecorder'
@@ -13,13 +14,23 @@ interface QuickEntrySettingsProps {
   hotkeyWarnings?: { entry: boolean; viewer: boolean; waylandLimited: boolean }
 }
 
-
-const HOTKEY_FAILURE_COPY = window.api.platform === 'linux'
-  ? 'Failed to register. On Wayland, Electron binds shortcuts through the desktop portal — accept the consent dialog if prompted, or use the workaround below.'
-  : 'Failed to register — hotkey may be in use by another application'
+/** Key names are the same in every language. */
+function modifierLabel(mod: 'ctrl' | 'alt' | 'ctrl+alt'): string {
+  const mac = window.api.platform === 'darwin'
+  // i18n-ignore: keyboard key names
+  if (mod === 'ctrl') return mac ? '⌘ Cmd' : 'Ctrl'
+  // i18n-ignore: keyboard key names
+  if (mod === 'alt') return mac ? '⌥ Option' : 'Alt'
+  // i18n-ignore: keyboard key names
+  return mac ? '⌘⌥ Cmd+Option' : 'Ctrl+Alt'
+}
 
 export function QuickEntrySettings({ config, projects, onChange, hotkeyWarnings }: QuickEntrySettingsProps) {
+  const { t } = useTranslation()
   const { data: customLists = [] } = useCustomLists()
+  const hotkeyFailureCopy = window.api.platform === 'linux'
+    ? t('settings.quickEntry.hotkeyFailure.linux')
+    : t('settings.quickEntry.hotkeyFailure.other')
   const [launcherCmd, setLauncherCmd] = useState<{ quickEntry: string; quickView: string; kind: 'appimage' | 'packaged' | 'dev' } | null>(null)
   const [copied, setCopied] = useState<'entry' | 'view' | null>(null)
 
@@ -85,36 +96,36 @@ export function QuickEntrySettings({ config, projects, onChange, hotkeyWarnings 
 
   return (
     <div className="rounded-card border border-[var(--border-color)] bg-[var(--bg-primary)] p-5">
-      <h2 className="text-sm font-semibold text-[var(--text-primary)]">Quick Entry & Quick View</h2>
+      <h2 className="text-sm font-semibold text-[var(--text-primary)]">{t('settings.quickEntry.title')}</h2>
 
       <div className="mt-4 space-y-4">
         {hotkeyWarnings?.waylandLimited && (entryEnabled || viewEnabled) && (
           <div className="rounded-control border border-status-today/40 bg-status-today/10 px-3 py-3 text-xs text-[var(--text-primary)]">
             <p className="mb-2 font-semibold text-status-today">
-              Wayland: global hotkey registration failed
+              {t('settings.quickEntry.wayland.title')}
             </p>
             <p className="mb-2 text-[var(--text-secondary)]">
-              On Wayland, Vicu uses the GlobalShortcuts portal. If a consent dialog appeared, accept it and try again. If registration still fails, bind a shortcut in your desktop environment that runs Vicu with a command-line flag:
+              {t('settings.quickEntry.wayland.intro')}
             </p>
             <ol className="mb-3 list-decimal space-y-1 pl-5 text-[var(--text-secondary)]">
-              <li>Open <strong className="text-[var(--text-primary)]">Settings → Keyboard → Custom Shortcuts</strong> (GNOME) or <strong className="text-[var(--text-primary)]">System Settings → Shortcuts → Custom Shortcuts</strong> (KDE).</li>
-              <li>Add a new shortcut. Paste the command below as the <em>Command</em>.</li>
-              <li>Set the key combo (e.g. <code className="rounded-control bg-[var(--bg-tertiary)] px-1">Alt+Shift+V</code>).</li>
-              <li>Keep Vicu running in the tray — the shortcut wakes the running instance.</li>
+              <li><Trans i18nKey="settings.quickEntry.wayland.step1" components={{ gnome: <strong className="text-[var(--text-primary)]" />, kde: <strong className="text-[var(--text-primary)]" /> }} /></li>
+              <li><Trans i18nKey="settings.quickEntry.wayland.step2" components={{ field: <em /> }} /></li>
+              <li><Trans i18nKey="settings.quickEntry.wayland.step3" components={{ combo: <code className="rounded-control bg-[var(--bg-tertiary)] px-1" /> }} /></li>
+              <li>{t('settings.quickEntry.wayland.step4')}</li>
             </ol>
             {!launcherCmd && (
-              <div className="text-[var(--text-secondary)]">Loading command…</div>
+              <div className="text-[var(--text-secondary)]">{t('settings.quickEntry.wayland.loading')}</div>
             )}
             {launcherCmd?.kind === 'dev' && (
               <div className="mb-2 rounded-control border border-yellow-500/40 bg-yellow-500/10 px-2 py-1.5 text-[11px] text-yellow-600 dark:text-yellow-400">
-                <strong>Dev build notice:</strong> the command below points at the unpackaged source tree and won't work outside this dev session. Use this feature from the installed AppImage for real keybinds.
+                <Trans i18nKey="settings.quickEntry.wayland.devNotice" components={{ notice: <strong /> }} />
               </div>
             )}
             {launcherCmd && (
               <div className="space-y-2">
                 {entryEnabled && (
                   <div>
-                    <div className="mb-1 text-[var(--text-secondary)]">Quick Entry command:</div>
+                    <div className="mb-1 text-[var(--text-secondary)]">{t('settings.quickEntry.wayland.entryCommand')}</div>
                     <div className="flex items-center gap-2">
                       <code className="flex-1 overflow-x-auto whitespace-nowrap rounded-control border border-[var(--border-color)] bg-[var(--bg-tertiary)] px-2 py-1 font-mono text-[11px] text-[var(--text-primary)]">
                         {launcherCmd.quickEntry}
@@ -124,14 +135,14 @@ export function QuickEntrySettings({ config, projects, onChange, hotkeyWarnings 
                         onClick={() => copy(launcherCmd.quickEntry, 'entry')}
                         className="shrink-0 rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-2 py-1 text-[11px] font-medium text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]"
                       >
-                        {copied === 'entry' ? 'Copied' : 'Copy'}
+                        {copied === 'entry' ? t('settings.quickEntry.wayland.copied') : t('settings.quickEntry.wayland.copy')}
                       </button>
                     </div>
                   </div>
                 )}
                 {viewEnabled && (
                   <div>
-                    <div className="mb-1 text-[var(--text-secondary)]">Quick View command:</div>
+                    <div className="mb-1 text-[var(--text-secondary)]">{t('settings.quickEntry.wayland.viewCommand')}</div>
                     <div className="flex items-center gap-2">
                       <code className="flex-1 overflow-x-auto whitespace-nowrap rounded-control border border-[var(--border-color)] bg-[var(--bg-tertiary)] px-2 py-1 font-mono text-[11px] text-[var(--text-primary)]">
                         {launcherCmd.quickView}
@@ -141,7 +152,7 @@ export function QuickEntrySettings({ config, projects, onChange, hotkeyWarnings 
                         onClick={() => copy(launcherCmd.quickView, 'view')}
                         className="shrink-0 rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-2 py-1 text-[11px] font-medium text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]"
                       >
-                        {copied === 'view' ? 'Copied' : 'Copy'}
+                        {copied === 'view' ? t('settings.quickEntry.wayland.copied') : t('settings.quickEntry.wayland.copy')}
                       </button>
                     </div>
                   </div>
@@ -158,7 +169,7 @@ export function QuickEntrySettings({ config, projects, onChange, hotkeyWarnings 
               onChange={(e) => onChange({ quick_entry_enabled: e.target.checked })}
             />
             <span className="text-sm text-[var(--text-primary)]">
-              Enable Quick Entry
+              {t('settings.quickEntry.enableEntry')}
             </span>
           </label>
           <label className="flex cursor-pointer items-center gap-2">
@@ -167,7 +178,7 @@ export function QuickEntrySettings({ config, projects, onChange, hotkeyWarnings 
               onChange={(e) => onChange({ quick_view_enabled: e.target.checked })}
             />
             <span className="text-sm text-[var(--text-primary)]">
-              Enable Quick View
+              {t('settings.quickEntry.enableView')}
             </span>
           </label>
         </div>
@@ -177,41 +188,41 @@ export function QuickEntrySettings({ config, projects, onChange, hotkeyWarnings 
               {/* Quick Entry section */}
               <div className="space-y-3 border-t border-[var(--border-color)] pt-4">
                 <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
-                  Quick Entry
+                  {t('settings.quickEntry.entry.title')}
                 </h3>
 
                 <div>
-                  <label className="mb-1 block text-xs text-[var(--text-secondary)]">Hotkey</label>
+                  <label className="mb-1 block text-xs text-[var(--text-secondary)]">{t('settings.quickEntry.hotkey')}</label>
                   <HotkeyRecorder
                     value={config.quick_entry_hotkey || 'Alt+Shift+V'}
                     onChange={(v) => onChange({ quick_entry_hotkey: v })}
                     defaultValue="Alt+Shift+V"
-                    label="Quick Entry hotkey"
+                    label={t('settings.quickEntry.entry.hotkeyLabel')}
                     warning={hotkeyWarnings?.entry === false}
                   />
                   {hotkeyWarnings?.entry === false && (
                     <p className="mt-1 text-xs text-status-today">
-                      {HOTKEY_FAILURE_COPY}
+                      {hotkeyFailureCopy}
                     </p>
                   )}
                 </div>
 
                 <div>
-                  <label className="mb-1 block text-xs text-[var(--text-secondary)]">Default Project</label>
+                  <label className="mb-1 block text-xs text-[var(--text-secondary)]">{t('settings.quickEntry.entry.defaultProject.label')}</label>
                   <select
-                    aria-label="Default project"
+                    aria-label={t('settings.quickEntry.entry.defaultProject.aria')}
                     value={defaultProjectAvailable ? configuredDefaultProjectId : 0}
                     onChange={(e) => onChange({ quick_entry_default_project_id: Number(e.target.value) })}
                     className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)]"
                   >
-                    <option value={0}>Select a project...</option>
+                    <option value={0}>{t('settings.quickEntry.entry.defaultProject.placeholder')}</option>
                     {projects.map((p) => (
                       <option key={p.id} value={p.id}>{p.title}</option>
                     ))}
                   </select>
                   {!defaultProjectAvailable && (
                     <p className="mt-1 text-xs text-status-today">
-                      The saved default project is archived. Quick Entry will use an active fallback until you choose another project.
+                      {t('settings.quickEntry.entry.defaultProject.archived')}
                     </p>
                   )}
                 </div>
@@ -219,7 +230,7 @@ export function QuickEntrySettings({ config, projects, onChange, hotkeyWarnings 
                 {/* Secondary projects */}
                 <div>
                   <label className="mb-1 block text-xs text-[var(--text-secondary)]">
-                    Secondary Projects (cycle with modifier + arrow keys)
+                    {t('settings.quickEntry.entry.secondary.label')}
                   </label>
                   <div className="space-y-1">
                     {availableSecondaryProjects.map((sp) => (
@@ -230,17 +241,17 @@ export function QuickEntrySettings({ config, projects, onChange, hotkeyWarnings 
                           onClick={() => removeSecondaryProject(sp.id)}
                           className="text-xs text-danger hover:text-danger/80"
                         >
-                          Remove
+                          {t('settings.quickEntry.entry.secondary.remove')}
                         </button>
                       </div>
                     ))}
                     {unavailableSecondaryProjectCount > 0 && (
                       <p className="text-xs text-status-today">
-                        {unavailableSecondaryProjectCount} archived project{unavailableSecondaryProjectCount === 1 ? '' : 's'} hidden from the project cycle.
+                        {t('settings.quickEntry.entry.secondary.archivedHidden', { count: unavailableSecondaryProjectCount })}
                       </p>
                     )}
                     <select
-                      aria-label="Add a project to the cycle"
+                      aria-label={t('settings.quickEntry.entry.secondary.addAria')}
                       value=""
                       onChange={(e) => {
                         if (e.target.value) addSecondaryProject(Number(e.target.value))
@@ -248,7 +259,7 @@ export function QuickEntrySettings({ config, projects, onChange, hotkeyWarnings 
                       }}
                       className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-1.5 text-xs text-[var(--text-secondary)]"
                     >
-                      <option value="">Add a project...</option>
+                      <option value="">{t('settings.quickEntry.entry.secondary.addPlaceholder')}</option>
                       {projects
                         .filter((p) => !(config.secondary_projects || []).some((sp) => sp.id === p.id))
                         .map((p) => (
@@ -261,7 +272,7 @@ export function QuickEntrySettings({ config, projects, onChange, hotkeyWarnings 
                 {/* Project cycle modifier */}
                 <div>
                   <label className="mb-1 block text-xs text-[var(--text-secondary)]">
-                    Project Cycle Modifier
+                    {t('settings.quickEntry.entry.modifier.label')}
                   </label>
                   <div className="flex gap-2">
                     {(['ctrl', 'alt', 'ctrl+alt'] as const).map((mod) => (
@@ -282,11 +293,8 @@ export function QuickEntrySettings({ config, projects, onChange, hotkeyWarnings 
                           onChange={() => onChange({ project_cycle_modifier: mod })}
                           className="sr-only"
                         />
-                        {mod === 'ctrl'
-                          ? (window.api.platform === 'darwin' ? '\u2318 Cmd' : 'Ctrl')
-                          : mod === 'alt'
-                            ? (window.api.platform === 'darwin' ? '\u2325 Option' : 'Alt')
-                            : (window.api.platform === 'darwin' ? '\u2318\u2325 Cmd+Option' : 'Ctrl+Alt')}
+                        {/* i18n-ignore: keyboard key names */}
+                        {modifierLabel(mod)}
                       </label>
                     ))}
                   </div>
@@ -301,30 +309,30 @@ export function QuickEntrySettings({ config, projects, onChange, hotkeyWarnings 
               {/* Quick View section */}
               <div className="space-y-3 border-t border-[var(--border-color)] pt-4">
                 <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
-                  Quick View
+                  {t('settings.quickEntry.view.title')}
                 </h3>
 
                 <div>
-                  <label className="mb-1 block text-xs text-[var(--text-secondary)]">Hotkey</label>
+                  <label className="mb-1 block text-xs text-[var(--text-secondary)]">{t('settings.quickEntry.hotkey')}</label>
                   <HotkeyRecorder
                     value={config.quick_view_hotkey || 'Alt+Shift+B'}
                     onChange={(v) => onChange({ quick_view_hotkey: v })}
                     defaultValue="Alt+Shift+B"
-                    label="Quick View hotkey"
+                    label={t('settings.quickEntry.view.hotkeyLabel')}
                     warning={hotkeyWarnings?.viewer === false}
                   />
                   {hotkeyWarnings?.viewer === false && (
                     <p className="mt-1 text-xs text-status-today">
-                      {HOTKEY_FAILURE_COPY}
+                      {hotkeyFailureCopy}
                     </p>
                   )}
                 </div>
 
                 {/* List picker */}
                 <div>
-                  <label className="mb-1 block text-xs text-[var(--text-secondary)]">List</label>
+                  <label className="mb-1 block text-xs text-[var(--text-secondary)]">{t('settings.quickEntry.view.list.label')}</label>
                   <select
-                    aria-label="List"
+                    aria-label={t('settings.quickEntry.view.list.aria')}
                     value={
                       viewerFilter.view_type
                         ? `view:${viewerFilter.view_type}`
@@ -346,19 +354,19 @@ export function QuickEntrySettings({ config, projects, onChange, hotkeyWarnings 
                     }}
                     className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)]"
                   >
-                    <option value="0">All projects</option>
-                    <optgroup label="Views">
-                      <option value="view:today">Today</option>
-                      <option value="view:upcoming">Upcoming</option>
-                      <option value="view:anytime">Anytime</option>
+                    <option value="0">{t('settings.quickEntry.view.list.allProjects')}</option>
+                    <optgroup label={t('settings.quickEntry.view.list.views')}>
+                      <option value="view:today">{t('settings.quickEntry.view.list.today')}</option>
+                      <option value="view:upcoming">{t('settings.quickEntry.view.list.upcoming')}</option>
+                      <option value="view:anytime">{t('settings.quickEntry.view.list.anytime')}</option>
                     </optgroup>
-                    <optgroup label="Projects">
+                    <optgroup label={t('settings.quickEntry.view.list.projects')}>
                       {projects.map((p) => (
                         <option key={p.id} value={String(p.id)}>{p.title}</option>
                       ))}
                     </optgroup>
                     {customLists.length > 0 && (
-                      <optgroup label="Lists">
+                      <optgroup label={t('settings.quickEntry.view.list.lists')}>
                         {customLists.map((l) => (
                           <option key={l.id} value={l.id}>{l.name}</option>
                         ))}
@@ -367,7 +375,7 @@ export function QuickEntrySettings({ config, projects, onChange, hotkeyWarnings 
                   </select>
                   {!viewerProjectAvailable && (
                     <p className="mt-1 text-xs text-status-today">
-                      The saved project is archived. Quick View will omit it until you select an active project or restore it.
+                      {t('settings.quickEntry.view.list.archived')}
                     </p>
                   )}
                 </div>
@@ -379,7 +387,7 @@ export function QuickEntrySettings({ config, projects, onChange, hotkeyWarnings 
                     onChange={(e) => updateViewerFilter({ include_today_all_projects: e.target.checked })}
                   />
                   <span className="text-sm text-[var(--text-primary)]">
-                    Include tasks due today from all projects
+                    {t('settings.quickEntry.view.includeToday')}
                   </span>
                 </label>
               </div>

@@ -1,4 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
+import { useTranslation } from 'react-i18next'
+import type { TranslationKey } from '../../../shared/i18n'
 import { api } from '@/lib/api'
 import { cn } from '@/lib/cn'
 import { useSetSyncedPreference } from '@/hooks/use-synced-prefs'
@@ -6,11 +8,23 @@ import { useWeekStart } from '@/hooks/use-week-start'
 import {
   WEEK_START_CHOICES,
   WEEK_START_KEY,
-  weekStartLabel,
   weekStartOffer,
   writeWeekStart,
   type WeekStart,
 } from '../../../shared/week-start'
+
+const DAY_NAMES: Record<WeekStart, TranslationKey> = {
+  monday: 'settings.weekStart.monday',
+  sunday: 'settings.weekStart.sunday',
+  saturday: 'settings.weekStart.saturday',
+}
+
+/** The same names inside a sentence (some languages write them in lowercase there). */
+const DAY_NAMES_IN_TEXT: Record<WeekStart, TranslationKey> = {
+  monday: 'settings.weekStart.inText.monday',
+  sunday: 'settings.weekStart.inText.sunday',
+  saturday: 'settings.weekStart.inText.saturday',
+}
 
 /**
  * "Week starts on" (Settings, Preferences; cross-app semantics 2.1): Monday, Sunday or Saturday, a
@@ -21,6 +35,7 @@ import {
  * a line under the choices offers it. Vicu only reads that setting, and only here.
  */
 export function WeekStartSetting() {
+  const { t } = useTranslation()
   const weekStart = useWeekStart()
   const set = useSetSyncedPreference()
   // Read while the setting is on screen. No answer (offline, a token without the right): no offer.
@@ -35,8 +50,8 @@ export function WeekStartSetting() {
 
   return (
     <div>
-      <label className="mb-2 block text-xs text-[var(--text-secondary)]">Week starts on</label>
-      <div className="flex gap-3" role="radiogroup" aria-label="Week starts on">
+      <label className="mb-2 block text-xs text-[var(--text-secondary)]">{t('settings.weekStart.label')}</label>
+      <div className="flex gap-3" role="radiogroup" aria-label={t('settings.weekStart.label')}>
         {WEEK_START_CHOICES.map((opt) => (
           <label
             key={opt.value}
@@ -55,22 +70,22 @@ export function WeekStartSetting() {
               onChange={() => choose(opt.value)}
               className="sr-only"
             />
-            {opt.label}
+            {t(DAY_NAMES[opt.value])}
           </label>
         ))}
       </div>
       <p className="mt-1.5 text-xs text-[var(--text-secondary)]">
-        Calendars, This week and Next week follow it. Syncs to your other devices.
+        {t('settings.weekStart.note')}
       </p>
       {offer && (
         <p className="mt-1 text-xs text-[var(--text-secondary)]">
-          Vikunja is set to {weekStartLabel(offer)}.{' '}
+          {t('settings.weekStart.vikunjaIs', { day: t(DAY_NAMES_IN_TEXT[offer]) })}{' '}
           <button
             type="button"
             onClick={() => choose(offer)}
             className="rounded-control font-medium text-accent-blue hover:underline"
           >
-            Use {weekStartLabel(offer)}
+            {t('settings.weekStart.use', { day: t(DAY_NAMES[offer]) })}
           </button>
         </p>
       )}

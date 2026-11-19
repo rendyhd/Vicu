@@ -1,12 +1,26 @@
 import { useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/shared/Button'
 import { BrowserSignIn } from '@/components/auth/BrowserSignIn'
 import { api, type OIDCProvider, type ServerAuthInfo } from '@/lib/api'
 import { cn } from '@/lib/cn'
 import type { Project } from '@/lib/vikunja-types'
 import type { OidcSignInMode } from '../../shared/oidc-browser'
+import type { TranslationKey } from '../../shared/i18n'
+
+/** The route groups and permissions an API token needs: Vikunja's own names, the same in every language. */
+const TOKEN_PERMISSIONS: { route: string; permission: string; use: TranslationKey }[] = [
+  { route: 'tasks', permission: 'read_all, create, update, delete', use: 'settings.tokenPermissions.uses.tasks' },
+  { route: 'projects', permission: 'read_all, create, update, delete', use: 'settings.tokenPermissions.uses.projects' },
+  { route: 'labels', permission: 'read_all, create, update, delete', use: 'settings.tokenPermissions.uses.labels' },
+  { route: 'task_labels', permission: 'create, delete', use: 'settings.tokenPermissions.uses.taskLabels' },
+  { route: 'task_relations', permission: 'create, delete', use: 'settings.tokenPermissions.uses.taskRelations' },
+  { route: 'task_attachments', permission: 'read_all, create, delete', use: 'settings.tokenPermissions.uses.taskAttachments' },
+  { route: 'project_views', permission: 'read_all', use: 'settings.tokenPermissions.uses.projectViews' },
+]
 
 function TokenPermissionsInfo() {
+  const { t } = useTranslation()
   const [open, setOpen] = useState(false)
 
   return (
@@ -20,59 +34,31 @@ function TokenPermissionsInfo() {
             ? 'bg-accent-fill text-on-accent'
             : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:bg-accent-blue/20 hover:text-accent-blue'
         )}
-        aria-label="Token permissions info"
+        aria-label={t('settings.tokenPermissions.label')}
       >
         i
       </button>
       {open && (
         <div className="absolute left-0 top-6 z-10 w-80 rounded-popover border border-[var(--border-color)] bg-[var(--bg-primary)] p-3 shadow-lg">
           <p className="mb-2 text-xs text-[var(--text-secondary)]">
-            Your API token needs these permissions:
+            {t('settings.tokenPermissions.intro')}
           </p>
           <table className="w-full text-xs">
             <thead>
               <tr className="border-b border-[var(--border-color)] text-left text-[var(--text-secondary)]">
-                <th className="pb-1.5 pr-2 font-medium">Route</th>
-                <th className="pb-1.5 pr-2 font-medium">Permission</th>
-                <th className="pb-1.5 font-medium">Used for</th>
+                <th className="pb-1.5 pr-2 font-medium">{t('settings.tokenPermissions.route')}</th>
+                <th className="pb-1.5 pr-2 font-medium">{t('settings.tokenPermissions.permission')}</th>
+                <th className="pb-1.5 font-medium">{t('settings.tokenPermissions.usedFor')}</th>
               </tr>
             </thead>
             <tbody className="text-[var(--text-primary)]">
-              <tr className="border-b border-border/50">
-                <td className="py-1.5 pr-2 font-mono text-caption">tasks</td>
-                <td className="py-1.5 pr-2">read_all, create, update, delete</td>
-                <td className="py-1.5">Task CRUD</td>
-              </tr>
-              <tr className="border-b border-border/50">
-                <td className="py-1.5 pr-2 font-mono text-caption">projects</td>
-                <td className="py-1.5 pr-2">read_all, create, update, delete</td>
-                <td className="py-1.5">Project CRUD</td>
-              </tr>
-              <tr className="border-b border-border/50">
-                <td className="py-1.5 pr-2 font-mono text-caption">labels</td>
-                <td className="py-1.5 pr-2">read_all, create, update, delete</td>
-                <td className="py-1.5">Label CRUD</td>
-              </tr>
-              <tr className="border-b border-border/50">
-                <td className="py-1.5 pr-2 font-mono text-caption">task_labels</td>
-                <td className="py-1.5 pr-2">create, delete</td>
-                <td className="py-1.5">Adding/removing labels</td>
-              </tr>
-              <tr className="border-b border-border/50">
-                <td className="py-1.5 pr-2 font-mono text-caption">task_relations</td>
-                <td className="py-1.5 pr-2">create, delete</td>
-                <td className="py-1.5">Subtasks & relations</td>
-              </tr>
-              <tr className="border-b border-border/50">
-                <td className="py-1.5 pr-2 font-mono text-caption">task_attachments</td>
-                <td className="py-1.5 pr-2">read_all, create, delete</td>
-                <td className="py-1.5">File attachments</td>
-              </tr>
-              <tr>
-                <td className="py-1.5 pr-2 font-mono text-caption">project_views</td>
-                <td className="py-1.5 pr-2">read_all</td>
-                <td className="py-1.5">Position sorting</td>
-              </tr>
+              {TOKEN_PERMISSIONS.map((row, index) => (
+                <tr key={row.route} className={index < TOKEN_PERMISSIONS.length - 1 ? 'border-b border-border/50' : undefined}>
+                  <td className="py-1.5 pr-2 font-mono text-caption">{row.route}</td>
+                  <td className="py-1.5 pr-2">{row.permission}</td>
+                  <td className="py-1.5">{t(row.use)}</td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>

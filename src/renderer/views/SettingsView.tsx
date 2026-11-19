@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
+import { Trans, useTranslation } from 'react-i18next'
 import { useNavigate, useRouter, useSearch } from '@tanstack/react-router'
 import { api, type VikunjaUser } from '@/lib/api'
 import { APP_CONFIG_QUERY_KEY } from '@/hooks/use-app-config'
@@ -35,14 +36,22 @@ import { closeAction, type AppConfig, type Project } from '@/lib/vikunja-types'
 
 import type { ThemeOption } from '@/lib/theme'
 import { ProSettings } from '@/components/settings/ProSettings'
-import { SettingsMenu } from '@/components/settings/SettingsMenu'
-import { currentSectionIndex, settingsTabLabel, SETTINGS_MENU_WIDTH } from '@/lib/settings-menu'
+import { SettingsMenu, SETTINGS_TAB_LABELS } from '@/components/settings/SettingsMenu'
+import { currentSectionIndex, SETTINGS_MENU_WIDTH } from '@/lib/settings-menu'
 import { useSettingsNavStore } from '@/stores/settings-nav-store'
+import type { TranslationKey } from '../../shared/i18n'
 
 /** Every tab's content sits in the same column, left-aligned with the page title. */
 const SETTINGS_COLUMN = 'mx-6 max-w-[640px] space-y-6 pb-8 pt-4'
 
+const THEME_OPTIONS: { value: ThemeOption; label: TranslationKey }[] = [
+  { value: 'light', label: 'settings.appearance.themeLight' },
+  { value: 'dark', label: 'settings.appearance.themeDark' },
+  { value: 'system', label: 'settings.appearance.themeSystem' },
+]
+
 export function SettingsView() {
+  const { t } = useTranslation()
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const router = useRouter()
@@ -110,7 +119,7 @@ export function SettingsView() {
     }
     const collect = (): void => {
       headings = Array.from(content.querySelectorAll<HTMLElement>('h2')).filter((h) => !h.closest('dialog, [popover]'))
-      setSections(headings.map((h) => h.textContent?.trim() || 'Section'))
+      setSections(headings.map((h) => h.textContent?.trim() || t('settings.sectionFallback')))
       follow()
     }
     let frame = 0
@@ -227,7 +236,7 @@ export function SettingsView() {
       } catch (err) {
         console.error('Failed to save the connection', err)
         setTestStatus('error')
-        setTestError('Connected, but the connection settings could not be saved. Try again.')
+        setTestError(t('settings.connection.notSaved'))
       }
     } else {
       setTestStatus('error')
@@ -255,9 +264,9 @@ export function SettingsView() {
       pendingPatchRef.current = { ...patch, ...pendingPatchRef.current }
       setSaveStatus('error')
       const reason = err instanceof Error ? err.message.replace(/^Error invoking remote method '[^']*': (Error: )?/, '') : ''
-      toast.error(reason ? `Could not save settings: ${reason}` : 'Could not save settings')
+      toast.error(reason ? t('settings.save.failedWithReason', { reason }) : t('settings.save.failed'))
     }
-  }, [queryClient])
+  }, [queryClient, t])
 
   const scheduleSave = useCallback(() => {
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
@@ -288,7 +297,7 @@ export function SettingsView() {
     } finally {
       setSigningOut(false)
     }
-    if (warning && !(await confirmDelete(warning, { force: true, confirmLabel: 'Sign Out' }))) return
+    if (warning && !(await confirmDelete(warning, { force: true, confirmLabel: t('settings.connection.signOut') }))) return
     await api.logout()
     // Main keeps app preferences (theme, hotkeys, window bounds, notifications, etc.)
     // and clears the connection and account-specific data (project IDs, custom lists, etc.)
@@ -310,7 +319,7 @@ export function SettingsView() {
         </div>
       )}
     <ReadingScroll ref={scrollRef} className="bg-[var(--bg-primary)]" columnClassName="mx-0 flex flex-col">
-      <PageHeader title={settingsTabLabel(activeTab)} inScroll />
+      <PageHeader title={t(SETTINGS_TAB_LABELS[activeTab])} inScroll />
 
       <div ref={contentRef}>
       {/* One column width for every tab (SETTINGS_COLUMN). */}
@@ -345,12 +354,12 @@ export function SettingsView() {
       ) : activeTab === 'general' ? (
       <div className={SETTINGS_COLUMN}>
         <div className="rounded-card border border-[var(--border-color)] bg-[var(--bg-primary)] p-5">
-          <h2 className="mb-4 text-sm font-semibold text-[var(--text-primary)]">Connection</h2>
+          <h2 className="mb-4 text-sm font-semibold text-[var(--text-primary)]">{t('settings.connection.title')}</h2>
 
           {authMethod === 'oidc' || authMethod === 'password' ? (
             <div className="space-y-3">
               <div>
-                <label className="mb-1 block text-xs text-[var(--text-secondary)]">Vikunja URL</label>
+                <label className="mb-1 block text-xs text-[var(--text-secondary)]">{t('settings.connection.url')}</label>
                 <div className="rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-secondary)]">
                   {url}
                 </div>
@@ -360,25 +369,26 @@ export function SettingsView() {
                 <span className="inline-block h-2 w-2 rounded-full bg-status-done" />
                 <span className="text-xs text-status-done">
                   {authMethod === 'oidc'
-                    ? 'Signed in via SSO'
+                    ? t('settings.connection.signedInSso')
                     : currentUser
-                      ? `Signed in as ${currentUser.name || currentUser.username}`
-                      : 'Signed in'}
+                      ? t('settings.connection.signedInAs', { name: currentUser.name || currentUser.username })
+                      : t('settings.connection.signedIn')}
                 </span>
               </div>
 
               <Button variant="secondary" danger onClick={handleLogout} disabled={signingOut}>
-                {signingOut ? 'Syncing...' : 'Sign Out'}
+                {signingOut ? t('settings.connection.syncing') : t('settings.connection.signOut')}
               </Button>
             </div>
           ) : (
             <div className="space-y-3">
               <div>
-                <label className="mb-1 block text-xs text-[var(--text-secondary)]">Vikunja URL</label>
+                <label className="mb-1 block text-xs text-[var(--text-secondary)]">{t('settings.connection.url')}</label>
                 <input
                   type="url"
                   value={url}
                   onChange={(e) => setUrl(e.target.value)}
+                  // i18n-ignore: an address example, the same in every language
                   placeholder="https://vikunja.example.com"
                   className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]"
                 />
@@ -386,7 +396,7 @@ export function SettingsView() {
 
               <div>
                 <label className="mb-1 flex items-center text-xs text-[var(--text-secondary)]">
-                  API Token
+                  {t('settings.connection.apiToken')}
                   <TokenPermissionsInfo />
                 </label>
                 <div className="relative">
@@ -394,7 +404,7 @@ export function SettingsView() {
                     type={showToken ? 'text' : 'password'}
                     value={token}
                     onChange={(e) => setToken(e.target.value)}
-                    placeholder="Enter your API token"
+                    placeholder={t('settings.connection.tokenPlaceholder')}
                     className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 pr-16 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]"
                   />
                   <button
@@ -402,12 +412,12 @@ export function SettingsView() {
                     onClick={() => setShowToken(!showToken)}
                     className="absolute right-2 top-1/2 inline-flex min-h-6 -translate-y-1/2 items-center rounded-control px-2 py-0.5 text-meta text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                   >
-                    {showToken ? 'Hide' : 'Show'}
+                    {showToken ? t('settings.connection.hideToken') : t('settings.connection.showToken')}
                   </button>
                 </div>
                 {hasSavedToken && (
                   <p className="mt-1 text-meta text-[var(--text-secondary)]">
-                    Uses the saved token. Paste a new one to replace it.
+                    {t('settings.connection.savedToken')}
                   </p>
                 )}
               </div>
@@ -417,19 +427,19 @@ export function SettingsView() {
                 onClick={handleTestConnection}
                 disabled={!url || (!token && !hasSavedToken) || testStatus === 'testing'}
               >
-                {testStatus === 'testing' ? 'Testing...' : 'Test Connection'}
+                {testStatus === 'testing' ? t('settings.connection.testing') : t('settings.connection.test')}
               </Button>
 
               {testStatus === 'success' && (
-                <p className="text-xs text-status-done">Connected successfully</p>
+                <p className="text-xs text-status-done">{t('settings.connection.success')}</p>
               )}
               {testStatus === 'error' && (
-                <p className="text-xs text-danger">{testError || 'Connection failed'}</p>
+                <p className="text-xs text-danger">{testError || t('settings.connection.failed')}</p>
               )}
 
               <div className="border-t border-[var(--border-color)] pt-3">
                 <Button variant="secondary" danger onClick={handleLogout} disabled={signingOut}>
-                  {signingOut ? 'Syncing...' : 'Disconnect'}
+                  {signingOut ? t('settings.connection.syncing') : t('settings.connection.disconnect')}
                 </Button>
               </div>
             </div>
@@ -438,13 +448,13 @@ export function SettingsView() {
         </div>
 
         <div className="rounded-card border border-[var(--border-color)] bg-[var(--bg-primary)] p-5">
-          <h2 className="mb-4 text-sm font-semibold text-[var(--text-primary)]">Appearance</h2>
+          <h2 className="mb-4 text-sm font-semibold text-[var(--text-primary)]">{t('settings.appearance.title')}</h2>
 
           <div className="space-y-3">
             <div>
-              <label className="mb-2 block text-xs text-[var(--text-secondary)]">Theme</label>
+              <label className="mb-2 block text-xs text-[var(--text-secondary)]">{t('settings.appearance.theme')}</label>
               <div className="flex gap-3">
-                {(['light', 'dark', 'system'] as ThemeOption[]).map((opt) => (
+                {THEME_OPTIONS.map(({ value: opt, label }) => (
                   <label
                     key={opt}
                     className={cn(
@@ -462,19 +472,19 @@ export function SettingsView() {
                       onChange={() => { setTheme(opt); applyTheme(opt); handleQuickEntryChange({ theme: opt }) }}
                       className="sr-only"
                     />
-                    {opt.charAt(0).toUpperCase() + opt.slice(1)}
+                    {t(label)}
                   </label>
                 ))}
               </div>
             </div>
 
             <div>
-              <label className="mb-2 block text-xs text-[var(--text-secondary)]">Clock</label>
-              <div className="flex gap-3" role="radiogroup" aria-label="Clock">
+              <label className="mb-2 block text-xs text-[var(--text-secondary)]">{t('settings.appearance.clock')}</label>
+              <div className="flex gap-3" role="radiogroup" aria-label={t('settings.appearance.clock')}>
                 {([
-                  { value: 'system' as const, label: 'System' },
-                  { value: '12h' as const, label: '12-hour' },
-                  { value: '24h' as const, label: '24-hour' },
+                  { value: 'system' as const, label: t('settings.appearance.clockSystem') },
+                  { value: '12h' as const, label: t('settings.appearance.clock12') },
+                  { value: '24h' as const, label: t('settings.appearance.clock24') },
                 ]).map((opt) => {
                   const current = fullConfig?.clock_format ?? 'system'
                   return (
@@ -501,16 +511,16 @@ export function SettingsView() {
                 })}
               </div>
               <p className="mt-1.5 text-xs text-[var(--text-secondary)]">
-                System follows your region. Pick 12-hour or 24-hour if your system uses a custom time format. Applies to every Vicu window.
+                {t('settings.appearance.clockNote')}
               </p>
             </div>
 
             <div>
-              <label className="mb-2 block text-xs text-[var(--text-secondary)]">Task rows</label>
-              <div className="flex gap-3" role="radiogroup" aria-label="Task rows">
+              <label className="mb-2 block text-xs text-[var(--text-secondary)]">{t('settings.appearance.rows')}</label>
+              <div className="flex gap-3" role="radiogroup" aria-label={t('settings.appearance.rows')}>
                 {([
-                  { value: 'compact' as const, label: 'Compact' },
-                  { value: 'comfortable' as const, label: 'Comfortable' },
+                  { value: 'compact' as const, label: t('settings.appearance.rowsCompact') },
+                  { value: 'comfortable' as const, label: t('settings.appearance.rowsComfortable') },
                 ]).map((opt) => {
                   const current = fullConfig?.row_density ?? 'compact'
                   return (
@@ -537,7 +547,7 @@ export function SettingsView() {
                 })}
               </div>
               <p className="mt-1.5 text-xs text-[var(--text-secondary)]">
-                Comfortable shows longer titles and a line of notes.
+                {t('settings.appearance.rowsNote')}
               </p>
             </div>
 
@@ -545,7 +555,7 @@ export function SettingsView() {
         </div>
 
         <div className="rounded-card border border-[var(--border-color)] bg-[var(--bg-primary)] p-5">
-          <h2 className="mb-4 text-sm font-semibold text-[var(--text-primary)]">Preferences</h2>
+          <h2 className="mb-4 text-sm font-semibold text-[var(--text-primary)]">{t('settings.preferences.title')}</h2>
 
           <div className="space-y-3">
             {launchOnStartupSupported && (
@@ -556,9 +566,9 @@ export function SettingsView() {
                     onChange={(e) => handleQuickEntryChange({ launch_on_startup: e.target.checked })}
                   />
                   <span className="text-sm text-[var(--text-primary)]">
-                    Launch on startup
+                    {t('settings.preferences.launchOnStartup')}
                   </span>
-                  <span className="text-xs text-[var(--text-secondary)]">(advised for Quick Entry / View)</span>
+                  <span className="text-xs text-[var(--text-secondary)]">{t('settings.preferences.launchOnStartupNote')}</span>
                 </label>
 
                 {fullConfig?.launch_on_startup === true && (
@@ -568,14 +578,14 @@ export function SettingsView() {
                       onChange={(e) => handleQuickEntryChange({ start_hidden: e.target.checked })}
                     />
                     <span className="text-sm text-[var(--text-primary)]">
-                      Start hidden
+                      {t('settings.preferences.startHidden')}
                     </span>
                     <span className="text-xs text-[var(--text-secondary)]">
                       {window.api.platform === 'darwin'
-                        ? '(no window at login)'
+                        ? t('settings.preferences.startHiddenMac')
                         : closeAction(fullConfig) === 'minimize'
-                          ? '(starts minimized to the taskbar)'
-                          : '(no window at login; needs the tray icon)'}
+                          ? t('settings.preferences.startHiddenMinimized')
+                          : t('settings.preferences.startHiddenTray')}
                     </span>
                   </label>
                 )}
@@ -592,7 +602,7 @@ export function SettingsView() {
                 onChange={(e) => handleQuickEntryChange({ confirm_before_delete: e.target.checked })}
               />
               <span className="text-sm text-[var(--text-primary)]">
-                Confirm before deleting
+                {t('settings.preferences.confirmDelete')}
               </span>
             </label>
 
@@ -602,9 +612,9 @@ export function SettingsView() {
 
             <label className="flex items-center justify-between gap-4">
               <span>
-                <span className="block text-sm text-[var(--text-primary)]">Subtasks in task lists</span>
+                <span className="block text-sm text-[var(--text-primary)]">{t('settings.preferences.subtasks')}</span>
                 <span className="block text-xs text-[var(--text-secondary)]">
-                  Keep them in task details, or expand them below the parent.
+                  {t('settings.preferences.subtasksNote')}
                 </span>
               </span>
               <select
@@ -614,8 +624,8 @@ export function SettingsView() {
                 })}
                 className="rounded-control border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-1.5 text-sm text-[var(--text-primary)]"
               >
-                <option value="inside_task">Inside task</option>
-                <option value="expandable">Expandable</option>
+                <option value="inside_task">{t('settings.preferences.subtasksInside')}</option>
+                <option value="expandable">{t('settings.preferences.subtasksExpandable')}</option>
               </select>
             </label>
 
@@ -625,28 +635,28 @@ export function SettingsView() {
                 onChange={(e) => handleQuickEntryChange({ show_today_overdue_badge: e.target.checked })}
               />
               <span className="text-sm text-[var(--text-primary)]">
-                Show today &amp; overdue count on app icon
+                {t('settings.preferences.badge')}
               </span>
             </label>
             {window.api.platform === 'darwin' && fullConfig?.show_today_overdue_badge === true && (
               <p className="ml-6 text-xs text-[var(--text-secondary)]">
-                macOS shows the count only while Vicu may send notifications with badges.{' '}
+                {t('settings.preferences.badgeMacNote')}{' '}
                 <button
                   type="button"
                   onClick={() => { void api.openBadgeNotificationSettings() }}
                   className="text-accent-blue hover:underline"
                 >
-                  Notification settings
+                  {t('settings.preferences.notificationSettings')}
                 </button>
               </p>
             )}
 
             <div>
-              <label className="mb-2 block text-xs text-[var(--text-secondary)]">What does urgent mean?</label>
+              <label className="mb-2 block text-xs text-[var(--text-secondary)]">{t('settings.preferences.urgent')}</label>
               <div className="flex gap-3">
                 {([
-                  { value: 'today' as const, label: 'Schedule for Today' },
-                  { value: 'important' as const, label: 'Mark Important' },
+                  { value: 'today' as const, label: t('settings.preferences.urgentToday') },
+                  { value: 'important' as const, label: t('settings.preferences.urgentImportant') },
                 ]).map((opt) => {
                   const current = fullConfig?.urgency_mode ?? 'today'
                   return (
@@ -673,7 +683,7 @@ export function SettingsView() {
                 })}
               </div>
               <p className="mt-1.5 text-xs text-[var(--text-secondary)]">
-                Sets what the top action in a task&rsquo;s right-click menu does.
+                {t('settings.preferences.urgentNote')}
               </p>
             </div>
 
@@ -698,7 +708,7 @@ export function SettingsView() {
 
         {/* Task Parser */}
         <div className="rounded-card border border-[var(--border-color)] bg-[var(--bg-primary)] p-5">
-          <h2 className="mb-4 text-sm font-semibold text-[var(--text-primary)]">Task Parser</h2>
+          <h2 className="mb-4 text-sm font-semibold text-[var(--text-primary)]">{t('settings.parser.title')}</h2>
 
           <div className="space-y-3">
             <label className="flex cursor-pointer items-center gap-2">
@@ -708,10 +718,10 @@ export function SettingsView() {
               />
               <div>
                 <span className="text-sm text-[var(--text-primary)]">
-                  Parse task metadata from text
+                  {t('settings.parser.parse')}
                 </span>
                 <p className="text-xs text-[var(--text-secondary)]">
-                  Extract labels, projects, priority, dates, and recurrence from your input
+                  {t('settings.parser.parseNote')}
                 </p>
               </div>
             </label>
@@ -720,7 +730,7 @@ export function SettingsView() {
               <>
                 <div>
                   <div className="mb-2 block text-xs text-[var(--text-secondary)]">
-                    Syntax Mode
+                    {t('settings.parser.syntaxMode')}
                   </div>
                   <div role="radiogroup" className="grid grid-cols-2 gap-3">
                     <button
@@ -735,12 +745,15 @@ export function SettingsView() {
                           : 'border-[var(--border-color)]'
                       )}
                     >
+                      {/* i18n-ignore: a product name */}
                       <div className="text-sm font-medium text-[var(--text-primary)]">Todoist</div>
                       <p className="mt-0.5 text-xs text-[var(--text-secondary)]">
-                        Familiar Todoist-style prefixes
+                        {t('settings.parser.todoistNote')}
                       </p>
                       <p className="mt-1.5 font-mono text-xs">
+                        {/* i18n-ignore: the quick-add syntax stays English */}
                         <code className="text-blue-500">#project</code>{' '}
+                        {/* i18n-ignore: the quick-add syntax stays English */}
                         <code className="text-orange-500">@label</code>{' '}
                         <code className="text-danger">p1-p4</code>
                       </p>
@@ -757,12 +770,15 @@ export function SettingsView() {
                           : 'border-[var(--border-color)]'
                       )}
                     >
+                      {/* i18n-ignore: a product name */}
                       <div className="text-sm font-medium text-[var(--text-primary)]">Vikunja</div>
                       <p className="mt-0.5 text-xs text-[var(--text-secondary)]">
-                        Native Vikunja-style prefixes
+                        {t('settings.parser.vikunjaNote')}
                       </p>
                       <p className="mt-1.5 font-mono text-xs">
+                        {/* i18n-ignore: the quick-add syntax stays English */}
                         <code className="text-blue-500">+project</code>{' '}
+                        {/* i18n-ignore: the quick-add syntax stays English */}
                         <code className="text-orange-500">*label</code>{' '}
                         <code className="text-danger">!1-!4</code>
                       </p>
@@ -778,10 +794,13 @@ export function SettingsView() {
                   />
                   <div>
                     <span className="text-sm text-[var(--text-primary)]">
-                      <code className="rounded-control bg-[var(--bg-secondary)] px-1 py-0.5 text-xs font-mono text-green-600">!</code> in task title sets due date to today
+                      <Trans
+                        i18nKey="settings.parser.exclamation"
+                        components={{ mark: <code className="rounded-control bg-[var(--bg-secondary)] px-1 py-0.5 text-xs font-mono text-green-600" /> }}
+                      />
                     </span>
                     <p className="text-xs text-[var(--text-secondary)]">
-                      Add ! before or after a task title to set it due today (e.g. "buy groceries !" or "! buy groceries")
+                      {t('settings.parser.exclamationNote')}
                     </p>
                   </div>
                 </label>
@@ -791,13 +810,13 @@ export function SettingsView() {
         </div>
 
         {saveStatus === 'saving' && (
-          <p className="text-xs text-[var(--text-secondary)]">Saving...</p>
+          <p className="text-xs text-[var(--text-secondary)]">{t('settings.save.saving')}</p>
         )}
         {saveStatus === 'saved' && (
-          <p className="text-xs text-status-done">Settings saved</p>
+          <p className="text-xs text-status-done">{t('settings.save.saved')}</p>
         )}
         {saveStatus === 'error' && (
-          <p className="text-xs text-danger">Settings could not be saved. Your changes are kept and are saved again with the next change.</p>
+          <p className="text-xs text-danger">{t('settings.save.failedNote')}</p>
         )}
       </div>
       ) : activeTab === 'integrations' ? (
@@ -831,13 +850,13 @@ export function SettingsView() {
         )}
 
         {saveStatus === 'saving' && (
-          <p className="text-xs text-[var(--text-secondary)]">Saving...</p>
+          <p className="text-xs text-[var(--text-secondary)]">{t('settings.save.saving')}</p>
         )}
         {saveStatus === 'saved' && (
-          <p className="text-xs text-status-done">Settings saved</p>
+          <p className="text-xs text-status-done">{t('settings.save.saved')}</p>
         )}
         {saveStatus === 'error' && (
-          <p className="text-xs text-danger">Settings could not be saved. Your changes are kept and are saved again with the next change.</p>
+          <p className="text-xs text-danger">{t('settings.save.failedNote')}</p>
         )}
       </div>
       ) : null}

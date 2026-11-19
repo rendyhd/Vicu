@@ -1,4 +1,5 @@
 import { useRef, useState, useCallback, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { formatAcceleratorForDisplay, keyEventToAccelerator } from '@/lib/accelerator'
 
 const isMacRenderer = window.api.platform === 'darwin'
@@ -16,7 +17,8 @@ interface HotkeyRecorderProps {
   onClear?: () => void
 }
 
-export function HotkeyRecorder({ value, onChange, defaultValue, warning, label = 'Hotkey', emptyText = '', onClear }: HotkeyRecorderProps) {
+export function HotkeyRecorder({ value, onChange, defaultValue, warning, label, emptyText = '', onClear }: HotkeyRecorderProps) {
+  const { t } = useTranslation()
   const [recording, setRecording] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const prevValueRef = useRef(value)
@@ -68,10 +70,10 @@ export function HotkeyRecorder({ value, onChange, defaultValue, warning, label =
         ref={inputRef}
         type="text"
         data-hotkey-recorder=""
-        aria-label={label}
+        aria-label={label ?? t('settings.hotkey.label')}
         readOnly
         value={recording ? '' : value ? formatAcceleratorForDisplay(value, isMacRenderer) : emptyText}
-        placeholder={recording ? 'Press keys...' : undefined}
+        placeholder={recording ? t('settings.hotkey.pressKeys') : undefined}
         className={`flex-1 rounded-control border px-3 py-2 text-sm ${
           warning
             ? 'border-status-today bg-[var(--bg-secondary)] text-[var(--text-primary)]'
@@ -87,7 +89,7 @@ export function HotkeyRecorder({ value, onChange, defaultValue, warning, label =
             : 'border-[var(--border-color)] bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]'
         }`}
       >
-        {recording ? 'Press keys...' : 'Record'}
+        {recording ? t('settings.hotkey.pressKeys') : t('settings.hotkey.record')}
       </button>
       {onClear && value && !recording && (
         <button
@@ -95,7 +97,7 @@ export function HotkeyRecorder({ value, onChange, defaultValue, warning, label =
           onClick={onClear}
           className="shrink-0 rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-xs font-medium text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
         >
-          Clear
+          {t('settings.hotkey.clear')}
         </button>
       )}
     </div>

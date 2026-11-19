@@ -1,5 +1,6 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
+import { Trans, useTranslation } from 'react-i18next'
 import { CheckCircle2, Download, Loader2, Pause, Trash2, XCircle } from 'lucide-react'
 import { Button } from '@/components/shared/Button'
 import { Switch } from '@/components/shared/Switch'
@@ -34,19 +35,36 @@ import {
   untestedModels,
   type ModelFeature,
 } from '../../../shared/ai/settings'
+import type { TranslationKey } from '../../../shared/i18n'
 import type { AiSettingsPatch, AiSettingsView, ConnectionTestResult, SpeechDownloadProgress } from '../../../shared/ai/types'
 
 const CARD = 'rounded-card border border-[var(--border-color)] bg-[var(--bg-primary)] p-5'
 const INPUT = 'w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]'
 const LABEL = 'mb-1 block text-xs text-[var(--text-secondary)]'
 
-const LANGUAGES: Array<[string, string]> = [
-  ['auto', 'Detect per phrase'], ['en', 'English'], ['nl', 'Dutch'], ['de', 'German'], ['fr', 'French'], ['es', 'Spanish'],
-  ['it', 'Italian'], ['pt', 'Portuguese'], ['sv', 'Swedish'], ['da', 'Danish'], ['pl', 'Polish'], ['cs', 'Czech'],
-  ['fi', 'Finnish'], ['ja', 'Japanese'], ['zh', 'Chinese'], ['ko', 'Korean'], ['ru', 'Russian'], ['uk', 'Ukrainian'],
+const LANGUAGES: Array<[string, TranslationKey]> = [
+  ['auto', 'settings.assistant.languages.auto'],
+  ['en', 'settings.assistant.languages.en'],
+  ['nl', 'settings.assistant.languages.nl'],
+  ['de', 'settings.assistant.languages.de'],
+  ['fr', 'settings.assistant.languages.fr'],
+  ['es', 'settings.assistant.languages.es'],
+  ['it', 'settings.assistant.languages.it'],
+  ['pt', 'settings.assistant.languages.pt'],
+  ['sv', 'settings.assistant.languages.sv'],
+  ['da', 'settings.assistant.languages.da'],
+  ['pl', 'settings.assistant.languages.pl'],
+  ['cs', 'settings.assistant.languages.cs'],
+  ['fi', 'settings.assistant.languages.fi'],
+  ['ja', 'settings.assistant.languages.ja'],
+  ['zh', 'settings.assistant.languages.zh'],
+  ['ko', 'settings.assistant.languages.ko'],
+  ['ru', 'settings.assistant.languages.ru'],
+  ['uk', 'settings.assistant.languages.uk'],
 ]
 
 function formatBytes(bytes: number): string {
+  // i18n-ignore: unit symbols
   if (bytes >= 1e9) return `${(bytes / 1e9).toFixed(1)} GB`
   return `${Math.round(bytes / 1e6)} MB`
 }
@@ -99,6 +117,7 @@ interface ModelTests {
 
 /** Test connection for Settings: one run per model at a time, the results kept for the cards. */
 function useModelTests(settings: AiSettingsView | undefined): ModelTests {
+  const { t } = useTranslation()
   const save = useSaveAiSettings()
   const qc = useQueryClient()
   const [testing, setTesting] = useState<ReadonlySet<string>>(new Set())
@@ -113,7 +132,7 @@ function useModelTests(settings: AiSettingsView | undefined): ModelTests {
     if (current) return current
     const promise = window.api.ai.testConnection(model)
       .then((result): TestOutcome => (result.success ? result.data : result.error.message))
-      .catch((err: unknown): TestOutcome => (err instanceof Error ? err.message : 'The test failed.'))
+      .catch((err: unknown): TestOutcome => (err instanceof Error ? err.message : t('settings.assistant.testFailed')))
       .then(async (outcome) => {
         running.current.delete(model)
         setTesting(new Set(running.current.keys()))
@@ -155,7 +174,7 @@ function useModelTests(settings: AiSettingsView | undefined): ModelTests {
   const consentDialog = (
     <ConsentDialog
       open={consent !== null}
-      providerName={preset?.name ?? 'the provider'}
+      providerName={preset?.name ?? t('settings.assistant.consent.theProvider')}
       onCancel={() => {
         consent?.cancel()
         ask(null)
@@ -184,6 +203,7 @@ function useModelTests(settings: AiSettingsView | undefined): ModelTests {
 }
 
 function ThinkingCard({ settings, tests }: { settings: AiSettingsView; tests: ModelTests }) {
+  const { t } = useTranslation()
   const save = useSaveAiSettings()
   const qc = useQueryClient()
   const preset = settings.provider ? providerPreset(settings.provider) : undefined
@@ -201,30 +221,30 @@ function ThinkingCard({ settings, tests }: { settings: AiSettingsView; tests: Mo
     const view = await window.api.ai.setKey(value)
     qc.setQueryData(AI_SETTINGS_QUERY_KEY, view)
     setKey('')
-    toast.success(value ? 'Key saved' : 'Key removed')
+    toast.success(value ? t('settings.assistant.thinking.keySaved') : t('settings.assistant.thinking.keyRemoved'))
     if (value) tests.testUntested(view)
   }
 
 
   return (
     <section className={CARD} aria-labelledby="ai-provider-heading">
-      <h2 id="ai-provider-heading" className="mb-1 text-sm font-semibold text-[var(--text-primary)]">Thinking</h2>
+      <h2 id="ai-provider-heading" className="mb-1 text-sm font-semibold text-[var(--text-primary)]">{t('settings.assistant.thinking.title')}</h2>
       <p className="text-xs text-[var(--text-primary)]">
-        The model that turns your words into tasks and answers your questions. It runs at your provider.
+        {t('settings.assistant.thinking.intro')}
       </p>
       <p className="mb-4 mt-1 text-xs text-[var(--text-secondary)]">
-        Requests go straight from this computer to the provider you choose, with your key; Vicu has no server in between and shows no prices.
+        {t('settings.assistant.thinking.requests')}
       </p>
       <div className="space-y-3">
         <div>
-          <label className={LABEL} htmlFor="ai-provider">Provider</label>
+          <label className={LABEL} htmlFor="ai-provider">{t('settings.assistant.thinking.provider')}</label>
           <select
             id="ai-provider"
             value={settings.provider ?? ''}
             onChange={(e) => void chooseProvider(e.target.value)}
             className="rounded-control border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-1.5 text-sm text-[var(--text-primary)]"
           >
-            <option value="">Off</option>
+            <option value="">{t('settings.assistant.thinking.off')}</option>
             {PROVIDER_PRESETS.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
         </div>
@@ -235,7 +255,7 @@ function ThinkingCard({ settings, tests }: { settings: AiSettingsView; tests: Mo
               <TypedAddress key={settings.provider} settings={settings} tests={tests} />
             ) : (
               <div>
-                <label className={LABEL} htmlFor="ai-address">Address</label>
+                <label className={LABEL} htmlFor="ai-address">{t('settings.assistant.address')}</label>
                 <input
                   id="ai-address"
                   type="url"
@@ -248,7 +268,7 @@ function ThinkingCard({ settings, tests }: { settings: AiSettingsView; tests: Mo
 
             <div>
               <label className={LABEL} htmlFor="ai-key">
-                Key {preset.key === 'optional' ? '(optional)' : ''}
+                {preset.key === 'optional' ? t('settings.assistant.thinking.keyOptional') : t('settings.assistant.thinking.key')}
               </label>
               <div className="flex gap-2">
                 <div className="relative flex-1">
@@ -257,7 +277,7 @@ function ThinkingCard({ settings, tests }: { settings: AiSettingsView; tests: Mo
                     type={showKey ? 'text' : 'password'}
                     value={key}
                     autoComplete="off"
-                    placeholder={settings.hasKey ? 'A key is saved. Paste a new one to replace it.' : 'Paste your key'}
+                    placeholder={settings.hasKey ? t('settings.assistant.thinking.keyPlaceholderSaved') : t('settings.assistant.thinking.keyPlaceholder')}
                     onChange={(e) => setKey(e.target.value)}
                     className={cn(INPUT, 'pr-16')}
                   />
@@ -266,14 +286,14 @@ function ThinkingCard({ settings, tests }: { settings: AiSettingsView; tests: Mo
                     onClick={() => setShowKey(!showKey)}
                     className="absolute right-2 top-1/2 inline-flex min-h-6 -translate-y-1/2 items-center rounded-control px-2 py-0.5 text-meta text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                   >
-                    {showKey ? 'Hide' : 'Show'}
+                    {showKey ? t('settings.assistant.thinking.hide') : t('settings.assistant.thinking.show')}
                   </button>
                 </div>
-                <Button variant="secondary" disabled={!key.trim()} onClick={() => void saveKey(key)}>Save key</Button>
-                {settings.hasKey && <Button variant="quiet" danger onClick={() => void saveKey(null)}>Remove</Button>}
+                <Button variant="secondary" disabled={!key.trim()} onClick={() => void saveKey(key)}>{t('settings.assistant.thinking.saveKey')}</Button>
+                {settings.hasKey && <Button variant="quiet" danger onClick={() => void saveKey(null)}>{t('settings.assistant.remove')}</Button>}
               </div>
               <p className="mt-1 text-xs text-[var(--text-secondary)]">
-                Kept in this computer’s secret store, like your Vikunja sign-in. It is never synced or shown again.
+                {t('settings.assistant.thinking.keyNote')}
               </p>
               <SecretStorageNotice subject="key" />
             </div>
@@ -287,10 +307,11 @@ function ThinkingCard({ settings, tests }: { settings: AiSettingsView; tests: Mo
 }
 
 function CleartextWarning({ address }: { address: string }) {
+  const { t } = useTranslation()
   if (!isCleartextToRemoteHost(address)) return null
   return (
     <p className="mt-1 text-xs text-danger" role="alert">
-      This address is not encrypted (http) and is outside your local network: your key and what you send can be read on the way. Use https.
+      {t('settings.assistant.cleartext')}
     </p>
   )
 }
@@ -300,6 +321,7 @@ function CleartextWarning({ address }: { address: string }) {
  * addresses are listed to pick or remove; Add address saves another one next to it.
  */
 function TypedAddress({ settings, tests }: { settings: AiSettingsView; tests: ModelTests }) {
+  const { t } = useTranslation()
   const qc = useQueryClient()
   const current = effectiveAddress(settings)
   const saved = savedAddressesOf(settings)
@@ -330,12 +352,13 @@ function TypedAddress({ settings, tests }: { settings: AiSettingsView; tests: Mo
   if (editing) {
     return (
       <div>
-        <label className={LABEL} htmlFor="ai-address">{editing === 'add' ? 'New address' : 'Address'}</label>
+        <label className={LABEL} htmlFor="ai-address">{editing === 'add' ? t('settings.assistant.typed.newAddress') : t('settings.assistant.address')}</label>
         <div className="flex gap-2">
           <input
             id="ai-address"
             type="url"
             value={draft}
+            // i18n-ignore: an address example
             placeholder="http://192.168.1.10:1234/v1"
             aria-describedby={helpId}
             autoFocus={mode !== null}
@@ -346,8 +369,8 @@ function TypedAddress({ settings, tests }: { settings: AiSettingsView; tests: Mo
             }}
             className={cn(INPUT, 'flex-1')}
           />
-          <Button variant="secondary" disabled={!draft.trim()} onClick={() => void submit()}>Save address</Button>
-          {current && <Button variant="quiet" onClick={() => setMode(null)}>Cancel</Button>}
+          <Button variant="secondary" disabled={!draft.trim()} onClick={() => void submit()}>{t('settings.assistant.typed.saveAddress')}</Button>
+          {current && <Button variant="quiet" onClick={() => setMode(null)}>{t('settings.assistant.cancel')}</Button>}
         </div>
         <p id={helpId} className="mt-1 text-xs text-[var(--text-secondary)]">{AI_MESSAGES.addressHelp}</p>
         <CleartextWarning address={draft} />
@@ -357,16 +380,16 @@ function TypedAddress({ settings, tests }: { settings: AiSettingsView; tests: Mo
 
   return (
     <div>
-      <p className={LABEL}>Address</p>
+      <p className={LABEL}>{t('settings.assistant.address')}</p>
       <div className="flex items-center gap-2">
         <span className="min-w-0 flex-1 truncate text-sm text-[var(--text-primary)]" title={current}>{current}</span>
-        <Button variant="secondary" onClick={() => start('edit')}>Edit</Button>
-        <Button variant="quiet" onClick={() => start('add')}>Add address</Button>
+        <Button variant="secondary" onClick={() => start('edit')}>{t('settings.assistant.typed.edit')}</Button>
+        <Button variant="quiet" onClick={() => start('add')}>{t('settings.assistant.typed.addAddress')}</Button>
       </div>
       <CleartextWarning address={current} />
       {saved.length > 1 && (
         <div className="mt-2">
-          <p className="text-xs text-[var(--text-secondary)]">Saved addresses</p>
+          <p className="text-xs text-[var(--text-secondary)]">{t('settings.assistant.typed.savedAddresses')}</p>
           <ul className="mt-1 space-y-1">
             {saved.map((entry) => {
               const inUse = sameAddress(entry.address, current)
@@ -384,10 +407,10 @@ function TypedAddress({ settings, tests }: { settings: AiSettingsView; tests: Mo
                   >
                     {entry.address}
                     {entry.models.dictation && <span className="text-[var(--text-secondary)]"> · {entry.models.dictation}</span>}
-                    {inUse && <span className="text-[var(--text-secondary)]"> · in use</span>}
+                    {inUse && <span className="text-[var(--text-secondary)]"> · {t('settings.assistant.typed.inUse')}</span>}
                   </button>
                   {!inUse && (
-                    <Button variant="quiet" aria-label={`Remove ${entry.address}`} onClick={() => void remove(entry.address)}>Remove</Button>
+                    <Button variant="quiet" aria-label={t('settings.assistant.typed.removeAddress', { address: entry.address })} onClick={() => void remove(entry.address)}>{t('settings.assistant.remove')}</Button>
                   )}
                 </li>
               )
@@ -405,6 +428,7 @@ function TypedAddress({ settings, tests }: { settings: AiSettingsView; tests: Mo
  * off gives Ask the main model again. A saved model without a test result is tested at once.
  */
 function ModelFields({ settings, tests }: { settings: AiSettingsView; tests: ModelTests }) {
+  const { t, i18n } = useTranslation()
   const save = useSaveAiSettings()
   const preset = settings.provider ? providerPreset(settings.provider) : undefined
   const [models, setModels] = useState<string[] | null>(null)
@@ -458,57 +482,57 @@ function ModelFields({ settings, tests }: { settings: AiSettingsView; tests: Mod
     <div className="space-y-3 border-t border-[var(--border-color)] pt-3">
       <div className="flex items-center gap-2">
         <Button variant="secondary" disabled={!setUp || loadingModels} onClick={loadModels}>
-          {loadingModels ? 'Loading…' : 'Load models'}
+          {loadingModels ? t('settings.assistant.model.loading') : t('settings.assistant.model.load')}
         </Button>
-        {models && <span className="text-xs text-[var(--text-secondary)]">{models.length} models</span>}
-        {modelError && <span className="text-xs text-danger">{modelError} You can still type a model name.</span>}
+        {models && <span className="text-xs text-[var(--text-secondary)]">{t('settings.assistant.model.count', { count: models.length })}</span>}
+        {modelError && <span className="text-xs text-danger">{t('settings.assistant.model.loadError', { error: modelError })}</span>}
       </div>
       <datalist id={listId}>{(models ?? []).map((m) => <option key={m} value={m} />)}</datalist>
       <div>
-        <label className={LABEL} htmlFor="ai-model">Model</label>
+        <label className={LABEL} htmlFor="ai-model">{t('settings.assistant.model.model')}</label>
         <input
           id="ai-model"
           list={listId}
           value={mainModel}
-          placeholder={preset.suggested.dictation ?? preset.suggested.ask ?? 'Model name'}
+          placeholder={preset.suggested.dictation ?? preset.suggested.ask ?? t('settings.assistant.model.modelName')}
           onChange={(e) => setMainModel(e.target.value)}
           onBlur={saveMain}
           className={INPUT}
         />
         <p className="mt-1 text-xs text-[var(--text-secondary)]">
-          {separate ? 'Used for smart dictation.' : 'Used for smart dictation, Ask and Talk.'}
+          {separate ? t('settings.assistant.model.usedDictation') : t('settings.assistant.model.usedAll')}
         </p>
       </div>
       <label className="flex items-center justify-between gap-4">
-        <span className="text-sm text-[var(--text-primary)]">Use a different model for Ask</span>
+        <span className="text-sm text-[var(--text-primary)]">{t('settings.assistant.model.useDifferent')}</span>
         <Switch checked={separate} onCheckedChange={chooseSeparate} />
       </label>
       {separate && (
         <div>
-          <label className={LABEL} htmlFor="ai-model-ask">Ask model</label>
+          <label className={LABEL} htmlFor="ai-model-ask">{t('settings.assistant.model.askModel')}</label>
           <input
             id="ai-model-ask"
             list={listId}
             value={askModel}
-            placeholder={preset.suggested.ask ?? 'Model name'}
+            placeholder={preset.suggested.ask ?? t('settings.assistant.model.modelName')}
             onChange={(e) => setAskModel(e.target.value)}
             onBlur={() => { if (askModel.trim() !== settings.models.ask) saveModels({ ask: askModel.trim() }) }}
             className={INPUT}
           />
           <p className="mt-1 text-xs text-[var(--text-secondary)]">
-            Used for Ask and Talk.{askSuggestion ? ` Suggested: ${askSuggestion}.` : ''}
+            {askSuggestion ? t('settings.assistant.model.usedAskSuggested', { model: askSuggestion }) : t('settings.assistant.model.usedAsk')}
           </p>
         </div>
       )}
 
       <div>
         <Button variant="primary" disabled={!setUp || testing.length > 0 || shownModels.length === 0} onClick={() => void tests.run(settings, shownModels)}>
-          {testing.length > 0 ? 'Testing…' : 'Test connection'}
+          {testing.length > 0 ? t('settings.assistant.model.testing') : t('settings.assistant.model.test')}
         </Button>
         <p className="mt-1 text-xs text-[var(--text-secondary)]" role="status">
           {!setUp
-            ? (preset.key === 'required' && !settings.hasKey ? 'Save a key first.' : 'Enter an address first.')
-            : testing.length > 0 ? `Testing ${testing.join(' and ')}…` : 'A model is tested by itself once you choose it.'}
+            ? (preset.key === 'required' && !settings.hasKey ? t('settings.assistant.model.saveKeyFirst') : t('settings.assistant.model.enterAddressFirst'))
+            : testing.length > 0 ? t('settings.assistant.model.testingModels', { models: new Intl.ListFormat(i18n.language === 'en' ? 'en-GB' : i18n.language, { type: 'conjunction' }).format(testing) }) : t('settings.assistant.model.autoTest')}
         </p>
         {shownModels.filter((model) => tests.results[model] !== undefined).map((model) => <TestResult key={model} model={model} result={tests.results[model]} />)}
       </div>
@@ -524,6 +548,7 @@ function ModelFields({ settings, tests }: { settings: AiSettingsView; tests: Mod
  * the model.
  */
 function FeaturesCard({ settings, tests }: { settings: AiSettingsView; tests: ModelTests }) {
+  const { t } = useTranslation()
   const save = useSaveAiSettings()
   const ready = useAiReady()
   const preset = settings.provider ? providerPreset(settings.provider) : undefined
@@ -536,9 +561,9 @@ function FeaturesCard({ settings, tests }: { settings: AiSettingsView; tests: Mo
     const result = model ? tests.results[model] : undefined
     const can = canRunFeature(feature, caps)
     let blocked: string | null = null
-    if (!preset) blocked = 'Choose a provider under Thinking first.'
-    else if (!setUp) blocked = preset.key === 'required' && !settings.hasKey ? 'Save a key under Thinking first.' : 'Enter an address under Thinking first.'
-    else if (!model) blocked = 'Choose a model under Thinking first.'
+    if (!preset) blocked = t('settings.assistant.features.blockedProvider')
+    else if (!setUp) blocked = preset.key === 'required' && !settings.hasKey ? t('settings.assistant.features.blockedKey') : t('settings.assistant.features.blockedAddress')
+    else if (!model) blocked = t('settings.assistant.features.blockedModel')
     const testing = model !== '' && tests.testing.has(model)
     let problem: string | null = null
     if (!blocked && !testing) {
@@ -563,18 +588,18 @@ function FeaturesCard({ settings, tests }: { settings: AiSettingsView; tests: Mo
 
   const dictation = stateOf('dictation')
   const ask = stateOf('ask')
-  const talkBlocked = ask.blocked ?? (!settings.features.ask || !ask.can ? 'Turn on Ask first.' : null)
+  const talkBlocked = ask.blocked ?? (!settings.features.ask || !ask.can ? t('settings.assistant.features.turnOnAsk') : null)
 
   return (
     <section className={CARD} aria-labelledby="ai-features-heading">
-      <h2 id="ai-features-heading" className="mb-1 text-sm font-semibold text-[var(--text-primary)]">Features</h2>
+      <h2 id="ai-features-heading" className="mb-1 text-sm font-semibold text-[var(--text-primary)]">{t('settings.assistant.features.title')}</h2>
       <p className="mb-3 text-xs text-[var(--text-secondary)]">
-        Holding + (or the voice shortcut) and letting go always adds one task at once, without the model.
+        {t('settings.assistant.features.intro')}
       </p>
       <div className="space-y-3">
         <FeatureRow
-          label="Smart dictation"
-          how="Tap the voice shortcut, or hold + and slide up to the sparkle, then keep talking: tasks appear as cards while you talk. Also Break into steps (right-click a task) and Make tasks from text (command palette)."
+          label={t('settings.assistant.features.dictation')}
+          how={t('settings.assistant.features.dictationHow')}
           blocked={dictation.blocked}
           testing={dictation.testing ? dictation.model : null}
           problem={dictation.problem}
@@ -583,16 +608,16 @@ function FeaturesCard({ settings, tests }: { settings: AiSettingsView; tests: Mo
           onTry={ready.dictation ? () => useDictationStore.getState().startLive() : null}
         />
         <FeatureRow
-          label="Brain dump"
-          how="Slide up from a held + or tap the voice shortcut, then turn on Brain dump in the sheet (or choose Brain dump in the command palette). Talk or type as long as you like; Organize sorts it all into projects, subprojects, tasks, subtasks and notes for you to check."
-          blocked={dictation.blocked ?? (!settings.features.dictation || !dictation.can ? 'Turn on Smart dictation first.' : null)}
+          label={t('settings.assistant.features.brainDump')}
+          how={t('settings.assistant.features.brainDumpHow')}
+          blocked={dictation.blocked ?? (!settings.features.dictation || !dictation.can ? t('settings.assistant.features.turnOnDictation') : null)}
           testing={null}
           problem={null}
           onTry={ready.dictation ? () => useDictationStore.getState().startLive({ brainDump: true }) : null}
         />
         <FeatureRow
-          label="Ask"
-          how={`Press the Ask button next to Search, or ${askKeys}. Changes are proposed on cards you apply.`}
+          label={t('settings.assistant.features.ask')}
+          how={t('settings.assistant.features.askHow', { keys: askKeys })}
           blocked={ask.blocked}
           testing={ask.testing ? ask.model : null}
           problem={ask.problem}
@@ -601,8 +626,8 @@ function FeaturesCard({ settings, tests }: { settings: AiSettingsView; tests: Mo
           onTry={ready.ask ? () => useAskStore.getState().setOpen(true) : null}
         />
         <FeatureRow
-          label="Talk"
-          how="Turn on the microphone in Ask and just talk; answers are read aloud and it keeps listening."
+          label={t('settings.assistant.features.talk')}
+          how={t('settings.assistant.features.talkHow')}
           blocked={talkBlocked}
           testing={null}
           problem={null}
@@ -632,6 +657,7 @@ interface FeatureRowProps {
 }
 
 function FeatureRow({ label, how, blocked, testing, problem, checked, onChange, onTry }: FeatureRowProps) {
+  const { t } = useTranslation()
   return (
     <div className="flex items-start justify-between gap-4" data-feature={label}>
       <div className="min-w-0">
@@ -639,12 +665,12 @@ function FeatureRow({ label, how, blocked, testing, problem, checked, onChange, 
         <p className="text-xs text-[var(--text-secondary)]">{how}</p>
         <p role="status" className={cn('text-xs', problem && !testing && !blocked ? 'text-danger' : 'text-[var(--text-secondary)]')}>
           {testing ? (
-            <span className="inline-flex items-center gap-1"><Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" /> Testing {testing}…</span>
+            <span className="inline-flex items-center gap-1"><Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" /> {t('settings.assistant.features.testing', { model: testing })}</span>
           ) : blocked ?? problem}
         </p>
       </div>
       <div className="flex shrink-0 items-center gap-2">
-        {onTry && <Button variant="secondary" aria-label={`Try ${label}`} onClick={onTry}>Try it</Button>}
+        {onTry && <Button variant="secondary" aria-label={t('settings.assistant.features.tryLabel', { label })} onClick={onTry}>{t('settings.assistant.features.tryIt')}</Button>}
         {onChange && <Switch aria-label={label} checked={checked === true} disabled={blocked !== null || testing !== null} onCheckedChange={onChange} />}
       </div>
     </div>
@@ -652,24 +678,25 @@ function FeatureRow({ label, how, blocked, testing, problem, checked, onChange, 
 }
 
 function TestResult({ model, result }: { model: string; result: ConnectionTestResult | string }) {
+  const { t, i18n } = useTranslation()
   if (typeof result === 'string') return <p className="mt-2 text-xs text-danger">{model}: {result}</p>
   const row = (ok: boolean, text: string) => (
     <li className="flex items-center gap-1.5">
       {ok ? <CheckCircle2 className="h-3.5 w-3.5 text-status-done" aria-hidden="true" /> : <XCircle className="h-3.5 w-3.5 text-danger" aria-hidden="true" />}
-      <span className="sr-only">{ok ? 'Passed:' : 'Failed:'}</span>
+      <span className="sr-only">{ok ? t('settings.assistant.result.passed') : t('settings.assistant.result.failed')}</span>
       {text}
     </li>
   )
-  const features = [result.features.dictation && 'Dictation', result.features.ask && 'Ask', result.features.talk && 'Talk'].filter(Boolean)
+  const features = [result.features.dictation && t('settings.assistant.result.dictation'), result.features.ask && t('settings.assistant.result.ask'), result.features.talk && t('settings.assistant.result.talk')].filter(Boolean) as string[]
   return (
     <div className="mt-2 rounded-control border border-[var(--border-color)] p-3 text-xs text-[var(--text-primary)]">
       <p className="mb-1 font-medium">{model}</p>
       <ul className="space-y-0.5">
-        {row(result.models.ok, result.models.ok ? `Model list (${result.models.count})` : `Model list: ${result.models.error ?? 'not available'}`)}
-        {row(result.structured.ok, result.structured.ok ? `Structured answer (${result.structured.mode === 'prompt' ? 'from the prompt' : 'strict schema'})` : `Structured answer: ${result.structured.error ?? 'failed'}`)}
-        {row(result.tool.ok, result.tool.ok ? 'Tool call' : `Tool call: ${result.tool.error ?? 'failed'}`)}
+        {row(result.models.ok, result.models.ok ? t('settings.assistant.result.modelList', { n: result.models.count }) : t('settings.assistant.result.modelListError', { error: result.models.error ?? t('settings.assistant.result.notAvailable') }))}
+        {row(result.structured.ok, result.structured.ok ? (result.structured.mode === 'prompt' ? t('settings.assistant.result.structuredPrompt') : t('settings.assistant.result.structuredStrict')) : t('settings.assistant.result.structuredError', { error: result.structured.error ?? t('settings.assistant.result.failedShort') }))}
+        {row(result.tool.ok, result.tool.ok ? t('settings.assistant.result.toolCall') : t('settings.assistant.result.toolCallError', { error: result.tool.error ?? t('settings.assistant.result.failedShort') }))}
       </ul>
-      <p className="mt-1 text-[var(--text-secondary)]">{features.length ? `Can run: ${features.join(', ')}` : 'This model can run none of the features.'}</p>
+      <p className="mt-1 text-[var(--text-secondary)]">{features.length ? t('settings.assistant.result.canRun', { features: new Intl.ListFormat(i18n.language === 'en' ? 'en-GB' : i18n.language, { type: 'unit' }).format(features) }) : t('settings.assistant.result.canRunNone')}</p>
       {result.hint && <p className="mt-1 text-[var(--text-secondary)]">{result.hint}</p>}
     </div>
   )
@@ -677,22 +704,23 @@ function TestResult({ model, result }: { model: string; result: ConnectionTestRe
 
 /** What each feature sends (7.1), asked before a cloud provider is first used. */
 function ConsentDialog({ open, providerName, onAgree, onCancel }: { open: boolean; providerName: string; onAgree: () => void; onCancel: () => void }) {
+  const { t } = useTranslation()
   const titleId = useId()
   return (
     <Dialog open={open} onClose={onCancel} labelledBy={titleId} className="w-[480px] max-w-[92vw]">
       <div className="space-y-3 p-5 text-sm text-[var(--text-primary)]">
-        <h2 id={titleId} className="text-card-title">Send data to {providerName}?</h2>
-        <p className="text-xs text-[var(--text-secondary)]">The assistant sends this to {providerName} with your key, and only when you use it:</p>
+        <h2 id={titleId} className="text-card-title">{t('settings.assistant.consent.title', { provider: providerName })}</h2>
+        <p className="text-xs text-[var(--text-secondary)]">{t('settings.assistant.consent.intro', { provider: providerName })}</p>
         <ul className="list-disc space-y-1 pl-5 text-xs">
-          <li><strong>Dictation</strong>: the text of what you said or pasted (never audio), your project, label and place names, the list you are in, and the date, time and time zone.</li>
-          <li><strong>Ask and Talk</strong>: your messages, an overview (counts, project, label and custom list names), and the tasks it looks up, including the names of people in shared projects.</li>
+          <li><Trans i18nKey="settings.assistant.consent.dictation" components={{ strong: <strong /> }} /></li>
+          <li><Trans i18nKey="settings.assistant.consent.ask" components={{ strong: <strong /> }} /></li>
         </ul>
         <p className="text-xs text-[var(--text-secondary)]">
-          Never sent: audio (speech is recognised on this computer), hidden tasks, comment texts, attachments, your Vikunja token, your server address, place positions.
+          {t('settings.assistant.consent.neverSent')}
         </p>
         <div className="flex justify-end gap-2 pt-1">
-          <Button variant="quiet" onClick={onCancel}>Cancel</Button>
-          <Button variant="primary" data-autofocus="" onClick={onAgree}>Agree</Button>
+          <Button variant="quiet" onClick={onCancel}>{t('settings.assistant.cancel')}</Button>
+          <Button variant="primary" data-autofocus="" onClick={onAgree}>{t('settings.assistant.consent.agree')}</Button>
         </div>
       </div>
     </Dialog>
@@ -700,6 +728,7 @@ function ConsentDialog({ open, providerName, onAgree, onCancel }: { open: boolea
 }
 
 function SpeechCard({ settings }: { settings: AiSettingsView }) {
+  const { t } = useTranslation()
   const { data: status } = useSpeechStatus()
   const save = useSaveAiSettings()
   const qc = useQueryClient()
@@ -714,15 +743,15 @@ function SpeechCard({ settings }: { settings: AiSettingsView }) {
 
   return (
     <section className={CARD} aria-labelledby="ai-speech-heading">
-      <h2 id="ai-speech-heading" className="mb-1 text-sm font-semibold text-[var(--text-primary)]">Hearing</h2>
+      <h2 id="ai-speech-heading" className="mb-1 text-sm font-semibold text-[var(--text-primary)]">{t('settings.assistant.speech.title')}</h2>
       <p className="text-xs text-[var(--text-primary)]">
-        Turns your voice into text on this computer; audio never leaves it. Without a downloaded model, the system’s speech recognition is used{window.api.platform === 'linux' ? ' (Linux has none)' : ''}.
+        {window.api.platform === 'linux' ? t('settings.assistant.speech.introLinux') : t('settings.assistant.speech.intro')}
       </p>
       <p className="mb-3 mt-1 text-xs text-[var(--text-secondary)]">
-        Used by every voice feature: quick capture, smart dictation and Talk. Only the text goes to the model under Thinking.
+        {t('settings.assistant.speech.usedBy')}
       </p>
       {status && !status.engine && (
-        <p className="mb-3 text-xs text-danger">Local speech is not part of this build of Vicu.</p>
+        <p className="mb-3 text-xs text-danger">{t('settings.assistant.speech.notInBuild')}</p>
       )}
       <ul className="space-y-2">
         {SPEECH.models.map((model) => {
@@ -736,7 +765,7 @@ function SpeechCard({ settings }: { settings: AiSettingsView }) {
               <input
                 type="radio"
                 name="speech-model"
-                aria-label={`Use ${model.label}`}
+                aria-label={t('settings.assistant.speech.use', { label: model.label })}
                 checked={settings.speech.modelId === model.id}
                 disabled={!state?.downloaded}
                 onChange={() => void save({ speech: { modelId: model.id } }).then(refresh)}
@@ -744,31 +773,31 @@ function SpeechCard({ settings }: { settings: AiSettingsView }) {
               <div className="min-w-0 flex-1">
                 <p className="text-sm text-[var(--text-primary)]">
                   {model.label}
-                  {model.default_for.includes('computer') && <span className="ml-2 text-xs text-accent-blue">Suggested</span>}
-                  {active && <span className="ml-2 text-xs text-status-done">In use</span>}
+                  {model.default_for.includes('computer') && <span className="ml-2 text-xs text-accent-blue">{t('settings.assistant.speech.suggested')}</span>}
+                  {active && <span className="ml-2 text-xs text-status-done">{t('settings.assistant.speech.inUse')}</span>}
                 </p>
                 <p className="text-xs text-[var(--text-secondary)]">
-                  {formatBytes(model.size)} · {model.language_codes ? `${model.language_count} European languages` : `${model.language_count} languages`} · {model.license}
+                  {formatBytes(model.size)} · {model.language_codes ? t('settings.assistant.speech.europeanLanguages', { count: model.language_count }) : t('settings.assistant.speech.languages', { count: model.language_count })} · {model.license}
                   {model.attribution && <> · {model.attribution}</>}
                 </p>
-                {downloading && <p className="text-xs text-[var(--text-secondary)]" role="status">Downloading {Math.round((bytes / model.size) * 100)}%</p>}
-                {!downloading && !state?.downloaded && bytes > 0 && <p className="text-xs text-[var(--text-secondary)]">Paused at {Math.round((bytes / model.size) * 100)}%</p>}
+                {downloading && <p className="text-xs text-[var(--text-secondary)]" role="status">{t('settings.assistant.speech.downloading', { percent: Math.round((bytes / model.size) * 100) })}</p>}
+                {!downloading && !state?.downloaded && bytes > 0 && <p className="text-xs text-[var(--text-secondary)]">{t('settings.assistant.speech.pausedAt', { percent: Math.round((bytes / model.size) * 100) })}</p>}
                 {(live?.error && live.error !== 'Paused.' ? live.error : state?.error) && <p className="text-xs text-danger">{live?.error ?? state?.error}</p>}
               </div>
               {state?.downloaded ? (
-                <Button variant="quiet" danger aria-label={`Delete ${model.label}`} onClick={() => void window.api.speech.deleteModel(model.id).then(refresh).then(() => qc.invalidateQueries({ queryKey: AI_SETTINGS_QUERY_KEY }))}>
-                  <Trash2 className="h-4 w-4" aria-hidden="true" /> Delete
+                <Button variant="quiet" danger aria-label={t('settings.assistant.speech.deleteLabel', { label: model.label })} onClick={() => void window.api.speech.deleteModel(model.id).then(refresh).then(() => qc.invalidateQueries({ queryKey: AI_SETTINGS_QUERY_KEY }))}>
+                  <Trash2 className="h-4 w-4" aria-hidden="true" /> {t('settings.assistant.speech.delete')}
                 </Button>
               ) : downloading ? (
                 <Button variant="secondary" onClick={() => void window.api.speech.cancelDownload(model.id).then(refresh)}>
-                  <Pause className="h-4 w-4" aria-hidden="true" /> Pause
+                  <Pause className="h-4 w-4" aria-hidden="true" /> {t('settings.assistant.speech.pause')}
                 </Button>
               ) : (
                 <Button variant="secondary" disabled={status ? !status.engine : true} onClick={() => {
                   setProgress((current) => ({ ...current, [model.id]: { id: model.id, downloadedBytes: bytes, totalBytes: model.size, done: false } }))
                   void window.api.speech.download(model.id).then(refresh)
                 }}>
-                  {downloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" aria-hidden="true" />} {bytes > 0 ? 'Resume' : 'Download'}
+                  {downloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" aria-hidden="true" />} {bytes > 0 ? t('settings.assistant.speech.resume') : t('settings.assistant.speech.download')}
                 </Button>
               )}
             </li>
@@ -776,34 +805,35 @@ function SpeechCard({ settings }: { settings: AiSettingsView }) {
         })}
       </ul>
       <div className="mt-3">
-        <label className={LABEL} htmlFor="speech-language">Language</label>
+        <label className={LABEL} htmlFor="speech-language">{t('settings.assistant.speech.language')}</label>
         <select
           id="speech-language"
           value={settings.speech.language}
           onChange={(e) => void save({ speech: { language: e.target.value } })}
           className="rounded-control border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-1.5 text-sm text-[var(--text-primary)]"
         >
-          {LANGUAGES.map(([code, name]) => <option key={code} value={code}>{name}</option>)}
+          {LANGUAGES.map(([code, name]) => <option key={code} value={code}>{t(name)}</option>)}
         </select>
-        <p className="mt-1 text-xs text-[var(--text-secondary)]">Parakeet models detect the language themselves.</p>
+        <p className="mt-1 text-xs text-[var(--text-secondary)]">{t('settings.assistant.speech.parakeet')}</p>
       </div>
     </section>
   )
 }
 
 function PrivacyCard() {
+  const { t } = useTranslation()
   const clear = async () => {
     await window.api.ai.saveConversations([])
     useAskStore.setState({ conversations: [], currentId: null })
-    toast.success('Conversations deleted')
+    toast.success(t('settings.assistant.privacy.deleted'))
   }
   return (
     <section className={CARD} aria-labelledby="ai-privacy-heading">
-      <h2 id="ai-privacy-heading" className="mb-1 text-sm font-semibold text-[var(--text-primary)]">Privacy</h2>
+      <h2 id="ai-privacy-heading" className="mb-1 text-sm font-semibold text-[var(--text-primary)]">{t('settings.assistant.privacy.title')}</h2>
       <p className="mb-3 text-xs text-[var(--text-secondary)]">
-        Conversations (the last five) and transcripts kept after a failed request stay on this computer and are deleted when you sign out. The assistant’s settings and key stay with this computer.
+        {t('settings.assistant.privacy.text')}
       </p>
-      <Button variant="secondary" danger onClick={() => void clear()}>Delete conversations</Button>
+      <Button variant="secondary" danger onClick={() => void clear()}>{t('settings.assistant.privacy.delete')}</Button>
     </section>
   )
 }

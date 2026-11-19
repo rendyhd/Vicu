@@ -63,5 +63,802 @@
     "quickEntry": "Quick Entry",
     "quickView": "Quick View",
     "quit": "Quit"
+  },
+  "settings": {
+    "sectionFallback": "Section",
+    "save": {
+      "saving": "Saving...",
+      "saved": "Settings saved",
+      "failedNote": "Settings could not be saved. Your changes are kept and are saved again with the next change.",
+      "failed": "Could not save settings",
+      "failedWithReason": "Could not save settings: {{reason}}"
+    },
+    "connection": {
+      "title": "Connection",
+      "url": "Vikunja URL",
+      "signedInSso": "Signed in via SSO",
+      "signedInAs": "Signed in as {{name}}",
+      "signedIn": "Signed in",
+      "syncing": "Syncing...",
+      "signOut": "Sign Out",
+      "apiToken": "API Token",
+      "tokenPlaceholder": "Enter your API token",
+      "showToken": "Show",
+      "hideToken": "Hide",
+      "savedToken": "Uses the saved token. Paste a new one to replace it.",
+      "testing": "Testing...",
+      "test": "Test Connection",
+      "success": "Connected successfully",
+      "failed": "Connection failed",
+      "notSaved": "Connected, but the connection settings could not be saved. Try again.",
+      "disconnect": "Disconnect"
+    },
+    "appearance": {
+      "title": "Appearance",
+      "theme": "Theme",
+      "themeLight": "Light",
+      "themeDark": "Dark",
+      "themeSystem": "System",
+      "clock": "Clock",
+      "clockSystem": "System",
+      "clock12": "12-hour",
+      "clock24": "24-hour",
+      "clockNote": "System follows your region. Pick 12-hour or 24-hour if your system uses a custom time format. Applies to every Vicu window.",
+      "rows": "Task rows",
+      "rowsCompact": "Compact",
+      "rowsComfortable": "Comfortable",
+      "rowsNote": "Comfortable shows longer titles and a line of notes."
+    },
+    "preferences": {
+      "title": "Preferences",
+      "launchOnStartup": "Launch on startup",
+      "launchOnStartupNote": "(advised for Quick Entry / View)",
+      "startHidden": "Start hidden",
+      "startHiddenMac": "(no window at login)",
+      "startHiddenMinimized": "(starts minimized to the taskbar)",
+      "startHiddenTray": "(no window at login; needs the tray icon)",
+      "confirmDelete": "Confirm before deleting",
+      "subtasks": "Subtasks in task lists",
+      "subtasksNote": "Keep them in task details, or expand them below the parent.",
+      "subtasksInside": "Inside task",
+      "subtasksExpandable": "Expandable",
+      "badge": "Show today & overdue count on app icon",
+      "badgeMacNote": "macOS shows the count only while Vicu may send notifications with badges.",
+      "notificationSettings": "Notification settings",
+      "urgent": "What does urgent mean?",
+      "urgentToday": "Schedule for Today",
+      "urgentImportant": "Mark Important",
+      "urgentNote": "Sets what the top action in a task’s right-click menu does."
+    },
+    "parser": {
+      "title": "Task Parser",
+      "parse": "Parse task metadata from text",
+      "parseNote": "Extract labels, projects, priority, dates, and recurrence from your input",
+      "syntaxMode": "Syntax Mode",
+      "todoistNote": "Familiar Todoist-style prefixes",
+      "vikunjaNote": "Native Vikunja-style prefixes",
+      "exclamation": "<mark>!</mark> in task title sets due date to today",
+      "exclamationNote": "Add ! before or after a task title to set it due today (e.g. \"buy groceries !\" or \"! buy groceries\")"
+    },
+    "quickEntry": {
+      "title": "Quick Entry & Quick View",
+      "hotkey": "Hotkey",
+      "enableEntry": "Enable Quick Entry",
+      "enableView": "Enable Quick View",
+      "hotkeyFailure": {
+        "linux": "Failed to register. On Wayland, Electron binds shortcuts through the desktop portal — accept the consent dialog if prompted, or use the workaround below.",
+        "other": "Failed to register — hotkey may be in use by another application"
+      },
+      "wayland": {
+        "title": "Wayland: global hotkey registration failed",
+        "intro": "On Wayland, Vicu uses the GlobalShortcuts portal. If a consent dialog appeared, accept it and try again. If registration still fails, bind a shortcut in your desktop environment that runs Vicu with a command-line flag:",
+        "step1": "Open <gnome>Settings → Keyboard → Custom Shortcuts</gnome> (GNOME) or <kde>System Settings → Shortcuts → Custom Shortcuts</kde> (KDE).",
+        "step2": "Add a new shortcut. Paste the command below as the <field>Command</field>.",
+        "step3": "Set the key combo (e.g. <combo>Alt+Shift+V</combo>).",
+        "step4": "Keep Vicu running in the tray — the shortcut wakes the running instance.",
+        "loading": "Loading command…",
+        "devNotice": "<notice>Dev build notice:</notice> the command below points at the unpackaged source tree and won't work outside this dev session. Use this feature from the installed AppImage for real keybinds.",
+        "entryCommand": "Quick Entry command:",
+        "viewCommand": "Quick View command:",
+        "copy": "Copy",
+        "copied": "Copied"
+      },
+      "entry": {
+        "title": "Quick Entry",
+        "hotkeyLabel": "Quick Entry hotkey",
+        "defaultProject": {
+          "label": "Default Project",
+          "aria": "Default project",
+          "placeholder": "Select a project...",
+          "archived": "The saved default project is archived. Quick Entry will use an active fallback until you choose another project."
+        },
+        "secondary": {
+          "label": "Secondary Projects (cycle with modifier + arrow keys)",
+          "remove": "Remove",
+          "archivedHidden_one": "{{count}} archived project hidden from the project cycle.",
+          "archivedHidden_other": "{{count}} archived projects hidden from the project cycle.",
+          "addAria": "Add a project to the cycle",
+          "addPlaceholder": "Add a project..."
+        },
+        "modifier": {
+          "label": "Project Cycle Modifier"
+        }
+      },
+      "view": {
+        "title": "Quick View",
+        "hotkeyLabel": "Quick View hotkey",
+        "list": {
+          "label": "List",
+          "aria": "List",
+          "allProjects": "All projects",
+          "views": "Views",
+          "today": "Today",
+          "upcoming": "Upcoming",
+          "anytime": "Anytime",
+          "projects": "Projects",
+          "lists": "Lists",
+          "archived": "The saved project is archived. Quick View will omit it until you select an active project or restore it."
+        },
+        "includeToday": "Include tasks due today from all projects"
+      }
+    },
+    "browser": {
+      "title": "Browser Integration",
+      "titleDisabled": "Browser Integration (requires Quick Entry)",
+      "reRegisterHint": "Then click “Re-register Bridge” above",
+      "pageLinking": {
+        "label": "Page Linking",
+        "off": "Off",
+        "ask": "Ask ({{shortcut}})",
+        "always": "Always auto-link"
+      },
+      "extensionId": {
+        "label": "Chrome Extension ID (optional)",
+        "placeholder": "For instant detection — leave blank to use auto-detect"
+      },
+      "bridge": {
+        "chromeRegistered": "Chrome bridge: Registered",
+        "chromeNotRegistered": "Chrome bridge: Not registered",
+        "firefoxRegistered": "Firefox bridge: Registered",
+        "firefoxNotRegistered": "Firefox bridge: Not registered",
+        "registering": "Registering...",
+        "reRegister": "Re-register Bridge"
+      },
+      "setup": {
+        "toggle": "How to set up {{arrow}}",
+        "howItWorks": "How it works",
+        "introMac": "Vicu reads the URL from the active browser tab using AppleScript when Quick Entry opens. This works with Chrome, Safari, Edge, Brave, Opera, Vivaldi, and Arc. Firefox has limited support. Browser extensions provide instant (<1ms) detection; without them Vicu falls back to AppleScript (~300ms).",
+        "introOther": "Vicu automatically reads the URL bar from the active browser window when Quick Entry opens. This works with Chrome, Firefox, Edge, Brave, Opera, and Vivaldi. Browser extensions provide instant (<1ms) detection; without them Vicu falls back to Windows accessibility APIs (~300ms).",
+        "macNoSetup": "No setup needed for Chrome, Safari, Edge, Brave, Vivaldi, and Arc. On first use, macOS will ask you to allow Vicu to control the browser.",
+        "hint": "Open Quick Entry while a browser tab is active to see the link hint."
+      },
+      "firefox": {
+        "title": "Firefox (extension for instant detection)",
+        "macWarning": "Firefox fallback detection via AppleScript is unreliable on macOS. Installing the extension is strongly recommended for Firefox support.",
+        "step1": "Open the <folder>extensions/browser</folder> folder and locate the <code>.xpi</code> file",
+        "step2": "Open Firefox and go to <code>about:addons</code>",
+        "step3": "Click the gear icon → “Install Add-on From File…”",
+        "step4": "Select the <code>.xpi</code> file and click “Add”"
+      },
+      "chrome": {
+        "title": "Chrome (optional extension for instant detection)",
+        "intro": "Chrome works without the extension, but installing it provides instant (<1ms) detection instead of the ~300ms fallback.",
+        "step1": "Open <code>chrome://extensions</code>",
+        "step2": "Enable “Developer mode” (top-right toggle)",
+        "step3": "Click “Load unpacked” → select the <folder>extensions/browser</folder> folder",
+        "step4": "Copy the Extension ID shown on the card and paste it in the field above"
+      },
+      "others": {
+        "titleMac": "Safari, Arc, Edge, Brave, Opera, Vivaldi",
+        "titleOther": "Edge, Brave, Opera, Vivaldi",
+        "autoMac": "No setup needed. Vicu detects URLs automatically via AppleScript.",
+        "autoOther": "No setup needed. Vicu detects URLs automatically via accessibility APIs."
+      }
+    },
+    "obsidian": {
+      "title": "Obsidian Integration",
+      "titleDisabled": "Obsidian Integration (requires Quick Entry)",
+      "noteLinking": {
+        "label": "Note Linking",
+        "off": "Off",
+        "ask": "Ask ({{shortcut}})",
+        "always": "Always auto-link"
+      },
+      "setup": {
+        "toggle": "How to set up Obsidian {{arrow}}",
+        "rest": {
+          "title": "<name>1. Local REST API</name> (by Adam Coddington)",
+          "step1": "Open Obsidian → Settings (gear icon, bottom-left) → Community Plugins → Browse",
+          "step2": "Search “Local REST API” → Install → Enable",
+          "step3": "Go back to Settings → scroll to “Local REST API” under Community Plugins",
+          "step4": "The API Key is shown at the top of the plugin's settings panel — click the copy button and paste it below",
+          "step5": "Leave all other settings at their defaults (HTTPS on port 27124)"
+        },
+        "uri": {
+          "title": "<name>2. Advanced URI</name> (by Vinzent03)",
+          "step1": "Same steps — search “Advanced URI” in Community Plugins → Install → Enable",
+          "step2": "In the plugin settings, turn on “Use UID instead of file paths”",
+          "step3": "This makes note links survive file renames. All other settings can stay at their defaults.",
+          "step4": "Vicu adds a <prop>uid</prop> property to a note only when you save a task linked to it; notes you do not link are never changed."
+        },
+        "done": "Once both plugins are enabled and Obsidian is running, click Test Connection below to verify."
+      },
+      "apiKey": {
+        "label": "API Key",
+        "placeholder": "Obsidian > Settings > Local REST API > Copy API Key",
+        "hide": "Hide",
+        "show": "Show"
+      },
+      "vaultName": {
+        "label": "Vault Name",
+        "placeholder": "Shown in Obsidian's title bar"
+      },
+      "port": {
+        "label": "Port"
+      },
+      "test": {
+        "button": "Test Connection",
+        "testing": "Testing...",
+        "connected": "Connected",
+        "failed": "Connection failed"
+      }
+    },
+    "secretNotice": {
+      "keyPlaintext": "The key is not encrypted",
+      "keyObfuscated": "The key is obfuscated, not encrypted",
+      "tokenPlaintext": "Sign-in token is not encrypted",
+      "tokenObfuscated": "Sign-in token is obfuscated, not encrypted",
+      "keyPlaintextBody": "This system does not offer secure storage to Vicu, so your provider key is saved as plain text in Vicu's data folder. Anyone who can read your user profile can read it. Only the file's permissions protect it.",
+      "tokenPlaintextBody": "This system does not offer secure storage to Vicu, so your sign-in token is saved as plain text in Vicu's data folder. Anyone who can read your user profile can read it. Only the file's permissions protect it.",
+      "keyObfuscatedBody": "Your provider key is saved in a file in Vicu's data folder that is only obscured, not protected by a key. Anyone who can read your user profile can recover it. Only the file's permissions protect it.",
+      "tokenObfuscatedBody": "Your sign-in token is saved in a file in Vicu's data folder that is only obscured, not protected by a key. Anyone who can read your user profile can recover it. Only the file's permissions protect it.",
+      "keyObfuscatedBodyLinux": "On Linux, Vicu does not use the system keyring. Your provider key is saved in a file in Vicu's data folder that is only obscured, not protected by a key. Anyone who can read your user profile can recover it. Only the file's permissions protect it.",
+      "tokenObfuscatedBodyLinux": "On Linux, Vicu does not use the system keyring. Your sign-in token is saved in a file in Vicu's data folder that is only obscured, not protected by a key. Anyone who can read your user profile can recover it. Only the file's permissions protect it."
+    },
+    "voice": {
+      "checking": "Checking voice input…",
+      "unavailable": "Voice input is not available on this system.",
+      "engineMacos": "macOS speech recognition",
+      "engineWindows": "Windows speech recognition",
+      "onDevice": "Uses {{engine}}, on this computer: what you say is not sent anywhere.",
+      "servers": "Uses {{engine}}. Your language is recognized by Apple's servers.",
+      "title": "Voice input",
+      "intro": "Hold the + button and say a task such as “Call mom tomorrow 3pm”. Let go to add it, press Esc to cancel. It goes where the list you are looking at puts new tasks, unless you name a project or date. With a shortcut set below, hold it the same way, or tap it to keep listening until you press it again or Enter. “Say a task” in the command palette works without holding anything.",
+      "smart": "With smart dictation on (Settings, Assistant), tapping the shortcut or sliding up from a held + starts smart dictation instead: keep talking and the tasks appear as cards.",
+      "shortcut": "Shortcut (while Vicu is in front)",
+      "notSet": "Not set",
+      "shortcutLabel": "Voice input shortcut"
+    },
+    "hotkey": {
+      "label": "Hotkey",
+      "pressKeys": "Press keys...",
+      "record": "Record",
+      "clear": "Clear"
+    },
+    "assistant": {
+      "testFailed": "The test failed.",
+      "address": "Address",
+      "remove": "Remove",
+      "cancel": "Cancel",
+      "cleartext": "This address is not encrypted (http) and is outside your local network: your key and what you send can be read on the way. Use https.",
+      "languages": {
+        "auto": "Detect per phrase",
+        "en": "English",
+        "nl": "Dutch",
+        "de": "German",
+        "fr": "French",
+        "es": "Spanish",
+        "it": "Italian",
+        "pt": "Portuguese",
+        "sv": "Swedish",
+        "da": "Danish",
+        "pl": "Polish",
+        "cs": "Czech",
+        "fi": "Finnish",
+        "ja": "Japanese",
+        "zh": "Chinese",
+        "ko": "Korean",
+        "ru": "Russian",
+        "uk": "Ukrainian"
+      },
+      "thinking": {
+        "title": "Thinking",
+        "intro": "The model that turns your words into tasks and answers your questions. It runs at your provider.",
+        "requests": "Requests go straight from this computer to the provider you choose, with your key; Vicu has no server in between and shows no prices.",
+        "provider": "Provider",
+        "off": "Off",
+        "key": "Key",
+        "keyOptional": "Key (optional)",
+        "keyPlaceholderSaved": "A key is saved. Paste a new one to replace it.",
+        "keyPlaceholder": "Paste your key",
+        "hide": "Hide",
+        "show": "Show",
+        "saveKey": "Save key",
+        "keyNote": "Kept in this computer’s secret store, like your Vikunja sign-in. It is never synced or shown again.",
+        "keySaved": "Key saved",
+        "keyRemoved": "Key removed"
+      },
+      "typed": {
+        "newAddress": "New address",
+        "saveAddress": "Save address",
+        "edit": "Edit",
+        "addAddress": "Add address",
+        "savedAddresses": "Saved addresses",
+        "inUse": "in use",
+        "removeAddress": "Remove {{address}}"
+      },
+      "model": {
+        "loading": "Loading…",
+        "load": "Load models",
+        "count_one": "{{count}} model",
+        "count_other": "{{count}} models",
+        "loadError": "{{error}} You can still type a model name.",
+        "model": "Model",
+        "modelName": "Model name",
+        "usedDictation": "Used for smart dictation.",
+        "usedAll": "Used for smart dictation, Ask and Talk.",
+        "useDifferent": "Use a different model for Ask",
+        "askModel": "Ask model",
+        "usedAsk": "Used for Ask and Talk.",
+        "usedAskSuggested": "Used for Ask and Talk. Suggested: {{model}}.",
+        "testing": "Testing…",
+        "test": "Test connection",
+        "saveKeyFirst": "Save a key first.",
+        "enterAddressFirst": "Enter an address first.",
+        "testingModels": "Testing {{models}}…",
+        "autoTest": "A model is tested by itself once you choose it."
+      },
+      "features": {
+        "blockedProvider": "Choose a provider under Thinking first.",
+        "blockedKey": "Save a key under Thinking first.",
+        "blockedAddress": "Enter an address under Thinking first.",
+        "blockedModel": "Choose a model under Thinking first.",
+        "turnOnAsk": "Turn on Ask first.",
+        "turnOnDictation": "Turn on Smart dictation first.",
+        "title": "Features",
+        "intro": "Holding + (or the voice shortcut) and letting go always adds one task at once, without the model.",
+        "dictation": "Smart dictation",
+        "dictationHow": "Tap the voice shortcut, or hold + and slide up to the sparkle, then keep talking: tasks appear as cards while you talk. Also Break into steps (right-click a task) and Make tasks from text (command palette).",
+        "brainDump": "Brain dump",
+        "brainDumpHow": "Slide up from a held + or tap the voice shortcut, then turn on Brain dump in the sheet (or choose Brain dump in the command palette). Talk or type as long as you like; Organize sorts it all into projects, subprojects, tasks, subtasks and notes for you to check.",
+        "ask": "Ask",
+        "askHow": "Press the Ask button next to Search, or {{keys}}. Changes are proposed on cards you apply.",
+        "talk": "Talk",
+        "talkHow": "Turn on the microphone in Ask and just talk; answers are read aloud and it keeps listening.",
+        "testing": "Testing {{model}}…",
+        "tryLabel": "Try {{label}}",
+        "tryIt": "Try it"
+      },
+      "result": {
+        "passed": "Passed:",
+        "failed": "Failed:",
+        "dictation": "Dictation",
+        "ask": "Ask",
+        "talk": "Talk",
+        "modelList": "Model list ({{n}})",
+        "modelListError": "Model list: {{error}}",
+        "notAvailable": "not available",
+        "structuredPrompt": "Structured answer (from the prompt)",
+        "structuredStrict": "Structured answer (strict schema)",
+        "structuredError": "Structured answer: {{error}}",
+        "failedShort": "failed",
+        "toolCall": "Tool call",
+        "toolCallError": "Tool call: {{error}}",
+        "canRun": "Can run: {{features}}",
+        "canRunNone": "This model can run none of the features."
+      },
+      "consent": {
+        "theProvider": "the provider",
+        "title": "Send data to {{provider}}?",
+        "intro": "The assistant sends this to {{provider}} with your key, and only when you use it:",
+        "dictation": "<strong>Dictation</strong>: the text of what you said or pasted (never audio), your project, label and place names, the list you are in, and the date, time and time zone.",
+        "ask": "<strong>Ask and Talk</strong>: your messages, an overview (counts, project, label and custom list names), and the tasks it looks up, including the names of people in shared projects.",
+        "neverSent": "Never sent: audio (speech is recognised on this computer), hidden tasks, comment texts, attachments, your Vikunja token, your server address, place positions.",
+        "agree": "Agree"
+      },
+      "speech": {
+        "title": "Hearing",
+        "intro": "Turns your voice into text on this computer; audio never leaves it. Without a downloaded model, the system’s speech recognition is used.",
+        "introLinux": "Turns your voice into text on this computer; audio never leaves it. Without a downloaded model, the system’s speech recognition is used (Linux has none).",
+        "usedBy": "Used by every voice feature: quick capture, smart dictation and Talk. Only the text goes to the model under Thinking.",
+        "notInBuild": "Local speech is not part of this build of Vicu.",
+        "use": "Use {{label}}",
+        "suggested": "Suggested",
+        "inUse": "In use",
+        "europeanLanguages_one": "{{count}} European language",
+        "europeanLanguages_other": "{{count}} European languages",
+        "languages_one": "{{count}} language",
+        "languages_other": "{{count}} languages",
+        "downloading": "Downloading {{percent}}%",
+        "pausedAt": "Paused at {{percent}}%",
+        "deleteLabel": "Delete {{label}}",
+        "delete": "Delete",
+        "pause": "Pause",
+        "resume": "Resume",
+        "download": "Download",
+        "language": "Language",
+        "parakeet": "Parakeet models detect the language themselves."
+      },
+      "privacy": {
+        "deleted": "Conversations deleted",
+        "title": "Privacy",
+        "text": "Conversations (the last five) and transcripts kept after a failed request stay on this computer and are deleted when you sign out. The assistant’s settings and key stay with this computer.",
+        "delete": "Delete conversations"
+      }
+    },
+    "shortcuts": {
+      "categories": {
+        "navigation": "Navigation",
+        "taskActions": "Task Actions",
+        "scheduling": "Scheduling",
+        "plan": "Plan",
+        "editing": "Editing (while task is open)",
+        "assistant": "Assistant",
+        "pro": "Pro (when on)",
+        "comments": "Comments"
+      },
+      "items": {
+        "previousTask": "Move to previous task",
+        "nextTask": "Move to next task",
+        "openTask": "Expand / open task",
+        "collapseTask": "Collapse task / clear focus",
+        "newTask": "New task",
+        "newTaskFromClipboard": "New task from clipboard",
+        "saveAndClose": "Save and close task",
+        "completeSelected": "Complete selected task",
+        "duplicateSelected": "Duplicate selected task",
+        "copyTitles": "Copy selected task titles",
+        "dueToday": "Set due date to today",
+        "newEvent": "New event",
+        "moveEarlier": "Move a block or your event 15 minutes earlier",
+        "moveLater": "Move a block or your event 15 minutes later",
+        "shorter": "Make a block or your event 15 minutes shorter",
+        "longer": "Make a block or your event 15 minutes longer",
+        "focusNotes": "Move focus to notes",
+        "completeAndClose": "Complete and close task",
+        "toggleComments": "Show or hide comments (shared projects)",
+        "toggleAsk": "Show or hide Ask",
+        "sendMessage": "Send the message",
+        "makeTasks": "Make tasks from the text",
+        "focusProjects": "Focus on some projects",
+        "flag": "Flag or unflag the selected tasks",
+        "importMeeting": "Import meeting notes",
+        "inspector": "Inspector for the selected tasks",
+        "verdict": "Verdict on a promise row: Delivered, Late, Not yet, New date, Dropped, Ask me tomorrow",
+        "postComment": "Post the comment",
+        "mention": "Mention someone",
+        "closeComments": "Close comments"
+      }
+    },
+    "notifications": {
+      "enable": "Enable desktop notifications",
+      "macNote": "On macOS, the first notification will prompt you to allow notifications from Vicu.",
+      "playSound": "Play sound",
+      "stay": "Stay until dismissed",
+      "scheduled": {
+        "title": "Scheduled Reminders",
+        "note": "Daily notifications that summarize your overdue, due today, and upcoming tasks.",
+        "morning": "Morning reminder",
+        "morningTime": "Morning reminder time",
+        "afternoon": "Afternoon reminder",
+        "afternoonTime": "Afternoon reminder time",
+        "include": "Include",
+        "overdue": "Overdue tasks",
+        "dueToday": "Tasks due today",
+        "dueTomorrow": "Tasks due tomorrow"
+      },
+      "task": {
+        "title": "Task Reminders",
+        "note": "Reminders you set on individual tasks using the bell icon.",
+        "defaultReminder": "Default reminder",
+        "defaultNote": "Added to every new task that has a due date and no reminder of its own (not when you change the date of an existing task).",
+        "relativeLabel": "Default reminder relative to",
+        "relativeDue": "Relative to due date",
+        "relativeStart": "Relative to start date",
+        "relativeEnd": "Relative to end date"
+      },
+      "offset": {
+        "none": "None",
+        "atDue": "At due time",
+        "min5": "5 min before",
+        "min15": "15 min before",
+        "min30": "30 min before",
+        "hour1": "1 hour before",
+        "hour3": "3 hours before",
+        "day1": "1 day before"
+      },
+      "places": {
+        "title": "Places",
+        "note": "Remind yourself when you arrive at or leave a place: choose it in a task's reminders. Your phone reminds you there.",
+        "empty": "Save places in Vicu on your phone: Settings > Notifications > Places."
+      },
+      "test": "Test Notification",
+      "testSent": "Notification sent"
+    },
+    "pro": {
+      "title": "Pro",
+      "note": "Extra tools for heavier work: what you can do now, promises to and from people, a portfolio of initiatives. Pro only adds. Turn it off and Vicu is as it was; nothing is removed. This choice is for this device.",
+      "turnOn": "Turn on Pro on this device",
+      "standalone": "Pro needs a Vikunja server; it is not available in standalone mode.",
+      "layers": {
+        "availability": {
+          "name": "Know what you can do now",
+          "note": "Start dates, on hold, after, sequential projects, flags, focus, estimates and repeat ends."
+        },
+        "promises": {
+          "name": "Promises and people",
+          "note": "People, what you promised and what they promised, recaps, meetings and import."
+        },
+        "portfolio": {
+          "name": "Portfolio",
+          "note": "Initiatives, the cap, readiness, escalations, the sponsor desk and the logs."
+        },
+        "power": {
+          "name": "Power tools",
+          "note": "Pro list conditions, columns, the batch inspector, the focus block and the weekly execution review."
+        }
+      },
+      "assistant": {
+        "title": "Assistant help in Pro",
+        "note": "Promise drafts, import from any text and the Pro questions in Ask, on the model set in Assistant. Work text goes to that provider; check that your employer allows it."
+      },
+      "startDates": {
+        "title": "Start dates",
+        "none": "With Pro, a task with a start date waits until that day. None of your open tasks has one yet.",
+        "some_one": "With Pro, a task with a start date waits until that day. {{count}} open task has one already, set in Vikunja's web app or another device.",
+        "some_other": "With Pro, a task with a start date waits until that day. {{count}} open tasks have one already, set in Vikunja's web app or another device.",
+        "show": "Show them",
+        "gotIt": "Got it"
+      },
+      "area": {
+        "title": "Work area",
+        "note": "Promises, people and the portfolio apply to projects in these categories. With none ticked they apply to every project. Shared with your other devices.",
+        "empty": "You have no project categories. Add one in Settings, Projects to limit Pro to it."
+      },
+      "portfolio": {
+        "title": "Portfolio",
+        "note": "Shared with your other devices.",
+        "cap": "Active initiatives at most",
+        "agreedWith": "Agreed with",
+        "notAgreed": "Not agreed yet",
+        "outsider": "Someone not in Vicu",
+        "agreedOn": "Agreed on {{date}}.",
+        "threshold": "Draft an escalation after this many misses",
+        "ruleAgreedOn": "Escalation rule agreed on"
+      }
+    },
+    "projects": {
+      "actions": "{{name}} actions",
+      "categorySuffix": ", category",
+      "restore": "Restore",
+      "restoreLabel": "Restore {{name}}",
+      "sortBy": "Sort project tasks by",
+      "sortNote": "Projects and the Inbox, on every device. A project can choose its own under Sort tasks in its menu.",
+      "ownOrder_one": "{{count}} project has its own order.",
+      "ownOrder_other": "{{count}} projects have their own order.",
+      "reset": "Reset",
+      "order": {
+        "manual": "Manual",
+        "priority": "Priority",
+        "title": "Title",
+        "newest": "Newest first",
+        "oldest": "Oldest first",
+        "dueDateFirst": "Due date, then manual",
+        "dueDatePriority": "Due date, then priority"
+      },
+      "inbox": {
+        "note": "Tasks without a project land here. It shows as Inbox in the sidebar, not among the projects.",
+        "project": "Inbox project",
+        "select": "Select a project...",
+        "missing": "The configured Inbox project is archived or unavailable. Select an active project."
+      },
+      "list": {
+        "title": "Projects",
+        "note": "Drag a project to reorder it, onto another project to put it inside, or onto a category. Right-click or use … for more.",
+        "refresh": "Refresh projects",
+        "newCategory": "New category",
+        "newProject": "New project",
+        "loading": "Loading projects…",
+        "empty": "No active projects",
+        "archived": "Archived"
+      },
+      "display": {
+        "title": "Display",
+        "progress": "Show project progress in the sidebar",
+        "taskCount": "Show task count in the sidebar"
+      }
+    },
+    "savedFilters": {
+      "title": "Saved filters and views",
+      "introNone": "Import a saved filter or a project view from Vikunja as a custom list.",
+      "introSome_one": "Your server has a saved filter. Imported filters and project views become custom lists.",
+      "introSome_other": "Your server has {{count}} saved filters. Imported filters and project views become custom lists.",
+      "notNow": "Not now",
+      "review": "Review",
+      "importButton": "Import saved filters and views",
+      "close": "Close",
+      "sheetNote": "Each becomes a custom list in Vicu. Changes you make to these lists won't change anything on your server.",
+      "reading": "Reading the saved filters...",
+      "readingViews": "Reading the project views...",
+      "readFailed": "Vicu couldn't read the saved filters. Check the connection and try again.",
+      "viewsReadFailed": "Vicu couldn't read the project views.",
+      "filtersHeading": "Saved filters",
+      "viewsHeading": "Project views",
+      "noViews": "No project has a view of its own yet. A view with its own filter or sort shows up here.",
+      "cancel": "Cancel",
+      "import": "Import",
+      "importCount": "Import {{count}}",
+      "updateTitle": "Update “{{name}}” from Vikunja?",
+      "colPart": "Part",
+      "colYours": "Your list",
+      "colVikunja": "Vikunja now",
+      "keptNote": "Kept either way: the icon, its place and the list's other conditions.",
+      "sameForNext_one": "Same for the next one",
+      "sameForNext_other": "Same for the next {{count}}",
+      "skip": "Skip",
+      "overwrite": "Overwrite",
+      "noRule": "No rule",
+      "included": "Included",
+      "leftOut": "Left out",
+      "sortPart": "{{name}}, {{order}}",
+      "sortThen": "{{first}}, then {{next}}",
+      "reason": {
+        "kanbanColumn": "the kanban column",
+        "otherField": "a condition Vicu can't check",
+        "manualOrder": "the manual order",
+        "sortKey": "a sort order"
+      },
+      "part": {
+        "name": "Name",
+        "rule": "Rule",
+        "sort": "Sort",
+        "includeNulls": "Tasks without a value"
+      },
+      "status": {
+        "cannot": "Can't import: Vicu can't read this yet",
+        "same": "Same as your list",
+        "vikunja": "Changed in Vikunja since you imported it",
+        "both": "Changed in Vikunja and in Vicu",
+        "vicu": "Your list differs from Vikunja's",
+        "differs": "Differs from Vikunja",
+        "importedBefore": "Imported before",
+        "exact": "Imports exactly",
+        "leavesOut": "Leaves out {{things}}"
+      },
+      "change": {
+        "vikunja": "Changed in Vikunja",
+        "vicu": "Changed in Vicu",
+        "both": "Changed in both",
+        "differs": "Differs",
+        "same": "Same"
+      },
+      "question": {
+        "viewVikunja": "The project view \"{{title}}\" changed in Vikunja since you imported it.",
+        "viewBoth": "The project view \"{{title}}\" changed in Vikunja, and the list changed in Vicu.",
+        "viewVicu": "Your list differs from the project view \"{{title}}\". Overwrite puts Vikunja's version back.",
+        "viewDefault": "Your list differs from the project view \"{{title}}\". Vicu can't tell which side changed.",
+        "filterVikunja": "The saved filter \"{{title}}\" changed in Vikunja since you imported it.",
+        "filterBoth": "The saved filter \"{{title}}\" changed in Vikunja, and the list changed in Vicu.",
+        "filterVicu": "Your list differs from the saved filter \"{{title}}\". Overwrite puts Vikunja's version back.",
+        "filterDefault": "Your list differs from the saved filter \"{{title}}\". Vicu can't tell which side changed."
+      },
+      "offer": {
+        "addedTitle_one": "{{count}} new saved filter on your server",
+        "addedTitle_other": "{{count}} new saved filters on your server",
+        "addedBody_one": "Import it as a custom list to use it in Vicu.",
+        "addedBody_other": "Import them as custom lists to use them in Vicu.",
+        "changedTitle_one": "{{count}} saved filter changed in Vikunja",
+        "changedTitle_other": "{{count}} saved filters changed in Vikunja",
+        "changedBody": "See what changed and choose whether to update your lists.",
+        "bothTitle": "{{added}} new and {{changed}} changed saved filters on your server",
+        "bothBody": "Review them to import or update your lists."
+      }
+    },
+    "completionSound": {
+      "title": "Task Completion Sound",
+      "enable": "Play a sound when completing a task",
+      "current": "Current sound:",
+      "default": "(default)",
+      "playLabel": "Play the completion sound",
+      "play": "Play",
+      "choose": "Choose file...",
+      "reset": "Reset to default",
+      "supported": "Supported: MP3, WAV, OGG, M4A, AAC, FLAC (max 10MB)",
+      "cannotPlay": "This sound cannot be played. Choose another file."
+    },
+    "planner": {
+      "title": "Plan",
+      "note": "A screen to give tasks a time on a timeline. A time you set shows on every device, whether this is on or not.",
+      "show": "Show Plan in the sidebar"
+    },
+    "closeAction": {
+      "label": "When closing the window",
+      "minimize": "Minimize to taskbar",
+      "tray": "Hide to system tray",
+      "quit": "Quit Vicu",
+      "minimizeNote": "Vicu keeps its taskbar button, with the task count when that is on.",
+      "trayNote": "Vicu keeps running in the tray; its icon brings the window back.",
+      "quitNote": "Vicu stops, and Quick Entry and Quick View with it."
+    },
+    "menu": {
+      "title": "Settings",
+      "backToApp": "Back to app",
+      "groupAccount": "Account and app",
+      "groupFeatures": "Features",
+      "general": "General",
+      "projects": "Projects",
+      "notifications": "Notifications",
+      "integrations": "Quick Entry / View",
+      "assistant": "Assistant",
+      "pro": "Pro",
+      "shortcuts": "Keyboard Shortcuts",
+      "sectionsOf": "{{tab}} sections",
+      "sectionAria": "{{section}} section"
+    },
+    "sidebar": {
+      "title": "Sidebar",
+      "note": "The lists shown above your projects. A hidden list keeps working and stays in the command palette."
+    },
+    "weekStart": {
+      "label": "Week starts on",
+      "monday": "Monday",
+      "sunday": "Sunday",
+      "saturday": "Saturday",
+      "note": "Calendars, This week and Next week follow it. Syncs to your other devices.",
+      "vikunjaIs": "Vikunja is set to {{day}}.",
+      "use": "Use {{day}}",
+      "inText": {
+        "monday": "Monday",
+        "sunday": "Sunday",
+        "saturday": "Saturday"
+      }
+    },
+    "review": {
+      "title": "Review",
+      "note": "Periodic project review, GTD-style. Marker is stored in each project's description so it syncs across clients.",
+      "enable": "Enable project review tracking",
+      "cadence": "Default review cadence (days)",
+      "cadenceNote": "How often projects should be reviewed unless overridden per project.",
+      "cadenceAria": "Default review cadence in days",
+      "excludeInbox": "Exclude Inbox from review list",
+      "excludeInboxNote": "Your Inbox is for capture, not for periodic review.",
+      "excluded": {
+        "title": "Excluded from review",
+        "note": "Projects you took out of the Review list. Include one to track it again.",
+        "include": "Include again",
+        "includeLabel": "Include again: {{name}}"
+      }
+    },
+    "routines": {
+      "title": "Routines",
+      "note": "What you do regularly. Turning them off hides them and stops their reminders; your routines and their history are kept.",
+      "enable": "Enable routines",
+      "inToday": "Show routines in Today",
+      "inTodayNote": "Lists the routines still open today above your tasks. Finished ones are left out.",
+      "limit": "Routines shown on Today",
+      "limitNote": "How many routines due in the next two hours show at once. The rest wait behind one line.",
+      "all": "All",
+      "hidden": {
+        "title": "Hidden shared routines",
+        "note": "Routines someone shared with you that you hid. They stay shared; only you do not see them.",
+        "show": "Show"
+      }
+    },
+    "tokenPermissions": {
+      "label": "Token permissions info",
+      "intro": "Your API token needs these permissions:",
+      "route": "Route",
+      "permission": "Permission",
+      "usedFor": "Used for",
+      "uses": {
+        "tasks": "Task CRUD",
+        "projects": "Project CRUD",
+        "labels": "Label CRUD",
+        "taskLabels": "Adding/removing labels",
+        "taskRelations": "Subtasks & relations",
+        "taskAttachments": "File attachments",
+        "projectViews": "Position sorting"
+      }
+    }
   }
 }
