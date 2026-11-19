@@ -17,6 +17,10 @@ export function isRetriableError(error: string): boolean {
  * a non-idempotent create for replay without risking a duplicate).
  * Note: timeouts and resets are deliberately excluded — those requests may
  * have been received and applied server-side.
+ *
+ * A certificate that does not verify (`net::ERR_CERT_...`) counts: the TLS handshake failed, so the
+ * request was never sent. A network that puts its sign-in page in front of every HTTPS address (a
+ * plane, a hotel) answers with a certificate of its own; the create waits for the real server.
  */
 export function isConnectionError(error: string): boolean {
   if (!error) return false
@@ -25,6 +29,7 @@ export function isConnectionError(error: string): boolean {
     'ERR_NAME_NOT_RESOLVED', 'ERR_CONNECTION_REFUSED',
     'ERR_INTERNET_DISCONNECTED', 'ERR_ADDRESS_UNREACHABLE',
     'ERR_NETWORK_CHANGED', 'ERR_CONNECTION_TIMED_OUT',
+    'ERR_CERT_', 'ERR_SSL_VERSION_OR_CIPHER_MISMATCH',
   ]
   return patterns.some((p) => error.includes(p))
 }
@@ -55,6 +60,47 @@ export const NOT_API_RESPONSE_MESSAGE =
   'The server answered with a web page instead of the Vikunja API. If a sign-in page protects your Vikunja server, sign in there in your browser, then try again.'
 
 /**
+ * Statuses with which something in front of Vikunja judges the request itself (malformed, too
+ * large): sending it again cannot help, so these stay refusals whoever answered.
+ */
+const ABOUT_THE_REQUEST: ReadonlySet<number> = new Set([400, 413, 414, 431])
+
+/** A body that is there and is neither a JSON object nor a JSON array. An empty body shows nothing. */
+function isNotJson(body: string): boolean {
+  const text = body.replace(/^[\s﻿]+/, '').trimEnd()
+  if (text === '') return false
+  if (text[0] !== '{' && text[0] !== '[') return true
+  try {
+    JSON.parse(text)
+    return false
+  } catch {
+    return true
+  }
+}
+
+/**
+ * Whether an error answer did not come from Vikunja: the sign-in page of a network (a plane, a
+ * hotel), the block page of a firewall or a reverse proxy. Vikunja never saw the request, so the
+ * answer says nothing about the change or the session: the result carries `notApiResponse: true` and
+ * no status, the change is kept and sent again later, and nobody is asked to sign in.
+ *
+ * It needs positive evidence, a 4xx with a body that is there and is not JSON, because Vikunja
+ * answers every error with a JSON object. A 408, a 429 and every 5xx already mean "try again later"
+ * by themselves and keep their status. The same rule as the mobile app's `NotApiResponse`; keep them
+ * in step.
+ */
+export function isNotApiErrorAnswer(statusCode: number, body: string): boolean {
+  if (statusCode < 400 || statusCode > 499) return false
+  if (statusCode === 408 || statusCode === 429 || ABOUT_THE_REQUEST.has(statusCode)) return false
+  return isNotJson(body)
+}
+
+/** What to say when such an answer has to be shown; `statusCode` is what the thing in between answered. */
+export function notApiErrorMessage(statusCode: number): string {
+  return `The answer did not come from your Vikunja server (HTTP ${statusCode}). A sign-in page of the network, a firewall or a proxy is probably in the way.`
+}
+
+/**
  * Whether the server answered a `q` search with this failure while the session still works: the
  * server's search is broken, not the connection or the sign-in. A ParadeDB `pg_search` extension
  * older than the library Postgres loads answers every search with a 500 ("function
@@ -71,7 +117,7 @@ export interface FailureLike {
   statusCode?: number
   /** A 403 that stands for an API token without this permission (cross-app semantics 9.7). */
   tokenPermission?: boolean
-  /** The server answered with a page that is not the API (`NOT_API_RESPONSE_MESSAGE`): handled like an unreachable server. */
+  /** The answer was a page that is not the API (`NOT_API_RESPONSE_MESSAGE`, `isNotApiErrorAnswer`): handled like an unreachable server. */
   notApiResponse?: boolean
 }
 

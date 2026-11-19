@@ -1,6 +1,14 @@
 import type { EventEmitter } from 'node:events'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { NOT_API_RESPONSE_MESSAGE, SESSION_ENDED_MESSAGE, isAuthError, isQueueableFailure } from '../../shared/error-classify'
+import {
+  NOT_API_RESPONSE_MESSAGE,
+  SESSION_ENDED_MESSAGE,
+  isAuthError,
+  isQueueableFailure,
+  isUnreachableFailure,
+  notApiErrorMessage,
+} from '../../shared/error-classify'
+import { classifyReplayFailure } from '../offline/classify'
 
 // What the API client makes of an answer: a web page with 200 (C-1), a slow answer (C-11), a 401 of
 // an ended session (C-12), and the session check behind a 403 (C-2).
@@ -128,6 +136,90 @@ describe('a 2xx answer', () => {
       expect(client.readSuccessBody('  \n')).toEqual({ success: true, data: null })
       expect(client.readSuccessBody('<html>')).toMatchObject({ success: false, notApiResponse: true })
     })
+  })
+})
+
+describe('a 4xx answer that is a page, not the API', () => {
+  // The sign-in page of a plane's or hotel's network, a firewall's block page: Vikunja never saw
+  // the request, so none of the rules about its own 401, 403 or 404 may apply.
+  const BLOCK_PAGE = '<html><body><h1>Access to this site is blocked</h1></body></html>'
+
+  beforeEach(() => {
+    auth.method = 'api_token'
+  })
+
+  it('is marked notApiResponse without a status, and queued like an unreachable server', async () => {
+    const client = await loadClient()
+    net.onRequest = (req) => queueMicrotask(() => answer(req as FakeRequest, 403, BLOCK_PAGE, 'text/html'))
+
+    const result = await client.createTask(7, { title: 'Lumae gemini' })
+
+    expect(result).toEqual({ success: false, error: notApiErrorMessage(403), notApiResponse: true })
+    if (!result.success) {
+      expect(isQueueableFailure(result, 'create')).toBe(true)
+      expect(isQueueableFailure(result, 'change')).toBe(true)
+      expect(isUnreachableFailure(result)).toBe(true)
+      expect(classifyReplayFailure(result, 'create')).toEqual({ kind: 'stop', why: 'network' })
+    }
+  })
+
+  it("leaves Vikunja's own 403 a refusal", async () => {
+    const client = await loadClient()
+    net.onRequest = (req) =>
+      queueMicrotask(() => answer(req as FakeRequest, 403, JSON.stringify({ title: 'Forbidden', status: 403, detail: 'Forbidden' })))
+
+    const result = await client.createTask(7, { title: 'x' })
+
+    expect(result).toMatchObject({ success: false, statusCode: 403 })
+    if (!result.success) {
+      expect(result.notApiResponse).toBeUndefined()
+      expect(isQueueableFailure(result, 'create')).toBe(false)
+    }
+  })
+
+  it('with 401 ends no session and raises no sign-in prompt', async () => {
+    auth.method = 'oidc'
+    const client = await loadClient()
+    net.onRequest = (req) => queueMicrotask(() => answer(req as FakeRequest, 401, BLOCK_PAGE, 'text/html'))
+
+    const result = await client.updateTask(1, { title: 'x' })
+
+    expect(result).toMatchObject({ success: false, notApiResponse: true })
+    if (!result.success) {
+      expect(result.error).not.toBe(SESSION_ENDED_MESSAGE)
+      expect(isAuthError(result.error)).toBe(false)
+    }
+    expect(windows.sent).toHaveLength(0)
+    expect(net.requests).toHaveLength(1)
+  })
+
+  it('with 404 is not taken for a task that is gone', async () => {
+    const client = await loadClient()
+    net.onRequest = (req) => queueMicrotask(() => answer(req as FakeRequest, 404, '404 page not found', 'text/plain'))
+
+    const result = await client.deleteTask(5)
+
+    expect(result).toMatchObject({ success: false, notApiResponse: true })
+    // A real 404 on a delete counts as done; this one keeps the delete for later.
+    if (!result.success) expect(classifyReplayFailure(result, 'delete')).toEqual({ kind: 'stop', why: 'network' })
+  })
+
+  it('about the request itself stays a refusal: a proxy that finds an upload too large', async () => {
+    const client = await loadClient()
+    net.onRequest = (req) => queueMicrotask(() => answer(req as FakeRequest, 413, '<html>413 Request Entity Too Large</html>', 'text/html'))
+
+    const result = await client.updateTask(1, { title: 'x' })
+
+    expect(result).toMatchObject({ success: false, statusCode: 413 })
+    if (!result.success) expect(result.notApiResponse).toBeUndefined()
+  })
+
+  it('says nothing about whether the connection works', async () => {
+    auth.method = 'oidc'
+    const client = await loadClient()
+    net.onRequest = (req) => queueMicrotask(() => answer(req as FakeRequest, 403, BLOCK_PAGE, 'text/html'))
+
+    expect(await client.connectionState()).toBe('unknown')
   })
 })
 

@@ -9,8 +9,60 @@ import {
   isRetriableError,
   isConnectionError,
   isAuthError,
+  isNotApiErrorAnswer,
   maybeCreatedMessage,
+  notApiErrorMessage,
 } from '../error-classify'
+
+// The cases of the mobile app's `NotApiResponseTest`; keep them in step.
+describe('isNotApiErrorAnswer: an error answer that did not come from Vikunja', () => {
+  const page = '<!DOCTYPE html><html><body><h1>Sign in to the network</h1></body></html>'
+
+  it('a 4xx whose body is a page is not the server answering', () => {
+    for (const status of [401, 403, 404, 405, 407, 409, 451]) {
+      expect(isNotApiErrorAnswer(status, page), `${status} with a page`).toBe(true)
+      expect(isNotApiErrorAnswer(status, 'Forbidden'), `${status} with plain text`).toBe(true)
+    }
+  })
+
+  it("Vikunja's own error answers stay what they are", () => {
+    const middleware = '{"code":11,"message":"missing, malformed, expired or otherwise invalid token provided"}'
+    const problem = '{"title":"Forbidden","status":403,"detail":"Forbidden"}'
+    for (const status of [401, 403, 404, 409, 412, 422]) {
+      expect(isNotApiErrorAnswer(status, middleware), `${status}`).toBe(false)
+      expect(isNotApiErrorAnswer(status, problem), `${status}`).toBe(false)
+      expect(isNotApiErrorAnswer(status, `  \n${problem}\n`), `${status} with whitespace`).toBe(false)
+      expect(isNotApiErrorAnswer(status, '[]'), `${status} with an array`).toBe(false)
+    }
+  })
+
+  it('an empty body shows nothing, so the status stands', () => {
+    for (const status of [401, 403, 404]) {
+      expect(isNotApiErrorAnswer(status, ''), `${status}`).toBe(false)
+      expect(isNotApiErrorAnswer(status, '  \n'), `${status}`).toBe(false)
+    }
+  })
+
+  it('a status about the request itself is a refusal whoever answered', () => {
+    for (const status of [400, 413, 414, 431]) expect(isNotApiErrorAnswer(status, page), `${status}`).toBe(false)
+  })
+
+  it('statuses with a meaning of their own keep it', () => {
+    for (const status of [200, 204, 301, 302, 304, 408, 429, 500, 502, 503, 504]) {
+      expect(isNotApiErrorAnswer(status, page), `${status}`).toBe(false)
+    }
+  })
+
+  it('a body that starts like JSON but is not is a page', () => {
+    expect(isNotApiErrorAnswer(403, '{ not json')).toBe(true)
+  })
+
+  it('names the status that was answered', () => {
+    expect(notApiErrorMessage(403)).toContain('HTTP 403')
+    expect(authError(notApiErrorMessage(401))).toBe(false)
+    expect(isRetriableError(notApiErrorMessage(403))).toBe(false) // classified by its marker, never by its text
+  })
+})
 
 describe('error classification', () => {
   it('connection errors are both retriable and connection-level', () => {
@@ -18,6 +70,21 @@ describe('error classification', () => {
       expect(isConnectionError(e)).toBe(true)
       expect(isRetriableError(e)).toBe(true)
     }
+  })
+
+  it('a certificate that does not verify never sent the request: a create is queued, without a "may exist" warning', () => {
+    // A network that puts its sign-in page in front of every HTTPS address (a plane, a hotel).
+    for (const e of ['net::ERR_CERT_AUTHORITY_INVALID', 'net::ERR_CERT_COMMON_NAME_INVALID', 'net::ERR_CERT_DATE_INVALID', 'net::ERR_SSL_VERSION_OR_CIPHER_MISMATCH']) {
+      expect(isConnectionError(e), e).toBe(true)
+      expect(isRetriableError(e), e).toBe(true)
+      expect(queueable({ error: e }, 'create'), e).toBe(true)
+      expect(queueable({ error: e }, 'change'), e).toBe(true)
+      expect(isUnreachableFailure({ error: e }), e).toBe(true)
+      expect(maybeCreatedMessage({ error: e }), e).toBeNull()
+    }
+    // A TLS failure after the handshake may have followed the request: still not connection-level.
+    expect(isConnectionError('net::ERR_SSL_PROTOCOL_ERROR')).toBe(false)
+    expect(queueable({ error: 'net::ERR_SSL_PROTOCOL_ERROR' }, 'change')).toBe(true)
   })
 
   it('timeouts are retriable but NOT connection-level (request may have reached the server)', () => {

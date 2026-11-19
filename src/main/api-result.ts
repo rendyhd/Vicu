@@ -25,9 +25,10 @@ export interface ApiError {
    */
   tokenPermission?: boolean
   /**
-   * The server answered 2xx with a body that is not JSON: a web page from something in front of
-   * Vikunja (a sign-in proxy), not the API. Handled like an unreachable server (see
-   * `NOT_API_RESPONSE_MESSAGE` in src/shared/error-classify.ts).
+   * The answer was a web page from something in front of Vikunja, not the API: 2xx with a body that
+   * is not JSON (a sign-in proxy), or a 4xx with one (a network's sign-in page, a firewall). Handled
+   * like an unreachable server; a 4xx of this kind carries no `statusCode` (see
+   * `NOT_API_RESPONSE_MESSAGE` and `isNotApiErrorAnswer` in src/shared/error-classify.ts).
    */
   notApiResponse?: boolean
 }

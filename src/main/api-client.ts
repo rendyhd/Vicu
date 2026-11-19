@@ -23,7 +23,7 @@ import {
   type TaskCommentPage,
 } from './api-v2'
 import { sanitizeProjectPatch, sanitizeTaskPatch } from '../shared/merge-patches'
-import { NOT_API_RESPONSE_MESSAGE, SESSION_ENDED_MESSAGE } from '../shared/error-classify'
+import { NOT_API_RESPONSE_MESSAGE, SESSION_ENDED_MESSAGE, isNotApiErrorAnswer, notApiErrorMessage } from '../shared/error-classify'
 import type { ApiError, ApiResult } from './api-result'
 import { collectAllPages } from './paginate'
 import { decodeUtf8Chunks } from './response-body'
@@ -138,6 +138,30 @@ export function readSuccessBody<T>(responseBody: string): ApiResult<T> {
   }
 }
 
+/**
+ * The answer of a response that is not 2xx. A 4xx whose body is a page instead of JSON did not come
+ * from Vikunja: the sign-in page of a plane's or hotel's network, a firewall's or a proxy's block
+ * page (`isNotApiErrorAnswer`). It is marked `notApiResponse` and carries no status, so it is
+ * handled like an unreachable server (the change is queued, the replay waits) and no rule about a
+ * 401, 403 or 404 of the server applies to it: no sign-in prompt, no dropped change.
+ */
+export function readErrorAnswer(statusCode: number, responseBody: string): ApiError {
+  if (isNotApiErrorAnswer(statusCode, responseBody)) {
+    return { success: false, error: notApiErrorMessage(statusCode), notApiResponse: true }
+  }
+  let errorCode: number | undefined
+  try {
+    const parsed = JSON.parse(responseBody)
+    if (typeof parsed.code === 'number') errorCode = parsed.code
+  } catch { /* ignore */ }
+  return {
+    success: false,
+    error: describeHttpError(statusCode, responseBody),
+    statusCode,
+    errorCode,
+  }
+}
+
 function request<T>(
   method: string,
   url: string,
@@ -186,17 +210,7 @@ function request<T>(
           if (statusCode >= 200 && statusCode < 300) {
             resolve(readSuccessBody<T>(responseBody))
           } else {
-            let errorCode: number | undefined
-            try {
-              const parsed = JSON.parse(responseBody)
-              if (typeof parsed.code === 'number') errorCode = parsed.code
-            } catch { /* ignore */ }
-            resolve({
-              success: false,
-              error: describeHttpError(statusCode, responseBody),
-              statusCode,
-              errorCode,
-            })
+            resolve(readErrorAnswer(statusCode, responseBody))
           }
         })
       })
@@ -789,17 +803,7 @@ function requestMultipart<T>(
             resolve(readSuccessBody<T>(responseBody))
           } else {
             console.error(`[upload] HTTP ${statusCode} for ${method} ${url}:`, responseBody)
-            let errorCode: number | undefined
-            try {
-              const parsed = JSON.parse(responseBody)
-              if (typeof parsed.code === 'number') errorCode = parsed.code
-            } catch { /* ignore */ }
-            resolve({
-              success: false,
-              error: describeHttpError(statusCode, responseBody),
-              statusCode,
-              errorCode,
-            })
+            resolve(readErrorAnswer(statusCode, responseBody))
           }
         })
       })
@@ -885,18 +889,7 @@ function requestBinary(
           if (statusCode >= 200 && statusCode < 300) {
             resolve({ success: true, data: Buffer.concat(chunks) })
           } else {
-            const body = decodeUtf8Chunks(chunks)
-            let errorCode: number | undefined
-            try {
-              const parsed = JSON.parse(body)
-              if (typeof parsed.code === 'number') errorCode = parsed.code
-            } catch { /* ignore */ }
-            resolve({
-              success: false,
-              error: describeHttpError(statusCode, body),
-              statusCode,
-              errorCode,
-            })
+            resolve(readErrorAnswer(statusCode, decodeUtf8Chunks(chunks)))
           }
         })
       })

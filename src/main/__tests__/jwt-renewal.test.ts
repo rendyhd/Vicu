@@ -133,9 +133,24 @@ describe('renewing the JWT (F2)', () => {
 
   it('writes nothing when the refresh is refused', async () => {
     const { store, renewal } = await signedIn()
-    state.fetch = async () => refreshResponse('nope', 'refresh_new', 401)
+    state.fetch = async () => refreshResponse({ title: 'Unauthorized', status: 401, detail: 'Invalid refresh token.' }, 'refresh_new', 401)
 
     await expect(renewal.renewJWT('https://tasks.example.com')).rejects.toMatchObject({ kind: 'unauthorized' })
+
+    expect(state.renames).toBe(0)
+    expect(store.getRefreshToken()).toBe('refresh_old')
+  })
+
+  it('reads a page from a network or firewall as a network problem, never as a refused refresh', async () => {
+    const { store, renewal } = await signedIn()
+    const page = '<!doctype html><html><body>Sign in to the network</body></html>'
+
+    for (const status of [401, 403]) {
+      state.fetch = async () => new Response(page, { status, headers: { 'Content-Type': 'text/html' } })
+
+      // 'unauthorized' would end the session; a page says nothing about the refresh token.
+      await expect(renewal.renewJWT('https://tasks.example.com')).rejects.toMatchObject({ kind: 'network-error', status })
+    }
 
     expect(state.renames).toBe(0)
     expect(store.getRefreshToken()).toBe('refresh_old')
