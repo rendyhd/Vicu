@@ -10,7 +10,7 @@ lead: The desktop app is the full Vicu, plus a few things that only a computer c
 - **Quick Entry and Quick View are off until you turn them on** in **Settings, Quick Entry / View**. Each has its own shortcut that works in any app.
 - **The command palette** ({desktop}) opens with <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>P</kbd> (<kbd>Cmd</kbd> on a Mac). It jumps to any list, project, label or task and runs actions.
 - **Quick find** is the search box at the top of the sidebar. <kbd>Ctrl</kbd>+<kbd>F</kbd> puts the cursor there.
-- **The tray icon** appears while Quick Entry or Quick View is on. Closing the window then hides Vicu instead of quitting it.
+- **The tray icon** appears while Quick Entry or Quick View is on, or while closing the window hides Vicu to the tray.
 - **F5 refreshes** the page you are on from your server.
 - **Browser and Obsidian links** attach the page or note you were looking at to a new task.
 
@@ -75,10 +75,10 @@ The Quick Entry and Quick View shortcuts work in any app. If another program alr
 
 ## The tray, startup and the window
 
-- **Tray icon.** It exists while Quick Entry or Quick View is on. Click it to show Vicu, or right-click for **Show Vicu**, **Quick Entry**, **Quick View** and **Quit**. On macOS the menu opens with a single click.
-- **Closing the window.** With a tray icon (or on a Mac), the close button hides Vicu and keeps it running so the shortcuts stay ready. Choose **Quit** from the tray, or **File, Quit** on Windows and Linux, to end it.
+- **Tray icon.** It exists while Quick Entry or Quick View is on, or while **When closing the window** is **Hide to system tray**. Click it to show Vicu, or right-click for **Show Vicu**, **Quick Entry**, **Quick View** and **Quit**. On macOS the menu opens with a single click.
+- **Closing the window.** On a Mac the close button hides Vicu and keeps it running. On Windows and Linux, **Settings, General, Preferences, When closing the window** chooses: **Minimize to taskbar** keeps the taskbar button and its task count, **Hide to system tray** keeps Vicu running in the tray so the shortcuts stay ready, and **Quit Vicu** ends it. Until you choose, Vicu hides to the tray while Quick Entry or Quick View is on and quits otherwise. Choose **Quit** from the tray, or **File, Quit**, to end it at any time.
 - **Launch on startup.** **Settings, General, Preferences, Launch on startup** starts Vicu when you sign in. It is advised if you use Quick Entry or Quick View.
-- **Start hidden.** With launch on startup ticked, **Start hidden** opens Vicu without a window. It needs the tray icon (turned on through Quick Entry or Quick View) or a Mac, so there is a way back to the window.
+- **Start hidden.** With launch on startup ticked, **Start hidden** opens Vicu without a window. It needs the tray icon or a Mac, so there is a way back to the window. With **Minimize to taskbar**, Vicu starts minimized instead, so its taskbar button and task count are there from the start.
 - **Linux.** The AppImage writes an autostart entry. The option is hidden when Vicu cannot tell which file to start, for example in a development build. On GNOME the tray icon needs the AppIndicator extension.
 - **Updates.** Vicu checks for a new version every 12 hours and tells you.
 

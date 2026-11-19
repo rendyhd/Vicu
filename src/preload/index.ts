@@ -193,6 +193,7 @@ const api = {
   // Badge
   setTaskBadge: (count: number, dataUrl: string | null) =>
     ipcRenderer.invoke('set-task-badge', count, dataUrl),
+  openBadgeNotificationSettings: () => ipcRenderer.invoke('open-badge-notification-settings'),
 
   // Connection test
   testConnection: (url: string, token: string) =>

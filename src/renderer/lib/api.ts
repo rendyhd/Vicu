@@ -286,6 +286,7 @@ export const api = {
 
   setTaskBadge: (count: number, dataUrl: string | null) =>
     window.api.setTaskBadge(count, dataUrl) as Promise<void>,
+  openBadgeNotificationSettings: () => window.api.openBadgeNotificationSettings() as Promise<void>,
 
   testConnection: (url: string, token: string) =>
     window.api.testConnection(url, token) as Promise<ApiResult<Project[]>>,

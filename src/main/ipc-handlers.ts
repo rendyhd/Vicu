@@ -158,7 +158,7 @@ import {
 } from './quick-entry-state'
 import { getAPIToken, getOidcSignInMode, getProviderKey, getSecretStorageStatus, storeAPIToken, API_TOKEN_NO_EXPIRY } from './auth/token-store'
 import { sendTestNotification, rescheduleNotifications, refreshTaskRemindersSoon, refreshRoutineReminders } from './notifications'
-import { setTaskBadge, clearTaskBadge } from './badge'
+import { setTaskBadge, clearTaskBadge, openBadgeNotificationSettings } from './badge'
 import { resolveShownObsidianLink, testObsidianConnection } from './obsidian-client'
 import { isRegistered, registerHosts } from './browser-host-registration'
 import { checkForUpdates, getCachedUpdateStatus } from './update-checker'
@@ -673,6 +673,8 @@ export function registerIpcHandlers(): void {
     }
     return readSetupPreferences(url, tokenForConnectionTest(url, typed, config?.vikunja_url ?? '', saved))
   })
+
+  handleTrusted('open-badge-notification-settings', () => openBadgeNotificationSettings())
 
   handleTrusted('set-task-badge', (_event, count: number, dataUrl: string | null) => {
     const cfg = loadConfig()

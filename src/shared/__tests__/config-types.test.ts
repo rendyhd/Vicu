@@ -3,13 +3,41 @@ import { readdirSync, readFileSync, statSync } from 'fs'
 import { join, relative, sep } from 'path'
 import {
   CUSTOM_LIST_SORT_FIELDS,
+  closeAction,
   isHiddenFromSidebar,
   isQuickEntryEnabled,
   isQuickViewEnabled,
   isRoutinesEnabled,
   showRoutinesInToday,
+  wantsTray,
   withSidebarListHidden,
 } from '../config-types'
+
+describe('closeAction and wantsTray', () => {
+  it('keeps the old rule while unset: the tray with Quick Entry or Quick View, else quit', () => {
+    expect(closeAction(null)).toBe('quit')
+    expect(closeAction({})).toBe('quit')
+    expect(closeAction({ quick_entry_enabled: true })).toBe('tray')
+    expect(closeAction({ quick_view_enabled: true })).toBe('tray')
+  })
+
+  it('follows the choice once made, whatever Quick Entry and Quick View are', () => {
+    expect(closeAction({ close_action: 'minimize', quick_entry_enabled: true })).toBe('minimize')
+    expect(closeAction({ close_action: 'quit', quick_view_enabled: true })).toBe('quit')
+    expect(closeAction({ close_action: 'tray' })).toBe('tray')
+  })
+
+  it('reads an unknown value as unset', () => {
+    expect(closeAction({ close_action: 'explode' as never, quick_entry_enabled: true })).toBe('tray')
+  })
+
+  it('wants the tray icon for Quick Entry, Quick View or hiding to the tray', () => {
+    expect(wantsTray({})).toBe(false)
+    expect(wantsTray({ close_action: 'minimize' })).toBe(false)
+    expect(wantsTray({ close_action: 'tray' })).toBe(true)
+    expect(wantsTray({ quick_entry_enabled: true, close_action: 'quit' })).toBe(true)
+  })
+})
 
 describe('Quick Entry and Quick View defaults', () => {
   it('are off until the user turns them on, whatever the process reading them', () => {

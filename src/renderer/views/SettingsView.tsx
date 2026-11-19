@@ -22,6 +22,7 @@ import { CompletionSoundSettings } from '@/components/settings/CompletionSoundSe
 import { SidebarSettings } from '@/components/settings/SidebarSettings'
 import { PlannerSettings } from '@/components/settings/PlannerSettings'
 import { WeekStartSetting } from '@/components/settings/WeekStartSetting'
+import { CloseActionSetting } from '@/components/settings/CloseActionSetting'
 import { RoutinesSettingsPanel } from '@/components/routines/RoutinesSettingsPanel'
 import { ProjectSettings } from '@/components/settings/ProjectSettings'
 import { useProjects } from '@/hooks/use-projects'
@@ -29,7 +30,7 @@ import { toast } from '@/stores/toast-store'
 import { connectionAfterTest } from '@/lib/connection-settings'
 import { confirmDelete } from '@/lib/confirm-bridge'
 import { checkUnsyncedWork, signOutWarning } from '@/lib/sign-out-check'
-import type { AppConfig, Project } from '@/lib/vikunja-types'
+import { closeAction, type AppConfig, type Project } from '@/lib/vikunja-types'
 
 import type { ThemeOption } from '@/lib/theme'
 import { ProSettings } from '@/components/settings/ProSettings'
@@ -568,10 +569,20 @@ export function SettingsView() {
                     <span className="text-sm text-[var(--text-primary)]">
                       Start hidden
                     </span>
-                    <span className="text-xs text-[var(--text-secondary)]">(no window at login; needs the tray icon from Quick Entry / View)</span>
+                    <span className="text-xs text-[var(--text-secondary)]">
+                      {window.api.platform === 'darwin'
+                        ? '(no window at login)'
+                        : closeAction(fullConfig) === 'minimize'
+                          ? '(starts minimized to the taskbar)'
+                          : '(no window at login; needs the tray icon)'}
+                    </span>
                   </label>
                 )}
               </>
+            )}
+
+            {window.api.platform !== 'darwin' && (
+              <CloseActionSetting config={fullConfig} onChange={handleQuickEntryChange} />
             )}
 
             <label className="flex cursor-pointer items-center gap-2">
@@ -614,6 +625,18 @@ export function SettingsView() {
                 Show today &amp; overdue count on app icon
               </span>
             </label>
+            {window.api.platform === 'darwin' && fullConfig?.show_today_overdue_badge === true && (
+              <p className="ml-6 text-xs text-[var(--text-secondary)]">
+                macOS shows the count only while Vicu may send notifications with badges.{' '}
+                <button
+                  type="button"
+                  onClick={() => { void api.openBadgeNotificationSettings() }}
+                  className="text-accent-blue hover:underline"
+                >
+                  Notification settings
+                </button>
+              </p>
+            )}
 
             <div>
               <label className="mb-2 block text-xs text-[var(--text-secondary)]">What does urgent mean?</label>

@@ -40,9 +40,10 @@ How to read the tables: **Synced** follows you to every device. **This device** 
 |---|---|---|
 | Launch on startup | Starts Vicu when you sign in to your computer | This device |
 | Start hidden | Starts without a window. Needs the tray icon. | This device |
+| When closing the window | Windows and Linux: minimize to the taskbar (the task count stays), hide to the tray, or quit | This device |
 | Confirm before deleting | Asks before deleting tasks, projects, labels and lists | This device |
 | Subtasks in task lists | **Inside task** keeps them in the task, **Expandable** shows them under the parent | This device |
-| Show today & overdue count on app icon | A badge with the number of tasks due today and overdue | This device |
+| Show today & overdue count on app icon | A badge with the number of tasks due today and overdue. On a Mac it needs notifications with badges allowed for Vicu in System Settings, Notifications. | This device |
 | What does urgent mean? | **Schedule for Today** or **Mark Important**: what the top action in a task's right-click menu does | This device |
 
 #### Sidebar

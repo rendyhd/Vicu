@@ -206,6 +206,8 @@ export interface ElectronAPI {
   /** Drops those changes; each document goes back to the server's copy. Says which had any. */
   discardUnsyncedDocuments(): Promise<{ customLists: boolean; preferences: boolean }>
   setTaskBadge(count: number, dataUrl: string | null): Promise<void>
+  /** macOS: System Settings, Notifications, Vicu (badges need notifications allowed). */
+  openBadgeNotificationSettings(): Promise<void>
   testConnection(url: string, token: string): Promise<ApiResult<Project[]>>
 
   // Auth

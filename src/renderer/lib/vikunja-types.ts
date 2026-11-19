@@ -215,6 +215,7 @@ export type ApiResult<T> =
 export type {
   AppConfig,
   AuthMethod,
+  CloseAction,
   CustomList,
   CustomListFilter,
   CustomListSortField,
@@ -229,6 +230,7 @@ export type {
 export {
   CUSTOM_LIST_SORT_FIELDS,
   SIDEBAR_HIDEABLE_LISTS,
+  closeAction,
   isHiddenFromSidebar,
   isQuickEntryEnabled,
   isQuickViewEnabled,

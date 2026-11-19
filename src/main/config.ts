@@ -205,6 +205,9 @@ export function normalizeConfig(raw: Record<string, unknown>): AppConfig {
     start_hidden: raw.start_hidden === true,
     standalone_mode: raw.standalone_mode === true,
     show_today_overdue_badge: raw.show_today_overdue_badge === true,
+    close_action: raw.close_action === 'minimize' || raw.close_action === 'tray' || raw.close_action === 'quit'
+      ? raw.close_action
+      : undefined,
     show_project_progress: raw.show_project_progress !== false,
     show_project_task_count: raw.show_project_task_count === true,
     // Obsidian

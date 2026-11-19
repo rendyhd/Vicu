@@ -353,6 +353,12 @@ export interface AppConfig {
   start_hidden?: boolean
   standalone_mode?: boolean
   show_today_overdue_badge?: boolean
+  /**
+   * What the main window's close button does on Windows and Linux (`closeAction`): minimize to
+   * the taskbar (the taskbar button and its count badge stay), hide to the tray, or quit. Missing
+   * keeps the old rule: the tray while Quick Entry or Quick View is on, else quit. Per device.
+   */
+  close_action?: CloseAction
   /** Progress rings next to the projects in the sidebar. Missing means on. */
   show_project_progress?: boolean
   /** Each project's number of open tasks in the sidebar, beside the ring when both are on. Missing means off. */
@@ -457,6 +463,26 @@ export function isQuickEntryEnabled(config: Pick<AppConfig, 'quick_entry_enabled
 
 export function isQuickViewEnabled(config: Pick<AppConfig, 'quick_view_enabled'> | null | undefined): boolean {
   return config?.quick_view_enabled === true
+}
+
+/** What the main window's close button does on Windows and Linux (macOS always hides it to the dock). */
+export type CloseAction = 'minimize' | 'tray' | 'quit'
+
+type CloseActionConfig = Pick<AppConfig, 'close_action' | 'quick_entry_enabled' | 'quick_view_enabled'>
+
+/**
+ * The close button's action. Unset keeps the behaviour from before the setting: hide to the tray
+ * while there is one (Quick Entry or Quick View is on), else quit.
+ */
+export function closeAction(config: CloseActionConfig | null | undefined): CloseAction {
+  const chosen = config?.close_action
+  if (chosen === 'minimize' || chosen === 'tray' || chosen === 'quit') return chosen
+  return isQuickEntryEnabled(config) || isQuickViewEnabled(config) ? 'tray' : 'quit'
+}
+
+/** The tray icon exists while Quick Entry or Quick View is on, or closing hides the window to it. */
+export function wantsTray(config: CloseActionConfig | null | undefined): boolean {
+  return isQuickEntryEnabled(config) || isQuickViewEnabled(config) || config?.close_action === 'tray'
 }
 
 /** Routines are on unless the user turned them off (configs from before the setting have none). */

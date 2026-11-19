@@ -2,7 +2,7 @@ import { app, BrowserWindow, globalShortcut, nativeTheme, powerMonitor, screen }
 import { createMainWindow, createQuickEntryWindow, createQuickViewWindow } from './window-manager'
 import { registerIpcHandlers } from './ipc-handlers'
 import { loadConfig, saveConfigQuietly, type AppConfig, DEFAULT_QUICK_ENTRY_HOTKEY, DEFAULT_QUICK_VIEW_HOTKEY } from './config'
-import { isQuickEntryEnabled, isQuickViewEnabled } from '../shared/config-types'
+import { closeAction, isQuickEntryEnabled, isQuickViewEnabled, wantsTray } from '../shared/config-types'
 import { authManager } from './auth/auth-manager'
 import { createTray, destroyTray, hasTray } from './tray'
 import { returnFocusToPreviousWindow, destroyDummyWindow } from './focus'
@@ -29,7 +29,7 @@ import { applyWeekStart, syncSyncedPrefs } from './synced-preferences'
 import { syncProLedger } from './pro-ledger-service'
 import { DEEP_LINK_SCHEME, deepLinkFromArgv, parseDeepLink, quickEntryText, routeOfView, type DeepLink } from './deep-link'
 import { isProEnabled } from '../shared/pro/settings'
-import { parseHiddenArg, shouldStartHidden } from './login-item-settings'
+import { parseHiddenArg, startWindowState } from './login-item-settings'
 import { applyLaunchOnStartup } from './launch-on-startup'
 import { startupEnv } from './startup-env'
 import { buildShortcutStatus } from './shortcut-status'
@@ -37,7 +37,7 @@ import { handleTrusted } from './secure-ipc'
 import { cleanAttachmentTempDir } from './attachment-temp'
 import { registerWebSecurity } from './web-security'
 import { registerTextContextMenu } from './text-context-menu'
-import { APP_ID } from './app-id'
+import { APP_ID, appUserModelId } from './app-id'
 import { cancelVoiceSession } from './voice/service'
 import { shutdownAi } from './ai/ipc'
 
@@ -378,7 +378,10 @@ function registerQuickEntryShortcuts(config: AppConfig): { entry: boolean; viewe
 // --- Main window creation + wiring ---
 // Everything window-instance-specific lives here so the window can be
 // recreated on demand (tray "Show Vicu" / second-instance after a close).
-function createAndWireMainWindow(config: AppConfig | null, options: { startHidden?: boolean } = {}): BrowserWindow {
+function createAndWireMainWindow(
+  config: AppConfig | null,
+  options: { startHidden?: boolean; startMinimized?: boolean } = {},
+): BrowserWindow {
   const win = createMainWindow(config, options)
 
   win.on('maximize', () => win.webContents.send('window-maximized-change', true))
@@ -429,14 +432,33 @@ function createAndWireMainWindow(config: AppConfig | null, options: { startHidde
     void syncProLedger()
   })
 
-  // Unified close policy, evaluated at close time (not startup time):
-  // hide instead of closing whenever that leaves the user a way back —
-  // always on macOS (dock), elsewhere when the tray is active.
+  // Close policy, evaluated at close time (not startup time). macOS always hides to the dock.
+  // Elsewhere the "When closing the window" setting decides (closeAction): minimize keeps the
+  // taskbar button and its count badge, tray hides the window (only while there is a tray icon to
+  // bring it back), quit ends the app even while the tray and the Quick Entry windows are there.
   win.on('close', (e) => {
     if (appIsQuitting) return
-    if (isMac || hasTray()) {
+    if (isMac) {
       e.preventDefault()
       win.hide()
+      return
+    }
+    const action = closeAction(loadConfig())
+    if (action === 'minimize') {
+      e.preventDefault()
+      win.minimize()
+      return
+    }
+    if (action === 'tray' && hasTray()) {
+      e.preventDefault()
+      win.hide()
+      return
+    }
+    // Quit. The hidden Quick Entry and Quick View windows would keep the app alive after this
+    // window closed, so quit explicitly; before-quit then lets this close through.
+    if (hasTray() || BrowserWindow.getAllWindows().some((w) => w !== win && !w.isDestroyed())) {
+      e.preventDefault()
+      app.quit()
     }
   })
 
@@ -562,9 +584,10 @@ function applyQuickEntrySettings(): { entry: boolean; viewer: boolean; waylandLi
   globalShortcut.unregisterAll()
 
   const eitherEnabled = isQuickEntryEnabled(config) || isQuickViewEnabled(config)
+  // "Hide to system tray" on close needs the tray icon even with Quick Entry and View off.
+  if (wantsTray(config)) setupTray()
 
   if (eitherEnabled) {
-    setupTray()
     initQuickEntryWindows(config)
     const result = registerQuickEntryShortcuts(config)
 
@@ -590,7 +613,7 @@ function applyQuickEntrySettings(): { entry: boolean; viewer: boolean; waylandLi
       quickViewWindow.destroy()
       quickViewWindow = null
     }
-    destroyTray()
+    if (!wantsTray(config)) destroyTray()
     if (dragHoverTimer) {
       clearInterval(dragHoverTimer)
       dragHoverTimer = null
@@ -743,7 +766,7 @@ if (!gotLock) {
     callback(false)
   })
 
-  app.setAppUserModelId(APP_ID)
+  app.setAppUserModelId(appUserModelId({ packaged: app.isPackaged, userDataOverride: !!process.env.VICU_USER_DATA_DIR }))
 
   app.whenReady().then(async () => {
     // Attachments opened in a previous session (D-IPC-2). Only the primary
@@ -787,17 +810,22 @@ if (!gotLock) {
     // The account's week start (contract section 2.1), before anything computes a week.
     applyWeekStart()
     // Start in the tray when launched at login with "Start hidden" (or with --hidden), but only
-    // when there is a way back: the tray icon exists when Quick Entry or Quick View is on, and
-    // macOS always has the dock.
-    const trayWillExist = !!config && (isQuickEntryEnabled(config) || isQuickViewEnabled(config))
-    const startHidden = !!config && shouldStartHidden({
+    // when there is a way back: the tray icon exists when Quick Entry or Quick View is on or the
+    // close button hides to the tray, and macOS always has the dock. With "Minimize to taskbar"
+    // the window starts minimized instead, so its taskbar button (and count badge) are there.
+    const trayWillExist = !!config && wantsTray(config)
+    const startState = !config ? 'shown' : startWindowState({
       hiddenArg: parseHiddenArg(process.argv),
       openedAtLogin: isMac && app.getLoginItemSettings().wasOpenedAtLogin,
       startHiddenSetting: config.start_hidden === true,
       isMac,
       canComeBack: isMac || trayWillExist,
+      minimizeOnClose: closeAction(config) === 'minimize',
     })
-    mainWindow = createAndWireMainWindow(config, { startHidden })
+    mainWindow = createAndWireMainWindow(config, {
+      startHidden: startState === 'hidden',
+      startMinimized: startState === 'minimized',
+    })
     startupComplete = true
 
     // Sync Electron's native theme with the user's config setting
@@ -873,8 +901,8 @@ if (!gotLock) {
     // Quick Entry/View: if either enabled, set up tray + windows + hotkeys.
     // Require config to be non-null: on first launch loadConfig() returns null, and
     // initQuickEntryWindows(null) would throw before the user finished setup.
+    if (wantsTray(config)) setupTray()
     if (config && (isQuickEntryEnabled(config) || isQuickViewEnabled(config))) {
-      setupTray()
       initQuickEntryWindows(config)
       globalShortcut.unregisterAll() // Clear stale registrations from crashes
       registerQuickEntryShortcuts(config)
@@ -912,8 +940,8 @@ if (!gotLock) {
     // may close before the main window is created, which would quit the app.
     if (!startupComplete) return
     // macOS: never quit on window-all-closed (standard macOS behavior)
-    // Windows: only quit if tray is not active
-    if (!isMac && !hasTray()) {
+    // Windows and Linux: stay in the tray only while closing hides to it
+    if (!isMac && !(hasTray() && closeAction(loadConfig()) === 'tray')) {
       app.quit()
     }
   })
