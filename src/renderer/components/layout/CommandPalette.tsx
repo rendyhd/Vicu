@@ -28,6 +28,7 @@ import { useNotesStore } from '@/stores/notes-store'
 import { t } from '../../../shared/i18n'
 import { toast } from '@/stores/toast-store'
 import { useAiReady } from '@/hooks/use-ai'
+import { can } from '@/lib/capabilities'
 import { buildPaletteItems, rankPalette, type PaletteCommand, type PaletteItem, type PaletteKind } from '@/lib/palette'
 import { shortcutHint } from '@/lib/shortcut-hint'
 import { useUIStore } from '@/stores/ui-store'
@@ -96,6 +97,8 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
       projects: projects?.flat ?? [],
       labels: labels ?? [],
       planner: isPlannerEnabled(appConfig),
+      voice: can('voice'),
+      assistant: can('assistant'),
       pro: pro.on ? { lists: proLists, focus: pro.layer('availability'), promises: pro.layer('promises') } : undefined,
     }),
     [smartLists, projects?.flat, labels, appConfig, pro, proLists],

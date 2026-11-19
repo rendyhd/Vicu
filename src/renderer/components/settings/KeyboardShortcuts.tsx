@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next'
 import type { TranslationKey } from '../../../shared/i18n'
+import { can } from '@/lib/capabilities'
 
 const isMac = window.api.platform === 'darwin'
 const mod = isMac ? '\u2318' : 'Ctrl'
@@ -69,7 +70,7 @@ export function KeyboardShortcuts() {
   const { t } = useTranslation()
   return (
     <div className="space-y-6">
-      {shortcuts.map((section) => (
+      {shortcuts.filter((section) => can('assistant') || section.category !== 'settings.shortcuts.categories.assistant').map((section) => (
         <div
           key={t(section.category)}
           className="rounded-card border border-[var(--border-color)] bg-[var(--bg-primary)] p-5"

@@ -868,6 +868,10 @@
         "taskAttachments": "Bijlagen",
         "projectViews": "Sorteren op positie"
       }
+    },
+    "webToken": {
+      "remember": "Onthouden in deze browser",
+      "rememberHint": "Als dit uit staat, wordt het token vergeten zodra je de browser sluit."
     }
   },
   "notes": {

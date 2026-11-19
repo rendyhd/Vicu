@@ -31,6 +31,7 @@ import { confirmTaskCompletion } from '@/lib/task-completion'
 import { SmartListIcon } from '@/components/shared/SmartListIcon'
 import { ReadingScroll } from '@/components/layout/ReadingScroll'
 import { useHoldToTalk } from '@/hooks/use-hold-to-talk'
+import { can } from '@/lib/capabilities'
 import { useVoiceListStore } from '@/stores/voice-list-store'
 import type { SmartListId } from '@/lib/smart-list-identity'
 
@@ -597,7 +598,7 @@ export function TaskList({
               {...holdToTalk}
               className="flex h-7 w-7 select-none items-center justify-center rounded-control text-[var(--text-secondary)] transition-colors duration-fade-fast hover:bg-[var(--bg-hover)] hover:text-[var(--accent-blue)]"
               aria-label="New task"
-              title="Click to type a task, hold to say it"
+              title={can('voice') ? 'Click to type a task, hold to say it' : undefined}
             >
               <Plus className="h-4 w-4" />
             </button>
@@ -622,7 +623,7 @@ export function TaskList({
             extra={emptyExtra}
             action={
               showNewTask && projectId ? (
-                <Button variant="secondary" onClick={startAdding} {...holdToTalk} title="Click to type a task, hold to say it">
+                <Button variant="secondary" onClick={startAdding} {...holdToTalk} title={can('voice') ? 'Click to type a task, hold to say it' : undefined}>
                   <Plus className="h-4 w-4" />
                   Add task
                 </Button>

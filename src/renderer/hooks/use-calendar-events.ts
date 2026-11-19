@@ -2,6 +2,7 @@ import { useEffect, useMemo } from 'react'
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { addLocalDays, startOfLocalDay, type LocalDate } from '../../shared/due-dates'
 import type { CalendarEvent, CalendarEventsResult, CalendarFeedView } from '../../shared/calendar-events'
+import { can } from '@/lib/capabilities'
 import type { AddCalendarLinkInput, CaldavDiscoverInput, CaldavSaveInput, CalendarSourcesView } from '../../shared/calendar-sources'
 
 // Connected calendars on the Plan screen (contract 20.9). Main reads them; this asks for the days on
@@ -37,13 +38,15 @@ export function useCalendarEvents(days: readonly LocalDate[]): {
   const query = useQuery<CalendarEventsResult>({
     queryKey: [CALENDAR_EVENTS_KEY, from, to],
     queryFn: () => window.api.calendar.events({ from, to }),
-    enabled: days.length > 0,
+    // A host without connected calendars (the web version) never asks main for them.
+    enabled: days.length > 0 && can('calendars'),
     staleTime: 60_000,
-    refetchInterval: 5 * 60_000,
+    refetchInterval: can('calendars') ? 5 * 60_000 : false,
     placeholderData: (previous) => previous,
   })
 
   useEffect(() => {
+    if (!can('calendars')) return
     // An Electron window that only loses focus never changes page visibility, so TanStack's own
     // focus refetch never runs; main keeps its 5-minute rule.
     const onFocus = () => void client.invalidateQueries({ queryKey: [CALENDAR_EVENTS_KEY] })
@@ -73,6 +76,7 @@ export function useCalendarSources() {
   return useQuery<CalendarSourcesView>({
     queryKey: [CALENDAR_SOURCES_KEY],
     queryFn: () => window.api.calendar.list(),
+    enabled: can('calendars'),
   })
 }
 

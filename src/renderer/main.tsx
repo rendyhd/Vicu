@@ -7,6 +7,7 @@ import { router } from './router'
 import { IsDarkProvider } from './hooks/use-is-dark'
 import { preloadRichTextEditor } from './components/rich-text/LazyRichTextEditor'
 import { api } from './lib/api'
+import { isWebHost } from './lib/capabilities'
 import { initDateFormat } from './lib/date-format'
 import { initLanguage } from './lib/language'
 import './lib/i18n-react'
@@ -44,31 +45,35 @@ async function start(): Promise<void> {
   const dateFormatReady = withTimeout(initDateFormat(window.api), 1_000, undefined)
   // The language too, so the first paint is not in English and then redrawn.
   const languageReady = withTimeout(initLanguage(window.api), 1_000, undefined)
-  const server = await withTimeout(signedInServer(), 1_500, '')
-  await withTimeout(restoreQueryCache(queryClient, indexedDbStore, server).catch(() => false), 1_500, false)
+  // The web version never keeps lists of tasks in the browser: the machine may not be the user's own.
+  const savesLists = !isWebHost()
+  const server = savesLists ? await withTimeout(signedInServer(), 1_500, '') : ''
+  if (savesLists) await withTimeout(restoreQueryCache(queryClient, indexedDbStore, server).catch(() => false), 1_500, false)
 
   await dateFormatReady
   await languageReady
 
   let serverAtSave = server
   let serverCheckedAt = 0
-  startQueryPersistence(queryClient, {
-    store: indexedDbStore,
-    // Read at save time: a login can change it. Looked up at most every few seconds.
-    getServer: () => {
-      if (Date.now() - serverCheckedAt > 5_000) {
-        serverCheckedAt = Date.now()
-        void signedInServer().then((value) => { serverAtSave = value })
-      }
-      return serverAtSave
-    },
-  })
+  if (savesLists) {
+    startQueryPersistence(queryClient, {
+      store: indexedDbStore,
+      // Read at save time: a login can change it. Looked up at most every few seconds.
+      getServer: () => {
+        if (Date.now() - serverCheckedAt > 5_000) {
+          serverCheckedAt = Date.now()
+          void signedInServer().then((value) => { serverAtSave = value })
+        }
+        return serverAtSave
+      },
+    })
+  }
 
   // A new login or a disconnect: forget the previous account's lists, in memory and on disk.
   window.addEventListener(ACCOUNT_CHANGED_EVENT, () => {
     queryClient.removeQueries({ predicate: (query) => PERSISTED_KEY_PREFIXES.has(query.queryKey[0]) })
     serverCheckedAt = 0
-    void indexedDbStore.clear().catch(() => {})
+    if (savesLists) void indexedDbStore.clear().catch(() => {})
   })
 
   ReactDOM.createRoot(document.getElementById('root')!).render(

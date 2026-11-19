@@ -5,6 +5,7 @@ import { checkPlanRequest, planRequestUser, type PlanRequestInput } from '@/lib/
 import { announce } from '@/stores/announcer-store'
 import { errorText } from '@/stores/dictation-store'
 import { useAiWorkspace } from './use-ai'
+import { can } from '@/lib/capabilities'
 
 export interface PlanSuggestions {
   result: PlanDayResult | null
@@ -31,7 +32,9 @@ export function usePlanSuggestions(options: {
   /** Built when the request is sent, so it reads the day as it is then. */
   input: () => Omit<PlanRequestInput, 'reference'>
 }): PlanSuggestions {
-  const { enabled, dataReady, day } = options
+  const { dataReady, day } = options
+  // A host without the assistant (the web version) never asks for suggestions.
+  const enabled = options.enabled && can('assistant')
   const ws = useAiWorkspace()
   // Each belongs to the day it was asked for and is not shown on another.
   const [answered, setAnswered] = useState<{ day: string; result: PlanDayResult } | null>(null)

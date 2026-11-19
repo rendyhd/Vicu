@@ -3,7 +3,8 @@ import { ArrowLeft, Bell, FolderTree, Gem, Keyboard, SlidersHorizontal, Sparkles
 import { useTranslation } from 'react-i18next'
 import type { TranslationKey } from '../../../shared/i18n'
 import { cn } from '@/lib/cn'
-import { SETTINGS_GROUPS, type SettingsTab } from '@/lib/settings-menu'
+import { settingsGroups, type SettingsTab } from '@/lib/settings-menu'
+import { capabilities } from '@/lib/capabilities'
 import { useSettingsNavStore } from '@/stores/settings-nav-store'
 import { SelectionPill } from '@/components/sidebar/SelectionPill'
 
@@ -71,7 +72,7 @@ export function SettingsMenu({ variant }: { variant: 'column' | 'sidebar' }) {
         <span className="text-card-title text-[var(--text-primary)]">{t('settings.menu.title')}</span>
       </div>
       <nav aria-label={t('settings.menu.title')} className="flex-1 overflow-y-auto px-2 pb-3">
-        {SETTINGS_GROUPS.map((group) => {
+        {settingsGroups(capabilities()).map((group) => {
           const groupLabel = GROUP_LABELS[group.label] ? t(GROUP_LABELS[group.label]) : group.label
           return (
           <div key={group.label} role="group" aria-label={groupLabel}>

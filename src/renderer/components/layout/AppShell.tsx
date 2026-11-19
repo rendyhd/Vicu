@@ -38,6 +38,7 @@ import { useProShortcuts } from '@/hooks/use-pro-shortcuts'
 import { useRepeatRuleBridge } from '@/hooks/use-repeat-rules'
 import { useReorderStore } from '@/stores/reorder-store'
 import { api } from '@/lib/api'
+import { can } from '@/lib/capabilities'
 import { applyTheme } from '@/lib/theme'
 import type { ThemeOption } from '@/lib/theme'
 import type { Task, Project, CustomList, AppConfig } from '@/lib/vikunja-types'
@@ -861,7 +862,7 @@ export function AppShell() {
           } as React.CSSProperties}
         >
           <div className="flex-1" />
-          <WindowControls />
+          {can('windowControls') && <WindowControls />}
         </header>
 
         {/* Sidebar — bg extends behind drag region */}
@@ -886,14 +887,14 @@ export function AppShell() {
 
         <div ref={contentColumnRef} className="flex flex-1 flex-col overflow-hidden bg-[var(--bg-primary)]">
           <div className="h-8 shrink-0" />
-          <UpdateBanner />
+          {can('updates') && <UpdateBanner />}
           <ContentArea>
             <Outlet />
           </ContentArea>
         </div>
         <CommentsPaneHost />
-        <AskHost />
-        <BadgeSync />
+        {can('assistant') && <AskHost />}
+        {can('badge') && <BadgeSync />}
         <CompletionSoundSync />
         <GlobalConfirm />
         <ProjectActionsHost />
@@ -901,11 +902,15 @@ export function AppShell() {
         <FocusPickerHost />
         <ProDialogHost />
         <ToastHost />
-        <VoiceHost />
-        <DictationHost />
-        <NotesHost />
-        <MakeTasksDialog />
-        <AiHost />
+        {can('voice') && <VoiceHost />}
+        {can('assistant') && (
+          <>
+            <DictationHost />
+            <NotesHost />
+            <MakeTasksDialog />
+            <AiHost />
+          </>
+        )}
         <CommandPalette />
       </div>
 

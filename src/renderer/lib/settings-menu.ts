@@ -36,6 +36,27 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
   },
 ]
 
+/** What the host leaves out of the menu: the tabs of features it lacks (src/shared/capabilities.ts). */
+export interface SettingsHost {
+  assistant: boolean
+  quickWindows: boolean
+}
+
+/**
+ * The tabs this host offers: every tab on the desktop; the web version has no Assistant and no
+ * Quick Entry / View. A group left empty is dropped.
+ */
+export function settingsGroups(host: SettingsHost): SettingsGroup[] {
+  const offered = (tab: SettingsTab): boolean => {
+    if (tab === 'assistant') return host.assistant
+    if (tab === 'integrations') return host.quickWindows
+    return true
+  }
+  return SETTINGS_GROUPS
+    .map((group) => ({ ...group, tabs: group.tabs.filter((tab) => offered(tab.key)) }))
+    .filter((group) => group.tabs.length > 0)
+}
+
 export function settingsTabLabel(tab: SettingsTab): string {
   for (const group of SETTINGS_GROUPS) {
     const found = group.tabs.find((t) => t.key === tab)

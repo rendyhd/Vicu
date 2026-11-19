@@ -1,4 +1,5 @@
 import { api } from './api'
+import { can } from './capabilities'
 import { isQueueableFailure, maybeCreatedMessage } from './error-classify'
 import { ApiError, apiError } from './mutation-errors'
 import { isTempTaskId, pendingTaskFromCreate } from './pending-cache'
@@ -166,7 +167,8 @@ export async function createTaskOrQueue(
 ): Promise<CreateOutcome> {
   const result = await api.createTask(projectId, task)
   if (result.success) return { queued: false, task: result.data }
-  if (!isQueueableFailure(result, 'create')) {
+  // Without a queue (the web version) a failed create is reported like one that cannot be queued.
+  if (!can('offlineQueue') || !isQueueableFailure(result, 'create')) {
     // A timeout or a 500 may have created the task; say so, so "try again" does not add it twice.
     const warning = maybeCreatedMessage(result)
     throw apiError(warning ? { ...result, error: warning, mayExist: true } : result)

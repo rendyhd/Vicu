@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
+import { can } from '@/lib/capabilities'
 import { isRefreshKey, manualRefresh } from '@/lib/manual-refresh'
 import { appRefreshDeps } from '@/lib/task-refresh'
 import { announce } from '@/stores/announcer-store'
@@ -15,6 +16,7 @@ export function refreshNow(qc: QueryClient): void {
       void Promise.resolve(api.syncSyncedPrefs()).catch(() => {})
     },
     refreshCalendars: () => {
+      if (!can('calendars')) return
       void Promise.resolve(window.api.calendar.refresh())
         .catch(() => {})
         .then(() => invalidateCalendars(qc))

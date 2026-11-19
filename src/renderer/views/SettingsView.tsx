@@ -37,9 +37,10 @@ import { closeAction, type AppConfig, type Project } from '@/lib/vikunja-types'
 import type { ThemeOption } from '@/lib/theme'
 import { ProSettings } from '@/components/settings/ProSettings'
 import { SettingsMenu, SETTINGS_TAB_LABELS } from '@/components/settings/SettingsMenu'
-import { currentSectionIndex, SETTINGS_MENU_WIDTH } from '@/lib/settings-menu'
+import { currentSectionIndex, SETTINGS_MENU_WIDTH, settingsGroups } from '@/lib/settings-menu'
 import { useSettingsNavStore } from '@/stores/settings-nav-store'
 import type { TranslationKey } from '../../shared/i18n'
+import { can, capabilities } from '@/lib/capabilities'
 
 /** Every tab's content sits in the same column, left-aligned with the page title. */
 const SETTINGS_COLUMN = 'mx-6 max-w-[640px] space-y-6 pb-8 pt-4'
@@ -85,8 +86,12 @@ export function SettingsView() {
   // Manage in the Plan gear: the calendars of the Plan settings, once they are drawn.
   useEffect(() => {
     if (section === 'pro') setActiveTab('pro')
-    if (section === 'assistant') setActiveTab('assistant')
+    if (section === 'assistant' && can('assistant')) setActiveTab('assistant')
   }, [section])
+  // A tab the host does not offer (the web version has no Assistant) is never the open one.
+  useEffect(() => {
+    if (!settingsGroups(capabilities()).some((group) => group.tabs.some((tab) => tab.key === activeTab))) setActiveTab('general')
+  }, [activeTab, setActiveTab])
   useEffect(() => {
     if (section !== 'calendars' || !fullConfig) return
     setActiveTab('pro')
@@ -201,8 +206,8 @@ export function SettingsView() {
     })
     // Pull current global-shortcut registration state so the banner shows on
     // cold start, not only after the user edits a hotkey.
-    api.getGlobalShortcutStatus().then(setHotkeyWarnings).catch(() => {})
-    api.getLaunchOnStartupSupport().then((result) => setLaunchOnStartupSupported(result.supported)).catch(() => {})
+    if (can('quickWindows')) api.getGlobalShortcutStatus().then(setHotkeyWarnings).catch(() => {})
+    if (can('windowControls')) api.getLaunchOnStartupSupport().then((result) => setLaunchOnStartupSupported(result.supported)).catch(() => {})
   }, [])
 
   useEffect(() => {
@@ -252,10 +257,10 @@ export function SettingsView() {
     setSaveStatus('saving')
     try {
       await api.saveConfigPatch(patch)
-      const result = await api.applyQuickEntrySettings()
+      const result = can('quickWindows') ? await api.applyQuickEntrySettings() : null
       await api.rescheduleNotifications()
       queryClient.invalidateQueries({ queryKey: APP_CONFIG_QUERY_KEY })
-      setHotkeyWarnings(result)
+      if (result) setHotkeyWarnings(result)
       setSaveStatus('saved')
       setTimeout(() => setSaveStatus('idle'), 2000)
     } catch (err) {
@@ -291,8 +296,9 @@ export function SettingsView() {
       warning = signOutWarning(await checkUnsyncedWork({
         syncCustomLists: api.syncCustomLists,
         syncSyncedPrefs: api.syncSyncedPrefs,
-        replayNow: api.offlineQueue.replayNow,
-        snapshot: api.offlineQueue.snapshot,
+        // Without an offline queue (the web version) nothing is waiting.
+        replayNow: can('offlineQueue') ? api.offlineQueue.replayNow : async () => ({ success: false as const, error: 'No offline queue' }),
+        snapshot: can('offlineQueue') ? api.offlineQueue.snapshot : async () => ({ success: false as const, error: 'No offline queue' }),
         getConfig: api.getConfig,
       }))
     } finally {
@@ -326,7 +332,7 @@ export function SettingsView() {
       {/* One column width for every tab (SETTINGS_COLUMN). */}
       {activeTab === 'shortcuts' ? (
         <div className={SETTINGS_COLUMN}>
-          {fullConfig && <VoiceSettings config={fullConfig} onChange={handleQuickEntryChange} />}
+          {fullConfig && can('voice') && <VoiceSettings config={fullConfig} onChange={handleQuickEntryChange} />}
           <KeyboardShortcuts />
         </div>
       ) : activeTab === 'projects' ? (
@@ -339,7 +345,7 @@ export function SettingsView() {
           {/* Plan lives with Pro's tools, but works whether Pro is on or off. */}
           {fullConfig && !fullConfig.standalone_mode && <PlannerSettings config={fullConfig} onChange={handleQuickEntryChange} />}
         </div>
-      ) : activeTab === 'assistant' ? (
+      ) : activeTab === 'assistant' && can('assistant') ? (
         <div className={SETTINGS_COLUMN}>
           <AssistantSettings />
         </div>
@@ -383,6 +389,8 @@ export function SettingsView() {
             </div>
           ) : (
             <div className="space-y-3">
+              {/* The web version is served next to its server: there is no address to change. */}
+              {can('serverChoice') && (
               <div>
                 <label className="mb-1 block text-xs text-[var(--text-secondary)]">{t('settings.connection.url')}</label>
                 <input
@@ -394,6 +402,7 @@ export function SettingsView() {
                   className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]"
                 />
               </div>
+              )}
 
               <div>
                 <label className="mb-1 flex items-center text-xs text-[var(--text-secondary)]">
@@ -593,7 +602,7 @@ export function SettingsView() {
               </>
             )}
 
-            {window.api.platform !== 'darwin' && (
+            {window.api.platform !== 'darwin' && can('windowControls') && (
               <CloseActionSetting config={fullConfig} onChange={handleQuickEntryChange} />
             )}
 
@@ -630,6 +639,7 @@ export function SettingsView() {
               </select>
             </label>
 
+            {can('badge') && (
             <label className="flex cursor-pointer items-center gap-2">
               <Checkbox
                 checked={fullConfig?.show_today_overdue_badge === true}
@@ -639,7 +649,8 @@ export function SettingsView() {
                 {t('settings.preferences.badge')}
               </span>
             </label>
-            {window.api.platform === 'darwin' && fullConfig?.show_today_overdue_badge === true && (
+            )}
+            {can('badge') && window.api.platform === 'darwin' && fullConfig?.show_today_overdue_badge === true && (
               <p className="ml-6 text-xs text-[var(--text-secondary)]">
                 {t('settings.preferences.badgeMacNote')}{' '}
                 <button
@@ -820,7 +831,7 @@ export function SettingsView() {
           <p className="text-xs text-danger">{t('settings.save.failedNote')}</p>
         )}
       </div>
-      ) : activeTab === 'integrations' ? (
+      ) : activeTab === 'integrations' && can('quickWindows') ? (
       <div className={SETTINGS_COLUMN}>
         {fullConfig && (
           <QuickEntrySettings
@@ -831,7 +842,7 @@ export function SettingsView() {
           />
         )}
 
-        {fullConfig && (
+        {fullConfig && can('browserLink') && (
           <BrowserSettings
             config={fullConfig}
             onChange={handleQuickEntryChange}
@@ -842,7 +853,7 @@ export function SettingsView() {
         {/* Obsidian integration is unavailable on Linux (Wayland blocks the
             foreground-process detection it relies on) — hide the section
             entirely so users aren't offered a dead setting. */}
-        {fullConfig && window.api.platform !== 'linux' && (
+        {fullConfig && can('obsidian') && window.api.platform !== 'linux' && (
           <ObsidianSettings
             config={fullConfig}
             onChange={handleQuickEntryChange}

@@ -868,6 +868,10 @@
         "taskAttachments": "File attachments",
         "projectViews": "Position sorting"
       }
+    },
+    "webToken": {
+      "remember": "Remember on this browser",
+      "rememberHint": "If this is off, the token is forgotten when you close the browser."
     }
   },
   "notes": {

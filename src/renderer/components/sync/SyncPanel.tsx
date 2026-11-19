@@ -2,6 +2,7 @@ import { useId, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { AlertTriangle, LogIn, RefreshCw, X } from 'lucide-react'
 import { api } from '@/lib/api'
+import { can } from '@/lib/capabilities'
 import { invalidateTaskData, refreshTasks } from '@/lib/task-refresh'
 import { removePendingTasks } from '@/lib/pending-cache'
 import { confirmDelete } from '@/lib/confirm-bridge'
@@ -110,8 +111,10 @@ export function SyncPanel({ onClose }: { onClose: () => void }) {
 
   const { data: unsyncedDocuments } = useUnsyncedDocuments()
 
-  const failed = snapshot?.failed ?? []
-  const pending = snapshot?.pending ?? []
+  // Without the offline queue (the web version) there are no waiting or failed changes to show.
+  const queueOn = can('offlineQueue')
+  const failed = queueOn ? snapshot?.failed ?? [] : []
+  const pending = queueOn ? snapshot?.pending ?? [] : []
   const documents = unsyncedDocumentItems(unsyncedDocuments)
 
   const run = async (action: () => Promise<{ success: boolean; error?: string }>, failure: string): Promise<boolean> => {
@@ -189,7 +192,7 @@ export function SyncPanel({ onClose }: { onClose: () => void }) {
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto">
-          {authProblem && (
+          {queueOn && authProblem && (
             <div className="flex items-start gap-3 border-b border-[var(--border-color)] bg-danger/10 px-4 py-3">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-danger" />
               <div className="min-w-0 flex-1">
@@ -211,7 +214,7 @@ export function SyncPanel({ onClose }: { onClose: () => void }) {
             </div>
           )}
 
-          {counts.pending > 0 && (
+          {queueOn && counts.pending > 0 && (
             <section className="border-b border-[var(--border-color)]">
               <div className="flex items-center gap-2 px-4 pb-1 pt-3">
                 <h3 className="flex-1 text-[11px] font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
@@ -325,7 +328,7 @@ export function SyncPanel({ onClose }: { onClose: () => void }) {
             </section>
           )}
 
-          {!authProblem && counts.pending === 0 && failed.length === 0 && documents.length === 0 && (
+          {!(queueOn && authProblem) && !(queueOn && counts.pending > 0) && failed.length === 0 && documents.length === 0 && (
             <p className="px-4 py-6 text-center text-[12px] text-[var(--text-secondary)]">Everything is synced.</p>
           )}
         </div>

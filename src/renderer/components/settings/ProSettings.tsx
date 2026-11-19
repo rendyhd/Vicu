@@ -16,6 +16,7 @@ import { PRO_LAYERS, type ProLayer } from '../../../shared/pro/settings'
 import { ledgerSettings } from '../../../shared/pro/ledger'
 import { startDateOf } from '../../../shared/pro/start-dates'
 import { toLocalDate } from '../../../shared/due-dates'
+import { can } from '@/lib/capabilities'
 
 const CARD = 'rounded-card border border-[var(--border-color)] bg-[var(--bg-primary)] p-5'
 const FIELD = 'rounded-control border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-1.5 text-sm text-[var(--text-primary)]'
@@ -89,6 +90,7 @@ export function ProSettings() {
                 </span>
               </label>
             ))}
+            {can('assistant') && (
             <label className="flex cursor-pointer items-start gap-2 border-t border-[var(--border-color)] pt-3">
               <Checkbox
                 checked={config?.pro_assistant === true}
@@ -101,6 +103,7 @@ export function ProSettings() {
                 </span>
               </span>
             </label>
+            )}
           </div>
         )}
       </div>

@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
+import { can } from '@/lib/capabilities'
 import { handleReplayed } from '@/lib/replay-handler'
 import { insertPendingTask, pendingTaskFromCreate } from '@/lib/pending-cache'
 import { useOfflineStore } from '@/stores/offline-store'
@@ -21,6 +22,8 @@ export function useOfflineQueueSync(): void {
   const qc = useQueryClient()
 
   useEffect(() => {
+    // A host without the queue (the web version) has nothing to subscribe to; the counts stay zero.
+    if (!can('offlineQueue')) return
     let disposed = false
     let timer: ReturnType<typeof setTimeout> | null = null
 

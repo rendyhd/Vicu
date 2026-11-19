@@ -1,5 +1,6 @@
 import type { QueryClient, QueryKey } from '@tanstack/react-query'
 import { api } from './api'
+import { can } from './capabilities'
 import { useOfflineStore } from '@/stores/offline-store'
 
 /** Every cached query that holds tasks or something derived from them (the sidebar's done counts). */
@@ -49,8 +50,9 @@ const REPLAY_REQUEST_MIN_INTERVAL_MS = 5_000
 let lastReplayRequest = 0
 
 export const appRefreshDeps: RefreshDeps = {
-  pendingCount: () => useOfflineStore.getState().counts.pending,
+  pendingCount: () => (can('offlineQueue') ? useOfflineStore.getState().counts.pending : 0),
   replayNow: () => {
+    if (!can('offlineQueue')) return
     const now = Date.now()
     if (now - lastReplayRequest < REPLAY_REQUEST_MIN_INTERVAL_MS) return
     lastReplayRequest = now

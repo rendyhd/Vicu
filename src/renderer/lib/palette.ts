@@ -36,6 +36,10 @@ export interface PaletteSources {
   labels: readonly Pick<Label, 'id' | 'title'>[]
   /** The Plan screen is on: "New event" is listed (calendar plan, phase 1). */
   planner?: boolean
+  /** The host has voice input; "Say a task" is listed (default true: the desktop). */
+  voice?: boolean
+  /** The host has the assistant; its entries are listed (default true: the desktop). */
+  assistant?: boolean
   /** Pro's lists and actions while Pro is on (plan 7.1.11); absent while it is off. */
   pro?: ProPaletteSources
 }
@@ -74,7 +78,7 @@ export const GUIDED_PALETTE_ITEMS: readonly PaletteItem[] = [
 ]
 
 /** Everything the palette can run except tasks: actions, smart lists, guided sessions, projects and labels, in that order. */
-export function buildPaletteItems({ smartLists, projects, labels, planner = false, pro }: PaletteSources): PaletteItem[] {
+export function buildPaletteItems({ smartLists, projects, labels, planner = false, voice = true, assistant = true, pro }: PaletteSources): PaletteItem[] {
   const actions: PaletteItem[] = [
     { id: 'cmd:new-task', kind: 'Action', title: 'New task', keywords: 'add create', action: { type: 'command', command: 'new-task' } },
     // An Event on the Plan screen (contract 20.3), at the selected day's next free time.
@@ -82,15 +86,21 @@ export function buildPaletteItems({ smartLists, projects, labels, planner = fals
       ? [{ id: 'cmd:new-event', kind: 'Action', title: 'New event', keywords: 'add create calendar meeting busy plan', action: { type: 'command', command: 'new-event' } } satisfies PaletteItem]
       : []),
     // Voice input that needs no holding (docs/voice-input.md): listening until Enter, Esc cancels.
-    { id: 'cmd:voice', kind: 'Action', title: 'Say a task', keywords: 'voice dictate speak speech microphone add', action: { type: 'command', command: 'voice' } },
+    ...(voice
+      ? [{ id: 'cmd:voice', kind: 'Action', title: 'Say a task', keywords: 'voice dictate speak speech microphone add', action: { type: 'command', command: 'voice' } } satisfies PaletteItem]
+      : []),
     // The AI assistant (docs/ai-assistant-v1.md): smart dictation with the microphone open, its
     // brain dump (organized at the end, 4.8), Ask, and dictation's "Make tasks from this".
-    { id: 'cmd:dictate', kind: 'Action', title: 'Dictate tasks', keywords: 'assistant ai voice smart dictation speak several microphone', action: { type: 'command', command: 'dictate' } },
-    { id: 'cmd:brain-dump', kind: 'Action', title: 'Brain dump', keywords: 'assistant ai voice dictation ramble organize organise projects think type', action: { type: 'command', command: 'brain-dump' } },
-    { id: 'cmd:ask', kind: 'Action', title: 'Ask Vicu', keywords: 'assistant ai chat question talk', action: { type: 'command', command: 'ask' } },
-    { id: 'cmd:make-tasks', kind: 'Action', title: 'Make tasks from text', keywords: 'assistant ai paste notes email split', action: { type: 'command', command: 'make-tasks' } },
-    // Notes, PDFs and pictures of pages made into tasks (docs/ai-assistant-v1.md 4.9).
-    { id: 'cmd:notes', kind: 'Action', title: t('notes.palette'), keywords: 'assistant ai notes meeting offsite pdf picture photo scan handwriting pages action items', action: { type: 'command', command: 'notes' } },
+    ...(assistant
+      ? ([
+          { id: 'cmd:dictate', kind: 'Action', title: 'Dictate tasks', keywords: 'assistant ai voice smart dictation speak several microphone', action: { type: 'command', command: 'dictate' } },
+          { id: 'cmd:brain-dump', kind: 'Action', title: 'Brain dump', keywords: 'assistant ai voice dictation ramble organize organise projects think type', action: { type: 'command', command: 'brain-dump' } },
+          { id: 'cmd:ask', kind: 'Action', title: 'Ask Vicu', keywords: 'assistant ai chat question talk', action: { type: 'command', command: 'ask' } },
+          { id: 'cmd:make-tasks', kind: 'Action', title: 'Make tasks from text', keywords: 'assistant ai paste notes email split', action: { type: 'command', command: 'make-tasks' } },
+          // Notes, PDFs and pictures of pages made into tasks (docs/ai-assistant-v1.md 4.9).
+          { id: 'cmd:notes', kind: 'Action', title: t('notes.palette'), keywords: 'assistant ai notes meeting offsite pdf picture photo scan handwriting pages action items', action: { type: 'command', command: 'notes' } },
+        ] satisfies PaletteItem[])
+      : []),
     { id: 'cmd:refresh', kind: 'Action', title: 'Refresh', keywords: 'reload sync update', action: { type: 'command', command: 'refresh' } },
     { id: 'cmd:toggle-theme', kind: 'Action', title: 'Toggle theme', keywords: 'dark light mode', action: { type: 'command', command: 'toggle-theme' } },
     { id: 'cmd:settings', kind: 'Action', title: 'Settings', keywords: 'preferences options', action: { type: 'command', command: 'settings' } },

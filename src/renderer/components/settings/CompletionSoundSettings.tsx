@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { api } from '@/lib/api'
 import { cn } from '@/lib/cn'
+import { can } from '@/lib/capabilities'
 import { reloadCompletionSound, previewCompletionSound } from '@/lib/completion-sound'
 import type { AppConfig } from '@/lib/vikunja-types'
 
@@ -97,10 +98,13 @@ export function CompletionSoundSettings({ config, onChange }: Props) {
             <Button variant="secondary" onClick={() => void handlePlay()} disabled={busy} aria-label={t('settings.completionSound.playLabel')}>
               <Play className="h-4 w-4" aria-hidden="true" /> {t('settings.completionSound.play')}
             </Button>
-            <Button variant="secondary" onClick={handleChooseFile} disabled={busy}>
-              {t('settings.completionSound.choose')}
-            </Button>
-            {info && !info.isDefault && (
+            {/* Choosing a file by its path needs the desktop; the built-in sound and its switch stay. */}
+            {can('openFiles') && (
+              <Button variant="secondary" onClick={handleChooseFile} disabled={busy}>
+                {t('settings.completionSound.choose')}
+              </Button>
+            )}
+            {can('openFiles') && info && !info.isDefault && (
               <Button variant="secondary" onClick={handleReset} disabled={busy}>
                 {t('settings.completionSound.reset')}
               </Button>
@@ -109,9 +113,11 @@ export function CompletionSoundSettings({ config, onChange }: Props) {
 
           {error && <p className="text-xs text-danger">{error}</p>}
 
-          <p className="text-xs text-[var(--text-secondary)]">
-            {t('settings.completionSound.supported')}
-          </p>
+          {can('openFiles') && (
+            <p className="text-xs text-[var(--text-secondary)]">
+              {t('settings.completionSound.supported')}
+            </p>
+          )}
         </div>
       </div>
     </div>

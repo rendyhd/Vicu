@@ -1,6 +1,7 @@
 import { Plus } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { useHoldToTalk } from '@/hooks/use-hold-to-talk'
+import { can } from '@/lib/capabilities'
 
 interface AddTaskButtonProps {
   onClick: () => void
@@ -20,7 +21,7 @@ export function AddTaskButton({ onClick, label = 'New task', className }: AddTas
       type="button"
       onClick={onClick}
       {...holdToTalk}
-      title="Click to type a task, hold to say it"
+      title={can('voice') ? 'Click to type a task, hold to say it' : undefined}
       className={cn(
         'flex w-full select-none items-center gap-3 px-4 py-2.5 text-left text-task-title text-text-secondary transition-colors duration-fade-fast hover:bg-bg-hover hover:text-text',
         className

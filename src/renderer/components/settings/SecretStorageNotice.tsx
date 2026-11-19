@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api } from '@/lib/api'
+import { can } from '@/lib/capabilities'
 import { useTranslation } from 'react-i18next'
 import { t } from '../../../shared/i18n'
 
@@ -23,10 +24,11 @@ export function SecretStorageNotice({ subject = 'token' }: { subject?: 'token' |
   const [level, setLevel] = useState<Level | null>(null)
 
   useEffect(() => {
+    if (!can('secretStorage')) return
     api.getSecretStorageStatus().then(setLevel).catch(() => {})
   }, [])
 
-  if (!level || level === 'encrypted') return null
+  if (!can('secretStorage') || !level || level === 'encrypted') return null
 
   const isLinux = window.api.platform === 'linux'
   const isKey = subject === 'key'

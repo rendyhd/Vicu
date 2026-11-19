@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { BrowserSignIn } from '@/components/auth/BrowserSignIn'
 import { api } from '@/lib/api'
 import { cn } from '@/lib/cn'
+import { isWebHost } from '@/lib/capabilities'
 import type { OidcSignInMode } from '../../shared/oidc-browser'
 
 interface ReauthViewProps {
@@ -31,6 +32,31 @@ export function ReauthView({
   const [oidcMode, setOidcMode] = useState<OidcSignInMode>('window')
   const [passkeyPrompted, setPasskeyPrompted] = useState(false)
   const [providerName, setProviderName] = useState<string | undefined>()
+  // The web version signs in to SSO by leaving the page, so there is no "in the browser instead" mode.
+  const web = isWebHost()
+  // The provider a sign-in that left the page came back from (it asked for a two-factor code).
+  const [pendingProvider, setPendingProvider] = useState('')
+
+  // The web version: what the sign-in that left the page came back with, read once.
+  useEffect(() => {
+    if (!web) return
+    let live = true
+    void api.pendingSignIn()
+      .then((pending) => {
+        if (!live || !pending) return
+        if (pending.totpRequired) {
+          setPendingProvider(pending.providerKey)
+          setNeedsOidcTotp(true)
+          setTotpCode('')
+        } else if (pending.error) {
+          setError(pending.error)
+        }
+      })
+      .catch(() => {})
+    return () => {
+      live = false
+    }
+  }, [web])
 
   useEffect(() => {
     if (authMethod !== 'oidc') return
@@ -38,14 +64,14 @@ export function ReauthView({
     void Promise.all([api.getOidcSignIn(), api.discoverOidc(vikunjaUrl)])
       .then(([last, providers]) => {
         if (!live) return
-        setOidcMode(last.mode)
+        setOidcMode(web ? 'window' : last.mode)
         setProviderName((providers.find((p) => p.key === last.providerKey) ?? providers[0])?.name)
       })
       .catch(() => {})
     return () => {
       live = false
     }
-  }, [authMethod, vikunjaUrl])
+  }, [authMethod, vikunjaUrl, web])
 
   const handlePasswordLogin = async (totpPasscode?: string) => {
     setLoading(true)
@@ -82,8 +108,8 @@ export function ReauthView({
 
     try {
       // No provider key: main signs in with the provider used last time.
-      const signIn = mode === 'browser' ? api.oidcBrowserLogin : api.oidcLogin
-      const result = await signIn(vikunjaUrl, '', totpPasscode)
+      const signIn = mode === 'browser' && !web ? api.oidcBrowserLogin : api.oidcLogin
+      const result = await signIn(vikunjaUrl, pendingProvider, totpPasscode)
       if (result.success) {
         onSuccess()
       } else if (result.totpRequired) {
@@ -131,6 +157,7 @@ export function ReauthView({
               >
                 {loading ? 'Waiting for sign-in...' : providerName ? `Sign in with ${providerName}` : 'Sign in with SSO'}
               </button>
+              {!web && (
               <button
                 type="button"
                 onClick={() => {
@@ -142,10 +169,11 @@ export function ReauthView({
               >
                 Uses a passkey? Sign in through your browser
               </button>
+              )}
             </>
           )}
 
-          {authMethod === 'oidc' && !needsOidcTotp && oidcMode === 'browser' && (
+          {authMethod === 'oidc' && !web && !needsOidcTotp && oidcMode === 'browser' && (
             <>
               <BrowserSignIn
                 providerName={providerName}

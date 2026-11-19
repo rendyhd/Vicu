@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { Settings } from 'lucide-react'
 import { api } from '@/lib/api'
+import { can } from '@/lib/capabilities'
 import { SyncStatusButton } from '@/components/sync/SyncStatusButton'
 
 export function SidebarFooter() {
@@ -12,6 +13,8 @@ export function SidebarFooter() {
   const [releaseUrl, setReleaseUrl] = useState('')
 
   useEffect(() => {
+    // A host without the update check (the web version) is updated by its server.
+    if (!can('updates')) return
     api.getUpdateStatus().then((status) => {
       if (status?.available) {
         api.getConfig().then((config) => {
@@ -51,6 +54,9 @@ export function SidebarFooter() {
           <Settings className="h-3.5 w-3.5" strokeWidth={1.8} />
           <span>Settings</span>
         </button>
+        {!can('updates') ? (
+          <span className="flex h-7 items-center px-2 text-caption text-[var(--text-secondary)]">{`v${__APP_VERSION__}`}</span>
+        ) : (
         <button
           type="button"
           onClick={async () => {
@@ -75,6 +81,7 @@ export function SidebarFooter() {
             <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-[var(--accent-blue)]" />
           )}
         </button>
+        )}
       </div>
     </div>
   )

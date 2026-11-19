@@ -5,11 +5,13 @@ import { usePersonLabels } from './use-people'
 import type { ProToolData } from '@/lib/ai/pro-tools'
 import { isProAssistantOn } from '../../shared/pro/settings'
 import { recordValue } from '../../shared/pro/ledger'
+import { can } from '@/lib/capabilities'
 
 /** Pro's assistant switch on this device (docs/ai-assistant-v1.md section 11): off by default. */
 export function useProAssistantOn(): boolean {
   const { data: config } = useAppConfig()
-  return isProAssistantOn(config ?? null)
+  // Without the assistant (the web version) its Pro parts are off, whatever the setting says.
+  return can('assistant') && isProAssistantOn(config ?? null)
 }
 
 /**

@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/shared/Button'
+import { Checkbox } from '@/components/shared/Checkbox'
 import { BrowserSignIn } from '@/components/auth/BrowserSignIn'
 import { api, type OIDCProvider, type ServerAuthInfo } from '@/lib/api'
 import { cn } from '@/lib/cn'
+import { can, isWebHost } from '@/lib/capabilities'
 import type { Project } from '@/lib/vikunja-types'
 import type { OidcSignInMode } from '../../shared/oidc-browser'
 import type { TranslationKey } from '../../shared/i18n'
@@ -69,6 +71,18 @@ function TokenPermissionsInfo() {
 
 export { TokenPermissionsInfo }
 
+/** The web version's "Remember on this browser" choice for an API token; its host reads the key when it saves the connection. */
+const REMEMBER_TOKEN_KEY = 'vicu-web-remember-token'
+
+function rememberTokenChoice(remember: boolean): void {
+  try {
+    if (remember) localStorage.setItem(REMEMBER_TOKEN_KEY, '1')
+    else localStorage.removeItem(REMEMBER_TOKEN_KEY)
+  } catch {
+    // Storage is blocked: the token is then simply not remembered.
+  }
+}
+
 type Step = 'url' | 'auth-method' | 'oidc-login' | 'oidc-totp' | 'password-login' | 'totp' | 'api-token' | 'project'
 
 // The order the steps are reached in; a step later in it slides in from the right, an earlier one from the left.
@@ -79,13 +93,20 @@ interface SetupViewProps {
 }
 
 export function SetupView({ onComplete }: SetupViewProps) {
+  const { t } = useTranslation()
+  // The web version is served next to its server, so the server is this page's own origin and no
+  // address is asked for; its SSO sign-in leaves the page and comes back (api.pendingSignIn).
+  const web = isWebHost()
+  const ownServer = !can('serverChoice')
   const [step, setStep] = useState<Step>('url')
   // Which way the step slid (card 4.11a), read while rendering so the new step starts sliding in its first frame.
   const shown = useRef<{ step: Step; direction: 'forward' | 'back' | null }>({ step: 'url', direction: null })
   if (shown.current.step !== step) {
     shown.current = { step, direction: STEP_ORDER.indexOf(step) >= STEP_ORDER.indexOf(shown.current.step) ? 'forward' : 'back' }
   }
-  const [url, setUrl] = useState('')
+  const [url, setUrl] = useState(ownServer ? window.location.origin : '')
+  // Web: keep an API token on this browser between visits (off: it is forgotten when the browser closes).
+  const [rememberToken, setRememberToken] = useState(false)
   const [token, setToken] = useState('')
   const [showToken, setShowToken] = useState(false)
   const [inboxProjectId, setInboxProjectId] = useState(0)
@@ -151,9 +172,8 @@ export function SetupView({ onComplete }: SetupViewProps) {
     }
   }
 
-  const handleUrlContinue = async () => {
-    const effectiveUrl = url.trim() || DEFAULT_URL
-    if (!url.trim()) setUrl(effectiveUrl)
+  /** Ask the server how it signs people in, and go to the step that follows. */
+  const discoverServer = async (effectiveUrl: string): Promise<ServerAuthInfo> => {
     setDiscovering(true)
     const authInfo = await api.discoverAuthMethods(effectiveUrl.replace(/\/+$/, ''))
     setServerAuth(authInfo)
@@ -165,7 +185,55 @@ export function SetupView({ onComplete }: SetupViewProps) {
     } else {
       setStep('api-token')
     }
+    return authInfo
   }
+
+  const handleUrlContinue = async () => {
+    const effectiveUrl = url.trim() || DEFAULT_URL
+    if (!url.trim()) setUrl(effectiveUrl)
+    await discoverServer(effectiveUrl)
+  }
+
+  // Without a server to choose (the web version) setup starts by asking the page's own server how it
+  // signs in. On the web an SSO sign-in leaves the page and returns here: its outcome is read once,
+  // and a session that already exists goes straight to choosing the Inbox.
+  useEffect(() => {
+    if (!ownServer) return
+    let live = true
+    const begin = async () => {
+      const pending = web ? await api.pendingSignIn().catch(() => null) : null
+      if (!live) return
+      if (!pending && web) {
+        const projectsResult = await api.fetchProjects().catch(() => null)
+        if (!live) return
+        if (projectsResult?.success) {
+          const config = await api.getConfig().catch(() => null)
+          if (!live) return
+          setAuthMethod(config?.auth_method === 'password' ? 'password' : config?.auth_method === 'api_token' ? 'api_token' : 'oidc')
+          setProjects(projectsResult.data)
+          await preselectInbox(projectsResult.data)
+          if (live) setStep('project')
+          return
+        }
+      }
+      const authInfo = await discoverServer(window.location.origin)
+      if (!live || !pending) return
+      const provider = authInfo.oidc_providers.find((p) => p.key === pending.providerKey)
+      if (provider) setSelectedOidcProvider(provider)
+      if (pending.totpRequired && provider) {
+        setOidcMode('window')
+        setTotpCode('')
+        setStep('oidc-totp')
+      } else if (pending.error) {
+        setOidcError(pending.error)
+      }
+    }
+    void begin()
+    return () => {
+      live = false
+    }
+    // Once, when the view opens.
+  }, [])
 
   const showBrowserSignIn = (provider: OIDCProvider, prompted: boolean) => {
     setSelectedOidcProvider(provider)
@@ -270,6 +338,8 @@ export function SetupView({ onComplete }: SetupViewProps) {
   const handleTestConnection = async () => {
     setTestStatus('testing')
     setTestError('')
+    // The web version reads this when the connection is saved: a remembered token stays on this browser.
+    if (web) rememberTokenChoice(rememberToken)
     const result = await api.testConnection(url.replace(/\/+$/, ''), token)
     if (result.success) {
       setTestStatus('success')
@@ -285,6 +355,7 @@ export function SetupView({ onComplete }: SetupViewProps) {
 
   const handleSave = async () => {
     setSaving(true)
+    if (web) rememberTokenChoice(rememberToken)
     // Main merges the connection details into the existing config, so app preferences
     // are preserved. If the server URL changed it also resets account-specific data
     // (project IDs, custom lists, etc.), since those belong to the previous server/account.
@@ -296,14 +367,16 @@ export function SetupView({ onComplete }: SetupViewProps) {
     })
     // If the user is coming from standalone mode, push their local tasks to
     // the freshly chosen inbox so nothing is stranded in offline-cache.json.
-    try {
-      const standaloneCount = await api.getStandaloneTaskCount()
-      if (standaloneCount > 0 && inboxProjectId) {
-        await api.uploadStandaloneTasks(inboxProjectId)
+    if (can('standalone')) {
+      try {
+        const standaloneCount = await api.getStandaloneTaskCount()
+        if (standaloneCount > 0 && inboxProjectId) {
+          await api.uploadStandaloneTasks(inboxProjectId)
+        }
+      } catch {
+        // Best effort — tasks stay in the local store and upload can be retried
+        // by re-running setup.
       }
-    } catch {
-      // Best effort — tasks stay in the local store and upload can be retried
-      // by re-running setup.
     }
     setSaving(false)
     onComplete()
@@ -325,7 +398,7 @@ export function SetupView({ onComplete }: SetupViewProps) {
           Welcome to Vicu
         </h1>
         <p className="mb-6 text-sm text-text-secondary">
-          {step === 'url' && 'Enter your Vikunja server URL to get started.'}
+          {step === 'url' && !ownServer && 'Enter your Vikunja server URL to get started.'}
           {step === 'auth-method' && 'Choose how to sign in.'}
           {step === 'oidc-login' && 'Complete sign-in in your browser.'}
           {step === 'oidc-totp' && 'Enter your two-factor code to complete SSO.'}
@@ -337,7 +410,8 @@ export function SetupView({ onComplete }: SetupViewProps) {
 
         <div key={step} data-step={step} data-step-direction={shown.current.direction ?? undefined} className={cn('space-y-4', shown.current.direction === 'forward' && 'vicu-step-forward', shown.current.direction === 'back' && 'vicu-step-back')}>
           {/* Step 1: URL Input */}
-          {step === 'url' && (
+          {/* With the server fixed (the web version) this step has nothing to ask: discovery is already running. */}
+          {step === 'url' && !ownServer && (
             <>
               <div>
                 <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">
@@ -392,7 +466,7 @@ export function SetupView({ onComplete }: SetupViewProps) {
                 </Button>
               ))}
 
-              {oidcProviders.length > 0 && (
+              {oidcProviders.length > 0 && !web && (
                 <Button
                   variant="quiet"
                   onClick={() => showBrowserSignIn(oidcProviders.find((p) => p.key === selectedOidcProvider?.key) ?? oidcProviders[0], false)}
@@ -440,14 +514,16 @@ export function SetupView({ onComplete }: SetupViewProps) {
                 Use API Token instead
               </Button>
 
-              <Button variant="quiet" onClick={() => setStep('url')} className="w-full">
-                Back
-              </Button>
+              {!ownServer && (
+                <Button variant="quiet" onClick={() => setStep('url')} className="w-full">
+                  Back
+                </Button>
+              )}
             </>
           )}
 
           {/* Step 2a: OIDC sign-in in the browser */}
-          {step === 'oidc-login' && selectedOidcProvider && (
+          {step === 'oidc-login' && !web && selectedOidcProvider && (
             <>
               {oidcProviders.length > 1 && (
                 <div>
@@ -619,7 +695,7 @@ export function SetupView({ onComplete }: SetupViewProps) {
                 variant="quiet"
                 onClick={() => {
                   setPasswordError('')
-                  setStep(serverAuth?.oidc_enabled ? 'auth-method' : 'url')
+                  setStep(serverAuth?.oidc_enabled || ownServer ? 'auth-method' : 'url')
                 }}
                 className="w-full"
               >
@@ -682,6 +758,7 @@ export function SetupView({ onComplete }: SetupViewProps) {
           {/* Step 3b: API Token */}
           {step === 'api-token' && (
             <>
+              {!ownServer && (
               <div>
                 <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">
                   Server URL
@@ -690,6 +767,7 @@ export function SetupView({ onComplete }: SetupViewProps) {
                   {url}
                 </div>
               </div>
+              )}
 
               <div>
                 <label className="mb-1 flex items-center text-xs font-medium text-[var(--text-secondary)]">
@@ -713,6 +791,16 @@ export function SetupView({ onComplete }: SetupViewProps) {
                   </button>
                 </div>
               </div>
+
+              {web && (
+                <label className="flex cursor-pointer items-start gap-2">
+                  <Checkbox checked={rememberToken} onChange={(e) => setRememberToken(e.target.checked)} />
+                  <span>
+                    <span className="block text-sm text-[var(--text-primary)]">{t('settings.webToken.remember')}</span>
+                    <span className="block text-xs text-[var(--text-secondary)]">{t('settings.webToken.rememberHint')}</span>
+                  </span>
+                </label>
+              )}
 
               <Button
                 variant="primary"

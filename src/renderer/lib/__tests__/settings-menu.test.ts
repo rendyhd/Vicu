@@ -5,6 +5,7 @@ import {
   SETTINGS_CONTENT_MIN,
   SETTINGS_GROUPS,
   SETTINGS_MENU_WIDTH,
+  settingsGroups,
   settingsMenuInSidebar,
   settingsTabLabel,
 } from '../settings-menu'
@@ -15,6 +16,14 @@ describe('settings menu', () => {
     expect(new Set(keys).size).toBe(keys.length)
     expect(keys).toHaveLength(7)
     expect(settingsTabLabel('integrations')).toBe('Quick Entry / View')
+  })
+
+  it('offers every tab on the desktop and leaves out the tabs of features the web lacks', () => {
+    const keys = (host: { assistant: boolean; quickWindows: boolean }) => settingsGroups(host).flatMap((g) => g.tabs.map((t) => t.key))
+    expect(settingsGroups({ assistant: true, quickWindows: true })).toEqual(SETTINGS_GROUPS)
+    expect(keys({ assistant: false, quickWindows: false })).toEqual(['general', 'projects', 'notifications', 'pro', 'shortcuts'])
+    expect(keys({ assistant: true, quickWindows: false })).toContain('assistant')
+    expect(keys({ assistant: false, quickWindows: true })).toContain('integrations')
   })
 
   it('moves into the sidebar only when the column and the settings do not fit', () => {

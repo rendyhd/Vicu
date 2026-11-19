@@ -51,6 +51,7 @@ import {
   readPositionHints,
 } from '@/lib/new-task-position'
 import { useOfflineStore } from '@/stores/offline-store'
+import { can } from '@/lib/capabilities'
 import { useUploadingStore } from '@/stores/uploading-store'
 import { toast } from '@/stores/toast-store'
 import { queuedUploadText, queuedUploadsText } from '@/lib/waiting-uploads'
@@ -622,7 +623,7 @@ export function useReorderTask() {
 
 /** Take a done flag back: a completion still waiting in the queue is cancelled, anything else is reversed with a request. */
 async function reverseDone(entry: { task: Task; queued: boolean }, done: boolean): Promise<void> {
-  if (entry.queued) {
+  if (entry.queued && can('offlineQueue')) {
     const cancelled = await api.offlineQueue.cancelChange(entry.task.id, ['done'])
     if (cancelled.success && cancelled.data) return
   }
@@ -679,7 +680,7 @@ export async function completeTaskRequest(task: Task): Promise<Task> {
 export async function uncompleteTaskRequest(task: Task, autoCompleted: readonly Task[]): Promise<Task> {
   const restored: Array<{ task: Task; queued: boolean }> = []
   const reopen = async (item: Task): Promise<Task | null> => {
-    if (useOfflineStore.getState().counts.pending > 0) {
+    if (can('offlineQueue') && useOfflineStore.getState().counts.pending > 0) {
       const cancelled = await api.offlineQueue.cancelChange(item.id, ['done'])
       if (cancelled.success && cancelled.data) {
         restored.push({ task: item, queued: false })

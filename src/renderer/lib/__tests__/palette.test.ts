@@ -22,6 +22,15 @@ describe('buildPaletteItems', () => {
     expect(ids(items).map((id) => id.split(':')[0])).toEqual(['cmd', 'cmd', 'cmd', 'cmd', 'cmd', 'cmd', 'cmd', 'cmd', 'cmd', 'cmd', 'list', 'list', 'list', 'guided', 'guided', 'guided', 'guided', 'guided', 'project', 'project', 'label'])
   })
 
+  it('leaves out Say a task and the assistant entries on a host without voice or the assistant', () => {
+    const base = { smartLists: [], projects: [], labels: [] }
+    const web = ids(buildPaletteItems({ ...base, voice: false, assistant: false }))
+    expect(web).toEqual(['cmd:new-task', 'cmd:refresh', 'cmd:toggle-theme', 'cmd:settings', ...web.filter((id) => id.startsWith('guided:'))])
+    expect(ids(buildPaletteItems({ ...base, voice: true, assistant: false }))).toContain('cmd:voice')
+    expect(ids(buildPaletteItems({ ...base, voice: false, assistant: true }))).toEqual(expect.arrayContaining(['cmd:ask', 'cmd:dictate', 'cmd:brain-dump', 'cmd:make-tasks', 'cmd:notes']))
+    expect(ids(buildPaletteItems({ ...base, voice: false, assistant: true }))).not.toContain('cmd:voice')
+  })
+
   it('lists New event after New task only while the Plan screen is on', () => {
     expect(items.some((i) => i.id === 'cmd:new-event')).toBe(false)
     const planner = buildPaletteItems({ smartLists: [], projects: [], labels: [], planner: true })

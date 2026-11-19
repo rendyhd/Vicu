@@ -4,6 +4,7 @@ import { Check, ChevronDown, Plus, RefreshCw, Trash2 } from 'lucide-react'
 import { Button } from '@/components/shared/Button'
 import { Checkbox } from '@/components/shared/Checkbox'
 import { cn } from '@/lib/cn'
+import { can } from '@/lib/capabilities'
 import { useCalendarActions, useCalendarSources } from '@/hooks/use-calendar-events'
 import { usePlanEventActions, usePlanEvents } from '@/hooks/use-plan-events'
 import { formatLength } from '@/lib/planner-timeline'
@@ -273,7 +274,8 @@ function CalendarSummary() {
   const failing = feeds.filter((feed) => feed.error)
   const parts = [
     events.length === 1 ? '1 Event' : `${events.length} Events`,
-    shown.length === 1 ? '1 calendar shown' : `${shown.length} calendars shown`,
+    // Connected calendars do not exist in every host (the web version): then only the Events count.
+    ...(can('calendars') ? [shown.length === 1 ? '1 calendar shown' : `${shown.length} calendars shown`] : []),
   ]
   return (
     <div data-calendar-summary>
@@ -308,6 +310,8 @@ export function CalendarFeeds({ summary = false }: { summary?: boolean }) {
   return (
     <div data-calendar-feeds>
       <MyEvents />
+      {can('calendars') && (
+      <>
       <div className="flex items-center gap-2 border-t border-border pt-3">
         <p className="flex-1 text-meta font-medium text-text">Calendars</p>
         {connections.length > 0 && (
@@ -341,6 +345,8 @@ export function CalendarFeeds({ summary = false }: { summary?: boolean }) {
         Add calendar
       </Button>
       <AddCalendarDialog open={adding} onClose={() => setAdding(false)} />
+      </>
+      )}
       <ImportCalendarHost />
     </div>
   )

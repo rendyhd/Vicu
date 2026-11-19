@@ -28,6 +28,7 @@ import type { TaskPatch } from './merge-patches'
 import type { JsonPatchOperation } from '../../shared/routines'
 import type { SyncedPrefsSnapshot } from '../../shared/synced-prefs'
 import type { OidcSignInMode } from '../../shared/oidc-browser'
+import { can } from './capabilities'
 import { withCollabSignals } from './collab-signals'
 import { announceAccountChanged } from './account-events'
 import type {
@@ -65,6 +66,8 @@ export type OidcLoginResult =
     }
 
 function queueOptions(title?: string): TaskWriteOptions {
+  // A host without the offline queue (the web version) never asks main to queue a change.
+  if (!can('offlineQueue')) return title ? { title } : {}
   return title ? { queue: true, title } : { queue: true }
 }
 

@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { CalendarAccountProvider, OAuthClientsView, OwnOAuthClientInput } from '../../shared/calendar-accounts'
 import type { CalendarSourcesView } from '../../shared/calendar-sources'
+import { can } from '@/lib/capabilities'
 import { CALENDAR_SOURCES_KEY, invalidateCalendars } from './use-calendar-events'
 
 // Microsoft 365 and Google calendar accounts (plan phase 2e): which OAuth client signs in, the
@@ -16,6 +17,7 @@ export function useOAuthClients() {
   return useQuery<OAuthClientsView>({
     queryKey: [OAUTH_CLIENTS_KEY],
     queryFn: () => window.api.calendar.oauthClients(),
+    enabled: can('calendars'),
     // One IPC call to main: asked again whenever a form opens.
     staleTime: 0,
   })
