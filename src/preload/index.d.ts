@@ -239,6 +239,10 @@ export interface ElectronAPI {
   saveTaskAttachment(taskId: number, attachmentId: number, fileName: string): Promise<ApiResult<{ saved: boolean; path?: string }>>
   /** `queued` names the files kept for later because the server could not be reached. */
   pickAndUploadAttachment(taskId: number): Promise<ApiResult<{ count: number; attachments: unknown[]; queued?: string[]; error?: string }>>
+  /** The attach dialog: each picked file by a token for `uploadPickedAttachment`, with its name and size. Empty when cancelled. */
+  pickAttachmentFiles(): Promise<ApiResult<{ token: string; name: string; size: number }[]>>
+  /** Uploads one picked file; `queued` names it when it was kept for later. */
+  uploadPickedAttachment(taskId: number, token: string): Promise<ApiResult<{ attachments: unknown[]; queued?: string }>>
 
   // Quick Entry/View
   applyQuickEntrySettings(): Promise<{ entry: boolean; viewer: boolean; waylandLimited: boolean }>

@@ -51,6 +51,7 @@ import {
   readPositionHints,
 } from '@/lib/new-task-position'
 import { useOfflineStore } from '@/stores/offline-store'
+import { useUploadingStore } from '@/stores/uploading-store'
 import { toast } from '@/stores/toast-store'
 import { queuedUploadText, queuedUploadsText } from '@/lib/waiting-uploads'
 import type {
@@ -1195,24 +1196,74 @@ export function useTaskAttachments(taskId: number, enabled: boolean) {
   })
 }
 
+let uploadKeys = 0
+
+/**
+ * The attach dialog for a task's attachments: every picked file shows as uploading at once and is
+ * sent one after the other; each one's attachment goes into the list as soon as the server names
+ * it, in the place its uploading row had (the phone's editor does the same).
+ */
 export function useUploadAttachment() {
   const qc = useQueryClient()
 
   return useMutation({
     meta: metaFor('upload the attachment'),
     mutationFn: async (taskId: number) => {
-      const result = await api.pickAndUploadAttachment(taskId)
-      if (!result.success) throw apiError(result)
-      return result.data
+      const picked = await api.pickAttachmentFiles()
+      if (!picked.success) throw apiError(picked)
+      return sendPickedFiles(qc, taskId, picked.data)
     },
     onSuccess: (data) => {
-      if (data.queued?.length) toast.info(queuedUploadsText(data.queued))
+      if (data.queued.length) toast.info(queuedUploadsText(data.queued))
     },
     onSettled: (_data, _err, taskId) => {
       qc.invalidateQueries({ queryKey: ['task-attachments', taskId] })
       refreshTasks(qc, [['tasks'], ['view-tasks']])
     },
   })
+}
+
+export async function sendPickedFiles(
+  qc: ReturnType<typeof useQueryClient>,
+  taskId: number,
+  files: readonly { token: string; name: string; size: number }[],
+): Promise<{ count: number; queued: string[] }> {
+  const store = useUploadingStore.getState()
+  const knownIds = (qc.getQueryData<TaskAttachment[]>(['task-attachments', taskId]) ?? []).map((a) => a.id)
+  const uploads = files.map((file) => ({ key: ++uploadKeys, taskId, name: file.name, size: file.size, knownIds }))
+  store.add(uploads)
+  let count = 0
+  let lastError = ''
+  const queued: string[] = []
+  for (const [index, file] of files.entries()) {
+    const { key } = uploads[index]
+    const result = await api.uploadPickedAttachment(taskId, file.token).catch((err: unknown) => ({
+      success: false as const,
+      error: err instanceof Error ? err.message : 'Upload failed',
+    }))
+    if (!result.success) {
+      store.remove(key)
+      lastError = result.error
+      continue
+    }
+    if (result.data.queued) {
+      store.remove(key)
+      queued.push(result.data.queued)
+      continue
+    }
+    const made = result.data.attachments
+    count++
+    if (made.length === 0) {
+      store.remove(key)
+      continue
+    }
+    qc.setQueryData<TaskAttachment[]>(['task-attachments', taskId], (old) =>
+      old ? [...old, ...made.filter((m) => !old.some((o) => o.id === m.id))] : old)
+    store.land(key, Math.max(...made.map((m) => m.id)))
+    store.announce(taskId, `${file.name} attached`)
+  }
+  if (count === 0 && queued.length === 0 && files.length > 0) throw new Error(lastError || 'Upload failed')
+  return { count, queued }
 }
 
 export function useUploadAttachmentFromDrop() {

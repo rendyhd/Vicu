@@ -386,6 +386,10 @@ export const api = {
     window.api.saveTaskAttachment(taskId, attachmentId, fileName) as Promise<ApiResult<{ saved: boolean; path?: string }>>,
   pickAndUploadAttachment: (taskId: number) =>
     window.api.pickAndUploadAttachment(taskId) as Promise<ApiResult<{ count: number; attachments: TaskAttachment[]; queued?: string[]; error?: string }>>,
+  pickAttachmentFiles: () =>
+    window.api.pickAttachmentFiles() as Promise<ApiResult<{ token: string; name: string; size: number }[]>>,
+  uploadPickedAttachment: (taskId: number, token: string) =>
+    window.api.uploadPickedAttachment(taskId, token) as Promise<ApiResult<{ attachments: TaskAttachment[]; queued?: string }>>,
 
   // Offline queue (main process). Changes that fail for network or server reasons are queued here
   // and replayed in order; see src/main/offline/ and src/shared/offline-queue-types.ts.

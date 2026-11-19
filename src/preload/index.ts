@@ -245,6 +245,9 @@ const api = {
     ipcRenderer.invoke('save-task-attachment', taskId, attachmentId, fileName),
   pickAndUploadAttachment: (taskId: number) =>
     ipcRenderer.invoke('pick-and-upload-attachment', taskId),
+  pickAttachmentFiles: () => ipcRenderer.invoke('pick-attachment-files'),
+  uploadPickedAttachment: (taskId: number, token: string) =>
+    ipcRenderer.invoke('upload-picked-attachment', taskId, token),
 
   // Obsidian
   openDeepLink: (url: string) => ipcRenderer.invoke('open-deep-link', url),

@@ -54,6 +54,7 @@ import {
   downloadTaskAttachment,
 } from './api-client'
 import { loadFileForUpload } from './upload-file'
+import { PickedFiles } from './picked-files'
 import { getLaunchOnStartupSupport } from './launch-on-startup'
 import { startupEnv } from './startup-env'
 import { announceDateFormatIfChanged, dateFormatForWindow } from './date-format'
@@ -1247,23 +1248,11 @@ export function registerIpcHandlers(): void {
     })
   })
 
+  // The attach dialog: the files picked, uploaded one after the other in this call (comments).
   handleTrusted('pick-and-upload-attachment', async (_event, taskId: number) => {
-    const win = getMainWindow()
-    const config = loadConfig()
-    const dialogResult = await dialog.showOpenDialog(win!, {
-      properties: ['openFile', 'multiSelections'],
-      defaultPath: resolveDialogDefaultPath(
-        config?.last_file_dialog_directory,
-        app.getPath('documents')
-      ),
-    })
-    if (dialogResult.canceled || dialogResult.filePaths.length === 0) {
+    const filePaths = await pickAttachmentPaths()
+    if (filePaths.length === 0) {
       return { success: true, data: { count: 0, attachments: [] } }
-    }
-
-    if (config) {
-      config.last_file_dialog_directory = directoryFromSelectedFile(dialogResult.filePaths[0])
-      saveConfig(config)
     }
 
     let count = 0
@@ -1271,41 +1260,38 @@ export function registerIpcHandlers(): void {
     const attachments: unknown[] = []
     // Files kept for later because the server could not be reached (issue 104).
     const queued: string[] = []
-    const deps = taskWriteDeps()
-    for (const filePath of dialogResult.filePaths) {
-      // Size is checked against the server's limit from stat, before the file is read, and the read
-      // is asynchronous: picking a huge file neither freezes the app nor fills memory (D-IPC-5).
-      const loaded = await loadFileForUpload(filePath, { checkSize })
-      if (!loaded.ok) {
-        lastError = loaded.error
-        continue
+    for (const filePath of filePaths) {
+      const sent = await uploadAttachmentFile(taskId, filePath)
+      if (sent.kind === 'queued') queued.push(sent.name)
+      else if (sent.kind === 'failed') lastError = sent.error
+      else {
+        attachments.push(...sent.attachments)
+        count++
       }
-      const fileName = path.basename(filePath)
-      const mimeType = getMimeType(fileName)
-      const outcome = await writeTask(
-        deps,
-        taskWrites.upload(deps.queue, { uploadTaskAttachment }, taskId, { bytes: loaded.buffer, name: fileName, mime: mimeType }),
-        { queue: true }
-      )
-      if (outcome.kind === 'queued') {
-        queued.push(fileName)
-        continue
-      }
-      if (outcome.kind === 'refused') {
-        lastError = outcome.result.error
-        continue
-      }
-      // The server answers 201 even for a file it refused.
-      const answer = readUploadAnswer(outcome.result.data)
-      attachments.push(...answer.attachments)
-      if (answer.error && answer.attachments.length === 0) lastError = answer.error
-      else count++
     }
-    if (count === 0 && queued.length === 0 && dialogResult.filePaths.length > 0) {
+    if (count === 0 && queued.length === 0) {
       return { success: false, error: lastError || 'Upload failed' }
     }
     if (count > 0) notifyViewerSync()
     return { success: true, data: { count, attachments, queued, ...(lastError ? { error: lastError } : {}) } }
+  })
+
+  // The attach dialog for the task's attachments: the files picked, each named by a token, so the
+  // renderer can show each one uploading while it sends them with 'upload-picked-attachment'.
+  handleTrusted('pick-attachment-files', async () => {
+    const filePaths = await pickAttachmentPaths()
+    return { success: true, data: await pickedFiles.remember(filePaths) }
+  })
+
+  handleTrusted('upload-picked-attachment', async (_event, taskId: number, token: string) => {
+    if (!Number.isSafeInteger(taskId)) return { success: false, error: 'Invalid task' }
+    const filePath = pickedFiles.take(token)
+    if (!filePath) return { success: false, error: 'The picked file is no longer available. Pick it again.' }
+    const sent = await uploadAttachmentFile(taskId, filePath)
+    if (sent.kind === 'failed') return { success: false, error: sent.error }
+    if (sent.kind === 'queued') return { success: true, data: { attachments: [], queued: sent.name } }
+    notifyViewerSync()
+    return { success: true, data: { attachments: sent.attachments } }
   })
 
   // --- Obsidian IPC ---
@@ -1435,6 +1421,54 @@ function notifyMainWindow(excludeWebContentsId?: number): void {
 function refreshViewerOnSuccess<T extends { success: boolean }>(result: T): T {
   if (result.success) notifyViewerSync()
   return result
+}
+
+const pickedFiles = new PickedFiles()
+
+/** The attach dialog (several files), starting in the folder of the last pick; empty when cancelled. */
+async function pickAttachmentPaths(): Promise<string[]> {
+  const win = getMainWindow()
+  const config = loadConfig()
+  const dialogResult = await dialog.showOpenDialog(win!, {
+    properties: ['openFile', 'multiSelections'],
+    defaultPath: resolveDialogDefaultPath(
+      config?.last_file_dialog_directory,
+      app.getPath('documents')
+    ),
+  })
+  if (dialogResult.canceled || dialogResult.filePaths.length === 0) return []
+  if (config) {
+    config.last_file_dialog_directory = directoryFromSelectedFile(dialogResult.filePaths[0])
+    saveConfig(config)
+  }
+  return dialogResult.filePaths
+}
+
+type SentAttachment =
+  | { kind: 'uploaded'; attachments: unknown[] }
+  | { kind: 'queued'; name: string }
+  | { kind: 'failed'; error: string }
+
+/** Uploads one picked file to the task, or keeps it for later when the server cannot be reached. */
+async function uploadAttachmentFile(taskId: number, filePath: string): Promise<SentAttachment> {
+  // Size is checked against the server's limit from stat, before the file is read, and the read
+  // is asynchronous: picking a huge file neither freezes the app nor fills memory (D-IPC-5).
+  const loaded = await loadFileForUpload(filePath, { checkSize })
+  if (!loaded.ok) return { kind: 'failed', error: loaded.error }
+  const fileName = path.basename(filePath)
+  const mimeType = getMimeType(fileName)
+  const deps = taskWriteDeps()
+  const outcome = await writeTask(
+    deps,
+    taskWrites.upload(deps.queue, { uploadTaskAttachment }, taskId, { bytes: loaded.buffer, name: fileName, mime: mimeType }),
+    { queue: true }
+  )
+  if (outcome.kind === 'queued') return { kind: 'queued', name: fileName }
+  if (outcome.kind === 'refused') return { kind: 'failed', error: outcome.result.error }
+  // The server answers 201 even for a file it refused.
+  const answer = readUploadAnswer(outcome.result.data)
+  if (answer.error && answer.attachments.length === 0) return { kind: 'failed', error: answer.error }
+  return { kind: 'uploaded', attachments: answer.attachments }
 }
 
 // Helper: notify Quick View to refresh

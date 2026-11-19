@@ -34,6 +34,8 @@ import { InfoPopover } from './InfoPopover'
 import { AssignPopover } from './AssignPopover'
 import { AvatarStack } from '../shared/Avatar'
 import { ProCardChips } from '../pro/ProCardChips'
+import { useUploadingStore } from '@/stores/uploading-store'
+import { uploadsToShow } from '@/lib/uploading-files'
 
 /** The one editor of the card that is open, if any. */
 export type CardPopover =
@@ -184,7 +186,9 @@ export function TaskCardBar({
   const placeReminder = reminderFor(task.id)
   const reminderCount = (task.reminders?.length ?? 0) + (placeReminder ? 1 : 0)
   const repeats = (task.repeat_after ?? 0) > 0 || (task.repeat_mode ?? 0) > 0
-  const attachmentCount = task.attachments?.length ?? 0
+  // Files on their way from the attach dialog count at once (the popover lists them as uploading).
+  const uploads = useUploadingStore((state) => state.uploads)
+  const attachmentCount = (task.attachments?.length ?? 0) + uploadsToShow(uploads, task.id, task.attachments ?? []).length
   const project = projects?.flat.find((p) => p.id === task.project_id)
   const dueText = hasDate ? (formatDueDate(task.due_date, new Date(), dateFormat, 'chip') ?? '') : ''
   const repeatText = formatRecurrenceLabel(task.repeat_after ?? 0, task.repeat_mode ?? 0)

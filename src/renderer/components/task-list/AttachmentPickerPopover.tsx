@@ -9,6 +9,8 @@ import { AttachmentViewer } from './AttachmentViewer'
 import { api } from '@/lib/api'
 import { useOfflineStore } from '@/stores/offline-store'
 import { waitingUploadStatus, waitingUploadsFor, type WaitingUpload } from '@/lib/waiting-uploads'
+import { uploadingStatus, uploadsToShow, type UploadingFile } from '@/lib/uploading-files'
+import { useUploadingStore } from '@/stores/uploading-store'
 
 interface AttachmentPickerPopoverProps {
   anchorRef: RefObject<HTMLElement | null>
@@ -83,11 +85,36 @@ function WaitingUploadRow({ upload }: { upload: WaitingUpload }) {
   )
 }
 
+/**
+ * A file the attach dialog is sending now: the waiting row's shape with a spinner in the badge.
+ * Its attachment's own row takes its place once the server names it.
+ */
+function UploadingRow({ upload }: { upload: UploadingFile }) {
+  return (
+    <div role="status" aria-label={`Uploading ${upload.name}`} className="flex items-center gap-2 rounded-control px-2 py-1.5">
+      <span className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-control bg-bg-hover opacity-80">
+        <File className="h-4 w-4 text-[var(--text-secondary)]" aria-hidden="true" />
+        <Loader2
+          className="absolute -bottom-1 -right-1 h-3.5 w-3.5 animate-spin rounded-full bg-[var(--bg-primary)] text-accent-blue motion-reduce:animate-none"
+          aria-hidden="true"
+        />
+      </span>
+      <span className="min-w-0 flex-1" aria-hidden="true">
+        <span className="block truncate text-xs text-[var(--text-primary)]">{upload.name}</span>
+        <span className="block text-caption text-[var(--text-secondary)]">{uploadingStatus(upload.size)}</span>
+      </span>
+    </div>
+  )
+}
+
 export function AttachmentPickerPopover({ anchorRef, invokedBy, taskId, onClose }: AttachmentPickerPopoverProps) {
   const { data: attachments, isLoading } = useTaskAttachments(taskId, true)
   const offlineSnapshot = useOfflineStore((state) => state.snapshot)
   const waiting = useMemo(() => waitingUploadsFor(offlineSnapshot, taskId), [offlineSnapshot, taskId])
   const uploadAttachment = useUploadAttachment()
+  const allUploads = useUploadingStore((state) => state.uploads)
+  const landedNotice = useUploadingStore((state) => (state.notice?.taskId === taskId ? state.notice.text : ''))
+  const uploading = useMemo(() => uploadsToShow(allUploads, taskId, attachments ?? []), [allUploads, taskId, attachments])
   const deleteAttachment = useDeleteAttachment()
   // What the last Open or Save did, shown under the list; and the attachment being saved.
   const { notice, savingId, open: handleOpen, save: handleSave } = useAttachmentActions(taskId)
@@ -109,7 +136,7 @@ export function AttachmentPickerPopover({ anchorRef, invokedBy, taskId, onClose 
         <div className="flex items-center justify-center py-4">
           <Loader2 className="h-4 w-4 animate-spin text-[var(--text-secondary)]" />
         </div>
-      ) : (attachments && attachments.length > 0) || waiting.length > 0 ? (
+      ) : (attachments && attachments.length > 0) || uploading.length > 0 || waiting.length > 0 ? (
         <div className="mb-2 flex max-h-48 flex-col gap-1 overflow-y-auto custom-scrollbar">
           {(attachments ?? []).map((att) => {
             const Icon = getFileIcon(att.file.mime)
@@ -167,6 +194,9 @@ export function AttachmentPickerPopover({ anchorRef, invokedBy, taskId, onClose 
               </div>
             )
           })}
+          {uploading.map((upload) => (
+            <UploadingRow key={upload.key} upload={upload} />
+          ))}
           {waiting.map((upload) => (
             <WaitingUploadRow key={upload.id} upload={upload} />
           ))}
@@ -175,14 +205,15 @@ export function AttachmentPickerPopover({ anchorRef, invokedBy, taskId, onClose 
         <p className="mb-2 text-center text-xs text-[var(--text-secondary)]">No attachments</p>
       )}
 
+      {/* Another file can be added while one uploads: each shows its own row above. */}
       <button
         type="button"
         onClick={handleBrowse}
-        disabled={uploadAttachment.isPending}
-        className="w-full rounded-control bg-accent-fill px-2 py-1.5 text-xs text-on-accent hover:opacity-90 disabled:opacity-40"
+        className="w-full rounded-control bg-accent-fill px-2 py-1.5 text-xs text-on-accent hover:opacity-90"
       >
-        {uploadAttachment.isPending ? 'Uploading...' : 'Browse files'}
+        Browse files
       </button>
+      <p role="status" className="sr-only">{landedNotice}</p>
 
       {notice && (
         <p role="status" className={`mt-1.5 text-caption ${notice.error ? 'text-danger' : 'text-[var(--text-secondary)]'}`}>
