@@ -5,6 +5,7 @@ import { loadConfig } from '../main/config'
 import { syncCustomLists } from '../main/custom-list-service'
 import { registerPortableHandlers } from '../main/handlers/portable'
 import { knownUserIdFor } from '../main/known-user'
+import { initNotifications, refreshTaskRemindersOnFocus, rescheduleNotifications } from '../main/notifications'
 import type { TaskWriteDeps } from '../main/offline/task-writes'
 import { syncProLedger } from '../main/pro-ledger-service'
 import { startSavedFilterImport } from '../main/saved-filter-service'
@@ -43,11 +44,15 @@ function syncDocuments(): void {
 
 function startSyncs(): void {
   window.setTimeout(syncDocuments, 4_000)
+  // The reminder scheduler, as the desktop's main process starts it; a moment later, so the
+  // session is ready when it first reads the server.
+  window.setTimeout(initNotifications, 4_000)
   window.setInterval(() => {
     if (document.visibilityState === 'visible') syncDocuments()
   }, SYNC_EVERY_MS)
   window.addEventListener('focus', () => {
     if (Date.now() - lastSync >= FOCUS_SYNC_THROTTLE_MS) syncDocuments()
+    refreshTaskRemindersOnFocus()
   })
 
   // A computer that slept: the page's timers (midnight, polling) may have been paused.
@@ -58,6 +63,7 @@ function startSyncs(): void {
     lastTick = now
     if (!slept) return
     sendToAllWindows('app-resumed')
+    rescheduleNotifications()
     syncDocuments()
   }, TICK_MS)
 }

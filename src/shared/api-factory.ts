@@ -241,6 +241,12 @@ export function createApi(bridge: ApiBridge) {
     invoke('notifications:refresh-task-reminders'),
   refreshRoutineReminders: () =>
     invoke('notifications:refresh-routine-reminders'),
+  /** 'granted', 'denied', 'default' (not asked yet) or 'unsupported'. The desktop is always 'granted'. */
+  notificationPermission: () =>
+    invoke('notifications:permission'),
+  /** Ask the user (a browser prompt); call it straight from a click. Answers the new state. */
+  requestNotificationPermission: () =>
+    invoke('notifications:request-permission'),
 
   // Attachments
   fetchTaskAttachments: (taskId: number) =>
@@ -297,6 +303,11 @@ export function createApi(bridge: ApiBridge) {
   // The computer woke from sleep: timers and the clock may have jumped while it was asleep.
   onAppResumed: (callback: () => void) => {
     return on('app-resumed', callback as ApiListener)
+  },
+
+  // The web version: a reminder that could not be a browser notification, shown inside the page.
+  onInPageNotification: (callback: (notice: { title: string; body: string; taskId?: number; route?: string }) => void) => {
+    return on('notifications:in-page', callback as ApiListener)
   },
 
   // Offline queue: changes that could not reach the server wait here, in the main process, and are

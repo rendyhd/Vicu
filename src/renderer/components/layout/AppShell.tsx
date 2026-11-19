@@ -72,6 +72,7 @@ import { FocusPickerHost } from '@/components/pro/FocusBanner'
 import { ProDialogHost } from '@/components/pro/ProDialogHost'
 import { APP_CONFIG_QUERY_KEY, useAppConfig } from '@/hooks/use-app-config'
 import { openTaskInApp } from '@/lib/open-task'
+import { useInPageNotifications } from '@/hooks/use-in-page-notifications'
 import { toast } from '@/stores/toast-store'
 import { importOutcomeText } from '../../../shared/saved-filter-import'
 import { useOfflineQueueSync } from '@/hooks/use-offline-queue'
@@ -694,6 +695,9 @@ export function AppShell() {
       })
     })
   }, [navigate])
+
+  // The web version's reminders that are not browser notifications.
+  useInPageNotifications()
 
   // A clicked task reminder or Quick View's "open in app": show that task in this window.
   useEffect(() => {

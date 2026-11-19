@@ -194,6 +194,6 @@ export const useToastStore = create<ToastState>((set, get) => {
 /** For non-component code: `toast.error('...')`. */
 export const toast = {
   error: (message: string) => useToastStore.getState().push('error', message),
-  info: (message: string) => useToastStore.getState().push('info', message),
+  info: (message: string, options?: ToastOptions) => useToastStore.getState().push('info', message, options),
   success: (message: string, options?: ToastOptions) => useToastStore.getState().push('success', message, options),
 }

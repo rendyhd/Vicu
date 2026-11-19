@@ -542,6 +542,11 @@
     "notifications": {
       "enable": "Enable desktop notifications",
       "macNote": "On macOS, the first notification will prompt you to allow notifications from Vicu.",
+      "webNote": "Reminders show while Vicu is open in a browser tab.",
+      "allowNotifications": "Allow notifications",
+      "permissionDenied": "Your browser blocks notifications for this site, so reminders show inside Vicu instead.",
+      "permissionUnsupported": "This browser cannot show notifications, so reminders show inside Vicu instead.",
+      "inPageOpen": "Open",
       "playSound": "Play sound",
       "stay": "Stay until dismissed",
       "scheduled": {

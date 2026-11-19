@@ -1,8 +1,9 @@
 import { Checkbox } from '@/components/shared/Checkbox'
 import { Switch } from '@/components/shared/Switch'
 import { Button } from '@/components/shared/Button'
-import { useState } from 'react'
-import { api } from '@/lib/api'
+import { useEffect, useState } from 'react'
+import { api, type NotificationPermissionState } from '@/lib/api'
+import { isWebHost } from '@/lib/capabilities'
 import { cn } from '@/lib/cn'
 import type { AppConfig } from '@/lib/vikunja-types'
 import { useLocationReminders } from '@/hooks/use-location-reminders'
@@ -37,6 +38,20 @@ export function NotificationSettings({ config, onChange }: NotificationSettingsP
   const { t } = useTranslation()
   const [testStatus, setTestStatus] = useState<'idle' | 'sent'>('idle')
   const enabled = config.notifications_enabled ?? false
+  const web = isWebHost()
+  const [permission, setPermission] = useState<NotificationPermissionState | null>(null)
+
+  useEffect(() => {
+    if (!web) return
+    let live = true
+    void api.notificationPermission().then((state) => { if (live) setPermission(state) }).catch(() => undefined)
+    return () => { live = false }
+  }, [web])
+
+  // Called straight from the click: browsers only show the prompt for a user gesture.
+  const handleAllow = () => {
+    void api.requestNotificationPermission().then(setPermission).catch(() => undefined)
+  }
 
   const handleTestNotification = async () => {
     await api.testNotification()
@@ -52,6 +67,24 @@ export function NotificationSettings({ config, onChange }: NotificationSettingsP
 
   return (
     <div className="space-y-4">
+      {/* The web version: where reminders show, and the browser's permission */}
+      {web && (
+        <div className="rounded-card border border-[var(--border-color)] bg-[var(--bg-primary)] p-5">
+          <p className="text-sm text-[var(--text-primary)]">{t('settings.notifications.webNote')}</p>
+          {permission === 'default' && (
+            <div className="mt-3">
+              <Button onClick={handleAllow}>{t('settings.notifications.allowNotifications')}</Button>
+            </div>
+          )}
+          {permission === 'denied' && (
+            <p className="mt-2 text-xs text-[var(--text-secondary)]">{t('settings.notifications.permissionDenied')}</p>
+          )}
+          {permission === 'unsupported' && (
+            <p className="mt-2 text-xs text-[var(--text-secondary)]">{t('settings.notifications.permissionUnsupported')}</p>
+          )}
+        </div>
+      )}
+
       {/* Master toggle */}
       <div className="rounded-card border border-[var(--border-color)] bg-[var(--bg-primary)] p-5">
         <label className="flex cursor-pointer items-center gap-2">

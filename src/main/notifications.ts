@@ -1,5 +1,3 @@
-import { app, Notification, nativeImage, BrowserWindow } from 'electron'
-import { join } from 'path'
 import { loadConfig, type AppConfig } from './config'
 import { MAX_PAGE_SIZE } from './api-v2'
 import { fetchProjects, fetchTaskById, fetchTasks } from './api-client'
@@ -10,8 +8,7 @@ import { getSyncedPrefs } from './synced-preferences'
 import { occurrenceStillOpen, routineRemindsHere, type RoutineReminderContext } from './routine-reminder-rules'
 import { createdById } from '../shared/hidden-tasks'
 import { effectivePermission } from '../shared/collaboration'
-import { getAllStandaloneTasks } from './cache'
-import { getOfflineQueue } from './offline/service'
+import { isTaskClosedLocally, showNotification, standaloneTasks } from '@host/notify'
 import { createTaskReminderScheduler } from './task-reminders'
 import { notificationCategory, notificationFilters, overdueDays } from './notification-windows'
 import { addLocalDays, startOfLocalDay, toLocalDate } from '../shared/due-dates'
@@ -28,57 +25,25 @@ let routineRefreshTimerId: ReturnType<typeof setTimeout> | null = null
 
 const routineReminderTimers = new Map<string, ReturnType<typeof setTimeout>>()
 
-// Reference to main window (set during init)
-let mainWindowRef: BrowserWindow | null = null
-
-/** The user completed or deleted the task here and the offline queue has not told the server yet. */
-function isClosedLocally(taskId: number): boolean {
-  try {
-    return getOfflineQueue().getPending().some((action) =>
-      (action.type === 'delete' && action.taskId === taskId) ||
-      (action.type === 'update' && action.taskId === taskId && action.patch.done === true)
-    )
-  } catch {
-    return false
-  }
-}
-
 // Task reminders: one refresh from the server every 15 minutes (and on focus, resume and after a
 // task changes), one timer per reminder, a re-check when each fires. See ./task-reminders.ts.
 const taskReminders = createTaskReminderScheduler({
   loadConfig,
   fetchTasks,
   fetchTaskById,
-  isClosedLocally,
+  isClosedLocally: isTaskClosedLocally,
   show: (taskId, title, config) => fireTaskReminder(taskId, title, config as AppConfig),
   now: () => Date.now(),
 })
 
-/**
- * Attach failure logging for desktop notifications. On macOS, Electron 42+
- * uses UNNotification which requires a code-signed app — unsigned/dev builds
- * emit `failed` instead of showing the notification.
- */
-function attachNotificationDiagnostics(notification: Notification, context: string): void {
-  notification.on('failed', (_event, error) => {
-    console.warn(`[Notifications] ${context} failed:`, error)
-  })
-}
-
 // --- Public API ---
 
-export function initNotifications(mainWindow: BrowserWindow | null): void {
-  mainWindowRef = mainWindow
+export function initNotifications(): void {
   scheduleAll()
   taskReminders.start()
   refreshRoutineReminders()
   scheduleRoutineRefresh()
   schedulePlannerNudge()
-}
-
-/** Update the main-window ref after a recreation without rescheduling timers. */
-export function setNotificationsMainWindow(mainWindow: BrowserWindow | null): void {
-  mainWindowRef = mainWindow
 }
 
 export function rescheduleNotifications(): void {
@@ -189,15 +154,14 @@ export function refreshTaskRemindersOnFocus(): void {
 
 export function sendTestNotification(): void {
   const config = loadConfig()
-  const notification = new Notification({
+  showNotification({
     title: 'Vicu — Test Notification',
     body: 'Notifications are working! You will receive task reminders at your scheduled times.',
     silent: !(config?.notifications_sound ?? true),
-    timeoutType: config?.notifications_persistent ? 'never' : 'default',
-    icon: getIcon(),
+    persistent: !!config?.notifications_persistent,
+    tag: `test:${Date.now()}`,
+    context: 'test notification',
   })
-  attachNotificationDiagnostics(notification, 'test notification')
-  notification.show()
 }
 
 // --- Scheduling ---
@@ -219,18 +183,14 @@ function schedulePlannerNudge(): void {
     plannerNudgeTimerId = null
     const current = loadConfig()
     if (current?.notifications_enabled && isPlannerEnabled(current) && current.planner_nudge === time) {
-      const notification = new Notification({
+      showNotification({
         title: 'Plan tomorrow',
         body: 'Set up tomorrow in Plan my day.',
         silent: !current.notifications_sound,
-        icon: getIcon(),
+        tag: `plan-nudge:${toLocalDate(new Date())}`,
+        context: 'plan nudge',
+        click: { route: '/plan' },
       })
-      attachNotificationDiagnostics(notification, 'plan nudge')
-      notification.on('click', () => {
-        showMainWindow()
-        mainWindowRef?.webContents.send('navigate', '/plan')
-      })
-      notification.show()
     }
     schedulePlannerNudge()
   }, next.getTime() - now.getTime())
@@ -329,19 +289,15 @@ async function fireRoutineReminder(
   const config = loadConfig() || configSnapshot
   if (!config.notifications_enabled || !isRoutinesEnabled(config)) return
   const definition = payload.definition
-  const notification = new Notification({
+  showNotification({
     title: followUp ? `Still pending: ${definition.name}` : definition.name,
     body: followUp ? 'A gentle follow-up' : 'Routine reminder',
     silent: !(config.notifications_task_reminder_sound ?? config.notifications_sound),
-    timeoutType: (config.notifications_task_reminder_persistent ?? config.notifications_persistent) ? 'never' : 'default',
-    icon: getIcon(),
+    persistent: !!(config.notifications_task_reminder_persistent ?? config.notifications_persistent),
+    tag: `routine:${target.occurrenceKey}:${followUp ? 'followup' : 'primary'}`,
+    context: `routine reminder (${definition.id})`,
+    click: { route: '/routines' },
   })
-  attachNotificationDiagnostics(notification, `routine reminder (${definition.id})`)
-  notification.on('click', () => {
-    showMainWindow()
-    mainWindowRef?.webContents.send('navigate', '/routines')
-  })
-  notification.show()
 }
 
 function localDateAtMinutes(value: string, minutes: number): Date {
@@ -355,21 +311,15 @@ function fireTaskReminder(taskId: number, title: string, configSnapshot: AppConf
   // The master toggle covers task reminders too (D-NOTIF-1).
   if (!config.notifications_enabled) return
 
-  const notification = new Notification({
+  showNotification({
     title: `Reminder: ${title}`,
     body: 'Task reminder',
     silent: !(config.notifications_task_reminder_sound ?? config.notifications_sound),
-    timeoutType: (config.notifications_task_reminder_persistent ?? config.notifications_persistent) ? 'never' : 'default',
-    icon: getIcon(),
+    persistent: !!(config.notifications_task_reminder_persistent ?? config.notifications_persistent),
+    tag: `task:${taskId}`,
+    context: `task reminder (${taskId})`,
+    click: { taskId },
   })
-  attachNotificationDiagnostics(notification, `task reminder (${taskId})`)
-
-  notification.on('click', () => {
-    showMainWindow()
-    mainWindowRef?.webContents.send('navigate-to-task', taskId)
-  })
-
-  notification.show()
 }
 
 function scheduleAll(): void {
@@ -400,7 +350,7 @@ function scheduleReminder(
 ): void {
   const ms = msUntilTime(timeStr)
   const id = setTimeout(() => {
-    fireReminder(config)
+    fireReminder(config, timeStr)
     // Reschedule for next day
     scheduleReminder(timeStr, setTimer, config)
   }, ms)
@@ -422,7 +372,7 @@ function msUntilTime(timeStr: string): number {
 
 // --- Notification firing ---
 
-async function fireReminder(configSnapshot: AppConfig): Promise<void> {
+async function fireReminder(configSnapshot: AppConfig, slot: string): Promise<void> {
   // Re-read config in case it changed since scheduling
   const config = loadConfig() || configSnapshot
 
@@ -438,11 +388,11 @@ async function fireReminder(configSnapshot: AppConfig): Promise<void> {
   if (allTasks.length <= 3) {
     // Show individual notifications
     for (const task of allTasks) {
-      showTaskNotification(task, config)
+      showTaskNotification(task, config, slot)
     }
   } else {
     // Show summary notification
-    showSummaryNotification(tasks, config)
+    showSummaryNotification(tasks, config, slot)
   }
 }
 
@@ -536,7 +486,7 @@ async function getNotificationTasks(config: AppConfig): Promise<NotificationTask
 
 function getStandaloneNotificationTasks(config: AppConfig): NotificationTasks {
   const result: NotificationTasks = { overdue: [], dueToday: [], upcoming: [] }
-  const tasks = getAllStandaloneTasks()
+  const tasks = standaloneTasks()
 
   const now = new Date()
 
@@ -573,27 +523,19 @@ function getStandaloneNotificationTasks(config: AppConfig): NotificationTasks {
 
 // --- Notification display ---
 
-function showTaskNotification(task: TaskInfo, config: AppConfig): void {
-  const notification = new Notification({
+function showTaskNotification(task: TaskInfo, config: AppConfig, slot: string): void {
+  showNotification({
     title: task.title,
     body: formatDueDate(task.due_date, task.category),
     silent: !config.notifications_sound,
-    timeoutType: config.notifications_persistent ? 'never' : 'default',
-    icon: getIcon(),
+    persistent: !!config.notifications_persistent,
+    tag: `daily:${toLocalDate(new Date())}:${slot}:task:${task.id}`,
+    context: `task notification (${task.id ?? 'unknown'})`,
+    click: typeof task.id === 'number' ? { taskId: task.id } : {},
   })
-  attachNotificationDiagnostics(notification, `task notification (${task.id ?? 'unknown'})`)
-
-  notification.on('click', () => {
-    showMainWindow()
-    if (typeof task.id === 'number') {
-      mainWindowRef?.webContents.send('navigate-to-task', task.id)
-    }
-  })
-
-  notification.show()
 }
 
-function showSummaryNotification(tasks: NotificationTasks, config: AppConfig): void {
+function showSummaryNotification(tasks: NotificationTasks, config: AppConfig, slot: string): void {
   const overdueCount = tasks.overdue.length
   const dueTodayCount = tasks.dueToday.length
   const upcomingCount = tasks.upcoming.length
@@ -604,20 +546,15 @@ function showSummaryNotification(tasks: NotificationTasks, config: AppConfig): v
   if (overdueCount > 0) parts.push(`${overdueCount} overdue`)
   if (upcomingCount > 0) parts.push(`${upcomingCount} due tomorrow`)
 
-  const notification = new Notification({
+  showNotification({
     title: `Vicu — ${total} task${total === 1 ? '' : 's'} need attention`,
     body: parts.join(', '),
     silent: !config.notifications_sound,
-    timeoutType: config.notifications_persistent ? 'never' : 'default',
-    icon: getIcon(),
+    persistent: !!config.notifications_persistent,
+    tag: `daily:${toLocalDate(new Date())}:${slot}:summary`,
+    context: 'summary notification',
+    click: {},
   })
-  attachNotificationDiagnostics(notification, 'summary notification')
-
-  notification.on('click', () => {
-    showMainWindow()
-  })
-
-  notification.show()
 }
 
 // --- Helpers ---
@@ -632,24 +569,4 @@ function formatDueDate(dueDateStr: string, category: 'overdue' | 'due_today' | '
   if (diffDays <= 0) return 'Due today'
   if (diffDays === 1) return 'Overdue by 1 day'
   return `Overdue by ${diffDays} days`
-}
-
-function getIcon(): Electron.NativeImage | undefined {
-  try {
-    const iconPath = app.isPackaged
-      ? join(process.resourcesPath, 'resources', 'icon.png')
-      : join(app.getAppPath(), 'resources', 'icon.png')
-    const icon = nativeImage.createFromPath(iconPath)
-    return icon.isEmpty() ? undefined : icon
-  } catch {
-    return undefined
-  }
-}
-
-function showMainWindow(): void {
-  if (mainWindowRef && !mainWindowRef.isDestroyed()) {
-    mainWindowRef.show()
-    if (mainWindowRef.isMinimized()) mainWindowRef.restore()
-    mainWindowRef.focus()
-  }
 }

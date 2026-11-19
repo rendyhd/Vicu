@@ -237,6 +237,10 @@ export interface ElectronAPI {
   rescheduleNotifications(): Promise<void>
   refreshTaskReminders(): Promise<void>
   refreshRoutineReminders(): Promise<void>
+  /** 'granted', 'denied', 'default' (not asked yet) or 'unsupported'. The desktop is always 'granted'. */
+  notificationPermission(): Promise<'granted' | 'denied' | 'default' | 'unsupported'>
+  /** Ask the user (a browser prompt); call it straight from a click. Answers the new state. */
+  requestNotificationPermission(): Promise<'granted' | 'denied' | 'default' | 'unsupported'>
 
   // Attachments
   fetchTaskAttachments(taskId: number): Promise<ApiResult<TaskAttachment[]>>
@@ -456,6 +460,8 @@ export interface ElectronAPI {
   onNewTask(cb: () => void): () => void
   onRefreshView(cb: () => void): () => void
   onAppResumed(cb: () => void): () => void
+  /** The web version: a reminder that could not be a browser notification, shown inside the page. */
+  onInPageNotification(cb: (notice: { title: string; body: string; taskId?: number; route?: string }) => void): () => void
   /** The locale and clock dates are phrased with (system locale, clock setting). */
   getDateFormat(): Promise<{ locale: string; hour12: boolean }>
   onDateFormatChanged(cb: (format: { locale: string; hour12: boolean }) => void): () => void

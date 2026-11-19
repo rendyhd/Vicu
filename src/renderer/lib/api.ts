@@ -45,6 +45,17 @@ import type {
   TaskWriteOptions,
 } from '../../shared/offline-queue-types'
 
+/** What `notificationPermission` answers: the desktop is always 'granted'. */
+export type NotificationPermissionState = 'granted' | 'denied' | 'default' | 'unsupported'
+
+/** A reminder shown inside the page (the web version, when the browser shows no notification). */
+export interface InPageNotice {
+  title: string
+  body: string
+  taskId?: number
+  route?: string
+}
+
 export type {
   OIDCProvider,
   ServerAuthInfo,
@@ -336,6 +347,12 @@ export const api = {
   refreshRoutineReminders: () =>
     window.api.refreshRoutineReminders() as Promise<void>,
 
+  notificationPermission: () =>
+    window.api.notificationPermission() as Promise<NotificationPermissionState>,
+
+  requestNotificationPermission: () =>
+    window.api.requestNotificationPermission() as Promise<NotificationPermissionState>,
+
   applyQuickEntrySettings: () =>
     window.api.applyQuickEntrySettings() as Promise<{ entry: boolean; viewer: boolean; waylandLimited: boolean }>,
 
@@ -447,6 +464,8 @@ export const api = {
     window.api.onRefreshView?.(cb) ?? (() => {}),
   onAppResumed: (cb: () => void) =>
     window.api.onAppResumed?.(cb) ?? (() => {}),
+  onInPageNotification: (cb: (notice: InPageNotice) => void) =>
+    window.api.onInPageNotification?.(cb) ?? (() => {}),
   printHtml: (html: string) =>
     window.api.printHtml(html) as Promise<{ success: true } | { success: false; error: string }>,
   onPrintView: (cb: () => void) =>

@@ -75,6 +75,8 @@ import { forgetDeletedTask, loadRoutineCarriers, rememberCreatedTask } from '../
 import { countProjectTasks, invalidateProjectCounts } from '../project-counts-service'
 import { invalidateViewerCaches } from '../quick-entry/viewer-caches'
 import { parseTaskWriteOptions, sendSerially, taskWriteReply, taskWrites, writeTask, type TaskWriteDeps } from '../offline/task-writes'
+import { sendTestNotification, rescheduleNotifications, refreshTaskRemindersSoon, refreshRoutineReminders } from '../notifications'
+import { notificationPermission, requestNotificationPermission } from '@host/notify'
 import type { Handle } from './types'
 
 // The IPC handlers that need nothing from Electron or Node: the desktop registers them through
@@ -431,4 +433,27 @@ export function registerPortableHandlers(handle: Handle, deps: PortableDeps): vo
     }
     return { success: true, data: new Uint8Array(result.data) }
   })
+
+  // --- Notifications ---
+  handle('notifications:test', () => {
+    sendTestNotification()
+  })
+
+  handle('notifications:reschedule', () => {
+    rescheduleNotifications()
+  })
+
+  // Every completed, deleted or edited task asks for this; a bulk change asks many times in a row,
+  // so main waits for a quiet second and refreshes once.
+  handle('notifications:refresh-task-reminders', () => {
+    refreshTaskRemindersSoon()
+  })
+
+  handle('notifications:refresh-routine-reminders', () => {
+    refreshRoutineReminders()
+  })
+
+  // Whether the host may show notifications (the desktop always may) and asking the user.
+  handle('notifications:permission', () => notificationPermission())
+  handle('notifications:request-permission', () => requestNotificationPermission())
 }

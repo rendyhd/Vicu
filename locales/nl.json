@@ -542,6 +542,11 @@
     "notifications": {
       "enable": "Bureaubladmeldingen inschakelen",
       "macNote": "Op macOS vraagt de eerste melding of je meldingen van Vicu wilt toestaan.",
+      "webNote": "Herinneringen verschijnen zolang Vicu open staat in een browsertabblad.",
+      "allowNotifications": "Meldingen toestaan",
+      "permissionDenied": "Je browser blokkeert meldingen van deze site, dus herinneringen verschijnen in Vicu zelf.",
+      "permissionUnsupported": "Deze browser kan geen meldingen tonen, dus herinneringen verschijnen in Vicu zelf.",
+      "inPageOpen": "Openen",
       "playSound": "Geluid afspelen",
       "stay": "Blijven staan tot ze gesloten worden",
       "scheduled": {

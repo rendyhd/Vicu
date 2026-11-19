@@ -7,7 +7,8 @@ import { authManager } from './auth/auth-manager'
 import { createTray, destroyTray, hasTray, updateTrayMenu } from './tray'
 import { destroyDummyWindow, forgetForegroundWindow, giveFocusBack, nudgeFocusAway, prewarmFocusReturn, rememberForegroundWindow, type PopupKind } from './focus'
 import { registerQuickEntryState } from './quick-entry-state'
-import { initNotifications, refreshTaskRemindersOnFocus, rescheduleNotifications, stopNotifications, setNotificationsMainWindow } from './notifications'
+import { initNotifications, refreshTaskRemindersOnFocus, rescheduleNotifications, stopNotifications } from './notifications'
+import { setNotificationsMainWindow } from './host/notify'
 import { getObsidianContext, getForegroundProcessName, getForegroundWindowHandle, prewarmForegroundCheck, rememberShownObsidianContext, type ObsidianNoteContext } from './obsidian-client'
 import { foregroundNeeds, lookUpForeground } from './quick-entry/foreground-gate'
 import { getBrowserContext, type BrowserContext } from './browser-client'
@@ -882,7 +883,8 @@ if (!gotLock) {
     handleTrusted('window-is-maximized', () => mainWindow?.isMaximized() ?? false)
 
     // Initialize notification scheduler
-    initNotifications(mainWindow)
+    setNotificationsMainWindow(mainWindow)
+    initNotifications()
     powerMonitor.on('resume', () => {
       // The main window's timers (midnight, polling) may have been paused by sleep.
       if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('app-resumed')
