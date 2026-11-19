@@ -1,0 +1,67 @@
+{
+  "language": {
+    "label": "Taal",
+    "system": "Systeemstandaard ({{language}})",
+    "note": "Tekst die nog niet is vertaald, staat in het Engels. <guide>Help Vicu vertalen</guide>"
+  },
+  "nav": {
+    "lists": "Lijsten",
+    "inbox": "Inbox",
+    "today": "Vandaag",
+    "plan": "Planning",
+    "routines": "Routines",
+    "upcoming": "Binnenkort",
+    "anytime": "Wanneer dan ook",
+    "review": "Review",
+    "logbook": "Logboek"
+  },
+  "completion": {
+    "toast_one": "Voltooid",
+    "toast_other": "{{count}} voltooid",
+    "undo": "Ongedaan maken"
+  },
+  "menu": {
+    "about": "Over Vicu",
+    "preferences": "Instellingen",
+    "services": "Voorzieningen",
+    "hide": "Vicu verbergen",
+    "hideOthers": "Andere verbergen",
+    "showAll": "Alles tonen",
+    "quit": "Vicu afsluiten",
+    "file": "Bestand",
+    "newTask": "Nieuwe taak",
+    "print": "Afdrukken",
+    "closeWindow": "Venster sluiten",
+    "edit": "Bewerken",
+    "undo": "Ongedaan maken",
+    "redo": "Opnieuw",
+    "cut": "Knippen",
+    "copy": "Kopiëren",
+    "paste": "Plakken",
+    "pasteAndMatchStyle": "Plakken met huidige stijl",
+    "selectAll": "Alles selecteren",
+    "speech": "Spraak",
+    "startSpeaking": "Voorlezen starten",
+    "stopSpeaking": "Voorlezen stoppen",
+    "view": "Weergave",
+    "refresh": "Vernieuwen",
+    "reloadWindow": "Venster opnieuw laden",
+    "toggleDevTools": "Ontwikkelaarstools",
+    "actualSize": "Ware grootte",
+    "zoomIn": "Inzoomen",
+    "zoomOut": "Uitzoomen",
+    "toggleFullScreen": "Volledig scherm",
+    "window": "Venster",
+    "minimize": "Minimaliseren",
+    "zoom": "Zoomen",
+    "bringAllToFront": "Alles op voorgrond",
+    "help": "Help",
+    "documentation": "Documentatie"
+  },
+  "tray": {
+    "show": "Vicu tonen",
+    "quickEntry": "Quick Entry",
+    "quickView": "Quick View",
+    "quit": "Afsluiten"
+  }
+}

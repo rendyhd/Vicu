@@ -29,6 +29,10 @@ contextBridge.exposeInMainWorld('quickViewApi', {
   onDateFormatChanged: (callback: (format: { locale: string; hour12: boolean }) => void) => {
     ipcRenderer.on('date-format-changed', (_event, format: { locale: string; hour12: boolean }) => callback(format))
   },
+  getLanguage: () => ipcRenderer.invoke('get-language'),
+  onLanguageChanged: (callback: (info: { language: string; system: string }) => void) => {
+    ipcRenderer.on('language-changed', (_event, info: { language: string; system: string }) => callback(info))
+  },
   onShowWindow: (callback: () => void) => {
     ipcRenderer.on('viewer-shown', () => callback())
   },

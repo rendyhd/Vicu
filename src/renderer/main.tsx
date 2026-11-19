@@ -8,6 +8,8 @@ import { IsDarkProvider } from './hooks/use-is-dark'
 import { preloadRichTextEditor } from './components/rich-text/LazyRichTextEditor'
 import { api } from './lib/api'
 import { initDateFormat } from './lib/date-format'
+import { initLanguage } from './lib/language'
+import './lib/i18n-react'
 import { ACCOUNT_CHANGED_EVENT } from './lib/account-events'
 import {
   PERSISTED_KEY_PREFIXES,
@@ -40,10 +42,13 @@ async function start(): Promise<void> {
   // refetch as soon as they mount. Never let this hold up the first paint for long.
   // Dates are phrased in the system locale and the Settings clock; ask main before the first paint.
   const dateFormatReady = withTimeout(initDateFormat(window.api), 1_000, undefined)
+  // The language too, so the first paint is not in English and then redrawn.
+  const languageReady = withTimeout(initLanguage(window.api), 1_000, undefined)
   const server = await withTimeout(signedInServer(), 1_500, '')
   await withTimeout(restoreQueryCache(queryClient, indexedDbStore, server).catch(() => false), 1_500, false)
 
   await dateFormatReady
+  await languageReady
 
   let serverAtSave = server
   let serverCheckedAt = 0

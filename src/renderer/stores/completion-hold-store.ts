@@ -1,5 +1,6 @@
 import { create } from 'zustand'
-import { COMPLETION_TOAST_ACTION, CompletionHold } from '../../shared/completion-hold'
+import { CompletionHold } from '../../shared/completion-hold'
+import { t } from '../../shared/i18n'
 import { useToastStore } from '@/stores/toast-store'
 import { useCompletedTasksStore } from '@/stores/completed-tasks-store'
 import type { CompletedTaskEntry } from '@/stores/completed-tasks-store'
@@ -141,10 +142,12 @@ function showToast(toast: CompletionToastState | null): void {
     toasts.remove(TOAST_KEY)
     return
   }
-  toasts.push('success', toast.text, {
+  // The machine's own text is the contract's English (cross-app semantics section 7); what is
+  // shown is the same sentence from the catalog, in the language in use.
+  toasts.push('success', t('completion.toast', { count: toast.ids.length }), {
     key: TOAST_KEY,
     durationMs: null,
-    action: { label: COMPLETION_TOAST_ACTION, onAction: () => undoHandler?.() },
+    action: { label: t('completion.undo'), onAction: () => undoHandler?.() },
     onEngage: (engaged) => completionHold.hoverToast(engaged),
     onClose: () => completionHold.dismissToast(),
   })

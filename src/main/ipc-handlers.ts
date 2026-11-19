@@ -58,6 +58,7 @@ import { PickedFiles } from './picked-files'
 import { getLaunchOnStartupSupport } from './launch-on-startup'
 import { startupEnv } from './startup-env'
 import { announceDateFormatIfChanged, dateFormatForWindow } from './date-format'
+import { applyLanguage, languageForWindow } from './i18n'
 import {
   applyConfigPatch,
   applyConnectionFields,
@@ -272,6 +273,8 @@ function persistConfig(config: AppConfig, announce = true): void {
   saveConfig(config)
   // The clock choice changes how every window phrases dates.
   announceDateFormatIfChanged(config)
+  // So does the language, for the windows, the menus and the tray.
+  void applyLanguage(config)
   // Sync native theme when config changes
   if (config.theme) {
     nativeTheme.themeSource = config.theme === 'system' ? 'system' : config.theme
@@ -522,6 +525,9 @@ export function registerIpcHandlers(): void {
 
   // The locale and clock for dates; all three windows ask when they load and listen for changes.
   handleTrusted('get-date-format', () => dateFormatForWindow())
+
+  // The language in use (src/main/i18n.ts); all three windows ask when they load and listen for changes.
+  handleTrusted('get-language', () => languageForWindow())
 
   // The renderer never saves a whole config: its copy can be stale (main changes window bounds,
   // sidebar width, popup positions... on its own). Preferences go through save-config-patch and

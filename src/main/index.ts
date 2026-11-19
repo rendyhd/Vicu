@@ -4,7 +4,7 @@ import { registerIpcHandlers } from './ipc-handlers'
 import { loadConfig, saveConfigQuietly, type AppConfig, DEFAULT_QUICK_ENTRY_HOTKEY, DEFAULT_QUICK_VIEW_HOTKEY } from './config'
 import { closeAction, isQuickEntryEnabled, isQuickViewEnabled, wantsTray } from '../shared/config-types'
 import { authManager } from './auth/auth-manager'
-import { createTray, destroyTray, hasTray } from './tray'
+import { createTray, destroyTray, hasTray, updateTrayMenu } from './tray'
 import { returnFocusToPreviousWindow, destroyDummyWindow } from './focus'
 import { registerQuickEntryState } from './quick-entry-state'
 import { initNotifications, refreshTaskRemindersOnFocus, rescheduleNotifications, stopNotifications, setNotificationsMainWindow } from './notifications'
@@ -18,6 +18,7 @@ import { checkForUpdates } from './update-checker'
 import { startUpdateChecks, type UpdateChecksHandle } from './update-schedule'
 import { isMac, isWindows, isLinux } from './platform'
 import { setupApplicationMenu } from './app-menu'
+import { applyLanguage, onMainLanguageChange } from './i18n'
 import { storeAPIToken, getAPIToken, API_TOKEN_NO_EXPIRY } from './auth/token-store'
 import { clearTaskBadge, reapplyTaskBadge } from './badge'
 import { replayPendingActions } from './sync'
@@ -772,7 +773,13 @@ if (!gotLock) {
     // Attachments opened in a previous session (D-IPC-2). Only the primary
     // instance gets here, so nothing else is using the folder.
     cleanAttachmentTempDir(app.getPath('temp'))
+    // The language first: the menus below and every window read it.
+    await applyLanguage()
     setupApplicationMenu(() => mainWindow)
+    onMainLanguageChange(() => {
+      setupApplicationMenu(() => mainWindow)
+      updateTrayMenu()
+    })
     registerIpcHandlers()
     if (isWindows) prewarmForegroundCheck()
     // Don't block window creation on auth recovery (up to 15s offline).

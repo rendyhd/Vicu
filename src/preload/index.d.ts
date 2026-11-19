@@ -438,6 +438,8 @@ export interface ElectronAPI {
   /** The locale and clock dates are phrased with (system locale, clock setting). */
   getDateFormat(): Promise<{ locale: string; hour12: boolean }>
   onDateFormatChanged(cb: (format: { locale: string; hour12: boolean }) => void): () => void
+  getLanguage(): Promise<{ language: string; system: string }>
+  onLanguageChanged(cb: (info: { language: string; system: string }) => void): () => void
   // Print
   printHtml(html: string): Promise<{ success: true } | { success: false; error: string }>
   onPrintView(cb: () => void): () => void

@@ -13,6 +13,7 @@ import { isCategoryId } from '../shared/project-categories'
 import { todayRoutinesLimit } from '../shared/today-routines'
 import { readProFocus } from '../shared/pro/focus'
 import { PRO_LAYERS } from '../shared/pro/settings'
+import { normalizeLanguageSetting } from '../shared/i18n/languages'
 
 /** Stored layers: only `false` is kept (a missing layer is on). */
 function normalizeProLayers(value: unknown): AppConfig['pro_layers'] {
@@ -52,6 +53,7 @@ const DEFAULT_CONFIG: AppConfig = {
   inbox_project_id: 0,
   theme: 'system',
   clock_format: 'system',
+  language: 'system',
   row_density: 'compact',
   subtask_display: 'inside_task',
   review: {
@@ -160,6 +162,7 @@ export function normalizeConfig(raw: Record<string, unknown>): AppConfig {
       ? raw.theme
       : DEFAULT_CONFIG.theme,
     clock_format: raw.clock_format === '12h' || raw.clock_format === '24h' ? raw.clock_format : 'system',
+    language: normalizeLanguageSetting(raw.language),
     row_density: raw.row_density === 'comfortable' ? 'comfortable' : 'compact',
     window_bounds: isWindowBounds(raw.window_bounds) ? raw.window_bounds : undefined,
     sidebar_width: typeof raw.sidebar_width === 'number' ? raw.sidebar_width : undefined,

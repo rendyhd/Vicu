@@ -171,6 +171,7 @@ Found a bug or have an idea? [Open an issue](https://github.com/rendyhd/Vicu/iss
 - **[Vicu for Android and iOS](https://github.com/rendyhd/Vicu-Mobile)**: Vicu on your phone, iPhone and iPad
 - **[vikunja-quick-entry](https://github.com/rendyhd/vikunja-quick-entry)**: a lightweight tray app with only Quick Entry and Quick View
 - **[Vikunja](https://vikunja.io/)**: the open-source backend that powers Vicu
+- **[Translating Vicu](docs/translating.md)**: add your language or improve one
 
 ## Support Vicu
 

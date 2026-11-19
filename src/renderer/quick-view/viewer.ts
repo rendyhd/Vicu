@@ -18,6 +18,9 @@ declare global {
       // The locale and clock dates are phrased with (system locale, Settings clock choice).
       getDateFormat(): Promise<{ locale: string; hour12: boolean }>
       onDateFormatChanged(callback: (format: { locale: string; hour12: boolean }) => void): void
+      // The language the app shows (src/shared/i18n), chosen in Settings.
+      getLanguage(): Promise<{ language: string; system: string }>
+      onLanguageChanged(callback: (info: { language: string; system: string }) => void): void
       onShowWindow(callback: () => void): void
       onHideWindow(callback: () => void): void
       onSyncCompleted(callback: () => void): void
@@ -75,6 +78,7 @@ import { diffLocalDays, dueToday, isDateOnly, isNoDueDate, toLocalDate } from '@
 import { followColorScheme, followConfiguredTheme } from '@/lib/theme'
 import { formatDateDisplay } from '@/lib/date-display'
 import { getDateFormat, initDateFormat, subscribeDateFormat } from '@/lib/date-format'
+import { initLanguage } from '@/lib/language'
 import { priorityMarkSvg } from '../../shared/priority-mark-svg'
 import { blockOf, dueRepeatsBlockDay } from '../../shared/time-blocks'
 import { formatBlockRow } from '../../shared/date-display'
@@ -726,6 +730,7 @@ window.quickViewApi.onConfigChanged(() => {
 // Dates follow the system locale and the Settings clock choice. A change drops the cached list so
 // the next show draws the due dates again with the new format.
 void initDateFormat(window.quickViewApi)
+void initLanguage(window.quickViewApi)
 subscribeDateFormat(() => {
   lastFetchTime = 0
 })

@@ -23,6 +23,7 @@ import { SidebarSettings } from '@/components/settings/SidebarSettings'
 import { PlannerSettings } from '@/components/settings/PlannerSettings'
 import { WeekStartSetting } from '@/components/settings/WeekStartSetting'
 import { CloseActionSetting } from '@/components/settings/CloseActionSetting'
+import { LanguageSetting } from '@/components/settings/LanguageSetting'
 import { RoutinesSettingsPanel } from '@/components/routines/RoutinesSettingsPanel'
 import { ProjectSettings } from '@/components/settings/ProjectSettings'
 import { useProjects } from '@/hooks/use-projects'
@@ -596,6 +597,8 @@ export function SettingsView() {
             </label>
 
             <WeekStartSetting />
+
+            <LanguageSetting config={fullConfig} onChange={handleQuickEntryChange} />
 
             <label className="flex items-center justify-between gap-4">
               <span>

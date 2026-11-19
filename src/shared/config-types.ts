@@ -250,6 +250,12 @@ export interface AppConfig {
    */
   clock_format?: 'system' | '12h' | '24h'
   /**
+   * The language the app shows (src/shared/i18n): 'system' follows the computer's preferred
+   * languages, else the BCP 47 tag of a catalog in `locales/` ("nl", "pt-BR"). Per device, never
+   * synced. Missing means 'system'.
+   */
+  language?: string
+  /**
    * How much of a task a row shows (design-system section 4). Per device, never synced: a desktop
    * window and a phone differ in width. Missing means 'compact'.
    */

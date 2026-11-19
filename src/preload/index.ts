@@ -279,6 +279,14 @@ const api = {
     return () => { ipcRenderer.removeListener('date-format-changed', handler) }
   },
 
+  // The language the app shows (src/shared/i18n); changes when the Language setting does.
+  getLanguage: () => ipcRenderer.invoke('get-language'),
+  onLanguageChanged: (callback: (info: { language: string; system: string }) => void) => {
+    const handler = (_: unknown, info: { language: string; system: string }) => callback(info)
+    ipcRenderer.on('language-changed', handler)
+    return () => { ipcRenderer.removeListener('language-changed', handler) }
+  },
+
   // The computer woke from sleep: timers and the clock may have jumped while it was asleep.
   onAppResumed: (callback: () => void) => {
     const handler = () => callback()

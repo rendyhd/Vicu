@@ -1,0 +1,67 @@
+{
+  "language": {
+    "label": "Language",
+    "system": "System default ({{language}})",
+    "note": "Text that is not translated yet shows in English. <guide>Help translate Vicu</guide>"
+  },
+  "nav": {
+    "lists": "Lists",
+    "inbox": "Inbox",
+    "today": "Today",
+    "plan": "Plan",
+    "routines": "Routines",
+    "upcoming": "Upcoming",
+    "anytime": "Anytime",
+    "review": "Review",
+    "logbook": "Logbook"
+  },
+  "completion": {
+    "toast_one": "Completed",
+    "toast_other": "{{count}} completed",
+    "undo": "Undo"
+  },
+  "menu": {
+    "about": "About Vicu",
+    "preferences": "Preferences",
+    "services": "Services",
+    "hide": "Hide Vicu",
+    "hideOthers": "Hide Others",
+    "showAll": "Show All",
+    "quit": "Quit Vicu",
+    "file": "File",
+    "newTask": "New task",
+    "print": "Print",
+    "closeWindow": "Close Window",
+    "edit": "Edit",
+    "undo": "Undo",
+    "redo": "Redo",
+    "cut": "Cut",
+    "copy": "Copy",
+    "paste": "Paste",
+    "pasteAndMatchStyle": "Paste and Match Style",
+    "selectAll": "Select All",
+    "speech": "Speech",
+    "startSpeaking": "Start Speaking",
+    "stopSpeaking": "Stop Speaking",
+    "view": "View",
+    "refresh": "Refresh",
+    "reloadWindow": "Reload window",
+    "toggleDevTools": "Toggle Developer Tools",
+    "actualSize": "Actual Size",
+    "zoomIn": "Zoom In",
+    "zoomOut": "Zoom Out",
+    "toggleFullScreen": "Toggle Full Screen",
+    "window": "Window",
+    "minimize": "Minimize",
+    "zoom": "Zoom",
+    "bringAllToFront": "Bring All to Front",
+    "help": "Help",
+    "documentation": "Documentation"
+  },
+  "tray": {
+    "show": "Show Vicu",
+    "quickEntry": "Quick Entry",
+    "quickView": "Quick View",
+    "quit": "Quit"
+  }
+}

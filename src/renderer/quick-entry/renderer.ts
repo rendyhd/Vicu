@@ -28,6 +28,9 @@ declare global {
       // The locale and clock dates are phrased with (system locale, Settings clock choice).
       getDateFormat(): Promise<{ locale: string; hour12: boolean }>
       onDateFormatChanged(callback: (format: { locale: string; hour12: boolean }) => void): void
+      // The language the app shows (src/shared/i18n), chosen in Settings.
+      getLanguage(): Promise<{ language: string; system: string }>
+      onLanguageChanged(callback: (info: { language: string; system: string }) => void): void
       // The note's final link when saving with it linked; the uid is written into the note then.
       resolveObsidianLink(): Promise<{ deepLink: string; noteName: string; isUidBased: boolean } | null>
       setHeight(height: number): Promise<void>
@@ -89,6 +92,7 @@ import { followColorScheme } from '../lib/theme'
 import { parseChips } from '../lib/parse-chips'
 import { motionMs, motionSpringCurve, travelStart } from '../lib/motion'
 import { initDateFormat, subscribeDateFormat } from '../lib/date-format'
+import { initLanguage } from '../lib/language'
 import type { ParseResult, ParserConfig, ParsedToken, TokenType } from '../lib/task-parser'
 import type { Person } from '../../shared/pro/people'
 import { getClipboardImages, fileToUint8Array } from '../lib/clipboard-images'
@@ -1056,6 +1060,7 @@ window.quickEntryApi.onBrowserContext((ctx) => {
 
 // Dates follow the system locale and the Settings clock choice; main sends them and any change.
 void initDateFormat(window.quickEntryApi)
+void initLanguage(window.quickEntryApi)
 subscribeDateFormat(() => {
   if (lastParseResult) renderParsePreview(lastParseResult)
 })
