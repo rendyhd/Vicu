@@ -1,4 +1,4 @@
-import { BrowserWindow } from 'electron'
+import { sendToAllWindows } from '@host/windows'
 import { createTask, deleteTask, fetchTaskById, updateTask } from './api-client'
 import type { ApiResult } from './api-result'
 import { OWNER_UNKNOWN_ERROR, forgetDeletedTask, rememberCreatedTask } from './carrier-service'
@@ -144,13 +144,9 @@ function looksOffline(message: string): boolean {
   return /offline|network|connect|timed?\s*out|ENOTFOUND|ECONN|ERR_/i.test(message)
 }
 
-function sendToWindows(send: (win: BrowserWindow) => void): void {
-  for (const win of BrowserWindow.getAllWindows()) {
-    if (win.isDestroyed()) continue
-    try {
-      send(win)
-    } catch { /* window may close between enumeration and send */ }
-  }
+function sendToWindows(send: (win: { webContents: { send(channel: string, ...args: unknown[]): void } }) => void): void {
+  // One stand-in window whose send reaches every window (see @host/windows).
+  send({ webContents: { send: sendToAllWindows } })
 }
 
 const sameServer = (config: AppConfig | null, url: string): boolean =>

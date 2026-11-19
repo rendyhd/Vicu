@@ -12,7 +12,11 @@
     "skipLibCheck": true,
     "target": "ES2022",
     "lib": ["ES2022"],
-    "types": ["node"]
+    "types": ["node"],
+    "baseUrl": ".",
+    "paths": {
+      "@host/*": ["./src/main/host/*"]
+    }
   },
   "include": [
     "test-fixtures/ai-tools-v1.json",

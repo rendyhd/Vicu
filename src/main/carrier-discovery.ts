@@ -27,11 +27,9 @@
  * Kept free of Electron so the rules run in unit tests; `carrier-service.ts` wires it to the API
  * client and the config.
  */
-import { join } from 'path'
 import type { ApiResult } from './api-result'
 import { MAX_PAGE_SIZE } from './api-v2'
 import { CUSTOM_LIST_CARRIER_SEARCH, hasCustomListMarker } from './custom-list-protocol'
-import { JsonFileStore } from './json-file-store'
 import { mapLimited } from './map-limited'
 import { isBrokenSearch } from '../shared/error-classify'
 import { isOwnTask } from '../shared/hidden-tasks'
@@ -163,10 +161,13 @@ export function createMemoryCarrierIdStore(): CarrierIdStore {
   }
 }
 
-type FileShape = { version: 1; servers: Record<string, Partial<Record<CarrierKind, CarrierIdState>>> }
+/** What the carrier id store keeps, whatever holds it (a file on the desktop, the browser's storage on the web). */
+export type CarrierIdFile = { version: 1; servers: Record<string, Partial<Record<CarrierKind, CarrierIdState>>> }
 
-function parseFileShape(json: unknown): FileShape {
-  const servers: FileShape['servers'] = {}
+export const emptyCarrierIdFile = (): CarrierIdFile => ({ version: 1, servers: {} })
+
+export function parseCarrierIdFile(json: unknown): CarrierIdFile {
+  const servers: CarrierIdFile['servers'] = {}
   const raw = (json as { servers?: unknown } | null)?.servers
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return { version: 1, servers }
   for (const [server, kinds] of Object.entries(raw as Record<string, unknown>)) {
@@ -186,26 +187,25 @@ function parseFileShape(json: unknown): FileShape {
   return { version: 1, servers }
 }
 
+/** A loaded carrier id document and the way to write it back (synchronously, or queued by the host). */
+export interface CarrierIdDocument {
+  readonly state: CarrierIdFile
+  save(): void
+}
+
 /**
- * The same, kept in `carrier-ids.json` in the user data folder. A lost or unreadable file only
- * means one discovery pass (and one full scan) on the next load, so there is no backup copy.
+ * The same, kept in a stored document: `carrier-ids.json` in the user data folder on the desktop
+ * (carrier-id-file.ts), the browser's storage on the web. A lost or unreadable document only means
+ * one discovery pass (and one full scan) on the next load, so there is no backup copy.
  */
-export function createFileCarrierIdStore(path: string): CarrierIdStore {
-  const file = new JsonFileStore<FileShape>({
-    path,
-    backup: false,
-    label: 'carrier ids',
-    empty: () => ({ version: 1, servers: {} }),
-    parse: parseFileShape,
-  })
-  file.load()
+export function createDocumentCarrierIdStore(file: CarrierIdDocument): CarrierIdStore {
   // The file is a few hundred bytes and written only when a carrier appears or disappears (or once
   // a day), so a synchronous write is simpler than an async one and leaves nothing running.
   const persist = (): void => {
     try {
-      file.saveSync()
+      file.save()
     } catch (err) {
-      console.warn('[carriers] could not save carrier-ids.json:', err instanceof Error ? err.message : err)
+      console.warn('[carriers] could not save the carrier ids:', err instanceof Error ? err.message : err)
     }
   }
   return {
@@ -234,9 +234,6 @@ export function createFileCarrierIdStore(path: string): CarrierIdStore {
   }
 }
 
-export function carrierIdsPath(userDataDir: string): string {
-  return join(userDataDir, CARRIER_IDS_FILENAME)
-}
 
 // --- The loader --------------------------------------------------------------------------
 

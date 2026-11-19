@@ -1,5 +1,4 @@
-import { BrowserWindow } from 'electron'
-import { randomUUID } from 'crypto'
+import { sendToAllWindows } from '@host/windows'
 import { searchTasksAt } from './api-client'
 import { loadPrefsCarriers } from './carrier-service'
 import { loadConfig, saveConfig, type AppConfig } from './config'
@@ -102,13 +101,11 @@ function applySyncedValues(config: AppConfig, document: SyncedPrefsDocument): vo
 let lastBroadcast: string | null = null
 let pendingAdoptedInbox: number | undefined
 
+/** A random id (the Web Crypto global, in Node, Electron and browsers alike). */
+const randomUUID = (): string => crypto.randomUUID()
+
 function sendToWindows(channel: string, payload: unknown): void {
-  for (const win of BrowserWindow.getAllWindows()) {
-    if (win.isDestroyed()) continue
-    try {
-      win.webContents.send(channel, payload)
-    } catch { /* window may close between enumeration and send */ }
-  }
+  sendToAllWindows(channel, payload)
 }
 
 function snapshotOf(config: AppConfig): SyncedPrefsSnapshot {

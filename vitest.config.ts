@@ -5,6 +5,8 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': resolve(__dirname, 'src/renderer'),
+      // The host seam (src/main/host); the web build maps it to src/web/host instead.
+      '@host': resolve(__dirname, 'src/main/host'),
     },
   },
   test: {

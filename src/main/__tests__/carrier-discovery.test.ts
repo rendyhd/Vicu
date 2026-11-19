@@ -8,13 +8,12 @@ import {
   DISCOVERY_INTERVAL_MS,
   FULL_SCAN_INTERVAL_MS,
   ROUTINE_CARRIER_SPEC,
-  carrierIdsPath,
   createCarrierLoader,
-  createFileCarrierIdStore,
   createMemoryCarrierIdStore,
   type CarrierIdStore,
   type CarrierTask,
 } from '../carrier-discovery'
+import { carrierIdsPath, createFileCarrierIdStore } from '../carrier-id-file'
 import { encodeRoutineEnvelope, type RoutinePayload } from '../../shared/routines'
 
 const SERVER = 'https://tasks.example.com'

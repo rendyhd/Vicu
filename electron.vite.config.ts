@@ -4,6 +4,12 @@ import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   main: {
+    // The host seam: what differs between the desktop and the web build (see src/main/host).
+    resolve: {
+      alias: {
+        '@host': resolve(__dirname, 'src/main/host')
+      }
+    },
     build: {
       rollupOptions: {
         input: {

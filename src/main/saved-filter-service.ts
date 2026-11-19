@@ -15,8 +15,7 @@
  *
  * An import is a copy: the saved filter or view on the server is never changed or deleted.
  */
-import { BrowserWindow } from 'electron'
-import { randomUUID } from 'crypto'
+import { sendToAllWindows } from '@host/windows'
 import { fetchProjectViews, fetchProjectsAndSavedFilters, fetchSavedFilter } from './api-client'
 import { loadConfig, saveConfig, type AppConfig } from './config'
 import {
@@ -62,13 +61,11 @@ function storeOf(config: AppConfig): Store {
   return config.saved_filters
 }
 
+/** A random id (the Web Crypto global, in Node, Electron and browsers alike). */
+const randomUUID = (): string => crypto.randomUUID()
+
 function broadcast(channel: string, payload?: unknown): void {
-  for (const win of BrowserWindow.getAllWindows()) {
-    if (win.isDestroyed()) continue
-    try {
-      win.webContents.send(channel, payload)
-    } catch { /* window may close between enumeration and send */ }
-  }
+  sendToAllWindows(channel, payload)
 }
 
 /** The list that holds the saved filter `filterId`, if any. */

@@ -1,7 +1,5 @@
-import { net, BrowserWindow } from 'electron'
 import { loadConfig } from './config'
-import { authManager } from './auth/auth-manager'
-import { getAPIToken } from './auth/token-store'
+import { sessionToken, sessionTokenSync, storedApiToken } from '@host/auth'
 import {
   buildTaskAttachmentDownloadUrl,
   buildProjectCollectionUrl,
@@ -23,226 +21,28 @@ import {
   type TaskCommentPage,
 } from './api-v2'
 import { sanitizeProjectPatch, sanitizeTaskPatch } from '../shared/merge-patches'
-import { NOT_API_RESPONSE_MESSAGE, SESSION_ENDED_MESSAGE, answerCutOffMessage, isNotApiErrorAnswer, notApiErrorMessage } from '../shared/error-classify'
+import { SESSION_ENDED_MESSAGE } from '../shared/error-classify'
 import type { ApiError, ApiResult } from './api-result'
 import { collectAllPages } from './paginate'
-import { decodeUtf8Chunks } from './response-body'
-import { MAX_BINARY_DOWNLOAD_BYTES, describeDownloadLimit, parseContentLength } from './attachment-safety'
-import { buildMultipartBody } from './multipart'
-import { vikunjaUserAgent } from './user-agent'
-import { createIdleTimeout } from './idle-timeout'
-import { DEFAULT_MAX_UPLOAD_BYTES, parseMaxFileSize, uploadSizeError, uploadTimeoutMs } from './upload-limits'
+import { bytesToBase64 } from '../shared/bytes'
+import { DEFAULT_MAX_UPLOAD_BYTES, parseMaxFileSize, uploadSizeError } from './upload-limits'
+import { request, requestBinary, requestMultipart } from '@host/http'
+import { sendToAllWindows } from '@host/windows'
+
+// The answer readers moved to api-answers.ts; these names stay importable from here.
+export { readErrorAnswer, readSuccessBody } from './api-answers'
+
 
 /**
  * Send 'auth-required' IPC event to all renderer windows.
  */
 function notifyAuthRequired(): void {
-  for (const win of BrowserWindow.getAllWindows()) {
-    try {
-      if (!win.isDestroyed()) {
-        win.webContents.send('auth-required')
-      }
-    } catch { /* ignore */ }
-  }
+  sendToAllWindows('auth-required')
 }
 
-// A request fails after this long WITHOUT data (connecting, waiting for the answer, or between two
-// chunks of it), not after this long in total (C-11).
-const REQUEST_IDLE_TIMEOUT = 10_000
-// A download is cut off after this long WITHOUT data, not after this long in total, so a large file
-// on a slow link still arrives as long as it keeps moving (D-API-3).
-const DOWNLOAD_IDLE_TIMEOUT = 60_000
 const API_BASE_PATH = '/api/v2'
 const JSON_MERGE_PATCH = 'application/merge-patch+json'
 const JSON_PATCH = 'application/json-patch+json'
-
-// Friendly error overrides for known unhelpful server messages
-const FRIENDLY_ERROR_OVERRIDES: { pattern: RegExp; message: string }[] = [
-  {
-    pattern: /missing,?\s*malformed,?\s*expired\s*or\s*otherwise\s*invalid\s*token/i,
-    message:
-      'API token is invalid or expired. Generate a new token in Vikunja (Settings > API Tokens).',
-  },
-  {
-    pattern: /token.*(?:lacks?|insufficient|no)\s*permission/i,
-    message:
-      'API token has insufficient permissions. Create a new token with read/write access to tasks and projects.',
-  },
-]
-
-function getFriendlyError(serverMessage: string): string | null {
-  for (const { pattern, message } of FRIENDLY_ERROR_OVERRIDES) {
-    if (pattern.test(serverMessage)) return message
-  }
-  return null
-}
-
-function describeHttpError(statusCode: number, responseBody: string): string {
-  let serverMessage: string | null = null
-  try {
-    const parsed = JSON.parse(responseBody)
-    if (parsed.detail) {
-      serverMessage = parsed.detail
-    } else if (parsed.message) {
-      serverMessage = parsed.message
-    } else if (parsed.title) {
-      serverMessage = parsed.title
-    }
-  } catch {
-    // fall through
-  }
-
-  if (serverMessage) {
-    const friendly = getFriendlyError(serverMessage)
-    if (friendly) return friendly
-  }
-
-  switch (statusCode) {
-    case 401:
-      return 'API token is invalid or expired. Check Settings or generate a new token in Vikunja.'
-    case 403:
-      return 'API token lacks permission. Ensure your token has read/write access to tasks and projects.'
-    case 404:
-      return 'Not found — the task or project may have been deleted.'
-    default:
-      if (serverMessage) return serverMessage
-      if (statusCode >= 500) return 'Server error — Vikunja may be experiencing issues.'
-      return `HTTP ${statusCode}`
-  }
-}
-
-function validateHttpUrl(url: string): { valid: true; parsed: URL } | { valid: false; error: string } {
-  try {
-    const parsed = new URL(url)
-    if (!['http:', 'https:'].includes(parsed.protocol)) {
-      return { valid: false, error: 'Only HTTP(S) URLs are supported' }
-    }
-    return { valid: true, parsed }
-  } catch {
-    return { valid: false, error: 'Invalid URL' }
-  }
-}
-
-/**
- * The answer of a 2xx response. An empty body (204, some PUT and DELETE answers) is a success with
- * `data: null`. A body that is not JSON is not the API at all: a sign-in proxy in front of Vikunja
- * answers its login page with 200. That is a failure marked `notApiResponse`, handled like an
- * unreachable server, never a success: a change "saved" that way would silently be lost (C-1).
- */
-export function readSuccessBody<T>(responseBody: string): ApiResult<T> {
-  if (responseBody.trim() === '') return { success: true, data: null as T }
-  try {
-    return { success: true, data: JSON.parse(responseBody) as T }
-  } catch {
-    return { success: false, error: NOT_API_RESPONSE_MESSAGE, notApiResponse: true }
-  }
-}
-
-/**
- * The answer of a response that is not 2xx. A 4xx whose body is a page instead of JSON did not come
- * from Vikunja: the sign-in page of a plane's or hotel's network, a firewall's or a proxy's block
- * page (`isNotApiErrorAnswer`). It is marked `notApiResponse` and carries no status, so it is
- * handled like an unreachable server (the change is queued, the replay waits) and no rule about a
- * 401, 403 or 404 of the server applies to it: no sign-in prompt, no dropped change.
- */
-export function readErrorAnswer(statusCode: number, responseBody: string): ApiError {
-  if (isNotApiErrorAnswer(statusCode, responseBody)) {
-    return { success: false, error: notApiErrorMessage(statusCode), notApiResponse: true }
-  }
-  let errorCode: number | undefined
-  try {
-    const parsed = JSON.parse(responseBody)
-    if (typeof parsed.code === 'number') errorCode = parsed.code
-  } catch { /* ignore */ }
-  return {
-    success: false,
-    error: describeHttpError(statusCode, responseBody),
-    statusCode,
-    errorCode,
-  }
-}
-
-function request<T>(
-  method: string,
-  url: string,
-  token: string,
-  body?: unknown,
-  contentType = 'application/json'
-): Promise<ApiResult<T>> {
-  const validation = validateHttpUrl(url)
-  if (!validation.valid) {
-    return Promise.resolve({ success: false, error: validation.error })
-  }
-
-  return new Promise((resolve) => {
-    let req: Electron.ClientRequest | null = null
-    // A limit on time without data (connecting included), not on the whole answer: a page of 1,000
-    // tasks from a slow server keeps arriving as long as it moves (C-11). "timed out" is what
-    // `isRetriableError` looks for.
-    const idle = createIdleTimeout(REQUEST_IDLE_TIMEOUT, () => {
-      try { req?.abort() } catch { /* ignore */ }
-      resolve({ success: false, error: `Request timed out (no answer for ${REQUEST_IDLE_TIMEOUT / 1000}s)` })
-    })
-
-    try {
-      req = net.request({ method, url })
-
-      req.setHeader('Authorization', `Bearer ${token}`)
-      req.setHeader('Content-Type', contentType)
-      req.setHeader('User-Agent', vikunjaUserAgent())
-
-      const bodyChunks: Buffer[] = []
-      let statusCode = 0
-      let answered = false
-
-      // A network error after the answer began reaches both the request and the response (Electron
-      // destroys the response with it); either way the request settles once. After the headers it
-      // says the server got the request, so it is not a connection error (`answerCutOffMessage`).
-      const fail = (err: Error): void => {
-        idle.clear()
-        const message = err.message || 'Network error'
-        resolve({ success: false, error: answered ? answerCutOffMessage(message) : message })
-      }
-
-      req.on('response', (response) => {
-        idle.touch()
-        answered = true
-        statusCode = response.statusCode
-
-        // Without a listener the response's error is an uncaught exception in main (the
-        // "JavaScript error occurred in the main process" dialog on ERR_NETWORK_CHANGED).
-        response.on('error', fail)
-
-        response.on('data', (chunk) => {
-          idle.touch()
-          bodyChunks.push(Buffer.from(chunk))
-        })
-
-        response.on('end', () => {
-          idle.clear()
-          const responseBody = decodeUtf8Chunks(bodyChunks)
-
-          if (statusCode >= 200 && statusCode < 300) {
-            resolve(readSuccessBody<T>(responseBody))
-          } else {
-            resolve(readErrorAnswer(statusCode, responseBody))
-          }
-        })
-      })
-
-      req.on('error', fail)
-
-      if (body !== undefined) {
-        req.write(JSON.stringify(body))
-      }
-      req.end()
-    } catch (err: unknown) {
-      idle.clear()
-      const message = err instanceof Error ? err.message : 'Request failed'
-      resolve({ success: false, error: message })
-    }
-  })
-}
 
 /**
  * Check if a failed result is a 401 with Vikunja error code 11 (expired token).
@@ -266,7 +66,7 @@ async function requestWithRetry<T>(
 
   if (!result.success && isExpiredTokenError(result)) {
     try {
-      const newToken = await authManager.getToken()
+      const newToken = await sessionToken()
       return sessionAware(await request<T>(method, url, newToken, body, contentType))
     } catch {
       return sessionAware(result)
@@ -350,7 +150,7 @@ async function requestMultipartWithRetry<T>(
   method: string,
   url: string,
   token: string,
-  fileBuffer: Buffer,
+  fileBuffer: Uint8Array,
   fileName: string,
   mimeType: string
 ): Promise<ApiResult<T>> {
@@ -358,7 +158,7 @@ async function requestMultipartWithRetry<T>(
 
   if (!result.success && isExpiredTokenError(result)) {
     try {
-      const newToken = await authManager.getToken()
+      const newToken = await sessionToken()
       return sessionAware(await requestMultipart<T>(method, url, newToken, fileBuffer, fileName, mimeType))
     } catch {
       return sessionAware(result)
@@ -371,12 +171,12 @@ async function requestMultipartWithRetry<T>(
 async function requestBinaryWithRetry(
   url: string,
   token: string
-): Promise<ApiResult<Buffer>> {
+): Promise<ApiResult<Uint8Array>> {
   const result = await requestBinary(url, token)
 
   if (!result.success && isExpiredTokenError(result)) {
     try {
-      const newToken = await authManager.getToken()
+      const newToken = await sessionToken()
       return sessionAware(await requestBinary(url, newToken))
     } catch {
       return sessionAware(result)
@@ -401,12 +201,12 @@ async function getConfigOrFail(): Promise<Connection | ApiError> {
 
   if (config.auth_method === 'oidc' || config.auth_method === 'password') {
     // Fast path: sync token check
-    const syncToken = authManager.getTokenSync()
+    const syncToken = sessionTokenSync()
     if (syncToken) return { url: config.vikunja_url, token: syncToken, apiToken: false }
 
     // Slow path: async recovery (refresh token / silent reauth)
     try {
-      const asyncToken = await authManager.getToken()
+      const asyncToken = await sessionToken()
       return { url: config.vikunja_url, token: asyncToken, apiToken: false }
     } catch {
       notifyAuthRequired()
@@ -415,7 +215,7 @@ async function getConfigOrFail(): Promise<Connection | ApiError> {
   }
 
   // API token path — prefer encrypted store, fall back to config (pre-migration)
-  const token = getAPIToken() || config.api_token
+  const token = storedApiToken() || config.api_token
   if (!token) {
     return { success: false, error: 'Vikunja is not configured. Open Settings to connect.' }
   }
@@ -761,176 +561,8 @@ export function searchTasksAt(url: string, token: string, q: string): Promise<Ap
     })
 }
 
+
 // --- Attachments ---
-
-function requestMultipart<T>(
-  method: string,
-  url: string,
-  token: string,
-  fileBuffer: Buffer,
-  fileName: string,
-  mimeType: string
-): Promise<ApiResult<T>> {
-  const validation = validateHttpUrl(url)
-  if (!validation.valid) {
-    return Promise.resolve({ success: false, error: validation.error })
-  }
-
-  return new Promise((resolve) => {
-    let req: Electron.ClientRequest | null = null
-    // The time allowed grows with the file, so a file the server accepts is not cut off on a slow link.
-    const uploadTimeout = uploadTimeoutMs(fileBuffer.length)
-    const timeout = setTimeout(() => {
-      try { req?.abort() } catch { /* ignore */ }
-      resolve({ success: false, error: `Upload timed out (${Math.round(uploadTimeout / 1000)}s)` })
-    }, uploadTimeout)
-
-    try {
-      const boundary = `----ViCU${Date.now()}${Math.random().toString(36).slice(2)}`
-      // The file name and type are escaped inside buildMultipartBody (D-API-3).
-      const body = buildMultipartBody({ boundary, fieldName: 'files', fileName, mimeType, file: fileBuffer })
-
-      req = net.request({ method, url })
-      req.setHeader('Authorization', `Bearer ${token}`)
-      req.setHeader('Content-Type', `multipart/form-data; boundary=${boundary}`)
-      req.setHeader('User-Agent', vikunjaUserAgent())
-      // Content-Length is a forbidden header in Chromium's network stack —
-      // Electron's net.request rejects it with ERR_INVALID_ARGUMENT.
-      // Chromium calculates it automatically from the body.
-
-      const bodyChunks: Buffer[] = []
-      let statusCode = 0
-      let answered = false
-
-      // Settles once, from the request or the response (see `request`).
-      const fail = (err: Error): void => {
-        clearTimeout(timeout)
-        console.error(`[upload] Network error for ${method} ${url}:`, err.message)
-        const message = err.message || 'Upload failed'
-        resolve({ success: false, error: answered ? answerCutOffMessage(message) : message })
-      }
-
-      req.on('response', (response) => {
-        answered = true
-        statusCode = response.statusCode
-        response.on('error', fail)
-
-        response.on('data', (chunk) => {
-          bodyChunks.push(Buffer.from(chunk))
-        })
-
-        response.on('end', () => {
-          clearTimeout(timeout)
-          const responseBody = decodeUtf8Chunks(bodyChunks)
-          if (statusCode >= 200 && statusCode < 300) {
-            resolve(readSuccessBody<T>(responseBody))
-          } else {
-            console.error(`[upload] HTTP ${statusCode} for ${method} ${url}:`, responseBody)
-            resolve(readErrorAnswer(statusCode, responseBody))
-          }
-        })
-      })
-
-      req.on('error', fail)
-
-      // Send complete body in one call to avoid chunked transfer issues
-      req.end(body)
-    } catch (err: unknown) {
-      clearTimeout(timeout)
-      const message = err instanceof Error ? err.message : 'Upload failed'
-      resolve({ success: false, error: message })
-    }
-  })
-}
-
-function requestBinary(
-  url: string,
-  token: string
-): Promise<ApiResult<Buffer>> {
-  const validation = validateHttpUrl(url)
-  if (!validation.valid) {
-    return Promise.resolve({ success: false, error: validation.error })
-  }
-
-  return new Promise((resolve) => {
-    let req: Electron.ClientRequest | null = null
-    // Restarted by every sign of life (response headers, each chunk), so only a stalled transfer times out.
-    const idle = createIdleTimeout(DOWNLOAD_IDLE_TIMEOUT, () => {
-      try { req?.abort() } catch { /* ignore */ }
-      resolve({ success: false, error: `Download timed out (no data for ${DOWNLOAD_IDLE_TIMEOUT / 1000}s)` })
-    })
-
-    try {
-      req = net.request({ method: 'GET', url })
-      req.setHeader('Authorization', `Bearer ${token}`)
-      req.setHeader('User-Agent', vikunjaUserAgent())
-
-      const chunks: Buffer[] = []
-      let statusCode = 0
-      let receivedBytes = 0
-      let tooLarge = false
-
-      const rejectTooLarge = (): void => {
-        if (tooLarge) return
-        tooLarge = true
-        chunks.length = 0
-        idle.clear()
-        try { req?.abort() } catch { /* ignore */ }
-        resolve({ success: false, error: describeDownloadLimit(MAX_BINARY_DOWNLOAD_BYTES) })
-      }
-
-      // Settles once, from the request or the response (see `request`). A read, so a cut-off answer
-      // needs no message of its own.
-      const fail = (err: Error): void => {
-        idle.clear()
-        resolve({ success: false, error: err.message || 'Download failed' })
-      }
-
-      req.on('response', (response) => {
-        idle.touch()
-        statusCode = response.statusCode
-        response.on('error', fail)
-
-        // Refuse oversized downloads up front when the server declares a length,
-        // and again while streaming in case it did not (D-IPC-2).
-        const declaredLength = parseContentLength(response.headers['content-length'])
-        if (declaredLength !== null && declaredLength > MAX_BINARY_DOWNLOAD_BYTES) {
-          rejectTooLarge()
-          return
-        }
-
-        response.on('data', (chunk) => {
-          if (tooLarge) return
-          idle.touch()
-          receivedBytes += chunk.length
-          if (receivedBytes > MAX_BINARY_DOWNLOAD_BYTES) {
-            rejectTooLarge()
-            return
-          }
-          chunks.push(Buffer.from(chunk))
-        })
-
-        response.on('end', () => {
-          if (tooLarge) return
-          idle.clear()
-          if (statusCode >= 200 && statusCode < 300) {
-            resolve({ success: true, data: Buffer.concat(chunks) })
-          } else {
-            resolve(readErrorAnswer(statusCode, decodeUtf8Chunks(chunks)))
-          }
-        })
-      })
-
-      req.on('error', fail)
-
-      req.end()
-    } catch (err: unknown) {
-      idle.clear()
-      const message = err instanceof Error ? err.message : 'Download failed'
-      resolve({ success: false, error: message })
-    }
-  })
-}
 
 export async function fetchTaskAttachments(taskId: number): Promise<ApiResult<unknown[]>> {
   const c = await getConfigOrFail()
@@ -975,7 +607,7 @@ export async function checkUploadSize(size: number): Promise<string | null> {
 
 export async function uploadTaskAttachment(
   taskId: number,
-  fileBuffer: Buffer,
+  fileBuffer: Uint8Array,
   fileName: string,
   mimeType: string
 ): Promise<ApiResult<unknown>> {
@@ -1015,7 +647,7 @@ export async function downloadTaskAttachment(
   taskId: number,
   attachmentId: number,
   previewSize?: AttachmentPreviewSize
-): Promise<ApiResult<Buffer>> {
+): Promise<ApiResult<Uint8Array>> {
   const c = await getConfigOrFail()
   if ('success' in c) return c
 
@@ -1284,5 +916,5 @@ export async function fetchAvatar(username: string, size: number): Promise<ApiRe
   if (result.data.length > MAX_AVATAR_BYTES) return { success: false, error: 'The avatar is too large' }
   const type = sniffImageType(result.data)
   if (!type) return { success: false, error: 'The avatar is not an image' }
-  return { success: true, data: `data:${type};base64,${result.data.toString('base64')}` }
+  return { success: true, data: `data:${type};base64,${bytesToBase64(result.data)}` }
 }

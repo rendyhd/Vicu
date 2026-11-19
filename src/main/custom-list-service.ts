@@ -1,5 +1,4 @@
-import { BrowserWindow } from 'electron'
-import { randomUUID } from 'crypto'
+import { sendToAllWindows } from '@host/windows'
 import { loadCustomListCarriers } from './carrier-service'
 import { loadConfig, saveConfig, type AppConfig } from './config'
 import { onAccountDataCleared } from './known-user'
@@ -53,13 +52,12 @@ function ensureSyncState(config: AppConfig): NonNullable<AppConfig['custom_lists
   return config.custom_lists_sync
 }
 
-function sendToWindows(send: (win: BrowserWindow) => void): void {
-  for (const win of BrowserWindow.getAllWindows()) {
-    if (win.isDestroyed()) continue
-    try {
-      send(win)
-    } catch { /* window may close between enumeration and send */ }
-  }
+/** A random id (the Web Crypto global, in Node, Electron and browsers alike). */
+const randomUUID = (): string => crypto.randomUUID()
+
+function sendToWindows(send: (win: { webContents: { send(channel: string, ...args: unknown[]): void } }) => void): void {
+  // One stand-in window whose send reaches every window (see @host/windows).
+  send({ webContents: { send: sendToAllWindows } })
 }
 
 /** What the windows currently show is what the config holds; call before the lists can change. */

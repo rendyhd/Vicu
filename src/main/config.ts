@@ -1,7 +1,5 @@
-import { app } from 'electron'
-import { join } from 'path'
-import { isMac } from './platform'
-import { readFileWithBackup, writeFileAtomic } from './atomic-file'
+import { isMac } from '@host/env'
+import { readStoredConfig, writeStoredConfig } from '@host/storage'
 import type {
   AppConfig,
   ConnectionFields,
@@ -45,8 +43,6 @@ export type {
 export const DEFAULT_QUICK_ENTRY_HOTKEY = isMac ? 'Command+Shift+Space' : 'Alt+Shift+V'
 export const DEFAULT_QUICK_VIEW_HOTKEY = isMac ? 'Command+Shift+B' : 'Alt+Shift+B'
 
-const CONFIG_FILENAME = 'config.json'
-
 const DEFAULT_CONFIG: AppConfig = {
   vikunja_url: '',
   api_token: '',
@@ -61,10 +57,6 @@ const DEFAULT_CONFIG: AppConfig = {
     default_cadence_days: 14,
     exclude_inbox: true,
   },
-}
-
-function getConfigPath(): string {
-  return join(app.getPath('userData'), CONFIG_FILENAME)
 }
 
 // In-memory cache: the config file is only ever written through saveConfig,
@@ -89,7 +81,7 @@ function parseConfigFile(raw: string): AppConfig {
 
 function readConfigFromDisk(): AppConfig | null {
   // Falls back to config.json.bak (and logs it) when the file does not parse.
-  const loaded = readFileWithBackup(getConfigPath(), parseConfigFile)
+  const loaded = readStoredConfig(parseConfigFile)
   if (!loaded) return null
   const config = loaded.value
 
@@ -321,7 +313,7 @@ function isWindowBounds(v: unknown): v is { x: number; y: number; width: number;
 export function saveConfig(config: AppConfig): void {
   const snapshot = structuredClone(config)
   // Temp file + rename, keeping config.json.bak (see atomic-file.ts)
-  writeFileAtomic(getConfigPath(), JSON.stringify(config, null, 2), { backup: true })
+  writeStoredConfig(JSON.stringify(config, null, 2))
   // The cache follows the disk: after a failed write it still holds what is on disk, so a caller
   // that is told the save failed does not keep seeing the unsaved values until the next restart.
   cachedConfig = snapshot

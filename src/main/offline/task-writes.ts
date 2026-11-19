@@ -266,7 +266,7 @@ export const taskWrites = {
    */
   upload(
     queue: OfflineQueue,
-    api: { uploadTaskAttachment(taskId: number, bytes: Buffer, name: string, mime: string): Promise<ApiResult<unknown>> },
+    api: { uploadTaskAttachment(taskId: number, bytes: Uint8Array, name: string, mime: string): Promise<ApiResult<unknown>> },
     taskId: number,
     file: { bytes: Uint8Array; name: string; mime: string },
     options: { inline?: boolean; title?: string } = {}
@@ -274,7 +274,7 @@ export const taskWrites = {
     return {
       taskId,
       kind: 'create',
-      send: () => api.uploadTaskAttachment(taskId, Buffer.from(file.bytes), file.name, file.mime),
+      send: () => api.uploadTaskAttachment(taskId, file.bytes, file.name, file.mime),
       enqueue: () =>
         queue.enqueueUpload(taskId, { name: file.name, mime: file.mime, bytes: file.bytes }, { addImageToken: options.inline === true, ...titleMeta(options.title) }),
     }

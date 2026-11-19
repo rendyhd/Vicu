@@ -1,4 +1,4 @@
-import { app } from 'electron'
+import { openCarrierIdStore } from '@host/storage'
 import type { ApiResult } from './api-result'
 import { fetchTaskById, fetchTasks } from './api-client'
 import {
@@ -8,9 +8,7 @@ import {
   PRO_LEDGER_SPEC,
   ROUTINE_ARCHIVE_SPEC,
   ROUTINE_CARRIER_SPEC,
-  carrierIdsPath,
   createCarrierLoader,
-  createFileCarrierIdStore,
   type CarrierLoader,
   type CarrierSpec,
   type CarrierTask,
@@ -32,7 +30,7 @@ function getLoader(): CarrierLoader {
     loader = createCarrierLoader({
       fetchTasks,
       fetchTaskById,
-      store: createFileCarrierIdStore(carrierIdsPath(app.getPath('userData'))),
+      store: openCarrierIdStore(),
       now: () => Date.now(),
     })
   }

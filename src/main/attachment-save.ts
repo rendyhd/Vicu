@@ -7,8 +7,8 @@ export interface SaveAttachmentDeps {
   /** Asks where to save, starting at [defaultPath]; null when the user cancels. */
   chooseFile(defaultPath: string): Promise<string | null>
   /** The attachment's bytes from the server. */
-  download(): Promise<ApiResult<Buffer>>
-  writeFile(filePath: string, data: Buffer): Promise<void>
+  download(): Promise<ApiResult<Uint8Array>>
+  writeFile(filePath: string, data: Uint8Array): Promise<void>
   /**
    * Marks the written file as downloaded from the internet (review S-3). Defaults to
    * `markFromInternet` without the server's address.
