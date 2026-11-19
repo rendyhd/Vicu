@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { createApi } from '../shared/api-factory'
+import { ELECTRON_CAPABILITIES } from '../shared/capabilities'
 
 // The channels live in src/shared/api-factory.ts, shared with the web host.
 const api = createApi({
@@ -13,6 +14,7 @@ const api = createApi({
   },
   platform: process.platform as 'darwin' | 'win32' | 'linux',
   windowMaterial: process.argv.includes('--vicu-window-material=mica') ? 'mica' : 'none',
+  capabilities: ELECTRON_CAPABILITIES,
 })
 
 contextBridge.exposeInMainWorld('api', api)

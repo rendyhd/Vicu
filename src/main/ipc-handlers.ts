@@ -375,6 +375,9 @@ export function registerIpcHandlers(): void {
 
   handleTrusted('auth:oidc-sign-in', () => ({ mode: getOidcSignInMode(), providerKey: getProviderKey() }))
 
+  // Only the web version's sign-in leaves the page and comes back (src/web/session.ts).
+  handleTrusted('auth:pending-sign-in', () => null)
+
   handleTrusted('auth:discover-methods', (_event, url: string) => {
     return discoverAuthMethods(url)
   })

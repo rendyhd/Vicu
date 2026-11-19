@@ -307,6 +307,7 @@ export const api = {
 
   /** How the last OIDC sign-in ran and with which provider, so signing in again starts the same way. */
   getOidcSignIn: () => window.api.getOidcSignIn() as Promise<{ mode: OidcSignInMode; providerKey: string | null }>,
+  pendingSignIn: () => window.api.pendingSignIn(),
 
   loginPassword: (url: string, username: string, password: string, totpPasscode?: string) =>
     window.api.loginPassword(url, username, password, totpPasscode) as Promise<PasswordLoginResult>,

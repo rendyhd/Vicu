@@ -12,6 +12,8 @@ import type { AiSettingsPatch, AskTurnEnvelope, AskTurnRequest, KeptTranscript, 
 // to one. The Electron preload passes `ipcRenderer`; the web host (src/web) passes its own
 // dispatcher. Both objects have the same shape by construction, so a channel is written once.
 
+import type { HostCapabilities } from './capabilities'
+
 export type ApiListener = (...args: any[]) => void
 
 export interface ApiBridge {
@@ -23,6 +25,8 @@ export interface ApiBridge {
   platform: 'darwin' | 'win32' | 'linux'
   /** 'mica' when the main window has Mica behind it (Windows 11 22H2+; set by main, window-chrome.ts). */
   windowMaterial: 'mica' | 'none'
+  /** What this host can do (src/shared/capabilities.ts). */
+  capabilities: HostCapabilities
 }
 
 export function createApi(bridge: ApiBridge) {
@@ -31,6 +35,8 @@ export function createApi(bridge: ApiBridge) {
   platform: bridge.platform,
   /** 'mica' when the main window has Mica behind it (Windows 11 22H2+; set by main, window-chrome.ts). */
   windowMaterial: bridge.windowMaterial,
+  /** What this host can do; a feature it lacks is hidden (src/shared/capabilities.ts). */
+  capabilities: bridge.capabilities,
 
   // Tasks
   fetchTasks: (params: Record<string, unknown>) =>
@@ -214,6 +220,9 @@ export function createApi(bridge: ApiBridge) {
     invoke('auth:cancel-oidc-browser'),
   getOidcSignIn: () =>
     invoke('auth:oidc-sign-in'),
+  // What a sign-in that left the page came back with (the web version's OIDC redirect); null on the desktop.
+  pendingSignIn: () =>
+    invoke('auth:pending-sign-in'),
   loginPassword: (url: string, username: string, password: string, totpPasscode?: string) =>
     invoke('auth:login-password', url, username, password, totpPasscode),
   getUser: () =>

@@ -28,6 +28,7 @@ import type {
   TaskCommentPage,
 } from '../renderer/lib/vikunja-types'
 import type { NotesPickResult } from '../shared/notes-import-types'
+import type { HostCapabilities } from '../shared/capabilities'
 import type { TaskPatch } from '../shared/merge-patches'
 import type { CalendarEventsResult, CalendarFeedView } from '../shared/calendar-events'
 import type {
@@ -93,6 +94,8 @@ export interface ElectronAPI {
   platform: 'darwin' | 'win32' | 'linux'
   /** 'mica' when the main window has Mica behind it (Windows 11 22H2+). */
   windowMaterial: 'mica' | 'none'
+  /** What this host can do; a feature it lacks is hidden (src/shared/capabilities.ts). */
+  capabilities: HostCapabilities
 
   // Tasks
   fetchTasks(params: TaskQueryParams): Promise<ApiResult<Task[]>>
@@ -219,6 +222,11 @@ export interface ElectronAPI {
   oidcBrowserLogin(url: string, providerKey: string, totpPasscode?: string): Promise<OidcLoginResult>
   cancelOidcBrowserLogin(): Promise<void>
   getOidcSignIn(): Promise<{ mode: 'window' | 'browser'; providerKey: string | null }>
+  /**
+   * What a sign-in that left the page came back with: the web version's OIDC sign-in is a full-page
+   * redirect, so Setup and Reauth ask once when they load. Always null on the desktop.
+   */
+  pendingSignIn(): Promise<{ providerKey: string; totpRequired?: boolean; error?: string } | null>
   loginPassword(url: string, username: string, password: string, totpPasscode?: string): Promise<PasswordLoginResult>
   getUser(): Promise<VikunjaUser | null>
   checkAuth(): Promise<AuthCheckResult>
