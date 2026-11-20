@@ -156,6 +156,60 @@ export function isSent(promise: PromiseValue | null | undefined): boolean {
   return (promise?.sent?.length ?? 0) > 0
 }
 
+// --- Who it was promised to, and checks (sections 21.6 and 21.18) -------------------------------
+
+export type Requester =
+  | { kind: 'you' }
+  | { kind: 'group'; group: number }
+  | { kind: 'person'; person: number }
+  | { kind: 'text'; text: string }
+
+const isLabelId = (value: unknown): value is number => typeof value === 'number' && Number.isInteger(value) && value > 0
+
+/**
+ * Who a promise was promised to: the first of `to.group`, `to.person` and `to.text` that is set;
+ * without one of them (and without `to`), you.
+ */
+export function requesterOf(promise: PromiseValue | null | undefined): Requester {
+  const to = promise?.to
+  if (to && typeof to === 'object' && !Array.isArray(to)) {
+    if (isLabelId(to.group)) return { kind: 'group', group: to.group }
+    if (isLabelId(to.person)) return { kind: 'person', person: to.person }
+    if (typeof to.text === 'string' && to.text.trim()) return { kind: 'text', text: to.text.trim() }
+  }
+  return { kind: 'you' }
+}
+
+/** True when the promise was made to someone other than you. */
+export function promisedToOthers(promise: PromiseValue | null | undefined): boolean {
+  return requesterOf(promise).kind !== 'you'
+}
+
+/** The promise with a check made at `at`. */
+export function withChecked(promise: PromiseValue, at: string): PromiseValue {
+  return { ...promise, checked: [...new Set([...(promise.checked ?? []), at])].sort() }
+}
+
+/** Undo of a copy: the marks made at `at` are taken out again. */
+export function withoutMark(promise: PromiseValue, field: 'checked' | 'sent', at: string): PromiseValue {
+  const left = (promise[field] ?? []).filter((mark) => mark !== at)
+  const next: PromiseValue = { ...promise }
+  if (left.length) next[field] = left
+  else delete next[field]
+  return next
+}
+
+/** True when a check was made on or after `day` (a local day). */
+export function checkedSince(promise: PromiseValue | null | undefined, day: LocalDate): boolean {
+  return (promise?.checked ?? []).some((at) => localDateOf(at) >= day)
+}
+
+/** The `check_on` day, or null when it is not a date. */
+export function checkOnOf(promise: PromiseValue | null | undefined): LocalDate | null {
+  const day = promise?.check_on
+  return typeof day === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(day) ? day : null
+}
+
 // --- Waiting on (section 21.6) ------------------------------------------------------------------
 
 export interface WaitingGroup {

@@ -69,6 +69,22 @@ export interface PromiseValue {
   /** When a recap holding this promise was copied (UTC instants). */
   sent?: string[]
   verdicts?: Verdict[]
+  /** Who it was promised to (section 21.6); without it, to you. */
+  to?: PromiseRequester | null
+  /** A local day to look at the promise before it is due (section 21.18). */
+  check_on?: LocalDate | null
+  /** When a check was made (UTC instants); a union in the merge, like `sent`. */
+  checked?: string[]
+  /** Left out of checks before due. */
+  no_check?: boolean
+  [unknownField: string]: unknown
+}
+
+/** `group` and `person` are label ids; `text` names anyone else. The first that is set counts. */
+export interface PromiseRequester {
+  group?: number
+  person?: number
+  text?: string
   [unknownField: string]: unknown
 }
 
@@ -97,7 +113,7 @@ export interface InitiativeValue {
   [unknownField: string]: unknown
 }
 
-export type LogKind = 'decision' | 'value' | 'unknown'
+export type LogKind = 'decision' | 'value' | 'unknown' | 'issue'
 
 export interface LogValue {
   initiative?: number | null
@@ -105,10 +121,20 @@ export interface LogValue {
   text: string
   by?: number | null
   at: LocalDate
-  /** For `unknown`: who to ask, and the task made for it. */
+  /** For `unknown`: who to ask, and the task made for it. For `issue`: the action it is about. */
   ask?: number | null
   task?: number | null
   resolved?: LocalDate | null
+  /** The group it belongs to (its label id, section 21.16). */
+  group?: number | null
+  /** The session it was captured in (a round id). */
+  session?: string | null
+  /** An open issue's place in the group's list (lowest first). */
+  rank?: number | null
+  /** The session an issue was solved in. */
+  solved_in?: string | null
+  /** When a recap with this decision was copied (UTC instants). */
+  shared?: string[]
   [unknownField: string]: unknown
 }
 
@@ -135,11 +161,27 @@ export interface EscalationValue {
   [unknownField: string]: unknown
 }
 
+export interface GroupSession {
+  id: string
+  /** `weekly` or `standup`; other kinds are kept and run as `weekly`. */
+  kind: string
+  rhythm?: string | null
+  [unknownField: string]: unknown
+}
+
 export interface MeetingValue {
   name: string
   people: number[]
   initiatives?: number[]
   rhythm?: string | null
+  /** The label of a group (section 21.16): a meeting with one is a group. */
+  label?: number | null
+  /** The recurring meetings a group holds. */
+  sessions?: GroupSession[]
+  /** False: no checks before due for this group's actions. */
+  checks?: boolean
+  /** The language of text copied for this group (a BCP 47 tag). */
+  language?: string | null
   [unknownField: string]: unknown
 }
 
@@ -150,6 +192,15 @@ export interface RoundValue {
   skipped: number[]
   absent: number[]
   not_discussed: number[]
+  /** A session of a group (section 21.17): its kind, when it ran, and how it closed. */
+  kind?: string
+  started?: string
+  ended?: string
+  read_back?: boolean
+  /** Private, 1 to 10; never copied. */
+  score?: number | null
+  /** When its recap was copied (UTC instants). */
+  recap_sent?: string[]
   [unknownField: string]: unknown
 }
 
@@ -163,6 +214,20 @@ export interface LedgerSettingsValue {
   cap_agreed?: { by: number | null; on: LocalDate } | null
   rule_agreed_on?: LocalDate | null
   threshold?: number
+  /** No limit on active initiatives (section 21.10); `cap` is kept for when it comes back. */
+  cap_off?: boolean
+  /** Working days before a due day that a check comes up (section 21.18); 2 unless set. */
+  check_days?: number
+  /** ISO weekdays that count as working days; Monday to Friday unless set. */
+  workdays?: number[]
+  /** The ISO weekday of the weekly note; none unless set. */
+  note_day?: number | null
+  /** When the weekly note was copied (UTC instants). */
+  note_sent?: string[]
+  /** The language of text copied for other people, unless a group has its own. */
+  text_language?: string | null
+  /** Weekly review steps marked done by hand, for one week (section 21.11). */
+  weekly_done?: { week: LocalDate; steps: string[] } | null
   [unknownField: string]: unknown
 }
 
@@ -314,8 +379,10 @@ function mergeRecords<V>(
       const other = loser.value as unknown as PromiseValue
       const verdicts = unionVerdicts(value.verdicts, other.verdicts)
       const sent = unionSent(value.sent, other.sent)
+      const checked = unionSent(value.checked, other.checked)
       if (verdicts) value.verdicts = verdicts
       if (sent) value.sent = sent
+      if (checked) value.checked = checked
       merged[id] = { ...winner, value: value as unknown as V }
     } else {
       merged[id] = winner
@@ -517,7 +584,7 @@ export function closedOn(collection: LedgerCollection, value: unknown): LocalDat
     case 'initiatives':
       return value.status === 'closed' && isLocalDate(value.closed_on) ? value.closed_on : null
     case 'log':
-      if (value.kind === 'unknown') return isLocalDate(value.resolved) ? value.resolved : null
+      if (value.kind === 'unknown' || value.kind === 'issue') return isLocalDate(value.resolved) ? value.resolved : null
       return isLocalDate(value.at) ? value.at : null
     case 'owed':
     case 'escalations':
@@ -538,13 +605,28 @@ export interface ArchivePlan {
   moved: Array<{ collection: LedgerCollection; id: string }>
 }
 
-/** Records closed more than 180 days before `today`, by the quarter they were closed in. */
+/** A group's records move sooner: its promises, its log entries and every round (section 21.7). */
+export const GROUP_ARCHIVE_AFTER_DAYS = 90
+
+/** After how many closed days a record moves to the archive. */
+export function archiveAfterDays(collection: LedgerCollection, value: unknown): number {
+  if (collection === 'rounds') return GROUP_ARCHIVE_AFTER_DAYS
+  if (!isObject(value)) return ARCHIVE_AFTER_DAYS
+  if (collection === 'promises' && isObject(value.to)) return GROUP_ARCHIVE_AFTER_DAYS
+  if (collection === 'log' && typeof value.group === 'number' && value.group > 0) return GROUP_ARCHIVE_AFTER_DAYS
+  return ARCHIVE_AFTER_DAYS
+}
+
+/**
+ * Records closed more than 180 days before `today` (90 for a group's records), by the quarter they
+ * were closed in.
+ */
 export function archivePlan(ledger: ProLedger, today: LocalDate): ArchivePlan {
   const plan: ArchivePlan = { parts: {}, moved: [] }
   for (const collection of LEDGER_COLLECTIONS) {
     for (const [id, record] of Object.entries(ledger[collection] ?? {})) {
       const day = closedOn(collection, record.value)
-      if (day === null || diffLocalDays(day, today) <= ARCHIVE_AFTER_DAYS) continue
+      if (day === null || diffLocalDays(day, today) <= archiveAfterDays(collection, record.value)) continue
       const quarter = quarterOf(day)
       const part = (plan.parts[quarter] ??= {})
       ;(part[collection] ??= {})[id] = record as LedgerRecord<unknown>

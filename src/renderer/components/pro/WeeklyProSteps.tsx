@@ -1,18 +1,25 @@
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
+import { useTranslation } from 'react-i18next'
 import { useNavigate } from '@tanstack/react-router'
 import { CheckCircle2, Circle } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { Button } from '@/components/shared/Button'
 import { usePro } from '@/hooks/use-pro'
-import { useProLedger } from '@/hooks/use-pro-ledger'
+import { useProLedger, writeLedger } from '@/hooks/use-pro-ledger'
+import { useWeekStart } from '@/hooks/use-week-start'
 import { useProjects } from '@/hooks/use-projects'
 import { useAvailability } from '@/hooks/use-availability'
 import type { Task } from '@/lib/vikunja-types'
 import type { LocalDate } from '../../../shared/due-dates'
-import { mirrorText, proWeeklySteps, weeklyMirror, type ProWeeklyStepId } from '../../../shared/pro/weekly'
+import { startOfWeek } from '../../../shared/due-dates'
+import { mirrorText, proWeeklySteps, weeklyDoneSteps, weeklyMirror, withWeeklyDone, type ProWeeklyStepId } from '../../../shared/pro/weekly'
 import { rankedInitiatives } from '../../../shared/pro/portfolio'
 
-const HINTS: Record<ProWeeklyStepId, string> = {
+/** The steps whose text is still here; the weekly note's is in the catalog. */
+type OlderStep = Exclude<ProWeeklyStepId, 'note'>
+
+const HINTS: Record<OlderStep, string> = {
   verdicts: 'Promises others made you that are due: kept, not yet, or another verdict.',
   unsent: 'What was agreed in a meeting and not sent in a recap yet.',
   escalations: 'Escalations drafted or on the agenda, and decisions you are owed.',
@@ -20,13 +27,16 @@ const HINTS: Record<ProWeeklyStepId, string> = {
   value: 'Initiatives closed this week without the value they delivered.',
 }
 
-const ROUTES: Record<ProWeeklyStepId, string> = {
+const ROUTES: Record<OlderStep, string> = {
   verdicts: '/waiting-on',
   unsent: '/people',
   escalations: '/sponsor',
   portfolio: '/portfolio',
   value: '/portfolio',
 }
+
+// i18n-ignore: a route, not text
+const TODAY_ROUTE = '/today'
 
 /**
  * The weekly execution review (cross-app semantics 21.11, plan 7.7.5): Pro's steps before the usual
@@ -38,7 +48,14 @@ export function WeeklyProSteps({ tasks, today }: { tasks: readonly Task[]; today
   const { ledger } = useProLedger()
   const { data: projects } = useProjects()
   const availability = useAvailability()
-  const [done, setDone] = useState<ReadonlySet<ProWeeklyStepId>>(new Set())
+  const { t } = useTranslation()
+  const queryClient = useQueryClient()
+  const weekStart = useWeekStart()
+  // Marked done by hand, remembered for this week on every device (21.11).
+  const week = startOfWeek(today, weekStart)
+  const done = useMemo(() => new Set(weeklyDoneSteps(ledger.settings?.value, week)), [ledger, week])
+  const markDone = (step: ProWeeklyStepId) =>
+    void writeLedger(queryClient, [{ op: 'settings', value: withWeeklyDone(ledger.settings?.value, week, step) }])
 
   const stalled = useMemo(() => {
     if (!pro.layer('portfolio') || !availability.on) return 0
@@ -80,7 +97,7 @@ export function WeeklyProSteps({ tasks, today }: { tasks: readonly Task[]; today
             const stepDone = done.has(step.id) || step.count === 0
             const hint = step.id === 'portfolio' && loggedAnyway > 0
               ? `${HINTS.portfolio} ${loggedAnyway} ${loggedAnyway === 1 ? 'task was' : 'tasks were'} logged anyway.`
-              : HINTS[step.id]
+              : step.id === 'note' ? t('pro.weekly.noteHint') : HINTS[step.id]
             return (
               <li key={step.id} className="flex items-center gap-3 rounded-card border border-[var(--border-color)] px-4 py-3" data-pro-weekly-step={step.id}>
                 {stepDone
@@ -93,8 +110,8 @@ export function WeeklyProSteps({ tasks, today }: { tasks: readonly Task[]; today
                   </div>
                   <p className="text-meta text-[var(--text-secondary)]">{hint}</p>
                 </div>
-                <Button onClick={() => void navigate({ to: ROUTES[step.id] })}>Open</Button>
-                {!stepDone && <Button variant="quiet" onClick={() => setDone((prev) => new Set(prev).add(step.id))}>Mark done</Button>}
+                <Button onClick={() => void navigate({ to: step.id === 'note' ? TODAY_ROUTE : ROUTES[step.id] })}>Open</Button>
+                {!stepDone && <Button variant="quiet" onClick={() => markDone(step.id)}>Mark done</Button>}
               </li>
             )
           })}

@@ -90,6 +90,58 @@ export function extractDollarPerson(
   return { person: null, tokens: [] }
 }
 
+export type DollarRequester = { id: number; start: number; end: number } | { id: null; name: string; start: number; end: number }
+
+/**
+ * Who it was promised to (section 5.5): exactly two `$` phrases, exactly one of them after `for`.
+ * The plain one is the owner and the `for` one the requester. Null when the text is not of that
+ * shape or a name is ambiguous: the caller then reads the first phrase only, as before.
+ */
+export function extractOwnerAndRequester(
+  input: string,
+  people: readonly Person[],
+  consumed: Region[],
+): { person: DollarPerson; requester: DollarRequester; tokens: ParsedToken[] } | null {
+  const matches = [...input.matchAll(DOLLAR_PERSON)].filter((match) => !overlaps(consumed, match.index, match.index + match[0].length))
+  if (matches.length !== 2 || matches.filter((match) => !!match[1]).length !== 1) return null
+  const read = (match: RegExpMatchArray) => {
+    const start = match.index as number
+    const end = start + match[0].length
+    const name = (match[2] ?? match[3]).trim().replace(/\s+/g, ' ')
+    const found = name ? matchPerson(name, people) : null
+    return { start, end, name, found, raw: match[0] }
+  }
+  const owner = read(matches.find((match) => !match[1]) as RegExpMatchArray)
+  const asked = read(matches.find((match) => !!match[1]) as RegExpMatchArray)
+  if (!owner.found || !asked.found || owner.found.match === 'ambiguous' || asked.found.match === 'ambiguous') return null
+  const person: DollarPerson = owner.found.id !== null
+    ? { id: owner.found.id, mine: false, start: owner.start, end: owner.end }
+    : { id: null, name: owner.name, mine: false, start: owner.start, end: owner.end }
+  const requester: DollarRequester = asked.found.id !== null
+    ? { id: asked.found.id, start: asked.start, end: asked.end }
+    : { id: null, name: asked.name, start: asked.start, end: asked.end }
+  consumed.push({ start: owner.start, end: owner.end }, { start: asked.start, end: asked.end })
+  return {
+    person,
+    requester,
+    tokens: [
+      { type: 'person', start: owner.start, end: owner.end, value: person, raw: owner.raw },
+      { type: 'requester', start: asked.start, end: asked.end, value: requester, raw: asked.raw },
+    ],
+  }
+}
+
+/** Where `check on` begins a check-date phrase: the words and the index right after their spaces. */
+export function findCheckOnWords(input: string, consumed: readonly Region[]): Array<{ start: number; phrase: number }> {
+  const found: Array<{ start: number; phrase: number }> = []
+  for (const match of input.matchAll(/(?<=^|\s)check\s+on\s+/gi)) {
+    const start = match.index
+    const phrase = start + match[0].length
+    if (!overlaps(consumed, start, phrase)) found.push({ start, phrase })
+  }
+  return found
+}
+
 const ESTIMATE =/(?<=^|\s)~(?:(\d{1,2})h(?:(\d{1,2})(?:m|min)?)?|(\d{1,4})(?:m|min))(?=[\s.,!?;)]|$)/gi
 
 /** `~10m`, `~45min`, `~1h`, `~1h30`, `~1h30m`: minutes, 1 to 1440. */

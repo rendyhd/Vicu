@@ -2,7 +2,7 @@
 
 This document defines the exact parser behavior that BOTH Vicu (desktop) and Vicu Android must implement identically. Both apps must produce the same `ParseResult` for the same input string and the same `ParserConfig`.
 
-The date and recurrence rules are the contract in `docs/cross-app-semantics-v1.md` section 5, and the test is the shared corpus `test-fixtures/nlp-corpus-v1.json` (203 cases, reference time Tue 2026-10-06 10:00 local; both apps run the same file). If this document and the corpus disagree, the corpus wins. The desktop implementation is `src/renderer/lib/task-parser/`: there is one parser (the main window, the task title editor and Quick Entry all call it), and the date work is done by chrono-node plus the rules below.
+The date and recurrence rules are the contract in `docs/cross-app-semantics-v1.md` section 5, and the test is the shared corpus `test-fixtures/nlp-corpus-v1.json` (217 cases, reference time Tue 2026-10-06 10:00 local; both apps run the same file). If this document and the corpus disagree, the corpus wins. The desktop implementation is `src/renderer/lib/task-parser/`: there is one parser (the main window, the task title editor and Quick Entry all call it), and the date work is done by chrono-node plus the rules below.
 
 ---
 
@@ -100,6 +100,8 @@ interface ParseResult {
   person: { id: number; mine: boolean }        // "Jan:" or "$Jan" (theirs), "for Jan:" or "for $Jan" (mine)
     | { id: null; name: string; mine: boolean }  // "$Lalith" naming nobody yet: a new person, made on save
     | null
+  requester: { id: number } | { id: null; name: string } | null  // "$Jan site list for $Priya": who it was promised to
+  checkOn: string | null     // "check on 3 feb" with a person: the local day to look at the promise (YYYY-MM-DD)
   start: Date | null         // "starts monday": a start date, local midnight without a time
   estimate: number | null    // "~1h30": minutes
   flag: boolean              // "!flag"
@@ -215,13 +217,13 @@ function buildPriorityPatterns(mode: SyntaxMode): Array<{ regex: RegExp; value: 
 
 The parser MUST extract tokens in this exact order:
 
-0. **Pro** (only with `config.pro`, contract section 5.5): `req:` at the start, then a person's `Jan:` / `for Jan:` at the start (else the first `$Jan` / `for $Jan`), then `!flag`, then `~1h30`
+0. **Pro** (only with `config.pro`, contract section 5.5): `req:` at the start, then a person's `Jan:` / `for Jan:` at the start (else two `$` phrases of which exactly one follows `for`: the owner and who it was promised to; else the first `$Jan` / `for $Jan`), then `!flag`, then `~1h30`
 0. **Place** ("when I get home" for a saved place, contract section 5.3) — only when places are passed
 1. **Labels** (prefix-based: `@` or `*`) — extract and remove first
 2. **Projects** (prefix-based: `#` or `+`) — extract and remove
 3. **Priority** (mode-dependent short form + shared word form) — extract and remove
 4. **Recurrence** (`every ...`, `daily`, `weekly`, etc.) — extract and remove
-5. **Start date** (Pro only): `starts` and the date phrase right after it, read by the date rules and never as the due date
+5. **Start date** (Pro only): `starts` and the date phrase right after it, read by the date rules and never as the due date. Then, only when a person was read, **check date**: `check on` and the date phrase right after it, kept as a local day and never as the due date
 5. **Dates** (the date rules below on the remaining text) — extract and remove
 6. **`!` today shortcut** — on the title that is left, when no date was found
 7. **Title** — everything remaining, trimmed and collapsed whitespace

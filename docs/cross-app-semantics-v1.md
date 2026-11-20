@@ -657,6 +657,16 @@ before: these words stay in the title.
   Only the first `$` phrase is read, and none after a `Jan:` prefix; the rest stay in the title.
   The phrase leaves the title. Apps offer the people as suggestions after a typed `$`; picking one
   writes `$Name`, or `$"Full Name"` when it has a space.
+- **Who it was promised to** (section 21.6): when the text has exactly two `$` phrases and exactly
+  one of them follows `for`, both are read: the plain one is the owner (`person`, their promise)
+  and the `for` one is who it was promised to (`requester`, with `id`, or `id` null and
+  `name` for a new person). `$Jan site list for $Priya` is Jan's promise to Priya. An ambiguous
+  name in either place leaves the text read without this rule (the first phrase only). Any other
+  number or mix of `$` phrases is read as before.
+- **A check date:** `check on` and a date phrase (`check on 3 feb`, `check on monday`), only in a
+  text that also has a person, gives `checkOn`: that local day (a time of day in the phrase is
+  dropped). The phrase is not read as a due date and leaves the title. Without a person the words
+  stay in the title and the date is read as usual.
 - **A start date:** `starts` and a date phrase (`starts monday`, `starts next week`, `starts 3 Nov
   9am`) gives `start`: the date, at local midnight without a time. The phrase is not read as a due
   date and leaves the title. A start date and a length (section 5.4) in one text: the length's block
@@ -1513,7 +1523,7 @@ A key is added here, in both repos, in the release that starts writing it.
 | `project_mode.<projectId>` | `"sequential"` or `"single"`, or `null`. Any other value acts as the default and is kept; section 21.2 | parallel |
 | `project_status.<projectId>` | `"on_hold"`, or `null`; section 21.2 | active |
 | `label_status.<labelId>` | `"on_hold"`, or `null`; section 21.2 | active |
-| `label_kind.<labelId>` | `"person"`, or `null`; section 21.5 | a label |
+| `label_kind.<labelId>` | `"person"` (section 21.5) or `"group"` (section 21.16), or `null` | a label |
 | `repeat_rule.<taskId>` | `{"until"?, "count"?, "catch_up"?}`, or `null`; section 21.13 | no end |
 
 ### 11.4 The Inbox
@@ -2621,6 +2631,11 @@ shows open flagged tasks; Vikunja's own Favorites pseudo-project (-1) is not use
   on time in the last 90 days, 2 late." and "Asked for a new date twice and missed a date once."
   (counts as once, twice, N times); "No promises closed in the last 90 days." when none closed.
 
+- **A person's page** (`pro.personPage`) splits their open promises of theirs into **promised to
+  you** (no `to`, section 21.6) and **promised to others**, and each of those by group (the
+  promise's `to.group`, else the lowest group label id on the task, else none): the part without a
+  group first, then groups by label id; tasks by effective due day (none last), then id.
+
 ### 21.6 Promises
 
 - A **promise** is an ordinary task with a ledger record keyed by the task id: `dir` `theirs`
@@ -2628,6 +2643,16 @@ shows open flagged tasks; Vikunja's own Favorites pseudo-project (-1) is not use
   words of a clear yes), `done_when`, `initiative` (a project id), `needs` (task ids of your
   promises it waits on), `sent` and `verdicts`. The task carries the person's label, so devices
   without Pro still see who it is about.
+- **Who it was promised to** is `to`: `{ "group": <labelId> }` (a group, section 21.16),
+  `{ "person": <labelId> }` (another person) or `{ "text": "…" }` (anyone else, named in words).
+  Read in that order: the first of `group` (a whole number above 0), `person` (the same) and
+  `text` (not blank) counts; without one of them, and without `to`, it was promised to you. You
+  track every promise and give its verdicts, whoever it was promised to; a version that does not
+  know `to` reads the promise as promised to you. The requester is never a label on the task.
+  Your own action for a group is `dir` `mine` with `person` null and `to.group`.
+- **Checks** (section 21.18): `check_on` is a local day to look at the promise before it is due;
+  `checked` holds when a check was made (UTC instants, added by copying a check message or by
+  "Checked"); `no_check` true leaves the promise out of checks before due.
 - **No stages** (decision 6): a promise is promised, then it gets a verdict.
 - **Verdicts:** `delivered`, `late` (delivered after the date), `not_yet` (with an optional new
   date and blocker), `renegotiated` (a new date agreed before it was due), `dropped`, and
@@ -2688,6 +2713,13 @@ shows open flagged tasks; Vikunja's own Favorites pseudo-project (-1) is not use
   `at` then `id`, and `sent` the sorted union. `estimates`: per task the entry with the later wall
   time (seconds) wins, equal keeps the server's; `[null, t]` clears an estimate. `settings` is one
   record. Unknown top-level fields: the union, the server's kept.
+- **More fields, all optional** (sections 21.6 and 21.16 to 21.19): a promise's `to`,
+  `check_on`, `checked` and `no_check`; a meeting's `label`, `sessions`, `checks` and
+  `language`; a round's `kind`, `started`, `ended`, `read_back`, `score` and `recap_sent`;
+  a log entry's `group`, `session`, `rank`, `task`, `shared`, `solved_in` and the kind
+  `issue`; the settings `cap_off`, `check_days`, `workdays`, `note_day`, `note_sent`,
+  `text_language` and `weekly_done`. A promise's `checked` is merged like `sent`: the sorted
+  union of both sides.
 - **Pruning:** tombstones and cleared estimates older than 90 days (section 10.6). Pro devices
   remove the promise and estimate of a task that is gone or done for 30 days.
 - **A task created offline** has a temporary id until the replay creates it; its ledger keys and the
@@ -2697,9 +2729,12 @@ shows open flagged tasks; Vikunja's own Favorites pseudo-project (-1) is not use
   (sync metadata — do not delete)`, search `vicu-pro-archive`, payload `{ "version": 1, "quarter":
   "2026-Q2", "promises": {...}, ... }` with the record collections only. The part is written first,
   then the records are tombstoned in the ledger. Closed: a promise on its final verdict's local day,
-  an initiative with status `closed` on `closed_on`, a log entry of kind `unknown` on `resolved` and
-  any other on `at`, owed decisions and escalations on `resolved`, a round on `at`. Meetings and
-  people never close. Archive parts are read on demand (the quarterly summary), never by the person
+  an initiative with status `closed` on `closed_on`, a log entry of kind `unknown` or `issue` on
+  `resolved` and any other on `at`, owed decisions and escalations on `resolved`, a round on `at`.
+  Meetings and people never close. A group's records move after **90 days**, not 180: a promise
+  with `to`, a log entry with `group`, and every round (two groups' weekly actions would fill the
+  ledger otherwise). A version from before issues closes an open issue on `at`; only versions
+  with this rule run next to each other. Archive parts are read on demand (the quarterly summary), never by the person
   page.
 - **Size:** the ledger's JSON stays within the 384 KiB write cap; the sync status warns from 70
   percent.
@@ -2746,7 +2781,9 @@ shows open flagged tasks; Vikunja's own Favorites pseudo-project (-1) is not use
   last.
 - **The cap** is the ledger setting `cap` (4 until agreed; a whole number of 1 or more), with
   `cap_agreed` `{ by, on }` when the sponsor agreed it (decision 14). At the cap, making another
-  initiative active asks to park one first.
+  initiative active asks to park one first. The setting `cap_off` true is **no limit**
+  (`pro.capOff`): nothing is ever at or over the cap, `cap` is kept for when the limit comes back,
+  and rank and park work as before. A version that does not know `cap_off` keeps the cap.
 - **Readiness** (`pro.readiness`, decision 16): nine items: sponsor, owner, why, done looks like,
   smallest useful step, not doing, who decides what, capacity agreed (`{ by, on }`), stop if. Text
   counts when not blank. Capturing into an initiative that is not ready asks "Log anyway?" and counts
@@ -2768,7 +2805,10 @@ shows open flagged tasks; Vikunja's own Favorites pseudo-project (-1) is not use
   Escalations and decisions (drafted or accepted escalations plus open owed decisions), Check the
   portfolio (initiatives not ready, one more when over the cap, and active initiatives with no
   available task), Note the value delivered (initiatives closed in the last 7 days without a value
-  entry). A step with nothing is listed with 0.
+  entry). A step with nothing is listed with 0. With promises on, a step **Send the weekly note**
+  follows "Send what was agreed": 1 while the weekly note is due (section 21.18), else 0.
+- **Marked done:** the steps marked done by hand are the setting `weekly_done`, `{ "week": "<the
+  local day the week starts on>", "steps": [ids] }`; it counts only in that week (section 2.1).
 - **The mirror:** over the last 7 local days, promises you took over, workdays (Monday to Friday)
   with a focus block, open tasks you hold against open promises others hold, and open confirm tasks,
   in the sentence the vectors fix.
@@ -2844,11 +2884,141 @@ the person turned on Pro's assistant switch (decision 20), with any configured p
 themselves are visible to Ask as before. The prompts, schemas and Ask tools are `pro` in
 `ai-tools-v1.json`.
 
-### 21.16 Vectors
+### 21.16 Groups and their actions
+
+- A **group** is the people who agree actions together: a leadership team, a project team. It is a
+  meeting (ledger `meetings`) with a `label`: an ordinary label marked `label_kind.<id>` =
+  `"group"`. The meeting's `name` is the group's name and its `people` the members, in order. A
+  meeting without a label is a meeting as before. When two meetings name one label, the one with
+  the lower id (compared as text) is the group. Groups are listed by name (case ignored), then id.
+  Taking the mark off leaves the label and its tasks as they are.
+- More fields of a group: `sessions`, the recurring meetings it holds, `[{ "id", "kind",
+  "rhythm" }]` (section 21.17); `checks` false turns checks before due off for its actions;
+  `language`, the language of text copied for it (section 21.19).
+- An **action** of a group is a task that carries the group's label. Its **owner** is the promise's
+  `person` when the promise is theirs, you when it is yours (`dir` `mine`), and nobody otherwise
+  ("No owner"). An action has one owner. A task captured with a person and a group's label is that
+  person's promise to the group (`to.group`, the lowest group label id when it has several),
+  unless the text names who it was promised to (section 5.5); captured with a group's label and no
+  person it has no promise and no owner.
+- **The group's page** (`pro.groupPage`) puts every action in one part. `since` is when the group's
+  last session ended (the latest `ended` of its rounds; none when it had no session) and `due` is
+  the action's effective due day (section 21.6; the task's due day without a promise). Open
+  actions, the first that fits: **yours** (your own promise); **overdue** (`due` on or before the
+  local day of `since`); **due** (`due` today or earlier); **new** (the task was created after
+  `since`); **open** (the rest). Without `since` nothing is overdue or new. Done actions are
+  **done** when they were completed after `since`, or in the last 7 local days without one. Each
+  part lists owners in the group's order, then other people by id, then you, then no owner; an
+  owner's actions by `due` (none last), then id. Your open actions are their own part, by `due`,
+  then id; open actions without an owner are also listed on their own.
+- **Reliability** (`pro.reliability`), in counts, never a score: over the group's last four ended
+  sessions (fewer when it had fewer; nothing without one). The window is the local days from the
+  day after the fifth-last session's day (its `at`), or from the earliest of them when there are
+  fewer than five, through today. Counted are the group's actions with a promise of theirs: final
+  verdicts given in the window (`delivered` on time, `late`, `dropped`, `taken_over`) and open
+  ones whose `due` is before today (open past due).
+- **A second miss** (`pro.missIssue`): when a `not_yet` verdict brings an action of a group to the
+  escalation threshold of misses (section 21.10), an issue is added to that group's list: kind
+  `issue`, `group`, `task` (the action), `text` (the task's title) and `at`; not when an open
+  issue of that group already names the task.
+- **Decisions, open questions and issues** of a group are log entries (section 21.10) with `group`
+  (the label id): kinds `decision`, `unknown` and `issue`. An issue is something to solve, not to
+  do: `rank` orders the open ones (lowest first, without a rank last, then `at`, then id);
+  `resolved` is the day it was solved and `solved_in` the session. A decision's `shared` holds
+  when a recap with it was copied.
+
+### 21.17 Sessions
+
+- A **session** is one meeting of a group, of a kind: `weekly` or `standup`. Other kinds are kept
+  and run as `weekly`. It is a round (ledger `rounds`) with `kind`, `started` and `ended` (UTC
+  instants), `read_back` and `score`; `discussed`, `skipped` and `not_discussed` stay empty and
+  `absent` holds who was not there. Its id is chosen when it starts, so what is captured in it can
+  name it (`session`) before the round is written at the end.
+- **Steps** (`pro.sessions`): `weekly` is actions, issues, new, read-back; `standup` is actions,
+  new, read-back.
+- **The actions step** goes through the group's open actions: first those that need a verdict
+  (section 21.6), then the others; in `standup` only actions whose `due` is on or before the last
+  day of this week (section 2.1). Each list is in the owner order of section 21.16 (the group's
+  people, other people, you, no owner), then `due` (none last), then id. Nothing is stored as carried forward: an action that
+  stays open is in the next session because it is still open.
+- **What a session held** is worked out, not stored: the verdicts given from `started` through
+  `ended` on the group's actions; the group's actions created in that time; the log entries whose
+  `session` is the round; the issues whose `solved_in` is the round.
+- **Read-back** is the last step: the session's decisions and new actions with owner, who they were
+  promised to and date, read aloud; `read_back` true records that it happened.
+- **Score:** a private whole number from 1 to 10 for how useful the session was. Never copied.
+- **End** writes the round. The recap (section 21.19) is for this session only; copying it adds the
+  time to the round's `recap_sent`, to `sent` of the promises in it and to `shared` of its
+  decisions. Undo of the copy takes those times out again.
+
+### 21.18 Follow-ups
+
+Everything that needs a move from you, as one list (`pro.followUps`), in this order. Nothing here
+is a system notification.
+
+1. **Verdict due:** one line per promise that needs a verdict (section 21.6), by effective due day,
+   then task id. Key `verdict:<taskId>`.
+2. **Check before due:** one line per owner, for their open promises of theirs on actions of a
+   group (the task carries a group's label) that are due later than today, when today is on or
+   after the check day: `check_days` working days (2 unless set, 0 to 10) before the effective due
+   day. Left out: a promise with `no_check`, an action whose every group has `checks` false, and a
+   promise with a `checked` time on or after its check day. The line holds all of that owner's
+   promises that fit, by effective due day then id. Lines by their first due day, then owner id.
+   Key `check:<personId>`. Copying the line's message adds the time to `checked` of each.
+3. **Bring back:** one line per open promise with `check_on` today or earlier and no `checked`
+   time on or after that day, unless the promise has a verdict line or is in a check line. By
+   `check_on`, then task id.
+   Key `bring:<taskId>`.
+4. **Recap not copied:** one line per session of a group that ended in the last 14 local days
+   without a `recap_sent` time, oldest first. Key `recap:<roundId>`.
+5. **Weekly note:** when the setting `note_day` (1 Monday to 7 Sunday) is set: one line from the
+   latest such weekday, today included, until a `note_sent` time on or after that day. Key
+   `note:<that day>`.
+
+- **Working days** (`pro.workingDays`) are the setting `workdays` (ISO weekdays; Monday to Friday
+  unless set, and when the list is empty). `n` working days before a day counts back from the day
+  before it; 0 is the day itself. Public holidays are not known.
+- **Dismissed for today:** per device (`pro_followup_dismissed`: `{ "<key>": "<local day>" }`); a
+  line is left out while today is before that day.
+
+### 21.19 Text for other people
+
+Recaps, agendas, messages and notes are copied into other programs, for people who do not use
+Vicu. They state what happened in counts and events and never judge.
+
+- **A document** (`pro.documents`) is `{ "title"?, "blocks" }`. A block has an optional `heading`,
+  an optional `text` (a paragraph) and optional `items` (a list), written in that order. The
+  title, a heading, an item and a paragraph are each one **line**: `{ "key", "params" }`. The key names a sentence in the catalog
+  (`proText.<key>` on desktop, `pro_text_<key with dots as underscores>` on mobile); parameters
+  are names and titles (never translated), `count` (which picks the plural form) and days
+  (`{ "day": "YYYY-MM-DD" }`, written as the weekday date of section 8 in the text's language).
+  The key `literal` is its parameter `text` as it is.
+- **The English text** of every key is fixed by `pro.documents.messages`; each app's English
+  catalog must equal it. Other languages come from translators and fall back to English per key.
+- **Rendering** gives three forms. Plain text: the title, an empty line, then each block: its
+  heading, its paragraph, its items as `- ` lines; an empty line between blocks. HTML: the title
+  as `<p><strong>`, a heading as `<p><strong>`, items in `<ul><li>`, a paragraph as `<p>`; text
+  escaped (`&`, `<`, `>`, `"`). Markdown: the title as `## `, a heading as `### `, items as
+  `- `, an empty line between parts. Copying puts HTML and plain text on the clipboard.
+- **Language:** the group's `language`, else the setting `text_language`, else `en`; a language
+  without a catalog reads as `en`. It is separate from the language the app is shown in.
+- **The documents:** a session's **agenda** (actions due, other open actions, open issues, the
+  closing line), its **read-back** (decisions, new actions), its **recap** (decisions, new
+  actions, delivered, changed, issues solved, open issues, who was absent), the **check message**
+  to one person (one thing as a sentence, more as a list), and the **weekly note** (per group:
+  counts of actions delivered on time, late and dropped, each date that slipped, decisions, open
+  issues, actions open past their date and due in the next 7 days). The weekly note covers the
+  local days from the day after the last `note_sent` (at most 14 days back, 7 without one) through
+  today. Which lines each holds, and in what order, is fixed by the vectors.
+
+### 21.20 Vectors
 
 `pro` in `cross-app-semantics-v1.json`, run in three time zones: `settings`, `prefs`, `availability`,
 `startVsBlock`, `ledgerMerge`, `ledgerPrune`, `archive`, `promises`, `waitingOn`, `personMatch`,
 `personPattern`, `recapText`, `meetingRound`, `portfolio`, `readiness`, `escalationDraft`,
 `importDates`, `importRead`, `importMatch`, `exportOpen`, `copilotPrompt`, `repeatRule`, `focus`,
-`focusBlock`, `weeklyPro`; and `customListPro` (section 3.8). `nlp-corpus-v1.json` covers section
+`focusBlock`, `weeklyPro`, `capOff`, `ledgerMergeGroups`, `archiveGroups`, `weeklyNote`,
+`workingDays`, `requester`, `groups`, `groupPage`, `reliability`, `missIssue`, `personPage`,
+`sessions`, `followUps`, `documents` (the last eight read the world in `groupWorld`); and
+`customListPro` (section 3.8). `nlp-corpus-v1.json` covers section
 5.5 with cases marked `"pro": true`.

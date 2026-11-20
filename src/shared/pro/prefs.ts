@@ -55,6 +55,10 @@ export function readIsPerson(value: unknown): boolean {
   return value === 'person'
 }
 
+export function readIsGroup(value: unknown): boolean {
+  return value === 'group'
+}
+
 export function projectMode(values: Readonly<Record<string, unknown>>, projectId: number): ProjectMode {
   return readProjectMode(values[projectModeKey(projectId)])
 }
@@ -77,6 +81,20 @@ export function personLabelIds(values: Readonly<Record<string, unknown>>): Set<n
   for (const [key, value] of Object.entries(values)) {
     const id = idOfProKey(key, LABEL_KIND_KEY_PREFIX)
     if (id !== null && readIsPerson(value)) ids.add(id)
+  }
+  return ids
+}
+
+export function isGroupLabel(values: Readonly<Record<string, unknown>>, labelId: number): boolean {
+  return readIsGroup(values[labelKindKey(labelId)])
+}
+
+/** The label ids marked as a group (section 21.16). */
+export function groupLabelIds(values: Readonly<Record<string, unknown>>): Set<number> {
+  const ids = new Set<number>()
+  for (const [key, value] of Object.entries(values)) {
+    const id = idOfProKey(key, LABEL_KIND_KEY_PREFIX)
+    if (id !== null && readIsGroup(value)) ids.add(id)
   }
   return ids
 }

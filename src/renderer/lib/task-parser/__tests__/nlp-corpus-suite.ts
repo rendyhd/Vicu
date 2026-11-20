@@ -39,6 +39,8 @@ interface CorpusCase {
   pro?: boolean
   person?: { id: number; mine: boolean } | { id: null; name: string; mine: boolean } | null
   proStart?: string | null
+  requester?: { id: number } | { id: null; name: string } | null
+  checkOn?: string | null
   estimate?: number | null
   flag?: boolean
   request?: boolean
@@ -80,7 +82,7 @@ export function runNlpCorpusSuite(options: { zone: string; expectedOffsetMinutes
   describe(`nlp corpus v1 in ${options.zone}`, () => {
     it('is running in the requested time zone', () => {
       expect(corpus.contractVersion).toBe(1)
-      expect(corpus.cases.length).toBe(203)
+      expect(corpus.cases.length).toBe(217)
       if (options.expectedOffsetMinutesInOctober !== undefined) {
         expect(new Date(2026, 9, 6).getTimezoneOffset()).toBe(options.expectedOffsetMinutesInOctober)
       }
@@ -122,6 +124,8 @@ export function runNlpCorpusSuite(options: { zone: string; expectedOffsetMinutes
           recurrence: result.recurrence,
           place: result.place ? { id: result.place.place.id, trigger: result.place.trigger } : null,
           person: result.person,
+          requester: result.requester,
+          checkOn: result.checkOn,
           proStart: result.start ? wall(result.start.toISOString()) : null,
           estimate: result.estimate,
           flag: result.flag,
@@ -137,6 +141,8 @@ export function runNlpCorpusSuite(options: { zone: string; expectedOffsetMinutes
           recurrence: testCase.recurrence ?? null,
           place: testCase.place ?? null,
           person: testCase.person ?? null,
+          requester: testCase.requester ?? null,
+          checkOn: testCase.checkOn ?? null,
           proStart: testCase.proStart ?? null,
           estimate: testCase.estimate ?? null,
           flag: testCase.flag ?? false,

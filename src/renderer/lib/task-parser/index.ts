@@ -10,7 +10,8 @@ import { findForPhrases } from './extract-length'
 import { matchPlacePhrase, type PlaceRef } from './place-phrases'
 import { isTimeBlock } from '../../../shared/time-blocks'
 import type { Person } from '../../../shared/pro/people'
-import { extractDollarPerson, extractEstimate, extractFlag, extractPersonPrefix, extractRequest, findStartsWords } from './extract-pro'
+import { extractDollarPerson, extractEstimate, extractFlag, extractOwnerAndRequester, extractPersonPrefix, extractRequest, findCheckOnWords, findStartsWords } from './extract-pro'
+import { toLocalDate } from '../../../shared/due-dates'
 
 export type { ParseResult, ParserConfig, ParsedToken, ParsedRecurrence, SyntaxMode, TokenType, SyntaxPrefixes } from './types'
 export { DEFAULT_PARSER_CONFIG, getPrefixes } from './types'
@@ -54,6 +55,8 @@ export function parse(
     recurrence: null,
     place: null,
     person: null,
+    requester: null,
+    checkOn: null,
     start: null,
     estimate: null,
     flag: false,
@@ -93,10 +96,19 @@ export function parse(
       if (found.person) result.person = { id: found.person.id, mine: found.person.mine }
       result.tokens.push(...found.tokens)
       if (!found.person) {
-        const dollar = extractDollarPerson(rawInput, people, consumed)
-        const person = dollar.person
-        if (person) result.person = person.id !== null ? { id: person.id, mine: person.mine } : { id: null, name: person.name, mine: person.mine }
-        result.tokens.push(...dollar.tokens)
+        // Two `$` phrases with one after `for`: the owner and who it was promised to.
+        const pair = extractOwnerAndRequester(rawInput, people, consumed)
+        if (pair) {
+          const { person, requester } = pair
+          result.person = person.id !== null ? { id: person.id, mine: false } : { id: null, name: person.name, mine: false }
+          result.requester = requester.id !== null ? { id: requester.id } : { id: null, name: requester.name }
+          result.tokens.push(...pair.tokens)
+        } else {
+          const dollar = extractDollarPerson(rawInput, people, consumed)
+          const person = dollar.person
+          if (person) result.person = person.id !== null ? { id: person.id, mine: person.mine } : { id: null, name: person.name, mine: person.mine }
+          result.tokens.push(...dollar.tokens)
+        }
       }
     }
     if (!suppress.has('flag')) {
@@ -171,6 +183,20 @@ export function parse(
       result.start = start
       consumed.push({ start: words.start, end: token.end })
       result.tokens.push({ type: 'start', start: words.start, end: token.end, value: start, raw: rawInput.slice(words.start, token.end) })
+      break
+    }
+  }
+
+  // Pro: `check on <date>` in a text with a person is a check date, never a due date.
+  if (pro && result.person && !suppress.has('checkOn')) {
+    for (const words of findCheckOnWords(rawInput, consumed)) {
+      const before = { start: 0, end: words.phrase }
+      const found = extractDate(rawInput, [...consumed, before], dateOptions)
+      const token = found.tokens[0]
+      if (!found.dueDate || !token || rawInput.slice(words.phrase, token.start).trim() !== '') continue
+      result.checkOn = toLocalDate(found.dueDate)
+      consumed.push({ start: words.start, end: token.end })
+      result.tokens.push({ type: 'checkOn', start: words.start, end: token.end, value: result.checkOn, raw: rawInput.slice(words.start, token.end) })
       break
     }
   }

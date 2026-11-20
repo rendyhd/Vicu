@@ -996,5 +996,10 @@
       "done": "Done"
     },
     "notImage": "The page is not an image."
+  },
+  "pro": {
+    "weekly": {
+      "noteHint": "The weekly note to leadership, from this week's verdicts, decisions and issues."
+    }
   }
 }

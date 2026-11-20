@@ -8,14 +8,17 @@ import { addLocalDays, isoWeekday, localDateOf, type LocalDate } from '../due-da
 import { blockOf, type BlockFields } from '../time-blocks'
 import { finalVerdictOf, recordValue, type ProLedger } from './ledger'
 import { needsVerdict, readConfirmTitle, unsentPromises, type PromiseTask } from './promises'
-import { capState, rankedInitiatives, readiness } from './portfolio'
+import { capState, overCap, rankedInitiatives, readiness } from './portfolio'
+import { noteDue } from './follow-ups'
+import type { LedgerSettingsValue } from './ledger'
 import type { ProLayers } from './settings'
 
-export type ProWeeklyStepId = 'verdicts' | 'unsent' | 'escalations' | 'portfolio' | 'value'
+export type ProWeeklyStepId = 'verdicts' | 'unsent' | 'note' | 'escalations' | 'portfolio' | 'value'
 
 export const PRO_WEEKLY_STEP_TITLES: Record<ProWeeklyStepId, string> = {
   verdicts: 'Give verdicts',
   unsent: 'Send what was agreed',
+  note: 'Send the weekly note',
   escalations: 'Escalations and decisions',
   portfolio: 'Check the portfolio',
   value: 'Note the value delivered',
@@ -55,6 +58,7 @@ export function proWeeklySteps(input: ProWeeklyInput): ProWeeklyStep[] {
   if (input.layers.promises) {
     step('verdicts', input.tasks.filter((task) => needsVerdict(task, recordValue(ledger?.promises, task.id), today)).length)
     step('unsent', unsentPromises(input.tasks, ledger).length)
+    step('note', noteDue(ledger?.settings?.value, today) !== null ? 1 : 0)
   }
   if (input.layers.portfolio) {
     const escalations = Object.values(ledger?.escalations ?? {}).filter((record) =>
@@ -64,7 +68,7 @@ export function proWeeklySteps(input: ProWeeklyInput): ProWeeklyStep[] {
     const ranked = rankedInitiatives(ledger)
     const cap = capState(ledger)
     const notReady = ranked.filter((entry) => !readiness(entry.value).ready).length
-    step('portfolio', notReady + (cap.active > cap.cap ? 1 : 0) + input.stalledInitiatives)
+    step('portfolio', notReady + (overCap(cap) ? 1 : 0) + input.stalledInitiatives)
     const weekStart = addLocalDays(today, -6)
     let closedWithoutValue = 0
     for (const [id, record] of Object.entries(ledger?.initiatives ?? {})) {
@@ -76,6 +80,21 @@ export function proWeeklySteps(input: ProWeeklyInput): ProWeeklyStep[] {
     step('value', closedWithoutValue)
   }
   return steps
+}
+
+// --- Marked done by hand (section 21.11) -------------------------------------------------------------
+
+/** The steps marked done in the week that starts on `week`; another week's marks do not count. */
+export function weeklyDoneSteps(settings: LedgerSettingsValue | null | undefined, week: LocalDate): string[] {
+  const done = settings?.weekly_done
+  if (!done || typeof done !== 'object' || done.week !== week || !Array.isArray(done.steps)) return []
+  return [...new Set(done.steps.filter((step): step is string => typeof step === 'string'))]
+}
+
+/** The settings with one more step marked done for the week that starts on `week`. */
+export function withWeeklyDone(settings: LedgerSettingsValue | null | undefined, week: LocalDate, step: string): LedgerSettingsValue {
+  const steps = weeklyDoneSteps(settings, week)
+  return { ...(settings ?? {}), weekly_done: { week, steps: steps.includes(step) ? steps : [...steps, step] } }
 }
 
 // --- The mirror ------------------------------------------------------------------------------------

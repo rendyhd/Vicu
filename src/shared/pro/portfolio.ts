@@ -53,12 +53,20 @@ export interface CapState {
   agreed: boolean
   /** Adding one more needs one parked first. */
   full: boolean
+  /** No limit (the setting `cap_off`): never full, never over. Only present when true. */
+  unlimited?: true
 }
 
 export function capState(ledger: ProLedger | null | undefined): CapState {
-  const settings = ledger ? ledgerSettings(ledger) : { cap: 4, cap_agreed: null }
+  const settings = ledger ? ledgerSettings(ledger) : { cap: 4, cap_agreed: null, cap_off: false }
   const active = rankedInitiatives(ledger).length
+  if (settings.cap_off === true) return { active, cap: settings.cap, agreed: !!settings.cap_agreed, full: false, unlimited: true }
   return { active, cap: settings.cap, agreed: !!settings.cap_agreed, full: active >= settings.cap }
+}
+
+/** True when more initiatives are active than the cap allows; never with no limit. */
+export function overCap(cap: CapState): boolean {
+  return cap.unlimited !== true && cap.active > cap.cap
 }
 
 /** Parking: status parked with the day and reason; the rank is dropped (it comes back last). */

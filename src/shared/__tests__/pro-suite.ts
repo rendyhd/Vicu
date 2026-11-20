@@ -27,7 +27,7 @@ import {
 import { hasProCondition, readGroupBy, readRowFields } from '../pro/list-conditions'
 import { endRound, markAbsent, nextPerson, pickPerson, skipPerson, startRound, type RoundState } from '../pro/meeting'
 import { matchPerson, patternText, personCounts, withAlias, type PersonCounts } from '../pro/people'
-import { capState, draftEscalation, escalationDue, moveRank, parkedValue, rankedInitiatives, readiness, unparkedValue } from '../pro/portfolio'
+import { capState, draftEscalation, escalationDue, moveRank, overCap, parkedValue, rankedInitiatives, readiness, unparkedValue } from '../pro/portfolio'
 import { isProPrefKey, projectOnHold, readOnHold, readProjectMode, readRepeatRule } from '../pro/prefs'
 import {
   buildVerdict,
@@ -38,6 +38,7 @@ import {
   missesOf,
   needsVerdict,
   readConfirmTitle,
+  requesterOf,
   unsentPromises,
   waitingOn,
 } from '../pro/promises'
@@ -45,8 +46,23 @@ import { buildRecap, recapItems } from '../pro/recap'
 import { catchUpPatch, completionPlan } from '../pro/repeat-rule'
 import { inProArea, isProEnabled, readProArea } from '../pro/settings'
 import { blockReplacesLaterStart, dateOnlyStart, startDayOf, startsEntries, startsLater } from '../pro/start-dates'
-import { mirrorText, proWeeklySteps, weeklyMirror } from '../pro/weekly'
+import { mirrorText, proWeeklySteps, weeklyDoneSteps, weeklyMirror, withWeeklyDone } from '../pro/weekly'
 import { DEFAULT_PRO_LAYERS } from '../pro/settings'
+import { groupPage, groupsOf, missIssue, personPage, reliability } from '../pro/groups'
+import { SESSION_STEPS, endSession, readScore, sessionActions, sessionContents, sessionKindOf } from '../pro/sessions'
+import { followUps, noteDue, notePeriod } from '../pro/follow-ups'
+import { readCheckDays, readWorkdays, workingDaysBefore } from '../pro/working-days'
+import {
+  agendaDocument,
+  checkDocument,
+  messageFormatter,
+  readBackDocument,
+  recapDocument,
+  renderDocument,
+  textLanguage,
+  weeklyNoteDocument,
+  type ProDocument,
+} from '../pro/documents'
 
 /**
  * The `pro` and `customListPro` vectors of test-fixtures/cross-app-semantics-v1.json (contract
@@ -474,6 +490,183 @@ export function runProSuite(options: { zone: string; expectedOffsetMinutesInNove
         const mirror = weeklyMirror(tasks, ledger, w.today)
         expect(mirror).toEqual(w.mirror)
         expect(mirrorText(mirror)).toBe(w.mirrorText)
+      })
+    })
+
+    // --- Groups, sessions, follow-ups and text for other people (sections 21.16 to 21.19) --------
+
+    const worldTask = (raw: Any) => ({
+      id: raw.id,
+      title: raw.title,
+      done: raw.done === true,
+      done_at: raw.done_at ?? null,
+      due_date: iso(raw.due) ?? '0001-01-01T00:00:00Z',
+      created: raw.created ?? null,
+      labels: (raw.labels ?? []).map((id: number) => ({ id })),
+    })
+    const w = v.groupWorld
+    const worldTasks = w.tasks.map(worldTask)
+    const worldLedger = (change?: (values: Any) => void): ProLedger => {
+      const values = JSON.parse(JSON.stringify(w.ledger))
+      change?.(values)
+      return ledgerOf(values)
+    }
+    const groupIn = (ledger: ProLedger, id: string) => groupsOf(ledger).find((group) => group.id === id)!
+    const names = { person: (id: number) => w.names[String(id)] ?? '?', me: w.me }
+
+    describe('no limit on the cap', () => {
+      for (const c of v.capOff.cases) {
+        it(JSON.stringify(c.settings), () => expect(capState(ledgerOf({ ...v.capOff.ledger, settings: c.settings }))).toEqual(c.expect))
+      }
+      it('nothing is over the cap without a limit', () => {
+        expect(overCap(capState(ledgerOf({ ...v.capOff.ledger, settings: { cap: 2 } })))).toBe(true)
+        expect(overCap(capState(ledgerOf({ ...v.capOff.ledger, settings: { cap: 2, cap_off: true } })))).toBe(false)
+      })
+    })
+
+    describe('the ledger with group records', () => {
+      for (const c of v.ledgerMergeGroups) {
+        it(`merge: ${c.name}`, () => expect(mergeLedger(compactLedger(c.local), compactLedger(c.server))).toEqual(compactLedger(c.expect)))
+      }
+      it("a group's records move after 90 days", () => {
+        const a = v.archiveGroups
+        const plan = archivePlan(ledgerOf(a.ledger), a.today)
+        const parts: Record<string, Record<string, string[]>> = {}
+        for (const [quarter, records] of Object.entries(plan.parts)) {
+          parts[quarter] = Object.fromEntries(Object.entries(records).map(([collection, byId]) => [collection, Object.keys(byId as object).sort()]))
+        }
+        expect(parts).toEqual(a.parts)
+        expect(plan.moved.map((m: { collection: LedgerCollection; id: string }) => `${m.collection}/${m.id}`)).toEqual(a.moved)
+      })
+      it('who a promise was made to', () => {
+        for (const c of v.requester) expect(requesterOf(c.promise)).toEqual(c.expect)
+      })
+    })
+
+    describe('working days', () => {
+      it('counting back', () => {
+        for (const c of v.workingDays.before) {
+          expect([c.day, c.n, workingDaysBefore(c.day, c.n, c.workdays ? readWorkdays(c.workdays) : undefined)]).toEqual([c.day, c.n, c.expect])
+        }
+      })
+      it('reading the settings', () => {
+        for (const c of v.workingDays.read) expect(readWorkdays(c.value)).toEqual(c.expect)
+        for (const c of v.workingDays.checkDays) expect(readCheckDays(c.value)).toBe(c.expect)
+      })
+    })
+
+    describe('the weekly note and steps marked done', () => {
+      for (const c of v.weeklyNote.due) it(`due: ${c.name}`, () => expect(noteDue(c.settings, c.today)).toBe(c.expect))
+      for (const c of v.weeklyNote.period) it(`period: ${c.name}`, () => expect(notePeriod(c.settings, c.today)).toEqual(c.expect))
+      for (const c of v.weeklyNote.done) it(`done: ${c.name}`, () => expect(weeklyDoneSteps(c.settings, c.week)).toEqual(c.expect))
+      for (const c of v.weeklyNote.mark) it(`mark: ${c.name}`, () => expect(withWeeklyDone(c.settings, c.week, c.step)).toEqual(c.expect))
+    })
+
+    describe('groups', () => {
+      it('the groups of a ledger', () => expect(groupsOf(worldLedger())).toEqual(v.groups))
+      for (const c of v.groupPage) {
+        it(`page: ${c.name}`, () => {
+          const ledger = worldLedger((values) => { for (const key of c.without ?? []) delete values[key] })
+          expect(groupPage({ group: groupIn(ledger, c.group), tasks: worldTasks, ledger, today: w.today })).toEqual(c.expect)
+        })
+      }
+      for (const c of v.reliability) {
+        it(`reliability: ${c.name}`, () => {
+          const ledger = worldLedger((values) => {
+            for (const key of c.without ?? []) delete values[key]
+            for (const id of c.dropRounds ?? []) delete values.rounds[id]
+          })
+          expect(reliability({ group: groupIn(ledger, c.group), tasks: worldTasks, ledger, today: w.today })).toEqual(c.expect)
+        })
+      }
+      for (const c of v.missIssue) {
+        it(`a second miss: ${c.name}`, () => {
+          const ledger = worldLedger((values) => { if (c.promise) values.promises[String(c.task)] = c.promise })
+          const task = w.tasks.find((entry: Any) => entry.id === c.task)
+          expect(missIssue(ledger, { id: task.id, title: task.title }, c.label, w.today, c.threshold)).toEqual(c.expect)
+        })
+      }
+      it("a person's page", () => {
+        const ledger = worldLedger()
+        const labels = new Set(groupsOf(ledger).map((group) => group.label))
+        for (const c of v.personPage) expect([c.person, personPage(c.person, worldTasks, ledger, labels)]).toEqual([c.person, c.expect])
+      })
+    })
+
+    describe('sessions', () => {
+      const s = v.sessions
+      it('steps and kinds', () => {
+        expect(SESSION_STEPS).toEqual(s.steps)
+        for (const c of s.kinds) expect(sessionKindOf(c.kind)).toBe(c.expect)
+        for (const c of s.scores) expect(readScore(c.value)).toBe(c.expect)
+      })
+      for (const c of s.actions) {
+        it(`actions: ${c.name}`, () => {
+          const ledger = worldLedger()
+          expect(sessionActions({ group: groupIn(ledger, c.group), tasks: worldTasks, ledger, today: w.today, kind: c.kind, weekStart: c.weekStart })).toEqual(c.expect)
+        })
+      }
+      for (const c of s.contents) {
+        it(`what ${c.round} held`, () => {
+          const ledger = worldLedger()
+          const round = w.ledger.rounds[c.round]
+          expect(sessionContents({ round: c.round, started: round.started, ended: round.ended, group: groupIn(ledger, c.group), tasks: worldTasks, ledger })).toEqual(c.expect)
+        })
+      }
+      it('the round written at the end', () => {
+        for (const c of s.end) expect(endSession(c.input)).toEqual(c.expect)
+      })
+    })
+
+    describe('follow-ups', () => {
+      for (const c of v.followUps) {
+        it(c.name, () => {
+          const ledger = c.empty ? null : worldLedger((values) => {
+            if (c.settings) values.settings = c.settings
+            Object.assign(values.meetings, c.meetings ?? {})
+          })
+          expect(followUps({ tasks: worldTasks, ledger, today: w.today, snoozes: c.snoozes, dismissed: c.dismissed })).toEqual(c.expect)
+        })
+      }
+    })
+
+    describe('text for other people', () => {
+      const d = v.documents
+      const t = messageFormatter(d.messages)
+      const day = (value: string) => formatWeekdayDate(local(`${value}T12:00:00`), local(w.now), fmtOf(d.locale, false))
+      const build = (c: Any): ProDocument | null => {
+        const ledger = worldLedger()
+        const group = (id: string) => groupIn(ledger, id)
+        if (c.type === 'agenda') return agendaDocument({ group: group(c.group), kind: c.kind, date: c.date, tasks: worldTasks, ledger, names, today: w.today, weekStart: c.weekStart })
+        if (c.type === 'check') return checkDocument(names.person(c.person), c.items)
+        if (c.type === 'note') {
+          if (c.emptyWorld) return weeklyNoteDocument({ groups: c.groups.map(group), tasks: [], ledger: ledgerOf({ meetings: w.ledger.meetings }), from: c.from, to: c.to, names })
+          return weeklyNoteDocument({ groups: c.groups.map(group), tasks: worldTasks, ledger, from: c.from, to: c.to, names })
+        }
+        const round = w.ledger.rounds[c.round]
+        const quiet = c.emptyWorld ? ledgerOf({ meetings: { [c.group]: w.ledger.meetings[c.group] }, rounds: { [c.round]: round } }) : ledger
+        const input = { group: group(c.group), kind: round.kind, date: round.at, tasks: c.emptyWorld ? [] : worldTasks, ledger: quiet, names, round: c.round, started: round.started, ended: round.ended, absent: c.emptyWorld ? [] : round.absent }
+        if (c.type === 'readback') return readBackDocument(input)
+        const recap = recapDocument(input)
+        expect(recap.taskIds).toEqual(c.taskIds)
+        expect(recap.decisionIds).toEqual(c.decisionIds)
+        return recap.document
+      }
+      for (const c of d.cases) {
+        it(c.name, () => {
+          const document = build(c)
+          expect(document).toEqual(c.document)
+          const rendered = renderDocument(document as ProDocument, t, day)
+          expect(rendered.text.split('\n')).toEqual(c.text)
+          expect(rendered.html).toBe(c.html)
+          expect(rendered.markdown.split('\n')).toEqual(c.markdown)
+        })
+      }
+      it('the language of a text', () => {
+        for (const c of d.language) expect(textLanguage(c.group === undefined ? null : { language: c.group }, { text_language: c.setting })).toBe(c.expect)
+      })
+      it('a key without a text is shown as the key', () => {
+        expect(messageFormatter({})('note.nothing', {})).toBe('note.nothing')
       })
     })
 

@@ -17,6 +17,8 @@ export type TokenType =
   | 'place'
   // Pro (section 5.5), only with `pro` on
   | 'person'
+  | 'requester'
+  | 'checkOn'
   | 'start'
   | 'estimate'
   | 'flag'
@@ -37,6 +39,9 @@ export interface ParsedRecurrence {
 
 /** A known person (`id`), or a new one a `$` phrase names (`id` null, made when the task is saved). */
 export type ParsedPerson = { id: number; mine: boolean } | { id: null; name: string; mine: boolean }
+
+/** Who a promise was made to: a known person, or a new one made when the task is saved. */
+export type ParsedRequester = { id: number } | { id: null; name: string }
 
 export interface ParseResult {
   title: string
@@ -64,6 +69,13 @@ export interface ParseResult {
    * yours to them. A `$` name that matches nobody is a new person (`id` null, `name`), made on save.
    */
   person: ParsedPerson | null
+  /**
+   * Who the promise was made to, when the text has two `$` phrases and one follows `for`
+   * (`$Jan site list for $Priya`): a known person or a new one. Null otherwise.
+   */
+  requester: ParsedRequester | null
+  /** `check on 3 feb`, only with a person: the local day to look at the promise (YYYY-MM-DD). */
+  checkOn: string | null
   /** `starts monday`: a start date (local midnight without a time). Null when a block holds the start. */
   start: Date | null
   /** `~1h30`: minutes. */

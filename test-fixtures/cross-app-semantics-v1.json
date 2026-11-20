@@ -4101,10 +4101,1778 @@
         { "id": 9, "project_id": 18, "title": "Sunday", "done": true, "start": "2026-11-08T09:00:00", "end": "2026-11-08T10:00:00" },
         { "id": 10, "project_id": 17, "title": "Taken over", "done": true }
       ],
-      "steps": [{ "id": "verdicts", "count": 1 }, { "id": "unsent", "count": 2 }, { "id": "escalations", "count": 2 }, { "id": "portfolio", "count": 2 }, { "id": "value", "count": 1 }],
+      "steps": [{ "id": "verdicts", "count": 1 }, { "id": "unsent", "count": 2 }, { "id": "note", "count": 0 }, { "id": "escalations", "count": 2 }, { "id": "portfolio", "count": 2 }, { "id": "value", "count": 1 }],
       "stepsWithoutPromises": [{ "id": "escalations", "count": 2 }, { "id": "portfolio", "count": 2 }, { "id": "value", "count": 1 }],
       "mirror": { "rescues": 1, "focusDays": 1, "workdays": 5, "youHold": 3, "othersHold": 2, "unconfirmed": 1 },
       "mirrorText": "Last 7 days: you took over 1 promise and had a focus block on 1 of 5 workdays. You hold 3 open tasks; others hold 2 promises to you. 1 still to confirm."
+    },
+    "capOff": {
+      "ledger": {
+        "initiatives": {
+          "17": { "rank": 1, "status": "active" },
+          "18": { "rank": 2, "status": "active" },
+          "19": { "rank": 3, "status": "active" },
+          "20": { "status": "parked" }
+        }
+      },
+      "cases": [
+        { "settings": { "cap": 2 }, "expect": { "active": 3, "cap": 2, "agreed": false, "full": true } },
+        { "settings": { "cap": 2, "cap_off": true }, "expect": { "active": 3, "cap": 2, "agreed": false, "full": false, "unlimited": true } },
+        {
+          "settings": { "cap_off": true, "cap_agreed": { "by": 51, "on": "2026-11-03" } },
+          "expect": { "active": 3, "cap": 4, "agreed": true, "full": false, "unlimited": true }
+        },
+        { "settings": { "cap": 2, "cap_off": "yes" }, "expect": { "active": 3, "cap": 2, "agreed": false, "full": true } },
+        { "settings": { "cap": 2, "cap_off": false }, "expect": { "active": 3, "cap": 2, "agreed": false, "full": true } }
+      ]
+    },
+    "ledgerMergeGroups": [
+      {
+        "name": "checked marks are a union, like sent",
+        "local": {
+          "promises": { "7": { "v": { "dir": "theirs", "person": 40, "to": { "group": 70 }, "checked": ["2026-11-10T08:00:00Z"] }, "r": [3000, 0, "a"] } }
+        },
+        "server": {
+          "promises": {
+            "7": {
+              "v": {
+                "dir": "theirs",
+                "person": 40,
+                "to": { "group": 70 },
+                "checked": ["2026-11-11T08:00:00Z", "2026-11-10T08:00:00Z"],
+                "check_on": "2026-11-20"
+              },
+              "r": [2000, 0, "b"]
+            }
+          }
+        },
+        "expect": {
+          "promises": {
+            "7": {
+              "v": { "dir": "theirs", "person": 40, "to": { "group": 70 }, "checked": ["2026-11-10T08:00:00Z", "2026-11-11T08:00:00Z"] },
+              "r": [3000, 0, "a"]
+            }
+          }
+        }
+      },
+      {
+        "name": "who it was promised to follows the newer record",
+        "local": { "promises": { "7": { "v": { "dir": "theirs", "person": 40, "to": { "person": 43 } }, "r": [1000, 0, "a"] } } },
+        "server": { "promises": { "7": { "v": { "dir": "theirs", "person": 40, "to": { "group": 70 }, "no_check": true }, "r": [2000, 0, "b"] } } },
+        "expect": { "promises": { "7": { "v": { "dir": "theirs", "person": 40, "to": { "group": 70 }, "no_check": true }, "r": [2000, 0, "b"] } } }
+      },
+      {
+        "name": "a round keeps its unknown fields and the newer side wins whole",
+        "local": {
+          "rounds": {
+            "r1": {
+              "v": {
+                "meeting": "g1",
+                "at": "2026-11-09",
+                "discussed": [],
+                "skipped": [],
+                "absent": [],
+                "not_discussed": [],
+                "kind": "weekly",
+                "ended": "2026-11-09T09:00:00Z",
+                "recap_sent": ["2026-11-09T09:30:00Z"],
+                "later": 1
+              },
+              "r": [5000, 0, "a"]
+            }
+          }
+        },
+        "server": {
+          "rounds": {
+            "r1": {
+              "v": {
+                "meeting": "g1",
+                "at": "2026-11-09",
+                "discussed": [],
+                "skipped": [],
+                "absent": [],
+                "not_discussed": [],
+                "kind": "weekly",
+                "ended": "2026-11-09T09:00:00Z"
+              },
+              "r": [4000, 0, "b"]
+            }
+          }
+        },
+        "expect": {
+          "rounds": {
+            "r1": {
+              "v": {
+                "meeting": "g1",
+                "at": "2026-11-09",
+                "discussed": [],
+                "skipped": [],
+                "absent": [],
+                "not_discussed": [],
+                "kind": "weekly",
+                "ended": "2026-11-09T09:00:00Z",
+                "recap_sent": ["2026-11-09T09:30:00Z"],
+                "later": 1
+              },
+              "r": [5000, 0, "a"]
+            }
+          }
+        }
+      }
+    ],
+    "archiveGroups": {
+      "about": "2026-08-04 is 100 days before today, 2026-08-14 is 90: only a record closed more than 90 days ago moves.",
+      "today": "2026-11-12",
+      "ledger": {
+        "promises": {
+          "1": { "dir": "theirs", "person": 40, "to": { "group": 70 }, "verdicts": [{ "id": "a", "at": "2026-08-04T08:00:00Z", "kind": "delivered" }] },
+          "2": { "dir": "theirs", "person": 40, "verdicts": [{ "id": "b", "at": "2026-08-04T08:00:00Z", "kind": "delivered" }] },
+          "3": { "dir": "theirs", "person": 40, "to": { "person": 43 }, "verdicts": [{ "id": "c", "at": "2026-08-14T08:00:00Z", "kind": "late" }] },
+          "4": { "dir": "theirs", "person": 40, "to": { "group": 70 }, "verdicts": [{ "id": "d", "at": "2026-08-13T08:00:00Z", "kind": "delivered" }] },
+          "5": { "dir": "mine", "person": null, "to": { "group": 70 } }
+        },
+        "log": {
+          "a": { "kind": "decision", "text": "x", "at": "2026-08-04", "group": 70 },
+          "b": { "kind": "decision", "text": "y", "at": "2026-08-04" },
+          "c": { "kind": "issue", "text": "open and old", "at": "2026-01-10", "group": 70 },
+          "d": { "kind": "issue", "text": "solved", "at": "2026-07-01", "group": 70, "resolved": "2026-08-04" },
+          "e": { "kind": "issue", "text": "solved lately", "at": "2026-07-01", "group": 70, "resolved": "2026-10-30" }
+        },
+        "rounds": {
+          "f": {
+            "meeting": "g1",
+            "at": "2026-08-04",
+            "discussed": [],
+            "skipped": [],
+            "absent": [],
+            "not_discussed": [],
+            "kind": "weekly",
+            "started": "2026-08-04T08:00:00Z",
+            "ended": "2026-08-04T09:00:00Z"
+          },
+          "g": { "meeting": "g1", "at": "2026-08-14", "discussed": [], "skipped": [], "absent": [], "not_discussed": [] },
+          "h": { "meeting": "m9", "at": "2026-08-04", "discussed": [40], "skipped": [], "absent": [], "not_discussed": [] }
+        },
+        "meetings": { "g1": { "name": "LT Operations", "people": [40], "label": 70 } }
+      },
+      "parts": { "2026-Q3": { "promises": ["1", "4"], "log": ["a", "d"], "rounds": ["f", "h"] } },
+      "moved": ["log/a", "log/d", "promises/1", "promises/4", "rounds/f", "rounds/h"]
+    },
+    "weeklyNote": {
+      "due": [
+        { "name": "no day set", "today": "2026-11-12", "settings": {}, "expect": null },
+        {
+          "name": "a Friday note on a Thursday is due from last Friday",
+          "today": "2026-11-12",
+          "settings": { "note_day": 5 },
+          "expect": "2026-11-06"
+        },
+        { "name": "on the day itself", "today": "2026-11-13", "settings": { "note_day": 5 }, "expect": "2026-11-13" },
+        {
+          "name": "copied on that Friday",
+          "today": "2026-11-12",
+          "settings": { "note_day": 5, "note_sent": ["2026-11-06T08:00:00Z"] },
+          "expect": null
+        },
+        {
+          "name": "copied the day before does not count",
+          "today": "2026-11-12",
+          "settings": { "note_day": 5, "note_sent": ["2026-11-05T08:00:00Z"] },
+          "expect": "2026-11-06"
+        },
+        {
+          "name": "copied since",
+          "today": "2026-11-12",
+          "settings": { "note_day": 5, "note_sent": ["2026-10-30T08:00:00Z", "2026-11-09T08:00:00Z"] },
+          "expect": null
+        },
+        { "name": "a day that is not a weekday number", "today": "2026-11-12", "settings": { "note_day": 8 }, "expect": null },
+        { "name": "Sunday", "today": "2026-11-12", "settings": { "note_day": 7 }, "expect": "2026-11-08" }
+      ],
+      "period": [
+        { "name": "never copied: seven days", "today": "2026-11-12", "settings": {}, "expect": { "from": "2026-11-06", "to": "2026-11-12" } },
+        {
+          "name": "from the day after the last copy",
+          "today": "2026-11-12",
+          "settings": { "note_sent": ["2026-11-06T08:00:00Z"] },
+          "expect": { "from": "2026-11-07", "to": "2026-11-12" }
+        },
+        {
+          "name": "at most fourteen days back",
+          "today": "2026-11-12",
+          "settings": { "note_sent": ["2026-10-02T08:00:00Z"] },
+          "expect": { "from": "2026-10-30", "to": "2026-11-12" }
+        },
+        {
+          "name": "copied today",
+          "today": "2026-11-12",
+          "settings": { "note_sent": ["2026-11-12T08:00:00Z"] },
+          "expect": { "from": "2026-11-12", "to": "2026-11-12" }
+        }
+      ],
+      "done": [
+        {
+          "name": "this week",
+          "settings": { "weekly_done": { "week": "2026-11-09", "steps": ["verdicts", "note", "note"] } },
+          "week": "2026-11-09",
+          "expect": ["verdicts", "note"]
+        },
+        {
+          "name": "another week does not count",
+          "settings": { "weekly_done": { "week": "2026-11-02", "steps": ["verdicts"] } },
+          "week": "2026-11-09",
+          "expect": []
+        },
+        { "name": "none", "settings": {}, "week": "2026-11-09", "expect": [] }
+      ],
+      "mark": [
+        {
+          "name": "the first mark of a week",
+          "settings": { "cap": 5 },
+          "week": "2026-11-09",
+          "step": "unsent",
+          "expect": { "cap": 5, "weekly_done": { "week": "2026-11-09", "steps": ["unsent"] } }
+        },
+        {
+          "name": "one more",
+          "settings": { "weekly_done": { "week": "2026-11-09", "steps": ["verdicts"] } },
+          "week": "2026-11-09",
+          "step": "note",
+          "expect": { "weekly_done": { "week": "2026-11-09", "steps": ["verdicts", "note"] } }
+        },
+        {
+          "name": "a new week starts over",
+          "settings": { "weekly_done": { "week": "2026-11-02", "steps": ["verdicts"] } },
+          "week": "2026-11-09",
+          "step": "note",
+          "expect": { "weekly_done": { "week": "2026-11-09", "steps": ["note"] } }
+        },
+        {
+          "name": "twice is once",
+          "settings": { "weekly_done": { "week": "2026-11-09", "steps": ["note"] } },
+          "week": "2026-11-09",
+          "step": "note",
+          "expect": { "weekly_done": { "week": "2026-11-09", "steps": ["note"] } }
+        }
+      ]
+    },
+    "workingDays": {
+      "before": [
+        { "day": "2026-11-13", "n": 2, "expect": "2026-11-11" },
+        { "day": "2026-11-16", "n": 2, "expect": "2026-11-12" },
+        { "day": "2026-11-17", "n": 2, "expect": "2026-11-13" },
+        { "day": "2026-11-15", "n": 1, "expect": "2026-11-13" },
+        { "day": "2026-11-13", "n": 0, "expect": "2026-11-13" },
+        { "day": "2026-11-13", "n": 10, "expect": "2026-10-30" },
+        { "day": "2026-11-16", "n": 1, "workdays": [1, 2, 3, 4, 5, 6], "expect": "2026-11-14" },
+        { "day": "2026-11-16", "n": 2, "workdays": [7, 1, 2, 3, 4], "expect": "2026-11-12" },
+        { "day": "2026-11-13", "n": 3, "workdays": [], "expect": "2026-11-10" },
+        { "day": "2026-01-02", "n": 2, "expect": "2025-12-31" }
+      ],
+      "read": [
+        { "value": null, "expect": [1, 2, 3, 4, 5] },
+        { "value": [1, 2, 3, 4, 5], "expect": [1, 2, 3, 4, 5] },
+        { "value": [5, 1, 1, 3], "expect": [1, 3, 5] },
+        { "value": [], "expect": [1, 2, 3, 4, 5] },
+        { "value": [0, 8, 2.5, "x"], "expect": [1, 2, 3, 4, 5] },
+        { "value": [7], "expect": [7] },
+        { "value": "weekdays", "expect": [1, 2, 3, 4, 5] }
+      ],
+      "checkDays": [
+        { "value": null, "expect": 2 },
+        { "value": 0, "expect": 0 },
+        { "value": 2, "expect": 2 },
+        { "value": 10, "expect": 10 },
+        { "value": 11, "expect": 2 },
+        { "value": -1, "expect": 2 },
+        { "value": 1.5, "expect": 2 },
+        { "value": "3", "expect": 2 }
+      ]
+    },
+    "requester": [
+      { "promise": { "dir": "theirs", "person": 40 }, "expect": { "kind": "you" } },
+      { "promise": { "dir": "theirs", "person": 40, "to": null }, "expect": { "kind": "you" } },
+      { "promise": { "dir": "theirs", "person": 40, "to": { "group": 70 } }, "expect": { "kind": "group", "group": 70 } },
+      { "promise": { "dir": "theirs", "person": 40, "to": { "person": 43 } }, "expect": { "kind": "person", "person": 43 } },
+      { "promise": { "dir": "theirs", "person": 40, "to": { "text": " Finance " } }, "expect": { "kind": "text", "text": "Finance" } },
+      { "promise": { "dir": "theirs", "person": 40, "to": { "group": 70, "person": 43, "text": "x" } }, "expect": { "kind": "group", "group": 70 } },
+      { "promise": { "dir": "theirs", "person": 40, "to": { "group": 0, "person": 43 } }, "expect": { "kind": "person", "person": 43 } },
+      { "promise": { "dir": "theirs", "person": 40, "to": { "group": "70", "text": "  " } }, "expect": { "kind": "you" } },
+      { "promise": { "dir": "theirs", "person": 40, "to": "LT Ops" }, "expect": { "kind": "you" } },
+      { "promise": { "dir": "mine", "person": null, "to": { "group": 70 } }, "expect": { "kind": "group", "group": 70 } }
+    ],
+    "groupWorld": {
+      "about": "Today is Thursday 12 November 2026. Instants end in Z and sit between 06:00Z and 10:00Z, the same local day in every zone under test. Label 70 is LT Operations (meeting g1, weekly on Monday), 71 is LT Services (g2).",
+      "today": "2026-11-12",
+      "now": "2026-11-12T10:00:00",
+      "me": "Rendy",
+      "names": { "40": "Jan de Vries", "41": "Ana Silva", "43": "Priya", "44": "Sofia Marin" },
+      "ledger": {
+        "settings": { "note_day": 5, "threshold": 2 },
+        "meetings": {
+          "g1": {
+            "name": "LT Operations",
+            "people": [40, 43, 44, 40],
+            "label": 70,
+            "sessions": [{ "id": "w", "kind": "weekly", "rhythm": "weekly" }, { "id": "s", "kind": "standup" }, { "kind": "broken" }],
+            "language": "en"
+          },
+          "g2": { "name": "LT Services", "people": [41, 40], "label": 71 },
+          "g3": { "name": "A copy of LT Operations", "people": [41], "label": 70 },
+          "m9": { "name": "Steering", "people": [40], "rhythm": "monthly" },
+          "b0": { "name": "broken label", "people": [40], "label": 0 }
+        },
+        "rounds": {
+          "r1": {
+            "meeting": "g1",
+            "at": "2026-10-12",
+            "discussed": [],
+            "skipped": [],
+            "absent": [],
+            "not_discussed": [],
+            "kind": "weekly",
+            "started": "2026-10-12T08:00:00Z",
+            "ended": "2026-10-12T09:00:00Z",
+            "read_back": true,
+            "recap_sent": ["2026-10-12T09:10:00Z"]
+          },
+          "r2": {
+            "meeting": "g1",
+            "at": "2026-10-19",
+            "discussed": [],
+            "skipped": [],
+            "absent": [],
+            "not_discussed": [],
+            "kind": "weekly",
+            "started": "2026-10-19T08:00:00Z",
+            "ended": "2026-10-19T09:00:00Z",
+            "read_back": true,
+            "recap_sent": ["2026-10-19T09:10:00Z"]
+          },
+          "r3": {
+            "meeting": "g1",
+            "at": "2026-10-26",
+            "discussed": [],
+            "skipped": [],
+            "absent": [],
+            "not_discussed": [],
+            "kind": "weekly",
+            "started": "2026-10-26T08:00:00Z",
+            "ended": "2026-10-26T09:00:00Z",
+            "read_back": false,
+            "recap_sent": ["2026-10-26T09:10:00Z"]
+          },
+          "r4": {
+            "meeting": "g1",
+            "at": "2026-11-02",
+            "discussed": [],
+            "skipped": [],
+            "absent": [],
+            "not_discussed": [],
+            "kind": "weekly",
+            "started": "2026-11-02T08:00:00Z",
+            "ended": "2026-11-02T09:00:00Z",
+            "read_back": true,
+            "score": 6
+          },
+          "r5": {
+            "meeting": "g1",
+            "at": "2026-11-09",
+            "discussed": [],
+            "skipped": [],
+            "absent": [44],
+            "not_discussed": [],
+            "kind": "weekly",
+            "started": "2026-11-09T08:00:00Z",
+            "ended": "2026-11-09T09:00:00Z",
+            "read_back": true,
+            "score": 7,
+            "recap_sent": ["2026-11-09T09:10:00Z"]
+          },
+          "r6": {
+            "meeting": "g1",
+            "at": "2026-11-12",
+            "discussed": [],
+            "skipped": [],
+            "absent": [],
+            "not_discussed": [],
+            "kind": "standup",
+            "started": "2026-11-12T07:00:00Z"
+          },
+          "s1": {
+            "meeting": "g2",
+            "at": "2026-11-10",
+            "discussed": [],
+            "skipped": [],
+            "absent": [],
+            "not_discussed": [],
+            "kind": "weekly",
+            "started": "2026-11-10T08:00:00Z",
+            "ended": "2026-11-10T09:00:00Z",
+            "read_back": true
+          },
+          "o1": {
+            "meeting": "g2",
+            "at": "2026-10-20",
+            "discussed": [],
+            "skipped": [],
+            "absent": [],
+            "not_discussed": [],
+            "kind": "weekly",
+            "started": "2026-10-20T08:00:00Z",
+            "ended": "2026-10-20T09:00:00Z"
+          },
+          "m1": { "meeting": "m9", "at": "2026-11-11", "discussed": [40], "skipped": [], "absent": [], "not_discussed": [] }
+        },
+        "promises": {
+          "101": { "dir": "theirs", "person": 40, "to": { "group": 70 } },
+          "102": { "dir": "theirs", "person": 40, "to": { "person": 43 } },
+          "103": {
+            "dir": "theirs",
+            "person": 43,
+            "to": { "group": 70 },
+            "verdicts": [{ "id": "v103", "at": "2026-11-09T08:20:00Z", "kind": "not_yet", "new_due": "2026-11-13", "blocker": "waiting for two quotes" }]
+          },
+          "104": { "dir": "theirs", "person": 44, "to": { "group": 70 } },
+          "106": { "dir": "mine", "person": null, "to": { "group": 70 } },
+          "107": { "dir": "theirs", "person": 40, "to": { "group": 70 } },
+          "108": { "dir": "theirs", "person": 40, "to": { "group": 70 }, "checked": ["2026-11-12T07:00:00Z"] },
+          "109": { "dir": "theirs", "person": 40, "to": { "group": 70 }, "checked": ["2026-11-04T07:00:00Z"] },
+          "110": { "dir": "theirs", "person": 40, "to": { "group": 71 } },
+          "111": {
+            "dir": "theirs",
+            "person": 40,
+            "to": { "group": 70 },
+            "sent": ["2026-11-02T09:10:00Z"],
+            "verdicts": [{ "id": "v111", "at": "2026-11-10T08:00:00Z", "kind": "delivered" }]
+          },
+          "112": { "dir": "theirs", "person": 43, "to": { "group": 70 }, "verdicts": [{ "id": "v112", "at": "2026-10-20T08:00:00Z", "kind": "late" }] },
+          "113": { "dir": "theirs", "person": 44, "to": { "group": 70 }, "verdicts": [{ "id": "v113", "at": "2026-10-12T08:00:00Z", "kind": "delivered" }] },
+          "114": { "dir": "theirs", "person": 41, "to": { "group": 70 }, "verdicts": [{ "id": "v114", "at": "2026-11-03T08:00:00Z", "kind": "dropped" }] },
+          "115": { "dir": "theirs", "person": 41, "to": { "group": 71 } },
+          "116": { "dir": "theirs", "person": 41, "check_on": "2026-11-11" },
+          "117": { "dir": "theirs", "person": 41, "to": { "group": 71 }, "no_check": true },
+          "119": { "dir": "theirs", "person": 44, "to": { "text": "Finance" } },
+          "120": { "dir": "theirs", "person": 40 }
+        },
+        "log": {
+          "d1": { "kind": "decision", "text": "Pilot starts in Region North, not Region West", "by": 44, "at": "2026-11-09", "group": 70, "session": "r5" },
+          "d2": {
+            "kind": "decision",
+            "text": "Freeze the vendor list until January",
+            "at": "2026-11-02",
+            "group": 70,
+            "session": "r4",
+            "shared": ["2026-11-02T09:10:00Z"]
+          },
+          "d3": { "kind": "decision", "text": "Two engineers move to the pilot", "by": 41, "at": "2026-11-10", "group": 71, "session": "s1" },
+          "d4": { "kind": "decision", "text": "A decision outside any group", "at": "2026-11-09", "initiative": 17 },
+          "q1": { "kind": "unknown", "text": "Who owns the vendor contact?", "at": "2026-11-09", "group": 70, "session": "r5", "ask": 43 },
+          "i1": { "kind": "issue", "text": "Supplier shortlist keeps slipping", "at": "2026-11-02", "group": 70, "session": "r4", "rank": 2, "task": 103 },
+          "i2": { "kind": "issue", "text": "No test environment for the billing migration", "at": "2026-11-09", "group": 70, "session": "r5", "rank": 1 },
+          "i3": {
+            "kind": "issue",
+            "text": "Nobody owned the rota",
+            "at": "2026-10-26",
+            "group": 70,
+            "session": "r3",
+            "resolved": "2026-11-09",
+            "solved_in": "r5"
+          },
+          "i4": { "kind": "issue", "text": "Access requests take a week", "at": "2026-11-01", "group": 70 },
+          "i5": { "kind": "issue", "text": "An issue of the other group", "at": "2026-11-10", "group": 71, "session": "s1" }
+        }
+      },
+      "tasks": [
+        {
+          "id": 101,
+          "title": "Pricing proposal for Region North",
+          "labels": [70, 40],
+          "due": "2026-11-12T23:59:59",
+          "created": "2026-10-26T08:30:00Z"
+        },
+        { "id": 102, "title": "Site list for Region North", "labels": [70, 40], "due": "2026-11-11T23:59:59", "created": "2026-11-09T08:30:00Z" },
+        { "id": 103, "title": "Supplier shortlist", "labels": [70, 43], "due": "2026-11-13T23:59:59", "created": "2026-10-26T08:31:00Z" },
+        { "id": 104, "title": "Agree pilot region", "labels": [70, 44], "due": "2026-11-16T23:59:59", "created": "2026-11-10T07:00:00Z" },
+        { "id": 105, "title": "Draft the on-call rota", "labels": [70], "due": "2026-11-20T23:59:59", "created": "2026-11-10T07:05:00Z" },
+        { "id": 106, "title": "Send the MOR pre-read template", "labels": [70], "due": "2026-11-13T23:59:59", "created": "2026-11-09T08:40:00Z" },
+        { "id": 107, "title": "Vendor contract summary", "labels": [70, 40], "due": "2026-11-05T23:59:59", "created": "2026-10-19T08:30:00Z" },
+        { "id": 108, "title": "Rollout plan for the pilot", "labels": [70, 40], "due": "2026-11-16T23:59:59", "created": "2026-11-02T08:30:00Z" },
+        { "id": 109, "title": "Budget sheet", "labels": [70, 40], "due": "2026-11-13T23:59:59", "created": "2026-11-02T08:31:00Z" },
+        { "id": 110, "title": "Access for the survey team", "labels": [71, 40], "due": "2026-11-13T23:59:59", "created": "2026-11-10T08:30:00Z" },
+        {
+          "id": 111,
+          "title": "Kick-off deck",
+          "labels": [70, 40],
+          "due": "2026-11-10T23:59:59",
+          "created": "2026-10-26T08:32:00Z",
+          "done": true,
+          "done_at": "2026-11-10T08:00:00Z"
+        },
+        {
+          "id": 112,
+          "title": "Training plan",
+          "labels": [70, 43],
+          "due": "2026-10-16T23:59:59",
+          "created": "2026-10-05T08:00:00Z",
+          "done": true,
+          "done_at": "2026-10-20T08:00:00Z"
+        },
+        {
+          "id": 113,
+          "title": "Before the window",
+          "labels": [70, 44],
+          "due": "2026-10-12T23:59:59",
+          "created": "2026-10-05T08:00:00Z",
+          "done": true,
+          "done_at": "2026-10-12T08:00:00Z"
+        },
+        {
+          "id": 114,
+          "title": "Second supplier visit",
+          "labels": [70, 41],
+          "due": "2026-11-03T23:59:59",
+          "created": "2026-10-19T08:32:00Z",
+          "done": true,
+          "done_at": "2026-11-03T08:00:00Z"
+        },
+        { "id": 115, "title": "Capacity overview", "labels": [71, 41], "due": "2026-11-10T23:59:59", "created": "2026-10-20T08:30:00Z" },
+        { "id": 116, "title": "Migration runbook", "labels": [41], "due": "2026-12-04T23:59:59", "created": "2026-10-20T08:31:00Z" },
+        { "id": 117, "title": "Licence count", "labels": [71, 41], "due": "2026-11-13T23:59:59", "created": "2026-10-20T08:32:00Z" },
+        { "id": 118, "title": "A task of another list", "labels": [5], "due": "2026-11-12T23:59:59", "created": "2026-11-01T08:00:00Z" },
+        { "id": 119, "title": "Cost model", "labels": [70, 44], "due": "2026-11-25T23:59:59", "created": "2026-10-26T08:33:00Z" },
+        { "id": 120, "title": "Review my draft", "labels": [40], "due": "2026-11-18T23:59:59", "created": "2026-11-01T08:00:00Z" }
+      ]
+    },
+    "groups": [
+      {
+        "id": "g1",
+        "label": 70,
+        "name": "LT Operations",
+        "people": [40, 43, 44],
+        "sessions": [{ "id": "w", "kind": "weekly", "rhythm": "weekly" }, { "id": "s", "kind": "standup" }],
+        "checks": true,
+        "language": "en"
+      },
+      { "id": "g2", "label": 71, "name": "LT Services", "people": [41, 40], "sessions": [], "checks": true, "language": null }
+    ],
+    "groupPage": [
+      {
+        "name": "LT Operations after five sessions",
+        "group": "g1",
+        "expect": {
+          "since": "2026-11-09T09:00:00Z",
+          "yours": [106],
+          "overdue": [{ "owner": 40, "tasks": [107] }],
+          "due": [{ "owner": 40, "tasks": [102, 101] }],
+          "fresh": [{ "owner": 44, "tasks": [104] }, { "owner": null, "tasks": [105] }],
+          "open": [{ "owner": 40, "tasks": [109, 108] }, { "owner": 43, "tasks": [103] }, { "owner": 44, "tasks": [119] }],
+          "done": [{ "owner": 40, "tasks": [111] }],
+          "noOwner": [105]
+        }
+      },
+      {
+        "name": "LT Services",
+        "group": "g2",
+        "expect": {
+          "since": "2026-11-10T09:00:00Z",
+          "yours": [],
+          "overdue": [{ "owner": 41, "tasks": [115] }],
+          "due": [],
+          "fresh": [],
+          "open": [{ "owner": 41, "tasks": [117] }, { "owner": 40, "tasks": [110] }],
+          "done": [],
+          "noOwner": []
+        }
+      },
+      {
+        "name": "a group that never had a session",
+        "group": "g1",
+        "without": ["rounds"],
+        "expect": {
+          "since": null,
+          "yours": [106],
+          "overdue": [],
+          "due": [{ "owner": 40, "tasks": [107, 102, 101] }],
+          "fresh": [],
+          "open": [
+            { "owner": 40, "tasks": [109, 108] },
+            { "owner": 43, "tasks": [103] },
+            { "owner": 44, "tasks": [104, 119] },
+            { "owner": null, "tasks": [105] }
+          ],
+          "done": [{ "owner": 40, "tasks": [111] }],
+          "noOwner": [105]
+        }
+      }
+    ],
+    "reliability": [
+      {
+        "name": "five sessions: the window starts the day after the fifth-last",
+        "group": "g1",
+        "expect": { "sessions": 4, "from": "2026-10-13", "onTime": 1, "late": 1, "dropped": 1, "takenOver": 0, "openPastDue": 2, "total": 5 }
+      },
+      {
+        "name": "three sessions: from the earliest of them",
+        "group": "g1",
+        "dropRounds": ["r1", "r2"],
+        "expect": { "sessions": 3, "from": "2026-10-26", "onTime": 1, "late": 0, "dropped": 1, "takenOver": 0, "openPastDue": 2, "total": 4 }
+      },
+      {
+        "name": "one session",
+        "group": "g1",
+        "dropRounds": ["r1", "r2", "r3", "r4"],
+        "expect": { "sessions": 1, "from": "2026-11-09", "onTime": 1, "late": 0, "dropped": 0, "takenOver": 0, "openPastDue": 2, "total": 3 }
+      },
+      { "name": "no session, no line", "group": "g1", "without": ["rounds"], "expect": null },
+      {
+        "name": "the other group",
+        "group": "g2",
+        "expect": { "sessions": 2, "from": "2026-10-20", "onTime": 0, "late": 0, "dropped": 0, "takenOver": 0, "openPastDue": 1, "total": 1 }
+      }
+    ],
+    "missIssue": [
+      { "name": "one miss is not yet an issue", "task": 103, "label": 70, "threshold": 2, "expect": null },
+      {
+        "name": "the second miss adds one",
+        "task": 107,
+        "label": 70,
+        "threshold": 2,
+        "promise": {
+          "dir": "theirs",
+          "person": 40,
+          "to": { "group": 70 },
+          "verdicts": [
+            { "id": "a", "at": "2026-11-02T08:20:00Z", "kind": "not_yet" },
+            { "id": "b", "at": "2026-11-09T08:20:00Z", "kind": "not_yet", "new_due": "2026-11-13" }
+          ]
+        },
+        "expect": { "kind": "issue", "text": "Vendor contract summary", "at": "2026-11-12", "group": 70, "task": 107 }
+      },
+      {
+        "name": "not when an open issue names the task",
+        "task": 103,
+        "label": 70,
+        "threshold": 2,
+        "promise": {
+          "dir": "theirs",
+          "person": 43,
+          "to": { "group": 70 },
+          "verdicts": [
+            { "id": "a", "at": "2026-11-02T08:20:00Z", "kind": "not_yet" },
+            { "id": "b", "at": "2026-11-09T08:20:00Z", "kind": "not_yet", "new_due": "2026-11-13" }
+          ]
+        },
+        "expect": null
+      },
+      {
+        "name": "a third miss adds nothing more",
+        "task": 107,
+        "label": 70,
+        "threshold": 2,
+        "promise": {
+          "dir": "theirs",
+          "person": 40,
+          "verdicts": [
+            { "id": "a", "at": "2026-11-02T08:20:00Z", "kind": "not_yet" },
+            { "id": "b", "at": "2026-11-09T08:20:00Z", "kind": "not_yet", "new_due": "2026-11-13" },
+            { "id": "c", "at": "2026-11-10T08:20:00Z", "kind": "not_yet" }
+          ]
+        },
+        "expect": null
+      },
+      {
+        "name": "an undone miss does not count",
+        "task": 107,
+        "label": 70,
+        "threshold": 2,
+        "promise": {
+          "dir": "theirs",
+          "person": 40,
+          "verdicts": [
+            { "id": "a", "at": "2026-11-02T08:20:00Z", "kind": "not_yet" },
+            { "id": "b", "at": "2026-11-09T08:20:00Z", "kind": "not_yet", "new_due": "2026-11-13", "undone": true }
+          ]
+        },
+        "expect": null
+      },
+      { "name": "your own action never does", "task": 106, "label": 70, "threshold": 1, "expect": null },
+      {
+        "name": "a threshold of one",
+        "task": 103,
+        "label": 71,
+        "threshold": 1,
+        "expect": { "kind": "issue", "text": "Supplier shortlist", "at": "2026-11-12", "group": 71, "task": 103 }
+      }
+    ],
+    "personPage": [
+      {
+        "person": 40,
+        "expect": {
+          "toYou": [{ "group": null, "tasks": [120] }],
+          "toOthers": [{ "group": 70, "tasks": [107, 102, 101, 109, 108] }, { "group": 71, "tasks": [110] }]
+        }
+      },
+      { "person": 41, "expect": { "toYou": [{ "group": null, "tasks": [116] }], "toOthers": [{ "group": 71, "tasks": [115, 117] }] } },
+      { "person": 43, "expect": { "toYou": [], "toOthers": [{ "group": 70, "tasks": [103] }] } },
+      { "person": 44, "expect": { "toYou": [], "toOthers": [{ "group": 70, "tasks": [104, 119] }] } },
+      { "person": 99, "expect": { "toYou": [], "toOthers": [] } }
+    ],
+    "sessions": {
+      "steps": { "weekly": ["actions", "issues", "new", "readback"], "standup": ["actions", "new", "readback"] },
+      "kinds": [
+        { "kind": "weekly", "expect": "weekly" },
+        { "kind": "standup", "expect": "standup" },
+        { "kind": "mor", "expect": "weekly" },
+        { "kind": null, "expect": "weekly" },
+        { "kind": 7, "expect": "weekly" }
+      ],
+      "actions": [
+        {
+          "name": "a weekly goes through every open action",
+          "group": "g1",
+          "kind": "weekly",
+          "weekStart": "monday",
+          "expect": { "verdicts": [107, 102, 101], "others": [109, 108, 103, 104, 119, 106, 105] }
+        },
+        {
+          "name": "a stand-up only has what is due by the end of this week",
+          "group": "g1",
+          "kind": "standup",
+          "weekStart": "monday",
+          "expect": { "verdicts": [107, 102, 101], "others": [109, 103, 106] }
+        },
+        {
+          "name": "a week that starts on Saturday ends on Friday",
+          "group": "g1",
+          "kind": "standup",
+          "weekStart": "saturday",
+          "expect": { "verdicts": [107, 102, 101], "others": [109, 103, 106] }
+        },
+        { "name": "the other group", "group": "g2", "kind": "weekly", "weekStart": "monday", "expect": { "verdicts": [115], "others": [117, 110] } }
+      ],
+      "contents": [
+        {
+          "round": "r5",
+          "group": "g1",
+          "expect": {
+            "verdicts": [
+              {
+                "taskId": 103,
+                "verdict": { "id": "v103", "at": "2026-11-09T08:20:00Z", "kind": "not_yet", "new_due": "2026-11-13", "blocker": "waiting for two quotes" }
+              }
+            ],
+            "created": [102, 106],
+            "decisions": ["d1"],
+            "questions": ["q1"],
+            "issues": ["i2"],
+            "solved": ["i3"]
+          }
+        },
+        {
+          "round": "r4",
+          "group": "g1",
+          "expect": { "verdicts": [], "created": [108, 109], "decisions": ["d2"], "questions": [], "issues": ["i1"], "solved": [] }
+        },
+        {
+          "round": "s1",
+          "group": "g2",
+          "expect": { "verdicts": [], "created": [110], "decisions": ["d3"], "questions": [], "issues": ["i5"], "solved": [] }
+        }
+      ],
+      "end": [
+        {
+          "input": {
+            "meeting": "g1",
+            "kind": "weekly",
+            "at": "2026-11-12",
+            "started": "2026-11-12T08:00:00Z",
+            "ended": "2026-11-12T08:50:00Z",
+            "absent": [44, 44],
+            "readBack": true,
+            "score": 8
+          },
+          "expect": {
+            "meeting": "g1",
+            "at": "2026-11-12",
+            "discussed": [],
+            "skipped": [],
+            "absent": [44],
+            "not_discussed": [],
+            "kind": "weekly",
+            "started": "2026-11-12T08:00:00Z",
+            "ended": "2026-11-12T08:50:00Z",
+            "read_back": true,
+            "score": 8
+          }
+        },
+        {
+          "input": {
+            "meeting": "g1",
+            "kind": "standup",
+            "at": "2026-11-12",
+            "started": "2026-11-12T08:00:00Z",
+            "ended": "2026-11-12T08:10:00Z",
+            "absent": [],
+            "readBack": false,
+            "score": 11
+          },
+          "expect": {
+            "meeting": "g1",
+            "at": "2026-11-12",
+            "discussed": [],
+            "skipped": [],
+            "absent": [],
+            "not_discussed": [],
+            "kind": "standup",
+            "started": "2026-11-12T08:00:00Z",
+            "ended": "2026-11-12T08:10:00Z",
+            "read_back": false
+          }
+        },
+        {
+          "input": {
+            "meeting": "g1",
+            "kind": "mor",
+            "at": "2026-11-12",
+            "started": "2026-11-12T08:00:00Z",
+            "ended": "2026-11-12T09:30:00Z",
+            "absent": [],
+            "readBack": true
+          },
+          "expect": {
+            "meeting": "g1",
+            "at": "2026-11-12",
+            "discussed": [],
+            "skipped": [],
+            "absent": [],
+            "not_discussed": [],
+            "kind": "mor",
+            "started": "2026-11-12T08:00:00Z",
+            "ended": "2026-11-12T09:30:00Z",
+            "read_back": true
+          }
+        }
+      ],
+      "scores": [
+        { "value": 1, "expect": 1 },
+        { "value": 10, "expect": 10 },
+        { "value": 0, "expect": null },
+        { "value": 11, "expect": null },
+        { "value": 5.5, "expect": null },
+        { "value": "7", "expect": null },
+        { "value": null, "expect": null }
+      ]
+    },
+    "followUps": [
+      {
+        "name": "everything at once",
+        "expect": [
+          { "kind": "verdict", "key": "verdict:107", "taskId": 107, "person": 40, "due": "2026-11-05" },
+          { "kind": "verdict", "key": "verdict:115", "taskId": 115, "person": 41, "due": "2026-11-10" },
+          { "kind": "verdict", "key": "verdict:102", "taskId": 102, "person": 40, "due": "2026-11-11" },
+          { "kind": "verdict", "key": "verdict:101", "taskId": 101, "person": 40, "due": "2026-11-12" },
+          { "kind": "check", "key": "check:40", "person": 40, "tasks": [109, 110], "due": "2026-11-13" },
+          { "kind": "check", "key": "check:43", "person": 43, "tasks": [103], "due": "2026-11-13" },
+          { "kind": "check", "key": "check:44", "person": 44, "tasks": [104], "due": "2026-11-16" },
+          { "kind": "bring", "key": "bring:116", "taskId": 116, "person": 41, "checkOn": "2026-11-11" },
+          { "kind": "recap", "key": "recap:r4", "round": "r4", "meeting": "g1", "ended": "2026-11-02T09:00:00Z" },
+          { "kind": "recap", "key": "recap:s1", "round": "s1", "meeting": "g2", "ended": "2026-11-10T09:00:00Z" },
+          { "kind": "note", "key": "note:2026-11-06", "day": "2026-11-06" }
+        ]
+      },
+      {
+        "name": "a verdict asked again tomorrow",
+        "snoozes": { "101": { "due": "2026-11-12", "until": "2026-11-13" } },
+        "expect": [
+          { "kind": "verdict", "key": "verdict:107", "taskId": 107, "person": 40, "due": "2026-11-05" },
+          { "kind": "verdict", "key": "verdict:115", "taskId": 115, "person": 41, "due": "2026-11-10" },
+          { "kind": "verdict", "key": "verdict:102", "taskId": 102, "person": 40, "due": "2026-11-11" },
+          { "kind": "check", "key": "check:40", "person": 40, "tasks": [109, 110], "due": "2026-11-13" },
+          { "kind": "check", "key": "check:43", "person": 43, "tasks": [103], "due": "2026-11-13" },
+          { "kind": "check", "key": "check:44", "person": 44, "tasks": [104], "due": "2026-11-16" },
+          { "kind": "bring", "key": "bring:116", "taskId": 116, "person": 41, "checkOn": "2026-11-11" },
+          { "kind": "recap", "key": "recap:r4", "round": "r4", "meeting": "g1", "ended": "2026-11-02T09:00:00Z" },
+          { "kind": "recap", "key": "recap:s1", "round": "s1", "meeting": "g2", "ended": "2026-11-10T09:00:00Z" },
+          { "kind": "note", "key": "note:2026-11-06", "day": "2026-11-06" }
+        ]
+      },
+      {
+        "name": "a line dismissed for today, and one whose day has come",
+        "dismissed": { "check:40": "2026-11-13", "verdict:107": "2026-11-12", "note:2026-11-06": "2026-11-13" },
+        "expect": [
+          { "kind": "verdict", "key": "verdict:107", "taskId": 107, "person": 40, "due": "2026-11-05" },
+          { "kind": "verdict", "key": "verdict:115", "taskId": 115, "person": 41, "due": "2026-11-10" },
+          { "kind": "verdict", "key": "verdict:102", "taskId": 102, "person": 40, "due": "2026-11-11" },
+          { "kind": "verdict", "key": "verdict:101", "taskId": 101, "person": 40, "due": "2026-11-12" },
+          { "kind": "check", "key": "check:43", "person": 43, "tasks": [103], "due": "2026-11-13" },
+          { "kind": "check", "key": "check:44", "person": 44, "tasks": [104], "due": "2026-11-16" },
+          { "kind": "bring", "key": "bring:116", "taskId": 116, "person": 41, "checkOn": "2026-11-11" },
+          { "kind": "recap", "key": "recap:r4", "round": "r4", "meeting": "g1", "ended": "2026-11-02T09:00:00Z" },
+          { "kind": "recap", "key": "recap:s1", "round": "s1", "meeting": "g2", "ended": "2026-11-10T09:00:00Z" }
+        ]
+      },
+      {
+        "name": "the note was copied",
+        "settings": { "note_day": 5, "note_sent": ["2026-11-06T08:00:00Z"] },
+        "expect": [
+          { "kind": "verdict", "key": "verdict:107", "taskId": 107, "person": 40, "due": "2026-11-05" },
+          { "kind": "verdict", "key": "verdict:115", "taskId": 115, "person": 41, "due": "2026-11-10" },
+          { "kind": "verdict", "key": "verdict:102", "taskId": 102, "person": 40, "due": "2026-11-11" },
+          { "kind": "verdict", "key": "verdict:101", "taskId": 101, "person": 40, "due": "2026-11-12" },
+          { "kind": "check", "key": "check:40", "person": 40, "tasks": [109, 110], "due": "2026-11-13" },
+          { "kind": "check", "key": "check:43", "person": 43, "tasks": [103], "due": "2026-11-13" },
+          { "kind": "check", "key": "check:44", "person": 44, "tasks": [104], "due": "2026-11-16" },
+          { "kind": "bring", "key": "bring:116", "taskId": 116, "person": 41, "checkOn": "2026-11-11" },
+          { "kind": "recap", "key": "recap:r4", "round": "r4", "meeting": "g1", "ended": "2026-11-02T09:00:00Z" },
+          { "kind": "recap", "key": "recap:s1", "round": "s1", "meeting": "g2", "ended": "2026-11-10T09:00:00Z" }
+        ]
+      },
+      {
+        "name": "checks on the due day only",
+        "settings": { "check_days": 0 },
+        "expect": [
+          { "kind": "verdict", "key": "verdict:107", "taskId": 107, "person": 40, "due": "2026-11-05" },
+          { "kind": "verdict", "key": "verdict:115", "taskId": 115, "person": 41, "due": "2026-11-10" },
+          { "kind": "verdict", "key": "verdict:102", "taskId": 102, "person": 40, "due": "2026-11-11" },
+          { "kind": "verdict", "key": "verdict:101", "taskId": 101, "person": 40, "due": "2026-11-12" },
+          { "kind": "bring", "key": "bring:116", "taskId": 116, "person": 41, "checkOn": "2026-11-11" },
+          { "kind": "recap", "key": "recap:r4", "round": "r4", "meeting": "g1", "ended": "2026-11-02T09:00:00Z" },
+          { "kind": "recap", "key": "recap:s1", "round": "s1", "meeting": "g2", "ended": "2026-11-10T09:00:00Z" }
+        ]
+      },
+      {
+        "name": "five working days ahead",
+        "settings": { "check_days": 5 },
+        "expect": [
+          { "kind": "verdict", "key": "verdict:107", "taskId": 107, "person": 40, "due": "2026-11-05" },
+          { "kind": "verdict", "key": "verdict:115", "taskId": 115, "person": 41, "due": "2026-11-10" },
+          { "kind": "verdict", "key": "verdict:102", "taskId": 102, "person": 40, "due": "2026-11-11" },
+          { "kind": "verdict", "key": "verdict:101", "taskId": 101, "person": 40, "due": "2026-11-12" },
+          { "kind": "check", "key": "check:40", "person": 40, "tasks": [109, 110], "due": "2026-11-13" },
+          { "kind": "check", "key": "check:43", "person": 43, "tasks": [103], "due": "2026-11-13" },
+          { "kind": "check", "key": "check:44", "person": 44, "tasks": [104], "due": "2026-11-16" },
+          { "kind": "bring", "key": "bring:116", "taskId": 116, "person": 41, "checkOn": "2026-11-11" },
+          { "kind": "recap", "key": "recap:r4", "round": "r4", "meeting": "g1", "ended": "2026-11-02T09:00:00Z" },
+          { "kind": "recap", "key": "recap:s1", "round": "s1", "meeting": "g2", "ended": "2026-11-10T09:00:00Z" }
+        ]
+      },
+      {
+        "name": "a group with checks off",
+        "meetings": { "g2": { "name": "LT Services", "people": [41, 40], "label": 71, "checks": false } },
+        "expect": [
+          { "kind": "verdict", "key": "verdict:107", "taskId": 107, "person": 40, "due": "2026-11-05" },
+          { "kind": "verdict", "key": "verdict:115", "taskId": 115, "person": 41, "due": "2026-11-10" },
+          { "kind": "verdict", "key": "verdict:102", "taskId": 102, "person": 40, "due": "2026-11-11" },
+          { "kind": "verdict", "key": "verdict:101", "taskId": 101, "person": 40, "due": "2026-11-12" },
+          { "kind": "check", "key": "check:40", "person": 40, "tasks": [109], "due": "2026-11-13" },
+          { "kind": "check", "key": "check:43", "person": 43, "tasks": [103], "due": "2026-11-13" },
+          { "kind": "check", "key": "check:44", "person": 44, "tasks": [104], "due": "2026-11-16" },
+          { "kind": "bring", "key": "bring:116", "taskId": 116, "person": 41, "checkOn": "2026-11-11" },
+          { "kind": "recap", "key": "recap:r4", "round": "r4", "meeting": "g1", "ended": "2026-11-02T09:00:00Z" },
+          { "kind": "recap", "key": "recap:s1", "round": "s1", "meeting": "g2", "ended": "2026-11-10T09:00:00Z" },
+          { "kind": "note", "key": "note:2026-11-06", "day": "2026-11-06" }
+        ]
+      },
+      {
+        "name": "weekends are working days too",
+        "settings": { "workdays": [1, 2, 3, 4, 5, 6, 7], "check_days": 3 },
+        "expect": [
+          { "kind": "verdict", "key": "verdict:107", "taskId": 107, "person": 40, "due": "2026-11-05" },
+          { "kind": "verdict", "key": "verdict:115", "taskId": 115, "person": 41, "due": "2026-11-10" },
+          { "kind": "verdict", "key": "verdict:102", "taskId": 102, "person": 40, "due": "2026-11-11" },
+          { "kind": "verdict", "key": "verdict:101", "taskId": 101, "person": 40, "due": "2026-11-12" },
+          { "kind": "check", "key": "check:40", "person": 40, "tasks": [109, 110], "due": "2026-11-13" },
+          { "kind": "check", "key": "check:43", "person": 43, "tasks": [103], "due": "2026-11-13" },
+          { "kind": "bring", "key": "bring:116", "taskId": 116, "person": 41, "checkOn": "2026-11-11" },
+          { "kind": "recap", "key": "recap:r4", "round": "r4", "meeting": "g1", "ended": "2026-11-02T09:00:00Z" },
+          { "kind": "recap", "key": "recap:s1", "round": "s1", "meeting": "g2", "ended": "2026-11-10T09:00:00Z" }
+        ]
+      },
+      { "name": "nothing without a ledger", "empty": true, "expect": [] }
+    ],
+    "documents": {
+      "about": "messages is the English text of every key (a count picks _one for 1, else _other). Days are written as the weekday date of section 8 in en-GB. text and markdown are given as lines.",
+      "locale": "en-GB",
+      "messages": {
+        "agenda.title.weekly": "Agenda: {{group}} weekly, {{date}}",
+        "agenda.title.standup": "Agenda: {{group}} stand-up, {{date}}",
+        "agenda.close": "Close: read back the decisions and new actions.",
+        "recap.title.weekly": "{{group}} weekly, {{date}}",
+        "recap.title.standup": "{{group}} stand-up, {{date}}",
+        "recap.nothing": "Nothing was decided or changed.",
+        "readback.title": "Read-back: {{group}}, {{date}}",
+        "readback.nothing": "No decisions or new actions.",
+        "heading.actionsDue": "Actions due",
+        "heading.actionsOpen": "Other open actions",
+        "heading.issues": "Open issues",
+        "heading.decisions": "Decisions",
+        "heading.newActions": "New actions",
+        "heading.delivered": "Delivered",
+        "heading.changed": "Changed",
+        "heading.issuesSolved": "Issues solved",
+        "heading.questions": "Open questions",
+        "action.owner": "{{owner}}: {{title}}, by {{date}}",
+        "action.ownerNoDate": "{{owner}}: {{title}}",
+        "action.forPerson": "{{owner}} for {{requester}}: {{title}}, by {{date}}",
+        "action.forPersonNoDate": "{{owner}} for {{requester}}: {{title}}",
+        "action.noOwner": "No owner: {{title}}, by {{date}}",
+        "action.noOwnerNoDate": "No owner: {{title}}",
+        "action.delivered": "{{owner}}: {{title}}",
+        "action.deliveredLate": "{{owner}}: {{title}} (late)",
+        "action.dropped": "{{owner}}: {{title}} (dropped)",
+        "action.takenOver": "{{owner}}: {{title}} (done by {{me}})",
+        "action.newDate": "{{owner}}: {{title}}, new date {{date}}",
+        "action.newDateBlocker": "{{owner}}: {{title}}, new date {{date}} ({{blocker}})",
+        "action.notYet": "{{owner}}: {{title}}, not yet",
+        "action.notYetBlocker": "{{owner}}: {{title}}, not yet ({{blocker}})",
+        "decision.plain": "{{text}}",
+        "decision.by": "{{text}} (decided by {{by}})",
+        "absent": "Absent: {{names}}",
+        "check.one": "Hi {{name}}, checking one thing: {{title}} ({{date}}). Still on track?",
+        "check.oneNoDate": "Hi {{name}}, checking one thing: {{title}}. Still on track?",
+        "check.intro_one": "Hi {{name}}, checking {{count}} thing:",
+        "check.intro_other": "Hi {{name}}, checking {{count}} things:",
+        "check.item": "{{title}} ({{date}})",
+        "check.itemNoDate": "{{title}}",
+        "check.close": "Still on track?",
+        "note.title": "Weekly note, {{from}} to {{to}}",
+        "note.onTime_one": "{{count}} action delivered on time",
+        "note.onTime_other": "{{count}} actions delivered on time",
+        "note.late_one": "{{count}} action delivered late",
+        "note.late_other": "{{count}} actions delivered late",
+        "note.dropped_one": "{{count}} action dropped",
+        "note.dropped_other": "{{count}} actions dropped",
+        "note.takenOver_one": "{{count}} action done by {{me}}",
+        "note.takenOver_other": "{{count}} actions done by {{me}}",
+        "note.slipped.newDate": "Slipped: {{owner}}: {{title}}, new date {{date}}",
+        "note.slipped.newDateBlocker": "Slipped: {{owner}}: {{title}}, new date {{date}} ({{blocker}})",
+        "note.slipped.notYet": "Slipped: {{owner}}: {{title}}, not yet",
+        "note.slipped.notYetBlocker": "Slipped: {{owner}}: {{title}}, not yet ({{blocker}})",
+        "note.decision": "Decision: {{text}}",
+        "note.issue": "Open issue: {{text}}",
+        "note.pastDue_one": "{{count}} action open past its date",
+        "note.pastDue_other": "{{count}} actions open past their date",
+        "note.nextWeek_one": "{{count}} action due in the next 7 days",
+        "note.nextWeek_other": "{{count}} actions due in the next 7 days",
+        "note.nothing": "Nothing to report.",
+        "note.noGroups": "No groups yet."
+      },
+      "language": [
+        { "group": "en", "setting": "nl", "expect": "en" },
+        { "group": null, "setting": "nl", "expect": "nl" },
+        { "group": null, "setting": null, "expect": "en" },
+        { "group": null, "setting": "  ", "expect": "en" }
+      ],
+      "cases": [
+        {
+          "name": "the agenda of a weekly",
+          "type": "agenda",
+          "group": "g1",
+          "kind": "weekly",
+          "date": "2026-11-12",
+          "weekStart": "monday",
+          "document": {
+            "title": { "key": "agenda.title.weekly", "params": { "group": "LT Operations", "date": { "day": "2026-11-12" } } },
+            "blocks": [
+              {
+                "heading": { "key": "heading.actionsDue" },
+                "items": [
+                  {
+                    "key": "action.owner",
+                    "params": { "owner": "Jan de Vries", "title": "Vendor contract summary", "date": { "day": "2026-11-05" } }
+                  },
+                  {
+                    "key": "action.forPerson",
+                    "params": { "owner": "Jan de Vries", "requester": "Priya", "title": "Site list for Region North", "date": { "day": "2026-11-11" } }
+                  },
+                  {
+                    "key": "action.owner",
+                    "params": { "owner": "Jan de Vries", "title": "Pricing proposal for Region North", "date": { "day": "2026-11-12" } }
+                  }
+                ]
+              },
+              {
+                "heading": { "key": "heading.actionsOpen" },
+                "items": [
+                  { "key": "action.owner", "params": { "owner": "Jan de Vries", "title": "Budget sheet", "date": { "day": "2026-11-13" } } },
+                  {
+                    "key": "action.owner",
+                    "params": { "owner": "Jan de Vries", "title": "Rollout plan for the pilot", "date": { "day": "2026-11-16" } }
+                  },
+                  { "key": "action.owner", "params": { "owner": "Priya", "title": "Supplier shortlist", "date": { "day": "2026-11-13" } } },
+                  { "key": "action.owner", "params": { "owner": "Sofia Marin", "title": "Agree pilot region", "date": { "day": "2026-11-16" } } },
+                  {
+                    "key": "action.forPerson",
+                    "params": { "owner": "Sofia Marin", "requester": "Finance", "title": "Cost model", "date": { "day": "2026-11-25" } }
+                  },
+                  {
+                    "key": "action.owner",
+                    "params": { "owner": "Rendy", "title": "Send the MOR pre-read template", "date": { "day": "2026-11-13" } }
+                  },
+                  { "key": "action.noOwner", "params": { "title": "Draft the on-call rota", "date": { "day": "2026-11-20" } } }
+                ]
+              },
+              {
+                "heading": { "key": "heading.issues" },
+                "items": [
+                  { "key": "literal", "params": { "text": "No test environment for the billing migration" } },
+                  { "key": "literal", "params": { "text": "Supplier shortlist keeps slipping" } },
+                  { "key": "literal", "params": { "text": "Access requests take a week" } }
+                ]
+              },
+              { "text": { "key": "agenda.close" } }
+            ]
+          },
+          "text": [
+            "Agenda: LT Operations weekly, Thu 12 Nov",
+            "",
+            "Actions due",
+            "- Jan de Vries: Vendor contract summary, by Thu 5 Nov",
+            "- Jan de Vries for Priya: Site list for Region North, by Wed 11 Nov",
+            "- Jan de Vries: Pricing proposal for Region North, by Thu 12 Nov",
+            "",
+            "Other open actions",
+            "- Jan de Vries: Budget sheet, by Fri 13 Nov",
+            "- Jan de Vries: Rollout plan for the pilot, by Mon 16 Nov",
+            "- Priya: Supplier shortlist, by Fri 13 Nov",
+            "- Sofia Marin: Agree pilot region, by Mon 16 Nov",
+            "- Sofia Marin for Finance: Cost model, by Wed 25 Nov",
+            "- Rendy: Send the MOR pre-read template, by Fri 13 Nov",
+            "- No owner: Draft the on-call rota, by Fri 20 Nov",
+            "",
+            "Open issues",
+            "- No test environment for the billing migration",
+            "- Supplier shortlist keeps slipping",
+            "- Access requests take a week",
+            "",
+            "Close: read back the decisions and new actions."
+          ],
+          "html": "<p><strong>Agenda: LT Operations weekly, Thu 12 Nov</strong></p><p><strong>Actions due</strong></p><ul><li>Jan de Vries: Vendor contract summary, by Thu 5 Nov</li><li>Jan de Vries for Priya: Site list for Region North, by Wed 11 Nov</li><li>Jan de Vries: Pricing proposal for Region North, by Thu 12 Nov</li></ul><p><strong>Other open actions</strong></p><ul><li>Jan de Vries: Budget sheet, by Fri 13 Nov</li><li>Jan de Vries: Rollout plan for the pilot, by Mon 16 Nov</li><li>Priya: Supplier shortlist, by Fri 13 Nov</li><li>Sofia Marin: Agree pilot region, by Mon 16 Nov</li><li>Sofia Marin for Finance: Cost model, by Wed 25 Nov</li><li>Rendy: Send the MOR pre-read template, by Fri 13 Nov</li><li>No owner: Draft the on-call rota, by Fri 20 Nov</li></ul><p><strong>Open issues</strong></p><ul><li>No test environment for the billing migration</li><li>Supplier shortlist keeps slipping</li><li>Access requests take a week</li></ul><p>Close: read back the decisions and new actions.</p>",
+          "markdown": [
+            "## Agenda: LT Operations weekly, Thu 12 Nov",
+            "",
+            "### Actions due",
+            "",
+            "- Jan de Vries: Vendor contract summary, by Thu 5 Nov",
+            "- Jan de Vries for Priya: Site list for Region North, by Wed 11 Nov",
+            "- Jan de Vries: Pricing proposal for Region North, by Thu 12 Nov",
+            "",
+            "### Other open actions",
+            "",
+            "- Jan de Vries: Budget sheet, by Fri 13 Nov",
+            "- Jan de Vries: Rollout plan for the pilot, by Mon 16 Nov",
+            "- Priya: Supplier shortlist, by Fri 13 Nov",
+            "- Sofia Marin: Agree pilot region, by Mon 16 Nov",
+            "- Sofia Marin for Finance: Cost model, by Wed 25 Nov",
+            "- Rendy: Send the MOR pre-read template, by Fri 13 Nov",
+            "- No owner: Draft the on-call rota, by Fri 20 Nov",
+            "",
+            "### Open issues",
+            "",
+            "- No test environment for the billing migration",
+            "- Supplier shortlist keeps slipping",
+            "- Access requests take a week",
+            "",
+            "Close: read back the decisions and new actions."
+          ]
+        },
+        {
+          "name": "the agenda of a stand-up has no issues",
+          "type": "agenda",
+          "group": "g1",
+          "kind": "standup",
+          "date": "2026-11-12",
+          "weekStart": "monday",
+          "document": {
+            "title": { "key": "agenda.title.standup", "params": { "group": "LT Operations", "date": { "day": "2026-11-12" } } },
+            "blocks": [
+              {
+                "heading": { "key": "heading.actionsDue" },
+                "items": [
+                  {
+                    "key": "action.owner",
+                    "params": { "owner": "Jan de Vries", "title": "Vendor contract summary", "date": { "day": "2026-11-05" } }
+                  },
+                  {
+                    "key": "action.forPerson",
+                    "params": { "owner": "Jan de Vries", "requester": "Priya", "title": "Site list for Region North", "date": { "day": "2026-11-11" } }
+                  },
+                  {
+                    "key": "action.owner",
+                    "params": { "owner": "Jan de Vries", "title": "Pricing proposal for Region North", "date": { "day": "2026-11-12" } }
+                  }
+                ]
+              },
+              {
+                "heading": { "key": "heading.actionsOpen" },
+                "items": [
+                  { "key": "action.owner", "params": { "owner": "Jan de Vries", "title": "Budget sheet", "date": { "day": "2026-11-13" } } },
+                  { "key": "action.owner", "params": { "owner": "Priya", "title": "Supplier shortlist", "date": { "day": "2026-11-13" } } },
+                  {
+                    "key": "action.owner",
+                    "params": { "owner": "Rendy", "title": "Send the MOR pre-read template", "date": { "day": "2026-11-13" } }
+                  }
+                ]
+              },
+              { "text": { "key": "agenda.close" } }
+            ]
+          },
+          "text": [
+            "Agenda: LT Operations stand-up, Thu 12 Nov",
+            "",
+            "Actions due",
+            "- Jan de Vries: Vendor contract summary, by Thu 5 Nov",
+            "- Jan de Vries for Priya: Site list for Region North, by Wed 11 Nov",
+            "- Jan de Vries: Pricing proposal for Region North, by Thu 12 Nov",
+            "",
+            "Other open actions",
+            "- Jan de Vries: Budget sheet, by Fri 13 Nov",
+            "- Priya: Supplier shortlist, by Fri 13 Nov",
+            "- Rendy: Send the MOR pre-read template, by Fri 13 Nov",
+            "",
+            "Close: read back the decisions and new actions."
+          ],
+          "html": "<p><strong>Agenda: LT Operations stand-up, Thu 12 Nov</strong></p><p><strong>Actions due</strong></p><ul><li>Jan de Vries: Vendor contract summary, by Thu 5 Nov</li><li>Jan de Vries for Priya: Site list for Region North, by Wed 11 Nov</li><li>Jan de Vries: Pricing proposal for Region North, by Thu 12 Nov</li></ul><p><strong>Other open actions</strong></p><ul><li>Jan de Vries: Budget sheet, by Fri 13 Nov</li><li>Priya: Supplier shortlist, by Fri 13 Nov</li><li>Rendy: Send the MOR pre-read template, by Fri 13 Nov</li></ul><p>Close: read back the decisions and new actions.</p>",
+          "markdown": [
+            "## Agenda: LT Operations stand-up, Thu 12 Nov",
+            "",
+            "### Actions due",
+            "",
+            "- Jan de Vries: Vendor contract summary, by Thu 5 Nov",
+            "- Jan de Vries for Priya: Site list for Region North, by Wed 11 Nov",
+            "- Jan de Vries: Pricing proposal for Region North, by Thu 12 Nov",
+            "",
+            "### Other open actions",
+            "",
+            "- Jan de Vries: Budget sheet, by Fri 13 Nov",
+            "- Priya: Supplier shortlist, by Fri 13 Nov",
+            "- Rendy: Send the MOR pre-read template, by Fri 13 Nov",
+            "",
+            "Close: read back the decisions and new actions."
+          ]
+        },
+        {
+          "name": "the read-back of a session",
+          "type": "readback",
+          "group": "g1",
+          "round": "r5",
+          "document": {
+            "title": { "key": "readback.title", "params": { "group": "LT Operations", "date": { "day": "2026-11-09" } } },
+            "blocks": [
+              {
+                "heading": { "key": "heading.decisions" },
+                "items": [{ "key": "decision.by", "params": { "text": "Pilot starts in Region North, not Region West", "by": "Sofia Marin" } }]
+              },
+              {
+                "heading": { "key": "heading.newActions" },
+                "items": [
+                  {
+                    "key": "action.forPerson",
+                    "params": { "owner": "Jan de Vries", "requester": "Priya", "title": "Site list for Region North", "date": { "day": "2026-11-11" } }
+                  },
+                  {
+                    "key": "action.owner",
+                    "params": { "owner": "Rendy", "title": "Send the MOR pre-read template", "date": { "day": "2026-11-13" } }
+                  }
+                ]
+              }
+            ]
+          },
+          "text": [
+            "Read-back: LT Operations, Mon 9 Nov",
+            "",
+            "Decisions",
+            "- Pilot starts in Region North, not Region West (decided by Sofia Marin)",
+            "",
+            "New actions",
+            "- Jan de Vries for Priya: Site list for Region North, by Wed 11 Nov",
+            "- Rendy: Send the MOR pre-read template, by Fri 13 Nov"
+          ],
+          "html": "<p><strong>Read-back: LT Operations, Mon 9 Nov</strong></p><p><strong>Decisions</strong></p><ul><li>Pilot starts in Region North, not Region West (decided by Sofia Marin)</li></ul><p><strong>New actions</strong></p><ul><li>Jan de Vries for Priya: Site list for Region North, by Wed 11 Nov</li><li>Rendy: Send the MOR pre-read template, by Fri 13 Nov</li></ul>",
+          "markdown": [
+            "## Read-back: LT Operations, Mon 9 Nov",
+            "",
+            "### Decisions",
+            "",
+            "- Pilot starts in Region North, not Region West (decided by Sofia Marin)",
+            "",
+            "### New actions",
+            "",
+            "- Jan de Vries for Priya: Site list for Region North, by Wed 11 Nov",
+            "- Rendy: Send the MOR pre-read template, by Fri 13 Nov"
+          ]
+        },
+        {
+          "name": "a read-back with only new actions",
+          "type": "readback",
+          "group": "g1",
+          "round": "r3",
+          "document": {
+            "title": { "key": "readback.title", "params": { "group": "LT Operations", "date": { "day": "2026-10-26" } } },
+            "blocks": [
+              {
+                "heading": { "key": "heading.newActions" },
+                "items": [
+                  {
+                    "key": "action.owner",
+                    "params": { "owner": "Jan de Vries", "title": "Pricing proposal for Region North", "date": { "day": "2026-11-12" } }
+                  },
+                  { "key": "action.owner", "params": { "owner": "Priya", "title": "Supplier shortlist", "date": { "day": "2026-11-13" } } },
+                  { "key": "action.owner", "params": { "owner": "Jan de Vries", "title": "Kick-off deck", "date": { "day": "2026-11-10" } } },
+                  {
+                    "key": "action.forPerson",
+                    "params": { "owner": "Sofia Marin", "requester": "Finance", "title": "Cost model", "date": { "day": "2026-11-25" } }
+                  }
+                ]
+              }
+            ]
+          },
+          "text": [
+            "Read-back: LT Operations, Mon 26 Oct",
+            "",
+            "New actions",
+            "- Jan de Vries: Pricing proposal for Region North, by Thu 12 Nov",
+            "- Priya: Supplier shortlist, by Fri 13 Nov",
+            "- Jan de Vries: Kick-off deck, by Tue 10 Nov",
+            "- Sofia Marin for Finance: Cost model, by Wed 25 Nov"
+          ],
+          "html": "<p><strong>Read-back: LT Operations, Mon 26 Oct</strong></p><p><strong>New actions</strong></p><ul><li>Jan de Vries: Pricing proposal for Region North, by Thu 12 Nov</li><li>Priya: Supplier shortlist, by Fri 13 Nov</li><li>Jan de Vries: Kick-off deck, by Tue 10 Nov</li><li>Sofia Marin for Finance: Cost model, by Wed 25 Nov</li></ul>",
+          "markdown": [
+            "## Read-back: LT Operations, Mon 26 Oct",
+            "",
+            "### New actions",
+            "",
+            "- Jan de Vries: Pricing proposal for Region North, by Thu 12 Nov",
+            "- Priya: Supplier shortlist, by Fri 13 Nov",
+            "- Jan de Vries: Kick-off deck, by Tue 10 Nov",
+            "- Sofia Marin for Finance: Cost model, by Wed 25 Nov"
+          ]
+        },
+        {
+          "name": "a read-back with nothing in it",
+          "type": "readback",
+          "group": "g1",
+          "round": "r1",
+          "document": {
+            "title": { "key": "readback.title", "params": { "group": "LT Operations", "date": { "day": "2026-10-12" } } },
+            "blocks": [{ "text": { "key": "readback.nothing" } }]
+          },
+          "text": ["Read-back: LT Operations, Mon 12 Oct", "", "No decisions or new actions."],
+          "html": "<p><strong>Read-back: LT Operations, Mon 12 Oct</strong></p><p>No decisions or new actions.</p>",
+          "markdown": ["## Read-back: LT Operations, Mon 12 Oct", "", "No decisions or new actions."]
+        },
+        {
+          "name": "the recap of a session",
+          "type": "recap",
+          "group": "g1",
+          "round": "r5",
+          "document": {
+            "title": { "key": "recap.title.weekly", "params": { "group": "LT Operations", "date": { "day": "2026-11-09" } } },
+            "blocks": [
+              {
+                "heading": { "key": "heading.decisions" },
+                "items": [{ "key": "decision.by", "params": { "text": "Pilot starts in Region North, not Region West", "by": "Sofia Marin" } }]
+              },
+              {
+                "heading": { "key": "heading.newActions" },
+                "items": [
+                  {
+                    "key": "action.forPerson",
+                    "params": { "owner": "Jan de Vries", "requester": "Priya", "title": "Site list for Region North", "date": { "day": "2026-11-11" } }
+                  },
+                  {
+                    "key": "action.owner",
+                    "params": { "owner": "Rendy", "title": "Send the MOR pre-read template", "date": { "day": "2026-11-13" } }
+                  }
+                ]
+              },
+              {
+                "heading": { "key": "heading.changed" },
+                "items": [
+                  {
+                    "key": "action.newDateBlocker",
+                    "params": { "owner": "Priya", "title": "Supplier shortlist", "date": { "day": "2026-11-13" }, "blocker": "waiting for two quotes" }
+                  }
+                ]
+              },
+              { "heading": { "key": "heading.issuesSolved" }, "items": [{ "key": "literal", "params": { "text": "Nobody owned the rota" } }] },
+              {
+                "heading": { "key": "heading.issues" },
+                "items": [
+                  { "key": "literal", "params": { "text": "No test environment for the billing migration" } },
+                  { "key": "literal", "params": { "text": "Supplier shortlist keeps slipping" } },
+                  { "key": "literal", "params": { "text": "Access requests take a week" } }
+                ]
+              },
+              { "heading": { "key": "heading.questions" }, "items": [{ "key": "literal", "params": { "text": "Who owns the vendor contact?" } }] },
+              { "text": { "key": "absent", "params": { "names": "Sofia Marin" } } }
+            ]
+          },
+          "text": [
+            "LT Operations weekly, Mon 9 Nov",
+            "",
+            "Decisions",
+            "- Pilot starts in Region North, not Region West (decided by Sofia Marin)",
+            "",
+            "New actions",
+            "- Jan de Vries for Priya: Site list for Region North, by Wed 11 Nov",
+            "- Rendy: Send the MOR pre-read template, by Fri 13 Nov",
+            "",
+            "Changed",
+            "- Priya: Supplier shortlist, new date Fri 13 Nov (waiting for two quotes)",
+            "",
+            "Issues solved",
+            "- Nobody owned the rota",
+            "",
+            "Open issues",
+            "- No test environment for the billing migration",
+            "- Supplier shortlist keeps slipping",
+            "- Access requests take a week",
+            "",
+            "Open questions",
+            "- Who owns the vendor contact?",
+            "",
+            "Absent: Sofia Marin"
+          ],
+          "html": "<p><strong>LT Operations weekly, Mon 9 Nov</strong></p><p><strong>Decisions</strong></p><ul><li>Pilot starts in Region North, not Region West (decided by Sofia Marin)</li></ul><p><strong>New actions</strong></p><ul><li>Jan de Vries for Priya: Site list for Region North, by Wed 11 Nov</li><li>Rendy: Send the MOR pre-read template, by Fri 13 Nov</li></ul><p><strong>Changed</strong></p><ul><li>Priya: Supplier shortlist, new date Fri 13 Nov (waiting for two quotes)</li></ul><p><strong>Issues solved</strong></p><ul><li>Nobody owned the rota</li></ul><p><strong>Open issues</strong></p><ul><li>No test environment for the billing migration</li><li>Supplier shortlist keeps slipping</li><li>Access requests take a week</li></ul><p><strong>Open questions</strong></p><ul><li>Who owns the vendor contact?</li></ul><p>Absent: Sofia Marin</p>",
+          "markdown": [
+            "## LT Operations weekly, Mon 9 Nov",
+            "",
+            "### Decisions",
+            "",
+            "- Pilot starts in Region North, not Region West (decided by Sofia Marin)",
+            "",
+            "### New actions",
+            "",
+            "- Jan de Vries for Priya: Site list for Region North, by Wed 11 Nov",
+            "- Rendy: Send the MOR pre-read template, by Fri 13 Nov",
+            "",
+            "### Changed",
+            "",
+            "- Priya: Supplier shortlist, new date Fri 13 Nov (waiting for two quotes)",
+            "",
+            "### Issues solved",
+            "",
+            "- Nobody owned the rota",
+            "",
+            "### Open issues",
+            "",
+            "- No test environment for the billing migration",
+            "- Supplier shortlist keeps slipping",
+            "- Access requests take a week",
+            "",
+            "### Open questions",
+            "",
+            "- Who owns the vendor contact?",
+            "",
+            "Absent: Sofia Marin"
+          ],
+          "taskIds": [102, 103, 106],
+          "decisionIds": ["d1"]
+        },
+        {
+          "name": "a recap of another group holds only its own",
+          "type": "recap",
+          "group": "g2",
+          "round": "s1",
+          "document": {
+            "title": { "key": "recap.title.weekly", "params": { "group": "LT Services", "date": { "day": "2026-11-10" } } },
+            "blocks": [
+              {
+                "heading": { "key": "heading.decisions" },
+                "items": [{ "key": "decision.by", "params": { "text": "Two engineers move to the pilot", "by": "Ana Silva" } }]
+              },
+              {
+                "heading": { "key": "heading.newActions" },
+                "items": [
+                  {
+                    "key": "action.owner",
+                    "params": { "owner": "Jan de Vries", "title": "Access for the survey team", "date": { "day": "2026-11-13" } }
+                  }
+                ]
+              },
+              { "heading": { "key": "heading.issues" }, "items": [{ "key": "literal", "params": { "text": "An issue of the other group" } }] }
+            ]
+          },
+          "text": [
+            "LT Services weekly, Tue 10 Nov",
+            "",
+            "Decisions",
+            "- Two engineers move to the pilot (decided by Ana Silva)",
+            "",
+            "New actions",
+            "- Jan de Vries: Access for the survey team, by Fri 13 Nov",
+            "",
+            "Open issues",
+            "- An issue of the other group"
+          ],
+          "html": "<p><strong>LT Services weekly, Tue 10 Nov</strong></p><p><strong>Decisions</strong></p><ul><li>Two engineers move to the pilot (decided by Ana Silva)</li></ul><p><strong>New actions</strong></p><ul><li>Jan de Vries: Access for the survey team, by Fri 13 Nov</li></ul><p><strong>Open issues</strong></p><ul><li>An issue of the other group</li></ul>",
+          "markdown": [
+            "## LT Services weekly, Tue 10 Nov",
+            "",
+            "### Decisions",
+            "",
+            "- Two engineers move to the pilot (decided by Ana Silva)",
+            "",
+            "### New actions",
+            "",
+            "- Jan de Vries: Access for the survey team, by Fri 13 Nov",
+            "",
+            "### Open issues",
+            "",
+            "- An issue of the other group"
+          ],
+          "taskIds": [110],
+          "decisionIds": ["d3"]
+        },
+        {
+          "name": "an older session of the other group",
+          "type": "recap",
+          "group": "g2",
+          "round": "o1",
+          "document": {
+            "title": { "key": "recap.title.weekly", "params": { "group": "LT Services", "date": { "day": "2026-10-20" } } },
+            "blocks": [
+              {
+                "heading": { "key": "heading.newActions" },
+                "items": [
+                  { "key": "action.owner", "params": { "owner": "Ana Silva", "title": "Capacity overview", "date": { "day": "2026-11-10" } } },
+                  { "key": "action.owner", "params": { "owner": "Ana Silva", "title": "Licence count", "date": { "day": "2026-11-13" } } }
+                ]
+              },
+              { "heading": { "key": "heading.issues" }, "items": [{ "key": "literal", "params": { "text": "An issue of the other group" } }] }
+            ]
+          },
+          "text": [
+            "LT Services weekly, Tue 20 Oct",
+            "",
+            "New actions",
+            "- Ana Silva: Capacity overview, by Tue 10 Nov",
+            "- Ana Silva: Licence count, by Fri 13 Nov",
+            "",
+            "Open issues",
+            "- An issue of the other group"
+          ],
+          "html": "<p><strong>LT Services weekly, Tue 20 Oct</strong></p><p><strong>New actions</strong></p><ul><li>Ana Silva: Capacity overview, by Tue 10 Nov</li><li>Ana Silva: Licence count, by Fri 13 Nov</li></ul><p><strong>Open issues</strong></p><ul><li>An issue of the other group</li></ul>",
+          "markdown": [
+            "## LT Services weekly, Tue 20 Oct",
+            "",
+            "### New actions",
+            "",
+            "- Ana Silva: Capacity overview, by Tue 10 Nov",
+            "- Ana Silva: Licence count, by Fri 13 Nov",
+            "",
+            "### Open issues",
+            "",
+            "- An issue of the other group"
+          ],
+          "taskIds": [115, 117],
+          "decisionIds": []
+        },
+        {
+          "name": "a recap with a delivery and nothing new",
+          "type": "recap",
+          "group": "g1",
+          "round": "r1",
+          "document": {
+            "title": { "key": "recap.title.weekly", "params": { "group": "LT Operations", "date": { "day": "2026-10-12" } } },
+            "blocks": [
+              {
+                "heading": { "key": "heading.delivered" },
+                "items": [{ "key": "action.delivered", "params": { "owner": "Sofia Marin", "title": "Before the window" } }]
+              },
+              {
+                "heading": { "key": "heading.issues" },
+                "items": [
+                  { "key": "literal", "params": { "text": "No test environment for the billing migration" } },
+                  { "key": "literal", "params": { "text": "Supplier shortlist keeps slipping" } },
+                  { "key": "literal", "params": { "text": "Access requests take a week" } }
+                ]
+              }
+            ]
+          },
+          "text": [
+            "LT Operations weekly, Mon 12 Oct",
+            "",
+            "Delivered",
+            "- Sofia Marin: Before the window",
+            "",
+            "Open issues",
+            "- No test environment for the billing migration",
+            "- Supplier shortlist keeps slipping",
+            "- Access requests take a week"
+          ],
+          "html": "<p><strong>LT Operations weekly, Mon 12 Oct</strong></p><p><strong>Delivered</strong></p><ul><li>Sofia Marin: Before the window</li></ul><p><strong>Open issues</strong></p><ul><li>No test environment for the billing migration</li><li>Supplier shortlist keeps slipping</li><li>Access requests take a week</li></ul>",
+          "markdown": [
+            "## LT Operations weekly, Mon 12 Oct",
+            "",
+            "### Delivered",
+            "",
+            "- Sofia Marin: Before the window",
+            "",
+            "### Open issues",
+            "",
+            "- No test environment for the billing migration",
+            "- Supplier shortlist keeps slipping",
+            "- Access requests take a week"
+          ],
+          "taskIds": [113],
+          "decisionIds": []
+        },
+        {
+          "name": "a recap of a session where nothing happened",
+          "type": "recap",
+          "group": "g2",
+          "round": "o1",
+          "emptyWorld": true,
+          "document": {
+            "title": { "key": "recap.title.weekly", "params": { "group": "LT Services", "date": { "day": "2026-10-20" } } },
+            "blocks": [{ "text": { "key": "recap.nothing" } }]
+          },
+          "text": ["LT Services weekly, Tue 20 Oct", "", "Nothing was decided or changed."],
+          "html": "<p><strong>LT Services weekly, Tue 20 Oct</strong></p><p>Nothing was decided or changed.</p>",
+          "markdown": ["## LT Services weekly, Tue 20 Oct", "", "Nothing was decided or changed."],
+          "taskIds": [],
+          "decisionIds": []
+        },
+        {
+          "name": "a check with two things",
+          "type": "check",
+          "person": 40,
+          "items": [{ "title": "Budget sheet", "due": "2026-11-13" }, { "title": "Access for the survey team", "due": "2026-11-13" }],
+          "document": {
+            "blocks": [
+              {
+                "text": { "key": "check.intro", "params": { "name": "Jan", "count": 2 } },
+                "items": [
+                  { "key": "check.item", "params": { "title": "Budget sheet", "date": { "day": "2026-11-13" } } },
+                  { "key": "check.item", "params": { "title": "Access for the survey team", "date": { "day": "2026-11-13" } } }
+                ]
+              },
+              { "text": { "key": "check.close" } }
+            ]
+          },
+          "text": ["Hi Jan, checking 2 things:", "- Budget sheet (Fri 13 Nov)", "- Access for the survey team (Fri 13 Nov)", "", "Still on track?"],
+          "html": "<p>Hi Jan, checking 2 things:</p><ul><li>Budget sheet (Fri 13 Nov)</li><li>Access for the survey team (Fri 13 Nov)</li></ul><p>Still on track?</p>",
+          "markdown": ["Hi Jan, checking 2 things:", "", "- Budget sheet (Fri 13 Nov)", "- Access for the survey team (Fri 13 Nov)", "", "Still on track?"]
+        },
+        {
+          "name": "a check with one thing",
+          "type": "check",
+          "person": 44,
+          "items": [{ "title": "Agree pilot region", "due": "2026-11-16" }],
+          "document": {
+            "blocks": [{ "text": { "key": "check.one", "params": { "name": "Sofia", "title": "Agree pilot region", "date": { "day": "2026-11-16" } } } }]
+          },
+          "text": ["Hi Sofia, checking one thing: Agree pilot region (Mon 16 Nov). Still on track?"],
+          "html": "<p>Hi Sofia, checking one thing: Agree pilot region (Mon 16 Nov). Still on track?</p>",
+          "markdown": ["Hi Sofia, checking one thing: Agree pilot region (Mon 16 Nov). Still on track?"]
+        },
+        {
+          "name": "a check without a date, escaped in HTML",
+          "type": "check",
+          "person": 43,
+          "items": [{ "title": "Costs <draft> & \"final\"", "due": null }],
+          "document": { "blocks": [{ "text": { "key": "check.oneNoDate", "params": { "name": "Priya", "title": "Costs <draft> & \"final\"" } } }] },
+          "text": ["Hi Priya, checking one thing: Costs <draft> & \"final\". Still on track?"],
+          "html": "<p>Hi Priya, checking one thing: Costs &lt;draft&gt; &amp; &quot;final&quot;. Still on track?</p>",
+          "markdown": ["Hi Priya, checking one thing: Costs <draft> & \"final\". Still on track?"]
+        },
+        {
+          "name": "the weekly note for both groups",
+          "type": "note",
+          "groups": ["g1", "g2"],
+          "from": "2026-11-06",
+          "to": "2026-11-12",
+          "document": {
+            "title": { "key": "note.title", "params": { "from": { "day": "2026-11-06" }, "to": { "day": "2026-11-12" } } },
+            "blocks": [
+              {
+                "heading": { "key": "literal", "params": { "text": "LT Operations" } },
+                "items": [
+                  { "key": "note.onTime", "params": { "count": 1 } },
+                  {
+                    "key": "note.slipped.newDateBlocker",
+                    "params": { "owner": "Priya", "title": "Supplier shortlist", "date": { "day": "2026-11-13" }, "blocker": "waiting for two quotes" }
+                  },
+                  { "key": "note.decision", "params": { "text": "Pilot starts in Region North, not Region West" } },
+                  { "key": "note.issue", "params": { "text": "No test environment for the billing migration" } },
+                  { "key": "note.issue", "params": { "text": "Supplier shortlist keeps slipping" } },
+                  { "key": "note.issue", "params": { "text": "Access requests take a week" } },
+                  { "key": "note.pastDue", "params": { "count": 2 } },
+                  { "key": "note.nextWeek", "params": { "count": 5 } }
+                ]
+              },
+              {
+                "heading": { "key": "literal", "params": { "text": "LT Services" } },
+                "items": [
+                  { "key": "note.decision", "params": { "text": "Two engineers move to the pilot" } },
+                  { "key": "note.issue", "params": { "text": "An issue of the other group" } },
+                  { "key": "note.pastDue", "params": { "count": 1 } },
+                  { "key": "note.nextWeek", "params": { "count": 2 } }
+                ]
+              }
+            ]
+          },
+          "text": [
+            "Weekly note, Fri 6 Nov to Thu 12 Nov",
+            "",
+            "LT Operations",
+            "- 1 action delivered on time",
+            "- Slipped: Priya: Supplier shortlist, new date Fri 13 Nov (waiting for two quotes)",
+            "- Decision: Pilot starts in Region North, not Region West",
+            "- Open issue: No test environment for the billing migration",
+            "- Open issue: Supplier shortlist keeps slipping",
+            "- Open issue: Access requests take a week",
+            "- 2 actions open past their date",
+            "- 5 actions due in the next 7 days",
+            "",
+            "LT Services",
+            "- Decision: Two engineers move to the pilot",
+            "- Open issue: An issue of the other group",
+            "- 1 action open past its date",
+            "- 2 actions due in the next 7 days"
+          ],
+          "html": "<p><strong>Weekly note, Fri 6 Nov to Thu 12 Nov</strong></p><p><strong>LT Operations</strong></p><ul><li>1 action delivered on time</li><li>Slipped: Priya: Supplier shortlist, new date Fri 13 Nov (waiting for two quotes)</li><li>Decision: Pilot starts in Region North, not Region West</li><li>Open issue: No test environment for the billing migration</li><li>Open issue: Supplier shortlist keeps slipping</li><li>Open issue: Access requests take a week</li><li>2 actions open past their date</li><li>5 actions due in the next 7 days</li></ul><p><strong>LT Services</strong></p><ul><li>Decision: Two engineers move to the pilot</li><li>Open issue: An issue of the other group</li><li>1 action open past its date</li><li>2 actions due in the next 7 days</li></ul>",
+          "markdown": [
+            "## Weekly note, Fri 6 Nov to Thu 12 Nov",
+            "",
+            "### LT Operations",
+            "",
+            "- 1 action delivered on time",
+            "- Slipped: Priya: Supplier shortlist, new date Fri 13 Nov (waiting for two quotes)",
+            "- Decision: Pilot starts in Region North, not Region West",
+            "- Open issue: No test environment for the billing migration",
+            "- Open issue: Supplier shortlist keeps slipping",
+            "- Open issue: Access requests take a week",
+            "- 2 actions open past their date",
+            "- 5 actions due in the next 7 days",
+            "",
+            "### LT Services",
+            "",
+            "- Decision: Two engineers move to the pilot",
+            "- Open issue: An issue of the other group",
+            "- 1 action open past its date",
+            "- 2 actions due in the next 7 days"
+          ]
+        },
+        {
+          "name": "a weekly note for a quiet week",
+          "type": "note",
+          "groups": ["g2"],
+          "from": "2026-10-01",
+          "to": "2026-10-07",
+          "document": {
+            "title": { "key": "note.title", "params": { "from": { "day": "2026-10-01" }, "to": { "day": "2026-10-07" } } },
+            "blocks": [{ "heading": { "key": "literal", "params": { "text": "LT Services" } }, "items": [{ "key": "note.nothing" }] }]
+          },
+          "text": ["Weekly note, Thu 1 Oct to Wed 7 Oct", "", "LT Services", "- Nothing to report."],
+          "html": "<p><strong>Weekly note, Thu 1 Oct to Wed 7 Oct</strong></p><p><strong>LT Services</strong></p><ul><li>Nothing to report.</li></ul>",
+          "markdown": ["## Weekly note, Thu 1 Oct to Wed 7 Oct", "", "### LT Services", "", "- Nothing to report."],
+          "emptyWorld": true
+        }
+      ]
     }
   },
   "customListPro": {
