@@ -222,6 +222,38 @@ step('task', async () => {
   await capture(page, 'task-created')
 })
 
+// --- The Plan screen and Pro (both off until turned on, per browser) ---------------------------
+
+step('plan-and-pro', async () => {
+  const today = new Date()
+  const at = (hour, minute) => new Date(today.getFullYear(), today.getMonth(), today.getDate(), hour, minute, 0, 0).toISOString()
+  // A task with a time block today: its own start and end dates (contract section 16).
+  const blocked = await serverApi.post(`/projects/${ids.inbox}/tasks`, {
+    title: `Web harness block ${Date.now()}`,
+    due_date: new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59).toISOString(),
+    start_date: at(15, 0),
+    end_date: at(15, 45),
+  })
+  try {
+    await page.evaluate(() => window.api.saveConfigPatch({ planner_enabled: true, planner_view: 'day', planner_source: 'day', pro_enabled: true }))
+    await page.reload()
+    await settle(page, 1200)
+    const before = problems.length
+    await goto(page, '/plan')
+    assert('the Plan screen shows its timeline', (await page.locator('[data-plan-scroller]').count()) === 1, await text(page))
+    assert('a time block is drawn on it', await page.locator(`[data-plan-block="${blocked.id}"]`).first().waitFor({ timeout: 10000 }).then(() => true, () => false))
+    await capture(page, 'plan-screen')
+    for (const route of ['/flagged', '/waiting-on', '/people', '/portfolio']) await goto(page, route)
+    await capture(page, 'pro-portfolio')
+    assert('Plan and the Pro views open without an error', problems.length === before, problems.slice(before).join(' | '))
+  } finally {
+    await page.evaluate(() => window.api.saveConfigPatch({ planner_enabled: false, pro_enabled: false })).catch(() => {})
+    await serverApi.del(`/tasks/${blocked.id}`).catch(() => {})
+    await page.reload()
+    await settle(page, 1000)
+  }
+})
+
 // --- Reminders, links and printing under the container's policy ------------------------------
 
 step('page-guards', async () => {
