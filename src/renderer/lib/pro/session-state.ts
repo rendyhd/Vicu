@@ -14,6 +14,28 @@ export interface SessionState {
   score: number | null
 }
 
+/** While a session runs it has no end yet: everything from its start on is in it. */
+export const RUNNING_SESSION_END = '9999-12-31T23:59:59.999Z'
+
+/** How far a server's clock may run ahead of this device's and still be taken for the same moment. */
+const MAX_CLOCK_AHEAD_MS = 5 * 60 * 1000
+
+/**
+ * When a session ends: now, or a little later when an action made in it carries a later time. A
+ * task's `created` is the server's clock, which can run ahead of this device's; a session that
+ * ended "before" an action made in its last seconds would leave that action out of its recap.
+ */
+export function sessionEndTime(now: Date, started: string, created: ReadonlyArray<string | null | undefined>): string {
+  const start = new Date(started).getTime()
+  const limit = now.getTime() + MAX_CLOCK_AHEAD_MS
+  let end = now.getTime()
+  for (const at of created) {
+    const time = at ? new Date(at).getTime() : Number.NaN
+    if (!Number.isNaN(time) && time >= start && time > end && time <= limit) end = time
+  }
+  return new Date(end).toISOString()
+}
+
 const PREFIX = 'vicu-pro-session:'
 const storageKey = (meetingId: string, kind: string) => `${PREFIX}${meetingId}:${kind}`
 

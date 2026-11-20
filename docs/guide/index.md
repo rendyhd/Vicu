@@ -52,6 +52,7 @@ Pro only adds; with it off, Vicu is the app you know. New to it? [Watch the five
 - [What Pro is](guide:pro): Who it is for, its four parts, and how to try it safely.
 - [Know what you can do now](guide:pro/available): Available tasks, start dates, waiting on other tasks, flags.
 - [Promises and people](guide:pro/promises): Who promised what, verdicts, Waiting on, 1:1s and meetings.
+- [Groups and sessions](guide:pro/groups): A recurring meeting's actions, sessions, recaps and Follow-ups.
 - [Portfolio](guide:pro/portfolio): Initiatives, the cap, readiness, escalations and the Sponsor desk.
 - [Power tools](guide:pro/power): Pro lists, the table, the inspector and the weekly review.
 - [Plan your day](guide:plan): Time blocks, the Plan screen and Plan my day. Works with Pro on or off.

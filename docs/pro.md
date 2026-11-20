@@ -74,7 +74,7 @@ For work that is agreed in a recurring meeting: a leadership team, a project tea
 - **Groups.** A group is the people who agree actions together. On People, New group (or the
   sidebar's New group, or Make this a group on a meeting): a name, a label, the people in the order
   they report, the sessions it holds (weekly, stand-up), and the language of text copied for it. A
-  task with the group's label is an action of the group. `$Jan site list friday *leadership` is
+  task with the group's label is an action of the group. `$Jan site list friday @leadership` (`*leadership` in Vikunja style) is
   Jan's action for the group; `$Jan site list for $Priya` says who it was promised to; `check on
   wednesday` adds a day to look at it before it is due.
 - **The group's page** lists the actions by where they stand since the last session (overdue, due
@@ -96,13 +96,14 @@ For work that is agreed in a recurring meeting: a leadership team, a project tea
   day in Settings, Pro.
 - **Language.** Text copied for other people is written in the language chosen for the group, else
   the default in Settings, Pro, whatever language you read Vicu in.
-- **Phone.** The phone has Follow-ups and the group's page (read, with verdicts); sessions run on
-  the desktop and the web.
+- **Phone.** The phone has Follow-ups and the group's page (read, with verdicts); groups are made
+  and sessions run on the desktop and the web. A check message shared from the phone is written in
+  the language the phone shows Vicu in.
 
 ## Portfolio
 
 - **Initiatives.** In a project's menu, Initiative, Make this an initiative. The portfolio has a cap (four unless you
-  agree on another), a rank you change with the arrows, and Park with a reason. A parked
+  agree on another, or No limit in Settings, Pro), a rank you change with the arrows, and Park with a reason. A parked
   initiative's tasks leave Today and Upcoming until you start it again.
 - **Readiness.** An initiative's panel (on its project page) has nine items: sponsor, owner, why,
   what done looks like, the smallest next result, what you are not doing, who decides, capacity

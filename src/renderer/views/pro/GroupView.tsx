@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useNavigate, useParams } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
-import { Copy, Pencil, Play } from 'lucide-react'
+import { Copy, FileInput, Pencil, Play } from 'lucide-react'
 import { useGroupWorld } from '@/hooks/use-groups'
 import { useProPrefs } from '@/hooks/use-pro-prefs'
 import { useCollabMe } from '@/hooks/use-project-access'
@@ -9,6 +9,7 @@ import { useAppConfig } from '@/hooks/use-app-config'
 import { useProjects } from '@/hooks/use-projects'
 import { useWeekStart } from '@/hooks/use-week-start'
 import { toast } from '@/stores/toast-store'
+import { useProUiStore } from '@/stores/pro-ui-store'
 import { TaskList } from '@/components/task-list/TaskList'
 import { TaskRow } from '@/components/task-list/TaskRow'
 import { TaskRowGroup } from '@/components/task-list/TaskRowGroup'
@@ -112,7 +113,9 @@ export function GroupView() {
         headerContent={
           <div className="space-y-3 px-6 pb-3" data-pro-group={id}>
             <p className="text-meta text-text-secondary" data-pro-reliability>
-              {rel
+              {rel && rel.total === 0
+                ? t('pro.group.reliabilityNone', { count: rel.sessions })
+                : rel
                 ? <>
                     {t('pro.group.reliability', { count: rel.sessions, onTime: rel.onTime, total: rel.total, late: rel.late, pastDue: rel.openPastDue })}
                     {(rel.dropped > 0 || rel.takenOver > 0) && <> {t('pro.group.reliabilityMore', { dropped: rel.dropped, takenOver: rel.takenOver })}</>}
@@ -130,6 +133,7 @@ export function GroupView() {
                   <Copy className="h-3.5 w-3.5" aria-hidden /> {t('pro.group.copyAgenda', { kind: kindName[kind] })}
                 </button>
               ))}
+              <button type="button" className={ACTION} onClick={() => useProUiStore.getState().open('pro-import', { groupLabel: group.label })} data-pro-group-import><FileInput className="h-3.5 w-3.5" aria-hidden /> {t('pro.group.importNotes')}</button>
               <button type="button" className={ACTION} onClick={() => setEditing(true)} data-pro-edit-group><Pencil className="h-3.5 w-3.5" aria-hidden /> {t('pro.group.edit')}</button>
             </div>
           </div>

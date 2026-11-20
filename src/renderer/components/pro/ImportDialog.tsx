@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { Dialog } from '@/components/overlay/Dialog'
 import { Checkbox } from '@/components/shared/Checkbox'
 import { usePromiseWorld } from '@/hooks/use-promise-world'
+import { useGroups } from '@/hooks/use-groups'
 import { useProjects } from '@/hooks/use-projects'
 import { useAppConfig } from '@/hooks/use-app-config'
 import { useProPrefs } from '@/hooks/use-pro-prefs'
@@ -57,6 +58,8 @@ interface RowChoice {
 export function ImportDialog({ onClose, initialText = '', groupLabel }: { onClose: () => void; initialText?: string; groupLabel?: number }) {
   const queryClient = useQueryClient()
   const world = usePromiseWorld()
+  const groups = useGroups()
+  const groupTag = groupLabel !== undefined ? groups.labelOf(groupLabel) : undefined
   const { data: projects } = useProjects()
   const { data: config } = useAppConfig()
   const prefs = useProPrefs()
@@ -152,11 +155,14 @@ export function ImportDialog({ onClose, initialText = '', groupLabel }: { onClos
       }
       return ids
     }
+    const inGroup = groupLabel !== undefined ? { group: groupLabel } : {}
     const make = async (title: string, due: string | null, projectId: number, person: number | null): Promise<Task> => {
       const payload = { title, ...(due ? { due_date: dateOnlyDue(due) } : {}) }
       const label = person !== null ? world.people.get(person) : undefined
-      const task = await createTask.mutateAsync({ projectId, task: payload, extras: label ? { labels: [{ id: label.id, title: label.title }], displayLabels: [label as Label] } : undefined })
-      if (label && !isTempTaskId(task.id)) await addLabel.mutateAsync({ taskId: task.id, labelId: label.id }).catch(() => undefined)
+      // Opened for a group (21.16): what the import adds is an action of that group.
+      const labels = [label, groupTag].filter((entry): entry is Label => !!entry)
+      const task = await createTask.mutateAsync({ projectId, task: payload, extras: labels.length ? { labels: labels.map((entry) => ({ id: entry.id, title: entry.title })), displayLabels: labels } : undefined })
+      if (!isTempTaskId(task.id)) for (const entry of labels) await addLabel.mutateAsync({ taskId: task.id, labelId: entry.id }).catch(() => undefined)
       created.push(task)
       return task
     }
@@ -173,6 +179,7 @@ export function ImportDialog({ onClose, initialText = '', groupLabel }: { onClos
           case 'their_promise': {
             const task = await make(choice.title, row.due, projectId, person)
             const value: PromiseValue = { dir: 'theirs', person }
+            if (groupLabel !== undefined) value.to = { group: groupLabel }
             if (row.item.in_their_words) value.words = row.item.in_their_words
             if (row.item.done_when) value.done_when = row.item.done_when
             if (row.initiative) value.initiative = row.initiative
@@ -205,11 +212,11 @@ export function ImportDialog({ onClose, initialText = '', groupLabel }: { onClos
           case 'open_item':
             if (row.item.ask) {
               const task = await make(choice.title, null, projectId, person)
-              set('log', newLedgerId(), { kind: 'unknown', text: row.item.what, at: today, initiative: row.initiative, ask: person, task: task.id })
-            } else set('log', newLedgerId(), { kind: 'unknown', text: row.item.what, at: today, initiative: row.initiative, ask: null })
+              set('log', newLedgerId(), { kind: 'unknown', text: row.item.what, at: today, initiative: row.initiative, ask: person, task: task.id, ...inGroup })
+            } else set('log', newLedgerId(), { kind: 'unknown', text: row.item.what, at: today, initiative: row.initiative, ask: null, ...inGroup })
             break
           case 'decision':
-            set('log', newLedgerId(), { kind: 'decision', text: row.item.what, by: person, at: row.item.date ?? today, initiative: row.initiative })
+            set('log', newLedgerId(), { kind: 'decision', text: row.item.what, by: person, at: row.item.date ?? today, initiative: row.initiative, ...inGroup })
             break
           case 'owed':
             set('owed', newLedgerId(), { what: row.item.what, from: person, initiative: row.initiative, opened: today })

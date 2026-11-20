@@ -4128,6 +4128,30 @@
     },
     "ledgerMergeGroups": [
       {
+        "name": "a mark that was taken back stays away, whichever side holds it",
+        "local": {
+          "promises": { "7": { "v": { "dir": "theirs", "person": 40, "checked": ["2026-11-10T08:00:00Z"], "unmarked": ["2026-11-11T08:00:00Z"] }, "r": [3000, 0, "a"] } }
+        },
+        "server": {
+          "promises": { "7": { "v": { "dir": "theirs", "person": 40, "checked": ["2026-11-10T08:00:00Z", "2026-11-11T08:00:00Z"], "sent": ["2026-11-11T08:00:00Z"] }, "r": [2000, 0, "b"] } }
+        },
+        "expect": {
+          "promises": { "7": { "v": { "dir": "theirs", "person": 40, "checked": ["2026-11-10T08:00:00Z"], "unmarked": ["2026-11-11T08:00:00Z"] }, "r": [3000, 0, "a"] } }
+        }
+      },
+      {
+        "name": "the older side's mark does not come back over a newer record that took it back",
+        "local": {
+          "promises": { "7": { "v": { "dir": "theirs", "person": 40, "sent": ["2026-11-11T08:00:00Z"] }, "r": [1000, 0, "a"] } }
+        },
+        "server": {
+          "promises": { "7": { "v": { "dir": "theirs", "person": 40, "unmarked": ["2026-11-11T08:00:00Z"], "check_on": "2026-11-20" }, "r": [2000, 0, "b"] } }
+        },
+        "expect": {
+          "promises": { "7": { "v": { "dir": "theirs", "person": 40, "unmarked": ["2026-11-11T08:00:00Z"], "check_on": "2026-11-20" }, "r": [2000, 0, "b"] } }
+        }
+      },
+      {
         "name": "checked marks are a union, like sent",
         "local": {
           "promises": { "7": { "v": { "dir": "theirs", "person": 40, "to": { "group": 70 }, "checked": ["2026-11-10T08:00:00Z"] }, "r": [3000, 0, "a"] } }

@@ -2719,7 +2719,9 @@ shows open flagged tasks; Vikunja's own Favorites pseudo-project (-1) is not use
   a log entry's `group`, `session`, `rank`, `task`, `shared`, `solved_in` and the kind
   `issue`; the settings `cap_off`, `check_days`, `workdays`, `note_day`, `note_sent`,
   `text_language` and `weekly_done`. A promise's `checked` is merged like `sent`: the sorted
-  union of both sides.
+  union of both sides. A union cannot lose a mark, so a mark that is taken back (the Undo of a
+  copy) is also named in the promise's `unmarked`, itself a sorted union: a mark in `unmarked`
+  is in neither `sent` nor `checked`, after every merge and for every reader.
 - **Pruning:** tombstones and cleared estimates older than 90 days (section 10.6). Pro devices
   remove the promise and estimate of a task that is gone or done for 30 days.
 - **A task created offline** has a temporary id until the replay creates it; its ledger keys and the
@@ -3001,7 +3003,9 @@ Vicu. They state what happened in counts and events and never judge.
   escaped (`&`, `<`, `>`, `"`). Markdown: the title as `## `, a heading as `### `, items as
   `- `, an empty line between parts. Copying puts HTML and plain text on the clipboard.
 - **Language:** the group's `language`, else the setting `text_language`, else `en`; a language
-  without a catalog reads as `en`. It is separate from the language the app is shown in.
+  without a catalog reads as `en`. It is separate from the language the app is shown in. The phone
+  cannot read its strings in a second language yet, so for now it writes its check message in the
+  language the app is shown in; the desktop and the web follow the rule.
 - **The documents:** a session's **agenda** (actions due, other open actions, open issues, the
   closing line), its **read-back** (decisions, new actions), its **recap** (decisions, new
   actions, delivered, changed, issues solved, open issues, who was absent), the **check message**

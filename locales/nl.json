@@ -996,5 +996,91 @@
       "done": "Klaar"
     },
     "notImage": "De pagina is geen afbeelding."
+  },
+  "proText": {
+    "agenda": {
+      "title": {
+        "weekly": "Agenda: {{group}} weekoverleg, {{date}}",
+        "standup": "Agenda: {{group}} stand-up, {{date}}"
+      },
+      "close": "Afsluiting: lees de besluiten en nieuwe acties voor."
+    },
+    "recap": {
+      "title": {
+        "weekly": "{{group}} weekoverleg, {{date}}",
+        "standup": "{{group}} stand-up, {{date}}"
+      },
+      "nothing": "Er is niets besloten of gewijzigd."
+    },
+    "readback": {
+      "title": "Teruglezen: {{group}}, {{date}}",
+      "nothing": "Geen besluiten of nieuwe acties."
+    },
+    "heading": {
+      "actionsDue": "Acties die af moeten zijn",
+      "actionsOpen": "Overige open acties",
+      "issues": "Open knelpunten",
+      "decisions": "Besluiten",
+      "newActions": "Nieuwe acties",
+      "delivered": "Opgeleverd",
+      "changed": "Gewijzigd",
+      "issuesSolved": "Opgeloste knelpunten",
+      "questions": "Open vragen"
+    },
+    "action": {
+      "owner": "{{owner}}: {{title}}, uiterlijk {{date}}",
+      "ownerNoDate": "{{owner}}: {{title}}",
+      "forPerson": "{{owner}} voor {{requester}}: {{title}}, uiterlijk {{date}}",
+      "forPersonNoDate": "{{owner}} voor {{requester}}: {{title}}",
+      "noOwner": "Geen eigenaar: {{title}}, uiterlijk {{date}}",
+      "noOwnerNoDate": "Geen eigenaar: {{title}}",
+      "delivered": "{{owner}}: {{title}}",
+      "deliveredLate": "{{owner}}: {{title}} (te laat)",
+      "dropped": "{{owner}}: {{title}} (vervallen)",
+      "takenOver": "{{owner}}: {{title}} (gedaan door {{me}})",
+      "newDate": "{{owner}}: {{title}}, nieuwe datum {{date}}",
+      "newDateBlocker": "{{owner}}: {{title}}, nieuwe datum {{date}} ({{blocker}})",
+      "notYet": "{{owner}}: {{title}}, nog niet",
+      "notYetBlocker": "{{owner}}: {{title}}, nog niet ({{blocker}})"
+    },
+    "decision": {
+      "plain": "{{text}}",
+      "by": "{{text}} (besloten door {{by}})"
+    },
+    "absent": "Afwezig: {{names}}",
+    "check": {
+      "one": "Hoi {{name}}, even één ding checken: {{title}} ({{date}}). Ligt het nog op schema?",
+      "oneNoDate": "Hoi {{name}}, even één ding checken: {{title}}. Ligt het nog op schema?",
+      "intro_one": "Hoi {{name}}, even {{count}} ding checken:",
+      "intro_other": "Hoi {{name}}, even {{count}} dingen checken:",
+      "item": "{{title}} ({{date}})",
+      "itemNoDate": "{{title}}",
+      "close": "Ligt het nog op schema?"
+    },
+    "note": {
+      "title": "Weeknotitie, {{from}} tot en met {{to}}",
+      "onTime_one": "{{count}} actie op tijd opgeleverd",
+      "onTime_other": "{{count}} acties op tijd opgeleverd",
+      "late_one": "{{count}} actie te laat opgeleverd",
+      "late_other": "{{count}} acties te laat opgeleverd",
+      "dropped_one": "{{count}} actie vervallen",
+      "dropped_other": "{{count}} acties vervallen",
+      "takenOver_one": "{{count}} actie gedaan door {{me}}",
+      "takenOver_other": "{{count}} acties gedaan door {{me}}",
+      "slipped": {
+        "newDate": "Uitgelopen: {{owner}}: {{title}}, nieuwe datum {{date}}",
+        "newDateBlocker": "Uitgelopen: {{owner}}: {{title}}, nieuwe datum {{date}} ({{blocker}})",
+        "notYet": "Uitgelopen: {{owner}}: {{title}}, nog niet",
+        "notYetBlocker": "Uitgelopen: {{owner}}: {{title}}, nog niet ({{blocker}})"
+      },
+      "decision": "Besluit: {{text}}",
+      "issue": "Open knelpunt: {{text}}",
+      "pastDue_one": "{{count}} actie open na de datum",
+      "pastDue_other": "{{count}} acties open na hun datum",
+      "nextWeek_one": "{{count}} actie loopt af in de komende 7 dagen",
+      "nextWeek_other": "{{count}} acties lopen af in de komende 7 dagen",
+      "nothing": "Niets te melden.",
+      "noGroups": "Nog geen groepen."
+    }
   }
 }

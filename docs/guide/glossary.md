@@ -47,10 +47,12 @@ lead: Short definitions of the words you meet in Vicu. Each links to the page wh
 
 - **Fit**: A Plan action that gives tasks without a time the next free slots in your day. See [Plan your day](guide:plan).
 - **Flag** {pro}: Marks a task for attention. It is Vikunja's favorite star, so other apps see it. Typing `!flag` sets it. See [Know what you can do now](guide:pro/available).
+- **Follow-ups** {pro}: The block at the top of Today with what needs a move from you: verdicts due, checks before an action is due, recaps not sent and the weekly note. See [Groups, sessions and follow-ups](guide:pro/groups).
 - **Focus** {pro}: Shows only one area of your projects everywhere until you leave it. See [Know what you can do now](guide:pro/available).
 
 ## G
 
+- **Group** {pro}: The people who agree actions together, such as a leadership team. A task with the group's label is one of its actions. See [Groups, sessions and follow-ups](guide:pro/groups).
 - **Guided session**: A review the app leads one decision at a time: Sort the Inbox, Sort out overdue, Waiting a long time, and Review projects. See [Review and guided organizing](guide:review).
 
 ## H
@@ -100,6 +102,7 @@ lead: Short definitions of the words you meet in Vicu. Each links to the page wh
 
 - **Saved filter**: A filter you saved in Vikunja. Vicu can import it as a custom list. See [Custom lists](guide:custom-lists).
 - **Section**: A collapsible group of tasks inside a project, with its own header and count. See [Projects and labels](guide:projects).
+- **Session** {pro}: One meeting of a group, walked through step by step on the desktop: actions, issues, what is new and a read-back, ending in a recap. See [Groups, sessions and follow-ups](guide:pro/groups).
 - **Smart dictation**: Voice input where you keep talking and the assistant turns each pause into draft task cards. See [The assistant](guide:assistant).
 - **Smart list**: One of Vicu's built-in lists: Inbox, Today, Upcoming, Anytime and Logbook. See [Smart lists](guide:lists).
 - **Sponsor desk** {pro}: A desktop screen with escalations, decisions you are owed, initiatives without agreed capacity, and a one-page summary. See [Portfolio](guide:pro/portfolio).
@@ -125,6 +128,7 @@ lead: Short definitions of the words you meet in Vicu. Each links to the page wh
 ## W
 
 - **Waiting on** {pro}: A view of what others owe you, by person. See [Promises and people](guide:pro/promises).
+- **Weekly note** {pro}: A short status per group to copy for the people above you: what was delivered, what slipped, what was decided. See [Groups, sessions and follow-ups](guide:pro/groups).
 - **Weekly review**: A checklist for the end of the week, from sorting the Inbox to a look ahead. Finishing it records the date. See [Review and guided organizing](guide:review).
 - **When panel**: The one panel for setting a date and time on a task: type it in words, pick a quick choice, or use the calendar. See [Work with tasks](guide:tasks).
 - **Work hours**: The start and end of your day on Plan. Free time, Fit and Plan my day use them. See [Settings](guide:settings).

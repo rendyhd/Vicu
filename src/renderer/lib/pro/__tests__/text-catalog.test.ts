@@ -41,6 +41,20 @@ describe('the catalog of text for other people', () => {
     expect(textDateFormat('nl', { locale: 'en-US', hour12: true })).toEqual({ locale: 'nl', hour12: false })
   })
 
+  it('writes a document in the language chosen for it, whatever the app shows', async () => {
+    const check: ProDocument = { blocks: [{ text: { key: 'check.one', params: { name: 'Jan', title: 'Site list', date: { day: '2026-11-12' } } } }] }
+    const now = new Date(2026, 10, 12, 12)
+    const dutch = await renderProDocumentWith(check, 'nl', null, now)
+    expect(dutch.text).toMatch(/^Hoi Jan, even één ding checken: Site list \(.*\)\. Ligt het nog op schema\?$/)
+    expect(dutch.text).not.toContain('Thu')
+    // The app itself is still shown in English.
+    const english = await renderProDocumentWith(check, 'en', { locale: 'en-GB', hour12: false }, now)
+    expect(english.text).toBe('Hi Jan, checking one thing: Site list (Thu 12 Nov). Still on track?')
+    // A language without a catalog reads English.
+    const unknown = await renderProDocumentWith(check, 'xx', { locale: 'en-GB', hour12: false }, now)
+    expect(unknown.text).toBe(english.text)
+  })
+
   // The same documents the shared suite renders with the fixture's own messages, here through
   // i18next and the catalog: plurals, placeholders and the three forms come out the same.
   for (const c of documents.cases) {

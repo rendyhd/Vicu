@@ -24,7 +24,7 @@ import { GroupLog } from '@/components/pro/GroupLog'
 import { NoOwnerList } from '@/components/pro/NoOwnerList'
 import { SessionRecapDialog } from '@/components/pro/SessionRecapDialog'
 import { renderProDocument } from '@/lib/pro/text'
-import { loadSession, saveSession, type SessionState } from '@/lib/pro/session-state'
+import { loadSession, RUNNING_SESSION_END, saveSession, sessionEndTime, type SessionState } from '@/lib/pro/session-state'
 import type { Task } from '@/lib/vikunja-types'
 import { toLocalDate } from '../../../shared/due-dates'
 import { ledgerSettings, recordValue } from '../../../shared/pro/ledger'
@@ -74,7 +74,7 @@ export function SessionView() {
   )
   // What the session holds so far: the same rule as its recap, up to now.
   const contents = useMemo(
-    () => (group && state ? sessionContents({ round: state.round, started: state.started, ended: new Date().toISOString(), group, tasks: view.tasks, ledger: view.ledger }) : null),
+    () => (group && state ? sessionContents({ round: state.round, started: state.started, ended: RUNNING_SESSION_END, group, tasks: view.tasks, ledger: view.ledger }) : null),
     [group, state, view.tasks, view.ledger],
   )
 
@@ -91,7 +91,7 @@ export function SessionView() {
       names: { person: view.world.nameOf, me: myName },
       round: state.round,
       started: state.started,
-      ended: new Date().toISOString(),
+      ended: RUNNING_SESSION_END,
     })
     void renderProDocument(document, language).then((rendered) => { if (live) setReadBack(rendered.text) })
     return () => { live = false }
@@ -119,7 +119,7 @@ export function SessionView() {
       kind,
       at: toLocalDate(new Date(state.started)),
       started: state.started,
-      ended: new Date().toISOString(),
+      ended: sessionEndTime(new Date(), state.started, view.tasks.map((task) => task.created)),
       absent: state.absent,
       readBack: state.readBack,
       score: state.score,
@@ -170,25 +170,27 @@ export function SessionView() {
         }
       />
       <div className="mx-auto w-full max-w-reading pb-10" data-pro-session={state?.round ?? ''}>
-        <div className="mb-3 flex flex-wrap items-center gap-1.5 px-6" role="tablist" aria-label={t('pro.session.steps')}>
-          {steps.map((entry, index) => (
-            <button
-              key={entry}
-              type="button"
-              role="tab"
-              aria-selected={!!state && step === entry}
-              disabled={!state}
-              onClick={() => state && setState({ ...state, step: index })}
-              className={cn(
-                'rounded-chip border px-2.5 py-0.5 text-meta',
-                state && step === entry ? 'border-accent-blue bg-accent-blue/12 text-accent-blue' : 'border-border text-text',
-                !state && 'text-text-secondary',
-              )}
-              data-pro-session-step={entry}
-            >
-              {index + 1}. {stepName[entry]}
-            </button>
-          ))}
+        <div className="mb-3 flex flex-wrap items-center gap-1.5 px-6">
+          <div className="flex flex-wrap items-center gap-1.5" role="tablist" aria-label={t('pro.session.steps')}>
+            {steps.map((entry, index) => (
+              <button
+                key={entry}
+                type="button"
+                role="tab"
+                aria-selected={!!state && step === entry}
+                disabled={!state}
+                onClick={() => state && setState({ ...state, step: index })}
+                className={cn(
+                  'rounded-chip border px-2.5 py-0.5 text-meta',
+                  state && step === entry ? 'border-accent-blue bg-accent-blue/12 text-accent-blue' : 'border-border text-text',
+                  !state && 'text-text-secondary',
+                )}
+                data-pro-session-step={entry}
+              >
+                {index + 1}. {stepName[entry]}
+              </button>
+            ))}
+          </div>
           {state && state.step < steps.length - 1 && (
             <button type="button" className={cn(PRIMARY, 'ml-auto')} onClick={() => setState({ ...state, step: state.step + 1 })} data-pro-session-next>{t('pro.session.next')}</button>
           )}

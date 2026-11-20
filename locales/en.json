@@ -1129,7 +1129,10 @@
       "list": {
         "title": "Groups",
         "empty": "A group is the people who agree actions together: a leadership team, a project team. Its actions carry the group's label."
-      }
+      },
+      "importNotes": "Import notes",
+      "reliabilityNone_one": "Last session: no action was due.",
+      "reliabilityNone_other": "Last {{count}} sessions: no action was due."
     },
     "person": {
       "toYou": "Promised to you",

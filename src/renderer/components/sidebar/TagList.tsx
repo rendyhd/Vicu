@@ -2,7 +2,9 @@ import { useState, useEffect, useId } from 'react'
 import { SelectionPill } from './SelectionPill'
 import { useNavigate, useMatches } from '@tanstack/react-router'
 import { useDroppable } from '@dnd-kit/core'
-import { Pencil, Trash2, X, PauseCircle, User } from 'lucide-react'
+import { Pencil, Trash2, X, PauseCircle, User, UsersRound } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
+import { GroupDialog } from '@/components/pro/GroupDialog'
 import { useLabels } from '@/hooks/use-labels'
 import { useCreateLabel, useUpdateLabel, useDeleteLabel } from '@/hooks/use-task-mutations'
 import { useConfirmDelete } from '@/hooks/use-confirm-delete'
@@ -209,8 +211,12 @@ export function TagList() {
   // Pro (21.2, 21.5): a label on hold makes its tasks wait; a person label is someone you work with.
   const pro = usePro()
   const proPrefs = useProPrefs()
+  const navigate = useNavigate()
 
   const [editingLabel, setEditingLabel] = useState<Label | null>(null)
+  // Pro (21.16): a label that becomes a group opens the group's dialog.
+  const [groupLabel, setGroupLabel] = useState<number | null>(null)
+  const { t } = useTranslation()
   const [contextMenu, setContextMenu] = useState<{
     x: number
     y: number
@@ -264,7 +270,19 @@ export function TagList() {
               {proPrefs.labelOnHold(contextMenu.label.id) ? 'Make active' : 'Put on hold'}
             </MenuItem>
           )}
-          {pro.layer('promises') && (
+          {pro.layer('promises') && !proPrefs.isPerson(contextMenu.label.id) && (
+            <MenuItem
+              icon={<UsersRound />}
+              onSelect={() => {
+                const id = contextMenu.label.id
+                if (proPrefs.isGroup(id)) void navigate({ to: '/group/$labelId', params: { labelId: String(id) } })
+                else setGroupLabel(id)
+              }}
+            >
+              {proPrefs.isGroup(contextMenu.label.id) ? t('pro.group.open') : t('pro.group.makeGroup')}
+            </MenuItem>
+          )}
+          {pro.layer('promises') && !proPrefs.isGroup(contextMenu.label.id) && (
             <MenuItem
               icon={<User />}
               onSelect={() => void proPrefs.setPerson(contextMenu.label.id, !proPrefs.isPerson(contextMenu.label.id))}
@@ -297,6 +315,13 @@ export function TagList() {
         onClose={handleCloseDialog}
       />
       <ConfirmDialog {...deleteDialogProps} />
+      {groupLabel !== null && (
+        <GroupDialog
+          label={groupLabel}
+          onClose={() => setGroupLabel(null)}
+          onSaved={(labelId) => void navigate({ to: '/group/$labelId', params: { labelId: String(labelId) } })}
+        />
+      )}
     </>
   )
 }

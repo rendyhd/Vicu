@@ -75,6 +75,8 @@ export interface PromiseValue {
   check_on?: LocalDate | null
   /** When a check was made (UTC instants); a union in the merge, like `sent`. */
   checked?: string[]
+  /** Marks of `sent` and `checked` that were taken back (an Undo of a copy): in neither list. */
+  unmarked?: string[]
   /** Left out of checks before due. */
   no_check?: boolean
   [unknownField: string]: unknown
@@ -378,11 +380,20 @@ function mergeRecords<V>(
       const value = { ...(winner.value as unknown as PromiseValue) }
       const other = loser.value as unknown as PromiseValue
       const verdicts = unionVerdicts(value.verdicts, other.verdicts)
-      const sent = unionSent(value.sent, other.sent)
-      const checked = unionSent(value.checked, other.checked)
+      // Marks are unions, so one that was taken back is named in `unmarked` (a union too) and
+      // left out of both lists, or the other side's copy would bring it back.
+      const unmarked = unionSent(value.unmarked, other.unmarked)
+      const marks = (field: 'sent' | 'checked') => {
+        const all = unionSent(value[field], other[field])
+        if (!all) return
+        const left = unmarked ? all.filter((mark) => !unmarked.includes(mark)) : all
+        if (left.length || left.length === all.length) value[field] = left
+        else delete value[field]
+      }
       if (verdicts) value.verdicts = verdicts
-      if (sent) value.sent = sent
-      if (checked) value.checked = checked
+      marks('sent')
+      marks('checked')
+      if (unmarked) value.unmarked = unmarked
       merged[id] = { ...winner, value: value as unknown as V }
     } else {
       merged[id] = winner

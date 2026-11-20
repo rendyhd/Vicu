@@ -153,7 +153,16 @@ export function withSent(promise: PromiseValue, at: string): PromiseValue {
 }
 
 export function isSent(promise: PromiseValue | null | undefined): boolean {
-  return (promise?.sent?.length ?? 0) > 0
+  return marksOf(promise, 'sent').length > 0
+}
+
+/**
+ * The marks of `sent` or `checked` that stand: a mark named in `unmarked` was taken back and does
+ * not count, also when a copy that does not know `unmarked` wrote it into the list again.
+ */
+export function marksOf(promise: PromiseValue | null | undefined, field: 'checked' | 'sent'): string[] {
+  const taken = promise?.unmarked ?? []
+  return (promise?.[field] ?? []).filter((mark) => !taken.includes(mark))
 }
 
 // --- Who it was promised to, and checks (sections 21.6 and 21.18) -------------------------------
@@ -190,10 +199,13 @@ export function withChecked(promise: PromiseValue, at: string): PromiseValue {
   return { ...promise, checked: [...new Set([...(promise.checked ?? []), at])].sort() }
 }
 
-/** Undo of a copy: the marks made at `at` are taken out again. */
+/**
+ * Undo of a copy: the mark made at `at` is taken out again and named in `unmarked`, because the
+ * lists are merged as unions and another copy of the record may still hold it (section 21.7).
+ */
 export function withoutMark(promise: PromiseValue, field: 'checked' | 'sent', at: string): PromiseValue {
   const left = (promise[field] ?? []).filter((mark) => mark !== at)
-  const next: PromiseValue = { ...promise }
+  const next: PromiseValue = { ...promise, unmarked: [...new Set([...(promise.unmarked ?? []), at])].sort() }
   if (left.length) next[field] = left
   else delete next[field]
   return next
@@ -201,7 +213,7 @@ export function withoutMark(promise: PromiseValue, field: 'checked' | 'sent', at
 
 /** True when a check was made on or after `day` (a local day). */
 export function checkedSince(promise: PromiseValue | null | undefined, day: LocalDate): boolean {
-  return (promise?.checked ?? []).some((at) => localDateOf(at) >= day)
+  return marksOf(promise, 'checked').some((at) => localDateOf(at) >= day)
 }
 
 /** The `check_on` day, or null when it is not a date. */

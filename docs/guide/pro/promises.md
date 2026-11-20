@@ -193,6 +193,7 @@ With **Assistant help in Pro** on, Import can also read plain notes that are not
 ## Related
 
 - [What Pro is](guide:pro)
+- [Groups, sessions and follow-ups](guide:pro/groups)
 - [Know what you can do now](guide:pro/available)
 - [Portfolio](guide:pro/portfolio)
 - [Quick add syntax](guide:quick-add)
