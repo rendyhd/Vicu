@@ -88,14 +88,34 @@ export function writeDocument(name: string, text: string | null): void {
   else documents.set(name, text)
   if (db) {
     try {
-      const store = db.transaction(STORE, 'readwrite').objectStore(STORE)
+      const transaction = db.transaction(STORE, 'readwrite')
+      const store = transaction.objectStore(STORE)
       const request = text === null ? store.delete(name) : store.put(text, name)
       request.onerror = () => console.warn(`[vicu] could not save "${name}":`, request.error?.message)
+      const written = new Promise<void>((done) => {
+        transaction.oncomplete = () => done()
+        transaction.onerror = () => done()
+        transaction.onabort = () => done()
+      }).finally(() => {
+        writing.delete(written)
+      })
+      writing.add(written)
     } catch (err) {
       console.warn(`[vicu] could not save "${name}":`, err instanceof Error ? err.message : err)
     }
   }
   channel?.postMessage({ name, text })
+}
+
+/** The writes that have not reached the browser's storage yet. */
+const writing = new Set<Promise<void>>()
+
+/**
+ * Wait until everything written so far is stored. Before the page leaves on purpose (an SSO
+ * sign-in goes to the provider and comes back), so what was just saved is there on the way back.
+ */
+export async function flushDocuments(): Promise<void> {
+  await Promise.all([...writing])
 }
 
 /** Another tab replaced a document; this tab already holds its new text when the listener runs. */

@@ -1,3 +1,4 @@
+import { setupResume } from '@/lib/setup-resume'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/shared/Button'
@@ -203,7 +204,8 @@ export function SetupView({ onComplete }: SetupViewProps) {
     const begin = async () => {
       const pending = web ? await api.pendingSignIn().catch(() => null) : null
       if (!live) return
-      if (!pending && web) {
+      // A sign-in that came back and worked, or a session that is already there (a reload half way).
+      if (web && setupResume(pending) === 'try-session') {
         const projectsResult = await api.fetchProjects().catch(() => null)
         if (!live) return
         if (projectsResult?.success) {

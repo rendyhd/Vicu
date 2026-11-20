@@ -20,6 +20,7 @@ import { inboxChosenAtSetup, readSetupPreferences, setSyncedPreference } from '.
 import { isDeepLinkAllowed, safeExternalUrl } from '../main/web-security-policy'
 import { dateFormatFor, isClockFormat, type DateFormat } from '../shared/date-display'
 import { availableLanguages, resolveLanguage, type LanguageInfo } from '../shared/i18n'
+import { flushDocuments } from './host/storage'
 import { sendToAllWindows } from './host/windows'
 import { storeApiToken, storedApiToken } from './host/auth'
 import { accountChanged, serverUrl, tokenForRequest } from './account'
@@ -194,6 +195,8 @@ export function registerWebHandlers(handle: Handle): void {
       const provider = providers.find((candidate) => candidate.key === providerKey)
       if (!provider) return { success: false, error: 'This sign-in provider is no longer offered by the server' }
       writeLocal(OIDC_PROVIDER_KEY, provider.key)
+      // The connection Setup just saved must be in storage when the page comes back.
+      await flushDocuments()
       return await beginOidcSignIn(provider, typeof totpPasscode === 'string' && totpPasscode ? totpPasscode : undefined)
     } catch (err) {
       return { success: false, error: err instanceof Error ? err.message : 'Login failed' }
