@@ -13,7 +13,8 @@
     "upcoming": "Binnenkort",
     "anytime": "Wanneer dan ook",
     "review": "Review",
-    "logbook": "Logboek"
+    "logbook": "Logboek",
+    "bottomLists": "Meer lijsten"
   },
   "completion": {
     "toast_one": "Voltooid",
@@ -811,7 +812,8 @@
     },
     "sidebar": {
       "title": "Zijbalk",
-      "note": "De lijsten die boven je projecten staan. Een verborgen lijst blijft werken en blijft in het opdrachtenpalet."
+      "note": "De lijsten die boven je projecten staan. Een verborgen lijst blijft werken en blijft in het opdrachtenpalet.",
+      "logbookBottom": "Het Logboek onderaan de zijbalk houden"
     },
     "weekStart": {
       "label": "De week begint op",

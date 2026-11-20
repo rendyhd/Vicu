@@ -169,6 +169,8 @@ export function normalizeConfig(raw: Record<string, unknown>): AppConfig {
     sidebar_collapsed_projects: normalizeProjectIds(raw.sidebar_collapsed_projects),
     sidebar_collapsed_categories: normalizeCategoryIds(raw.sidebar_collapsed_categories),
     sidebar_hidden_lists: normalizeListNames(raw.sidebar_hidden_lists),
+    sidebar_logbook_bottom: raw.sidebar_logbook_bottom !== false,
+    sidebar_pro_collapsed: raw.sidebar_pro_collapsed === true,
     custom_lists: Array.isArray(raw.custom_lists) ? raw.custom_lists as AppConfig['custom_lists'] : undefined,
     custom_lists_sync: raw.custom_lists_sync && typeof raw.custom_lists_sync === 'object'
       ? raw.custom_lists_sync as AppConfig['custom_lists_sync']

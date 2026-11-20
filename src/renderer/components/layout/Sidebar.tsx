@@ -1,7 +1,7 @@
 import { Plus, Sparkles } from 'lucide-react'
 import { useDroppable } from '@dnd-kit/core'
 import { QuickFind } from '@/components/sidebar/QuickFind'
-import { SmartListNav } from '@/components/sidebar/SmartListNav'
+import { BottomListNav, SmartListNav } from '@/components/sidebar/SmartListNav'
 import { ProNav } from '@/components/sidebar/ProNav'
 import { FocusBanner } from '@/components/pro/FocusBanner'
 import { CustomListNav } from '@/components/sidebar/CustomListNav'
@@ -119,6 +119,7 @@ export function Sidebar() {
         <TagList />
       </div>
 
+      <BottomListNav />
       <SidebarFooter />
     </div>
   )

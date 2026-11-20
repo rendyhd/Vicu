@@ -33,6 +33,24 @@ export function useSidebarCollapsed() {
   return { collapsed, setCollapsed }
 }
 
+/** Whether Pro's sidebar section is collapsed to its header (per device, saved in the config). */
+export function useProSectionCollapsed() {
+  const qc = useQueryClient()
+  const { data: config } = useAppConfig()
+  const collapsed = config?.sidebar_pro_collapsed === true
+
+  const setCollapsed = useCallback(
+    (collapse: boolean) => {
+      const current = qc.getQueryData<AppConfig | null>(APP_CONFIG_QUERY_KEY)
+      if (current) qc.setQueryData<AppConfig>(APP_CONFIG_QUERY_KEY, { ...current, sidebar_pro_collapsed: collapse })
+      void api.saveConfigPatch({ sidebar_pro_collapsed: collapse })
+    },
+    [qc],
+  )
+
+  return { collapsed, setCollapsed }
+}
+
 /**
  * Which sidebar categories are collapsed (cross-app semantics 13.3: per device, never synced).
  * Saved in the config like the collapsed projects.

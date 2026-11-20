@@ -5,6 +5,7 @@ import { useSmartLists } from '@/components/sidebar/SmartListNav'
 import {
   SIDEBAR_HIDEABLE_LISTS,
   isHiddenFromSidebar,
+  isLogbookAtSidebarBottom,
   withSidebarListHidden,
   type AppConfig,
   type SidebarHideableList,
@@ -44,6 +45,16 @@ export function SidebarSettings({ config, onChange }: SidebarSettingsProps) {
           </label>
         ))}
       </div>
+
+      {!isHiddenFromSidebar(config, 'logbook') && (
+        <label className="mt-4 flex cursor-pointer items-center gap-2 border-t border-border pt-4">
+          <Checkbox
+            checked={isLogbookAtSidebarBottom(config)}
+            onChange={(e) => onChange({ sidebar_logbook_bottom: e.target.checked })}
+          />
+          <span className="text-sm text-[var(--text-primary)]">{t('settings.sidebar.logbookBottom')}</span>
+        </label>
+      )}
     </div>
   )
 }

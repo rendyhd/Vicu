@@ -80,6 +80,8 @@ Besides the five smart lists, the sidebar or drawer can show:
 
 You can hide Today, Upcoming, Anytime and Logbook, plus Routines and Review while they are on. The Inbox always stays. A hidden list still opens from the command palette. The setting is per computer.
 
+The Logbook has its own row at the bottom of the sidebar, under your projects, lists and labels. To keep it with the other lists instead, clear **Keep the Logbook at the bottom of the sidebar** in the same place.
+
 ### On a phone {phone}
 
 1. Open **Settings, General, Drawer**.

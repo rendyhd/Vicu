@@ -235,6 +235,9 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
       <div id={listId} role="listbox" aria-label="Results" className="max-h-80 overflow-y-auto py-1">
         {shown.map((item, index) => {
           const Icon = iconOf(item)
+          // A Pro list has its own icon and colour; only the smart lists are in the identity table.
+          const listId = item.kind === 'List' ? item.id.slice('list:'.length) : null
+          const proList = listId ? proLists.find((list) => list.id === listId) : undefined
           return (
             <div
               key={item.id}
@@ -245,8 +248,10 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
               onClick={() => run(item)}
               className={cn('flex cursor-default items-center gap-3 px-4 py-2 text-sm', index === activeIndex && 'bg-[var(--bg-hover)]')}
             >
-              {item.kind === 'List' ? (
-                <SmartListIcon list={item.id.slice('list:'.length) as SmartListId} className="h-4 w-4 shrink-0" />
+              {proList ? (
+                <proList.icon aria-hidden="true" className={cn('h-4 w-4 shrink-0', proList.tone)} />
+              ) : listId ? (
+                <SmartListIcon list={listId as SmartListId} className="h-4 w-4 shrink-0" />
               ) : (
                 <Icon aria-hidden="true" className="h-4 w-4 shrink-0 text-[var(--text-secondary)]" />
               )}

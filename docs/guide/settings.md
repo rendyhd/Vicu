@@ -50,6 +50,8 @@ How to read the tables: **Synced** follows you to every device. **This device** 
 
 Tick the smart lists you want above your projects. The Inbox always stays. A hidden list still opens from the [command palette](guide:desktop#the-command-palette). This choice is per computer.
 
+**Keep the Logbook at the bottom of the sidebar** (on unless you clear it) gives the Logbook its own row at the bottom, under your projects, lists and labels; cleared, it is the last of the lists on top. With Pro on, the **Pro** header in the sidebar folds Pro's lists away and opens them again; they stay in the command palette.
+
 #### Task Completion Sound
 
 A sound when you complete a task. Pick a file (MP3, WAV, OGG, M4A, AAC or FLAC, up to 10 MB), use **Play** to hear it, or reset to the default. **This device.**

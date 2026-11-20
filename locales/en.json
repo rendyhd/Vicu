@@ -13,7 +13,8 @@
     "upcoming": "Upcoming",
     "anytime": "Anytime",
     "review": "Review",
-    "logbook": "Logbook"
+    "logbook": "Logbook",
+    "bottomLists": "More lists"
   },
   "completion": {
     "toast_one": "Completed",
@@ -811,7 +812,8 @@
     },
     "sidebar": {
       "title": "Sidebar",
-      "note": "The lists shown above your projects. A hidden list keeps working and stays in the command palette."
+      "note": "The lists shown above your projects. A hidden list keeps working and stays in the command palette.",
+      "logbookBottom": "Keep the Logbook at the bottom of the sidebar"
     },
     "weekStart": {
       "label": "Week starts on",

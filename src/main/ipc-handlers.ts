@@ -151,6 +151,8 @@ const QUIET_PATCH_KEYS: ReadonlySet<string> = new Set([
   'sidebar_collapsed_projects',
   'sidebar_collapsed_categories',
   'sidebar_hidden_lists',
+  'sidebar_logbook_bottom',
+  'sidebar_pro_collapsed',
   'window_bounds',
   'last_used_project_id',
   'last_used_label_id',

@@ -278,6 +278,13 @@ export interface AppConfig {
    * and stays in the command palette. A name this version does not know (a newer one wrote it) is kept.
    */
   sidebar_hidden_lists?: string[]
+  /**
+   * Where the sidebar shows the Logbook: in its own row at the bottom, under the projects, lists and
+   * labels (missing or true), or with the other smart lists (false). Per device, never synced.
+   */
+  sidebar_logbook_bottom?: boolean
+  /** Whether Pro's sidebar section is collapsed to its header. Per device, never synced. */
+  sidebar_pro_collapsed?: boolean
   custom_lists?: CustomList[]
   /**
    * What this device knows about the account's Vikunja saved filters (cross-app semantics 3.7):
@@ -500,7 +507,6 @@ export function isRoutinesEnabled(config: Pick<AppConfig, 'routines_enabled'> | 
 export const SIDEBAR_HIDEABLE_LISTS = ['today', 'plan', 'routines', 'upcoming', 'anytime', 'review', 'logbook'] as const
 export type SidebarHideableList = (typeof SIDEBAR_HIDEABLE_LISTS)[number]
 
-/** Whether the person took `list` out of the sidebar (Settings → General → Sidebar). */
 export type PlannerView = 'day' | '3days' | 'week'
 
 /** Standalone tasks have no start and end date, so the planner needs a server. */
@@ -508,6 +514,7 @@ export function isPlannerEnabled(config: Pick<AppConfig, 'planner_enabled' | 'st
   return config?.planner_enabled === true && config.standalone_mode !== true
 }
 
+/** Whether the person took `list` out of the sidebar (Settings → General → Sidebar). */
 export function isHiddenFromSidebar(config: Pick<AppConfig, 'sidebar_hidden_lists'> | null | undefined, list: string): boolean {
   return config?.sidebar_hidden_lists?.includes(list) === true
 }
@@ -520,6 +527,11 @@ export function withSidebarListHidden(
 ): string[] {
   const rest = (config?.sidebar_hidden_lists ?? []).filter((id) => id !== list)
   return hidden ? [...rest, list] : rest
+}
+
+/** The Logbook has its own row at the bottom of the sidebar unless the person put it back with the lists. */
+export function isLogbookAtSidebarBottom(config: Pick<AppConfig, 'sidebar_logbook_bottom'> | null | undefined): boolean {
+  return config?.sidebar_logbook_bottom !== false
 }
 
 /** Today lists open routines only while routines are on and the Today section is not turned off. */

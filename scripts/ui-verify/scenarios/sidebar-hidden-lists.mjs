@@ -5,17 +5,26 @@
 //      sidebar_hidden_lists and the sidebar leaves them out at once.
 //   C. A hidden list keeps working: the command palette still lists it and opens it.
 //   D. Ticking them again brings them back in their places.
+//   E. The Logbook has its own row at the bottom of the sidebar; unticking "Keep the Logbook at the
+//      bottom of the sidebar" puts it back as the last of the lists on top.
 export const meta = {
   id: 'hidden-lists',
   wave: null,
   title: 'Sidebar: smart lists hidden in Settings leave the sidebar, stay in the palette and come back',
 }
 
-/** The names of the sidebar's smart lists, without their counts. */
+/** The names of the sidebar's smart lists, without their counts: the lists on top, then the Logbook's row at the bottom. */
 const sidebarLists = (page) =>
   page.evaluate(() =>
-    [...document.querySelectorAll('aside nav[aria-label="Lists"] button')].map((b) =>
+    [...document.querySelectorAll('aside nav[aria-label="Lists"] button, aside nav[aria-label="More lists"] button')].map((b) =>
       (b.textContent ?? '').replace(/\d+$/, '').trim()))
+
+/** The name of the sidebar navigation that holds the Logbook: "Lists" on top, "More lists" at the bottom. */
+const logbookNav = (page) =>
+  page.evaluate(() =>
+    [...document.querySelectorAll('aside nav')]
+      .find((nav) => [...nav.querySelectorAll('button')].some((b) => (b.textContent ?? '').trim() === 'Logbook'))
+      ?.getAttribute('aria-label') ?? null)
 
 const savedHidden = (page) => page.evaluate(async () => (await window.api.getConfig())?.sidebar_hidden_lists ?? null)
 
@@ -26,7 +35,7 @@ export default async function run(h) {
     await h.wait(400)
   }
   await h.resize(1280, 820)
-  await page.evaluate(() => window.api.saveConfigPatch({ sidebar_hidden_lists: [] }))
+  await page.evaluate(() => window.api.saveConfigPatch({ sidebar_hidden_lists: [], sidebar_logbook_bottom: true }))
   await h.goto('/today')
   await h.wait(800)
 
@@ -110,5 +119,35 @@ export default async function run(h) {
   await h.assert('nothing is left hidden', async () => {
     const saved = await savedHidden(page)
     return { ok: Array.isArray(saved) && saved.length === 0, detail: JSON.stringify(saved) }
+  })
+
+  // ---- E. The Logbook's place -----------------------------------------------------------------
+  await h.assert('the Logbook has its own row at the bottom, after the scrolling part', async () => {
+    const nav = await logbookNav(page)
+    // The row is outside the part that scrolls (so it is always in view) and comes after it.
+    const below = await page.evaluate(() => {
+      const row = document.querySelector('aside nav[aria-label="More lists"]')
+      const lists = document.querySelector('aside nav[aria-label="Lists"]')
+      const scroller = lists?.parentElement
+      if (!row || !scroller) return false
+      const after = (scroller.compareDocumentPosition(row) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0
+      return after && !scroller.contains(row) && row.getBoundingClientRect().top >= scroller.getBoundingClientRect().bottom - 1
+    })
+    return { ok: nav === 'More lists' && below, detail: `${nav}, under the scrolling part: ${below}` }
+  })
+  await h.capture('sidebar-logbook-bottom', { clip: page.locator('aside').first() })
+  await card.getByLabel('Keep the Logbook at the bottom of the sidebar').uncheck()
+  await h.wait(900)
+  await h.assert('unticked, the Logbook is the last of the lists on top', async () => {
+    const nav = await logbookNav(page)
+    const lists = await sidebarLists(page)
+    const saved = await page.evaluate(async () => (await window.api.getConfig())?.sidebar_logbook_bottom)
+    return { ok: nav === 'Lists' && lists.at(-1) === 'Logbook' && saved === false, detail: `${nav} ${JSON.stringify(lists)} ${saved}` }
+  })
+  await card.getByLabel('Keep the Logbook at the bottom of the sidebar').check()
+  await h.wait(900)
+  await h.assert('ticked again, it goes back to the bottom', async () => {
+    const nav = await logbookNav(page)
+    return { ok: nav === 'More lists', detail: String(nav) }
   })
 }

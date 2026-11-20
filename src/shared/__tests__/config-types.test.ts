@@ -5,6 +5,7 @@ import {
   CUSTOM_LIST_SORT_FIELDS,
   closeAction,
   isHiddenFromSidebar,
+  isLogbookAtSidebarBottom,
   isQuickEntryEnabled,
   isQuickViewEnabled,
   isRoutinesEnabled,
@@ -68,6 +69,13 @@ describe('lists hidden from the sidebar', () => {
     expect(isHiddenFromSidebar({ sidebar_hidden_lists: hidden }, 'logbook')).toBe(true)
     expect(isHiddenFromSidebar({ sidebar_hidden_lists: hidden }, 'today')).toBe(false)
     expect(withSidebarListHidden({ sidebar_hidden_lists: hidden }, 'logbook', false)).toEqual([])
+  })
+
+  it('the Logbook sits at the bottom of the sidebar until the person puts it back with the lists', () => {
+    expect(isLogbookAtSidebarBottom(null)).toBe(true)
+    expect(isLogbookAtSidebarBottom({})).toBe(true)
+    expect(isLogbookAtSidebarBottom({ sidebar_logbook_bottom: true })).toBe(true)
+    expect(isLogbookAtSidebarBottom({ sidebar_logbook_bottom: false })).toBe(false)
   })
 
   it('hiding twice keeps one entry and a name from a newer version stays', () => {
