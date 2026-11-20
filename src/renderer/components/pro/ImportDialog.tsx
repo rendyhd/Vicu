@@ -54,7 +54,7 @@ interface RowChoice {
  * Import (cross-app semantics 21.12, plan 7.4.2): paste the JSON Copilot gave (or a Vicu export),
  * review every row, then add the ticked ones at once with one Undo.
  */
-export function ImportDialog({ onClose, initialText = '' }: { onClose: () => void; initialText?: string }) {
+export function ImportDialog({ onClose, initialText = '', groupLabel }: { onClose: () => void; initialText?: string; groupLabel?: number }) {
   const queryClient = useQueryClient()
   const world = usePromiseWorld()
   const { data: projects } = useProjects()
@@ -138,6 +138,20 @@ export function ImportDialog({ onClose, initialText = '' }: { onClose: () => voi
       touched.push({ collection, id })
       operations.push(setRecord(collection, id, value))
     }
+    // Your own open promises: what an imported promise's `needs` may name (`t-<id>` or the id).
+    const ownOpen = new Set(world.open.filter((task) => {
+      const promise = world.promiseFor(task)
+      return promise !== null && promise !== undefined && String(promise.dir) === 'mine'
+    }).map((task) => task.id))
+    const needsOf = (needs: string[] | undefined): number[] => {
+      const ids: number[] = []
+      for (const need of needs ?? []) {
+        const found = /^t-(\d+)$/.exec(need) ?? /^(\d+)$/.exec(need)
+        const id = found ? Number(found[1]) : NaN
+        if (ownOpen.has(id) && !ids.includes(id)) ids.push(id)
+      }
+      return ids
+    }
     const make = async (title: string, due: string | null, projectId: number, person: number | null): Promise<Task> => {
       const payload = { title, ...(due ? { due_date: dateOnlyDue(due) } : {}) }
       const label = person !== null ? world.people.get(person) : undefined
@@ -162,6 +176,8 @@ export function ImportDialog({ onClose, initialText = '' }: { onClose: () => voi
             if (row.item.in_their_words) value.words = row.item.in_their_words
             if (row.item.done_when) value.done_when = row.item.done_when
             if (row.initiative) value.initiative = row.initiative
+            const needs = needsOf(row.item.needs)
+            if (needs.length) value.needs = needs
             set('promises', String(task.id), value)
             break
           }
@@ -170,7 +186,8 @@ export function ImportDialog({ onClose, initialText = '' }: { onClose: () => voi
             break
           case 'my_task': {
             const task = await make(choice.title, row.due, projectId, null)
-            if (person !== null) set('promises', String(task.id), { dir: 'mine', person, ...(row.initiative ? { initiative: row.initiative } : {}) })
+            // With no one named it is still your own promise, to the group when opened for one.
+            set('promises', String(task.id), { dir: 'mine', person, ...(person === null && groupLabel !== undefined ? { to: { group: groupLabel } } : {}), ...(row.initiative ? { initiative: row.initiative } : {}) })
             break
           }
           case 'verdict': {
@@ -186,8 +203,10 @@ export function ImportDialog({ onClose, initialText = '' }: { onClose: () => voi
             break
           }
           case 'open_item':
-            if (row.item.ask) await make(choice.title, null, projectId, person)
-            else set('log', newLedgerId(), { kind: 'unknown', text: row.item.what, at: today, initiative: row.initiative, ask: null })
+            if (row.item.ask) {
+              const task = await make(choice.title, null, projectId, person)
+              set('log', newLedgerId(), { kind: 'unknown', text: row.item.what, at: today, initiative: row.initiative, ask: person, task: task.id })
+            } else set('log', newLedgerId(), { kind: 'unknown', text: row.item.what, at: today, initiative: row.initiative, ask: null })
             break
           case 'decision':
             set('log', newLedgerId(), { kind: 'decision', text: row.item.what, by: person, at: row.item.date ?? today, initiative: row.initiative })

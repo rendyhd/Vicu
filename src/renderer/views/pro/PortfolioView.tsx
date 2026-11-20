@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useNavigate } from '@tanstack/react-router'
 import { ArrowDown, ArrowUp, PauseCircle, Play } from 'lucide-react'
 import { cn } from '@/lib/cn'
@@ -20,6 +21,7 @@ const ICON = 'rounded-control p-1 text-text-secondary hover:bg-bg-hover hover:te
  * then parked and closed ones. Moving one logs a decision; parking asks why.
  */
 export function PortfolioView() {
+  const { t } = useTranslation()
   const pro = usePro()
   const portfolio = usePortfolio()
   const people = usePersonLabels()
@@ -53,12 +55,12 @@ export function PortfolioView() {
       <div className="mx-auto w-full max-w-reading px-6 pb-10">
         <div className="mb-4" data-pro-cap>
           <div className="mb-1 flex items-center justify-between text-meta text-text">
-            <span>{portfolio.cap.active} of {portfolio.cap.cap} active{portfolio.cap.agreed ? ', agreed' : ', not agreed yet'}</span>
+            <span>{portfolio.cap.unlimited ? t('pro.groundwork.activeNoLimit', { count: portfolio.cap.active }) : `${portfolio.cap.active} of ${portfolio.cap.cap} active${portfolio.cap.agreed ? ', agreed' : ', not agreed yet'}`}</span>
             {portfolio.cap.full && <span className="text-status-overdue">At the cap: park one before starting another</span>}
           </div>
           <div className="flex h-2 gap-1" aria-hidden>
-            {Array.from({ length: Math.max(portfolio.cap.cap, portfolio.cap.active) }, (_, index) => (
-              <span key={index} className={cn('flex-1 rounded-full', index < portfolio.cap.active ? (index < portfolio.cap.cap ? 'bg-accent-purple' : 'bg-status-overdue') : 'bg-bg-hover')} />
+            {Array.from({ length: portfolio.cap.unlimited ? portfolio.cap.active : Math.max(portfolio.cap.cap, portfolio.cap.active) }, (_, index) => (
+              <span key={index} className={cn('flex-1 rounded-full', index < portfolio.cap.active ? (portfolio.cap.unlimited || index < portfolio.cap.cap ? 'bg-accent-purple' : 'bg-status-overdue') : 'bg-bg-hover')} />
             ))}
           </div>
         </div>

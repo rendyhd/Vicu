@@ -14,7 +14,8 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { useQueryClient } from '@tanstack/react-query'
-import { finishProCapture, proPersonLabelId, withProFields } from '@/lib/pro/capture'
+import { finishProCapture, groupLabelOf, initiativeOfProject, proPersonLabelId, withProFields } from '@/lib/pro/capture'
+import { useGroups } from '@/hooks/use-groups'
 import { useProUiStore } from '@/stores/pro-ui-store'
 import { currentLedger, setRecord, writeLedger } from '@/hooks/use-pro-ledger'
 import { confirmDelete } from '@/lib/confirm-bridge'
@@ -83,6 +84,8 @@ interface PartialFailure {
 export interface NewTaskComposerProps {
   projectId: number
   defaultDueDate?: Date
+  /** Labels a new task starts with (a group's page: its actions carry the group's label). */
+  defaultLabelIds?: readonly number[]
   inputRef?: React.Ref<HTMLInputElement>
   onCancel: () => void
   onCreated?: (task: Task) => void
@@ -135,6 +138,7 @@ function ActionButton({ active, label, children, onClick, buttonRef, popup, expa
 export function NewTaskComposer({
   projectId,
   defaultDueDate,
+  defaultLabelIds,
   inputRef,
   onCancel,
   onCreated,
@@ -149,6 +153,8 @@ export function NewTaskComposer({
   const parser = useTaskParser(locations.places)
   // Pro's people, suggested after `$` (contract 5.5); empty while the promises layer is off.
   const people = usePeople()
+  // Pro's groups (21.16): a person's promise on a task with a group's label is made to that group.
+  const groupLabelIds = useGroups().labelIds
   const dateFormat = useDateFormat()
   const { data: labels = [] } = useLabels()
   const { data: projects } = useProjects()
@@ -190,7 +196,7 @@ export function NewTaskComposer({
   const [repeatMode, setRepeatMode] = useState(template?.repeat_mode ?? 0)
   const [recurrenceTouched, setRecurrenceTouched] = useState(!!template)
   const [reminders, setReminders] = useState<TaskReminder[]>(() => (template?.reminders ?? []) as TaskReminder[])
-  const [selectedLabelIds, setSelectedLabelIds] = useState<number[]>(template?.labels ?? [])
+  const [selectedLabelIds, setSelectedLabelIds] = useState<number[]>(template?.labels ?? [...(defaultLabelIds ?? [])])
   const [selectedProjectId, setSelectedProjectId] = useState(projectId)
   const [projectTouched, setProjectTouched] = useState(!!template)
   const [attachments, setAttachments] = useState<DraftAttachment[]>([])
@@ -287,7 +293,7 @@ export function NewTaskComposer({
     setRepeatMode(0)
     setRecurrenceTouched(false)
     setReminders([])
-    setSelectedLabelIds([])
+    setSelectedLabelIds([...(defaultLabelIds ?? [])])
     setSelectedProjectId(projectId)
     setProjectTouched(false)
     setAttachments([])
@@ -432,6 +438,15 @@ export function NewTaskComposer({
           toast.info(`${name} could not be made a person (${made.error}), so the name stays in the title.`)
         }
       }
+      // Who it was promised to (5.5), when that names nobody yet: made a person too; when that fails
+      // the name is kept in words (21.6, `to.text`).
+      if (parsed?.requester && parsed.requester.id === null) {
+        const made = await api.ensurePerson(parsed.requester.name).catch(() => null)
+        if (made?.success) {
+          parsed = { ...parsed, requester: { id: made.data.id } }
+          void queryClient.invalidateQueries({ queryKey: ['labels'] })
+        }
+      }
       const title = parsed?.title.trim() || (parser.enabled ? rawTitle : '')
       if (!title) throw new Error('Enter a task title')
 
@@ -484,7 +499,12 @@ export function NewTaskComposer({
         description: draftDescription,
       })
       const task = await createTask.mutateAsync({ projectId: targetProjectId, task: payload, extras })
-      void finishProCapture(queryClient, task, parsed, promiseDraft)
+      const namedLabelIds = labelNames.flatMap((name) => labels.find((label) => label.title.toLowerCase() === name.toLowerCase())?.id ?? [])
+      void finishProCapture(queryClient, task, parsed, {
+        ...promiseDraft,
+        initiative: initiativeOfProject(currentLedger(queryClient), targetProjectId),
+        group: groupLabelOf([...explicitLabels.map((label) => label.id), ...namedLabelIds], groupLabelIds),
+      })
       // `req:` (5.5): the new task opens in triage, next to the portfolio.
       if (parsed?.request) useProUiStore.getState().setTriageTask(task)
       const place = parsed?.place

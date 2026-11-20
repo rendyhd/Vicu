@@ -46,6 +46,7 @@ import { useSubtasks } from '@/hooks/use-subtasks'
 import { useHasLocationReminder } from '@/hooks/use-location-reminders'
 import { useAvailability, useReasonText } from '@/hooks/use-availability'
 import { usePromiseOf } from '@/hooks/use-promises'
+import { PromiseLine } from '@/components/pro/PromiseLine'
 import { usePersonLabels } from '@/hooks/use-people'
 import { PersonMark } from '@/components/pro/PersonMark'
 import { VerdictBar, verdictForKey } from '@/components/pro/VerdictBar'
@@ -857,8 +858,7 @@ function TaskRowInner({
                 </span>
               )}
               {unavailableReason && !theirs && <span className="min-w-0 shrink truncate" data-pro-reason>{unavailableReason}</span>}
-              {theirs && <span className="shrink-0" data-pro-promise="theirs">From {promiseName}</span>}
-              {mine && <span className="shrink-0" data-pro-promise="mine">For {promiseName}</span>}
+              {promise && (theirs || mine) && <PromiseLine promise={promise} personName={promiseName} theirs={theirs} />}
               {promise?.words && <span className="min-w-0 shrink truncate italic">&ldquo;{promise.words}&rdquo;</span>}
               {promise && isSent(promise) && (
                 <span className="vicu-chip shrink-0 rounded-chip bg-accent-blue/12 px-2 py-px text-chip leading-tight text-accent-blue">In recap</span>

@@ -3,6 +3,7 @@ import { useNavigate, useMatches } from '@tanstack/react-router'
 import { Briefcase, ChevronRight, Flag, Hourglass, Layers, Users, type LucideIcon } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { SelectionPill } from './SelectionPill'
+import { GroupNav } from './GroupNav'
 import { usePro } from '@/hooks/use-pro'
 import { useProSectionCollapsed } from '@/hooks/use-sidebar-collapsed'
 import type { ProLayer } from '../../../shared/pro/settings'
@@ -87,6 +88,7 @@ export function ProNav() {
               </button>
             )
           })}
+          <GroupNav currentPath={currentPath} />
         </nav>
       )}
     </div>

@@ -1,8 +1,10 @@
 import { useMemo } from 'react'
 import { useParams } from '@tanstack/react-router'
+import { useTranslation } from 'react-i18next'
 import { Copy, FileInput, MessageSquareQuote, Send } from 'lucide-react'
 import { usePromiseWorld } from '@/hooks/use-promise-world'
 import { useProPrefs } from '@/hooks/use-pro-prefs'
+import { useGroups } from '@/hooks/use-groups'
 import { useLabels } from '@/hooks/use-labels'
 import { useProjects } from '@/hooks/use-projects'
 import { api } from '@/lib/api'
@@ -22,6 +24,8 @@ import { finalVerdictOf, recordValue } from '../../../shared/pro/ledger'
 import { matchPerson, patternText, personCounts } from '../../../shared/pro/people'
 import { readConfirmTitle } from '../../../shared/pro/promises'
 import { exportOpen } from '../../../shared/pro/import'
+import { personPage, type PersonPart } from '../../../shared/pro/groups'
+import type { Task } from '@/lib/vikunja-types'
 
 const ACTION = 'inline-flex items-center gap-1.5 rounded-control border border-border px-2.5 py-1 text-meta text-text hover:bg-bg-hover'
 
@@ -32,7 +36,9 @@ const ACTION = 'inline-flex items-center gap-1.5 rounded-control border border-b
 export function PersonView() {
   const { labelId } = useParams({ from: '/person/$labelId' })
   const id = Number(labelId)
+  const { t } = useTranslation()
   const world = usePromiseWorld()
+  const groups = useGroups()
   const prefs = useProPrefs()
   const { data: labels } = useLabels()
   const { data: projects } = useProjects()
@@ -59,6 +65,8 @@ export function PersonView() {
     return { theirs, mine, confirm }
   }, [world, id])
 
+  // What they promised, by who it was promised to and by group (21.5).
+  const promised = useMemo(() => personPage(id, sections.theirs, world.ledger, groups.labelIds), [id, sections.theirs, world.ledger, groups.labelIds])
   const counts = useMemo(() => personCounts(id, world.ledger, (taskId) => world.openById.has(taskId), today), [id, world, today])
   const agenda = useMemo(() => personAgenda(name, sections.theirs, sections.mine, world, today), [name, sections, world, today])
 
@@ -85,6 +93,25 @@ export function PersonView() {
     const json = exportOpen(name, today, openPromises(world, projectTitle, (_task, person) => person === id))
     await api.writeClipboardRich(json)
     toast.success('Open promises copied for Copilot')
+  }
+
+  // Without a group and with nothing promised to anyone else, the page is as it was.
+  const plain = promised.toOthers.length === 0 && promised.toYou.every((part) => part.group === null)
+  const theirsById = new Map(sections.theirs.map((task) => [task.id, task]))
+  const promisedPart = (key: string, title: string, parts: readonly PersonPart[]) => {
+    const count = parts.reduce((sum, part) => sum + part.tasks.length, 0)
+    if (count === 0) return null
+    return (
+      <div data-pro-promised={key}>
+        <ListSectionHeader level={1} title={title} count={count} />
+        {parts.map((part) => (
+          <div key={String(part.group)} data-pro-promised-group={part.group ?? 'none'}>
+            <ListSectionHeader level={2} title={part.group === null ? t('pro.person.outsideGroup') : groups.nameOf(part.group)} count={part.tasks.length} />
+            <TaskRowGroup>{part.tasks.flatMap((taskId): Task[] => { const task = theirsById.get(taskId); return task ? [task] : [] }).map((task) => <TaskRow key={task.id} task={task} />)}</TaskRowGroup>
+          </div>
+        ))}
+      </div>
+    )
   }
 
   return (
@@ -117,12 +144,14 @@ export function PersonView() {
           ))}
         </ul>
       </div>
-      {sections.theirs.length > 0 && (
+      {plain && sections.theirs.length > 0 && (
         <div>
           <ListSectionHeader level={1} title={`From ${name}`} count={sections.theirs.length} />
           <TaskRowGroup>{sections.theirs.map((task) => <TaskRow key={task.id} task={task} />)}</TaskRowGroup>
         </div>
       )}
+      {!plain && promisedPart('to-you', t('pro.person.toYou'), promised.toYou)}
+      {!plain && promisedPart('to-others', t('pro.person.toOthers'), promised.toOthers)}
       {sections.mine.length > 0 && (
         <div>
           <ListSectionHeader level={1} title={`You owe ${name}`} count={sections.mine.length} />

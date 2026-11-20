@@ -4,7 +4,7 @@ import type { CreateTaskPayload, Task } from '@/lib/vikunja-types'
 import { sendTaskPatch } from '@/lib/offline-mutations'
 import { writeLedger } from '@/hooks/use-pro-ledger'
 import type { ProLedgerOperation } from '../../../shared/pro/ledger-ipc'
-import type { PromiseValue } from '../../../shared/pro/ledger'
+import { recordValue, type PromiseValue, type ProLedger } from '../../../shared/pro/ledger'
 
 /**
  * What Pro's quick-add phrases (cross-app semantics 5.5) add to a new task. Off, the parser reads
@@ -26,6 +26,23 @@ export interface PromiseDraft {
   words?: string | null
   done_when?: string | null
   needs?: number[]
+  /** The project id of the initiative the task's project is. */
+  initiative?: number | null
+  /** The lowest group label on the task (21.16): a person's promise there is made to the group. */
+  group?: number | null
+}
+
+/** The lowest of a task's labels that is a group's, or null. */
+export function groupLabelOf(labelIds: Iterable<number>, groupLabels: ReadonlySet<number>): number | null {
+  const found = [...labelIds].filter((id) => groupLabels.has(id)).sort((a, b) => a - b)
+  return found.length ? found[0] : null
+}
+
+/** The project when it is an active or parked initiative, else null. */
+export function initiativeOfProject(ledger: ProLedger, projectId: number | null | undefined): number | null {
+  if (typeof projectId !== 'number') return null
+  const status = recordValue(ledger.initiatives, projectId)?.status
+  return status === 'active' || status === 'parked' ? projectId : null
 }
 
 export function proCaptureOperations(parsed: ParseResult | null | undefined, taskId: number, draft: PromiseDraft = {}): ProLedgerOperation[] {
@@ -37,6 +54,12 @@ export function proCaptureOperations(parsed: ParseResult | null | undefined, tas
     if (draft.words?.trim()) value.words = draft.words.trim()
     if (draft.done_when?.trim()) value.done_when = draft.done_when.trim()
     if (draft.needs?.length) value.needs = draft.needs
+    if (typeof draft.initiative === 'number') value.initiative = draft.initiative
+    // Who it was promised to (21.6): the one the text names, else the group whose label the task
+    // carries when the promise is theirs; without either, you.
+    if (parsed.requester) value.to = parsed.requester.id !== null ? { person: parsed.requester.id } : { text: parsed.requester.name }
+    else if (!parsed.person.mine && typeof draft.group === 'number') value.to = { group: draft.group }
+    if (parsed.checkOn) value.check_on = parsed.checkOn
     operations.push({ op: 'set', collection: 'promises', id: String(taskId), value })
   }
   return operations

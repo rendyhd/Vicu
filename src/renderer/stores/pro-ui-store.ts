@@ -12,7 +12,7 @@ interface ProUiState {
   setFocusPickerOpen: (open: boolean) => void
   /** The Pro dialog on screen, with what it starts from (pasted text, a person, a meeting round). */
   dialog: ProDialog | null
-  dialogInput: { text?: string; personId?: number; roundId?: string; projectId?: number } | null
+  dialogInput: { text?: string; personId?: number; roundId?: string; projectId?: number; groupLabel?: number } | null
   open: (dialog: ProDialog, input?: ProUiState['dialogInput']) => void
   close: () => void
   /** An initiative to start once one is parked (the cap is full). */

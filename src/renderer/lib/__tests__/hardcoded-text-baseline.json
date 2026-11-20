@@ -69,7 +69,7 @@
   "src/renderer/components/pro/PromiseDrafts.tsx": 9,
   "src/renderer/components/pro/RecapDialog.tsx": 11,
   "src/renderer/components/pro/RepeatRuleFields.tsx": 9,
-  "src/renderer/components/pro/TriageDialog.tsx": 20,
+  "src/renderer/components/pro/TriageDialog.tsx": 19,
   "src/renderer/components/pro/VerdictBar.tsx": 12,
   "src/renderer/components/pro/ViewSwitch.tsx": 10,
   "src/renderer/components/pro/WeeklyProSteps.tsx": 6,
@@ -128,7 +128,7 @@
   "src/renderer/components/task-list/TaskContextMenu.tsx": 27,
   "src/renderer/components/task-list/TaskDescription.tsx": 6,
   "src/renderer/components/task-list/TaskList.tsx": 4,
-  "src/renderer/components/task-list/TaskRow.tsx": 18,
+  "src/renderer/components/task-list/TaskRow.tsx": 16,
   "src/renderer/components/task-list/TaskSyncIcon.tsx": 4,
   "src/renderer/components/task-list/TaskTable.tsx": 5,
   "src/renderer/components/task-list/TemplateEditHost.tsx": 2,
@@ -188,7 +188,7 @@
   "src/renderer/views/pro/MeetingView.tsx": 25,
   "src/renderer/views/pro/PeopleView.tsx": 12,
   "src/renderer/views/pro/PersonView.tsx": 13,
-  "src/renderer/views/pro/PortfolioView.tsx": 20,
+  "src/renderer/views/pro/PortfolioView.tsx": 17,
   "src/renderer/views/pro/SponsorView.tsx": 24,
   "src/renderer/views/pro/WaitingOnView.tsx": 4
 }

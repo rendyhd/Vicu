@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Dialog } from '@/components/overlay/Dialog'
 import { usePortfolio } from '@/hooks/use-portfolio'
 import { usePersonLabels } from '@/hooks/use-people'
@@ -22,6 +23,7 @@ const OPTION = 'rounded-chip border px-2.5 py-1 text-meta'
  * sponsor (a decision owed). A reply to send back is copied.
  */
 export function TriageDialog({ task, onClose }: { task: Task; onClose: () => void }) {
+  const { t } = useTranslation()
   const portfolio = usePortfolio()
   const people = usePersonLabels()
   const update = useUpdateTask()
@@ -75,7 +77,7 @@ export function TriageDialog({ task, onClose }: { task: Task; onClose: () => voi
   return (
     <Dialog open label="Request" onClose={onClose} className="w-[600px] max-w-[92vw] p-5">
       <h2 className="mb-1 text-card-title text-text">Request: {title}</h2>
-      <p className="mb-3 text-meta text-text-secondary">{portfolio.cap.active} of {portfolio.cap.cap} initiatives are active. Weigh it against them.</p>
+      <p className="mb-3 text-meta text-text-secondary">{portfolio.cap.unlimited ? t('pro.groundwork.triageNoLimit', { count: portfolio.cap.active }) : `${portfolio.cap.active} of ${portfolio.cap.cap} initiatives are active. Weigh it against them.`}</p>
       <ol className="mb-4 divide-y divide-border rounded-card border border-border">
         {portfolio.ranked.map((entry) => (
           <li key={entry.projectId} className="flex items-center gap-3 px-3 py-1.5 text-meta text-text">

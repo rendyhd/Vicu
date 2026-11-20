@@ -10,7 +10,7 @@ import { capState, moveRank, parkedValue, rankedInitiatives, unparkedValue } fro
 
 /**
  * The portfolio (cross-app semantics 21.10): initiatives, their rank, the cap, parking and the log.
- * Every change is a ledger write with Undo; a rank change is logged as a decision.
+ * Every change is a ledger write with Undo; parking is logged as a decision, a rank change is not.
  */
 export function usePortfolio() {
   const queryClient = useQueryClient()
@@ -58,7 +58,6 @@ export function usePortfolio() {
             const current = value(Number(id))
             if (current && current.rank !== rank) touch('initiatives', id, { ...current, rank })
           }
-          log(touch, { kind: 'decision', text: `${titleOf(projectId)} moved to rank ${toIndex + 1}`, initiative: projectId })
         }),
       park: (projectId: number, reason: string) =>
         write(`${titleOf(projectId)} parked`, (_ops, touch) => {

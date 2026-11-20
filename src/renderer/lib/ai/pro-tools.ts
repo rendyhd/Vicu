@@ -117,7 +117,7 @@ function getPortfolio(ctx: ToolContext, data: ProToolData) {
     return value?.status === 'parked' ? [{ name: pathOf(ctx.ws, Number(id)), reason: value.parked?.reason ?? null, since: value.parked?.on ?? null }] : []
   })
   return {
-    cap: { active: cap.active, cap: cap.cap, agreed: cap.agreed },
+    cap: cap.unlimited ? { active: cap.active, cap: 'no limit', agreed: cap.agreed } : { active: cap.active, cap: cap.cap, agreed: cap.agreed },
     initiatives: rankedInitiatives(ledger).map((entry) => {
       const ready = readiness(entry.value)
       return {

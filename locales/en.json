@@ -634,6 +634,7 @@
         "title": "Portfolio",
         "note": "Shared with your other devices.",
         "cap": "Active initiatives at most",
+        "noLimit": "No limit",
         "agreedWith": "Agreed with",
         "notAgreed": "Not agreed yet",
         "outsider": "Someone not in Vicu",
@@ -998,8 +999,241 @@
     "notImage": "The page is not an image."
   },
   "pro": {
+    "groundwork": {
+      "activeNoLimit": "{{count}} active, no limit",
+      "triageNoLimit_one": "{{count}} initiative is active. Weigh it against it.",
+      "triageNoLimit_other": "{{count}} initiatives are active. Weigh it against them.",
+      "initiative": "Initiative",
+      "initiativeNone": "None",
+      "meetingInitiatives": "Initiatives"
+    },
     "weekly": {
       "noteHint": "The weekly note to leadership, from this week's verdicts, decisions and issues."
+    },
+    "group": {
+      "title": "Group",
+      "you": "You",
+      "someone": "Someone",
+      "noOwner": "No owner",
+      "isPerson": "This label is a person, so it cannot be a group.",
+      "notGroup": "This label is not a group.",
+      "makeGroup": "Make this a group",
+      "edit": "Edit",
+      "start": "Start {{kind}}",
+      "copyAgenda": "Copy {{kind}} agenda",
+      "agendaCopied": "Agenda copied",
+      "noSession": "No session yet. The counts start after the first one.",
+      "reliability_one": "Last session: {{onTime}} of {{total}} on time, {{late}} late, {{pastDue}} open past their date.",
+      "reliability_other": "Last {{count}} sessions: {{onTime}} of {{total}} on time, {{late}} late, {{pastDue}} open past their date.",
+      "reliabilityMore": "{{dropped}} dropped, {{takenOver}} done by you.",
+      "sessions": "Past sessions",
+      "recapNotCopied": "Recap not copied",
+      "scoreHint": "Your own score for this session. It is never copied.",
+      "kind": {
+        "weekly": "weekly",
+        "standup": "stand-up"
+      },
+      "part": {
+        "overdue": "Overdue since the last session",
+        "due": "Due now",
+        "dueNoSession": "Due",
+        "fresh": "New since the last session",
+        "open": "Open",
+        "yours": "Yours",
+        "done": "Done since the last session",
+        "doneRecent": "Done in the last 7 days"
+      },
+      "nav": {
+        "new": "New group"
+      },
+      "log": {
+        "issues": "Issues",
+        "addIssue": "Add an issue",
+        "noIssues": "No open issues.",
+        "up": "Move up: {{text}}",
+        "down": "Move down: {{text}}",
+        "solve": "Solved: {{text}}",
+        "decisions": "Decisions",
+        "addDecision": "Add a decision",
+        "noDecisions": "No decisions yet.",
+        "decidedBy": "{{name}}, {{date}}",
+        "notShared": "not shared yet",
+        "questions": "Open questions",
+        "addQuestion": "Add a question",
+        "noQuestions": "No open questions.",
+        "answered": "Answered: {{text}}",
+        "add": "Add",
+        "makeAction": "Make an action: {{text}}"
+      },
+      "dialog": {
+        "edit": "Edit group",
+        "new": "New group",
+        "name": "Name",
+        "label": "Label",
+        "newLabel": "A new label with this name",
+        "labelHint": "A task with this label is an action of the group.",
+        "people": "People, in the order they report",
+        "earlier": "Move {{name}} earlier",
+        "later": "Move {{name}} later",
+        "remove": "Remove {{name}}",
+        "addPerson": "Add a person",
+        "sessions": "Sessions",
+        "checks": "Check actions before they are due",
+        "checksHint": "A line in Follow-ups a few working days before an action's date, with a message to copy.",
+        "language": "Language of copied text",
+        "languageDefault": "The default (Settings, Pro)",
+        "unmark": "No longer a group",
+        "cancel": "Cancel",
+        "save": "Save"
+      },
+      "withoutOwner": "Without an owner",
+      "withoutOwnerHint": "Give one to a person with the task's Promise chip, or take it yourself.",
+      "takeIt": "I own this"
+    },
+    "person": {
+      "toYou": "Promised to you",
+      "toOthers": "Promised to others",
+      "outsideGroup": "Outside a group"
+    },
+    "promise": {
+      "from": "From {{name}}",
+      "for": "For {{name}}",
+      "fromFor": "From {{owner}}, for {{requester}}",
+      "yours": "Yours",
+      "yoursFor": "Yours, for {{requester}}"
+    },
+    "chip": {
+      "requester": "Promised to {{name}}",
+      "checkOn": "Check on {{date}}"
+    },
+    "session": {
+      "title": "{{group}}: {{kind}}",
+      "notFound": "Group not found",
+      "back": "Back to People",
+      "toGroup": "Back to the group",
+      "start": "Start session",
+      "end": "End session",
+      "discard": "Leave without saving",
+      "steps": "Steps",
+      "next": "Next step",
+      "step": {
+        "actions": "Actions",
+        "issues": "Issues",
+        "new": "New actions and decisions",
+        "readback": "Read back"
+      },
+      "absent": "Not here:",
+      "needVerdict": "Need a verdict",
+      "otherOpen": "Other open actions",
+      "nothingOpen": "No open actions.",
+      "verdictHint": "On an action: click the person's mark, or press 1 to 5, to give the verdict.",
+      "startHint": "Start the session to give verdicts and capture what is agreed. Nothing is timed.",
+      "captured": "Captured in this session",
+      "noCaptured": "Nothing yet. A task added here carries the group's label.",
+      "actionMade": "Action made: {{title}}",
+      "readBackHint": "Read this aloud before you close, so everyone hears the same decisions and actions.",
+      "readBackDone": "Read back to the room",
+      "score": "Your score",
+      "scoreNone": "None",
+      "recap": {
+        "title": "Session recap",
+        "language": "Language",
+        "loading": "Reading the session...",
+        "missing": "This session has no recap.",
+        "note": "Copy it into a mail or a chat. Copying marks the actions in it as sent.",
+        "later": "Later",
+        "copy": "Copy",
+        "copyMarkdown": "Copy as Markdown",
+        "copied_one": "Recap copied; {{count}} action marked as sent",
+        "copied_other": "Recap copied; {{count}} actions marked as sent",
+        "undo": "Undo"
+      }
+    }
+  },
+  "proText": {
+    "agenda": {
+      "title": {
+        "weekly": "Agenda: {{group}} weekly, {{date}}",
+        "standup": "Agenda: {{group}} stand-up, {{date}}"
+      },
+      "close": "Close: read back the decisions and new actions."
+    },
+    "recap": {
+      "title": {
+        "weekly": "{{group}} weekly, {{date}}",
+        "standup": "{{group}} stand-up, {{date}}"
+      },
+      "nothing": "Nothing was decided or changed."
+    },
+    "readback": {
+      "title": "Read-back: {{group}}, {{date}}",
+      "nothing": "No decisions or new actions."
+    },
+    "heading": {
+      "actionsDue": "Actions due",
+      "actionsOpen": "Other open actions",
+      "issues": "Open issues",
+      "decisions": "Decisions",
+      "newActions": "New actions",
+      "delivered": "Delivered",
+      "changed": "Changed",
+      "issuesSolved": "Issues solved",
+      "questions": "Open questions"
+    },
+    "action": {
+      "owner": "{{owner}}: {{title}}, by {{date}}",
+      "ownerNoDate": "{{owner}}: {{title}}",
+      "forPerson": "{{owner}} for {{requester}}: {{title}}, by {{date}}",
+      "forPersonNoDate": "{{owner}} for {{requester}}: {{title}}",
+      "noOwner": "No owner: {{title}}, by {{date}}",
+      "noOwnerNoDate": "No owner: {{title}}",
+      "delivered": "{{owner}}: {{title}}",
+      "deliveredLate": "{{owner}}: {{title}} (late)",
+      "dropped": "{{owner}}: {{title}} (dropped)",
+      "takenOver": "{{owner}}: {{title}} (done by {{me}})",
+      "newDate": "{{owner}}: {{title}}, new date {{date}}",
+      "newDateBlocker": "{{owner}}: {{title}}, new date {{date}} ({{blocker}})",
+      "notYet": "{{owner}}: {{title}}, not yet",
+      "notYetBlocker": "{{owner}}: {{title}}, not yet ({{blocker}})"
+    },
+    "decision": {
+      "plain": "{{text}}",
+      "by": "{{text}} (decided by {{by}})"
+    },
+    "absent": "Absent: {{names}}",
+    "check": {
+      "one": "Hi {{name}}, checking one thing: {{title}} ({{date}}). Still on track?",
+      "oneNoDate": "Hi {{name}}, checking one thing: {{title}}. Still on track?",
+      "intro_one": "Hi {{name}}, checking {{count}} thing:",
+      "intro_other": "Hi {{name}}, checking {{count}} things:",
+      "item": "{{title}} ({{date}})",
+      "itemNoDate": "{{title}}",
+      "close": "Still on track?"
+    },
+    "note": {
+      "title": "Weekly note, {{from}} to {{to}}",
+      "onTime_one": "{{count}} action delivered on time",
+      "onTime_other": "{{count}} actions delivered on time",
+      "late_one": "{{count}} action delivered late",
+      "late_other": "{{count}} actions delivered late",
+      "dropped_one": "{{count}} action dropped",
+      "dropped_other": "{{count}} actions dropped",
+      "takenOver_one": "{{count}} action done by {{me}}",
+      "takenOver_other": "{{count}} actions done by {{me}}",
+      "slipped": {
+        "newDate": "Slipped: {{owner}}: {{title}}, new date {{date}}",
+        "newDateBlocker": "Slipped: {{owner}}: {{title}}, new date {{date}} ({{blocker}})",
+        "notYet": "Slipped: {{owner}}: {{title}}, not yet",
+        "notYetBlocker": "Slipped: {{owner}}: {{title}}, not yet ({{blocker}})"
+      },
+      "decision": "Decision: {{text}}",
+      "issue": "Open issue: {{text}}",
+      "pastDue_one": "{{count}} action open past its date",
+      "pastDue_other": "{{count}} actions open past their date",
+      "nextWeek_one": "{{count}} action due in the next 7 days",
+      "nextWeek_other": "{{count}} actions due in the next 7 days",
+      "nothing": "Nothing to report.",
+      "noGroups": "No groups yet."
     }
   }
 }

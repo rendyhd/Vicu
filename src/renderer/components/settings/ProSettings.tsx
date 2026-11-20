@@ -212,16 +212,25 @@ function PortfolioSettings() {
       <p className="mb-4 text-xs text-[var(--text-secondary)]">{t('settings.pro.portfolio.note')}</p>
       <div className="space-y-4">
         <label className="flex items-center justify-between gap-3">
+          <span className="text-sm text-[var(--text-primary)]">{t('settings.pro.portfolio.noLimit')}</span>
+          <input
+            type="checkbox"
+            checked={settings.cap_off === true}
+            onChange={(event) => write({ cap_off: event.target.checked })}
+          />
+        </label>
+        <label className="flex items-center justify-between gap-3">
           <span className="text-sm text-[var(--text-primary)]">{t('settings.pro.portfolio.cap')}</span>
           <input
             type="number"
             min={1}
             max={50}
             className={`${FIELD} w-20`}
+            disabled={settings.cap_off === true}
             value={settings.cap}
             onChange={(event) => {
               const cap = Math.floor(Number(event.target.value))
-              if (cap >= 1) write({ cap, cap_agreed: null })
+              if (cap >= 1) write({ cap, cap_off: false, cap_agreed: null })
             }}
           />
         </label>

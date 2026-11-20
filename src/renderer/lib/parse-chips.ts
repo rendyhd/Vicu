@@ -3,6 +3,7 @@ import { formatDateChip } from './date-utils'
 import { formatBlockRange, type DateFormat } from './date-display'
 import { getDateFormat } from './date-format'
 import { locationReminderLabel, type LocationTrigger } from '../../shared/synced-prefs'
+import { t } from '../../shared/i18n'
 
 // The chips under a quick-add input: one builder for the composer, the title editor and Quick
 // Entry, so the same parse gives the same words everywhere. Pure: no React, no DOM.
@@ -63,6 +64,18 @@ export function parseChips(result: ParseResult, fmt: DateFormat = getDateFormat(
   // Pro's phrases (cross-app semantics 5.5); the parser reads them only while Pro is on.
   const person = personChip(result)
   if (person) chips.push(person)
+  // Who it was promised to, and the day to look at it again (5.5).
+  if (result.requester) {
+    const token = result.tokens.find((entry) => entry.type === 'requester')
+    const name = result.requester.id === null
+      ? result.requester.name
+      : (token?.raw ?? '').replace(/^fors+/i, '').replace(/^$/, '').replace(/^"(.*)"$/, '$1').trim()
+    chips.push({ type: 'requester', label: t('pro.chip.requester', { name }), key: 'requester', source: 'text' })
+  }
+  if (result.checkOn) {
+    const [year, month, day] = result.checkOn.split('-').map(Number)
+    chips.push({ type: 'checkOn', label: t('pro.chip.checkOn', { date: formatDateChip(new Date(year, month - 1, day), true, now, fmt) }), key: 'checkOn', source: 'text' })
+  }
   if (result.start && !result.block) {
     chips.push({ type: 'start', label: `Starts ${formatDateChip(result.start, true, now, fmt)}`, key: 'start', source: 'text' })
   }

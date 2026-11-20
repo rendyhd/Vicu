@@ -1,6 +1,6 @@
 import { createInstance, type ParseKeys, type TFunction } from 'i18next'
-import { SOURCE_CATALOG, loadCatalog } from './catalogs'
-import { SOURCE_LANGUAGE } from './languages'
+import { SOURCE_CATALOG, availableLanguages, loadCatalog } from './catalogs'
+import { SOURCE_LANGUAGE, matchLanguage } from './languages'
 
 // The app's text in the reader's language (docs/translating.md for translators, CLAUDE.md
 // "Translations" for the rules in code). One i18next instance per process and window, ready as
@@ -74,6 +74,20 @@ export function currentLanguage(): string {
 export function onLanguageChange(listener: (language: string) => void): () => void {
   i18n.on('languageChanged', listener)
   return () => { i18n.off('languageChanged', listener) }
+}
+
+/**
+ * `t` fixed to a language other than the one shown: text Vicu writes for other people is in the
+ * language chosen for it (cross-app semantics 21.19). Loads that catalog on first use; a language
+ * without a catalog, and a key it lacks, reads English.
+ */
+export async function translatorFor(tag: string): Promise<{ language: string; t: TFunction }> {
+  const language = matchLanguage([tag], availableLanguages(false)) ?? SOURCE_LANGUAGE
+  if (language !== SOURCE_LANGUAGE && !i18n.hasResourceBundle(language, NAMESPACE)) {
+    const catalog = await loadCatalog(language)
+    if (catalog) i18n.addResourceBundle(language, NAMESPACE, catalog, true, true)
+  }
+  return { language, t: i18n.getFixedT(language) }
 }
 
 export { availableLanguages } from './catalogs'

@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
+import { usePortfolio } from '@/hooks/use-portfolio'
 import { useQueryClient } from '@tanstack/react-query'
 import { ArrowDown, ArrowUp, X } from 'lucide-react'
 import { Dialog } from '@/components/overlay/Dialog'
@@ -13,11 +15,14 @@ const RHYTHMS = ['', 'weekly', 'every two weeks', 'monthly']
  * and how often it meets. Kept in the ledger, so every device knows it.
  */
 export function MeetingDialog({ meeting, id, onClose }: { meeting?: MeetingValue | null; id?: string; onClose: () => void }) {
+  const { t } = useTranslation()
+  const portfolio = usePortfolio()
   const queryClient = useQueryClient()
   const people = usePersonLabels()
   const [name, setName] = useState(meeting?.name ?? '')
   const [order, setOrder] = useState<number[]>(meeting?.people ?? [])
   const [rhythm, setRhythm] = useState(meeting?.rhythm ?? '')
+  const [initiatives, setInitiatives] = useState<number[]>(meeting?.initiatives ?? [])
   const others = [...people.values()].filter((label) => !order.includes(label.id))
 
   const move = (index: number, by: number) => {
@@ -28,6 +33,8 @@ export function MeetingDialog({ meeting, id, onClose }: { meeting?: MeetingValue
   }
   const save = () => {
     const value: MeetingValue = { ...(meeting ?? {}), name: name.trim(), people: order, rhythm: rhythm || null }
+    if (initiatives.length) value.initiatives = initiatives
+    else delete value.initiatives
     void writeLedger(queryClient, [setRecord('meetings', id ?? newLedgerId(), value)])
     onClose()
   }
@@ -52,6 +59,25 @@ export function MeetingDialog({ meeting, id, onClose }: { meeting?: MeetingValue
           <option value="">Add a person</option>
           {others.map((label) => <option key={label.id} value={label.id}>{label.title}</option>)}
         </select>
+      )}
+      {portfolio.ranked.length > 0 && (
+        <fieldset className="mb-3">
+          <legend className="mb-1 text-group text-text-secondary">{t('pro.groundwork.meetingInitiatives')}</legend>
+          <ul className="space-y-1">
+            {portfolio.ranked.map((entry) => (
+              <li key={entry.projectId}>
+                <label className="flex items-center gap-2 text-meta text-text">
+                  <input
+                    type="checkbox"
+                    checked={initiatives.includes(entry.projectId)}
+                    onChange={(event) => setInitiatives(event.target.checked ? [...initiatives, entry.projectId] : initiatives.filter((id) => id !== entry.projectId))}
+                  />
+                  <span className="min-w-0 truncate">{portfolio.titleOf(entry.projectId)}</span>
+                </label>
+              </li>
+            ))}
+          </ul>
+        </fieldset>
       )}
       <label className="flex items-center gap-2 text-meta text-text">
         Meets

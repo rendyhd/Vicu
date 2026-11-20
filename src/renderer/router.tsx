@@ -162,6 +162,18 @@ const meetingRoute = createRoute({
   component: lazyRouteComponent(() => import('@/views/pro/MeetingView'), 'MeetingView'),
 })
 
+const groupRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/group/$labelId',
+  component: lazyRouteComponent(() => import('@/views/pro/GroupView'), 'GroupView'),
+})
+
+const sessionRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/session/$meetingId/$kind',
+  component: lazyRouteComponent(() => import('@/views/pro/SessionView'), 'SessionView'),
+})
+
 const portfolioRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/portfolio',
@@ -196,6 +208,8 @@ const routeTree = rootRoute.addChildren([
   peopleRoute,
   personRoute,
   meetingRoute,
+  groupRoute,
+  sessionRoute,
   portfolioRoute,
   sponsorRoute,
 ])

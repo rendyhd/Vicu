@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useSyncedPrefs, writeSyncedPrefs } from './use-synced-prefs'
 import {
+  groupLabelIds,
   labelKindKey,
   labelStatusKey,
   onHoldLabelIds,
@@ -29,11 +30,17 @@ export function useProPrefs() {
   return useMemo(() => {
     const people = personLabelIds(values)
     const heldLabels = onHoldLabelIds(values)
+    const groups = groupLabelIds(values)
     return {
       values,
       area: readProArea(values[PRO_AREA_KEY]),
       people,
       heldLabels,
+      /** The labels marked as a group (21.16). */
+      groups,
+      isGroup: (labelId: number) => groups.has(labelId),
+      setGroup: (labelId: number, group: boolean) =>
+        writeSyncedPrefs(queryClient, { [labelKindKey(labelId)]: group ? 'group' : null }),
       isPerson: (labelId: number) => people.has(labelId),
       labelOnHold: (labelId: number) => heldLabels.has(labelId),
       projectMode: (projectId: number): ProjectMode => projectMode(values, projectId),

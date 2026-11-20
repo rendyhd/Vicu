@@ -286,7 +286,7 @@ export function isWritablePref(key: unknown, value: unknown): key is string {
   if (key === PRO_AREA_KEY) return value === null || (Array.isArray(value) && readProArea(value).length === value.length)
   if (idOfProKey(key, PROJECT_MODE_KEY_PREFIX) !== null) return value === null || value === 'sequential' || value === 'single'
   if (idOfProKey(key, PROJECT_STATUS_KEY_PREFIX) !== null || idOfProKey(key, LABEL_STATUS_KEY_PREFIX) !== null) return value === null || value === 'on_hold'
-  if (idOfProKey(key, LABEL_KIND_KEY_PREFIX) !== null) return value === null || value === 'person'
+  if (idOfProKey(key, LABEL_KIND_KEY_PREFIX) !== null) return value === null || value === 'person' || value === 'group'
   if (idOfProKey(key, REPEAT_RULE_KEY_PREFIX) !== null) return value === null || readRepeatRule(value) !== null
   return false
 }

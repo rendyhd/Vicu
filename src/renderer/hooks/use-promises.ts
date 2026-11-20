@@ -7,6 +7,7 @@ import { useProPrefs } from './use-pro-prefs'
 import { useProjects } from './use-projects'
 import { toast } from '@/stores/toast-store'
 import { draftEscalationIfDue } from '@/lib/pro/escalation'
+import { addMissIssues } from '@/lib/pro/miss-issue'
 import { NULL_DATE } from '@/lib/constants'
 import type { Task } from '@/lib/vikunja-types'
 import { toLocalDate, type LocalDate } from '../../shared/due-dates'
@@ -81,6 +82,8 @@ export function usePromiseActions() {
       void writeLedger(queryClient, [setRecord('promises', task.id, after)]).then((ok) => {
         // Decision 15: a second miss drafts an escalation for the Sponsor desk.
         if (ok && kind === 'not_yet' && portfolioOn) void draftEscalationIfDue(queryClient, currentLedger(queryClient), task.id)
+        // A second miss on a group's action adds an issue to that group's list (21.16).
+        if (ok && kind === 'not_yet') void addMissIssues(queryClient, task)
       })
       const oldDue = task.due_date
       if (change.taskPatch?.done) complete.mutate(task)

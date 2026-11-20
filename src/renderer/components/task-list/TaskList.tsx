@@ -65,6 +65,8 @@ interface TaskListProps {
   insertIndex?: number
   /** When set, new tasks get this due date by default. Shown as a dismissible chip. */
   defaultDueDate?: Date
+  /** Labels a task made here starts with (a group's page). */
+  defaultLabelIds?: readonly number[]
   /** Content rendered inside the scroll area above the task input (e.g. date subtitle) */
   headerContent?: React.ReactNode
   /** Buttons at the right of the title, before New task (a project's … menu). */
@@ -99,6 +101,7 @@ export function TaskList({
   empty,
   insertIndex,
   defaultDueDate,
+  defaultLabelIds,
   headerContent,
   headerActions,
   onTaskCreated,
@@ -545,6 +548,7 @@ export function TaskList({
       <NewTaskComposer
         projectId={projectId!}
         defaultDueDate={defaultDueDate}
+        defaultLabelIds={defaultLabelIds}
         inputRef={inputRef}
         onCancel={() => setIsAdding(false)}
         onCreated={(task) => {

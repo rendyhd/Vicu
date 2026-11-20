@@ -1,0 +1,67 @@
+import type { TranslationKey } from '../../../shared/i18n'
+
+/**
+ * The catalog key of every line a document can hold (cross-app semantics 21.19): the shared
+ * builders name a sentence (`action.owner`), the catalog has it under `proText`. Written out in
+ * full so the compiler checks each key and the unused-key check finds it. A plural sentence is
+ * listed once, without its `_one` / `_other` ending.
+ */
+export const PRO_TEXT_KEYS = {
+  'agenda.title.weekly': 'proText.agenda.title.weekly',
+  'agenda.title.standup': 'proText.agenda.title.standup',
+  'agenda.close': 'proText.agenda.close',
+  'recap.title.weekly': 'proText.recap.title.weekly',
+  'recap.title.standup': 'proText.recap.title.standup',
+  'recap.nothing': 'proText.recap.nothing',
+  'readback.title': 'proText.readback.title',
+  'readback.nothing': 'proText.readback.nothing',
+  'heading.actionsDue': 'proText.heading.actionsDue',
+  'heading.actionsOpen': 'proText.heading.actionsOpen',
+  'heading.issues': 'proText.heading.issues',
+  'heading.decisions': 'proText.heading.decisions',
+  'heading.newActions': 'proText.heading.newActions',
+  'heading.delivered': 'proText.heading.delivered',
+  'heading.changed': 'proText.heading.changed',
+  'heading.issuesSolved': 'proText.heading.issuesSolved',
+  'heading.questions': 'proText.heading.questions',
+  'action.owner': 'proText.action.owner',
+  'action.ownerNoDate': 'proText.action.ownerNoDate',
+  'action.forPerson': 'proText.action.forPerson',
+  'action.forPersonNoDate': 'proText.action.forPersonNoDate',
+  'action.noOwner': 'proText.action.noOwner',
+  'action.noOwnerNoDate': 'proText.action.noOwnerNoDate',
+  'action.delivered': 'proText.action.delivered',
+  'action.deliveredLate': 'proText.action.deliveredLate',
+  'action.dropped': 'proText.action.dropped',
+  'action.takenOver': 'proText.action.takenOver',
+  'action.newDate': 'proText.action.newDate',
+  'action.newDateBlocker': 'proText.action.newDateBlocker',
+  'action.notYet': 'proText.action.notYet',
+  'action.notYetBlocker': 'proText.action.notYetBlocker',
+  'decision.plain': 'proText.decision.plain',
+  'decision.by': 'proText.decision.by',
+  absent: 'proText.absent',
+  'check.one': 'proText.check.one',
+  'check.oneNoDate': 'proText.check.oneNoDate',
+  'check.intro': 'proText.check.intro',
+  'check.item': 'proText.check.item',
+  'check.itemNoDate': 'proText.check.itemNoDate',
+  'check.close': 'proText.check.close',
+  'note.title': 'proText.note.title',
+  'note.onTime': 'proText.note.onTime',
+  'note.late': 'proText.note.late',
+  'note.dropped': 'proText.note.dropped',
+  'note.takenOver': 'proText.note.takenOver',
+  'note.slipped.newDate': 'proText.note.slipped.newDate',
+  'note.slipped.newDateBlocker': 'proText.note.slipped.newDateBlocker',
+  'note.slipped.notYet': 'proText.note.slipped.notYet',
+  'note.slipped.notYetBlocker': 'proText.note.slipped.notYetBlocker',
+  'note.decision': 'proText.note.decision',
+  'note.issue': 'proText.note.issue',
+  'note.pastDue': 'proText.note.pastDue',
+  'note.nextWeek': 'proText.note.nextWeek',
+  'note.nothing': 'proText.note.nothing',
+  'note.noGroups': 'proText.note.noGroups',
+} as const satisfies Record<string, TranslationKey>
+
+export type ProTextKey = keyof typeof PRO_TEXT_KEYS

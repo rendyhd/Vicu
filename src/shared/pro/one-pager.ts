@@ -32,7 +32,7 @@ export function buildOnePager(input: OnePagerInput): OnePager {
   const sections: Array<{ heading: string; lines: string[] }> = []
 
   sections.push({
-    heading: `Active (${cap.active} of ${cap.cap}${cap.agreed ? ', agreed' : ', cap not agreed'})`,
+    heading: cap.unlimited ? `Active (${cap.active}, no limit)` : `Active (${cap.active} of ${cap.cap}${cap.agreed ? ', agreed' : ', cap not agreed'})`,
     lines: rankedInitiatives(ledger).map((entry) => {
       const ready = readiness(entry.value)
       return `${entry.rank}. ${input.projectName(entry.projectId)}: owner ${name(entry.value.owner)}, sponsor ${name(entry.value.sponsor)}, ready ${ready.done} of ${ready.total}`

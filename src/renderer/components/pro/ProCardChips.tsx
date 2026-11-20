@@ -1,4 +1,6 @@
 import { useMemo, useRef, useState, type ReactNode, type RefObject } from 'react'
+import { useTranslation } from 'react-i18next'
+import { usePortfolio } from '@/hooks/use-portfolio'
 import { useQueryClient } from '@tanstack/react-query'
 import { CalendarClock, Flag, Handshake, Hourglass, Link2, Plus, Search, X } from 'lucide-react'
 import { cn } from '@/lib/cn'
@@ -189,6 +191,8 @@ export function ProCardChips({ task }: { task: Task }) {
  * (decision 31): the title loses the prefix.
  */
 function PromisePopover({ anchorRef, task, onClose }: { anchorRef: RefObject<HTMLElement | null>; task: Task; onClose: () => void }) {
+  const { t } = useTranslation()
+  const portfolio = usePortfolio()
   const queryClient = useQueryClient()
   const update = useUpdateTask()
   const addLabel = useAddLabel()
@@ -202,12 +206,15 @@ function PromisePopover({ anchorRef, task, onClose }: { anchorRef: RefObject<HTM
   const [person, setPerson] = useState<number | null>(existing?.person ?? confirmPerson)
   const [words, setWords] = useState(existing?.words ?? '')
   const [doneWhen, setDoneWhen] = useState(existing?.done_when ?? '')
+  const [initiative, setInitiative] = useState<number | null>(existing?.initiative ?? null)
 
   const save = (retitle: boolean) => {
     if (person === null) return
     const value: PromiseValue = { ...(existing ?? {}), dir, person }
     value.words = words.trim() || null
     value.done_when = doneWhen.trim() || null
+    if (initiative === null) delete value.initiative
+    else value.initiative = initiative
     void writeLedger(queryClient, [setRecord('promises', task.id, value)])
     if (!(task.labels ?? []).some((label) => label.id === person)) addLabel.mutate({ taskId: task.id, labelId: person })
     if (retitle && confirm) update.mutate({ id: task.id, changes: { title: confirm.what }, original: task })
@@ -242,6 +249,13 @@ function PromisePopover({ anchorRef, task, onClose }: { anchorRef: RefObject<HTM
       {personLabels.size === 0 && <p className="text-caption text-text-secondary">Mark a label as a person first (its menu in the sidebar, or People).</p>}
       <input value={words} onChange={(event) => setWords(event.target.value)} placeholder={dir === 'theirs' ? 'In their words' : 'What you said'} aria-label="Words" className="w-full rounded-control border border-border bg-bg-page px-2 py-1 text-meta text-text" />
       <input value={doneWhen} onChange={(event) => setDoneWhen(event.target.value)} placeholder="We will see it is done when" aria-label="Done when" className="w-full rounded-control border border-border bg-bg-page px-2 py-1 text-meta text-text" />
+      {(portfolio.ranked.length > 0 || initiative !== null) && (
+        <select value={initiative ?? ''} onChange={(event) => setInitiative(event.target.value ? Number(event.target.value) : null)} aria-label={t('pro.groundwork.initiative')} className="w-full rounded-control border border-border bg-bg-page px-2 py-1 text-meta text-text">
+          <option value="">{t('pro.groundwork.initiative')}: {t('pro.groundwork.initiativeNone')}</option>
+          {initiative !== null && !portfolio.ranked.some((entry) => entry.projectId === initiative) && <option value={initiative}>{portfolio.titleOf(initiative)}</option>}
+          {portfolio.ranked.map((entry) => <option key={entry.projectId} value={entry.projectId}>{portfolio.titleOf(entry.projectId)}</option>)}
+        </select>
+      )}
       <div className="flex justify-between gap-2">
         {existing ? (
           <button type="button" className="rounded-control px-2 py-1 text-meta text-danger hover:bg-danger/10" onClick={() => { void writeLedger(queryClient, [setRecord('promises', task.id, null)]); onClose() }}>
