@@ -83,13 +83,15 @@ export function Sidebar() {
         <AskButton />
       </div>
 
-      <SmartListNav />
-      <FocusBanner />
-      <ProNav />
+      {/* Everything between search and the footer scrolls as one, the smart lists and Pro's section
+          too: with Pro on they can fill the height, and a scroller under them was then a few rows tall. */}
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        <SmartListNav />
+        <FocusBanner />
+        <ProNav />
 
-      <div className="mx-4 border-t border-[var(--border-color)]" />
+        <div className="mx-4 border-t border-[var(--border-color)]" />
 
-      <div className="flex-1 overflow-y-auto">
         <ProjectsHeader />
         <ProjectTree />
 

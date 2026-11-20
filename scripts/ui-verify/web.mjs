@@ -19,6 +19,7 @@ import { parseArgs } from 'node:util'
 import { chromium } from 'playwright-core'
 import { OUT, REPO, SERVER_URL, createApi, loadOrCreateCredentials, readApiToken, readSeedIds, requireServer } from './lib.mjs'
 import { startWebServer } from './web-server.mjs'
+import { sidebarScroll, sidebarScrollChecks } from './scenarios/_sidebar-scroll.mjs'
 
 const { values: opt } = parseArgs({
   options: {
@@ -246,6 +247,12 @@ step('plan-and-pro', async () => {
     for (const route of ['/flagged', '/waiting-on', '/people', '/portfolio']) await goto(page, route)
     await capture(page, 'pro-portfolio')
     assert('Plan and the Pro views open without an error', problems.length === before, problems.slice(before).join(' | '))
+    // With Pro on in a short window the whole sidebar scrolls as one (also the desktop's sidebar-scroll).
+    await page.setViewportSize({ width: WIDTH, height: 560 })
+    await goto(page, '/today')
+    for (const [name, ok, detail] of sidebarScrollChecks(await sidebarScroll(page))) assert(name, ok, detail)
+    await capture(page, 'pro-sidebar-short')
+    await page.setViewportSize({ width: WIDTH, height: HEIGHT })
   } finally {
     await page.evaluate(() => window.api.saveConfigPatch({ planner_enabled: false, pro_enabled: false })).catch(() => {})
     await serverApi.del(`/tasks/${blocked.id}`).catch(() => {})
