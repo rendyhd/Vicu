@@ -13,6 +13,14 @@ services:
     #   context: ../..
     #   dockerfile: docker/web/Dockerfile
     restart: unless-stopped
+    # The container needs to write nowhere but these two places (nginx's own files and the config
+    # its entry point writes at start), and needs no privileges.
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /etc/nginx/conf.d:uid=101,gid=101
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
     ports:
       - "8080:8080"
     environment:

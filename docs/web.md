@@ -62,7 +62,10 @@ docker build -f docker/web/Dockerfile -t vicu-web .
 | `VICU_MAX_UPLOAD` | `25m` | The largest attachment the proxy lets through (nginx `client_max_body_size`). Keep it at or above Vikunja's own limit (`files.maxsize`, 20 MB by default). |
 
 The container listens on port 8080 as an unprivileged user and answers `GET /healthz` with `ok`
-without asking Vikunja.
+without asking Vikunja. It can run with a read-only file system and no capabilities, given two
+places to write: `/tmp` and `/etc/nginx/conf.d` (owned by user 101), as the compose example shows.
+Vikunja's address is looked up again while the container runs, so Vikunja can be restarted or
+recreated without restarting Vicu web.
 
 ## TLS and your reverse proxy
 

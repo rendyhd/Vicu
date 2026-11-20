@@ -37,9 +37,14 @@ server {
     return 200 "ok\n";
   }
 
+  # Vikunja's address is looked up again while running (the container's own DNS, filled in by the
+  # image's entry point), so Vikunja can be restarted or recreated without restarting this container.
+  resolver ${NGINX_LOCAL_RESOLVERS} valid=30s ipv6=off;
+
   # The Vikunja API, as the server itself answers it.
   location /api/ {
-    proxy_pass ${VIKUNJA_URL};
+    set $vikunja ${VIKUNJA_URL};
+    proxy_pass $vikunja;
     proxy_http_version 1.1;
     proxy_set_header Host $http_host;
     proxy_set_header X-Real-IP $remote_addr;

@@ -23,10 +23,12 @@ FROM nginxinc/nginx-unprivileged:1.27-alpine
 
 # Where the Vikunja server is, as this container reaches it (no path, no trailing slash).
 ENV VIKUNJA_URL=http://vikunja:3456 \
-    VICU_MAX_UPLOAD=25m
+    VICU_MAX_UPLOAD=25m \
+    NGINX_ENTRYPOINT_LOCAL_RESOLVERS=1
 
 COPY docker/web/security-headers.conf /etc/nginx/vicu/security-headers.conf
-# The image's entry point fills in the two variables above and writes conf.d/default.conf.
+# The image's entry point fills in the variables above (the third makes it pass the container's DNS
+# servers to the template) and writes conf.d/default.conf.
 COPY docker/web/default.conf.template /etc/nginx/templates/default.conf.template
 COPY --from=build /src/out/web /usr/share/nginx/html
 
