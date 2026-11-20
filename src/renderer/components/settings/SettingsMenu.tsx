@@ -1,5 +1,5 @@
 import { useRouter } from '@tanstack/react-router'
-import { ArrowLeft, Bell, FolderTree, Gem, Keyboard, SlidersHorizontal, Sparkles, Zap, type LucideIcon } from 'lucide-react'
+import { ArrowLeft, Bell, FolderTree, Gauge, Keyboard, SlidersHorizontal, Sparkles, Zap, type LucideIcon } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { TranslationKey } from '../../../shared/i18n'
 import { cn } from '@/lib/cn'
@@ -14,7 +14,8 @@ const TAB_ICONS: Record<SettingsTab, LucideIcon> = {
   notifications: Bell,
   integrations: Zap,
   assistant: Sparkles,
-  pro: Gem,
+  // Pro is a power feature, not a paid one: a gauge, never a gem or diamond.
+  pro: Gauge,
   shortcuts: Keyboard,
 }
 
