@@ -56,7 +56,8 @@ export function sidebarScrollChecks(facts) {
   return [
     ['the sidebar has one scroller that holds the smart lists', facts.found, detail],
     ['the smart lists and the labels scroll together', !!facts.sameAsLabels, detail],
-    ['the scroller takes most of the sidebar, not a few rows under Pro', (facts.share ?? 0) > 0.75, detail],
+    // Search, the footer and the Logbook's row at the bottom (the default order) are outside it.
+    ['the scroller takes most of the sidebar, not a few rows under Pro', (facts.share ?? 0) > 0.65, detail],
     ['in a short window with Pro on the list is longer than the sidebar', !!facts.overflows, detail],
     ['the wheel over the smart lists scrolls the sidebar', (facts.wheeled ?? 0) > 0, detail],
     ['scrolled to the end, the Labels header is in view', !!facts.labelsShown, detail],

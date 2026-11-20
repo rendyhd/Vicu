@@ -30,7 +30,7 @@ function userConfig(overrides: Partial<AppConfig> = {}): AppConfig {
     sidebar_collapsed_projects: [4, 9],
     sidebar_collapsed_categories: ['work'],
     sidebar_hidden_lists: ['logbook', 'anytime'],
-    sidebar_logbook_bottom: false,
+    sidebar_order: ['inbox', 'logbook', 'projects'],
     sidebar_pro_collapsed: true,
     quick_entry_enabled: true,
     quick_view_enabled: true,
@@ -79,7 +79,7 @@ const PREFERENCE_KEYS = [
   'window_bounds',
   'sidebar_width',
   'sidebar_hidden_lists',
-  'sidebar_logbook_bottom',
+  'sidebar_order',
   'sidebar_pro_collapsed',
   'quick_entry_enabled',
   'quick_view_enabled',
@@ -213,6 +213,13 @@ describe('applyConnectionFields: another server or account', () => {
     expect(normalizeConfig({ sidebar_hidden_lists: ['logbook', 'anytime', 'logbook', 'calendar', 'Today', '', 3, null] }).sidebar_hidden_lists)
       .toEqual(['anytime', 'calendar', 'logbook'])
     expect(normalizeConfig({ sidebar_hidden_lists: 'nope' }).sidebar_hidden_lists).toBeUndefined()
+  })
+
+  it('sidebar_order keeps the names in the order saved, once each', () => {
+    expect(normalizeConfig({ sidebar_order: ['logbook', 'inbox', 'logbook', 'calendar', 'Today', '', 3, null, 'projects'] }).sidebar_order)
+      .toEqual(['logbook', 'inbox', 'calendar', 'projects'])
+    expect(normalizeConfig({ sidebar_order: 'nope' }).sidebar_order).toBeUndefined()
+    expect(normalizeConfig({}).sidebar_order).toBeUndefined()
   })
 
   it('does not carry the old inbox project over', () => {

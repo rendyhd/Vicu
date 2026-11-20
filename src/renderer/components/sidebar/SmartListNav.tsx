@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import { useNavigate, useMatches } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import type { TranslationKey } from '../../../shared/i18n'
@@ -10,7 +11,7 @@ import { useReviewBadgeCount, useReviewFeatureEnabled } from '@/hooks/use-review
 import { useAppConfig } from '@/hooks/use-app-config'
 import { useOpenTaskCounts } from '@/hooks/use-project-progress'
 import { useTodayOverdueCount } from '@/hooks/use-today-overdue-count'
-import { isHiddenFromSidebar, isLogbookAtSidebarBottom, isPlannerEnabled, isRoutinesEnabled } from '@/lib/vikunja-types'
+import { isPlannerEnabled, isRoutinesEnabled } from '@/lib/vikunja-types'
 
 export interface SmartListItem {
   id: SmartListId
@@ -43,18 +44,13 @@ export function useSmartLists(): SmartListItem[] {
   const routinesEnabled = isRoutinesEnabled(config)
   const plannerEnabled = isPlannerEnabled(config)
 
-  return ALL_SMART_LISTS
-    .filter((i) =>
-      (i.id !== 'review' || reviewEnabled) && (i.id !== 'routines' || routinesEnabled) && (i.id !== 'plan' || plannerEnabled))
-    .map((i) => ({ id: i.id, label: t(i.name), path: i.path }))
-}
-
-/** The smart lists the sidebar shows, split: the Logbook has its own row at the bottom unless Settings put it back. */
-function useSidebarLists(): { top: SmartListItem[]; bottom: SmartListItem[] } {
-  const { data: config } = useAppConfig()
-  const items = useSmartLists().filter((item) => !isHiddenFromSidebar(config, item.id))
-  if (!isLogbookAtSidebarBottom(config)) return { top: items, bottom: [] }
-  return { top: items.filter((item) => item.id !== 'logbook'), bottom: items.filter((item) => item.id === 'logbook') }
+  return useMemo(
+    () => ALL_SMART_LISTS
+      .filter((i) =>
+        (i.id !== 'review' || reviewEnabled) && (i.id !== 'routines' || routinesEnabled) && (i.id !== 'plan' || plannerEnabled))
+      .map((i) => ({ id: i.id, label: t(i.name), path: i.path })),
+    [t, reviewEnabled, routinesEnabled, plannerEnabled],
+  )
 }
 
 function SmartListRow({ item, count = 0, reviewDue = false }: { item: SmartListItem; count?: number; reviewDue?: boolean }) {
@@ -84,11 +80,21 @@ function SmartListRow({ item, count = 0, reviewDue = false }: { item: SmartListI
   )
 }
 
-export function SmartListNav() {
+
+interface SmartListNavProps {
+  /** The lists of this stretch, in order (the person's order, Settings → General → Sidebar). */
+  items: SmartListItem[]
+  /** The first stretch is the "Lists" navigation; the one in view at the bottom is "More lists". */
+  label: 'lists' | 'more' | null
+  /** Under the last block: drawn outside the scrolling part, above the footer. */
+  pinned?: boolean
+}
+
+/** A stretch of smart lists in the sidebar, with their counts. */
+export function SmartListNav({ items, label, pinned = false }: SmartListNavProps) {
   const { t } = useTranslation()
   const reviewCount = useReviewBadgeCount()
   const { data: config } = useAppConfig()
-  const items = useSidebarLists().top
   const openCounts = useOpenTaskCounts()
   const todayCount = useTodayOverdueCount()
 
@@ -100,27 +106,14 @@ export function SmartListNav() {
     return 0
   }
 
+  const rows = items.map((item) => (
+    <SmartListRow key={item.id} item={item} count={countOf(item.id)} reviewDue={item.id === 'review' && reviewCount > 0} />
+  ))
+  const className = cn('flex flex-col gap-0.5 px-2', pinned ? 'border-t border-border py-1.5' : 'py-2')
+  if (!label) return <div data-sidebar-lists className={className}>{rows}</div>
   return (
-    <nav aria-label={t('nav.lists')} className="flex flex-col gap-0.5 px-2 py-2">
-      {items.map((item) => (
-        <SmartListRow key={item.id} item={item} count={countOf(item.id)} reviewDue={item.id === 'review' && reviewCount > 0} />
-      ))}
-    </nav>
-  )
-}
-
-/**
- * The Logbook's row at the bottom of the sidebar, under the projects, lists and labels and always
- * in view above the footer. Nothing when the Logbook is hidden or kept with the other lists
- * (Settings → General → Sidebar).
- */
-export function BottomListNav() {
-  const { t } = useTranslation()
-  const items = useSidebarLists().bottom
-  if (items.length === 0) return null
-  return (
-    <nav aria-label={t('nav.bottomLists')} className="flex flex-col gap-0.5 border-t border-border px-2 py-1.5">
-      {items.map((item) => <SmartListRow key={item.id} item={item} />)}
+    <nav data-sidebar-lists aria-label={label === 'lists' ? t('nav.lists') : t('nav.bottomLists')} className={className}>
+      {rows}
     </nav>
   )
 }

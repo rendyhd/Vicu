@@ -5,8 +5,8 @@
 //      sidebar_hidden_lists and the sidebar leaves them out at once.
 //   C. A hidden list keeps working: the command palette still lists it and opens it.
 //   D. Ticking them again brings them back in their places.
-//   E. The Logbook has its own row at the bottom of the sidebar; unticking "Keep the Logbook at the
-//      bottom of the sidebar" puts it back as the last of the lists on top.
+//   E. In the default order the Logbook has its own row at the bottom of the sidebar, outside the
+//      part that scrolls (sidebar-arrange covers moving it).
 export const meta = {
   id: 'hidden-lists',
   wave: null,
@@ -16,7 +16,7 @@ export const meta = {
 /** The names of the sidebar's smart lists, without their counts: the lists on top, then the Logbook's row at the bottom. */
 const sidebarLists = (page) =>
   page.evaluate(() =>
-    [...document.querySelectorAll('aside nav[aria-label="Lists"] button, aside nav[aria-label="More lists"] button')].map((b) =>
+    [...document.querySelectorAll('aside [data-sidebar-lists] button')].map((b) =>
       (b.textContent ?? '').replace(/\d+$/, '').trim()))
 
 /** The name of the sidebar navigation that holds the Logbook: "Lists" on top, "More lists" at the bottom. */
@@ -35,7 +35,7 @@ export default async function run(h) {
     await h.wait(400)
   }
   await h.resize(1280, 820)
-  await page.evaluate(() => window.api.saveConfigPatch({ sidebar_hidden_lists: [], sidebar_logbook_bottom: true }))
+  await page.evaluate(() => window.api.saveConfigPatch({ sidebar_hidden_lists: [], sidebar_order: [] }))
   await h.goto('/today')
   await h.wait(800)
 
@@ -136,18 +136,4 @@ export default async function run(h) {
     return { ok: nav === 'More lists' && below, detail: `${nav}, under the scrolling part: ${below}` }
   })
   await h.capture('sidebar-logbook-bottom', { clip: page.locator('aside').first() })
-  await card.getByLabel('Keep the Logbook at the bottom of the sidebar').uncheck()
-  await h.wait(900)
-  await h.assert('unticked, the Logbook is the last of the lists on top', async () => {
-    const nav = await logbookNav(page)
-    const lists = await sidebarLists(page)
-    const saved = await page.evaluate(async () => (await window.api.getConfig())?.sidebar_logbook_bottom)
-    return { ok: nav === 'Lists' && lists.at(-1) === 'Logbook' && saved === false, detail: `${nav} ${JSON.stringify(lists)} ${saved}` }
-  })
-  await card.getByLabel('Keep the Logbook at the bottom of the sidebar').check()
-  await h.wait(900)
-  await h.assert('ticked again, it goes back to the bottom', async () => {
-    const nav = await logbookNav(page)
-    return { ok: nav === 'More lists', detail: String(nav) }
-  })
 }

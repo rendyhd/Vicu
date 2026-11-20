@@ -812,8 +812,15 @@
     },
     "sidebar": {
       "title": "Zijbalk",
-      "note": "De lijsten die boven je projecten staan. Een verborgen lijst blijft werken en blijft in het opdrachtenpalet.",
-      "logbookBottom": "Het Logboek onderaan de zijbalk houden"
+      "arrange": "Kies wat de zijbalk toont en sleep het in je eigen volgorde. Een verborgen lijst blijft werken en blijft in het opdrachtenpalet. Lijsten onder het laatste blok blijven onderaan de zijbalk in beeld.",
+      "projects": "Projecten",
+      "lists": "Eigen lijsten",
+      "labels": "Labels",
+      "pinned": "Blijft onderaan in beeld",
+      "moveUp": "{{name}} omhoog verplaatsen",
+      "moveDown": "{{name}} omlaag verplaatsen",
+      "moved": "{{name}}, plaats {{place}} van {{total}}",
+      "reset": "Volgorde herstellen"
     },
     "weekStart": {
       "label": "De week begint op",

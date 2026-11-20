@@ -36,9 +36,10 @@ export function useProNavItems(): ProNavItem[] {
 }
 
 /**
- * Pro's sidebar section, between the smart lists and the projects (plan 7.9): a header that folds
- * it away (per device, `sidebar_pro_collapsed`) and its lists. Folded, the lists stay in the
- * command palette. Nothing while Pro is off.
+ * Pro's sidebar section, between the smart lists and the projects unless the person moved it
+ * (plan 7.9; Settings → General → Sidebar): a header that folds it away (per device,
+ * `sidebar_pro_collapsed`) and its lists. Folded, the lists stay in the command palette. Nothing
+ * while Pro is off.
  */
 export function ProNav() {
   const navigate = useNavigate()
@@ -50,7 +51,6 @@ export function ProNav() {
   if (items.length === 0) return null
   return (
     <div className="px-2 pb-2" data-pro-nav>
-      <div aria-hidden="true" className="mx-2 mb-2 border-t border-border" />
       <button
         type="button"
         aria-expanded={!collapsed}

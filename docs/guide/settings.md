@@ -48,9 +48,11 @@ How to read the tables: **Synced** follows you to every device. **This device** 
 
 #### Sidebar
 
-Tick the smart lists you want above your projects. The Inbox always stays. A hidden list still opens from the [command palette](guide:desktop#the-command-palette). This choice is per computer.
+One list of your smart lists and the sidebar's sections (Projects, Custom lists, Labels, and Pro while it is on). Tick the smart lists you want. The Inbox always stays. A hidden list still opens from the [command palette](guide:desktop#the-command-palette).
 
-**Keep the Logbook at the bottom of the sidebar** (on unless you clear it) gives the Logbook its own row at the bottom, under your projects, lists and labels; cleared, it is the last of the lists on top. With Pro on, the **Pro** header in the sidebar folds Pro's lists away and opens them again; they stay in the command palette.
+Drag a row by its grip to put the sidebar in your own order, or use the arrows at the end of the row. Lists under the last section stay in view at the bottom of the sidebar; the Logbook is there until you move it. **Reset order** brings the default back. These choices are per computer.
+
+With Pro on, the **Pro** header in the sidebar folds Pro's lists away and opens them again; they stay in the command palette.
 
 #### Task Completion Sound
 
@@ -169,7 +171,7 @@ Settings are in the drawer. Everything on the phone is per device unless marked.
 | Bottom Bar | The last three slots, **Smart list colours**, **Reset to Defaults** | This device |
 | Plan | **Show Plan in the drawer**, and the Plan options (default length and work hours sync, the evening nudge does not) | Switch: this device. Length and hours: Synced |
 | Pro | **Turn on Pro on this device** and its parts | This device |
-| Drawer | Which views the drawer lists | This device |
+| Drawer | Which views the drawer lists and in what order, with the Projects, Lists and Labels blocks; **Reset order** | This device |
 | Widget | **Smart add button**, **Context navigation** | This device |
 | Routines | **Enable routines**, **Show routines in Today**, **Routines shown on Today**, **Hidden shared routines** | This device. Hidden shared routines: Synced |
 | Logbook | **Hide old completed tasks** and **Keep completed tasks for** a number of days. Nothing is deleted. | This device |

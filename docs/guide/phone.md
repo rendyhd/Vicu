@@ -98,7 +98,7 @@ The notification says "Arriving at Home" or "Leaving Work" and has **Mark Comple
 
 ## The drawer and the bottom bar {phone}
 
-- **Drawer.** It lists your smart lists, projects, categories and labels. Hold and drag projects and labels to reorder them. **Settings, General, Drawer** hides the views you do not use.
+- **Drawer.** It lists your smart lists, projects, categories and labels. Hold and drag projects and labels to reorder them. **Settings, General, Drawer** is one list of the views and the Projects, Lists and Labels blocks: turn off the views you do not use and drag the rows into your own order. A view the bottom bar holds is in the drawer once you turn it on there.
 - **Bottom bar.** The Inbox always stays first. **Settings, General, Bottom Bar** sets the other three slots to any smart list, project or custom list, with an icon and a color. **Smart list colours** draws the Inbox, Today, Upcoming and Anytime icons in their own colors. Plan can take a slot when it is on.
 - **Left-handed add button.** **Settings, General, Preferences** can move the + button to the bottom-left corner.
 

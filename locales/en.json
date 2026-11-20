@@ -822,8 +822,15 @@
     },
     "sidebar": {
       "title": "Sidebar",
-      "note": "The lists shown above your projects. A hidden list keeps working and stays in the command palette.",
-      "logbookBottom": "Keep the Logbook at the bottom of the sidebar"
+      "arrange": "Choose what the sidebar lists and drag it into your order. A hidden list keeps working and stays in the command palette. Lists under the last section stay in view at the bottom of the sidebar.",
+      "projects": "Projects",
+      "lists": "Custom lists",
+      "labels": "Labels",
+      "pinned": "Stays in view at the bottom",
+      "moveUp": "Move {{name}} up",
+      "moveDown": "Move {{name}} down",
+      "moved": "{{name}}, place {{place}} of {{total}}",
+      "reset": "Reset order"
     },
     "weekStart": {
       "label": "Week starts on",

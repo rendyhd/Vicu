@@ -232,7 +232,6 @@ export {
   SIDEBAR_HIDEABLE_LISTS,
   closeAction,
   isHiddenFromSidebar,
-  isLogbookAtSidebarBottom,
   isQuickEntryEnabled,
   isQuickViewEnabled,
   isPlannerEnabled,

@@ -279,10 +279,11 @@ export interface AppConfig {
    */
   sidebar_hidden_lists?: string[]
   /**
-   * Where the sidebar shows the Logbook: in its own row at the bottom, under the projects, lists and
-   * labels (missing or true), or with the other smart lists (false). Per device, never synced.
+   * The person's order of the sidebar: the smart lists and its blocks (`src/shared/sidebar-layout.ts`,
+   * Settings → General → Sidebar). Missing or empty is the default order, with the Logbook in its own
+   * row at the bottom. Per device and kept through sign-out, never synced.
    */
-  sidebar_logbook_bottom?: boolean
+  sidebar_order?: string[]
   /** Whether Pro's sidebar section is collapsed to its header. Per device, never synced. */
   sidebar_pro_collapsed?: boolean
   custom_lists?: CustomList[]
@@ -529,11 +530,6 @@ export function withSidebarListHidden(
 ): string[] {
   const rest = (config?.sidebar_hidden_lists ?? []).filter((id) => id !== list)
   return hidden ? [...rest, list] : rest
-}
-
-/** The Logbook has its own row at the bottom of the sidebar unless the person put it back with the lists. */
-export function isLogbookAtSidebarBottom(config: Pick<AppConfig, 'sidebar_logbook_bottom'> | null | undefined): boolean {
-  return config?.sidebar_logbook_bottom !== false
 }
 
 /** Today lists open routines only while routines are on and the Today section is not turned off. */
