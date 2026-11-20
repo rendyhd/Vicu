@@ -1,6 +1,7 @@
 import { getProLedger, mutateProLedger, syncProLedger } from './pro-ledger-service'
 import { shell, dialog, app, nativeTheme, nativeImage, clipboard as electronClipboard, ClipboardItem as ElectronClipboardItem } from 'electron'
 import { isProEnabled } from '../shared/pro/settings'
+import { quickPromiseValue } from '../shared/pro/quick-promise'
 import { personLabelIds } from '../shared/pro/prefs'
 import { recordValue } from '../shared/pro/ledger'
 import { handleTrusted } from './secure-ipc'
@@ -483,12 +484,14 @@ export function registerIpcHandlers(): void {
   })
   // The promise a Quick Entry capture names (21.6), once the task has an id (a temporary one
   // offline: the ledger is remapped when the create replays).
-  handleTrusted('qe:add-promise', (_event, taskId: unknown, person: unknown, mine: unknown) => {
+  handleTrusted('qe:add-promise', (_event, taskId: unknown, person: unknown, mine: unknown, extra: unknown) => {
     const config = loadConfig()
     if (!isProEnabled(config, 'promises') || config?.standalone_mode) return false
     if (typeof taskId !== 'number' || !Number.isInteger(taskId) || taskId === 0) return false
-    if (typeof person !== 'number' || !Number.isInteger(person) || person <= 0) return false
-    mutateProLedger([{ op: 'set', collection: 'promises', id: String(taskId), value: { dir: mine === true ? 'mine' : 'theirs', person } }])
+    // Who it was promised to and the check day (5.5) come along when the text named them.
+    const value = quickPromiseValue(person, mine, extra)
+    if (!value) return false
+    mutateProLedger([{ op: 'set', collection: 'promises', id: String(taskId), value }])
     return true
   })
 

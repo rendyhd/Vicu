@@ -181,7 +181,7 @@
   "src/renderer/views/SearchView.tsx": 2,
   "src/renderer/views/SetupView.tsx": 61,
   "src/renderer/views/TagView.tsx": 2,
-  "src/renderer/views/TodayView.tsx": 5,
+  "src/renderer/views/TodayView.tsx": 4,
   "src/renderer/views/UpcomingView.tsx": 3,
   "src/renderer/views/WeeklyReviewView.tsx": 22,
   "src/renderer/views/pro/FlaggedView.tsx": 3,

@@ -15,6 +15,9 @@ import { ListSectionHeader } from '@/components/task-list/ListSectionHeader'
 import { PersonMark } from '@/components/pro/PersonMark'
 import { ProOffNotice } from '@/components/pro/ProOffNotice'
 import { MeetingDialog } from '@/components/pro/MeetingDialog'
+import { GroupDialog } from '@/components/pro/GroupDialog'
+import { useGroups } from '@/hooks/use-groups'
+import { useTranslation } from 'react-i18next'
 import { RecapDialog } from '@/components/pro/RecapDialog'
 import { PromiseDrafts } from '@/components/pro/PromiseDrafts'
 import { useProAssistantOn } from '@/hooks/use-pro-assistant'
@@ -67,6 +70,9 @@ export function MeetingView() {
   const meeting = recordValue(world.ledger.meetings, meetingId)
   const [round, setRoundState] = useState<RoundState | null>(() => loadRound(meetingId))
   const [editing, setEditing] = useState(false)
+  const [grouping, setGrouping] = useState(false)
+  const groups = useGroups()
+  const { t } = useTranslation()
   const [recap, setRecap] = useState<null | { people: number[]; notDiscussed: string[]; absent: string[] }>(null)
   const [draft, setDraft] = useState('')
   const [draftMine, setDraftMine] = useState(false)
@@ -182,6 +188,9 @@ export function MeetingView() {
         actions={
           <div className="flex gap-1.5">
             <button type="button" className={ACTION} onClick={() => setEditing(true)}><Pencil className="h-3.5 w-3.5" aria-hidden /> Edit</button>
+            {groups.byMeeting.has(meetingId)
+              ? <button type="button" className={ACTION} onClick={() => navigate({ to: '/group/$labelId', params: { labelId: String(groups.byMeeting.get(meetingId)!.label) } })}>{t('pro.group.open')}</button>
+              : <button type="button" className={ACTION} onClick={() => setGrouping(true)} data-pro-make-group>{t('pro.group.makeGroup')}</button>}
             {round ? (
               <button type="button" className={cn(ACTION, 'border-accent-blue text-accent-blue')} onClick={end} data-pro-meeting-end>End meeting</button>
             ) : (
@@ -294,6 +303,13 @@ export function MeetingView() {
         )}
       </div>
       {editing && <MeetingDialog meeting={meeting} id={meetingId} onClose={() => setEditing(false)} />}
+      {grouping && (
+        <GroupDialog
+          fromMeeting={{ id: meetingId, name: meeting.name, people: meeting.people }}
+          onClose={() => setGrouping(false)}
+          onSaved={(labelId) => void navigate({ to: '/group/$labelId', params: { labelId: String(labelId) } })}
+        />
+      )}
       {recap && (
         <RecapDialog
           onClose={() => setRecap(null)}

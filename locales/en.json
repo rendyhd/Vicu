@@ -595,6 +595,15 @@
       "note": "Extra tools for heavier work: what you can do now, promises to and from people, a portfolio of initiatives. Pro only adds. Turn it off and Vicu is as it was; nothing is removed. This choice is for this device.",
       "turnOn": "Turn on Pro on this device",
       "standalone": "Pro needs a Vikunja server; it is not available in standalone mode.",
+      "followUps": {
+        "title": "Follow-ups",
+        "note": "When Today asks you to check on actions that others owe you, and how text for other people is written. These choices are shared with your other devices.",
+        "checkDays": "Check actions this many working days before they are due",
+        "workdays": "Working days",
+        "noteDay": "Weekly note day",
+        "noteDayNone": "None",
+        "textLanguage": "Language of text copied for other people"
+      },
       "layers": {
         "availability": {
           "name": "Know what you can do now",
@@ -999,6 +1008,32 @@
     "notImage": "The page is not an image."
   },
   "pro": {
+    "followUps": {
+      "title": "Follow-ups",
+      "dismiss": "Dismiss for today",
+      "undo": "Undo",
+      "check_one": "Check with {{name}}: {{count}} action, first due {{date}}",
+      "check_other": "Check with {{name}}: {{count}} actions, first due {{date}}",
+      "copyMessage": "Copy message",
+      "copyFailed": "The message could not be copied.",
+      "copied_one": "Message copied; {{count}} marked as checked",
+      "copied_other": "Message copied; {{count}} marked as checked",
+      "bring": "Look at: {{title}}",
+      "bringMeta": "{{name}}, check on {{date}}",
+      "bringMetaNoOne": "Check on {{date}}",
+      "checked": "Checked",
+      "checkedToast": "Marked as checked: {{title}}",
+      "open": "Open",
+      "recapWeekly": "Recap not copied: {{group}} weekly, {{date}}",
+      "recapStandup": "Recap not copied: {{group}} stand-up, {{date}}",
+      "openRecap": "Open recap",
+      "note": "The weekly note is due",
+      "writeIt": "Write it",
+      "promise": {
+        "checkOn": "Check on",
+        "noCheck": "No check before due"
+      }
+    },
     "groundwork": {
       "activeNoLimit": "{{count}} active, no limit",
       "triageNoLimit_one": "{{count}} initiative is active. Weigh it against it.",
@@ -1008,7 +1043,8 @@
       "meetingInitiatives": "Initiatives"
     },
     "weekly": {
-      "noteHint": "The weekly note to leadership, from this week's verdicts, decisions and issues."
+      "noteHint": "The weekly note to leadership, from this week's verdicts, decisions and issues.",
+      "noteOpen": "Write the note"
     },
     "group": {
       "title": "Group",
@@ -1088,7 +1124,12 @@
       },
       "withoutOwner": "Without an owner",
       "withoutOwnerHint": "Give one to a person with the task's Promise chip, or take it yourself.",
-      "takeIt": "I own this"
+      "takeIt": "I own this",
+      "open": "Open the group",
+      "list": {
+        "title": "Groups",
+        "empty": "A group is the people who agree actions together: a leadership team, a project team. Its actions carry the group's label."
+      }
     },
     "person": {
       "toYou": "Promised to you",
@@ -1148,6 +1189,17 @@
         "copied_other": "Recap copied; {{count}} actions marked as sent",
         "undo": "Undo"
       }
+    },
+    "note": {
+      "title": "Weekly note",
+      "language": "Language",
+      "loading": "Reading the week...",
+      "hint": "Counts and lines per group, never a score. Copying records the day, so the next note starts after it.",
+      "close": "Close",
+      "copy": "Copy",
+      "copyMarkdown": "Copy as Markdown",
+      "copied": "Weekly note copied",
+      "undo": "Undo"
     }
   },
   "proText": {

@@ -459,6 +459,8 @@ export interface AppConfig {
   pro_assistant?: boolean
   /** "Ask me tomorrow", once per due day (section 21.6). */
   pro_verdict_snooze?: Record<string, { due: string; until: string }>
+  /** Follow-up lines dismissed for today (section 21.18): a line's key and the local day it shows again. */
+  pro_followup_dismissed?: Record<string, string>
   /** The first-run notice about existing start dates was shown. */
   pro_onboarding_seen?: boolean
 }

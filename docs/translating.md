@@ -145,6 +145,19 @@ It writes the language into the two lists Android and iOS read (`app/src/main/re
 - **Capitals.** English writes "Select All"; most languages write only the first word with a capital. Follow your language.
 - **Leave out what you are not sure about.** A missing text shows in English, which is better than a guess.
 
+## Text Vicu writes for other people
+
+Most of Vicu's text is read by the person using it. Some of it is written for someone else: with Vicu Pro, the agenda and the recap of a meeting, a short message that checks on an action, and a weekly note are copied and pasted into a mail or a chat. That text has its own part of each catalog: the `proText` group on the desktop, and the strings whose names start with `pro_text_` on mobile. Both hold the same sentences.
+
+- **Its language is chosen apart from the app's.** A person can read Vicu in Dutch and send a recap in English, or the other way round: the language is set per group, with a default in Settings, Pro. So translate these sentences even when the rest of your translation is not complete, and keep them correct on their own.
+- **Write it the way a colleague would.** These lines land in someone's inbox with no Vicu around them. Keep them short and neutral: no greeting beyond the one that is there, nothing that sounds like software.
+- **A line is one whole sentence.** `{{owner}}: {{title}}, by {{date}}` becomes one line of a list. Keep every placeholder; move them to where your language puts them. Names, task titles and what people typed are filled in as they are and are never translated.
+- **Days are written for you.** `{{date}}`, `{{from}}` and `{{to}}` are a day in the text's language ("Thu 12 Nov", "do 12 nov"). Do not add a weekday or a month yourself.
+- **Counts have plural forms** like any other text (`_one`, `_other`, and the forms your language needs).
+- **Do not change the meaning of a line.** "Late" and "dropped" say what happened to an action; a softer word would say something else to the reader.
+
+A sentence that is missing from your language is written in English, so a recap is never half in one language by accident: check the whole `proText` group when you translate it.
+
 ## What is not translated
 
 - **What you type.** Quick add reads dates and shortcuts in English ("tomorrow 3pm", "every week"), in every language, for now.

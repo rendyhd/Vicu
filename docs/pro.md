@@ -67,6 +67,38 @@ of Pro's data.
   A absent); verdicts and new promises are written as they happen. End meeting writes the round and
   opens its recap.
 
+## Groups, sessions and follow-ups
+
+For work that is agreed in a recurring meeting: a leadership team, a project team.
+
+- **Groups.** A group is the people who agree actions together. On People, New group (or the
+  sidebar's New group, or Make this a group on a meeting): a name, a label, the people in the order
+  they report, the sessions it holds (weekly, stand-up), and the language of text copied for it. A
+  task with the group's label is an action of the group. `$Jan site list friday *leadership` is
+  Jan's action for the group; `$Jan site list for $Priya` says who it was promised to; `check on
+  wednesday` adds a day to look at it before it is due.
+- **The group's page** lists the actions by where they stand since the last session (overdue, due
+  now, new, open, yours, done) and by owner, with a line of counts over the last four sessions:
+  how many were delivered on time, late, and are open past their date. Counts, never a score. Below
+  are the group's issues (ranked), decisions and open questions.
+- **Sessions.** Start weekly or Start stand-up on the group's page. A session goes through its
+  steps without a timer: the actions that need a verdict, the issues (weekly), new actions and
+  decisions, and a read-back of what was decided to read aloud before you close. End session writes
+  it and opens a recap of that session only, to copy as formatted text or Markdown; copying marks
+  the actions in it as sent. Your own score for the session, if you give one, is never copied. An
+  action that is missed a second time is added to the group's issues.
+- **Follow-ups** at the top of Today is everything that needs a move from you, in order: verdicts
+  due, a check with each owner a few working days before their actions are due (with a message to
+  copy), dates you set to look at something again, recaps not copied yet, and the weekly note. Each
+  line can be dismissed for today. Nothing here is a notification.
+- **The weekly note** (command palette, or the weekly review's step) is per group what was
+  delivered, what slipped, what was decided and what is still open, to paste into a mail. Set its
+  day in Settings, Pro.
+- **Language.** Text copied for other people is written in the language chosen for the group, else
+  the default in Settings, Pro, whatever language you read Vicu in.
+- **Phone.** The phone has Follow-ups and the group's page (read, with verdicts); sessions run on
+  the desktop and the web.
+
 ## Portfolio
 
 - **Initiatives.** In a project's menu, Initiative, Make this an initiative. The portfolio has a cap (four unless you

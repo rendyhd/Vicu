@@ -7,6 +7,7 @@ import { cn } from '@/lib/cn'
 import { Button } from '@/components/shared/Button'
 import { usePro } from '@/hooks/use-pro'
 import { useProLedger, writeLedger } from '@/hooks/use-pro-ledger'
+import { useProUiStore } from '@/stores/pro-ui-store'
 import { useWeekStart } from '@/hooks/use-week-start'
 import { useProjects } from '@/hooks/use-projects'
 import { useAvailability } from '@/hooks/use-availability'
@@ -35,8 +36,6 @@ const ROUTES: Record<OlderStep, string> = {
   value: '/portfolio',
 }
 
-// i18n-ignore: a route, not text
-const TODAY_ROUTE = '/today'
 
 /**
  * The weekly execution review (cross-app semantics 21.11, plan 7.7.5): Pro's steps before the usual
@@ -110,7 +109,9 @@ export function WeeklyProSteps({ tasks, today }: { tasks: readonly Task[]; today
                   </div>
                   <p className="text-meta text-[var(--text-secondary)]">{hint}</p>
                 </div>
-                <Button onClick={() => void navigate({ to: step.id === 'note' ? TODAY_ROUTE : ROUTES[step.id] })}>Open</Button>
+                {step.id === 'note'
+                  ? <Button onClick={() => useProUiStore.getState().open('pro-weekly-note')} data-pro-weekly-note-open>{t('pro.weekly.noteOpen')}</Button>
+                  : <Button onClick={() => void navigate({ to: ROUTES[step.id as OlderStep] })}>Open</Button>}
                 {!stepDone && <Button variant="quiet" onClick={() => markDone(step.id)}>Mark done</Button>}
               </li>
             )

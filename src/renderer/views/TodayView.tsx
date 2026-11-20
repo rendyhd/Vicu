@@ -7,8 +7,8 @@ import { useDayKey } from '@/stores/day-store'
 import { splitTodayOverdue } from '@/lib/today-overdue'
 import { TaskList } from '@/components/task-list/TaskList'
 import { ListSectionHeader } from '@/components/task-list/ListSectionHeader'
-import { TaskRowGroup } from '@/components/task-list/TaskRowGroup'
-import { TaskRow } from '@/components/task-list/TaskRow'
+import { FollowUps } from '@/components/pro/FollowUps'
+import { useFollowUps } from '@/hooks/use-follow-ups'
 import { usePromisesDue } from '@/hooks/use-promises'
 import { useParkedFilter } from '@/hooks/use-parked'
 import { ProjectTaskGroup } from '@/components/task-list/ProjectTaskGroup'
@@ -78,6 +78,7 @@ export function TodayView() {
   // Pro (21.6, decision 10): promises of theirs that are due come first, to get a verdict. Off,
   // there are none and the lists are as before.
   const promises = usePromisesDue(useMemo(() => [...split.overdue, ...split.today], [split]))
+  const followUps = useFollowUps()
   const { overdueTasks, todayTasks } = useMemo(() => {
     if (promises.due.length === 0) return { overdueTasks: split.overdue, todayTasks: split.today }
     const asked = new Set(promises.due.map((task) => task.id))
@@ -116,7 +117,7 @@ export function TodayView() {
 
   // Empty after having had tasks in this visit (the last one was done): All clear warms in and offers
   // the next upcoming task. Empty from the start it simply shows.
-  const empty = overdueTasks.length === 0 && todayTasks.length === 0 && promises.due.length === 0 && !routinesLeft
+  const empty = overdueTasks.length === 0 && todayTasks.length === 0 && promises.due.length === 0 && followUps.count === 0 && !routinesLeft
   const hadTasks = useRef(false)
   if (!empty) hadTasks.current = true
   const justCleared = empty && hadTasks.current
@@ -141,15 +142,8 @@ export function TodayView() {
         emptyWarm={justCleared}
         emptyExtra={empty ? <NextUpcomingOffer /> : undefined}
       >
+        <FollowUps />
         {routinesShown && <RoutineTodaySection onToday />}
-        {promises.due.length > 0 && (
-          <div data-pro-promises-due>
-            <ListSectionHeader level={1} title="Promises due" count={promises.due.length} />
-            <TaskRowGroup>
-              {promises.due.map((task) => <TaskRow key={task.id} task={task} />)}
-            </TaskRowGroup>
-          </div>
-        )}
         {overdueTasks.length > 0 && (
           <div>
             <ListSectionHeader level={1} title="Overdue" count={openCount(overdueTasks)} tone="overdue" />

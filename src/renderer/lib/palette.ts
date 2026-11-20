@@ -6,7 +6,7 @@ import type { Label, Project, Task } from './vikunja-types'
 // action into a navigation or a change.
 
 export type PaletteCommand = 'new-task' | 'new-event' | 'voice' | 'dictate' | 'brain-dump' | 'ask' | 'make-tasks' | 'notes' | 'refresh' | 'toggle-theme' | 'settings'
-  | 'pro-focus' | 'pro-settings' | 'pro-import' | 'pro-copilot' | 'pro-recap'
+  | 'pro-focus' | 'pro-settings' | 'pro-import' | 'pro-copilot' | 'pro-recap' | 'pro-weekly-note'
 
 export type PaletteAction =
   | { type: 'command'; command: PaletteCommand }
@@ -61,6 +61,7 @@ export function proPaletteItems(pro: ProPaletteSources): PaletteItem[] {
           { id: 'cmd:pro-import', kind: 'Action', title: 'Import meeting notes', keywords: 'pro paste copilot json promises actions decisions', action: { type: 'command', command: 'pro-import' } },
           { id: 'cmd:pro-copilot', kind: 'Action', title: 'Ask Copilot', keywords: 'pro prompt meeting mail chat summary export', action: { type: 'command', command: 'pro-copilot' } },
           { id: 'cmd:pro-recap', kind: 'Action', title: 'Recap', keywords: 'pro summary send people promises meeting', action: { type: 'command', command: 'pro-recap' } },
+          { id: 'cmd:pro-weekly-note', kind: 'Action', title: t('pro.note.title'), keywords: 'pro weekly note leadership report summary groups status', action: { type: 'command', command: 'pro-weekly-note' } },
         ] satisfies PaletteItem[])
       : []),
     { id: 'cmd:pro-settings', kind: 'Action', title: 'Pro settings', keywords: 'pro preferences layers area cap', action: { type: 'command', command: 'pro-settings' } },

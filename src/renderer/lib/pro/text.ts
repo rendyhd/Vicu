@@ -30,13 +30,18 @@ export function textDateFormat(language: string, app: DateFormat = getDateFormat
 
 /** A document in one language: plain text, HTML and Markdown. */
 export async function renderProDocument(document: ProDocument, language: string, now: Date = new Date()): Promise<RenderedDocument> {
+  return renderProDocumentWith(document, language, null, now)
+}
+
+/** The same with the way days are written given (`null`: by the text's language and the app's date setting). */
+export async function renderProDocumentWith(document: ProDocument, language: string, dates: DateFormat | null, now: Date): Promise<RenderedDocument> {
   const { language: used, t } = await translatorFor(language)
   const translate: DocTranslate = (key, params) => {
     const catalogKey = (PRO_TEXT_KEYS as Record<string, (typeof PRO_TEXT_KEYS)[keyof typeof PRO_TEXT_KEYS]>)[key]
     // A key this version does not know (a document built by a newer rule): shown as it is.
     return catalogKey ? (t as unknown as (key: string, options: Record<string, string | number>) => string)(catalogKey, params) : key
   }
-  const fmt = textDateFormat(used)
+  const fmt = dates ?? textDateFormat(used)
   return renderDocument(document, translate, (day) => formatWeekdayDate(noon(day), now, fmt))
 }
 

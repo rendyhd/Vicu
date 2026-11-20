@@ -8,6 +8,9 @@ import { ReadingScroll } from '@/components/layout/ReadingScroll'
 import { PersonMark } from '@/components/pro/PersonMark'
 import { ProOffNotice } from '@/components/pro/ProOffNotice'
 import { MeetingDialog } from '@/components/pro/MeetingDialog'
+import { GroupDialog } from '@/components/pro/GroupDialog'
+import { useGroups } from '@/hooks/use-groups'
+import { useTranslation } from 'react-i18next'
 import { recordValue } from '../../../shared/pro/ledger'
 import { toLocalDate } from '../../../shared/due-dates'
 import { effectiveDue } from '../../../shared/pro/promises'
@@ -21,6 +24,9 @@ export function PeopleView() {
   const prefs = useProPrefs()
   const [adding, setAdding] = useState('')
   const [newMeeting, setNewMeeting] = useState(false)
+  const [newGroup, setNewGroup] = useState(false)
+  const groups = useGroups()
+  const { t } = useTranslation()
   const today = toLocalDate(new Date())
 
   const rows = useMemo(() => {
@@ -71,6 +77,23 @@ export function PeopleView() {
             </li>
           ))}
         </ul>
+        <section className="mt-8" data-pro-groups>
+          <div className="mb-2 flex items-center justify-between">
+            <h2 className="text-section text-text">{t('pro.group.list.title')}</h2>
+            <button type="button" className="text-meta font-medium text-accent-blue hover:underline" onClick={() => setNewGroup(true)}>{t('pro.group.nav.new')}</button>
+          </div>
+          {groups.groups.length === 0 && <p className="text-meta text-text-secondary">{t('pro.group.list.empty')}</p>}
+          <ul className="divide-y divide-border">
+            {groups.groups.map((group) => (
+              <li key={group.id}>
+                <button type="button" className="flex w-full items-center gap-3 px-2 py-2.5 text-left hover:bg-bg-hover" onClick={() => navigate({ to: '/group/$labelId', params: { labelId: String(group.label) } })}>
+                  <span className="min-w-0 flex-1 truncate text-task-title text-text">{group.name}</span>
+                  <span className="text-meta text-text-secondary">{group.people.map((person) => world.nameOf(person)).join(', ')}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
         <section className="mt-8" data-pro-meetings>
           <div className="mb-2 flex items-center justify-between">
             <h2 className="text-section text-text">Meetings</h2>
@@ -82,7 +105,8 @@ export function PeopleView() {
           <ul className="divide-y divide-border">
             {Object.keys(world.ledger.meetings).flatMap((id) => {
               const meeting = recordValue(world.ledger.meetings, id)
-              if (!meeting) return []
+              // A meeting that is a group is listed with the groups.
+              if (!meeting || groups.byMeeting.has(id)) return []
               return [(
                 <li key={id}>
                   <button type="button" className="flex w-full items-center gap-3 px-2 py-2.5 text-left hover:bg-bg-hover" onClick={() => navigate({ to: '/meeting/$meetingId', params: { meetingId: id } })}>
@@ -95,6 +119,7 @@ export function PeopleView() {
           </ul>
         </section>
         {newMeeting && <MeetingDialog onClose={() => setNewMeeting(false)} />}
+        {newGroup && <GroupDialog onClose={() => setNewGroup(false)} onSaved={(labelId) => void navigate({ to: '/group/$labelId', params: { labelId: String(labelId) } })} />}
         {candidates.length > 0 && (
           <div className="mt-6 flex items-center gap-2">
             <select value={adding} onChange={(event) => setAdding(event.target.value)} aria-label="Label" className="rounded-control border border-border bg-bg-page px-3 py-1.5 text-sm text-text">

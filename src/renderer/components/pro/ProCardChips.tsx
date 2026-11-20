@@ -14,7 +14,7 @@ import { usePro } from '@/hooks/use-pro'
 import { usePromiseOf } from '@/hooks/use-promises'
 import { usePeople, usePersonLabels } from '@/hooks/use-people'
 import { useAddLabel, useUpdateTask } from '@/hooks/use-task-mutations'
-import { promiseOf, readConfirmTitle } from '../../../shared/pro/promises'
+import { checkOnOf, promiseOf, readConfirmTitle } from '../../../shared/pro/promises'
 import { matchPerson } from '../../../shared/pro/people'
 import type { PromiseValue } from '../../../shared/pro/ledger'
 import { useTasks } from '@/hooks/use-tasks'
@@ -207,12 +207,18 @@ function PromisePopover({ anchorRef, task, onClose }: { anchorRef: RefObject<HTM
   const [words, setWords] = useState(existing?.words ?? '')
   const [doneWhen, setDoneWhen] = useState(existing?.done_when ?? '')
   const [initiative, setInitiative] = useState<number | null>(existing?.initiative ?? null)
+  const [checkOn, setCheckOn] = useState<string>(checkOnOf(existing) ?? '')
+  const [noCheck, setNoCheck] = useState(existing?.no_check === true)
 
   const save = (retitle: boolean) => {
     if (person === null) return
     const value: PromiseValue = { ...(existing ?? {}), dir, person }
     value.words = words.trim() || null
     value.done_when = doneWhen.trim() || null
+    if (/^\d{4}-\d{2}-\d{2}$/.test(checkOn)) value.check_on = checkOn
+    else delete value.check_on
+    if (noCheck) value.no_check = true
+    else delete value.no_check
     if (initiative === null) delete value.initiative
     else value.initiative = initiative
     void writeLedger(queryClient, [setRecord('promises', task.id, value)])
@@ -256,6 +262,14 @@ function PromisePopover({ anchorRef, task, onClose }: { anchorRef: RefObject<HTM
           {portfolio.ranked.map((entry) => <option key={entry.projectId} value={entry.projectId}>{portfolio.titleOf(entry.projectId)}</option>)}
         </select>
       )}
+      <label className="flex items-center gap-2 text-meta text-text-secondary">
+        <span className="shrink-0">{t('pro.followUps.promise.checkOn')}</span>
+        <input type="date" value={checkOn} onChange={(event) => setCheckOn(event.target.value)} aria-label={t('pro.followUps.promise.checkOn')} data-pro-check-on className="min-w-0 flex-1 rounded-control border border-border bg-bg-page px-2 py-1 text-meta text-text" />
+      </label>
+      <label className="flex items-center gap-2 text-meta text-text-secondary">
+        <input type="checkbox" checked={noCheck} onChange={(event) => setNoCheck(event.target.checked)} data-pro-no-check />
+        {t('pro.followUps.promise.noCheck')}
+      </label>
       <div className="flex justify-between gap-2">
         {existing ? (
           <button type="button" className="rounded-control px-2 py-1 text-meta text-danger hover:bg-danger/10" onClick={() => { void writeLedger(queryClient, [setRecord('promises', task.id, null)]); onClose() }}>

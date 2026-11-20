@@ -41,7 +41,8 @@ contextBridge.exposeInMainWorld('quickEntryApi', {
   fetchPlaces: () => ipcRenderer.invoke('qe:get-places'),
   fetchPeople: () => ipcRenderer.invoke('qe:get-people'),
   ensurePerson: (name: string) => ipcRenderer.invoke('pro:ensure-person', name),
-  addPromise: (taskId: number, person: number, mine: boolean) => ipcRenderer.invoke('qe:add-promise', taskId, person, mine),
+  addPromise: (taskId: number, person: number, mine: boolean, extra?: { to?: { person?: number; text?: string } | null; check_on?: string | null }) =>
+    ipcRenderer.invoke('qe:add-promise', taskId, person, mine, extra),
   addLabelToTask: (taskId: number, labelId: number) => ipcRenderer.invoke('add-label-to-task', taskId, labelId),
   createLabel: (label: { title: string; hex_color?: string }) => ipcRenderer.invoke('create-label', label),
   getDateFormat: () => ipcRenderer.invoke('get-date-format'),

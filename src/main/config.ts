@@ -284,6 +284,7 @@ export function normalizeConfig(raw: Record<string, unknown>): AppConfig {
     pro_assistant: raw.pro_assistant === true,
     pro_verdict_snooze: normalizeStringMap(raw.pro_verdict_snooze, (value) =>
       !!value && typeof value === 'object' && typeof (value as { due?: unknown }).due === 'string' && typeof (value as { until?: unknown }).until === 'string'),
+    pro_followup_dismissed: normalizeStringMap(raw.pro_followup_dismissed, (value) => typeof value === 'string'),
     pro_onboarding_seen: raw.pro_onboarding_seen === true,
     pro_ledger_sync: raw.pro_ledger_sync && typeof raw.pro_ledger_sync === 'object'
       ? raw.pro_ledger_sync as AppConfig['pro_ledger_sync']

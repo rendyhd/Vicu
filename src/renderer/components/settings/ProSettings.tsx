@@ -14,6 +14,11 @@ import { useOpenTask } from '@/hooks/use-open-task'
 import { NULL_DATE } from '@/lib/constants'
 import { PRO_LAYERS, type ProLayer } from '../../../shared/pro/settings'
 import { ledgerSettings } from '../../../shared/pro/ledger'
+import { DEFAULT_CHECK_DAYS, MAX_CHECK_DAYS, readCheckDays, readWorkdays } from '../../../shared/pro/working-days'
+import { readNoteDay } from '../../../shared/pro/follow-ups'
+import { availableLanguages, languageName } from '../../../shared/i18n'
+import { textLanguage } from '../../../shared/pro/documents'
+import { useWeekStart } from '@/hooks/use-week-start'
 import { startDateOf } from '../../../shared/pro/start-dates'
 import { toLocalDate } from '../../../shared/due-dates'
 import { can } from '@/lib/capabilities'
@@ -109,6 +114,7 @@ export function ProSettings() {
       </div>
       {on && <StartDateNotice />}
       {on && layers.promises && <AreaSettings />}
+      {on && layers.promises && <FollowUpSettings />}
       {on && layers.portfolio && <PortfolioSettings />}
     </>
   )
@@ -277,6 +283,96 @@ function PortfolioSettings() {
             value={settings.rule_agreed_on ?? ''}
             onChange={(event) => write({ rule_agreed_on: event.target.value || null })}
           />
+        </label>
+      </div>
+    </div>
+  )
+}
+
+/** ISO weekdays (1 Monday to 7 Sunday) in the order of the account's week start. */
+function weekdayOrder(weekStart: string): number[] {
+  const first = weekStart === 'sunday' ? 7 : weekStart === 'saturday' ? 6 : 1
+  return Array.from({ length: 7 }, (_unused, index) => ((first - 1 + index) % 7) + 1)
+}
+
+/** A weekday's name in the language the app is shown in (2024-01-01 was a Monday). */
+function weekdayLabel(isoDay: number, language: string): string {
+  return new Intl.DateTimeFormat(language, { weekday: 'long' }).format(new Date(2024, 0, isoDay, 12))
+}
+
+/** Follow-ups (21.18): when to check, which days count as working days, the weekly note, the text language. */
+function FollowUpSettings() {
+  const { t, i18n } = useTranslation()
+  const queryClient = useQueryClient()
+  const { ledger } = useProLedger()
+  const weekStart = useWeekStart()
+  const settings = ledgerSettings(ledger)
+  const write = (value: Record<string, unknown>) => void writeLedger(queryClient, [{ op: 'settings', value: { ...settings, ...value } }])
+  const workdays = readWorkdays(settings.workdays)
+  const noteDay = readNoteDay(settings.note_day)
+  const language = textLanguage(null, settings)
+  const languages = [...new Set(['en', language, ...availableLanguages(false)])]
+  const order = weekdayOrder(weekStart)
+
+  return (
+    <div className={CARD} data-pro-follow-up-settings>
+      <h2 className="mb-1 text-sm font-semibold text-[var(--text-primary)]">{t('settings.pro.followUps.title')}</h2>
+      <p className="mb-4 text-xs text-[var(--text-secondary)]">{t('settings.pro.followUps.note')}</p>
+      <div className="space-y-4">
+        <label className="flex items-center justify-between gap-3">
+          <span className="text-sm text-[var(--text-primary)]">{t('settings.pro.followUps.checkDays')}</span>
+          <input
+            type="number"
+            min={0}
+            max={MAX_CHECK_DAYS}
+            className={`${FIELD} w-20`}
+            value={readCheckDays(settings.check_days ?? DEFAULT_CHECK_DAYS)}
+            onChange={(event) => {
+              const days = Math.floor(Number(event.target.value))
+              if (event.target.value !== '' && days >= 0 && days <= MAX_CHECK_DAYS) write({ check_days: days })
+            }}
+          />
+        </label>
+        <fieldset>
+          <legend className="mb-1 text-sm text-[var(--text-primary)]">{t('settings.pro.followUps.workdays')}</legend>
+          <div className="flex flex-wrap gap-x-4 gap-y-1">
+            {order.map((day) => {
+              const on = workdays.includes(day)
+              return (
+                <label key={day} className="flex items-center gap-1.5 text-sm text-[var(--text-primary)]">
+                  <input
+                    type="checkbox"
+                    checked={on}
+                    // At least one day stays ticked.
+                    disabled={on && workdays.length === 1}
+                    data-pro-workday={day}
+                    onChange={(event) => {
+                      const next = event.target.checked ? [...workdays, day] : workdays.filter((entry) => entry !== day)
+                      if (next.length > 0) write({ workdays: [...new Set(next)].sort((a, b) => a - b) })
+                    }}
+                  />
+                  {weekdayLabel(day, i18n.language)}
+                </label>
+              )
+            })}
+          </div>
+        </fieldset>
+        <label className="flex items-center justify-between gap-3">
+          <span className="text-sm text-[var(--text-primary)]">{t('settings.pro.followUps.noteDay')}</span>
+          <select
+            className={FIELD}
+            value={noteDay === null ? '' : String(noteDay)}
+            onChange={(event) => write({ note_day: event.target.value === '' ? null : Number(event.target.value) })}
+          >
+            <option value="">{t('settings.pro.followUps.noteDayNone')}</option>
+            {order.map((day) => <option key={day} value={String(day)}>{weekdayLabel(day, i18n.language)}</option>)}
+          </select>
+        </label>
+        <label className="flex items-center justify-between gap-3">
+          <span className="text-sm text-[var(--text-primary)]">{t('settings.pro.followUps.textLanguage')}</span>
+          <select className={FIELD} value={language} onChange={(event) => write({ text_language: event.target.value })}>
+            {languages.map((tag) => <option key={tag} value={tag}>{languageName(tag)}</option>)}
+          </select>
         </label>
       </div>
     </div>

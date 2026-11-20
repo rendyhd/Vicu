@@ -1,13 +1,14 @@
 import { useEffect, useId, useMemo, useState, type KeyboardEvent } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { useQueryClient } from '@tanstack/react-query'
-import { CalendarPlus, CheckCircle2, Circle, Folder, Layers, Mic, Plus, RefreshCw, Settings, Sparkles, SunMoon, Tag } from 'lucide-react'
+import { CalendarPlus, CheckCircle2, Circle, Folder, Layers, Mic, Plus, RefreshCw, Settings, Sparkles, SunMoon, Tag, UsersRound } from 'lucide-react'
 import { useAppConfig } from '@/hooks/use-app-config'
 import { formatAcceleratorForDisplay } from '@/lib/accelerator'
 import { Dialog } from '@/components/overlay/Dialog'
 import { nextOptionIndex } from '@/components/overlay/popover-logic'
 import { useSmartLists } from '@/components/sidebar/SmartListNav'
-import { useProNavItems } from '@/components/sidebar/ProNav'
+import { useProNavItems, type ProNavItem } from '@/components/sidebar/ProNav'
+import { useGroups } from '@/hooks/use-groups'
 import { usePro } from '@/hooks/use-pro'
 import { useProUiStore } from '@/stores/pro-ui-store'
 import { SmartListIcon } from '@/components/shared/SmartListIcon'
@@ -90,7 +91,13 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
   const isDark = useIsDark()
   const ai = useAiReady()
   const pro = usePro()
-  const proLists = useProNavItems()
+  const proNavLists = useProNavItems()
+  const groups = useGroups()
+  // A group's page is found by its name, like Pro's lists.
+  const proLists = useMemo<ProNavItem[]>(
+    () => [...proNavLists, ...groups.groups.map((group): ProNavItem => ({ id: `group-${group.label}`, label: group.name, path: `/group/${group.label}`, layer: 'promises', icon: UsersRound, tone: 'text-accent-teal' }))],
+    [proNavLists, groups.groups],
+  )
 
   const items = useMemo(
     () => buildPaletteItems({
@@ -120,7 +127,7 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
       void navigate({ to: '/settings', search: { section: 'pro' } })
     } else if (command === 'pro-focus') {
       useProUiStore.getState().setFocusPickerOpen(true)
-    } else if (command === 'pro-import' || command === 'pro-copilot' || command === 'pro-recap') {
+    } else if (command === 'pro-import' || command === 'pro-copilot' || command === 'pro-recap' || command === 'pro-weekly-note') {
       useProUiStore.getState().open(command)
     } else if (command === 'voice') {
       useVoiceStore.getState().begin('command', 'latched')

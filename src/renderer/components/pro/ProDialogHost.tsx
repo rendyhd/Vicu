@@ -5,6 +5,8 @@ import { CopilotDialog } from './CopilotDialog'
 import { ImportDialog } from './ImportDialog'
 import { ParkDialog } from './ParkDialog'
 import { TriageDialog } from './TriageDialog'
+import { WeeklyNoteDialog } from './WeeklyNoteDialog'
+import { SessionRecapDialog } from './SessionRecapDialog'
 
 /** Pro's dialogs, opened from the palette, shortcuts, pages and the paste handler. Drawn once in AppShell. */
 export function ProDialogHost() {
@@ -20,6 +22,8 @@ export function ProDialogHost() {
   if (atCapStart !== null && pro.layer('portfolio')) return <ParkDialog projectId={null} thenStart={atCapStart} onClose={() => setAtCapStart(null)} />
   if (!dialog || !pro.layer('promises')) return null
   if (dialog === 'pro-recap') return <RecapDialog onClose={close} personId={input?.personId} />
+  if (dialog === 'pro-weekly-note') return <WeeklyNoteDialog onClose={close} />
+  if (dialog === 'pro-session-recap') return input?.roundId ? <SessionRecapDialog roundId={input.roundId} onClose={close} /> : null
   if (dialog === 'pro-copilot') return <CopilotDialog onClose={close} personId={input?.personId} />
   return <ImportDialog onClose={close} initialText={input?.text ?? ''} groupLabel={input?.groupLabel} />
 }

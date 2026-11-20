@@ -51,7 +51,7 @@ declare global {
       fetchPeople(): Promise<Array<{ id: number; aliases: string[] }>>
       // `$Lalith` naming nobody yet: the label that is or becomes that person (21.5).
       ensurePerson(name: string): Promise<{ success: true; data: { id: number; title: string } } | { success: false; error: string }>
-      addPromise(taskId: number, person: number, mine: boolean): Promise<boolean>
+      addPromise(taskId: number, person: number, mine: boolean, extra?: { to?: { person?: number; text?: string } | null; check_on?: string | null }): Promise<boolean>
       addLabelToTask(taskId: number, labelId: number): Promise<{ success: boolean; error?: string; statusCode?: number }>
       createLabel(label: { title: string; hex_color?: string }): Promise<{ success: boolean; error?: string; statusCode?: number; data?: { id: number; title: string } }>
       onShowWindow(callback: (prefill: string | null) => void): void
@@ -660,6 +660,8 @@ async function saveTask(): Promise<void> {
   // Pro (5.5): the person a capture names, as a label id once known.
   let person: { id: number; title: string; mine: boolean } | null = null
   let personNotMade: string | null = null
+  // Who it was promised to and the day to check on it (5.5), when the text named them.
+  let promiseExtra: { to: { person?: number; text?: string } | null; check_on: string | null } = { to: null, check_on: null }
 
   if (parserConfig.enabled && lastParseResult) {
     title = lastParseResult.title
@@ -691,6 +693,11 @@ async function saveTask(): Promise<void> {
     parsedLabels = lastParseResult.labels
     if (lastParseResult.place) location = { place: lastParseResult.place.place.id, trigger: lastParseResult.place.trigger }
 
+    const requester = lastParseResult.requester
+    promiseExtra = {
+      to: requester ? (requester.id !== null ? { person: requester.id } : { text: requester.name }) : null,
+      check_on: lastParseResult.checkOn,
+    }
     const named = lastParseResult.person
     if (named && named.id !== null) {
       const label = cachedLabels.find((entry) => entry.id === named.id)
@@ -740,7 +747,7 @@ async function saveTask(): Promise<void> {
   if (result.success) {
     const createdTask = result.data as (Record<string, unknown> & { id?: number }) | undefined
     const taskId = createdTask?.id
-    if (taskId && person) await window.quickEntryApi.addPromise(taskId, person.id, person.mine).catch(() => false)
+    if (taskId && person) await window.quickEntryApi.addPromise(taskId, person.id, person.mine, promiseExtra).catch(() => false)
 
     // Labels and images go on after the create. A step the network drops is queued, not lost.
     let queuedFollowUps = false
