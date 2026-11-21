@@ -5925,6 +5925,7 @@
         { "value": { "start": "2026-11-17", "end": "2026-11-16" }, "expect": null },
         { "value": { "start": "2026-11-16" }, "expect": null },
         { "value": { "start": "16 Nov", "end": "2027-02-14" }, "expect": null },
+        { "value": { "start": "2026-02-30", "end": "2026-05-30" }, "expect": null },
         { "value": "a plan", "expect": null },
         { "value": null, "expect": null }
       ],

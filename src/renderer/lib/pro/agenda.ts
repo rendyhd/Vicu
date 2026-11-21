@@ -13,7 +13,15 @@ const escapeHtml = (value: string) => value.replace(/&/g, '&amp;').replace(/</g,
  * are due or missed, what you owe them, and decisions they owe. Plain text and HTML for the
  * clipboard.
  */
-export function personAgenda(name: string, theirs: readonly Task[], mine: readonly Task[], world: PromiseWorld, today: LocalDate) {
+export function personAgenda(
+  name: string,
+  theirs: readonly Task[],
+  mine: readonly Task[],
+  world: PromiseWorld,
+  today: LocalDate,
+  /** The person's topics for the next 1:1, in the rule's order, and the ones that carry a private label (left out). */
+  topics?: { tasks: readonly Task[]; hidden: readonly number[] },
+) {
   const items: string[] = [UNCLEAR_ITEM]
   const byDue = (a: Task, b: Task) => {
     const da = effectiveDue(a, world.promiseFor(a)) ?? '9999'
@@ -33,8 +41,10 @@ export function personAgenda(name: string, theirs: readonly Task[], mine: readon
     const owed = record.value as OwedValue | null
     if (owed && !owed.resolved && personId != null && owed.from === personId) items.push(`Decision needed: ${owed.what}`)
   }
+  const shown = (topics?.tasks ?? []).filter((task) => !topics?.hidden.includes(task.id)).map((task) => task.title.trim())
   const title = `1:1 with ${name}`
-  const text = [title, '', ...items.map((item) => `- ${item}`)].join('\n')
-  const html = `<p><strong>${escapeHtml(title)}</strong></p><ul>${items.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>`
+  const text = [title, '', ...items.map((item) => `- ${item}`), ...(shown.length ? ['', 'Topics', ...shown.map((item) => `- ${item}`)] : [])].join('\n')
+  const topicsHtml = shown.length ? `<p><strong>Topics</strong></p><ul>${shown.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>` : ''
+  const html = `<p><strong>${escapeHtml(title)}</strong></p><ul>${items.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>${topicsHtml}`
   return { items, text, html }
 }

@@ -228,7 +228,7 @@ export function SessionView() {
         )}
 
         {state && step === 'issues' && (
-          <GroupLog label={group.label} issues={view.issues} decisions={view.decisions} questions={view.questions} session={state.round} nameOf={view.world.nameOf} show={['issue']} onMakeAction={(entry) => void makeAction(entry)} />
+          <GroupLog label={group.label} issues={view.issues} decisions={view.decisions} questions={view.questions} blockers={view.blockers} commitments={view.commitments} stops={view.stops} session={state.round} nameOf={view.world.nameOf} show={['issue', 'blocker']} onMakeAction={(entry) => void makeAction(entry)} />
         )}
 
         {state && step === 'new' && (
@@ -242,7 +242,7 @@ export function SessionView() {
             <TaskRowGroup>{captured.map((task) => <TaskRow key={task.id} task={task} />)}</TaskRowGroup>
             {captured.length === 0 && <p className="px-6 py-3 text-meta text-text-secondary">{t('pro.session.noCaptured')}</p>}
             <div className="pt-3"><NoOwnerList tasks={withoutOwner} group={group.label} /></div>
-            <GroupLog label={group.label} issues={view.issues} decisions={view.decisions} questions={view.questions} session={state.round} nameOf={view.world.nameOf} show={['decision', 'unknown']} />
+            <GroupLog label={group.label} issues={view.issues} decisions={view.decisions} questions={view.questions} blockers={view.blockers} commitments={view.commitments} stops={view.stops} session={state.round} nameOf={view.world.nameOf} show={['decision', 'commitment', 'stop', 'unknown']} />
           </section>
         )}
 

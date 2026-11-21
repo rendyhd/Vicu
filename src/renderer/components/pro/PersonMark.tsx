@@ -25,12 +25,13 @@ export function PersonMark({ name, color, onClick, expanded, className }: {
   // The label's own colour, as its chips draw it (contrast-checked for the theme).
   const isDark = useIsDark()
   const style = color ? labelChipStyle(color, isDark) : undefined
-  const content = initialsOf(name)
+  // The initials are drawn by CSS from the attribute: they are decoration next to the name the mark
+  // is labelled with, and text inside would have to be part of that name.
+  const initials = initialsOf(name)
+  const drawn = 'before:content-[attr(data-initials)]'
   if (!onClick) {
     return (
-      <span role="img" aria-label={name} style={style} className={cn('inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-accent-blue/12 text-chip font-semibold leading-none tracking-tight text-accent-blue', className)}>
-        {content}
-      </span>
+      <span role="img" aria-label={name} style={style} data-initials={initials} className={cn(drawn, 'inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-accent-blue/12 text-chip font-semibold leading-none tracking-tight text-accent-blue', className)} />
     )
   }
   return (
@@ -44,9 +45,8 @@ export function PersonMark({ name, color, onClick, expanded, className }: {
       aria-expanded={expanded}
       style={style}
       data-pro-person-mark
-      className={cn('inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-accent-blue/12 text-chip font-semibold leading-none tracking-tight text-accent-blue hover:ring-2 hover:ring-accent-blue/40', className)}
-    >
-      {content}
-    </button>
+      data-initials={initials}
+      className={cn(drawn, 'inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-accent-blue/12 text-chip font-semibold leading-none tracking-tight text-accent-blue hover:ring-2 hover:ring-accent-blue/40', className)}
+    />
   )
 }

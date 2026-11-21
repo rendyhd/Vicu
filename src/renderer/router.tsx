@@ -174,6 +174,12 @@ const sessionRoute = createRoute({
   component: lazyRouteComponent(() => import('@/views/pro/SessionView'), 'SessionView'),
 })
 
+const projectPlanRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/project-plan/$projectId',
+  component: lazyRouteComponent(() => import('@/views/pro/ProjectPlanView'), 'ProjectPlanView'),
+})
+
 const portfolioRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/portfolio',
@@ -210,6 +216,7 @@ const routeTree = rootRoute.addChildren([
   meetingRoute,
   groupRoute,
   sessionRoute,
+  projectPlanRoute,
   portfolioRoute,
   sponsorRoute,
 ])

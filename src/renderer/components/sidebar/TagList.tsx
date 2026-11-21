@@ -2,7 +2,7 @@ import { useState, useEffect, useId } from 'react'
 import { SelectionPill } from './SelectionPill'
 import { useNavigate, useMatches } from '@tanstack/react-router'
 import { useDroppable } from '@dnd-kit/core'
-import { Pencil, Trash2, X, PauseCircle, User, UsersRound } from 'lucide-react'
+import { Pencil, Trash2, X, PauseCircle, User, UsersRound, Lock } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { GroupDialog } from '@/components/pro/GroupDialog'
 import { useLabels } from '@/hooks/use-labels'
@@ -10,7 +10,7 @@ import { useCreateLabel, useUpdateLabel, useDeleteLabel } from '@/hooks/use-task
 import { useConfirmDelete } from '@/hooks/use-confirm-delete'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { Dialog } from '@/components/overlay/Dialog'
-import { Menu, MenuItem, MenuSeparator } from '@/components/overlay/Menu'
+import { Menu, MenuItem, MenuRadioItem, MenuSeparator } from '@/components/overlay/Menu'
 import { useSidebarStore } from '@/stores/sidebar-store'
 import { cn } from '@/lib/cn'
 import { focusTargetOf } from '@/lib/focus-target'
@@ -270,7 +270,7 @@ export function TagList() {
               {proPrefs.labelOnHold(contextMenu.label.id) ? 'Make active' : 'Put on hold'}
             </MenuItem>
           )}
-          {pro.layer('promises') && !proPrefs.isPerson(contextMenu.label.id) && (
+          {pro.layer('promises') && !proPrefs.isPerson(contextMenu.label.id) && !proPrefs.isPrivate(contextMenu.label.id) && (
             <MenuItem
               icon={<UsersRound />}
               onSelect={() => {
@@ -282,13 +282,22 @@ export function TagList() {
               {proPrefs.isGroup(contextMenu.label.id) ? t('pro.group.open') : t('pro.group.makeGroup')}
             </MenuItem>
           )}
-          {pro.layer('promises') && !proPrefs.isGroup(contextMenu.label.id) && (
+          {pro.layer('promises') && !proPrefs.isGroup(contextMenu.label.id) && !proPrefs.isPrivate(contextMenu.label.id) && (
             <MenuItem
               icon={<User />}
               onSelect={() => void proPrefs.setPerson(contextMenu.label.id, !proPrefs.isPerson(contextMenu.label.id))}
             >
               {proPrefs.isPerson(contextMenu.label.id) ? 'Not a person' : 'This is a person'}
             </MenuItem>
+          )}
+          {pro.layer('promises') && !proPrefs.isPerson(contextMenu.label.id) && !proPrefs.isGroup(contextMenu.label.id) && (
+            <MenuRadioItem
+              icon={<Lock />}
+              checked={proPrefs.isPrivate(contextMenu.label.id)}
+              onSelect={() => void proPrefs.setPrivate(contextMenu.label.id, !proPrefs.isPrivate(contextMenu.label.id))}
+            >
+              {t('pro.topics.privateLabel')}
+            </MenuRadioItem>
           )}
           {pro.on && <MenuSeparator />}
           <MenuItem

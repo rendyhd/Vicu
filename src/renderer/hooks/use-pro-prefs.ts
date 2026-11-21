@@ -7,6 +7,7 @@ import {
   labelStatusKey,
   onHoldLabelIds,
   personLabelIds,
+  privateLabelIds,
   projectMode,
   projectModeKey,
   projectOnHold,
@@ -31,6 +32,7 @@ export function useProPrefs() {
     const people = personLabelIds(values)
     const heldLabels = onHoldLabelIds(values)
     const groups = groupLabelIds(values)
+    const privateLabels = privateLabelIds(values)
     return {
       values,
       area: readProArea(values[PRO_AREA_KEY]),
@@ -38,6 +40,11 @@ export function useProPrefs() {
       heldLabels,
       /** The labels marked as a group (21.16). */
       groups,
+      /** The labels marked private (21.21): their topics are left out of copied text. */
+      privateLabels,
+      isPrivate: (labelId: number) => privateLabels.has(labelId),
+      setPrivate: (labelId: number, value: boolean) =>
+        writeSyncedPrefs(queryClient, { [labelKindKey(labelId)]: value ? 'private' : null }),
       isGroup: (labelId: number) => groups.has(labelId),
       setGroup: (labelId: number, group: boolean) =>
         writeSyncedPrefs(queryClient, { [labelKindKey(labelId)]: group ? 'group' : null }),

@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useParams } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import { Copy, FileInput, MessageSquareQuote, Send } from 'lucide-react'
@@ -7,6 +7,8 @@ import { useProPrefs } from '@/hooks/use-pro-prefs'
 import { useGroups } from '@/hooks/use-groups'
 import { useLabels } from '@/hooks/use-labels'
 import { useProjects } from '@/hooks/use-projects'
+import { useAppConfig } from '@/hooks/use-app-config'
+import { ledgerInArea } from '@/hooks/use-groups'
 import { api } from '@/lib/api'
 import { toast } from '@/stores/toast-store'
 import { useProUiStore } from '@/stores/pro-ui-store'
@@ -15,6 +17,7 @@ import { TaskRow } from '@/components/task-list/TaskRow'
 import { TaskRowGroup } from '@/components/task-list/TaskRowGroup'
 import { ListSectionHeader } from '@/components/task-list/ListSectionHeader'
 import { ListSkeleton } from '@/components/shared/ListSkeleton'
+import { NewTaskComposer } from '@/components/task-list/NewTaskComposer'
 import { PersonMark } from '@/components/pro/PersonMark'
 import { ProOffNotice } from '@/components/pro/ProOffNotice'
 import { openPromises } from '@/lib/pro/export'
@@ -25,6 +28,7 @@ import { matchPerson, patternText, personCounts } from '../../../shared/pro/peop
 import { readConfirmTitle } from '../../../shared/pro/promises'
 import { exportOpen } from '../../../shared/pro/import'
 import { personPage, type PersonPart } from '../../../shared/pro/groups'
+import { personTopics } from '../../../shared/pro/topics'
 import type { Task } from '@/lib/vikunja-types'
 
 const ACTION = 'inline-flex items-center gap-1.5 rounded-control border border-border px-2.5 py-1 text-meta text-text hover:bg-bg-hover'
@@ -43,6 +47,14 @@ export function PersonView() {
   const { data: labels } = useLabels()
   const { data: projects } = useProjects()
   const openDialog = useProUiStore((s) => s.open)
+  const { data: config } = useAppConfig()
+  const inbox = config?.inbox_project_id
+  const [addingTopic, setAddingTopic] = useState(false)
+  // The field takes the focus when it opens, and again after each topic it made.
+  const topicInput = useRef<HTMLInputElement>(null)
+  useEffect(() => {
+    if (addingTopic) topicInput.current?.focus()
+  }, [addingTopic])
   const label = labels?.find((entry) => entry.id === id)
   const name = label?.title ?? 'Person'
   const today = toLocalDate(new Date())
@@ -68,7 +80,18 @@ export function PersonView() {
   // What they promised, by who it was promised to and by group (21.5).
   const promised = useMemo(() => personPage(id, sections.theirs, world.ledger, groups.labelIds), [id, sections.theirs, world.ledger, groups.labelIds])
   const counts = useMemo(() => personCounts(id, world.ledger, (taskId) => world.openById.has(taskId), today), [id, world, today])
-  const agenda = useMemo(() => personAgenda(name, sections.theirs, sections.mine, world, today), [name, sections, world, today])
+  // 1:1 topics (21.21): open tasks with the person's label and no promise.
+  const topics = useMemo(() => {
+    const tasks = world.open.filter((task) => (task.labels ?? []).some((entry) => entry.id === id))
+    const result = personTopics({ person: id, tasks, ledger: ledgerInArea(world, tasks), today, privateLabels: prefs.privateLabels })
+    const byId = new Map(tasks.map((task) => [task.id, task]))
+    const pick = (ids: readonly number[]) => ids.flatMap((taskId) => byId.get(taskId) ?? [])
+    return { now: pick(result.now), later: pick(result.later), hidden: result.hidden }
+  }, [world, id, today, prefs.privateLabels])
+  const agenda = useMemo(
+    () => personAgenda(name, sections.theirs, sections.mine, world, today, { tasks: topics.now, hidden: topics.hidden }),
+    [name, sections, world, today, topics],
+  )
 
   if (!world.on) return <ProOffNotice title={name} />
   if (world.isLoading) return <ListSkeleton title={name} />
@@ -114,6 +137,15 @@ export function PersonView() {
     )
   }
 
+  const topicRow = (task: Task) => (
+    <div key={task.id} className="flex items-center" data-pro-topic={task.id}>
+      <div className="min-w-0 flex-1"><TaskRow task={task} /></div>
+      {topics.hidden.includes(task.id) && (
+        <span className="mr-6 shrink-0 rounded-chip border border-border px-2 py-0.5 text-chip text-text-secondary" data-pro-topic-private>{t('pro.topics.private')}</span>
+      )}
+    </div>
+  )
+
   return (
     <TaskList
       title={name}
@@ -143,6 +175,26 @@ export function PersonView() {
             <li key={item} className="flex gap-2"><span className="text-text-secondary" aria-hidden>-</span>{item}</li>
           ))}
         </ul>
+      </div>
+      <div data-pro-topics>
+        <ListSectionHeader level={1} title={t('pro.topics.title')} count={topics.now.length} />
+        {topics.now.length === 0 && <p className="px-6 py-2 text-meta text-text-secondary">{t('pro.topics.empty')}</p>}
+        <TaskRowGroup>{topics.now.map((task) => topicRow(task))}</TaskRowGroup>
+        {topics.later.length > 0 && (
+          <div data-pro-topics-later>
+            <ListSectionHeader level={2} title={t('pro.topics.later')} count={topics.later.length} />
+            <TaskRowGroup>{topics.later.map((task) => topicRow(task))}</TaskRowGroup>
+          </div>
+        )}
+        {inbox && (
+          <div className="px-2 py-1">
+            {addingTopic ? (
+              <NewTaskComposer projectId={inbox} defaultLabelIds={[id]} inputRef={topicInput} onCancel={() => setAddingTopic(false)} onCreated={() => topicInput.current?.focus()} />
+            ) : (
+              <button type="button" className={ACTION} onClick={() => setAddingTopic(true)} data-pro-add-topic>{t('pro.topics.add')}</button>
+            )}
+          </div>
+        )}
       </div>
       {plain && sections.theirs.length > 0 && (
         <div>

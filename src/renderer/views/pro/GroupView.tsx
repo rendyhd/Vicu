@@ -19,6 +19,7 @@ import { ProOffNotice } from '@/components/pro/ProOffNotice'
 import { GroupDialog } from '@/components/pro/GroupDialog'
 import { GroupLog } from '@/components/pro/GroupLog'
 import { NoOwnerList } from '@/components/pro/NoOwnerList'
+import { GroupPlans } from '@/components/pro/GroupPlans'
 import { copyRendered, renderProDocument } from '@/lib/pro/text'
 import type { Task } from '@/lib/vikunja-types'
 import { ledgerSettings } from '../../../shared/pro/ledger'
@@ -151,7 +152,8 @@ export function GroupView() {
         )}
         {part('done', page.since ? t('pro.group.part.done') : t('pro.group.part.doneRecent'), page.done)}
         <NoOwnerList tasks={tasksOf(page.noOwner)} group={group.label} />
-        <GroupLog label={group.label} issues={view.issues} decisions={view.decisions} questions={view.questions} nameOf={world.nameOf} />
+        <GroupLog label={group.label} issues={view.issues} decisions={view.decisions} questions={view.questions} blockers={view.blockers} commitments={view.commitments} stops={view.stops} nameOf={world.nameOf} />
+        <GroupPlans labelId={group.label} />
         {view.sessions.length > 0 && (
           <section className="px-6 pb-8" aria-label={t('pro.group.sessions')} data-pro-group-sessions>
             <h2 className="mb-1 text-group text-text-secondary">{t('pro.group.sessions')}</h2>

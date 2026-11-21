@@ -30,7 +30,13 @@ export interface ProjectPlan {
 }
 
 const LOCAL_DAY = /^\d{4}-\d{2}-\d{2}$/
-const isDay = (value: unknown): value is LocalDate => typeof value === 'string' && LOCAL_DAY.test(value)
+/** A real calendar day: `2026-02-30` is none. */
+const isDay = (value: unknown): value is LocalDate => {
+  if (typeof value !== 'string' || !LOCAL_DAY.test(value)) return false
+  const [year, month, day] = value.split('-').map(Number)
+  const date = new Date(Date.UTC(year, month - 1, day))
+  return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day
+}
 const wholeAboveZero = (value: unknown): value is number => typeof value === 'number' && Number.isInteger(value) && value > 0
 
 /** A plan from its stored value, or null when it is not one: both days are needed, in order. */

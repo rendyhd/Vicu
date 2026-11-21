@@ -5,7 +5,7 @@ import type { Task } from '@/lib/vikunja-types'
  * Pro's dialogs and pickers that the palette and shortcuts open from anywhere (plan 7.1.11).
  * Each is drawn once by its host in AppShell.
  */
-export type ProDialog = 'pro-import' | 'pro-copilot' | 'pro-recap' | 'pro-weekly-note' | 'pro-session-recap'
+export type ProDialog = 'pro-import' | 'pro-copilot' | 'pro-recap' | 'pro-weekly-note' | 'pro-session-recap' | 'pro-plan'
 
 interface ProUiState {
   focusPickerOpen: boolean

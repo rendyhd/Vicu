@@ -4,7 +4,8 @@ import { useQueryClient } from '@tanstack/react-query'
 import { ArrowDown, ArrowUp, Check, ListPlus } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { Button } from '@/components/shared/Button'
-import { currentLedger, newLedgerId, setRecord, writeLedger } from '@/hooks/use-pro-ledger'
+import { toast } from '@/stores/toast-store'
+import { currentLedger, newLedgerId, restoreRecords, setRecord, writeLedger } from '@/hooks/use-pro-ledger'
 import { toLocalDate } from '../../../shared/due-dates'
 import { recordValue, type LogValue } from '../../../shared/pro/ledger'
 import { openIssues, type LogEntry } from '../../../shared/pro/groups'
@@ -12,7 +13,7 @@ import { openIssues, type LogEntry } from '../../../shared/pro/groups'
 const FIELD = 'min-w-0 flex-1 rounded-control border border-border bg-bg-page px-2 py-1 text-meta text-text'
 const ICON = 'rounded-control p-1 text-text-secondary hover:bg-bg-hover hover:text-text disabled:opacity-30'
 
-export type GroupLogKind = 'issue' | 'decision' | 'unknown'
+export type GroupLogKind = 'issue' | 'blocker' | 'commitment' | 'decision' | 'stop' | 'unknown'
 
 /** A new log entry of a group; captured in a session when one is open. */
 export function logEntryFor(kind: GroupLogKind, text: string, group: number, session: string | null): LogValue {
@@ -22,21 +23,25 @@ export function logEntryFor(kind: GroupLogKind, text: string, group: number, ses
 }
 
 /**
- * A group's issues, decisions and open questions (cross-app semantics 21.16): one kind of record in
- * the log, shown as three short lists, each with a field to add one. Issues are ranked and can be
- * solved; a question can be answered.
+ * A group's issues, blockers, commitments, decisions, stops and open questions (cross-app semantics
+ * 21.16): one kind of record in the log, shown as short lists, each with a field to add one. Issues
+ * are ranked and can be solved; a question can be answered; a blocker, commitment or stop stays
+ * open until it is closed (with Undo).
  */
-const ALL_KINDS: readonly GroupLogKind[] = ['issue', 'decision', 'unknown']
+const ALL_KINDS: readonly GroupLogKind[] = ['issue', 'blocker', 'commitment', 'decision', 'stop', 'unknown']
 
-export function GroupLog({ label, issues, decisions, questions, session = null, nameOf, show = ALL_KINDS, onMakeAction }: {
+export function GroupLog({ label, issues, decisions, questions, blockers = [], commitments = [], stops = [], session = null, nameOf, show = ALL_KINDS, onMakeAction }: {
   label: number
   issues: readonly LogEntry[]
   decisions: readonly LogEntry[]
   questions: readonly LogEntry[]
+  blockers?: readonly LogEntry[]
+  commitments?: readonly LogEntry[]
+  stops?: readonly LogEntry[]
   /** The open session's round id: what is added now is captured in it. */
   session?: string | null
   nameOf: (personId: number | null | undefined) => string
-  /** The lists to show; all three without it. */
+  /** The lists to show; all six without it. */
   show?: readonly GroupLogKind[]
   /** An issue gets a button that makes an action of it (a session). */
   onMakeAction?: (entry: LogEntry) => void
@@ -68,10 +73,37 @@ export function GroupLog({ label, issues, decisions, questions, session = null, 
     })
     void writeLedger(queryClient, operations)
   }
+  /** Closes a blocker, commitment or stop: `resolved` is today, and Undo puts the record back as it was. */
+  const close = (entry: LogEntry) => {
+    const before = currentLedger(queryClient)
+    change(entry.id, { resolved: today, ...(session ? { solved_in: session } : {}) })
+    toast.success(t('pro.groupLog.closed', { text: entry.value.text }), {
+      action: { label: t('pro.groupLog.undo'), onAction: () => void writeLedger(queryClient, restoreRecords(before, [{ collection: 'log', id: entry.id }])) },
+    })
+  }
   const today = toLocalDate(new Date())
+  const closeList = (kind: 'blocker' | 'commitment' | 'stop', entries: readonly LogEntry[]) => {
+    const text = {
+      blocker: { title: t('pro.groupLog.blockers'), placeholder: t('pro.groupLog.addBlocker'), empty: t('pro.groupLog.noBlockers'), button: t('pro.groupLog.outOfTheWay'), aria: (what: string) => t('pro.groupLog.outOfTheWayAria', { text: what }) },
+      commitment: { title: t('pro.groupLog.commitments'), placeholder: t('pro.groupLog.addCommitment'), empty: t('pro.groupLog.noCommitments'), button: t('pro.groupLog.close'), aria: (what: string) => t('pro.groupLog.closeAria', { text: what }) },
+      stop: { title: t('pro.groupLog.stops'), placeholder: t('pro.groupLog.addStop'), empty: t('pro.groupLog.noStops'), button: t('pro.groupLog.close'), aria: (what: string) => t('pro.groupLog.closeAria', { text: what }) },
+    }[kind]
+    return (
+      <LogList title={text.title} placeholder={text.placeholder} empty={text.empty} onAdd={(value) => add(kind, value)} kind={kind}>
+        {entries.map((entry) => (
+          <li key={entry.id} className="flex items-start gap-2 py-1" data-pro-log-entry={entry.id}>
+            <span className="min-w-0 flex-1 text-meta text-text">{entry.value.text}<span className="ml-1 text-text-secondary">{entry.value.at}</span></span>
+            <button type="button" className="shrink-0 rounded-control border border-border px-2 py-0.5 text-meta text-text hover:bg-bg-hover" aria-label={text.aria(entry.value.text)} onClick={() => close(entry)} data-pro-close={entry.id}>
+              {text.button}
+            </button>
+          </li>
+        ))}
+      </LogList>
+    )
+  }
 
   return (
-    <div className={cn('grid gap-4 px-6 pb-6 pt-2', show.length === 3 && 'md:grid-cols-3', show.length === 2 && 'md:grid-cols-2')} data-pro-group-log>
+    <div className={cn('grid gap-4 px-6 pb-6 pt-2', show.length >= 3 && 'md:grid-cols-3', show.length === 2 && 'md:grid-cols-2')} data-pro-group-log>
       {show.includes('issue') && <LogList title={t('pro.group.log.issues')} placeholder={t('pro.group.log.addIssue')} empty={t('pro.group.log.noIssues')} onAdd={(text) => add('issue', text)} kind="issue">
         {issues.map((entry, index) => (
           <li key={entry.id} className="flex items-start gap-1 py-1" data-pro-issue={entry.id}>
@@ -93,6 +125,8 @@ export function GroupLog({ label, issues, decisions, questions, session = null, 
           </li>
         ))}
       </LogList>}
+      {show.includes('blocker') && closeList('blocker', blockers)}
+      {show.includes('commitment') && closeList('commitment', commitments)}
       {show.includes('decision') && <LogList title={t('pro.group.log.decisions')} placeholder={t('pro.group.log.addDecision')} empty={t('pro.group.log.noDecisions')} onAdd={(text) => add('decision', text)} kind="decision">
         {decisions.slice(0, 8).map((entry) => (
           <li key={entry.id} className="py-1 text-meta text-text" data-pro-decision={entry.id}>
@@ -106,6 +140,7 @@ export function GroupLog({ label, issues, decisions, questions, session = null, 
           </li>
         ))}
       </LogList>}
+      {show.includes('stop') && closeList('stop', stops)}
       {show.includes('unknown') && <LogList title={t('pro.group.log.questions')} placeholder={t('pro.group.log.addQuestion')} empty={t('pro.group.log.noQuestions')} onAdd={(text) => add('unknown', text)} kind="unknown">
         {questions.map((entry) => (
           <li key={entry.id} className="flex items-start gap-1 py-1" data-pro-question={entry.id}>

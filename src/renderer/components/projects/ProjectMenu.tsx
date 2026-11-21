@@ -43,6 +43,10 @@ import { useProjectsWithoutIcon } from '@/hooks/use-project-icons'
 import { usePro } from '@/hooks/use-pro'
 import { InitiativeMenu, ProjectStatusMenu, ProjectTypeMenu } from '@/components/pro/ProjectProMenus'
 import { useProUiStore } from '@/stores/pro-ui-store'
+import { useNavigate } from '@tanstack/react-router'
+import { useTranslation } from 'react-i18next'
+import { CalendarRange } from 'lucide-react'
+import { useProjectPlans } from '@/hooks/use-project-plans'
 
 interface ParentPickerProps {
   anchorRef: RefObject<HTMLElement | null>
@@ -184,6 +188,10 @@ export function ProjectMenu({ project, surface, anchorRef, anchorPoint, opener =
   const proOn = usePro().layer('availability')
   const portfolioOn = usePro().layer('portfolio')
   const proInitiativeRef = useRef<HTMLButtonElement>(null)
+  // A 90-day plan (21.20), with the promises layer.
+  const { t } = useTranslation()
+  const navigate = useNavigate()
+  const projectPlans = useProjectPlans()
   const [sub, setSub] = useState<Sub>(null)
   const { data } = useProjects()
   const { data: config } = useAppConfig()
@@ -354,6 +362,17 @@ export function ProjectMenu({ project, surface, anchorRef, anchorPoint, opener =
             <InitiativeMenu project={project} anchorRef={proInitiativeRef} onClose={closeSub} onAtCap={(id) => useProUiStore.getState().setAtCapStart(id)} />
           )}
         </>
+      )}
+      {projectPlans.on && !isInbox && (
+        <MenuItem
+          icon={<CalendarRange />}
+          onSelect={() => {
+            if (projectPlans.byProject.has(project.id)) void navigate({ to: '/project-plan/$projectId', params: { projectId: String(project.id) } })
+            else useProUiStore.getState().open('pro-plan', { projectId: project.id })
+          }}
+        >
+          {t('pro.plan.menu')}
+        </MenuItem>
       )}
 
       {(!isInbox || showReview) && <MenuSeparator />}

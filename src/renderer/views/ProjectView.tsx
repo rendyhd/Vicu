@@ -21,6 +21,7 @@ import { useSharedProjectActions } from '@/hooks/use-project-actions'
 import { useAvailabilityView } from '@/hooks/use-availability'
 import { HiddenSummary, ViewSwitch } from '@/components/pro/ViewSwitch'
 import { InitiativePanel } from '@/components/pro/InitiativePanel'
+import { ProjectPlanLink } from '@/components/pro/ProjectPlanLink'
 
 function findSectionForTask(
   sections: SectionData[],
@@ -233,6 +234,7 @@ export function ProjectView() {
       headerContent={availability.on || activeProject ? (
         <>
           <InitiativePanel projectId={pid} />
+          <ProjectPlanLink projectId={pid} />
           {availability.on && <ViewSwitch view={availability.view} onChange={availability.setView} />}
         </>
       ) : undefined}

@@ -16,6 +16,7 @@ import {
   groupPage,
   groupsOf,
   openIssues,
+  openLog,
   reliability,
   RELIABILITY_SESSIONS,
   type Group,
@@ -159,6 +160,9 @@ export interface GroupWorld {
   issues: LogEntry[]
   decisions: LogEntry[]
   questions: LogEntry[]
+  blockers: LogEntry[]
+  commitments: LogEntry[]
+  stops: LogEntry[]
   sessions: ReturnType<typeof endedSessions>
   today: LocalDate
 }
@@ -193,6 +197,9 @@ export function useGroupWorld(labelId: number): GroupWorld {
       issues: group ? openIssues(ledger, group.label) : [],
       decisions: group ? groupLog(ledger, group.label, 'decision') : [],
       questions: group ? groupLog(ledger, group.label, 'unknown').filter((entry) => !entry.value.resolved) : [],
+      blockers: group ? openLog(ledger, group.label, 'blocker') : [],
+      commitments: group ? openLog(ledger, group.label, 'commitment') : [],
+      stops: group ? openLog(ledger, group.label, 'stop') : [],
       sessions: group ? endedSessions(ledger, group.id) : [],
       today,
     }
