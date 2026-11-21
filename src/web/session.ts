@@ -205,15 +205,52 @@ export async function loginWithPassword(username: string, password: string, totp
   }
 }
 
-/** End the session on the server (best effort) and forget it in every tab. */
-export async function logoutSession(): Promise<void> {
-  const token = jwt
-  clearSession(true)
-  if (!token) return
+/** How a sign-out went. */
+export type LogoutOutcome =
+  /** The server ended the session (or had none left). `providerSignOutUrl`: where the identity provider ends its own. */
+  | { ended: true; providerSignOutUrl?: string }
+  /** The server could not be asked: the session, and the cookie that renews it, still work. */
+  | { ended: false }
+
+/**
+ * End the session on the server and forget it in every tab. The session is only forgotten here
+ * once the server has ended it: the cookie that renews it stays in the browser, so a sign-out the
+ * server never heard of would leave the next person at this computer one step from the account.
+ */
+export async function logoutSession(): Promise<LogoutOutcome> {
+  // A token that works now: the one in memory may have run out while the tab was hidden.
+  let token = sessionTokenSync()
+  if (!token) {
+    const outcome = await renewSession()
+    if (outcome === 'ended') {
+      clearSession(true)
+      return { ended: true }
+    }
+    if (outcome === 'unreachable' || !jwt) return { ended: false }
+    token = jwt
+  }
   try {
-    await timedFetch(`${origin()}/api/v2/logout`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } })
+    const response = await timedFetch(`${origin()}/api/v2/logout`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } })
+    const text = await response.text().catch(() => '')
+    if (response.ok) {
+      let url: unknown
+      try {
+        url = (JSON.parse(text) as { oidc_logout_url?: unknown }).oidc_logout_url
+      } catch {
+        // A 2xx that is not the API (a sign-in page in front of the server) ended nothing.
+        return { ended: false }
+      }
+      clearSession(true)
+      return typeof url === 'string' && /^https?:\/\//i.test(url) ? { ended: true, providerSignOutUrl: url } : { ended: true }
+    }
+    // The server itself says this session is no longer one: there is nothing left to end.
+    if (response.status === 401 && !isNotApiErrorAnswer(response.status, text)) {
+      clearSession(true)
+      return { ended: true }
+    }
+    return { ended: false }
   } catch {
-    // The session ends on its own; the cookie is useless once the server forgets it.
+    return { ended: false }
   }
 }
 

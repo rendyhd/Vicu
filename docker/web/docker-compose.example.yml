@@ -22,7 +22,9 @@ services:
     cap_drop: [ALL]
     security_opt: ["no-new-privileges:true"]
     ports:
-      - "8080:8080"
+      # Reachable from this machine only. Your reverse proxy (TLS) goes in front; do not publish
+      # this plain-HTTP port to the internet.
+      - "127.0.0.1:8080:8080"
     environment:
       # How this container reaches Vikunja (the service name below), not the public address.
       VIKUNJA_URL: http://vikunja:3456

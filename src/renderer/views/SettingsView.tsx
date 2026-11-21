@@ -41,7 +41,7 @@ import { SettingsMenu, SETTINGS_TAB_LABELS } from '@/components/settings/Setting
 import { currentSectionIndex, SETTINGS_MENU_WIDTH, settingsGroups } from '@/lib/settings-menu'
 import { useSettingsNavStore } from '@/stores/settings-nav-store'
 import type { TranslationKey } from '../../shared/i18n'
-import { can, capabilities } from '@/lib/capabilities'
+import { can, capabilities, isWebHost } from '@/lib/capabilities'
 
 /** Every tab's content sits in the same column, left-aligned with the page title. */
 const SETTINGS_COLUMN = 'mx-6 max-w-[640px] space-y-6 pb-8 pt-4'
@@ -306,7 +306,16 @@ export function SettingsView() {
       setSigningOut(false)
     }
     if (warning && !(await confirmDelete(warning, { force: true, confirmLabel: t('settings.connection.signOut') }))) return
-    await api.logout()
+    let signedOut: { providerSignOutUrl?: string } | void
+    try {
+      signedOut = await api.logout()
+    } catch (err) {
+      // Only the web version refuses: there the session lives in the browser and would still work
+      // for the next person if the server never heard of the sign-out.
+      if (!isWebHost()) throw err
+      toast.error(t('settings.connection.signOutNotReached'))
+      return
+    }
     // Main keeps app preferences (theme, hotkeys, window bounds, notifications, etc.)
     // and clears the connection and account-specific data (project IDs, custom lists, etc.)
     await api.saveConnectionConfig({
@@ -315,7 +324,10 @@ export function SettingsView() {
       auth_method: 'api_token',
       inbox_project_id: 0,
     })
-    window.location.reload()
+    // A single sign-on session also lives at the identity provider: the browser goes there to end it.
+    const providerSignOut = isWebHost() ? signedOut?.providerSignOutUrl : undefined
+    if (typeof providerSignOut === 'string' && /^https?:\/\//i.test(providerSignOut)) window.location.assign(providerSignOut)
+    else window.location.reload()
   }
 
   return (

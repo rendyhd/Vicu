@@ -333,7 +333,7 @@ export const api = {
     window.api.checkAuth() as Promise<AuthCheckResult>,
 
   logout: () =>
-    window.api.logout() as Promise<void>,
+    window.api.logout() as Promise<{ providerSignOutUrl?: string } | void>,
 
   testNotification: () =>
     window.api.testNotification() as Promise<void>,

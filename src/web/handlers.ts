@@ -258,11 +258,20 @@ export function registerWebHandlers(handle: Handle): void {
     return { status: finished ? 'authenticated' as const : 'unconfigured' as const }
   })
 
+  // Rejects when the server could not be told: the page then says so and stays signed in, because
+  // the session would still work for whoever uses this browser next.
   handle('auth:logout', async () => {
-    await logoutSession()
+    let providerSignOutUrl: string | undefined
+    if (loadConfig()?.auth_method !== 'api_token') {
+      const outcome = await logoutSession()
+      if (!outcome.ended) throw new Error('The server could not be reached, so the session was not ended')
+      providerSignOutUrl = outcome.providerSignOutUrl
+    }
     storeApiToken(null)
     writeLocal(REMEMBER_TOKEN_KEY, null)
     accountChanged()
+    // An SSO session also lives at the identity provider; the page goes there to end it.
+    return providerSignOutUrl ? { providerSignOutUrl } : undefined
   })
 
   // --- Links ---------------------------------------------------------------------------------

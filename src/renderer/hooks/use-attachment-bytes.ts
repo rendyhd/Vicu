@@ -1,3 +1,5 @@
+import { isWebHost } from '@/lib/capabilities'
+import { displayBlobType } from '@/lib/attachment-preview'
 import { useQuery } from '@tanstack/react-query'
 import { useCallback, useEffect, useState } from 'react'
 import { api } from '@/lib/api'
@@ -54,7 +56,7 @@ export function useAttachmentBlobUrl(
       setUrl(null)
       return
     }
-    const blob = new Blob([query.data as BlobPart], { type: mime })
+    const blob = new Blob([query.data as BlobPart], { type: displayBlobType(mime, isWebHost()) })
     const created = URL.createObjectURL(blob)
     setUrl(created)
     return () => {

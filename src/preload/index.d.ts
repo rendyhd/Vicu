@@ -230,7 +230,8 @@ export interface ElectronAPI {
   loginPassword(url: string, username: string, password: string, totpPasscode?: string): Promise<PasswordLoginResult>
   getUser(): Promise<VikunjaUser | null>
   checkAuth(): Promise<AuthCheckResult>
-  logout(): Promise<void>
+  /** Web only: rejects when the server could not be told; may name the address where the identity provider ends its own session. */
+  logout(): Promise<{ providerSignOutUrl?: string } | void>
 
   // Notifications
   testNotification(): Promise<void>

@@ -82,6 +82,7 @@
       "signedIn": "Signed in",
       "syncing": "Syncing...",
       "signOut": "Sign Out",
+      "signOutNotReached": "The server could not be reached, so you are still signed in. Try again when you are connected.",
       "apiToken": "API Token",
       "tokenPlaceholder": "Enter your API token",
       "showToken": "Show",

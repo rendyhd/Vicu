@@ -55,3 +55,25 @@ describe('stepImage', () => {
     expect(stepImage(0, 0, -1)).toBe(0)
   })
 })
+
+describe('the type of a blob that shows a file from the server as a picture', () => {
+  it('keeps the type on the desktop, where a blob is never a page of a site', async () => {
+    const { displayBlobType } = await import('../attachment-preview')
+    expect(displayBlobType('image/svg+xml', false)).toBe('image/svg+xml')
+    expect(displayBlobType('text/html', false)).toBe('text/html')
+  })
+
+  it('keeps only pixel formats in a browser', async () => {
+    const { displayBlobType } = await import('../attachment-preview')
+    expect(displayBlobType('image/png', true)).toBe('image/png')
+    expect(displayBlobType('IMAGE/JPEG; charset=binary', true)).toBe('image/jpeg')
+    expect(displayBlobType('image/webp', true)).toBe('image/webp')
+  })
+
+  it('never lets a document type through in a browser', async () => {
+    const { displayBlobType } = await import('../attachment-preview')
+    for (const type of ['image/svg+xml', 'text/html', 'application/xhtml+xml', 'text/xml', 'application/pdf', '']) {
+      expect(displayBlobType(type, true), type).toBe('application/octet-stream')
+    }
+  })
+})

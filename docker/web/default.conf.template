@@ -66,6 +66,19 @@ server {
     proxy_set_header Connection "";
     # Appended to the cookie's Path attribute, which is the one place nginx lets a variable in.
     proxy_cookie_path ~^(.+)$ "$1$vicu_cookie_secure";
+
+    # The app and the API are one origin, so no other site has a reason to read the API through
+    # this address: whatever cross-origin permission Vikunja is configured to give is not passed on.
+    proxy_hide_header Access-Control-Allow-Origin;
+    proxy_hide_header Access-Control-Allow-Credentials;
+    proxy_hide_header Access-Control-Allow-Headers;
+    proxy_hide_header Access-Control-Allow-Methods;
+    proxy_hide_header Access-Control-Expose-Headers;
+
+    # An answer of the API is data. Opened as a page (a link someone made to an attachment's
+    # address), it may load and run nothing at all.
+    include /etc/nginx/vicu/security-headers.conf;
+    add_header Content-Security-Policy "default-src 'none'; frame-ancestors 'none'; sandbox" always;
     # An upload goes straight through instead of being written to disk here first.
     proxy_request_buffering off;
     proxy_connect_timeout 10s;

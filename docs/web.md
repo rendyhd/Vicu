@@ -115,7 +115,8 @@ keys work, because the sign-in happens in the browser itself.
 
 The container sends a Content-Security-Policy that allows scripts, styles, fonts, images and
 requests from its own origin only, forbids framing, and sends `nosniff`, `no-referrer` and a closed
-Permissions-Policy (`docker/web/security-headers.conf`). If your reverse proxy adds headers of its
+Permissions-Policy (`docker/web/security-headers.conf`). Answers of the API get a policy of their
+own that lets them load and run nothing if one is ever opened as a page. If your reverse proxy adds headers of its
 own, do not loosen these. Attachments are never shown as pages of the site: a picture, PDF or text
 file opens in a new tab from memory, everything else is downloaded.
 
@@ -134,7 +135,18 @@ file opens in a new tab from memory, everything else is downloaded.
 - **The address a single sign-on comes back to carries a one-time code.** The container leaves it
   out of its access log; make sure your reverse proxy's log is not public either.
 - **People on a shared computer must sign out.** Closing the tab does not end a password or
-  single sign-on session.
+  single sign-on session. Sign Out ends the session on the server and refuses, with a message, when
+  the server cannot be reached. A single sign-on session at your identity provider is ended only
+  when the provider's `logout_url` is set in Vikunja's configuration: Vicu web then sends the
+  browser there. Without it, the next person can sign in again through the provider without a
+  password, as in Vikunja's own interface.
+- **Other sites on the same domain.** The session cookie is `SameSite=Lax`, which treats
+  `wiki.example.com` and `vicu.example.com` as one site. The container never passes on
+  cross-origin permissions from Vikunja (`Access-Control-*`), so a page on a sibling address cannot
+  read an answer of the API. Still, do not host Vicu web next to applications you do not trust on
+  the same domain.
+- **Keep the plain-HTTP port private.** The compose example binds it to `127.0.0.1`. Only your
+  reverse proxy should reach it.
 
 ## Updating
 

@@ -74,3 +74,31 @@ export function stepImage(index: number, count: number, step: 1 | -1): number {
   if (count <= 0) return 0
   return (((index + step) % count) + count) % count
 }
+
+/** Picture formats that are only ever pixels: nothing in them is markup or script. */
+const RASTER_TYPES: ReadonlySet<string> = new Set([
+  'image/png',
+  'image/apng',
+  'image/jpeg',
+  'image/pjpeg',
+  'image/gif',
+  'image/webp',
+  'image/avif',
+  'image/bmp',
+  'image/x-ms-bmp',
+  'image/x-icon',
+  'image/vnd.microsoft.icon',
+])
+
+/**
+ * The type to give a blob of a file from the server that is shown as a picture. In a browser the
+ * blob's address belongs to the site, so a file that is really a document (SVG, HTML, whatever
+ * type its uploader claimed) would open as a page of the site if someone opened the picture in a
+ * tab of its own. There only pixel formats keep their type; anything else becomes plain bytes,
+ * which a browser never shows as a page. The desktop window has no such tab and keeps the type.
+ */
+export function displayBlobType(mime: string, inBrowser: boolean): string {
+  if (!inBrowser) return mime
+  const type = mime.split(';')[0].trim().toLowerCase()
+  return RASTER_TYPES.has(type) ? type : 'application/octet-stream'
+}

@@ -82,6 +82,7 @@
       "signedIn": "Ingelogd",
       "syncing": "Synchroniseren...",
       "signOut": "Uitloggen",
+      "signOutNotReached": "De server was niet bereikbaar, dus je bent nog ingelogd. Probeer het opnieuw als je verbinding hebt.",
       "apiToken": "API-token",
       "tokenPlaceholder": "Voer je API-token in",
       "showToken": "Tonen",

@@ -25,6 +25,8 @@ After the first sign-in Vicu asks which project is your Inbox. If one of your ot
 > [!WARNING]
 > On a shared or borrowed computer, sign out when you are done. Closing the tab does not end a password or organization sign-in.
 
+**Sign Out** ends the session on the server. If the server cannot be reached at that moment, Vicu says so and you stay signed in, so try again once you are connected. With your organization's sign-in you may still be signed in there afterwards: Vicu takes you to its sign-out page when your server is set up for that, and otherwise you sign out there yourself.
+
 ## What is the same
 
 Everything you do with tasks: adding them with [quick add](guide:quick-add), dates, repeats, reminders, labels, notes, checklists, subtasks, attachments, [projects](guide:projects) and their order, [custom lists](guide:custom-lists), [routines](guide:routines), [Plan](guide:plan) with time blocks and your own Events, [comments and sharing](guide:collaboration), [reviews and guided sessions](guide:review), and [Pro](guide:pro). Your settings that sync, such as the Inbox, the week start and project categories, are the same as on your other devices.
