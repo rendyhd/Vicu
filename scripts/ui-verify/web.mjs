@@ -156,6 +156,11 @@ step('setup-password', async () => {
   assert('setup ends in the app', await page.locator('nav, aside').first().isVisible().catch(() => false), await text(page))
   const stored = await page.evaluate(() => JSON.stringify([Object.keys(localStorage), Object.keys(sessionStorage)]))
   assert('no token is written to page storage by a password sign-in', !/token/i.test(stored) && !/jwt/i.test(stored), stored)
+  const session = (await context.cookies()).find((cookie) => cookie.name === 'vikunja_refresh_token')
+  assert('the session cookie cannot be read by the page and is not sent from other sites',
+    !!session && session.httpOnly === true && ['Lax', 'Strict'].includes(session.sameSite) && session.path.startsWith('/api/'),
+    session ? JSON.stringify({ httpOnly: session.httpOnly, sameSite: session.sameSite, path: session.path, secure: session.secure }) : 'no cookie')
+  assert('the page cannot see the session cookie', !(await page.evaluate(() => document.cookie)).includes('vikunja_refresh_token'))
 })
 
 // --- The views -----------------------------------------------------------------------------
@@ -393,6 +398,36 @@ step('sign-out', async () => {
   assert('signing out returns to the sign-in page', await visible(page, 'Sign in with username', 15000), await text(page))
   const session = await page.evaluate(() => fetch('/api/v1/user/token/refresh', { method: 'POST' }).then((r) => r.status))
   assert('the session is over on the server', session !== 200, String(session))
+  const left = await page.evaluate(async () => {
+    const databases = (await indexedDB.databases?.())?.map((database) => database.name) ?? []
+    const config = await new Promise((done) => {
+      const open = indexedDB.open('vicu-web')
+      open.onerror = () => done(null)
+      open.onsuccess = () => {
+        try {
+          const read = open.result.transaction('documents', 'readonly').objectStore('documents').get('config')
+          read.onsuccess = () => done(typeof read.result === 'string' ? JSON.parse(read.result) : null)
+          read.onerror = () => done(null)
+        } catch {
+          done(null)
+        }
+      }
+    })
+    // A sync state that was started afresh (a device id and an empty document) holds nothing of the account.
+    const holdsSomething = (value) => {
+      if (value === undefined || value === null || value === '' || value === false) return false
+      if (Array.isArray(value)) return value.some(holdsSomething)
+      if (typeof value === 'object') return Object.entries(value).some(([key, inner]) => !['device_id', 'version', 'updated_at', 'dirty'].includes(key) && holdsSomething(inner))
+      return true
+    }
+    const kept = config
+      ? ['custom_lists', 'custom_lists_sync', 'synced_prefs_sync', 'pro_ledger_sync', 'saved_filters', 'known_user', 'account_owner', 'api_token', 'last_username']
+          .filter((key) => holdsSomething(key === 'custom_lists_sync' ? config[key]?.document?.lists : config[key]))
+      : []
+    return { databases, kept, inbox: config?.inbox_project_id ?? 0, session: Object.keys(sessionStorage), local: Object.keys(localStorage) }
+  })
+  assert('signing out leaves none of the account in the browser', left.kept.length === 0 && left.inbox === 0 && !left.session.includes('vicu-web-api-token'), JSON.stringify(left))
+  assert('the browser holds no database but the settings', left.databases.every((name) => name === 'vicu-web'), JSON.stringify(left.databases))
 })
 
 step('setup-token', async () => {

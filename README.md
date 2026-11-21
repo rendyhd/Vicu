@@ -23,6 +23,7 @@
 | Linux (x64, arm64) | [AppImage](https://github.com/rendyhd/Vicu/releases/latest) |
 | iPhone and iPad (iOS 17 or later) | [TestFlight public beta](https://testflight.apple.com/join/c6wuvXrH) |
 | Android 8 or later | [Google Play beta](https://github.com/rendyhd/Vicu-Mobile#download) or the [APK](https://github.com/rendyhd/Vicu-Mobile/releases/latest) |
+| A browser, where you cannot install an app | [Vicu web](#vicu-in-a-browser), a container you host next to your Vikunja |
 
 You need a [Vikunja](https://vikunja.io/) **2.4.0 or newer** server you can reach: your own or [Vikunja Cloud](https://vikunja.cloud/). Vicu has no server or account of its own and collects nothing. Desktop builds check for updates every 12 hours.
 
@@ -149,6 +150,23 @@ If you share nothing, none of this shows. With an API token sign-in, give the to
 
 Then enter your server URL, sign in with a username and password (with two-factor), single sign-on (OpenID Connect) or an API token, and pick your Inbox project (if another device already chose one, Vicu suggests it). If your identity provider signs you in with a passkey (Pocket ID, for example), choose "Sign in through your browser": add `http://127.0.0.1:47823/vicu/oidc-callback` once as a redirect (callback) URL of the Vikunja client at the provider, since passkeys don't work in Vicu's own sign-in window on macOS and Linux. Turn on Quick Entry in Settings. `VICU_USER_DATA_DIR=<folder>` runs Vicu with a separate, throwaway profile.
 
+## Vicu in a browser
+
+**Vicu web** is the desktop app's main window as a website, for a computer where you cannot or may not install an app. You host it yourself as a small container next to your Vikunja server and open it in a desktop browser. There is no public Vicu web address.
+
+It has the lists, projects, the Plan screen with your own Events, routines, custom lists, comments, sharing, guided sessions and Pro, on the same account as your other devices. It needs a connection (nothing is kept for later), and it leaves out what needs a program on the computer: the assistant and voice input, connected calendars, Quick Entry and Quick View, the browser and Obsidian links. Reminders are browser notifications while a Vicu tab is open. It is made for desktop browsers; on a phone, use the [phone app](https://github.com/rendyhd/Vicu-Mobile).
+
+```bash
+docker run -d --name vicu-web -p 8080:8080 -e VIKUNJA_URL=http://vikunja:3456 ghcr.io/rendyhd/vicu-web:latest
+```
+
+`VIKUNJA_URL` is where the container reaches Vikunja (an internal address is fine). The container serves the app and passes `/api/` on to Vikunja, so the app and the API share one address; put your reverse proxy with TLS in front of it. Two compose files to start from:
+
+- [`docker-compose.example.yml`](docker/web/docker-compose.example.yml): Vicu web and a new Vikunja together.
+- [`docker-compose.traefik.example.yml`](docker/web/docker-compose.traefik.example.yml): Vicu web next to a Vikunja you already run, behind Traefik.
+
+To sign in with single sign-on, add `https://<your vicu address>/auth/openid/<provider key>` to the redirect addresses of the Vikunja client at your identity provider. Hosting, TLS, sign-in and what is kept in the browser are covered in [`docs/web.md`](docs/web.md); what it is like to use is in the [guide](https://vicutodo.app/guide/web/).
+
 ## Building from source
 
 Electron, React, TypeScript and Tailwind CSS. Node.js 22.12 or newer.
@@ -161,7 +179,7 @@ npm install
 npm run dev
 ```
 
-`npm test` runs the tests, `npm run verify` runs typecheck, tests and a build (before every commit), and `npm run dist` / `dist:mac` / `dist:linux` packages the app. The architecture and conventions are in [`CLAUDE.md`](CLAUDE.md), the rules shared with the mobile app in [`docs/cross-app-semantics-v1.md`](docs/cross-app-semantics-v1.md) and [`docs/design-system-v1.md`](docs/design-system-v1.md), release notes in [`docs/releases/`](docs/releases/), and the website in [`site/`](site/).
+`npm run dev:web` runs Vicu web with hot reload and `npm run build:web` builds it (`docker build -f docker/web/Dockerfile -t vicu-web .` makes the image). `npm test` runs the tests, `npm run verify` runs typecheck, tests and a build (before every commit), and `npm run dist` / `dist:mac` / `dist:linux` packages the app. The architecture and conventions are in [`CLAUDE.md`](CLAUDE.md), the rules shared with the mobile app in [`docs/cross-app-semantics-v1.md`](docs/cross-app-semantics-v1.md) and [`docs/design-system-v1.md`](docs/design-system-v1.md), release notes in [`docs/releases/`](docs/releases/), and the website in [`site/`](site/).
 
 Found a bug or have an idea? [Open an issue](https://github.com/rendyhd/Vicu/issues).
 

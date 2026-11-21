@@ -72,7 +72,7 @@ For reminders that reach you when no tab is open, use the desktop or phone app a
 ## Privacy on a computer that is not yours
 
 - A password or organization sign-in keeps nothing in the browser that could sign someone else in later, apart from the session itself, which **Sign Out** ends.
-- Vicu keeps some settings of that browser (the theme, the sidebar) in the browser. They hold no task content.
+- While you are signed in, the browser holds a copy of your settings and of what syncs with them: your custom lists, your own Events, and Pro's records if you use Pro. Your tasks themselves are never stored in the browser. **Sign Out** removes that copy; the theme and the sidebar's layout stay.
 - Files you open or save go to the browser's downloads, like any download.
 
 ## Hosting it

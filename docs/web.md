@@ -42,7 +42,9 @@ With Docker Compose, next to a new Vikunja (see `docker/web/docker-compose.examp
 docker compose -f docker/web/docker-compose.example.yml up -d
 ```
 
-Next to a Vikunja you already run:
+Next to a Vikunja you already run, behind Traefik: `docker/web/docker-compose.traefik.example.yml`
+(the address, the entry point and the shared network are the three things to change). Or with
+any other reverse proxy:
 
 ```
 docker run -d --name vicu-web -p 8080:8080 \
@@ -73,9 +75,14 @@ Put your own reverse proxy with TLS in front of the container and send the whole
 HTTPS for anything but a test on your own machine: browsers only offer notifications and the
 clipboard on HTTPS (or `localhost`), and a sign-in over plain HTTP can be read on the way.
 
-- Forward `X-Forwarded-Proto` and `X-Forwarded-For`; the container passes them on to Vikunja.
-- Set Vikunja's public address (`service.publicurl` / `VIKUNJA_SERVICE_PUBLICURL`) to the address
-  people open, the one of this container.
+- Forward `X-Forwarded-Proto` and `X-Forwarded-For` (Traefik, Caddy and nginx Proxy Manager do).
+  `X-Forwarded-Proto: https` is how the container knows the visitor used HTTPS: it then tells the
+  browser to never use plain HTTP for the address again (HSTS) and marks Vikunja's session cookie
+  `Secure`. Without that header neither happens.
+- Do not also publish the container's port 8080 to the internet: it is plain HTTP, and anyone who
+  reaches it directly could claim to have come over HTTPS.
+- Vikunja's own public address (`service.publicurl`) can stay what it is. With a new Vikunja that
+  only Vicu web uses, set it to the address of this container.
 - If Vikunja's own web interface is also reachable, on another address, both keep working. They
   are separate sign-ins.
 
@@ -99,8 +106,10 @@ keys work, because the sign-in happens in the browser itself.
 - An API token is kept for that browser tab's session, and only for longer when the person ticks
   "Remember on this browser" at setup. On a computer that is not theirs they should leave it
   unticked, or use a password or OIDC sign-in instead.
-- Settings of that browser (theme, sidebar, the Inbox it read) are in the browser's IndexedDB.
-  Signing out clears what belongs to the account.
+- Settings of that browser (theme, sidebar) and a copy of the account's synced documents (custom
+  lists, the person's own Events, the Pro ledger, the Inbox choice) are in the browser's IndexedDB
+  while they are signed in. Tasks, notes and comments are never stored there. Signing out clears
+  everything that belongs to the account.
 
 ## Security headers
 
@@ -109,6 +118,23 @@ requests from its own origin only, forbids framing, and sends `nosniff`, `no-ref
 Permissions-Policy (`docker/web/security-headers.conf`). If your reverse proxy adds headers of its
 own, do not loosen these. Attachments are never shown as pages of the site: a picture, PDF or text
 file opens in a new tab from memory, everything else is downloaded.
+
+## What to know before putting it on the internet
+
+- **It adds no way into your data that Vikunja does not already have.** Everything goes through
+  Vikunja's API with Vikunja's sign-in; the container holds no accounts, no secrets and no data.
+  If your Vikunja is reachable from the internet, Vicu web exposes nothing more. If it is not,
+  publishing Vicu web publishes Vikunja's API with it.
+- **Sign-in attempts are limited by Vikunja**, not by this container. Keep Vikunja's rate limit on,
+  or put your proxy's in front.
+- **A page in a browser is one program.** On the desktop a hidden part of the app holds your
+  sign-in; in a browser the page holds it. The content policy above is what stands between a task
+  someone else wrote and that sign-in: scripts only ever load from the site itself. Keep the
+  headers as they are, and keep the image up to date.
+- **The address a single sign-on comes back to carries a one-time code.** The container leaves it
+  out of its access log; make sure your reverse proxy's log is not public either.
+- **People on a shared computer must sign out.** Closing the tab does not end a password or
+  single sign-on session.
 
 ## Updating
 

@@ -11,6 +11,19 @@ map $http_x_forwarded_proto $vicu_forwarded_proto {
   ""      $scheme;
 }
 
+# Only for a visitor who came over HTTPS: the browser is told to never use plain HTTP for this
+# address again, and the session cookie Vikunja sets is marked Secure, so it is never sent over
+# plain HTTP (Vikunja does not always mark it itself). Over plain HTTP, as in a test on your own
+# machine, both are left out and everything still works.
+map $vicu_forwarded_proto $vicu_hsts {
+  default "";
+  https   "max-age=31536000";
+}
+map $vicu_forwarded_proto $vicu_cookie_secure {
+  default "";
+  https   "; Secure";
+}
+
 server {
   listen 8080;
   listen [::]:8080;
@@ -51,6 +64,8 @@ server {
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     proxy_set_header X-Forwarded-Proto $vicu_forwarded_proto;
     proxy_set_header Connection "";
+    # Appended to the cookie's Path attribute, which is the one place nginx lets a variable in.
+    proxy_cookie_path ~^(.+)$ "$1$vicu_cookie_secure";
     # An upload goes straight through instead of being written to disk here first.
     proxy_request_buffering off;
     proxy_connect_timeout 10s;
@@ -64,6 +79,15 @@ server {
     include /etc/nginx/vicu/security-headers.conf;
     add_header Cache-Control "public, max-age=31536000, immutable" always;
     try_files $uri =404;
+  }
+
+  # The address an OIDC sign-in comes back to carries a one-time code in its query. It is the app's
+  # page like any other address, but it is kept out of the access log.
+  location /auth/openid/ {
+    access_log off;
+    include /etc/nginx/vicu/security-headers.conf;
+    add_header Cache-Control "no-store" always;
+    try_files /index.html =404;
   }
 
   # Everything else is the app: its own files, and its page for any other address (an OIDC sign-in

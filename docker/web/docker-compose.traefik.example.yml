@@ -1,0 +1,52 @@
+# Vicu web next to a Vikunja you already run, behind Traefik. Copy it, change the three things
+# marked CHANGE, and start it:
+#
+#   docker compose -f docker-compose.traefik.example.yml up -d
+#
+# Traefik serves Vicu web at its own address and handles TLS. The container forwards /api/ to your
+# Vikunja over the Docker network they share, so the browser only ever talks to one address.
+# No host port, no volumes and no secrets are needed.
+#
+# After it runs:
+# - OIDC: add https://<the address below>/auth/openid/<provider key> to the allowed redirect
+#   addresses of the Vikunja client at your identity provider. The provider key is the one in
+#   Vikunja's auth.openid.providers configuration. Username and password or an API token need
+#   nothing extra.
+# - docs/web.md in the repository has the details.
+
+services:
+  vicu-web:
+    image: ghcr.io/rendyhd/vicu-web:latest
+    container_name: vicu-web
+    restart: unless-stopped
+    # The container writes nowhere but these two places and needs no privileges.
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /etc/nginx/conf.d:uid=101,gid=101
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    environment:
+      # CHANGE: how this container reaches Vikunja on the shared network: the name of the Vikunja
+      # service or container, and its port. Not the public address.
+      VIKUNJA_URL: http://vikunja:3456
+      # The largest attachment; keep it at or above Vikunja's own limit (files.maxsize).
+      VICU_MAX_UPLOAD: 25m
+    networks: [proxy]
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=proxy"
+      # CHANGE: the address people open, and the name of your HTTPS entry point (often
+      # "websecure" or "https").
+      - "traefik.http.routers.vicu-web.rule=Host(`vicu.example.com`)"
+      - "traefik.http.routers.vicu-web.entrypoints=websecure"
+      - "traefik.http.routers.vicu-web.tls=true"
+      # With Let's Encrypt through Traefik, name your resolver here; leave it out when Traefik
+      # already has a certificate that covers the address.
+      # - "traefik.http.routers.vicu-web.tls.certresolver=letsencrypt"
+      - "traefik.http.services.vicu-web.loadbalancer.server.port=8080"
+
+networks:
+  # CHANGE: the Docker network that Traefik and your Vikunja container are both on.
+  proxy:
+    external: true

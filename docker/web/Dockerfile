@@ -26,6 +26,11 @@ ENV VIKUNJA_URL=http://vikunja:3456 \
     VICU_MAX_UPLOAD=25m \
     NGINX_ENTRYPOINT_LOCAL_RESOLVERS=1
 
+# Nothing of the base image's own site stays in the web root.
+USER root
+RUN rm -rf /usr/share/nginx/html/*
+USER 101
+
 COPY docker/web/security-headers.conf /etc/nginx/vicu/security-headers.conf
 # The image's entry point fills in the variables above (the third makes it pass the container's DNS
 # servers to the template) and writes conf.d/default.conf.
