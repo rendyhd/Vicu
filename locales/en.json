@@ -637,7 +637,10 @@
       "area": {
         "title": "Work area",
         "note": "Promises, people and the portfolio apply to projects in these categories. With none ticked they apply to every project. Shared with your other devices.",
-        "empty": "You have no project categories. Add one in Settings, Projects to limit Pro to it."
+        "empty": "You have no project categories. Add one in Settings, Projects to limit Pro to it.",
+        "byCategory": "Chosen categories",
+        "workProjects": "Work projects",
+        "workProjectsNote": "Promises, people and the portfolio apply to the projects ticked as work in Settings, General, Work and Personal."
       },
       "portfolio": {
         "title": "Portfolio",
@@ -896,6 +899,21 @@
     "webToken": {
       "remember": "Remember on this browser",
       "rememberHint": "If this is off, the token is forgotten when you close the browser."
+    },
+    "workMode": {
+      "title": "Work and Personal",
+      "note": "Keep work and private life in one account and look at one at a time. Work shows the tasks with the work label and the tasks of work projects; Personal shows everything else. Search finds everything and reminders always come.",
+      "enable": "Show the Work and Personal switch",
+      "enableNote": "Adds All, Work and Personal to the top of the sidebar. The choice is kept on this device.",
+      "label": "Work label",
+      "labelNone": "None",
+      "labelNote": "A task with this label is work, whatever project it is in. In Work, a new task outside a work project gets it automatically. Shared with your other devices.",
+      "noLabel": "No work label is set: a task you add in Work outside a work project stays Personal.",
+      "projects": "Work projects",
+      "projectsNote": "Tick the projects that are work. Their subprojects follow, and a subproject can be taken out. The Inbox is split by the label only. Shared with your other devices.",
+      "noProjects": "You have no projects yet.",
+      "proOnly": "Show Pro only in Work",
+      "proOnlyNote": "In Personal, this device is as it is with Pro off. Nothing of Pro is changed or lost."
     }
   },
   "notes": {
@@ -1429,5 +1447,25 @@
       "blocker": "Blocker: {{text}}",
       "noGroups": "No groups yet."
     }
+  },
+  "workMode": {
+    "switchLabel": "Work and Personal",
+    "all": "All",
+    "work": "Work",
+    "personal": "Personal",
+    "announceAll": "Showing everything",
+    "announceWork": "Showing work",
+    "announcePersonal": "Showing personal",
+    "paletteAll": "Show everything",
+    "paletteWork": "Switch to Work",
+    "palettePersonal": "Switch to Personal",
+    "workProject": "Work project",
+    "moreInPersonal_one": "{{count}} more in Personal",
+    "moreInPersonal_other": "{{count}} more in Personal",
+    "moreInWork_one": "{{count}} more in Work",
+    "moreInWork_other": "{{count}} more in Work",
+    "showMore": "Show",
+    "addedToPersonal": "Added to Personal, because no work label is set",
+    "showTask": "Show"
   }
 }

@@ -261,6 +261,39 @@ step('plan-and-pro', async () => {
   }
 })
 
+// --- Work and Personal (cross-app semantics section 22) -------------------------------------
+
+step('work-and-personal', async () => {
+  const mode = () => page.evaluate(async () => (await window.api.getConfig())?.work_mode ?? 'all')
+  const switchBox = page.locator('[data-work-mode-switch]')
+  try {
+    await goto(page, '/settings')
+    await page.getByRole('navigation', { name: 'Settings' }).getByRole('button', { name: 'General', exact: true }).click()
+    await sleep(400)
+    const card = page.locator('[data-work-mode-settings]')
+    assert('Settings, General has the Work and Personal card', (await card.count()) === 1, await text(page))
+    assert('the sidebar has no switch while the feature is off', (await switchBox.count()) === 0)
+    await card.getByRole('switch').first().click()
+    await settle(page, 500)
+    assert('turning the feature on shows the switch in the sidebar', await switchBox.waitFor({ timeout: 5000 }).then(() => true, () => false))
+    assert('it starts on All', (await page.locator('[data-work-mode="all"]').getAttribute('aria-checked')) === 'true')
+    await capture(page, 'work-and-personal-settings')
+    await goto(page, '/today')
+    await page.locator('[data-work-mode="work"]').click()
+    await settle(page, 400)
+    assert('clicking Work selects it and saves the mode', (await page.locator('[data-work-mode="work"]').getAttribute('aria-checked')) === 'true' && (await mode()) === 'work', await mode())
+    await capture(page, 'work-mode-today')
+    await page.keyboard.press('Home')
+    await settle(page, 300)
+    assert('Home on the switch goes back to All', (await page.locator('[data-work-mode="all"]').getAttribute('aria-checked')) === 'true' && (await mode()) === 'all', await mode())
+  } finally {
+    await page.evaluate(() => window.api.saveConfigPatch({ work_mode_enabled: false, work_mode: 'all' })).catch(() => {})
+    await page.reload()
+    await settle(page, 1000)
+  }
+  assert('with the feature off again the switch is gone', (await switchBox.count()) === 0)
+})
+
 // --- Reminders, links and printing under the container's policy ------------------------------
 
 step('page-guards', async () => {

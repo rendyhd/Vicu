@@ -60,14 +60,14 @@ export function UpcomingView() {
   // Recomputes the groups when the local day rolls over (Today / Tomorrow / weekday headings).
   const dayKey = useDayKey()
   const dateFormat = useDateFormat()
-  const { data: loadedTasks = [], isLoading } = useTasks(params)
+  const { data: loadedTasks = [], isLoading } = useTasks(params, true, true)
   // Pro (21.10): a parked initiative's tasks wait; off, every task.
   const withoutParked = useParkedFilter()
   const tasks = useMemo(() => withoutParked(loadedTasks), [withoutParked, loadedTasks])
   const { data: projects } = useProjects()
   // Pro: the day a task starts is listed too (cross-app semantics 21.3). Off, nothing is fetched.
   const proOn = useAvailability().on
-  const { data: openTasks = [] } = useTasks(OPEN_TASKS_PARAMS, proOn)
+  const { data: openTasks = [] } = useTasks(OPEN_TASKS_PARAMS, proOn, true)
   const [inboxProjectId, setInboxProjectId] = useState<number | undefined>()
 
   useEffect(() => {

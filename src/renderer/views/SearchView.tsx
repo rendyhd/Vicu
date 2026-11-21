@@ -8,7 +8,8 @@ import { SearchFilterBar } from '@/components/search/SearchFilterBar'
 import { searchFiltersActive, type SearchFilters } from '../../shared/search-filters'
 
 // Results come from every project and have no group headers, so each row names its project.
-const ROW_VIEW = { showProject: true }
+// Search is not filtered by Work and Personal: a task of the other mode names its mode (22.4).
+const ROW_VIEW = { showProject: true, showWorkMark: true }
 
 export function SearchView() {
   const { q } = useSearch({ from: '/search' })

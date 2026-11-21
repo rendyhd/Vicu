@@ -77,7 +77,8 @@ my day also uses your estimates and proposes a focus block.
 3. Choose the parts you want. Every part is on until you turn it off.
 4. Optional: turn on **Assistant help in Pro** if you use the assistant and want it to see Pro's data.
 5. Optional: under **Work area**, tick the project categories that are your work, so promises count only
-   there. With none ticked, every project counts.
+   there. With none ticked, every project counts. If you use [Work and Personal](guide:work-and-personal),
+   you can choose **Work projects** here instead, and show Pro only while you are in Work.
 :::
 
 Pro is per device: turn it on on each device where you want it. What Pro stores is shared through your

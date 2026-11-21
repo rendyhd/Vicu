@@ -535,6 +535,8 @@ export function PlanMyDaySession({ onExit, listRef }: { onExit: () => void; list
         selectedDay={session.day}
         onSelectDay={() => {}}
         tasks={session.timelineTasks}
+        mutedIds={session.mutedIds}
+        lockMuted
         routines={session.routines}
         defaultLength={session.prefs.defaultLength}
         hours={session.prefs.hours}

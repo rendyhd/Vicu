@@ -23,7 +23,7 @@ import {
   ListOrdered,
   PauseCircle,
 } from 'lucide-react'
-import { Menu, MenuItem, MenuSeparator } from '@/components/overlay/Menu'
+import { Menu, MenuCheckItem, MenuItem, MenuSeparator } from '@/components/overlay/Menu'
 import { Popover, type PopoverCloseReason } from '@/components/overlay/Popover'
 import { useAppConfig } from '@/hooks/use-app-config'
 import { useProjects } from '@/hooks/use-projects'
@@ -47,6 +47,9 @@ import { useNavigate } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import { CalendarRange } from 'lucide-react'
 import { useProjectPlans } from '@/hooks/use-project-plans'
+import { useWorkMode } from '@/hooks/use-work-mode'
+import { useMarkWorkProject } from '@/hooks/use-work-marking'
+import { Briefcase } from 'lucide-react'
 
 interface ParentPickerProps {
   anchorRef: RefObject<HTMLElement | null>
@@ -192,6 +195,9 @@ export function ProjectMenu({ project, surface, anchorRef, anchorPoint, opener =
   const { t } = useTranslation()
   const navigate = useNavigate()
   const projectPlans = useProjectPlans()
+  // Work and Personal (22.7): a tick that writes the project's own entry.
+  const workMode = useWorkMode()
+  const markWork = useMarkWorkProject()
   const [sub, setSub] = useState<Sub>(null)
   const { data } = useProjects()
   const { data: config } = useAppConfig()
@@ -373,6 +379,12 @@ export function ProjectMenu({ project, surface, anchorRef, anchorPoint, opener =
         >
           {t('pro.plan.menu')}
         </MenuItem>
+      )}
+
+      {workMode.enabled && !isInbox && (
+        <MenuCheckItem icon={<Briefcase />} checked={workMode.isWorkProject(project.id)} onSelect={() => void markWork(project, !workMode.isWorkProject(project.id))}>
+          {t('workMode.workProject')}
+        </MenuCheckItem>
       )}
 
       {(!isInbox || showReview) && <MenuSeparator />}

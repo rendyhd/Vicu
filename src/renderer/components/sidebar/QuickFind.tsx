@@ -7,6 +7,7 @@ import { useOpenTask } from '@/hooks/use-open-task'
 import { useProjects } from '@/hooks/use-projects'
 import { useFloatingPopover } from '@/components/overlay/use-floating-popover'
 import { nextOptionIndex } from '@/components/overlay/popover-logic'
+import { WorkModeWord, useOtherModeOf } from '@/components/task-list/WorkMark'
 import type { Task } from '@/lib/vikunja-types'
 
 const isMac = () => window.api.platform === 'darwin'
@@ -162,6 +163,7 @@ interface ResultsProps {
 
 function Results({ anchor, listId, tasks, query, pending, activeIndex, optionId, projectTitle, onHover, onChoose }: ResultsProps) {
   const panelRef = useRef<HTMLDivElement>(null)
+  const otherModeOf = useOtherModeOf()
   useFloatingPopover(anchor, panelRef, { placement: 'bottom-start' })
 
   // The highlighted row stays in view as the arrows move.
@@ -170,8 +172,8 @@ function Results({ anchor, listId, tasks, query, pending, activeIndex, optionId,
   }, [activeIndex, optionId])
 
   const rows = [
-    ...tasks.map((task) => ({ key: `task-${task.id}`, title: task.title, detail: projectTitle(task), done: task.done, all: false })),
-    { key: 'all', title: `Search all tasks for “${query}”`, detail: '', done: false, all: true },
+    ...tasks.map((task) => ({ key: `task-${task.id}`, title: task.title, detail: projectTitle(task), done: task.done, all: false, other: otherModeOf({ task }) })),
+    { key: 'all', title: `Search all tasks for “${query}”`, detail: '', done: false, all: true, other: null },
   ]
   const summary = `${tasks.length} ${tasks.length === 1 ? 'task' : 'tasks'}${pending ? ', still searching' : ''}`
 
@@ -203,6 +205,7 @@ function Results({ anchor, listId, tasks, query, pending, activeIndex, optionId,
           >
             {row.all && <Search aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />}
             <span className={cn('min-w-0 flex-1 truncate', row.done && 'text-[var(--text-secondary)] line-through')}>{row.title}</span>
+            {row.other && <WorkModeWord other={row.other} />}
             {row.detail && <span className="max-w-[40%] shrink-0 truncate text-caption text-[var(--text-secondary)]">{row.detail}</span>}
           </div>
         ))}

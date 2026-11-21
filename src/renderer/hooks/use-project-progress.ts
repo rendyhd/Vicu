@@ -15,7 +15,7 @@ const OPEN_TASKS: TaskQueryParams = { filter: 'done = false', keep_nested_subtas
  * like every other task list.
  */
 export function useOpenTaskCounts(): ReadonlyMap<number, number> | null {
-  const { data, isSuccess } = useTasks(OPEN_TASKS)
+  const { data, isSuccess } = useTasks(OPEN_TASKS, true, true)
   return useMemo(() => (isSuccess ? openCountsByProject(data) : null), [data, isSuccess])
 }
 

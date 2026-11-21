@@ -21,6 +21,7 @@ import { AssistantSettings } from '@/components/settings/AssistantSettings'
 import { NotificationSettings } from '@/components/settings/NotificationSettings'
 import { CompletionSoundSettings } from '@/components/settings/CompletionSoundSettings'
 import { SidebarSettings } from '@/components/settings/SidebarSettings'
+import { WorkModeSettings } from '@/components/settings/WorkModeSettings'
 import { PlannerSettings } from '@/components/settings/PlannerSettings'
 import { WeekStartSetting } from '@/components/settings/WeekStartSetting'
 import { CloseActionSetting } from '@/components/settings/CloseActionSetting'
@@ -706,6 +707,8 @@ export function SettingsView() {
         </div>
 
         {fullConfig && <SidebarSettings config={fullConfig} onChange={handleQuickEntryChange} />}
+
+        <WorkModeSettings />
 
         {fullConfig && (
           <CompletionSoundSettings

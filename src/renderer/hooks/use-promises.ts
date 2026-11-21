@@ -24,6 +24,8 @@ import {
   withVerdictUndone,
 } from '../../shared/pro/promises'
 import { inProArea, readProArea, type AreaProject } from '../../shared/pro/settings'
+import { isWorkProArea } from '../../shared/work-scope'
+import { useWorkMode } from './use-work-mode'
 
 export const VERDICT_LABELS: Record<VerdictKind, string> = {
   delivered: 'Delivered',
@@ -47,8 +49,11 @@ export function usePromiseOf(): (task: Pick<Task, 'id' | 'project_id'>) => Promi
   const { ledger } = useProLedger()
   const { values } = useProPrefs()
   const { data: projects } = useProjects()
+  const { scope } = useWorkMode()
   return useMemo(() => {
     if (!on) return () => null
+    // The area may be the work projects of section 22.2 (section 22.8), whatever this device's mode.
+    const workArea = isWorkProArea(values['pro.area'])
     const area = readProArea(values['pro.area'])
     const map = new Map<number, AreaProject>((projects?.all ?? []).map((project) => [project.id, project]))
     const categoryOf = (id: number) => {
@@ -58,9 +63,10 @@ export function usePromiseOf(): (task: Pick<Task, 'id' | 'project_id'>) => Promi
     return (task) => {
       const promise = promiseOf(ledger, task.id)
       if (!promise) return null
+      if (workArea) return scope.projects.has(task.project_id) ? promise : null
       return inProArea(task.project_id, area, map, categoryOf) ? promise : null
     }
-  }, [on, ledger, values, projects?.all])
+  }, [on, ledger, values, projects?.all, scope])
 }
 
 /** Verdicts, snoozes and making a task a promise; each with Undo where it changes the task. */

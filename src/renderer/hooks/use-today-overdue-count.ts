@@ -15,7 +15,7 @@ import { useDayKey } from '@/stores/day-store'
 export function useTodayOverdueCount(): number | null {
   const params = useFilters({ view: 'today' })
   const dayKey = useDayKey()
-  const { data: tasks = [] } = useTasks(params)
+  const { data: tasks = [] } = useTasks(params, true, true)
   const { data: projects } = useProjects()
   return useMemo(() => {
     if (!projects) return null

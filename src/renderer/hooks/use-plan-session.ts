@@ -12,6 +12,8 @@ import { usePlanBusy } from './use-plan-busy'
 import { usePro } from './use-pro'
 import { useProLedger } from './use-pro-ledger'
 import { useFocusBlock } from './use-focus-block'
+import { useWorkMode } from './use-work-mode'
+import { useWorkMuted } from './use-work-muted'
 import { estimateOf, type ProLedger } from '../../shared/pro/ledger'
 import { NULL_DATE } from '@/lib/constants'
 import type { Task, TaskQueryParams } from '@/lib/vikunja-types'
@@ -100,7 +102,10 @@ export function usePlanSession() {
   const [remindersOn, setRemindersOn] = useState(false)
   const log = useRef(new Map<number, LogEntry>())
 
-  const canChange = useCallback((task: Task) => (access.get(task.project_id)?.permission ?? 1) > 0, [access])
+  // Work and Personal (22.4): Plan my day lists and plans the tasks the mode shows. A block of the
+  // other mode stays on the timeline and counts as busy time, but is never moved or planned here.
+  const work = useWorkMode()
+  const canChange = useCallback((task: Task) => (access.get(task.project_id)?.permission ?? 1) > 0 && work.passes(task), [access, work.passes])
 
   // The tasks.
   const days = useMemo(() => [day], [day])
@@ -109,11 +114,12 @@ export function usePlanSession() {
     () => ({ filter: leftoversFilter(today), sort_by: 'due_date', order_by: 'asc', per_page: 1000, keep_nested_subtasks: true }),
     [today],
   )
-  const leftoverQuery = useTasks(leftoverParams)
-  const inbox = useProjectTasks(inboxId || undefined)
+  const leftoverQuery = useTasks(leftoverParams, true, true)
+  const inbox = useProjectTasks(inboxId || undefined, true, true)
   const upcomingParams = useFilters({ view: 'upcoming' })
-  const upcoming = useTasks(upcomingParams)
-  const pickedProject = useProjectTasks(projectId ?? undefined)
+  const upcoming = useTasks(upcomingParams, true, true)
+  const pickedProject = useProjectTasks(projectId ?? undefined, true, true)
+  const mutedIds = useWorkMuted(range.tasks)
   const routines = usePlanRoutines(days)
   // The day's events (contract 20.2): drawn on the timeline and busy time for the meter, the draft
   // and the free time the assistant gets. Never their titles.
@@ -446,6 +452,7 @@ export function usePlanSession() {
     eventColor: busy.eventColor,
     eventBusy,
     timelineTasks,
+    mutedIds,
     timelineChange,
     dashedIds,
     reasons,

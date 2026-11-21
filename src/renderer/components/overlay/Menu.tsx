@@ -229,6 +229,31 @@ export const MenuRadioItem = forwardRef<HTMLButtonElement, MenuRadioItemProps>(f
   )
 })
 
+/** An item that is on or off (a tick); choosing it flips it and closes the menu. */
+export const MenuCheckItem = forwardRef<HTMLButtonElement, MenuRadioItemProps>(function MenuCheckItem(
+  { icon, checked, onSelect, keepOpen, danger, disabled, children },
+  ref: Ref<HTMLButtonElement>,
+) {
+  const choose = useChoose({ onSelect, keepOpen })
+  return (
+    <button
+      ref={ref}
+      type="button"
+      role="menuitemcheckbox"
+      aria-checked={checked}
+      tabIndex={-1}
+      disabled={disabled}
+      data-typeahead={labelOf(children)}
+      onClick={choose}
+      className={cn(itemBase, danger && 'text-danger hover:bg-danger/10 focus-visible:bg-danger/10')}
+    >
+      <IconCell icon={icon} danger={danger} />
+      <span className="min-w-0 flex-1 truncate">{children}</span>
+      {checked && <Check aria-hidden="true" className="h-3.5 w-3.5 shrink-0 text-[var(--accent-blue)]" />}
+    </button>
+  )
+})
+
 export function MenuSeparator() {
   return <div role="separator" className="my-1 h-px bg-[var(--border-color)]" />
 }

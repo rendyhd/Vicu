@@ -3,6 +3,7 @@ import { Check, ChevronDown } from 'lucide-react'
 import { Popover } from '@/components/overlay/Popover'
 import { flattenTree } from '@/components/task-list/ProjectPickerPopover'
 import { useProjects } from '@/hooks/use-projects'
+import { useWorkMode } from '@/hooks/use-work-mode'
 import { cn } from '@/lib/cn'
 import { normalizeHex } from '@/lib/constants'
 import { sourceLists, sourceProjectId, type PlanSource } from '@/lib/plan-source'
@@ -40,13 +41,20 @@ export function SourceChips({ source, dayLabel, counts, projectLabel, projectCou
   const [query, setQuery] = useState('')
   const anchorRef = useRef<HTMLButtonElement>(null)
   const { data: projects } = useProjects()
+  const { shownProjects } = useWorkMode()
+
+  const isProject = source.startsWith('project:')
+  const current = isProject ? sourceProjectId(source, 0) : null
 
   const needle = query.trim().toLowerCase()
   const rows = useMemo(() => {
-    const all = flattenTree(projects?.tree ?? []).filter(({ node }) => node.id !== inboxId)
+    // Only the projects of the mode (22.5); the one already chosen stays selectable.
+    const all = flattenTree(projects?.tree ?? []).filter(
+      ({ node }) => node.id !== inboxId && (shownProjects === null || shownProjects.has(node.id) || node.id === current),
+    )
     if (!needle) return all
     return all.filter(({ node }) => node.title.toLowerCase().includes(needle)).map((row) => ({ ...row, depth: 0 }))
-  }, [projects, inboxId, needle])
+  }, [projects, inboxId, needle, shownProjects, current])
 
   const close = () => {
     setOpen(false)
@@ -56,8 +64,6 @@ export function SourceChips({ source, dayLabel, counts, projectLabel, projectCou
     onChange(next)
     close()
   }
-  const isProject = source.startsWith('project:')
-  const current = isProject ? sourceProjectId(source, 0) : null
 
   return (
     <div role="group" aria-label="Tasks to plan from" className="flex flex-wrap gap-1.5" data-plan-source>

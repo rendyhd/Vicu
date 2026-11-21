@@ -45,7 +45,7 @@ function groupByProject(tasks: Task[], projectsFlat?: { id: number; title: strin
 
 export function TodayView() {
   const params = useFilters({ view: 'today' })
-  const { data: tasks = [], isLoading } = useTasks(params)
+  const { data: tasks = [], isLoading } = useTasks(params, true, true)
   const { data: projects } = useProjects()
   const { data: config } = useAppConfig()
   // Wait for the config, so a turned-off section does not flash in (and fetch routines) on start.

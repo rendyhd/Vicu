@@ -9,6 +9,8 @@ import { nextOptionIndex } from '@/components/overlay/popover-logic'
 import { useSmartLists } from '@/components/sidebar/SmartListNav'
 import { useProNavItems, type ProNavItem } from '@/components/sidebar/ProNav'
 import { useGroups } from '@/hooks/use-groups'
+import { useSetWorkMode, useWorkMode } from '@/hooks/use-work-mode'
+import { announce } from '@/stores/announcer-store'
 import { usePro } from '@/hooks/use-pro'
 import { useProUiStore } from '@/stores/pro-ui-store'
 import { SmartListIcon } from '@/components/shared/SmartListIcon'
@@ -16,6 +18,7 @@ import type { SmartListId } from '@/lib/smart-list-identity'
 import { useQuickFindTasks } from '@/hooks/use-quick-find'
 import { useOpenTask } from '@/hooks/use-open-task'
 import { useProjects } from '@/hooks/use-projects'
+import { WorkModeWord, useOtherModeOf } from '@/components/task-list/WorkMark'
 import { useLabels } from '@/hooks/use-labels'
 import { useIsDark } from '@/hooks/use-is-dark'
 import { refreshNow } from '@/hooks/use-manual-refresh'
@@ -84,6 +87,7 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
   const openTask = useOpenTask()
   const smartLists = useSmartLists()
   const { data: projects } = useProjects()
+  const otherModeOf = useOtherModeOf()
   const { data: labels } = useLabels()
   const { data: appConfig } = useAppConfig()
   const { tasks } = useQuickFindTasks(query, 20)
@@ -93,6 +97,8 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
   const pro = usePro()
   const proNavLists = useProNavItems()
   const groups = useGroups()
+  const workMode = useWorkMode()
+  const setWorkMode = useSetWorkMode()
   // A group's page is found by its name, like Pro's lists.
   const proLists = useMemo<ProNavItem[]>(
     () => [...proNavLists, ...groups.groups.map((group): ProNavItem => ({ id: `group-${group.label}`, label: group.name, path: `/group/${group.label}`, layer: 'promises', icon: UsersRound, tone: 'text-accent-teal' }))],
@@ -108,8 +114,9 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
       voice: can('voice'),
       assistant: can('assistant'),
       pro: pro.on ? { lists: proLists, focus: pro.layer('availability'), promises: pro.layer('promises') } : undefined,
+      workMode: workMode.enabled,
     }),
-    [smartLists, projects?.flat, labels, appConfig, pro, proLists],
+    [smartLists, projects?.flat, labels, appConfig, pro, proLists, workMode.enabled],
   )
   const shown = useMemo(() => rankPalette(items, query, tasks), [items, query, tasks])
   const activeIndex = shown.length === 0 ? -1 : Math.min(active, shown.length - 1)
@@ -121,7 +128,11 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
   }, [activeIndex, listId])
 
   const runCommand = (command: PaletteCommand) => {
-    if (command === 'settings') {
+    if (command === 'work-all' || command === 'work-work' || command === 'work-personal') {
+      const next = command === 'work-work' ? 'work' : command === 'work-personal' ? 'personal' : 'all'
+      setWorkMode(next)
+      announce(next === 'work' ? t('workMode.announceWork') : next === 'personal' ? t('workMode.announcePersonal') : t('workMode.announceAll'))
+    } else if (command === 'settings') {
       void navigate({ to: '/settings' })
     } else if (command === 'pro-settings') {
       void navigate({ to: '/settings', search: { section: 'pro' } })
@@ -263,6 +274,10 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
                 <Icon aria-hidden="true" className="h-4 w-4 shrink-0 text-[var(--text-secondary)]" />
               )}
               <span className="min-w-0 flex-1 truncate">{item.title}</span>
+              {(() => {
+                const other = item.action.type === 'task' ? otherModeOf({ task: item.action.task }) : item.action.type === 'project' ? otherModeOf({ projectId: item.action.id }) : null
+                return other ? <WorkModeWord other={other} /> : null
+              })()}
               <span className="max-w-[40%] shrink-0 truncate text-caption text-[var(--text-secondary)]">{detailOf(item)}</span>
             </div>
           )

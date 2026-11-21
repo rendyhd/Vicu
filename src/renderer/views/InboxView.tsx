@@ -55,7 +55,7 @@ export function InboxView() {
   const inboxProject = inboxProjectId ? projects?.flat.find((project) => project.id === inboxProjectId) : undefined
   const activeInboxId = inboxProject?.id
   // The Inbox uses the order of the Inbox project (cross-app semantics 12.3).
-  const { data: tasks = [], isLoading, viewId, order: taskOrder } = useProjectTasks(activeInboxId)
+  const { data: tasks = [], isLoading, viewId, order: taskOrder } = useProjectTasks(activeInboxId, true, true)
   const rowView = useMemo(() => ({ projectId: activeInboxId }), [activeInboxId])
   const setReorderContext = useReorderStore((s) => s.setReorderContext)
 

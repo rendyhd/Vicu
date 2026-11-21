@@ -13,6 +13,7 @@ import { useProjectTasks } from './use-project-tasks'
 import { useProjects } from './use-projects'
 import { useSyncedPrefs } from './use-synced-prefs'
 import { useTasks } from './use-tasks'
+import { useWorkMode } from './use-work-mode'
 
 // What the guided sessions read (docs/cross-app-semantics-v1.md section 14): every open task with
 // subtasks kept (a queue holds tasks, not rows), the tasks done in the last 7 local days, the
@@ -44,19 +45,21 @@ export interface GuidedData {
 export function useGuidedWorld(projectId?: number): GuidedData {
   const dayKey = useDayKey()
   const today = useMemo(() => toLocalDate(new Date()), [dayKey])
-  const open = useTasks(OPEN_TASKS)
+  const open = useTasks(OPEN_TASKS, true, true)
   const doneParams = useMemo(
     () => ({ filter: `done = true && done_at >= '${startOfLocalDayIso(-6)}'`, keep_nested_subtasks: true, sort_by: 'done_at', order_by: 'desc' }),
     [dayKey],
   )
-  const recentlyDone = useTasks(doneParams)
+  const recentlyDone = useTasks(doneParams, true, true)
   const { data: projects, isLoading: projectsLoading } = useProjects()
   const { data: config, isLoading: configLoading } = useAppConfig()
   const { snapshot } = useSyncedPrefs()
   const access = useProjectAccessMap()
   const inboxId = config?.inbox_project_id || 0
-  const inboxView = useProjectTasks(inboxId || undefined)
-  const projectView = useProjectTasks(projectId && projectId !== inboxId ? projectId : undefined)
+  // Work and Personal (22.4): the review queue lists the projects the mode lists.
+  const reviewScope = useWorkMode().shownProjects
+  const inboxView = useProjectTasks(inboxId || undefined, true, true)
+  const projectView = useProjectTasks(projectId && projectId !== inboxId ? projectId : undefined, true, true)
   const lastDone = useQuery({
     queryKey: ['tasks', { filter: `done = true && project_id = ${projectId ?? 0}`, sort_by: 'done_at', order_by: 'desc', page: 1, per_page: 1 }],
     queryFn: async () => {
@@ -86,9 +89,10 @@ export function useGuidedWorld(projectId?: number): GuidedData {
         excludeInbox: config.review?.exclude_inbox ?? false,
       },
       orderValues: snapshot.values,
+      reviewScope,
       permission: (project) => access.get(project.id)?.permission ?? effectivePermission(project.max_permission, false),
     })
-  }, [open.data, recentlyDone.data, lastDone.data, projects, config, inboxId, today, snapshot.values, access, inboxView.data, projectView.data])
+  }, [open.data, recentlyDone.data, lastDone.data, projects, config, inboxId, today, snapshot.values, reviewScope, access, inboxView.data, projectView.data])
 
   const openTask = useMemo(() => {
     const byId = new Map((open.data ?? []).filter((task) => !task.done).map((task) => [task.id, task]))

@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useParams } from '@tanstack/react-router'
 import { useTasks } from '@/hooks/use-tasks'
 import { useLabels } from '@/hooks/use-labels'
@@ -17,6 +17,8 @@ import { HiddenSummary, ViewSwitch } from '@/components/pro/ViewSwitch'
 import { Link } from '@tanstack/react-router'
 import { usePro } from '@/hooks/use-pro'
 import { useProPrefs } from '@/hooks/use-pro-prefs'
+import { parentTaskId, useWorkMode } from '@/hooks/use-work-mode'
+import { WorkModeMore } from '@/components/task-list/WorkModeMore'
 
 export function TagView() {
   const { labelId } = useParams({ from: '/tag/$labelId' })
@@ -34,16 +36,25 @@ export function TagView() {
   const params = useFilters({ view: 'tag', labelId: lid })
   const { data: tasks = [], isLoading } = useTasks(params)
 
+  // Work and Personal (22.4): the screen shows the tasks the mode lists and says how many it holds
+  // back, with a way to show them until the screen is left.
+  const work = useWorkMode()
+  const [shownAllFor, setShownAllFor] = useState<number | null>(null)
+  const showAll = shownAllFor === lid
   const availability = useAvailabilityView(`tag.${lid}`)
   // Pro (21.5): a person label links to the person's page.
   const personPage = usePro().layer('promises') && useProPrefs().isPerson(lid)
-  const labeledAll = useMemo(() => {
+  const { labeledAll, workHidden } = useMemo(() => {
     const activeIds = new Set(projects?.flat.map((project) => project.id) ?? [])
-    const labeled = tasks.filter((t) => activeIds.has(t.project_id) && t.labels?.some((l) => l.id === lid))
+    const labeledRaw = tasks.filter((t) => activeIds.has(t.project_id) && t.labels?.some((l) => l.id === lid))
+    const labeled = showAll ? labeledRaw : work.filter(labeledRaw, parentTaskId)
     // Filter first, then hide nested subtasks: a labeled subtask is shown even when its parent
     // lacks the label, and nests under its parent only when the parent is in the list too.
-    return withoutNestedSubtasks(labeled, { hideChildrenOfCompletedParents: false })
-  }, [tasks, lid, projects?.flat])
+    return {
+      labeledAll: withoutNestedSubtasks(labeled, { hideChildrenOfCompletedParents: false }),
+      workHidden: withoutNestedSubtasks(labeledRaw, { hideChildrenOfCompletedParents: false }).length - withoutNestedSubtasks(labeled, { hideChildrenOfCompletedParents: false }).length,
+    }
+  }, [tasks, lid, projects?.flat, work.filter, showAll])
   const filtered = useMemo(() => availability.filter(labeledAll), [availability, labeledAll])
   const hiddenCount = availability.hidden(labeledAll)
 
@@ -106,6 +117,7 @@ export function TagView() {
         {groups.map((group) => (
           <ProjectTaskGroup key={group.name} level={1} name={group.name} color={group.color} tasks={group.tasks} />
         ))}
+        <WorkModeMore count={workHidden} mode={work.mode} onShow={() => setShownAllFor(lid)} />
         {availability.on && availability.view === 'available' && (
           <HiddenSummary count={hiddenCount} onShow={() => availability.setView('remaining')} />
         )}

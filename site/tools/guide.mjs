@@ -32,7 +32,7 @@ const EDIT_BASE = 'https://github.com/rendyhd/Vicu/blob/main/docs/guide/'
 // The guide's order. Slugs are paths under guide/ ('' is the guide's home).
 const NAV = [
   { title: 'Start here', pages: ['', 'getting-started', 'basics'] },
-  { title: 'Everyday Vicu', pages: ['capture', 'tasks', 'lists', 'projects', 'custom-lists', 'routines', 'review', 'collaboration', 'assistant'] },
+  { title: 'Everyday Vicu', pages: ['capture', 'tasks', 'lists', 'projects', 'custom-lists', 'work-and-personal', 'routines', 'review', 'collaboration', 'assistant'] },
   { title: 'Your devices', pages: ['desktop', 'phone', 'web', 'sync', 'settings'] },
   { title: 'Vicu Pro', pages: ['pro', 'pro/available', 'pro/promises', 'pro/groups', 'pro/plans', 'pro/portfolio', 'pro/power', 'plan', 'calendars'] },
   { title: 'Reference', pages: ['quick-add', 'shortcuts', 'faq', 'glossary'] },

@@ -27,6 +27,7 @@ that are often all you need, then the steps, then the finer points. Badges show 
 - [Smart lists](guide:lists): Inbox, Today, Upcoming, Anytime and Logbook.
 - [Projects and labels](guide:projects): Projects, subprojects, sections, categories and labels.
 - [Custom lists](guide:custom-lists): Lists of your own, made from filters and rules.
+- [Work and Personal](guide:work-and-personal): One account, and a switch that shows work or everything else.
 - [Routines](guide:routines): Habits and checklists that come back, alone or shared.
 - [Review and guided organizing](guide:review): Keep projects healthy, sort the Inbox, the weekly review.
 - [Work with others](guide:collaboration): Shared projects, assignees and comments.

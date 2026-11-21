@@ -542,3 +542,21 @@ describe('voice shortcut', () => {
     expect(applyConfigPatch(recorded, { voice_hotkey: '' }).voice_hotkey).toBe('')
   })
 })
+
+describe('Work and Personal device settings (contract 22.4)', () => {
+  it('defaults to off, All and Pro everywhere', () => {
+    const config = normalizeConfig({})
+    expect(config.work_mode_enabled).toBe(false)
+    expect(config.work_mode).toBe('all')
+    expect(config.pro_only_in_work).toBe(false)
+  })
+
+  it('keeps a valid mode and reads an unknown one as all', () => {
+    expect(normalizeConfig({ work_mode_enabled: true, work_mode: 'work', pro_only_in_work: true })).toMatchObject({
+      work_mode_enabled: true, work_mode: 'work', pro_only_in_work: true,
+    })
+    expect(normalizeConfig({ work_mode: 'personal' }).work_mode).toBe('personal')
+    expect(normalizeConfig({ work_mode: 'home' }).work_mode).toBe('all')
+    expect(normalizeConfig({ work_mode_enabled: 'yes' }).work_mode_enabled).toBe(false)
+  })
+})

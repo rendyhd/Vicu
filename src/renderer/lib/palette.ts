@@ -7,6 +7,7 @@ import type { Label, Project, Task } from './vikunja-types'
 
 export type PaletteCommand = 'new-task' | 'new-event' | 'voice' | 'dictate' | 'brain-dump' | 'ask' | 'make-tasks' | 'notes' | 'refresh' | 'toggle-theme' | 'settings'
   | 'pro-focus' | 'pro-settings' | 'pro-import' | 'pro-copilot' | 'pro-recap' | 'pro-weekly-note'
+  | 'work-all' | 'work-work' | 'work-personal'
 
 export type PaletteAction =
   | { type: 'command'; command: PaletteCommand }
@@ -24,6 +25,8 @@ export interface PaletteItem {
   /** Extra words the query may match without being shown ("go to"). */
   keywords: string
   action: PaletteAction
+  /** Found by typing its name only: not listed while the query is empty (the work mode entries). */
+  byNameOnly?: boolean
 }
 
 /** Most commands the palette lists, and most tasks added after them. */
@@ -42,6 +45,8 @@ export interface PaletteSources {
   assistant?: boolean
   /** Pro's lists and actions while Pro is on (plan 7.1.11); absent while it is off. */
   pro?: ProPaletteSources
+  /** Work and Personal is on: the three mode entries are listed (cross-app semantics 22.4). */
+  workMode?: boolean
 }
 
 export interface ProPaletteSources {
@@ -69,6 +74,15 @@ export function proPaletteItems(pro: ProPaletteSources): PaletteItem[] {
   ]
 }
 
+/** Work and Personal (22.4): switching the mode by name. No shortcut, and not listed with an empty query. */
+export function workModePaletteItems(): PaletteItem[] {
+  return [
+    { id: 'cmd:work-all', kind: 'Action', title: t('workMode.paletteAll'), keywords: 'work personal mode all everything show', action: { type: 'command', command: 'work-all' }, byNameOnly: true },
+    { id: 'cmd:work-work', kind: 'Action', title: t('workMode.paletteWork'), keywords: 'work personal mode job office', action: { type: 'command', command: 'work-work' }, byNameOnly: true },
+    { id: 'cmd:work-personal', kind: 'Action', title: t('workMode.palettePersonal'), keywords: 'work personal mode private home', action: { type: 'command', command: 'work-personal' }, byNameOnly: true },
+  ]
+}
+
 /** The guided sessions (cross-app semantics 14): found by name, not listed with an empty query. */
 export const GUIDED_PALETTE_ITEMS: readonly PaletteItem[] = [
   { id: 'guided:inbox', kind: 'Guided', title: 'Sort the Inbox', keywords: 'guided organize organise process triage one at a time session', action: { type: 'path', path: '/guided/inbox' } },
@@ -79,7 +93,7 @@ export const GUIDED_PALETTE_ITEMS: readonly PaletteItem[] = [
 ]
 
 /** Everything the palette can run except tasks: actions, smart lists, guided sessions, projects and labels, in that order. */
-export function buildPaletteItems({ smartLists, projects, labels, planner = false, voice = true, assistant = true, pro }: PaletteSources): PaletteItem[] {
+export function buildPaletteItems({ smartLists, projects, labels, planner = false, voice = true, assistant = true, pro, workMode = false }: PaletteSources): PaletteItem[] {
   const actions: PaletteItem[] = [
     { id: 'cmd:new-task', kind: 'Action', title: 'New task', keywords: 'add create', action: { type: 'command', command: 'new-task' } },
     // An Event on the Plan screen (contract 20.3), at the selected day's next free time.
@@ -110,6 +124,7 @@ export function buildPaletteItems({ smartLists, projects, labels, planner = fals
     ...actions,
     ...smartLists.map((list): PaletteItem => ({ id: `list:${list.id}`, kind: 'List', title: list.label, keywords: 'go to', action: { type: 'path', path: list.path } })),
     ...(pro ? proPaletteItems(pro) : []),
+    ...(workMode ? workModePaletteItems() : []),
     ...GUIDED_PALETTE_ITEMS,
     ...projects.map((project): PaletteItem => ({ id: `project:${project.id}`, kind: 'Project', title: project.title, keywords: 'go to', action: { type: 'project', id: project.id } })),
     ...labels.map((label): PaletteItem => ({ id: `label:${label.id}`, kind: 'Label', title: label.title, keywords: 'go to tag', action: { type: 'label', id: label.id } })),
@@ -126,7 +141,7 @@ export function taskItem(task: Task): PaletteItem {
  */
 export function rankPalette(items: readonly PaletteItem[], query: string, tasks: readonly Task[]): PaletteItem[] {
   if (query.trim() === '') {
-    return items.filter((item) => item.kind === 'Action' || item.kind === 'List').slice(0, PALETTE_COMMAND_LIMIT + PALETTE_TASK_LIMIT)
+    return items.filter((item) => (item.kind === 'Action' || item.kind === 'List') && !item.byNameOnly).slice(0, PALETTE_COMMAND_LIMIT + PALETTE_TASK_LIMIT)
   }
   // The title carries the match; the hidden keywords only help when the title does not match at all.
   const byTitle = fuzzyRank(items, query, (item) => item.title)

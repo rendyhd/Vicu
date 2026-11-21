@@ -57,6 +57,8 @@ import { addLocalDays, dateOnlyDue, isNoDueDate, localDateOf, startOfLocalDay, s
 import { withDefaultReminder } from '../../shared/default-reminder'
 import { withoutNestedSubtasks } from '../../shared/nested-subtasks'
 import { useAvailability } from '@/hooks/use-availability'
+import { useWorkMode } from '@/hooks/use-work-mode'
+import { useWorkMuted } from '@/hooks/use-work-muted'
 import { confirmDelete } from '@/lib/confirm-bridge'
 import { blockReplacesLaterStart, startDateOf } from '../../shared/pro/start-dates'
 import { formatWeekdayDate } from '../../shared/date-display'
@@ -293,18 +295,22 @@ function PlanScreen() {
   // The left panel's list.
   const heldTasks = useCompletedTasksStore((s) => s.tasks)
   const projectSourceId = sourceProjectId(source, inboxId) ?? undefined
-  const project = useProjectTasks(projectSourceId)
+  // Work and Personal (22.4): the left panel lists what the mode shows. The timeline keeps every
+  // block, muted, because a block of the other mode is still busy time.
+  const work = useWorkMode()
+  const mutedIds = useWorkMuted(range.tasks)
+  const project = useProjectTasks(projectSourceId, true, true)
   // Only what is cached: a list that is not shown is never fetched for its count.
-  const inboxCached = useProjectTasks(inboxId || undefined, false)
+  const inboxCached = useProjectTasks(inboxId || undefined, false, true)
   const upcomingParams = useFilters({ view: 'upcoming' })
   const anytimeParams = useFilters({ view: 'anytime' })
-  const upcoming = useTasks(upcomingParams, source === 'next7')
-  const anytime = useTasks(anytimeParams, source === 'nodate')
+  const upcoming = useTasks(upcomingParams, source === 'next7', true)
+  const anytime = useTasks(anytimeParams, source === 'nodate', true)
   const [filter, setFilter] = useState('')
 
   const dayTasks = useMemo(
-    () => withoutNestedSubtasks(dayWithoutTime(range.tasks, selectedDay, new Date(), (task) => heldTasks.has(task.id))),
-    [range.tasks, selectedDay, heldTasks, dayKey],
+    () => work.filter(withoutNestedSubtasks(dayWithoutTime(range.tasks, selectedDay, new Date(), (task) => heldTasks.has(task.id)))),
+    [range.tasks, selectedDay, heldTasks, dayKey, work.filter],
   )
   const nextSevenTasks = useMemo(() => upcoming.data.filter((task) => inNextSevenDays(task.due_date, today)), [upcoming.data, today, dayKey])
   const noDateTasks = useMemo(
@@ -444,7 +450,7 @@ function PlanScreen() {
 
   /** Fit (contract 16.6): the day's tasks without a time take the next free slots, with Undo. */
   const fitDay = () => {
-    const candidates = dayWithoutTime(range.tasks, selectedDay, new Date()).filter((task) => canWriteProject(task.project_id))
+    const candidates = dayWithoutTime(range.tasks, selectedDay, new Date()).filter((task) => canWriteProject(task.project_id) && work.passes(task))
     const fitted = fitTasks(candidates, {
       now: new Date(),
       day: selectedDay,
@@ -654,6 +660,7 @@ function PlanScreen() {
           selectedDay={selectedDay}
           onSelectDay={setSelectedDay}
           tasks={range.tasks}
+          mutedIds={mutedIds}
           routines={routines}
           defaultLength={prefs.defaultLength}
           hours={prefs.hours}

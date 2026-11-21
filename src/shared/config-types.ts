@@ -464,6 +464,13 @@ export interface AppConfig {
   pro_followup_dismissed?: Record<string, string>
   /** The first-run notice about existing start dates was shown. */
   pro_onboarding_seen?: boolean
+  // Work and Personal (cross-app semantics section 22): per device, never synced.
+  /** The feature; off by default (`effectiveWorkMode`). Off, every list is as without it. */
+  work_mode_enabled?: boolean
+  /** All, Work or Personal; kept while the feature is off. */
+  work_mode?: 'all' | 'work' | 'personal'
+  /** With this on, a device in Personal mode acts as one with Pro off (section 22.8). */
+  pro_only_in_work?: boolean
 }
 
 // --- Defaults every reader shares -------------------------------------------------------------

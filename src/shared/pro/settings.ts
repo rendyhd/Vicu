@@ -3,8 +3,10 @@
  * layers are per device; the area is the synced preference `pro.area`. Off is today's Vicu: nothing
  * here may change what a device without Pro shows.
  *
- * Only imports its siblings, so every tsconfig can include it.
+ * Only imports its siblings and the import-free `work-scope.ts`, so every tsconfig can include it.
  */
+
+import { proAllowedInWorkMode } from '../work-scope'
 
 export const PRO_LAYERS = ['availability', 'promises', 'portfolio', 'power'] as const
 export type ProLayer = (typeof PRO_LAYERS)[number]
@@ -19,6 +21,10 @@ export interface ProSwitches {
   pro_layers?: Partial<Record<ProLayer, boolean>> | null
   standalone_mode?: boolean
   pro_assistant?: boolean
+  // Work and Personal (section 22.8): Pro may show only in Work.
+  work_mode_enabled?: boolean
+  work_mode?: string
+  pro_only_in_work?: boolean
 }
 
 /** The layers as stored: a missing or unreadable layer is on. */
@@ -30,12 +36,22 @@ export function readProLayers(value: unknown): ProLayers {
 }
 
 /**
- * Pro is on: the switch is on and the device is not in standalone mode (Pro needs a server). With a
- * layer, that layer is on too.
+ * Pro's own switch, whatever the Work and Personal mode: on, and not in standalone mode (Pro needs a
+ * server). What keeps Pro's data whole asks this (the ledger's sync, the hidden-task counts), so
+ * nothing is lost while Pro is out of sight in Personal mode.
+ */
+export function isProSwitchedOn(config: ProSwitches | null | undefined): boolean {
+  return !!config && config.pro_enabled === true && config.standalone_mode !== true
+}
+
+/**
+ * Pro is on: the switch is on, the device is not in standalone mode, and the Work and Personal mode
+ * lets it show (section 22.8: with "Pro only in Work", Personal mode is Pro off). With a layer, that
+ * layer is on too. Everything Pro shows or offers asks this.
  */
 export function isProEnabled(config: ProSwitches | null | undefined, layer?: ProLayer): boolean {
-  if (!config || config.pro_enabled !== true || config.standalone_mode === true) return false
-  return layer ? readProLayers(config.pro_layers)[layer] : true
+  if (!isProSwitchedOn(config) || !proAllowedInWorkMode(config)) return false
+  return layer ? readProLayers(config?.pro_layers)[layer] : true
 }
 
 /**

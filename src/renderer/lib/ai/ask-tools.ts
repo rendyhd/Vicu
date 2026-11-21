@@ -11,6 +11,7 @@ import { filterCustomList, buildCustomListServerFilter, customListRuleParams, ty
 import { sortCustomListTasks } from '../../../shared/custom-list-sort'
 import { addLocalDays, localDateOf, toLocalDate } from '../../../shared/due-dates'
 import { blockStartsOn } from '../../../shared/time-blocks'
+import { projectsShownInMode, shownInWorkMode, workModeClause, type WorkMode, type WorkScope } from '../../../shared/work-scope'
 import { resolveTaskOrder, sortTasksByOrder } from '../../../shared/task-order'
 import { parseReviewFooter, computeStatus } from '../review-metadata'
 import type { Task, TaskQueryParams } from '../vikunja-types'
@@ -28,6 +29,11 @@ export interface ToolContext {
   review: { enabled: boolean; defaultCadenceDays: number; excludeInbox: boolean }
   /** Pro's data for its read tools (ai-assistant 11.3); absent or null while Pro's assistant is off. */
   pro?: import('./pro-tools').ProToolData | null
+  /**
+   * Work and Personal (cross-app semantics 22.4): `get_overview` and `list_view` answer as the screens do,
+   * by the mode. `find_tasks` and `get_task` stay unfiltered. Absent: every task.
+   */
+  work?: { scope: WorkScope; mode: WorkMode } | null
 }
 
 export class ToolError extends Error {
@@ -54,6 +60,13 @@ function visible(tasks: readonly Task[]): Task[] {
   return tasks.filter(isVisibleTask)
 }
 
+/** The tasks the mode shows, in order; all of them in All or without a mode. */
+function inMode<T extends Task>(tasks: T[], ctx: ToolContext): T[] {
+  const work = ctx.work
+  if (!work || work.mode === 'all') return tasks
+  return shownInWorkMode(tasks, work.scope, work.mode, (task) => task.related_tasks?.parenttask?.[0]?.id)
+}
+
 function customListContext(ws: AiWorkspace) {
   return { me: ws.me?.id ?? null, isShared: (projectId: number) => ws.access(projectId).shared }
 }
@@ -70,7 +83,7 @@ export async function getOverview(ctx: ToolContext): Promise<unknown> {
   const now = ctx.now()
   const today = toLocalDate(now)
   const active = activeProjectIds(ws)
-  const open = visible(await ctx.fetchTasks({ filter: 'done = false' })).filter((task) => active.has(task.project_id) && !task.done)
+  const open = inMode(visible(await ctx.fetchTasks({ filter: 'done = false' })).filter((task) => active.has(task.project_id) && !task.done), ctx)
   const counts = { inbox: 0, today: 0, overdue: 0, upcoming: 0, anytime: 0 }
   for (const task of open) {
     if (task.project_id === ws.inboxProjectId) counts.inbox++
@@ -81,8 +94,10 @@ export async function getOverview(ctx: ToolContext): Promise<unknown> {
     else if (due === today) counts.today++
     else counts.upcoming++
   }
+  // The review queue lists the projects the mode lists.
+  const shownProjects = ctx.work && ctx.work.mode !== 'all' ? projectsShownInMode(ws.projects, ctx.work.scope.projects, ctx.work.mode, ws.inboxProjectId) : null
   const reviewDue = !ctx.review.enabled ? [] : ws.projects
-    .filter((project) => !project.is_archived && !(ctx.review.excludeInbox && project.id === ws.inboxProjectId))
+    .filter((project) => !project.is_archived && (shownProjects === null || shownProjects.has(project.id)) && !(ctx.review.excludeInbox && project.id === ws.inboxProjectId))
     .filter((project) => {
       const status = computeStatus(parseReviewFooter(project.description), ctx.review.defaultCadenceDays, now)
       return status.metadata.state !== 'excluded' && (status.isOverdue || status.daysUntilDue === 0)
@@ -182,16 +197,19 @@ export async function listView(args: Args, ctx: ToolContext): Promise<{ tasks: T
   switch (view) {
     case 'logbook': {
       // The Logbook loads newest first, a page at a time, like the view.
-      const page = visible(await ctx.fetchTasks({ filter: 'done = true', sort_by: 'done_at', order_by: 'desc', page: pageArg, per_page: size }))
-      return { tasks: page.map((task) => summariseTask(task, ws)), page: pageArg, has_more: page.length >= size }
+      // By the mode: the server narrows the page and the rule is applied to what comes back.
+      const { clause, empty } = ctx.work ? workModeClause(ctx.work.scope, ctx.work.mode) : { clause: null, empty: false }
+      if (empty) return { tasks: [], page: pageArg, has_more: false }
+      const page = visible(await ctx.fetchTasks({ filter: clause ? `done = true && ${clause}` : 'done = true', sort_by: 'done_at', order_by: 'desc', page: pageArg, per_page: size }))
+      return { tasks: inMode(page, ctx).map((task) => summariseTask(task, ws)), page: pageArg, has_more: page.length >= size }
     }
     case 'inbox':
     case 'project': {
       const projectId = view === 'inbox' ? ws.inboxProjectId : typeof args.project_id === 'number' ? args.project_id : null
       if (projectId === null) throw new ToolError('invalid_arguments', 'project_id is needed with view project')
       if (!projectOf(ws, projectId)) throw new ToolError('not_found', `No project ${projectId}`)
-      const tasks = visible(await ctx.fetchTasks({ filter: `done = false && project_id = ${projectId}` }))
-        .filter((task) => task.project_id === projectId && !task.done)
+      const tasks = inMode(visible(await ctx.fetchTasks({ filter: `done = false && project_id = ${projectId}` }))
+        .filter((task) => task.project_id === projectId && !task.done), ctx)
       ordered = sortTasksByOrder(tasks, orderOf(ws, ctx.syncedValues, projectId))
       break
     }
@@ -200,7 +218,7 @@ export async function listView(args: Args, ctx: ToolContext): Promise<{ tasks: T
       const tasks = visible(await ctx.fetchTasks(view === 'today'
         ? { filter: 'done = false', due_window: view }
         : { filter: "done = false && due_date != '0001-01-01T00:00:00Z'", due_window: view }))
-      const inWindow = tasks.filter((task) => {
+      const inWindow = inMode(tasks, ctx).filter((task) => {
         const due = localDateOf(task.due_date)
         if (!active.has(task.project_id)) return false
         if (view === 'today' && blockStartsOn(task, today)) return true
@@ -210,7 +228,7 @@ export async function listView(args: Args, ctx: ToolContext): Promise<{ tasks: T
       break
     }
     case 'anytime': {
-      const tasks = visible(await ctx.fetchTasks({ filter: 'done = false' }))
+      const tasks = inMode(visible(await ctx.fetchTasks({ filter: 'done = false' })), ctx)
       ordered = sortTasksByOrder(tasks.filter((task) => active.has(task.project_id) && task.project_id !== ws.inboxProjectId), 'due_date_first')
       break
     }
@@ -225,7 +243,7 @@ export async function listView(args: Args, ctx: ToolContext): Promise<{ tasks: T
         ...customListRuleParams(list.filter),
         keep_nested_subtasks: true,
       }))
-      const matching = filterCustomList(tasks, list.filter, today, customListContext(ws), now).filter((task) => active.has(task.project_id))
+      const matching = filterCustomList(inMode(tasks, ctx), list.filter, today, customListContext(ws), now).filter((task) => active.has(task.project_id))
       ordered = sortCustomListTasks(matching, list.filter.sort_by, list.filter.order_by, list.filter.then_by ?? [])
       break
     }

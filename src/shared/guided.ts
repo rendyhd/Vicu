@@ -74,6 +74,8 @@ export interface GuidedWorldInput<T extends GuidedTask = GuidedTask> {
   orderValues?: Readonly<Record<string, unknown>>
   /** A project's permission (section 9.1); its `max_permission` when not given (unknown: 1). */
   permission?: (project: GuidedProject) => number
+  /** Work and Personal (section 22.4): the projects the mode lists; the review queue holds only those. Null: all. */
+  reviewScope?: ReadonlySet<number> | null
 }
 
 /**
@@ -87,6 +89,7 @@ export class GuidedWorld<T extends GuidedTask = GuidedTask> {
   readonly today: LocalDate
   readonly review: GuidedReviewSettings
   readonly orderValues: Readonly<Record<string, unknown>>
+  readonly reviewScope: ReadonlySet<number> | null
   private readonly projectById: Map<number, GuidedProject>
   private readonly permissionOf: (project: GuidedProject) => number
 
@@ -97,6 +100,7 @@ export class GuidedWorld<T extends GuidedTask = GuidedTask> {
     this.today = input.today
     this.review = input.review
     this.orderValues = input.orderValues ?? {}
+    this.reviewScope = input.reviewScope ?? null
     this.projectById = new Map(input.projects.map((project) => [project.id, project]))
     this.permissionOf = input.permission ?? ((project) => (typeof project.max_permission === 'number' ? project.max_permission : 1))
   }
@@ -248,7 +252,7 @@ export function reviewQueue<T extends GuidedTask>(world: GuidedWorld<T>): number
   if (!world.review.enabled) return []
   const now = startOfLocalDay(world.today)
   return world.projects
-    .filter((project) => world.canChange(project.id) && !(world.review.excludeInbox && project.id === world.inboxId))
+    .filter((project) => (world.reviewScope === null || world.reviewScope.has(project.id)) && world.canChange(project.id) && !(world.review.excludeInbox && project.id === world.inboxId))
     .map((project) => ({ project, status: computeStatus(parseReviewFooter(project.description), world.review.defaultCadence, now) }))
     .filter(({ status }) => status.metadata.state !== 'excluded' && status.isOverdue)
     .map((entry) => ({ ...entry, path: world.path(entry.project.id).toLowerCase() }))

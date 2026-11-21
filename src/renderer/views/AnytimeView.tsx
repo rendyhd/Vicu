@@ -17,7 +17,7 @@ import { HiddenSummary, ViewSwitch } from '@/components/pro/ViewSwitch'
 
 export function AnytimeView() {
   const params = useFilters({ view: 'anytime' })
-  const { data: loaded = [], isLoading } = useTasks(params)
+  const { data: loaded = [], isLoading } = useTasks(params, true, true)
   // Pro: Available, Remaining or All (cross-app semantics 21.2); off, every task as before.
   const availability = useAvailabilityView('anytime')
   const tasks = useMemo(() => availability.filter(loaded), [availability, loaded])

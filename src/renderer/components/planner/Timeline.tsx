@@ -70,6 +70,13 @@ interface TimelineProps {
   dashedIds?: ReadonlySet<number>
   /** While Plan my day arranges a draft: no drawing and no ticking. */
   draft?: boolean
+  /**
+   * Tasks the Work and Personal mode does not list but the timeline keeps, as busy time: task id to the
+   * name of its mode. They are drawn muted and named for a screen reader (cross-app semantics 22.4).
+   */
+  mutedIds?: ReadonlyMap<number, string>
+  /** Plan my day: a muted task can be neither moved nor resized. */
+  lockMuted?: boolean
   /** Why each dashed block sits there (the assistant's reason). */
   reasonOf?: (task: Task) => string | undefined
   /** In place of the hint under the day's name. */
@@ -328,6 +335,8 @@ interface BlockViewProps {
   dashed: boolean
   draft: boolean
   reason?: string
+  /** The other mode's name: the block is drawn muted and named for a screen reader. */
+  muted?: string
   hidden: boolean
   instructionsId: string
   onPointerDown: (event: React.PointerEvent<HTMLElement>) => void
@@ -340,7 +349,7 @@ const TINY_BLOCK_PX = 20
 const OPENING_MARGIN_PX = 20
 
 const BlockView = memo(function BlockView(props: BlockViewProps) {
-  const { task, top, height, left, width, range, color, editable, dashed, draft, reason, hidden, instructionsId } = props
+  const { task, top, height, left, width, range, color, editable, dashed, draft, reason, muted, hidden, instructionsId } = props
   const compact = height < 40
   // Too short for a checkbox: the block's popover has one.
   const tiny = height < TINY_BLOCK_PX
@@ -363,6 +372,7 @@ const BlockView = memo(function BlockView(props: BlockViewProps) {
         editable && 'cursor-grab active:cursor-grabbing',
         dashed && 'border-dashed border-accent-blue',
         task.done && 'opacity-70',
+        muted && 'opacity-60',
         hidden && 'opacity-30',
       )}
     >
@@ -382,6 +392,7 @@ const BlockView = memo(function BlockView(props: BlockViewProps) {
           <span className={cn('block truncate font-medium text-text', tiny ? 'text-caption leading-none' : 'text-meta', task.done && 'line-through')}>{task.title}</span>
           <span className={compact ? 'sr-only' : 'block truncate text-caption text-text-secondary'}>{range}</span>
           {task.done && <span className="sr-only">, done</span>}
+          {muted && <span className="sr-only">, {muted}</span>}
           {!compact && reason && height >= 58 && <span className="block truncate text-caption text-text-secondary">{reason}</span>}
         </button>
       </div>
@@ -416,6 +427,8 @@ export function Timeline({
   reasonOf,
   note,
   pageTurn,
+  mutedIds,
+  lockMuted = false,
   events = NO_EVENTS,
   eventColor,
   onPressEvent,
@@ -442,8 +455,8 @@ export function Timeline({
   }, [projects])
 
   const canChange = useCallback(
-    (task: Task) => (access.get(task.project_id)?.permission ?? 1) > 0,
-    [access],
+    (task: Task) => (access.get(task.project_id)?.permission ?? 1) > 0 && !(lockMuted && mutedIds?.has(task.id)),
+    [access, lockMuted, mutedIds],
   )
 
   const commit = (result: GestureResult) => {
@@ -792,6 +805,7 @@ export function Timeline({
                             overBlock ? 'right-1 z-[2] max-w-[45%] rounded-full border border-border bg-bg-card px-1.5' : 'inset-x-0.5',
                             editable && 'cursor-grab',
                             gesture.preview?.taskId === task.id && 'opacity-30',
+                            mutedIds?.has(task.id) && 'opacity-60',
                           )}
                           style={{ top: minute * PX_PER_MINUTE - 10 }}
                         >
@@ -799,7 +813,7 @@ export function Timeline({
                           <button type="button" data-plan-focus onClick={(event) => {
                               // By keyboard; a press goes through the gesture above.
                               if (event.detail === 0) onPressBlock?.(task, event.currentTarget)
-                            }} aria-label={`${task.title}, due ${formatDateDisplay('logbook.time', start, now, false, fmt)}`} className="min-w-0 truncate rounded-control text-caption text-text">
+                            }} aria-label={`${task.title}, due ${formatDateDisplay('logbook.time', start, now, false, fmt)}${mutedIds?.has(task.id) ? `, ${mutedIds.get(task.id)}` : ''}`} className="min-w-0 truncate rounded-control text-caption text-text">
                             {task.title}
                           </button>
                         </li>
@@ -858,6 +872,7 @@ export function Timeline({
                             dashed={dashedIds?.has(task.id) === true}
                             draft={draft}
                             reason={reasonOf?.(task)}
+                            muted={mutedIds?.get(task.id)}
                             hidden={previewingTask === task.id}
                             instructionsId={instructionsId}
                             onPointerDown={(event) => {

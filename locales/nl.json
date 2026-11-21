@@ -628,7 +628,10 @@
       "area": {
         "title": "Werkgebied",
         "note": "Beloftes, mensen en het portfolio gelden voor projecten in deze categorieën. Als er geen is aangevinkt, gelden ze voor elk project. Gedeeld met je andere apparaten.",
-        "empty": "Je hebt geen projectcategorieën. Voeg er een toe bij Instellingen, Projecten om Pro daartoe te beperken."
+        "empty": "Je hebt geen projectcategorieën. Voeg er een toe bij Instellingen, Projecten om Pro daartoe te beperken.",
+        "byCategory": "Gekozen categorieën",
+        "workProjects": "Werkprojecten",
+        "workProjectsNote": "Beloftes, mensen en het portfolio gelden voor de projecten die als werk zijn aangevinkt bij Instellingen, Algemeen, Werk en persoonlijk."
       },
       "portfolio": {
         "title": "Portfolio",
@@ -886,6 +889,21 @@
     "webToken": {
       "remember": "Onthouden in deze browser",
       "rememberHint": "Als dit uit staat, wordt het token vergeten zodra je de browser sluit."
+    },
+    "workMode": {
+      "title": "Werk en persoonlijk",
+      "note": "Houd werk en privé in één account en bekijk ze een voor een. Werk toont de taken met het werklabel en de taken van werkprojecten; Persoonlijk toont al het andere. Zoeken vindt alles en herinneringen komen altijd.",
+      "enable": "De schakelaar Werk en persoonlijk tonen",
+      "enableNote": "Zet Alles, Werk en Persoonlijk boven in de zijbalk. De keuze blijft op dit apparaat.",
+      "label": "Werklabel",
+      "labelNone": "Geen",
+      "labelNote": "Een taak met dit label is werk, in welk project die ook staat. In Werk krijgt een nieuwe taak buiten een werkproject het vanzelf. Gedeeld met je andere apparaten.",
+      "noLabel": "Er is geen werklabel ingesteld: een taak die je in Werk buiten een werkproject toevoegt, blijft Persoonlijk.",
+      "projects": "Werkprojecten",
+      "projectsNote": "Vink de projecten aan die werk zijn. Hun subprojecten volgen, en een subproject kan eruit worden gehaald. De Inbox wordt alleen op het label gesplitst. Gedeeld met je andere apparaten.",
+      "noProjects": "Je hebt nog geen projecten.",
+      "proOnly": "Pro alleen in Werk tonen",
+      "proOnlyNote": "In Persoonlijk is dit apparaat zoals met Pro uit. Er wordt niets van Pro gewijzigd of weggegooid."
     }
   },
   "notes": {
@@ -1223,5 +1241,25 @@
       "nothing": "Niets te melden.",
       "noGroups": "Nog geen groepen."
     }
+  },
+  "workMode": {
+    "switchLabel": "Werk en persoonlijk",
+    "all": "Alles",
+    "work": "Werk",
+    "personal": "Persoonlijk",
+    "announceAll": "Alles wordt getoond",
+    "announceWork": "Werk wordt getoond",
+    "announcePersonal": "Persoonlijk wordt getoond",
+    "paletteAll": "Alles tonen",
+    "paletteWork": "Naar Werk",
+    "palettePersonal": "Naar Persoonlijk",
+    "workProject": "Werkproject",
+    "moreInPersonal_one": "Nog {{count}} in Persoonlijk",
+    "moreInPersonal_other": "Nog {{count}} in Persoonlijk",
+    "moreInWork_one": "Nog {{count}} in Werk",
+    "moreInWork_other": "Nog {{count}} in Werk",
+    "showMore": "Tonen",
+    "addedToPersonal": "Toegevoegd aan Persoonlijk, omdat er geen werklabel is ingesteld",
+    "showTask": "Tonen"
   }
 }

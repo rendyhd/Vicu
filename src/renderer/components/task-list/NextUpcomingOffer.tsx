@@ -6,6 +6,8 @@ import { useFilters } from '@/hooks/use-filters'
 import { useDateFormat } from '@/hooks/use-date-format'
 import { formatDateDisplay } from '@/lib/date-display'
 import { isUpcoming } from '@/lib/due-dates'
+import { useWorkMode } from '@/hooks/use-work-mode'
+import { workModeClause } from '../../../shared/work-scope'
 
 /**
  * What Today offers when it is empty (card 4.11a): the next task that is due after today, with its
@@ -16,8 +18,14 @@ export function NextUpcomingOffer() {
   const navigate = useNavigate()
   const dateFormat = useDateFormat()
   const upcoming = useFilters({ view: 'upcoming' })
-  const params = useMemo(() => ({ ...upcoming, page: 1, per_page: 1 }), [upcoming])
-  const { data: tasks = [] } = useTasks(params)
+  // Work and Personal (22.4): the one task asked for is the next one the mode shows.
+  const { scope, mode } = useWorkMode()
+  const { clause, empty } = useMemo(() => workModeClause(scope, mode), [scope, mode])
+  const params = useMemo(
+    () => ({ ...upcoming, ...(clause && upcoming.filter ? { filter: `(${upcoming.filter}) && ${clause}` } : {}), page: 1, per_page: 1 }),
+    [upcoming, clause],
+  )
+  const { data: tasks = [] } = useTasks(params, !empty, true)
   const next = tasks.find((task) => isUpcoming(task.due_date, new Date()))
   if (!next) return null
   const day = formatDateDisplay('header.day', new Date(next.due_date), new Date(), true, dateFormat)

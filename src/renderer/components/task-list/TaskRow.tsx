@@ -44,6 +44,7 @@ import { TaskInputParser } from '@/components/task-input/TaskInputParser'
 import { useAppConfig } from '@/hooks/use-app-config'
 import { useSubtasks } from '@/hooks/use-subtasks'
 import { useHasLocationReminder } from '@/hooks/use-location-reminders'
+import { WorkMark, useWorkMark } from './WorkMark'
 import { useAvailability, useReasonText } from '@/hooks/use-availability'
 import { usePromiseOf } from '@/hooks/use-promises'
 import { PromiseLine } from '@/components/pro/PromiseLine'
@@ -718,6 +719,7 @@ function TaskRowInner({
   const notesShown = rowView.fields ? rowView.fields.includes('notes') : true
   const notesLine = notesShown && (comfortable || rowView.fields !== undefined) ? notesPreview(task.description) : ''
   const showNotesIcon = notesShown && notesLine === '' && hasNotesContent(task.description)
+  const workMark = useWorkMark(task, rowView.showWorkMark === true)
   const hasMeta =
     projectSource !== 'none' ||
     metaLabels.length > 0 ||
@@ -730,6 +732,7 @@ function TaskRowInner({
     (nestedDepth > 0 && parentProjectId !== undefined && parentProjectId !== task.project_id) ||
     unavailableReason !== null ||
     isNext ||
+    workMark ||
     showStart ||
     showEstimate ||
     !!promise
@@ -852,6 +855,7 @@ function TaskRowInner({
           {notesLine && <p className="mt-0.5 truncate text-meta font-normal text-text-secondary">{notesLine}</p>}
           {hasMeta && (
             <div className="mt-0.5 flex min-w-0 items-center gap-x-2 overflow-hidden whitespace-nowrap text-meta text-text-secondary">
+              {workMark && <WorkMark task={task} />}
               {isNext && (
                 <span className="vicu-chip shrink-0 rounded-chip bg-accent-blue/12 px-2 py-px text-chip leading-tight text-accent-blue" data-pro-next>
                   Next

@@ -68,6 +68,7 @@ import { MakeTasksDialog } from '@/components/ai/MakeTasksDialog'
 import { AiHost } from '@/components/ai/AiHost'
 import { ProjectAccessProvider } from '@/hooks/use-project-access'
 import { AvailabilityProvider } from '@/hooks/use-availability'
+import { WorkModeProvider } from '@/hooks/use-work-mode'
 import { FocusPickerHost } from '@/components/pro/FocusBanner'
 import { ProDialogHost } from '@/components/pro/ProDialogHost'
 import { APP_CONFIG_QUERY_KEY, useAppConfig } from '@/hooks/use-app-config'
@@ -852,6 +853,7 @@ export function AppShell() {
   return (
     <ProjectActionsContext.Provider value={projectActionsApi}>
     <ProjectAccessProvider>
+    <WorkModeProvider>
     <AvailabilityProvider>
     <DndContext
       sensors={sensors}
@@ -940,6 +942,7 @@ export function AppShell() {
       </DragOverlay>
     </DndContext>
     </AvailabilityProvider>
+    </WorkModeProvider>
     </ProjectAccessProvider>
     </ProjectActionsContext.Provider>
   )

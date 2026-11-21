@@ -19,7 +19,7 @@ declare global {
           // The time block `for 30m` made; part of the create.
           block?: { start_date: string; end_date: string } | null
         },
-      ): Promise<{ success: boolean; cached?: boolean; error?: string; mayExist?: boolean; data?: { id: number } }>
+      ): Promise<{ success: boolean; cached?: boolean; error?: string; mayExist?: boolean; data?: { id: number }; workLabel?: number }>
       uploadAttachment(taskId: number, fileData: Uint8Array, fileName: string, mimeType: string): Promise<{ success: boolean; error?: string; statusCode?: number }>
       fetchTaskAttachments(taskId: number): Promise<{ success: boolean; data?: Array<{ id: number }>; error?: string; statusCode?: number }>
       updateTask(taskId: number, task: Record<string, unknown>, options?: { baseDescription?: string }): Promise<{ success: boolean; error?: string; statusCode?: number; data?: unknown }>
@@ -749,6 +749,8 @@ async function saveTask(): Promise<void> {
     const taskId = createdTask?.id
     if (taskId && person) await window.quickEntryApi.addPromise(taskId, person.id, person.mine, promiseExtra).catch(() => false)
 
+    // Work mode (contract 22.6): main names the work label to add, like a label typed here.
+    if (typeof result.workLabel === 'number' && !labelRefs.some((ref) => ref.id === result.workLabel)) labelRefs.push({ id: result.workLabel } as { id: number; title: string })
     // Labels and images go on after the create. A step the network drops is queued, not lost.
     let queuedFollowUps = false
     if (taskId && (labelRefs.length > 0 || imageInputs.length > 0)) {

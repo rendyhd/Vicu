@@ -8,9 +8,14 @@ import { mergeProjectUndoWindow } from '@/lib/undo-window'
 import { hasVicuMetadataMarker } from '@/lib/metadata-tasks'
 import { useTaskOrder } from './use-task-order'
 import { sortTasksByOrder } from '../../shared/task-order'
+import { parentTaskId, useWorkMode } from './use-work-mode'
 
-/** `fetch: false` reads only what is cached (a count beside a list that is not shown) and never asks the server. */
-export function useProjectTasks(projectId: number | undefined, fetch = true) {
+/**
+ * `fetch: false` reads only what is cached (a count beside a list that is not shown) and never asks the server.
+ * `scoped` keeps the tasks the Work and Personal mode shows (cross-app semantics 22.4); the project's own
+ * screen passes nothing and filters itself, because it says how many tasks the mode hides.
+ */
+export function useProjectTasks(projectId: number | undefined, fetch = true, scoped = false) {
   const matches = useMatches()
   const pathname = matches[matches.length - 1]?.pathname ?? ''
   const completedTasks = useCompletedTasksStore((s) => s.tasks)
@@ -44,13 +49,15 @@ export function useProjectTasks(projectId: number | undefined, fetch = true) {
 
   // The project's task order (cross-app semantics 12): its own, its parent's or the global one.
   const order = useTaskOrder(projectId)
+  const workFilter = useWorkMode().filter
 
   // Merge recently completed tasks back so they stay visible with strikethrough
   const data = useMemo(() => {
     const merged = mergeProjectUndoWindow(tasksQuery.data ?? [], completedTasks, pathname, projectId)
     // The cache is kept in the default order; another order sorts on display.
-    return order === 'due_date_first' ? merged : sortTasksByOrder(merged, order)
-  }, [tasksQuery.data, completedTasks, pathname, projectId, order])
+    const ordered = order === 'due_date_first' ? merged : sortTasksByOrder(merged, order)
+    return scoped ? workFilter(ordered, parentTaskId) : ordered
+  }, [tasksQuery.data, completedTasks, pathname, projectId, order, scoped, workFilter])
 
   // Loading until the view is known too: the tasks query waits for it and would say "not loading",
   // so a list would mount, go to its skeleton and mount again, and lose what it had open.

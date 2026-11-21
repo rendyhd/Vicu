@@ -20,6 +20,8 @@ import type { Project } from '@/lib/vikunja-types'
 import type { ProjectCategory } from '../../../shared/project-categories'
 import { useProjectsWithoutIcon } from '@/hooks/use-project-icons'
 import { useFocus } from '@/hooks/use-focus'
+import { useWorkMode } from '@/hooks/use-work-mode'
+import { categoryHeaderListed, pruneToListed } from '@/lib/work-sidebar'
 
 interface MenuState {
   project: Project
@@ -191,16 +193,21 @@ export function ProjectTree() {
   const nodesById = useMemo(() => new Map(flatten(data?.tree ?? []).map(({ node }) => [node.id, node])), [data?.tree])
   // Pro's focus (21.14): only the projects in focus and their ancestors; without one, all.
   const { shownProjects } = useFocus()
+  // Work and Personal (22.5): the projects the mode lists, and the tree above a listed one.
+  const { shownProjects: workShown, mode: workMode } = useWorkMode()
   const groups = useMemo(() => {
-    const prune = (node: ProjectTreeNode): ProjectTreeNode[] =>
-      !shownProjects ? [node] : shownProjects.has(node.id) ? [{ ...node, children: node.children.flatMap(prune) }] : []
+    const narrowed = !!shownProjects || !!workShown
+    const prune = (node: ProjectTreeNode): ProjectTreeNode[] => pruneToListed(node, shownProjects).flatMap((kept) => pruneToListed(kept, workShown))
     return layout
       .map((group) => ({
         category: group.category,
         nodes: group.projectIds.flatMap((id) => nodesById.get(id) ?? []).flatMap(prune),
+        total: group.projectIds.length,
       }))
-      .filter((group) => !shownProjects || group.nodes.length > 0)
-  }, [layout, nodesById, shownProjects])
+      .filter((group) => !narrowed || (group.category
+        ? categoryHeaderListed({ listed: group.nodes.length, total: group.total, mode: workMode, focusActive: !!shownProjects })
+        : group.nodes.length > 0))
+  }, [layout, nodesById, shownProjects, workShown, workMode])
   const archived = data?.archived ?? []
 
   const openMenu = (project: Project, at: { point: { x: number; y: number } } | { anchor: HTMLElement }, opener: HTMLElement | null) => {

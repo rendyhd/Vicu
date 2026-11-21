@@ -19,6 +19,11 @@ export interface RowView {
    * `due`, `start`, `estimate`, `flag`, `notes`. Absent, rows show what they always did.
    */
   fields?: readonly string[]
+  /**
+   * The list is not filtered by Work and Personal (Search): a row the mode would not list names its
+   * mode (cross-app semantics 22.4).
+   */
+  showWorkMark?: boolean
 }
 
 export const NO_ROW_VIEW: RowView = {}

@@ -91,6 +91,19 @@ describe('task reminder scheduling (D-NOTIF-1, D-NOTIF-2, D-NOTIF-4)', () => {
     })
   })
 
+  describe('Work and Personal (contract 22.4)', () => {
+    it('still fires the reminder of a personal task while the config says Work mode', async () => {
+      scheduler.stop()
+      scheduler = make({
+        loadConfig: () => ({ notifications_enabled: true, standalone_mode: false, work_mode_enabled: true, work_mode: 'work' }) as never,
+      })
+      tasks = [task(1, T0 + 10 * MIN, { project_id: 10 } as never)]
+      await scheduler.refresh()
+      await vi.advanceTimersByTimeAsync(11 * MIN)
+      expect(show).toHaveBeenCalledTimes(1)
+    })
+  })
+
   describe('the master notification toggle (D-NOTIF-1)', () => {
     it('does not fetch or schedule anything while task reminders are off', async () => {
       notificationsEnabled = false

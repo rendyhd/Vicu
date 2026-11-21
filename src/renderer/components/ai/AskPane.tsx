@@ -13,6 +13,7 @@ import { useAppConfig } from '@/hooks/use-app-config'
 import { useDateFormat } from '@/hooks/use-date-format'
 import { useOpenTask } from '@/hooks/use-open-task'
 import { useSyncedPrefs } from '@/hooks/use-synced-prefs'
+import { useWorkMode } from '@/hooks/use-work-mode'
 import { useProToolData } from '@/hooks/use-pro-assistant'
 import {
   useAddLabel,
@@ -68,8 +69,10 @@ export function AskHost() {
   const open = useAskStore((s) => s.open)
 
   const proData = useProToolData()
-  const live = useRef({ ws, config, snapshot, pathname, aiSettings, proData })
-  live.current = { ws, config, snapshot, pathname, aiSettings, proData }
+  // Ask's list tools answer by the Work and Personal mode, as the screens do (22.4).
+  const { scope: workScope, mode: workModeNow } = useWorkMode()
+  const live = useRef({ ws, config, snapshot, pathname, aiSettings, proData, workScope, workModeNow })
+  live.current = { ws, config, snapshot, pathname, aiSettings, proData, workScope, workModeNow }
   const mutations = useRef({ addDrafts, deleteTask, updateTask, createLabel, addLabel, removeLabel, complete, reopen })
   mutations.current = { addDrafts, deleteTask, updateTask, createLabel, addLabel, removeLabel, complete, reopen }
 
@@ -98,6 +101,7 @@ export function AskHost() {
         },
         syncedValues: live.current.snapshot.values,
         pro: live.current.proData,
+        work: { scope: live.current.workScope, mode: live.current.workModeNow },
         review: {
           enabled: live.current.config?.review?.enabled === true,
           defaultCadenceDays: live.current.config?.review?.default_cadence_days ?? 14,

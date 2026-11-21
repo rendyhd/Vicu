@@ -6,6 +6,7 @@ import { Checkbox } from '@/components/shared/Checkbox'
 import { Switch } from '@/components/shared/Switch'
 import { usePro, useSaveProConfig } from '@/hooks/use-pro'
 import { useProPrefs } from '@/hooks/use-pro-prefs'
+import { useWorkMode } from '@/hooks/use-work-mode'
 import { useProLedger, writeLedger } from '@/hooks/use-pro-ledger'
 import { useProjectCategories } from '@/hooks/use-project-categories'
 import { useLabels } from '@/hooks/use-labels'
@@ -168,15 +169,35 @@ function StartDateNotice() {
 function AreaSettings() {
   const { t } = useTranslation()
   const { categories } = useProjectCategories()
-  const { area, setArea } = useProPrefs()
+  const { area, areaIsWork, setArea, setAreaWork } = useProPrefs()
+  const { enabled: workModeOn } = useWorkMode()
+  // The choice between categories and the work projects is offered while Work and Personal is on, or
+  // while the area already is the work projects (so it can be changed back).
+  const offerWork = workModeOn || areaIsWork
   const chosen = new Set(area)
+  const radio = 'mt-0.5'
   return (
     <div className={CARD}>
       <h2 className="mb-1 text-sm font-semibold text-[var(--text-primary)]">{t('settings.pro.area.title')}</h2>
       <p className="mb-4 text-xs text-[var(--text-secondary)]">
         {t('settings.pro.area.note')}
       </p>
-      {categories.length === 0 ? (
+      {offerWork && (
+        <div role="radiogroup" aria-label={t('settings.pro.area.title')} className="mb-4 space-y-2">
+          <label className="flex cursor-pointer items-start gap-2">
+            <input type="radio" name="pro-area" className={radio} checked={!areaIsWork} onChange={() => void setAreaWork(false)} />
+            <span className="text-sm text-[var(--text-primary)]">{t('settings.pro.area.byCategory')}</span>
+          </label>
+          <label className="flex cursor-pointer items-start gap-2">
+            <input type="radio" name="pro-area" className={radio} checked={areaIsWork} onChange={() => void setAreaWork(true)} />
+            <span className="min-w-0">
+              <span className="block text-sm text-[var(--text-primary)]">{t('settings.pro.area.workProjects')}</span>
+              <span className="block text-xs text-[var(--text-secondary)]">{t('settings.pro.area.workProjectsNote')}</span>
+            </span>
+          </label>
+        </div>
+      )}
+      {areaIsWork ? null : categories.length === 0 ? (
         <p className="text-sm text-[var(--text-secondary)]">{t('settings.pro.area.empty')}</p>
       ) : (
         <div className="space-y-2">

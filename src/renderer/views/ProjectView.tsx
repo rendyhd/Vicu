@@ -22,6 +22,8 @@ import { useAvailabilityView } from '@/hooks/use-availability'
 import { HiddenSummary, ViewSwitch } from '@/components/pro/ViewSwitch'
 import { InitiativePanel } from '@/components/pro/InitiativePanel'
 import { ProjectPlanLink } from '@/components/pro/ProjectPlanLink'
+import { parentTaskId, useWorkMode } from '@/hooks/use-work-mode'
+import { WorkModeMore } from '@/components/task-list/WorkModeMore'
 
 function findSectionForTask(
   sections: SectionData[],
@@ -34,6 +36,19 @@ function findSectionForTask(
     if (found) return found
   }
   return null
+}
+
+/** The sections with only the tasks `keep` lets through, and how many tasks it took out in all. */
+function filterSections(sections: SectionData[], keep: (tasks: Task[]) => Task[]): { sections: SectionData[]; removed: number } {
+  let removed = 0
+  const walk = (list: SectionData[]): SectionData[] =>
+    list.map((section) => {
+      const tasks = keep(section.tasks)
+      removed += section.tasks.length - tasks.length
+      return { ...section, tasks, children: walk(section.children) }
+    })
+  const result = walk(sections)
+  return { sections: result, removed }
 }
 
 function flattenForPrint(
@@ -61,8 +76,19 @@ export function ProjectView() {
   const archivedProject = projectData?.archived.find((p) => p.id === pid)
   const projectName = activeProject?.title ?? archivedProject?.title ?? 'Project'
 
-  const { data: allTasks = [], isLoading: tasksLoading, viewId, order: taskOrder } = useProjectTasks(activeProject?.id)
-  const { sections: allSections, hasSections, isLoading: sectionsLoading } = useProjectSections(pid)
+  const { data: everyTask = [], isLoading: tasksLoading, viewId, order: taskOrder } = useProjectTasks(activeProject?.id)
+  const { sections: everySection, hasSections, isLoading: sectionsLoading } = useProjectSections(pid)
+  // Work and Personal (22.4): the screen lists the tasks the mode shows, and says how many it holds
+  // back (a task of the project can carry the work label), with a way to show them until it is left.
+  const work = useWorkMode()
+  const [shownAllFor, setShownAllFor] = useState<number | null>(null)
+  const showAll = shownAllFor === pid
+  const { allTasks, allSections, workHidden } = useMemo(() => {
+    if (showAll || work.mode === 'all') return { allTasks: everyTask, allSections: everySection, workHidden: 0 }
+    const own = work.filter(everyTask, parentTaskId)
+    const inSections = filterSections(everySection, (tasks) => work.filter(tasks, parentTaskId))
+    return { allTasks: own, allSections: inSections.sections, workHidden: everyTask.length - own.length + inSections.removed }
+  }, [everyTask, everySection, work.filter, work.mode, showAll])
   // Pro: Available, Remaining or All (cross-app semantics 21.2). Off, `filter` keeps every task.
   const availability = useAvailabilityView(`project.${pid}`)
   const tasks = useMemo(() => availability.filter(allTasks), [availability, allTasks])
@@ -270,6 +296,7 @@ export function ProjectView() {
         )}
         <AddSectionButton parentProjectId={pid} siblings={sectionProjects} index={sectionProjects.length} />
       </div>
+      <WorkModeMore count={workHidden} mode={work.mode} onShow={() => setShownAllFor(pid)} />
       {availability.on && availability.view === 'available' && (
         <HiddenSummary count={hiddenCount} onShow={() => availability.setView('remaining')} />
       )}

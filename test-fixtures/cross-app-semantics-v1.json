@@ -6597,5 +6597,159 @@
       { "value": "person", "expect": "person" },
       { "value": "colour", "expect": "none" }
     ]
+  },
+  "workMode": {
+    "about": "Vectors for docs/cross-app-semantics-v1.md section 22. Entries hold values only (no revisions). Expected id lists are in ascending order unless a vector says it keeps the list's order.",
+    "inboxProjectId": 1,
+    "projects": [
+      { "id": 1, "title": "Inbox", "parent": 0 },
+      { "id": 2, "title": "Groceries", "parent": 0 },
+      { "id": 3, "title": "Client A", "parent": 0 },
+      { "id": 4, "title": "Invoices", "parent": 3 },
+      { "id": 5, "title": "Contracts", "parent": 4 },
+      { "id": 6, "title": "House", "parent": 0 },
+      { "id": 7, "title": "Renovation", "parent": 6 },
+      { "id": 8, "title": "Office move", "parent": 7 },
+      { "id": 12, "title": "Someday", "parent": 1 },
+      { "id": 15, "title": "Team board", "parent": 99 },
+      { "id": 20, "title": "Loop A", "parent": 21 },
+      { "id": 21, "title": "Loop B", "parent": 20 }
+    ],
+    "keys": [
+      { "key": "work.project.12", "expect": 12 },
+      { "key": "work.project.0", "expect": null },
+      { "key": "work.project.012", "expect": null },
+      { "key": "work.project.x", "expect": null },
+      { "key": "work.project.", "expect": null },
+      { "key": "work.label", "expect": null }
+    ],
+    "writable": [
+      { "key": "work.label", "value": 9, "expect": true },
+      { "key": "work.label", "value": null, "expect": true },
+      { "key": "work.label", "value": "9", "expect": false },
+      { "key": "work.label", "value": 0, "expect": false },
+      { "key": "work.project.3", "value": true, "expect": true },
+      { "key": "work.project.3", "value": false, "expect": true },
+      { "key": "work.project.3", "value": null, "expect": true },
+      { "key": "work.project.3", "value": "yes", "expect": false },
+      { "key": "work.project.x", "value": true, "expect": false },
+      { "key": "work.other", "value": null, "expect": false }
+    ],
+    "label": [
+      { "value": 9, "expect": 9 },
+      { "value": "9", "expect": null },
+      { "value": 0, "expect": null },
+      { "value": -3, "expect": null },
+      { "value": 2.5, "expect": null },
+      { "value": true, "expect": null },
+      { "value": null, "expect": null }
+    ],
+    "resolve": [
+      { "name": "a work project and everything below it", "entries": { "work.project.3": true }, "expect": [3, 4, 5] },
+      { "name": "a subproject taken out, with what is below it", "entries": { "work.project.3": true, "work.project.4": false }, "expect": [3] },
+      { "name": "the nearest entry decides, in both directions", "entries": { "work.project.3": true, "work.project.4": false, "work.project.5": true, "work.project.7": true }, "expect": [3, 5, 7, 8] },
+      { "name": "the Inbox is never work and passes nothing on", "entries": { "work.project.1": true }, "expect": [] },
+      { "name": "a subproject of the Inbox with its own entry", "entries": { "work.project.1": true, "work.project.12": true }, "expect": [12] },
+      { "name": "null and other values are no entry", "entries": { "work.project.3": "yes", "work.project.4": 1, "work.project.6": null }, "expect": [] },
+      { "name": "an unreadable entry does not stop the walk", "entries": { "work.project.3": true, "work.project.4": "no" }, "expect": [3, 4, 5] },
+      { "name": "a loop of parents, and a parent that is not listed", "entries": { "work.project.21": true, "work.project.99": true }, "expect": [20, 21] },
+      { "name": "nothing set", "entries": {}, "expect": [] }
+    ],
+    "tasks": [
+      { "id": 1, "project": 3, "labels": [] },
+      { "id": 2, "project": 4, "labels": [] },
+      { "id": 3, "project": 4, "labels": [9] },
+      { "id": 4, "project": 6, "labels": [2] },
+      { "id": 5, "project": 1, "labels": [9, 2] },
+      { "id": 6, "project": 1, "labels": null },
+      { "id": 7, "project": 5, "labels": [] }
+    ],
+    "classify": [
+      { "name": "work projects and the work label", "entries": { "work.project.3": true, "work.project.4": false, "work.label": 9 }, "expectWork": [1, 3, 5] },
+      { "name": "no work label", "entries": { "work.project.3": true, "work.project.4": false }, "expectWork": [1] },
+      { "name": "only a work label", "entries": { "work.label": 2 }, "expectWork": [4, 5] },
+      { "name": "a work label that is not a label id", "entries": { "work.label": "9" }, "expectWork": [] },
+      { "name": "nothing set", "entries": {}, "expectWork": [] }
+    ],
+    "modes": [
+      { "value": "work", "expect": "work" },
+      { "value": "personal", "expect": "personal" },
+      { "value": "all", "expect": "all" },
+      { "value": "private", "expect": "all" },
+      { "value": 1, "expect": "all" },
+      { "value": null, "expect": "all" }
+    ],
+    "effective": [
+      { "name": "on, in Work", "settings": { "work_mode_enabled": true, "work_mode": "work" }, "expect": "work" },
+      { "name": "on, in Personal", "settings": { "work_mode_enabled": true, "work_mode": "personal" }, "expect": "personal" },
+      { "name": "on, no mode chosen", "settings": { "work_mode_enabled": true }, "expect": "all" },
+      { "name": "off keeps the mode and shows everything", "settings": { "work_mode_enabled": false, "work_mode": "work" }, "expect": "all" },
+      { "name": "standalone mode shows everything", "settings": { "work_mode_enabled": true, "work_mode": "personal", "standalone_mode": true }, "expect": "all" }
+    ],
+    "rows": {
+      "about": "The work label is 9 and no project is work. parent is the row a task is nested under in this list. expect keeps the list's order.",
+      "label": 9,
+      "tasks": [
+        { "id": 1, "project": 6, "labels": [9] },
+        { "id": 2, "project": 6, "labels": [], "parent": 1 },
+        { "id": 3, "project": 6, "labels": [] },
+        { "id": 4, "project": 6, "labels": [9], "parent": 3 },
+        { "id": 5, "project": 6, "labels": [], "parent": 4 },
+        { "id": 6, "project": 6, "labels": [], "parent": 99 }
+      ],
+      "vectors": [
+        { "name": "Work, a list that nests subtasks", "mode": "work", "nested": true, "expect": [1, 2, 4, 5] },
+        { "name": "Personal, a list that nests subtasks", "mode": "personal", "nested": true, "expect": [2, 3, 4, 5, 6] },
+        { "name": "Work, a flat list", "mode": "work", "nested": false, "expect": [1, 4] },
+        { "name": "Personal, a flat list", "mode": "personal", "nested": false, "expect": [2, 3, 5, 6] },
+        { "name": "All", "mode": "all", "nested": true, "expect": [1, 2, 3, 4, 5, 6] }
+      ]
+    },
+    "projectList": {
+      "about": "Run on workMode.projects with these entries: 3, 7 and 8 are work.",
+      "entries": { "work.project.3": true, "work.project.4": false, "work.project.7": true },
+      "vectors": [
+        { "mode": "work", "expect": [1, 3, 6, 7, 8] },
+        { "mode": "personal", "expect": [1, 2, 3, 4, 5, 6, 12, 15, 20, 21] },
+        { "mode": "all", "expect": [1, 2, 3, 4, 5, 6, 7, 8, 12, 15, 20, 21] }
+      ]
+    },
+    "newTask": [
+      { "name": "Work mode, a task for the Inbox gets the work label", "mode": "work", "label": 9, "workProjects": [3], "task": { "project": 1, "labels": [] }, "expectAdd": 9, "expectStaysPersonal": false },
+      { "name": "Work mode, a task for a work project gets nothing", "mode": "work", "label": 9, "workProjects": [3], "task": { "project": 3, "labels": [2] }, "expectAdd": null, "expectStaysPersonal": false },
+      { "name": "Work mode, a task that names the work label itself", "mode": "work", "label": 9, "workProjects": [3], "task": { "project": 6, "labels": [9] }, "expectAdd": null, "expectStaysPersonal": false },
+      { "name": "Work mode without a work label", "mode": "work", "label": null, "workProjects": [3], "task": { "project": 1, "labels": [] }, "expectAdd": null, "expectStaysPersonal": true },
+      { "name": "Personal mode adds nothing", "mode": "personal", "label": 9, "workProjects": [3], "task": { "project": 1, "labels": [] }, "expectAdd": null, "expectStaysPersonal": false },
+      { "name": "Personal mode takes nothing away", "mode": "personal", "label": 9, "workProjects": [3], "task": { "project": 3, "labels": [9] }, "expectAdd": null, "expectStaysPersonal": false },
+      { "name": "All adds nothing", "mode": "all", "label": 9, "workProjects": [3], "task": { "project": 1, "labels": [] }, "expectAdd": null, "expectStaysPersonal": false }
+    ],
+    "mark": [
+      { "name": "work under a parent that is not work", "parentIsWork": false, "want": true, "expectWrite": true },
+      { "name": "work under a work parent needs no entry", "parentIsWork": true, "want": true, "expectWrite": null },
+      { "name": "taken out of a work parent", "parentIsWork": true, "want": false, "expectWrite": false },
+      { "name": "not work under a parent that is not work needs no entry", "parentIsWork": false, "want": false, "expectWrite": null }
+    ],
+    "proOnly": [
+      { "name": "Pro only in Work, in Personal", "settings": { "work_mode_enabled": true, "work_mode": "personal", "pro_only_in_work": true }, "expectProAllowed": false },
+      { "name": "Pro only in Work, in Work", "settings": { "work_mode_enabled": true, "work_mode": "work", "pro_only_in_work": true }, "expectProAllowed": true },
+      { "name": "Pro only in Work, in All", "settings": { "work_mode_enabled": true, "work_mode": "all", "pro_only_in_work": true }, "expectProAllowed": true },
+      { "name": "the option off", "settings": { "work_mode_enabled": true, "work_mode": "personal", "pro_only_in_work": false }, "expectProAllowed": true },
+      { "name": "the feature off", "settings": { "work_mode_enabled": false, "work_mode": "personal", "pro_only_in_work": true }, "expectProAllowed": true }
+    ],
+    "proArea": [
+      { "value": "work", "expectWork": true },
+      { "value": "Work", "expectWork": false },
+      { "value": ["0b6e3c1a"], "expectWork": false },
+      { "value": null, "expectWork": false }
+    ],
+    "clause": [
+      { "name": "Work: the work projects or the work label", "mode": "work", "label": 9, "workProjects": [8, 3, 7], "expect": "(project in 3, 7, 8 || labels = 9)", "expectEmpty": false },
+      { "name": "Work: only a label", "mode": "work", "label": 9, "workProjects": [], "expect": "labels = 9", "expectEmpty": false },
+      { "name": "Work: only projects", "mode": "work", "label": null, "workProjects": [3], "expect": "project in 3", "expectEmpty": false },
+      { "name": "Work: nothing is work, so nothing is asked", "mode": "work", "label": null, "workProjects": [], "expect": null, "expectEmpty": true },
+      { "name": "Personal: outside the work projects; the device drops the labelled ones", "mode": "personal", "label": 9, "workProjects": [7, 3], "expect": "project not in 3, 7", "expectEmpty": false },
+      { "name": "Personal: no work project, nothing to narrow", "mode": "personal", "label": 9, "workProjects": [], "expect": null, "expectEmpty": false },
+      { "name": "All", "mode": "all", "label": 9, "workProjects": [3], "expect": null, "expectEmpty": false }
+    ]
   }
 }

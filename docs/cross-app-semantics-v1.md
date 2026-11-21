@@ -8,7 +8,7 @@ Test vectors live in `test-fixtures/` in both repos and must stay byte-identical
 
 | Fixture | Covers |
 |---|---|
-| `cross-app-semantics-v1.json` | due-date rules, smart lists, weeks, custom-list windows, rules and sorting, saved-filter import, review math, completion hold, date display, collaboration, hidden tasks, synced preferences, task order, project categories, guided organizing, routines on Today, time blocks, Events and calendars, Pro |
+| `cross-app-semantics-v1.json` | due-date rules, smart lists, weeks, custom-list windows, rules and sorting, saved-filter import, review math, completion hold, date display, collaboration, hidden tasks, synced preferences, task order, project categories, guided organizing, routines on Today, time blocks, Events and calendars, Pro, Work and Personal |
 | `nlp-corpus-v1.json` | quick-add parsing |
 | `routine-archive-v1.json` | routine merge, pruning and archive rules |
 | `ai-tools-v1.json` | the assistant (see `ai-assistant-v1.md`) and Pro's Copilot prompt (section 21.12) |
@@ -1519,13 +1519,15 @@ A key is added here, in both repos, in the release that starts writing it.
 | `weekly_review.last` | the local date the last weekly review was finished, `"YYYY-MM-DD"`; section 14.7 | never done |
 | `planner.default_length` | the length of a new block in minutes: 15, 30, 45, 60, 75 or 90. Any other value acts as the default and is kept; section 16.2 | 30 |
 | `planner.hours` | the work hours, `["HH:mm", "HH:mm"]` in 24-hour local time, the start before the end. Any other value acts as the default and is kept; section 16.6 | `["08:00", "18:00"]` |
-| `pro.area` | Pro's area: an array of project category ids, or `null`; section 21.1 | every project |
+| `pro.area` | Pro's area: an array of project category ids, `"work"` (the work projects, section 22.8), or `null`; section 21.1 | every project |
 | `project_mode.<projectId>` | `"sequential"` or `"single"`, or `null`. Any other value acts as the default and is kept; section 21.2 | parallel |
 | `project_status.<projectId>` | `"on_hold"`, or `null`; section 21.2 | active |
 | `label_status.<labelId>` | `"on_hold"`, or `null`; section 21.2 | active |
 | `label_kind.<labelId>` | `"person"` (section 21.5), `"group"` (section 21.16) or `"private"` (section 21.21), or `null` | a label |
 | `project_plan.<projectId>` | `{"start", "end", "group"?, "closed"?, "from"?}`, or `null`. A value without both days in order is no plan and is kept; section 21.20 | a project |
 | `repeat_rule.<taskId>` | `{"until"?, "count"?, "catch_up"?}`, or `null`; section 21.13 | no end |
+| `work.label` | the id of the work label, a whole number above 0, or `null`. Any other value acts as the default and is kept; section 22.1 | no work label |
+| `work.project.<projectId>` | `true` (work) or `false` (not work), or `null`. Any other value acts as the default and is kept; section 22.1 | follows the parent project, then not work (section 22.2) |
 
 ### 11.4 The Inbox
 
@@ -2551,7 +2553,8 @@ so availability is decided on the device. A 512 KB description is stored intact 
 - **The area** is the synced key `pro.area`: an array of project category ids (section 13).
   Promises and the portfolio apply to projects whose top-level project is in one of those
   categories; no area (absent, `null`, empty or unreadable) means every project. Availability
-  applies everywhere.
+  applies everywhere. The value `"work"` means the work projects of section 22.2 instead (section
+  22.8).
 - **Off.** With the switch off (O1) every list, count, card, parser result, reminder and screen is
   what a version without Pro shows. Turning Pro off never writes anything (O2). Pro writes only
   `is_favorite`, a lone `start_date`, `blocked` relations, the synced keys of section 11.3 marked
@@ -3089,3 +3092,164 @@ nobody fills in a weekly reading by hand.
 `sessions`, `followUps`, `documents` (the last eight read the world in `groupWorld`), `plans`,
 `topics`, `logKinds` (each with a small world of its own); and `customListPro` (section 3.8). `nlp-corpus-v1.json` covers section
 5.5 with cases marked `"pro": true`.
+
+---
+
+## 22. Work and Personal
+
+A person who keeps work and private life in one account can look at one of them at a time. They
+say what is work once: a label, and the projects that are work. Each device then has a mode,
+**All**, **Work** or **Personal**: Work shows what is work, Personal shows everything else, All
+shows everything. The feature is optional and off until turned on; off, every list, count and
+screen is what a version without this section shows.
+
+It is for focus, not for privacy: nothing is locked away, reminders still come, and search finds
+everything. What work is belongs to the account and syncs through the preferences carrier (section
+11); the mode belongs to the device and never syncs, so a work computer can stay in Work while the
+phone stays in Personal. Other people on a shared project see nothing of it, and Vikunja knows
+nothing of it.
+
+### 22.1 Keys
+
+- `work.label`: the id of the **work label**, a whole number above 0, or `null` (none). A value of
+  another shape is no work label and is kept. A work label whose label no longer exists is no work
+  label; the entry is kept, and the app that deletes the label writes `null`.
+- `work.project.<projectId>`: `true` (the project is work) or `false` (it is not), or `null` (no
+  entry). `<projectId>` is the server's project id, a whole number above 0. A value of another
+  shape is no entry and is kept.
+- There is one key per project, so two devices that mark different projects never undo each
+  other's change. Entries of deleted projects are not used; the app that deletes a project may
+  write `null` to its entry.
+- The work label is an ordinary label in every other way: it shows on rows, can be put on and
+  taken off by hand, and has no `label_kind` of its own (it may be a label with a kind).
+
+### 22.2 Work projects
+
+A project is **work** by its own entry, else by the entry of its nearest ancestor that has one
+(walking `parent_project_id`; a parent that is not listed and a loop end the walk), else it is
+not work. So marking a project marks everything below it, a subproject can be taken out with
+`false`, and one below that can be put back with `true`.
+
+- The Inbox is never work. Its own entry is not used, also not by its subprojects, which follow
+  their own entry or are not work.
+- Archived projects follow the same rule.
+- Nothing follows from a project's category (section 13): marking every project of a category is
+  a convenience an app may offer, written as one entry per top-level project of that category.
+
+### 22.3 Work tasks
+
+A task is **work** when its project is work or it carries the work label. Every other task is
+**personal**. There is no third kind and nothing is stored on the task: moving a task to a work
+project, or putting the label on it, makes it work on every device at once.
+
+- A subtask is judged by its own project and labels, like any task.
+- Hidden tasks (section 10) are never listed and are not judged.
+- Routines, your own Events and connected calendars are neither work nor personal: they show in
+  every mode.
+
+### 22.4 The mode
+
+Device settings, never synced: `work_mode_enabled` (off by default), `work_mode` (`"all"`,
+`"work"` or `"personal"`; anything else is `"all"`) and `pro_only_in_work` (section 22.8). The
+**mode in effect** is `all` while the feature is off or the device is in standalone mode; turning
+the feature off keeps the stored mode for the next time. Changing the mode writes nothing but that
+setting.
+
+In Work a list shows the tasks that are work, in Personal the tasks that are not, in All every
+task. The mode is applied after everything else that decides what a list holds (the list's own
+conditions, hidden tasks, Pro's availability view), and before counting.
+
+- **Nested subtasks.** Where a list shows subtasks under their parent, a row under a shown row is
+  shown with it, whatever it is itself, so a task never loses part of its steps. A subtask that
+  passes while its parent does not is listed as that list would list it without its parent.
+- **Follows the mode:** the Inbox, Today, Upcoming, Anytime, the Logbook, label and project
+  screens, custom lists, the tasks of the Plan screen's list and of Plan my day, Review and the
+  guided sessions (their queues, and the projects reviewed: section 22.5), every count and badge
+  made from those lists, widgets, and Quick View.
+- **Never follows the mode:** reminders and notifications of any kind; search and the command
+  palette, which find everything and say for a task or project of the other mode which one it is
+  in; routines, Events and calendars; settings; and a task opened by a link or a notification,
+  which opens whatever the mode.
+- **Time blocks.** On a timeline a block of the other mode stays where it is and counts as busy
+  time, so nothing is planned over it; the app may draw it muted. The list beside the timeline
+  follows the mode.
+- **A screen opened on purpose.** A project or label screen reached while the mode hides some of
+  its tasks says how many it leaves out and shows them on request, until the screen is left.
+- The assistant's tools answer as the screens do: a list by the mode, a search across both.
+
+### 22.5 The project list
+
+In Work the project list (drawer, sidebar, and the lists of Settings that are not for marking
+projects) holds the work projects; in Personal the others; in both, also every project above a
+listed one, so a tree is never cut. The Inbox is always listed. All lists everything.
+
+- A category header (section 13) shows when one of its top-level projects is listed. A category
+  without any project is nobody's work yet: it shows in All and in Personal.
+- Labels and custom lists are listed in every mode; what they hold follows the mode.
+- Project pickers are not pinned here. An app that narrows a picker to the mode must still let
+  the person reach every project from it, because moving a task is how it changes sides.
+
+### 22.6 New tasks
+
+A task made on a device in Work mode must not vanish from the list it was made in. So when the
+person makes a task in Work mode and it would not be work (its project is not work and it does not
+name the work label itself), the app adds the work label to it. This holds for every way of making
+a task for the person: the composer in any view, quick entry, voice and dictation, pasted lines,
+templates, drafts of the assistant the person accepts, and a new subtask.
+
+- Personal and All add nothing, and no mode ever takes a label off or moves a task.
+- A duplicate (section 15) is a copy and gets what its original has, nothing more.
+- Hidden carriers and anything else an app makes for itself get nothing.
+- Where the create is queued for later, the label goes with it, like any label the task names.
+- With no work label set, nothing can be added: the task is made as it is, stays Personal, and the
+  app says so at once with a way to see it. Settings says the same before it happens.
+
+### 22.7 Marking
+
+- A project's menu has "Work project" as a tick. A change writes the project's own entry and
+  nothing else: `null` when the project would be what the person wants without an entry (its
+  parent is work and they want work, or its parent is not work and they want not work), else
+  `true` or `false`. Entries below it are left alone. Not offered on the Inbox.
+- Settings has the work label (any label, or none) and the list of projects with their ticks.
+- Marking is offered in every mode and needs the feature to be on on that device. The entries are
+  kept and used by every device whatever its own switch.
+
+### 22.8 Pro
+
+- **Pro only in Work** (`pro_only_in_work`, per device, off by default): while it is on and the
+  mode in effect is Personal, the device acts as a device with Pro off, exactly as section 21.1
+  describes it (O1, O2): nothing of Pro shows and nothing is written. In Work and All, and with
+  the feature off, Pro follows its own switch.
+- **Pro's area** (`pro.area`, section 21.1) may be the string `"work"`: promises and the
+  portfolio then apply to the work projects of section 22.2, on every device, whatever its mode
+  and whether or not this feature is on there. A version that does not know the value reads it as
+  no area, which is every project.
+
+### 22.9 Server filters
+
+The rule is decided on the device. A listing that is paged by the server (the Logbook) may add a
+clause, as long as the clause never leaves out a task the mode shows:
+
+- Work: `project in <ids>` for the work projects, or `labels = <work label>`, joined with `||`
+  inside brackets when there are both. With neither, the mode shows nothing and nothing is asked.
+- Personal: `project not in <ids>` for the work projects, and the device drops the tasks that
+  carry the work label. Without a work project, no clause.
+- The ids are every work project, the inherited ones included, in ascending order: the server
+  knows no inheritance.
+
+### 22.10 Vectors
+
+`workMode` in `cross-app-semantics-v1.json`. `keys` gives a key and the project id it names;
+`writable` a key, a value and whether an app may write it; `label` a stored value and the label id
+used. `resolve` runs on `workMode.projects` (`id`, `parent`; `title` is only for the reader) with
+`inboxProjectId` and gives entries and the work project ids. `classify` gives entries and the ids
+of `workMode.tasks` (`project`, `labels` as label ids or `null`) that are work. `modes` and
+`effective` give a stored mode or device settings and the mode. `rows` gives a list in order
+(`parent`: the row a task is nested under), a mode, whether the list nests, and the ids shown in
+the list's order. `projectList` gives entries and, per mode, the projects listed. `newTask` gives
+a mode, the work label, the work project ids and a task, with the label the app adds
+(`expectAdd`) and whether the task stays Personal for want of a label. `proOnly` gives device
+settings and whether Pro may show; `mark` whether the parent is work, what the person wants and
+the entry written; `proArea` a value of `pro.area` and whether it means the work
+projects. `clause` gives the server clause of section 22.9, and `expectEmpty` when nothing is
+asked.

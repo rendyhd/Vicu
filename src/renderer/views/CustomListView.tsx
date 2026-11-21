@@ -106,7 +106,7 @@ export function CustomListView() {
     return buildQueryParams(customList, weekStart)
   }, [customList, dayKey, weekStart])
 
-  const { data: tasks = [], isLoading } = useTasks(queryParams, !!customList)
+  const { data: tasks = [], isLoading } = useTasks(queryParams, !!customList, true)
 
   const destinationProjectId = useMemo(() => {
     const requested = customList?.filter.add_to_project_id ?? 0

@@ -11,6 +11,7 @@ import { isCategoryId } from '../shared/project-categories'
 import { todayRoutinesLimit } from '../shared/today-routines'
 import { readProFocus } from '../shared/pro/focus'
 import { PRO_LAYERS } from '../shared/pro/settings'
+import { parseWorkMode } from '../shared/work-scope'
 import { normalizeLanguageSetting } from '../shared/i18n/languages'
 
 /** Stored layers: only `false` is kept (a missing layer is on). */
@@ -292,6 +293,10 @@ export function normalizeConfig(raw: Record<string, unknown>): AppConfig {
       !!value && typeof value === 'object' && typeof (value as { due?: unknown }).due === 'string' && typeof (value as { until?: unknown }).until === 'string'),
     pro_followup_dismissed: normalizeStringMap(raw.pro_followup_dismissed, (value) => typeof value === 'string'),
     pro_onboarding_seen: raw.pro_onboarding_seen === true,
+    // Work and Personal (cross-app semantics section 22), per device.
+    work_mode_enabled: raw.work_mode_enabled === true,
+    work_mode: parseWorkMode(raw.work_mode),
+    pro_only_in_work: raw.pro_only_in_work === true,
     pro_ledger_sync: raw.pro_ledger_sync && typeof raw.pro_ledger_sync === 'object'
       ? raw.pro_ledger_sync as AppConfig['pro_ledger_sync']
       : undefined,

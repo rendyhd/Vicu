@@ -54,6 +54,13 @@ import { useOfflineStore } from '@/stores/offline-store'
 import { can } from '@/lib/capabilities'
 import { useUploadingStore } from '@/stores/uploading-store'
 import { toast } from '@/stores/toast-store'
+import { t } from '../../shared/i18n'
+import { namedLabelIds, planNewTaskWork } from '@/lib/work-new-task'
+import { useWorkMode } from './use-work-mode'
+import { useOpenTask } from './use-open-task'
+import { SYNCED_PREFS_QUERY_KEY, writeSyncedPrefs } from './use-synced-prefs'
+import type { SyncedPrefsSnapshot } from '../../shared/synced-prefs'
+import { WORK_LABEL_KEY, readWorkLabel, readWorkProjectEntry, workProjectKey } from '../../shared/work-scope'
 import { queuedUploadText, queuedUploadsText } from '@/lib/waiting-uploads'
 import type {
   Task,
@@ -182,8 +189,18 @@ export function useRemoveLabel(options?: MutationHookOptions) {
   return useLabelMutation('remove', options)
 }
 
+/**
+ * Work and Personal (cross-app semantics 22.6): once a task made in Work mode exists, the notice
+ * that it stays Personal (no work label is set) with a way to see it; a temp id has nothing to open.
+ */
+function tellStaysPersonal(taskId: number, open: (taskId: number) => void): void {
+  toast.info(t('workMode.addedToPersonal'), isTempTaskId(taskId) ? undefined : { action: { label: t('workMode.showTask'), onAction: () => open(taskId) } })
+}
+
 export function useCreateSubtask() {
   const qc = useQueryClient()
+  const workMode = useWorkMode()
+  const openTask = useOpenTask()
 
   return useMutation({
     mutationFn: async ({
@@ -200,7 +217,24 @@ export function useCreateSubtask() {
       // Create the child task in the same project
       const createResult = await api.createTask(parentTask.project_id, { title })
       if (!createResult.success) throw apiError(createResult)
-      const childTask = createResult.data as Task
+      let childTask = createResult.data as Task
+      // Work mode (22.6): a new subtask is judged by its own project and labels, like any task.
+      const work = planNewTaskWork({
+        projectId: parentTask.project_id,
+        named: [],
+        labelForNewTask: workMode.labelForNewTask,
+        staysPersonal: workMode.staysPersonal,
+      })
+      if (work.labelId !== null) {
+        try {
+          const label = qc.getQueryData<Label[]>(['labels'])?.find((l) => l.id === work.labelId)
+          await addLabelOrQueue(childTask.id, { id: work.labelId, title: label?.title || undefined }, title)
+          childTask = { ...childTask, labels: [...(childTask.labels ?? []), label ?? { id: work.labelId, title: '', hex_color: '', created: '', updated: '' }] }
+        } catch {
+          // The subtask exists; it only misses the label.
+        }
+      }
+      if (work.staysPersonal) tellStaysPersonal(childTask.id, openTask)
       // In the background; the mutation's own refresh below shows the subtask inside its parent.
       placeNewTaskAtEnd(qc, parentTask.project_id, childTask.id, false)
 
@@ -223,23 +257,62 @@ export function useCreateSubtask() {
 
 export function useCreateTask(options?: MutationHookOptions) {
   const qc = useQueryClient()
+  const workMode = useWorkMode()
+  const openTask = useOpenTask()
 
   return useMutation({
     mutationFn: async ({
       projectId,
       task,
       extras,
+      workLabel,
     }: {
       projectId: number
       task: CreateTaskPayload
       /** Labels and images the queue keeps with the create if it has to be queued offline. */
       extras?: CreateExtras
+      /**
+       * `false` for a copy or anything the app makes for itself: Work mode adds nothing to it
+       * (cross-app semantics 22.6). Left out, a task the person makes in Work mode that would not
+       * be work gets the work label, the way a label they picked would be added.
+       */
+      workLabel?: false
     }) => {
-      const outcome = await createTaskOrQueue(projectId, task, extras)
+      const knownLabels = qc.getQueryData<Label[]>(['labels'])
+      const work = planNewTaskWork({
+        projectId,
+        named: namedLabelIds(extras?.labels, knownLabels),
+        optOut: workLabel === false,
+        labelForNewTask: workMode.labelForNewTask,
+        staysPersonal: workMode.staysPersonal,
+      })
+      const label = work.labelId !== null ? knownLabels?.find((l) => l.id === work.labelId) : undefined
+      const labelObject: Label | null = work.labelId !== null
+        ? label ?? { id: work.labelId, title: '', hex_color: '', created: '', updated: '' }
+        : null
+      // A queued create carries the label as a follow-up action, like any label the task names.
+      const sentExtras: CreateExtras | undefined = work.labelId !== null && labelObject
+        ? {
+            ...extras,
+            labels: [...(extras?.labels ?? []), { id: work.labelId, ...(label?.title ? { title: label.title } : {}) }],
+            displayLabels: [...(extras?.displayLabels ?? []), labelObject],
+          }
+        : extras
+      const outcome = await createTaskOrQueue(projectId, task, sentExtras)
+      let created = outcome.task
+      if (!outcome.queued && work.labelId !== null && labelObject) {
+        try {
+          await addLabelOrQueue(created.id, { id: work.labelId, title: label?.title || undefined }, created.title)
+          created = { ...created, labels: [...(created.labels ?? []), labelObject] }
+        } catch {
+          // The task exists; it only misses the label.
+        }
+      }
       // A queued create has no real id yet; its stand-in carries a temp id. The position update
       // does not hold the create back; the project's lists refresh once it has landed.
-      if (!outcome.queued) placeNewTaskAtEnd(qc, projectId, outcome.task.id)
-      return outcome.task
+      if (!outcome.queued) placeNewTaskAtEnd(qc, projectId, created.id)
+      if (work.staysPersonal) tellStaysPersonal(created.id, openTask)
+      return created
     },
     onSuccess: (task) => {
       if (isTempTaskId(task.id)) insertPendingTask(qc, task)
@@ -1111,6 +1184,9 @@ export function useDeleteProject(options?: MutationHookOptions) {
     },
     onSuccess: (_data, id) => {
       newTaskPlacer.invalidate(id)
+      // Work and Personal (22.1): a deleted project's entry goes too, when it has one.
+      const prefs = qc.getQueryData<SyncedPrefsSnapshot>(SYNCED_PREFS_QUERY_KEY)
+      if (readWorkProjectEntry(prefs?.values[workProjectKey(id)]) !== null) void writeSyncedPrefs(qc, { [workProjectKey(id)]: null })
       const currentPath = matches[matches.length - 1]?.pathname ?? ''
       if (currentPath === `/project/${id}`) {
         navigate({ to: '/inbox' })
@@ -1171,6 +1247,9 @@ export function useDeleteLabel() {
       if (!result.success) throw apiError(result)
     },
     onSuccess: (_data, id) => {
+      // Work and Personal (22.1): when this was the work label, the entry says no label.
+      const prefs = qc.getQueryData<SyncedPrefsSnapshot>(SYNCED_PREFS_QUERY_KEY)
+      if (readWorkLabel(prefs?.values[WORK_LABEL_KEY]) === id) void writeSyncedPrefs(qc, { [WORK_LABEL_KEY]: null })
       const currentPath = matches[matches.length - 1]?.pathname ?? ''
       if (currentPath === `/tag/${id}`) {
         navigate({ to: '/inbox' })

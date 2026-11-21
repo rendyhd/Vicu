@@ -38,7 +38,7 @@ import {
   type ProArchivePart,
   type ProLedger,
 } from '../shared/pro/ledger'
-import { isProEnabled } from '../shared/pro/settings'
+import { isProSwitchedOn } from '../shared/pro/settings'
 import type { ProLedgerOperation, ProLedgerSnapshot } from '../shared/pro/ledger-ipc'
 
 /**
@@ -142,7 +142,8 @@ const service = createSyncedDocumentService<ProLedger>({
 })
 
 function proOn(): boolean {
-  return isProEnabled(loadConfig())
+  // The plain switch: the ledger keeps syncing while Personal mode hides Pro (section 22.8).
+  return isProSwitchedOn(loadConfig())
 }
 
 /** Syncs the ledger, only while Pro is on. */
@@ -245,7 +246,7 @@ let archiving = false
 
 /** Moves records closed more than 180 days ago to the archive part of their quarter. */
 async function archiveClosedRecords(config: AppConfig): Promise<void> {
-  if (archiving || !isProEnabled(config)) return
+  if (archiving || !isProSwitchedOn(config)) return
   const state = config.pro_ledger_sync
   if (!state) return
   const plan = archivePlan(state.document, toLocalDate(new Date()))

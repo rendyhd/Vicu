@@ -16,7 +16,7 @@ import { ProOffNotice } from '@/components/pro/ProOffNotice'
 export function FlaggedView() {
   const pro = usePro()
   const on = pro.layer('availability')
-  const { data: tasks = [], isLoading } = useTasks(OPEN_TASKS_PARAMS, on)
+  const { data: tasks = [], isLoading } = useTasks(OPEN_TASKS_PARAMS, on, true)
   const { data: projects } = useProjects()
   const { data: config } = useAppConfig()
   const availability = useAvailabilityView('flagged')

@@ -14,6 +14,7 @@ import { DEFAULT_WEEK_START, WEEK_START_KEY, readWeekStart, setWeekStart } from 
 import { EVENT_KEY_PREFIX, readPlanEvent } from '../shared/plan-events'
 import { readSubtaskOrder } from '../shared/subtask-order'
 import { PRO_AREA_KEY, readProArea } from '../shared/pro/settings'
+import { WORK_LABEL_KEY, isWorkProArea, isWritableWorkValue, workProjectIdOfKey } from '../shared/work-scope'
 import { readPlan } from '../shared/pro/project-plan'
 import {
   LABEL_KIND_KEY_PREFIX,
@@ -284,8 +285,10 @@ export function isWritablePref(key: unknown, value: unknown): key is string {
   if (/^subtask_order\.\d+$/.test(key)) return value === null || (Array.isArray(value) && readSubtaskOrder(value).length === value.length)
   // An Event of the Plan screen (proof of concept, plan-events.ts).
   if (key.startsWith(EVENT_KEY_PREFIX) && key.length > EVENT_KEY_PREFIX.length) return value === null || readPlanEvent(value) !== null
+  // Work and Personal (section 22): the work label and the projects that are work.
+  if (key === WORK_LABEL_KEY || workProjectIdOfKey(key) !== null) return isWritableWorkValue(key, value)
   // Pro (section 21): the area, project types and statuses, label statuses and kinds, repeat rules.
-  if (key === PRO_AREA_KEY) return value === null || (Array.isArray(value) && readProArea(value).length === value.length)
+  if (key === PRO_AREA_KEY) return value === null || isWorkProArea(value) || (Array.isArray(value) && readProArea(value).length === value.length)
   if (idOfProKey(key, PROJECT_MODE_KEY_PREFIX) !== null) return value === null || value === 'sequential' || value === 'single'
   if (idOfProKey(key, PROJECT_STATUS_KEY_PREFIX) !== null || idOfProKey(key, LABEL_STATUS_KEY_PREFIX) !== null) return value === null || value === 'on_hold'
   if (idOfProKey(key, LABEL_KIND_KEY_PREFIX) !== null) return value === null || value === 'person' || value === 'group' || value === 'private'

@@ -1,6 +1,7 @@
 import { withDefaultReminder, type DefaultReminderSettings } from '../../shared/default-reminder'
 import { isQueueableFailure, maybeCreatedMessage } from '../../shared/error-classify'
 import { isTimeBlock } from '../../shared/time-blocks'
+import { workLabelForNewTask, type WorkMode, type WorkScope } from '../../shared/work-scope'
 import { completedDueFor } from '../../shared/repeat-completion'
 import type { ApiResult } from '../api-result'
 import type { OfflineQueue } from './queue'
@@ -69,6 +70,28 @@ export function quickEntryTaskPayload(input: QuickEntryTaskInput, settings: Defa
   if (input.repeatAfter !== undefined) payload.repeat_after = input.repeatAfter
   if (input.repeatMode !== undefined) payload.repeat_mode = input.repeatMode
   return withDefaultReminder(payload, settings)
+}
+
+/**
+ * Work and Personal (contract 22.6): in Work mode a task that would not be work gets the work
+ * label, added like a label typed in Quick Entry (it joins `labels`, so a queued create keeps it and
+ * the window applies it after an online create). Returns the labels to use and the id added, or
+ * null when nothing is added (any other mode, no work label, or the task is work already).
+ */
+export function withWorkLabel(
+  labels: unknown,
+  projectId: number,
+  scope: WorkScope,
+  mode: WorkMode,
+): { labels: unknown; added: number | null } {
+  const named = parseQueuedLabels(labels)
+  const added = workLabelForNewTask(
+    { project_id: projectId, labels: named.filter((l) => l.id !== undefined).map((l) => ({ id: l.id as number })) },
+    scope,
+    mode,
+  )
+  if (added === null) return { labels, added: null }
+  return { labels: [...named, { id: added }], added }
 }
 
 /**

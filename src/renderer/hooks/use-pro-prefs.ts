@@ -18,6 +18,7 @@ import {
   type RepeatRule,
 } from '../../shared/pro/prefs'
 import { PRO_AREA_KEY, readProArea } from '../../shared/pro/settings'
+import { PRO_AREA_WORK, isWorkProArea } from '../../shared/work-scope'
 
 /**
  * Pro's synced keys (cross-app semantics 11.3 and 21): project types and statuses, label statuses
@@ -36,6 +37,8 @@ export function useProPrefs() {
     return {
       values,
       area: readProArea(values[PRO_AREA_KEY]),
+      /** Pro's area is the work projects (22.8). */
+      areaIsWork: isWorkProArea(values[PRO_AREA_KEY]),
       people,
       heldLabels,
       /** The labels marked as a group (21.16). */
@@ -65,6 +68,8 @@ export function useProPrefs() {
         writeSyncedPrefs(queryClient, { [repeatRuleKey(taskId)]: rule }),
       setArea: (categoryIds: string[]) =>
         writeSyncedPrefs(queryClient, { [PRO_AREA_KEY]: categoryIds.length ? categoryIds : null }),
+      /** Work projects on, or back to no area (then the categories apply again). */
+      setAreaWork: (work: boolean) => writeSyncedPrefs(queryClient, { [PRO_AREA_KEY]: work ? PRO_AREA_WORK : null }),
     }
   }, [values, queryClient])
 }

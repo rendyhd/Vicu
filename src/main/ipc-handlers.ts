@@ -1,5 +1,6 @@
 import { getProLedger, mutateProLedger, syncProLedger } from './pro-ledger-service'
 import { shell, dialog, app, nativeTheme, nativeImage, clipboard as electronClipboard, ClipboardItem as ElectronClipboardItem } from 'electron'
+import { currentWorkMode, currentWorkScope } from './work-scope-service'
 import { isProEnabled } from '../shared/pro/settings'
 import { quickPromiseValue } from '../shared/pro/quick-promise'
 import { personLabelIds } from '../shared/pro/prefs'
@@ -92,6 +93,7 @@ import { claimAccountData } from './known-user'
 import {
   createFromQuickEntry,
   quickEntryTaskPayload,
+  withWorkLabel,
   queueQuickEntryFollowUps,
   quickViewComplete,
   quickViewPatch,
@@ -143,6 +145,12 @@ function quickActionDeps(): QuickActionDeps {
 /** Every change to an existing task goes through the write gate (see offline/task-writes.ts). */
 function taskWriteDeps() {
   return { queue: getOfflineQueue(), requestReplay }
+}
+
+/** What work is on this account right now, from the cached project list (never a request per task). */
+async function currentScopeFor(config: AppConfig) {
+  const projects = (await activeProjects.list(config.vikunja_url)) ?? []
+  return currentWorkScope(getSyncedPrefs().values, projects, config.inbox_project_id)
 }
 
 // Config keys that only record UI state. Changing just these needs no badge refresh,
@@ -461,7 +469,19 @@ export function registerIpcHandlers(): void {
 
     // The create is queued with everything the user set when the server cannot be reached; see
     // createFromQuickEntry for what may be queued and why.
-    const result = await createFromQuickEntry(quickActionDeps(), targetProjectId, taskPayload, extras)
+    // Work mode (contract 22.6): a task that would not be work gets the work label, like a typed one.
+    let queuedExtras = extras
+    let workLabel: number | null = null
+    if (currentWorkMode(config) === 'work') {
+      const withLabel = withWorkLabel(extras?.labels, targetProjectId, await currentScopeFor(config), 'work')
+      if (withLabel.added !== null) {
+        workLabel = withLabel.added
+        queuedExtras = { ...extras, labels: withLabel.labels }
+      }
+    }
+    const created = await createFromQuickEntry(quickActionDeps(), targetProjectId, taskPayload, queuedExtras)
+    // The window applies the label after an online create, with the labels it typed.
+    const result = workLabel !== null ? { ...created, workLabel } : created
     if (result.success && !('cached' in result)) {
       notifyViewerSync()
       // "When I get home" for a saved place: the reminder goes on the server id (contract 5.3).
@@ -617,12 +637,16 @@ export function registerIpcHandlers(): void {
         const me = knownUserIdFor(config.vikunja_url) ?? null
         context = await viewerCollab.contextFor(config.vikunja_url, me, fetched.map((task) => task.project_id))
       }
+      // Work and Personal (contract 22.4): the mode narrows the list after the viewer's own rules.
+      const mode = currentWorkMode(config)
+      const work = mode === 'all' ? undefined : { mode, scope: await currentScopeFor(config) }
       const tasks = selectQuickViewTasks(
         fetched,
         resolved,
         {
           now,
           context,
+          work,
           inboxProjectId: config.inbox_project_id,
           keep: (task) => !hasVicuMetadataMarker(task.description)
             && (!activeProjectIds || activeProjectIds.has(task.project_id)),

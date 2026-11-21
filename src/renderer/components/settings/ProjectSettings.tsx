@@ -29,6 +29,7 @@ import type { AppConfig, Project } from '@/lib/vikunja-types'
 import { TASK_ORDER_KEYS, parseTaskOrder, type TaskOrderKey } from '../../../shared/task-order'
 import type { ProjectCategory } from '../../../shared/project-categories'
 import { useProjectsWithoutIcon } from '@/hooks/use-project-icons'
+import { useWorkMode } from '@/hooks/use-work-mode'
 import { SavedFilterSettings } from './SavedFilterSettings'
 
 const ROOT_ID = 'project-root-settings'
@@ -62,6 +63,9 @@ function ProjectRow({ node, depth, inboxId, menuOpenFor, renamingId, onOpenMenu 
   const isInbox = node.id === inboxId
   const color = normalizeHex(node.hex_color)
   const showIcon = !useProjectsWithoutIcon().has(node.id)
+  // Work and Personal: a text mark on a work project (the mark is words, never colour alone).
+  const workMode = useWorkMode()
+  const isWork = workMode.enabled && workMode.isWorkProject(node.id)
   const dndId = `settings-project-${node.id}`
   const menuOpen = menuOpenFor === node.id
   const indent = 12 + depth * 20
@@ -137,6 +141,9 @@ function ProjectRow({ node, depth, inboxId, menuOpenFor, renamingId, onOpenMenu 
             <span className="min-w-0 flex-1 truncate text-sm text-[var(--text-primary)]">{node.title}</span>
             {isInbox && (
               <span className="vicu-chip rounded-chip bg-[var(--bg-secondary)] px-1.5 py-0.5 text-caption text-[var(--text-secondary)]">{t('nav.inbox')}</span>
+            )}
+            {isWork && (
+              <span className="vicu-chip rounded-chip bg-[var(--bg-secondary)] px-1.5 py-0.5 text-caption text-[var(--text-secondary)]">{t('workMode.work')}</span>
             )}
           </div>
         )}

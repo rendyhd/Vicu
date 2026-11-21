@@ -2,6 +2,7 @@ import { Fragment } from 'react'
 import { Plus, Sparkles } from 'lucide-react'
 import { useDroppable } from '@dnd-kit/core'
 import { QuickFind } from '@/components/sidebar/QuickFind'
+import { WorkModeSwitch } from '@/components/sidebar/WorkModeSwitch'
 import { SmartListNav } from '@/components/sidebar/SmartListNav'
 import { ProNav } from '@/components/sidebar/ProNav'
 import { FocusBanner } from '@/components/pro/FocusBanner'
@@ -128,6 +129,7 @@ export function Sidebar() {
 
   return (
     <div className="isolate flex h-full flex-col">
+      <WorkModeSwitch />
       <div className="flex items-center gap-1.5 px-2 pt-2">
         <div role="search" className="min-w-0 flex-1">
           <QuickFind />

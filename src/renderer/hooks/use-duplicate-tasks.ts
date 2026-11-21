@@ -43,6 +43,8 @@ export function useDuplicateTasks(): (tasks: readonly Task[]) => Promise<Task[]>
             projectId,
             task: payload,
             extras: { labels: labels.map((l) => ({ id: l.id, title: l.title })), displayLabels: labels },
+            // A copy gets what its original has, nothing more (cross-app semantics 22.6).
+            workLabel: false,
           }),
           addLabel: (copy, label) => addLabel.mutateAsync({ taskId: copy.id, labelId: label.id }),
           assign: (copy, person) => toggleAssignee.mutateAsync({ task: copy, person, assign: true }),
