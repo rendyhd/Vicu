@@ -9,6 +9,10 @@ lead: Short definitions of the words you meet in Vicu. Each links to the page wh
 - Terms are in alphabetical order. Terms that belong to [Vicu Pro](guide:pro) are marked {pro}.
 - Missing a word? [Open an issue](https://github.com/rendyhd/Vicu/issues) and we will add it.
 
+## 0-9
+
+- **90-day plan** {pro}: A project with a start and an end day. Its tasks are the items, their subtasks the milestones, and its view counts week by week what was due, delivered, moved and dropped. See [90-day plans](guide:pro/plans).
+
 ## A
 
 - **After** {pro}: A way to say a task waits on other tasks. The row reads "After: ..." and the task is not available until they are done. See [Know what you can do now](guide:pro/available).
@@ -21,6 +25,7 @@ lead: Short definitions of the words you meet in Vicu. Each links to the page wh
 ## B
 
 - **Block**: See time block.
+- **Blocker** {pro}: Something in the way that a group has to get moved. A line on the group's page, open until you close it. See [Groups, sessions and follow-ups](guide:pro/groups).
 - **Bottom bar** {phone}: The row of lists at the bottom of the phone app. The Inbox is always first and you pick the other three. See [On your phone](guide:phone).
 - **Brain dump**: Talk or type everything on your mind, and the assistant organizes it into a plan by project, with new projects where none fit. Nothing is added until you accept. See [The assistant](guide:assistant).
 
@@ -28,6 +33,7 @@ lead: Short definitions of the words you meet in Vicu. Each links to the page wh
 
 - **Cap** {pro}: The most initiatives you keep active at once, four unless you agree otherwise. Adding one more asks you to park or finish one. See [Portfolio](guide:pro/portfolio).
 - **Category**: An optional named header that groups your top-level projects in the sidebar or drawer. Categories sync to all your devices. See [Projects and labels](guide:projects).
+- **Commitment** {pro}: What a group as a whole said it will reach. A line on the group's page, open until it is met or let go. See [Groups, sessions and follow-ups](guide:pro/groups).
 - **Command palette** {desktop}: A search box that finds lists, projects, labels and tasks and runs actions. Open it with <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>P</kbd>. See [On the desktop](guide:desktop).
 - **Completion hold**: A completed task stays in the list for about 5 seconds, shown as done, before it collapses, so you can undo it. See [Work with tasks](guide:tasks).
 - **Custom list**: A list of your own made from conditions such as project, label, due window and priority. It is stored on your server, so every device shows it. See [Custom lists](guide:custom-lists).
@@ -69,6 +75,10 @@ lead: Short definitions of the words you meet in Vicu. Each links to the page wh
 - **Label**: A colored tag you put on tasks. Each label has its own page. See [Projects and labels](guide:projects).
 - **Logbook**: The smart list of finished tasks, grouped by the day you completed them. See [Smart lists](guide:lists).
 
+## M
+
+- **Milestone** {pro}: A subtask of an item in a 90-day plan, with one owner and a date. See [90-day plans](guide:pro/plans).
+
 ## O
 
 - **Offline queue**: The list of changes made without a connection. They wait and go to the server in order when you are back. See [Sync and offline](guide:sync#the-offline-queue).
@@ -80,6 +90,7 @@ lead: Short definitions of the words you meet in Vicu. Each links to the page wh
 - **Person** {pro}: A label you marked as a person with **This is a person**. People can owe you promises, and you can owe them. See [Promises and people](guide:pro/promises).
 - **Plan**: The optional screen with a timeline, where you give tasks a time. Off until you turn it on. See [Plan your day](guide:plan).
 - **Plan my day**: A four-step session that takes you from leftover tasks to a planned day: Leftovers, Choose, Arrange and Ready. See [Plan your day](guide:plan).
+- **Private label** {pro}: A label you marked as private in its menu. A 1:1 topic that carries it is left out of the agenda you copy. See [Promises and people](guide:pro/promises).
 - **Project**: A group of tasks. Projects can contain subprojects, be split into sections, and be shared with others. See [Projects and labels](guide:projects).
 - **Project review**: Stepping through your projects on a schedule to keep them current. Each shows when it was last reviewed. See [Review and guided organizing](guide:review).
 - **Promise** {pro}: Something a person committed to, or that you committed to them. It has a due date and ends with a verdict. See [Promises and people](guide:pro/promises).
@@ -116,6 +127,7 @@ lead: Short definitions of the words you meet in Vicu. Each links to the page wh
 - **Task template**: A saved task, with its project, notes, labels, dates counted in days from today, reminders and subtasks. Use it to start a new task. See [Work with tasks](guide:tasks).
 - **Time block**: Time you set aside for a task, with a start and an end on its due day. Type `at 3pm for 30m` to make one. It shows on Today and on Plan. See [Plan your day](guide:plan).
 - **Today**: The smart list of what is due before the start of tomorrow: an Overdue section, today's tasks, tasks whose time block starts today, and today's routines. See [Smart lists](guide:lists).
+- **Topic** {pro}: Something to talk about with a person in your next 1:1: a task with the person's label and no promise. See [Promises and people](guide:pro/promises).
 
 ## U
 

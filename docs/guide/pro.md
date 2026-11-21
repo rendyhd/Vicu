@@ -53,7 +53,7 @@ Each part works on its own. Start with one and add more when you feel the need.
 | Part | What it adds | Complexity | Where |
 |---|---|---|---|
 | [Know what you can do now](guide:pro/available) | Available, Remaining and All on your lists; start dates; waiting on other tasks; step-by-step projects; on hold; flags; estimates; Focus | Low: a few new fields and a filter | {desktop} {phone} |
-| [Promises and people](guide:pro/promises) | People, promises both ways, verdicts, Waiting on, the person page, 1:1 agendas, recaps, meetings, import from Copilot; [groups, sessions and Follow-ups](guide:pro/groups) for recurring meetings | Medium: a habit of giving verdicts | {desktop} {phone} (meetings, sessions and import on the desktop) |
+| [Promises and people](guide:pro/promises) | People, promises both ways, verdicts, Waiting on, the person page, 1:1 agendas, recaps, meetings, import from Copilot; [groups, sessions and Follow-ups](guide:pro/groups) for recurring meetings; [90-day plans](guide:pro/plans) | Medium: a habit of giving verdicts | {desktop} {phone} (meetings, sessions and import on the desktop) |
 | [Portfolio](guide:pro/portfolio) | Initiatives with a cap, rank and parking; readiness; escalations; the Sponsor desk; request triage | High: a way of running your work | {desktop} |
 | [Power tools](guide:pro/power) | Pro conditions and grouping in custom lists, a table view, the inspector, estimates and a focus block in Plan my day, the weekly execution review, a quarterly impact summary | Medium: power tools | {desktop} |
 
@@ -144,6 +144,7 @@ Links work in the installed app. The Pro lists (`flagged`, `waiting`) open only 
 - [Know what you can do now](guide:pro/available)
 - [Promises and people](guide:pro/promises)
 - [Groups, sessions and follow-ups](guide:pro/groups)
+- [90-day plans](guide:pro/plans)
 - [Portfolio](guide:pro/portfolio)
 - [Power tools](guide:pro/power)
 - [Keyboard shortcuts](guide:shortcuts)

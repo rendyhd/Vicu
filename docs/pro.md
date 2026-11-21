@@ -96,9 +96,28 @@ For work that is agreed in a recurring meeting: a leadership team, a project tea
   day in Settings, Pro.
 - **Language.** Text copied for other people is written in the language chosen for the group, else
   the default in Settings, Pro, whatever language you read Vicu in.
+- **Blockers, commitments and stops.** Three more lists on the group's page and in a session, next
+  to issues, decisions and open questions: what is in the way, what the group as a whole said it
+  will reach, and what it agreed to stop doing. One line each, no owner and no date, open until you
+  close it. The agenda, the recap and the weekly note name them.
 - **Phone.** The phone has Follow-ups and the group's page (read, with verdicts); groups are made
   and sessions run on the desktop and the web. A check message shared from the phone is written in
   the language the phone shows Vicu in.
+
+## 90-day plans and 1:1 topics
+
+- **90-day plans.** In a project's menu, 90-day plan: a start day, an end day (13 weeks unless you
+  change it) and, if you like, the group it belongs to. The project's tasks are the plan's items and
+  their subtasks the milestones; a milestone is a promise with one owner and a date. The plan's view
+  has a row per item and a column per week, and each cell counts what happened: due, delivered,
+  delivered late, moved to a new date, dropped. No status is filled in or worked out. Close plan can
+  carry the open items and milestones into a new project that is the next plan; the tasks move, so
+  their promises and history go with them. The phone shows a plan; plans are made and closed on the
+  desktop and the web.
+- **1:1 topics.** A task with a person's label and no promise is a topic for your next 1:1. The
+  person's page lists them under Topics, with a field to add one, and Copy agenda includes them. A
+  repeating task is a topic for every 1:1. Mark a label as a Private label (the label's menu) and
+  topics that carry it stay out of the agenda you copy.
 
 ## Portfolio
 

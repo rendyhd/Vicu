@@ -109,7 +109,8 @@ first. Tasks with a label on hold (for example "waiting for budget") are listed 
 Click a person under **People** to open their page:
 
 - **Next 1:1**: an agenda made from what is open between you: "What's still unclear?", their promises
-  that are due or missed, what you owe them, and decisions they owe.
+  that are due or missed, what you owe them, decisions they owe, and your topics.
+- **Topics**: what you want to talk about with them (see below).
 - **From** them: what they promised you.
 - **You owe** them: what you promised.
 - **To confirm**: tasks named "Confirm with" them, made by an import or a triage when something they
@@ -119,6 +120,22 @@ Click a person under **People** to open their page:
 
 On the desktop, **Copy agenda** puts the agenda on the clipboard for a meeting invite or chat. On the
 phone, share the agenda instead.
+
+## Keep topics for a 1:1 {desktop} {phone}
+
+A topic is something to talk about with a person, not something anyone delivers: "How the vendor work
+is going", "Feedback on the board paper".
+
+- **Add one** with **Add a topic** on the person's page. Anywhere else, a task with the person's label and
+  no promise is a topic: `How the vendor work is going @Jan` (`*Jan` in Vikunja style).
+- **Tick it** when you talked about it.
+- **A date** puts a topic in order; one dated more than a week ahead waits under **Later**.
+- **A topic for every 1:1**, such as "Development", is a repeating task: tick it and it comes back.
+- **A private label** keeps a topic to yourself. In a label's menu choose **Private label** (on the
+  phone, **Mark as private**); a topic
+  with that label shows on the page, marked **Private**, and is left out of the agenda you copy.
+
+A topic is an ordinary task, so it is on every device and in every app that reads your server.
 
 ## Send a recap {desktop} {phone}
 

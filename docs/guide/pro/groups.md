@@ -10,7 +10,8 @@ lead: Most of a plan is carried out in a few recurring meetings. A group keeps o
 - **A group** is the people who agree actions together: a leadership team, a project team. A task
   with the group's label is one of its **actions**.
 - **The group's page** shows every action by owner and by where it stands since the last meeting,
-  and a line of plain counts: how many were delivered on time, how many late.
+  and a line of plain counts: how many were delivered on time, how many late. Below are the group's
+  issues, blockers, commitments, decisions and open questions.
 - **A session** is one meeting of the group. It walks through the actions that need a verdict, the
   issues, what is new, and a read-back. Ending it gives you a **recap** to copy. {desktop}
 - **Follow-ups** at the top of Today lists what needs a move from you: verdicts due, a check with
@@ -73,12 +74,20 @@ The actions are in parts, and in each part by owner:
 Above them is one line such as "Last 4 sessions: 9 of 12 on time, 2 late, 1 open past their date."
 It counts what happened and is never a score of a person.
 
-Below the actions are three short lists:
+Below the actions are short lists. Each is one line per entry, with no owner and no date: who does
+what is an action.
 
 - **Issues**: things to solve, not to do. They are ranked; move one up or down, and tick it when it is
   solved. An action that is missed a second time is added here by itself.
+- **Blockers**: what is in the way and the group has to get moved. **Out of the way** closes one.
+- **Commitments**: what the group as a whole said it will reach. **Close** one when it is met or let
+  go.
 - **Decisions**, with the day and who decided.
+- **Stopped**: what the group agreed to stop doing, so it stays said. **Close** one when it no longer
+  needs saying.
 - **Open questions**, to tick when they are answered.
+
+A group's [90-day plans](guide:pro/plans) are listed on its page too.
 
 ## Run a session {desktop}
 
@@ -89,8 +98,9 @@ timed.
    row, or press 1 to 5, to say what happened: Delivered, Late, Not yet, New date or Dropped. A
    stand-up shows only what is due this week. Mark who is not here.
 2. **Issues** (weekly only). Add issues, rank them, tick the ones you solved, or make an action of one.
-3. **New actions and decisions.** Type new actions as people commit to them; add what was decided and
-   questions nobody could answer.
+   Blockers are here too: add what is in the way, close what is not any more.
+3. **New actions and decisions.** Type new actions as people commit to them; add what was decided,
+   what the group committed to, what it stops doing, and questions nobody could answer.
 4. **Read back.** The decisions and new actions of this session, to read aloud before you close, so
    everyone leaves with the same list. Tick **Read back to the room** when you did. You can give the
    session a score from 1 to 10 for yourself; it is never copied.
@@ -100,12 +110,12 @@ verdicts and tasks you already added stay.
 
 > [!TIP]
 > Before the meeting, **Copy weekly agenda** on the group's page gives you the actions due, the other
-> open actions and the open issues as text to send round.
+> open actions, the open issues and the open blockers as text to send round.
 
 ## Send the recap {desktop}
 
-The recap holds this session only: decisions, new actions, what was delivered, what changed, issues
-solved, open issues and questions, and who was absent.
+The recap holds this session only: decisions, commitments, what was stopped, new actions, what was
+delivered, what changed, issues solved, open issues, blockers, open questions, and who was absent.
 
 1. Check the text. Change **Language** if this one should go out in another language.
 2. Choose **Copy** for formatted text (mail, Teams, Word) or **Copy as Markdown**.
@@ -136,8 +146,8 @@ open it, choose **Promise** and tick **No check before due**.
 ## Write the weekly note {desktop}
 
 The weekly note is a short status for the people above you: per group, how many actions were
-delivered on time and late, each date that slipped and why, what was decided, the open issues, and
-what is due next week.
+delivered on time and late, each date that slipped and why, what was decided, the open issues and
+blockers, and what is due next week.
 
 1. Open the command palette and choose **Weekly note**, or choose **Write it** in Follow-ups.
 2. Read it, change the language if needed, and choose **Copy** or **Copy as Markdown**.
@@ -164,6 +174,7 @@ it: add the two sentences only you can write.
 ## Related
 
 - [Promises and people](guide:pro/promises)
+- [90-day plans](guide:pro/plans)
 - [Portfolio](guide:pro/portfolio)
 - [Quick add syntax](guide:quick-add)
 - [What Pro is](guide:pro)
