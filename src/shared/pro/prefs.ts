@@ -11,6 +11,8 @@ export const PROJECT_STATUS_KEY_PREFIX = 'project_status.'
 export const LABEL_STATUS_KEY_PREFIX = 'label_status.'
 export const LABEL_KIND_KEY_PREFIX = 'label_kind.'
 export const REPEAT_RULE_KEY_PREFIX = 'repeat_rule.'
+/** A project that is a 90-day plan (section 21.20): `{ start, end, group, closed, from }`. */
+export const PROJECT_PLAN_KEY_PREFIX = 'project_plan.'
 
 /** Every key prefix Pro writes, for the main process's writable check. */
 export const PRO_PREF_PREFIXES = [
@@ -19,6 +21,7 @@ export const PRO_PREF_PREFIXES = [
   LABEL_STATUS_KEY_PREFIX,
   LABEL_KIND_KEY_PREFIX,
   REPEAT_RULE_KEY_PREFIX,
+  PROJECT_PLAN_KEY_PREFIX,
 ] as const
 
 /** `parallel` is the default and never written. */
@@ -29,6 +32,7 @@ export const projectStatusKey = (projectId: number): string => `${PROJECT_STATUS
 export const labelStatusKey = (labelId: number): string => `${LABEL_STATUS_KEY_PREFIX}${labelId}`
 export const labelKindKey = (labelId: number): string => `${LABEL_KIND_KEY_PREFIX}${labelId}`
 export const repeatRuleKey = (taskId: number): string => `${REPEAT_RULE_KEY_PREFIX}${taskId}`
+export const projectPlanKey = (projectId: number): string => `${PROJECT_PLAN_KEY_PREFIX}${projectId}`
 
 /** The id at the end of a Pro key, or null when the key is not one of `prefix`'s. */
 export function idOfProKey(key: string, prefix: string): number | null {
@@ -57,6 +61,20 @@ export function readIsPerson(value: unknown): boolean {
 
 export function readIsGroup(value: unknown): boolean {
   return value === 'group'
+}
+
+/** A private label (section 21.21): a task that carries it is left out of text copied for other people. */
+export function readIsPrivate(value: unknown): boolean {
+  return value === 'private'
+}
+
+export function privateLabelIds(values: Readonly<Record<string, unknown>>): Set<number> {
+  const ids = new Set<number>()
+  for (const [key, value] of Object.entries(values)) {
+    const id = idOfProKey(key, LABEL_KIND_KEY_PREFIX)
+    if (id !== null && readIsPrivate(value)) ids.add(id)
+  }
+  return ids
 }
 
 export function projectMode(values: Readonly<Record<string, unknown>>, projectId: number): ProjectMode {

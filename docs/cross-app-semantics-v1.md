@@ -1523,7 +1523,8 @@ A key is added here, in both repos, in the release that starts writing it.
 | `project_mode.<projectId>` | `"sequential"` or `"single"`, or `null`. Any other value acts as the default and is kept; section 21.2 | parallel |
 | `project_status.<projectId>` | `"on_hold"`, or `null`; section 21.2 | active |
 | `label_status.<labelId>` | `"on_hold"`, or `null`; section 21.2 | active |
-| `label_kind.<labelId>` | `"person"` (section 21.5) or `"group"` (section 21.16), or `null` | a label |
+| `label_kind.<labelId>` | `"person"` (section 21.5), `"group"` (section 21.16) or `"private"` (section 21.21), or `null` | a label |
+| `project_plan.<projectId>` | `{"start", "end", "group"?, "closed"?, "from"?}`, or `null`. A value without both days in order is no plan and is kept; section 21.20 | a project |
 | `repeat_rule.<taskId>` | `{"until"?, "count"?, "catch_up"?}`, or `null`; section 21.13 | no end |
 
 ### 11.4 The Inbox
@@ -2731,8 +2732,8 @@ shows open flagged tasks; Vikunja's own Favorites pseudo-project (-1) is not use
   (sync metadata — do not delete)`, search `vicu-pro-archive`, payload `{ "version": 1, "quarter":
   "2026-Q2", "promises": {...}, ... }` with the record collections only. The part is written first,
   then the records are tombstoned in the ledger. Closed: a promise on its final verdict's local day,
-  an initiative with status `closed` on `closed_on`, a log entry of kind `unknown` or `issue` on
-  `resolved` and any other on `at`, owed decisions and escalations on `resolved`, a round on `at`.
+  an initiative with status `closed` on `closed_on`, a log entry of kind `unknown`, `issue`,
+  `blocker`, `commitment` or `stop` on `resolved` and any other on `at`, owed decisions and escalations on `resolved`, a round on `at`.
   Meetings and people never close. A group's records move after **90 days**, not 180: a promise
   with `to`, a log entry with `group`, and every round (two groups' weekly actions would fill the
   ledger otherwise). A version from before issues closes an open issue on `at`; only versions
@@ -2928,6 +2929,13 @@ themselves are visible to Ask as before. The prompts, schemas and Ask tools are 
   do: `rank` orders the open ones (lowest first, without a rank last, then `at`, then id);
   `resolved` is the day it was solved and `solved_in` the session. A decision's `shared` holds
   when a recap with it was copied.
+- **Blockers, commitments and stops** (`pro.logKinds`) are log entries with `group` too: kinds
+  `blocker` (something in the way that the group has to get moved), `commitment` (what the group
+  as a whole said it will reach) and `stop` (what the group agreed to stop doing). Each stays open
+  until `resolved` (a local day): a blocker when it is out of the way, a commitment when it is met
+  or let go, a stop when it no longer needs saying. Open ones are listed oldest first (`at`, then
+  id). They hold no owner and no date: who does what is an action. A version from before these
+  kinds keeps them, shows none of them, and archives them by `at`.
 
 ### 21.17 Sessions
 
@@ -2945,7 +2953,8 @@ themselves are visible to Ask as before. The prompts, schemas and Ask tools are 
   stays open is in the next session because it is still open.
 - **What a session held** is worked out, not stored: the verdicts given from `started` through
   `ended` on the group's actions; the group's actions created in that time; the log entries whose
-  `session` is the round; the issues whose `solved_in` is the round.
+  `session` is the round, by kind (decisions, questions, issues, blockers, commitments, stops);
+  the issues whose `solved_in` is the round.
 - **Read-back** is the last step: the session's decisions and new actions with owner, who they were
   promised to and date, read aloud; `read_back` true records that it happened.
 - **Score:** a private whole number from 1 to 10 for how useful the session was. Never copied.
@@ -3006,16 +3015,70 @@ Vicu. They state what happened in counts and events and never judge.
   without a catalog reads as `en`. It is separate from the language the app is shown in. The phone
   cannot read its strings in a second language yet, so for now it writes its check message in the
   language the app is shown in; the desktop and the web follow the rule.
-- **The documents:** a session's **agenda** (actions due, other open actions, open issues, the
-  closing line), its **read-back** (decisions, new actions), its **recap** (decisions, new
-  actions, delivered, changed, issues solved, open issues, who was absent), the **check message**
-  to one person (one thing as a sentence, more as a list), and the **weekly note** (per group:
-  counts of actions delivered on time, late and dropped, each date that slipped, decisions, open
-  issues, actions open past their date and due in the next 7 days). The weekly note covers the
+- **The documents:** a session's **agenda** (actions due, other open actions, open issues, open
+  blockers, the closing line), its **read-back** (decisions, new actions), its **recap**
+  (decisions, the session's commitments and stops, new actions, delivered, changed, issues solved,
+  open issues, the session's blockers, open questions, who was absent), the **check message** to
+  one person (one thing as a sentence, more as a list), and the **weekly note** (per group: counts
+  of actions delivered on time, late and dropped, each date that slipped, decisions, open issues,
+  open blockers, actions open past their date and due in the next 7 days). The weekly note covers the
   local days from the day after the last `note_sent` (at most 14 days back, 7 without one) through
   today. Which lines each holds, and in what order, is fixed by the vectors.
 
-### 21.20 Vectors
+### 21.20 90-day plans
+
+A plan is a project with a start and an end. What it shows is counted from its tasks and the
+verdicts given on them (`pro.plans`); no status and no progress is ever stored or worked out, and
+nobody fills in a weekly reading by hand.
+
+- **A plan** is the synced preference `project_plan.<projectId>` (section 11.3): `start` and `end`
+  are local days, `group` a group's label id (section 21.16; left out for a plan of your own),
+  `closed` the local day it was closed, `from` the project of the plan it carries on from. Other
+  fields are kept. A new plan runs 13 weeks: its `end` is `start` plus 90 days. Plans are listed
+  open ones first by `end`, then closed ones by `closed`, newest first; ties by project id.
+- **Items and milestones.** The plan's **items** are the project's tasks that are no subtask of
+  another task of the project, in the order the project shows them. An item's **milestones** are
+  its direct subtasks; an item without subtasks is its own one milestone. What hangs under a
+  milestone is not counted. Hidden tasks (section 10) are neither. A milestone is a task like any
+  other, and its promise (section 21.6) is what names its owner and takes its verdicts.
+- **Weeks** are blocks of seven days from `start`, whatever the week start; the last one ends on
+  `end`. A plan shows 53 weeks at most.
+- **A milestone's date** is its effective due day (section 21.6), the task's due day without a
+  promise. It is **delivered** by a final verdict of `delivered`, `late` or `taken_over`, and
+  without a final verdict when its task is done. A final `dropped` takes it out of the count.
+- **A cell** (one item, one week) holds counts of facts: `due`, the milestones not dropped whose
+  date is in the week; `delivered`, those delivered in the week (the final verdict's local day,
+  else the task's completion day), of which `late`; `slipped`, every `not_yet` and `renegotiated`
+  verdict (not undone) given in the week; `dropped`, those dropped in the week.
+- **An item** holds `total` (milestones not dropped), `delivered`, `dropped`, `overdue` (open
+  milestones whose date is before today), `next` (the open milestone that is due first, without a
+  date last, then id) and its milestones by date (none last), then id. Its **owner** is the owner
+  of its own promise (section 21.16); without one, the owner every promise of its milestones
+  shares; else nobody.
+- **Closing** a plan writes `closed`. It may carry the open work on: the items that are not done,
+  each with its milestones that are not done, move to another project, which becomes a plan with
+  `from`, the same group and 13 weeks from the day after the old `end` (from today when that has
+  passed). Tasks move, so their promises and history go with them. A done milestone whose item
+  moved on stays behind as an item of its own, so the closed plan still shows what it delivered.
+- A plan is shown while the promises layer is on. Off, and on a version from before plans, the
+  project is a project and the preference is kept.
+
+### 21.21 1:1 topics
+
+- A **topic** (`pro.topics`) is something to talk about with a person, not something anyone
+  delivers: an open task that carries the person's label (section 21.5), has no promise (a
+  tombstoned record is none) and is not a "Confirm with" task (section 21.6). It is an ordinary
+  task on every device, with or without Pro; discussing it is completing it, and a topic that
+  comes back every time is a repeating task.
+- **Order:** dated topics by day, then the undated ones oldest first (`created`), then id. Topics
+  without a date or dated up to 7 days from today are for the next 1:1 (`now`); those dated later
+  wait (`later`).
+- **A private label** is a label with `label_kind.<id>` = `"private"`. A topic that carries one is
+  shown in the app and left out of every text copied for other people (`hidden`). A label has one
+  kind, so a person or a group is never private.
+- Text copied for a 1:1 names the topics for the next 1:1 after the promises.
+
+### 21.22 Vectors
 
 `pro` in `cross-app-semantics-v1.json`, run in three time zones: `settings`, `prefs`, `availability`,
 `startVsBlock`, `ledgerMerge`, `ledgerPrune`, `archive`, `promises`, `waitingOn`, `personMatch`,
@@ -3023,6 +3086,6 @@ Vicu. They state what happened in counts and events and never judge.
 `importDates`, `importRead`, `importMatch`, `exportOpen`, `copilotPrompt`, `repeatRule`, `focus`,
 `focusBlock`, `weeklyPro`, `capOff`, `ledgerMergeGroups`, `archiveGroups`, `weeklyNote`,
 `workingDays`, `requester`, `groups`, `groupPage`, `reliability`, `missIssue`, `personPage`,
-`sessions`, `followUps`, `documents` (the last eight read the world in `groupWorld`); and
-`customListPro` (section 3.8). `nlp-corpus-v1.json` covers section
+`sessions`, `followUps`, `documents` (the last eight read the world in `groupWorld`), `plans`,
+`topics`, `logKinds` (each with a small world of its own); and `customListPro` (section 3.8). `nlp-corpus-v1.json` covers section
 5.5 with cases marked `"pro": true`.

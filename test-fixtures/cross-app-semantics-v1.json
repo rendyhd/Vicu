@@ -4890,18 +4890,21 @@
             "decisions": ["d1"],
             "questions": ["q1"],
             "issues": ["i2"],
-            "solved": ["i3"]
+            "solved": ["i3"],
+            "blockers": [],
+            "commitments": [],
+            "stops": []
           }
         },
         {
           "round": "r4",
           "group": "g1",
-          "expect": { "verdicts": [], "created": [108, 109], "decisions": ["d2"], "questions": [], "issues": ["i1"], "solved": [] }
+          "expect": { "verdicts": [], "created": [108, 109], "decisions": ["d2"], "questions": [], "issues": ["i1"], "solved": [], "blockers": [], "commitments": [], "stops": [] }
         },
         {
           "round": "s1",
           "group": "g2",
-          "expect": { "verdicts": [], "created": [110], "decisions": ["d3"], "questions": [], "issues": ["i5"], "solved": [] }
+          "expect": { "verdicts": [], "created": [110], "decisions": ["d3"], "questions": [], "issues": ["i5"], "solved": [], "blockers": [], "commitments": [], "stops": [] }
         }
       ],
       "end": [
@@ -5180,6 +5183,11 @@
         "note.nextWeek_one": "{{count}} action due in the next 7 days",
         "note.nextWeek_other": "{{count}} actions due in the next 7 days",
         "note.nothing": "Nothing to report.",
+        "heading.blockers": "Open blockers",
+        "heading.blockersRaised": "Blockers",
+        "heading.commitments": "Commitments",
+        "heading.stops": "Stopped",
+        "note.blocker": "Blocker: {{text}}",
         "note.noGroups": "No groups yet."
       },
       "language": [
@@ -5895,6 +5903,638 @@
           "html": "<p><strong>Weekly note, Thu 1 Oct to Wed 7 Oct</strong></p><p><strong>LT Services</strong></p><ul><li>Nothing to report.</li></ul>",
           "markdown": ["## Weekly note, Thu 1 Oct to Wed 7 Oct", "", "### LT Services", "", "- Nothing to report."],
           "emptyWorld": true
+        }
+      ]
+    },
+    "plans": {
+      "about": "A 90-day plan is a project with a start and an end day (section 21.20). Tasks carry `parent` (the task they are a subtask of, or null). Every instant is 08:00 UTC, the same local day in the three zones the suites run in.",
+      "today": "2026-12-10",
+      "read": [
+        {
+          "value": { "start": "2026-11-16", "end": "2027-02-14", "group": 70 },
+          "expect": { "start": "2026-11-16", "end": "2027-02-14", "group": 70, "closed": null, "from": null }
+        },
+        {
+          "value": { "start": "2026-11-16", "end": "2027-02-14", "group": 0, "closed": "2027-02-15", "from": 12, "note": "kept" },
+          "expect": { "start": "2026-11-16", "end": "2027-02-14", "group": null, "closed": "2027-02-15", "from": 12, "note": "kept" }
+        },
+        {
+          "value": { "start": "2026-11-16", "end": "2026-11-16" },
+          "expect": { "start": "2026-11-16", "end": "2026-11-16", "group": null, "closed": null, "from": null }
+        },
+        { "value": { "start": "2026-11-17", "end": "2026-11-16" }, "expect": null },
+        { "value": { "start": "2026-11-16" }, "expect": null },
+        { "value": { "start": "16 Nov", "end": "2027-02-14" }, "expect": null },
+        { "value": "a plan", "expect": null },
+        { "value": null, "expect": null }
+      ],
+      "stored": {
+        "plan": { "start": "2026-11-16", "end": "2027-02-14", "group": 70, "note": "kept", "closed": "2027-02-15", "from": null },
+        "expect": { "start": "2026-11-16", "end": "2027-02-14", "group": 70, "note": "kept", "closed": "2027-02-15" }
+      },
+      "defaultEnd": [{ "start": "2026-11-16", "expect": "2027-02-14" }, { "start": "2027-01-01", "expect": "2027-04-01" }],
+      "weeks": [
+        {
+          "plan": { "start": "2026-11-16", "end": "2026-11-30" },
+          "expect": [{ "from": "2026-11-16", "to": "2026-11-22" }, { "from": "2026-11-23", "to": "2026-11-29" }, { "from": "2026-11-30", "to": "2026-11-30" }]
+        },
+        { "plan": { "start": "2026-11-16", "end": "2026-11-16" }, "expect": [{ "from": "2026-11-16", "to": "2026-11-16" }] },
+        { "plan": { "start": "2026-11-16", "end": "2027-02-14" }, "count": 13, "last": { "from": "2027-02-08", "to": "2027-02-14" } }
+      ],
+      "weekOf": [
+        { "day": "2026-11-15", "expect": null },
+        { "day": "2026-11-16", "expect": 0 },
+        { "day": "2026-11-22", "expect": 0 },
+        { "day": "2026-11-23", "expect": 1 },
+        { "day": "2027-02-14", "expect": 12 },
+        { "day": "2027-02-15", "expect": null }
+      ],
+      "list": {
+        "values": {
+          "project_plan.12": { "start": "2026-08-17", "end": "2026-11-15", "closed": "2026-11-16" },
+          "project_plan.30": { "start": "2026-11-16", "end": "2027-02-14", "group": 70, "from": 12 },
+          "project_plan.31": { "start": "2026-11-01", "end": "2026-12-31" },
+          "project_plan.9": { "start": "2026-05-18", "end": "2026-08-16", "closed": "2026-08-17" },
+          "project_plan.40": { "start": "2026-11-16" },
+          "project_plan.x": { "start": "2026-11-16", "end": "2027-02-14" },
+          "project_mode.30": "sequential"
+        },
+        "expect": [31, 30, 12, 9]
+      },
+      "plan": { "start": "2026-11-16", "end": "2027-02-14" },
+      "ledger": {
+        "promises": {
+          "501": { "dir": "theirs", "person": 40, "verdicts": [{ "id": "v1", "kind": "delivered", "at": "2026-11-19T08:00:00Z" }] },
+          "502": {
+            "dir": "theirs",
+            "person": 40,
+            "verdicts": [
+              { "id": "v2", "kind": "not_yet", "at": "2026-11-27T08:00:00Z", "new_due": "2026-12-04" },
+              { "id": "v3", "kind": "late", "at": "2026-12-03T08:00:00Z" }
+            ]
+          },
+          "503": { "dir": "theirs", "person": 40, "verdicts": [{ "id": "v4", "kind": "not_yet", "at": "2026-12-08T08:00:00Z", "undone": true }] },
+          "504": { "dir": "theirs", "person": 40 },
+          "511": { "dir": "theirs", "person": 41 },
+          "512": {
+            "dir": "theirs",
+            "person": 40,
+            "verdicts": [{ "id": "v5", "kind": "renegotiated", "at": "2026-12-09T08:00:00Z", "new_due": "2027-01-08" }]
+          },
+          "513": { "dir": "theirs", "person": 41, "verdicts": [{ "id": "v6", "kind": "dropped", "at": "2026-12-02T08:00:00Z" }] },
+          "520": { "dir": "mine", "person": null, "to": { "group": 70 } },
+          "550": { "dir": "theirs", "person": 41, "verdicts": [{ "id": "v0", "kind": "delivered", "at": "2026-11-17T08:00:00Z" }] }
+        }
+      },
+      "tasks": [
+        { "id": 500, "title": "Pilot region agreed", "parent": null, "due_date": null, "done": false },
+        {
+          "id": 501,
+          "title": "Shortlist three regions",
+          "parent": 500,
+          "due_date": "2026-11-20T08:00:00Z",
+          "done": true,
+          "done_at": "2026-11-19T08:00:00Z"
+        },
+        { "id": 502, "title": "Site visits done", "parent": 500, "due_date": "2026-12-04T08:00:00Z", "done": true, "done_at": "2026-12-03T08:00:00Z" },
+        { "id": 503, "title": "Regional lead signs off", "parent": 500, "due_date": "2026-12-08T08:00:00Z", "done": false },
+        { "id": 504, "title": "Pilot kick-off", "parent": 500, "due_date": "2027-01-15T08:00:00Z", "done": false },
+        { "id": 510, "title": "Supplier shortlist", "parent": null, "due_date": null, "done": false },
+        { "id": 511, "title": "Request quotes", "parent": 510, "due_date": "2026-12-11T08:00:00Z", "done": false },
+        { "id": 512, "title": "Compare quotes", "parent": 510, "due_date": "2026-12-18T08:00:00Z", "done": false },
+        {
+          "id": 513,
+          "title": "Visit the third supplier",
+          "parent": 510,
+          "due_date": "2026-12-04T08:00:00Z",
+          "done": true,
+          "done_at": "2026-12-02T08:00:00Z"
+        },
+        { "id": 520, "title": "Cost model", "parent": null, "due_date": "2026-12-20T08:00:00Z", "done": false },
+        { "id": 530, "title": "Kick-off deck", "parent": null, "due_date": null, "done": true, "done_at": "2026-11-18T08:00:00Z" },
+        { "id": 540, "title": "Training plan", "parent": null, "due_date": null, "done": false },
+        { "id": 541, "title": "Draft the outline", "parent": 540, "due_date": null, "done": true },
+        { "id": 542, "title": "First session held", "parent": 540, "due_date": "2027-03-01T08:00:00Z", "done": false },
+        { "id": 543, "title": "Book the room", "parent": 542, "due_date": "2026-12-15T08:00:00Z", "done": false },
+        { "id": 550, "title": "Baseline numbers", "parent": 499, "due_date": "2026-11-18T08:00:00Z", "done": true, "done_at": "2026-11-17T08:00:00Z" }
+      ],
+      "view": {
+        "weeks": [
+          { "from": "2026-11-16", "to": "2026-11-22" },
+          { "from": "2026-11-23", "to": "2026-11-29" },
+          { "from": "2026-11-30", "to": "2026-12-06" },
+          { "from": "2026-12-07", "to": "2026-12-13" },
+          { "from": "2026-12-14", "to": "2026-12-20" },
+          { "from": "2026-12-21", "to": "2026-12-27" },
+          { "from": "2026-12-28", "to": "2027-01-03" },
+          { "from": "2027-01-04", "to": "2027-01-10" },
+          { "from": "2027-01-11", "to": "2027-01-17" },
+          { "from": "2027-01-18", "to": "2027-01-24" },
+          { "from": "2027-01-25", "to": "2027-01-31" },
+          { "from": "2027-02-01", "to": "2027-02-07" },
+          { "from": "2027-02-08", "to": "2027-02-14" }
+        ],
+        "week": 3,
+        "items": [
+          {
+            "id": 500,
+            "owner": 40,
+            "done": false,
+            "total": 4,
+            "delivered": 2,
+            "dropped": 0,
+            "overdue": 1,
+            "next": 503,
+            "milestones": [501, 502, 503, 504],
+            "weeks": [
+              { "due": 1, "delivered": 1, "late": 0, "slipped": 0, "dropped": 0 },
+              { "due": 0, "delivered": 0, "late": 0, "slipped": 1, "dropped": 0 },
+              { "due": 1, "delivered": 1, "late": 1, "slipped": 0, "dropped": 0 },
+              { "due": 1, "delivered": 0, "late": 0, "slipped": 0, "dropped": 0 },
+              { "due": 0, "delivered": 0, "late": 0, "slipped": 0, "dropped": 0 },
+              { "due": 0, "delivered": 0, "late": 0, "slipped": 0, "dropped": 0 },
+              { "due": 0, "delivered": 0, "late": 0, "slipped": 0, "dropped": 0 },
+              { "due": 0, "delivered": 0, "late": 0, "slipped": 0, "dropped": 0 },
+              { "due": 1, "delivered": 0, "late": 0, "slipped": 0, "dropped": 0 },
+              { "due": 0, "delivered": 0, "late": 0, "slipped": 0, "dropped": 0 },
+              { "due": 0, "delivered": 0, "late": 0, "slipped": 0, "dropped": 0 },
+              { "due": 0, "delivered": 0, "late": 0, "slipped": 0, "dropped": 0 },
+              { "due": 0, "delivered": 0, "late": 0, "slipped": 0, "dropped": 0 }
+            ]
+          },
+          {
+            "id": 510,
+            "owner": null,
+            "done": false,
+            "total": 2,
+            "delivered": 0,
+            "dropped": 1,
+            "overdue": 0,
+            "next": 511,
+            "milestones": [513, 511, 512],
+            "weeks": [
+              { "due": 0, "delivered": 0, "late": 0, "slipped": 0, "dropped": 0 },
+              { "due": 0, "delivered": 0, "late": 0, "slipped": 0, "dropped": 0 },
+              { "due": 0, "delivered": 0, "late": 0, "slipped": 0, "dropped": 1 },
+              { "due": 1, "delivered": 0, "late": 0, "slipped": 1, "dropped": 0 },
+              { "due": 0, "delivered": 0, "late": 0, "slipped": 0, "dropped": 0 },
+              { "due": 0, "delivered": 0, "late": 0, "slipped": 0, "dropped": 0 },
+              { "due": 0, "delivered": 0, "late": 0, "slipped": 0, "dropped": 0 },
+              { "due": 1, "delivered": 0, "late": 0, "slipped": 0, "dropped": 0 },
+              { "due": 0, "delivered": 0, "late": 0, "slipped": 0, "dropped": 0 },
+              { "due": 0, "delivered": 0, "late": 0, "slipped": 0, "dropped": 0 },
+              { "due": 0, "delivered": 0, "late": 0, "slipped": 0, "dropped": 0 },
+              { "due": 0, "delivered": 0, "late": 0, "slipped": 0, "dropped": 0 },
+              { "due": 0, "delivered": 0, "late": 0, "slipped": 0, "dropped": 0 }
+            ]
+          },
+          {
+            "id": 520,
+            "owner": 0,
+            "done": false,
+            "total": 1,
+            "delivered": 0,
+            "dropped": 0,
+            "overdue": 0,
+            "next": 520,
+            "milestones": [520],
+            "weeks": [
+              { "due": 0, "delivered": 0, "late": 0, "slipped": 0, "dropped": 0 },
+              { "due": 0, "delivered": 0, "late": 0, "slipped": 0, "dropped": 0 },
+              { "due": 0, "delivered": 0, "late": 0, "slipped": 0, "dropped": 0 },
+              { "due": 0, "delivered": 0, "late": 0, "slipped": 0, "dropped": 0 },
+              { "due": 1, "delivered": 0, "late": 0, "slipped": 0, "dropped": 0 },
+              { "due": 0, "delivered": 0, "late": 0, "slipped": 0, "dropped": 0 },
+              { "due": 0, "delivered": 0, "late": 0, "slipped": 0, "dropped": 0 },
+              { "due": 0, "delivered": 0, "late": 0, "slipped": 0, "dropped": 0 },
+              { "due": 0, "delivered": 0, "late": 0, "slipped": 0, "dropped": 0 },
+              { "due": 0, "delivered": 0, "late": 0, "slipped": 0, "dropped": 0 },
+              { "due": 0, "delivered": 0, "late": 0, "slipped": 0, "dropped": 0 },
+              { "due": 0, "delivered": 0, "late": 0, "slipped": 0, "dropped": 0 },
+              { "due": 0, "delivered": 0, "late": 0, "slipped": 0, "dropped": 0 }
+            ]
+          },
+          {
+            "id": 530,
+            "owner": null,
+            "done": true,
+            "total": 1,
+            "delivered": 1,
+            "dropped": 0,
+            "overdue": 0,
+            "next": null,
+            "milestones": [530],
+            "weeks": [
+              { "due": 0, "delivered": 1, "late": 0, "slipped": 0, "dropped": 0 },
+              { "due": 0, "delivered": 0, "late": 0, "slipped": 0, "dropped": 0 },
+              { "due": 0, "delivered": 0, "late": 0, "slipped": 0, "dropped": 0 },
+              { "due": 0, "delivered": 0, "late": 0, "slipped": 0, "dropped": 0 },
+              { "due": 0, "delivered": 0, "late": 0, "slipped": 0, "dropped": 0 },
+              { "due": 0, "delivered": 0, "late": 0, "slipped": 0, "dropped": 0 },
+              { "due": 0, "delivered": 0, "late": 0, "slipped": 0, "dropped": 0 },
+              { "due": 0, "delivered": 0, "late": 0, "slipped": 0, "dropped": 0 },
+              { "due": 0, "delivered": 0, "late": 0, "slipped": 0, "dropped": 0 },
+              { "due": 0, "delivered": 0, "late": 0, "slipped": 0, "dropped": 0 },
+              { "due": 0, "delivered": 0, "late": 0, "slipped": 0, "dropped": 0 },
+              { "due": 0, "delivered": 0, "late": 0, "slipped": 0, "dropped": 0 },
+              { "due": 0, "delivered": 0, "late": 0, "slipped": 0, "dropped": 0 }
+            ]
+          },
+          {
+            "id": 540,
+            "owner": null,
+            "done": false,
+            "total": 2,
+            "delivered": 1,
+            "dropped": 0,
+            "overdue": 0,
+            "next": 542,
+            "milestones": [542, 541],
+            "weeks": [
+              { "due": 0, "delivered": 0, "late": 0, "slipped": 0, "dropped": 0 },
+              { "due": 0, "delivered": 0, "late": 0, "slipped": 0, "dropped": 0 },
+              { "due": 0, "delivered": 0, "late": 0, "slipped": 0, "dropped": 0 },
+              { "due": 0, "delivered": 0, "late": 0, "slipped": 0, "dropped": 0 },
+              { "due": 0, "delivered": 0, "late": 0, "slipped": 0, "dropped": 0 },
+              { "due": 0, "delivered": 0, "late": 0, "slipped": 0, "dropped": 0 },
+              { "due": 0, "delivered": 0, "late": 0, "slipped": 0, "dropped": 0 },
+              { "due": 0, "delivered": 0, "late": 0, "slipped": 0, "dropped": 0 },
+              { "due": 0, "delivered": 0, "late": 0, "slipped": 0, "dropped": 0 },
+              { "due": 0, "delivered": 0, "late": 0, "slipped": 0, "dropped": 0 },
+              { "due": 0, "delivered": 0, "late": 0, "slipped": 0, "dropped": 0 },
+              { "due": 0, "delivered": 0, "late": 0, "slipped": 0, "dropped": 0 },
+              { "due": 0, "delivered": 0, "late": 0, "slipped": 0, "dropped": 0 }
+            ]
+          },
+          {
+            "id": 550,
+            "owner": 41,
+            "done": true,
+            "total": 1,
+            "delivered": 1,
+            "dropped": 0,
+            "overdue": 0,
+            "next": null,
+            "milestones": [550],
+            "weeks": [
+              { "due": 1, "delivered": 1, "late": 0, "slipped": 0, "dropped": 0 },
+              { "due": 0, "delivered": 0, "late": 0, "slipped": 0, "dropped": 0 },
+              { "due": 0, "delivered": 0, "late": 0, "slipped": 0, "dropped": 0 },
+              { "due": 0, "delivered": 0, "late": 0, "slipped": 0, "dropped": 0 },
+              { "due": 0, "delivered": 0, "late": 0, "slipped": 0, "dropped": 0 },
+              { "due": 0, "delivered": 0, "late": 0, "slipped": 0, "dropped": 0 },
+              { "due": 0, "delivered": 0, "late": 0, "slipped": 0, "dropped": 0 },
+              { "due": 0, "delivered": 0, "late": 0, "slipped": 0, "dropped": 0 },
+              { "due": 0, "delivered": 0, "late": 0, "slipped": 0, "dropped": 0 },
+              { "due": 0, "delivered": 0, "late": 0, "slipped": 0, "dropped": 0 },
+              { "due": 0, "delivered": 0, "late": 0, "slipped": 0, "dropped": 0 },
+              { "due": 0, "delivered": 0, "late": 0, "slipped": 0, "dropped": 0 },
+              { "due": 0, "delivered": 0, "late": 0, "slipped": 0, "dropped": 0 }
+            ]
+          }
+        ],
+        "total": 11,
+        "delivered": 5,
+        "overdue": 1
+      },
+      "beforeAndAfter": [{ "today": "2026-11-10", "week": null }, { "today": "2027-02-20", "week": null, "overdue": 5 }],
+      "next": [
+        { "today": "2027-02-10", "expect": { "start": "2027-02-15", "end": "2027-05-16", "group": 70, "closed": null, "from": 30 } },
+        { "today": "2027-03-01", "expect": { "start": "2027-03-01", "end": "2027-05-30", "group": 70, "closed": null, "from": 30 } }
+      ],
+      "carryOver": { "items": [500, 510, 520, 540], "milestones": [503, 504, 511, 512, 542] }
+    },
+    "topics": {
+      "about": "A topic is an open task with the person's label and no promise (section 21.21). `hidden` are the topics with a private label, left out of copied text.",
+      "today": "2026-12-10",
+      "prefs": { "label_kind.40": "person", "label_kind.41": "person", "label_kind.90": "private", "label_kind.70": "group" },
+      "privateLabels": [90],
+      "ledger": { "promises": { "605": { "dir": "theirs", "person": 40 }, "609": null } },
+      "tasks": [
+        {
+          "id": 600,
+          "title": "Budget overrun in Region North",
+          "labels": [{ "id": 40 }],
+          "due_date": null,
+          "created": "2026-12-01T08:00:00Z",
+          "done": false
+        },
+        {
+          "id": 601,
+          "title": "How the vendor work is going",
+          "labels": [{ "id": 40 }],
+          "due_date": null,
+          "created": "2026-11-20T08:00:00Z",
+          "done": false
+        },
+        {
+          "id": 602,
+          "title": "Feedback on the board paper",
+          "labels": [{ "id": 40 }, { "id": 90 }],
+          "due_date": "2026-12-12T08:00:00Z",
+          "created": "2026-12-05T08:00:00Z",
+          "done": false
+        },
+        {
+          "id": 603,
+          "title": "Development",
+          "labels": [{ "id": 40 }],
+          "due_date": "2026-12-17T08:00:00Z",
+          "created": "2026-06-01T08:00:00Z",
+          "done": false
+        },
+        {
+          "id": 604,
+          "title": "Career",
+          "labels": [{ "id": 40 }],
+          "due_date": "2026-12-18T08:00:00Z",
+          "created": "2026-06-01T08:00:00Z",
+          "done": false
+        },
+        {
+          "id": 605,
+          "title": "Send the site list",
+          "labels": [{ "id": 40 }],
+          "due_date": "2026-12-11T08:00:00Z",
+          "created": "2026-12-02T08:00:00Z",
+          "done": false
+        },
+        { "id": 606, "title": "Holiday cover", "labels": [{ "id": 40 }], "due_date": null, "created": "2026-11-01T08:00:00Z", "done": true },
+        { "id": 607, "title": "Hiring plan", "labels": [{ "id": 41 }], "due_date": null, "created": "2026-12-01T08:00:00Z", "done": false },
+        {
+          "id": 608,
+          "title": "Confirm with Jan: the budget",
+          "labels": [{ "id": 40 }],
+          "due_date": null,
+          "created": "2026-12-03T08:00:00Z",
+          "done": false
+        },
+        {
+          "id": 609,
+          "title": "Once a promise, now a topic",
+          "labels": [{ "id": 40 }],
+          "due_date": null,
+          "created": "2026-12-04T08:00:00Z",
+          "done": false
+        },
+        {
+          "id": 610,
+          "title": "Still to raise from last time",
+          "labels": [{ "id": 40 }, { "id": 70 }],
+          "due_date": "2026-12-01T08:00:00Z",
+          "created": "2026-11-25T08:00:00Z",
+          "done": false
+        }
+      ],
+      "cases": [
+        { "person": 40, "expect": { "now": [610, 602, 603, 601, 600, 609], "later": [604], "hidden": [602] } },
+        { "person": 41, "expect": { "now": [607], "later": [], "hidden": [] } },
+        { "person": 43, "expect": { "now": [], "later": [], "hidden": [] } }
+      ]
+    },
+    "logKinds": {
+      "about": "Blockers, commitments and stops are log entries of a group (section 21.16), open until `resolved`. `messages` are the sentences this block adds to `documents.messages`; the documents are rendered as there (en-GB, text and markdown as lines).",
+      "today": "2026-12-10",
+      "names": { "40": "Jan de Vries", "41": "Maya Chen" },
+      "me": "Rendy",
+      "messages": {
+        "heading.blockers": "Open blockers",
+        "heading.blockersRaised": "Blockers",
+        "heading.commitments": "Commitments",
+        "heading.stops": "Stopped",
+        "note.blocker": "Blocker: {{text}}"
+      },
+      "closed": [
+        { "value": { "kind": "blocker", "text": "x", "at": "2026-11-01" }, "expect": null },
+        { "value": { "kind": "blocker", "text": "x", "at": "2026-11-01", "resolved": "2026-11-20" }, "expect": "2026-11-20" },
+        { "value": { "kind": "commitment", "text": "x", "at": "2026-11-01" }, "expect": null },
+        { "value": { "kind": "commitment", "text": "x", "at": "2026-11-01", "resolved": "2026-12-01" }, "expect": "2026-12-01" },
+        { "value": { "kind": "stop", "text": "x", "at": "2026-11-01" }, "expect": null },
+        { "value": { "kind": "stop", "text": "x", "at": "2026-11-01", "resolved": "soon" }, "expect": null },
+        { "value": { "kind": "decision", "text": "x", "at": "2026-11-01", "resolved": "2026-11-20" }, "expect": "2026-11-01" },
+        { "value": { "kind": "later-kind", "text": "x", "at": "2026-11-01" }, "expect": "2026-11-01" }
+      ],
+      "ledger": {
+        "meetings": { "g9": { "name": "Ops team", "people": [40, 41], "rhythm": "weekly", "label": 70, "sessions": [{ "id": "s1", "kind": "weekly" }] } },
+        "rounds": {
+          "r9": {
+            "meeting": "g9",
+            "at": "2026-12-09",
+            "discussed": [],
+            "skipped": [],
+            "absent": [],
+            "not_discussed": [],
+            "kind": "weekly",
+            "started": "2026-12-09T08:00:00Z",
+            "ended": "2026-12-09T09:00:00Z",
+            "read_back": true
+          }
+        },
+        "log": {
+          "b1": { "kind": "blocker", "text": "No test environment", "at": "2026-12-01", "group": 70 },
+          "b2": { "kind": "blocker", "text": "Legal has not answered", "at": "2026-11-20", "group": 70 },
+          "b3": { "kind": "blocker", "text": "Budget code missing", "at": "2026-11-10", "group": 70, "resolved": "2026-11-25" },
+          "b4": { "kind": "blocker", "text": "Vendor contract unsigned", "at": "2026-12-09", "group": 70, "session": "r9" },
+          "b5": { "kind": "blocker", "text": "Another team's blocker", "at": "2026-12-02", "group": 71 },
+          "c1": { "kind": "commitment", "text": "Pilot live in Region North by March", "at": "2026-12-09", "group": 70, "session": "r9" },
+          "c2": { "kind": "commitment", "text": "Monthly numbers to the board", "at": "2026-10-01", "group": 70 },
+          "s1": { "kind": "stop", "text": "The weekly status deck", "at": "2026-12-09", "group": 70, "session": "r9" },
+          "s2": { "kind": "stop", "text": "Ad hoc vendor demos", "at": "2026-11-01", "group": 70, "resolved": "2026-12-01" },
+          "d1": { "kind": "decision", "text": "Start with one region", "at": "2026-12-09", "group": 70, "session": "r9" }
+        }
+      },
+      "open": [
+        { "kind": "blocker", "label": 70, "expect": ["b2", "b1", "b4"] },
+        { "kind": "commitment", "label": 70, "expect": ["c2", "c1"] },
+        { "kind": "stop", "label": 70, "expect": ["s1"] }
+      ],
+      "session": {
+        "round": "r9",
+        "expect": {
+          "verdicts": [],
+          "created": [],
+          "decisions": ["d1"],
+          "questions": [],
+          "issues": [],
+          "solved": [],
+          "blockers": ["b4"],
+          "commitments": ["c1"],
+          "stops": ["s1"]
+        }
+      },
+      "documents": [
+        {
+          "name": "the agenda names the open blockers",
+          "type": "agenda",
+          "document": {
+            "title": { "key": "agenda.title.weekly", "params": { "group": "Ops team", "date": { "day": "2026-12-10" } } },
+            "blocks": [
+              {
+                "heading": { "key": "heading.blockers" },
+                "items": [
+                  { "key": "literal", "params": { "text": "Legal has not answered" } },
+                  { "key": "literal", "params": { "text": "No test environment" } },
+                  { "key": "literal", "params": { "text": "Vendor contract unsigned" } }
+                ]
+              },
+              { "text": { "key": "agenda.close" } }
+            ]
+          },
+          "text": [
+            "Agenda: Ops team weekly, Thu 10 Dec",
+            "",
+            "Open blockers",
+            "- Legal has not answered",
+            "- No test environment",
+            "- Vendor contract unsigned",
+            "",
+            "Close: read back the decisions and new actions."
+          ],
+          "html": "<p><strong>Agenda: Ops team weekly, Thu 10 Dec</strong></p><p><strong>Open blockers</strong></p><ul><li>Legal has not answered</li><li>No test environment</li><li>Vendor contract unsigned</li></ul><p>Close: read back the decisions and new actions.</p>",
+          "markdown": [
+            "## Agenda: Ops team weekly, Thu 10 Dec",
+            "",
+            "### Open blockers",
+            "",
+            "- Legal has not answered",
+            "- No test environment",
+            "- Vendor contract unsigned",
+            "",
+            "Close: read back the decisions and new actions."
+          ]
+        },
+        {
+          "name": "a stand-up agenda names them too",
+          "type": "agenda",
+          "kind": "standup",
+          "document": {
+            "title": { "key": "agenda.title.standup", "params": { "group": "Ops team", "date": { "day": "2026-12-10" } } },
+            "blocks": [
+              {
+                "heading": { "key": "heading.blockers" },
+                "items": [
+                  { "key": "literal", "params": { "text": "Legal has not answered" } },
+                  { "key": "literal", "params": { "text": "No test environment" } },
+                  { "key": "literal", "params": { "text": "Vendor contract unsigned" } }
+                ]
+              },
+              { "text": { "key": "agenda.close" } }
+            ]
+          },
+          "text": [
+            "Agenda: Ops team stand-up, Thu 10 Dec",
+            "",
+            "Open blockers",
+            "- Legal has not answered",
+            "- No test environment",
+            "- Vendor contract unsigned",
+            "",
+            "Close: read back the decisions and new actions."
+          ],
+          "html": "<p><strong>Agenda: Ops team stand-up, Thu 10 Dec</strong></p><p><strong>Open blockers</strong></p><ul><li>Legal has not answered</li><li>No test environment</li><li>Vendor contract unsigned</li></ul><p>Close: read back the decisions and new actions.</p>",
+          "markdown": [
+            "## Agenda: Ops team stand-up, Thu 10 Dec",
+            "",
+            "### Open blockers",
+            "",
+            "- Legal has not answered",
+            "- No test environment",
+            "- Vendor contract unsigned",
+            "",
+            "Close: read back the decisions and new actions."
+          ]
+        },
+        {
+          "name": "the recap holds what the session committed to, stopped and found in the way",
+          "type": "recap",
+          "document": {
+            "title": { "key": "recap.title.weekly", "params": { "group": "Ops team", "date": { "day": "2026-12-09" } } },
+            "blocks": [
+              { "heading": { "key": "heading.decisions" }, "items": [{ "key": "decision.plain", "params": { "text": "Start with one region" } }] },
+              {
+                "heading": { "key": "heading.commitments" },
+                "items": [{ "key": "literal", "params": { "text": "Pilot live in Region North by March" } }]
+              },
+              { "heading": { "key": "heading.stops" }, "items": [{ "key": "literal", "params": { "text": "The weekly status deck" } }] },
+              { "heading": { "key": "heading.blockersRaised" }, "items": [{ "key": "literal", "params": { "text": "Vendor contract unsigned" } }] }
+            ]
+          },
+          "text": [
+            "Ops team weekly, Wed 9 Dec",
+            "",
+            "Decisions",
+            "- Start with one region",
+            "",
+            "Commitments",
+            "- Pilot live in Region North by March",
+            "",
+            "Stopped",
+            "- The weekly status deck",
+            "",
+            "Blockers",
+            "- Vendor contract unsigned"
+          ],
+          "html": "<p><strong>Ops team weekly, Wed 9 Dec</strong></p><p><strong>Decisions</strong></p><ul><li>Start with one region</li></ul><p><strong>Commitments</strong></p><ul><li>Pilot live in Region North by March</li></ul><p><strong>Stopped</strong></p><ul><li>The weekly status deck</li></ul><p><strong>Blockers</strong></p><ul><li>Vendor contract unsigned</li></ul>",
+          "markdown": [
+            "## Ops team weekly, Wed 9 Dec",
+            "",
+            "### Decisions",
+            "",
+            "- Start with one region",
+            "",
+            "### Commitments",
+            "",
+            "- Pilot live in Region North by March",
+            "",
+            "### Stopped",
+            "",
+            "- The weekly status deck",
+            "",
+            "### Blockers",
+            "",
+            "- Vendor contract unsigned"
+          ],
+          "decisionIds": ["d1"]
+        },
+        {
+          "name": "the weekly note names the open blockers",
+          "type": "note",
+          "from": "2026-12-04",
+          "to": "2026-12-10",
+          "document": {
+            "title": { "key": "note.title", "params": { "from": { "day": "2026-12-04" }, "to": { "day": "2026-12-10" } } },
+            "blocks": [
+              {
+                "heading": { "key": "literal", "params": { "text": "Ops team" } },
+                "items": [
+                  { "key": "note.decision", "params": { "text": "Start with one region" } },
+                  { "key": "note.blocker", "params": { "text": "Legal has not answered" } },
+                  { "key": "note.blocker", "params": { "text": "No test environment" } },
+                  { "key": "note.blocker", "params": { "text": "Vendor contract unsigned" } }
+                ]
+              }
+            ]
+          },
+          "text": [
+            "Weekly note, Fri 4 Dec to Thu 10 Dec",
+            "",
+            "Ops team",
+            "- Decision: Start with one region",
+            "- Blocker: Legal has not answered",
+            "- Blocker: No test environment",
+            "- Blocker: Vendor contract unsigned"
+          ],
+          "html": "<p><strong>Weekly note, Fri 4 Dec to Thu 10 Dec</strong></p><p><strong>Ops team</strong></p><ul><li>Decision: Start with one region</li><li>Blocker: Legal has not answered</li><li>Blocker: No test environment</li><li>Blocker: Vendor contract unsigned</li></ul>",
+          "markdown": [
+            "## Weekly note, Fri 4 Dec to Thu 10 Dec",
+            "",
+            "### Ops team",
+            "",
+            "- Decision: Start with one region",
+            "- Blocker: Legal has not answered",
+            "- Blocker: No test environment",
+            "- Blocker: Vendor contract unsigned"
+          ]
         }
       ]
     }

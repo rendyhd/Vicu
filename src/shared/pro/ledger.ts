@@ -115,7 +115,10 @@ export interface InitiativeValue {
   [unknownField: string]: unknown
 }
 
-export type LogKind = 'decision' | 'value' | 'unknown' | 'issue'
+export type LogKind = 'decision' | 'value' | 'unknown' | 'issue' | 'blocker' | 'commitment' | 'stop'
+
+/** The log kinds that stay open until they are resolved; the others are a fact of their day. */
+export const OPEN_LOG_KINDS: readonly string[] = ['unknown', 'issue', 'blocker', 'commitment', 'stop']
 
 export interface LogValue {
   initiative?: number | null
@@ -595,7 +598,7 @@ export function closedOn(collection: LedgerCollection, value: unknown): LocalDat
     case 'initiatives':
       return value.status === 'closed' && isLocalDate(value.closed_on) ? value.closed_on : null
     case 'log':
-      if (value.kind === 'unknown' || value.kind === 'issue') return isLocalDate(value.resolved) ? value.resolved : null
+      if (typeof value.kind === 'string' && OPEN_LOG_KINDS.includes(value.kind)) return isLocalDate(value.resolved) ? value.resolved : null
       return isLocalDate(value.at) ? value.at : null
     case 'owed':
     case 'escalations':

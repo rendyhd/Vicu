@@ -9,7 +9,7 @@
  */
 import { addLocalDays, localDateOf, type LocalDate } from '../due-dates'
 import { finalVerdictOf, recordValue, type LedgerSettingsValue, type LogValue, type PromiseValue, type ProLedger, type Verdict } from './ledger'
-import { actionDue, actionsOf, groupLog, openIssues, ownerOf, ownerRank, verdictsBetween, YOU, type Group, type GroupTask } from './groups'
+import { actionDue, actionsOf, groupLog, openIssues, openLog, ownerOf, ownerRank, verdictsBetween, YOU, type Group, type GroupTask } from './groups'
 import { effectiveDue, requesterOf } from './promises'
 import { sessionActions, sessionContents, sessionKindOf, type SessionKind } from './sessions'
 import type { WeekStart } from '../week-start'
@@ -237,6 +237,7 @@ export function agendaDocument(input: SessionDocInput & { today: LocalDate; week
     ...block('heading.actionsOpen', lines(actions.others)),
   ]
   if (kind === 'weekly') blocks.push(...block('heading.issues', openIssues(ledger, group.label).map((entry) => literal(entry.value.text.trim()))))
+  blocks.push(...block('heading.blockers', openLog(ledger, group.label, 'blocker').map((entry) => literal(entry.value.text.trim()))))
   blocks.push({ text: line('agenda.close') })
   return { title: line(titleKey('agenda', kind), { group: group.name, date: { day: input.date } }), blocks }
 }
@@ -301,11 +302,14 @@ export function recapDocument(input: SessionRecapInput): SessionRecap {
   })
   const blocks: DocBlock[] = [
     ...block('heading.decisions', parts.decisions),
+    ...block('heading.commitments', literals(parts.contents.commitments)),
+    ...block('heading.stops', literals(parts.contents.stops)),
     ...block('heading.newActions', parts.created),
     ...block('heading.delivered', delivered),
     ...block('heading.changed', changed),
     ...block('heading.issuesSolved', literals(parts.contents.solved)),
     ...block('heading.issues', openIssues(ledger, group.label).map((entry) => literal(entry.value.text.trim()))),
+    ...block('heading.blockersRaised', literals(parts.contents.blockers)),
     ...block('heading.questions', literals(parts.contents.questions)),
   ]
   const absent = [...new Set(input.absent ?? [])].map((id) => names.person(id))
@@ -408,6 +412,7 @@ export function weeklyNoteDocument(input: WeeklyNoteInput): ProDocument {
     const decisions = groupLog(ledger, group.label, 'decision').filter((entry) => inPeriod(entry.value.at)).reverse()
     items.push(...decisions.map((entry) => line('note.decision', { text: entry.value.text.trim() })))
     items.push(...openIssues(ledger, group.label).map((entry) => line('note.issue', { text: entry.value.text.trim() })))
+    items.push(...openLog(ledger, group.label, 'blocker').map((entry) => line('note.blocker', { text: entry.value.text.trim() })))
     if (counts.pastDue) items.push(line('note.pastDue', { count: counts.pastDue }))
     if (counts.next) items.push(line('note.nextWeek', { count: counts.next }))
     if (!items.length) items.push(line('note.nothing'))

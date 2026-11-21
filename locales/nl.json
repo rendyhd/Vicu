@@ -1032,7 +1032,11 @@
       "delivered": "Opgeleverd",
       "changed": "Gewijzigd",
       "issuesSolved": "Opgeloste knelpunten",
-      "questions": "Open vragen"
+      "questions": "Open vragen",
+      "blockers": "Open blokkades",
+      "blockersRaised": "Blokkades",
+      "commitments": "Toezeggingen",
+      "stops": "Gestopt"
     },
     "action": {
       "owner": "{{owner}}: {{title}}, uiterlijk {{date}}",
@@ -1082,6 +1086,7 @@
       },
       "decision": "Besluit: {{text}}",
       "issue": "Open knelpunt: {{text}}",
+      "blocker": "Blokkade: {{text}}",
       "pastDue_one": "{{count}} actie open na de datum",
       "pastDue_other": "{{count}} acties open na hun datum",
       "nextWeek_one": "{{count}} actie loopt af in de komende 7 dagen",

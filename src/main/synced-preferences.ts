@@ -14,10 +14,12 @@ import { DEFAULT_WEEK_START, WEEK_START_KEY, readWeekStart, setWeekStart } from 
 import { EVENT_KEY_PREFIX, readPlanEvent } from '../shared/plan-events'
 import { readSubtaskOrder } from '../shared/subtask-order'
 import { PRO_AREA_KEY, readProArea } from '../shared/pro/settings'
+import { readPlan } from '../shared/pro/project-plan'
 import {
   LABEL_KIND_KEY_PREFIX,
   LABEL_STATUS_KEY_PREFIX,
   PROJECT_MODE_KEY_PREFIX,
+  PROJECT_PLAN_KEY_PREFIX,
   PROJECT_STATUS_KEY_PREFIX,
   REPEAT_RULE_KEY_PREFIX,
   idOfProKey,
@@ -286,7 +288,9 @@ export function isWritablePref(key: unknown, value: unknown): key is string {
   if (key === PRO_AREA_KEY) return value === null || (Array.isArray(value) && readProArea(value).length === value.length)
   if (idOfProKey(key, PROJECT_MODE_KEY_PREFIX) !== null) return value === null || value === 'sequential' || value === 'single'
   if (idOfProKey(key, PROJECT_STATUS_KEY_PREFIX) !== null || idOfProKey(key, LABEL_STATUS_KEY_PREFIX) !== null) return value === null || value === 'on_hold'
-  if (idOfProKey(key, LABEL_KIND_KEY_PREFIX) !== null) return value === null || value === 'person' || value === 'group'
+  if (idOfProKey(key, LABEL_KIND_KEY_PREFIX) !== null) return value === null || value === 'person' || value === 'group' || value === 'private'
+  // A 90-day plan (contract 21.20): its two days, in order; other fields are kept as they are.
+  if (idOfProKey(key, PROJECT_PLAN_KEY_PREFIX) !== null) return value === null || readPlan(value) !== null
   if (idOfProKey(key, REPEAT_RULE_KEY_PREFIX) !== null) return value === null || readRepeatRule(value) !== null
   return false
 }

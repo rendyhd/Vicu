@@ -312,6 +312,11 @@ export function groupLog(ledger: ProLedger | null | undefined, label: number, ki
   return entries.sort((a, b) => (a.value.at === b.value.at ? (a.id < b.id ? -1 : a.id > b.id ? 1 : 0) : a.value.at < b.value.at ? 1 : -1))
 }
 
+/** A group's open entries of one kind (not resolved yet), oldest first (`at`, then id). */
+export function openLog(ledger: ProLedger | null | undefined, label: number, kind: string): LogEntry[] {
+  return groupLog(ledger, label, kind).filter((entry) => !entry.value.resolved).reverse()
+}
+
 /** The group's open issues: by rank (lowest first, without one last), then `at`, then id. */
 export function openIssues(ledger: ProLedger | null | undefined, label: number): LogEntry[] {
   const rankOf = (entry: LogEntry) => (typeof entry.value.rank === 'number' && Number.isFinite(entry.value.rank) ? entry.value.rank : null)

@@ -17,6 +17,7 @@ import {
 } from '../pro/import'
 import {
   archivePlan,
+  closedOn,
   emptyLedger,
   mergeLedger,
   normalizeLedger,
@@ -28,7 +29,9 @@ import { hasProCondition, readGroupBy, readRowFields } from '../pro/list-conditi
 import { endRound, markAbsent, nextPerson, pickPerson, skipPerson, startRound, type RoundState } from '../pro/meeting'
 import { matchPerson, patternText, personCounts, withAlias, type PersonCounts } from '../pro/people'
 import { capState, draftEscalation, escalationDue, moveRank, overCap, parkedValue, rankedInitiatives, readiness, unparkedValue } from '../pro/portfolio'
-import { isProPrefKey, projectOnHold, readOnHold, readProjectMode, readRepeatRule } from '../pro/prefs'
+import { isProPrefKey, privateLabelIds, projectOnHold, readOnHold, readProjectMode, readRepeatRule } from '../pro/prefs'
+import { carryOver, defaultPlanEnd, nextPlan, planValue, planView, planWeekOf, planWeeks, plansOf, readPlan } from '../pro/project-plan'
+import { personTopics } from '../pro/topics'
 import {
   buildVerdict,
   canSnooze,
@@ -48,7 +51,7 @@ import { inProArea, isProEnabled, readProArea } from '../pro/settings'
 import { blockReplacesLaterStart, dateOnlyStart, startDayOf, startsEntries, startsLater } from '../pro/start-dates'
 import { mirrorText, proWeeklySteps, weeklyDoneSteps, weeklyMirror, withWeeklyDone } from '../pro/weekly'
 import { DEFAULT_PRO_LAYERS } from '../pro/settings'
-import { groupPage, groupsOf, missIssue, personPage, reliability } from '../pro/groups'
+import { groupPage, groupsOf, missIssue, openLog, personPage, reliability } from '../pro/groups'
 import { SESSION_STEPS, endSession, readScore, sessionActions, sessionContents, sessionKindOf } from '../pro/sessions'
 import { followUps, noteDue, notePeriod } from '../pro/follow-ups'
 import { readCheckDays, readWorkdays, workingDaysBefore } from '../pro/working-days'
@@ -668,6 +671,93 @@ export function runProSuite(options: { zone: string; expectedOffsetMinutesInNove
       it('a key without a text is shown as the key', () => {
         expect(messageFormatter({})('note.nothing', {})).toBe('note.nothing')
       })
+    })
+
+    describe('90-day plans', () => {
+      const p = v.plans
+      it('a plan is read from its two days', () => {
+        for (const c of p.read) expect(readPlan(c.value)).toEqual(c.expect)
+        expect(planValue(p.stored.plan)).toEqual(p.stored.expect)
+        for (const c of p.defaultEnd) expect(defaultPlanEnd(c.start)).toBe(c.expect)
+      })
+      it('weeks run from the first day', () => {
+        for (const c of p.weeks) {
+          const weeks = planWeeks(c.plan)
+          if (c.expect) expect(weeks).toEqual(c.expect)
+          else {
+            expect(weeks.length).toBe(c.count)
+            expect(weeks[weeks.length - 1]).toEqual(c.last)
+          }
+        }
+        for (const c of p.weekOf) expect(planWeekOf(p.plan, c.day)).toBe(c.expect)
+      })
+      it('the plans of an account, open ones first', () => {
+        expect(plansOf(p.list.values).map((entry) => entry.project)).toEqual(p.list.expect)
+        expect(isProPrefKey('project_plan.30')).toBe(true)
+        expect(isProPrefKey('project_plan.x')).toBe(false)
+      })
+      it('the view is counted from tasks and verdicts', () => {
+        expect(planView({ plan: p.plan, tasks: p.tasks, ledger: ledgerOf(p.ledger), today: p.today })).toEqual(p.view)
+        for (const c of p.beforeAndAfter) {
+          const view = planView({ plan: p.plan, tasks: p.tasks, ledger: ledgerOf(p.ledger), today: c.today })
+          expect(view.week).toBe(c.week)
+          if (c.overdue !== undefined) expect(view.overdue).toBe(c.overdue)
+        }
+      })
+      it('closing carries the open work into the next plan', () => {
+        const plan = readPlan({ ...p.stored.expect, closed: undefined })!
+        for (const c of p.next) expect(nextPlan(plan, 30, c.today)).toEqual(c.expect)
+        expect(carryOver(p.tasks)).toEqual(p.carryOver)
+      })
+    })
+
+    describe('1:1 topics', () => {
+      const s = v.topics
+      it('private labels', () => {
+        expect([...privateLabelIds(s.prefs)].sort((a, b) => a - b)).toEqual(s.privateLabels)
+      })
+      for (const c of s.cases) {
+        it(`the topics of person ${c.person}`, () => {
+          expect(personTopics({ person: c.person, tasks: s.tasks, ledger: ledgerOf(s.ledger), today: s.today, privateLabels: privateLabelIds(s.prefs) })).toEqual(c.expect)
+        })
+      }
+    })
+
+    describe('blockers, commitments and stops', () => {
+      const k = v.logKinds
+      const ledger = () => ledgerOf(k.ledger)
+      const names = { person: (id: number) => k.names[String(id)] ?? '?', me: k.me }
+      it('stay open until resolved', () => {
+        for (const c of k.closed) expect(closedOn('log', c.value)).toBe(c.expect)
+        for (const c of k.open) expect(openLog(ledger(), c.label, c.kind).map((entry) => entry.id)).toEqual(c.expect)
+      })
+      it('a session holds what was captured in it', () => {
+        const round = k.ledger.rounds[k.session.round]
+        const group = groupsOf(ledger()).find((entry) => entry.id === round.meeting)!
+        expect(sessionContents({ round: k.session.round, started: round.started, ended: round.ended, group, tasks: [], ledger: ledger() })).toEqual(k.session.expect)
+      })
+      it('their sentences are in the messages', () => {
+        for (const [key, text] of Object.entries(k.messages)) expect(v.documents.messages[key]).toBe(text)
+      })
+      for (const c of k.documents) {
+        it(c.name, () => {
+          const t = messageFormatter(v.documents.messages)
+          const day = (value: string) => formatWeekdayDate(local(`${value}T12:00:00`), local(`${k.today}T12:00:00`), fmtOf('en-GB', false))
+          const group = groupsOf(ledger())[0]
+          const round = k.ledger.rounds.r9
+          const document =
+            c.type === 'agenda'
+              ? agendaDocument({ group, kind: c.kind ?? 'weekly', date: k.today, tasks: [], ledger: ledger(), names, today: k.today, weekStart: 'monday' })
+              : c.type === 'note'
+                ? weeklyNoteDocument({ groups: [group], tasks: [], ledger: ledger(), from: c.from, to: c.to, names })
+                : recapDocument({ group, kind: round.kind, date: round.at, tasks: [], ledger: ledger(), names, round: 'r9', started: round.started, ended: round.ended, absent: [] }).document
+          expect(document).toEqual(c.document)
+          const rendered = renderDocument(document, t, day)
+          expect(rendered.text.split('\n')).toEqual(c.text)
+          expect(rendered.html).toBe(c.html)
+          expect(rendered.markdown.split('\n')).toEqual(c.markdown)
+        })
+      }
     })
 
     describe('custom lists with Pro conditions', () => {

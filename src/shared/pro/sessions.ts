@@ -82,6 +82,10 @@ export interface SessionContents {
   issues: string[]
   /** Issues solved in the session. */
   solved: string[]
+  /** Blockers, commitments and stops captured in the session. */
+  blockers: string[]
+  commitments: string[]
+  stops: string[]
 }
 
 export interface SessionContentsInput {
@@ -112,7 +116,7 @@ export function sessionContents(input: SessionContentsInput): SessionContents {
   }
   verdicts.sort((a, b) => a.taskId - b.taskId)
   created.sort((a, b) => a - b)
-  const byKind: Record<string, Array<{ id: string; at: string }>> = { decision: [], unknown: [], issue: [] }
+  const byKind: Record<string, Array<{ id: string; at: string }>> = { decision: [], unknown: [], issue: [], blocker: [], commitment: [], stop: [] }
   const solved: Array<{ id: string; at: string }> = []
   for (const [id, record] of Object.entries(ledger?.log ?? {})) {
     const value = record.value
@@ -122,7 +126,17 @@ export function sessionContents(input: SessionContentsInput): SessionContents {
   }
   const ids = (list: Array<{ id: string; at: string }>) =>
     [...list].sort((a, b) => (a.at === b.at ? (a.id < b.id ? -1 : a.id > b.id ? 1 : 0) : a.at < b.at ? -1 : 1)).map((entry) => entry.id)
-  return { verdicts, created, decisions: ids(byKind.decision), questions: ids(byKind.unknown), issues: ids(byKind.issue), solved: ids(solved) }
+  return {
+    verdicts,
+    created,
+    decisions: ids(byKind.decision),
+    questions: ids(byKind.unknown),
+    issues: ids(byKind.issue),
+    solved: ids(solved),
+    blockers: ids(byKind.blocker),
+    commitments: ids(byKind.commitment),
+    stops: ids(byKind.stop),
+  }
 }
 
 export interface SessionEnd {

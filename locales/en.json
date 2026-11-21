@@ -1240,7 +1240,11 @@
       "delivered": "Delivered",
       "changed": "Changed",
       "issuesSolved": "Issues solved",
-      "questions": "Open questions"
+      "questions": "Open questions",
+      "blockers": "Open blockers",
+      "blockersRaised": "Blockers",
+      "commitments": "Commitments",
+      "stops": "Stopped"
     },
     "action": {
       "owner": "{{owner}}: {{title}}, by {{date}}",
@@ -1295,6 +1299,7 @@
       "nextWeek_one": "{{count}} action due in the next 7 days",
       "nextWeek_other": "{{count}} actions due in the next 7 days",
       "nothing": "Nothing to report.",
+      "blocker": "Blocker: {{text}}",
       "noGroups": "No groups yet."
     }
   }
