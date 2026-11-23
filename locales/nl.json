@@ -1262,5 +1262,17 @@
     "showMore": "Tonen",
     "addedToPersonal": "Toegevoegd aan Persoonlijk, omdat er geen werklabel is ingesteld",
     "showTask": "Tonen"
+  },
+  "projectFilter": {
+    "button": "Filteren op label",
+    "buttonPicked_one": "Filteren op label, {{count}} gekozen",
+    "buttonPicked_other": "Filteren op label, {{count}} gekozen",
+    "bar": "Labels om te tonen",
+    "choice_one": "{{label}} {{count}} taak",
+    "choice_other": "{{label}} {{count}} taken",
+    "clear": "Wissen",
+    "more_one": "Nog {{count}} taak in dit project",
+    "more_other": "Nog {{count}} taken in dit project",
+    "showAll": "Alles tonen"
   }
 }

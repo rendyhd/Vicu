@@ -1468,5 +1468,17 @@
     "showMore": "Show",
     "addedToPersonal": "Added to Personal, because no work label is set",
     "showTask": "Show"
+  },
+  "projectFilter": {
+    "button": "Filter by label",
+    "buttonPicked_one": "Filter by label, {{count}} picked",
+    "buttonPicked_other": "Filter by label, {{count}} picked",
+    "bar": "Labels to show",
+    "choice_one": "{{label}} {{count}} task",
+    "choice_other": "{{label}} {{count}} tasks",
+    "clear": "Clear",
+    "more_one": "{{count}} more task in this project",
+    "more_other": "{{count}} more tasks in this project",
+    "showAll": "Show all"
   }
 }

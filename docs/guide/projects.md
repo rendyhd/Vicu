@@ -98,6 +98,7 @@ A label is a colored tag with its own page. Chip text always stays readable agai
 
 - Put labels on a task in its card, or type `@errand` in quick add. See [Quick add](guide:quick-add).
 - Open a label from **Tags** in the sidebar, or **Labels** in the phone drawer, to see all its tasks.
+- To see part of a project, tap the filter button next to the project's menu. A bar opens with the labels its tasks carry and how many tasks have each. Pick one or more: the page shows the tasks with any of them, and sections without such tasks step aside. The button keeps a count while labels are picked, and **Show all** under the list puts everything back. Nothing is saved: leaving the project clears it. For a view you keep, make a [custom list](guide:custom-lists).
 - Drag a task onto a label in the sidebar to apply it. {desktop}
 - On a phone, create labels from the picker. Tapping **Create** when a search finds nothing makes the label. Drag labels in the drawer to reorder them; the order stays on that device. {phone}
 

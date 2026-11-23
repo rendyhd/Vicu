@@ -7,7 +7,7 @@
 //   6. Project menu: untick and tick again on the subproject (entry false, then none again).
 //   7. A task added in Work gets the label; without a label "Added to Personal".
 //   8. Search, the palette and Quick find mark what the mode would not list.
-//   9. A project page reached in the other mode says "1 more in Work" and Show reveals it.
+//   9. A project page reached in the other mode says "1 more in Work", Show reveals it until the page is left.
 //   10. Pro only in Work.  11. axe on the sidebar and the Settings card.
 // Removes everything it made, writes the synced keys back to none and puts the device settings back.
 import { dueAt } from './_pro-groups.mjs'
@@ -374,6 +374,15 @@ export default async function run(h) {
     await more.getByRole('button', { name: 'Show' }).click()
     await h.wait(500)
     await h.assert('9: Show reveals the task and the line goes', async () => ({ ok: has(await titles(), 'WM home today') && (await more.count()) === 0 }))
+    // Show lasts until the page is left: another project and back hides the task again.
+    await h.goto(`/project/${client.id}`)
+    await h.wait(500)
+    await h.goto(`/project/${home.id}`)
+    await h.wait(500)
+    await h.assert('9: after another project and back, the task is hidden again and the line is back', async () => ({
+      ok: !has(await titles(), 'WM home today') && (await more.count()) === 1,
+      detail: (await more.allTextContents()).join('|'),
+    }))
     await retry(() => h.api('DELETE', `/tasks/${homeToday.id}/labels/${label.id}`)).catch(() => {})
 
     // --- 10. Pro only in Work -------------------------------------------------------------------------------------------------

@@ -2107,6 +2107,32 @@ and, when there is no text to narrow the read, `labels in` and `priority in`.
 
 `searchFilters` in `cross-app-semantics-v1.json` runs over the same `tasks` as `customLists`.
 
+### 17.2 Labels on a project page
+
+A project's page can be narrowed to some of its labels, to see part of a project without making a
+custom list. Like the search filters it is for the person reading: nothing is saved or synced, and
+the choice goes when the page is left (another project, another screen). A filter button sits next
+to the project's menu and opens a bar under the page header with one choice per label.
+
+- **The labels offered** are those of the tasks the page lists, its own and its sections', after
+  everything else that decides what the page holds (hidden tasks, Pro's availability view, Work and
+  Personal of section 22.4). Each shows how many of those tasks carry it. They are ordered by title,
+  compared in lowercase character by character (UTF-16 code units), then by id. A picked label that
+  no listed task carries any more stays in the bar with 0 until it is unpicked. With no label to
+  offer and none picked there is no button.
+- **What shows.** With labels picked, a task shows when it has at least one of them (`label_ids` of
+  section 17). Where the page shows subtasks under their parent, a row under a shown row is shown
+  with it; a subtask that matches while its parent does not is listed as the page would list it
+  without its parent (the rule of 22.4). A section with no task left, in itself or in its own
+  sections, is not drawn while labels are picked.
+- **What is said.** While labels are picked the button carries their number, also with the bar
+  closed, and one line under the list says how many of the page's tasks are left out, with Show all,
+  which unpicks every label.
+
+`projectLabelFilter` in `cross-app-semantics-v1.json`: `choices` gives the labels offered in order
+with their counts, `shown` the ids shown in the list's order. `parent` is the task a row is nested
+under on the page.
+
 ## 18. Task templates
 
 A template is a task to start from, saved by the person from a task they already have. Templates

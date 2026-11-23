@@ -156,6 +156,44 @@
     { "name": "one priority", "today": "2026-10-06", "filters": { "priorities": [4] }, "expect": [12] },
     { "name": "all conditions together", "today": "2026-10-06", "filters": { "date": "today", "status": "open", "label_ids": [7], "priorities": [3] }, "expect": [13] }
   ],
+  "projectLabelFilter": {
+    "about": "Section 17.2. The tasks are a project page's list in its order; parent is the task a row is nested under on the page.",
+    "labels": [
+      { "id": 2, "title": "booking" },
+      { "id": 3, "title": "Booking" },
+      { "id": 5, "title": "Errand" },
+      { "id": 7, "title": "Waiting" },
+      { "id": 9, "title": "packing" },
+      { "id": 11, "title": "Old" }
+    ],
+    "tasks": [
+      { "id": 1, "title": "Book flights", "labels": [3] },
+      { "id": 2, "title": "Reserve hotel", "labels": [3] },
+      { "id": 3, "title": "Renew passport", "labels": [5, 7] },
+      { "id": 4, "title": "Buy travel adapter", "labels": [5] },
+      { "id": 5, "title": "Ask Maya about dinner", "labels": [7] },
+      { "id": 6, "title": "Pack camera gear", "labels": [9] },
+      { "id": 7, "title": "Day plan for Sintra", "labels": [] },
+      { "id": 8, "title": "Lenses", "labels": [], "parent": 6 },
+      { "id": 9, "title": "Charger", "labels": [9], "parent": 7 },
+      { "id": 10, "title": "Spare batteries", "labels": [], "parent": 8 },
+      { "id": 11, "title": "Passport photos", "labels": [3, 3] },
+      { "id": 12, "title": "Train tickets", "labels": [2] }
+    ],
+    "choices": [
+      { "name": "nothing picked: by title in lowercase, then id", "picked": [], "expect": [{ "id": 2, "count": 1 }, { "id": 3, "count": 3 }, { "id": 5, "count": 2 }, { "id": 9, "count": 2 }, { "id": 7, "count": 2 }] },
+      { "name": "a picked label no task carries stays with 0", "picked": [11], "expect": [{ "id": 2, "count": 1 }, { "id": 3, "count": 3 }, { "id": 5, "count": 2 }, { "id": 11, "count": 0 }, { "id": 9, "count": 2 }, { "id": 7, "count": 2 }] },
+      { "name": "picking does not change the counts", "picked": [3], "expect": [{ "id": 2, "count": 1 }, { "id": 3, "count": 3 }, { "id": 5, "count": 2 }, { "id": 9, "count": 2 }, { "id": 7, "count": 2 }] }
+    ],
+    "shown": [
+      { "name": "nothing picked shows everything", "picked": [], "expect": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] },
+      { "name": "one label", "picked": [3], "expect": [1, 2, 11] },
+      { "name": "any of the labels", "picked": [5, 7], "expect": [3, 4, 5] },
+      { "name": "rows under a shown row go with it, a matching subtask shows without its parent", "picked": [9], "expect": [6, 8, 9, 10] },
+      { "name": "labels with the same title are two labels", "picked": [2], "expect": [12] },
+      { "name": "a label no task carries", "picked": [11], "expect": [] }
+    ]
+  },
   "taskTemplates": {
     "about": "Section 18. Due dates are local wall-clock times; 23:59:59 is date-only (section 1). Expected templates leave out created_ms, and every field at its default.",
     "capture": [
