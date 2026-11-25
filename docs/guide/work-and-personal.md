@@ -1,23 +1,25 @@
 ---
 title: Work and Personal
 nav: Work and Personal
-description: Keep work and private life in one Vicu account and look at one of them at a time. How to say what is work, how the All, Work and Personal switch behaves, and what it never hides.
-lead: One account can hold your job and the rest of your life. Tell Vicu once what is work, and a switch at the top of the sidebar shows work, everything else, or all of it.
+description: Keep work and private life in one Vicu account and look at one of them at a time. How to say what is work, how the Personal and Work switch behaves, and what it never hides.
+lead: One account can hold your job and the rest of your life. Tell Vicu once what is work, and a switch at the top of the sidebar shows Personal or Work (with an optional All position).
 ---
 
 ## In short
 
 - **It is off until you turn it on**, in **Settings, General, Work and Personal**. Off, Vicu is exactly as before.
 - **You say what is work in two ways:** a work label, and the projects that are work.
-- **The switch has three positions.** **Work** shows what is work. **Personal** shows everything else. **All** shows everything.
+- **The switch shows Personal and Work.** **Personal** shows everything that is not work. **Work** shows what is work. You can optionally add **All** as a third position in Settings.
+- **The work label stays quiet in Work mode.** In Work, task rows hide the work label chip by default so it is not repeated on every item; you can show it again in Settings, and it always stays visible when you open a task.
 - **It is for focus, not for privacy.** Search finds everything and reminders always come.
 - **Each device has its own position.** Your work computer can stay in Work while your phone stays in Personal. What counts as work is the same on all of them.
 
 ## Set it up
 
-1. Open **Settings, General, Work and Personal** and turn on **Show the Work and Personal switch**.
-2. Choose a **Work label**. Any label will do; many people make one called "work".
+1. Open **Settings, General, Work and Personal** and turn on **Show the Personal and Work switch**.
+2. Choose a **Work label**. Any label will do; many people make one called "work". You need one for the Inbox to work in Work mode.
 3. Under **Work projects**, tick the projects that are work.
+4. Optionally turn on **Show All in the switch** if you want a third **All** position, or **Show work label in Work mode** if you want the work label chip shown on rows while in Work.
 
 A ticked project takes its subprojects with it. To keep one subproject out, untick it; everything below it follows. You can also tick or untick a project from its menu: **Work project**.
 

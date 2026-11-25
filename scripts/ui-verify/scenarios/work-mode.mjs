@@ -109,7 +109,14 @@ export default async function run(h) {
   await cleanStale()
 
   try {
-    await saveConfig({ work_mode_enabled: false, work_mode: 'all', pro_enabled: false, pro_only_in_work: false })
+    await saveConfig({
+      work_mode_enabled: false,
+      work_mode: 'all',
+      work_mode_show_all: false,
+      work_mode_show_work_label: false,
+      pro_enabled: false,
+      pro_only_in_work: false,
+    })
 
     // --- Setup: throwaway data ------------------------------------------------------------------------
     const mk = async (title, extra = {}) => {
@@ -171,12 +178,27 @@ export default async function run(h) {
     const cardAxe = await h.axe('[data-work-mode-settings]', { label: 'the Work and Personal settings card' })
     await h.assert('11: axe finds no serious or critical violation in the Settings card', { ok: noSerious(cardAxe).length === 0, detail: cardAxe.map((v) => v.id).join(', ') })
 
-    // --- 3. The switch, All then Work ---------------------------------------------------------------------
+    // --- 3. The switch: Personal and Work by default, All optional ----------------------------------------
     await h.goto('/today')
     await h.wait(800)
-    await h.assert('3: the switch appears with All selected', async () => ({
-      ok: (await page.locator('[data-work-mode="all"]').getAttribute('aria-checked')) === 'true' && (await page.locator('[data-work-mode-switch] [role="radio"]').count()) === 3,
-    }))
+    await h.assert('3: by default the switch has Personal then Work with Personal selected', async () => {
+      const modes = await page.locator('[data-work-mode-switch] [role="radio"]').evaluateAll((els) => els.map((el) => el.getAttribute('data-work-mode')))
+      return {
+        ok: JSON.stringify(modes) === JSON.stringify(['personal', 'work']) && (await page.locator('[data-work-mode="personal"]').getAttribute('aria-checked')) === 'true',
+        detail: JSON.stringify(modes),
+      }
+    })
+    await saveConfig({ work_mode_show_all: true })
+    await reload()
+    await h.goto('/today')
+    await h.wait(800)
+    await h.assert('3: with Show All on, the switch has Personal, Work and All', async () => {
+      const modes = await page.locator('[data-work-mode-switch] [role="radio"]').evaluateAll((els) => els.map((el) => el.getAttribute('data-work-mode')))
+      return {
+        ok: JSON.stringify(modes) === JSON.stringify(['personal', 'work', 'all']) && (await page.locator('[data-work-mode="all"]').getAttribute('aria-checked')) === 'true',
+        detail: JSON.stringify(modes),
+      }
+    })
     await h.capture('sidebar-all', { clip: page.locator('aside').first() })
     const sidebarAxe = await h.axe('aside', { label: 'the sidebar with the switch' })
     await h.assert('11: axe finds no serious or critical violation in the sidebar', { ok: noSerious(sidebarAxe).length === 0, detail: sidebarAxe.map((v) => `${v.id}: ${v.targets.join(' ')}`).join(', ') })
@@ -193,17 +215,17 @@ export default async function run(h) {
     })
     await h.key('ArrowRight')
     await h.wait(300)
-    await h.assert('3: Right moves Work to Personal', { ok: (await checked()) === 'personal' && (await storedMode()) === 'personal' })
+    await h.assert('3: Right moves Work to All', { ok: (await checked()) === 'all' && (await storedMode()) === 'all' })
     await h.key('ArrowLeft')
     await h.wait(300)
     await h.assert('3: Left moves it back to Work', { ok: (await checked()) === 'work' })
     await h.key('End')
     await h.wait(300)
-    await h.assert('3: End goes to Personal', { ok: (await checked()) === 'personal' })
+    await h.assert('3: End goes to All', { ok: (await checked()) === 'all' })
     await h.key('Home')
     await h.wait(300)
-    await h.assert('3: Home goes to All', { ok: (await checked()) === 'all' })
-    await h.assert('3: the focus stays in the radio group', async () => ({ ok: (await page.evaluate(() => document.activeElement?.getAttribute('data-work-mode'))) === 'all' }))
+    await h.assert('3: Home goes to Personal', { ok: (await checked()) === 'personal' })
+    await h.assert('3: the focus stays in the radio group', async () => ({ ok: (await page.evaluate(() => document.activeElement?.getAttribute('data-work-mode'))) === 'personal' }))
     await setMode('work')
     await h.wait(500)
 
@@ -389,7 +411,7 @@ export default async function run(h) {
     await saveConfig({ pro_enabled: true, pro_onboarding_seen: true })
     await reload()
     await openGeneral()
-    const proSwitch = card.getByRole('switch').nth(1)
+    const proSwitch = card.locator('label', { hasText: 'Show Pro only in Work' }).getByRole('switch')
     await h.assert('10: with Pro on the card offers "Show Pro only in Work"', async () => ({ ok: (await card.getByText('Show Pro only in Work').count()) === 1 }))
     await proSwitch.click()
     await h.wait(500)
@@ -432,8 +454,21 @@ export default async function run(h) {
       return { ok: bad.length === 0 && !!box && !!side && box.x + box.width <= side.x + side.width + 1, detail: JSON.stringify({ bad, box, side }) }
     })
   } finally {
-    await saveConfig({ work_mode_enabled: false, work_mode: 'all', sidebar_width: before.sidebar_width ?? 260 }).catch(() => {})
-    await saveConfig({ pro_enabled: before.pro_enabled ?? false, pro_only_in_work: before.pro_only_in_work ?? false, work_mode_enabled: before.work_mode_enabled ?? false, work_mode: before.work_mode ?? 'all' }).catch(() => {})
+    await saveConfig({
+      work_mode_enabled: false,
+      work_mode: 'all',
+      work_mode_show_all: before.work_mode_show_all ?? false,
+      work_mode_show_work_label: before.work_mode_show_work_label ?? false,
+      sidebar_width: before.sidebar_width ?? 260,
+    }).catch(() => {})
+    await saveConfig({
+      pro_enabled: before.pro_enabled ?? false,
+      pro_only_in_work: before.pro_only_in_work ?? false,
+      work_mode_enabled: before.work_mode_enabled ?? false,
+      work_mode: before.work_mode ?? 'all',
+      work_mode_show_all: before.work_mode_show_all ?? false,
+      work_mode_show_work_label: before.work_mode_show_work_label ?? false,
+    }).catch(() => {})
     const keys = { 'work.label': beforePrefs['work.label'] ?? null }
     for (const id of made.projects) keys[`work.project.${id}`] = null
     await writePrefs(keys).catch(() => {})

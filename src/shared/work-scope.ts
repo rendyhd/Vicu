@@ -116,8 +116,13 @@ export function isWorkTask(task: WorkTask, scope: WorkScope): boolean {
 
 // --- The mode (section 22.4) ------------------------------------------------------------------
 
-export const WORK_MODES = ['all', 'work', 'personal'] as const
+export const WORK_MODES = ['personal', 'work', 'all'] as const
 export type WorkMode = (typeof WORK_MODES)[number]
+
+/** The modes offered by the switch, in display order: Personal, Work, and optionally All. */
+export function workModeOptions(showAll = false): readonly WorkMode[] {
+  return showAll ? WORK_MODES : ['personal', 'work']
+}
 
 /** A stored mode; anything else is `all`. */
 export function parseWorkMode(value: unknown): WorkMode {
@@ -128,14 +133,28 @@ export function parseWorkMode(value: unknown): WorkMode {
 export interface WorkModeSwitches {
   work_mode_enabled?: boolean
   work_mode?: string
+  work_mode_show_all?: boolean
+  work_mode_show_work_label?: boolean
   pro_only_in_work?: boolean
   standalone_mode?: boolean
 }
 
-/** The mode in effect: `all` while the feature is off or the device is in standalone mode. */
+/**
+ * The mode in effect: `all` while the feature is off or the device is in standalone mode; while on,
+ * a stored `all` (or none) acts as `personal` unless `work_mode_show_all` is on.
+ */
 export function effectiveWorkMode(config: WorkModeSwitches | null | undefined): WorkMode {
   if (!config || config.work_mode_enabled !== true || config.standalone_mode === true) return 'all'
-  return parseWorkMode(config.work_mode)
+  const mode = parseWorkMode(config.work_mode)
+  return mode === 'all' && config.work_mode_show_all !== true ? 'personal' : mode
+}
+
+/**
+ * The work label id hidden from task rows (section 22.4): in Work mode, the work label is hidden by
+ * default so it is not repeated on every row, unless the user opted in via `work_mode_show_work_label`.
+ */
+export function hiddenWorkLabel(scope: WorkScope, mode: WorkMode, showWorkLabel = false): number | null {
+  return mode === 'work' && !showWorkLabel ? scope.label : null
 }
 
 /** Whether the mode lists a task: everything in All, work in Work, the rest in Personal. */

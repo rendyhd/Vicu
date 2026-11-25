@@ -56,7 +56,7 @@ With Pro on, the **Pro** header in the sidebar folds Pro's lists away and opens 
 
 #### Work and Personal
 
-Turns on the switch at the top of the sidebar that shows work, everything else, or all of it, and holds the work label and the work projects. See [Work and Personal](guide:work-and-personal). The switch is per computer; the label and the projects are shared with your other devices.
+Turns on the Personal and Work switch at the top of the sidebar (with an optional All position), holds the work label and work projects, and lets you choose whether the work label shows on rows in Work mode. See [Work and Personal](guide:work-and-personal). The switch and display options are per computer; the label and the projects are shared with your other devices.
 
 #### Task Completion Sound
 

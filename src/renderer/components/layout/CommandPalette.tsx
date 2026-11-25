@@ -114,9 +114,9 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
       voice: can('voice'),
       assistant: can('assistant'),
       pro: pro.on ? { lists: proLists, focus: pro.layer('availability'), promises: pro.layer('promises') } : undefined,
-      workMode: workMode.enabled,
+      workMode: workMode.enabled ? { showAll: workMode.showAll } : false,
     }),
-    [smartLists, projects?.flat, labels, appConfig, pro, proLists, workMode.enabled],
+    [smartLists, projects?.flat, labels, appConfig, pro, proLists, workMode.enabled, workMode.showAll],
   )
   const shown = useMemo(() => rankPalette(items, query, tasks), [items, query, tasks])
   const activeIndex = shown.length === 0 ? -1 : Math.min(active, shown.length - 1)

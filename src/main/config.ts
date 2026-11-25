@@ -296,6 +296,8 @@ export function normalizeConfig(raw: Record<string, unknown>): AppConfig {
     // Work and Personal (cross-app semantics section 22), per device.
     work_mode_enabled: raw.work_mode_enabled === true,
     work_mode: parseWorkMode(raw.work_mode),
+    work_mode_show_all: raw.work_mode_show_all === true,
+    work_mode_show_work_label: raw.work_mode_show_work_label === true,
     pro_only_in_work: raw.pro_only_in_work === true,
     pro_ledger_sync: raw.pro_ledger_sync && typeof raw.pro_ledger_sync === 'object'
       ? raw.pro_ledger_sync as AppConfig['pro_ledger_sync']

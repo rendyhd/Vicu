@@ -3154,9 +3154,9 @@ nobody fills in a weekly reading by hand.
 
 A person who keeps work and private life in one account can look at one of them at a time. They
 say what is work once: a label, and the projects that are work. Each device then has a mode,
-**All**, **Work** or **Personal**: Work shows what is work, Personal shows everything else, All
-shows everything. The feature is optional and off until turned on; off, every list, count and
-screen is what a version without this section shows.
+**Personal**, **Work**, and optionally **All**: Work shows what is work, Personal shows everything
+else, and All (when offered) shows everything. The feature is optional and off until turned on;
+off, every list, count and screen is what a version without this section shows.
 
 It is for focus, not for privacy: nothing is locked away, reminders still come, and search finds
 everything. What work is belongs to the account and syncs through the preferences carrier (section
@@ -3175,8 +3175,10 @@ nothing of it.
 - There is one key per project, so two devices that mark different projects never undo each
   other's change. Entries of deleted projects are not used; the app that deletes a project may
   write `null` to its entry.
-- The work label is an ordinary label in every other way: it shows on rows, can be put on and
-  taken off by hand, and has no `label_kind` of its own (it may be a label with a kind).
+- The work label is an ordinary label in every other way: it can be put on and taken off by hand,
+  and has no `label_kind` of its own (it may be a label with a kind). In Work mode its chip is
+  hidden on task rows by default so every row does not repeat it (section 22.4,
+  `work_mode_show_work_label`); it still shows in the task editor so it can be seen and changed.
 
 ### 22.2 Work projects
 
@@ -3204,15 +3206,22 @@ project, or putting the label on it, makes it work on every device at once.
 
 ### 22.4 The mode
 
-Device settings, never synced: `work_mode_enabled` (off by default), `work_mode` (`"all"`,
-`"work"` or `"personal"`; anything else is `"all"`) and `pro_only_in_work` (section 22.8). The
-**mode in effect** is `all` while the feature is off or the device is in standalone mode; turning
-the feature off keeps the stored mode for the next time. Changing the mode writes nothing but that
-setting.
+Device settings, never synced: `work_mode_enabled` (off by default), `work_mode` (`"personal"`,
+`"work"` or `"all"`; anything else parses as `"all"`), `work_mode_show_all` (off by default:
+whether the switch offers **All** as a third option after **Personal** and **Work**),
+`work_mode_show_work_label` (off by default: whether task rows show the work label chip while in
+**Work** mode) and `pro_only_in_work` (section 22.8). The switch orders its options **Personal**,
+**Work**, and (only when `work_mode_show_all` is on) **All**. The **mode in effect** is `all`
+while the feature is off or the device is in standalone mode; while the feature is on, a stored
+mode of `all` (or none) acts as `personal` unless `work_mode_show_all` is on. Turning
+`work_mode_enabled` or `work_mode_show_all` off keeps the stored mode for the next time. Changing
+the mode writes nothing but that setting.
 
 In Work a list shows the tasks that are work, in Personal the tasks that are not, in All every
 task. The mode is applied after everything else that decides what a list holds (the list's own
-conditions, hidden tasks, Pro's availability view), and before counting.
+conditions, hidden tasks, Pro's availability view), and before counting. While the mode in effect
+is Work and `work_mode_show_work_label` is off, task rows hide the work label chip (the task
+editor and expanded card still show it).
 
 - **Nested subtasks.** Where a list shows subtasks under their parent, a row under a shown row is
   shown with it, whatever it is itself, so a task never loses part of its steps. A subtask that
@@ -3257,7 +3266,8 @@ templates, drafts of the assistant the person accepts, and a new subtask.
 - Hidden carriers and anything else an app makes for itself get nothing.
 - Where the create is queued for later, the label goes with it, like any label the task names.
 - With no work label set, nothing can be added: the task is made as it is, stays Personal, and the
-  app says so at once with a way to see it. Settings says the same before it happens.
+  app says so at once with a way to see it. Settings makes clear that the Inbox cannot be a work
+  project and requires a work label to work in Work mode, and warns visibly while none is chosen.
 
 ### 22.7 Marking
 
@@ -3299,7 +3309,9 @@ clause, as long as the clause never leaves out a task the mode shows:
 used. `resolve` runs on `workMode.projects` (`id`, `parent`; `title` is only for the reader) with
 `inboxProjectId` and gives entries and the work project ids. `classify` gives entries and the ids
 of `workMode.tasks` (`project`, `labels` as label ids or `null`) that are work. `modes` and
-`effective` give a stored mode or device settings and the mode. `rows` gives a list in order
+`effective` give a stored mode or device settings and the mode; `options` gives the switch order
+with and without `work_mode_show_all`; `hiddenLabel` gives the label id hidden on task rows in
+each mode. `rows` gives a list in order
 (`parent`: the row a task is nested under), a mode, whether the list nests, and the ids shown in
 the list's order. `projectList` gives entries and, per mode, the projects listed. `newTask` gives
 a mode, the work label, the work project ids and a task, with the label the app adds

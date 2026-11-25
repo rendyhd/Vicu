@@ -45,8 +45,8 @@ export interface PaletteSources {
   assistant?: boolean
   /** Pro's lists and actions while Pro is on (plan 7.1.11); absent while it is off. */
   pro?: ProPaletteSources
-  /** Work and Personal is on: the three mode entries are listed (cross-app semantics 22.4). */
-  workMode?: boolean
+  /** Work and Personal is on: the mode entries are listed (cross-app semantics 22.4). */
+  workMode?: boolean | { showAll?: boolean }
 }
 
 export interface ProPaletteSources {
@@ -75,11 +75,13 @@ export function proPaletteItems(pro: ProPaletteSources): PaletteItem[] {
 }
 
 /** Work and Personal (22.4): switching the mode by name. No shortcut, and not listed with an empty query. */
-export function workModePaletteItems(): PaletteItem[] {
+export function workModePaletteItems(showAll = false): PaletteItem[] {
   return [
-    { id: 'cmd:work-all', kind: 'Action', title: t('workMode.paletteAll'), keywords: 'work personal mode all everything show', action: { type: 'command', command: 'work-all' }, byNameOnly: true },
-    { id: 'cmd:work-work', kind: 'Action', title: t('workMode.paletteWork'), keywords: 'work personal mode job office', action: { type: 'command', command: 'work-work' }, byNameOnly: true },
     { id: 'cmd:work-personal', kind: 'Action', title: t('workMode.palettePersonal'), keywords: 'work personal mode private home', action: { type: 'command', command: 'work-personal' }, byNameOnly: true },
+    { id: 'cmd:work-work', kind: 'Action', title: t('workMode.paletteWork'), keywords: 'work personal mode job office', action: { type: 'command', command: 'work-work' }, byNameOnly: true },
+    ...(showAll
+      ? [{ id: 'cmd:work-all', kind: 'Action', title: t('workMode.paletteAll'), keywords: 'work personal mode all everything show', action: { type: 'command', command: 'work-all' }, byNameOnly: true } satisfies PaletteItem]
+      : []),
   ]
 }
 
@@ -124,7 +126,7 @@ export function buildPaletteItems({ smartLists, projects, labels, planner = fals
     ...actions,
     ...smartLists.map((list): PaletteItem => ({ id: `list:${list.id}`, kind: 'List', title: list.label, keywords: 'go to', action: { type: 'path', path: list.path } })),
     ...(pro ? proPaletteItems(pro) : []),
-    ...(workMode ? workModePaletteItems() : []),
+    ...(workMode ? workModePaletteItems(typeof workMode === 'object' ? workMode.showAll === true : false) : []),
     ...GUIDED_PALETTE_ITEMS,
     ...projects.map((project): PaletteItem => ({ id: `project:${project.id}`, kind: 'Project', title: project.title, keywords: 'go to', action: { type: 'project', id: project.id } })),
     ...labels.map((label): PaletteItem => ({ id: `label:${label.id}`, kind: 'Label', title: label.title, keywords: 'go to tag', action: { type: 'label', id: label.id } })),

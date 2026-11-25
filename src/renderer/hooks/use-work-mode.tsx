@@ -9,6 +9,7 @@ import { useSyncedPrefs } from './use-synced-prefs'
 import {
   WORK_LABEL_KEY,
   effectiveWorkMode,
+  hiddenWorkLabel,
   isWorkTask,
   newTaskStaysPersonal,
   passesWorkMode,
@@ -37,6 +38,12 @@ export interface WorkModeState {
   mode: WorkMode
   /** The stored mode, also while the feature is off. */
   storedMode: WorkMode
+  /** Whether the switch offers All as a third position after Personal and Work. */
+  showAll: boolean
+  /** Whether task rows show the work label chip while in Work mode (default false: hidden). */
+  showWorkLabel: boolean
+  /** The label id hidden on task rows in Work mode, or null when nothing is hidden. */
+  hiddenLabelId: number | null
   scope: WorkScope
   isWork: (task: WorkTask) => boolean
   /** Whether the mode lists this task (true for every task in All). */
@@ -61,6 +68,9 @@ const OFF: WorkModeState = {
   enabled: false,
   mode: 'all',
   storedMode: 'all',
+  showAll: false,
+  showWorkLabel: false,
+  hiddenLabelId: null,
   scope: NO_SCOPE,
   isWork: () => false,
   passes: () => true,
@@ -93,6 +103,8 @@ export function WorkModeProvider({ children }: { children: ReactNode }) {
   const enabled = config?.work_mode_enabled === true && config.standalone_mode !== true
   const mode = effectiveWorkMode(config ?? null)
   const storedMode = config?.work_mode ?? 'all'
+  const showAll = config?.work_mode_show_all === true
+  const showWorkLabel = config?.work_mode_show_work_label === true
 
   const value = useMemo<WorkModeState>(() => {
     const shownProjects = mode === 'all' ? null : projectsShownInMode(projects?.all ?? [], scope.projects, mode, inboxProjectId)
@@ -100,6 +112,9 @@ export function WorkModeProvider({ children }: { children: ReactNode }) {
       enabled,
       mode,
       storedMode,
+      showAll,
+      showWorkLabel,
+      hiddenLabelId: hiddenWorkLabel(scope, mode, showWorkLabel),
       scope,
       isWork: (task) => isWorkTask(task, scope),
       passes: (task) => passesWorkMode(task, scope, mode),
@@ -109,7 +124,7 @@ export function WorkModeProvider({ children }: { children: ReactNode }) {
       labelForNewTask: (task) => workLabelForNewTask(task, scope, mode),
       staysPersonal: (task) => newTaskStaysPersonal(task, scope, mode),
     }
-  }, [enabled, mode, storedMode, scope, projects?.all, inboxProjectId])
+  }, [enabled, mode, storedMode, showAll, showWorkLabel, scope, projects?.all, inboxProjectId])
 
   return <WorkModeContext.Provider value={value}>{children}</WorkModeContext.Provider>
 }
@@ -137,7 +152,7 @@ export function parentTaskId(task: { related_tasks?: { parenttask?: ReadonlyArra
 export function useSaveWorkModeConfig() {
   const queryClient = useQueryClient()
   return useCallback(
-    (patch: Pick<Partial<AppConfig>, 'work_mode_enabled' | 'work_mode' | 'pro_only_in_work'>) => {
+    (patch: Pick<Partial<AppConfig>, 'work_mode_enabled' | 'work_mode' | 'work_mode_show_all' | 'work_mode_show_work_label' | 'pro_only_in_work'>) => {
       const current = queryClient.getQueryData<AppConfig>(APP_CONFIG_QUERY_KEY)
       if (current) queryClient.setQueryData<AppConfig>(APP_CONFIG_QUERY_KEY, { ...current, ...patch })
       return api.saveConfigPatch(patch)

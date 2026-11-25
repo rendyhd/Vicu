@@ -1,6 +1,7 @@
 import { useId, useMemo } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
+import { AlertTriangle } from 'lucide-react'
 import { Checkbox } from '@/components/shared/Checkbox'
 import { Switch } from '@/components/shared/Switch'
 import { useAppConfig } from '@/hooks/use-app-config'
@@ -58,6 +59,14 @@ export function WorkModeSettings() {
 
       {enabled && (
         <>
+          <label className="mt-5 flex items-start justify-between gap-4 border-t border-[var(--border-color)] pt-4">
+            <span className="min-w-0">
+              <span className="block text-sm text-[var(--text-primary)]">{t('settings.workMode.showAll')}</span>
+              <span className="mt-0.5 block text-xs text-[var(--text-secondary)]">{t('settings.workMode.showAllNote')}</span>
+            </span>
+            <Switch checked={config.work_mode_show_all === true} onCheckedChange={(checked) => void save({ work_mode_show_all: checked })} />
+          </label>
+
           <div className="mt-5 border-t border-[var(--border-color)] pt-4">
             <label htmlFor={labelId} className="flex items-center justify-between gap-4">
               <span className="text-sm text-[var(--text-primary)]">{t('settings.workMode.label')}</span>
@@ -74,7 +83,26 @@ export function WorkModeSettings() {
               </select>
             </label>
             <p className="mt-1.5 text-xs text-[var(--text-secondary)]">{t('settings.workMode.labelNote')}</p>
-            {scope.label === null && <p className="mt-1.5 text-xs font-medium text-[var(--text-primary)]">{t('settings.workMode.noLabel')}</p>}
+            {scope.label === null && (
+              <div
+                role="alert"
+                className="mt-2.5 flex items-start gap-2 rounded-control border border-status-overdue/40 bg-status-overdue/8 px-3 py-2 text-xs text-text forced-colors:border-[CanvasText]"
+              >
+                <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-status-overdue" aria-hidden="true" />
+                <span>{t('settings.workMode.noLabel')}</span>
+              </div>
+            )}
+
+            <label className="mt-4 flex items-start justify-between gap-4">
+              <span className="min-w-0">
+                <span className="block text-sm text-[var(--text-primary)]">{t('settings.workMode.showWorkLabel')}</span>
+                <span className="mt-0.5 block text-xs text-[var(--text-secondary)]">{t('settings.workMode.showWorkLabelNote')}</span>
+              </span>
+              <Switch
+                checked={config.work_mode_show_work_label === true}
+                onCheckedChange={(checked) => void save({ work_mode_show_work_label: checked })}
+              />
+            </label>
           </div>
 
           <div className="mt-5 border-t border-[var(--border-color)] pt-4">

@@ -42,6 +42,14 @@ describe('buildPaletteItems', () => {
   it('has the New task, Say a task, Dictate tasks, Brain dump, Ask, Make tasks, Make tasks from notes, Refresh, Toggle theme and Settings actions', () => {
     expect(items.filter((i) => i.kind === 'Action').map((i) => i.title)).toEqual(['New task', 'Say a task', 'Dictate tasks', 'Brain dump', 'Ask Vicu', 'Make tasks from text', 'Make tasks from notes', 'Refresh', 'Toggle theme', 'Settings'])
   })
+
+  it('orders Personal then Work in the palette and offers All only when showAll is on', () => {
+    const base = { smartLists: [], projects: [], labels: [] }
+    const two = ids(buildPaletteItems({ ...base, workMode: { showAll: false } })).filter((id) => id.startsWith('cmd:work-'))
+    const three = ids(buildPaletteItems({ ...base, workMode: { showAll: true } })).filter((id) => id.startsWith('cmd:work-'))
+    expect(two).toEqual(['cmd:work-personal', 'cmd:work-work'])
+    expect(three).toEqual(['cmd:work-personal', 'cmd:work-work', 'cmd:work-all'])
+  })
 })
 
 describe('rankPalette', () => {

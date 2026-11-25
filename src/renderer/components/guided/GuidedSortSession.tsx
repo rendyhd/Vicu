@@ -20,6 +20,7 @@ import {
 } from '@/lib/guided/cards'
 import { useAiWorkspace } from '@/hooks/use-ai'
 import { useGuidedWorld } from '@/hooks/use-guided-world'
+import { useWorkMode } from '@/hooks/use-work-mode'
 import { useIsDark } from '@/hooks/use-is-dark'
 import { useOrganizeSuggestions } from '@/hooks/use-organize-suggestions'
 import { useCompleteTask, useDeleteTask, useUpdateTask } from '@/hooks/use-task-mutations'
@@ -78,6 +79,7 @@ interface Props {
 
 export function GuidedSortSession({ queueId, onExit, onDone, doneLabel }: Props) {
   const data = useGuidedWorld()
+  const { hiddenLabelId } = useWorkMode()
   const ws = useAiWorkspace()
   const dayKey = useDayKey()
   const today = useMemo(() => toLocalDate(new Date()), [dayKey])
@@ -294,7 +296,7 @@ export function GuidedSortSession({ queueId, onExit, onDone, doneLabel }: Props)
         <div className="mt-3 flex flex-wrap items-center gap-2 text-meta text-[var(--text-secondary)]">
           {added && <span>{added}</span>}
           <TaskDueBadge dueDate={task.due_date} />
-          {(task.labels ?? []).map((label) => (
+          {(task.labels ?? []).filter((label) => label.id !== hiddenLabelId).map((label) => (
             <span key={label.id} className="vicu-chip rounded-chip px-2 py-px text-chip" style={labelChipStyle(label.hex_color, isDark)}>{label.title}</span>
           ))}
         </div>

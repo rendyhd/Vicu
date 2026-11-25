@@ -42,6 +42,7 @@ import { useProjects } from '@/hooks/use-projects'
 import { blockFields, extractBangToday, recurrenceToVikunja } from '@/lib/task-parser'
 import { TaskInputParser } from '@/components/task-input/TaskInputParser'
 import { useAppConfig } from '@/hooks/use-app-config'
+import { useWorkMode } from '@/hooks/use-work-mode'
 import { useSubtasks } from '@/hooks/use-subtasks'
 import { useHasLocationReminder } from '@/hooks/use-location-reminders'
 import { WorkMark, useWorkMark } from './WorkMark'
@@ -706,9 +707,13 @@ function TaskRowInner({
     [task.id, uploadFromDrop]
   )
 
+  const { hiddenLabelId } = useWorkMode()
   const labels = task.labels ?? []
   // A promise names its person on the meta line: the person's label chip would say it twice.
-  const metaLabels = rowFieldShown(rowView, 'labels') ? rowLabels(labels, rowView).filter((label) => !promise || label.id !== promise.person) : []
+  // In Work mode the work label chip is also hidden by default to avoid repeating it on every row.
+  const metaLabels = rowFieldShown(rowView, 'labels')
+    ? rowLabels(labels, rowView).filter((label) => (!promise || label.id !== promise.person) && label.id !== hiddenLabelId)
+    : []
   const projectSource = rowFieldShown(rowView, 'project') ? rowProjectSource(task.project_id, rowView, projectMeta !== undefined) : 'none'
   const showStart = rowFieldShown(rowView, 'start') && startDateOf(task) !== null
   const showEstimate = rowFieldShown(rowView, 'estimate')

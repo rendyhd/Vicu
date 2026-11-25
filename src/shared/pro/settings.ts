@@ -24,6 +24,7 @@ export interface ProSwitches {
   // Work and Personal (section 22.8): Pro may show only in Work.
   work_mode_enabled?: boolean
   work_mode?: string
+  work_mode_show_all?: boolean
   pro_only_in_work?: boolean
 }
 

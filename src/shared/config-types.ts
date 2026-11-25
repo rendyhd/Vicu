@@ -467,8 +467,12 @@ export interface AppConfig {
   // Work and Personal (cross-app semantics section 22): per device, never synced.
   /** The feature; off by default (`effectiveWorkMode`). Off, every list is as without it. */
   work_mode_enabled?: boolean
-  /** All, Work or Personal; kept while the feature is off. */
+  /** Personal, Work or All; kept while the feature is off. */
   work_mode?: 'all' | 'work' | 'personal'
+  /** Show All as a third option in the Personal/Work switch (off by default). */
+  work_mode_show_all?: boolean
+  /** Show the work label chip on task rows while in Work mode (off by default: hidden as noise). */
+  work_mode_show_work_label?: boolean
   /** With this on, a device in Personal mode acts as one with Pro off (section 22.8). */
   pro_only_in_work?: boolean
 }

@@ -10,10 +10,10 @@ describe('Pro and the Work and Personal mode (contract 22.8)', () => {
     expect(isProEnabled(config, 'promises')).toBe(false)
   })
 
-  it('Work and All keep Pro on', () => {
-    for (const work_mode of ['work', 'all']) {
-      expect(isProEnabled({ ...pro, work_mode_enabled: true, work_mode, pro_only_in_work: true })).toBe(true)
-    }
+  it('Work and All (when shown) keep Pro on', () => {
+    expect(isProEnabled({ ...pro, work_mode_enabled: true, work_mode: 'work', pro_only_in_work: true })).toBe(true)
+    expect(isProEnabled({ ...pro, work_mode_enabled: true, work_mode: 'all', work_mode_show_all: true, pro_only_in_work: true })).toBe(true)
+    expect(isProEnabled({ ...pro, work_mode_enabled: true, work_mode: 'all', work_mode_show_all: false, pro_only_in_work: true })).toBe(false)
   })
 
   it('the feature off, or the option off, leaves Pro as it was', () => {

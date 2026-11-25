@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
   effectiveWorkMode,
+  hiddenWorkLabel,
   isWorkProArea,
   isWorkTask,
   isWritableWorkValue,
@@ -15,6 +16,7 @@ import {
   workEntryToWrite,
   workLabelForNewTask,
   workModeClause,
+  workModeOptions,
   workProjectIdOfKey,
   workProjectIds,
   workProjectKey,
@@ -43,6 +45,8 @@ interface Fixture {
     classify: Array<{ name: string; entries: Record<string, unknown>; expectWork: number[] }>
     modes: Array<{ value: unknown; expect: WorkMode }>
     effective: Array<{ name: string; settings: WorkModeSwitches; expect: WorkMode }>
+    options: Array<{ showAll: boolean; expect: WorkMode[] }>
+    hiddenLabel: Array<{ name: string; mode: WorkMode; label: number | null; showWorkLabel: boolean; expect: number | null }>
     rows: {
       label: number
       tasks: FixtureTask[]
@@ -126,6 +130,17 @@ describe('workMode (contract section 22)', () => {
 
   for (const vector of world.effective) {
     it(`mode in effect: ${vector.name}`, () => expect(effectiveWorkMode(vector.settings)).toBe(vector.expect))
+  }
+
+  for (const vector of world.options) {
+    it(`switch options (showAll=${vector.showAll})`, () => expect(workModeOptions(vector.showAll)).toEqual(vector.expect))
+  }
+
+  for (const vector of world.hiddenLabel) {
+    it(`hidden label: ${vector.name}`, () => {
+      const scope: WorkScope = { label: vector.label, projects: new Set() }
+      expect(hiddenWorkLabel(scope, vector.mode, vector.showWorkLabel)).toBe(vector.expect)
+    })
   }
 
   for (const vector of world.rows.vectors) {

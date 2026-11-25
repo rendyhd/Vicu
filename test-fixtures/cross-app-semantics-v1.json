@@ -6720,9 +6720,23 @@
     "effective": [
       { "name": "on, in Work", "settings": { "work_mode_enabled": true, "work_mode": "work" }, "expect": "work" },
       { "name": "on, in Personal", "settings": { "work_mode_enabled": true, "work_mode": "personal" }, "expect": "personal" },
-      { "name": "on, no mode chosen", "settings": { "work_mode_enabled": true }, "expect": "all" },
+      { "name": "on, no mode chosen, All hidden", "settings": { "work_mode_enabled": true }, "expect": "personal" },
+      { "name": "on, stored All while All is hidden", "settings": { "work_mode_enabled": true, "work_mode": "all", "work_mode_show_all": false }, "expect": "personal" },
+      { "name": "on, no mode chosen, All shown", "settings": { "work_mode_enabled": true, "work_mode_show_all": true }, "expect": "all" },
+      { "name": "on, in All with All shown", "settings": { "work_mode_enabled": true, "work_mode": "all", "work_mode_show_all": true }, "expect": "all" },
       { "name": "off keeps the mode and shows everything", "settings": { "work_mode_enabled": false, "work_mode": "work" }, "expect": "all" },
       { "name": "standalone mode shows everything", "settings": { "work_mode_enabled": true, "work_mode": "personal", "standalone_mode": true }, "expect": "all" }
+    ],
+    "options": [
+      { "showAll": false, "expect": ["personal", "work"] },
+      { "showAll": true, "expect": ["personal", "work", "all"] }
+    ],
+    "hiddenLabel": [
+      { "name": "Work mode hides the work label by default", "mode": "work", "label": 9, "showWorkLabel": false, "expect": 9 },
+      { "name": "Work mode shows the work label when opted in", "mode": "work", "label": 9, "showWorkLabel": true, "expect": null },
+      { "name": "Work mode with no work label set", "mode": "work", "label": null, "showWorkLabel": false, "expect": null },
+      { "name": "Personal mode does not hide the work label", "mode": "personal", "label": 9, "showWorkLabel": false, "expect": null },
+      { "name": "All mode does not hide the work label", "mode": "all", "label": 9, "showWorkLabel": false, "expect": null }
     ],
     "rows": {
       "about": "The work label is 9 and no project is work. parent is the row a task is nested under in this list. expect keeps the list's order.",
@@ -6770,7 +6784,8 @@
     "proOnly": [
       { "name": "Pro only in Work, in Personal", "settings": { "work_mode_enabled": true, "work_mode": "personal", "pro_only_in_work": true }, "expectProAllowed": false },
       { "name": "Pro only in Work, in Work", "settings": { "work_mode_enabled": true, "work_mode": "work", "pro_only_in_work": true }, "expectProAllowed": true },
-      { "name": "Pro only in Work, in All", "settings": { "work_mode_enabled": true, "work_mode": "all", "pro_only_in_work": true }, "expectProAllowed": true },
+      { "name": "Pro only in Work, in All with All shown", "settings": { "work_mode_enabled": true, "work_mode": "all", "work_mode_show_all": true, "pro_only_in_work": true }, "expectProAllowed": true },
+      { "name": "Pro only in Work, stored All while All is hidden", "settings": { "work_mode_enabled": true, "work_mode": "all", "work_mode_show_all": false, "pro_only_in_work": true }, "expectProAllowed": false },
       { "name": "the option off", "settings": { "work_mode_enabled": true, "work_mode": "personal", "pro_only_in_work": false }, "expectProAllowed": true },
       { "name": "the feature off", "settings": { "work_mode_enabled": false, "work_mode": "personal", "pro_only_in_work": true }, "expectProAllowed": true }
     ],
