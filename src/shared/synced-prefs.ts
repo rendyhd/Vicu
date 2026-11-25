@@ -16,6 +16,7 @@ import {
 } from './hidden-tasks'
 import { DEFAULT_TASK_ORDER, GLOBAL_TASK_ORDER_KEY, parseTaskOrder, type TaskOrderKey } from './task-order'
 import { readDefaultLength, readPlannerHours } from './time-blocks'
+import { WHEN_DAYS_KEY, WHEN_MOVE_BY_KEY, WHEN_TIMES_KEY, readDays, readMoveBy, readTimes } from './when-choices'
 import { WEEK_START_KEY, readWeekStart } from './week-start'
 import {
   CATEGORY_KEY_PREFIX,
@@ -351,6 +352,10 @@ export function readSyncedPref(values: Readonly<Record<string, unknown>>, key: s
   if (key === WEEK_START_KEY) return readWeekStart(value)
   if (key === PLANNER_DEFAULT_LENGTH_KEY) return readDefaultLength(value)
   if (key === PLANNER_HOURS_KEY) return readPlannerHours(value)
+  // The When choices (section 23).
+  if (key === WHEN_TIMES_KEY) return readTimes(value)
+  if (key === WHEN_DAYS_KEY) return readDays(value)
+  if (key === WHEN_MOVE_BY_KEY) return readMoveBy(value)
   if (/^task_order\.project\.\d+$/.test(key)) return value === undefined || value === null ? null : parseTaskOrder(value)
   if (placeIdOfKey(key) !== null) return readPlacePref(value)
   if (taskIdOfLocationReminderKey(key) !== null) return readLocationReminderPref(value)

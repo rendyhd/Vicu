@@ -21,6 +21,7 @@ import {
 import { formatMinutesOfDay } from './date-utils'
 import { getWeekStart, type WeekStart } from '../../shared/week-start'
 import { extractDate } from './task-parser/extract-dates'
+import type { DayChoice } from '../../shared/when-choices'
 
 // The pure rules of the When panel (card 3.4a1): what a picked day and time mean as a due date,
 // the month grid and its keyboard moves, the quick choices, and how typed text becomes a
@@ -35,7 +36,7 @@ export interface WhenValue {
 
 export const EMPTY_WHEN: WhenValue = { date: null, time: null }
 
-/** The times offered under the grid. */
+/** The default times of day (section 23.1); the panel offers the account's own. */
 export const TIME_CHOICES = ['09:00', '12:00', '15:00', '18:00'] as const
 
 /** The time a reminder gets when only a day was picked. */
@@ -238,6 +239,18 @@ export function quickChoices(today: LocalDate, fmt: DateFormat, weekStart: WeekS
     { id: 'weekend', label: 'This weekend', hint: formatWeekdayShort(day(weekend), fmt), date: weekend },
     { id: 'nextWeek', label: 'Next week', hint: formatWeekdayDay(day(nextWeek), fmt), date: nextWeek },
   ]
+}
+
+/**
+ * What a day choice (section 23.2) says next to its label: "Wed"; "Mon 12" for next week and next
+ * month; "18:00" for This evening; "Thu 9:00" for another choice with a time.
+ */
+export function dayChoiceHint(choice: DayChoice, fmt: DateFormat): string {
+  const day = startOfLocalDay(choice.date)
+  if (choice.time && choice.id === 'this_evening') return timeLabel(choice.time, fmt)
+  if (choice.time) return `${formatWeekdayShort(day, fmt)} ${timeLabel(choice.time, fmt)}`
+  if (choice.id === 'next_week' || choice.id === 'next_month') return formatWeekdayDay(day, fmt)
+  return formatWeekdayShort(day, fmt)
 }
 
 // --- Text -------------------------------------------------------------------------------------

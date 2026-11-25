@@ -82,12 +82,15 @@ interface QuickEntryConfig {
   pro_import?: boolean
   /** The account's week start (contract section 2.1): which week "next week" means. */
   week_start?: string
+  /** The account's times of day (section 23.1), for the parser. */
+  when_times?: unknown
 }
 
 import { blockFields, parse, getParserConfig, recurrenceToVikunja, extractBangToday } from '../lib/task-parser'
 import { dueToday, parsedDue, toLocalDate } from '../lib/due-dates'
 import { readImport } from '../../shared/pro/import'
 import { readWeekStart, setWeekStart } from '../../shared/week-start'
+import { readTimes, setTimesOfDay } from '../../shared/when-choices'
 import { followColorScheme } from '../lib/theme'
 import { parseChips } from '../lib/parse-chips'
 import { motionMs, motionSpringCurve, travelStart } from '../lib/motion'
@@ -804,6 +807,7 @@ function applyConfig(cfg: QuickEntryConfig): void {
   parserConfig = peopleOn ? { ...base, suppressTypes: [...(base.suppressTypes ?? []), 'start', 'estimate', 'flag', 'request'] } : base
   refreshPeopleSuggestions()
   setWeekStart(readWeekStart(cfg.week_start))
+  setTimesOfDay(readTimes(cfg.when_times))
   autocomplete.setSyntaxMode(parserConfig.syntaxMode)
   autocomplete.setEnabled(parserConfig.enabled)
 }

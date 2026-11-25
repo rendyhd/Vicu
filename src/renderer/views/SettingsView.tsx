@@ -22,6 +22,7 @@ import { NotificationSettings } from '@/components/settings/NotificationSettings
 import { CompletionSoundSettings } from '@/components/settings/CompletionSoundSettings'
 import { SidebarSettings } from '@/components/settings/SidebarSettings'
 import { WorkModeSettings } from '@/components/settings/WorkModeSettings'
+import { WhenChoicesSettings } from '@/components/settings/WhenChoicesSettings'
 import { PlannerSettings } from '@/components/settings/PlannerSettings'
 import { WeekStartSetting } from '@/components/settings/WeekStartSetting'
 import { CloseActionSetting } from '@/components/settings/CloseActionSetting'
@@ -735,6 +736,8 @@ export function SettingsView() {
             onChange={handleQuickEntryChange}
           />
         )}
+
+        <WhenChoicesSettings />
 
         {/* Task Parser */}
         <div className="rounded-card border border-[var(--border-color)] bg-[var(--bg-primary)] p-5">

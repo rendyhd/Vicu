@@ -32,6 +32,7 @@ import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { registerConfirm } from '@/lib/confirm-bridge'
 import { resolveSelectedTasks } from '@/lib/task-selection'
 import { useSyncedPrefsEvents } from '@/hooks/use-synced-prefs'
+import { useWhenChoices } from '@/hooks/use-when-choices'
 import { useWeekStart } from '@/hooks/use-week-start'
 import { useProLedgerEvents } from '@/hooks/use-pro-ledger'
 import { useProShortcuts } from '@/hooks/use-pro-shortcuts'
@@ -179,6 +180,8 @@ export function AppShell() {
   useSyncedPrefsEvents()
   // The account's week start, for every week this window computes (contract section 2.1).
   useWeekStart()
+  // The times of day the quick-add parser reads (section 5.6).
+  useWhenChoices()
   useProLedgerEvents()
   useProShortcuts()
   useRepeatRuleBridge()

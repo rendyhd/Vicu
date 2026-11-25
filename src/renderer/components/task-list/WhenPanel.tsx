@@ -1,21 +1,25 @@
 import { useId, useMemo, useRef, useState, type FocusEvent, type KeyboardEvent } from 'react'
+import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/cn'
-import { toLocalDate, type LocalDate } from '@/lib/due-dates'
+import { isNoDueDate, localDateOf, startOfLocalDay, toLocalDate, type LocalDate } from '@/lib/due-dates'
 import { useDateFormat } from '@/hooks/use-date-format'
 import { MonthCalendar } from './MonthCalendar'
 import {
-  TIME_CHOICES,
+  dayChoiceHint,
   focusStaysInside,
   parseTimeText,
   parseWhenText,
-  quickChoices,
   timeLabel,
   whenText,
+  whenValueOfDue,
   withDate,
   withTime,
   type WhenValue,
 } from '@/lib/when-logic'
 import { useWeekStart } from '@/hooks/use-week-start'
+import { useWhenChoices } from '@/hooks/use-when-choices'
+import { formatWeekdayDay } from '@/lib/date-display'
+import { dayChoices, moveBy, moveDay, moveStep } from '../../../shared/when-choices'
 
 export interface WhenPanelChange {
   /** True when the pick finishes the job (a quick choice, Enter in the text field). */
@@ -28,6 +32,11 @@ interface WhenPanelProps {
   onChange: (value: WhenValue, options: WhenPanelChange) => void
   /** "Now" for the quick choices and for reading typed text. Defaults to the time the panel opened. */
   now?: Date
+  /**
+   * The task's stored due date, when the panel edits an existing task: the panel then offers Move
+   * by (cross-app semantics 23.3) while it has a date. Never given while a new task is entered.
+   */
+  moveFrom?: string | null
 }
 
 /**
@@ -36,7 +45,7 @@ interface WhenPanelProps {
  * reminder picker put it in one. A day without a time is date-only; the caller turns the value
  * into a due date with `dueOfWhenValue`.
  */
-export function WhenPanel({ value, onChange, now: nowProp }: WhenPanelProps) {
+export function WhenPanel({ value, onChange, now: nowProp, moveFrom }: WhenPanelProps) {
   const fmt = useDateFormat()
   const [opened] = useState(() => new Date())
   const now = nowProp ?? opened
@@ -57,7 +66,14 @@ export function WhenPanel({ value, onChange, now: nowProp }: WhenPanelProps) {
   const [customInvalid, setCustomInvalid] = useState(false)
 
   const weekStart = useWeekStart()
-  const choices = useMemo(() => quickChoices(today, fmt, weekStart), [today, fmt, weekStart])
+  // The account's day choices and times of day (section 23).
+  const whenChoices = useWhenChoices()
+  const { t } = useTranslation()
+  const choices = useMemo(
+    () => dayChoices(whenChoices.days, now, whenChoices.times, weekStart),
+    [whenChoices.days, whenChoices.times, now, weekStart],
+  )
+  const movable = moveFrom && !isNoDueDate(moveFrom) && whenChoices.moveBy.length > 0 ? moveFrom : null
 
   const showDay = (date: LocalDate) => setReveal({ date })
 
@@ -106,7 +122,7 @@ export function WhenPanel({ value, onChange, now: nowProp }: WhenPanelProps) {
     return typed ? `${whenText(typed, now, fmt)}, Enter to set` : 'No date found'
   })()
 
-  const timeIsPreset = selected.time !== null && (TIME_CHOICES as readonly string[]).includes(selected.time)
+  const timeIsPreset = selected.time !== null && whenChoices.times.some((t) => t.time === selected.time)
 
   return (
     // Plain keys stay in the panel: the list behind it has window-level shortcuts (Enter opens a task,
@@ -133,19 +149,35 @@ export function WhenPanel({ value, onChange, now: nowProp }: WhenPanelProps) {
         </p>
       </div>
 
-      <div className="grid grid-cols-2 gap-x-1" role="group" aria-label="Quick choices">
-        {choices.map((choice) => (
-          <button
-            key={choice.id}
-            type="button"
-            onClick={() => apply(withDate(selected, choice.date), true)}
-            className="flex min-h-7 items-center justify-between gap-2 rounded-control px-2 py-1 text-left text-meta text-[var(--text-primary)] hover:bg-[var(--bg-hover)]"
-          >
-            <span>{choice.label}</span>
-            <span className="text-[var(--text-secondary)]">{choice.hint}</span>
-          </button>
-        ))}
-      </div>
+      {choices.length > 0 && (
+        <div className="grid grid-cols-2 gap-x-1" role="group" aria-label="Quick choices">
+          {choices.map((choice) => (
+            <button
+              key={choice.id}
+              type="button"
+              // A choice with its own time sets both; the others keep the time picked.
+              onClick={() => apply(choice.time ? { date: choice.date, time: choice.time } : withDate(selected, choice.date), true)}
+              className="flex min-h-7 items-center justify-between gap-2 rounded-control px-2 py-1 text-left text-meta text-[var(--text-primary)] hover:bg-[var(--bg-hover)]"
+            >
+              <span>{choice.label}</span>
+              <span className="text-[var(--text-secondary)]">{dayChoiceHint(choice, fmt)}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {movable && (
+        <div className="flex flex-wrap items-center gap-1" role="group" aria-label={t('when.moveBy')}>
+          {whenChoices.moveBy.map((step) => {
+            const day = moveDay(localDateOf(movable), step, today)
+            return (
+              <TimeChip key={step} pressed={false} onClick={() => apply(whenValueOfDue(moveBy(movable, step, today)), true)}>
+                {`${moveStep(step).label} · ${formatWeekdayDay(startOfLocalDay(day), fmt)}`}
+              </TimeChip>
+            )
+          })}
+        </div>
+      )}
 
       <div className="border-t border-[var(--border-color)] pt-2">
         <MonthCalendar
@@ -161,9 +193,9 @@ export function WhenPanel({ value, onChange, now: nowProp }: WhenPanelProps) {
           <TimeChip pressed={selected.time === null} onClick={() => apply(withTime(selected, null, today), false)}>
             None
           </TimeChip>
-          {TIME_CHOICES.map((time) => (
+          {whenChoices.times.map(({ name, time }) => (
             <TimeChip key={time} pressed={selected.time === time} onClick={() => apply(withTime(selected, time, today), false)}>
-              {timeLabel(time, fmt)}
+              {`${name} ${timeLabel(time, fmt)}`}
             </TimeChip>
           ))}
           <input

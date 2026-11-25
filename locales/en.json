@@ -850,6 +850,30 @@
         "saturday": "Saturday"
       }
     },
+    "whenChoices": {
+      "title": "When choices",
+      "note": "What the When panel and Postpone offer, on every device. Quick add reads the times too: \"tomorrow morning\".",
+      "times": "Times of day",
+      "name": "Name",
+      "timeOf": "Time of {{name}}",
+      "timeOfUnnamed": "Time of this entry",
+      "remove": "Remove {{name}}",
+      "removeUnnamed": "Remove this time",
+      "newTimeName": "Time {{number}}",
+      "addTime": "Add time",
+      "days": "Day choices",
+      "daysLimit": "(up to {{max}}, in this order)",
+      "moveUp": "Move {{label}} up",
+      "moveDown": "Move {{label}} down",
+      "moveBy": "Move by",
+      "moveByLimit": "(up to {{max}}, for a task that has a date)",
+      "reset": "Reset to defaults",
+      "problemNone": "Keep at least one time.",
+      "problemName": "A name is 1 to {{max}} letters, digits and single spaces.",
+      "problemSameName": "Two times have the same name.",
+      "problemNoTime": "Pick a time for each.",
+      "problemSameTime": "Two times are at the same time."
+    },
     "review": {
       "title": "Review",
       "note": "Periodic project review, GTD-style. Marker is stored in each project's description so it syncs across clients.",
@@ -1480,5 +1504,11 @@
     "more_one": "{{count}} more task in this project",
     "more_other": "{{count}} more tasks in this project",
     "showAll": "Show all"
+  },
+  "when": {
+    "postpone": "Postpone",
+    "tomorrow": "Tomorrow",
+    "nextWeek": "Next week",
+    "moveBy": "Move by"
   }
 }

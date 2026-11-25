@@ -1,4 +1,5 @@
 import { sendToAllWindows } from '@host/windows'
+import { WHEN_DAYS_KEY, WHEN_MOVE_BY_KEY, WHEN_TIMES_KEY, readDays, readMoveBy, readTimes, writeTimes } from '../shared/when-choices'
 import { searchTasksAt } from './api-client'
 import { loadPrefsCarriers } from './carrier-service'
 import { loadConfig, saveConfig, type AppConfig } from './config'
@@ -260,6 +261,10 @@ export function isWritablePref(key: unknown, value: unknown): key is string {
   // The planner's default length and work hours (section 16).
   if (key === PLANNER_DEFAULT_LENGTH_KEY) return value === null || (BLOCK_LENGTHS as readonly unknown[]).includes(value)
   if (key === PLANNER_HOURS_KEY) return value === null || canonicalJson(readPlannerHours(value)) === canonicalJson(value)
+  // The When choices (section 23): only a value that keeps the rules, in the form a device writes.
+  if (key === WHEN_TIMES_KEY) return value === null || (Array.isArray(value) && canonicalJson(writeTimes(readTimes(value))) === canonicalJson(value))
+  if (key === WHEN_DAYS_KEY) return value === null || (Array.isArray(value) && canonicalJson(readDays(value)) === canonicalJson(value))
+  if (key === WHEN_MOVE_BY_KEY) return value === null || (Array.isArray(value) && canonicalJson(readMoveBy(value)) === canonicalJson(value))
   // The day weeks start on (section 2.1): Monday is the default, written as null.
   if (key === WEEK_START_KEY) return value === null || value === 'sunday' || value === 'saturday'
   // The day the last weekly review was finished (section 14.7).
