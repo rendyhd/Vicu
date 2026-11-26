@@ -148,9 +148,16 @@ step('setup-password', async () => {
   await page.getByPlaceholder('Enter your username or email').fill(credentials.username)
   await page.getByPlaceholder('Enter your password').fill(credentials.password)
   await page.keyboard.press('Enter')
-  assert('a password sign-in reaches the Inbox choice', await visible(page, 'Save & Continue', 15000), await text(page))
-  await capture(page, 'setup-inbox')
-  await page.getByText('Save & Continue').click()
+  // First-ever sign-in asks for the Inbox; subsequent sign-ins reuse the synced Inbox automatically.
+  const reachedAppOrInbox = await Promise.race([
+    visible(page, 'Save & Continue', 15000).then((ok) => (ok ? 'inbox' : null)),
+    page.locator('nav, aside').first().waitFor({ state: 'visible', timeout: 15000 }).then(() => 'app', () => null),
+  ])
+  assert('a password sign-in finishes or reaches the Inbox choice', reachedAppOrInbox !== null, await text(page))
+  if (reachedAppOrInbox === 'inbox') {
+    await capture(page, 'setup-inbox')
+    await page.getByText('Save & Continue').click()
+  }
   await page.waitForFunction(() => location.hash.includes('inbox') || !!document.querySelector('[data-task-id]'), null, { timeout: 15000 }).catch(() => {})
   await settle(page, 800)
   assert('setup ends in the app', await page.locator('nav, aside').first().isVisible().catch(() => false), await text(page))
@@ -435,10 +442,10 @@ step('setup-token', async () => {
   if (!token) return assert('an API token is seeded', false, 'scripts/ui-verify/.local/api-token.txt is missing')
   await page.getByText('Use API Token instead').click()
   await page.getByPlaceholder('Enter your API token').fill(token)
-  await page.keyboard.press('Enter')
-  if (!(await visible(page, 'Save & Continue', 4000))) await page.getByRole('button', { name: /test|connect|continue/i }).first().click().catch(() => {})
-  assert('an API token reaches the Inbox choice', await visible(page, 'Save & Continue', 15000), await text(page))
-  await page.getByText('Save & Continue').click()
+  await page.getByRole('button', { name: 'Test Connection' }).click()
+  // The account already has a synced Inbox from the password sign-in above, so Setup remembers it.
+  const reachedApp = await page.locator('nav, aside').first().waitFor({ state: 'visible', timeout: 15000 }).then(() => true, () => false)
+  assert('an API-token sign-in remembers the synced Inbox and enters the app', reachedApp, await text(page))
   await settle(page, 1500)
   await goto(page, '/today')
   assert('an API-token setup ends in the app', await page.locator('[data-task-id]').first().waitFor({ timeout: 15000 }).then(() => true, () => false), await text(page))

@@ -1,4 +1,4 @@
-import { setupResume } from '@/lib/setup-resume'
+import { resolveSetupInbox, setupResume } from '@/lib/setup-resume'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/shared/Button'
@@ -151,26 +151,79 @@ export function SetupView({ onComplete }: SetupViewProps) {
 
   const DEFAULT_URL = 'https://app.vikunja.cloud'
 
-  const autoSelectInbox = (projectList: Project[]) => {
-    const inbox = projectList.find((p) => p.title.toLowerCase() === 'inbox')
-    if (inbox) setInboxProjectId(inbox.id)
+  const completeSetup = async (
+    chosenInboxId: number,
+    method: 'api_token' | 'oidc' | 'password',
+    apiToken?: string,
+    isLive: () => boolean = () => true,
+  ) => {
+    setSaving(true)
+    try {
+      const effectiveToken = method === 'api_token' ? (apiToken ?? token) : ''
+      if (web && method === 'api_token' && effectiveToken) rememberTokenChoice(rememberToken)
+      // Main merges the connection details into the existing config, so app preferences
+      // are preserved. If the server URL changed it also resets account-specific data
+      // (project IDs, custom lists, etc.), since those belong to the previous server/account.
+      await api.saveConnectionConfig({
+        vikunja_url: url.replace(/\/+$/, ''),
+        api_token: effectiveToken,
+        inbox_project_id: chosenInboxId,
+        auth_method: method,
+      })
+      // If the user is coming from standalone mode, push their local tasks to
+      // the freshly chosen inbox so nothing is stranded in offline-cache.json.
+      if (can('standalone')) {
+        try {
+          const standaloneCount = await api.getStandaloneTaskCount()
+          if (standaloneCount > 0 && chosenInboxId) {
+            await api.uploadStandaloneTasks(chosenInboxId)
+          }
+        } catch {
+          // Best effort — tasks stay in the local store and upload can be retried
+          // by re-running setup.
+        }
+      }
+      if (isLive()) onComplete()
+    } finally {
+      if (isLive()) setSaving(false)
+    }
   }
 
   /**
-   * The Inbox syncs (cross-app semantics 11.4): before asking, read the account's synced Inbox and
-   * preselect it; without one, Vikunja's default project; else a project called Inbox. An API-token
-   * setup passes its token, a sign-in uses the session it just stored. Offline it works as before.
+   * The Inbox syncs (cross-app semantics 11.4): before asking, read the account's synced Inbox.
+   * When it exists in the user's projects, reuse it and finish setup straight away; otherwise
+   * ask with Vikunja's default project or a project called Inbox preselected. An API-token setup
+   * passes its token, a sign-in uses the session it just stored. Offline it works as before.
    */
-  const preselectInbox = async (projectList: Project[], apiToken?: string) => {
-    autoSelectInbox(projectList)
+  const advanceAfterAuth = async (
+    projectList: Project[],
+    method: 'api_token' | 'oidc' | 'password',
+    apiToken?: string,
+    isLive: () => boolean = () => true,
+  ) => {
+    setAuthMethod(method)
+    setProjects(projectList)
+    let prefs: { inboxProjectId: number | null; defaultProjectId: number | null } | null = null
     try {
-      const prefs = await api.readSetupPreferences(url.replace(/\/+$/, ''), apiToken)
-      const exists = (id: number | null): id is number => !!id && projectList.some((project) => project.id === id)
-      if (exists(prefs.inboxProjectId)) setInboxProjectId(prefs.inboxProjectId)
-      else if (exists(prefs.defaultProjectId)) setInboxProjectId(prefs.defaultProjectId)
+      prefs = await api.readSetupPreferences(url.replace(/\/+$/, ''), apiToken)
     } catch {
       // Nothing synced could be read: the user chooses as before.
     }
+    if (!isLive()) return
+    const resolved = resolveSetupInbox(projectList, prefs)
+    if (resolved.kind === 'synced') {
+      setInboxProjectId(resolved.inboxProjectId)
+      try {
+        await completeSetup(resolved.inboxProjectId, method, apiToken, isLive)
+        return
+      } catch {
+        // Could not finish automatically: fall back to the Inbox step with it preselected.
+        if (!isLive()) return
+      }
+    } else {
+      setInboxProjectId(resolved.preselectedId)
+    }
+    setStep('project')
   }
 
   /** Ask the server how it signs people in, and go to the step that follows. */
@@ -211,10 +264,8 @@ export function SetupView({ onComplete }: SetupViewProps) {
         if (projectsResult?.success) {
           const config = await api.getConfig().catch(() => null)
           if (!live) return
-          setAuthMethod(config?.auth_method === 'password' ? 'password' : config?.auth_method === 'api_token' ? 'api_token' : 'oidc')
-          setProjects(projectsResult.data)
-          await preselectInbox(projectsResult.data)
-          if (live) setStep('project')
+          const method = config?.auth_method === 'password' ? 'password' : config?.auth_method === 'api_token' ? 'api_token' : 'oidc'
+          await advanceAfterAuth(projectsResult.data, method, undefined, () => live)
           return
         }
       }
@@ -268,13 +319,10 @@ export function SetupView({ onComplete }: SetupViewProps) {
       )
 
       if (result.success) {
-        setAuthMethod('oidc')
         // Fetch projects using the now-stored OIDC token
         const projectsResult = await api.fetchProjects()
         if (projectsResult.success) {
-          setProjects(projectsResult.data)
-          await preselectInbox(projectsResult.data)
-          setStep('project')
+          await advanceAfterAuth(projectsResult.data, 'oidc')
         } else {
           setOidcError(projectsResult.error)
         }
@@ -314,12 +362,9 @@ export function SetupView({ onComplete }: SetupViewProps) {
       )
 
       if (result.success) {
-        setAuthMethod('password')
         const projectsResult = await api.fetchProjects()
         if (projectsResult.success) {
-          setProjects(projectsResult.data)
-          await preselectInbox(projectsResult.data)
-          setStep('project')
+          await advanceAfterAuth(projectsResult.data, 'password')
         } else {
           setPasswordError(projectsResult.error)
         }
@@ -345,10 +390,7 @@ export function SetupView({ onComplete }: SetupViewProps) {
     const result = await api.testConnection(url.replace(/\/+$/, ''), token)
     if (result.success) {
       setTestStatus('success')
-      setProjects(result.data)
-      await preselectInbox(result.data, token)
-      setAuthMethod('api_token')
-      setStep('project')
+      await advanceAfterAuth(result.data, 'api_token', token)
     } else {
       setTestStatus('error')
       setTestError(result.error)
@@ -356,32 +398,7 @@ export function SetupView({ onComplete }: SetupViewProps) {
   }
 
   const handleSave = async () => {
-    setSaving(true)
-    if (web) rememberTokenChoice(rememberToken)
-    // Main merges the connection details into the existing config, so app preferences
-    // are preserved. If the server URL changed it also resets account-specific data
-    // (project IDs, custom lists, etc.), since those belong to the previous server/account.
-    await api.saveConnectionConfig({
-      vikunja_url: url.replace(/\/+$/, ''),
-      api_token: authMethod === 'api_token' ? token : '',
-      inbox_project_id: inboxProjectId,
-      auth_method: authMethod,
-    })
-    // If the user is coming from standalone mode, push their local tasks to
-    // the freshly chosen inbox so nothing is stranded in offline-cache.json.
-    if (can('standalone')) {
-      try {
-        const standaloneCount = await api.getStandaloneTaskCount()
-        if (standaloneCount > 0 && inboxProjectId) {
-          await api.uploadStandaloneTasks(inboxProjectId)
-        }
-      } catch {
-        // Best effort — tasks stay in the local store and upload can be retried
-        // by re-running setup.
-      }
-    }
-    setSaving(false)
-    onComplete()
+    await completeSetup(inboxProjectId, authMethod)
   }
 
   return (

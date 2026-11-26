@@ -125,6 +125,20 @@ async function claimAccountDataFor(connection: ConnectionFields): Promise<void> 
   if (user) claimAccountData(serverUrl(), user.id)
 }
 
+/**
+ * The provider to sign in with: the one asked for, else the one used last time (`ReauthView` passes
+ * no key), else the first. A key that was asked for and is not offered returns null.
+ */
+export function resolveOidcProvider<T extends { key: string }>(
+  providers: readonly T[],
+  requestedKey: string,
+  rememberedKey: string | null,
+): T | null {
+  if (requestedKey) return providers.find((candidate) => candidate.key === requestedKey) ?? null
+  if (providers.length === 0) return null
+  return (rememberedKey ? providers.find((candidate) => candidate.key === rememberedKey) : undefined) ?? providers[0]
+}
+
 export function registerWebHandlers(handle: Handle): void {
   handle('get-config', () => loadConfig())
 
@@ -192,7 +206,11 @@ export function registerWebHandlers(handle: Handle): void {
   const oidcSignIn = async (_event: unknown, _url: unknown, providerKey: unknown, totpPasscode?: unknown) => {
     try {
       const providers = await discoverProviders(serverUrl())
-      const provider = providers.find((candidate) => candidate.key === providerKey)
+      const provider = resolveOidcProvider(
+        providers,
+        typeof providerKey === 'string' ? providerKey : '',
+        readLocal(OIDC_PROVIDER_KEY),
+      )
       if (!provider) return { success: false, error: 'This sign-in provider is no longer offered by the server' }
       writeLocal(OIDC_PROVIDER_KEY, provider.key)
       // The connection Setup just saved must be in storage when the page comes back.
