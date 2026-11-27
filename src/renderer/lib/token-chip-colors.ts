@@ -36,6 +36,7 @@ export const TOKEN_CHIP_ROLE = {
 export const TOKEN_CHIP_CLASSES: Record<Exclude<TokenType, 'priority'>, string> = {
   date: 'bg-accent-green/12 dark:bg-accent-green/20 text-[color:color-mix(in_srgb,rgb(var(--accent-green-rgb)),var(--text-primary))]',
   length: 'bg-accent-green/12 dark:bg-accent-green/20 text-[color:color-mix(in_srgb,rgb(var(--accent-green-rgb)),var(--text-primary))]',
+  // i18n-ignore: class names
   label: 'bg-accent-orange/12 dark:bg-accent-orange/20 text-[color:color-mix(in_srgb,rgb(var(--accent-orange-rgb)),var(--text-primary))]',
   project: 'bg-accent-blue/12 dark:bg-accent-blue/20 text-[color:color-mix(in_srgb,rgb(var(--accent-blue-rgb)),var(--text-primary))]',
   recurrence: 'bg-accent-purple/12 dark:bg-accent-purple/20 text-[color:color-mix(in_srgb,rgb(var(--accent-purple-rgb)),var(--text-primary))]',

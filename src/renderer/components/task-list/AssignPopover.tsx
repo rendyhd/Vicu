@@ -1,4 +1,5 @@
 import type { RefObject } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Check } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { canMemberWrite, displayName } from '@/lib/collaboration'
@@ -24,17 +25,18 @@ interface AssignPopoverProps {
  * cannot be picked ("Can view only").
  */
 export function AssignPopover({ anchorRef, task, members, me, projectTitle, onClose }: AssignPopoverProps) {
+  const { t } = useTranslation()
   const toggle = useToggleAssignee()
   const permissionOf = useMemberPermissions(task.project_id, true)
   const assigned = new Set((task.assignees ?? []).map((a) => a.id))
 
   return (
-    <Popover anchorRef={anchorRef} onClose={onClose} role="listbox" multiselectable label="Assign to" placement="bottom-start" className="w-[248px] p-1">
+    <Popover anchorRef={anchorRef} onClose={onClose} role="listbox" multiselectable label={t('task.assign.assignTo')} placement="bottom-start" className="w-[248px] p-1">
       <div aria-hidden="true" className="px-2.5 pb-1.5 pt-2 text-caption text-text-secondary">
-        Assign to
+        {t('task.assign.assignTo')}
       </div>
       {members.length === 0 ? (
-        <div className="px-2.5 py-2 text-meta text-text-secondary">Loading people…</div>
+        <div className="px-2.5 py-2 text-meta text-text-secondary">{t('task.assign.loadingPeople')}</div>
       ) : (
         members.map((person) => {
           const isAssigned = assigned.has(person.id)
@@ -63,9 +65,9 @@ export function AssignPopover({ anchorRef, task, members, me, projectTitle, onCl
               <Avatar person={person} size={20} />
               <span className="min-w-0 flex-1 truncate text-task-title text-text">
                 {displayName(person)}
-                {isMe && <span className="text-text-secondary"> (you)</span>}
+                {isMe && <span className="text-text-secondary"> {t('task.assign.you')}</span>}
               </span>
-              {!canWrite && <span className="shrink-0 text-caption text-text-secondary">Can view only</span>}
+              {!canWrite && <span className="shrink-0 text-caption text-text-secondary">{t('task.assign.viewOnly')}</span>}
               {isAssigned && <Check className="h-3.5 w-3.5 shrink-0 text-accent-blue" aria-hidden="true" />}
             </button>
           )
@@ -73,7 +75,7 @@ export function AssignPopover({ anchorRef, task, members, me, projectTitle, onCl
       )}
       <div aria-hidden="true" className="vicu-hairline mx-1 my-1 h-px bg-border" />
       <p className="px-2.5 pb-2 pt-1 text-caption text-text-secondary">
-        People {projectTitle} is shared with. Assigned people get a notification.
+        {t('task.assign.sharedWithProject', { project: projectTitle })}
       </p>
     </Popover>
   )

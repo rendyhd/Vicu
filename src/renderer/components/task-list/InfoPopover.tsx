@@ -1,4 +1,5 @@
 import type { RefObject } from 'react'
+import { useTranslation } from 'react-i18next'
 import type { Task } from '@/lib/vikunja-types'
 import { formatAbsoluteDateTime, isNullDate } from '@/lib/date-utils'
 import { useDateFormat } from '@/hooks/use-date-format'
@@ -11,6 +12,7 @@ interface InfoPopoverProps {
 }
 
 export function InfoPopover({ anchorRef, task, onClose }: InfoPopoverProps) {
+  const { t } = useTranslation()
   const identifier = task.identifier && task.identifier.length > 0 ? task.identifier : '—'
   const fmt = useDateFormat()
   const created = formatAbsoluteDateTime(task.created, fmt) || '—'
@@ -24,13 +26,13 @@ export function InfoPopover({ anchorRef, task, onClose }: InfoPopoverProps) {
   const completed = showCompleted ? formatAbsoluteDateTime(task.done_at, fmt) : ''
 
   return (
-    <Popover anchorRef={anchorRef} onClose={onClose} role="dialog" label="Task info" initialFocus="container" className="w-64 p-3">
+    <Popover anchorRef={anchorRef} onClose={onClose} role="dialog" label={t('task.info.title')} initialFocus="container" className="w-64 p-3">
       <div className="flex flex-col gap-2">
-        <Row label="Identifier" value={identifier} />
-        <Row label="Created" value={created} />
-        <Row label="Updated" value={updated} />
-        {showCreator && <Row label="Created by" value={creatorName!} />}
-        {showCompleted && <Row label="Completed" value={completed} />}
+        <Row label={t('task.info.identifier')} value={identifier} />
+        <Row label={t('task.info.created')} value={created} />
+        <Row label={t('task.info.updated')} value={updated} />
+        {showCreator && <Row label={t('task.info.createdBy')} value={creatorName!} />}
+        {showCompleted && <Row label={t('task.info.completed')} value={completed} />}
       </div>
     </Popover>
   )

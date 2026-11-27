@@ -1,4 +1,5 @@
 import { NULL_DATE } from './constants'
+import { t } from '../../shared/i18n'
 import { isDateOnly, isNoDueDate, parsedDue } from './due-dates'
 import { formatDateChip } from './date-utils'
 import { detectRecurrencePreset, formatRecurrenceLabel } from './recurrence'
@@ -168,7 +169,7 @@ export function composerChips({ fields, parsed, chipLabels, projectTitle, fmt, n
       type: 'project',
       key: 'project',
       source: 'text',
-      label: fields.projectNotFound && !projectTokenOpen(parsed, text) ? `${parsed.project} (no such project)` : fields.projectNotFound ? parsed.project : projectTitle,
+      label: fields.projectNotFound && !projectTokenOpen(parsed, text) ? t('composer.noSuchProject', { project: parsed.project }) : fields.projectNotFound ? parsed.project : projectTitle,
     })
   }
   if (fields.repeat && fields.repeatSource) {

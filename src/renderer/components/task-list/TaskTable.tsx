@@ -12,18 +12,20 @@ import { isNoDueDate, localDateOf } from '../../../shared/due-dates'
 import { estimateOf } from '../../../shared/pro/ledger'
 import { startDayOf } from '../../../shared/pro/start-dates'
 import { formatWeekdayDate } from '../../../shared/date-display'
+import { useTranslation } from 'react-i18next'
+import type { TranslationKey } from '../../../shared/i18n'
 
-const HEADERS: Record<TableColumn, string> = {
-  title: 'Task',
-  project: 'Project',
-  due: 'Due',
-  start: 'Start',
-  estimate: 'Estimate',
-  priority: 'Priority',
-  flag: 'Flag',
+const HEADERS: Record<TableColumn, TranslationKey> = {
+  title: 'task.table.task',
+  project: 'task.table.project',
+  due: 'task.table.due',
+  start: 'task.table.start',
+  estimate: 'task.table.estimate',
+  priority: 'task.table.priority',
+  flag: 'task.table.flag',
 }
 
-const PRIORITY = ['', 'Low', 'Medium', 'High', 'Urgent', 'Do now']
+const PRIORITY: ReadonlyArray<TranslationKey | ''> = ['', 'composer.chip.priorityLow', 'composer.chip.priorityMedium', 'composer.chip.priorityHigh', 'composer.chip.priorityUrgent', 'composer.chip.priorityDoNow']
 
 /**
  * The task table (plan 7.7.2): a list's tasks in sortable columns. A click on a header sorts by it,
@@ -32,6 +34,7 @@ const PRIORITY = ['', 'Low', 'Medium', 'High', 'Urgent', 'Do now']
  * the list.
  */
 export function TaskTable({ tasks, onOpen }: { tasks: readonly Task[]; onOpen: (task: Task) => void }) {
+  const { t } = useTranslation()
   const [keys, setKeys] = useState<TableSortKey[]>([])
   const { data: projects } = useProjects()
   const { ledger } = useProLedger()
@@ -62,7 +65,7 @@ export function TaskTable({ tasks, onOpen }: { tasks: readonly Task[]; onOpen: (
       case 'due':
       case 'start': return formatWeekdayDate(new Date(`${value}T12:00:00`), new Date(), fmt)
       case 'estimate': return formatLength(value as number)
-      case 'priority': return PRIORITY[value as number] ?? String(value)
+      case 'priority': { const key = PRIORITY[value as number]; return key ? t(key) : String(value) }
       case 'flag': return ''
       default: return String(value)
     }
@@ -112,7 +115,7 @@ export function TaskTable({ tasks, onOpen }: { tasks: readonly Task[]; onOpen: (
 
   return (
     <div className="overflow-x-auto px-4 pb-4" data-task-table>
-      <table role="grid" aria-label="Tasks" aria-multiselectable="true" className="w-full border-collapse text-meta">
+      <table role="grid" aria-label={t('task.table.tasks')} aria-multiselectable="true" className="w-full border-collapse text-meta">
         <thead>
           <tr className="border-b border-border text-left text-text-secondary">
             {TABLE_COLUMNS.map((column) => {
@@ -122,12 +125,12 @@ export function TaskTable({ tasks, onOpen }: { tasks: readonly Task[]; onOpen: (
                   <button
                     type="button"
                     className="inline-flex items-center gap-1 rounded-control px-1 hover:bg-bg-hover hover:text-text"
-                    title="Click to sort, Shift-click for a second key"
+                    title={t('task.table.sortTip')}
                     onClick={(event) => setKeys((current) => nextSortKeys(current, column, event.shiftKey))}
                   >
-                    {HEADERS[column]}
+                    {t(HEADERS[column])}
                     {sort && (sort.desc ? <ArrowDown className="h-3 w-3" aria-hidden /> : <ArrowUp className="h-3 w-3" aria-hidden />)}
-                    {sort?.index === 1 && <span className="text-caption" aria-label="second key">2</span>}
+                    {sort?.index === 1 && <span className="text-caption" aria-label={t('task.table.secondKey')}>2</span>}
                   </button>
                 </th>
               )
@@ -152,7 +155,7 @@ export function TaskTable({ tasks, onOpen }: { tasks: readonly Task[]; onOpen: (
                 {TABLE_COLUMNS.map((column) => (
                   <td key={column} className={cn('py-1.5 pr-3', column === 'title' ? 'max-w-0 truncate' : 'whitespace-nowrap text-text-secondary')}>
                     {column === 'flag'
-                      ? task.is_favorite && <Flag role="img" aria-label="Flagged" className="h-3 w-3 fill-accent-orange text-accent-orange" />
+                      ? task.is_favorite && <Flag role="img" aria-label={t('task.row.flagged')} className="h-3 w-3 fill-accent-orange text-accent-orange" />
                       : show(task, column)}
                   </td>
                 ))}

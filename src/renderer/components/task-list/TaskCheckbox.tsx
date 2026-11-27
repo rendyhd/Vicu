@@ -5,6 +5,7 @@ import type { Task } from '@/lib/vikunja-types'
 import { confirmTaskCompletion } from '@/lib/task-completion'
 import { focusNextCheckbox } from '@/lib/next-row'
 import { useSelectionStore } from '@/stores/selection-store'
+import { useTranslation } from 'react-i18next'
 
 interface TaskCheckboxProps {
   task: Task
@@ -15,6 +16,7 @@ interface TaskCheckboxProps {
 const CHECK_PATH = 'M2.5 6L5 8.5L9.5 3.5'
 
 export function TaskCheckbox({ task, className, suppressTopLevelUndo = false }: TaskCheckboxProps) {
+  const { t } = useTranslation()
   const completeTask = useCompleteTask()
   const uncompleteTask = useUncompleteTask()
   // The fill pops and the check draws only when the task is completed while this checkbox is on screen.
@@ -48,7 +50,7 @@ export function TaskCheckbox({ task, className, suppressTopLevelUndo = false }: 
         task.done ? 'border-accent-fill' : 'border-control-ring hover:border-accent-fill hover:bg-accent-fill/10',
         className
       )}
-      aria-label={`Complete ${task.title}`}
+      aria-label={t('task.checkbox.completeNamed', { title: task.title })}
     >
       {task.done && (
         // The ring fill: it scales in with the pop spring when the task was just completed.

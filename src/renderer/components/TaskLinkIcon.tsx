@@ -1,10 +1,12 @@
 import { extractTaskLink } from '@/lib/note-link'
+import { useTranslation } from 'react-i18next'
 
 interface Props {
   description: string | undefined | null
 }
 
 export function TaskLinkIcon({ description }: Props) {
+  const { t } = useTranslation()
   const link = extractTaskLink(description)
   if (!link) return null
 
@@ -12,7 +14,7 @@ export function TaskLinkIcon({ description }: Props) {
     return (
       <button
         onClick={(e) => { e.stopPropagation(); e.preventDefault(); window.api.openDeepLink(link.url) }}
-        title={`Open "${link.name}" in Obsidian`}
+        title={t('task.link.openInObsidian', { name: link.name })}
         className="ml-1 inline-flex items-center rounded-control p-0.5 text-purple-500 opacity-50 transition-opacity hover:bg-purple-500/10 hover:opacity-100 dark:text-purple-400"
       >
         <svg width="12" height="12" viewBox="0 0 100 100" className="flex-shrink-0">
@@ -26,7 +28,7 @@ export function TaskLinkIcon({ description }: Props) {
   return (
     <button
       onClick={(e) => { e.stopPropagation(); e.preventDefault(); window.api.openDeepLink(link.url) }}
-      title={`Open "${link.title}"`}
+      title={t('task.link.open', { title: link.title })}
       className="ml-1 inline-flex items-center rounded-control p-0.5 text-blue-500 opacity-50 transition-opacity hover:bg-blue-500/10 hover:opacity-100 dark:text-blue-400"
     >
       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0">

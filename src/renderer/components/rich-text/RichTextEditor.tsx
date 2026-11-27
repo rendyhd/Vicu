@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useEditor, useEditorState, EditorContent, type Editor } from '@tiptap/react'
 import { BubbleMenu } from '@tiptap/react/menus'
 import { StarterKit } from '@tiptap/starter-kit'
@@ -67,6 +68,7 @@ export function RichTextEditor({
   autoFocus,
   className,
 }: RichTextEditorProps) {
+  const { t } = useTranslation()
   const onChangeRef = useRef(onChange)
   const onBlurRef = useRef(onBlur)
   const onKeyDownRef = useRef(onKeyDown)
@@ -208,35 +210,35 @@ export function RichTextEditor({
         <ToolbarButton
           onClick={() => editor.chain().focus().toggleBold().run()}
           active={editor.isActive('bold')}
-          title="Bold (Ctrl+B)"
+          title={t('editor.bold')}
         >
           <BoldIcon className="h-3.5 w-3.5" />
         </ToolbarButton>
         <ToolbarButton
           onClick={() => editor.chain().focus().toggleItalic().run()}
           active={editor.isActive('italic')}
-          title="Italic (Ctrl+I)"
+          title={t('editor.italic')}
         >
           <ItalicIcon className="h-3.5 w-3.5" />
         </ToolbarButton>
         <ToolbarButton
           onClick={() => editor.chain().focus().toggleStrike().run()}
           active={editor.isActive('strike')}
-          title="Strikethrough"
+          title={t('editor.strikethrough')}
         >
           <Strikethrough className="h-3.5 w-3.5" />
         </ToolbarButton>
         <ToolbarButton
           onClick={() => editor.chain().focus().toggleUnderline().run()}
           active={editor.isActive('underline')}
-          title="Underline"
+          title={t('editor.underline')}
         >
           <UnderlineIcon className="h-3.5 w-3.5" />
         </ToolbarButton>
         <ToolbarButton
           onClick={() => editor.chain().focus().toggleCode().run()}
           active={editor.isActive('code')}
-          title="Inline code"
+          title={t('editor.inlineCode')}
         >
           <CodeIcon className="h-3.5 w-3.5" />
         </ToolbarButton>
@@ -244,10 +246,10 @@ export function RichTextEditor({
         <ListButtons editor={editor} active={listRow ?? NO_LIST} />
         {listLine && (
           <>
-            <ToolbarButton onClick={() => moveLine(-1)} disabled={!listLine.canUp} title="Move line up (Alt+Up)">
+            <ToolbarButton onClick={() => moveLine(-1)} disabled={!listLine.canUp} title={t('editor.moveLineUp')}>
               <ArrowUp className="h-3.5 w-3.5" />
             </ToolbarButton>
-            <ToolbarButton onClick={() => moveLine(1)} disabled={!listLine.canDown} title="Move line down (Alt+Down)">
+            <ToolbarButton onClick={() => moveLine(1)} disabled={!listLine.canDown} title={t('editor.moveLineDown')}>
               <ArrowDown className="h-3.5 w-3.5" />
             </ToolbarButton>
           </>
@@ -259,7 +261,7 @@ export function RichTextEditor({
             setLinkDialog({ open: true, initialUrl: prev, canRemove: editor.isActive('link') })
           }}
           active={editor.isActive('link')}
-          title="Link"
+          title={t('editor.link')}
         >
           <Link2 className="h-3.5 w-3.5" />
         </ToolbarButton>
@@ -300,27 +302,28 @@ const NO_LIST: ActiveLists = { taskList: false, bulletList: false, orderedList: 
 
 /** Checklist, Bullet list, Numbered list, in the phone toolbar's order; the shortcuts are TipTap's own. */
 function ListButtons({ editor, active }: { editor: Editor; active: ActiveLists }) {
+  const { t } = useTranslation()
   const mac = window.api.platform === 'darwin'
   return (
     <>
       <ToolbarButton
         onClick={() => editor.chain().focus().toggleTaskList().run()}
         active={active.taskList}
-        title={`Checklist (${shortcutHint('Mod+Shift+9', mac)})`}
+        title={t('editor.checklist', { shortcut: shortcutHint('Mod+Shift+9', mac) })}
       >
         <ListChecks className="h-3.5 w-3.5" />
       </ToolbarButton>
       <ToolbarButton
         onClick={() => editor.chain().focus().toggleBulletList().run()}
         active={active.bulletList}
-        title={`Bullet list (${shortcutHint('Mod+Shift+8', mac)})`}
+        title={t('editor.bulletList', { shortcut: shortcutHint('Mod+Shift+8', mac) })}
       >
         <List className="h-3.5 w-3.5" />
       </ToolbarButton>
       <ToolbarButton
         onClick={() => editor.chain().focus().toggleOrderedList().run()}
         active={active.orderedList}
-        title={`Numbered list (${shortcutHint('Mod+Shift+7', mac)})`}
+        title={t('editor.numberedList', { shortcut: shortcutHint('Mod+Shift+7', mac) })}
       >
         <ListOrdered className="h-3.5 w-3.5" />
       </ToolbarButton>

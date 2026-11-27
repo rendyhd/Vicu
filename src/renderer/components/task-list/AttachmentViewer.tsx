@@ -1,5 +1,6 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
 import { ChevronLeft, ChevronRight, Copy, Download, ExternalLink, ImageOff, Loader2, Maximize2, Minimize2, X } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/cn'
 import { stepImage, type ViewerImage } from '@/lib/attachment-preview'
 import { useAttachmentBlobUrl } from '@/hooks/use-attachment-bytes'
@@ -25,6 +26,7 @@ const ICON_BUTTON =
  * which then stays open behind it); Escape and Close return there.
  */
 export function AttachmentViewer({ taskId, images, startId, onClose }: AttachmentViewerProps) {
+  const { t } = useTranslation()
   const titleId = useId()
   const rootRef = useRef<HTMLDivElement>(null)
   const [index, setIndex] = useState(() => Math.max(0, images.findIndex((image) => image.id === startId)))
@@ -87,14 +89,14 @@ export function AttachmentViewer({ taskId, images, startId, onClose }: Attachmen
           )}
           {many && (
             <span className="mx-2 shrink-0 text-meta tabular-nums text-text-secondary" aria-live="polite">
-              {index + 1} of {images.length}
+              {t('task.viewer.position', { current: index + 1, total: images.length })}
             </span>
           )}
           <button
             type="button"
             onClick={() => void copyImage(image.id, image.name, image.mime)}
-            aria-label={`Copy ${image.name}`}
-            title="Copy image"
+            aria-label={t('task.viewer.copyNamed', { name: image.name })}
+            title={t('task.viewer.copyImage')}
             className={ICON_BUTTON}
           >
             <Copy className="h-4 w-4" />
@@ -102,8 +104,8 @@ export function AttachmentViewer({ taskId, images, startId, onClose }: Attachmen
           <button
             type="button"
             onClick={() => void open(image.id, image.name)}
-            aria-label="Open in default app"
-            title="Open in default app"
+            aria-label={t('task.viewer.openDefault')}
+            title={t('task.viewer.openDefault')}
             className={ICON_BUTTON}
           >
             <ExternalLink className="h-4 w-4" />
@@ -112,13 +114,13 @@ export function AttachmentViewer({ taskId, images, startId, onClose }: Attachmen
             type="button"
             onClick={() => void save(image.id, image.name)}
             disabled={savingId === image.id}
-            aria-label={`Save ${image.name}`}
-            title="Save to…"
+            aria-label={t('task.viewer.saveNamed', { name: image.name })}
+            title={t('task.viewer.saveTo')}
             className={ICON_BUTTON}
           >
             {savingId === image.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
           </button>
-          <button data-autofocus type="button" onClick={onClose} aria-label="Close" title="Close" className={ICON_BUTTON}>
+          <button data-autofocus type="button" onClick={onClose} aria-label={t('task.common.close')} title={t('task.common.close')} className={ICON_BUTTON}>
             <X className="h-4 w-4" />
           </button>
         </div>
@@ -127,10 +129,10 @@ export function AttachmentViewer({ taskId, images, startId, onClose }: Attachmen
           <ImageStage key={image.id} taskId={taskId} image={image} onOpen={() => void open(image.id, image.name)} />
           {many && (
             <>
-              <StepButton side="left" label="Previous image" onClick={() => go(-1)}>
+              <StepButton side="left" label={t('task.viewer.previous')} onClick={() => go(-1)}>
                 <ChevronLeft className="h-5 w-5" />
               </StepButton>
-              <StepButton side="right" label="Next image" onClick={() => go(1)}>
+              <StepButton side="right" label={t('task.viewer.next')} onClick={() => go(1)}>
                 <ChevronRight className="h-5 w-5" />
               </StepButton>
             </>
@@ -163,6 +165,7 @@ function StepButton({ side, label, onClick, children }: { side: 'left' | 'right'
  * original at its own size, shrunk to fit. Keyed by the image, so its state starts over on a step.
  */
 function ImageStage({ taskId, image, onOpen }: { taskId: number; image: ViewerImage; onOpen: () => void }) {
+  const { t } = useTranslation()
   const original = useAttachmentBlobUrl(taskId, image.id, image.mime, 'original')
   const preview = useAttachmentBlobUrl(taskId, image.id, image.mime)
   const [broken, setBroken] = useState(false)
@@ -217,7 +220,7 @@ function ImageStage({ taskId, image, onOpen }: { taskId: number; image: ViewerIm
           <div className="m-auto flex max-w-sm flex-col items-center gap-3 px-6 text-center">
             <ImageOff className="h-8 w-8 text-text-secondary" />
             <p className="text-meta text-text-secondary">
-              {broken ? 'This image cannot be shown here.' : 'The image could not be loaded.'}
+              {broken ? t('task.viewer.cannotShow') : t('task.viewer.cannotLoad')}
             </p>
             <div className="flex gap-2">
               {!broken && (
@@ -226,7 +229,7 @@ function ImageStage({ taskId, image, onOpen }: { taskId: number; image: ViewerIm
                   onClick={() => void original.retry()}
                   className="rounded-control border border-border px-3 py-1.5 text-meta text-text transition-colors duration-fade-fast hover:bg-bg-page"
                 >
-                  Retry
+                  {t('task.common.retry')}
                 </button>
               )}
               <button
@@ -234,7 +237,7 @@ function ImageStage({ taskId, image, onOpen }: { taskId: number; image: ViewerIm
                 onClick={onOpen}
                 className="rounded-control bg-accent-fill px-3 py-1.5 text-meta text-on-accent transition-colors duration-fade-fast hover:bg-accent-fill/90"
               >
-                Open in default app
+                {t('task.viewer.openDefault')}
               </button>
             </div>
           </div>
@@ -264,7 +267,7 @@ function ImageStage({ taskId, image, onOpen }: { taskId: number; image: ViewerIm
         ) : (
           <span role="status" className="m-auto">
             <Loader2 className="h-6 w-6 animate-spin text-text-secondary" aria-hidden />
-            <span className="sr-only">Loading image</span>
+            <span className="sr-only">{t('task.viewer.loading')}</span>
           </span>
         )}
       </div>
@@ -272,15 +275,15 @@ function ImageStage({ taskId, image, onOpen }: { taskId: number; image: ViewerIm
       {isPreview && (
         <span role="status" className="absolute bottom-3 left-3">
           <Loader2 className="h-4 w-4 animate-spin text-text-secondary" aria-hidden />
-          <span className="sr-only">Loading the full image</span>
+          <span className="sr-only">{t('task.viewer.loadingFull')}</span>
         </span>
       )}
       {canZoom && !failed && (
         <button
           type="button"
           onClick={() => toggleZoom()}
-          aria-label={isZoomed ? 'Fit to window' : 'Actual size'}
-          title={isZoomed ? 'Fit to window' : 'Actual size'}
+          aria-label={isZoomed ? t('task.viewer.fit') : t('task.viewer.actualSize')}
+          title={isZoomed ? t('task.viewer.fit') : t('task.viewer.actualSize')}
           className="absolute bottom-3 right-3 flex h-8 w-8 items-center justify-center rounded-full border border-border bg-bg-page/90 text-text shadow-sm transition-colors duration-fade-fast hover:bg-bg-page"
         >
           {isZoomed ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}

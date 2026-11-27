@@ -3,7 +3,7 @@ import { formatDateChip } from './date-utils'
 import { formatBlockRange, type DateFormat } from './date-display'
 import { getDateFormat } from './date-format'
 import { locationReminderLabel, type LocationTrigger } from '../../shared/synced-prefs'
-import { t } from '../../shared/i18n'
+import { t, type TranslationKey } from '../../shared/i18n'
 
 // The chips under a quick-add input: one builder for the composer, the title editor and Quick
 // Entry, so the same parse gives the same words everywhere. Pure: no React, no DOM.
@@ -20,16 +20,20 @@ export interface ChipData {
   priority?: number
 }
 
-const PRIORITY_NAMES = ['', 'Low', 'Medium', 'High', 'Urgent', 'Do now']
+const PRIORITY_NAMES: ReadonlyArray<TranslationKey | ''> = ['', 'composer.chip.priorityLow', 'composer.chip.priorityMedium', 'composer.chip.priorityHigh', 'composer.chip.priorityUrgent', 'composer.chip.priorityDoNow']
 
 /** The word on a priority chip. */
 export function priorityChipName(priority: number): string {
-  return PRIORITY_NAMES[priority] || `P${priority}`
+  const key = PRIORITY_NAMES[priority]
+  return key ? t(key) : `P${priority}`
 }
 
 /** The word on a repeat chip read from text: "Every week", "Every 2 months". */
 export function recurrenceChipName(interval: number, unit: string): string {
-  return interval === 1 ? `Every ${unit}` : `Every ${interval} ${unit}s`
+  if (interval === 1) {
+    return unit === 'day' ? t('composer.chip.everyDay') : unit === 'week' ? t('composer.chip.everyWeek') : unit === 'month' ? t('composer.chip.everyMonth') : t('composer.chip.everyYear')
+  }
+  return unit === 'day' ? t('composer.chip.everyDays', { count: interval }) : unit === 'week' ? t('composer.chip.everyWeeks', { count: interval }) : unit === 'month' ? t('composer.chip.everyMonths', { count: interval }) : t('composer.chip.everyYears', { count: interval })
 }
 
 /** The word on a place chip: "Arrive: Home" or "Leave: Work", as the reminder chip says it. */
@@ -77,15 +81,15 @@ export function parseChips(result: ParseResult, fmt: DateFormat = getDateFormat(
     chips.push({ type: 'checkOn', label: t('pro.chip.checkOn', { date: formatDateChip(new Date(year, month - 1, day), true, now, fmt) }), key: 'checkOn', source: 'text' })
   }
   if (result.start && !result.block) {
-    chips.push({ type: 'start', label: `Starts ${formatDateChip(result.start, true, now, fmt)}`, key: 'start', source: 'text' })
+    chips.push({ type: 'start', label: t('composer.chip.starts', { date: formatDateChip(result.start, true, now, fmt) }), key: 'start', source: 'text' })
   }
   if (result.estimate) {
     const hours = Math.floor(result.estimate / 60)
     const minutes = result.estimate % 60
     chips.push({ type: 'estimate', label: `~${hours ? `${hours}h` : ''}${minutes ? `${minutes}m` : ''}`, key: 'estimate', source: 'text' })
   }
-  if (result.flag) chips.push({ type: 'flag', label: 'Flagged', key: 'flag', source: 'text' })
-  if (result.request) chips.push({ type: 'request', label: 'Request', key: 'request', source: 'text' })
+  if (result.flag) chips.push({ type: 'flag', label: t('composer.chip.flagged'), key: 'flag', source: 'text' })
+  if (result.request) chips.push({ type: 'request', label: t('composer.chip.request'), key: 'request', source: 'text' })
   return chips
 }
 
@@ -99,6 +103,9 @@ export function personChip(result: Pick<ParseResult, 'person' | 'tokens'>): Chip
   const name = result.person.id === null
     ? result.person.name
     : token.raw.replace(/^for\s+/i, '').replace(/:$/, '').replace(/^\$/, '').replace(/^"(.*)"$/, '$1').trim()
-  const label = result.person.mine ? `For ${name}` : `From ${name}`
-  return { type: 'person', label: result.person.id === null ? `${label} (new person)` : label, key: 'person', source: 'text' }
+  const isNew = result.person.id === null
+  const label = result.person.mine
+    ? t(isNew ? 'composer.chip.forNewPerson' : 'composer.chip.forPerson', { name })
+    : t(isNew ? 'composer.chip.fromNewPerson' : 'composer.chip.fromPerson', { name })
+  return { type: 'person', label, key: 'person', source: 'text' }
 }

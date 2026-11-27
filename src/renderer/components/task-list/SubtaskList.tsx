@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { ArrowDown, ArrowUp, ArrowUpRight, GripVertical, Pencil, Trash2 } from 'lucide-react'
 import { DndContext, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core'
 import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
@@ -28,6 +29,7 @@ const ACTION_BUTTON =
   'flex h-6 w-6 shrink-0 items-center justify-center rounded-control text-text-secondary transition-colors duration-fade-fast hover:bg-bg-hover hover:text-text'
 
 export function SubtaskList({ parentTask, showInput = false }: SubtaskListProps) {
+  const { t } = useTranslation()
   const embeddedSubtasks = parentTask.related_tasks?.subtask ?? []
   const { data: fetchedSubtasks, isLoading } = useSubtasks(parentTask.id)
   const { snapshot } = useSyncedPrefs()
@@ -92,18 +94,18 @@ export function SubtaskList({ parentTask, showInput = false }: SubtaskListProps)
     let deleteSubtasks = true
     if (count > 0) {
       const deleteChildren = await confirmDelete(
-        `Delete this subtask and ${count} ${count === 1 ? 'subtask' : 'subtasks'} of its own?`,
-        { force: true, confirmLabel: 'Delete all', destructive: true, returnFocusTo },
+        t('task.confirm.deleteSubtaskWithChildren', { count }),
+        { force: true, confirmLabel: t('task.confirm.deleteAll'), destructive: true, returnFocusTo },
       )
       if (!deleteChildren) {
         const keepChildren = await confirmDelete(
-          `Keep ${count === 1 ? 'its subtask' : 'its subtasks'} as standalone tasks and delete only this subtask?`,
-          { force: true, confirmLabel: 'Keep subtasks', destructive: false, returnFocusTo },
+          t('task.confirm.keepChildren', { count }),
+          { force: true, confirmLabel: t('task.confirm.keepSubtasks'), destructive: false, returnFocusTo },
         )
         if (!keepChildren) return
         deleteSubtasks = false
       }
-    } else if (!(await confirmDelete('Delete this subtask? This cannot be undone.', { returnFocusTo }))) {
+    } else if (!(await confirmDelete(t('task.confirm.deleteSubtask'), { returnFocusTo }))) {
       return
     }
     // Focus moves to the next subtask (or the one before) once this row is gone.
@@ -115,7 +117,7 @@ export function SubtaskList({ parentTask, showInput = false }: SubtaskListProps)
   }
 
   if (isLoading && subtasks.length === 0 && showInput) {
-    return <div className="py-1 text-caption text-[var(--text-secondary)]">Loading subtasks...</div>
+    return <div className="py-1 text-caption text-[var(--text-secondary)]">{t('task.subtask.loading')}</div>
   }
 
   if (subtasks.length === 0 && !showInput) return null
@@ -149,7 +151,7 @@ export function SubtaskList({ parentTask, showInput = false }: SubtaskListProps)
       )}
       {completeTask.isError && (
         <div role="alert" className="mb-1 text-caption text-danger">
-          Could not complete subtask: {completeTask.error.message}
+          {t('task.subtask.completeFailed', { error: completeTask.error.message })}
         </div>
       )}
 
@@ -171,7 +173,7 @@ export function SubtaskList({ parentTask, showInput = false }: SubtaskListProps)
                 inputRef.current?.blur()
               }
             }}
-            placeholder="Add subtask..."
+            placeholder={t('task.subtask.addPlaceholder')}
             className="flex-1 bg-transparent text-xs text-[var(--text-primary)] placeholder:text-[var(--text-secondary)] focus:outline-none"
           />
         </div>
@@ -196,6 +198,7 @@ interface SubtaskRowProps {
  * own task, or delete it (the buttons at the end, or the right-click menu).
  */
 function SubtaskRow({ subtask: st, canMove, onMoveUp, onMoveDown, onComplete, onRename, onOpen, onDelete }: SubtaskRowProps) {
+  const { t } = useTranslation()
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({ id: st.id, disabled: !canMove })
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(st.title)
@@ -257,7 +260,7 @@ function SubtaskRow({ subtask: st, canMove, onMoveUp, onMoveDown, onComplete, on
         type="button"
         role="checkbox"
         aria-checked={st.done}
-        aria-label={`Complete ${st.title}`}
+        aria-label={t('task.subtask.completeNamed', { title: st.title })}
         onClick={onComplete}
         // A 24 px target around the 14 px box.
         className="group/sub flex h-6 w-6 shrink-0 items-center justify-center"
@@ -282,7 +285,7 @@ function SubtaskRow({ subtask: st, canMove, onMoveUp, onMoveDown, onComplete, on
           type="text"
           autoFocus
           value={draft}
-          aria-label={`Rename ${st.title}`}
+          aria-label={t('task.subtask.renameNamed', { title: st.title })}
           onChange={(e) => setDraft(e.target.value)}
           onFocus={(e) => e.currentTarget.select()}
           onKeyDown={(e) => {
@@ -305,7 +308,7 @@ function SubtaskRow({ subtask: st, canMove, onMoveUp, onMoveDown, onComplete, on
           ref={titleRef}
           type="button"
           data-subtask-title={st.id}
-          aria-label={`Rename ${st.title}`}
+          aria-label={t('task.subtask.renameNamed', { title: st.title })}
           onClick={startEditing}
           className={cn(
             'min-w-0 flex-1 cursor-text truncate rounded-control px-1 py-0.5 text-left text-xs text-[var(--text-primary)] hover:bg-bg-hover',
@@ -318,16 +321,16 @@ function SubtaskRow({ subtask: st, canMove, onMoveUp, onMoveDown, onComplete, on
       {!editing && (
         // Shown on hover and while the row has keyboard focus.
         <div className="flex shrink-0 items-center opacity-0 transition-opacity duration-fade-fast focus-within:opacity-100 group-hover/subrow:opacity-100">
-          <Tooltip label="Open subtask">
-            <button type="button" aria-label={`Open ${st.title}`} onClick={onOpen} className={ACTION_BUTTON}>
+          <Tooltip label={t('task.subtask.open')}>
+            <button type="button" aria-label={t('task.subtask.openNamed', { title: st.title })} onClick={onOpen} className={ACTION_BUTTON}>
               <ArrowUpRight className="h-3.5 w-3.5" aria-hidden="true" />
             </button>
           </Tooltip>
-          <Tooltip label="Delete subtask">
+          <Tooltip label={t('task.subtask.delete')}>
             <button
               ref={deleteRef}
               type="button"
-              aria-label={`Delete ${st.title}`}
+              aria-label={t('task.subtask.deleteNamed', { title: st.title })}
               onClick={() => onDelete(deleteRef.current)}
               className={cn(ACTION_BUTTON, 'hover:text-danger')}
             >
@@ -337,13 +340,13 @@ function SubtaskRow({ subtask: st, canMove, onMoveUp, onMoveDown, onComplete, on
         </div>
       )}
       {menuAt && (
-        <Menu anchorPoint={menuAt} label="Subtask actions" onClose={() => setMenuAt(null)}>
-          <MenuItem icon={<Pencil />} onSelect={startEditing}>Rename</MenuItem>
-          <MenuItem icon={<ArrowUpRight />} onSelect={onOpen}>Open subtask</MenuItem>
-          {canMove && onMoveUp && <MenuItem icon={<ArrowUp />} onSelect={onMoveUp}>Move up</MenuItem>}
-          {canMove && onMoveDown && <MenuItem icon={<ArrowDown />} onSelect={onMoveDown}>Move down</MenuItem>}
+        <Menu anchorPoint={menuAt} label={t('task.subtask.actions')} onClose={() => setMenuAt(null)}>
+          <MenuItem icon={<Pencil />} onSelect={startEditing}>{t('task.subtask.rename')}</MenuItem>
+          <MenuItem icon={<ArrowUpRight />} onSelect={onOpen}>{t('task.subtask.open')}</MenuItem>
+          {canMove && onMoveUp && <MenuItem icon={<ArrowUp />} onSelect={onMoveUp}>{t('task.subtask.moveUp')}</MenuItem>}
+          {canMove && onMoveDown && <MenuItem icon={<ArrowDown />} onSelect={onMoveDown}>{t('task.subtask.moveDown')}</MenuItem>}
           <MenuSeparator />
-          <MenuItem icon={<Trash2 />} danger onSelect={() => onDelete(titleRef.current)}>Delete subtask</MenuItem>
+          <MenuItem icon={<Trash2 />} danger onSelect={() => onDelete(titleRef.current)}>{t('task.subtask.delete')}</MenuItem>
         </Menu>
       )}
     </div>

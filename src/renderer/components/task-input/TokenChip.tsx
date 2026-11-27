@@ -5,6 +5,7 @@ import { motionMs, motionSpringCurve, travelStart } from '@/lib/motion'
 import { readReducedMotion } from '@/hooks/use-reduced-motion'
 import { priorityMark } from '../../../shared/priority-mark-svg'
 import { TOKEN_CHIP_CLASSES } from '@/lib/token-chip-colors'
+import { useTranslation } from 'react-i18next'
 
 // Green=date, orange=label, blue=project, purple=recurrence, as roles of the design tokens
 // (lib/token-chip-colors.ts). A priority chip takes the colour role of its level (the same as the
@@ -33,6 +34,7 @@ interface TokenChipProps {
 }
 
 export function TokenChip({ type, label, source, priority, onDismiss }: TokenChipProps) {
+  const { t } = useTranslation()
   const ref = useRef<HTMLSpanElement>(null)
 
   // A chip read from the typed text travels out of the highlighted token (card 4.11a); under reduced
@@ -77,8 +79,9 @@ export function TokenChip({ type, label, source, priority, onDismiss }: TokenChi
             e.stopPropagation()
             onDismiss()
           }}
-          aria-label={`Dismiss ${type}`}
+          aria-label={t('composer.chip.dismiss', { label })}
         >
+          {/* i18n-ignore: a multiplication sign */}
           &times;
         </button>
       )}

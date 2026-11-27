@@ -7,17 +7,19 @@ import { formatDateChip } from '@/lib/date-utils'
 import { startOfLocalDay } from '@/lib/due-dates'
 import { Popover } from '../overlay/Popover'
 import type { SearchDate, SearchFilters, SearchStatus } from '../../../shared/search-filters'
+import { useTranslation } from 'react-i18next'
+import type { TranslationKey } from '../../../shared/i18n'
 
-const DATE_CHOICES: Array<[SearchDate, string]> = [
-  ['all', 'Any'],
-  ['overdue', 'Overdue'],
-  ['today', 'Today'],
-  ['this_week', 'This week'],
-  ['this_month', 'This month'],
-  ['no_due_date', 'No date'],
+const DATE_CHOICES: Array<[SearchDate, TranslationKey]> = [
+  ['all', 'search.filters.any'],
+  ['overdue', 'search.filters.overdue'],
+  ['today', 'search.filters.today'],
+  ['this_week', 'search.filters.thisWeek'],
+  ['this_month', 'search.filters.thisMonth'],
+  ['no_due_date', 'search.filters.noDate'],
 ]
-const STATUS_CHOICES: Array<[SearchStatus, string]> = [['all', 'All'], ['open', 'Open'], ['done', 'Completed']]
-const PRIORITY_CHOICES: Array<[number, string]> = [[1, 'Low'], [2, 'Medium'], [3, 'High'], [4, 'Urgent'], [5, 'Do now']]
+const STATUS_CHOICES: Array<[SearchStatus, TranslationKey]> = [['all', 'search.filters.all'], ['open', 'search.filters.open'], ['done', 'search.filters.completed']]
+const PRIORITY_CHOICES: Array<[number, TranslationKey]> = [[1, 'search.filters.low'], [2, 'search.filters.medium'], [3, 'search.filters.high'], [4, 'search.filters.urgent'], [5, 'search.filters.doNow']]
 
 interface FilterButtonProps {
   name: string
@@ -29,6 +31,7 @@ interface FilterButtonProps {
 
 /** One filter: its name until it is set, then its value and an X. */
 function FilterButton({ name, value, onClear, children }: FilterButtonProps) {
+  const { t } = useTranslation()
   const anchor = useRef<HTMLButtonElement>(null)
   const [open, setOpen] = useState(false)
   return (
@@ -50,7 +53,7 @@ function FilterButton({ name, value, onClear, children }: FilterButtonProps) {
         {!value && <ChevronDown className="h-3 w-3" aria-hidden="true" />}
       </button>
       {value && (
-        <button type="button" aria-label={`Clear ${name} filter`} onClick={onClear} className="flex h-full items-center rounded-control pr-1.5 hover:text-[var(--text-primary)]">
+        <button type="button" aria-label={t('search.filters.clearNamed', { name })} onClick={onClear} className="flex h-full items-center rounded-control pr-1.5 hover:text-[var(--text-primary)]">
           <X className="h-3 w-3" aria-hidden="true" />
         </button>
       )}
@@ -67,6 +70,7 @@ const ROW = 'flex w-full items-center gap-2 rounded-control px-2 py-1.5 text-lef
 
 /** Date, Status, Labels and Priority under the search page's header (contract section 17). */
 export function SearchFilterBar({ filters, onChange }: { filters: SearchFilters; onChange: (filters: SearchFilters) => void }) {
+  const { t } = useTranslation()
   const { data: labels = [] } = useLabels()
   const fmt = useDateFormat()
   const day = (date: string) => formatDateChip(startOfLocalDay(date), true, new Date(), fmt)
@@ -76,35 +80,41 @@ export function SearchFilterBar({ filters, onChange }: { filters: SearchFilters;
   const dateText = (() => {
     if (filters.date === 'range' && filters.from && filters.to) {
       const [first, last] = filters.from <= filters.to ? [filters.from, filters.to] : [filters.to, filters.from]
-      return first === last ? day(first) : `${day(first)} to ${day(last)}`
+      return first === last ? day(first) : t('search.filters.dateRange', { from: day(first), to: day(last) })
     }
-    return DATE_CHOICES.find(([value]) => value === filters.date && value !== 'all')?.[1] ?? null
+    const choice = DATE_CHOICES.find(([value]) => value === filters.date && value !== 'all')?.[1]
+    return choice ? t(choice) : null
   })()
-  const statusText = STATUS_CHOICES.find(([value]) => value === filters.status && value !== 'all')?.[1] ?? null
+  const statusChoice = STATUS_CHOICES.find(([value]) => value === filters.status && value !== 'all')?.[1]
+  const statusText = statusChoice ? t(statusChoice) : null
+  const priorityName = (priority: number) => {
+    const choice = PRIORITY_CHOICES.find(([value]) => value === priority)?.[1]
+    return choice ? t(choice) : null
+  }
   const labelIds = filters.label_ids ?? []
   const priorities = filters.priorities ?? []
-  const labelsText = labelIds.length === 0 ? null : labelIds.length === 1 ? labels.find((l) => l.id === labelIds[0])?.title ?? '1 label' : `${labelIds.length} labels`
-  const priorityText = priorities.length === 0 ? null : priorities.length === 1 ? PRIORITY_CHOICES.find(([value]) => value === priorities[0])?.[1] ?? null : `${priorities.length} priorities`
+  const labelsText = labelIds.length === 0 ? null : labelIds.length === 1 ? labels.find((l) => l.id === labelIds[0])?.title ?? t('search.filters.labelCount', { count: 1 }) : t('search.filters.labelCount', { count: labelIds.length })
+  const priorityText = priorities.length === 0 ? null : priorities.length === 1 ? priorityName(priorities[0]) : t('search.filters.priorityCount', { count: priorities.length })
   const toggle = <T,>(list: T[], item: T) => (list.includes(item) ? list.filter((x) => x !== item) : [...list, item])
 
   return (
-    <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Search filters">
-      <FilterButton name="Date" value={dateText} onClear={() => { setFrom(''); setTo(''); onChange({ ...filters, date: 'all', from: undefined, to: undefined }) }}>
+    <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label={t('search.filters.group')}>
+      <FilterButton name={t('search.filters.date')} value={dateText} onClear={() => { setFrom(''); setTo(''); onChange({ ...filters, date: 'all', from: undefined, to: undefined }) }}>
         {(close) => (
           <>
             {DATE_CHOICES.map(([value, label]) => (
               <button key={value} type="button" role="menuitemradio" aria-checked={(filters.date ?? 'all') === value} className={ROW} onClick={() => { onChange({ ...filters, date: value, from: undefined, to: undefined }); close() }}>
-                {label}
+                {t(label)}
               </button>
             ))}
             <div className="mt-1 border-t border-[var(--border-color)] px-2 pb-1 pt-2">
-              <p className="mb-1 text-caption text-[var(--text-secondary)]">Pick dates</p>
+              <p className="mb-1 text-caption text-[var(--text-secondary)]">{t('search.filters.pickDates')}</p>
               <label className="mb-1 flex items-center justify-between gap-2 text-caption text-[var(--text-secondary)]">
-                From
+                {t('search.filters.from')}
                 <input type="date" value={from} onChange={(e) => { setFrom(e.target.value); if (e.target.value && to) onChange({ ...filters, date: 'range', from: e.target.value, to }) }} className="rounded-control border border-[var(--border-color)] bg-transparent px-1 text-[var(--text-primary)]" />
               </label>
               <label className="flex items-center justify-between gap-2 text-caption text-[var(--text-secondary)]">
-                To
+                {t('search.filters.to')}
                 <input type="date" value={to} onChange={(e) => { setTo(e.target.value); if (from && e.target.value) onChange({ ...filters, date: 'range', from, to: e.target.value }) }} className="rounded-control border border-[var(--border-color)] bg-transparent px-1 text-[var(--text-primary)]" />
               </label>
             </div>
@@ -112,18 +122,18 @@ export function SearchFilterBar({ filters, onChange }: { filters: SearchFilters;
         )}
       </FilterButton>
 
-      <FilterButton name="Status" value={statusText} onClear={() => onChange({ ...filters, status: 'all' })}>
+      <FilterButton name={t('search.filters.status')} value={statusText} onClear={() => onChange({ ...filters, status: 'all' })}>
         {(close) => STATUS_CHOICES.map(([value, label]) => (
           <button key={value} type="button" role="menuitemradio" aria-checked={(filters.status ?? 'all') === value} className={ROW} onClick={() => { onChange({ ...filters, status: value }); close() }}>
-            {label}
+            {t(label)}
           </button>
         ))}
       </FilterButton>
 
-      <FilterButton name="Labels" value={labelsText} onClear={() => onChange({ ...filters, label_ids: [] })}>
+      <FilterButton name={t('search.filters.labels')} value={labelsText} onClear={() => onChange({ ...filters, label_ids: [] })}>
         {() => (
           <div className="max-h-72 overflow-y-auto">
-            {labels.length === 0 && <p className="px-2 py-1.5 text-caption text-[var(--text-secondary)]">No labels yet</p>}
+            {labels.length === 0 && <p className="px-2 py-1.5 text-caption text-[var(--text-secondary)]">{t('search.filters.noLabelsYet')}</p>}
             {labels.map((label) => (
               <label key={label.id} className={cn(ROW, 'cursor-pointer')}>
                 <input type="checkbox" checked={labelIds.includes(label.id)} onChange={() => onChange({ ...filters, label_ids: toggle(labelIds, label.id) })} />
@@ -134,11 +144,11 @@ export function SearchFilterBar({ filters, onChange }: { filters: SearchFilters;
         )}
       </FilterButton>
 
-      <FilterButton name="Priority" value={priorityText} onClear={() => onChange({ ...filters, priorities: [] })}>
+      <FilterButton name={t('search.filters.priority')} value={priorityText} onClear={() => onChange({ ...filters, priorities: [] })}>
         {() => PRIORITY_CHOICES.map(([value, label]) => (
           <label key={value} className={cn(ROW, 'cursor-pointer')}>
             <input type="checkbox" checked={priorities.includes(value)} onChange={() => onChange({ ...filters, priorities: toggle(priorities, value) })} />
-            {label}
+            {t(label)}
           </label>
         ))}
       </FilterButton>

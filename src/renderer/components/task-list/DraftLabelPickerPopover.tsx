@@ -1,4 +1,5 @@
 import { useState, type RefObject } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Check, Plus } from 'lucide-react'
 import { useLabels } from '@/hooks/use-labels'
 import { useCreateLabel } from '@/hooks/use-task-mutations'
@@ -17,6 +18,7 @@ export function DraftLabelPickerPopover({
   onChange: (ids: number[]) => void
   onClose: (reason?: PopoverCloseReason) => void
 }) {
+  const { t } = useTranslation()
   const { data: labels = [] } = useLabels()
   const createLabel = useCreateLabel()
   const [search, setSearch] = useState('')
@@ -31,14 +33,14 @@ export function DraftLabelPickerPopover({
   const filtered = labels.filter((label) => label.title.toLowerCase().includes(trimmed.toLowerCase()))
 
   return (
-    <Popover anchorRef={anchorRef} onClose={onClose} label="Labels" className="w-52">
+    <Popover anchorRef={anchorRef} onClose={onClose} label={t('task.labels.title')} className="w-52">
       <div className="border-b border-[var(--border-color)] px-3 py-2">
         <input
           data-autofocus
-          aria-label="Search labels"
+          aria-label={t('task.labels.search')}
           value={search}
           onChange={(event) => setSearch(event.target.value)}
-          placeholder="Search labels..."
+          placeholder={t('task.labels.searchPlaceholder')}
           className="w-full bg-transparent text-xs text-[var(--text-primary)] placeholder:text-[var(--text-secondary)] focus:outline-none"
           onKeyDown={(event) => {
             if (event.key === 'Enter' && trimmed && !exact) {
@@ -51,7 +53,7 @@ export function DraftLabelPickerPopover({
           }}
         />
       </div>
-      <div role="listbox" aria-label="Labels" aria-multiselectable="true" className="max-h-60 overflow-y-auto py-1">
+      <div role="listbox" aria-label={t('task.labels.title')} aria-multiselectable="true" className="max-h-60 overflow-y-auto py-1">
         {filtered.map((label) => (
           <button key={label.id} type="button" role="option" tabIndex={-1} aria-selected={selectedIds.includes(label.id)} onClick={() => toggle(label)} className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-[var(--text-primary)] hover:bg-[var(--bg-hover)]">
             <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: normalizeHex(label.hex_color) || 'var(--text-secondary)' }} />
@@ -61,7 +63,7 @@ export function DraftLabelPickerPopover({
         ))}
         {trimmed && !exact && (
           <button type="button" role="option" tabIndex={-1} aria-selected={false} onClick={() => createLabel.mutate({ title: trimmed }, { onSuccess: (label) => onChange([...selectedIds, label.id]) })} className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs italic text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]">
-            <Plus className="h-3.5 w-3.5" /> Create “{trimmed}”
+            <Plus className="h-3.5 w-3.5" /> {t('task.labels.create', { name: trimmed })}
           </button>
         )}
       </div>

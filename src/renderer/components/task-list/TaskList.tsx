@@ -34,6 +34,7 @@ import { useHoldToTalk } from '@/hooks/use-hold-to-talk'
 import { can } from '@/lib/capabilities'
 import { useVoiceListStore } from '@/stores/voice-list-store'
 import type { SmartListId } from '@/lib/smart-list-identity'
+import { useTranslation } from 'react-i18next'
 
 interface TaskListProps {
   title: string
@@ -88,7 +89,7 @@ export function TaskList({
   subtitle,
   tasks,
   projectId,
-  emptyTitle = 'No tasks',
+  emptyTitle,
   emptySubtitle,
   emptyWarm,
   emptyExtra,
@@ -108,6 +109,7 @@ export function TaskList({
   newTaskPlacement = 'after-children',
   hideHeader = false,
 }: TaskListProps) {
+  const { t } = useTranslation()
   const [isAdding, setIsAdding] = useState(false)
   // Holding the header + says a task instead of typing it (docs/voice-input.md). A voice task gets
   // the defaults this list gives its composer, from wherever the capture is started.
@@ -300,8 +302,13 @@ export function TaskList({
         void (async () => {
           if (descendantCount > 0) {
             const ok = await confirmDelete(
-              `Complete ${targets.length} ${targets.length === 1 ? 'task' : 'tasks'} and ${descendantCount} unfinished ${descendantCount === 1 ? 'subtask' : 'subtasks'}?`,
-              { force: true, confirmLabel: 'Complete all', destructive: false },
+              t(
+                targets.length === 1
+                  ? (descendantCount === 1 ? 'task.confirm.completeTaskSubtask' : 'task.confirm.completeTaskSubtasks')
+                  : (descendantCount === 1 ? 'task.confirm.completeTasksSubtask' : 'task.confirm.completeTasksSubtasks'),
+                { tasks: targets.length, subtasks: descendantCount },
+              ),
+              { force: true, confirmLabel: t('task.confirm.completeAll'), destructive: false },
             )
             if (!ok) return
           }
@@ -322,15 +329,15 @@ export function TaskList({
         if (targets.length === 0) return
         if (targets.some((task) => taskDescendants(task).length > 0)) {
           void confirmDelete(
-            'This selection includes a parent task. Open that parent to choose whether its subtasks should be deleted or kept.',
-            { force: true, confirmLabel: 'Close', destructive: false },
+            t('task.confirm.selectionHasParent'),
+            { force: true, confirmLabel: t('task.confirm.close'), destructive: false },
           )
           return
         }
         const message =
           targets.length > 1
-            ? `Delete ${targets.length} tasks? This cannot be undone.`
-            : 'Delete this task? This cannot be undone.'
+            ? t('task.confirm.deleteTasks', { count: targets.length })
+            : t('task.confirm.deleteTask')
         void confirmDelete(message).then((ok) => {
           if (!ok) return
           targets.forEach((t) => deleteTask.mutate({ task: t }))
@@ -601,8 +608,8 @@ export function TaskList({
               onClick={startAdding}
               {...holdToTalk}
               className="flex h-7 w-7 select-none items-center justify-center rounded-control text-[var(--text-secondary)] transition-colors duration-fade-fast hover:bg-[var(--bg-hover)] hover:text-[var(--accent-blue)]"
-              aria-label="New task"
-              title={can('voice') ? 'Click to type a task, hold to say it' : undefined}
+              aria-label={t('task.list.newTask')}
+              title={can('voice') ? t('task.list.holdToTalk') : undefined}
             >
               <Plus className="h-4 w-4" />
             </button>
@@ -621,15 +628,15 @@ export function TaskList({
           <EmptyState
             icon={Inbox}
             identity={identity}
-            title={emptyTitle}
+            title={emptyTitle ?? t('task.list.noTasks')}
             subtitle={emptySubtitle}
             warm={emptyWarm}
             extra={emptyExtra}
             action={
               showNewTask && projectId ? (
-                <Button variant="secondary" onClick={startAdding} {...holdToTalk} title={can('voice') ? 'Click to type a task, hold to say it' : undefined}>
+                <Button variant="secondary" onClick={startAdding} {...holdToTalk} title={can('voice') ? t('task.list.holdToTalk') : undefined}>
                   <Plus className="h-4 w-4" />
-                  Add task
+                  {t('task.list.addTask')}
                 </Button>
               ) : undefined
             }

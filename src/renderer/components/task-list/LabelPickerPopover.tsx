@@ -1,4 +1,5 @@
 import { useState, type RefObject } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Check, Plus } from 'lucide-react'
 import { useLabels } from '@/hooks/use-labels'
 import { useAddLabel, useRemoveLabel, useCreateLabel } from '@/hooks/use-task-mutations'
@@ -17,6 +18,7 @@ interface LabelPickerPopoverProps {
 }
 
 export function LabelPickerPopover({ anchorRef, placement = 'bottom-start', tasks, onClose, onApplied }: LabelPickerPopoverProps) {
+  const { t } = useTranslation()
   const { data: allLabels } = useLabels()
   const addLabel = useAddLabel()
   const removeLabel = useRemoveLabel()
@@ -72,15 +74,15 @@ export function LabelPickerPopover({ anchorRef, placement = 'bottom-start', task
   )
 
   return (
-    <Popover anchorRef={anchorRef} onClose={onClose} placement={placement} label="Labels" className="w-52">
+    <Popover anchorRef={anchorRef} onClose={onClose} placement={placement} label={t('task.labels.title')} className="w-52">
       {/* Search field */}
       <div className="border-b border-[var(--border-color)] px-3 py-2">
         <input
           type="text"
-          aria-label="Search labels"
+          aria-label={t('task.labels.search')}
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Search labels..."
+          placeholder={t('task.labels.searchPlaceholder')}
           data-autofocus
           className="w-full bg-transparent text-xs text-[var(--text-primary)] placeholder:text-[var(--text-secondary)] focus:outline-none"
           onKeyDown={(e) => {
@@ -92,10 +94,10 @@ export function LabelPickerPopover({ anchorRef, placement = 'bottom-start', task
       </div>
 
       {filteredLabels.length === 0 && !trimmedQuery && (
-        <div className="px-3 py-2 text-xs text-[var(--text-secondary)]">No labels</div>
+        <div className="px-3 py-2 text-xs text-[var(--text-secondary)]">{t('task.labels.none')}</div>
       )}
 
-      <div role="listbox" aria-label="Labels" aria-multiselectable="true" className="max-h-60 overflow-y-auto py-1">
+      <div role="listbox" aria-label={t('task.labels.title')} aria-multiselectable="true" className="max-h-60 overflow-y-auto py-1">
         {filteredLabels.map((label) => (
           <button
             key={label.id}
@@ -129,7 +131,7 @@ export function LabelPickerPopover({ anchorRef, placement = 'bottom-start', task
           >
             <Plus className="h-3.5 w-3.5 shrink-0" />
             <span className="min-w-0 flex-1 truncate">
-              Create &ldquo;{trimmedQuery}&rdquo;
+              {t('task.labels.create', { name: trimmedQuery })}
             </span>
           </button>
         )}

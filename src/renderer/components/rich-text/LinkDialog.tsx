@@ -2,6 +2,7 @@ import { useEffect, useId, useState } from 'react'
 import { cn } from '@/lib/cn'
 import { normalizeEditableLink } from '@/lib/description-html'
 import { Dialog } from '@/components/overlay/Dialog'
+import { useTranslation } from 'react-i18next'
 
 interface LinkDialogProps {
   open: boolean
@@ -20,6 +21,7 @@ export function LinkDialog({
   onRemove,
   onCancel,
 }: LinkDialogProps) {
+  const { t } = useTranslation()
   const titleId = useId()
   const [url, setUrl] = useState(initialUrl)
   const [error, setError] = useState<string | null>(null)
@@ -39,12 +41,12 @@ export function LinkDialog({
         onRemove()
         return
       }
-      setError('Enter a URL')
+      setError(t('editor.linkDialog.enterUrl'))
       return
     }
     const normalized = normalizeEditableLink(trimmed)
     if (!normalized) {
-      setError('Use an http://, https://, or mailto: link.')
+      setError(t('editor.linkDialog.badScheme'))
       return
     }
     onApply(normalized)
@@ -54,9 +56,9 @@ export function LinkDialog({
     <Dialog open onClose={onCancel} labelledBy={titleId} className="w-[calc(100%-2rem)] max-w-sm">
       <div className="p-5">
         <h2 id={titleId} className="mb-3 text-sm font-medium text-[var(--text-primary)]">
-          {canRemove ? 'Edit link' : 'Add link'}
+          {canRemove ? t('editor.linkDialog.edit') : t('editor.linkDialog.add')}
         </h2>
-        <label className="mb-1 block text-xs text-[var(--text-secondary)]">URL</label>
+        <label className="mb-1 block text-xs text-[var(--text-secondary)]">{t('editor.linkDialog.url')}</label>
         <input
           data-autofocus
           type="text"
@@ -71,6 +73,7 @@ export function LinkDialog({
               handleApply()
             }
           }}
+          // i18n-ignore: an address example
           placeholder="https://example.com"
           className={cn(
             'mb-1 w-full rounded-control border bg-[var(--bg-primary)] px-3 py-1.5 text-sm text-[var(--text-primary)]',
@@ -91,7 +94,7 @@ export function LinkDialog({
               'text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-hover)]',
             )}
           >
-            Cancel
+            {t('editor.linkDialog.cancel')}
           </button>
           {canRemove && (
             <button
@@ -102,7 +105,7 @@ export function LinkDialog({
                 'text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-hover)]',
               )}
             >
-              Remove
+              {t('editor.linkDialog.remove')}
             </button>
           )}
           <button
@@ -110,7 +113,7 @@ export function LinkDialog({
             onClick={handleApply}
             className="rounded-control bg-accent-fill px-4 py-1.5 text-sm font-medium text-on-accent transition-colors hover:bg-accent-fill/90"
           >
-            Apply
+            {t('editor.linkDialog.apply')}
           </button>
         </div>
       </div>

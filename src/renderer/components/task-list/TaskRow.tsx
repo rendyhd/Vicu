@@ -1,4 +1,5 @@
 import { forwardRef, memo, useState, useRef, useEffect, useCallback, useImperativeHandle, useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import { ListChecks, Bell, Repeat, Paperclip, AlignLeft, ChevronRight, MessageSquare, Flag } from 'lucide-react'
 import type { Editor } from '@tiptap/react'
 import { useDraggable } from '@dnd-kit/core'
@@ -176,6 +177,7 @@ interface TaskTitleEditorProps {
 
 const TaskTitleEditor = forwardRef<TaskTitleEditorHandle, TaskTitleEditorProps>(
   function TaskTitleEditor({ task, onSave, onSubmit, onCancel, onPasteImages }, ref) {
+    const { t } = useTranslation()
     const addLabel = useAddLabel()
     const createLabel = useCreateLabel()
     const parser = useTaskParser()
@@ -348,7 +350,7 @@ const TaskTitleEditor = forwardRef<TaskTitleEditorHandle, TaskTitleEditorProps>(
           projects={projectItems}
           labels={labelItems}
           inputRef={inputRef}
-          placeholder="Task title"
+          placeholder={t('task.row.titlePlaceholder')}
           showBangTodayHint={isDirty && !parser.enabled && !!parser.parserConfig.bangToday}
           inputClassName="font-medium leading-snug"
           multiline
@@ -375,10 +377,11 @@ function RowProject({ title, color }: { title: string; color?: string }) {
 /** The project of a row in a list that mixes projects without headers (Search, custom lists). */
 /** A list's `row_fields` asked for the start date (21.3); a block is its own start and shows already. */
 function RowStart({ task }: { task: Task }) {
+  const { t } = useTranslation()
   const fmt = useDateFormat()
   const start = startDateOf(task)
   if (!start) return null
-  return <span className="shrink-0" data-row-start>Starts {formatWeekdayDate(start, new Date(), fmt)}</span>
+  return <span className="shrink-0" data-row-start>{t('task.row.starts', { date: formatWeekdayDate(start, new Date(), fmt) })}</span>
 }
 
 /** A list's `row_fields` asked for the estimate (21.7). */
@@ -403,6 +406,7 @@ function TaskRowInner({
   drag,
   reorderable = false,
 }: Omit<TaskRowProps, 'sortable'> & { drag: DragBehavior; reorderable?: boolean }) {
+  const { t } = useTranslation()
   // Per-field subscriptions: each row re-renders only when *its own* derived
   // state flips, not on every focus/selection change anywhere in the list.
   const isExpanded = useSelectionStore((s) => s.expandedTaskId === task.id)
@@ -422,7 +426,7 @@ function TaskRowInner({
   // A digit pressed on the row: the verdict bar opens and acts on it (it holds the actions).
   const [verdictKey, setVerdictKey] = useState<string | null>(null)
   const promisePerson = promise?.person != null ? personLabels.get(promise.person) : undefined
-  const promiseName = promisePerson?.title ?? 'Someone'
+  const promiseName = promisePerson?.title ?? t('task.row.someone')
   const theirs = promise?.dir === 'theirs' && !finalVerdictOf(promise)
   const mine = promise?.dir === 'mine' && !finalVerdictOf(promise)
   const isFocused = useSelectionStore((s) => s.focusedTaskId === task.id)
@@ -521,7 +525,7 @@ function TaskRowInner({
   // Flash red border briefly when drag-drop upload fails, show error message
   useEffect(() => {
     if (uploadFromDrop.isError) {
-      setDropError(uploadFromDrop.error?.message || 'Upload failed')
+      setDropError(uploadFromDrop.error?.message || t('task.row.uploadFailed'))
       const timer = setTimeout(() => setDropError(null), 4000)
       return () => clearTimeout(timer)
     }
@@ -854,7 +858,7 @@ function TaskRowInner({
               <span className={cn(task.done && 'vicu-strike', task.done && strikePlay && 'vicu-strike-play')}>{task.title}</span>
             )}
             {flagged && rowFieldShown(rowView, 'flag') && (
-              <Flag role="img" aria-label="Flagged" className="ml-1.5 inline h-3 w-3 -translate-y-px fill-accent-orange text-accent-orange" />
+              <Flag role="img" aria-label={t('task.row.flagged')} className="ml-1.5 inline h-3 w-3 -translate-y-px fill-accent-orange text-accent-orange" />
             )}
           </span>
           {notesLine && <p className="mt-0.5 truncate text-meta font-normal text-text-secondary">{notesLine}</p>}
@@ -863,14 +867,14 @@ function TaskRowInner({
               {workMark && <WorkMark task={task} />}
               {isNext && (
                 <span className="vicu-chip shrink-0 rounded-chip bg-accent-blue/12 px-2 py-px text-chip leading-tight text-accent-blue" data-pro-next>
-                  Next
+                  {t('task.row.next')}
                 </span>
               )}
               {unavailableReason && !theirs && <span className="min-w-0 shrink truncate" data-pro-reason>{unavailableReason}</span>}
               {promise && (theirs || mine) && <PromiseLine promise={promise} personName={promiseName} theirs={theirs} />}
-              {promise?.words && <span className="min-w-0 shrink truncate italic">&ldquo;{promise.words}&rdquo;</span>}
+              {promise?.words && <span className="min-w-0 shrink truncate italic">{t('task.row.promiseWords', { words: promise.words })}</span>}
               {promise && isSent(promise) && (
-                <span className="vicu-chip shrink-0 rounded-chip bg-accent-blue/12 px-2 py-px text-chip leading-tight text-accent-blue">In recap</span>
+                <span className="vicu-chip shrink-0 rounded-chip bg-accent-blue/12 px-2 py-px text-chip leading-tight text-accent-blue">{t('task.row.inRecap')}</span>
               )}
               {projectSource === 'group' && projectMeta && (
                 <RowProject title={projectMeta.title} color={projectMeta.color} />
@@ -888,10 +892,10 @@ function TaskRowInner({
                 </span>
               ))}
               {nestedDepth === 0 && parentTitle(task) && (
-                <span className="min-w-0 truncate">Subtask of {parentTitle(task)}</span>
+                <span className="min-w-0 truncate">{t('task.row.subtaskOf', { title: parentTitle(task) })}</span>
               )}
               {nestedDepth > 0 && parentProjectId !== undefined && parentProjectId !== task.project_id && (
-                <span className="shrink-0">Different project</span>
+                <span className="shrink-0">{t('task.row.differentProject')}</span>
               )}
               {subtaskCount > 0 && (
                 <button
@@ -905,7 +909,7 @@ function TaskRowInner({
                     'flex min-h-6 shrink-0 items-center justify-center gap-0.5',
                     canExpandSubtasks && 'rounded-control px-0.5 hover:bg-bg-hover hover:text-text',
                   )}
-                  aria-label={`${checklistLabel(progress.completed, progress.total)} subtasks complete`}
+                  aria-label={t('task.row.subtasksComplete', { progress: checklistLabel(progress.completed, progress.total) })}
                   aria-expanded={canExpandSubtasks ? subtasksExpanded : undefined}
                 >
                   {canExpandSubtasks && (
@@ -916,9 +920,9 @@ function TaskRowInner({
                 </button>
               )}
               {showNotesIcon && (
-                <AlignLeft className="h-3 w-3 shrink-0" aria-label="Has notes" />
+                <AlignLeft className="h-3 w-3 shrink-0" aria-label={t('task.row.hasNotes')} />
               )}
-              {isRepeating && <Repeat className="h-3 w-3 shrink-0" aria-label="Repeats" />}
+              {isRepeating && <Repeat className="h-3 w-3 shrink-0" aria-label={t('task.row.repeats')} />}
               {(task.attachments?.length ?? 0) > 0 && (
                 <button
                   type="button"
@@ -928,7 +932,7 @@ function TaskRowInner({
                     setActivePopover('attachment')
                   }}
                   className="relative shrink-0 after:absolute after:-inset-1.5 after:content-[''] hover:text-text"
-                  aria-label="Attachments"
+                  aria-label={t('task.row.attachments')}
                 >
                   <Paperclip className="h-3 w-3" />
                 </button>
@@ -981,7 +985,7 @@ function TaskRowInner({
           {rowFieldShown(rowView, 'due') && !(block && dueRepeatsBlockDay(task.due_date, block)) && <TaskDueBadge dueDate={task.due_date} />}
           {block && <TaskBlockBadge block={block} />}
           {((task.reminders?.length ?? 0) > 0 || hasPlaceReminder) && (
-            <Bell className="h-3 w-3 text-text-secondary" aria-label="Has a reminder" />
+            <Bell className="h-3 w-3 text-text-secondary" aria-label={t('task.row.hasReminder')} />
           )}
           <PriorityMark priority={task.priority} />
         </div>
@@ -1067,7 +1071,7 @@ function TaskRowInner({
             aria-expanded={activePopover === 'attachment'}
             onClick={() => togglePopover('attachment')}
             className="relative shrink-0 text-[var(--text-secondary)] after:absolute after:-inset-1.5 after:content-['']"
-            title="Attachments"
+            title={t('task.row.attachments')}
           >
             <Paperclip className="h-3.5 w-3.5" />
           </button>
@@ -1101,7 +1105,7 @@ function TaskRowInner({
           }}
           editorRef={descEditorRef}
           imagesRef={descImagesRef}
-          placeholder="Notes"
+          placeholder={t('task.row.notes')}
         />
         </FoldedNotes>
       </div>
@@ -1131,7 +1135,7 @@ function TaskRowInner({
             setStructuralDeleteOpen(true)
             return
           }
-          const ok = await confirmDelete('Delete this task? This cannot be undone.')
+          const ok = await confirmDelete(t('task.confirm.deleteTask'))
           if (ok) {
             deleteTask.mutate({ task })
             collapseAll()
@@ -1142,14 +1146,14 @@ function TaskRowInner({
       <ConfirmDialog {...dialogProps} />
       <ConfirmDialog
         open={structuralDeleteOpen}
-        message={`This task has ${taskDescendants(task).length} ${taskDescendants(task).length === 1 ? 'subtask' : 'subtasks'}. Delete them too, or keep them as standalone tasks?`}
-        confirmLabel="Delete all"
+        message={t('task.confirm.taskHasSubtasks', { count: taskDescendants(task).length })}
+        confirmLabel={t('task.confirm.deleteAll')}
         onConfirm={() => {
           setStructuralDeleteOpen(false)
           deleteTask.mutate({ task, deleteSubtasks: true })
           collapseAll()
         }}
-        secondaryLabel="Keep subtasks"
+        secondaryLabel={t('task.confirm.keepSubtasks')}
         onSecondary={() => {
           setStructuralDeleteOpen(false)
           deleteTask.mutate({ task, deleteSubtasks: false })

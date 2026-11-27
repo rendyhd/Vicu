@@ -20,6 +20,7 @@ import {
 } from './date-display'
 import { formatMinutesOfDay } from './date-utils'
 import { getWeekStart, type WeekStart } from '../../shared/week-start'
+import { t } from '../../shared/i18n'
 import { extractDate } from './task-parser/extract-dates'
 import type { DayChoice } from '../../shared/when-choices'
 
@@ -234,10 +235,10 @@ export function quickChoices(today: LocalDate, fmt: DateFormat, weekStart: WeekS
   const nextWeek = nextWeekDay(today, weekStart)
   const day = (date: LocalDate) => startOfLocalDay(date)
   return [
-    { id: 'today', label: 'Today', hint: formatWeekdayShort(day(today), fmt), date: today },
-    { id: 'tomorrow', label: 'Tomorrow', hint: formatWeekdayShort(day(tomorrow), fmt), date: tomorrow },
-    { id: 'weekend', label: 'This weekend', hint: formatWeekdayShort(day(weekend), fmt), date: weekend },
-    { id: 'nextWeek', label: 'Next week', hint: formatWeekdayDay(day(nextWeek), fmt), date: nextWeek },
+    { id: 'today', label: t('when.today'), hint: formatWeekdayShort(day(today), fmt), date: today },
+    { id: 'tomorrow', label: t('when.tomorrow'), hint: formatWeekdayShort(day(tomorrow), fmt), date: tomorrow },
+    { id: 'weekend', label: t('when.thisWeekend'), hint: formatWeekdayShort(day(weekend), fmt), date: weekend },
+    { id: 'nextWeek', label: t('when.nextWeek'), hint: formatWeekdayDay(day(nextWeek), fmt), date: nextWeek },
   ]
 }
 

@@ -3,6 +3,7 @@ import { Plus } from 'lucide-react'
 import { useCreateProject, useReorderProject } from '@/hooks/use-task-mutations'
 import { planInsertedSibling } from '@/lib/reorder-positions'
 import type { Project } from '@/lib/vikunja-types'
+import { useTranslation } from 'react-i18next'
 
 interface AddSectionButtonProps {
   parentProjectId: number
@@ -18,6 +19,7 @@ interface AddSectionButtonProps {
  * the gap when the gap is not at the end. The project menu in the sidebar adds one at the end too.
  */
 export function AddSectionButton({ parentProjectId, siblings, index }: AddSectionButtonProps) {
+  const { t } = useTranslation()
   const [isAdding, setIsAdding] = useState(false)
   const [name, setName] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
@@ -66,8 +68,8 @@ export function AddSectionButton({ parentProjectId, siblings, index }: AddSectio
             }
           }}
           onBlur={handleSubmit}
-          placeholder="Section name"
-          aria-label="Section name"
+          placeholder={t('task.section.name')}
+          aria-label={t('task.section.name')}
           className="flex-1 bg-transparent text-section text-text placeholder:text-text-secondary focus:outline-none"
         />
       </div>
@@ -79,12 +81,12 @@ export function AddSectionButton({ parentProjectId, siblings, index }: AddSectio
       type="button"
       onClick={() => setIsAdding(true)}
       className="group/section flex h-6 w-full items-center gap-2 px-6 text-meta text-text-secondary opacity-0 transition-opacity duration-fade-fast hover:opacity-100 focus-visible:opacity-100"
-      aria-label="Add section"
+      aria-label={t('task.section.add')}
     >
       <span className="h-px flex-1 bg-border" />
       <span className="flex shrink-0 items-center gap-1">
         <Plus className="h-3 w-3" />
-        Add section
+        {t('task.section.add')}
       </span>
       <span className="h-px flex-1 bg-border" />
     </button>

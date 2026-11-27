@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
+import { t as translate } from '../../../shared/i18n'
 import {
   AlignLeft,
   Bell,
@@ -103,7 +105,7 @@ function dateOnlyIso(date: Date): string {
 
 /** The date button's label: the weekday date, plus the time when the due date has one. */
 function shortDate(value: string, fmt: DateFormat): string {
-  if (!value || value === NULL_DATE) return 'Date'
+  if (!value || value === NULL_DATE) return translate('composer.date')
   return formatDateChip(new Date(value), isDateOnly(value), new Date(), fmt)
 }
 
@@ -147,6 +149,7 @@ export function NewTaskComposer({
   onSaveTemplate,
   className,
 }: NewTaskComposerProps) {
+  const { t } = useTranslation()
   // "Call mom when I get home": a phrase that names a place saved on a phone sets the task's
   // location reminder (contract section 5.3).
   const locations = useLocationReminders()
@@ -228,8 +231,8 @@ export function NewTaskComposer({
   const effectiveDueDate = fields.dueDate ?? NULL_DATE
   const effectiveRepeatAfter = fields.repeat?.repeat_after ?? 0
   const effectiveRepeatMode = fields.repeat?.repeat_mode ?? 0
-  const selectedProjectTitle = projects?.flat.find((project) => project.id === fields.projectId)?.title ?? 'Project'
-  const priorityLabel = fields.priority > 0 ? PRIORITY_OPTIONS.find((option) => option.value === fields.priority)?.label ?? 'Priority' : 'Priority'
+  const selectedProjectTitle = projects?.flat.find((project) => project.id === fields.projectId)?.title ?? t('composer.project')
+  const priorityLabel = fields.priority > 0 ? t(PRIORITY_OPTIONS.find((option) => option.value === fields.priority)?.label ?? 'task.priority.label') : t('composer.priority')
   const labelCount = new Set([...selectedLabelIds.map((id) => labels.find((label) => label.id === id)?.title.toLowerCase() ?? String(id)), ...(parsed?.labels ?? []).map((name) => name.toLowerCase())]).size
   useEffect(() => {
     if (!projectTouched) setSelectedProjectId(projectId)
@@ -384,7 +387,7 @@ export function NewTaskComposer({
     setAttachments(uploadResult.failed)
     const stillPartial = next.labels.length > 0 || next.attachments.length > 0 || !!next.descriptionPatch
     setPartialFailure(stillPartial ? next : null)
-    if (stillPartial) setError('Some task details still could not be saved.')
+    if (stillPartial) setError(t('composer.detailsNotSaved'))
     setSubmitting(false)
   }
 
@@ -399,7 +402,7 @@ export function NewTaskComposer({
     if (template) {
       const due = templateDueOf(fields.dueDate, toLocalDate(new Date()))
       const kept = due ? relativeReminders(reminders) : []
-      if (kept.length < reminders.length) toast.info('A template keeps only reminders that count from its due date.')
+      if (kept.length < reminders.length) toast.info(t('composer.templateReminders'))
       onSaveTemplate?.({
         ...template,
         title: rawTitle,
@@ -435,7 +438,7 @@ export function NewTaskComposer({
         } else {
           const withoutPerson = parse(rawTitle, { ...parser.parserConfig, suppressTypes: [...(parser.parserConfig.suppressTypes ?? []), 'person'] }, new Date(), locations.places)
           parsed = { ...parsed, person: null, title: withoutPerson.title }
-          toast.info(`${name} could not be made a person (${made.error}), so the name stays in the title.`)
+          toast.info(t('composer.personNotMade', { name, error: made.error }))
         }
       }
       // Who it was promised to (5.5), when that names nobody yet: made a person too; when that fails
@@ -448,7 +451,7 @@ export function NewTaskComposer({
         }
       }
       const title = parsed?.title.trim() || (parser.enabled ? rawTitle : '')
-      if (!title) throw new Error('Enter a task title')
+      if (!title) throw new Error(t('composer.enterTitle'))
 
       // The same rules the buttons and chips show: the text, unless a control was used.
       const saved = parser.parserConfig.enabled ? fields : resolveWith(parsed)
@@ -459,9 +462,9 @@ export function NewTaskComposer({
         const initiative = recordValue(ledger.initiatives, targetProjectId)
         const ready = initiative && initiative.status === 'active' ? readiness(initiative) : null
         if (initiative && ready && !ready.ready) {
-          const ok = await confirmDelete(`This initiative is not ready yet (${ready.done} of ${ready.total}). Log the task anyway?`, {
+          const ok = await confirmDelete(t('composer.initiativeNotReady', { done: ready.done, total: ready.total }), {
             force: true,
-            confirmLabel: 'Log anyway',
+            confirmLabel: t('composer.logAnyway'),
             destructive: false,
           })
           if (!ok) {
@@ -510,7 +513,7 @@ export function NewTaskComposer({
       const place = parsed?.place
       if (isTempTaskId(task.id)) {
         // A location reminder is written for a server id only (section 11.7).
-        if (place) toast.info(`Saved offline, so no reminder at ${place.place.name}: add it once the task has synced.`)
+        if (place) toast.info(t('composer.savedOfflineNoReminder', { place: place.place.name }))
         closeAndReset()
         onCreated?.(task)
         return
@@ -549,7 +552,7 @@ export function NewTaskComposer({
       if (failure.labels.length || failure.attachments.length || failure.descriptionPatch) {
         setAttachments(failure.attachments)
         setPartialFailure(failure)
-        setError('Task created, but some labels or attachments failed. Retry will not create another task.')
+        setError(t('composer.labelsFailed'))
       }
     } catch (cause) {
       if (createdTask) {
@@ -557,17 +560,17 @@ export function NewTaskComposer({
         closeAndReset()
         setAttachments(failure.attachments)
         setPartialFailure(failure)
-        setError('Task created, but some details failed. Retry will not create another task.')
+        setError(t('composer.detailsFailed'))
         onCreated?.(createdTask)
       } else {
-        setError(cause instanceof Error ? cause.message : 'Could not create task')
+        setError(cause instanceof Error ? cause.message : t('composer.createFailed'))
       }
     } finally {
       setSubmitting(false)
     }
   }
 
-  const refuseTemplateImages = () => toast.info("A template can't hold images.")
+  const refuseTemplateImages = () => toast.info(t('composer.templateNoImages'))
 
   const stagePendingImage = (image: PendingImage) => {
     if (template) {
@@ -661,7 +664,7 @@ export function NewTaskComposer({
           labels={labelItems}
           people={parser.parserConfig.pro ? people : undefined}
           inputRef={inputRef}
-          placeholder="New task"
+          placeholder={t('composer.newTask')}
           showBangTodayHint={!template && !parser.enabled && !!parser.parserConfig.bangToday}
           className="min-w-0 flex-1"
           contextChips={contextChips}
@@ -670,9 +673,9 @@ export function NewTaskComposer({
           onDismissContextChip={() => setDefaultDateDismissed(true)}
         />
         {parser.inputValue.trim() && !submitting && (
-          <kbd aria-hidden className="mt-1 shrink-0 rounded-control border border-[var(--border-color)] px-1.5 py-0.5 font-sans text-caption text-[var(--text-secondary)]">Enter</kbd>
+          <kbd aria-hidden className="mt-1 shrink-0 rounded-control border border-[var(--border-color)] px-1.5 py-0.5 font-sans text-caption text-[var(--text-secondary)]">{/* i18n-ignore: key name */}Enter</kbd>
         )}
-        <button type="button" onClick={() => { void submit() }} disabled={submitting || !parser.inputValue.trim()} className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-control bg-accent-fill text-on-accent disabled:opacity-40" aria-label={template ? 'Save template' : 'Create task'} title={template ? 'Save template (Enter)' : 'Create task (Enter)'}>
+        <button type="button" onClick={() => { void submit() }} disabled={submitting || !parser.inputValue.trim()} className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-control bg-accent-fill text-on-accent disabled:opacity-40" aria-label={template ? t('composer.saveTemplate') : t('composer.createTask')} title={template ? t('composer.saveTemplateEnter') : t('composer.createTaskEnter')}>
           {submitting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
         </button>
       </div>
@@ -682,15 +685,15 @@ export function NewTaskComposer({
           <input
             value={promiseWords}
             onChange={(event) => setPromiseWords(event.target.value)}
-            placeholder={parser.parseResult.person.mine ? 'What you said' : 'In their words'}
-            aria-label={parser.parseResult.person.mine ? 'What you said' : 'In their words'}
+            placeholder={parser.parseResult.person.mine ? t('composer.whatYouSaid') : t('composer.inTheirWords')}
+            aria-label={parser.parseResult.person.mine ? t('composer.whatYouSaid') : t('composer.inTheirWords')}
             className="rounded-control border border-border bg-bg-page px-2 py-1 text-meta text-text"
           />
           <input
             value={promiseDoneWhen}
             onChange={(event) => setPromiseDoneWhen(event.target.value)}
-            placeholder="We'll see it's done when"
-            aria-label="We'll see it's done when"
+            placeholder={t('composer.doneWhen')}
+            aria-label={t('composer.doneWhen')}
             className="rounded-control border border-border bg-bg-page px-2 py-1 text-meta text-text"
           />
         </div>
@@ -710,7 +713,7 @@ export function NewTaskComposer({
               bytes: attachment.bytes,
               blobUrl: attachment.blobUrl!,
             }]))}
-            placeholder="Notes"
+            placeholder={t('composer.notes')}
             autoFocus={notesTakeFocus}
             onKeyDown={(event) => {
               if (event.key === 'Escape') (inputRef as React.RefObject<HTMLInputElement> | undefined)?.current?.focus()
@@ -725,7 +728,7 @@ export function NewTaskComposer({
           {subtaskTitles.map((title, index) => (
             <div key={`${title}-${index}`} className="flex items-center gap-2 py-0.5 text-sm text-[var(--text-primary)]">
               <span className="min-w-0 flex-1 truncate">{title}</span>
-              <button type="button" onClick={() => setSubtaskTitles((titles) => titles.filter((_, at) => at !== index))} aria-label={`Remove subtask ${title}`} className="rounded-control text-[var(--text-secondary)] hover:text-[var(--text-primary)]"><X className="h-3 w-3" /></button>
+              <button type="button" onClick={() => setSubtaskTitles((titles) => titles.filter((_, at) => at !== index))} aria-label={t('composer.removeSubtask', { title })} className="rounded-control text-[var(--text-secondary)] hover:text-[var(--text-primary)]"><X className="h-3 w-3" /></button>
             </div>
           ))}
           <input
@@ -738,8 +741,8 @@ export function NewTaskComposer({
               if (title) setSubtaskTitles((titles) => [...titles, title])
               setNewSubtask('')
             }}
-            placeholder="Add subtask"
-            aria-label="Add subtask"
+            placeholder={t('composer.addSubtask')}
+            aria-label={t('composer.addSubtask')}
             className="w-full bg-transparent py-1 text-sm text-[var(--text-primary)] outline-none placeholder:text-[var(--text-secondary)]"
           />
         </div>
@@ -747,48 +750,48 @@ export function NewTaskComposer({
 
       <div className="flex flex-wrap items-center gap-0.5 pb-2 pl-[46px] pr-4">
         <div className="relative">
-          <ActionButton buttonRef={dateButtonRef} popup="dialog" expanded={openPicker === 'date'} active={effectiveDueDate !== NULL_DATE || fields.repeatSource !== null} label="Date and repeat" onClick={() => setOpenPicker(openPicker === 'date' ? null : 'date')}>
+          <ActionButton buttonRef={dateButtonRef} popup="dialog" expanded={openPicker === 'date'} active={effectiveDueDate !== NULL_DATE || fields.repeatSource !== null} label={t('composer.dateAndRepeat')} onClick={() => setOpenPicker(openPicker === 'date' ? null : 'date')}>
             <CalendarDays className="h-3.5 w-3.5" /> {shortDate(effectiveDueDate, dateFormat)}
           </ActionButton>
           {openPicker === 'date' && <WhenPopover anchorRef={dateButtonRef} currentDate={effectiveDueDate} onDateChange={(value) => { setDateTouched(true); setExplicitDueDate(value); parser.pinType('date') }} repeatAfter={effectiveRepeatAfter} repeatMode={effectiveRepeatMode} onRecurrenceChange={(after, mode) => { setRecurrenceTouched(true); setRepeatAfter(after); setRepeatMode(mode); parser.pinType('recurrence') }} onClose={() => setOpenPicker(null)} />}
         </div>
         <div className="relative">
-          <ActionButton buttonRef={reminderButtonRef} popup="dialog" expanded={openPicker === 'reminder'} active={reminders.length > 0} label="Reminder" onClick={() => setOpenPicker(openPicker === 'reminder' ? null : 'reminder')}>
-            <Bell className="h-3.5 w-3.5" /> {reminders.length ? `${reminders.length} reminder${reminders.length === 1 ? '' : 's'}` : 'Reminder'}
+          <ActionButton buttonRef={reminderButtonRef} popup="dialog" expanded={openPicker === 'reminder'} active={reminders.length > 0} label={t('composer.reminder')} onClick={() => setOpenPicker(openPicker === 'reminder' ? null : 'reminder')}>
+            <Bell className="h-3.5 w-3.5" /> {reminders.length ? t('composer.reminderCount', { count: reminders.length }) : t('composer.reminder')}
           </ActionButton>
           {openPicker === 'reminder' && <ReminderPickerPopover anchorRef={reminderButtonRef} dueDate={effectiveDueDate} reminders={reminders} onReminderChange={setReminders} onClose={() => setOpenPicker(null)} />}
         </div>
         <div className="relative">
-          <ActionButton buttonRef={priorityButtonRef} popup="listbox" expanded={openPicker === 'priority'} active={fields.priority > 0} label="Priority" onClick={() => setOpenPicker(openPicker === 'priority' ? null : 'priority')}>
+          <ActionButton buttonRef={priorityButtonRef} popup="listbox" expanded={openPicker === 'priority'} active={fields.priority > 0} label={t('composer.priority')} onClick={() => setOpenPicker(openPicker === 'priority' ? null : 'priority')}>
             <Flag className="h-3.5 w-3.5" /> {priorityLabel}
           </ActionButton>
           {openPicker === 'priority' && <PriorityPickerPopover anchorRef={priorityButtonRef} currentPriority={fields.priority} onPriorityChange={(value) => { setPriority(value); parser.pinType('priority') }} onClose={() => setOpenPicker(null)} />}
         </div>
         <div className="relative">
-          <ActionButton buttonRef={labelsButtonRef} popup="dialog" expanded={openPicker === 'labels'} active={labelCount > 0} label="Labels" onClick={() => setOpenPicker(openPicker === 'labels' ? null : 'labels')}>
-            <Tags className="h-3.5 w-3.5" /> {labelCount ? `${labelCount} label${labelCount === 1 ? '' : 's'}` : 'Labels'}
+          <ActionButton buttonRef={labelsButtonRef} popup="dialog" expanded={openPicker === 'labels'} active={labelCount > 0} label={t('composer.labels')} onClick={() => setOpenPicker(openPicker === 'labels' ? null : 'labels')}>
+            <Tags className="h-3.5 w-3.5" /> {labelCount ? t('composer.labelCount', { count: labelCount }) : t('composer.labels')}
           </ActionButton>
           {openPicker === 'labels' && <DraftLabelPickerPopover anchorRef={labelsButtonRef} selectedIds={selectedLabelIds} onChange={setSelectedLabelIds} onClose={() => setOpenPicker(null)} />}
         </div>
         <div className="relative">
-          <ActionButton buttonRef={projectButtonRef} popup="listbox" expanded={openPicker === 'project'} active={fields.projectSource !== 'default'} label="Project" onClick={() => setOpenPicker(openPicker === 'project' ? null : 'project')}>
+          <ActionButton buttonRef={projectButtonRef} popup="listbox" expanded={openPicker === 'project'} active={fields.projectSource !== 'default'} label={t('composer.project')} onClick={() => setOpenPicker(openPicker === 'project' ? null : 'project')}>
             <FolderOpen className="h-3.5 w-3.5" /> <span className="max-w-28 truncate">{selectedProjectTitle}</span>
           </ActionButton>
           {openPicker === 'project' && <ProjectPickerPopover anchorRef={projectButtonRef} currentProjectId={fields.projectId} onSelect={(id) => { setSelectedProjectId(id); setProjectTouched(true); parser.pinType('project') }} onClose={() => setOpenPicker(null)} />}
         </div>
-        <ActionButton active={showNotes || !!description} label="Notes" onClick={() => (showNotes ? setShowNotes(false) : openNotes(true))}>
-          <AlignLeft className="h-3.5 w-3.5" /> Notes
+        <ActionButton active={showNotes || !!description} label={t('composer.notes')} onClick={() => (showNotes ? setShowNotes(false) : openNotes(true))}>
+          <AlignLeft className="h-3.5 w-3.5" /> {t('composer.notes')}
         </ActionButton>
         {!template && (
-          <ActionButton active={attachments.length > 0} label="Attachments" onClick={() => fileInputRef.current?.click()}>
-            <Paperclip className="h-3.5 w-3.5" /> {attachments.length ? `${attachments.length} file${attachments.length === 1 ? '' : 's'}` : 'Attach'}
+          <ActionButton active={attachments.length > 0} label={t('composer.attachments')} onClick={() => fileInputRef.current?.click()}>
+            <Paperclip className="h-3.5 w-3.5" /> {attachments.length ? t('composer.fileCount', { count: attachments.length }) : t('composer.attach')}
           </ActionButton>
         )}
         <input ref={fileInputRef} type="file" multiple className="hidden" onChange={(event) => { void stageFiles(event.target.files) }} />
         {!template && templates.length > 0 && (
           <div className="relative">
-            <ActionButton buttonRef={templateButtonRef} popup="dialog" expanded={openPicker === 'template'} label="Template" onClick={() => setOpenPicker(openPicker === 'template' ? null : 'template')}>
-              <FileText className="h-3.5 w-3.5" /> Template
+            <ActionButton buttonRef={templateButtonRef} popup="dialog" expanded={openPicker === 'template'} label={t('composer.template')} onClick={() => setOpenPicker(openPicker === 'template' ? null : 'template')}>
+              <FileText className="h-3.5 w-3.5" /> {t('composer.template')}
             </ActionButton>
             {openPicker === 'template' && (
               <TemplatePickerPopover
@@ -810,7 +813,7 @@ export function NewTaskComposer({
           {attachments.map((attachment) => (
             <span key={attachment.id} className="flex max-w-48 items-center gap-1 rounded-control bg-[var(--bg-hover)] px-2 py-1 text-caption text-[var(--text-secondary)]">
               <span className="truncate">{attachment.name}</span>
-              <button type="button" onClick={() => removeAttachment(attachment.id)} aria-label={`Remove ${attachment.name}`}><X className="h-3 w-3" /></button>
+              <button type="button" onClick={() => removeAttachment(attachment.id)} aria-label={t('composer.removeFile', { name: attachment.name })}><X className="h-3 w-3" /></button>
             </span>
           ))}
         </div>
@@ -819,7 +822,7 @@ export function NewTaskComposer({
       {(error || partialFailure) && (
         <div className="flex items-center justify-between gap-2 px-4 pb-2 pl-[46px] text-[11px] text-danger">
           <span>{error}</span>
-          {partialFailure && <button type="button" onClick={() => { void retryPartial() }} disabled={submitting} className="rounded-control border border-current px-2 py-1 font-medium">Retry</button>}
+          {partialFailure && <button type="button" onClick={() => { void retryPartial() }} disabled={submitting} className="rounded-control border border-current px-2 py-1 font-medium">{t('composer.retry')}</button>}
         </div>
       )}
     </div>

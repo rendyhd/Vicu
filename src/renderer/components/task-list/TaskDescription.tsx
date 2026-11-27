@@ -13,6 +13,7 @@ import { useAttachmentBlobUrl } from '@/hooks/use-attachment-bytes'
 import { viewableImageType, type ViewerImage } from '@/lib/attachment-preview'
 import { LazyRichTextEditor } from '@/components/rich-text/LazyRichTextEditor'
 import { AttachmentViewer } from './AttachmentViewer'
+import { useTranslation } from 'react-i18next'
 
 export interface PendingImage {
   uuid: string
@@ -75,7 +76,7 @@ export function TaskDescription({
   onChange,
   onBlur,
   onKeyDown,
-  placeholder = 'Notes',
+  placeholder,
   className,
   taskId,
   onStagePending,
@@ -86,6 +87,7 @@ export function TaskDescription({
   onReady,
   imagesRef: imagesHandleRef,
 }: Props) {
+  const { t } = useTranslation()
   const [uploadError, setUploadError] = useState<string | null>(null)
   const uploadMutation = useAttachPastedImage()
   const deleteMutation = useDeleteAttachment()
@@ -173,7 +175,7 @@ export function TaskDescription({
             added.push({ kind: 'pending', uuid: pending.uuid })
           }
         } catch (err) {
-          setUploadError(err instanceof Error ? err.message : 'Upload failed')
+          setUploadError(err instanceof Error ? err.message : t('task.description.uploadFailed'))
         }
       }
       if (added.length === 0) return
@@ -213,7 +215,7 @@ export function TaskDescription({
         onReady={handleReady}
         editorRef={editorRef}
         autoFocus={autoFocus}
-        placeholder={placeholder}
+        placeholder={placeholder ?? t('task.row.notes')}
         className="text-xs leading-[18px]"
       />
 
@@ -238,7 +240,7 @@ export function TaskDescription({
 
       {uploadMutation.isPending && (
         <div className="text-caption italic text-[var(--text-secondary)]">
-          Uploading image…
+          {t('task.description.uploading')}
         </div>
       )}
       {uploadError && <div className="text-caption text-danger">{uploadError}</div>}
@@ -284,6 +286,7 @@ function AttachmentThumb({
   onRemove: () => void
   onView?: () => void
 }) {
+  const { t } = useTranslation()
   const [decodeError, setDecodeError] = useState(false)
   const { data: attachments } = useTaskAttachments(taskId ?? -1, taskId != null)
   const file = attachments?.find((a) => a.id === attachmentId)?.file
@@ -303,7 +306,7 @@ function AttachmentThumb({
         }}
         className="rounded-control border border-danger/30 bg-danger/10 px-2 py-1 text-caption text-danger hover:bg-danger/15"
       >
-        Retry image
+        {t('task.description.retryImage')}
       </button>
     )
   }
@@ -313,7 +316,7 @@ function AttachmentThumb({
   return (
     <Thumb
       src={url}
-      alt={file?.name || `Attachment ${attachmentId}`}
+      alt={file?.name || t('task.description.attachmentNamed', { id: attachmentId })}
       onRemove={onRemove}
       onError={() => setDecodeError(true)}
       onView={onView}
@@ -335,6 +338,7 @@ function Thumb({
   /** Shows the image in the viewer; without it the thumbnail is only a picture. */
   onView?: () => void
 }) {
+  const { t } = useTranslation()
   const image = (
     <img
       src={src}
@@ -347,7 +351,7 @@ function Thumb({
   return (
     <div className="group relative inline-block">
       {onView ? (
-        <button type="button" onClick={onView} aria-label={`View ${alt}`} title="View image" className="block cursor-zoom-in rounded-control">
+        <button type="button" onClick={onView} aria-label={t('task.description.viewNamed', { name: alt })} title={t('task.description.viewImage')} className="block cursor-zoom-in rounded-control">
           {image}
         </button>
       ) : (
@@ -356,7 +360,7 @@ function Thumb({
       <button
         type="button"
         tabIndex={-1}
-        title="Remove image"
+        title={t('task.description.removeImage')}
         onMouseDown={(e) => e.preventDefault()}
         onClick={onRemove}
         className="absolute right-1 top-1 hidden h-5 w-5 cursor-pointer items-center justify-center rounded-full bg-black/70 text-white shadow-sm transition-colors hover:bg-black/90 group-hover:flex"

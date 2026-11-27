@@ -1,6 +1,7 @@
 import { useState, useEffect, useImperativeHandle, forwardRef, useCallback, useId, useRef } from 'react'
 import type { SyntaxPrefixes } from '@/lib/task-parser'
 import { Popover } from '../overlay/Popover'
+import { useTranslation } from 'react-i18next'
 
 interface AutocompleteItem {
   id: number
@@ -77,6 +78,7 @@ function caretOffset(input: HTMLInputElement | HTMLTextAreaElement, index: numbe
  */
 export const AutocompleteDropdown = forwardRef<AutocompleteHandle, AutocompleteDropdownProps>(
   function AutocompleteDropdown({ inputValue, cursorPosition, prefixes, projects, labels, people, onSelect, enabled, inputElement, onAriaChange }, ref) {
+    const { t } = useTranslation()
     const listboxId = useId()
     const anchorRef = useRef<HTMLSpanElement>(null)
     const [items, setItems] = useState<AutocompleteItem[]>([])
@@ -186,6 +188,7 @@ export const AutocompleteDropdown = forwardRef<AutocompleteHandle, AutocompleteD
 
     const colorMap: Record<ItemType, string> = {
       project: 'bg-accent-blue/8 dark:bg-accent-blue/15',
+      // i18n-ignore: class names
       label: 'bg-accent-orange/8 dark:bg-accent-orange/15',
       person: 'bg-accent-teal/8 dark:bg-accent-teal/15',
     }
@@ -209,7 +212,7 @@ export const AutocompleteDropdown = forwardRef<AutocompleteHandle, AutocompleteD
             id={listboxId}
             anchorRef={anchorRef}
             onClose={() => setVisible(false)}
-            label={itemType === 'project' ? 'Project suggestions' : itemType === 'person' ? 'People suggestions' : 'Label suggestions'}
+            label={itemType === 'project' ? t('composer.suggestions.project') : itemType === 'person' ? t('composer.suggestions.people') : t('composer.suggestions.label')}
             role="listbox"
             initialFocus="none"
             className="min-w-48 max-w-80 py-1"

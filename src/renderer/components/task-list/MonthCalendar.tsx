@@ -7,6 +7,7 @@ import { useDateFormat } from '@/hooks/use-date-format'
 import { addMonths, monthGrid, monthStart, moveGridFocus } from '@/lib/when-logic'
 import { useWeekStart } from '@/hooks/use-week-start'
 import { weekdaysOf } from '../../../shared/week-start'
+import { useTranslation } from 'react-i18next'
 
 interface MonthCalendarProps {
   /** The picked day, ringed in the accent fill. */
@@ -41,6 +42,7 @@ const MONDAY = new Date(2026, 9, 5)
  * month arrows and arrow-key movement. The When panel and the planner's day picker use it.
  */
 export function MonthCalendar({ selected, today, reveal, onPick, isDisabled, dayMark }: MonthCalendarProps) {
+  const { t } = useTranslation()
   const fmt = useDateFormat()
   const opening = reveal?.date ?? selected ?? today
   const [viewMonth, setViewMonth] = useState(() => monthStart(opening))
@@ -100,7 +102,7 @@ export function MonthCalendar({ selected, today, reveal, onPick, isDisabled, day
         <div className="flex gap-0.5">
           <button
             type="button"
-            aria-label="Previous month"
+            aria-label={t('task.calendar.previousMonth')}
             onClick={() => shiftMonth(-1)}
             className="flex h-7 w-7 items-center justify-center rounded-control text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
           >
@@ -108,7 +110,7 @@ export function MonthCalendar({ selected, today, reveal, onPick, isDisabled, day
           </button>
           <button
             type="button"
-            aria-label="Next month"
+            aria-label={t('task.calendar.nextMonth')}
             onClick={() => shiftMonth(1)}
             className="flex h-7 w-7 items-center justify-center rounded-control text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
           >

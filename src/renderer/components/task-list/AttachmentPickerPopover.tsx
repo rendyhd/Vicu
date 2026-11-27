@@ -1,4 +1,5 @@
 import { useMemo, useState, type RefObject } from 'react'
+import { useTranslation } from 'react-i18next'
 import { X, FileText, Image, File, Loader2, Download, Clock, AlertCircle } from 'lucide-react'
 import { useTaskAttachments, useUploadAttachment, useDeleteAttachment } from '@/hooks/use-task-mutations'
 import { useAttachmentActions } from '@/hooks/use-attachment-actions'
@@ -46,6 +47,7 @@ function ImageThumbnail({ taskId, image }: { taskId: number; image: ViewerImage 
  * or refused by the server with the reason and, where it can help, Retry.
  */
 function WaitingUploadRow({ upload }: { upload: WaitingUpload }) {
+  const { t } = useTranslation()
   const remove = () => void (upload.failed ? api.offlineQueue.discardFailed([upload.id]) : api.offlineQueue.discardPending([upload.id]))
   return (
     <div className={`flex items-center gap-2 rounded-control px-2 py-1.5 ${upload.failed ? 'bg-danger/10' : ''}`}>
@@ -69,14 +71,14 @@ function WaitingUploadRow({ upload }: { upload: WaitingUpload }) {
           onClick={() => void api.offlineQueue.retryFailed([upload.id])}
           className="shrink-0 rounded-control px-1.5 py-0.5 text-caption font-medium text-accent-blue hover:bg-[var(--bg-hover)]"
         >
-          Retry
+          {t('task.common.retry')}
         </button>
       )}
       <button
         type="button"
         onClick={remove}
-        aria-label={`Remove ${upload.name}`}
-        title="Remove"
+        aria-label={t('task.attachments.removeNamed', { name: upload.name })}
+        title={t('task.attachments.remove')}
         className="shrink-0 rounded-control p-1 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-danger"
       >
         <X className="h-3 w-3" />
@@ -90,8 +92,9 @@ function WaitingUploadRow({ upload }: { upload: WaitingUpload }) {
  * Its attachment's own row takes its place once the server names it.
  */
 function UploadingRow({ upload }: { upload: UploadingFile }) {
+  const { t } = useTranslation()
   return (
-    <div role="status" aria-label={`Uploading ${upload.name}`} className="flex items-center gap-2 rounded-control px-2 py-1.5">
+    <div role="status" aria-label={t('task.attachments.uploadingNamed', { name: upload.name })} className="flex items-center gap-2 rounded-control px-2 py-1.5">
       <span className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-control bg-bg-hover opacity-80">
         <File className="h-4 w-4 text-[var(--text-secondary)]" aria-hidden="true" />
         <Loader2
@@ -108,6 +111,7 @@ function UploadingRow({ upload }: { upload: UploadingFile }) {
 }
 
 export function AttachmentPickerPopover({ anchorRef, invokedBy, taskId, onClose }: AttachmentPickerPopoverProps) {
+  const { t } = useTranslation()
   const { data: attachments, isLoading } = useTaskAttachments(taskId, true)
   const offlineSnapshot = useOfflineStore((state) => state.snapshot)
   const waiting = useMemo(() => waitingUploadsFor(offlineSnapshot, taskId), [offlineSnapshot, taskId])
@@ -131,7 +135,7 @@ export function AttachmentPickerPopover({ anchorRef, invokedBy, taskId, onClose 
   }
 
   return (
-    <Popover anchorRef={anchorRef} invokedBy={invokedBy} onClose={onClose} label="Attachments" className="w-72 p-3">
+    <Popover anchorRef={anchorRef} invokedBy={invokedBy} onClose={onClose} label={t('task.attachments.title')} className="w-72 p-3">
       {isLoading ? (
         <div className="flex items-center justify-center py-4">
           <Loader2 className="h-4 w-4 animate-spin text-[var(--text-secondary)]" />
@@ -149,7 +153,7 @@ export function AttachmentPickerPopover({ anchorRef, invokedBy, taskId, onClose 
                 <button
                   type="button"
                   onClick={() => (image ? setViewingId(att.id) : handleOpen(att.id, att.file.name))}
-                  title={image ? 'View' : 'Open'}
+                  title={image ? t('task.attachments.view') : t('task.attachments.open')}
                   className="flex min-w-0 flex-1 items-center gap-2 text-left"
                 >
                   {image ? (
@@ -173,8 +177,8 @@ export function AttachmentPickerPopover({ anchorRef, invokedBy, taskId, onClose 
                     handleSave(att.id, att.file.name)
                   }}
                   disabled={savingId === att.id}
-                  aria-label={`Save ${att.file.name}`}
-                  title="Save to…"
+                  aria-label={t('task.viewer.saveNamed', { name: att.file.name })}
+                  title={t('task.viewer.saveTo')}
                   className="shrink-0 rounded-control p-1 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] disabled:opacity-40"
                 >
                   {savingId === att.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
@@ -185,8 +189,8 @@ export function AttachmentPickerPopover({ anchorRef, invokedBy, taskId, onClose 
                     e.stopPropagation()
                     handleDelete(att.id)
                   }}
-                  aria-label={`Remove ${att.file.name}`}
-                  title="Remove attachment"
+                  aria-label={t('task.attachments.removeNamed', { name: att.file.name })}
+                  title={t('task.attachments.removeAttachment')}
                   className="shrink-0 opacity-0 group-hover/att:opacity-100 focus-visible:opacity-100 text-[var(--text-secondary)] hover:text-danger"
                 >
                   <X className="h-3 w-3" />
@@ -202,7 +206,7 @@ export function AttachmentPickerPopover({ anchorRef, invokedBy, taskId, onClose 
           ))}
         </div>
       ) : (
-        <p className="mb-2 text-center text-xs text-[var(--text-secondary)]">No attachments</p>
+        <p className="mb-2 text-center text-xs text-[var(--text-secondary)]">{t('task.attachments.none')}</p>
       )}
 
       {/* Another file can be added while one uploads: each shows its own row above. */}
@@ -211,7 +215,7 @@ export function AttachmentPickerPopover({ anchorRef, invokedBy, taskId, onClose 
         onClick={handleBrowse}
         className="w-full rounded-control bg-accent-fill px-2 py-1.5 text-xs text-on-accent hover:opacity-90"
       >
-        Browse files
+        {t('task.attachments.browse')}
       </button>
       <p role="status" className="sr-only">{landedNotice}</p>
 
@@ -222,12 +226,12 @@ export function AttachmentPickerPopover({ anchorRef, invokedBy, taskId, onClose 
       )}
       {uploadAttachment.isError && (
         <p className="mt-1.5 text-caption text-danger">
-          {uploadAttachment.error?.message || 'Upload failed'}
+          {uploadAttachment.error?.message || t('task.attachments.uploadFailed')}
         </p>
       )}
       {deleteAttachment.isError && (
         <p className="mt-1.5 text-caption text-danger">
-          {deleteAttachment.error?.message || 'Delete failed'}
+          {deleteAttachment.error?.message || t('task.attachments.deleteFailed')}
         </p>
       )}
 

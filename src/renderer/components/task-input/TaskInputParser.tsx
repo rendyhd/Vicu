@@ -8,6 +8,7 @@ import { AutocompleteDropdown } from './AutocompleteDropdown'
 import type { AutocompleteAria, AutocompleteHandle } from './AutocompleteDropdown'
 import { cn } from '@/lib/cn'
 import { useDateFormat } from '@/hooks/use-date-format'
+import { useTranslation } from 'react-i18next'
 
 interface AutocompleteItem {
   id: number
@@ -71,6 +72,7 @@ export function TaskInputParser({
   onDismissChip,
   onDismissContextChip,
 }: TaskInputParserProps) {
+  const { t } = useTranslation()
   const dateFormat = useDateFormat()
   const autocompleteRef = useRef<AutocompleteHandle>(null)
   const internalInputRef = useRef<HTMLInputElement | HTMLTextAreaElement>(null)
@@ -271,7 +273,7 @@ export function TaskInputParser({
       {/* Bang-today hint (parser off): same rule as the save path, a `!` inside the text is not a date */}
       {showBangTodayHint && extractBangToday(value).dueDate && (
         <span className="absolute right-0 top-1/2 -translate-y-1/2 shrink-0 text-[11px] font-medium text-accent-blue">
-          Today
+          {t('composer.chip.today')}
         </span>
       )}
 

@@ -158,19 +158,19 @@ export function TaskContextMenu({ fallbackTask, x, y, reorderable = false, onClo
   return (
     <Menu
       anchorPoint={{ x, y }}
-      label={multi ? `${tasks.length} tasks` : 'Task actions'}
+      label={multi ? t('task.menu.count', { count: tasks.length }) : t('task.menu.actions')}
       onClose={onClose}
     >
-      {multi && <MenuHeading>{tasks.length} tasks</MenuHeading>}
+      {multi && <MenuHeading>{t('task.menu.count', { count: tasks.length })}</MenuHeading>}
 
       {/* When: the top entry follows the "What does urgent mean?" setting */}
       {urgencyImportant ? (
         <MenuItem icon={<Star />} onSelect={actions.setUrgentPriority}>
-          Set Important
+          {t('task.menu.setImportant')}
         </MenuItem>
       ) : (
         <MenuItem icon={<Sun />} shortcut={hint('Mod+T')} onSelect={actions.setDueToday}>
-          Set Today
+          {t('task.menu.setToday')}
         </MenuItem>
       )}
       <MenuItem
@@ -208,7 +208,7 @@ export function TaskContextMenu({ fallbackTask, x, y, reorderable = false, onClo
         expanded={sub === 'date'}
         onSelect={() => setSub((s) => (s === 'date' ? null : 'date'))}
       >
-        Schedule
+        {t('task.menu.schedule')}
       </MenuItem>
       {sub === 'date' && (
         <DatePickerPopover
@@ -222,7 +222,7 @@ export function TaskContextMenu({ fallbackTask, x, y, reorderable = false, onClo
       )}
       {anyHasDate && (
         <MenuItem icon={<CalendarX />} onSelect={actions.clearDate}>
-          Clear date
+          {t('task.menu.clearDate')}
         </MenuItem>
       )}
 
@@ -236,12 +236,12 @@ export function TaskContextMenu({ fallbackTask, x, y, reorderable = false, onClo
           checked={tasks.every((t) => t.priority === option.value)}
           onSelect={() => actions.setPriority(option.value)}
         >
-          {option.label}
+          {t(option.label)}
         </MenuRadioItem>
       ))}
       {anyHasPriority && (
         <MenuItem icon={<FlagOff />} onSelect={actions.clearPriority}>
-          Clear priority
+          {t('task.menu.clearPriority')}
         </MenuItem>
       )}
 
@@ -258,7 +258,7 @@ export function TaskContextMenu({ fallbackTask, x, y, reorderable = false, onClo
           }
           onSelect={() => actions.applyLabel(lastLabel.id)}
         >
-          {`Apply "${lastLabel.title}"`}
+          {t('task.menu.applyLabel', { label: lastLabel.title })}
         </MenuItem>
       )}
       <MenuItem
@@ -268,7 +268,7 @@ export function TaskContextMenu({ fallbackTask, x, y, reorderable = false, onClo
         expanded={sub === 'label'}
         onSelect={() => setSub((s) => (s === 'label' ? null : 'label'))}
       >
-        Apply label
+        {t('task.menu.applyLabelMore')}
       </MenuItem>
       {sub === 'label' && (
         <LabelPickerPopover
@@ -291,7 +291,7 @@ export function TaskContextMenu({ fallbackTask, x, y, reorderable = false, onClo
             actions.recordLastProject(lastProject.id)
           }}
         >
-          {`Move to "${lastProject.title}"`}
+          {t('task.menu.moveTo', { project: lastProject.title })}
         </MenuItem>
       )}
       <MenuItem
@@ -301,7 +301,7 @@ export function TaskContextMenu({ fallbackTask, x, y, reorderable = false, onClo
         expanded={sub === 'project'}
         onSelect={() => setSub((s) => (s === 'project' ? null : 'project'))}
       >
-        Move to project
+        {t('task.menu.moveToProject')}
       </MenuItem>
       {sub === 'project' && (
         <ProjectPickerPopover
@@ -324,7 +324,7 @@ export function TaskContextMenu({ fallbackTask, x, y, reorderable = false, onClo
           expanded={sub === 'assign'}
           onSelect={() => setSub((s) => (s === 'assign' ? null : 'assign'))}
         >
-          Assign
+          {t('task.menu.assign')}
         </MenuItem>
       )}
       {sub === 'assign' && (
@@ -333,18 +333,18 @@ export function TaskContextMenu({ fallbackTask, x, y, reorderable = false, onClo
 
       {canMoveUp && (
         <MenuItem icon={<ArrowUp />} shortcut={hint('Alt+Shift+↑')} onSelect={() => stepTask(fallbackTask.id, 'up')}>
-          Move up
+          {t('task.menu.moveUp')}
         </MenuItem>
       )}
       {canMoveDown && (
         <MenuItem icon={<ArrowDown />} shortcut={hint('Alt+Shift+↓')} onSelect={() => stepTask(fallbackTask.id, 'down')}>
-          Move down
+          {t('task.menu.moveDown')}
         </MenuItem>
       )}
 
       {canBreak && (
         <MenuItem icon={<Sparkles />} onSelect={() => breakIntoSteps(fallbackTask, projectData?.all.find((p) => p.id === fallbackTask.project_id)?.title)}>
-          Break into steps
+          {t('task.menu.breakIntoSteps')}
         </MenuItem>
       )}
 
@@ -352,7 +352,7 @@ export function TaskContextMenu({ fallbackTask, x, y, reorderable = false, onClo
 
       {/* Bulk-friendly actions */}
       <MenuItem icon={<Copy />} shortcut={hint('Mod+C')} onSelect={actions.copyAll}>
-        {multi ? 'Copy tasks' : 'Copy task'}
+        {t('task.menu.copyTask', { count: multi ? 2 : 1 })}
       </MenuItem>
       <MenuItem
         icon={<CopyPlus />}
@@ -362,16 +362,16 @@ export function TaskContextMenu({ fallbackTask, x, y, reorderable = false, onClo
           clearSelection()
         }}
       >
-        {multi ? 'Duplicate tasks' : 'Duplicate task'}
+        {t('task.menu.duplicateTask', { count: multi ? 2 : 1 })}
       </MenuItem>
       {anyNotDone && (
         <MenuItem icon={<CheckCircle2 />} shortcut={hint('Mod+K')} onSelect={actions.completeAll}>
-          {multi ? 'Complete tasks' : 'Complete task'}
+          {t('task.menu.completeTask', { count: multi ? 2 : 1 })}
         </MenuItem>
       )}
       {triageOn && !multi && !fallbackTask.done && (
         <MenuItem icon={<InboxIcon />} onSelect={() => useProUiStore.getState().setTriageTask(fallbackTask)}>
-          Treat as request
+          {t('task.menu.treatAsRequest')}
         </MenuItem>
       )}
       {flagsOn && (
@@ -390,11 +390,11 @@ export function TaskContextMenu({ fallbackTask, x, y, reorderable = false, onClo
             clearSelection()
           }}
         >
-          Save as template
+          {t('task.menu.saveAsTemplate')}
         </MenuItem>
       )}
       <MenuItem icon={<Trash2 />} danger shortcut={hint('Delete')} onSelect={actions.deleteAll}>
-        {multi ? 'Delete tasks' : 'Delete task'}
+        {t('task.menu.deleteTask', { count: multi ? 2 : 1 })}
       </MenuItem>
     </Menu>
   )

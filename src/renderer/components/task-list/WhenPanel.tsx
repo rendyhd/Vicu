@@ -119,7 +119,7 @@ export function WhenPanel({ value, onChange, now: nowProp, moveFrom }: WhenPanel
 
   const typedHint = (() => {
     if (!text.trim() || text === whenText(selected, now, fmt)) return null
-    return typed ? `${whenText(typed, now, fmt)}, Enter to set` : 'No date found'
+    return typed ? t('when.setHint', { when: whenText(typed, now, fmt) }) : t('when.noDateFound')
   })()
 
   const timeIsPreset = selected.time !== null && whenChoices.times.some((t) => t.time === selected.time)
@@ -132,10 +132,10 @@ export function WhenPanel({ value, onChange, now: nowProp, moveFrom }: WhenPanel
         <input
           type="text"
           data-autofocus
-          aria-label="Date and time"
+          aria-label={t('when.dateAndTime')}
           aria-describedby={`${ids}-preview`}
-          aria-invalid={typedHint === 'No date found'}
-          placeholder="Type a day, a date or a time"
+          aria-invalid={typedHint === t('when.noDateFound')}
+          placeholder={t('when.typePlaceholder')}
           value={text}
           onChange={(e) => onText(e.target.value)}
           onKeyDown={onTextKey}
@@ -150,7 +150,7 @@ export function WhenPanel({ value, onChange, now: nowProp, moveFrom }: WhenPanel
       </div>
 
       {choices.length > 0 && (
-        <div className="grid grid-cols-2 gap-x-1" role="group" aria-label="Quick choices">
+        <div className="grid grid-cols-2 gap-x-1" role="group" aria-label={t('when.quickChoices')}>
           {choices.map((choice) => (
             <button
               key={choice.id}
@@ -188,10 +188,10 @@ export function WhenPanel({ value, onChange, now: nowProp, moveFrom }: WhenPanel
         />
       </div>
 
-      <div className="border-t border-[var(--border-color)] pt-2" role="group" aria-label="Time">
+      <div className="border-t border-[var(--border-color)] pt-2" role="group" aria-label={t('when.time')}>
         <div className="flex flex-wrap items-center gap-1">
           <TimeChip pressed={selected.time === null} onClick={() => apply(withTime(selected, null, today), false)}>
-            None
+            {t('when.none')}
           </TimeChip>
           {whenChoices.times.map(({ name, time }) => (
             <TimeChip key={time} pressed={selected.time === time} onClick={() => apply(withTime(selected, time, today), false)}>
@@ -200,9 +200,9 @@ export function WhenPanel({ value, onChange, now: nowProp, moveFrom }: WhenPanel
           ))}
           <input
             type="text"
-            aria-label="Custom time"
+            aria-label={t('when.customTime')}
             aria-invalid={customInvalid}
-            placeholder={selected.time !== null && !timeIsPreset ? timeLabel(selected.time, fmt) : 'Custom time'}
+            placeholder={selected.time !== null && !timeIsPreset ? timeLabel(selected.time, fmt) : t('when.customTime')}
             value={customTime}
             onChange={(e) => { setCustomTime(e.target.value); setCustomInvalid(false) }}
             onKeyDown={(e) => {

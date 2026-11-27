@@ -1,5 +1,6 @@
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { noteFoldHeight, shownNoteHeight } from './note-fold'
+import { useTranslation } from 'react-i18next'
 
 /**
  * Long notes stop at about half the window, with a fade and Show all, so the rest of the task card
@@ -7,6 +8,7 @@ import { noteFoldHeight, shownNoteHeight } from './note-fold'
  * each time it opens, and short notes never fold.
  */
 export function FoldedNotes({ children }: { children: ReactNode }) {
+  const { t } = useTranslation()
   const inner = useRef<HTMLDivElement>(null)
   const [open, setOpen] = useState(false)
   const [full, setFull] = useState(0)
@@ -53,7 +55,7 @@ export function FoldedNotes({ children }: { children: ReactNode }) {
           onClick={() => setOpen(true)}
           className="mt-1 rounded-control text-caption font-medium text-[var(--accent-blue)] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
         >
-          Show all
+          {t('editor.showAll')}
         </button>
       )}
     </>
