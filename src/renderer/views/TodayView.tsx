@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
+import { t as translate } from '../../shared/i18n'
 import { useTasks } from '@/hooks/use-tasks'
 import { useProjects } from '@/hooks/use-projects'
 import { useFilters } from '@/hooks/use-filters'
@@ -33,7 +35,7 @@ function groupByProject(tasks: Task[], projectsFlat?: { id: number; title: strin
     if (!activeIds.has(pid)) continue
     if (!byProject.has(pid)) {
       byProject.set(pid, {
-        name: projectsFlat?.find((p) => p.id === pid)?.title ?? 'Unknown Project',
+        name: projectsFlat?.find((p) => p.id === pid)?.title ?? translate('views.unknownProject'),
         color: projectsFlat?.find((p) => p.id === pid)?.hex_color,
         tasks: [],
       })
@@ -44,6 +46,7 @@ function groupByProject(tasks: Task[], projectsFlat?: { id: number; title: strin
 }
 
 export function TodayView() {
+  const { t } = useTranslation()
   const params = useFilters({ view: 'today' })
   const { data: tasks = [], isLoading } = useTasks(params, true, true)
   const { data: projects } = useProjects()
@@ -97,17 +100,17 @@ export function TodayView() {
   usePrintable(
     useMemo(
       () => ({
-        viewTitle: 'Today',
+        viewTitle: t('views.today.title'),
         sections: [
           ...(overdueGroups.length > 0
-            ? [{ heading: 'Overdue', groups: overdueGroups.map((g) => ({ heading: g.name, tasks: g.tasks })) }]
+            ? [{ heading: t('views.today.overdue'), groups: overdueGroups.map((g) => ({ heading: g.name, tasks: g.tasks })) }]
             : []),
           ...(todayGroups.length > 0
-            ? [{ heading: overdueGroups.length > 0 ? 'Today' : undefined, groups: todayGroups.map((g) => ({ heading: g.name, tasks: g.tasks })) }]
+            ? [{ heading: overdueGroups.length > 0 ? t('views.today.title') : undefined, groups: todayGroups.map((g) => ({ heading: g.name, tasks: g.tasks })) }]
             : []),
         ],
       }),
-      [overdueGroups, todayGroups]
+      [overdueGroups, todayGroups, t]
     )
   )
 
@@ -123,13 +126,13 @@ export function TodayView() {
   const justCleared = empty && hadTasks.current
 
   if (isLoading) {
-    return <ListSkeleton title="Today" identity="today" subtitle={dateStr} />
+    return <ListSkeleton title={t('views.today.title')} identity="today" subtitle={dateStr} />
   }
 
   return (
     <DueDateContextProvider value="row.inToday">
       <TaskList
-        title="Today"
+        title={t('views.today.title')}
         identity="today"
         tasks={[]}
         projectId={inboxProjectId}
@@ -137,8 +140,8 @@ export function TodayView() {
         defaultDueDate={today}
         subtitle={dateStr}
         empty={empty}
-        emptyTitle="All clear"
-        emptySubtitle="Nothing is due today"
+        emptyTitle={t('views.today.emptyTitle')}
+        emptySubtitle={t('views.today.emptySubtitle')}
         emptyWarm={justCleared}
         emptyExtra={empty ? <NextUpcomingOffer /> : undefined}
       >
@@ -146,7 +149,7 @@ export function TodayView() {
         {routinesShown && <RoutineTodaySection onToday />}
         {overdueTasks.length > 0 && (
           <div>
-            <ListSectionHeader level={1} title="Overdue" count={openCount(overdueTasks)} tone="overdue" />
+            <ListSectionHeader level={1} title={t('views.today.overdue')} count={openCount(overdueTasks)} tone="overdue" />
             {overdueGroups.map((group) => (
               <ProjectTaskGroup key={group.name} level={2} name={group.name} color={group.color} tasks={group.tasks} />
             ))}
@@ -156,7 +159,7 @@ export function TodayView() {
         {todayTasks.length > 0 && (
           <div>
             {overdueTasks.length > 0 && (
-              <ListSectionHeader level={1} title="Today" count={openCount(todayTasks)} />
+              <ListSectionHeader level={1} title={t('views.today.title')} count={openCount(todayTasks)} />
             )}
             {/* Without an Overdue section above, the projects are the top level of the list. */}
             {todayGroups.map((group) => (

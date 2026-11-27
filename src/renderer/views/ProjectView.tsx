@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useId, useMemo, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useParams } from '@tanstack/react-router'
 import { useDndMonitor } from '@dnd-kit/core'
 import { SortableContext } from '@dnd-kit/sortable'
@@ -84,6 +85,7 @@ interface InsertIndicator {
 }
 
 export function ProjectView() {
+  const { t } = useTranslation()
   const { projectId } = useParams({ from: '/project/$projectId' })
   const pid = Number(projectId)
   const { restore } = useSharedProjectActions()
@@ -92,7 +94,7 @@ export function ProjectView() {
   const { data: projectData, isLoading: projectsLoading } = useProjects()
   const activeProject = projectData?.flat.find((p) => p.id === pid)
   const archivedProject = projectData?.archived.find((p) => p.id === pid)
-  const projectName = activeProject?.title ?? archivedProject?.title ?? 'Project'
+  const projectName = activeProject?.title ?? archivedProject?.title ?? t('views.project.fallbackName')
 
   const { data: everyTask = [], isLoading: tasksLoading, viewId, order: taskOrder } = useProjectTasks(activeProject?.id)
   const { sections: everySection, hasSections, isLoading: sectionsLoading } = useProjectSections(pid)
@@ -270,16 +272,16 @@ export function ProjectView() {
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 text-center">
         <h1 className="text-lg font-semibold text-[var(--text-primary)]">
-          {archivedProject ? 'Project archived' : 'Project unavailable'}
+          {archivedProject ? t('views.project.archived') : t('views.project.unavailable')}
         </h1>
         <p className="max-w-sm text-sm text-[var(--text-secondary)]">
           {archivedProject
-            ? 'Restore it to see its tasks again.'
-            : 'This project may have been deleted or you may no longer have access.'}
+            ? t('views.project.archivedHint')
+            : t('views.project.unavailableHint')}
         </p>
         {archivedProject && (
           <Button variant="primary" className="mt-2" onClick={() => restore(archivedProject)}>
-            Restore project
+            {t('views.project.restore')}
           </Button>
         )}
       </div>
@@ -320,8 +322,8 @@ export function ProjectView() {
           {availability.on && <ViewSwitch view={availability.view} onChange={availability.setView} />}
         </>
       ) : undefined}
-      emptyTitle="No tasks in this project"
-      emptySubtitle="Create a new task to get started"
+      emptyTitle={t('views.project.emptyTitle')}
+      emptySubtitle={t('views.project.emptySubtitle')}
       headerActions={activeProject && (
         <>
           {labelChoices.length > 0 && (

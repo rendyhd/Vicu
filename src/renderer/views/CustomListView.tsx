@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useParams } from '@tanstack/react-router'
 import { useQueryClient } from '@tanstack/react-query'
 import { Info } from 'lucide-react'
@@ -70,6 +71,7 @@ function readTableModes(): Record<string, boolean> {
 }
 
 export function CustomListView() {
+  const { t } = useTranslation()
   const { listId } = useParams({ from: '/list/$listId' })
   const { data: customList, isLoading: isListLoading } = useCustomList(listId)
   const { data: projects } = useProjects()
@@ -163,7 +165,7 @@ export function CustomListView() {
     const projectsById = new Map((projects?.flat ?? []).map((project) => [project.id, project]))
     return groupListTasks(shownTasks, groupBy, {
       today: toLocalDate(new Date()),
-      projectTitle: (id) => projectsById.get(id)?.title ?? 'Project',
+      projectTitle: (id) => projectsById.get(id)?.title ?? t('views.customList.project'),
       projectColor: (id) => projectsById.get(id)?.hex_color,
       personOf: (task) => {
         const promise = recordValue(ledger.promises, task.id)
@@ -174,22 +176,22 @@ export function CustomListView() {
         return label ? { id: label.id, title: label.title } : null
       },
     })
-  }, [shownTasks, groupBy, projects?.flat, ledger.promises, personLabels, dayKey])
+  }, [shownTasks, groupBy, projects?.flat, ledger.promises, personLabels, dayKey, t])
 
   usePrintable(
     useMemo(
       () => ({
-        viewTitle: customList?.name ?? 'List',
+        viewTitle: customList?.name ?? t('views.customList.list'),
         sections: [{ groups: [{ tasks: filteredTasks }] }],
       }),
-      [customList?.name, filteredTasks]
+      [customList?.name, filteredTasks, t]
     )
   )
 
   if (isLoading || isListLoading) {
     return (
       <div className="flex flex-1 items-center justify-center text-sm text-[var(--text-secondary)]">
-        Loading...
+        {t('views.customList.loading')}
       </div>
     )
   }
@@ -197,7 +199,7 @@ export function CustomListView() {
   return (
     <RowViewProvider value={rowView}>
     <TaskList
-      title={customList?.name ?? 'List'}
+      title={customList?.name ?? t('views.customList.list')}
       tasks={groups || table ? [] : shownTasks}
       empty={groups || table || switchOn ? shownTasks.length === 0 && hiddenCount === 0 : undefined}
       projectId={destinationProjectId}
@@ -212,15 +214,15 @@ export function CustomListView() {
           setCreationNotice(null)
           return
         }
-        const projectTitle = projects?.flat.find((project) => project.id === task.project_id)?.title ?? 'the destination project'
-        setCreationNotice(`Task created in ${projectTitle}, but it does not currently match this list's filters.`)
+        const projectTitle = projects?.flat.find((project) => project.id === task.project_id)?.title ?? t('views.customList.destinationProject')
+        setCreationNotice(t('views.customList.createdNotMatching', { project: projectTitle }))
         setTimeout(() => setCreationNotice(null), 6000)
       }}
       headerContent={creationNotice || showImportNotice || switchOn || powerOn ? (
         <>
           {powerOn && (
             <div className="mx-4 mb-2 flex justify-end">
-              <div role="radiogroup" aria-label="Show as" className="flex rounded-control border border-border p-0.5">
+              <div role="radiogroup" aria-label={t('views.customList.showAs')} className="flex rounded-control border border-border p-0.5">
                 {(['rows', 'table'] as const).map((mode) => (
                   <button
                     key={mode}
@@ -230,7 +232,7 @@ export function CustomListView() {
                     onClick={() => setTable(mode === 'table')}
                     className={cn('rounded-control px-2 py-0.5 text-meta', (mode === 'table') === table ? 'bg-bg-selected text-text' : 'text-text-secondary hover:bg-bg-hover')}
                   >
-                    {mode === 'rows' ? 'Rows' : 'Table'}
+                    {mode === 'rows' ? t('views.customList.rows') : t('views.customList.table')}
                   </button>
                 ))}
               </div>
@@ -241,16 +243,17 @@ export function CustomListView() {
             <div className="mx-4 mb-2 flex items-start gap-2 rounded-control bg-[var(--bg-hover)] px-3 py-2 text-xs text-[var(--text-secondary)]">
               <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-accent-blue" aria-hidden />
               <p className="flex-1">
-                <span className="block font-medium text-[var(--text-primary)]">Imported from your server</span>
-                This list is a copy of the {fromView ? 'project view' : 'saved filter'} &ldquo;{customList?.name}&rdquo;.
-                Changes you make here stay in Vicu and won&apos;t update it on your server.
+                <span className="block font-medium text-[var(--text-primary)]">{t('views.customList.importedTitle')}</span>
+                {fromView
+                  ? t('views.customList.importedFromView', { name: customList?.name })
+                  : t('views.customList.importedFromFilter', { name: customList?.name })}
               </p>
               <button
                 type="button"
                 onClick={closeImportNotice}
                 className="shrink-0 rounded-control px-2 py-0.5 font-medium text-accent-blue hover:bg-[var(--bg-secondary)]"
               >
-                Got it
+                {t('views.customList.gotIt')}
               </button>
             </div>
           )}

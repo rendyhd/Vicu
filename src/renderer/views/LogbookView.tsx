@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useLogbookTasks } from '@/hooks/use-logbook-tasks'
 import { useProjects } from '@/hooks/use-projects'
 import { usePrintable } from '@/stores/print-store'
@@ -32,6 +33,7 @@ function LogbookRow({ task, time }: { task: Task; time: string }) {
 }
 
 export function LogbookView() {
+  const { t } = useTranslation()
   const { tasks, isLoading, hasMore, isLoadingMore, moreError, loadMore, retryMore } = useLogbookTasks()
   const { data: projects } = useProjects()
   const dateFormat = useDateFormat()
@@ -66,24 +68,24 @@ export function LogbookView() {
   }, [hasMore, loadMore, visibleTasks.length])
 
   usePrintable(
-    useMemo(() => ({ viewTitle: 'Logbook', sections: [{ groups: [{ tasks: visibleTasks }] }] }), [visibleTasks])
+    useMemo(() => ({ viewTitle: t('views.logbook.title'), sections: [{ groups: [{ tasks: visibleTasks }] }] }), [visibleTasks, t])
   )
 
   if (isLoading) {
     return (
       <div className="flex flex-1 items-center justify-center text-sm text-[var(--text-secondary)]">
-        Loading...
+        {t('views.logbook.loading')}
       </div>
     )
   }
 
   return (
     <div className="flex h-full flex-col">
-      <PageHeader title="Logbook" icon={<SmartListIcon list="logbook" className="h-5 w-5" />} />
+      <PageHeader title={t('views.logbook.title')} icon={<SmartListIcon list="logbook" className="h-5 w-5" />} />
 
       <ReadingScroll ref={scrollRef}>
         {visibleTasks.length === 0 && !hasMore && !isLoadingMore && !moreError ? (
-          <EmptyState icon={Inbox} identity="logbook" title="No completed tasks" subtitle="Completed tasks appear here" />
+          <EmptyState icon={Inbox} identity="logbook" title={t('views.logbook.emptyTitle')} subtitle={t('views.logbook.emptySubtitle')} />
         ) : (
           groups.map((group, index) => (
             <section key={`${index}:${group.title}`} aria-label={group.title || undefined}>
@@ -96,13 +98,13 @@ export function LogbookView() {
         )}
         {moreError ? (
           <div className="flex items-center justify-center gap-2 px-6 py-3 text-xs text-[var(--text-secondary)]">
-            <span>Could not load more completed tasks.</span>
+            <span>{t('views.logbook.loadMoreFailed')}</span>
             <button type="button" onClick={retryMore} className="text-[var(--accent-blue)] hover:underline">
-              Try again
+              {t('views.logbook.tryAgain')}
             </button>
           </div>
         ) : isLoadingMore ? (
-          <div className="px-6 py-3 text-center text-xs text-[var(--text-secondary)]">Loading...</div>
+          <div className="px-6 py-3 text-center text-xs text-[var(--text-secondary)]">{t('views.logbook.loading')}</div>
         ) : hasMore ? (
           <div ref={endRef} className="flex justify-center px-6 py-3">
             <button
@@ -110,7 +112,7 @@ export function LogbookView() {
               onClick={loadMore}
               className="text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:underline"
             >
-              Load more
+              {t('views.logbook.loadMore')}
             </button>
           </div>
         ) : null}

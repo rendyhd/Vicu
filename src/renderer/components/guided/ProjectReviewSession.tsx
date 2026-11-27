@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
+import type { TranslationKey } from '../../../shared/i18n'
 import { Archive, ArrowRight, Check, CheckCircle2, PauseCircle, Plus, Sparkles, Trash2 } from 'lucide-react'
 import { usePro } from '@/hooks/use-pro'
 import { useProPrefs } from '@/hooks/use-pro-prefs'
@@ -41,11 +43,11 @@ import { GuidedSummary } from './GuidedSummary'
 // suggests a decision for its tasks and the next step (docs/ai-assistant-v1.md section 9).
 
 const HINTS = [
-  ['R', 'Mark reviewed'],
-  ['S', 'Skip'],
-  ['A', 'Archive'],
-  ['Esc', 'Exit'],
-] as const
+  ['R', 'guided.review.markReviewed'],
+  ['S', 'guided.skip'],
+  ['A', 'guided.review.archive'],
+  ['Esc', 'guided.exit'],
+] as const satisfies ReadonlyArray<readonly [string, TranslationKey]>
 
 interface Props {
   onExit: () => void
@@ -60,6 +62,7 @@ interface PageResult {
 }
 
 export function ProjectReviewSession({ onExit, onDone, doneLabel }: Props) {
+  const { t } = useTranslation()
   const [queue, setQueue] = useState<number[] | null>(null)
   const [index, setIndex] = useState(0)
   const projectId = queue && index < queue.length ? queue[index] : undefined
@@ -83,8 +86,8 @@ export function ProjectReviewSession({ onExit, onDone, doneLabel }: Props) {
   const review = () => {
     if (!project) return
     markReviewed.mutate({ project }, {
-      onSuccess: () => announce(`Marked ${project.title} reviewed`),
-      onError: (error) => toast.error(`Could not mark ${project.title} reviewed: ${error.message}`),
+      onSuccess: () => announce(t('guided.review.markedReviewed', { title: project.title })),
+      onError: (error) => toast.error(t('guided.review.markFailed', { title: project.title, error: error.message })),
     })
     setResult((prev) => ({ ...prev, reviewed: [...prev.reviewed, project] }))
     goOn()
@@ -94,7 +97,7 @@ export function ProjectReviewSession({ onExit, onDone, doneLabel }: Props) {
     if (!project || project.id === data.world?.inboxId) return
     setArchived.mutate({ project, archived: true })
     setResult((prev) => ({ ...prev, archived: [...prev.archived, project] }))
-    announce(`Archived ${project.title}`)
+    announce(t('guided.review.archivedProject', { title: project.title }))
     goOn()
   }
 
@@ -117,33 +120,33 @@ export function ProjectReviewSession({ onExit, onDone, doneLabel }: Props) {
     return () => window.removeEventListener('keydown', onKey)
   }, [finished, project])
 
-  const title = 'Review projects'
+  const title = t('guided.review.title')
   const icon = <SmartListIcon list="review" className="h-4 w-4" />
 
   if (queue === null) {
     return (
       <GuidedFrame title={title} icon={icon} position={null} onExit={onExit}>
-        <p className="text-center text-meta text-[var(--text-secondary)]" role="status">Loading your projects…</p>
+        <p className="text-center text-meta text-[var(--text-secondary)]" role="status">{t('guided.review.loadingProjects')}</p>
       </GuidedFrame>
     )
   }
 
   if (finished || !project || !data.world) {
     const reviewedText = [
-      result.reviewed.length > 0 && `${result.reviewed.length} reviewed`,
-      result.archived.length > 0 && `${result.archived.length} archived`,
-      result.created.length > 0 && `${result.created.length} ${result.created.length === 1 ? 'task' : 'tasks'} added`,
+      result.reviewed.length > 0 && t('guided.review.countReviewed', { count: result.reviewed.length }),
+      result.archived.length > 0 && t('guided.review.countArchived', { count: result.archived.length }),
+      result.created.length > 0 && t('guided.review.countTasksAdded', { count: result.created.length }),
     ].filter(Boolean).join(', ')
     const tasksText = summaryText(sessionCounts(log))
-    const summary = reviewedText ? `Projects: ${reviewedText}` : 'No project was reviewed'
+    const summary = reviewedText ? t('guided.review.projectsSummary', { summary: reviewedText }) : t('guided.review.noneReviewed')
     return (
-      <GuidedFrame title={title} icon={icon} position={null} onExit={onExit} exitLabel="Close">
+      <GuidedFrame title={title} icon={icon} position={null} onExit={onExit} exitLabel={t('guided.close')}>
         <GuidedSummary
           empty={queue.length === 0}
-          emptyText="No project is due for review."
+          emptyText={t('guided.review.nothingDue')}
           log={log}
           summary={summary}
-          extra={<p className="text-meta text-[var(--text-secondary)]">Tasks: {tasksText}</p>}
+          extra={<p className="text-meta text-[var(--text-secondary)]">{t('guided.review.tasksSummary', { summary: tasksText })}</p>}
           canUndoMore={result.reviewed.length + result.archived.length + result.created.length > 0}
           onUndoMore={async () => {
             for (const created of result.created) await deleteTask.mutateAsync({ task: created, deleteSubtasks: false })
@@ -151,7 +154,7 @@ export function ProjectReviewSession({ onExit, onDone, doneLabel }: Props) {
             for (const reviewed of result.reviewed) restoreReview.mutate({ project: reviewed })
           }}
           doneLabel={doneLabel}
-          onDone={() => onDone(`${summary}. Tasks: ${tasksText}`)}
+          onDone={() => onDone(t('guided.review.doneSummary', { summary, tasks: tasksText }))}
         />
       </GuidedFrame>
     )
@@ -184,6 +187,7 @@ interface PageProps {
 }
 
 function ReviewPage({ project, data, onLog, onCreated, onReview, onSkip, onArchive }: PageProps) {
+  const { t } = useTranslation()
   // Pro (21.2): a project can be put on hold here instead of archived; not the Inbox.
   const proHold = usePro().layer('availability') && project.id !== data.world?.inboxId
   const proPrefs = useProPrefs()
@@ -199,7 +203,7 @@ function ReviewPage({ project, data, onLog, onCreated, onReview, onSkip, onArchi
 
   const health = projectHealth(world, project.id)
   const status = computeStatus(parseReviewFooter(project.description), world.review.defaultCadence, new Date())
-  const last = status.daysSinceReviewed === null ? 'Never reviewed' : `Last reviewed ${ago(status.daysSinceReviewed)}`
+  const last = status.daysSinceReviewed === null ? t('guided.review.neverReviewed') : t('guided.review.lastReviewed', { ago: ago(status.daysSinceReviewed) })
   const path = world.path(project.id)
 
   // The page's tasks for the request: the untouched ones first, then the project's order (9.1).
@@ -238,19 +242,19 @@ function ReviewPage({ project, data, onLog, onCreated, onReview, onSkip, onArchi
   const complete = (task: Task) => {
     completeTask.mutate(task)
     onLog((log) => logComplete(log, task))
-    mark(task.id, 'Completed')
+    mark(task.id, t('guided.review.completed'))
   }
 
   const remove = async (task: Task) => {
     const children = taskDescendants(task).length
     const ok = await confirmDelete(
-      children > 0 ? `Delete this task and ${children} ${children === 1 ? 'subtask' : 'subtasks'}?` : 'Delete this task? This cannot be undone.',
-      children > 0 ? { force: true, confirmLabel: 'Delete all', destructive: true } : {},
+      children > 0 ? t('guided.deleteWithSubtasks', { count: children }) : t('guided.deleteTask'),
+      children > 0 ? { force: true, confirmLabel: t('guided.deleteAll'), destructive: true } : {},
     )
     if (!ok) return
     deleteTask.mutate({ task })
     onLog((log) => logDelete(log, task))
-    mark(task.id, 'Deleted')
+    mark(task.id, t('guided.review.deleted'))
   }
 
   const addStep = () => {
@@ -262,7 +266,7 @@ function ReviewPage({ project, data, onLog, onCreated, onReview, onSkip, onArchi
       {
         onSuccess: (task) => {
           onCreated(task)
-          announce(`Added ${title}`)
+          announce(t('guided.review.added', { title }))
         },
       },
     )
@@ -273,10 +277,10 @@ function ReviewPage({ project, data, onLog, onCreated, onReview, onSkip, onArchi
     <GuidedCardShell
       footer={
         <>
-          <Button variant="quiet" onClick={onSkip} aria-keyshortcuts="S">Skip</Button>
+          <Button variant="quiet" onClick={onSkip} aria-keyshortcuts="S">{t('guided.skip')}</Button>
           <span className="flex-1" />
           <Button variant="primary" onClick={onReview} aria-keyshortcuts="R">
-            <Check aria-hidden="true" className="h-4 w-4" /> Mark reviewed <ArrowRight aria-hidden="true" className="h-4 w-4" />
+            <Check aria-hidden="true" className="h-4 w-4" /> {t('guided.review.markReviewed')} <ArrowRight aria-hidden="true" className="h-4 w-4" />
           </Button>
         </>
       }
@@ -292,23 +296,23 @@ function ReviewPage({ project, data, onLog, onCreated, onReview, onSkip, onArchi
       {suggestions.failure && <p className="mt-2 text-caption text-[var(--text-secondary)]">{suggestions.failure}</p>}
 
       <section className="mt-6" aria-labelledby="still-working">
-        <FieldLabel><span id="still-working">Still working on it?</span></FieldLabel>
+        <FieldLabel><span id="still-working">{t('guided.review.stillWorking')}</span></FieldLabel>
         <div className="flex flex-wrap gap-1.5">
           {proHold ? (
             <>
               <Button aria-pressed={!held} className={cn(!held && 'border-accent-blue bg-accent-blue/12')} onClick={() => held && void proPrefs.setProjectOnHold(project.id, false)}>
-                Keep
+                {t('guided.review.keep')}
               </Button>
               <Button aria-pressed={held} className={cn(held && 'border-accent-blue bg-accent-blue/12')} onClick={() => !held && void proPrefs.setProjectOnHold(project.id, true)}>
-                <PauseCircle aria-hidden="true" className="h-4 w-4" /> On hold
+                <PauseCircle aria-hidden="true" className="h-4 w-4" /> {t('guided.review.onHold')}
               </Button>
             </>
           ) : (
-            <Button aria-pressed="true" className="border-accent-blue bg-accent-blue/12">Keep</Button>
+            <Button aria-pressed="true" className="border-accent-blue bg-accent-blue/12">{t('guided.review.keep')}</Button>
           )}
           {onArchive && (
             <Button onClick={onArchive} aria-keyshortcuts="A">
-              <Archive aria-hidden="true" className="h-4 w-4" /> Archive
+              <Archive aria-hidden="true" className="h-4 w-4" /> {t('guided.review.archive')}
             </Button>
           )}
         </div>
@@ -316,7 +320,7 @@ function ReviewPage({ project, data, onLog, onCreated, onReview, onSkip, onArchi
 
       {untouched.length > 0 && (
         <section className="mt-6" aria-labelledby="untouched">
-          <FieldLabel><span id="untouched">Untouched for 30+ days</span></FieldLabel>
+          <FieldLabel><span id="untouched">{t('guided.review.untouched')}</span></FieldLabel>
           <ul className="divide-y divide-[var(--border-color)] rounded-card border border-[var(--border-color)]">
             {untouched.map((id) => {
               const task = data.openTask(id)
@@ -343,26 +347,26 @@ function ReviewPage({ project, data, onLog, onCreated, onReview, onSkip, onArchi
       )}
 
       <section className="mt-6" aria-labelledby="next-step">
-        <FieldLabel><span id="next-step">Next step</span></FieldLabel>
+        <FieldLabel><span id="next-step">{t('guided.review.nextStep')}</span></FieldLabel>
         {stepTask ? (
           <div className="rounded-card border border-[var(--border-color)] p-3">
             <div className="flex items-center gap-2">
-              {nextStep?.task_id === stepTask.id && <Sparkles aria-label="Suggested" className="h-3.5 w-3.5 shrink-0 text-accent-blue" />}
+              {nextStep?.task_id === stepTask.id && <Sparkles aria-label={t('guided.suggested')} className="h-3.5 w-3.5 shrink-0 text-accent-blue" />}
               <span className="min-w-0 flex-1 truncate text-task-title text-[var(--text-primary)]">{stepTask.title}</span>
               <TaskDueBadge dueDate={stepTask.due_date} />
             </div>
             <div className="mt-2">
               <WhenChoices
                 compact
-                label={`When for ${stepTask.title}`}
+                label={t('guided.review.whenFor', { title: stepTask.title })}
                 value={stepTask.due_date}
                 suggested={nextStep?.task_id === stepTask.id && nextStep.due !== null}
-                onChange={(due) => change(stepTask, draftChanges(stepTask, { title: stepTask.title, projectId: stepTask.project_id, due }), 'Scheduled')}
+                onChange={(due) => change(stepTask, draftChanges(stepTask, { title: stepTask.title, projectId: stepTask.project_id, due }), t('guided.review.scheduled'))}
               />
             </div>
           </div>
         ) : (
-          <p className="text-meta text-[var(--text-secondary)]">No open task yet.</p>
+          <p className="text-meta text-[var(--text-secondary)]">{t('guided.review.noOpenTask')}</p>
         )}
         <form
           className="mt-3 flex items-center gap-2"
@@ -371,19 +375,19 @@ function ReviewPage({ project, data, onLog, onCreated, onReview, onSkip, onArchi
             addStep()
           }}
         >
-          <label htmlFor="review-new-step" className="sr-only">A new task for {project.title}</label>
+          <label htmlFor="review-new-step" className="sr-only">{t('guided.review.newTaskFor', { title: project.title })}</label>
           <input
             id="review-new-step"
             value={shownTitle}
             onChange={(e) => setNewTitle(e.target.value)}
-            placeholder="Or name a new task"
+            placeholder={t('guided.review.newTaskPlaceholder')}
             className={cn(
               'min-w-0 flex-1 rounded-control border bg-transparent px-2.5 py-1.5 text-task-title text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]',
               newTitle === null && suggestedTitle ? SUGGESTED : 'border-[var(--border-color)]',
             )}
           />
           <Button type="submit" disabled={!shownTitle.trim()}>
-            <Plus aria-hidden="true" className="h-4 w-4" /> Add
+            <Plus aria-hidden="true" className="h-4 w-4" /> {t('guided.review.add')}
           </Button>
         </form>
       </section>
@@ -404,6 +408,7 @@ interface RowProps {
 
 /** An untouched task on a review page: kept, given a date or none, moved, completed or deleted. */
 function UntouchedRow({ task, note, pending, suggestion, projectPath, onChange, onComplete, onDelete }: RowProps) {
+  const { t } = useTranslation()
   const applied = withSuggestion(task, suggestion)
   const suggestedChanges = suggestion ? draftChanges(task, applied.draft) : {}
   const hasSuggestedChange = Object.keys(suggestedChanges).length > 0
@@ -418,27 +423,27 @@ function UntouchedRow({ task, note, pending, suggestion, projectPath, onChange, 
       <SuggestionLine reason={suggestion?.reason} pending={pending} />
       <div className="mt-2 flex flex-wrap items-center gap-1.5">
         {hasSuggestedChange && (
-          <Button className={cn('min-h-7 px-2.5 text-meta', SUGGESTED)} onClick={() => onChange(suggestedChanges, 'Changed as suggested')}>
-            <Sparkles aria-hidden="true" className="h-3.5 w-3.5" /> Use suggestion
+          <Button className={cn('min-h-7 px-2.5 text-meta', SUGGESTED)} onClick={() => onChange(suggestedChanges, t('guided.review.changedAsSuggested'))}>
+            <Sparkles aria-hidden="true" className="h-3.5 w-3.5" /> {t('guided.review.useSuggestion')}
           </Button>
         )}
         <WhenChoices
           compact
-          label={`When for ${task.title}`}
+          label={t('guided.review.whenFor', { title: task.title })}
           value={task.due_date}
-          onChange={(due) => onChange(draftChanges(task, { title: task.title, projectId: task.project_id, due }), 'Scheduled')}
+          onChange={(due) => onChange(draftChanges(task, { title: task.title, projectId: task.project_id, due }), t('guided.review.scheduled'))}
         />
         <ProjectChoice
           compact
           projectId={task.project_id}
           path={projectPath(task.project_id)}
-          onChange={(projectId) => onChange({ project_id: projectId }, `Moved to ${projectPath(projectId)}`)}
+          onChange={(projectId) => onChange({ project_id: projectId }, t('guided.review.movedTo', { path: projectPath(projectId) }))}
         />
         <Button className={cn('min-h-7 px-2.5 text-meta', close === 'done' && SUGGESTED)} onClick={onComplete}>
-          <CheckCircle2 aria-hidden="true" className="h-3.5 w-3.5" /> Complete
+          <CheckCircle2 aria-hidden="true" className="h-3.5 w-3.5" /> {t('guided.complete')}
         </Button>
         <Button danger className={cn('min-h-7 px-2.5 text-meta', close === 'delete' && SUGGESTED)} onClick={onDelete}>
-          <Trash2 aria-hidden="true" className="h-3.5 w-3.5" /> Delete
+          <Trash2 aria-hidden="true" className="h-3.5 w-3.5" /> {t('guided.delete')}
         </Button>
       </div>
     </li>

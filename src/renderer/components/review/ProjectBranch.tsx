@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { ChevronRight, MoreHorizontal, Plus } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { normalizeHex } from '@/lib/constants'
@@ -105,6 +106,7 @@ interface ProjectHeaderProps {
 }
 
 function ProjectHeader({ node, depth, isOpen, isReviewed, isFocused, onToggle, onMarkReviewed }: ProjectHeaderProps) {
+  const { t } = useTranslation()
   const { project } = node
   const dotColor = normalizeHex(project.hex_color) || 'var(--control-ring)'
   const subCount = node.children.length
@@ -155,7 +157,7 @@ function ProjectHeader({ node, depth, isOpen, isReviewed, isFocused, onToggle, o
       </span>
       {depth === 0 && subCount > 0 && (
         <span style={{ fontSize: 'var(--type-caption-size)', color: 'var(--text-secondary)', flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>
-          {subCount} sub-project{subCount === 1 ? '' : 's'}
+          {t('review.subProjects', { count: subCount })}
         </span>
       )}
       {!isReviewed && <StalenessPill node={node} />}
@@ -182,7 +184,7 @@ function ProjectHeader({ node, depth, isOpen, isReviewed, isFocused, onToggle, o
             flexShrink: 0,
           }}
         >
-          ✓ Mark reviewed
+          {t('review.branch.markReviewed')}
         </button>
       ) : (
         <span
@@ -197,7 +199,7 @@ function ProjectHeader({ node, depth, isOpen, isReviewed, isFocused, onToggle, o
             flexShrink: 0,
           }}
         >
-          ✓ Reviewed
+          {t('review.branch.reviewed')}
         </span>
       )}
       <ProjectRowMenu node={node} />
@@ -222,6 +224,7 @@ function StalenessPill({ node }: { node: ReviewTreeNode }) {
 
 // Preserves the per-project cadence + exclude actions from the old flat list.
 function ProjectRowMenu({ node }: { node: ReviewTreeNode }) {
+  const { t } = useTranslation()
   const [open, setOpen] = useState(false)
   const [cadenceOpen, setCadenceOpen] = useState(false)
   const [cadenceInput, setCadenceInput] = useState(String(node.status.metadata.cadenceDaysOverride ?? ''))
@@ -234,7 +237,7 @@ function ProjectRowMenu({ node }: { node: ReviewTreeNode }) {
         type="button"
         onClick={() => setOpen((v) => !v)}
         className="flex h-6 w-6 items-center justify-center rounded-control text-[var(--text-secondary)] opacity-0 transition-opacity hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] group-hover:opacity-100"
-        title="Review options"
+        title={t('review.branch.options')}
       >
         <MoreHorizontal className="h-4 w-4" />
       </button>
@@ -248,7 +251,7 @@ function ProjectRowMenu({ node }: { node: ReviewTreeNode }) {
             className="w-full px-3 py-1.5 text-left text-sm hover:bg-[var(--bg-hover)]"
             onClick={() => setCadenceOpen(true)}
           >
-            Set cadence
+            {t('review.branch.setCadence')}
           </button>
           <button
             type="button"
@@ -258,13 +261,13 @@ function ProjectRowMenu({ node }: { node: ReviewTreeNode }) {
               exclude.mutate({ project: node.project, excluded: true })
             }}
           >
-            Exclude from review
+            {t('review.branch.exclude')}
           </button>
         </div>
       )}
       {cadenceOpen && (
         <div className="absolute right-0 top-full z-20 mt-1 w-52 space-y-2 rounded-popover border border-[var(--border-color)] bg-[var(--bg-primary)] p-3 shadow-lg">
-          <label className="block text-xs text-[var(--text-secondary)]">Cadence in days (blank = default)</label>
+          <label className="block text-xs text-[var(--text-secondary)]">{t('review.branch.cadenceLabel')}</label>
           <input
             type="number"
             min={1}
@@ -284,7 +287,7 @@ function ProjectRowMenu({ node }: { node: ReviewTreeNode }) {
                 setOpen(false)
               }}
             >
-              Save
+              {t('review.branch.save')}
             </button>
             <button
               type="button"
@@ -294,7 +297,7 @@ function ProjectRowMenu({ node }: { node: ReviewTreeNode }) {
                 setOpen(false)
               }}
             >
-              Cancel
+              {t('review.branch.cancel')}
             </button>
           </div>
         </div>
@@ -304,13 +307,14 @@ function ProjectRowMenu({ node }: { node: ReviewTreeNode }) {
 }
 
 function ProjectReviewTasks({ projectId, depth }: { projectId: number; depth: number }) {
+  const { t } = useTranslation()
   const { data: tasks, isLoading } = useProjectTasks(projectId)
 
   return (
     <div style={{ paddingLeft: 26 + depth * 18, paddingRight: 4, paddingBottom: 8 }}>
-      {isLoading && <div className="px-2 py-1 text-xs text-[var(--text-secondary)]">Loading…</div>}
+      {isLoading && <div className="px-2 py-1 text-xs text-[var(--text-secondary)]">{t('review.branch.loading')}</div>}
       {!isLoading && tasks.length === 0 && (
-        <div className="px-2 py-1 text-xs text-[var(--text-secondary)]">No open tasks.</div>
+        <div className="px-2 py-1 text-xs text-[var(--text-secondary)]">{t('review.branch.noOpenTasks')}</div>
       )}
       {!isLoading && tasks.length > 0 && (
         <TaskRowGroup>{tasks.map((task) => <TaskRow key={task.id} task={task} />)}</TaskRowGroup>
@@ -321,6 +325,7 @@ function ProjectReviewTasks({ projectId, depth }: { projectId: number; depth: nu
 }
 
 function AddTaskInline({ projectId }: { projectId: number }) {
+  const { t } = useTranslation()
   const [adding, setAdding] = useState(false)
   const [title, setTitle] = useState('')
   const createTask = useCreateTask()
@@ -340,7 +345,7 @@ function AddTaskInline({ projectId }: { projectId: number }) {
         onClick={() => setAdding(true)}
         className="mt-0.5 inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
       >
-        <Plus className="h-3 w-3" /> Add task
+        <Plus className="h-3 w-3" /> {t('review.branch.addTask')}
       </button>
     )
   }
@@ -349,7 +354,7 @@ function AddTaskInline({ projectId }: { projectId: number }) {
     <input
       autoFocus
       value={title}
-      placeholder="Task title, Enter to add"
+      placeholder={t('review.branch.addPlaceholder')}
       onChange={(e) => setTitle(e.target.value)}
       onKeyDown={(e) => {
         if (e.key === 'Enter') {

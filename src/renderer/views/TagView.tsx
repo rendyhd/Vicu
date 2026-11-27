@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useParams } from '@tanstack/react-router'
 import { useTasks } from '@/hooks/use-tasks'
 import { useLabels } from '@/hooks/use-labels'
@@ -21,6 +22,7 @@ import { parentTaskId, useWorkMode } from '@/hooks/use-work-mode'
 import { WorkModeMore } from '@/components/task-list/WorkModeMore'
 
 export function TagView() {
+  const { t } = useTranslation()
   const { labelId } = useParams({ from: '/tag/$labelId' })
   const lid = Number(labelId)
   const { data: labels } = useLabels()
@@ -31,7 +33,7 @@ export function TagView() {
   const inboxProjectId = config?.inbox_project_id
   // The rows are all about this tag: they do not repeat it as a chip.
   const rowView = useMemo(() => ({ labelId: lid }), [lid])
-  const labelName = labels?.find((l) => l.id === lid)?.title ?? 'Tag'
+  const labelName = labels?.find((l) => l.id === lid)?.title ?? t('views.tag.fallbackName')
 
   const params = useFilters({ view: 'tag', labelId: lid })
   const { data: tasks = [], isLoading } = useTasks(params)
@@ -65,7 +67,7 @@ export function TagView() {
       if (!projectMap.has(pid)) {
         const project = projects?.flat.find((p) => p.id === pid)
         projectMap.set(pid, {
-          name: project?.title ?? 'Unknown Project',
+          name: project?.title ?? t('views.unknownProject'),
           color: project?.hex_color,
           tasks: [],
         })
@@ -75,7 +77,7 @@ export function TagView() {
     return Array.from(projectMap.values()).sort((a, b) =>
       a.name.localeCompare(b.name)
     )
-  }, [filtered, projects?.flat])
+  }, [filtered, projects?.flat, t])
 
   usePrintable(
     useMemo(
@@ -101,13 +103,13 @@ export function TagView() {
         onTaskCreated={(task) => {
           if (!task.labels?.some((l) => l.id === lid)) addLabel.mutate({ taskId: task.id, labelId: lid })
         }}
-        emptyTitle={`No tasks tagged "${labelName}"`}
+        emptyTitle={t('views.tag.emptyTitle', { name: labelName })}
         empty={availability.on ? groups.length === 0 && hiddenCount === 0 : undefined}
         headerContent={availability.on || personPage ? (
           <>
             {personPage && (
               <Link to="/person/$labelId" params={{ labelId: String(lid) }} className="mx-6 mb-2 inline-block text-meta font-medium text-accent-blue hover:underline">
-                Open {labelName}'s page
+                {t('views.tag.openPage', { name: labelName })}
               </Link>
             )}
             {availability.on && <ViewSwitch view={availability.view} onChange={availability.setView} />}

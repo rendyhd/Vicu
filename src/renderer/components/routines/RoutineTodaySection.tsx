@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useQueryClient } from '@tanstack/react-query'
 import { Bell, Check, ChevronRight, Clock3, SkipForward, Undo2 } from 'lucide-react'
 import { useRoutines } from '@/hooks/use-routines'
@@ -29,6 +30,7 @@ function RoutineCheck({
   /** How far the routine is today, as `1/3`, when it has more than one time (Today, semantics 6.10). */
   progress?: string | null
 }) {
+  const { t } = useTranslation()
   const dateFormat = useDateFormat()
   const completed = occurrence.status === 'COMPLETED'
   const skipped = occurrence.status === 'SKIPPED'
@@ -49,7 +51,7 @@ function RoutineCheck({
         type="button"
         disabled={locked}
         onClick={() => onStatus(completed ? 'PENDING' : 'COMPLETED')}
-        aria-label={completed ? `Undo ${definition.name}` : `Complete ${definition.name}`}
+        aria-label={completed ? t('routines.today.undoName', { name: definition.name }) : t('routines.today.completeName', { name: definition.name })}
         className={cn(
           'flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 transition-all',
           completed
@@ -73,8 +75,8 @@ function RoutineCheck({
           </span>
           {occurrence.slot.reminderEnabled && <Bell className="h-3 w-3" />}
           {progress && <span className="tabular-nums">{progress}</span>}
-          {occurrence.status === 'NOT_LOGGED' && <span>Not logged</span>}
-          {skipped && !doneBy && <span>Skipped</span>}
+          {occurrence.status === 'NOT_LOGGED' && <span>{t('routines.today.notLogged')}</span>}
+          {skipped && !doneBy && <span>{t('routines.today.skipped')}</span>}
           {doneBy && <span>{doneBy}</span>}
         </div>
       </div>
@@ -84,10 +86,10 @@ function RoutineCheck({
         disabled={locked}
         onClick={() => onStatus(skipped ? 'PENDING' : 'SKIPPED')}
         className="flex h-7 items-center gap-1 rounded-control px-2 text-meta text-[var(--text-secondary)] opacity-0 transition hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)] group-hover:opacity-100 focus:opacity-100"
-        aria-label={skipped ? `Undo skip for ${definition.name}` : `Skip ${definition.name}`}
+        aria-label={skipped ? t('routines.today.undoSkipName', { name: definition.name }) : t('routines.today.skipName', { name: definition.name })}
       >
         {skipped ? <Undo2 className="h-3.5 w-3.5" /> : <SkipForward className="h-3.5 w-3.5" />}
-        {skipped ? 'Undo' : 'Skip'}
+        {skipped ? t('routines.today.undo') : t('routines.today.skip')}
       </button>}
     </div>
   )
@@ -135,6 +137,7 @@ export function RoutineTodaySection({
    */
   onToday?: boolean
 }) {
+  const { t } = useTranslation()
   const routines = useRoutines()
   const completed = routines.today.filter((occurrence) => occurrence.status === 'COMPLETED').length
   const total = routines.today.length
@@ -161,11 +164,11 @@ export function RoutineTodaySection({
 
   return (
     <section className="border-b border-[var(--border-color)] pb-2">
-      <ListSectionHeader level={1} title="Routines" tone="routines" className="gap-3">
+      <ListSectionHeader level={1} title={t('routines.title')} tone="routines" className="gap-3">
         {onToday && (
           <button
             type="button"
-            aria-label={folded ? 'Expand routines' : 'Collapse routines'}
+            aria-label={folded ? t('routines.today.expand') : t('routines.today.collapse')}
             aria-expanded={!folded}
             onClick={() => setFolded(!folded)}
             className="-ml-2 flex h-6 w-6 shrink-0 items-center justify-center rounded-control text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
@@ -190,10 +193,10 @@ export function RoutineTodaySection({
       </ListSectionHeader>
 
       {routines.isLoading && (
-        <div className="px-6 py-3 text-xs text-[var(--text-secondary)]">Loading routines...</div>
+        <div className="px-6 py-3 text-xs text-[var(--text-secondary)]">{t('routines.loading')}</div>
       )}
       {!routines.isLoading && total === 0 && (
-        <div className="px-6 py-3 text-xs text-[var(--text-secondary)]">Nothing scheduled for today.</div>
+        <div className="px-6 py-3 text-xs text-[var(--text-secondary)]">{t('routines.today.nothingScheduled')}</div>
       )}
       {rows.map(({ occurrence, progress }) => (
         <RoutineCheck
@@ -216,7 +219,7 @@ export function RoutineTodaySection({
           onClick={() => setOpened(!opened)}
           className="ml-4 mt-1 flex h-7 items-center rounded-control px-2 text-meta font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
         >
-          {opened ? 'Show less' : line}
+          {opened ? t('routines.today.showLess') : line}
         </button>
       )}
     </section>

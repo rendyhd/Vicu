@@ -1,6 +1,6 @@
 import { resolveSetupInbox, setupResume } from '@/lib/setup-resume'
 import { useEffect, useRef, useState } from 'react'
-import { useTranslation } from 'react-i18next'
+import { Trans, useTranslation } from 'react-i18next'
 import { Button } from '@/components/shared/Button'
 import { Checkbox } from '@/components/shared/Checkbox'
 import { BrowserSignIn } from '@/components/auth/BrowserSignIn'
@@ -336,7 +336,7 @@ export function SetupView({ onComplete }: SetupViewProps) {
         setOidcError(result.error)
       }
     } catch {
-      setOidcError('Login failed unexpectedly. Please try again.')
+      setOidcError(t('setup.loginFailed'))
     } finally {
       setOidcLogging(false)
     }
@@ -376,7 +376,7 @@ export function SetupView({ onComplete }: SetupViewProps) {
         setPasswordError(result.error)
       }
     } catch {
-      setPasswordError('Login failed unexpectedly. Please try again.')
+      setPasswordError(t('setup.loginFailed'))
     } finally {
       setPasswordLogging(false)
     }
@@ -414,17 +414,17 @@ export function SetupView({ onComplete }: SetupViewProps) {
           {logoUrl && <img src={logoUrl} alt="" className="h-12 w-12" />}
         </div>
         <h1 className="mb-1 text-page-title text-[var(--text-primary)]">
-          Welcome to Vicu
+          {t('setup.welcome')}
         </h1>
         <p className="mb-6 text-sm text-text-secondary">
-          {step === 'url' && !ownServer && 'Enter your Vikunja server URL to get started.'}
-          {step === 'auth-method' && 'Choose how to sign in.'}
-          {step === 'oidc-login' && 'Complete sign-in in your browser.'}
-          {step === 'oidc-totp' && 'Enter your two-factor code to complete SSO.'}
-          {step === 'password-login' && 'Sign in with your credentials.'}
-          {step === 'totp' && 'Enter your two-factor authentication code.'}
-          {step === 'api-token' && 'Enter your API token to connect.'}
-          {step === 'project' && 'Choose your inbox project.'}
+          {step === 'url' && !ownServer && t('setup.intro.url')}
+          {step === 'auth-method' && t('setup.intro.authMethod')}
+          {step === 'oidc-login' && t('setup.intro.oidcLogin')}
+          {step === 'oidc-totp' && t('setup.intro.oidcTotp')}
+          {step === 'password-login' && t('setup.intro.passwordLogin')}
+          {step === 'totp' && t('setup.intro.totp')}
+          {step === 'api-token' && t('setup.intro.apiToken')}
+          {step === 'project' && t('setup.intro.project')}
         </p>
 
         <div key={step} data-step={step} data-step-direction={shown.current.direction ?? undefined} className={cn('space-y-4', shown.current.direction === 'forward' && 'vicu-step-forward', shown.current.direction === 'back' && 'vicu-step-back')}>
@@ -434,12 +434,13 @@ export function SetupView({ onComplete }: SetupViewProps) {
             <>
               <div>
                 <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">
-                  Server URL
+                  {t('setup.serverUrl')}
                 </label>
                 <input
                   type="url"
                   value={url}
                   onChange={(e) => setUrl(e.target.value)}
+                  // i18n-ignore: an example address
                   placeholder="https://app.vikunja.cloud"
                   className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-text-secondary/50"
                   onKeyDown={(e) => {
@@ -454,18 +455,22 @@ export function SetupView({ onComplete }: SetupViewProps) {
                 disabled={discovering}
                 className="w-full"
               >
-                {discovering ? 'Checking...' : 'Continue'}
+                {discovering ? t('setup.checking') : t('setup.continue')}
               </Button>
 
               <p className="text-center text-xs text-[var(--text-secondary)]">
-                Don't have an account?{' '}
-                <button
-                  type="button"
-                  onClick={() => window.api.openDeepLink('https://vikunja.cloud/register')}
-                  className="text-accent-blue hover:underline"
-                >
-                  Sign up
-                </button>
+                <Trans
+                  i18nKey="setup.noAccount"
+                  components={{
+                    signUp: (
+                      <button
+                        type="button"
+                        onClick={() => window.api.openDeepLink('https://vikunja.cloud/register')}
+                        className="text-accent-blue hover:underline"
+                      />
+                    ),
+                  }}
+                />
               </p>
             </>
           )}
@@ -481,7 +486,7 @@ export function SetupView({ onComplete }: SetupViewProps) {
                   disabled={oidcLogging}
                   className="w-full"
                 >
-                  {oidcLogging ? 'Waiting for sign-in...' : `Sign in with ${provider.name}`}
+                  {oidcLogging ? t('setup.waitingForSignIn') : t('setup.signInWith', { provider: provider.name })}
                 </Button>
               ))}
 
@@ -492,7 +497,7 @@ export function SetupView({ onComplete }: SetupViewProps) {
                   disabled={oidcLogging}
                   className="w-full"
                 >
-                  Uses a passkey? Sign in through your browser
+                  {t('setup.passkeyBrowser')}
                 </Button>
               )}
 
@@ -501,7 +506,7 @@ export function SetupView({ onComplete }: SetupViewProps) {
                   {oidcProviders.length > 0 && (
                     <div className="flex items-center gap-3">
                       <div className="h-px flex-1 bg-[var(--border-color)]" />
-                      <span className="text-xs text-[var(--text-secondary)]">or</span>
+                      <span className="text-xs text-[var(--text-secondary)]">{t('setup.or')}</span>
                       <div className="h-px flex-1 bg-[var(--border-color)]" />
                     </div>
                   )}
@@ -514,7 +519,7 @@ export function SetupView({ onComplete }: SetupViewProps) {
                     }}
                     className="w-full"
                   >
-                    Sign in with username & password
+                    {t('setup.signInWithPassword')}
                   </Button>
                 </>
               )}
@@ -525,17 +530,17 @@ export function SetupView({ onComplete }: SetupViewProps) {
 
               <div className="flex items-center gap-3">
                 <div className="h-px flex-1 bg-[var(--border-color)]" />
-                <span className="text-xs text-[var(--text-secondary)]">or</span>
+                <span className="text-xs text-[var(--text-secondary)]">{t('setup.or')}</span>
                 <div className="h-px flex-1 bg-[var(--border-color)]" />
               </div>
 
               <Button variant="secondary" onClick={() => setStep('api-token')} className="w-full">
-                Use API Token instead
+                {t('setup.useApiToken')}
               </Button>
 
               {!ownServer && (
                 <Button variant="quiet" onClick={() => setStep('url')} className="w-full">
-                  Back
+                  {t('setup.back')}
                 </Button>
               )}
             </>
@@ -547,7 +552,7 @@ export function SetupView({ onComplete }: SetupViewProps) {
               {oidcProviders.length > 1 && (
                 <div>
                   <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">
-                    Provider
+                    {t('setup.provider')}
                   </label>
                   <select
                     value={selectedOidcProvider.key}
@@ -585,7 +590,7 @@ export function SetupView({ onComplete }: SetupViewProps) {
                 }}
                 className="w-full"
               >
-                Back
+                {t('setup.back')}
               </Button>
             </>
           )}
@@ -595,7 +600,7 @@ export function SetupView({ onComplete }: SetupViewProps) {
             <>
               <div>
                 <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">
-                  Two-Factor Code
+                  {t('setup.twoFactorCode')}
                 </label>
                 <input
                   type="text"
@@ -613,7 +618,7 @@ export function SetupView({ onComplete }: SetupViewProps) {
                   }}
                 />
                 <p className="mt-1.5 text-xs text-[var(--text-secondary)]">
-                  Enter the 6-digit code from your authenticator app. Vikunja requires a fresh SSO authorization after the challenge.
+                  {t('setup.totpHintSso')}
                 </p>
               </div>
 
@@ -623,12 +628,12 @@ export function SetupView({ onComplete }: SetupViewProps) {
                 disabled={totpCode.length !== 6 || oidcLogging}
                 className="w-full"
               >
-                {oidcLogging ? 'Waiting for sign-in...' : 'Continue with SSO'}
+                {oidcLogging ? t('setup.waitingForSignIn') : t('setup.continueWithSso')}
               </Button>
 
               {oidcLogging && oidcMode === 'browser' && (
                 <Button variant="secondary" onClick={() => api.cancelOidcBrowserLogin()} className="w-full">
-                  Cancel
+                  {t('setup.cancel')}
                 </Button>
               )}
 
@@ -646,7 +651,7 @@ export function SetupView({ onComplete }: SetupViewProps) {
                 }}
                 className="w-full"
               >
-                Back
+                {t('setup.back')}
               </Button>
             </>
           )}
@@ -656,13 +661,13 @@ export function SetupView({ onComplete }: SetupViewProps) {
             <>
               <div>
                 <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">
-                  Username or Email
+                  {t('setup.usernameOrEmail')}
                 </label>
                 <input
                   type="text"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  placeholder="Enter your username or email"
+                  placeholder={t('setup.usernamePlaceholder')}
                   autoComplete="username"
                   className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-text-secondary/50"
                   onKeyDown={(e) => {
@@ -673,14 +678,14 @@ export function SetupView({ onComplete }: SetupViewProps) {
 
               <div>
                 <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">
-                  Password
+                  {t('setup.password')}
                 </label>
                 <div className="relative">
                   <input
                     type={showPassword ? 'text' : 'password'}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Enter your password"
+                    placeholder={t('setup.passwordPlaceholder')}
                     autoComplete="current-password"
                     className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2 pr-16 text-sm text-[var(--text-primary)] placeholder:text-text-secondary/50"
                     onKeyDown={(e) => {
@@ -692,7 +697,7 @@ export function SetupView({ onComplete }: SetupViewProps) {
                     onClick={() => setShowPassword(!showPassword)}
                     className="absolute right-2 top-1/2 -translate-y-1/2 rounded-control px-2 py-0.5 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                   >
-                    {showPassword ? 'Hide' : 'Show'}
+                    {showPassword ? t('setup.hide') : t('setup.show')}
                   </button>
                 </div>
               </div>
@@ -703,7 +708,7 @@ export function SetupView({ onComplete }: SetupViewProps) {
                 disabled={!username || !password || passwordLogging}
                 className="w-full"
               >
-                {passwordLogging ? 'Signing in...' : 'Sign In'}
+                {passwordLogging ? t('setup.signingIn') : t('setup.signIn')}
               </Button>
 
               {passwordError && (
@@ -718,7 +723,7 @@ export function SetupView({ onComplete }: SetupViewProps) {
                 }}
                 className="w-full"
               >
-                Back
+                {t('setup.back')}
               </Button>
             </>
           )}
@@ -728,7 +733,7 @@ export function SetupView({ onComplete }: SetupViewProps) {
             <>
               <div>
                 <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">
-                  Two-Factor Code
+                  {t('setup.twoFactorCode')}
                 </label>
                 <input
                   type="text"
@@ -743,7 +748,7 @@ export function SetupView({ onComplete }: SetupViewProps) {
                   }}
                 />
                 <p className="mt-1.5 text-xs text-[var(--text-secondary)]">
-                  Enter the 6-digit code from your authenticator app.
+                  {t('setup.totpHint')}
                 </p>
               </div>
 
@@ -753,7 +758,7 @@ export function SetupView({ onComplete }: SetupViewProps) {
                 disabled={totpCode.length !== 6 || passwordLogging}
                 className="w-full"
               >
-                {passwordLogging ? 'Verifying...' : 'Verify'}
+                {passwordLogging ? t('setup.verifying') : t('setup.verify')}
               </Button>
 
               {passwordError && (
@@ -769,7 +774,7 @@ export function SetupView({ onComplete }: SetupViewProps) {
                 }}
                 className="w-full"
               >
-                Back
+                {t('setup.back')}
               </Button>
             </>
           )}
@@ -780,7 +785,7 @@ export function SetupView({ onComplete }: SetupViewProps) {
               {!ownServer && (
               <div>
                 <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">
-                  Server URL
+                  {t('setup.serverUrl')}
                 </label>
                 <div className="rounded-control border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-secondary)]">
                   {url}
@@ -790,7 +795,7 @@ export function SetupView({ onComplete }: SetupViewProps) {
 
               <div>
                 <label className="mb-1 flex items-center text-xs font-medium text-[var(--text-secondary)]">
-                  API Token
+                  {t('setup.apiToken')}
                   <TokenPermissionsInfo />
                 </label>
                 <div className="relative">
@@ -798,7 +803,7 @@ export function SetupView({ onComplete }: SetupViewProps) {
                     type={showToken ? 'text' : 'password'}
                     value={token}
                     onChange={(e) => setToken(e.target.value)}
-                    placeholder="Enter your API token"
+                    placeholder={t('setup.apiTokenPlaceholder')}
                     className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2 pr-16 text-sm text-[var(--text-primary)] placeholder:text-text-secondary/50"
                   />
                   <button
@@ -806,7 +811,7 @@ export function SetupView({ onComplete }: SetupViewProps) {
                     onClick={() => setShowToken(!showToken)}
                     className="absolute right-2 top-1/2 -translate-y-1/2 rounded-control px-2 py-0.5 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                   >
-                    {showToken ? 'Hide' : 'Show'}
+                    {showToken ? t('setup.hide') : t('setup.show')}
                   </button>
                 </div>
               </div>
@@ -827,11 +832,11 @@ export function SetupView({ onComplete }: SetupViewProps) {
                 disabled={!token || testStatus === 'testing'}
                 className="w-full"
               >
-                {testStatus === 'testing' ? 'Testing...' : 'Test Connection'}
+                {testStatus === 'testing' ? t('setup.testing') : t('setup.testConnection')}
               </Button>
 
               {testStatus === 'error' && (
-                <p className="text-xs text-danger">{testError || 'Connection failed'}</p>
+                <p className="text-xs text-danger">{testError || t('setup.connectionFailed')}</p>
               )}
 
               <Button
@@ -843,7 +848,7 @@ export function SetupView({ onComplete }: SetupViewProps) {
                 }}
                 className="w-full"
               >
-                Back
+                {t('setup.back')}
               </Button>
             </>
           )}
@@ -852,25 +857,25 @@ export function SetupView({ onComplete }: SetupViewProps) {
           {step === 'project' && (
             <>
               {authMethod === 'oidc' && (
-                <p className="text-xs text-status-done">Signed in via SSO</p>
+                <p className="text-xs text-status-done">{t('setup.signedInSso')}</p>
               )}
               {authMethod === 'password' && (
-                <p className="text-xs text-status-done">Signed in successfully</p>
+                <p className="text-xs text-status-done">{t('setup.signedIn')}</p>
               )}
               {authMethod === 'api_token' && (
-                <p className="text-xs text-status-done">Connected successfully</p>
+                <p className="text-xs text-status-done">{t('setup.connected')}</p>
               )}
 
               <div>
                 <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">
-                  Inbox Project
+                  {t('setup.inboxProject')}
                 </label>
                 <select
                   value={inboxProjectId}
                   onChange={(e) => setInboxProjectId(Number(e.target.value))}
                   className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)]"
                 >
-                  <option value={0}>Select a project...</option>
+                  <option value={0}>{t('setup.selectProject')}</option>
                   {projects.map((p) => (
                     <option key={p.id} value={p.id}>{p.title}</option>
                   ))}
@@ -883,7 +888,7 @@ export function SetupView({ onComplete }: SetupViewProps) {
                 disabled={!inboxProjectId || saving}
                 className="w-full"
               >
-                {saving ? 'Saving...' : 'Save & Continue'}
+                {saving ? t('setup.saving') : t('setup.saveContinue')}
               </Button>
             </>
           )}

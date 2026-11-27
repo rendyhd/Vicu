@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
+import type { TranslationKey } from '../../../shared/i18n'
 import { AlarmClock, ArrowLeft, ArrowRight, CheckCircle2, Hourglass, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { confirmDelete } from '@/lib/confirm-bridge'
@@ -38,10 +40,10 @@ import { GuidedSummary } from './GuidedSummary'
 // the session starts, one task at a time, the card's choices written together on Next through the
 // usual offline-aware mutations, Complete and Delete at once, then a summary with Undo all.
 
-export const SESSION_TITLES: Record<GuidedQueueId, string> = {
-  inbox: 'Sort the Inbox',
-  overdue: 'Sort out overdue',
-  waiting: 'Waiting a long time',
+export const SESSION_TITLES: Record<GuidedQueueId, TranslationKey> = {
+  inbox: 'guided.sort.titles.inbox',
+  overdue: 'guided.sort.titles.overdue',
+  waiting: 'guided.sort.titles.waiting',
 }
 
 export function sessionIcon(queue: GuidedQueueId): React.ReactNode {
@@ -51,18 +53,18 @@ export function sessionIcon(queue: GuidedQueueId): React.ReactNode {
 }
 
 const HINTS = [
-  ['Enter', 'Next'],
-  ['←', 'Back'],
-  ['S', 'Skip'],
-  ['1 2 3 4', 'When'],
-  ['D', 'Pick a date'],
-  ['0', 'No date'],
-  ['P', 'Project'],
-  ['E', 'Title'],
-  ['C', 'Complete'],
-  ['Del', 'Delete'],
-  ['Esc', 'Exit'],
-] as const
+  ['Enter', 'guided.next'],
+  ['←', 'guided.back'],
+  ['S', 'guided.skip'],
+  ['1 2 3 4', 'guided.when'],
+  ['D', 'guided.pickDate'],
+  ['0', 'guided.noDate'],
+  ['P', 'guided.project'],
+  ['E', 'guided.title'],
+  ['C', 'guided.complete'],
+  ['Del', 'guided.delete'],
+  ['Esc', 'guided.exit'],
+] as const satisfies ReadonlyArray<readonly [string, TranslationKey]>
 
 interface CardState {
   draft: CardDraft
@@ -78,6 +80,7 @@ interface Props {
 }
 
 export function GuidedSortSession({ queueId, onExit, onDone, doneLabel }: Props) {
+  const { t } = useTranslation()
   const data = useGuidedWorld()
   const { hiddenLabelId } = useWorkMode()
   const ws = useAiWorkspace()
@@ -172,13 +175,13 @@ export function GuidedSortSession({ queueId, onExit, onDone, doneLabel }: Props)
     if (!task) return
     const children = taskDescendants(task).length
     const ok = await confirmDelete(
-      children > 0 ? `Delete this task and ${children} ${children === 1 ? 'subtask' : 'subtasks'}?` : 'Delete this task? This cannot be undone.',
-      children > 0 ? { force: true, confirmLabel: 'Delete all', destructive: true } : {},
+      children > 0 ? t('guided.deleteWithSubtasks', { count: children }) : t('guided.deleteTask'),
+      children > 0 ? { force: true, confirmLabel: t('guided.deleteAll'), destructive: true } : {},
     )
     if (!ok) return
     deleteTask.mutate({ task })
     setLog((prev) => logDelete(prev, task))
-    announce(`Deleted ${task.title}`)
+    announce(t('guided.deletedTask', { title: task.title }))
     advance()
   }
 
@@ -215,23 +218,23 @@ export function GuidedSortSession({ queueId, onExit, onDone, doneLabel }: Props)
     return () => window.removeEventListener('keydown', onKey)
   }, [finished, task])
 
-  const title = SESSION_TITLES[queueId]
+  const title = t(SESSION_TITLES[queueId])
   const icon = sessionIcon(queueId)
 
   if (queue === null) {
     return (
       <GuidedFrame title={title} icon={icon} position={null} onExit={onExit}>
-        <p className="text-center text-meta text-[var(--text-secondary)]" role="status">Loading your tasks…</p>
+        <p className="text-center text-meta text-[var(--text-secondary)]" role="status">{t('guided.loadingTasks')}</p>
       </GuidedFrame>
     )
   }
 
   if (finished || !task || !card) {
     return (
-      <GuidedFrame title={title} icon={icon} position={null} onExit={onExit} exitLabel="Close">
+      <GuidedFrame title={title} icon={icon} position={null} onExit={onExit} exitLabel={t('guided.close')}>
         <GuidedSummary
           empty={queue.length === 0}
-          emptyText={EMPTY_TEXT[queueId]}
+          emptyText={t(EMPTY_TEXT[queueId])}
           log={log}
           summary={summaryText(sessionCounts(log))}
           doneLabel={doneLabel}
@@ -241,9 +244,9 @@ export function GuidedSortSession({ queueId, onExit, onDone, doneLabel }: Props)
     )
   }
 
-  const status = suggestions.failure ?? (suggestions.active && suggestions.pending(task.id) ? 'Asking for suggestions…' : null)
+  const status = suggestions.failure ?? (suggestions.active && suggestions.pending(task.id) ? t('guided.askingSuggestions') : null)
   const added = addedAgo(task, today)
-  const projectPath = pathOf(ws, card.draft.projectId) || 'Project'
+  const projectPath = pathOf(ws, card.draft.projectId) || t('guided.project')
   const close = suggestion?.close ?? null
 
   return (
@@ -252,26 +255,26 @@ export function GuidedSortSession({ queueId, onExit, onDone, doneLabel }: Props)
         footer={
           <>
             <Button onClick={complete} aria-keyshortcuts="C" className={cn(close === 'done' && SUGGESTED)}>
-              <CheckCircle2 aria-hidden="true" className="h-4 w-4" /> Complete
-              {close === 'done' && <span className="text-caption text-accent-blue">Suggested</span>}
+              <CheckCircle2 aria-hidden="true" className="h-4 w-4" /> {t('guided.complete')}
+              {close === 'done' && <span className="text-caption text-accent-blue">{t('guided.suggested')}</span>}
             </Button>
             <Button danger onClick={() => void remove()} aria-keyshortcuts="Delete" className={cn(close === 'delete' && SUGGESTED)}>
-              <Trash2 aria-hidden="true" className="h-4 w-4" /> Delete
-              {close === 'delete' && <span className="text-caption text-accent-blue">Suggested</span>}
+              <Trash2 aria-hidden="true" className="h-4 w-4" /> {t('guided.delete')}
+              {close === 'delete' && <span className="text-caption text-accent-blue">{t('guided.suggested')}</span>}
             </Button>
-            <Button variant="quiet" onClick={advance} aria-keyshortcuts="S">Skip</Button>
+            <Button variant="quiet" onClick={advance} aria-keyshortcuts="S">{t('guided.skip')}</Button>
             <span className="flex-1" />
             <Button variant="quiet" onClick={back} disabled={previous < 0} aria-keyshortcuts="ArrowLeft">
-              <ArrowLeft aria-hidden="true" className="h-4 w-4" /> Back
+              <ArrowLeft aria-hidden="true" className="h-4 w-4" /> {t('guided.back')}
             </Button>
             <Button variant="primary" onClick={next} aria-keyshortcuts="Enter">
-              Next <ArrowRight aria-hidden="true" className="h-4 w-4" />
+              {t('guided.next')} <ArrowRight aria-hidden="true" className="h-4 w-4" />
             </Button>
           </>
         }
       >
         <div className="mb-2 text-meta text-[var(--text-secondary)]">{pathOf(ws, task.project_id)}</div>
-        <label className="sr-only" htmlFor="guided-title">Title</label>
+        <label className="sr-only" htmlFor="guided-title">{t('guided.title')}</label>
         <input
           id="guided-title"
           ref={titleRef}
@@ -303,7 +306,7 @@ export function GuidedSortSession({ queueId, onExit, onDone, doneLabel }: Props)
 
         <div ref={quick} className="mt-6 space-y-5">
           <div>
-            <FieldLabel>When</FieldLabel>
+            <FieldLabel>{t('guided.when')}</FieldLabel>
             <WhenChoices
               value={card.draft.due}
               onChange={(due) => edit({ due }, 'when')}
@@ -313,7 +316,7 @@ export function GuidedSortSession({ queueId, onExit, onDone, doneLabel }: Props)
             />
           </div>
           <div>
-            <FieldLabel>Project</FieldLabel>
+            <FieldLabel>{t('guided.project')}</FieldLabel>
             <ProjectChoice
               projectId={card.draft.projectId}
               path={projectPath}
@@ -329,8 +332,8 @@ export function GuidedSortSession({ queueId, onExit, onDone, doneLabel }: Props)
   )
 }
 
-const EMPTY_TEXT: Record<GuidedQueueId, string> = {
-  inbox: 'Nothing in the Inbox to sort.',
-  overdue: 'Nothing is overdue.',
-  waiting: 'No task has waited 60 days or more.',
+const EMPTY_TEXT: Record<GuidedQueueId, TranslationKey> = {
+  inbox: 'guided.sort.empty.inbox',
+  overdue: 'guided.sort.empty.overdue',
+  waiting: 'guided.sort.empty.waiting',
 }

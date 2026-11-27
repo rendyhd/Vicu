@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { Trans, useTranslation } from 'react-i18next'
 import { useNavigate } from '@tanstack/react-router'
 import { RefreshCw, CheckCircle2, ListChecks, Play } from 'lucide-react'
 import { cn } from '@/lib/cn'
@@ -32,6 +33,7 @@ function isEditableTarget(el: EventTarget | null): boolean {
 }
 
 export function ReviewView() {
+  const { t } = useTranslation()
   const [tab, setTab] = useState<Tab>('due')
   const [reviewedThisSession, setReviewedThisSession] = useState<ReadonlySet<number>>(new Set())
   const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set())
@@ -75,10 +77,10 @@ export function ReviewView() {
 
   // "Marked X reviewed, Undo" is an app toast (UNDO_TOAST_MS, paused while the pointer or focus is on it).
   const showReviewedToast = (prevProject: Project) => {
-    toast.success(`Marked ${prevProject.title} reviewed`, {
+    toast.success(t('review.markedReviewed', { title: prevProject.title }), {
       key: REVIEW_TOAST_KEY,
       durationMs: UNDO_TOAST_MS,
-      action: { label: 'Undo', onAction: () => handleUndo(prevProject) },
+      action: { label: t('review.undo'), onAction: () => handleUndo(prevProject) },
     })
   }
 
@@ -206,36 +208,37 @@ export function ReviewView() {
     <div className="relative flex h-full flex-col" style={{ background: 'var(--bg-primary)' }}>
       {/* Header */}
       <PageHeader
-        title="Review"
+        title={t('review.title')}
         icon={<SmartListIcon list="review" className="h-5 w-5" />}
         subtitle={
-          <>
-            Click a project to review tasks in place. Press{' '}
-            <kbd
-              style={{
-                fontFamily: '"SF Mono", ui-monospace, Menlo, Consolas, monospace',
-                fontSize: 'var(--type-caption-size)',
-                padding: '1px 5px',
-                borderRadius: 3,
-                background: 'var(--bg-hover)',
-                border: '1px solid var(--border-color)',
-              }}
-            >
-              R
-            </kbd>{' '}
-            to mark reviewed.
-          </>
+          <Trans
+            i18nKey="review.subtitle"
+            components={{
+              shortcut: (
+                <kbd
+                  style={{
+                    fontFamily: '"SF Mono", ui-monospace, Menlo, Consolas, monospace',
+                    fontSize: 'var(--type-caption-size)',
+                    padding: '1px 5px',
+                    borderRadius: 3,
+                    background: 'var(--bg-hover)',
+                    border: '1px solid var(--border-color)',
+                  }}
+                />
+              ),
+            }}
+          />
         }
         actions={
           <>
           {/* Guided organizing (cross-app semantics 14.4, 14.7): one project at a time, and the weekly checklist. */}
           {remaining > 0 && (
             <Button variant="primary" onClick={() => void navigate({ to: '/guided/$session', params: { session: 'review' } })}>
-              <Play aria-hidden="true" className="h-4 w-4" /> Start review
+              <Play aria-hidden="true" className="h-4 w-4" /> {t('review.startReview')}
             </Button>
           )}
           <Button onClick={() => void navigate({ to: '/weekly-review' })}>
-            <ListChecks aria-hidden="true" className="h-4 w-4" /> Weekly review
+            <ListChecks aria-hidden="true" className="h-4 w-4" /> {t('review.weeklyReview')}
           </Button>
           <span
             style={{
@@ -248,7 +251,7 @@ export function ReviewView() {
               fontVariantNumeric: 'tabular-nums',
             }}
           >
-            {remaining} due
+            {t('review.dueCount', { count: remaining })}
           </span>
           </>
         }
@@ -258,10 +261,10 @@ export function ReviewView() {
         {/* Tabs */}
         <div style={{ display: 'flex', gap: 6, marginTop: 12 }} role="tablist">
           <TabButton active={tab === 'due'} onClick={() => setTab('due')} count={remaining}>
-            Due
+            {t('review.tabDue')}
           </TabButton>
           <TabButton active={tab === 'all'} onClick={() => setTab('all')} count={allCount}>
-            All tracked
+            {t('review.tabAll')}
           </TabButton>
         </div>
 
@@ -286,14 +289,14 @@ export function ReviewView() {
 
       {/* Tree list */}
       <ReadingScroll columnClassName="flex flex-col px-4 pb-6 pt-2">
-        {isLoading && <div className="px-2 py-4 text-sm text-[var(--text-secondary)]">Loading…</div>}
+        {isLoading && <div className="px-2 py-4 text-sm text-[var(--text-secondary)]">{t('review.loading')}</div>}
 
         {allCaughtUp && (
           <EmptyState
             icon={RefreshCw}
             identity="review"
-            title="All reviewed"
-            subtitle={`You're caught up. Next review available in ${defaultCadence} days.`}
+            title={t('review.allReviewed')}
+            subtitle={t('review.caughtUp', { count: defaultCadence })}
           />
         )}
 
@@ -301,8 +304,8 @@ export function ReviewView() {
           <EmptyState
             icon={RefreshCw}
             identity="review"
-            title="No tracked projects"
-            subtitle="Projects appear here once review tracking is enabled in Settings."
+            title={t('review.noTracked')}
+            subtitle={t('review.noTrackedHint')}
           />
         )}
 
@@ -348,7 +351,7 @@ export function ReviewView() {
             onClick={clearErrorNotice}
             style={{ fontSize: 13, fontWeight: 600, color: 'var(--accent-red)', cursor: 'pointer' }}
           >
-            Dismiss
+            {t('review.dismiss')}
           </button>
         </div>
       )}
