@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useNavigate, useRouterState } from '@tanstack/react-router'
 import { AlarmClock, ChevronRight, Inbox, ListChecks, MessageCircleQuestion, RefreshCw } from 'lucide-react'
 import { startersFor } from '@/lib/ai/starters'
@@ -26,6 +27,7 @@ const ICONS: Record<AgendaItemId, typeof Inbox> = {
 }
 
 export function AskAgenda({ onSend, disabled }: { onSend: (text: string) => void; disabled?: boolean }) {
+  const { t } = useTranslation()
   const data = useGuidedWorld()
   const navigate = useNavigate()
   const pathname = useRouterState({ select: (s) => s.location.pathname })
@@ -38,7 +40,7 @@ export function AskAgenda({ onSend, disabled }: { onSend: (text: string) => void
     <div className="space-y-4">
       {items.length > 0 && (
         <section aria-labelledby="ask-agenda">
-          <h2 id="ask-agenda" className="mb-1.5 text-caption font-semibold uppercase tracking-wide text-[var(--text-secondary)]">Needs a decision</h2>
+          <h2 id="ask-agenda" className="mb-1.5 text-caption font-semibold uppercase tracking-wide text-[var(--text-secondary)]">{t('ai.askAgenda.needsDecision')}</h2>
           <ul className="space-y-1">
             {items.map((item) => {
               const Icon = ICONS[item.id]
@@ -66,7 +68,7 @@ export function AskAgenda({ onSend, disabled }: { onSend: (text: string) => void
         </section>
       )}
       <section aria-labelledby="ask-starters">
-        <h2 id="ask-starters" className="mb-1.5 text-caption font-semibold uppercase tracking-wide text-[var(--text-secondary)]">Ask</h2>
+        <h2 id="ask-starters" className="mb-1.5 text-caption font-semibold uppercase tracking-wide text-[var(--text-secondary)]">{t('ai.askAgenda.ask')}</h2>
         <ul className="flex flex-col items-start gap-1.5">
           {starters.map((text) => (
             <li key={text}>

@@ -213,11 +213,11 @@ export function setDictationDeps(next: DictationDeps | null): void {
 
 export function errorText(error: AiError): string {
   switch (error.kind) {
-    case 'timeout': return 'The model did not answer in time.'
-    case 'network': return 'Could not reach the model.'
-    case 'auth': return 'The provider refused the key.'
-    case 'bad_answer': return 'The model’s answer could not be used.'
-    default: return error.message || 'The request failed.'
+    case 'timeout': return t('ai.errors.timeout')
+    case 'network': return t('ai.errors.network')
+    case 'auth': return t('ai.errors.auth')
+    case 'bad_answer': return t('ai.errors.badAnswer')
+    default: return error.message || t('ai.errors.failed')
   }
 }
 
@@ -232,10 +232,10 @@ const PROJECT_DROPS = new Set(['project', 'project_title', 'parent'])
 /** The plan's notes for what the checks left out of its new projects (4.8.3), as the phone words them. */
 function projectNotesOf(dropped: readonly DroppedField[], projects: readonly CheckedProject[]): string[] {
   return dropped.filter((d) => PROJECT_DROPS.has(d.field)).map((d) => {
-    if (d.field === 'project') return `More than ${AI_LIMITS.brain_dump_projects_max} new projects: the rest were left out`
-    if (d.field === 'project_title') return 'Skipped a new project without a name'
+    if (d.field === 'project') return t('ai.dictation.projectsLimit', { max: AI_LIMITS.brain_dump_projects_max })
+    if (d.field === 'project_title') return t('ai.dictation.projectNoName')
     const title = projects.find((p) => p.ref === d.ref)?.title
-    return title ? `“${title}”: its parent project was not found, so it goes at the top level` : 'A parent project was not found, so a new project goes at the top level'
+    return title ? t('ai.dictation.parentMissingNamed', { title }) : t('ai.dictation.parentMissing')
   })
 }
 
@@ -249,14 +249,14 @@ function stopMicAtLimit(): void {
   setTimeout(() => {
     if (useOpenMicStore.getState().owner === 'dictation') cancelOpenMic()
   }, 0)
-  announce('That is as long as it can be, so the microphone turned off.')
+  announce(t('ai.dictation.micAtLimit'))
 }
 
 /** "2 new projects and 14 tasks" for the announcement of a plan. */
 function planSummary(projects: number, tasks: number): string {
-  const taskText = tasks === 1 ? '1 task' : `${tasks} tasks`
+  const taskText = t('ai.counts.tasks', { count: tasks })
   if (projects === 0) return taskText
-  return `${projects === 1 ? '1 new project' : `${projects} new projects`} and ${taskText}`
+  return t('ai.dictation.planSummary', { projects: t('ai.counts.newProjects', { count: projects }), tasks: taskText })
 }
 
 export const useDictationStore = create<DictationState>((set, get) => {
@@ -305,7 +305,7 @@ export const useDictationStore = create<DictationState>((set, get) => {
       }
       void window.api.ai.keepTranscript(kept)
       set({ phase: 'failed', error: kept.error, keptId, ...(dumping ? { transcript, dump: transcript, more: '' } : {}) })
-      announce(dumping ? 'The dump could not be organized. It is kept.' : 'The tasks could not be made. The transcript is kept.')
+      announce(dumping ? t('ai.dictation.dumpFailedKept') : t('ai.dictation.tasksFailedKept'))
       return
     }
 
@@ -358,7 +358,7 @@ export const useDictationStore = create<DictationState>((set, get) => {
     })
     if (cards.length === 0 && checked.projects.length === 0) {
       set({ phase: 'empty', cards: [], projects: [], unclear: checked.unclear, error: null, edit: EMPTY_EDIT })
-      announce('Nothing to add')
+      announce(t('ai.dictation.nothingToAdd'))
       return
     }
     // The kept transcript has served its purpose once there are cards.
@@ -375,7 +375,7 @@ export const useDictationStore = create<DictationState>((set, get) => {
       edit: EMPTY_EDIT,
       addError: null,
     })
-    announce(dumping ? `${planSummary(checked.projects.length, cards.length)} to check` : cards.length === 1 ? '1 task to check' : `${cards.length} tasks to check`)
+    announce(dumping ? t('ai.dictation.planToCheck', { summary: planSummary(checked.projects.length, cards.length) }) : t('ai.dictation.tasksToCheck', { count: cards.length }))
   }
 
   /** A brain dump's turn: added to the dump, or after Organize to the Update field; never sent. */
@@ -483,8 +483,8 @@ export const useDictationStore = create<DictationState>((set, get) => {
       if (!input.adopt) useVoiceStore.getState().cancel()
       startOpenMic('dictation', client, input.adopt, { dump: get().brainDump })
       announce(get().brainDump
-        ? 'Listening. Talk as long as you like; nothing is sent until you choose Organize.'
-        : 'Listening. Say your tasks; pause and they appear as cards.')
+        ? t('ai.dictation.listeningDump')
+        : t('ai.dictation.listeningCards'))
     },
 
     listen: () => {
@@ -560,7 +560,7 @@ export const useDictationStore = create<DictationState>((set, get) => {
         return
       }
       set({ brainDump: on, dumpFull: false })
-      announce(on ? 'Brain dump on. Nothing is sent until you choose Organize.' : 'Brain dump off. Each pause turns what you said into task cards.')
+      announce(on ? t('ai.dictation.dumpOn') : t('ai.dictation.dumpOff'))
     },
 
     setDump: (text) => {

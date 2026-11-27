@@ -14,6 +14,7 @@ import { cancelOpenMic, openMicOwner, setOpenMicInterruptible, startOpenMic, typ
 import { stopSpeaking } from '@/lib/ai/speech-output'
 import { spokenConfirmation } from '../../shared/ai/talk'
 import { announce } from '@/stores/announcer-store'
+import { t } from '../../shared/i18n'
 import { UNDO_TOAST_MS, toast, useToastStore } from '@/stores/toast-store'
 import { useVoiceStore } from '@/stores/voice-store'
 
@@ -101,11 +102,11 @@ function newConversation(talk: boolean): StoredConversation {
 
 function errorText(error: AiError): string {
   switch (error.kind) {
-    case 'timeout': return 'The model did not answer in time.'
-    case 'network': return 'Could not reach the model.'
-    case 'auth': return 'The provider refused the key.'
-    case 'cancelled': return 'Stopped.'
-    default: return error.message || 'The request failed.'
+    case 'timeout': return t('ai.errors.timeout')
+    case 'network': return t('ai.errors.network')
+    case 'auth': return t('ai.errors.auth')
+    case 'cancelled': return t('ai.errors.stopped')
+    default: return error.message || t('ai.errors.failed')
   }
 }
 
@@ -127,7 +128,7 @@ function streamTurn(messages: ChatMessage[], talk: boolean, final: boolean, onTe
     void window.api.ai.askStart({ turnId, talk, messages, final }).then((started) => {
       if (!started) {
         unsubscribe()
-        reject({ kind: 'bad_request', message: 'The request could not start.' } satisfies AiError)
+        reject({ kind: 'bad_request', message: t('ai.errors.couldNotStart') } satisfies AiError)
       }
     })
   })
@@ -180,7 +181,7 @@ export const useAskStore = create<AskState>((set, get) => {
     const tool = askTool(call.name)!
     try {
       if (tool.kind === 'read') {
-        set({ status: 'Looking up tasks…' })
+        set({ status: t('ai.ask.lookingUp') })
         const value = PRO_TOOL_NAMES.has(call.name) ? await runProTool(call.name, parsed.args, ctx) : await runReadTool(call.name, parsed.args, ctx)
         return { result: { callId: call.id, name: call.name, content: JSON.stringify(value) }, taskIds: taskIdsIn(value) }
       }
@@ -195,13 +196,13 @@ export const useAskStore = create<AskState>((set, get) => {
       const taskIds = proposal.tool === 'propose_update_tasks' ? proposal.updates.map((u) => u.task.id)
         : proposal.tool === 'propose_complete_tasks' ? proposal.tasks.map((t) => t.id) : []
       // An older card the user could still apply closes when a new one comes.
-      announce('A change is proposed. Apply or decline it.')
+      announce(t('ai.ask.proposed'))
       const outcome = await new Promise<ProposalResult>((resolve) => {
         set({ pending: { callId: call.id, proposal, resolve }, lingering: null })
       })
       return { result: { callId: call.id, name: call.name, content: JSON.stringify(outcome) }, taskIds: [...taskIds, ...outcome.applied] }
     } catch (err) {
-      const error = err instanceof ToolError ? toolErrorResult(err.code, err.detail) : toolErrorResult('not_found', err instanceof Error ? err.message : 'The lookup failed.')
+      const error = err instanceof ToolError ? toolErrorResult(err.code, err.detail) : toolErrorResult('not_found', err instanceof Error ? err.message : t('ai.errors.lookupFailed'))
       return { result: { callId: call.id, name: call.name, content: JSON.stringify(error), isError: err instanceof ToolError && err.code === 'invalid_arguments' }, taskIds: [] }
     }
   }
@@ -288,7 +289,7 @@ export const useAskStore = create<AskState>((set, get) => {
         let message = text
         const previous = conversation?.messages.filter((m) => m.message.role === 'user').at(-1)
         if (!conversation || conversation.messages.length === 0) {
-          set({ status: 'Reading your lists…' })
+          set({ status: t('ai.ask.readingLists') })
           const overview = await getOverview(ctx)
           const list = deps.list()
           message = withContext(askContextJson(nowLocal, timeZone(), {
@@ -309,7 +310,7 @@ export const useAskStore = create<AskState>((set, get) => {
           const final = rounds >= AI_LIMITS.ask_tool_rounds_max
           if (final) push({ role: 'user', text: AI_MESSAGES.finalAnswer })
           const messages = requestWindow((current()?.messages ?? []).map((m) => m.message))
-          set({ streaming: '', status: rounds === 0 ? 'Thinking…' : get().status })
+          set({ streaming: '', status: rounds === 0 ? t('ai.ask.thinking') : get().status })
           const done = await streamTurn(messages, talk, final, (piece) => set((s) => ({ streaming: s.streaming + piece, status: null })))
           if (cancelled) return
           const answer = done.message
@@ -377,12 +378,12 @@ export const useAskStore = create<AskState>((set, get) => {
       if (!apply) {
         set(which === 'pending' ? { pending: null } : { lingering: null })
         card.resolve(DECLINED(card.proposal))
-        announce('Declined')
+        announce(t('ai.ask.declined'))
         return
       }
       const size = proposalSize(card.proposal)
       if (size > AI_LIMITS.proposal_confirm_twice_above) {
-        const sure = await confirmDelete(`Apply this change to ${size} tasks?`, { force: true, confirmLabel: 'Apply', destructive: false })
+        const sure = await confirmDelete(t('ai.ask.confirmApply', { count: size }), { force: true, confirmLabel: t('ai.ask.apply'), destructive: false })
         if (!sure) return
       }
       set(which === 'pending' ? { pending: null } : { lingering: null })
@@ -391,11 +392,11 @@ export const useAskStore = create<AskState>((set, get) => {
       if (applied.count > 0) {
         const created = card.proposal.tool === 'propose_create_tasks'
         const message = created
-          ? (applied.count === 1 ? 'Added 1 task' : `Added ${applied.count} tasks`)
-          : (applied.count === 1 ? 'Changed 1 task' : `Changed ${applied.count} tasks`)
+          ? t('ai.ask.addedTasks', { count: applied.count })
+          : t('ai.ask.changedTasks', { count: applied.count })
         useToastStore.getState().push('success', message, {
           durationMs: UNDO_TOAST_MS,
-          action: { label: 'Undo', onAction: () => void applied.undo() },
+          action: { label: t('ai.undo'), onAction: () => void applied.undo() },
         })
         if (created) {
           const conversation = current()
@@ -403,7 +404,7 @@ export const useAskStore = create<AskState>((set, get) => {
         }
       } else if (applied.result.status === 'failed' && size > 0) {
         // With nothing to apply the card already said why; only a change that was tried and failed is news.
-        toast.error('The change could not be applied.')
+        toast.error(t('ai.ask.applyFailed'))
       }
     },
   }

@@ -28,32 +28,41 @@ import { planProjectPath } from '../../../shared/ai/brain-dump'
 import { instantOfLocal } from '../../../shared/ai/dictation'
 import type { DraftField } from '../../../shared/ai/contract'
 import type { Task } from '@/lib/vikunja-types'
+import type { TranslationKey } from '../../../shared/i18n'
 
-const FIELD_NAMES: Record<string, string> = {
-  task: 'task',
-  title: 'title',
-  notes: 'notes',
-  when: 'date',
-  project: 'project',
-  labels: 'labels',
-  priority: 'priority',
-  repeat: 'repeat',
-  reminder: 'reminder',
-  place: 'place',
-  subtasks: 'subtasks',
+const FIELD_NAMES: Record<string, TranslationKey> = {
+  task: 'ai.dictationPanel.fieldTask',
+  title: 'ai.dictationPanel.fieldTitle',
+  notes: 'ai.dictationPanel.fieldNotes',
+  when: 'ai.dictationPanel.fieldDate',
+  project: 'ai.dictationPanel.fieldProject',
+  labels: 'ai.dictationPanel.fieldLabels',
+  priority: 'ai.dictationPanel.fieldPriority',
+  repeat: 'ai.dictationPanel.fieldRepeat',
+  reminder: 'ai.dictationPanel.fieldReminder',
+  place: 'ai.dictationPanel.fieldPlace',
+  subtasks: 'ai.dictationPanel.fieldSubtasks',
 }
 
-const PRIORITIES = [
-  { value: 0, label: 'No priority' },
-  { value: 1, label: 'Low' },
-  { value: 2, label: 'Medium' },
-  { value: 3, label: 'High' },
-  { value: 4, label: 'Urgent' },
+/** The repeat units the model may name (the contract's enum), each with its plural forms. */
+const REPEAT_TEXT: Record<string, TranslationKey> = {
+  day: 'ai.dictationPanel.repeatDay',
+  week: 'ai.dictationPanel.repeatWeek',
+  month: 'ai.dictationPanel.repeatMonth',
+  year: 'ai.dictationPanel.repeatYear',
+}
+
+const PRIORITIES: { value: number; label: TranslationKey }[] = [
+  { value: 0, label: 'ai.dictationPanel.priorityNone' },
+  { value: 1, label: 'ai.dictationPanel.priorityLow' },
+  { value: 2, label: 'ai.dictationPanel.priorityMedium' },
+  { value: 3, label: 'ai.dictationPanel.priorityHigh' },
+  { value: 4, label: 'ai.dictationPanel.priorityUrgent' },
 ]
 
-function droppedValue(value: unknown): string {
+function droppedValue(value: unknown, nothing: string): string {
   if (typeof value === 'string') return `“${value}”`
-  if (value === null || value === undefined) return 'nothing'
+  if (value === null || value === undefined) return nothing
   return typeof value === 'object' ? JSON.stringify(value) : String(value)
 }
 
@@ -170,7 +179,7 @@ function DictationPanel() {
     store.cancelRequest()
     const plan = useDictationStore.getState()
     if (plan.projects.length > 0 && !navigator.onLine) {
-      plan.setAddError('New projects need a connection. Add again once you are online.')
+      plan.setAddError(t('ai.dictationPanel.needsConnection'))
       return
     }
     plan.setAddError(null)
@@ -186,7 +195,7 @@ function DictationPanel() {
       // Closed while it ran: nothing of a failed project stayed, and a failed task had its toast.
       if (after.phase === 'idle') return
       if (outcome.stage === 'projects') {
-        after.setAddError(`The project “${outcome.project.title}” could not be created, so nothing was added. ${describeMutationError(outcome.error).message}`)
+        after.setAddError(t('ai.dictationPanel.projectNotCreated', { title: outcome.project.title, message: describeMutationError(outcome.error).message }))
       } else {
         // The task's create failed with the app's usual error toast; its projects exist now.
         after.projectsCreated(outcome.projectIds)
@@ -199,7 +208,7 @@ function DictationPanel() {
     useToastStore.getState().push('success', addedMessage(outcome.projects.length, outcome.added.tasks.length), {
       durationMs: UNDO_TOAST_MS,
       action: {
-        label: 'Undo',
+        label: t('ai.undo'),
         onAction: () => {
           void undoBrainDump(outcome.added, outcome.projects, {
             deleteTask: async (task) => { await deleteTask.mutateAsync({ task, deleteSubtasks: false }) },
@@ -230,10 +239,10 @@ function DictationPanel() {
       close(true)
       for (const problem of result.problems) toast.error(problem)
       const count = result.tasks.length
-      useToastStore.getState().push('success', count === 1 ? 'Added 1 task' : `Added ${count} tasks`, {
+      useToastStore.getState().push('success', t('ai.ask.addedTasks', { count }), {
         durationMs: UNDO_TOAST_MS,
         action: {
-          label: 'Undo',
+          label: t('ai.undo'),
           onAction: () => {
             void (async () => {
               for (const task of [...result.created].reverse()) {
@@ -259,18 +268,18 @@ function DictationPanel() {
   }
 
   const micOn = useOpenMicStore((m) => m.owner === 'dictation')
-  const taskCount = cards.length === 1 ? '1 task' : `${cards.length} tasks`
+  const taskCount = t('ai.counts.tasks', { count: cards.length })
   const heading = source === 'steps' && parent
-    ? `Steps for “${parent.title}”`
-    : phase === 'live' ? (micOn ? 'Listening…' : brainDump ? 'Brain dump' : 'Dictate tasks')
-    : phase === 'requesting' ? (brainDump ? 'Organizing…' : 'Making tasks…')
-    : phase === 'failed' ? (brainDump ? 'The dump could not be organized' : 'The tasks could not be made')
-    : phase === 'empty' ? 'Nothing to add'
-    : brainDump && projects.length > 0 ? `${projects.length === 1 ? '1 new project' : `${projects.length} new projects`}, ${taskCount}`
+    ? t('ai.dictationPanel.stepsFor', { title: parent.title })
+    : phase === 'live' ? (micOn ? t('ai.dictationPanel.listening') : brainDump ? t('ai.dictationPanel.brainDump') : t('ai.dictationPanel.dictateTasks'))
+    : phase === 'requesting' ? (brainDump ? t('ai.dictationPanel.organizing') : t('ai.dictationPanel.makingTasks'))
+    : phase === 'failed' ? (brainDump ? t('ai.dictationPanel.dumpFailed') : t('ai.dictationPanel.tasksFailed'))
+    : phase === 'empty' ? t('ai.dictationPanel.nothingToAdd')
+    : brainDump && projects.length > 0 ? t('ai.dictationPanel.projectsAndTasks', { projects: t('ai.counts.newProjects', { count: projects.length }), tasks: taskCount })
     : taskCount
   const addLabel = brainDump && projects.length > 0
     ? addedMessage(projects.length, cards.length).replace(/^Added/, 'Add')
-    : cards.length === 1 ? 'Add task' : `Add ${cards.length} tasks`
+    : t('ai.dictationPanel.addTask', { count: cards.length })
   const newProjects = useMemo(
     () => projects.map((project) => ({ ref: project.ref, label: planProjectPath(project.ref, projects, (id) => pathOf(ws, id)) })),
     [projects, ws],
@@ -297,7 +306,7 @@ function DictationPanel() {
         ref={panelRef}
         role="dialog"
         aria-modal="false"
-        aria-label={notes ? t('notes.title') : brainDump ? 'Brain dump' : 'Dictated tasks'}
+        aria-label={notes ? t('notes.title') : brainDump ? t('ai.dictationPanel.dialogBrainDump') : t('ai.dictationPanel.dialogDictated')}
         data-dictation-panel=""
         data-phase={phase}
         className={cn(
@@ -311,7 +320,7 @@ function DictationPanel() {
           {phase !== 'adding' && <MicToggle />}
           <button
             type="button"
-            aria-label={notes ? t('notes.plan.backToPages') : 'Close'}
+            aria-label={notes ? t('notes.plan.backToPages') : t('ai.dictationPanel.close')}
             onClick={() => close(phase !== 'failed')}
             className="inline-flex h-7 w-7 items-center justify-center rounded-control text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
           >
@@ -328,7 +337,7 @@ function DictationPanel() {
                 <DumpEditor />
               ) : (
                 <p className="text-caption text-[var(--text-secondary)]">
-                  {micOn ? 'Pause and the tasks appear as cards; keep talking to add more or change them.' : 'Turn on the microphone to say your tasks.'}
+                  {micOn ? t('ai.dictationPanel.pauseHint') : t('ai.dictationPanel.micHint')}
                 </p>
               )}
             </div>
@@ -345,7 +354,7 @@ function DictationPanel() {
             <div className="space-y-2">
               <HeardLine phase={phase} brainDump={brainDump} />
               {phase === 'failed' && error && <p className="text-meta text-danger" role="alert">{error}</p>}
-              {phase === 'empty' && <p className="text-meta text-[var(--text-secondary)]">The model found no tasks in what you said.</p>}
+              {phase === 'empty' && <p className="text-meta text-[var(--text-secondary)]">{t('ai.dictationPanel.noTasksFound')}</p>}
               <blockquote className="whitespace-pre-wrap break-words rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-task-title text-[var(--text-primary)]">
                 {transcript}
               </blockquote>
@@ -359,7 +368,7 @@ function DictationPanel() {
               {edit.phase === 'requesting' && (
                 <p className="flex items-center gap-2 text-meta text-[var(--text-secondary)]" role="status">
                   <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-                  <span>Updating: {edit.words}</span>
+                  <span>{t('ai.dictationPanel.updating', { words: edit.words })}</span>
                 </p>
               )}
               {edit.error && <p className="text-meta text-danger" role="alert">{edit.error}</p>}
@@ -382,7 +391,7 @@ function DictationPanel() {
               )}
               {phase === 'cards' && <HeardLine phase={phase} />}
               {edit.error && <p className="text-meta text-danger" role="alert">{edit.error}</p>}
-              <ul className="space-y-2" aria-label="Tasks to add">
+              <ul className="space-y-2" aria-label={t('ai.dictationPanel.tasksToAdd')}>
                 {cards.map((card) => <li key={card.draft.ref}>{renderCard(card)}</li>)}
               </ul>
               {unclear.length > 0 && <UnclearNotes notes={unclear} />}
@@ -393,21 +402,21 @@ function DictationPanel() {
         <footer className="flex flex-wrap items-center justify-end gap-2 border-t border-[var(--border-color)] px-4 py-3">
           {(phase === 'failed' || phase === 'empty') && (
             <>
-              <Button variant="quiet" danger onClick={() => close(true)}>Discard</Button>
+              <Button variant="quiet" danger onClick={() => close(true)}>{t('ai.dictationPanel.discard')}</Button>
               {brainDump
-                ? <Button variant="secondary" onClick={() => useDictationStore.getState().editDump()}>Edit</Button>
-                : <Button variant="secondary" onClick={() => void addAsOneTask()}>Add as one task</Button>}
-              <Button variant="primary" onClick={() => useDictationStore.getState().retry()}>Retry</Button>
+                ? <Button variant="secondary" onClick={() => useDictationStore.getState().editDump()}>{t('ai.dictationPanel.edit')}</Button>
+                : <Button variant="secondary" onClick={() => void addAsOneTask()}>{t('ai.dictationPanel.addAsOne')}</Button>}
+              <Button variant="primary" onClick={() => useDictationStore.getState().retry()}>{t('ai.dictationPanel.retry')}</Button>
             </>
           )}
           {phase === 'requesting' && brainDump && (
-            <Button variant="quiet" title="Stop organizing and go back to the dump" onClick={() => useDictationStore.getState().cancelRequest()}>Back to the dump</Button>
+            <Button variant="quiet" title={t('ai.dictationPanel.backToDumpTitle')} onClick={() => useDictationStore.getState().cancelRequest()}>{t('ai.dictationPanel.backToDump')}</Button>
           )}
-          {(phase === 'live' || (phase === 'requesting' && !brainDump)) && <Button variant="quiet" onClick={() => close(true)}>Cancel</Button>}
+          {(phase === 'live' || (phase === 'requesting' && !brainDump)) && <Button variant="quiet" onClick={() => close(true)}>{t('ai.dictationPanel.cancel')}</Button>}
           {phase === 'live' && brainDump && (
-            <Button variant="primary" disabled={dump.trim() === ''} onClick={() => useDictationStore.getState().organize()}>Organize</Button>
+            <Button variant="primary" disabled={dump.trim() === ''} onClick={() => useDictationStore.getState().organize()}>{t('ai.dictationPanel.organize')}</Button>
           )}
-          {phase === 'live' && !brainDump && micOn && <Button variant="primary" onClick={() => stopOpenMic()}>Done</Button>}
+          {phase === 'live' && !brainDump && micOn && <Button variant="primary" onClick={() => stopOpenMic()}>{t('ai.dictationPanel.done')}</Button>}
           {(phase === 'cards' || phase === 'adding') && notes && (
             <>
               <Button variant="quiet" danger disabled={phase === 'adding'} onClick={() => useNotesStore.getState().discard()}>{t('notes.discard')}</Button>
@@ -420,10 +429,10 @@ function DictationPanel() {
           )}
           {(phase === 'cards' || phase === 'adding') && !notes && (
             <>
-              <Button variant="quiet" onClick={() => close(true)}>Cancel</Button>
-              {micOn && phase === 'cards' && <Button variant="secondary" onClick={() => stopOpenMic()}>Done</Button>}
+              <Button variant="quiet" onClick={() => close(true)}>{t('ai.dictationPanel.cancel')}</Button>
+              {micOn && phase === 'cards' && <Button variant="secondary" onClick={() => stopOpenMic()}>{t('ai.dictationPanel.done')}</Button>}
               <Button variant="primary" disabled={phase === 'adding' || (cards.length === 0 && projects.length === 0)} onClick={() => void addAll()}>
-                {phase === 'adding' ? 'Adding…' : addLabel}
+                {phase === 'adding' ? t('ai.dictationPanel.adding') : addLabel}
               </Button>
             </>
           )}
@@ -434,9 +443,10 @@ function DictationPanel() {
 }
 
 function UnclearNotes({ notes }: { notes: readonly string[] }) {
+  const { t } = useTranslation()
   return (
     <div className="rounded-control border border-[var(--border-color)] px-3 py-2">
-      <p className="text-caption font-medium text-[var(--text-secondary)]">Not placed</p>
+      <p className="text-caption font-medium text-[var(--text-secondary)]">{t('ai.dictationPanel.notPlaced')}</p>
       <ul className="mt-1 list-disc space-y-0.5 pl-4 text-meta text-[var(--text-primary)]">
         {notes.map((note, i) => <li key={i}>{note}</li>)}
       </ul>
@@ -446,14 +456,15 @@ function UnclearNotes({ notes }: { notes: readonly string[] }) {
 
 /** The microphone of smart dictation (3.7): on, it listens until Done; each pause sends the words. */
 function MicToggle() {
+  const { t } = useTranslation()
   const status = useOpenMicStore((m) => (m.owner === 'dictation' ? m.status : 'off'))
   const on = status !== 'off'
   return (
     <button
       type="button"
       aria-pressed={on}
-      aria-label="Microphone"
-      title={on ? 'Turn off the microphone (Done)' : 'Turn on the microphone to add or change tasks by voice'}
+      aria-label={t('ai.dictationPanel.microphone')}
+      title={on ? t('ai.dictationPanel.micTurnOff') : t('ai.dictationPanel.micTurnOn')}
       onClick={() => (on ? stopOpenMic() : useDictationStore.getState().listen())}
       className={cn(
         'inline-flex h-7 w-7 items-center justify-center rounded-control',
@@ -467,15 +478,16 @@ function MicToggle() {
 
 /** The words of the turn being heard (and those of a request that talking cancelled). */
 function HeardLine({ phase, brainDump = false }: { phase: DictationPhase; brainDump?: boolean }) {
+  const { t } = useTranslation()
   const { owner, status, words } = useOpenMicStore()
   if (owner !== 'dictation') return null
   const prompt = status === 'starting'
-    ? 'Starting…'
+    ? t('ai.dictationPanel.heardStarting')
     : brainDump
-      ? phase === 'cards' ? 'Keep talking: what you say waits below until Update' : 'Keep talking: each pause adds what you said to the dump'
+      ? phase === 'cards' ? t('ai.dictationPanel.heardDumpCards') : t('ai.dictationPanel.heardDump')
       : phase === 'cards'
-        ? 'Keep talking to add tasks or change them: “make the first one Friday”'
-        : 'Say your tasks, like “Buy milk, and call the plumber on Friday”'
+        ? t('ai.dictationPanel.heardCards')
+        : t('ai.dictationPanel.heardSay')
   return (
     <p className="flex items-start gap-2 text-meta" role="status" data-heard-line="">
       <span className="relative mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center" aria-hidden="true">
@@ -500,6 +512,7 @@ interface DraftCardProps {
 }
 
 function DraftCardView({ card, disabled, ws, newProjects, extra, dimmed = false }: DraftCardProps) {
+  const { t } = useTranslation()
   const { draft, changed } = card
   // Where a line of notes came from (4.9.5) is only for the source line; a wrong one is left out quietly.
   const dropped = card.dropped.filter((d) => d.field !== 'from' && d.field !== 'page')
@@ -531,7 +544,7 @@ function DraftCardView({ card, disabled, ws, newProjects, extra, dimmed = false 
       {extra}
       <div className="flex items-start gap-2">
         <input
-          aria-label="Title"
+          aria-label={t('ai.dictationPanel.cardTitle')}
           value={draft.title}
           disabled={disabled}
           onChange={(e) => update({ title: e.target.value })}
@@ -542,7 +555,7 @@ function DraftCardView({ card, disabled, ws, newProjects, extra, dimmed = false 
         />
         <button
           type="button"
-          aria-label={`Remove “${draft.title}”`}
+          aria-label={t('ai.dictationPanel.removeTask', { title: draft.title })}
           disabled={disabled}
           onClick={() => useDictationStore.getState().removeDraft(draft.ref)}
           className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-control text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-danger"
@@ -553,7 +566,7 @@ function DraftCardView({ card, disabled, ws, newProjects, extra, dimmed = false 
 
       {showNotes ? (
         <textarea
-          aria-label="Notes"
+          aria-label={t('ai.dictationPanel.notes')}
           value={draft.notes}
           disabled={disabled}
           rows={Math.min(4, Math.max(2, draft.notes.split('\n').length))}
@@ -566,14 +579,14 @@ function DraftCardView({ card, disabled, ws, newProjects, extra, dimmed = false 
         />
       ) : (
         <button type="button" className="mt-1 text-caption text-[var(--text-secondary)] hover:text-[var(--text-primary)]" onClick={() => setShowNotes(true)}>
-          Add notes
+          {t('ai.dictationPanel.addNotes')}
         </button>
       )}
 
       <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[var(--text-primary)]">
         <label className={cn(fieldClass('when'), 'inline-flex items-center gap-1')}>
-          <span className="sr-only">Due date</span>
-          <span aria-hidden="true">{dueLabel ?? 'No date'}</span>
+          <span className="sr-only">{t('ai.dictationPanel.dueDate')}</span>
+          <span aria-hidden="true">{dueLabel ?? t('ai.dictationPanel.noDate')}</span>
           <input
             type="date"
             disabled={disabled}
@@ -588,7 +601,7 @@ function DraftCardView({ card, disabled, ws, newProjects, extra, dimmed = false 
         </label>
         {draft.due && (
           <label className={cn(fieldClass('when'), 'inline-flex items-center gap-1')}>
-            <span className="text-[var(--text-secondary)]">Time</span>
+            <span className="text-[var(--text-secondary)]">{t('ai.dictationPanel.time')}</span>
             <input
               type="time"
               disabled={disabled}
@@ -600,7 +613,7 @@ function DraftCardView({ card, disabled, ws, newProjects, extra, dimmed = false 
         )}
 
         <label className={fieldClass('project')}>
-          <span className="sr-only">Project</span>
+          <span className="sr-only">{t('ai.dictationPanel.project')}</span>
           <select
             disabled={disabled}
             value={projectValue}
@@ -615,34 +628,34 @@ function DraftCardView({ card, disabled, ws, newProjects, extra, dimmed = false 
               <option key={project.id} value={`id:${project.id}`}>{project.path}</option>
             ))}
             {draft.project_ref === null && !projects.some((p) => p.id === draft.project_id) && (
-              <option value={projectValue}>{pathOf(ws, draft.project_id ?? 0) || 'Inbox'}</option>
+              <option value={projectValue}>{pathOf(ws, draft.project_id ?? 0) || t('ai.dictationPanel.inbox')}</option>
             )}
             {newProjects.length > 0 && (
-              <optgroup label="New projects">
-                {newProjects.map((project) => <option key={project.ref} value={`ref:${project.ref}`}>{project.label} (new)</option>)}
+              <optgroup label={t('ai.dictationPanel.newProjects')}>
+                {newProjects.map((project) => <option key={project.ref} value={`ref:${project.ref}`}>{t('ai.dictationPanel.newProjectOption', { name: project.label })}</option>)}
               </optgroup>
             )}
           </select>
         </label>
 
         <label className={fieldClass('priority')}>
-          <span className="sr-only">Priority</span>
+          <span className="sr-only">{t('ai.dictationPanel.priority')}</span>
           <select
             disabled={disabled}
             value={draft.priority ?? 0}
             onChange={(e) => update({ priority: Number(e.target.value) || null })}
             className="bg-transparent text-chip"
           >
-            {PRIORITIES.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
+            {PRIORITIES.map((p) => <option key={p.value} value={p.value}>{t(p.label)}</option>)}
           </select>
         </label>
 
         {draft.labels.map((label) => (
           <span key={label.title} className={cn(fieldClass('labels'), 'inline-flex items-center gap-1')}>
-            #{label.title}{label.id === null && <span className="text-[var(--text-secondary)]"> (new)</span>}
+            #{label.title}{label.id === null && <span className="text-[var(--text-secondary)]"> {t('ai.dictationPanel.newLabel')}</span>}
             <button
               type="button"
-              aria-label={`Remove label ${label.title}`}
+              aria-label={t('ai.dictationPanel.removeLabel', { title: label.title })}
               disabled={disabled}
               onClick={() => update({ labels: draft.labels.filter((l) => l !== label) })}
               className="text-[var(--text-secondary)] hover:text-danger"
@@ -652,8 +665,8 @@ function DraftCardView({ card, disabled, ws, newProjects, extra, dimmed = false 
           </span>
         ))}
         <input
-          aria-label="Add a label"
-          placeholder="+ label"
+          aria-label={t('ai.dictationPanel.addLabel')}
+          placeholder={t('ai.dictationPanel.labelPlaceholder')}
           disabled={disabled}
           value={labelText}
           onChange={(e) => setLabelText(e.target.value)}
@@ -671,8 +684,8 @@ function DraftCardView({ card, disabled, ws, newProjects, extra, dimmed = false 
 
         {draft.repeat && (
           <span className={cn(fieldClass('repeat'), 'inline-flex items-center gap-1')}>
-            Every {draft.repeat.every === 1 ? draft.repeat.unit : `${draft.repeat.every} ${draft.repeat.unit}s`}
-            <button type="button" aria-label="Remove repeat" disabled={disabled} onClick={() => update({ repeat: null })} className="text-[var(--text-secondary)] hover:text-danger">
+            {REPEAT_TEXT[draft.repeat.unit] ? t(REPEAT_TEXT[draft.repeat.unit], { count: draft.repeat.every }) : `${draft.repeat.every} ${draft.repeat.unit}`}
+            <button type="button" aria-label={t('ai.dictationPanel.removeRepeat')} disabled={disabled} onClick={() => update({ repeat: null })} className="text-[var(--text-secondary)] hover:text-danger">
               <X className="h-3 w-3" />
             </button>
           </span>
@@ -680,17 +693,17 @@ function DraftCardView({ card, disabled, ws, newProjects, extra, dimmed = false 
         {draft.reminder && (
           <span className={cn(fieldClass('reminder'), 'inline-flex items-center gap-1')}>
             {'before_due_minutes' in draft.reminder
-              ? `Remind ${draft.reminder.before_due_minutes} min before`
-              : `Remind ${midSentence(formatDateChip(instantOfLocal(draft.reminder.at), false, new Date(), fmt))}`}
-            <button type="button" aria-label="Remove reminder" disabled={disabled} onClick={() => update({ reminder: null })} className="text-[var(--text-secondary)] hover:text-danger">
+              ? t('ai.dictationPanel.remindBefore', { minutes: draft.reminder.before_due_minutes })
+              : t('ai.dictationPanel.remindAt', { when: midSentence(formatDateChip(instantOfLocal(draft.reminder.at), false, new Date(), fmt)) })}
+            <button type="button" aria-label={t('ai.dictationPanel.removeReminder')} disabled={disabled} onClick={() => update({ reminder: null })} className="text-[var(--text-secondary)] hover:text-danger">
               <X className="h-3 w-3" />
             </button>
           </span>
         )}
         {draft.place && (
           <span className={cn(fieldClass('place'), 'inline-flex items-center gap-1')}>
-            {draft.place.trigger === 'arrive' ? 'Arrive' : 'Leave'}: {place?.name ?? 'place'}
-            <button type="button" aria-label="Remove place reminder" disabled={disabled} onClick={() => update({ place: null })} className="text-[var(--text-secondary)] hover:text-danger">
+            {t(draft.place.trigger === 'arrive' ? 'ai.dictationPanel.arrive' : 'ai.dictationPanel.leave', { place: place?.name ?? t('ai.dictationPanel.placeFallback') })}
+            <button type="button" aria-label={t('ai.dictationPanel.removePlace')} disabled={disabled} onClick={() => update({ place: null })} className="text-[var(--text-secondary)] hover:text-danger">
               <X className="h-3 w-3" />
             </button>
           </span>
@@ -698,17 +711,17 @@ function DraftCardView({ card, disabled, ws, newProjects, extra, dimmed = false 
       </div>
 
       {draft.subtasks.length > 0 && (
-        <ul className={cn('mt-2 space-y-1 border-l-2 pl-3', guessed('subtasks') ? 'border-dashed border-accent-blue' : 'border-[var(--border-color)]', highlight('subtasks') && 'ring-2 ring-accent-blue/40')} aria-label="Subtasks">
+        <ul className={cn('mt-2 space-y-1 border-l-2 pl-3', guessed('subtasks') ? 'border-dashed border-accent-blue' : 'border-[var(--border-color)]', highlight('subtasks') && 'ring-2 ring-accent-blue/40')} aria-label={t('ai.dictationPanel.subtasks')}>
           {draft.subtasks.map((subtask, i) => (
             <li key={i} className="flex items-center gap-2">
               <input
-                aria-label={`Subtask ${i + 1}`}
+                aria-label={t('ai.dictationPanel.subtaskN', { n: i + 1 })}
                 value={subtask}
                 disabled={disabled}
                 onChange={(e) => update({ subtasks: draft.subtasks.map((s, j) => (j === i ? e.target.value : s)) })}
                 className="min-w-0 flex-1 rounded-control border border-transparent bg-transparent px-1 text-meta text-[var(--text-primary)] hover:border-[var(--border-color)]"
               />
-              <button type="button" aria-label={`Remove subtask ${subtask}`} disabled={disabled} onClick={() => update({ subtasks: draft.subtasks.filter((_, j) => j !== i) })} className="text-[var(--text-secondary)] hover:text-danger">
+              <button type="button" aria-label={t('ai.dictationPanel.removeSubtask', { title: subtask })} disabled={disabled} onClick={() => update({ subtasks: draft.subtasks.filter((_, j) => j !== i) })} className="text-[var(--text-secondary)] hover:text-danger">
                 <X className="h-3 w-3" />
               </button>
             </li>
@@ -719,12 +732,12 @@ function DraftCardView({ card, disabled, ws, newProjects, extra, dimmed = false 
       {dropped.length > 0 && (
         <ul className="mt-2 space-y-0.5 text-caption text-[var(--text-secondary)]">
           {dropped.map((d, i) => (
-            <li key={i}>Not understood: {FIELD_NAMES[d.field] ?? d.field} {droppedValue(d.value)}</li>
+            <li key={i}>{t('ai.dictationPanel.notUnderstood', { field: FIELD_NAMES[d.field] ? t(FIELD_NAMES[d.field]) : d.field, value: droppedValue(d.value, t('ai.dictationPanel.nothing')) })}</li>
           ))}
         </ul>
       )}
       {draft.guessed.length > 0 && (
-        <p className="mt-1 text-caption text-[var(--text-secondary)]">Dashed: check {draft.guessed.map((f) => FIELD_NAMES[f] ?? f).join(', ')}</p>
+        <p className="mt-1 text-caption text-[var(--text-secondary)]">{t('ai.dictationPanel.dashedCheck', { fields: draft.guessed.map((f) => (FIELD_NAMES[f] ? t(FIELD_NAMES[f]) : f)).join(', ') })}</p>
       )}
     </article>
   )

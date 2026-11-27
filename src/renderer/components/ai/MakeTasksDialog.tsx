@@ -1,5 +1,6 @@
 import { useEffect, useId, useState } from 'react'
 import { useRouterState } from '@tanstack/react-router'
+import { useTranslation } from 'react-i18next'
 import { Dialog } from '@/components/overlay/Dialog'
 import { Button } from '@/components/shared/Button'
 import { useAiReady, useAiWorkspace } from '@/hooks/use-ai'
@@ -14,6 +15,7 @@ import { useVoiceListStore } from '@/stores/voice-list-store'
  * a pasted list) goes through the dictation request and comes back as draft cards.
  */
 export function MakeTasksDialog() {
+  const { t } = useTranslation()
   const text = useAiUiStore((s) => s.makeTasksText)
   const close = useAiUiStore((s) => s.closeMakeTasks)
   const ready = useAiReady()
@@ -42,19 +44,19 @@ export function MakeTasksDialog() {
   return (
     <Dialog open onClose={close} labelledBy={titleId} className="w-[520px] max-w-[92vw]">
       <div className="space-y-3 p-5">
-        <h2 id={titleId} className="text-card-title text-[var(--text-primary)]">Make tasks from this</h2>
+        <h2 id={titleId} className="text-card-title text-[var(--text-primary)]">{t('ai.makeTasks.title')}</h2>
         {!ready.dictation ? (
           <p className="text-meta text-[var(--text-secondary)]">
-            This needs the assistant’s dictation: choose a provider and turn on Smart dictation in Settings, Assistant.
+            {t('ai.makeTasks.needsDictation')}
           </p>
         ) : (
           <>
             <p className="text-meta text-[var(--text-secondary)]">
-              Paste or type notes, an email or a list. The text is sent to your model, which suggests tasks you can check before they are added.
+              {t('ai.makeTasks.intro')}
             </p>
             <textarea
               data-autofocus=""
-              aria-label="Text to make tasks from"
+              aria-label={t('ai.makeTasks.textLabel')}
               rows={8}
               value={value}
               onChange={(e) => setValue(e.target.value)}
@@ -69,8 +71,8 @@ export function MakeTasksDialog() {
           </>
         )}
         <div className="flex justify-end gap-2">
-          <Button variant="quiet" onClick={close}>Cancel</Button>
-          {ready.dictation && <Button variant="primary" disabled={!value.trim()} onClick={submit}>Make tasks</Button>}
+          <Button variant="quiet" onClick={close}>{t('ai.makeTasks.cancel')}</Button>
+          {ready.dictation && <Button variant="primary" disabled={!value.trim()} onClick={submit}>{t('ai.makeTasks.submit')}</Button>}
         </div>
       </div>
     </Dialog>

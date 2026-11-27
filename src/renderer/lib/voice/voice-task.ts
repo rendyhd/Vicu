@@ -6,6 +6,7 @@ import { formatDateChip } from '../date-utils'
 import type { ChipData } from '../parse-chips'
 import type { CreateTaskPayload } from '../vikunja-types'
 import { withDefaultReminder, type DefaultReminderSettings } from '../../../shared/default-reminder'
+import { t } from '../../../shared/i18n'
 
 // One spoken sentence as a new task, read like quick add (docs/voice-input.md): the quick-add
 // parser with the user's settings and the composer's field rules with nothing picked by hand. The
@@ -81,14 +82,14 @@ function projectTitleOf(projectId: number, ctx: VoiceTaskContext): string | null
 
 export function voiceTaskDraft(text: string, ctx: VoiceTaskContext): VoiceTaskDraft {
   const input = cleanTranscript(text)
-  if (!input) return { ok: false, reason: 'empty', message: 'Nothing was heard.' }
-  if (!ctx.inboxProjectId) return { ok: false, reason: 'no-inbox', message: 'Choose an Inbox in Settings first.' }
+  if (!input) return { ok: false, reason: 'empty', message: t('voice.messages.nothingHeard') }
+  if (!ctx.inboxProjectId) return { ok: false, reason: 'no-inbox', message: t('voice.messages.chooseInbox') }
 
   // parse() also applies the `!` today shortcut when the parser is off.
   const parsed = parse(input, ctx.parserConfig, ctx.now ?? new Date())
   const fields = voiceFields(parsed, ctx)
   const title = parsed.title.trim()
-  if (!title) return { ok: false, reason: 'empty', message: 'Say what the task is.' }
+  if (!title) return { ok: false, reason: 'empty', message: t('voice.messages.sayWhat') }
 
   let payload: CreateTaskPayload = { title }
   if (fields.dueDate) payload.due_date = fields.dueDate
@@ -137,12 +138,12 @@ export function voiceConfirmation(
   now: Date,
   fmt: DateFormat,
 ): string {
-  let text = `Added “${draft.title}”`
-  if (draft.projectTitle) text += ` to ${draft.projectTitle}`
   const { due_date: due, start_date: start, end_date: end } = draft.payload
   const phrase = start && end
     ? formatBlockRow(new Date(start), new Date(end), now, fmt)
     : due ? formatDateDisplay('row', new Date(due), now, isDateOnly(due), fmt) : ''
-  if (phrase) text += `, ${/^(Today|Tomorrow)\b/.test(phrase) ? phrase[0].toLowerCase() + phrase.slice(1) : phrase}`
-  return text
+  const when = phrase ? (/^(Today|Tomorrow)\b/.test(phrase) ? phrase[0].toLowerCase() + phrase.slice(1) : phrase) : ''
+  const { title, projectTitle: project } = draft
+  if (project) return when ? t('voice.messages.addedToWhen', { title, project, when }) : t('voice.messages.addedTo', { title, project })
+  return when ? t('voice.messages.addedWhen', { title, when }) : t('voice.messages.added', { title })
 }
