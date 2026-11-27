@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Download, X } from 'lucide-react'
+import { Trans, useTranslation } from 'react-i18next'
 import { api } from '@/lib/api'
 
 interface UpdateInfo {
@@ -10,6 +11,7 @@ interface UpdateInfo {
 }
 
 export function UpdateBanner() {
+  const { t } = useTranslation()
   const [update, setUpdate] = useState<UpdateInfo | null>(null)
   const [dismissed, setDismissed] = useState(false)
 
@@ -45,7 +47,7 @@ export function UpdateBanner() {
   return (
     <div className="flex items-center gap-3 border-b border-[var(--border-color)] bg-accent-blue/10 px-4 py-2">
       <span className="flex-1 text-xs text-[var(--text-primary)]">
-        Vicu <span className="font-medium">v{update.latestVersion}</span> is available
+        <Trans i18nKey="app.update.available" values={{ version: update.latestVersion }} components={{ version: <span className="font-medium" /> }} />
       </span>
       <a
         href="#"
@@ -56,7 +58,7 @@ export function UpdateBanner() {
         className="flex items-center gap-1 rounded-control px-2 py-1 text-xs font-medium text-[var(--accent-blue)] transition-colors hover:bg-accent-blue/20"
       >
         <Download className="h-3 w-3" />
-        Download
+        {t('app.update.download')}
       </a>
       <button
         type="button"
@@ -65,7 +67,7 @@ export function UpdateBanner() {
           api.dismissUpdate(update.latestVersion)
         }}
         className="flex h-5 w-5 items-center justify-center rounded-control text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
-        aria-label="Dismiss update"
+        aria-label={t('app.update.dismiss')}
       >
         <X className="h-3 w-3" />
       </button>

@@ -1,4 +1,5 @@
 import { Fragment } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Plus, Sparkles } from 'lucide-react'
 import { useDroppable } from '@dnd-kit/core'
 import { QuickFind } from '@/components/sidebar/QuickFind'
@@ -24,6 +25,7 @@ const PROJECT_ROOT_ID = 'project-root-sidebar'
 
 /** The PROJECTS header: + adds a project in place, and a project dropped here goes to the top level. */
 function ProjectsHeader() {
+  const { t } = useTranslation()
   const { setNodeRef } = useDroppable({ id: PROJECT_ROOT_ID, data: { type: 'project-root' } })
   const dropActive = useRootDropActive(PROJECT_ROOT_ID)
 
@@ -36,13 +38,13 @@ function ProjectsHeader() {
         )}
       >
         <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
-          Projects
+          {t('sidebarNav.sections.projects')}
         </span>
         <button
           type="button"
           onClick={() => projectActions.startCreate(0)}
           className="flex h-5 w-5 items-center justify-center rounded-control text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
-          aria-label="New project"
+          aria-label={t('sidebarNav.sections.newProject')}
         >
           <Plus className="h-3.5 w-3.5" />
         </button>
@@ -53,15 +55,16 @@ function ProjectsHeader() {
 
 /** Ask, next to Search (docs/ai-assistant.md): shown while Ask is ready; Mod+J does the same. */
 function AskButton() {
+  const { t } = useTranslation()
   const ready = useAiReady()
   const open = useAskStore((s) => s.open)
   if (!ready.ask) return null
   return (
     <button
       type="button"
-      aria-label="Ask"
+      aria-label={t('sidebarNav.ask.label')}
       aria-pressed={open}
-      title={`Ask (${shortcutHint('Mod+J', window.api.platform === 'darwin')})`}
+      title={t('sidebarNav.ask.title', { shortcut: shortcutHint('Mod+J', window.api.platform === 'darwin') })}
       onClick={() => useAskStore.getState().setOpen(!open)}
       className={cn(
         'flex h-8 w-8 shrink-0 items-center justify-center rounded-control border border-[var(--border-color)] transition-colors',
@@ -77,19 +80,20 @@ function AskButton() {
 
 /** The LABELS header with its + and the labels. */
 function LabelsBlock() {
+  const { t } = useTranslation()
   const { openLabelDialog } = useSidebarActions()
   return (
     <>
       <div className="px-4 pb-1 pt-3">
         <div className="flex items-center justify-between">
           <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
-            Labels
+            {t('sidebarNav.sections.labels')}
           </span>
           <button
             type="button"
             onClick={() => openLabelDialog()}
             className="flex h-5 w-5 items-center justify-center rounded-control text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
-            aria-label="New label"
+            aria-label={t('sidebarNav.sections.newLabel')}
           >
             <Plus className="h-3.5 w-3.5" />
           </button>

@@ -1,6 +1,7 @@
 import { useId, useMemo, useState } from 'react'
 import { FolderOpen, X } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
+import { useTranslation } from 'react-i18next'
 import { Dialog } from '@/components/overlay/Dialog'
 import { Button } from '@/components/shared/Button'
 import { useAppConfig } from '@/hooks/use-app-config'
@@ -44,6 +45,7 @@ interface ProjectDialogProps {
  * edit, from the sidebar, the project page and Settings alike.
  */
 export function ProjectDialog({ project, initialParentId = TOP_LEVEL, returnFocusTo, onClose }: ProjectDialogProps) {
+  const { t } = useTranslation()
   const titleId = useId()
   const nameId = useId()
   const parentId = useId()
@@ -97,7 +99,7 @@ export function ProjectDialog({ project, initialParentId = TOP_LEVEL, returnFocu
     }
   }
 
-  const heading = project ? 'Edit Project' : parent ? 'New Subproject' : 'New Project'
+  const heading = project ? t('projects.dialog.editProject') : parent ? t('projects.dialog.newSubproject') : t('projects.dialog.newProject')
 
   return (
     <Dialog open onClose={onClose} labelledBy={titleId} returnFocusTo={returnFocusTo} className="w-[380px]">
@@ -112,7 +114,7 @@ export function ProjectDialog({ project, initialParentId = TOP_LEVEL, returnFocu
           <button
             type="button"
             onClick={onClose}
-            aria-label="Close"
+            aria-label={t('projects.dialog.close')}
             className="rounded-control p-1 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
           >
             <X className="h-4 w-4" />
@@ -121,27 +123,27 @@ export function ProjectDialog({ project, initialParentId = TOP_LEVEL, returnFocu
 
         <div className="space-y-4 p-5">
           <div>
-            <label htmlFor={nameId} className="mb-1 block text-xs text-[var(--text-secondary)]">Name</label>
+            <label htmlFor={nameId} className="mb-1 block text-xs text-[var(--text-secondary)]">{t('projects.dialog.name')}</label>
             <input
               id={nameId}
               type="text"
               value={title}
               onChange={(event) => setTitle(event.target.value)}
-              placeholder="Project name"
+              placeholder={t('projects.dialog.namePlaceholder')}
               data-autofocus
               className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]"
             />
           </div>
 
           <div>
-            <label htmlFor={parentId} className="mb-1 block text-xs text-[var(--text-secondary)]">Parent project</label>
+            <label htmlFor={parentId} className="mb-1 block text-xs text-[var(--text-secondary)]">{t('projects.dialog.parent')}</label>
             <select
               id={parentId}
               value={parent}
               onChange={(event) => setParent(Number(event.target.value))}
               className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)]"
             >
-              <option value={TOP_LEVEL}>None (top level)</option>
+              <option value={TOP_LEVEL}>{t('projects.dialog.parentNone')}</option>
               {options.map(({ project: option, depth }) => (
                 <option key={option.id} value={option.id}>
                   {'   '.repeat(depth)}
@@ -152,7 +154,7 @@ export function ProjectDialog({ project, initialParentId = TOP_LEVEL, returnFocu
           </div>
 
           <fieldset>
-            <legend className="mb-1 block text-xs text-[var(--text-secondary)]">Color</legend>
+            <legend className="mb-1 block text-xs text-[var(--text-secondary)]">{t('projects.dialog.color')}</legend>
             <div className="flex flex-wrap gap-1.5">
               {PROJECT_COLORS.map((color) => (
                 <button
@@ -177,23 +179,24 @@ export function ProjectDialog({ project, initialParentId = TOP_LEVEL, returnFocu
               />
               <input
                 type="text"
-                aria-label="Color as a hex value"
+                aria-label={t('projects.dialog.colorHex')}
                 value={hexColor}
                 onChange={(event) => setHexColor(event.target.value)}
+                // i18n-ignore: hex colour format example
                 placeholder="#hex"
                 className="flex-1 rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-1.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]"
               />
               {hexColor && (
                 <Button variant="quiet" onClick={() => setHexColor('')}>
-                  Clear
+                  {t('projects.dialog.clear')}
                 </Button>
               )}
             </div>
           </fieldset>
           {project && (
             <fieldset>
-              <legend className="mb-1 block text-xs text-[var(--text-secondary)]">Icon</legend>
-              <div role="radiogroup" aria-label="Icon" className="flex gap-1.5">
+              <legend className="mb-1 block text-xs text-[var(--text-secondary)]">{t('projects.dialog.icon')}</legend>
+              <div role="radiogroup" aria-label={t('projects.dialog.icon')} className="flex gap-1.5">
                 {[true, false].map((folder) => (
                   <button
                     key={String(folder)}
@@ -209,20 +212,20 @@ export function ProjectDialog({ project, initialParentId = TOP_LEVEL, returnFocu
                     )}
                   >
                     {folder && <FolderOpen aria-hidden="true" className="h-3.5 w-3.5" strokeWidth={1.8} />}
-                    {folder ? 'Folder' : 'None'}
+                    {folder ? t('projects.dialog.iconFolder') : t('projects.dialog.iconNone')}
                   </button>
                 ))}
               </div>
-              <p className="mt-1 text-xs text-[var(--text-secondary)]">With None the name starts where the icon would be, for a name that begins with an emoji.</p>
+              <p className="mt-1 text-xs text-[var(--text-secondary)]">{t('projects.dialog.iconNote')}</p>
             </fieldset>
           )}
           {mutation.error && <p className="text-xs text-danger">{mutation.error.message}</p>}
         </div>
 
         <div className="flex justify-end gap-2 border-t border-[var(--border-color)] px-5 py-3">
-          <Button variant="secondary" onClick={onClose}>Cancel</Button>
+          <Button variant="secondary" onClick={onClose}>{t('projects.dialog.cancel')}</Button>
           <Button variant="primary" type="submit" disabled={!title.trim() || pending}>
-            {pending ? 'Saving…' : project ? 'Save' : 'Create'}
+            {pending ? t('projects.dialog.saving') : project ? t('projects.dialog.save') : t('projects.dialog.create')}
           </Button>
         </div>
       </form>

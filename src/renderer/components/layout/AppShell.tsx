@@ -76,6 +76,8 @@ import { APP_CONFIG_QUERY_KEY, useAppConfig } from '@/hooks/use-app-config'
 import { openTaskInApp } from '@/lib/open-task'
 import { useInPageNotifications } from '@/hooks/use-in-page-notifications'
 import { toast } from '@/stores/toast-store'
+import { useTranslation } from 'react-i18next'
+import { t as translate } from '../../../shared/i18n'
 import { importOutcomeText } from '../../../shared/saved-filter-import'
 import { useOfflineQueueSync } from '@/hooks/use-offline-queue'
 import { useFreshness } from '@/hooks/use-freshness'
@@ -168,6 +170,7 @@ function GlobalConfirm() {
 const DRAG_OVERLAY_MODIFIERS = [overlayBesidePointer]
 
 export function AppShell() {
+  const { t } = useTranslation()
   const queryClient = useQueryClient()
   const { sidebarWidth, setSidebarWidth } = useSidebarStore()
   const { setExpandedTask } = useSelectionStore()
@@ -689,13 +692,13 @@ export function AppShell() {
       if (undoId) {
         toast.success(message, {
           key: 'saved-filters-imported',
-          action: { label: 'Undo', onAction: () => void api.undoSavedFilterImport(undoId) },
+          action: { label: translate('app.undo'), onAction: () => void api.undoSavedFilterImport(undoId) },
         })
         return
       }
       toast.success(message, {
         key: 'saved-filters-imported',
-        ...(listId ? { action: { label: 'Open', onAction: () => navigate({ to: '/list/$listId', params: { listId } }) } } : {}),
+        ...(listId ? { action: { label: translate('app.open'), onAction: () => navigate({ to: '/list/$listId', params: { listId } }) } } : {}),
       })
     })
   }, [navigate])
@@ -882,7 +885,7 @@ export function AppShell() {
 
         {/* Sidebar — bg extends behind drag region */}
         <aside
-          aria-label="Sidebar"
+          aria-label={t('app.sidebar')}
           ref={sidebarRef}
           className="flex shrink-0 flex-col overflow-hidden border-r border-[var(--border-color)] bg-[var(--bg-sidebar)]"
           style={{ width: sidebarWidth }}

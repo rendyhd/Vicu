@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { X } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/cn'
 import { useUndoCompletedTasks } from '@/hooks/use-completion-hold'
 import { setCompletionUndoHandler } from '@/stores/completion-hold-store'
@@ -63,6 +64,7 @@ function Announcer() {
 }
 
 function ToastItem({ toast, onGone }: { toast: Shown; onGone: () => void }) {
+  const { t } = useTranslation()
   const dismiss = useToastStore((s) => s.dismiss)
   const engage = useToastStore((s) => s.engage)
   const pointer = useRef(false)
@@ -149,7 +151,7 @@ function ToastItem({ toast, onGone }: { toast: Shown; onGone: () => void }) {
         type="button"
         onClick={() => dismiss(id)}
         className="shrink-0 rounded-control p-1.5 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
-        aria-label="Dismiss"
+        aria-label={t('app.toastDismiss')}
       >
         <X className="h-3 w-3" />
       </button>

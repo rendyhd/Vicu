@@ -20,6 +20,7 @@ import { useAddLabel, useCreateLabel, useCreateTask } from './use-task-mutations
 import { usePro } from './use-pro'
 import { useProUiStore } from '@/stores/pro-ui-store'
 import { readImport } from '../../shared/pro/import'
+import { t } from '../../shared/i18n'
 
 interface UsePasteTasksOptions {
   /** The project of the list; pasting does nothing without one. */
@@ -129,11 +130,11 @@ export function usePasteTasks({ projectId, defaultDueDate }: UsePasteTasksOption
         const reason = describeMutationError(result.failed[0].error).message
         toast.error(
           plans.length === 1
-            ? `Could not create the task. ${reason}`
-            : `Created ${result.created} of ${plans.length} tasks. ${reason}`,
+            ? t('taskActions.pasteCouldNotCreate', { reason })
+            : t('taskActions.pasteCreatedSome', { created: result.created, total: plans.length, reason }),
         )
       } else if (result.labelsFailed > 0) {
-        toast.error('Tasks were created, but some labels could not be added.')
+        toast.error(t('taskActions.pasteLabelsFailed'))
       }
     } finally {
       running.current = false

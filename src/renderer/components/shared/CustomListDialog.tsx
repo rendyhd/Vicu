@@ -1,6 +1,8 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { Info, X } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/cn'
+import { t, type TranslationKey } from '../../../shared/i18n'
 import { Dialog } from '@/components/overlay/Dialog'
 import { ListIconPicker } from '@/components/shared/ListIconPicker'
 import { useProjects } from '@/hooks/use-projects'
@@ -24,32 +26,37 @@ interface CustomListDialogProps {
   onClose: () => void
 }
 
+// The label is read when it is shown (a getter), so it follows the language.
+function sortOption(value: string, key: TranslationKey): { value: string; readonly label: string } {
+  return { value, get label() { return t(key) } }
+}
+
 export const SORT_OPTIONS = [
-  { value: 'due_date', label: 'Due date' },
-  { value: 'start_date', label: 'Start date' },
-  { value: 'end_date', label: 'End date' },
-  { value: 'created', label: 'Created' },
-  { value: 'updated', label: 'Updated' },
-  { value: 'done_at', label: 'Completed' },
-  { value: 'priority', label: 'Priority' },
-  { value: 'percent_done', label: 'Progress' },
-  { value: 'title', label: 'Title' },
-  { value: 'done', label: 'Done' },
-  { value: 'id', label: 'Order created' },
-  { value: 'position', label: 'Position' },
-] as const
+  sortOption('due_date', 'customLists.sort.dueDate'),
+  sortOption('start_date', 'customLists.sort.startDate'),
+  sortOption('end_date', 'customLists.sort.endDate'),
+  sortOption('created', 'customLists.sort.created'),
+  sortOption('updated', 'customLists.sort.updated'),
+  sortOption('done_at', 'customLists.sort.doneAt'),
+  sortOption('priority', 'customLists.sort.priority'),
+  sortOption('percent_done', 'customLists.sort.percentDone'),
+  sortOption('title', 'customLists.sort.title'),
+  sortOption('done', 'customLists.sort.done'),
+  sortOption('id', 'customLists.sort.id'),
+  sortOption('position', 'customLists.sort.position'),
+]
 
 /** The two orders of `sortBy`, named for the field ("Soonest first", "A to Z"); the same on Android. */
 export function orderOptions(sortBy: string): Array<{ value: 'asc' | 'desc'; label: string }> {
-  const [asc, desc] = (() => {
+  const [asc, desc] = ((): [string, string] => {
     switch (sortBy) {
-      case 'due_date': case 'start_date': case 'end_date': return ['Soonest first', 'Latest first']
-      case 'created': case 'updated': case 'done_at': case 'id': return ['Oldest first', 'Newest first']
-      case 'priority': return ['Lowest first', 'Highest first']
-      case 'percent_done': return ['Least done first', 'Most done first']
-      case 'title': return ['A to Z', 'Z to A']
-      case 'done': return ['Open first', 'Done first']
-      default: return ['Ascending', 'Descending']
+      case 'due_date': case 'start_date': case 'end_date': return [t('customLists.order.soonestFirst'), t('customLists.order.latestFirst')]
+      case 'created': case 'updated': case 'done_at': case 'id': return [t('customLists.order.oldestFirst'), t('customLists.order.newestFirst')]
+      case 'priority': return [t('customLists.order.lowestFirst'), t('customLists.order.highestFirst')]
+      case 'percent_done': return [t('customLists.order.leastDoneFirst'), t('customLists.order.mostDoneFirst')]
+      case 'title': return [t('customLists.order.aToZ'), t('customLists.order.zToA')]
+      case 'done': return [t('customLists.order.openFirst'), t('customLists.order.doneFirst')]
+      default: return [t('customLists.order.ascending'), t('customLists.order.descending')]
     }
   })()
   return [{ value: 'asc', label: asc }, { value: 'desc', label: desc }]
@@ -58,35 +65,35 @@ export function orderOptions(sortBy: string): Array<{ value: 'asc' | 'desc'; lab
 const SELECT_CLASS = 'w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)]'
 
 const DUE_DATE_OPTIONS = [
-  { value: 'all', label: 'All' },
-  { value: 'overdue', label: 'Overdue' },
-  { value: 'today', label: 'Today' },
-  { value: 'this_week', label: 'This Week' },
-  { value: 'this_month', label: 'This Month' },
-  { value: 'has_due_date', label: 'Has Due Date' },
-  { value: 'no_due_date', label: 'No Due Date' },
-] as const
+  { value: 'all', labelKey: 'customLists.dialog.dueAll' },
+  { value: 'overdue', labelKey: 'customLists.dialog.dueOverdue' },
+  { value: 'today', labelKey: 'customLists.dialog.dueToday' },
+  { value: 'this_week', labelKey: 'customLists.dialog.dueThisWeek' },
+  { value: 'this_month', labelKey: 'customLists.dialog.dueThisMonth' },
+  { value: 'has_due_date', labelKey: 'customLists.dialog.dueHasDate' },
+  { value: 'no_due_date', labelKey: 'customLists.dialog.dueNoDate' },
+] as const satisfies ReadonlyArray<{ value: string; labelKey: TranslationKey }>
 
 // "Changed" counts local days with today included (cross-app semantics 3.3); 0 is no condition.
-const CHANGED_OPTIONS = [
-  { value: 0, label: 'Any time' },
-  { value: 1, label: 'Today' },
-  { value: 3, label: 'In the last 3 days' },
-  { value: 7, label: 'In the last 7 days' },
-  { value: 30, label: 'In the last 30 days' },
-] as const
+const CHANGED_OPTIONS = [0, 1, 3, 7, 30] as const
 
-const ASSIGNED_OPTIONS: ReadonlyArray<{ value: (typeof ASSIGNED_VALUES)[number] | ''; label: string }> = [
-  { value: '', label: 'Any task' },
-  { value: 'me', label: 'To me' },
-  { value: 'others', label: 'To someone else' },
-  { value: 'nobody', label: 'To nobody' },
+function changedLabel(days: number): string {
+  if (days === 0) return t('customLists.dialog.changedAnyTime')
+  if (days === 1) return t('customLists.dialog.changedToday')
+  return t('customLists.dialog.changedLastDays', { count: days })
+}
+
+const ASSIGNED_OPTIONS: ReadonlyArray<{ value: (typeof ASSIGNED_VALUES)[number] | ''; labelKey: TranslationKey }> = [
+  { value: '', labelKey: 'customLists.dialog.assignedAny' },
+  { value: 'me', labelKey: 'customLists.dialog.assignedMe' },
+  { value: 'others', labelKey: 'customLists.dialog.assignedOthers' },
+  { value: 'nobody', labelKey: 'customLists.dialog.assignedNobody' },
 ]
 
-const COMMENTS_OPTIONS: ReadonlyArray<{ value: (typeof COMMENTS_VALUES)[number] | ''; label: string }> = [
-  { value: '', label: 'Any task' },
-  { value: 'unread', label: 'Unread comments' },
-  { value: 'any', label: 'Has comments' },
+const COMMENTS_OPTIONS: ReadonlyArray<{ value: (typeof COMMENTS_VALUES)[number] | ''; labelKey: TranslationKey }> = [
+  { value: '', labelKey: 'customLists.dialog.commentsAny' },
+  { value: 'unread', labelKey: 'customLists.dialog.commentsUnread' },
+  { value: 'any', labelKey: 'customLists.dialog.commentsHas' },
 ]
 
 /** A value this version does not offer (from a newer app) stays selectable, so saving keeps it. */
@@ -94,12 +101,12 @@ function isOffered(value: string, options: ReadonlyArray<{ value: string }>): bo
   return options.some((option) => option.value === value)
 }
 
-const PRIORITY_OPTIONS = [
-  { value: 0, label: 'None' },
-  { value: 1, label: 'Low' },
-  { value: 2, label: 'Medium' },
-  { value: 3, label: 'High' },
-  { value: 4, label: 'Urgent' },
+const PRIORITY_OPTIONS: ReadonlyArray<{ value: number; labelKey: TranslationKey }> = [
+  { value: 0, labelKey: 'customLists.dialog.priorityNone' },
+  { value: 1, labelKey: 'customLists.dialog.priorityLow' },
+  { value: 2, labelKey: 'customLists.dialog.priorityMedium' },
+  { value: 3, labelKey: 'customLists.dialog.priorityHigh' },
+  { value: 4, labelKey: 'customLists.dialog.priorityUrgent' },
 ]
 
 const DEFAULT_FILTER: CustomListFilter = {
@@ -111,6 +118,7 @@ const DEFAULT_FILTER: CustomListFilter = {
 }
 
 export function CustomListDialog({ open, list, onSave, onClose }: CustomListDialogProps) {
+  const { t } = useTranslation()
   const titleId = useId()
   const [name, setName] = useState('')
   const [icon, setIcon] = useState(DEFAULT_CUSTOM_LIST_ICON)
@@ -253,11 +261,11 @@ export function CustomListDialog({ open, list, onSave, onClose }: CustomListDial
     <Dialog open onClose={onClose} labelledBy={titleId} className="w-[440px]">
       <div className="flex items-center justify-between border-b border-[var(--border-color)] px-5 py-3">
         <h2 id={titleId} className="text-sm font-semibold text-[var(--text-primary)]">
-          {list ? 'Edit List' : 'New List'}
+          {list ? t('customLists.dialog.editTitle') : t('customLists.dialog.newTitle')}
         </h2>
         <button
           type="button"
-          aria-label="Close"
+          aria-label={t('customLists.dialog.close')}
           onClick={onClose}
           className="rounded-control p-1 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
         >
@@ -270,8 +278,8 @@ export function CustomListDialog({ open, list, onSave, onClose }: CustomListDial
           <p className="flex gap-2 rounded-control bg-[var(--bg-secondary)] px-3 py-2 text-xs text-[var(--text-secondary)]">
             <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-accent-blue" aria-hidden />
             {list?.project_view
-              ? "Imported from a Vikunja project view. Changes here stay in Vicu and won't update the view on your server."
-              : "Imported from a Vikunja saved filter. Changes here stay in Vicu and won't update the saved filter on your server."}
+              ? t('customLists.dialog.importedFromView')
+              : t('customLists.dialog.importedFromFilter')}
           </p>
         )}
 
@@ -287,13 +295,13 @@ export function CustomListDialog({ open, list, onSave, onClose }: CustomListDial
 
         {/* Name */}
         <div>
-          <label htmlFor={`${titleId}-name`} className="mb-1 block text-xs text-[var(--text-secondary)]">Name</label>
+          <label htmlFor={`${titleId}-name`} className="mb-1 block text-xs text-[var(--text-secondary)]">{t('customLists.dialog.name')}</label>
           <input
             id={`${titleId}-name`}
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="My List"
+            placeholder={t('customLists.dialog.namePlaceholder')}
             data-autofocus
             className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]"
             onKeyDown={(e) => {
@@ -303,23 +311,23 @@ export function CustomListDialog({ open, list, onSave, onClose }: CustomListDial
         </div>
 
         <div>
-          <span id={`${titleId}-icon`} className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">Icon</span>
+          <span id={`${titleId}-icon`} className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">{t('customLists.dialog.icon')}</span>
           <ListIconPicker value={icon} onChange={setIcon} labelledBy={`${titleId}-icon`} allowNone />
         </div>
 
         {/* Sort + Order, then a further key (section 3.6) */}
         <div className="flex gap-3">
           <div className="flex-1">
-            <label htmlFor={`${titleId}-sort`} className="mb-1 block text-xs text-[var(--text-secondary)]">Sort by</label>
+            <label htmlFor={`${titleId}-sort`} className="mb-1 block text-xs text-[var(--text-secondary)]">{t('customLists.dialog.sortBy')}</label>
             <select id={`${titleId}-sort`} value={filter.sort_by} onChange={(e) => setSortBy(e.target.value)} className={SELECT_CLASS}>
               {SORT_OPTIONS.map((o) => (
                 <option key={o.value} value={o.value}>{o.label}</option>
               ))}
-              {!isOffered(filter.sort_by, SORT_OPTIONS) && <option value={filter.sort_by}>Set by a newer version</option>}
+              {!isOffered(filter.sort_by, SORT_OPTIONS) && <option value={filter.sort_by}>{t('customLists.dialog.newerVersion')}</option>}
             </select>
           </div>
           <div className="flex-1">
-            <label htmlFor={`${titleId}-order`} className="mb-1 block text-xs text-[var(--text-secondary)]">Order</label>
+            <label htmlFor={`${titleId}-order`} className="mb-1 block text-xs text-[var(--text-secondary)]">{t('customLists.dialog.order')}</label>
             <select
               id={`${titleId}-order`}
               value={filter.order_by}
@@ -334,26 +342,26 @@ export function CustomListDialog({ open, list, onSave, onClose }: CustomListDial
         </div>
         <div className="flex gap-3">
           <div className="flex-1">
-            <label htmlFor={`${titleId}-then`} className="mb-1 block text-xs text-[var(--text-secondary)]">Then by</label>
+            <label htmlFor={`${titleId}-then`} className="mb-1 block text-xs text-[var(--text-secondary)]">{t('customLists.dialog.thenBy')}</label>
             <select
               id={`${titleId}-then`}
               value={thenBy?.sort_by ?? ''}
               onChange={(e) => setThenBy(e.target.value, thenBy?.order_by ?? 'asc')}
               className={SELECT_CLASS}
             >
-              <option value="">None</option>
+              <option value="">{t('customLists.dialog.thenNone')}</option>
               {thenByOptions.map((o) => (
                 <option key={o.value} value={o.value}>{o.label}</option>
               ))}
               {thenBy && !isOffered(thenBy.sort_by, thenByOptions) && (
-                <option value={thenBy.sort_by}>Set by a newer version</option>
+                <option value={thenBy.sort_by}>{t('customLists.dialog.newerVersion')}</option>
               )}
             </select>
           </div>
           <div className="flex-1">
             {thenBy && (
               <>
-                <label htmlFor={`${titleId}-then-order`} className="mb-1 block text-xs text-[var(--text-secondary)]">Then order</label>
+                <label htmlFor={`${titleId}-then-order`} className="mb-1 block text-xs text-[var(--text-secondary)]">{t('customLists.dialog.thenOrder')}</label>
                 <select
                   id={`${titleId}-then-order`}
                   value={thenBy.order_by}
@@ -371,7 +379,7 @@ export function CustomListDialog({ open, list, onSave, onClose }: CustomListDial
 
         {/* Due Date Filter */}
         <div>
-          <label htmlFor={`${titleId}-due`} className="mb-1 block text-xs text-[var(--text-secondary)]">Due Date</label>
+          <label htmlFor={`${titleId}-due`} className="mb-1 block text-xs text-[var(--text-secondary)]">{t('customLists.dialog.dueDate')}</label>
           <select
             id={`${titleId}-due`}
             value={filter.due_date_filter}
@@ -379,7 +387,7 @@ export function CustomListDialog({ open, list, onSave, onClose }: CustomListDial
             className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)]"
           >
             {DUE_DATE_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>{o.label}</option>
+              <option key={o.value} value={o.value}>{t(o.labelKey)}</option>
             ))}
           </select>
           {windowHonorsIncludeOverdue(filter.due_date_filter) && (
@@ -390,14 +398,14 @@ export function CustomListDialog({ open, list, onSave, onClose }: CustomListDial
                 onChange={(e) => setFilter((f) => ({ ...f, include_overdue: e.target.checked ? undefined : false }))}
                 className="accent-accent-blue"
               />
-              Include overdue tasks
+              {t('customLists.dialog.includeOverdue')}
             </label>
           )}
         </div>
 
         {/* Changed */}
         <div>
-          <label htmlFor={`${titleId}-changed`} className="mb-1 block text-xs text-[var(--text-secondary)]">Changed</label>
+          <label htmlFor={`${titleId}-changed`} className="mb-1 block text-xs text-[var(--text-secondary)]">{t('customLists.dialog.changed')}</label>
           <select
             id={`${titleId}-changed`}
             value={changedDays ?? 0}
@@ -407,11 +415,11 @@ export function CustomListDialog({ open, list, onSave, onClose }: CustomListDial
             }}
             className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)]"
           >
-            {CHANGED_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>{o.label}</option>
+            {CHANGED_OPTIONS.map((days) => (
+              <option key={days} value={days}>{changedLabel(days)}</option>
             ))}
-            {changedDays !== null && !CHANGED_OPTIONS.some((o) => o.value === changedDays) && (
-              <option value={changedDays}>In the last {changedDays} days</option>
+            {changedDays !== null && !CHANGED_OPTIONS.some((days) => days === changedDays) && (
+              <option value={changedDays}>{changedLabel(changedDays)}</option>
             )}
           </select>
         </div>
@@ -420,15 +428,13 @@ export function CustomListDialog({ open, list, onSave, onClose }: CustomListDial
         <div>
           <div className="mb-1 flex items-center justify-between">
             <label className="text-xs text-[var(--text-secondary)]">
-              Projects{' '}
-              {filter.project_ids.length === 0 && (
-                <span className="text-[var(--text-secondary)]">
-                  {(filter.project_filter_mode ?? 'include') === 'include' ? '(all)' : '(none excluded)'}
-                </span>
-              )}
-              {filter.project_ids.length > 0 && (filter.project_filter_mode ?? 'include') === 'exclude' && (
-                <span className="text-[var(--text-secondary)]">({filter.project_ids.length} excluded)</span>
-              )}
+              {filter.project_ids.length === 0
+                ? ((filter.project_filter_mode ?? 'include') === 'include'
+                  ? t('customLists.dialog.projectsAll')
+                  : t('customLists.dialog.projectsNoneExcluded'))
+                : (filter.project_filter_mode ?? 'include') === 'exclude'
+                  ? t('customLists.dialog.projectsExcluded', { count: filter.project_ids.length })
+                  : t('customLists.dialog.projects')}
             </label>
             <div className="flex overflow-hidden rounded-control border border-[var(--border-color)]">
               {(['include', 'exclude'] as const).map((mode) => (
@@ -443,7 +449,7 @@ export function CustomListDialog({ open, list, onSave, onClose }: CustomListDial
                       : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'
                   )}
                 >
-                  {mode}
+                  {mode === 'include' ? t('customLists.dialog.modeInclude') : t('customLists.dialog.modeExclude')}
                 </button>
               ))}
             </div>
@@ -464,26 +470,26 @@ export function CustomListDialog({ open, list, onSave, onClose }: CustomListDial
               </label>
             ))}
             {allProjects.length === 0 && (
-              <p className="px-2 py-1 text-xs text-[var(--text-secondary)]">No projects found</p>
+              <p className="px-2 py-1 text-xs text-[var(--text-secondary)]">{t('customLists.dialog.noProjects')}</p>
             )}
           </div>
         </div>
 
         {/* New-task destination */}
         <div>
-          <label htmlFor={`${titleId}-destination`} className="mb-1 block text-xs text-[var(--text-secondary)]">Add tasks to</label>
+          <label htmlFor={`${titleId}-destination`} className="mb-1 block text-xs text-[var(--text-secondary)]">{t('customLists.dialog.addTasksTo')}</label>
           <select
             id={`${titleId}-destination`}
             value={filter.add_to_project_id ?? 0}
             onChange={(e) => setFilter((current) => ({ ...current, add_to_project_id: Number(e.target.value) }))}
             className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)]"
           >
-            <option value={0}>Inbox</option>
+            <option value={0}>{t('customLists.dialog.inbox')}</option>
             {allProjects.map((project) => (
               <option key={project.id} value={project.id}>{project.title}</option>
             ))}
             {(filter.add_to_project_id ?? 0) > 0 && !allProjects.some((project) => project.id === filter.add_to_project_id) && (
-              <option value={filter.add_to_project_id}>Unavailable project (uses Inbox)</option>
+              <option value={filter.add_to_project_id}>{t('customLists.dialog.unavailableProject')}</option>
             )}
           </select>
         </div>
@@ -491,7 +497,7 @@ export function CustomListDialog({ open, list, onSave, onClose }: CustomListDial
         {/* Priority */}
         <div>
           <label className="mb-1 block text-xs text-[var(--text-secondary)]">
-            Priority {!filter.priority_filter?.length && <span className="text-[var(--text-secondary)]">(any)</span>}
+            {filter.priority_filter?.length ? t('customLists.dialog.priority') : t('customLists.dialog.priorityAny')}
           </label>
           <div className="flex flex-wrap gap-2">
             {PRIORITY_OPTIONS.map((p) => (
@@ -506,7 +512,7 @@ export function CustomListDialog({ open, list, onSave, onClose }: CustomListDial
                     : 'border-[var(--border-color)] text-[var(--text-secondary)] hover:border-[var(--text-secondary)]'
                 )}
               >
-                {p.label}
+                {t(p.labelKey)}
               </button>
             ))}
           </div>
@@ -516,7 +522,7 @@ export function CustomListDialog({ open, list, onSave, onClose }: CustomListDial
         {labels && labels.length > 0 && (
           <div>
             <label className="mb-1 block text-xs text-[var(--text-secondary)]">
-              Labels {!filter.label_ids?.length && <span className="text-[var(--text-secondary)]">(any)</span>}
+              {filter.label_ids?.length ? t('customLists.dialog.labels') : t('customLists.dialog.labelsAny')}
             </label>
             <div className="max-h-32 overflow-y-auto rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] p-2">
               {labels.map((l) => (
@@ -540,10 +546,10 @@ export function CustomListDialog({ open, list, onSave, onClose }: CustomListDial
         {/* Collaboration */}
         {showCollaboration && (
           <fieldset className="space-y-2">
-            <legend className="mb-1 text-xs text-[var(--text-secondary)]">Shared projects</legend>
+            <legend className="mb-1 text-xs text-[var(--text-secondary)]">{t('customLists.dialog.sharedProjects')}</legend>
             <div className="flex gap-3">
               <div className="flex-1">
-                <label htmlFor={`${titleId}-assigned`} className="mb-1 block text-xs text-[var(--text-secondary)]">Assigned</label>
+                <label htmlFor={`${titleId}-assigned`} className="mb-1 block text-xs text-[var(--text-secondary)]">{t('customLists.dialog.assigned')}</label>
                 <select
                   id={`${titleId}-assigned`}
                   value={assigned}
@@ -551,13 +557,13 @@ export function CustomListDialog({ open, list, onSave, onClose }: CustomListDial
                   className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)]"
                 >
                   {ASSIGNED_OPTIONS.map((o) => (
-                    <option key={o.value} value={o.value}>{o.label}</option>
+                    <option key={o.value} value={o.value}>{t(o.labelKey)}</option>
                   ))}
-                  {!isOffered(assigned, ASSIGNED_OPTIONS) && <option value={assigned}>Set by a newer version</option>}
+                  {!isOffered(assigned, ASSIGNED_OPTIONS) && <option value={assigned}>{t('customLists.dialog.newerVersion')}</option>}
                 </select>
               </div>
               <div className="flex-1">
-                <label htmlFor={`${titleId}-comments`} className="mb-1 block text-xs text-[var(--text-secondary)]">Comments</label>
+                <label htmlFor={`${titleId}-comments`} className="mb-1 block text-xs text-[var(--text-secondary)]">{t('customLists.dialog.comments')}</label>
                 <select
                   id={`${titleId}-comments`}
                   value={comments}
@@ -565,9 +571,9 @@ export function CustomListDialog({ open, list, onSave, onClose }: CustomListDial
                   className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)]"
                 >
                   {COMMENTS_OPTIONS.map((o) => (
-                    <option key={o.value} value={o.value}>{o.label}</option>
+                    <option key={o.value} value={o.value}>{t(o.labelKey)}</option>
                   ))}
-                  {!isOffered(comments, COMMENTS_OPTIONS) && <option value={comments}>Set by a newer version</option>}
+                  {!isOffered(comments, COMMENTS_OPTIONS) && <option value={comments}>{t('customLists.dialog.newerVersion')}</option>}
                 </select>
               </div>
             </div>
@@ -578,10 +584,10 @@ export function CustomListDialog({ open, list, onSave, onClose }: CustomListDial
                 onChange={(e) => setFilter((f) => ({ ...f, shared_only: e.target.checked || undefined }))}
                 className="accent-accent-blue"
               />
-              Only tasks in shared projects
+              {t('customLists.dialog.sharedOnly')}
             </label>
             <p className="text-xs text-[var(--text-secondary)]">
-              Assigned and unread comments only match tasks in projects someone else can see.
+              {t('customLists.dialog.sharedNote')}
             </p>
           </fieldset>
         )}
@@ -590,13 +596,14 @@ export function CustomListDialog({ open, list, onSave, onClose }: CustomListDial
 
         {/* Rule (section 3.5) */}
         <div>
-          <label htmlFor={`${titleId}-rule`} className="mb-1 block text-xs text-[var(--text-secondary)]">Rule</label>
+          <label htmlFor={`${titleId}-rule`} className="mb-1 block text-xs text-[var(--text-secondary)]">{t('customLists.dialog.rule')}</label>
           <textarea
             id={`${titleId}-rule`}
             ref={ruleInput}
             rows={2}
             value={ruleText}
             spellCheck={false}
+            // i18n-ignore: Vikunja filter syntax, the same in every language
             placeholder="done = false && priority > 2"
             aria-describedby={`${titleId}-rule-help`}
             aria-invalid={ruleProblem !== null}
@@ -613,7 +620,7 @@ export function CustomListDialog({ open, list, onSave, onClose }: CustomListDial
             )}
           />
           {suggestions.length > 0 && (
-            <div className="mt-1 flex flex-wrap gap-1" role="group" aria-label="Suggestions">
+            <div className="mt-1 flex flex-wrap gap-1" role="group" aria-label={t('customLists.dialog.suggestions')}>
               {suggestions.map((suggestion) => (
                 <button
                   key={`${suggestion.label}-${suggestion.start}`}
@@ -628,7 +635,7 @@ export function CustomListDialog({ open, list, onSave, onClose }: CustomListDial
             </div>
           )}
           <p id={`${titleId}-rule-help`} className={cn('mt-1 text-xs', ruleProblem ? 'text-danger' : 'text-[var(--text-secondary)]')}>
-            {ruleProblem ?? "Tasks must also match this. It is written as in Vikunja's saved filters."}
+            {ruleProblem ?? t('customLists.dialog.ruleHelp')}
           </p>
           {ruleText.trim() !== '' && (
             <label className="mt-2 flex cursor-pointer items-center gap-2 text-xs text-[var(--text-primary)]">
@@ -638,7 +645,7 @@ export function CustomListDialog({ open, list, onSave, onClose }: CustomListDial
                 onChange={(e) => setFilter((f) => ({ ...f, rule_include_nulls: e.target.checked || undefined }))}
                 className="accent-accent-blue"
               />
-              Include tasks without a value
+              {t('customLists.dialog.ruleIncludeNulls')}
             </label>
           )}
         </div>
@@ -651,7 +658,7 @@ export function CustomListDialog({ open, list, onSave, onClose }: CustomListDial
             onChange={(e) => setFilter((f) => ({ ...f, include_done: e.target.checked || undefined }))}
             className="accent-accent-blue"
           />
-          Include completed tasks
+          {t('customLists.dialog.includeDone')}
         </label>
 
         {/* Include today from all projects */}
@@ -662,7 +669,7 @@ export function CustomListDialog({ open, list, onSave, onClose }: CustomListDial
             onChange={(e) => setFilter((f) => ({ ...f, include_today_all_projects: e.target.checked || undefined }))}
             className="accent-accent-blue"
           />
-          Include tasks due today from all projects
+          {t('customLists.dialog.includeTodayAll')}
         </label>
       </div>
 
@@ -673,7 +680,7 @@ export function CustomListDialog({ open, list, onSave, onClose }: CustomListDial
           onClick={onClose}
           className="rounded-control border border-[var(--border-color)] px-4 py-1.5 text-xs font-medium text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-hover)]"
         >
-          Cancel
+          {t('customLists.dialog.cancel')}
         </button>
         <button
           type="button"
@@ -685,7 +692,7 @@ export function CustomListDialog({ open, list, onSave, onClose }: CustomListDial
             'disabled:cursor-not-allowed disabled:opacity-50'
           )}
         >
-          {list ? 'Save' : 'Create'}
+          {list ? t('customLists.dialog.save') : t('customLists.dialog.create')}
         </button>
       </div>
     </Dialog>

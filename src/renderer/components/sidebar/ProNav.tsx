@@ -1,6 +1,7 @@
 import { useId } from 'react'
 import { useNavigate, useMatches } from '@tanstack/react-router'
 import { Briefcase, ChevronRight, Flag, Hourglass, Layers, Users, type LucideIcon } from 'lucide-react'
+import { t, type TranslationKey } from '../../../shared/i18n'
 import { cn } from '@/lib/cn'
 import { SelectionPill } from './SelectionPill'
 import { GroupNav } from './GroupNav'
@@ -18,12 +19,17 @@ export interface ProNavItem {
   tone: string
 }
 
+// The label is read when it is shown (a getter), so it follows the language.
+function navItem(id: string, labelKey: TranslationKey, path: string, layer: ProLayer, icon: LucideIcon, tone: string): ProNavItem {
+  return { id, get label() { return t(labelKey) }, path, layer, icon, tone }
+}
+
 export const PRO_NAV_ITEMS: ProNavItem[] = [
-  { id: 'flagged', label: 'Flagged', path: '/flagged', layer: 'availability', icon: Flag, tone: 'text-accent-orange' },
-  { id: 'waiting-on', label: 'Waiting on', path: '/waiting-on', layer: 'promises', icon: Hourglass, tone: 'text-accent-teal' },
-  { id: 'people', label: 'People', path: '/people', layer: 'promises', icon: Users, tone: 'text-accent-teal' },
-  { id: 'portfolio', label: 'Portfolio', path: '/portfolio', layer: 'portfolio', icon: Layers, tone: 'text-accent-purple' },
-  { id: 'sponsor', label: 'Sponsor desk', path: '/sponsor', layer: 'portfolio', icon: Briefcase, tone: 'text-accent-purple' },
+  navItem('flagged', 'sidebarNav.pro.flagged', '/flagged', 'availability', Flag, 'text-accent-orange'),
+  navItem('waiting-on', 'sidebarNav.pro.waitingOn', '/waiting-on', 'promises', Hourglass, 'text-accent-teal'),
+  navItem('people', 'sidebarNav.pro.people', '/people', 'promises', Users, 'text-accent-teal'),
+  navItem('portfolio', 'sidebarNav.pro.portfolio', '/portfolio', 'portfolio', Layers, 'text-accent-purple'),
+  navItem('sponsor', 'sidebarNav.pro.sponsorDesk', '/sponsor', 'portfolio', Briefcase, 'text-accent-purple'),
 ]
 
 /** The pages that exist in this build; a list is added here with its route. */
@@ -67,6 +73,7 @@ export function ProNav() {
         />
       </button>
       {!collapsed && (
+        // i18n-ignore: a product name
         <nav id={listId} aria-label="Pro" className="mt-0.5 flex flex-col gap-0.5">
           {items.map((item) => {
             const isActive = currentPath === item.path || (item.id === 'people' && currentPath.startsWith('/person/'))

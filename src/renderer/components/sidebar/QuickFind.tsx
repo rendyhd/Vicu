@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent, type RefObject } from 'react'
 import { Search } from 'lucide-react'
 import { useNavigate } from '@tanstack/react-router'
+import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/cn'
 import { useQuickFindTasks } from '@/hooks/use-quick-find'
 import { useOpenTask } from '@/hooks/use-open-task'
@@ -20,6 +21,7 @@ const isMac = () => window.api.platform === 'darwin'
  * it was before Ctrl+F.
  */
 export function QuickFind() {
+  const { t } = useTranslation()
   const inputRef = useRef<HTMLInputElement>(null)
   const previousFocus = useRef<HTMLElement | null>(null)
   const [query, setQuery] = useState('')
@@ -107,7 +109,7 @@ export function QuickFind() {
         ref={inputRef}
         type="text"
         role="combobox"
-        aria-label="Quick find"
+        aria-label={t('sidebarNav.quickFind.label')}
         aria-expanded={open}
         aria-controls={open ? listId : undefined}
         aria-activedescendant={open ? optionId(activeIndex) : undefined}
@@ -115,7 +117,7 @@ export function QuickFind() {
         autoComplete="off"
         spellCheck={false}
         value={query}
-        placeholder="Quick find"
+        placeholder={t('sidebarNav.quickFind.label')}
         onChange={(event) => {
           setQuery(event.target.value)
           setActive(0)
@@ -127,7 +129,7 @@ export function QuickFind() {
       />
       {query === '' && (
         <kbd aria-hidden="true" className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 font-sans text-caption text-[var(--text-secondary)]">
-          {isMac() ? '⌘F' : 'Ctrl+F'}
+          {isMac() ? '⌘F' : 'Ctrl+F'} {/* i18n-ignore: key names */}
         </kbd>
       )}
       {open && (
@@ -162,6 +164,7 @@ interface ResultsProps {
 }
 
 function Results({ anchor, listId, tasks, query, pending, activeIndex, optionId, projectTitle, onHover, onChoose }: ResultsProps) {
+  const { t } = useTranslation()
   const panelRef = useRef<HTMLDivElement>(null)
   const otherModeOf = useOtherModeOf()
   useFloatingPopover(anchor, panelRef, { placement: 'bottom-start' })
@@ -173,9 +176,9 @@ function Results({ anchor, listId, tasks, query, pending, activeIndex, optionId,
 
   const rows = [
     ...tasks.map((task) => ({ key: `task-${task.id}`, title: task.title, detail: projectTitle(task), done: task.done, all: false, other: otherModeOf({ task }) })),
-    { key: 'all', title: `Search all tasks for “${query}”`, detail: '', done: false, all: true, other: null },
+    { key: 'all', title: t('sidebarNav.quickFind.searchAll', { query }), detail: '', done: false, all: true, other: null },
   ]
-  const summary = `${tasks.length} ${tasks.length === 1 ? 'task' : 'tasks'}${pending ? ', still searching' : ''}`
+  const summary = pending ? t('sidebarNav.quickFind.summarySearching', { count: tasks.length }) : t('sidebarNav.quickFind.summary', { count: tasks.length })
 
   return (
     <>
@@ -184,7 +187,7 @@ function Results({ anchor, listId, tasks, query, pending, activeIndex, optionId,
         id={listId}
         popover="manual"
         role="listbox"
-        aria-label="Quick find results"
+        aria-label={t('sidebarNav.quickFind.results')}
         // Clicking a result must not take focus from the field.
         onMouseDown={(event) => event.preventDefault()}
         className="m-0 inset-auto w-[360px] overflow-y-auto rounded-popover border border-[var(--border-color)] bg-[var(--bg-primary)] py-1 text-[var(--text-primary)] shadow-lg"

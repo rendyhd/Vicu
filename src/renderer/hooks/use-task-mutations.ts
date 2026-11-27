@@ -212,7 +212,7 @@ export function useCreateSubtask() {
     }) => {
       // The relation needs both tasks on the server; the offline queue has no relations yet.
       if (isTempTaskId(parentTask.id)) {
-        throw new ApiError('This task has not synced yet. Add subtasks once it has been saved.')
+        throw new ApiError(t('taskActions.notSyncedSubtasks'))
       }
       // Create the child task in the same project
       const createResult = await api.createTask(parentTask.project_id, { title })
@@ -654,7 +654,7 @@ export function useReorderTask() {
     }) => {
       // Positions are per view and are not queued offline.
       if (isTempTaskId(taskId) || renumbered.some((update) => isTempTaskId(update.taskId))) {
-        throw new ApiError('This task has not synced yet. Reorder it once it has been saved.')
+        throw new ApiError(t('taskActions.notSyncedReorder'))
       }
       await sendPositionUpdates(
         async (update) => {
@@ -812,7 +812,7 @@ export function useCompleteTask() {
       // the pointer or focus leaves it, or until the user leaves the view); then the hold removes it.
       addCompleted(mapTaskDoneByIds(task, doneById), currentPathname(router), autoCompleted, suppressTopLevelUndo)
       completionHold.complete(task.id)
-      announce(`Completed ${task.title}`)
+      announce(t('taskActions.completed', { title: task.title }))
 
       await qc.cancelQueries({ queryKey: ['tasks'] })
       await qc.cancelQueries({ queryKey: ['view-tasks'] })
@@ -1319,7 +1319,7 @@ export async function sendPickedFiles(
     const { key } = uploads[index]
     const result = await api.uploadPickedAttachment(taskId, file.token).catch((err: unknown) => ({
       success: false as const,
-      error: err instanceof Error ? err.message : 'Upload failed',
+      error: err instanceof Error ? err.message : t('taskActions.uploadFailed'),
     }))
     if (!result.success) {
       store.remove(key)
@@ -1340,9 +1340,9 @@ export async function sendPickedFiles(
     qc.setQueryData<TaskAttachment[]>(['task-attachments', taskId], (old) =>
       old ? [...old, ...made.filter((m) => !old.some((o) => o.id === m.id))] : old)
     store.land(key, Math.max(...made.map((m) => m.id)))
-    store.announce(taskId, `${file.name} attached`)
+    store.announce(taskId, t('taskActions.attached', { name: file.name }))
   }
-  if (count === 0 && queued.length === 0 && files.length > 0) throw new Error(lastError || 'Upload failed')
+  if (count === 0 && queued.length === 0 && files.length > 0) throw new Error(lastError || t('taskActions.uploadFailed'))
   return { count, queued }
 }
 

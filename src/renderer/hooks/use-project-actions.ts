@@ -16,6 +16,7 @@ import { toast, UNDO_TOAST_MS } from '@/stores/toast-store'
 import type { AppConfig, Project } from '@/lib/vikunja-types'
 import { sharedRoutineNamesIn } from '@/hooks/use-routines'
 import { SHARED_ROUTINE_ARCHIVE_NOTE, projectDeleteQuestion } from '@/lib/routine-sharing'
+import { t } from '../../shared/i18n'
 
 const MOVE_TOAST_KEY = 'project-move'
 const REVIEW_TOAST_KEY = 'project-review'
@@ -83,7 +84,7 @@ export function useProjectActions() {
               key: MOVE_TOAST_KEY,
               durationMs: UNDO_TOAST_MS,
               action: {
-                label: 'Undo',
+                label: t('app.undo'),
                 onAction: () => {
                   const now = activeProjects(qc)
                   const current = now.find((p) => p.id === project.id)
@@ -107,7 +108,7 @@ export function useProjectActions() {
       const message = shared.length > 0 ? `${archiveMessage(project.title)} ${SHARED_ROUTINE_ARCHIVE_NOTE}` : archiveMessage(project.title)
       const ok = await confirmDelete(message, {
         force: true,
-        confirmLabel: 'Archive',
+        confirmLabel: t('projects.actions.archive'),
         destructive: false,
         returnFocusTo,
       })
@@ -118,7 +119,7 @@ export function useProjectActions() {
 
   const restore = useCallback(
     (project: Project) => {
-      setArchived({ project, archived: false }, { onSuccess: () => announce(`Restored “${project.title}”`) })
+      setArchived({ project, archived: false }, { onSuccess: () => announce(t('projects.actions.restored', { title: project.title })) })
     },
     [setArchived],
   )
@@ -140,11 +141,11 @@ export function useProjectActions() {
       if (previous) qc.setQueryData<AppConfig>(APP_CONFIG_QUERY_KEY, { ...previous, inbox_project_id: project.id })
       try {
         await api.saveConfigPatch({ inbox_project_id: project.id })
-        toast.success(`“${project.title}” is now the Inbox`)
+        toast.success(t('projects.actions.nowInbox', { title: project.title }))
       } catch (error) {
         if (previous) qc.setQueryData<AppConfig>(APP_CONFIG_QUERY_KEY, previous)
         const reason = error instanceof Error ? error.message : ''
-        toast.error(reason ? `Could not change the Inbox: ${reason}` : 'Could not change the Inbox')
+        toast.error(reason ? t('projects.actions.inboxFailedReason', { reason }) : t('projects.actions.inboxFailed'))
       } finally {
         qc.invalidateQueries({ queryKey: APP_CONFIG_QUERY_KEY })
       }
@@ -156,10 +157,10 @@ export function useProjectActions() {
     (project: Project) => {
       review(() => markReviewedRequest(project), {
         onSuccess: () =>
-          toast.success(`Marked ${project.title} reviewed`, {
+          toast.success(t('projects.actions.markedReviewed', { title: project.title }), {
             key: REVIEW_TOAST_KEY,
             durationMs: UNDO_TOAST_MS,
-            action: { label: 'Undo', onAction: () => review(() => restoreReviewRequest(project)) },
+            action: { label: t('app.undo'), onAction: () => review(() => restoreReviewRequest(project)) },
           }),
       })
     },
@@ -177,7 +178,7 @@ export function useProjectActions() {
     (project: Project, excluded: boolean) => {
       review(() => excludeFromReviewRequest(project, excluded), {
         onSuccess: () =>
-          announce(excluded ? `Excluded “${project.title}” from review` : `Included “${project.title}” in review`),
+          announce(excluded ? t('projects.actions.excluded', { title: project.title }) : t('projects.actions.included', { title: project.title })),
       })
     },
     [review],

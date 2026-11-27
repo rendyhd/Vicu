@@ -1,6 +1,7 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import { ListSkeleton } from '../ListSkeleton'
+import '@/lib/i18n-react'
 
 describe('ListSkeleton', () => {
   it('keeps the page header and shows four placeholder rows by default, three on request', () => {

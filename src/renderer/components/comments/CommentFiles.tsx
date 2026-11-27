@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Download, FileText, ImageOff, Loader2, Paperclip, X } from 'lucide-react'
 import { useAttachmentActions } from '@/hooks/use-attachment-actions'
 import { useAttachmentBlobUrl } from '@/hooks/use-attachment-bytes'
@@ -29,6 +30,7 @@ interface FileProps {
  * the task no longer has.
  */
 export function CommentImage({ file, taskId, list, onView }: FileProps & { onView: () => void }) {
+  const { t } = useTranslation()
   const gone = isFileGone(file, list)
   const mime = list.known.get(file.attachment)?.file.mime || 'image/png'
   const { url, error } = useAttachmentBlobUrl(gone ? undefined : taskId, file.attachment, mime)
@@ -41,7 +43,7 @@ export function CommentImage({ file, taskId, list, onView }: FileProps & { onVie
   return (
     <button
       type="button"
-      aria-label={`View ${name}`}
+      aria-label={t('comments.files.view', { name })}
       title={name}
       onClick={onView}
       style={{ height: PREVIEW_HEIGHT_PX, ...(ratio ? { aspectRatio: ratio } : { width: '100%' }) }}
@@ -68,6 +70,7 @@ export function CommentImage({ file, taskId, list, onView }: FileProps & { onVie
 
 /** A file in a comment: its name and size. A click opens it in the default app; Save beside it. */
 export function CommentFile({ file, taskId, list }: FileProps) {
+  const { t } = useTranslation()
   const { notice, savingId, open, save } = useAttachmentActions(taskId)
   const name = fileDisplayName(file, list)
   const gone = isFileGone(file, list)
@@ -77,7 +80,7 @@ export function CommentFile({ file, taskId, list }: FileProps) {
     <>
       <span className={cn('block truncate text-meta', gone ? 'text-text-secondary' : 'text-text')}>{name}</span>
       {gone ? (
-        <span className="block text-caption text-text-secondary">No longer available</span>
+        <span className="block text-caption text-text-secondary">{t('comments.files.unavailable')}</span>
       ) : (
         size !== undefined && <span className="block text-caption text-text-secondary">{formatFileSize(size)}</span>
       )}
@@ -91,14 +94,14 @@ export function CommentFile({ file, taskId, list }: FileProps) {
           <div className="min-w-0 flex-1 py-0.5">{details}</div>
         ) : (
           <>
-            <button type="button" title="Open" onClick={() => void open(file.attachment, name)} className="min-w-0 flex-1 py-0.5 text-left">
-              <span className="sr-only">Open </span>
+            <button type="button" title={t('comments.files.open')} onClick={() => void open(file.attachment, name)} className="min-w-0 flex-1 py-0.5 text-left">
+              <span className="sr-only">{t('comments.files.open')} </span>
               {details}
             </button>
             <button
               type="button"
-              aria-label={`Save ${name}`}
-              title="Save to…"
+              aria-label={t('comments.files.save', { name })}
+              title={t('comments.files.saveTo')}
               disabled={savingId === file.attachment}
               onClick={() => void save(file.attachment, name)}
               className={ROW_BUTTON}
@@ -119,9 +122,10 @@ export function CommentFile({ file, taskId, list }: FileProps) {
 
 /** The composer's paperclip: the system's file dialog. */
 export function AttachButton({ busy, onClick }: { busy: boolean; onClick: () => void }) {
+  const { t } = useTranslation()
   return (
-    <Tooltip label="Attach files. You can also paste or drop them here.">
-      <button type="button" aria-label="Attach files" disabled={busy} onClick={onClick} className={cn(ROW_BUTTON, 'mr-1.5')}>
+    <Tooltip label={t('comments.files.attachTip')}>
+      <button type="button" aria-label={t('comments.files.attach')} disabled={busy} onClick={onClick} className={cn(ROW_BUTTON, 'mr-1.5')}>
         {busy ? <Loader2 className="h-[15px] w-[15px] animate-spin" aria-hidden="true" /> : <Paperclip className="h-[15px] w-[15px]" aria-hidden="true" />}
       </button>
     </Tooltip>
@@ -130,21 +134,22 @@ export function AttachButton({ busy, onClick }: { busy: boolean; onClick: () => 
 
 /** The files added to the comment being written: a spinner while one uploads, a button to take it out. */
 export function StagedFiles({ files, onRemove }: { files: readonly StagedFile[]; onRemove: (key: number) => void }) {
+  const { t } = useTranslation()
   return (
-    <ul aria-label="Files in this comment" className="mb-2 flex list-none flex-wrap gap-1.5">
+    <ul aria-label={t('comments.files.inThisComment')} className="mb-2 flex list-none flex-wrap gap-1.5">
       {files.map((file) => (
         <li key={file.key} className="inline-flex max-w-full items-center gap-1 rounded-control border border-[var(--border-color)] bg-bg-card pl-2 text-meta text-text">
           {file.attachment ? (
             <Paperclip className="h-3 w-3 shrink-0 text-text-secondary" aria-hidden="true" />
           ) : (
-            <Loader2 role="status" aria-label={`Uploading ${file.name}`} className="h-3 w-3 shrink-0 animate-spin text-text-secondary" />
+            <Loader2 role="status" aria-label={t('comments.files.uploading', { name: file.name })} className="h-3 w-3 shrink-0 animate-spin text-text-secondary" />
           )}
           <span className="min-w-0 truncate" title={file.name}>
             {file.name}
           </span>
           <button
             type="button"
-            aria-label={`Remove ${file.name}`}
+            aria-label={t('comments.files.remove', { name: file.name })}
             onClick={() => onRemove(file.key)}
             className="inline-flex shrink-0 rounded-control p-1.5 text-text-secondary hover:bg-bg-hover hover:text-text"
           >

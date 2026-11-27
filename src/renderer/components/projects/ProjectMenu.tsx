@@ -62,6 +62,7 @@ interface ParentPickerProps {
 
 /** "Move to": the top level and every project the project can go under, as a tree. */
 function ParentPicker({ anchorRef, project, projects, inboxId, onSelect, onClose }: ParentPickerProps) {
+  const { t } = useTranslation()
   const current = effectiveParent(project, projects)
   const options = useMemo(() => {
     const exclude = descendantIds(project.id, projects).add(project.id)
@@ -93,9 +94,9 @@ function ParentPicker({ anchorRef, project, projects, inboxId, onSelect, onClose
   )
 
   return (
-    <Popover anchorRef={anchorRef} onClose={onClose} placement="right-start" role="listbox" label="Move to" className="w-60 py-1">
+    <Popover anchorRef={anchorRef} onClose={onClose} placement="right-start" role="listbox" label={t('projects.menu.moveTo')} className="w-60 py-1">
       <div className="max-h-72 overflow-y-auto">
-        {option('top', 'Top level', TOP_LEVEL, 0)}
+        {option('top', t('projects.menu.topLevel'), TOP_LEVEL, 0)}
         {options.map(({ project: item, depth }) =>
           option(String(item.id), item.title, item.id, depth + 1, normalizeHex(item.hex_color)),
         )}
@@ -119,6 +120,7 @@ interface CategoryPickerProps {
  * and New category, which asks for a name and puts the project in it.
  */
 function CategoryPicker({ anchorRef, categories, current, onSelect, onNew, onClose }: CategoryPickerProps) {
+  const { t } = useTranslation()
   const choose = (categoryId: string | null) => {
     if (categoryId !== current) onSelect(categoryId)
     onClose()
@@ -139,10 +141,10 @@ function CategoryPicker({ anchorRef, categories, current, onSelect, onNew, onClo
   )
 
   return (
-    <Popover anchorRef={anchorRef} onClose={onClose} placement="right-start" role="listbox" label="Move to category" className="w-56 py-1">
+    <Popover anchorRef={anchorRef} onClose={onClose} placement="right-start" role="listbox" label={t('projects.menu.moveToCategory')} className="w-56 py-1">
       <div className="max-h-72 overflow-y-auto">
         {categories.map((category) => option(category.id, category.name, category.id))}
-        {option('none', 'No category', null)}
+        {option('none', t('projects.menu.noCategory'), null)}
         <button
           type="button"
           role="option"
@@ -155,7 +157,7 @@ function CategoryPicker({ anchorRef, categories, current, onSelect, onNew, onClo
           className="flex w-full items-center gap-2 border-t border-[var(--border-color)] px-3 py-1.5 text-left text-xs text-[var(--accent-blue)] hover:bg-[var(--bg-hover)] focus-visible:bg-[var(--bg-hover)]"
         >
           <Plus aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />
-          <span className="min-w-0 flex-1 truncate">New category</span>
+          <span className="min-w-0 flex-1 truncate">{t('projects.menu.newCategory')}</span>
         </button>
       </div>
     </Popover>
@@ -217,7 +219,7 @@ export function ProjectMenu({ project, surface, anchorRef, anchorPoint, opener =
   const showReview = reviewEnabled && !(isInbox && excludeInbox)
   // Only a project admin may share it (cross-app semantics 9.7).
   const canShare = effectivePermission(project.max_permission, project.is_archived) === 2
-  const label = `${project.title} actions`
+  const label = t('projects.menu.actions', { title: project.title })
 
   // A picker or submenu closes the menu too once something was chosen; Escape or a press
   // elsewhere closes only that layer.
@@ -230,10 +232,10 @@ export function ProjectMenu({ project, surface, anchorRef, anchorPoint, opener =
     return (
       <Menu anchorRef={anchorRef} anchorPoint={anchorPoint} label={label} onClose={onClose}>
         <MenuItem icon={<RotateCcw />} onSelect={() => actions.restore(project)}>
-          Restore
+          {t('projects.menu.restore')}
         </MenuItem>
         <MenuItem icon={<Trash2 />} danger onSelect={() => void actions.remove(project, opener)}>
-          Delete
+          {t('projects.menu.delete')}
         </MenuItem>
       </Menu>
     )
@@ -243,15 +245,15 @@ export function ProjectMenu({ project, surface, anchorRef, anchorPoint, opener =
     <Menu anchorRef={anchorRef} anchorPoint={anchorPoint} label={label} onClose={onClose}>
       {surface !== 'page' && (
         <MenuItem icon={<Pencil />} shortcut="F2" onSelect={() => projectActions.startRename(project.id, surface)}>
-          Rename
+          {t('projects.menu.rename')}
         </MenuItem>
       )}
       <MenuItem icon={<SlidersHorizontal />} onSelect={() => projectActions.openDialog({ kind: 'edit', project }, opener)}>
-        Edit
+        {t('projects.menu.edit')}
       </MenuItem>
       {canShare && (
         <MenuItem icon={<Users />} onSelect={() => projectActions.openDialog({ kind: 'share', project }, opener)}>
-          Share
+          {t('projects.menu.share')}
         </MenuItem>
       )}
       <MenuItem
@@ -265,7 +267,7 @@ export function ProjectMenu({ project, surface, anchorRef, anchorPoint, opener =
           }
         }}
       >
-        Add subproject
+        {t('projects.menu.addSubproject')}
       </MenuItem>
       {!isInbox && (
         <MenuItem
@@ -275,7 +277,7 @@ export function ProjectMenu({ project, surface, anchorRef, anchorPoint, opener =
           expanded={sub === 'move'}
           onSelect={() => setSub((s) => (s === 'move' ? null : 'move'))}
         >
-          Move to
+          {t('projects.menu.moveTo')}
         </MenuItem>
       )}
       {sub === 'move' && (
@@ -300,7 +302,7 @@ export function ProjectMenu({ project, surface, anchorRef, anchorPoint, opener =
           expanded={sub === 'category'}
           onSelect={() => setSub((s) => (s === 'category' ? null : 'category'))}
         >
-          Move to category
+          {t('projects.menu.moveToCategory')}
         </MenuItem>
       )}
       {sub === 'category' && group && (
@@ -315,7 +317,7 @@ export function ProjectMenu({ project, surface, anchorRef, anchorPoint, opener =
       )}
       {group && surface !== 'page' && canAddCategoryAbove(layout, project.id) && (
         <MenuItem icon={<ListPlus />} onSelect={() => projectActions.openDialog({ kind: 'category-new', above: project }, opener)}>
-          Add category above
+          {t('projects.menu.addCategoryAbove')}
         </MenuItem>
       )}
 
@@ -326,7 +328,7 @@ export function ProjectMenu({ project, surface, anchorRef, anchorPoint, opener =
         expanded={sub === 'sort'}
         onSelect={() => setSub((s) => (s === 'sort' ? null : 'sort'))}
       >
-        Sort tasks
+        {t('projects.menu.sortTasks')}
       </MenuItem>
       {sub === 'sort' && <TaskOrderMenu project={project} anchorRef={sortRef} onClose={closeSub} />}
       {proOn && !isInbox && (
@@ -338,7 +340,7 @@ export function ProjectMenu({ project, surface, anchorRef, anchorPoint, opener =
             expanded={sub === 'pro-type'}
             onSelect={() => setSub((s) => (s === 'pro-type' ? null : 'pro-type'))}
           >
-            Type
+            {t('projects.menu.type')}
           </MenuItem>
           {sub === 'pro-type' && <ProjectTypeMenu project={project} anchorRef={proTypeRef} onClose={closeSub} />}
           <MenuItem
@@ -348,7 +350,7 @@ export function ProjectMenu({ project, surface, anchorRef, anchorPoint, opener =
             expanded={sub === 'pro-status'}
             onSelect={() => setSub((s) => (s === 'pro-status' ? null : 'pro-status'))}
           >
-            Status
+            {t('projects.menu.status')}
           </MenuItem>
           {sub === 'pro-status' && <ProjectStatusMenu project={project} anchorRef={proStatusRef} onClose={closeSub} />}
         </>
@@ -362,7 +364,7 @@ export function ProjectMenu({ project, surface, anchorRef, anchorPoint, opener =
             expanded={sub === 'pro-initiative'}
             onSelect={() => setSub((s) => (s === 'pro-initiative' ? null : 'pro-initiative'))}
           >
-            Initiative
+            {t('projects.menu.initiative')}
           </MenuItem>
           {sub === 'pro-initiative' && (
             <InitiativeMenu project={project} anchorRef={proInitiativeRef} onClose={closeSub} onAtCap={(id) => useProUiStore.getState().setAtCapStart(id)} />
@@ -390,7 +392,7 @@ export function ProjectMenu({ project, surface, anchorRef, anchorPoint, opener =
       {(!isInbox || showReview) && <MenuSeparator />}
       {!isInbox && (
         <MenuItem icon={<Inbox />} onSelect={() => void actions.setInbox(project)}>
-          Set as Inbox
+          {t('projects.menu.setAsInbox')}
         </MenuItem>
       )}
       {showReview && (
@@ -401,25 +403,25 @@ export function ProjectMenu({ project, surface, anchorRef, anchorPoint, opener =
           expanded={sub === 'review'}
           onSelect={() => setSub((s) => (s === 'review' ? null : 'review'))}
         >
-          Review
+          {t('projects.menu.review')}
         </MenuItem>
       )}
       {sub === 'review' && (
-        <Menu anchorRef={reviewRef} placement="right-start" label="Review" onClose={closeSub}>
+        <Menu anchorRef={reviewRef} placement="right-start" label={t('projects.menu.review')} onClose={closeSub}>
           {reviewState === 'excluded' ? (
             <MenuItem icon={<Eye />} onSelect={() => actions.setExcludedFromReview(project, false)}>
-              Include in review
+              {t('projects.menu.includeInReview')}
             </MenuItem>
           ) : (
             <>
               <MenuItem icon={<CheckCircle2 />} onSelect={() => actions.markReviewed(project)}>
-                Mark reviewed
+                {t('projects.menu.markReviewed')}
               </MenuItem>
               <MenuItem icon={<Timer />} onSelect={() => projectActions.openDialog({ kind: 'cadence', project }, opener)}>
-                Review cadence
+                {t('projects.menu.reviewCadence')}
               </MenuItem>
               <MenuItem icon={<EyeOff />} onSelect={() => actions.setExcludedFromReview(project, true)}>
-                Exclude from review
+                {t('projects.menu.excludeFromReview')}
               </MenuItem>
             </>
           )}
@@ -430,10 +432,10 @@ export function ProjectMenu({ project, surface, anchorRef, anchorPoint, opener =
         <>
           <MenuSeparator />
           <MenuItem icon={<Archive />} onSelect={() => void actions.archive(project, opener)}>
-            Archive
+            {t('projects.menu.archive')}
           </MenuItem>
           <MenuItem icon={<Trash2 />} danger onSelect={() => void actions.remove(project, opener)}>
-            Delete
+            {t('projects.menu.delete')}
           </MenuItem>
         </>
       )}

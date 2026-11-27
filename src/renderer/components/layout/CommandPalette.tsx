@@ -29,7 +29,8 @@ import { useAskStore } from '@/stores/ask-store'
 import { useAiUiStore } from '@/stores/ai-ui-store'
 import { useDictationStore } from '@/stores/dictation-store'
 import { useNotesStore } from '@/stores/notes-store'
-import { t } from '../../../shared/i18n'
+import { useTranslation } from 'react-i18next'
+import { t, type TranslationKey } from '../../../shared/i18n'
 import { toast } from '@/stores/toast-store'
 import { useAiReady } from '@/hooks/use-ai'
 import { can } from '@/lib/capabilities'
@@ -41,6 +42,17 @@ import { useNewTaskRequestStore } from '@/stores/new-task-request-store'
 import { useNewEventRequestStore } from '@/stores/new-event-request-store'
 import { isPlannerEnabled } from '@/lib/vikunja-types'
 import { useVoiceStore } from '@/stores/voice-store'
+
+const KIND_LABELS: Record<PaletteKind, TranslationKey> = {
+  Action: 'palette.kind.action',
+  List: 'palette.kind.list',
+  Guided: 'palette.kind.guided',
+  Project: 'palette.kind.project',
+  Label: 'palette.kind.label',
+  Task: 'palette.kind.task',
+}
+
+const kindLabel = (kind: PaletteKind): string => t(KIND_LABELS[kind])
 
 const ICONS: Record<PaletteKind, typeof Circle> = {
   Action: Plus,
@@ -58,6 +70,7 @@ const ICONS: Record<PaletteKind, typeof Circle> = {
  * focus returns to where it was. It sits on the modal Dialog.
  */
 export function CommandPalette() {
+  const { t } = useTranslation()
   const open = useUIStore((s) => s.commandPaletteOpen)
   const toggle = useUIStore((s) => s.toggleCommandPalette)
 
@@ -73,13 +86,16 @@ export function CommandPalette() {
   }, [toggle])
 
   return (
-    <Dialog open={open} onClose={toggle} label="Command palette" className="mt-[12vh] w-[560px]">
+    <Dialog open={open} onClose={toggle} label={t('palette.title')} className="mt-[12vh] w-[560px]">
       <PaletteBody onClose={toggle} />
     </Dialog>
   )
 }
 
 function PaletteBody({ onClose }: { onClose: () => void }) {
+  // The items are built with the language shown, so they are built again when it changes.
+  const { i18n } = useTranslation()
+  const language = i18n.language
   const [query, setQuery] = useState('')
   const [active, setActive] = useState(0)
   const navigate = useNavigate()
@@ -116,7 +132,7 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
       pro: pro.on ? { lists: proLists, focus: pro.layer('availability'), promises: pro.layer('promises') } : undefined,
       workMode: workMode.enabled ? { showAll: workMode.showAll } : false,
     }),
-    [smartLists, projects?.flat, labels, appConfig, pro, proLists, workMode.enabled, workMode.showAll],
+    [smartLists, projects?.flat, labels, appConfig, pro, proLists, workMode.enabled, workMode.showAll, language],
   )
   const shown = useMemo(() => rankPalette(items, query, tasks), [items, query, tasks])
   const activeIndex = shown.length === 0 ? -1 : Math.min(active, shown.length - 1)
@@ -144,7 +160,7 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
       useVoiceStore.getState().begin('command', 'latched')
     } else if (command === 'dictate' || command === 'brain-dump') {
       if (ai.dictation) useDictationStore.getState().startLive(command === 'brain-dump' ? { brainDump: true } : {})
-      else toast.info('Smart dictation is off. Turn it on in Settings, Assistant.')
+      else toast.info(t('palette.dictationOff'))
     } else if (command === 'ask') {
       useAskStore.getState().setOpen(true)
     } else if (command === 'make-tasks') {
@@ -207,12 +223,12 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
   }
 
   const detailOf = ({ action, kind }: PaletteItem): string => {
-    if (action.type === 'task') return projects?.all.find((p) => p.id === action.task.project_id)?.title ?? kind
+    if (action.type === 'task') return projects?.all.find((p) => p.id === action.task.project_id)?.title ?? kindLabel(kind)
     if (action.type === 'command' && action.command === 'new-task') return shortcutHint(newTaskShortcut(), window.api.platform === 'darwin')
     if (action.type === 'command' && action.command === 'new-event') return shortcutHint(newEventShortcut(), window.api.platform === 'darwin')
     if (action.type === 'command' && action.command === 'refresh') return window.api.platform === 'darwin' ? shortcutHint('Mod+R', true) : 'F5'
     if (action.type === 'command' && action.command === 'voice' && appConfig?.voice_hotkey) return formatAcceleratorForDisplay(appConfig.voice_hotkey, window.api.platform === 'darwin')
-    return kind
+    return kindLabel(kind)
   }
 
   const iconOf = ({ action, kind }: PaletteItem): typeof Circle => {
@@ -233,7 +249,7 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
           data-autofocus
           type="text"
           role="combobox"
-          aria-label="Command palette"
+          aria-label={t('palette.title')}
           aria-expanded="true"
           aria-controls={listId}
           aria-activedescendant={activeIndex >= 0 ? optionId(activeIndex) : undefined}
@@ -241,7 +257,7 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
           autoComplete="off"
           spellCheck={false}
           value={query}
-          placeholder="Type a task, project, label, list or action"
+          placeholder={t('palette.placeholder')}
           onChange={(event) => {
             setQuery(event.target.value)
             setActive(0)
@@ -250,7 +266,7 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
           className="h-9 w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]"
         />
       </div>
-      <div id={listId} role="listbox" aria-label="Results" className="max-h-80 overflow-y-auto py-1">
+      <div id={listId} role="listbox" aria-label={t('palette.results')} className="max-h-80 overflow-y-auto py-1">
         {shown.map((item, index) => {
           const Icon = iconOf(item)
           // A Pro list has its own icon and colour; only the smart lists are in the identity table.
@@ -282,9 +298,9 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
             </div>
           )
         })}
-        {shown.length === 0 && <div className="px-4 py-3 text-sm text-[var(--text-secondary)]">Nothing matches</div>}
+        {shown.length === 0 && <div className="px-4 py-3 text-sm text-[var(--text-secondary)]">{t('palette.nothing')}</div>}
       </div>
-      <div role="status" className="sr-only">{`${shown.length} ${shown.length === 1 ? 'result' : 'results'}`}</div>
+      <div role="status" className="sr-only">{t('palette.resultCount', { count: shown.length })}</div>
     </div>
   )
 }

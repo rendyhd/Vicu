@@ -1,5 +1,7 @@
 import { useEffect, useId, useState } from 'react'
 import { X } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
+import type { TranslationKey } from '../../../shared/i18n'
 import { Dialog } from '@/components/overlay/Dialog'
 import { Button } from '@/components/shared/Button'
 import { Avatar } from '@/components/shared/Avatar'
@@ -16,11 +18,11 @@ import type { PersonRef, Project } from '@/lib/vikunja-types'
 // A removal is immediate and offers Undo in the dialog itself: the page behind a modal dialog is
 // inert, so a toast's Undo could not be reached while the dialog is open.
 
-const PERMISSIONS = [
-  { value: 0, label: 'Can view' },
-  { value: 1, label: 'Can edit' },
-  { value: 2, label: 'Admin' },
-] as const
+const PERMISSIONS: ReadonlyArray<{ value: number; labelKey: TranslationKey }> = [
+  { value: 0, labelKey: 'projects.share.canView' },
+  { value: 1, labelKey: 'projects.share.canEdit' },
+  { value: 2, labelKey: 'projects.share.admin' },
+]
 
 /** How long typing rests before the username is looked up. */
 const LOOKUP_DELAY_MS = 300
@@ -42,6 +44,7 @@ interface ShareProjectDialogProps {
 }
 
 export function ShareProjectDialog({ project, returnFocusTo, onClose }: ShareProjectDialogProps) {
+  const { t } = useTranslation()
   const titleId = useId()
   const usernameId = useId()
   const statusId = useId()
@@ -89,11 +92,11 @@ export function ShareProjectDialog({ project, returnFocusTo, onClose }: SharePro
 
   const status =
     lookup.state === 'missing'
-      ? 'No one with that username. Names and emails only match people who made themselves findable.'
+      ? t('projects.share.missing')
       : lookup.state === 'failed'
         ? lookup.message
         : already
-          ? 'Already has access.'
+          ? t('projects.share.alreadyHasAccess')
           : lookup.state === 'found'
             ? `${displayName(lookup.person)} · @${lookup.person.username}`
             : ''
@@ -112,7 +115,7 @@ export function ShareProjectDialog({ project, returnFocusTo, onClose }: SharePro
       {
         onSuccess: () => {
           setRemoved(person)
-          announce(`${displayName(person)} no longer has access`)
+          announce(t('projects.share.noAccess', { name: displayName(person) }))
         },
       },
     )
@@ -126,7 +129,7 @@ export function ShareProjectDialog({ project, returnFocusTo, onClose }: SharePro
       {
         onSuccess: () => {
           setRemoved(null)
-          announce(`${displayName(person)} has access again`)
+          announce(t('projects.share.hasAccessAgain', { name: displayName(person) }))
         },
       },
     )
@@ -138,18 +141,18 @@ export function ShareProjectDialog({ project, returnFocusTo, onClose }: SharePro
         <div className="flex items-center gap-2.5">
           <span aria-hidden="true" className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: normalizeHex(project.hex_color) || 'var(--text-secondary)' }} />
           <h2 id={titleId} className="min-w-0 flex-1 truncate text-card-title text-text">
-            Share “{project.title}”
+            {t('projects.share.title', { title: project.title })}
           </h2>
-          <button type="button" aria-label="Close" onClick={onClose} className="inline-flex rounded-control p-1 text-text-secondary hover:bg-bg-hover hover:text-text">
+          <button type="button" aria-label={t('projects.share.close')} onClick={onClose} className="inline-flex rounded-control p-1 text-text-secondary hover:bg-bg-hover hover:text-text">
             <X className="h-[15px] w-[15px]" aria-hidden="true" />
           </button>
         </div>
         <p className="mb-3.5 mt-2 text-meta leading-[19px] text-text-secondary [text-wrap:pretty]">
-          People you add see every task in this project. Assignees and comments appear on its tasks once it is shared. Your other projects stay private.
+          {t('projects.share.intro')}
         </p>
         {isInbox && (
           <p className="-mt-1.5 mb-3.5 text-meta leading-[19px] text-text [text-wrap:pretty]">
-            This is your Inbox, which also holds Vicu’s own synced settings and lists: the people you share it with can read and change them.
+            {t('projects.share.inboxWarning')}
           </p>
         )}
 
@@ -161,60 +164,60 @@ export function ShareProjectDialog({ project, returnFocusTo, onClose }: SharePro
           }}
         >
           <label htmlFor={usernameId} className="sr-only">
-            Username
+            {t('projects.share.username')}
           </label>
           <input
             id={usernameId}
             data-autofocus
             value={username}
             onChange={(event) => setUsername(event.target.value)}
-            placeholder="Username"
+            placeholder={t('projects.share.username')}
             autoComplete="off"
             spellCheck={false}
             aria-describedby={statusId}
             className={`${INPUT} h-8 min-w-0 flex-1`}
           />
           <select
-            aria-label="Permission"
+            aria-label={t('projects.share.permission')}
             value={permission}
             onChange={(event) => setPermission(Number(event.target.value))}
             className={`${INPUT} h-8 w-[104px] px-2`}
           >
             {PERMISSIONS.map((p) => (
               <option key={p.value} value={p.value}>
-                {p.label}
+                {t(p.labelKey)}
               </option>
             ))}
           </select>
           <Button variant="primary" type="submit" disabled={!canShare} className="h-8">
-            Share
+            {t('projects.share.share')}
           </Button>
         </form>
         <p id={statusId} aria-live="polite" className="mt-1.5 min-h-[18px] text-meta text-text-secondary">
           {status}
         </p>
 
-        <ul aria-label="People with access" className="mt-1.5 border-t border-[var(--border-color)]">
-          {owner && <MemberRow person={owner} me={me?.id} note="Owner" />}
+        <ul aria-label={t('projects.share.people')} className="mt-1.5 border-t border-[var(--border-color)]">
+          {owner && <MemberRow person={owner} me={me?.id} note={t('projects.share.owner')} />}
           {users
             .filter((u) => u.id !== owner?.id)
             .map((user) => (
               <MemberRow key={`u-${user.id}`} person={user} me={me?.id}>
                 <select
-                  aria-label={`Permission for ${displayName(user)}`}
+                  aria-label={t('projects.share.permissionFor', { name: displayName(user) })}
                   value={user.permission}
                   onChange={(event) => share.mutate({ kind: 'update', username: user.username, permission: Number(event.target.value) })}
                   className={`${INPUT} h-7 w-[104px] px-2`}
                 >
                   {PERMISSIONS.map((p) => (
                     <option key={p.value} value={p.value}>
-                      {p.label}
+                      {t(p.labelKey)}
                     </option>
                   ))}
                 </select>
                 <button
                   type="button"
-                  aria-label={`Remove ${displayName(user)}`}
+                  aria-label={t('projects.share.remove', { name: displayName(user) })}
                   onClick={() => remove(user)}
                   className="inline-flex rounded-control p-1 text-text-secondary hover:bg-bg-hover hover:text-text"
                 >
@@ -224,9 +227,9 @@ export function ShareProjectDialog({ project, returnFocusTo, onClose }: SharePro
             ))}
           {removed && !users.some((u) => u.id === removed.id) && (
             <li className="flex min-h-11 items-center gap-2.5 border-b border-[var(--border-color)]">
-              <span className="min-w-0 flex-1 truncate text-meta text-text-secondary">{displayName(removed)} no longer has access.</span>
+              <span className="min-w-0 flex-1 truncate text-meta text-text-secondary">{t('projects.share.removed', { name: displayName(removed) })}</span>
               <Button variant="quiet" onClick={undoRemove} disabled={share.isPending}>
-                Undo
+                {t('projects.share.undo')}
               </Button>
             </li>
           )}
@@ -237,17 +240,17 @@ export function ShareProjectDialog({ project, returnFocusTo, onClose }: SharePro
               </span>
               <div className="min-w-0 flex-1">
                 <div className="truncate text-task-title text-text">{team.name}</div>
-                <div className="text-meta text-text-secondary">Team · {PERMISSIONS.find((p) => p.value === team.permission)?.label ?? 'Can view'}</div>
+                <div className="text-meta text-text-secondary">{t('projects.share.team', { permission: t(PERMISSIONS.find((p) => p.value === team.permission)?.labelKey ?? 'projects.share.canView') })}</div>
               </div>
             </li>
           ))}
-          {isLoading && <li className="py-3 text-meta text-text-secondary">Loading…</li>}
-          {isError && <li className="py-3 text-meta text-text-secondary">Could not load who the project is shared with.</li>}
+          {isLoading && <li className="py-3 text-meta text-text-secondary">{t('projects.share.loading')}</li>}
+          {isError && <li className="py-3 text-meta text-text-secondary">{t('projects.share.loadFailed')}</li>}
         </ul>
 
         <div className="mt-4 flex justify-end">
           <Button variant="secondary" onClick={onClose}>
-            Done
+            {t('projects.share.done')}
           </Button>
         </div>
       </div>
@@ -256,13 +259,14 @@ export function ShareProjectDialog({ project, returnFocusTo, onClose }: SharePro
 }
 
 function MemberRow({ person, me, note, children }: { person: PersonRef; me: number | undefined; note?: string; children?: React.ReactNode }) {
+  const { t } = useTranslation()
   return (
     <li className="flex min-h-11 items-center gap-2.5 border-b border-[var(--border-color)]">
       <Avatar person={person} size={26} />
       <div className="min-w-0 flex-1">
         <div className="truncate text-task-title text-text">
           {displayName(person)}
-          {person.id === me && <span className="text-text-secondary"> (you)</span>}
+          {person.id === me && <span className="text-text-secondary"> {t('projects.share.you')}</span>}
         </div>
         <div className="truncate text-meta text-text-secondary">@{person.username}</div>
       </div>

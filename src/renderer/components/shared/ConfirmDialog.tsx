@@ -1,4 +1,5 @@
 import { useId } from 'react'
+import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/cn'
 import { Dialog } from '@/components/overlay/Dialog'
 
@@ -21,13 +22,15 @@ export function ConfirmDialog({
   message,
   onConfirm,
   onCancel,
-  confirmLabel = 'Delete',
+  confirmLabel: confirmLabelProp,
   destructive = true,
   secondaryLabel,
   onSecondary,
   secondaryDestructive = false,
   returnFocusTo,
 }: ConfirmDialogProps) {
+  const { t } = useTranslation()
+  const confirmLabel = confirmLabelProp ?? t('app.confirm.delete')
   const messageId = useId()
 
   return (
@@ -35,7 +38,7 @@ export function ConfirmDialog({
       open={open}
       onClose={onCancel}
       role="alertdialog"
-      label={`Confirm ${confirmLabel.toLowerCase()}`}
+      label={t('app.confirm.label', { action: confirmLabel.toLowerCase() })}
       describedBy={messageId}
       returnFocusTo={returnFocusTo}
       className="w-[calc(100%-2rem)] max-w-sm"
@@ -52,7 +55,7 @@ export function ConfirmDialog({
               'text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-hover)]'
             )}
           >
-            Cancel
+            {t('app.confirm.cancel')}
           </button>
           {secondaryLabel && onSecondary && (
             <button

@@ -1,17 +1,19 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { AlertTriangle, CloudOff, RefreshCw } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { useOfflineStore } from '@/stores/offline-store'
 import { useUnsyncedDocuments } from '@/hooks/use-unsynced-documents'
 import { stalledDocumentsLabel } from '@/lib/unsynced-documents'
 import { SyncPanel } from './SyncPanel'
+import { t } from '../../../shared/i18n'
 
 /** What the status button says; pure so it can be tested. */
 export function syncStatusLabel(counts: { pending: number; failed: number }, authProblem: boolean, documents?: string | null): string {
   const parts: string[] = []
-  if (authProblem) parts.push('Sign in needed')
-  if (counts.failed > 0) parts.push(`${counts.failed} failed`)
-  if (counts.pending > 0) parts.push(`${counts.pending} waiting`)
+  if (authProblem) parts.push(t('sync.status.signInNeeded'))
+  if (counts.failed > 0) parts.push(t('sync.status.failed', { count: counts.failed }))
+  if (counts.pending > 0) parts.push(t('sync.status.waiting', { count: counts.pending }))
   if (documents) parts.push(documents)
   return parts.join(' · ')
 }
@@ -22,6 +24,7 @@ export function syncStatusLabel(counts: { pending: number; failed: number }, aut
  * Hidden when everything is synced; opens the sync panel.
  */
 export function SyncStatusButton() {
+  const { t } = useTranslation()
   const counts = useOfflineStore((s) => s.counts)
   const replaying = useOfflineStore((s) => s.replaying)
   const authProblem = useOfflineStore((s) => s.authProblem)
@@ -42,7 +45,7 @@ export function SyncStatusButton() {
             'mb-1 flex h-7 w-full items-center gap-2 rounded-control px-2.5 text-xs transition-colors hover:bg-[var(--bg-hover)]',
             needsAttention ? 'text-danger' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]',
           )}
-          title="Offline changes: click to review"
+          title={t('sync.status.review')}
         >
           {needsAttention ? (
             <AlertTriangle className="h-3.5 w-3.5 shrink-0" strokeWidth={1.8} />

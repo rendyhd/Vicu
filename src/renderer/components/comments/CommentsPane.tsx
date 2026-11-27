@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { Bell, BellOff, Pencil, Trash2, X } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/cn'
 import {
   applyMention,
@@ -61,6 +62,7 @@ function isListShortcut(e: KeyboardEvent): boolean {
 }
 
 export function CommentsPaneHost() {
+  const { t } = useTranslation()
   const open = useUIStore((s) => s.commentsPaneOpen)
   const task = useCommentsPaneStore((s) => s.task)
   const access = useProjectAccess(task?.project_id)
@@ -98,7 +100,7 @@ export function CommentsPaneHost() {
   return (
     <aside
       id="comments-pane"
-      aria-label="Comments"
+      aria-label={t('comments.pane.title')}
       className="vicu-pane-in flex w-[352px] shrink-0 flex-col overflow-hidden border-l border-[var(--border-color)] bg-[var(--bg-sidebar)]"
       onKeyDown={(e) => {
         if (e.key === 'Escape' && !e.defaultPrevented) {
@@ -127,6 +129,7 @@ interface ThreadProps {
 }
 
 function CommentsThread({ task, access, me, onClose, focusComposer }: ThreadProps) {
+  const { t } = useTranslation()
   const query = useTaskComments(task.id)
   const { comments, isLoading, isError, refetch, hasNextPage, fetchNextPage, isFetchingNextPage } = query
   const fileList = useCommentFileList(task.id, comments)
@@ -217,12 +220,12 @@ function CommentsThread({ task, access, me, onClose, focusComposer }: ThreadProp
       <header className="shrink-0 border-b border-[var(--border-color)] px-4 pb-3 pt-3.5">
         <div className="flex items-center gap-2">
           <h2 id={titleId} className="text-section text-text">
-            Comments
+            {t('comments.pane.title')}
           </h2>
           <span className="text-section font-medium text-text-secondary">{count}</span>
           <span className="flex-1" />
           {task.id > 0 && canFollow && (
-            <Tooltip label={subscription.subscribed ? 'You get a notification for every new comment' : 'Get a notification for every new comment'}>
+            <Tooltip label={subscription.subscribed ? t('comments.pane.notifyingTip') : t('comments.pane.notifyTip')}>
               <button
                 type="button"
                 aria-pressed={subscription.subscribed}
@@ -236,13 +239,13 @@ function CommentsThread({ task, access, me, onClose, focusComposer }: ThreadProp
                 )}
               >
                 {subscription.subscribed ? <Bell className="h-[13px] w-[13px]" aria-hidden="true" /> : <BellOff className="h-[13px] w-[13px]" aria-hidden="true" />}
-                {subscription.subscribed ? 'Notifying you' : 'Notify me'}
+                {subscription.subscribed ? t('comments.pane.notifying') : t('comments.pane.notify')}
               </button>
             </Tooltip>
           )}
           <button
             type="button"
-            aria-label="Close comments"
+            aria-label={t('comments.pane.close')}
             onClick={onClose}
             className="inline-flex rounded-control p-1 text-text-secondary transition-colors duration-fade-fast hover:bg-bg-hover hover:text-text"
           >
@@ -259,20 +262,20 @@ function CommentsThread({ task, access, me, onClose, focusComposer }: ThreadProp
             <span>{visibleToText(access.members, me?.id)}</span>
           </div>
         )}
-        {isFetchingNextPage && <p className="py-2 text-center text-meta text-text-secondary">Loading older comments…</p>}
+        {isFetchingNextPage && <p className="py-2 text-center text-meta text-text-secondary">{t('comments.pane.loadingOlder')}</p>}
         {isLoading && comments.length === 0 ? (
-          <p className="py-9 text-center text-task-title text-text-secondary">Loading comments…</p>
+          <p className="py-9 text-center text-task-title text-text-secondary">{t('comments.pane.loading')}</p>
         ) : isError && comments.length === 0 ? (
           <div className="py-9 text-center text-task-title text-text-secondary">
-            <p>Could not load the comments.</p>
+            <p>{t('comments.pane.loadFailed')}</p>
             <button type="button" onClick={() => void refetch()} className={buttonClasses('quiet', false, 'mt-2')}>
-              Try again
+              {t('comments.pane.tryAgain')}
             </button>
           </div>
         ) : comments.length === 0 ? (
-          <p className="py-9 text-center text-task-title text-text-secondary">No comments yet.</p>
+          <p className="py-9 text-center text-task-title text-text-secondary">{t('comments.pane.empty')}</p>
         ) : (
-          <ol aria-label="Comments" className="list-none">
+          <ol aria-label={t('comments.pane.title')} className="list-none">
             {groups.map((group) => (
               <Fragment key={group.key}>
                 {group.label && (
@@ -293,7 +296,7 @@ function CommentsThread({ task, access, me, onClose, focusComposer }: ThreadProp
       {canWrite ? (
         <Composer task={task} access={access} me={me} composerRef={composerRef} onEscape={onClose} />
       ) : (
-        <p className="shrink-0 border-t border-[var(--border-color)] p-3 text-meta text-text-secondary">You can read comments in this project.</p>
+        <p className="shrink-0 border-t border-[var(--border-color)] p-3 text-meta text-text-secondary">{t('comments.pane.readOnly')}</p>
       )}
     </>
   )
@@ -326,6 +329,7 @@ interface CommentItemProps {
 }
 
 function CommentItem({ comment, task, access, me, dayLabel, fileList }: CommentItemProps) {
+  const { t } = useTranslation()
   const fmt = useDateFormat()
   const decoded = useMemo(() => decodeCommentHtml(comment.comment, access.members, task.id), [comment.comment, access.members, task.id])
   const blocks = useMemo(() => commentBlocks(decoded.segments), [decoded.segments])
@@ -367,8 +371,8 @@ function CommentItem({ comment, task, access, me, dayLabel, fileList }: CommentI
   }
   const askDelete = async () => {
     const question = decoded.attachments.length > 0
-      ? "Delete comment? This cannot be undone. Its files stay in the task's attachments."
-      : 'Delete comment? This cannot be undone.'
+      ? t('comments.pane.confirmDeleteWithFiles')
+      : t('comments.pane.confirmDelete')
     const ok = await confirmDelete(question, { force: true })
     if (ok) remove.mutate({ task, comment })
   }
@@ -382,7 +386,7 @@ function CommentItem({ comment, task, access, me, dayLabel, fileList }: CommentI
   // Edit only what Vicu writes itself (paragraphs, line breaks, mentions, files after the text), so nothing is lost.
   const canEdit = mine && decoded.plain && !sending
   const canDelete = mine && !sending
-  const status = comment.pending ? 'Waiting to sync' : edited ? 'edited' : ''
+  const status = comment.pending ? t('comments.pane.waitingToSync') : edited ? t('comments.pane.edited') : ''
 
   return (
     <li
@@ -400,12 +404,12 @@ function CommentItem({ comment, task, access, me, dayLabel, fileList }: CommentI
           {(canEdit || canDelete) && !editing && (
             <span className="-my-0.5 ml-auto flex gap-0.5 self-center opacity-0 transition-opacity duration-fade-fast focus-within:opacity-100 group-hover/comment:opacity-100">
               {canEdit && (
-                <button ref={editButtonRef} type="button" aria-label="Edit comment" onClick={startEdit} className="inline-flex rounded-control p-1.5 text-text-secondary hover:bg-bg-hover hover:text-text">
+                <button ref={editButtonRef} type="button" aria-label={t('comments.pane.edit')} onClick={startEdit} className="inline-flex rounded-control p-1.5 text-text-secondary hover:bg-bg-hover hover:text-text">
                   <Pencil className="h-3 w-3" aria-hidden="true" />
                 </button>
               )}
               {canDelete && (
-                <button type="button" aria-label="Delete comment" onClick={() => void askDelete()} className="inline-flex rounded-control p-1.5 text-text-secondary hover:bg-bg-hover hover:text-danger">
+                <button type="button" aria-label={t('comments.pane.delete')} onClick={() => void askDelete()} className="inline-flex rounded-control p-1.5 text-text-secondary hover:bg-bg-hover hover:text-danger">
                   <Trash2 className="h-3 w-3" aria-hidden="true" />
                 </button>
               )}
@@ -418,7 +422,7 @@ function CommentItem({ comment, task, access, me, dayLabel, fileList }: CommentI
               ref={editRef}
               value={draft}
               rows={2}
-              aria-label="Edit comment"
+              aria-label={t('comments.pane.edit')}
               onChange={(e) => setDraft(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
@@ -435,10 +439,10 @@ function CommentItem({ comment, task, access, me, dayLabel, fileList }: CommentI
             {decoded.attachments.map(renderFile)}
             <div className="mt-1.5 flex justify-end gap-1.5">
               <button type="button" onClick={cancelEdit} className={buttonClasses('secondary')}>
-                Cancel
+                {t('comments.pane.cancel')}
               </button>
               <button type="button" onClick={saveEdit} disabled={!draft.trim() && decoded.attachments.length === 0} className={buttonClasses('primary')}>
-                Save
+                {t('comments.pane.save')}
               </button>
             </div>
           </div>
@@ -469,6 +473,7 @@ interface ComposerProps {
 }
 
 function Composer({ task, access, me, composerRef, onEscape }: ComposerProps) {
+  const { t } = useTranslation()
   const create = useCreateComment()
   const files = useCommentFiles(task.id)
   const { data: config } = useAppConfig()
@@ -582,8 +587,8 @@ function Composer({ task, access, me, composerRef, onEscape }: ComposerProps) {
         ref={composerRef}
         value={text}
         rows={3}
-        placeholder={access.shared ? 'Write a comment. Type @ to mention someone.' : 'Write a comment.'}
-        aria-label="Write a comment"
+        placeholder={access.shared ? t('comments.pane.placeholderShared') : t('comments.pane.placeholder')}
+        aria-label={t('comments.pane.writeLabel')}
         aria-autocomplete="list"
         aria-controls={pickerOpen ? listId : undefined}
         aria-activedescendant={pickerOpen ? `${listId}-${activeIndex}` : undefined}
@@ -611,7 +616,7 @@ function Composer({ task, access, me, composerRef, onEscape }: ComposerProps) {
           anchorRef={composerRef}
           id={listId}
           role="listbox"
-          label="Mention"
+          label={t('comments.pane.mention')}
           placement="top-start"
           initialFocus="none"
           onClose={() => setDismissedAt(mention?.start ?? null)}
@@ -624,9 +629,9 @@ function Composer({ task, access, me, composerRef, onEscape }: ComposerProps) {
       )}
       <div className="mt-2 flex items-center">
         <AttachButton busy={files.picking} onClick={files.browse} />
-        <span className="flex-1 text-caption text-text-secondary">{isMac ? '⌘' : 'Ctrl'}+Enter to send</span>
+        <span className="flex-1 text-caption text-text-secondary">{t('comments.pane.sendHint', { key: isMac ? '⌘' : 'Ctrl' })}</span>
         <button type="button" onClick={send} disabled={!canSend} className={buttonClasses('primary', false, 'min-h-7 disabled:opacity-45')}>
-          Comment
+          {t('comments.pane.send')}
         </button>
       </div>
     </div>

@@ -6,6 +6,7 @@ import { isRefreshKey, manualRefresh } from '@/lib/manual-refresh'
 import { appRefreshDeps } from '@/lib/task-refresh'
 import { announce } from '@/stores/announcer-store'
 import { invalidateCalendars } from '@/hooks/use-calendar-events'
+import { t } from '../../shared/i18n'
 
 /** Refresh the page now, with the app's queue state; says so to screen readers. */
 export function refreshNow(qc: QueryClient): void {
@@ -22,7 +23,7 @@ export function refreshNow(qc: QueryClient): void {
         .then(() => invalidateCalendars(qc))
     },
   })
-  announce(outcome === 'deferred' ? 'Sending waiting changes, then refreshing' : 'Refreshing')
+  announce(outcome === 'deferred' ? t('app.refreshingDeferred') : t('app.refreshing'))
 }
 
 /** F5 and View → Refresh (Mod+R) in the main window. Mount once, in the app shell. */

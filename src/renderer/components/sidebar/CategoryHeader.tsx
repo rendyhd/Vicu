@@ -1,4 +1,5 @@
 import { useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { ChevronRight, MoreHorizontal } from 'lucide-react'
 import { useDroppable } from '@dnd-kit/core'
 import { cn } from '@/lib/cn'
@@ -12,11 +13,6 @@ export type OpenCategoryMenu = (
   at: { point: { x: number; y: number } } | { anchor: HTMLElement },
   opener: HTMLElement | null,
 ) => void
-
-/** "3 projects", for the header's name and the count of a collapsed one. */
-export function categoryProjectCount(count: number): string {
-  return count === 1 ? '1 project' : `${count} projects`
-}
 
 interface CategoryHeaderProps {
   category: ProjectCategory
@@ -36,6 +32,7 @@ interface CategoryHeaderProps {
  * on it goes to the start of the category.
  */
 export function CategoryHeader({ category, count, collapsed, onToggle, onOpenMenu, menuOpen }: CategoryHeaderProps) {
+  const { t } = useTranslation()
   const toggleRef = useRef<HTMLButtonElement>(null)
   const moreRef = useRef<HTMLButtonElement>(null)
   const dndId = `project-category-sidebar-${category.id}`
@@ -66,7 +63,7 @@ export function CategoryHeader({ category, count, collapsed, onToggle, onOpenMen
           ref={toggleRef}
           type="button"
           aria-expanded={!collapsed}
-          aria-label={`${category.name}, category, ${categoryProjectCount(count)}`}
+          aria-label={t('projects.category.label', { name: category.name, count })}
           aria-keyshortcuts="Shift+F10"
           onClick={onToggle}
           onKeyDown={(event) => {
@@ -89,7 +86,7 @@ export function CategoryHeader({ category, count, collapsed, onToggle, onOpenMen
           ref={moreRef}
           type="button"
           tabIndex={-1}
-          aria-label={`${category.name} actions`}
+          aria-label={t('projects.category.actions', { name: category.name })}
           aria-haspopup="menu"
           aria-expanded={menuOpen}
           onClick={openMenuAtButton}

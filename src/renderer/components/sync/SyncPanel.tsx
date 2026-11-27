@@ -1,7 +1,9 @@
 import { useId, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { AlertTriangle, LogIn, RefreshCw, X } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { api } from '@/lib/api'
+import { t } from '../../../shared/i18n'
 import { can } from '@/lib/capabilities'
 import { invalidateTaskData, refreshTasks } from '@/lib/task-refresh'
 import { removePendingTasks } from '@/lib/pending-cache'
@@ -20,27 +22,27 @@ import type { OfflineFailedItemView, OfflineFailureReason } from '../../../share
 export function failureReasonLabel(reason: OfflineFailureReason): string {
   switch (reason) {
     case 'rejected':
-      return 'The server refused this change.'
+      return t('sync.panel.reason.rejected')
     case 'too-large':
-      return 'The file is too large for the server. Retry after making it smaller or raising the limit.'
+      return t('sync.panel.reason.tooLarge')
     case 'conflict':
-      return 'The task was changed elsewhere in a way that conflicts.'
+      return t('sync.panel.reason.conflict')
     case 'task-gone':
-      return 'The task no longer exists.'
+      return t('sync.panel.reason.taskGone')
     case 'not-found':
-      return 'Something this change refers to no longer exists.'
+      return t('sync.panel.reason.notFound')
     case 'dependency-failed':
-      return 'Not sent, because the task it belongs to could not be created.'
+      return t('sync.panel.reason.dependencyFailed')
     case 'gave-up':
-      return 'Stopped after repeated errors.'
+      return t('sync.panel.reason.gaveUp')
     case 'other-account':
-      return 'Made while signed in to a different account, so it was not sent.'
+      return t('sync.panel.reason.otherAccount')
     case 'forbidden':
-      return 'You are no longer allowed to make this change in the project.'
+      return t('sync.panel.reason.forbidden')
     case 'token-permission':
-      return 'Your API token is not allowed to make this change.'
+      return t('sync.panel.reason.tokenPermission')
     case 'no-write-access':
-      return 'You no longer have write access to this project, so the server refused this change.'
+      return t('sync.panel.reason.noWriteAccess')
   }
 }
 
@@ -55,6 +57,7 @@ function FailedRow({
   onRetry: () => void
   onDiscard: () => void
 }) {
+  const { t } = useTranslation()
   const fmt = useDateFormat()
   return (
     <li className="flex flex-col gap-1 border-b border-[var(--border-color)] px-4 py-2.5 last:border-b-0">
@@ -68,7 +71,7 @@ function FailedRow({
               onClick={onRetry}
               className="rounded-control border border-[var(--border-color)] px-2 py-0.5 text-[11px] text-[var(--text-primary)] hover:bg-[var(--bg-hover)] disabled:opacity-50"
             >
-              Retry
+              {t('sync.panel.retry')}
             </button>
           )}
           <button
@@ -77,13 +80,13 @@ function FailedRow({
             onClick={onDiscard}
             className="rounded-control border border-[var(--border-color)] px-2 py-0.5 text-[11px] text-danger hover:bg-[var(--bg-hover)] disabled:opacity-50"
           >
-            Discard
+            {t('sync.panel.discard')}
           </button>
         </div>
       </div>
       <p className="text-[11px] text-[var(--text-secondary)]">{failureReasonLabel(item.reason)}</p>
       {item.reason !== 'dependency-failed' && item.reason !== 'other-account' && item.reason !== 'token-permission' && item.error && (
-        <p className="break-words text-[11px] text-[var(--text-secondary)]">Server said: {item.error}</p>
+        <p className="break-words text-[11px] text-[var(--text-secondary)]">{t('sync.panel.serverSaid', { error: item.error })}</p>
       )}
       {(item.reason === 'other-account' || item.reason === 'token-permission') && item.error && (
         <p className="break-words text-[11px] text-[var(--text-secondary)]">{item.error}</p>
@@ -100,6 +103,7 @@ function FailedRow({
  * the server's copy), like Android's "Discard unsynced changes".
  */
 export function SyncPanel({ onClose }: { onClose: () => void }) {
+  const { t } = useTranslation()
   const qc = useQueryClient()
   const snapshot = useOfflineStore((s) => s.snapshot)
   const counts = useOfflineStore((s) => s.counts)
@@ -121,26 +125,26 @@ export function SyncPanel({ onClose }: { onClose: () => void }) {
     setBusy(true)
     try {
       const result = await action()
-      if (!result.success) toast.error(`${failure}: ${result.error ?? 'unknown error'}`)
+      if (!result.success) toast.error(t('sync.panel.failedAction', { action: failure, error: result.error ?? t('sync.panel.unknownError') }))
       return result.success
     } catch (err) {
-      toast.error(`${failure}: ${err instanceof Error ? err.message : String(err)}`)
+      toast.error(t('sync.panel.failedAction', { action: failure, error: err instanceof Error ? err.message : String(err) }))
       return false
     } finally {
       setBusy(false)
     }
   }
 
-  const retry = (ids?: string[]) => run(() => api.offlineQueue.retryFailed(ids), 'Could not retry')
+  const retry = (ids?: string[]) => run(() => api.offlineQueue.retryFailed(ids), t('sync.panel.couldNotRetry'))
   const discard = async (ids?: string[]) => {
-    await run(() => api.offlineQueue.discardFailed(ids), 'Could not discard')
+    await run(() => api.offlineQueue.discardFailed(ids), t('sync.panel.couldNotDiscard'))
     // What the cache still shows of a discarded change goes away with the next refetch.
     refreshTasks(qc)
   }
   const discardAll = async () => {
-    const ok = await confirmDelete(`Discard ${failed.length} failed change${failed.length === 1 ? '' : 's'}? They will not be sent.`, {
+    const ok = await confirmDelete(t('sync.panel.confirmDiscardFailed', { count: failed.length }), {
       force: true,
-      confirmLabel: 'Discard',
+      confirmLabel: t('sync.panel.discard'),
     })
     if (ok) await discard()
   }
@@ -150,7 +154,7 @@ export function SyncPanel({ onClose }: { onClose: () => void }) {
   const discardWaiting = async (ids?: string[]) => {
     const targets = ids ? pending.filter((item) => ids.includes(item.id)) : pending
     if (targets.length === 0) return
-    const ok = await run(() => api.offlineQueue.discardPending(targets.map((item) => item.id)), 'Could not discard')
+    const ok = await run(() => api.offlineQueue.discardPending(targets.map((item) => item.id)), t('sync.panel.couldNotDiscard'))
     if (!ok) return
     removePendingTasks(qc, targets.flatMap((item) => (item.create ? [item.create.tempId] : [])))
     const after = await api.offlineQueue.snapshot().catch(() => null)
@@ -160,32 +164,32 @@ export function SyncPanel({ onClose }: { onClose: () => void }) {
     else refreshTasks(qc)
   }
   const discardAllWaiting = async () => {
-    const ok = await confirmDelete(`Discard ${counts.pending} waiting change${counts.pending === 1 ? '' : 's'}? They will not be sent.`, {
+    const ok = await confirmDelete(t('sync.panel.confirmDiscardWaiting', { count: counts.pending }), {
       force: true,
-      confirmLabel: 'Discard',
+      confirmLabel: t('sync.panel.discard'),
     })
     if (ok) await discardWaiting()
   }
-  const syncDocuments = () => run(() => api.syncCustomLists().then(() => ({ success: true })), 'Could not sync')
+  const syncDocuments = () => run(() => api.syncCustomLists().then(() => ({ success: true })), t('sync.panel.couldNotSync'))
   const discardDocuments = async () => {
-    const ok = await confirmDelete(discardDocumentsPrompt(documents), { force: true, confirmLabel: 'Discard' })
+    const ok = await confirmDelete(discardDocumentsPrompt(documents), { force: true, confirmLabel: t('sync.panel.discard') })
     if (!ok) return
-    await run(() => api.discardUnsyncedDocuments().then(() => ({ success: true })), 'Could not discard')
+    await run(() => api.discardUnsyncedDocuments().then(() => ({ success: true })), t('sync.panel.couldNotDiscard'))
     void qc.invalidateQueries({ queryKey: UNSYNCED_DOCUMENTS_QUERY_KEY })
   }
-  const syncNow = () => run(() => api.offlineQueue.replayNow().then((r) => (r.success ? { success: true } : r)), 'Could not sync')
+  const syncNow = () => run(() => api.offlineQueue.replayNow().then((r) => (r.success ? { success: true } : r)), t('sync.panel.couldNotSync'))
 
   return (
     <Dialog open onClose={onClose} labelledBy={titleId} className="w-[calc(100%-2rem)] max-w-lg">
       <div className="flex max-h-[80vh] flex-col overflow-hidden">
         <div className="flex items-center gap-2 border-b border-[var(--border-color)] px-4 py-3">
-          <h2 id={titleId} className="flex-1 text-sm font-semibold text-[var(--text-primary)]">Sync status</h2>
+          <h2 id={titleId} className="flex-1 text-sm font-semibold text-[var(--text-primary)]">{t('sync.panel.title')}</h2>
           <button
             data-autofocus
             type="button"
             onClick={onClose}
             className="rounded-control p-1 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
-            aria-label="Close"
+            aria-label={t('sync.panel.close')}
           >
             <X className="h-4 w-4" />
           </button>
@@ -196,9 +200,9 @@ export function SyncPanel({ onClose }: { onClose: () => void }) {
             <div className="flex items-start gap-3 border-b border-[var(--border-color)] bg-danger/10 px-4 py-3">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-danger" />
               <div className="min-w-0 flex-1">
-                <p className="text-[13px] font-medium text-[var(--text-primary)]">Sign in again to sync your changes</p>
+                <p className="text-[13px] font-medium text-[var(--text-primary)]">{t('sync.panel.signInAgainTitle')}</p>
                 <p className="mt-0.5 break-words text-[11px] text-[var(--text-secondary)]">
-                  {authProblem.error || 'Your session has expired.'} Waiting changes are kept and are sent once you are signed in.
+                  {t('sync.panel.signInAgainNote', { reason: authProblem.error || t('sync.panel.sessionExpired') })}
                 </p>
               </div>
               <button
@@ -209,7 +213,7 @@ export function SyncPanel({ onClose }: { onClose: () => void }) {
                 }}
                 className="flex shrink-0 items-center gap-1 rounded-control bg-accent-fill px-2.5 py-1 text-[11px] font-medium text-on-accent"
               >
-                <LogIn className="h-3 w-3" /> Sign in
+                <LogIn className="h-3 w-3" /> {t('sync.panel.signIn')}
               </button>
             </div>
           )}
@@ -218,7 +222,7 @@ export function SyncPanel({ onClose }: { onClose: () => void }) {
             <section className="border-b border-[var(--border-color)]">
               <div className="flex items-center gap-2 px-4 pb-1 pt-3">
                 <h3 className="flex-1 text-[11px] font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
-                  Waiting to sync ({counts.pending})
+                  {t('sync.panel.waiting', { count: counts.pending })}
                 </h3>
                 <button
                   type="button"
@@ -226,7 +230,7 @@ export function SyncPanel({ onClose }: { onClose: () => void }) {
                   onClick={() => void syncNow()}
                   className="flex items-center gap-1 rounded-control border border-[var(--border-color)] px-2 py-0.5 text-[11px] text-[var(--text-primary)] hover:bg-[var(--bg-hover)] disabled:opacity-50"
                 >
-                  <RefreshCw className={replaying ? 'h-3 w-3 animate-spin' : 'h-3 w-3'} /> {replaying ? 'Syncing' : 'Sync now'}
+                  <RefreshCw className={replaying ? 'h-3 w-3 animate-spin' : 'h-3 w-3'} /> {replaying ? t('sync.panel.syncing') : t('sync.panel.syncNow')}
                 </button>
                 <button
                   type="button"
@@ -234,7 +238,7 @@ export function SyncPanel({ onClose }: { onClose: () => void }) {
                   onClick={() => void discardAllWaiting()}
                   className="rounded-control border border-[var(--border-color)] px-2 py-0.5 text-[11px] text-danger hover:bg-[var(--bg-hover)] disabled:opacity-50"
                 >
-                  Discard all
+                  {t('sync.panel.discardAll')}
                 </button>
               </div>
               <ul className="px-4 pb-3 text-[12px] text-[var(--text-secondary)]">
@@ -245,14 +249,14 @@ export function SyncPanel({ onClose }: { onClose: () => void }) {
                       type="button"
                       disabled={busy || replaying}
                       onClick={() => void discardWaiting([item.id])}
-                      aria-label={`Discard ${item.summary}`}
+                      aria-label={t('sync.panel.discardItem', { summary: item.summary })}
                       className="shrink-0 rounded-control border border-[var(--border-color)] px-2 py-0.5 text-[11px] text-danger hover:bg-[var(--bg-hover)] disabled:opacity-50"
                     >
-                      Discard
+                      {t('sync.panel.discard')}
                     </button>
                   </li>
                 ))}
-                {pending.length > 50 && <li className="py-0.5 opacity-70">and {pending.length - 50} more</li>}
+                {pending.length > 50 && <li className="py-0.5 opacity-70">{t('sync.panel.andMore', { count: pending.length - 50 })}</li>}
               </ul>
             </section>
           )}
@@ -261,7 +265,7 @@ export function SyncPanel({ onClose }: { onClose: () => void }) {
             <section className="border-b border-[var(--border-color)]">
               <div className="flex items-center gap-2 px-4 pb-1 pt-3">
                 <h3 className="flex-1 text-[11px] font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
-                  Lists and settings
+                  {t('sync.panel.listsAndSettings')}
                 </h3>
                 <button
                   type="button"
@@ -269,7 +273,7 @@ export function SyncPanel({ onClose }: { onClose: () => void }) {
                   onClick={() => void syncDocuments()}
                   className="flex items-center gap-1 rounded-control border border-[var(--border-color)] px-2 py-0.5 text-[11px] text-[var(--text-primary)] hover:bg-[var(--bg-hover)] disabled:opacity-50"
                 >
-                  <RefreshCw className="h-3 w-3" /> Sync now
+                  <RefreshCw className="h-3 w-3" /> {t('sync.panel.syncNow')}
                 </button>
                 <button
                   type="button"
@@ -277,7 +281,7 @@ export function SyncPanel({ onClose }: { onClose: () => void }) {
                   onClick={() => void discardDocuments()}
                   className="rounded-control border border-[var(--border-color)] px-2 py-0.5 text-[11px] text-danger hover:bg-[var(--bg-hover)] disabled:opacity-50"
                 >
-                  Discard
+                  {t('sync.panel.discard')}
                 </button>
               </div>
               <ul className="px-4 pb-3">
@@ -295,7 +299,7 @@ export function SyncPanel({ onClose }: { onClose: () => void }) {
             <section>
               <div className="flex items-center gap-2 px-4 pb-1 pt-3">
                 <h3 className="flex-1 text-[11px] font-semibold uppercase tracking-wider text-danger">
-                  Failed ({failed.length})
+                  {t('sync.panel.failed', { count: failed.length })}
                 </h3>
                 <button
                   type="button"
@@ -303,7 +307,7 @@ export function SyncPanel({ onClose }: { onClose: () => void }) {
                   onClick={() => void retry()}
                   className="rounded-control border border-[var(--border-color)] px-2 py-0.5 text-[11px] text-[var(--text-primary)] hover:bg-[var(--bg-hover)] disabled:opacity-50"
                 >
-                  Retry all
+                  {t('sync.panel.retryAll')}
                 </button>
                 <button
                   type="button"
@@ -311,7 +315,7 @@ export function SyncPanel({ onClose }: { onClose: () => void }) {
                   onClick={() => void discardAll()}
                   className="rounded-control border border-[var(--border-color)] px-2 py-0.5 text-[11px] text-danger hover:bg-[var(--bg-hover)] disabled:opacity-50"
                 >
-                  Discard all
+                  {t('sync.panel.discardAll')}
                 </button>
               </div>
               <ul>
@@ -329,7 +333,7 @@ export function SyncPanel({ onClose }: { onClose: () => void }) {
           )}
 
           {!(queueOn && authProblem) && !(queueOn && counts.pending > 0) && failed.length === 0 && documents.length === 0 && (
-            <p className="px-4 py-6 text-center text-[12px] text-[var(--text-secondary)]">Everything is synced.</p>
+            <p className="px-4 py-6 text-center text-[12px] text-[var(--text-secondary)]">{t('sync.panel.synced')}</p>
           )}
         </div>
       </div>

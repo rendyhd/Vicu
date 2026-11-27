@@ -18,20 +18,20 @@ export interface SettingsGroup {
 
 export const SETTINGS_GROUPS: SettingsGroup[] = [
   {
-    label: 'Account and app',
+    label: 'Account and app', // i18n-ignore: the key of GROUP_LABELS in SettingsMenu
     tabs: [
-      { key: 'general', label: 'General' },
-      { key: 'projects', label: 'Projects' },
-      { key: 'notifications', label: 'Notifications' },
+      { key: 'general', label: 'General' }, // i18n-ignore: shown through SETTINGS_TAB_LABELS in SettingsMenu
+      { key: 'projects', label: 'Projects' }, // i18n-ignore: shown through SETTINGS_TAB_LABELS in SettingsMenu
+      { key: 'notifications', label: 'Notifications' }, // i18n-ignore: shown through SETTINGS_TAB_LABELS in SettingsMenu
     ],
   },
   {
-    label: 'Features',
+    label: 'Features', // i18n-ignore: the key of GROUP_LABELS in SettingsMenu
     tabs: [
-      { key: 'integrations', label: 'Quick Entry / View' },
-      { key: 'assistant', label: 'Assistant' },
-      { key: 'pro', label: 'Pro' },
-      { key: 'shortcuts', label: 'Keyboard Shortcuts' },
+      { key: 'integrations', label: 'Quick Entry / View' }, // i18n-ignore: shown through SETTINGS_TAB_LABELS in SettingsMenu
+      { key: 'assistant', label: 'Assistant' }, // i18n-ignore: shown through SETTINGS_TAB_LABELS in SettingsMenu
+      { key: 'pro', label: 'Pro' }, // i18n-ignore: shown through SETTINGS_TAB_LABELS in SettingsMenu
+      { key: 'shortcuts', label: 'Keyboard Shortcuts' }, // i18n-ignore: shown through SETTINGS_TAB_LABELS in SettingsMenu
     ],
   },
 ]
@@ -62,7 +62,7 @@ export function settingsTabLabel(tab: SettingsTab): string {
     const found = group.tabs.find((t) => t.key === tab)
     if (found) return found.label
   }
-  return 'Settings'
+  return 'Settings' // i18n-ignore: English fallback of the lookup above
 }
 
 /** Width of the menu column beside the settings. */
