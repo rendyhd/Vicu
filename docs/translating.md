@@ -1,6 +1,6 @@
 # Translating Vicu
 
-Vicu is written in English. This page explains how to add a language or improve one, for the desktop app and for the mobile app (Android and iOS). You do not need to be a programmer: a translation is one text file per app, and a pull request.
+Vicu is written in English. This page explains how to add a language or improve one, for the desktop app and for the mobile app (Android and iOS). You do not need to be a programmer: a translation is one text file per app (two small ones on mobile), and a pull request.
 
 This page is the same in both repositories:
 
@@ -11,7 +11,7 @@ The two apps have their own files, because each uses the format its platform's t
 
 ## Where things stand
 
-The framework is in place, but most of the apps' text is not in the catalogs yet. Text moves there area by area. Until an area has moved, it shows in English in every language. So a catalog you translate today is short, and it grows with later versions. A translation never has to be complete: whatever is missing shows in English.
+Nearly all the text both apps show is in the catalogs now. A few small pieces are still English in every language (see "What is not translated" below), and new versions add new texts, so a catalog grows over time. A translation never has to be complete: whatever is missing shows in English.
 
 ## The short version
 
@@ -95,6 +95,8 @@ npm run i18n:status
 
 The file is the Android string format, which the iPhone app reads too.
 
+A second, smaller file holds the text that only Android shows outside the app: the names of the widgets, the quick-add tile and the shortcuts, the notification channels and the buttons on notifications. Its English source is `app/src/main/res/values/strings.xml`; translate it as `app/src/main/res/values-<tag>/strings.xml`, in the same format and with the same rules. `app_name` stays `Vicu`.
+
 ```xml
 <resources>
     <string name="language_name">English</string>
@@ -164,12 +166,12 @@ A sentence that is missing from your language is written in English, so a recap 
 - **Your own data.** Task titles, project names, labels and notes are yours and are never changed.
 - **Dates.** Month and weekday names come from your system's region, not from the catalogs.
 - **Text from other places.** Messages from your Vikunja server, and the answers of an assistant model.
-- **Small platform pieces** that have their own files and are not part of this framework yet: the names of the Android widgets and shortcuts, the iOS widgets, and the permission questions the system asks.
+- **Small iOS pieces** that have their own files and are not part of this framework yet: the iOS widgets and the permission questions the system asks.
 - **The website and the user guide.**
 
 ## Sending your translation
 
-Open a pull request against the `main` branch of the repository the file belongs to (one for the desktop, one for mobile). The checks run on every pull request. If one fails, its message names the file and the text and says what is wrong.
+Open a pull request against the `pro` branch of the repository the file belongs to (one for the desktop, one for mobile); the catalogs reach `main` with the next release, and from then on `main` is the branch to use. The checks run on every pull request. If one fails, its message names the file and the text and says what is wrong.
 
 You can also open an issue to say you would like to translate a language, to ask what a text means, or to report a mistake in a translation.
 
