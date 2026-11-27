@@ -7,8 +7,15 @@ import { Dialog } from '@/components/overlay/Dialog'
 import { usePersonLabels } from '@/hooks/use-people'
 import { newLedgerId, setRecord, writeLedger } from '@/hooks/use-pro-ledger'
 import type { MeetingValue } from '../../../shared/pro/ledger'
+import type { TranslationKey } from '../../../shared/i18n'
 
-const RHYTHMS = ['', 'weekly', 'every two weeks', 'monthly']
+// The stored value is the English phrase (the ledger keeps it); its label is translated where it is shown.
+const RHYTHMS: ReadonlyArray<{ value: string; label: TranslationKey }> = [
+  { value: '', label: 'pro.meeting.rhythm.none' },
+  { value: 'weekly', label: 'pro.meeting.rhythm.weekly' },
+  { value: 'every two weeks', label: 'pro.meeting.rhythm.everyTwoWeeks' },
+  { value: 'monthly', label: 'pro.meeting.rhythm.monthly' },
+]
 
 /**
  * A meeting (cross-app semantics 21.9, plan 7.5.1): a name, its people in the order the round goes,
@@ -40,23 +47,23 @@ export function MeetingDialog({ meeting, id, onClose }: { meeting?: MeetingValue
   }
 
   return (
-    <Dialog open label="Meeting" onClose={onClose} className="w-[440px] max-w-[92vw] p-5">
-      <h2 className="mb-3 text-card-title text-text">{meeting ? 'Edit meeting' : 'New meeting'}</h2>
-      <input value={name} onChange={(event) => setName(event.target.value)} placeholder="Name" aria-label="Name" autoFocus className="mb-3 w-full rounded-control border border-border bg-bg-page px-2 py-1.5 text-task-title text-text" />
-      <p className="mb-1 text-group text-text-secondary">People, in round order</p>
+    <Dialog open label={t('pro.meeting.label')} onClose={onClose} className="w-[440px] max-w-[92vw] p-5">
+      <h2 className="mb-3 text-card-title text-text">{meeting ? t('pro.meeting.edit') : t('pro.meeting.new')}</h2>
+      <input value={name} onChange={(event) => setName(event.target.value)} placeholder={t('pro.meeting.name')} aria-label={t('pro.meeting.name')} autoFocus className="mb-3 w-full rounded-control border border-border bg-bg-page px-2 py-1.5 text-task-title text-text" />
+      <p className="mb-1 text-group text-text-secondary">{t('pro.meeting.people')}</p>
       <ul className="mb-2 space-y-1">
         {order.map((personId, index) => (
           <li key={personId} className="flex items-center gap-2 rounded-control border border-border px-2 py-1 text-meta text-text">
-            <span className="min-w-0 flex-1 truncate">{people.get(personId)?.title ?? 'Someone'}</span>
-            <button type="button" aria-label="Earlier" disabled={index === 0} onClick={() => move(index, -1)} className="rounded-control p-0.5 hover:bg-bg-hover disabled:opacity-30"><ArrowUp className="h-3 w-3" /></button>
-            <button type="button" aria-label="Later" disabled={index === order.length - 1} onClick={() => move(index, 1)} className="rounded-control p-0.5 hover:bg-bg-hover disabled:opacity-30"><ArrowDown className="h-3 w-3" /></button>
-            <button type="button" aria-label="Remove" onClick={() => setOrder(order.filter((entry) => entry !== personId))} className="rounded-control p-0.5 hover:bg-bg-hover"><X className="h-3 w-3" /></button>
+            <span className="min-w-0 flex-1 truncate">{people.get(personId)?.title ?? t('pro.meeting.someone')}</span>
+            <button type="button" aria-label={t('pro.meeting.earlier')} disabled={index === 0} onClick={() => move(index, -1)} className="rounded-control p-0.5 hover:bg-bg-hover disabled:opacity-30"><ArrowUp className="h-3 w-3" /></button>
+            <button type="button" aria-label={t('pro.meeting.later')} disabled={index === order.length - 1} onClick={() => move(index, 1)} className="rounded-control p-0.5 hover:bg-bg-hover disabled:opacity-30"><ArrowDown className="h-3 w-3" /></button>
+            <button type="button" aria-label={t('pro.meeting.remove')} onClick={() => setOrder(order.filter((entry) => entry !== personId))} className="rounded-control p-0.5 hover:bg-bg-hover"><X className="h-3 w-3" /></button>
           </li>
         ))}
       </ul>
       {others.length > 0 && (
-        <select value="" onChange={(event) => event.target.value && setOrder([...order, Number(event.target.value)])} aria-label="Add a person" className="mb-3 w-full rounded-control border border-border bg-bg-page px-2 py-1 text-meta text-text">
-          <option value="">Add a person</option>
+        <select value="" onChange={(event) => event.target.value && setOrder([...order, Number(event.target.value)])} aria-label={t('pro.meeting.addPerson')} className="mb-3 w-full rounded-control border border-border bg-bg-page px-2 py-1 text-meta text-text">
+          <option value="">{t('pro.meeting.addPerson')}</option>
           {others.map((label) => <option key={label.id} value={label.id}>{label.title}</option>)}
         </select>
       )}
@@ -80,14 +87,14 @@ export function MeetingDialog({ meeting, id, onClose }: { meeting?: MeetingValue
         </fieldset>
       )}
       <label className="flex items-center gap-2 text-meta text-text">
-        Meets
+        {t('pro.meeting.meets')}
         <select value={rhythm ?? ''} onChange={(event) => setRhythm(event.target.value)} className="rounded-control border border-border bg-bg-page px-2 py-1">
-          {RHYTHMS.map((value) => <option key={value} value={value}>{value || 'when it meets'}</option>)}
+          {RHYTHMS.map((rhythmOption) => <option key={rhythmOption.value} value={rhythmOption.value}>{t(rhythmOption.label)}</option>)}
         </select>
       </label>
       <div className="mt-5 flex justify-end gap-2">
-        <button type="button" className="rounded-control px-3 py-1.5 text-meta text-text hover:bg-bg-hover" onClick={onClose}>Cancel</button>
-        <button type="button" disabled={!name.trim() || order.length === 0} className="rounded-control bg-accent-fill px-3 py-1.5 text-meta font-medium text-on-accent disabled:opacity-40" onClick={save}>Save</button>
+        <button type="button" className="rounded-control px-3 py-1.5 text-meta text-text hover:bg-bg-hover" onClick={onClose}>{t('pro.common.cancel')}</button>
+        <button type="button" disabled={!name.trim() || order.length === 0} className="rounded-control bg-accent-fill px-3 py-1.5 text-meta font-medium text-on-accent disabled:opacity-40" onClick={save}>{t('pro.common.save')}</button>
       </div>
     </Dialog>
   )

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Checkbox } from '@/components/shared/Checkbox'
 import { useAvailability } from '@/hooks/use-availability'
 import { useProPrefs } from '@/hooks/use-pro-prefs'
@@ -11,6 +12,7 @@ type Ends = 'never' | 'until' | 'count'
  * or a number of times) and whether a late completion catches up. Synced.
  */
 export function RepeatRuleFields({ taskId }: { taskId: number }) {
+  const { t } = useTranslation()
   const { on } = useAvailability()
   const prefs = useProPrefs()
   const rule = prefs.repeatRule(taskId)
@@ -28,8 +30,8 @@ export function RepeatRuleFields({ taskId }: { taskId: number }) {
 
   return (
     <div className="mt-2 border-t border-border px-2 pb-1 pt-2" data-pro-repeat-rule>
-      <p className="mb-1 text-meta font-medium text-text">Ends</p>
-      <div className="flex flex-wrap gap-1" role="radiogroup" aria-label="Ends">
+      <p className="mb-1 text-meta font-medium text-text">{t('pro.repeat.ends')}</p>
+      <div className="flex flex-wrap gap-1" role="radiogroup" aria-label={t('pro.repeat.ends')}>
         {(['never', 'until', 'count'] as const).map((choice) => (
           <button
             key={choice}
@@ -49,14 +51,14 @@ export function RepeatRuleFields({ taskId }: { taskId: number }) {
               ? 'rounded-chip border border-accent-blue bg-accent-blue/12 px-2 py-0.5 text-meta text-accent-blue'
               : 'rounded-chip border border-border px-2 py-0.5 text-meta text-text-secondary hover:bg-bg-hover'}
           >
-            {choice === 'never' ? 'Never' : choice === 'until' ? 'On a day' : 'After times'}
+            {choice === 'never' ? t('pro.repeat.never') : choice === 'until' ? t('pro.repeat.onDay') : t('pro.repeat.afterTimes')}
           </button>
         ))}
       </div>
       {ends === 'until' && (
         <input
           type="date"
-          aria-label="Last day"
+          aria-label={t('pro.repeat.lastDay')}
           value={rule?.until ?? ''}
           onChange={(event) => event.target.value && write({ until: event.target.value, catch_up: rule?.catch_up })}
           className="mt-2 rounded-control border border-border bg-bg-page px-2 py-1 text-meta text-text"
@@ -68,7 +70,7 @@ export function RepeatRuleFields({ taskId }: { taskId: number }) {
             type="number"
             min={1}
             max={999}
-            aria-label="Times left"
+            aria-label={t('pro.repeat.timesLeft')}
             value={count}
             onChange={(event) => setCount(event.target.value)}
             onBlur={() => {
@@ -77,12 +79,12 @@ export function RepeatRuleFields({ taskId }: { taskId: number }) {
             }}
             className="w-16 rounded-control border border-border bg-bg-page px-2 py-1 text-meta text-text"
           />
-          more times, this one included
+          {t('pro.repeat.moreTimes')}
         </label>
       )}
       <label className="mt-2 flex cursor-pointer items-center gap-2">
         <Checkbox checked={rule?.catch_up === true} onChange={(event) => write({ ...rule, catch_up: event.target.checked })} />
-        <span className="text-meta text-text">Catch up: skip dates that have passed</span>
+        <span className="text-meta text-text">{t('pro.repeat.catchUp')}</span>
       </label>
     </div>
   )

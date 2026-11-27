@@ -1,4 +1,5 @@
 import { useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Crosshair, X } from 'lucide-react'
 import { Dialog } from '@/components/overlay/Dialog'
 import { Checkbox } from '@/components/shared/Checkbox'
@@ -11,6 +12,7 @@ import { usePro } from '@/hooks/use-pro'
 
 /** The sidebar line while a focus is set (21.14): what is in focus, Change and Clear. */
 export function FocusBanner() {
+  const { t } = useTranslation()
   const { focus, setFocus } = useFocus()
   const { categories } = useProjectCategories()
   const { data: projects } = useProjects()
@@ -23,10 +25,10 @@ export function FocusBanner() {
   return (
     <div className="mx-2 mb-1 flex items-center gap-2 rounded-control bg-accent-orange/12 px-2.5 py-1.5 text-meta text-text" data-pro-focus-banner>
       <Crosshair className="h-3.5 w-3.5 shrink-0 text-accent-orange" aria-hidden />
-      <button type="button" className="min-w-0 flex-1 truncate text-left" onClick={() => open(true)} title="Change focus">
-        Focus: {names.join(', ') || 'nothing'}
+      <button type="button" className="min-w-0 flex-1 truncate text-left" onClick={() => open(true)} title={t('pro.focus.change')}>
+        {t('pro.focus.banner', { names: names.join(', ') || t('pro.focus.nothing') })}
       </button>
-      <button type="button" aria-label="Clear focus" className="rounded-control p-0.5 text-text-secondary hover:bg-bg-hover hover:text-text" onClick={() => setFocus(null)}>
+      <button type="button" aria-label={t('pro.focus.clear')} className="rounded-control p-0.5 text-text-secondary hover:bg-bg-hover hover:text-text" onClick={() => setFocus(null)}>
         <X className="h-3 w-3" />
       </button>
     </div>
@@ -43,6 +45,7 @@ export function FocusPickerHost() {
 }
 
 function FocusPicker({ onClose }: { onClose: () => void }) {
+  const { t } = useTranslation()
   const { focus, setFocus } = useFocus()
   const { categories } = useProjectCategories()
   const { data: projects } = useProjects()
@@ -59,13 +62,13 @@ function FocusPicker({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <Dialog open label="Focus" onClose={onClose} className="w-[420px] p-5">
-      <h2 className="mb-1 text-card-title text-text">Focus</h2>
-      <p className="mb-4 text-meta text-text-secondary">Show only these on this device. The Inbox always stays.</p>
+    <Dialog open label={t('pro.focus.title')} onClose={onClose} className="w-[420px] p-5">
+      <h2 className="mb-1 text-card-title text-text">{t('pro.focus.title')}</h2>
+      <p className="mb-4 text-meta text-text-secondary">{t('pro.focus.intro')}</p>
       <div className="max-h-[50vh] space-y-4 overflow-y-auto">
         {categories.length > 0 && (
           <section>
-            <h3 className="mb-1 text-group text-text-secondary">Categories</h3>
+            <h3 className="mb-1 text-group text-text-secondary">{t('pro.focus.categories')}</h3>
             {categories.map((category) => (
               <label key={category.id} className="flex cursor-pointer items-center gap-2 py-1">
                 <Checkbox
@@ -78,7 +81,7 @@ function FocusPicker({ onClose }: { onClose: () => void }) {
           </section>
         )}
         <section>
-          <h3 className="mb-1 text-group text-text-secondary">Projects</h3>
+          <h3 className="mb-1 text-group text-text-secondary">{t('pro.focus.projects')}</h3>
           {topLevel.map((project) => (
             <label key={project.id} className="flex cursor-pointer items-center gap-2 py-1">
               <Checkbox
@@ -93,11 +96,11 @@ function FocusPicker({ onClose }: { onClose: () => void }) {
       <div className="mt-5 flex justify-end gap-2">
         {focus && (
           <button type="button" className="mr-auto rounded-control px-3 py-1.5 text-meta text-text-secondary hover:bg-bg-hover" onClick={() => { setFocus(null); onClose() }}>
-            Clear focus
+            {t('pro.focus.clear')}
           </button>
         )}
-        <button type="button" className="rounded-control px-3 py-1.5 text-meta text-text hover:bg-bg-hover" onClick={onClose}>Cancel</button>
-        <button type="button" className="rounded-control bg-accent-fill px-3 py-1.5 text-meta font-medium text-on-accent" onClick={apply}>Focus</button>
+        <button type="button" className="rounded-control px-3 py-1.5 text-meta text-text hover:bg-bg-hover" onClick={onClose}>{t('pro.common.cancel')}</button>
+        <button type="button" className="rounded-control bg-accent-fill px-3 py-1.5 text-meta font-medium text-on-accent" onClick={apply}>{t('pro.focus.title')}</button>
       </div>
     </Dialog>
   )

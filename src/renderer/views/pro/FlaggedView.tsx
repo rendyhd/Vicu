@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useTasks } from '@/hooks/use-tasks'
 import { useProjects } from '@/hooks/use-projects'
 import { useAppConfig } from '@/hooks/use-app-config'
@@ -14,6 +15,7 @@ import { ProOffNotice } from '@/components/pro/ProOffNotice'
 
 /** Flagged (cross-app semantics 21.4): open tasks you flagged, by project. */
 export function FlaggedView() {
+  const { t } = useTranslation()
   const pro = usePro()
   const on = pro.layer('availability')
   const { data: tasks = [], isLoading } = useTasks(OPEN_TASKS_PARAMS, on, true)
@@ -35,25 +37,25 @@ export function FlaggedView() {
     return [...byProject.entries()]
       .map(([id, list]) => {
         const project = projects?.flat.find((p) => p.id === id)
-        return { id, name: project?.title ?? 'Project', color: project?.hex_color, tasks: list }
+        return { id, name: project?.title ?? t('pro.flaggedView.fallbackProject'), color: project?.hex_color, tasks: list }
       })
       .sort((a, b) => a.name.localeCompare(b.name))
-  }, [shown, projects?.flat])
+  }, [shown, projects?.flat, t])
 
-  usePrintable(useMemo(() => ({ viewTitle: 'Flagged', sections: [{ groups: groups.map((g) => ({ heading: g.name, tasks: g.tasks })) }] }), [groups]))
+  usePrintable(useMemo(() => ({ viewTitle: t('pro.flaggedView.title'), sections: [{ groups: groups.map((g) => ({ heading: g.name, tasks: g.tasks })) }] }), [groups, t]))
 
-  if (!on) return <ProOffNotice title="Flagged" />
-  if (isLoading) return <ListSkeleton title="Flagged" />
+  if (!on) return <ProOffNotice title={t('pro.flaggedView.title')} />
+  if (isLoading) return <ListSkeleton title={t('pro.flaggedView.title')} />
 
   return (
     <TaskList
-      title="Flagged"
+      title={t('pro.flaggedView.title')}
       tasks={[]}
       projectId={config?.inbox_project_id}
       showNewTask={false}
       empty={groups.length === 0 && hiddenCount === 0}
-      emptyTitle="Nothing flagged"
-      emptySubtitle="Flag a task with Ctrl+Shift+F or from its menu"
+      emptyTitle={t('pro.flaggedView.emptyTitle')}
+      emptySubtitle={t('pro.flaggedView.emptySubtitle')}
       headerContent={<ViewSwitch view={availability.view} onChange={availability.setView} />}
     >
       {groups.map((group) => (

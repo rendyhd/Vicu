@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Copy, Printer } from 'lucide-react'
 import { usePortfolio } from '@/hooks/use-portfolio'
 import { usePro } from '@/hooks/use-pro'
@@ -21,15 +22,16 @@ const SMALL = 'rounded-control border border-border px-2 py-0.5 text-meta text-t
  * initiatives without agreed capacity, parked ones, and the one-pager.
  */
 export function SponsorView() {
+  const { t } = useTranslation()
   const pro = usePro()
   const portfolio = usePortfolio()
   const people = usePersonLabels()
   const [deciding, setDeciding] = useState<{ id: string; text: string } | null>(null)
   const today = toLocalDate(new Date())
-  if (!pro.layer('portfolio')) return <ProOffNotice title="Sponsor desk" />
+  if (!pro.layer('portfolio')) return <ProOffNotice title={t('pro.sponsorView.title')} />
 
   const ledger = portfolio.ledger
-  const personName = (id: number) => people.get(id)?.title ?? 'someone'
+  const personName = (id: number) => people.get(id)?.title ?? t('pro.sponsorView.someone')
   const escalations = Object.keys(ledger.escalations).flatMap((id) => {
     const value = recordValue(ledger.escalations, id) as EscalationValue | null
     return value && (value.status === 'drafted' || value.status === 'accepted') ? [{ id, value }] : []
@@ -44,7 +46,7 @@ export function SponsorView() {
   const copy = async () => {
     const page = onePager()
     await api.writeClipboardRich(page.text, page.html)
-    toast.success('One-pager copied')
+    toast.success(t('pro.sponsorView.copied'))
   }
   const print = async () => {
     const result = await api.printHtml(onePager().html)
@@ -54,45 +56,45 @@ export function SponsorView() {
   return (
     <ReadingScroll className="bg-[var(--bg-primary)]" columnClassName="flex flex-col">
       <PageHeader
-        title="Sponsor desk"
+        title={t('pro.sponsorView.title')}
         inScroll
         actions={
           <div className="flex gap-1.5">
-            <button type="button" className={ACTION} onClick={() => void copy()}><Copy className="h-3.5 w-3.5" aria-hidden /> Copy one-pager</button>
-            <button type="button" className={ACTION} onClick={() => void print()}><Printer className="h-3.5 w-3.5" aria-hidden /> Print</button>
+            <button type="button" className={ACTION} onClick={() => void copy()}><Copy className="h-3.5 w-3.5" aria-hidden /> {t('pro.sponsorView.copyOnePager')}</button>
+            <button type="button" className={ACTION} onClick={() => void print()}><Printer className="h-3.5 w-3.5" aria-hidden /> {t('pro.sponsorView.print')}</button>
           </div>
         }
       />
       <div className="mx-auto w-full max-w-reading space-y-8 px-6 pb-10">
         <section data-pro-escalations>
-          <h2 className="mb-2 text-section text-text">Escalations</h2>
-          {escalations.length === 0 && <p className="text-meta text-text-secondary">None. A promise missed twice drafts one here.</p>}
+          <h2 className="mb-2 text-section text-text">{t('pro.sponsorView.escalations')}</h2>
+          {escalations.length === 0 && <p className="text-meta text-text-secondary">{t('pro.sponsorView.noEscalations')}</p>}
           <ul className="space-y-3">
             {escalations.map(({ id, value }) => (
               <li key={id} className="rounded-card border border-border p-3">
                 <p className="text-task-title text-text">{value.draft}</p>
-                <p className="mt-1 text-meta text-text-secondary">{value.status === 'drafted' ? 'Draft' : 'On the agenda'}, since {value.opened}</p>
+                <p className="mt-1 text-meta text-text-secondary">{value.status === 'drafted' ? t('pro.sponsorView.draftSince', { date: value.opened }) : t('pro.sponsorView.agendaSince', { date: value.opened })}</p>
                 {deciding?.id === id ? (
                   <form
                     className="mt-2 flex gap-2"
                     onSubmit={(event) => {
                       event.preventDefault()
-                      void portfolio.setRecordValue('escalations', id, { ...value, status: 'resolved', decision: deciding.text.trim() || null, resolved: today }, 'Escalation resolved')
+                      void portfolio.setRecordValue('escalations', id, { ...value, status: 'resolved', decision: deciding.text.trim() || null, resolved: today }, t('pro.sponsorView.resolvedMessage'))
                       if (deciding.text.trim()) void portfolio.addLog({ kind: 'decision', text: deciding.text.trim(), initiative: null })
                       setDeciding(null)
                     }}
                   >
-                    <input autoFocus value={deciding.text} onChange={(event) => setDeciding({ id, text: event.target.value })} placeholder="What was decided" aria-label="Decision" className="min-w-0 flex-1 rounded-control border border-border bg-bg-page px-2 py-1 text-meta text-text" />
-                    <button type="submit" className={SMALL}>Save</button>
+                    <input autoFocus value={deciding.text} onChange={(event) => setDeciding({ id, text: event.target.value })} placeholder={t('pro.sponsorView.decisionPlaceholder')} aria-label={t('pro.sponsorView.decision')} className="min-w-0 flex-1 rounded-control border border-border bg-bg-page px-2 py-1 text-meta text-text" />
+                    <button type="submit" className={SMALL}>{t('pro.common.save')}</button>
                   </form>
                 ) : (
                   <div className="mt-2 flex gap-1.5">
                     {value.status === 'drafted' && (
-                      <button type="button" className={SMALL} onClick={() => void portfolio.setRecordValue('escalations', id, { ...value, status: 'accepted' }, 'On the sponsor agenda')}>Put on the agenda</button>
+                      <button type="button" className={SMALL} onClick={() => void portfolio.setRecordValue('escalations', id, { ...value, status: 'accepted' }, t('pro.sponsorView.onAgendaMessage'))}>{t('pro.sponsorView.putOnAgenda')}</button>
                     )}
-                    <button type="button" className={SMALL} onClick={() => void api.writeClipboardRich(value.draft).then(() => toast.success('Copied'))}>Copy</button>
-                    <button type="button" className={SMALL} onClick={() => setDeciding({ id, text: '' })}>Resolved</button>
-                    <button type="button" className={SMALL} onClick={() => void portfolio.setRecordValue('escalations', id, { ...value, status: 'dismissed', resolved: today }, 'Dismissed')}>Dismiss</button>
+                    <button type="button" className={SMALL} onClick={() => void api.writeClipboardRich(value.draft).then(() => toast.success(t('pro.sponsorView.copiedShort')))}>{t('pro.sponsorView.copy')}</button>
+                    <button type="button" className={SMALL} onClick={() => setDeciding({ id, text: '' })}>{t('pro.sponsorView.resolved')}</button>
+                    <button type="button" className={SMALL} onClick={() => void portfolio.setRecordValue('escalations', id, { ...value, status: 'dismissed', resolved: today }, t('pro.sponsorView.dismissedMessage'))}>{t('pro.sponsorView.dismiss')}</button>
                   </div>
                 )}
               </li>
@@ -101,14 +103,14 @@ export function SponsorView() {
         </section>
 
         <section data-pro-owed>
-          <h2 className="mb-2 text-section text-text">Decisions needed</h2>
-          {owed.length === 0 && <p className="text-meta text-text-secondary">None open.</p>}
+          <h2 className="mb-2 text-section text-text">{t('pro.sponsorView.decisionsNeeded')}</h2>
+          {owed.length === 0 && <p className="text-meta text-text-secondary">{t('pro.sponsorView.noneOpen')}</p>}
           <ul className="divide-y divide-border">
             {owed.map(({ id, value }) => (
               <li key={id} className="flex items-center gap-3 py-2">
                 <span className="min-w-0 flex-1 text-task-title text-text">{value.what}</span>
-                <span className="text-meta text-text-secondary">{typeof value.from === 'number' ? personName(value.from) : 'nobody named'}, {diffLocalDays(value.opened, today)} days</span>
-                <button type="button" className={SMALL} onClick={() => void portfolio.setRecordValue('owed', id, { ...value, resolved: today }, 'Decided')}>Decided</button>
+                <span className="text-meta text-text-secondary">{t('pro.sponsorView.owedAge', { name: typeof value.from === 'number' ? personName(value.from) : t('pro.sponsorView.nobodyNamed'), count: diffLocalDays(value.opened, today) })}</span>
+                <button type="button" className={SMALL} onClick={() => void portfolio.setRecordValue('owed', id, { ...value, resolved: today }, t('pro.sponsorView.decidedMessage'))}>{t('pro.sponsorView.decidedMessage')}</button>
               </li>
             ))}
           </ul>
@@ -116,7 +118,7 @@ export function SponsorView() {
 
         {noCapacity.length > 0 && (
           <section>
-            <h2 className="mb-2 text-section text-text">Capacity not agreed</h2>
+            <h2 className="mb-2 text-section text-text">{t('pro.sponsorView.capacityNotAgreed')}</h2>
             <ul className="space-y-1 text-task-title text-text">
               {noCapacity.map((entry) => <li key={entry.projectId}>{entry.rank}. {portfolio.titleOf(entry.projectId)}</li>)}
             </ul>

@@ -2,6 +2,7 @@
 // the names and the day in. Groups keep the list's own order inside them; an empty group is left out.
 import { addLocalDays, isNoDueDate, localDateOf, type LocalDate } from '../../../shared/due-dates'
 import type { GroupBy } from '../../../shared/pro/list-conditions'
+import { t, type TranslationKey } from '../../../shared/i18n'
 
 export interface GroupableTask {
   id: number
@@ -29,18 +30,18 @@ export interface GroupHelpers<T> {
 }
 
 const DUE_BUCKETS = [
-  ['overdue', 'Overdue'],
-  ['today', 'Today'],
-  ['tomorrow', 'Tomorrow'],
-  ['week', 'Next 7 days'],
-  ['later', 'Later'],
-  ['none', 'No due date'],
+  ['overdue', 'pro.listGroups.overdue'],
+  ['today', 'pro.listGroups.today'],
+  ['tomorrow', 'pro.listGroups.tomorrow'],
+  ['week', 'pro.listGroups.week'],
+  ['later', 'pro.listGroups.later'],
+  ['none', 'pro.listGroups.noDue'],
 ] as const
 
 const START_BUCKETS = [
-  ['started', 'Started'],
-  ['none', 'No start date'],
-  ['later', 'Starts later'],
+  ['started', 'pro.listGroups.started'],
+  ['none', 'pro.listGroups.noStart'],
+  ['later', 'pro.listGroups.startsLater'],
 ] as const
 
 function dueBucket(value: string | null | undefined, today: LocalDate): string {
@@ -69,10 +70,10 @@ function byKey<T>(tasks: readonly T[], keyOf: (task: T) => string): Map<string, 
   return groups
 }
 
-function fixed<T>(groups: Map<string, T[]>, order: ReadonlyArray<readonly [string, string]>): ListGroup<T>[] {
+function fixed<T>(groups: Map<string, T[]>, order: ReadonlyArray<readonly [string, TranslationKey]>): ListGroup<T>[] {
   return order.flatMap(([key, title]) => {
     const tasks = groups.get(key)
-    return tasks && tasks.length ? [{ key, title, tasks }] : []
+    return tasks && tasks.length ? [{ key, title: t(title), tasks }] : []
   })
 }
 
@@ -102,7 +103,7 @@ export function groupListTasks<T extends GroupableTask>(tasks: readonly T[], gro
         titles.set(String(first.id), first.title)
         return String(first.id)
       })
-      return withLast(groups, (key) => ({ key: `label:${key}`, title: titles.get(key) ?? '' }), { key: 'label:none', title: 'No label' })
+      return withLast(groups, (key) => ({ key: `label:${key}`, title: titles.get(key) ?? '' }), { key: 'label:none', title: t('pro.listGroups.noLabel') })
     }
     case 'person': {
       const titles = new Map<string, string>()
@@ -112,14 +113,14 @@ export function groupListTasks<T extends GroupableTask>(tasks: readonly T[], gro
         titles.set(String(person.id), person.title)
         return String(person.id)
       })
-      return withLast(groups, (key) => ({ key: `person:${key}`, title: titles.get(key) ?? '' }), { key: 'person:none', title: 'No person' })
+      return withLast(groups, (key) => ({ key: `person:${key}`, title: titles.get(key) ?? '' }), { key: 'person:none', title: t('pro.listGroups.noPerson') })
     }
     case 'due':
       return fixed(byKey(tasks, (task) => dueBucket(task.due_date, helpers.today)), DUE_BUCKETS).map((group) => ({ ...group, key: `due:${group.key}` }))
     case 'start':
       return fixed(byKey(tasks, (task) => startBucket(task.start_date, helpers.today)), START_BUCKETS).map((group) => ({ ...group, key: `start:${group.key}` }))
     case 'flagged':
-      return fixed(byKey(tasks, (task) => (task.is_favorite === true ? 'yes' : 'no')), [['yes', 'Flagged'], ['no', 'Not flagged']]).map((group) => ({ ...group, key: `flagged:${group.key}` }))
+      return fixed(byKey(tasks, (task) => (task.is_favorite === true ? 'yes' : 'no')), [['yes', 'pro.listGroups.flagged'], ['no', 'pro.listGroups.notFlagged']]).map((group) => ({ ...group, key: `flagged:${group.key}` }))
   }
 }
 

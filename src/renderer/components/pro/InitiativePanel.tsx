@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { ChevronRight } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { usePortfolio } from '@/hooks/use-portfolio'
@@ -15,6 +16,7 @@ const FIELD = 'w-full rounded-control border border-border bg-bg-page px-2 py-1 
  * nine readiness items and the log of decisions, values and open questions.
  */
 export function InitiativePanel({ projectId }: { projectId: number }) {
+  const { t } = useTranslation()
   const pro = usePro()
   const portfolio = usePortfolio()
   const people = usePersonLabels()
@@ -37,7 +39,7 @@ export function InitiativePanel({ projectId }: { projectId: number }) {
     <label className="flex items-center gap-1.5 text-meta text-text-secondary">
       {label}
       <select value={current ?? ''} onChange={(event) => onChange(event.target.value ? Number(event.target.value) : null)} className="rounded-control border border-border bg-bg-page px-1.5 py-0.5 text-text">
-        <option value="">Nobody yet</option>
+        <option value="">{t('pro.initiative.nobody')}</option>
         {[...people.values()].map((person) => <option key={person.id} value={person.id}>{person.title}</option>)}
       </select>
     </label>
@@ -47,16 +49,16 @@ export function InitiativePanel({ projectId }: { projectId: number }) {
     <div className="mx-6 mb-3 rounded-card border border-border p-3" data-pro-initiative-panel>
       <div className="flex flex-wrap items-center gap-3">
         <span className="rounded-chip bg-accent-purple/12 px-2 py-0.5 text-chip font-semibold text-accent-purple">
-          {value.status === 'parked' ? 'Parked' : value.status === 'closed' ? 'Closed' : `Initiative ${rank ?? ''}`}
+          {value.status === 'parked' ? t('pro.initiative.parked') : value.status === 'closed' ? t('pro.initiative.closed') : t('pro.initiative.rank', { rank: rank ?? '' })}
         </span>
-        {personSelect('Sponsor', value.sponsor, (id) => void portfolio.update(projectId, { sponsor: id }))}
-        {personSelect('Owner', value.owner, (id) => void portfolio.update(projectId, { owner: id }))}
+        {personSelect(t('pro.initiative.sponsor'), value.sponsor, (id) => void portfolio.update(projectId, { sponsor: id }))}
+        {personSelect(t('pro.initiative.owner'), value.owner, (id) => void portfolio.update(projectId, { owner: id }))}
         <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} className={cn('ml-auto inline-flex items-center gap-1 text-meta', ready.ready ? 'text-text-secondary' : 'text-status-overdue')}>
           <ChevronRight className={cn('h-3 w-3 transition-transform duration-fade-fast', open && 'rotate-90')} aria-hidden />
-          Ready {ready.done}/{ready.total}
+          {t('pro.initiative.ready', { done: ready.done, total: ready.total })}
         </button>
       </div>
-      {value.status === 'parked' && value.parked?.reason && <p className="mt-2 text-meta text-text-secondary">Parked: {value.parked.reason}</p>}
+      {value.status === 'parked' && value.parked?.reason && <p className="mt-2 text-meta text-text-secondary">{t('pro.initiative.parkedReason', { reason: value.parked.reason })}</p>}
       {open && (
         <div className="mt-3 grid gap-2 sm:grid-cols-2" data-pro-readiness>
           {READINESS_ITEMS.filter((item): item is Exclude<ReadinessItem, 'sponsor' | 'owner' | 'capacity'> => item !== 'sponsor' && item !== 'owner' && item !== 'capacity').map((item) => (
@@ -68,10 +70,10 @@ export function InitiativePanel({ projectId }: { projectId: number }) {
           <div className="text-meta text-text-secondary">
             {READINESS_LABELS.capacity}
             {value.ready?.capacity ? (
-              <p className="py-1 text-text">Agreed {value.ready.capacity.on}{value.ready.capacity.by ? ` with ${people.get(value.ready.capacity.by)?.title ?? 'someone'}` : ''}</p>
+              <p className="py-1 text-text">{value.ready.capacity.by ? t('pro.initiative.agreedWith', { on: value.ready.capacity.on, name: people.get(value.ready.capacity.by)?.title ?? t('pro.initiative.someone') }) : t('pro.initiative.agreed', { on: value.ready.capacity.on })}</p>
             ) : (
               <button type="button" className="block py-1 text-accent-blue hover:underline" onClick={() => void portfolio.update(projectId, { ready: { ...(value.ready ?? {}), capacity: { by: value.sponsor ?? null, on: toLocalDate(new Date()) } } })}>
-                Mark agreed today
+                {t('pro.initiative.markAgreed')}
               </button>
             )}
           </div>
@@ -87,23 +89,23 @@ export function InitiativePanel({ projectId }: { projectId: number }) {
             setEntry('')
           }}
         >
-          <select value={kind} onChange={(event) => setKind(event.target.value as typeof kind)} aria-label="Kind" className="rounded-control border border-border bg-bg-page px-1.5 py-1 text-meta text-text">
-            <option value="decision">Decision</option>
-            <option value="value">Value</option>
-            <option value="unknown">Open question</option>
+          <select value={kind} onChange={(event) => setKind(event.target.value as typeof kind)} aria-label={t('pro.initiative.kind')} className="rounded-control border border-border bg-bg-page px-1.5 py-1 text-meta text-text">
+            <option value="decision">{t('pro.initiative.kindDecision')}</option>
+            <option value="value">{t('pro.initiative.kindValue')}</option>
+            <option value="unknown">{t('pro.initiative.kindOpen')}</option>
           </select>
-          <input value={entry} onChange={(event) => setEntry(event.target.value)} placeholder="Note a decision, a result or a question" aria-label="Log entry" className={FIELD} />
+          <input value={entry} onChange={(event) => setEntry(event.target.value)} placeholder={t('pro.initiative.logPlaceholder')} aria-label={t('pro.initiative.logEntry')} className={FIELD} />
         </form>
         {logs.length > 0 && (
           <ul className="mt-2 max-h-40 space-y-0.5 overflow-y-auto text-meta" data-pro-log>
             {logs.map(({ id, log }) => (
               <li key={id} className="flex gap-2 text-text">
                 <span className="w-20 shrink-0 text-text-secondary">{log.at}</span>
-                <span className="shrink-0 text-text-secondary">{log.kind === 'decision' ? 'Decided' : log.kind === 'value' ? 'Value' : 'Open'}</span>
+                <span className="shrink-0 text-text-secondary">{log.kind === 'decision' ? t('pro.initiative.decided') : log.kind === 'value' ? t('pro.initiative.kindValue') : t('pro.initiative.open')}</span>
                 <span className={cn('min-w-0', log.resolved && 'line-through text-text-secondary')}>{log.text}</span>
                 {log.kind === 'unknown' && !log.resolved && (
-                  <button type="button" className="ml-auto shrink-0 text-accent-blue hover:underline" onClick={() => void portfolio.setRecordValue('log', id, { ...recordValue(portfolio.ledger.log, id), resolved: toLocalDate(new Date()) }, 'Answered')}>
-                    Answered
+                  <button type="button" className="ml-auto shrink-0 text-accent-blue hover:underline" onClick={() => void portfolio.setRecordValue('log', id, { ...recordValue(portfolio.ledger.log, id), resolved: toLocalDate(new Date()) }, t('pro.initiative.answered'))}>
+                    {t('pro.initiative.answered')}
                   </button>
                 )}
               </li>

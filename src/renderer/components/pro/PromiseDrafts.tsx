@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Sparkles } from 'lucide-react'
 import { readSaid } from '@/lib/ai/said-parser'
 import { checkPromiseDrafts, promiseDraftsUser, type PromiseDraft } from '../../../shared/ai/pro-import'
@@ -18,6 +19,7 @@ export function PromiseDrafts({ person, me, mine, onAdd }: {
   mine: ReadonlyArray<{ id: number; title: string }>
   onAdd: (draft: PromiseDraft, needs: number[]) => Promise<void>
 }) {
+  const { t } = useTranslation()
   const [transcript, setTranscript] = useState('')
   const [drafts, setDrafts] = useState<Array<PromiseDraft & { added?: boolean }>>([])
   const [busy, setBusy] = useState(false)
@@ -37,24 +39,24 @@ export function PromiseDrafts({ person, me, mine, onAdd }: {
     const reference = localDateTimeOf(new Date())
     const checked = checkPromiseDrafts(result.data, request, (said) => readSaid(said, reference, navigator.language)?.date ?? null)
     setDrafts(checked)
-    if (checked.length === 0) setProblem('No promise found in what was said.')
+    if (checked.length === 0) setProblem(t('pro.drafts.nonFound'))
   }
 
   return (
     <div className="mt-3 rounded-card border border-border p-3" data-pro-promise-drafts>
-      <label className="mb-1 block text-meta text-text-secondary" htmlFor="pro-promise-transcript">What was said</label>
+      <label className="mb-1 block text-meta text-text-secondary" htmlFor="pro-promise-transcript">{t('pro.drafts.whatWasSaid')}</label>
       <textarea
         id="pro-promise-transcript"
         value={transcript}
         onChange={(event) => setTranscript(event.target.value)}
         rows={2}
-        placeholder={`What ${person} and you agreed, in your words`}
+        placeholder={t('pro.drafts.placeholder', { person })}
         className="w-full resize-y rounded-control border border-border bg-bg-page px-2 py-1 text-meta text-text"
       />
       <div className="mt-2 flex items-center gap-2">
         <button type="button" className={SMALL} disabled={busy || !transcript.trim()} onClick={() => void ask()}>
           <Sparkles className="mr-1 inline h-3.5 w-3.5" aria-hidden />
-          {busy ? 'Drafting…' : 'Draft promises'}
+          {busy ? t('pro.drafts.drafting') : t('pro.drafts.draft')}
         </button>
         {problem && <span className="text-meta text-text-secondary">{problem}</span>}
       </div>
@@ -63,10 +65,10 @@ export function PromiseDrafts({ person, me, mine, onAdd }: {
           {drafts.map((draft, index) => (
             <li key={index} className="flex items-center gap-2 py-1.5">
               <span className="min-w-0 flex-1 text-meta text-text">
-                <span className="text-text-secondary">{draft.mine ? 'You: ' : `${person}: `}</span>
+                <span className="text-text-secondary">{draft.mine ? t('pro.drafts.you') : t('pro.drafts.person', { name: person })} </span>
                 {draft.what}
                 {draft.due && <span className="text-text-secondary">, {draft.due}</span>}
-                {draft.words && <span className="italic text-text-secondary"> &ldquo;{draft.words}&rdquo;</span>}
+                {draft.words && <span className="italic text-text-secondary"> {t('pro.drafts.quoted', { words: draft.words })}</span>}
               </span>
               <button
                 type="button"
@@ -77,7 +79,7 @@ export function PromiseDrafts({ person, me, mine, onAdd }: {
                   void onAdd(draft, needs).then(() => setDrafts((all) => all.map((entry, at) => (at === index ? { ...entry, added: true } : entry))))
                 }}
               >
-                {draft.added ? 'Added' : 'Add'}
+                {draft.added ? t('pro.drafts.added') : t('pro.drafts.add')}
               </button>
             </li>
           ))}

@@ -49,13 +49,14 @@ function Chip({ prop, name, value, isSet, open, buttonRef, onClick, icon, unsetL
   tip?: string
   shortcut?: string
 }) {
+  const { t } = useTranslation()
   return (
     <Tooltip label={tip ?? name} shortcut={shortcut}>
       <button
         ref={buttonRef}
         type="button"
         data-prop={prop}
-        aria-label={isSet && value ? `${name}: ${value}` : name}
+        aria-label={isSet && value ? t('pro.cardChips.nameValue', { name, value }) : name}
         aria-expanded={buttonRef ? open : undefined}
         onClick={onClick}
         className={cn(BUTTON, open ? OPEN : isSet ? SET : UNSET)}
@@ -81,6 +82,7 @@ function Chip({ prop, name, value, isSet, open, buttonRef, onClick, icon, unsetL
  * after and flag. Shown only while the availability layer is on.
  */
 export function ProCardChips({ task }: { task: Task }) {
+  const { t } = useTranslation()
   const { on: availabilityOn } = useAvailability()
   const promisesOn = usePro().layer('promises')
   const promiseRef = useRef<HTMLButtonElement>(null)
@@ -103,23 +105,23 @@ export function ProCardChips({ task }: { task: Task }) {
   const toggle = (which: Exclude<Open, null>) => setOpen((current) => (current === which ? null : which))
   const close = () => setOpen(null)
 
-  const promiseName = promise?.person != null ? people.get(promise.person)?.title ?? 'someone' : null
-  const promiseText = promise ? (promise.dir === 'mine' ? `For ${promiseName}` : `From ${promiseName}`) : undefined
+  const promiseName = promise?.person != null ? people.get(promise.person)?.title ?? t('pro.cardChips.someone') : null
+  const promiseText = promise ? (promise.dir === 'mine' ? t('pro.promise.for', { name: promiseName }) : t('pro.promise.from', { name: promiseName })) : undefined
 
   return (
     <>
       {promisesOn && (
         <Chip
           prop="pro-promise"
-          name="Promise"
-          tip="A promise to or from someone"
+          name={t('pro.cardChips.promise')}
+          tip={t('pro.cardChips.promiseTip')}
           value={promiseText}
           isSet={!!promise}
           open={open === 'promise'}
           buttonRef={promiseRef}
           onClick={() => toggle('promise')}
           icon={<Handshake className="h-3.5 w-3.5" aria-hidden="true" />}
-          unsetLabel="Promise"
+          unsetLabel={t('pro.cardChips.promise')}
         />
       )}
       {open === 'promise' && <PromisePopover anchorRef={promiseRef} task={task} onClose={close} />}
@@ -128,57 +130,57 @@ export function ProCardChips({ task }: { task: Task }) {
       {!block && (
         <Chip
           prop="pro-start"
-          name="Start date"
-          tip="When it becomes available"
-          value={start ? `Starts ${formatWeekdayDate(start, now, fmt)}` : undefined}
+          name={t('pro.cardChips.startDate')}
+          tip={t('pro.cardChips.startTip')}
+          value={start ? t('pro.cardChips.starts', { date: formatWeekdayDate(start, now, fmt) }) : undefined}
           isSet={!!start}
           open={open === 'start'}
           buttonRef={startRef}
           onClick={() => toggle('start')}
           icon={<CalendarClock className="h-3.5 w-3.5" aria-hidden="true" />}
-          unsetLabel="Start"
+          unsetLabel={t('pro.cardChips.start')}
         />
       )}
       {open === 'start' && <StartPopover anchorRef={startRef} task={task} onClose={close} />}
 
       <Chip
         prop="pro-estimate"
-        name="Estimate"
+        name={t('pro.cardChips.estimate')}
         value={estimate !== null ? formatLength(estimate) : undefined}
         isSet={estimate !== null}
         open={open === 'estimate'}
         buttonRef={estimateRef}
         onClick={() => toggle('estimate')}
         icon={<Hourglass className="h-3.5 w-3.5" aria-hidden="true" />}
-        unsetLabel="Estimate"
+        unsetLabel={t('pro.cardChips.estimate')}
       />
       {open === 'estimate' && <EstimatePopover anchorRef={estimateRef} task={task} current={estimate} onClose={close} />}
 
       <Chip
         prop="pro-after"
-        name="After"
-        tip="Tasks this one waits on"
-        value={blockers.length === 0 ? undefined : blockers.length === 1 ? `After: ${blockers[0].title ?? 'a task'}` : `After ${blockers.length} tasks`}
+        name={t('pro.cardChips.after')}
+        tip={t('pro.cardChips.afterTip')}
+        value={blockers.length === 0 ? undefined : blockers.length === 1 ? t('pro.cardChips.afterOne', { title: blockers[0].title ?? t('pro.cardChips.aTask') }) : t('pro.cardChips.afterMany', { count: blockers.length })}
         isSet={blockers.length > 0}
         open={open === 'after'}
         buttonRef={afterRef}
         onClick={() => toggle('after')}
         icon={<Link2 className="h-3.5 w-3.5" aria-hidden="true" />}
-        unsetLabel="After"
+        unsetLabel={t('pro.cardChips.after')}
       />
       {open === 'after' && <AfterPopover anchorRef={afterRef} task={task} onClose={close} />}
 
       <Chip
         prop="pro-flag"
-        name="Flag"
-        tip={task.is_favorite ? 'Remove flag' : 'Flag'}
+        name={t('pro.cardChips.flag')}
+        tip={task.is_favorite ? t('pro.cardChips.removeFlag') : t('pro.cardChips.flag')}
         shortcut="Mod+Shift+F"
-        value="Flagged"
+        value={t('pro.cardChips.flagged')}
         isSet={task.is_favorite === true}
         open={false}
         onClick={() => toggleFlags([task])}
         icon={<Flag className="h-3.5 w-3.5 fill-accent-orange text-accent-orange" aria-hidden="true" />}
-        unsetLabel="Flag"
+        unsetLabel={t('pro.cardChips.flag')}
       />
       </>)}
     </>
@@ -228,13 +230,13 @@ function PromisePopover({ anchorRef, task, onClose }: { anchorRef: RefObject<HTM
   }
 
   return (
-    <Popover anchorRef={anchorRef} onClose={onClose} label="Promise" role="dialog" className="w-80 space-y-2 p-3">
+    <Popover anchorRef={anchorRef} onClose={onClose} label={t('pro.cardChips.promise')} role="dialog" className="w-80 space-y-2 p-3">
       {confirm && confirmPerson !== null && !existing && (
         <button type="button" className="w-full rounded-control bg-accent-blue/12 px-2 py-1.5 text-left text-meta font-medium text-accent-blue" onClick={() => save(true)}>
-          Make it {confirm.name}&apos;s promise
+          {t('pro.cardChips.makeTheirPromise', { name: confirm.name })}
         </button>
       )}
-      <div className="flex gap-1" role="radiogroup" aria-label="Direction">
+      <div className="flex gap-1" role="radiogroup" aria-label={t('pro.cardChips.direction')}>
         {(['theirs', 'mine'] as const).map((value) => (
           <button
             key={value}
@@ -244,17 +246,17 @@ function PromisePopover({ anchorRef, task, onClose }: { anchorRef: RefObject<HTM
             onClick={() => setDir(value)}
             className={dir === value ? 'rounded-chip border border-accent-blue bg-accent-blue/12 px-2 py-0.5 text-meta text-accent-blue' : 'rounded-chip border border-border px-2 py-0.5 text-meta text-text-secondary hover:bg-bg-hover'}
           >
-            {value === 'theirs' ? 'They promised me' : 'I promised them'}
+            {value === 'theirs' ? t('pro.cardChips.theyPromised') : t('pro.cardChips.iPromised')}
           </button>
         ))}
       </div>
-      <select value={person ?? ''} onChange={(event) => setPerson(event.target.value ? Number(event.target.value) : null)} aria-label="Person" className="w-full rounded-control border border-border bg-bg-page px-2 py-1 text-meta text-text">
-        <option value="">Choose a person</option>
+      <select value={person ?? ''} onChange={(event) => setPerson(event.target.value ? Number(event.target.value) : null)} aria-label={t('pro.cardChips.person')} className="w-full rounded-control border border-border bg-bg-page px-2 py-1 text-meta text-text">
+        <option value="">{t('pro.cardChips.choosePerson')}</option>
         {[...personLabels.values()].map((label) => <option key={label.id} value={label.id}>{label.title}</option>)}
       </select>
-      {personLabels.size === 0 && <p className="text-caption text-text-secondary">Mark a label as a person first (its menu in the sidebar, or People).</p>}
-      <input value={words} onChange={(event) => setWords(event.target.value)} placeholder={dir === 'theirs' ? 'In their words' : 'What you said'} aria-label="Words" className="w-full rounded-control border border-border bg-bg-page px-2 py-1 text-meta text-text" />
-      <input value={doneWhen} onChange={(event) => setDoneWhen(event.target.value)} placeholder="We will see it is done when" aria-label="Done when" className="w-full rounded-control border border-border bg-bg-page px-2 py-1 text-meta text-text" />
+      {personLabels.size === 0 && <p className="text-caption text-text-secondary">{t('pro.cardChips.markPersonFirst')}</p>}
+      <input value={words} onChange={(event) => setWords(event.target.value)} placeholder={dir === 'theirs' ? t('pro.cardChips.inTheirWords') : t('pro.cardChips.whatYouSaid')} aria-label={t('pro.cardChips.words')} className="w-full rounded-control border border-border bg-bg-page px-2 py-1 text-meta text-text" />
+      <input value={doneWhen} onChange={(event) => setDoneWhen(event.target.value)} placeholder={t('pro.cardChips.doneWhenPlaceholder')} aria-label={t('pro.cardChips.doneWhen')} className="w-full rounded-control border border-border bg-bg-page px-2 py-1 text-meta text-text" />
       {(portfolio.ranked.length > 0 || initiative !== null) && (
         <select value={initiative ?? ''} onChange={(event) => setInitiative(event.target.value ? Number(event.target.value) : null)} aria-label={t('pro.groundwork.initiative')} className="w-full rounded-control border border-border bg-bg-page px-2 py-1 text-meta text-text">
           <option value="">{t('pro.groundwork.initiative')}: {t('pro.groundwork.initiativeNone')}</option>
@@ -273,16 +275,17 @@ function PromisePopover({ anchorRef, task, onClose }: { anchorRef: RefObject<HTM
       <div className="flex justify-between gap-2">
         {existing ? (
           <button type="button" className="rounded-control px-2 py-1 text-meta text-danger hover:bg-danger/10" onClick={() => { void writeLedger(queryClient, [setRecord('promises', task.id, null)]); onClose() }}>
-            Not a promise
+            {t('pro.cardChips.notAPromise')}
           </button>
         ) : <span />}
-        <button type="button" disabled={person === null} className="rounded-control bg-accent-fill px-3 py-1 text-meta font-medium text-on-accent disabled:opacity-40" onClick={() => save(false)}>Save</button>
+        <button type="button" disabled={person === null} className="rounded-control bg-accent-fill px-3 py-1 text-meta font-medium text-on-accent disabled:opacity-40" onClick={() => save(false)}>{t('pro.common.save')}</button>
       </div>
     </Popover>
   )
 }
 
 function StartPopover({ anchorRef, task, onClose }: { anchorRef: RefObject<HTMLElement | null>; task: Task; onClose: () => void }) {
+  const { t } = useTranslation()
   const update = useUpdateTask()
   const today = toLocalDate(new Date())
   const current = startDayOf(task)
@@ -292,12 +295,12 @@ function StartPopover({ anchorRef, task, onClose }: { anchorRef: RefObject<HTMLE
   }
   const nextMonday = nextWeekDay(today)
   const choices: Array<{ label: string; day: string }> = [
-    { label: 'Tomorrow', day: addLocalDays(today, 1) },
-    { label: 'Next week', day: nextMonday },
-    { label: 'In two weeks', day: addLocalDays(today, 14) },
+    { label: t('pro.cardChips.tomorrow'), day: addLocalDays(today, 1) },
+    { label: t('pro.cardChips.nextWeek'), day: nextMonday },
+    { label: t('pro.cardChips.inTwoWeeks'), day: addLocalDays(today, 14) },
   ]
   return (
-    <Popover anchorRef={anchorRef} onClose={onClose} label="Start date" role="dialog" className="w-72 p-2">
+    <Popover anchorRef={anchorRef} onClose={onClose} label={t('pro.cardChips.startDate')} role="dialog" className="w-72 p-2">
       <div className="mb-2 flex flex-wrap gap-1">
         {choices.map((choice) => (
           <button key={choice.label} type="button" className="rounded-chip border border-border px-2 py-0.5 text-meta text-text hover:bg-bg-hover" onClick={() => set(choice.day)}>
@@ -308,10 +311,10 @@ function StartPopover({ anchorRef, task, onClose }: { anchorRef: RefObject<HTMLE
       <MonthCalendar selected={current} today={today} onPick={(day) => set(day)} />
       {current && (
         <button type="button" className="mt-2 w-full rounded-control px-2 py-1 text-left text-meta text-danger hover:bg-danger/10" onClick={() => set(null)}>
-          Remove start date
+          {t('pro.cardChips.removeStart')}
         </button>
       )}
-      <p className="mt-2 text-caption text-text-secondary">Until that day the task waits: it leaves Available and shows on Upcoming the day it starts.</p>
+      <p className="mt-2 text-caption text-text-secondary">{t('pro.cardChips.startNote')}</p>
     </Popover>
   )
 }
@@ -319,6 +322,7 @@ function StartPopover({ anchorRef, task, onClose }: { anchorRef: RefObject<HTMLE
 const ESTIMATES = [5, 15, 30, 60, 90, 120, 240]
 
 function EstimatePopover({ anchorRef, task, current, onClose }: { anchorRef: RefObject<HTMLElement | null>; task: Task; current: number | null; onClose: () => void }) {
+  const { t } = useTranslation()
   const queryClient = useQueryClient()
   const [typed, setTyped] = useState('')
   const set = (minutes: number | null) => {
@@ -326,7 +330,7 @@ function EstimatePopover({ anchorRef, task, current, onClose }: { anchorRef: Ref
     onClose()
   }
   return (
-    <Popover anchorRef={anchorRef} onClose={onClose} label="Estimate" role="dialog" className="w-64 p-2">
+    <Popover anchorRef={anchorRef} onClose={onClose} label={t('pro.cardChips.estimate')} role="dialog" className="w-64 p-2">
       <div className="flex flex-wrap gap-1">
         {ESTIMATES.map((minutes) => (
           <button
@@ -354,15 +358,15 @@ function EstimatePopover({ anchorRef, task, current, onClose }: { anchorRef: Ref
           max={1440}
           value={typed}
           onChange={(event) => setTyped(event.target.value)}
-          placeholder="Minutes"
-          aria-label="Minutes"
+          placeholder={t('pro.cardChips.minutes')}
+          aria-label={t('pro.cardChips.minutes')}
           className="w-24 rounded-control border border-border bg-bg-page px-2 py-1 text-meta text-text"
         />
-        <button type="submit" className="rounded-control px-2 py-1 text-meta font-medium text-accent-blue hover:bg-bg-hover">Set</button>
+        <button type="submit" className="rounded-control px-2 py-1 text-meta font-medium text-accent-blue hover:bg-bg-hover">{t('pro.cardChips.set')}</button>
       </form>
       {current !== null && (
         <button type="button" className="mt-2 w-full rounded-control px-2 py-1 text-left text-meta text-danger hover:bg-danger/10" onClick={() => set(null)}>
-          Remove estimate
+          {t('pro.cardChips.removeEstimate')}
         </button>
       )}
     </Popover>
@@ -370,6 +374,7 @@ function EstimatePopover({ anchorRef, task, current, onClose }: { anchorRef: Ref
 }
 
 function AfterPopover({ anchorRef, task, onClose }: { anchorRef: RefObject<HTMLElement | null>; task: Task; onClose: () => void }) {
+  const { t } = useTranslation()
   const toggle = useToggleAfter()
   const { data: open = [] } = useTasks(OPEN_TASKS_PARAMS)
   const { cycles } = useAvailability()
@@ -385,17 +390,17 @@ function AfterPopover({ anchorRef, task, onClose }: { anchorRef: RefObject<HTMLE
   }, [open, query, task.id, blockerIds])
 
   return (
-    <Popover anchorRef={anchorRef} onClose={onClose} label="After" role="dialog" className="w-80 p-2" initialFocus="input">
-      <p className="mb-2 text-caption text-text-secondary">This task becomes available when these are done.</p>
+    <Popover anchorRef={anchorRef} onClose={onClose} label={t('pro.cardChips.after')} role="dialog" className="w-80 p-2" initialFocus="input">
+      <p className="mb-2 text-caption text-text-secondary">{t('pro.cardChips.afterIntro')}</p>
       {blockers.length > 0 && (
         <ul className="mb-2 space-y-0.5">
           {blockers.map((entry) => (
             <li key={entry.id} className="flex items-center gap-2 rounded-control px-1 py-0.5 text-meta text-text">
               <Link2 className="h-3 w-3 shrink-0 text-text-secondary" aria-hidden="true" />
-              <span className="min-w-0 flex-1 truncate">{entry.title ?? `Task ${entry.id}`}</span>
+              <span className="min-w-0 flex-1 truncate">{entry.title ?? t('pro.cardChips.taskFallback', { id: entry.id })}</span>
               <button
                 type="button"
-                aria-label={`Stop waiting on ${entry.title ?? 'this task'}`}
+                aria-label={t('pro.cardChips.stopWaiting', { title: entry.title ?? t('pro.cardChips.thisTask') })}
                 className="rounded-control p-0.5 text-text-secondary hover:bg-bg-hover hover:text-text"
                 onClick={() => toggle.mutate({ task, other: { id: entry.id, title: entry.title ?? '', done: !!entry.done }, add: false })}
               >
@@ -406,20 +411,20 @@ function AfterPopover({ anchorRef, task, onClose }: { anchorRef: RefObject<HTMLE
         </ul>
       )}
       {cycles.includes(task.id) && (
-        <p className="mb-2 text-caption text-status-overdue">These tasks wait on each other in a loop, so the loop is ignored. Remove one of them.</p>
+        <p className="mb-2 text-caption text-status-overdue">{t('pro.cardChips.loop')}</p>
       )}
       <label className="flex items-center gap-1.5 rounded-control border border-border px-2 py-1">
         <Search className="h-3 w-3 text-text-secondary" aria-hidden="true" />
         <input
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          placeholder="Find a task"
-          aria-label="Find a task to wait on"
+          placeholder={t('pro.cardChips.findTask')}
+          aria-label={t('pro.cardChips.findTaskToWait')}
           className="min-w-0 flex-1 bg-transparent text-meta text-text outline-none"
         />
       </label>
       {matches.length > 0 && (
-        <ul className="mt-1 max-h-56 overflow-y-auto" role="listbox" aria-label="Tasks">
+        <ul className="mt-1 max-h-56 overflow-y-auto" role="listbox" aria-label={t('pro.cardChips.tasks')}>
           {matches.map((other) => (
             <li key={other.id}>
               <button

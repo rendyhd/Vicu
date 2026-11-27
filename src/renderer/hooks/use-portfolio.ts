@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { currentLedger, newLedgerId, restoreRecords, setRecord, useProLedger, writeLedger } from './use-pro-ledger'
 import { useProjects } from './use-projects'
 import { toast } from '@/stores/toast-store'
+import { t } from '../../shared/i18n'
 import { toLocalDate } from '../../shared/due-dates'
 import { recordValue, type InitiativeValue, type LedgerCollection, type LogValue } from '../../shared/pro/ledger'
 import type { ProLedgerOperation } from '../../shared/pro/ledger-ipc'
@@ -16,7 +17,7 @@ export function usePortfolio() {
   const queryClient = useQueryClient()
   const { ledger } = useProLedger()
   const { data: projects } = useProjects()
-  const titleOf = useCallback((id: number) => projects?.all.find((project) => project.id === id)?.title ?? 'Initiative', [projects?.all])
+  const titleOf = useCallback((id: number) => projects?.all.find((project) => project.id === id)?.title ?? t('pro.portfolio.fallbackTitle'), [projects?.all])
 
   const write = useCallback(async (message: string, build: (ops: ProLedgerOperation[], touch: (collection: LedgerCollection, id: string | number, value: unknown) => void) => void) => {
     const before = currentLedger(queryClient)
@@ -28,7 +29,7 @@ export function usePortfolio() {
     })
     if (!operations.length) return
     if (await writeLedger(queryClient, operations)) {
-      toast.success(message, { action: { label: 'Undo', onAction: () => void writeLedger(queryClient, restoreRecords(before, touched)) } })
+      toast.success(message, { action: { label: t('pro.portfolio.undo'), onAction: () => void writeLedger(queryClient, restoreRecords(before, touched)) } })
     }
   }, [queryClient])
 
@@ -45,14 +46,14 @@ export function usePortfolio() {
       initiative: (projectId: number) => recordValue(ledger.initiatives, projectId),
       /** Makes a project an initiative, last in rank; at the cap the caller parks one first. */
       start: (projectId: number) =>
-        write(`${titleOf(projectId)} is an initiative`, (_ops, touch) => {
+        write(t('pro.portfolio.isInitiative', { title: titleOf(projectId) }), (_ops, touch) => {
           const current = value(projectId)
           touch('initiatives', projectId, { ...(current ?? {}), status: 'active', rank: rankedInitiatives(currentLedger(queryClient)).length + 1 })
         }),
-      update: (projectId: number, change: Partial<InitiativeValue>, message = 'Saved') =>
+      update: (projectId: number, change: Partial<InitiativeValue>, message = t('pro.portfolio.saved')) =>
         write(message, (_ops, touch) => touch('initiatives', projectId, { ...(value(projectId) ?? { status: 'active' }), ...change })),
       move: (projectId: number, toIndex: number) =>
-        write(`${titleOf(projectId)} moved to ${toIndex + 1}`, (_ops, touch) => {
+        write(t('pro.portfolio.movedTo', { title: titleOf(projectId), position: toIndex + 1 }), (_ops, touch) => {
           const ranks = moveRank(currentLedger(queryClient), projectId, toIndex)
           for (const [id, rank] of Object.entries(ranks)) {
             const current = value(Number(id))
@@ -60,19 +61,19 @@ export function usePortfolio() {
           }
         }),
       park: (projectId: number, reason: string) =>
-        write(`${titleOf(projectId)} parked`, (_ops, touch) => {
+        write(t('pro.portfolio.parked', { title: titleOf(projectId) }), (_ops, touch) => {
           const current = value(projectId)
           if (!current) return
           touch('initiatives', projectId, parkedValue(current, toLocalDate(new Date()), reason))
           log(touch, { kind: 'decision', text: `Parked ${titleOf(projectId)}${reason.trim() ? `: ${reason.trim()}` : ''}`, initiative: projectId })
         }),
       unpark: (projectId: number) =>
-        write(`${titleOf(projectId)} is active again`, (_ops, touch) => {
+        write(t('pro.portfolio.activeAgain', { title: titleOf(projectId) }), (_ops, touch) => {
           const current = value(projectId)
           if (current) touch('initiatives', projectId, unparkedValue(currentLedger(queryClient), current))
         }),
       close: (projectId: number) =>
-        write(`${titleOf(projectId)} closed`, (_ops, touch) => {
+        write(t('pro.portfolio.closed', { title: titleOf(projectId) }), (_ops, touch) => {
           const current = value(projectId)
           if (!current) return
           const next: InitiativeValue = { ...current, status: 'closed', closed_on: toLocalDate(new Date()) }
@@ -80,8 +81,8 @@ export function usePortfolio() {
           touch('initiatives', projectId, next)
         }),
       stop: (projectId: number) =>
-        write(`${titleOf(projectId)} is no longer an initiative`, (_ops, touch) => touch('initiatives', projectId, null)),
-      addLog: (entry: Omit<LogValue, 'at'>) => write(entry.kind === 'value' ? 'Value noted' : entry.kind === 'decision' ? 'Decision noted' : 'Noted', (_ops, touch) => log(touch, entry)),
+        write(t('pro.portfolio.noLonger', { title: titleOf(projectId) }), (_ops, touch) => touch('initiatives', projectId, null)),
+      addLog: (entry: Omit<LogValue, 'at'>) => write(entry.kind === 'value' ? t('pro.portfolio.valueNoted') : entry.kind === 'decision' ? t('pro.portfolio.decisionNoted') : t('pro.portfolio.noted'), (_ops, touch) => log(touch, entry)),
       setRecordValue: (collection: LedgerCollection, id: string, next: unknown, message: string) => write(message, (_ops, touch) => touch(collection, id, next)),
     }
   }, [ledger, titleOf, write, queryClient])

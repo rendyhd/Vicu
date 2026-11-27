@@ -26,14 +26,15 @@ import {
 import { inProArea, readProArea, type AreaProject } from '../../shared/pro/settings'
 import { isWorkProArea } from '../../shared/work-scope'
 import { useWorkMode } from './use-work-mode'
+import { t, type TranslationKey } from '../../shared/i18n'
 
-export const VERDICT_LABELS: Record<VerdictKind, string> = {
-  delivered: 'Delivered',
-  late: 'Late',
-  not_yet: 'Not yet',
-  renegotiated: 'New date',
-  dropped: 'Dropped',
-  taken_over: 'I did it',
+export const VERDICT_LABELS: Record<VerdictKind, TranslationKey> = {
+  delivered: 'pro.verdict.delivered',
+  late: 'pro.verdict.late',
+  not_yet: 'pro.verdict.notYet',
+  renegotiated: 'pro.verdict.renegotiated',
+  dropped: 'pro.verdict.dropped',
+  taken_over: 'pro.verdict.takenOver',
 }
 
 /** The verdict buttons in their order (keys 1 to 5, then 6 for Ask me tomorrow; design system 9). */
@@ -94,9 +95,9 @@ export function usePromiseActions() {
       const oldDue = task.due_date
       if (change.taskPatch?.done) complete.mutate(task)
       else if (typeof change.taskPatch?.due_date === 'string') update.mutate({ id: task.id, changes: { due_date: change.taskPatch.due_date }, original: task })
-      toast.success(`${VERDICT_LABELS[kind]}: ${task.title}`, {
+      toast.success(t('pro.verdict.toast', { verdict: t(VERDICT_LABELS[kind]), title: task.title }), {
         action: {
-          label: 'Undo',
+          label: t('pro.verdict.undo'),
           onAction: () => {
             const now = promiseOf(currentLedger(queryClient), task.id)
             if (now) void writeLedger(queryClient, [setRecord('promises', task.id, withVerdictUndone(now, change.verdict.id))])

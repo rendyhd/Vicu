@@ -5,6 +5,7 @@ import { toast } from '@/stores/toast-store'
 import { emptyLedger, recordValue, type LedgerCollection, type ProLedger } from '../../shared/pro/ledger'
 import type { ProLedgerOperation, ProLedgerSnapshot } from '../../shared/pro/ledger-ipc'
 import { usePro } from './use-pro'
+import { t } from '../../shared/i18n'
 
 /**
  * The Pro ledger (cross-app semantics 21.7) as the main process keeps it. Read only while Pro is on.
@@ -44,7 +45,7 @@ export async function writeLedger(queryClient: QueryClient, operations: ProLedge
     return true
   } catch (error) {
     const reason = error instanceof Error ? error.message : ''
-    toast.error(reason ? `Could not save the change: ${reason}` : 'Could not save the change')
+    toast.error(reason ? t('pro.ledger.saveFailedWith', { reason }) : t('pro.ledger.saveFailed'))
     return false
   }
 }

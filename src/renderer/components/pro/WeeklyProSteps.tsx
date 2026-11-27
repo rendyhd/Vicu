@@ -16,16 +16,17 @@ import type { LocalDate } from '../../../shared/due-dates'
 import { startOfWeek } from '../../../shared/due-dates'
 import { mirrorText, proWeeklySteps, weeklyDoneSteps, weeklyMirror, withWeeklyDone, type ProWeeklyStepId } from '../../../shared/pro/weekly'
 import { rankedInitiatives } from '../../../shared/pro/portfolio'
+import type { TranslationKey } from '../../../shared/i18n'
 
 /** The steps whose text is still here; the weekly note's is in the catalog. */
 type OlderStep = Exclude<ProWeeklyStepId, 'note'>
 
-const HINTS: Record<OlderStep, string> = {
-  verdicts: 'Promises others made you that are due: kept, not yet, or another verdict.',
-  unsent: 'What was agreed in a meeting and not sent in a recap yet.',
-  escalations: 'Escalations drafted or on the agenda, and decisions you are owed.',
-  portfolio: 'Initiatives not ready, over the cap or without an available task.',
-  value: 'Initiatives closed this week without the value they delivered.',
+const HINTS: Record<OlderStep, TranslationKey> = {
+  verdicts: 'pro.weeklySteps.verdicts',
+  unsent: 'pro.weeklySteps.unsent',
+  escalations: 'pro.weeklySteps.escalations',
+  portfolio: 'pro.weeklySteps.portfolio',
+  value: 'pro.weeklySteps.value',
 }
 
 const ROUTES: Record<OlderStep, string> = {
@@ -84,24 +85,24 @@ export function WeeklyProSteps({ tasks, today }: { tasks: readonly Task[]; today
   if (!pro.on || (steps.length === 0 && !mirror)) return null
 
   return (
-    <section aria-label="Execution review" className="mb-4 flex flex-col gap-2" data-pro-weekly>
+    <section aria-label={t('pro.weeklySteps.review')} className="mb-4 flex flex-col gap-2" data-pro-weekly>
       {mirror && (
         <p className="rounded-card border border-accent-blue/40 bg-accent-blue/8 px-4 py-3 text-meta text-[var(--text-primary)]" data-pro-mirror>
           {mirrorText(mirror)}
         </p>
       )}
       {steps.length > 0 && (
-        <ol className="flex flex-col gap-2" aria-label="Execution steps">
+        <ol className="flex flex-col gap-2" aria-label={t('pro.weeklySteps.steps')}>
           {steps.map((step) => {
             const stepDone = done.has(step.id) || step.count === 0
             const hint = step.id === 'portfolio' && loggedAnyway > 0
-              ? `${HINTS.portfolio} ${loggedAnyway} ${loggedAnyway === 1 ? 'task was' : 'tasks were'} logged anyway.`
-              : step.id === 'note' ? t('pro.weekly.noteHint') : HINTS[step.id]
+              ? t('pro.weeklySteps.portfolioLogged', { count: loggedAnyway })
+              : step.id === 'note' ? t('pro.weekly.noteHint') : t(HINTS[step.id])
             return (
               <li key={step.id} className="flex items-center gap-3 rounded-card border border-[var(--border-color)] px-4 py-3" data-pro-weekly-step={step.id}>
                 {stepDone
-                  ? <CheckCircle2 aria-label="Done" className="h-5 w-5 shrink-0 text-accent-green" />
-                  : <Circle aria-label="Not done" className="h-5 w-5 shrink-0 text-[var(--text-secondary)]" />}
+                  ? <CheckCircle2 aria-label={t('pro.weeklySteps.done')} className="h-5 w-5 shrink-0 text-accent-green" />
+                  : <Circle aria-label={t('pro.weeklySteps.notDone')} className="h-5 w-5 shrink-0 text-[var(--text-secondary)]" />}
                 <div className="min-w-0 flex-1">
                   <div className="flex items-baseline gap-2">
                     <h2 className={cn('text-task-title font-medium text-[var(--text-primary)]', stepDone && 'text-[var(--text-secondary)]')}>{step.title}</h2>
@@ -111,8 +112,8 @@ export function WeeklyProSteps({ tasks, today }: { tasks: readonly Task[]; today
                 </div>
                 {step.id === 'note'
                   ? <Button onClick={() => useProUiStore.getState().open('pro-weekly-note')} data-pro-weekly-note-open>{t('pro.weekly.noteOpen')}</Button>
-                  : <Button onClick={() => void navigate({ to: ROUTES[step.id as OlderStep] })}>Open</Button>}
-                {!stepDone && <Button variant="quiet" onClick={() => markDone(step.id)}>Mark done</Button>}
+                  : <Button onClick={() => void navigate({ to: ROUTES[step.id as OlderStep] })}>{t('pro.weeklySteps.open')}</Button>}
+                {!stepDone && <Button variant="quiet" onClick={() => markDone(step.id)}>{t('pro.weeklySteps.markDone')}</Button>}
               </li>
             )
           })}

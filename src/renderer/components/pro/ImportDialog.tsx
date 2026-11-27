@@ -1,4 +1,6 @@
 import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
+import type { TranslationKey } from '../../../shared/i18n'
 import { useQueryClient } from '@tanstack/react-query'
 import { Dialog } from '@/components/overlay/Dialog'
 import { Checkbox } from '@/components/shared/Checkbox'
@@ -25,22 +27,22 @@ import { recordValue, type LedgerCollection, type PromiseValue, type VerdictKind
 import { withAlias } from '../../../shared/pro/people'
 import type { ProLedgerOperation } from '../../../shared/pro/ledger-ipc'
 
-const ACTION_TEXT: Record<ImportRow['action'], string> = {
-  their_promise: 'Their promise',
-  confirm: 'To confirm',
-  my_task: 'Your action',
-  verdict: 'Update',
-  open_item: 'Open item',
-  decision: 'Decision',
-  owed: 'Decision needed',
-  value: 'Value',
+const ACTION_TEXT: Record<ImportRow['action'], TranslationKey> = {
+  their_promise: 'pro.import.action.theirPromise',
+  confirm: 'pro.import.action.confirm',
+  my_task: 'pro.import.action.myTask',
+  verdict: 'pro.import.action.verdict',
+  open_item: 'pro.import.action.openItem',
+  decision: 'pro.import.action.decision',
+  owed: 'pro.import.action.owed',
+  value: 'pro.import.action.value',
 }
 
-const GROUPS: Array<{ title: string; actions: ImportRow['action'][] }> = [
-  { title: 'Updates', actions: ['verdict'] },
-  { title: 'New promises', actions: ['their_promise', 'confirm'] },
-  { title: 'Your actions', actions: ['my_task'] },
-  { title: 'Open items and decisions', actions: ['open_item', 'decision', 'owed', 'value'] },
+const GROUPS: Array<{ title: TranslationKey; actions: ImportRow['action'][] }> = [
+  { title: 'pro.import.group.updates', actions: ['verdict'] },
+  { title: 'pro.import.group.newPromises', actions: ['their_promise', 'confirm'] },
+  { title: 'pro.import.group.yourActions', actions: ['my_task'] },
+  { title: 'pro.import.group.openItems', actions: ['open_item', 'decision', 'owed', 'value'] },
 ]
 
 interface RowChoice {
@@ -56,6 +58,7 @@ interface RowChoice {
  * review every row, then add the ticked ones at once with one Undo.
  */
 export function ImportDialog({ onClose, initialText = '', groupLabel }: { onClose: () => void; initialText?: string; groupLabel?: number }) {
+  const { t } = useTranslation()
   const queryClient = useQueryClient()
   const world = usePromiseWorld()
   const groups = useGroups()
@@ -121,7 +124,7 @@ export function ImportDialog({ onClose, initialText = '', groupLabel }: { onClos
     }
     const document = proImportDocument(result.data, { kind: sourceKind, title: '', date: today })
     if (!document) {
-      setConvertProblem('The assistant found nothing to import.')
+      setConvertProblem(t('pro.import.nothingToImport'))
       return
     }
     setText(document)
@@ -228,9 +231,9 @@ export function ImportDialog({ onClose, initialText = '', groupLabel }: { onClos
       }
       if (operations.length) await writeLedger(queryClient, operations)
       const people = [...new Set(ticked.map((row) => choiceOf(row).person).filter((id): id is number => id !== null))]
-      toast.success(`Added ${ticked.length} ${ticked.length === 1 ? 'item' : 'items'}`, {
+      toast.success(t('pro.import.added', { count: ticked.length }), {
         action: {
-          label: 'Undo',
+          label: t('pro.import.undo'),
           onAction: () => {
             for (const task of created) deleteTask.mutate({ task })
             for (const { task, oldDue } of verdicts) {
@@ -240,11 +243,11 @@ export function ImportDialog({ onClose, initialText = '', groupLabel }: { onClos
             void writeLedger(queryClient, restoreRecords(before, touched))
           },
         },
-        secondAction: people.length ? { label: 'Recap', onAction: () => openRecap('pro-recap', { personId: people[0] }) } : undefined,
+        secondAction: people.length ? { label: t('pro.import.recap'), onAction: () => openRecap('pro-recap', { personId: people[0] }) } : undefined,
       })
       onClose()
     } catch (error) {
-      toast.error(error instanceof Error ? `Import stopped: ${error.message}` : 'Import stopped')
+      toast.error(error instanceof Error ? t('pro.import.stoppedWith', { message: error.message }) : t('pro.import.stopped'))
     } finally {
       setWorking(false)
     }
@@ -259,9 +262,9 @@ export function ImportDialog({ onClose, initialText = '', groupLabel }: { onClos
   }
 
   return (
-    <Dialog open label="Import" onClose={onClose} className="w-[760px] max-w-[94vw] p-5">
-      <h2 className="mb-1 text-card-title text-text">Import</h2>
-      <p className="mb-3 text-meta text-text-secondary">Paste the answer Copilot gave, or a Vicu export. Nothing is added until you choose Add.</p>
+    <Dialog open label={t('pro.import.title')} onClose={onClose} className="w-[760px] max-w-[94vw] p-5">
+      <h2 className="mb-1 text-card-title text-text">{t('pro.import.title')}</h2>
+      <p className="mb-3 text-meta text-text-secondary">{t('pro.import.intro')}</p>
       <textarea
         value={text}
         onChange={(event) => {
@@ -269,25 +272,26 @@ export function ImportDialog({ onClose, initialText = '', groupLabel }: { onClos
           setChoices({})
         }}
         rows={match ? 3 : 10}
+        // i18n-ignore: the import format, the same in every language
         placeholder='{"format":"vicu-import/1", ...}'
-        aria-label="Pasted text"
+        aria-label={t('pro.import.pastedText')}
         className="w-full rounded-control border border-border bg-bg-page p-2 font-mono text-meta text-text"
         autoFocus
       />
       {read && !read.ok && (
         <p className="mt-2 text-meta text-status-overdue">
-          {read.problems[0] ?? 'This is not an import Vicu can read.'}
+          {read.problems[0] ?? t('pro.import.notReadable')}
         </p>
       )}
       {read && !read.ok && canConvert && (
         <div className="mt-2 flex flex-wrap items-center gap-2" data-pro-import-convert>
-          <select value={sourceKind} onChange={(event) => setSourceKind(event.target.value as typeof sourceKind)} aria-label="The text is" className="rounded-control border border-border bg-bg-page px-2 py-1 text-meta text-text">
-            <option value="meeting">Meeting notes</option>
-            <option value="mail">A mail thread</option>
-            <option value="chat">A chat</option>
+          <select value={sourceKind} onChange={(event) => setSourceKind(event.target.value as typeof sourceKind)} aria-label={t('pro.import.textIs')} className="rounded-control border border-border bg-bg-page px-2 py-1 text-meta text-text">
+            <option value="meeting">{t('pro.import.kindMeeting')}</option>
+            <option value="mail">{t('pro.import.kindMail')}</option>
+            <option value="chat">{t('pro.import.kindChat')}</option>
           </select>
           <button type="button" disabled={converting} onClick={() => void convert()} className="rounded-control bg-accent-fill px-3 py-1 text-meta font-medium text-on-accent disabled:opacity-40">
-            {converting ? 'Converting…' : 'Convert with the assistant'}
+            {converting ? t('pro.import.converting') : t('pro.import.convert')}
           </button>
           {convertProblem && <span className="text-meta text-status-overdue">{convertProblem}</span>}
         </div>
@@ -300,7 +304,7 @@ export function ImportDialog({ onClose, initialText = '', groupLabel }: { onClos
             if (!rows.length) return null
             return (
               <section key={group.title}>
-                <h3 className="mb-1 text-group text-text-secondary">{group.title}</h3>
+                <h3 className="mb-1 text-group text-text-secondary">{t(group.title)}</h3>
                 <ul className="divide-y divide-border rounded-card border border-border">
                   {rows.map((row) => {
                     const choice = choiceOf(row)
@@ -308,12 +312,12 @@ export function ImportDialog({ onClose, initialText = '', groupLabel }: { onClos
                     const target = row.target !== null ? world.openById.get(row.target) : undefined
                     return (
                       <li key={row.index} className="flex items-start gap-2 px-3 py-2" data-pro-import-row={row.action}>
-                        <Checkbox checked={choice.on} onChange={(event) => setChoice(row, { on: event.target.checked })} aria-label={`Add ${row.item.what}`} />
+                        <Checkbox checked={choice.on} onChange={(event) => setChoice(row, { on: event.target.checked })} aria-label={t('pro.import.addItem', { what: row.item.what })} />
                         <div className="min-w-0 flex-1 space-y-1">
                           <div className="flex items-center gap-2">
-                            <span className="shrink-0 rounded-chip bg-bg-hover px-2 py-px text-chip text-text-secondary">{ACTION_TEXT[row.action]}</span>
+                            <span className="shrink-0 rounded-chip bg-bg-hover px-2 py-px text-chip text-text-secondary">{t(ACTION_TEXT[row.action])}</span>
                             {row.title !== null ? (
-                              <input value={choice.title} onChange={(event) => setChoice(row, { title: event.target.value })} aria-label="Title" className="min-w-0 flex-1 rounded-control border border-transparent bg-transparent px-1 text-task-title text-text hover:border-border focus:border-border" />
+                              <input value={choice.title} onChange={(event) => setChoice(row, { title: event.target.value })} aria-label={t('pro.import.rowTitle')} className="min-w-0 flex-1 rounded-control border border-transparent bg-transparent px-1 text-task-title text-text hover:border-border focus:border-border" />
                             ) : (
                               <span className="min-w-0 flex-1 truncate text-task-title text-text">{row.item.what}</span>
                             )}
@@ -321,8 +325,8 @@ export function ImportDialog({ onClose, initialText = '', groupLabel }: { onClos
                           </div>
                           {row.action === 'verdict' && (
                             <p className="text-meta text-text-secondary">
-                              {target ? `${row.item.status ?? '?'} for "${target.title}"` : 'No open promise matches this update.'}
-                              {row.check && ' Check that this is the right one.'}
+                              {target ? t('pro.import.verdictFor', { status: row.item.status ?? '?', title: target.title }) : t('pro.import.noMatch')}
+                              {row.check && ` ${t('pro.import.checkRight')}`}
                             </p>
                           )}
                           {row.name && row.action !== 'verdict' && (
@@ -330,14 +334,14 @@ export function ImportDialog({ onClose, initialText = '', groupLabel }: { onClos
                               <span>{row.name}</span>
                               {unknownName && (
                                 <>
-                                  <select value={choice.person ?? ''} onChange={(event) => setChoice(row, { person: event.target.value ? Number(event.target.value) : null, on: !!event.target.value })} aria-label={`Who is ${row.name}`} className="rounded-control border border-border bg-bg-page px-1.5 py-0.5">
-                                    <option value="">Who is this?</option>
+                                  <select value={choice.person ?? ''} onChange={(event) => setChoice(row, { person: event.target.value ? Number(event.target.value) : null, on: !!event.target.value })} aria-label={t('pro.import.whoIsName', { name: row.name })} className="rounded-control border border-border bg-bg-page px-1.5 py-0.5">
+                                    <option value="">{t('pro.import.whoIsThis')}</option>
                                     {[...world.people.values()].map((label) => <option key={label.id} value={label.id}>{label.title}</option>)}
                                   </select>
                                   {choice.person !== null ? (
-                                    <label className="flex items-center gap-1"><Checkbox checked={choice.rememberAlias} onChange={(event) => setChoice(row, { rememberAlias: event.target.checked })} /> Remember</label>
+                                    <label className="flex items-center gap-1"><Checkbox checked={choice.rememberAlias} onChange={(event) => setChoice(row, { rememberAlias: event.target.checked })} /> {t('pro.import.remember')}</label>
                                   ) : (
-                                    <button type="button" className="text-accent-blue hover:underline" onClick={() => void addPerson(row)}>Add {row.name} as a person</button>
+                                    <button type="button" className="text-accent-blue hover:underline" onClick={() => void addPerson(row)}>{t('pro.import.addAsPerson', { name: row.name })}</button>
                                   )}
                                 </>
                               )}
@@ -353,18 +357,18 @@ export function ImportDialog({ onClose, initialText = '', groupLabel }: { onClos
           })}
           {match.notMentioned.length > 0 && (
             <section>
-              <h3 className="mb-1 text-group text-text-secondary">Not mentioned</h3>
+              <h3 className="mb-1 text-group text-text-secondary">{t('pro.import.notMentioned')}</h3>
               <ul className="space-y-0.5 text-meta text-text-secondary">
-                {match.notMentioned.map((id) => <li key={id}>{world.openById.get(id)?.title ?? `Task ${id}`}</li>)}
+                {match.notMentioned.map((id) => <li key={id}>{world.openById.get(id)?.title ?? t('pro.import.taskFallback', { id })}</li>)}
               </ul>
             </section>
           )}
         </div>
       )}
       <div className="mt-4 flex justify-end gap-2">
-        <button type="button" className="rounded-control px-3 py-1.5 text-meta text-text hover:bg-bg-hover" onClick={onClose}>Cancel</button>
+        <button type="button" className="rounded-control px-3 py-1.5 text-meta text-text hover:bg-bg-hover" onClick={onClose}>{t('pro.common.cancel')}</button>
         <button type="button" disabled={!ticked.length || working} className="rounded-control bg-accent-fill px-3 py-1.5 text-meta font-medium text-on-accent disabled:opacity-40" onClick={() => void apply()} data-pro-import-add>
-          {ticked.length ? `Add ${ticked.length} ${ticked.length === 1 ? 'item' : 'items'}` : 'Add'}
+          {ticked.length ? t('pro.import.addCount', { count: ticked.length }) : t('pro.import.add')}
         </button>
       </div>
     </Dialog>

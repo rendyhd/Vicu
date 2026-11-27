@@ -41,14 +41,18 @@ export function TriageDialog({ task, onClose }: { task: Task; onClose: () => voi
     switch (choice) {
       case 'accept': {
         const rank = portfolio.ranked.find((entry) => entry.projectId === initiative)?.rank
-        return `Thanks. "${title}" goes into ${portfolio.titleOf(initiative ?? 0)}${rank ? `, our number ${rank} priority` : ''}.`
+        return rank
+          ? t('pro.triage.replyAcceptRank', { title, initiative: portfolio.titleOf(initiative ?? 0), rank })
+          : t('pro.triage.replyAccept', { title, initiative: portfolio.titleOf(initiative ?? 0) })
       }
       case 'delegate':
-        return `Thanks. ${people.get(person ?? 0)?.title ?? 'A colleague'} is better placed for "${title}"; I have asked them.`
+        return t('pro.triage.replyDelegate', { name: people.get(person ?? 0)?.title ?? t('pro.triage.colleague'), title })
       case 'decline':
-        return `Thanks for asking. We cannot take on "${title}" now${reason.trim() ? `: ${reason.trim()}` : ''}. Our capacity is on ${portfolio.ranked.length} agreed priorities.`
+        return reason.trim()
+          ? t('pro.triage.replyDeclineReason', { title, reason: reason.trim(), count: portfolio.ranked.length })
+          : t('pro.triage.replyDecline', { title, count: portfolio.ranked.length })
       case 'ask':
-        return `Thanks. "${title}" needs a choice against our current priorities; I have asked ${sponsor !== null ? people.get(sponsor)?.title ?? 'our sponsor' : 'our sponsor'}.`
+        return t('pro.triage.replyAsk', { title, name: sponsor !== null ? people.get(sponsor)?.title ?? t('pro.triage.ourSponsor') : t('pro.triage.ourSponsor') })
     }
   }
 
@@ -64,10 +68,10 @@ export function TriageDialog({ task, onClose }: { task: Task; onClose: () => voi
       await portfolio.addLog({ kind: 'decision', text: `Declined "${title}"${reason.trim() ? `: ${reason.trim()}` : ''}`, initiative: null })
       complete.mutate(task)
     } else if (choice === 'ask') {
-      await portfolio.setRecordValue('owed', newLedgerId(), { what: title, from: sponsor, initiative: null, opened: today }, 'Asked the sponsor')
+      await portfolio.setRecordValue('owed', newLedgerId(), { what: title, from: sponsor, initiative: null, opened: today }, t('pro.triage.askedSponsor'))
     }
     await api.writeClipboardRich(reply())
-    toast.success('Reply copied')
+    toast.success(t('pro.triage.copied'))
     onClose()
   }
 
@@ -75,20 +79,20 @@ export function TriageDialog({ task, onClose }: { task: Task; onClose: () => voi
   const canApply = ready && (choice !== 'delegate' || person !== null)
 
   return (
-    <Dialog open label="Request" onClose={onClose} className="w-[600px] max-w-[92vw] p-5">
-      <h2 className="mb-1 text-card-title text-text">Request: {title}</h2>
-      <p className="mb-3 text-meta text-text-secondary">{portfolio.cap.unlimited ? t('pro.groundwork.triageNoLimit', { count: portfolio.cap.active }) : `${portfolio.cap.active} of ${portfolio.cap.cap} initiatives are active. Weigh it against them.`}</p>
+    <Dialog open label={t('pro.triage.label')} onClose={onClose} className="w-[600px] max-w-[92vw] p-5">
+      <h2 className="mb-1 text-card-title text-text">{t('pro.triage.title', { title })}</h2>
+      <p className="mb-3 text-meta text-text-secondary">{portfolio.cap.unlimited ? t('pro.groundwork.triageNoLimit', { count: portfolio.cap.active }) : t('pro.triage.capped', { active: portfolio.cap.active, cap: portfolio.cap.cap })}</p>
       <ol className="mb-4 divide-y divide-border rounded-card border border-border">
         {portfolio.ranked.map((entry) => (
           <li key={entry.projectId} className="flex items-center gap-3 px-3 py-1.5 text-meta text-text">
             <span className="w-5 text-right text-text-secondary">{entry.rank}</span>
             <span className="min-w-0 flex-1 truncate">{portfolio.titleOf(entry.projectId)}</span>
-            <span className="text-text-secondary">ready {readiness(entry.value).done}/9</span>
+            <span className="text-text-secondary">{t('pro.triage.ready', { done: readiness(entry.value).done })}</span>
           </li>
         ))}
-        {portfolio.ranked.length === 0 && <li className="px-3 py-2 text-meta text-text-secondary">No initiatives yet.</li>}
+        {portfolio.ranked.length === 0 && <li className="px-3 py-2 text-meta text-text-secondary">{t('pro.triage.none')}</li>}
       </ol>
-      <div className="mb-3 flex flex-wrap gap-1" role="radiogroup" aria-label="What to do">
+      <div className="mb-3 flex flex-wrap gap-1" role="radiogroup" aria-label={t('pro.triage.whatToDo')}>
         {(['accept', 'delegate', 'decline', 'ask'] as const).map((value) => (
           <button
             key={value}
@@ -98,29 +102,29 @@ export function TriageDialog({ task, onClose }: { task: Task; onClose: () => voi
             onClick={() => setChoice(value)}
             className={choice === value ? `${OPTION} border-accent-blue bg-accent-blue/12 text-accent-blue` : `${OPTION} border-border text-text-secondary hover:bg-bg-hover`}
           >
-            {value === 'accept' ? 'Accept' : value === 'delegate' ? 'Delegate' : value === 'decline' ? 'Decline' : 'Ask the sponsor'}
+            {value === 'accept' ? t('pro.triage.accept') : value === 'delegate' ? t('pro.triage.delegate') : value === 'decline' ? t('pro.triage.decline') : t('pro.triage.ask')}
           </button>
         ))}
       </div>
       {choice === 'accept' && (
-        <select value={initiative ?? ''} onChange={(event) => setInitiative(event.target.value ? Number(event.target.value) : null)} aria-label="Initiative" className="w-full rounded-control border border-border bg-bg-page px-2 py-1 text-meta text-text">
-          <option value="">Choose an initiative</option>
+        <select value={initiative ?? ''} onChange={(event) => setInitiative(event.target.value ? Number(event.target.value) : null)} aria-label={t('pro.triage.initiative')} className="w-full rounded-control border border-border bg-bg-page px-2 py-1 text-meta text-text">
+          <option value="">{t('pro.triage.chooseInitiative')}</option>
           {portfolio.ranked.map((entry) => <option key={entry.projectId} value={entry.projectId}>{entry.rank}. {portfolio.titleOf(entry.projectId)}</option>)}
         </select>
       )}
       {choice === 'delegate' && (
-        <select value={person ?? ''} onChange={(event) => setPerson(event.target.value ? Number(event.target.value) : null)} aria-label="Person" className="w-full rounded-control border border-border bg-bg-page px-2 py-1 text-meta text-text">
-          <option value="">To whom</option>
+        <select value={person ?? ''} onChange={(event) => setPerson(event.target.value ? Number(event.target.value) : null)} aria-label={t('pro.triage.person')} className="w-full rounded-control border border-border bg-bg-page px-2 py-1 text-meta text-text">
+          <option value="">{t('pro.triage.toWhom')}</option>
           {[...people.values()].map((label) => <option key={label.id} value={label.id}>{label.title}</option>)}
         </select>
       )}
       {choice === 'decline' && (
-        <input value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Why (optional)" aria-label="Reason" className="w-full rounded-control border border-border bg-bg-page px-2 py-1 text-meta text-text" />
+        <input value={reason} onChange={(event) => setReason(event.target.value)} placeholder={t('pro.triage.whyPlaceholder')} aria-label={t('pro.triage.reason')} className="w-full rounded-control border border-border bg-bg-page px-2 py-1 text-meta text-text" />
       )}
       <p className="mt-3 rounded-control bg-bg-hover p-2 text-meta text-text" data-pro-triage-reply>{reply()}</p>
       <div className="mt-4 flex justify-end gap-2">
-        <button type="button" className="rounded-control px-3 py-1.5 text-meta text-text hover:bg-bg-hover" onClick={onClose}>Cancel</button>
-        <button type="button" disabled={!canApply} className="rounded-control bg-accent-fill px-3 py-1.5 text-meta font-medium text-on-accent disabled:opacity-40" onClick={() => void apply()}>Do it and copy the reply</button>
+        <button type="button" className="rounded-control px-3 py-1.5 text-meta text-text hover:bg-bg-hover" onClick={onClose}>{t('pro.common.cancel')}</button>
+        <button type="button" disabled={!canApply} className="rounded-control bg-accent-fill px-3 py-1.5 text-meta font-medium text-on-accent disabled:opacity-40" onClick={() => void apply()}>{t('pro.triage.apply')}</button>
       </div>
     </Dialog>
   )

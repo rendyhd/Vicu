@@ -166,12 +166,12 @@ export function MeetingView() {
     setDraft('')
   }
 
-  if (!world.on) return <ProOffNotice title="Meeting" />
+  if (!world.on) return <ProOffNotice title={t('pro.meetingView.title')} />
   if (!meeting) {
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 text-center">
-        <h1 className="text-lg font-semibold text-text">Meeting not found</h1>
-        <button type="button" className="text-sm text-accent-blue hover:underline" onClick={() => navigate({ to: '/people' })}>Back to People</button>
+        <h1 className="text-lg font-semibold text-text">{t('pro.meetingView.notFound')}</h1>
+        <button type="button" className="text-sm text-accent-blue hover:underline" onClick={() => navigate({ to: '/people' })}>{t('pro.meetingView.backToPeople')}</button>
       </div>
     )
   }
@@ -187,23 +187,23 @@ export function MeetingView() {
         inScroll
         actions={
           <div className="flex gap-1.5">
-            <button type="button" className={ACTION} onClick={() => setEditing(true)}><Pencil className="h-3.5 w-3.5" aria-hidden /> Edit</button>
+            <button type="button" className={ACTION} onClick={() => setEditing(true)}><Pencil className="h-3.5 w-3.5" aria-hidden /> {t('pro.meetingView.edit')}</button>
             {groups.byMeeting.has(meetingId)
               ? <button type="button" className={ACTION} onClick={() => navigate({ to: '/group/$labelId', params: { labelId: String(groups.byMeeting.get(meetingId)!.label) } })}>{t('pro.group.open')}</button>
               : <button type="button" className={ACTION} onClick={() => setGrouping(true)} data-pro-make-group>{t('pro.group.makeGroup')}</button>}
             {round ? (
-              <button type="button" className={cn(ACTION, 'border-accent-blue text-accent-blue')} onClick={end} data-pro-meeting-end>End meeting</button>
+              <button type="button" className={cn(ACTION, 'border-accent-blue text-accent-blue')} onClick={end} data-pro-meeting-end>{t('pro.meetingView.end')}</button>
             ) : (
-              <button type="button" className="rounded-control bg-accent-fill px-3 py-1 text-meta font-medium text-on-accent" onClick={() => setRound(startRound(people))} data-pro-meeting-start>Start round</button>
+              <button type="button" className="rounded-control bg-accent-fill px-3 py-1 text-meta font-medium text-on-accent" onClick={() => setRound(startRound(people))} data-pro-meeting-start>{t('pro.meetingView.start')}</button>
             )}
           </div>
         }
       />
       <div className="mx-auto w-full max-w-reading px-6 pb-10">
-        <div className="mb-4 flex flex-wrap gap-1.5" role="tablist" aria-label="People" data-pro-meeting-people>
+        <div className="mb-4 flex flex-wrap gap-1.5" role="tablist" aria-label={t('pro.meetingView.people')} data-pro-meeting-people>
           {cardPeople.map((person) => {
             const state = status(person)
-            const name = person === ME ? 'You' : world.nameOf(person)
+            const name = person === ME ? t('pro.meetingView.you') : world.nameOf(person)
             return (
               <button
                 key={person}
@@ -219,7 +219,7 @@ export function MeetingView() {
                   state === 'skipped' && 'text-text-secondary',
                 )}
               >
-                {state === 'discussed' && <Check className="h-3 w-3" aria-label="discussed" />}
+                {state === 'discussed' && <Check className="h-3 w-3" aria-label={t('pro.meetingView.discussed')} />}
                 {name}
               </button>
             )
@@ -228,17 +228,19 @@ export function MeetingView() {
 
         {!round && prep.length > 0 && (
           <section className="mb-6" data-pro-meeting-prep>
-            <ListSectionHeader level={1} title="Before you start" count={prep.length} />
+            <ListSectionHeader level={1} title={t('pro.meetingView.before')} count={prep.length} />
             <ul className="space-y-1 px-2 py-2">
               {prep.map(({ task, person }) => (
                 <li key={task.id} className="flex items-center gap-2 text-task-title text-text">
+                  {/* i18n-ignore: shown as the title of the task made from it, which is written to the server in English */}
                   <span className="min-w-0 flex-1 truncate">Have a word with {world.nameOf(person)}: {task.title}</span>
                   <button
                     type="button"
                     className="text-meta text-accent-blue hover:underline"
+                    // i18n-ignore: a task title written to the server, so it stays English
                     onClick={() => createTask.mutate({ projectId: config?.inbox_project_id ?? 0, task: { title: `Have a word with ${world.nameOf(person)}: ${task.title}`, due_date: dateOnlyDue(today) } })}
                   >
-                    Make a task
+                    {t('pro.meetingView.makeTask')}
                   </button>
                 </li>
               ))}
@@ -250,12 +252,12 @@ export function MeetingView() {
           <section data-pro-meeting-card={current}>
             <div className="mb-3 flex items-center gap-2">
               {current !== ME && <PersonMark name={world.nameOf(current)} color={world.people.get(current)?.hex_color} />}
-              <h2 className="flex-1 text-section text-text">{current === ME ? 'Your card: what you owe the room' : world.nameOf(current)}</h2>
-              <button type="button" className={ACTION} onClick={() => setRound(skipPerson(round))} aria-keyshortcuts="S"><SkipForward className="h-3.5 w-3.5" aria-hidden /> Skip</button>
+              <h2 className="flex-1 text-section text-text">{current === ME ? t('pro.meetingView.yourCard') : world.nameOf(current)}</h2>
+              <button type="button" className={ACTION} onClick={() => setRound(skipPerson(round))} aria-keyshortcuts="S"><SkipForward className="h-3.5 w-3.5" aria-hidden /> {t('pro.meetingView.skip')}</button>
               {current !== ME && (
-                <button type="button" className={ACTION} onClick={() => setRound(markAbsent(round, current))} aria-keyshortcuts="A"><UserX className="h-3.5 w-3.5" aria-hidden /> Absent</button>
+                <button type="button" className={ACTION} onClick={() => setRound(markAbsent(round, current))} aria-keyshortcuts="A"><UserX className="h-3.5 w-3.5" aria-hidden /> {t('pro.meetingView.absent')}</button>
               )}
-              <button type="button" className="rounded-control bg-accent-fill px-3 py-1 text-meta font-medium text-on-accent" onClick={() => setRound(nextPerson(round))} aria-keyshortcuts="Enter" data-pro-meeting-next>Next</button>
+              <button type="button" className="rounded-control bg-accent-fill px-3 py-1 text-meta font-medium text-on-accent" onClick={() => setRound(nextPerson(round))} aria-keyshortcuts="Enter" data-pro-meeting-next>{t('pro.meetingView.next')}</button>
             </div>
             {current === ME ? (
               <TaskRowGroup>
@@ -263,11 +265,11 @@ export function MeetingView() {
               </TaskRowGroup>
             ) : (
               <>
-                <ListSectionHeader level={2} title="Promised to you" count={(byPerson.theirs.get(current) ?? []).length} />
+                <ListSectionHeader level={2} title={t('pro.meetingView.promisedToYou')} count={(byPerson.theirs.get(current) ?? []).length} />
                 <TaskRowGroup>{(byPerson.theirs.get(current) ?? []).map((task) => <TaskRow key={task.id} task={task} />)}</TaskRowGroup>
                 {(byPerson.mine.get(current) ?? []).length > 0 && (
                   <>
-                    <ListSectionHeader level={2} title="You owe them" count={(byPerson.mine.get(current) ?? []).length} />
+                    <ListSectionHeader level={2} title={t('pro.meetingView.youOweThem')} count={(byPerson.mine.get(current) ?? []).length} />
                     <TaskRowGroup>{(byPerson.mine.get(current) ?? []).map((task) => <TaskRow key={task.id} task={task} />)}</TaskRowGroup>
                   </>
                 )}
@@ -278,11 +280,11 @@ export function MeetingView() {
                     void addPromise()
                   }}
                 >
-                  <input value={draft} onChange={(event) => setDraft(event.target.value)} placeholder={draftMine ? 'You promise...' : `${world.nameOf(current)} promises...`} aria-label="New promise" className="min-w-0 flex-1 rounded-control border border-border bg-bg-page px-2 py-1.5 text-task-title text-text" />
+                  <input value={draft} onChange={(event) => setDraft(event.target.value)} placeholder={draftMine ? t('pro.meetingView.youPromise') : t('pro.meetingView.theyPromise', { name: world.nameOf(current) })} aria-label={t('pro.meetingView.newPromise')} className="min-w-0 flex-1 rounded-control border border-border bg-bg-page px-2 py-1.5 text-task-title text-text" />
                   <label className="flex items-center gap-1 text-meta text-text-secondary">
-                    <input type="checkbox" checked={draftMine} onChange={(event) => setDraftMine(event.target.checked)} /> Mine
+                    <input type="checkbox" checked={draftMine} onChange={(event) => setDraftMine(event.target.checked)} /> {t('pro.meetingView.mine')}
                   </label>
-                  <button type="submit" disabled={!draft.trim()} className="rounded-control border border-border px-2.5 py-1 text-meta text-text hover:bg-bg-hover disabled:opacity-40">Add</button>
+                  <button type="submit" disabled={!draft.trim()} className="rounded-control border border-border px-2.5 py-1 text-meta text-text hover:bg-bg-hover disabled:opacity-40">{t('pro.meetingView.add')}</button>
                 </form>
                 {assistantOn && aiReady.ask && (
                   <PromiseDrafts
@@ -295,11 +297,11 @@ export function MeetingView() {
                 )}
               </>
             )}
-            <p className="mt-4 text-caption text-text-secondary">Enter: next. S: skip. A: absent. On a promise: keys 1 to 6 give the verdict.</p>
+            <p className="mt-4 text-caption text-text-secondary">{t('pro.meetingView.keys')}</p>
           </section>
         )}
         {round && current === null && (
-          <p className="py-6 text-sm text-text-secondary">Everyone had a turn. End the meeting to write the recap.</p>
+          <p className="py-6 text-sm text-text-secondary">{t('pro.meetingView.everyone')}</p>
         )}
       </div>
       {editing && <MeetingDialog meeting={meeting} id={meetingId} onClose={() => setEditing(false)} />}

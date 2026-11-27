@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useQueryClient } from '@tanstack/react-query'
 import { Dialog } from '@/components/overlay/Dialog'
 import { Checkbox } from '@/components/shared/Checkbox'
@@ -26,6 +27,7 @@ export interface RecapDialogProps {
  * people over some days. Copy puts rich and plain text on the clipboard and marks the promises sent.
  */
 export function RecapDialog({ onClose, personId, round }: RecapDialogProps) {
+  const { t } = useTranslation()
   const queryClient = useQueryClient()
   const world = usePromiseWorld()
   const fmt = useDateFormat()
@@ -70,21 +72,21 @@ export function RecapDialog({ onClose, personId, round }: RecapDialogProps) {
       return promise ? [setRecord('promises', id, withSent(promise, at))] : []
     })
     if (operations.length) await writeLedger(queryClient, operations)
-    toast.success(recap.taskIds.length ? `Recap copied; ${recap.taskIds.length} marked as sent` : 'Recap copied')
+    toast.success(recap.taskIds.length ? t('pro.recap.copiedSent', { count: recap.taskIds.length }) : t('pro.recap.copied'))
     onClose()
   }
 
   return (
-    <Dialog open label="Recap" onClose={onClose} className="w-[640px] max-w-[92vw] p-5">
-      <h2 className="mb-3 text-card-title text-text">Recap</h2>
+    <Dialog open label={t('pro.recap.title')} onClose={onClose} className="w-[640px] max-w-[92vw] p-5">
+      <h2 className="mb-3 text-card-title text-text">{t('pro.recap.title')}</h2>
       <div className="mb-3 flex flex-wrap items-center gap-2 text-meta text-text">
-        <label className="flex items-center gap-1">From <input type="date" value={from} max={to} onChange={(event) => event.target.value && setFrom(event.target.value)} className="rounded-control border border-border bg-bg-page px-2 py-1" /></label>
-        <label className="flex items-center gap-1">to <input type="date" value={to} min={from} onChange={(event) => event.target.value && setTo(event.target.value)} className="rounded-control border border-border bg-bg-page px-2 py-1" /></label>
-        <label className="flex cursor-pointer items-center gap-1.5"><Checkbox checked={includeMine} onChange={(event) => setIncludeMine(event.target.checked)} /> What I owe</label>
-        <label className="flex cursor-pointer items-center gap-1.5"><Checkbox checked={includeQuotes} onChange={(event) => setIncludeQuotes(event.target.checked)} /> Their words</label>
+        <label className="flex items-center gap-1">{t('pro.recap.from')} <input type="date" value={from} max={to} onChange={(event) => event.target.value && setFrom(event.target.value)} className="rounded-control border border-border bg-bg-page px-2 py-1" /></label>
+        <label className="flex items-center gap-1">{t('pro.recap.to')} <input type="date" value={to} min={from} onChange={(event) => event.target.value && setTo(event.target.value)} className="rounded-control border border-border bg-bg-page px-2 py-1" /></label>
+        <label className="flex cursor-pointer items-center gap-1.5"><Checkbox checked={includeMine} onChange={(event) => setIncludeMine(event.target.checked)} /> {t('pro.recap.whatIOwe')}</label>
+        <label className="flex cursor-pointer items-center gap-1.5"><Checkbox checked={includeQuotes} onChange={(event) => setIncludeQuotes(event.target.checked)} /> {t('pro.recap.theirWords')}</label>
       </div>
       {!round && allPeople.length > 1 && (
-        <div className="mb-3 flex flex-wrap gap-1" role="group" aria-label="People">
+        <div className="mb-3 flex flex-wrap gap-1" role="group" aria-label={t('pro.recap.people')}>
           {allPeople.map((id) => {
             const on = people.includes(id)
             return (
@@ -105,9 +107,9 @@ export function RecapDialog({ onClose, personId, round }: RecapDialogProps) {
         {recap.text}
       </pre>
       <div className="mt-4 flex justify-end gap-2">
-        <button type="button" className="rounded-control px-3 py-1.5 text-meta text-text hover:bg-bg-hover" onClick={onClose}>Cancel</button>
+        <button type="button" className="rounded-control px-3 py-1.5 text-meta text-text hover:bg-bg-hover" onClick={onClose}>{t('pro.common.cancel')}</button>
         <button type="button" className="rounded-control bg-accent-fill px-3 py-1.5 text-meta font-medium text-on-accent" onClick={() => void copy()} data-pro-recap-copy>
-          Copy
+          {t('pro.recap.copy')}
         </button>
       </div>
     </Dialog>

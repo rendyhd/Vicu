@@ -48,16 +48,16 @@ export function PeopleView() {
       .sort((a, b) => (a.next === b.next ? a.name.localeCompare(b.name) : a.next === null ? 1 : b.next === null ? -1 : a.next < b.next ? -1 : 1))
   }, [world, today])
 
-  if (!world.on) return <ProOffNotice title="People" />
+  if (!world.on) return <ProOffNotice title={t('pro.peopleView.title')} />
   const candidates = labels.filter((label) => !prefs.isPerson(label.id))
 
   return (
     <ReadingScroll className="bg-[var(--bg-primary)]" columnClassName="flex flex-col">
-      <PageHeader title="People" inScroll />
+      <PageHeader title={t('pro.peopleView.title')} inScroll />
       <div className="mx-6 max-w-[720px] pb-8">
         {rows.length === 0 && (
           <p className="py-6 text-sm text-text-secondary">
-            No people yet. A person is a label: mark one below, or right-click a label in the sidebar and choose This is a person.
+            {t('pro.peopleView.none')}
           </p>
         )}
         <ul className="divide-y divide-border" data-pro-people>
@@ -70,9 +70,9 @@ export function PeopleView() {
               >
                 <PersonMark name={row.name} color={row.color} />
                 <span className="min-w-0 flex-1 truncate text-task-title text-text">{row.name}</span>
-                <span className="text-meta text-text-secondary">{row.theirs} from them</span>
-                <span className="text-meta text-text-secondary">{row.mine} from you</span>
-                {row.overdue > 0 && <span className="text-meta text-status-overdue">{row.overdue} overdue</span>}
+                <span className="text-meta text-text-secondary">{t('pro.peopleView.fromThem', { count: row.theirs })}</span>
+                <span className="text-meta text-text-secondary">{t('pro.peopleView.fromYou', { count: row.mine })}</span>
+                {row.overdue > 0 && <span className="text-meta text-status-overdue">{t('pro.plan.overdue', { count: row.overdue })}</span>}
               </button>
             </li>
           ))}
@@ -96,11 +96,11 @@ export function PeopleView() {
         </section>
         <section className="mt-8" data-pro-meetings>
           <div className="mb-2 flex items-center justify-between">
-            <h2 className="text-section text-text">Meetings</h2>
-            <button type="button" className="text-meta font-medium text-accent-blue hover:underline" onClick={() => setNewMeeting(true)}>New meeting</button>
+            <h2 className="text-section text-text">{t('pro.peopleView.meetings')}</h2>
+            <button type="button" className="text-meta font-medium text-accent-blue hover:underline" onClick={() => setNewMeeting(true)}>{t('pro.peopleView.newMeeting')}</button>
           </div>
           {Object.keys(world.ledger.meetings).filter((id) => recordValue(world.ledger.meetings, id)).length === 0 && (
-            <p className="text-meta text-text-secondary">A meeting goes round its people one at a time: what they promised, what you owe them, what is new.</p>
+            <p className="text-meta text-text-secondary">{t('pro.peopleView.meetingsEmpty')}</p>
           )}
           <ul className="divide-y divide-border">
             {Object.keys(world.ledger.meetings).flatMap((id) => {
@@ -122,8 +122,8 @@ export function PeopleView() {
         {newGroup && <GroupDialog onClose={() => setNewGroup(false)} onSaved={(labelId) => void navigate({ to: '/group/$labelId', params: { labelId: String(labelId) } })} />}
         {candidates.length > 0 && (
           <div className="mt-6 flex items-center gap-2">
-            <select value={adding} onChange={(event) => setAdding(event.target.value)} aria-label="Label" className="rounded-control border border-border bg-bg-page px-3 py-1.5 text-sm text-text">
-              <option value="">Choose a label</option>
+            <select value={adding} onChange={(event) => setAdding(event.target.value)} aria-label={t('pro.peopleView.label')} className="rounded-control border border-border bg-bg-page px-3 py-1.5 text-sm text-text">
+              <option value="">{t('pro.peopleView.chooseLabel')}</option>
               {candidates.map((label) => <option key={label.id} value={label.id}>{label.title}</option>)}
             </select>
             <button
@@ -135,7 +135,7 @@ export function PeopleView() {
                 setAdding('')
               }}
             >
-              Add as a person
+              {t('pro.peopleView.addAsPerson')}
             </button>
           </div>
         )}

@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useNavigate } from '@tanstack/react-router'
 import { usePromiseWorld } from '@/hooks/use-promise-world'
 import { usePrintable } from '@/stores/print-store'
@@ -15,6 +16,7 @@ import { waitingOn } from '../../../shared/pro/promises'
  * grouped by person, the earliest due first.
  */
 export function WaitingOnView() {
+  const { t } = useTranslation()
   const world = usePromiseWorld()
   const navigate = useNavigate()
   const groups = useMemo(() => {
@@ -27,19 +29,19 @@ export function WaitingOnView() {
     }))
   }, [world])
 
-  usePrintable(useMemo(() => ({ viewTitle: 'Waiting on', sections: [{ groups: groups.map((g) => ({ heading: g.name, tasks: g.tasks })) }] }), [groups]))
+  usePrintable(useMemo(() => ({ viewTitle: t('pro.waitingView.title'), sections: [{ groups: groups.map((g) => ({ heading: g.name, tasks: g.tasks })) }] }), [groups, t]))
 
-  if (!world.on) return <ProOffNotice title="Waiting on" />
-  if (world.isLoading) return <ListSkeleton title="Waiting on" />
+  if (!world.on) return <ProOffNotice title={t('pro.waitingView.title')} />
+  if (world.isLoading) return <ListSkeleton title={t('pro.waitingView.title')} />
 
   return (
     <TaskList
-      title="Waiting on"
+      title={t('pro.waitingView.title')}
       tasks={[]}
       showNewTask={false}
       empty={groups.length === 0}
-      emptyTitle="Nothing to wait for"
-      emptySubtitle={'Type "Jan: send the deck" to note what someone promised you'}
+      emptyTitle={t('pro.waitingView.emptyTitle')}
+      emptySubtitle={t('pro.waitingView.emptySubtitle')}
     >
       {groups.map((group) => (
         <div key={group.person ?? 'none'} data-pro-waiting-group={group.person ?? 'none'}>
@@ -50,7 +52,7 @@ export function WaitingOnView() {
               className="ml-6 text-meta text-accent-blue hover:underline"
               onClick={() => navigate({ to: '/person/$labelId', params: { labelId: String(group.person) } })}
             >
-              Open {group.name}
+              {t('pro.waitingView.open', { name: group.name })}
             </button>
           )}
           <TaskRowGroup>

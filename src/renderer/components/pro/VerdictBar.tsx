@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/cn'
 import { usePromiseActions, VERDICT_LABELS, VERDICT_ORDER } from '@/hooks/use-promises'
 import type { Task } from '@/lib/vikunja-types'
@@ -20,6 +21,7 @@ export function VerdictBar({ task, personName, canSnooze, pendingKey = null, onD
   pendingKey?: string | null
   onDone: () => void
 }) {
+  const { t } = useTranslation()
   const { verdict, snooze } = usePromiseActions()
   const [asking, setAsking] = useState<null | 'not_yet' | 'renegotiated'>(null)
   const tomorrow = addLocalDays(toLocalDate(new Date()), 1)
@@ -50,9 +52,9 @@ export function VerdictBar({ task, personName, canSnooze, pendingKey = null, onD
   if (task.done) {
     return (
       <div className="flex flex-wrap items-center gap-1.5" data-pro-verdicts onClick={(event) => event.stopPropagation()}>
-        <span className="mr-1 text-meta text-text-secondary">Delivered by {personName}, or did you do it?</span>
-        <button type="button" className={BUTTON} onClick={() => { verdict(task, 'delivered'); onDone() }}>Delivered by {personName}</button>
-        <button type="button" className={BUTTON} onClick={() => { verdict(task, 'taken_over'); onDone() }}>I did it</button>
+        <span className="mr-1 text-meta text-text-secondary">{t('pro.verdictBar.deliveredByAsk', { name: personName })}</span>
+        <button type="button" className={BUTTON} onClick={() => { verdict(task, 'delivered'); onDone() }}>{t('pro.verdictBar.deliveredBy', { name: personName })}</button>
+        <button type="button" className={BUTTON} onClick={() => { verdict(task, 'taken_over'); onDone() }}>{t(VERDICT_LABELS.taken_over)}</button>
       </div>
     )
   }
@@ -69,13 +71,13 @@ export function VerdictBar({ task, personName, canSnooze, pendingKey = null, onD
           onDone()
         }}
       >
-        <span className="text-meta text-text-secondary">{asking === 'not_yet' ? 'Ask again on' : 'New date'}</span>
-        <input type="date" value={newDue} min={toLocalDate(new Date())} onChange={(event) => setNewDue(event.target.value)} aria-label="Date" className="rounded-control border border-border bg-bg-page px-2 py-0.5 text-meta text-text" />
+        <span className="text-meta text-text-secondary">{asking === 'not_yet' ? t('pro.verdictBar.askAgainOn') : t('pro.verdictBar.newDate')}</span>
+        <input type="date" value={newDue} min={toLocalDate(new Date())} onChange={(event) => setNewDue(event.target.value)} aria-label={t('pro.verdictBar.date')} className="rounded-control border border-border bg-bg-page px-2 py-0.5 text-meta text-text" />
         {asking === 'not_yet' && (
-          <input value={blocker} onChange={(event) => setBlocker(event.target.value)} placeholder="What is in the way?" aria-label="What is in the way" className="min-w-0 flex-1 rounded-control border border-border bg-bg-page px-2 py-0.5 text-meta text-text" autoFocus />
+          <input value={blocker} onChange={(event) => setBlocker(event.target.value)} placeholder={t('pro.verdictBar.blockerPlaceholder')} aria-label={t('pro.verdictBar.blocker')} className="min-w-0 flex-1 rounded-control border border-border bg-bg-page px-2 py-0.5 text-meta text-text" autoFocus />
         )}
-        <button type="submit" className={cn(BUTTON, 'border-accent-blue text-accent-blue')}>Save</button>
-        <button type="button" className={BUTTON} onClick={() => setAsking(null)}>Back</button>
+        <button type="submit" className={cn(BUTTON, 'border-accent-blue text-accent-blue')}>{t('pro.common.save')}</button>
+        <button type="button" className={BUTTON} onClick={() => setAsking(null)}>{t('pro.verdictBar.back')}</button>
       </form>
     )
   }
@@ -85,13 +87,13 @@ export function VerdictBar({ task, personName, canSnooze, pendingKey = null, onD
       {VERDICT_ORDER.map((kind, index) => (
         <button key={kind} type="button" className={BUTTON} data-pro-verdict={kind} onClick={() => give(kind)} aria-keyshortcuts={String(index + 1)}>
           <span className="mr-1 text-text-secondary">{index + 1}</span>
-          {VERDICT_LABELS[kind]}
+          {t(VERDICT_LABELS[kind])}
         </button>
       ))}
       {canSnooze && (
         <button type="button" className={BUTTON} data-pro-verdict="snooze" onClick={() => { snooze(task); onDone() }} aria-keyshortcuts="6">
           <span className="mr-1 text-text-secondary">6</span>
-          Ask me tomorrow
+          {t('pro.verdictBar.snooze')}
         </button>
       )}
     </div>

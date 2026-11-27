@@ -1,4 +1,6 @@
 import { useState, type RefObject } from 'react'
+import { useTranslation } from 'react-i18next'
+import { t as translate } from '../../../shared/i18n'
 import { useQueryClient } from '@tanstack/react-query'
 import { Popover } from '@/components/overlay/Popover'
 import { MonthCalendar } from '@/components/task-list/MonthCalendar'
@@ -20,9 +22,9 @@ const ESTIMATES = [5, 15, 30, 60, 120]
 /** One value when every task has it, "Mixed" when they differ, "None" when none has one. */
 function summary<T>(values: readonly (T | null)[], show: (value: T) => string): string {
   const set = values.filter((value): value is T => value !== null)
-  if (set.length === 0) return 'None'
+  if (set.length === 0) return translate('pro.batch.none')
   const first = show(set[0])
-  return set.length === values.length && set.every((value) => show(value) === first) ? first : 'Mixed'
+  return set.length === values.length && set.every((value) => show(value) === first) ? first : translate('pro.batch.mixed')
 }
 
 /**
@@ -32,6 +34,7 @@ function summary<T>(values: readonly (T | null)[], show: (value: T) => string): 
  * a time block keeps its block as its start (21.3).
  */
 export function BatchInspector({ anchorRef, tasks, onClose }: { anchorRef: RefObject<HTMLElement | null>; tasks: readonly Task[]; onClose: () => void }) {
+  const { t } = useTranslation()
   const update = useUpdateTask()
   const queryClient = useQueryClient()
   const { ledger } = useProLedger()
@@ -47,7 +50,7 @@ export function BatchInspector({ anchorRef, tasks, onClose }: { anchorRef: RefOb
       const next = day ? dateOnlyStart(day) : NULL_DATE
       update.mutate({ id: task.id, changes: { start_date: next }, original: task })
     }
-    toast.success(day ? `Start set on ${startable.length} tasks` : `Start removed from ${startable.length} tasks`)
+    toast.success(day ? t('pro.batch.startSet', { count: startable.length }) : t('pro.batch.startRemoved', { count: startable.length }))
   }
   const setEstimate = (minutes: number | null) => {
     void writeLedger(queryClient, open.map((task) => ({ op: 'estimate' as const, taskId: task.id, minutes })))
@@ -57,15 +60,15 @@ export function BatchInspector({ anchorRef, tasks, onClose }: { anchorRef: RefOb
   }
 
   return (
-    <Popover anchorRef={anchorRef} label="Inspector" role="dialog" placement="top-start" onClose={onClose}>
+    <Popover anchorRef={anchorRef} label={t('pro.batch.label')} role="dialog" placement="top-start" onClose={onClose}>
       <div className="w-72 p-3" data-pro-inspector>
-        <p className="mb-2 text-meta font-medium text-text">{open.length === 1 ? '1 open task' : `${open.length} open tasks`}</p>
+        <p className="mb-2 text-meta font-medium text-text">{t('pro.batch.openTasks', { count: open.length })}</p>
         <div className={ROW}>
-          <span className="text-meta text-text-secondary">Start</span>
+          <span className="text-meta text-text-secondary">{t('pro.batch.start')}</span>
           <span className="flex items-center gap-1.5">
             <span className="text-meta text-text" data-pro-inspector-start>{summary(starts, (day) => day)}</span>
-            <button type="button" className={SMALL} disabled={startable.length === 0} onClick={() => setPicking((value) => !value)}>Set</button>
-            <button type="button" className={SMALL} disabled={!starts.some((day) => day !== null)} onClick={() => setStart(null)}>Clear</button>
+            <button type="button" className={SMALL} disabled={startable.length === 0} onClick={() => setPicking((value) => !value)}>{t('pro.batch.set')}</button>
+            <button type="button" className={SMALL} disabled={!starts.some((day) => day !== null)} onClick={() => setStart(null)}>{t('pro.batch.clear')}</button>
           </span>
         </div>
         {picking && (
@@ -79,21 +82,21 @@ export function BatchInspector({ anchorRef, tasks, onClose }: { anchorRef: RefOb
           />
         )}
         <div className={ROW}>
-          <span className="text-meta text-text-secondary">Estimate</span>
+          <span className="text-meta text-text-secondary">{t('pro.batch.estimate')}</span>
           <span className="text-meta text-text" data-pro-inspector-estimate>{summary(estimates, (minutes) => formatLength(minutes))}</span>
         </div>
         <div className="flex flex-wrap gap-1 pb-1.5">
           {ESTIMATES.map((minutes) => (
             <button key={minutes} type="button" className={SMALL} onClick={() => setEstimate(minutes)}>{formatLength(minutes)}</button>
           ))}
-          <button type="button" className={SMALL} disabled={!estimates.some((value) => value !== null)} onClick={() => setEstimate(null)}>Clear</button>
+          <button type="button" className={SMALL} disabled={!estimates.some((value) => value !== null)} onClick={() => setEstimate(null)}>{t('pro.batch.clear')}</button>
         </div>
         <div className={ROW}>
-          <span className="text-meta text-text-secondary">Flag</span>
+          <span className="text-meta text-text-secondary">{t('pro.batch.flag')}</span>
           <span className="flex items-center gap-1.5">
-            <span className="text-meta text-text">{flagged.every(Boolean) && flagged.length ? 'All' : flagged.some(Boolean) ? 'Some' : 'None'}</span>
-            <button type="button" className={SMALL} disabled={open.length === 0 || flagged.every(Boolean)} onClick={() => setFlag(true)}>Flag all</button>
-            <button type="button" className={SMALL} disabled={!flagged.some(Boolean)} onClick={() => setFlag(false)}>Unflag</button>
+            <span className="text-meta text-text">{flagged.every(Boolean) && flagged.length ? t('pro.batch.all') : flagged.some(Boolean) ? t('pro.batch.some') : t('pro.batch.none')}</span>
+            <button type="button" className={SMALL} disabled={open.length === 0 || flagged.every(Boolean)} onClick={() => setFlag(true)}>{t('pro.batch.flagAll')}</button>
+            <button type="button" className={SMALL} disabled={!flagged.some(Boolean)} onClick={() => setFlag(false)}>{t('pro.batch.unflag')}</button>
           </span>
         </div>
       </div>

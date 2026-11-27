@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { useIsDark } from '@/hooks/use-is-dark'
 import { labelChipStyle } from '@/lib/label-style'
 import { cn } from '@/lib/cn'
@@ -22,6 +23,7 @@ export function PersonMark({ name, color, onClick, expanded, className }: {
   expanded?: boolean
   className?: string
 }) {
+  const { t } = useTranslation()
   // The label's own colour, as its chips draw it (contrast-checked for the theme).
   const isDark = useIsDark()
   const style = color ? labelChipStyle(color, isDark) : undefined
@@ -41,7 +43,7 @@ export function PersonMark({ name, color, onClick, expanded, className }: {
         event.stopPropagation()
         onClick()
       }}
-      aria-label={`${name}'s promise: give a verdict`}
+      aria-label={t('pro.personMark.verdict', { name })}
       aria-expanded={expanded}
       style={style}
       data-pro-person-mark

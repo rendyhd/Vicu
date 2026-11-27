@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Copy, Printer } from 'lucide-react'
 import { Dialog } from '@/components/overlay/Dialog'
 import { useProLedger } from '@/hooks/use-pro-ledger'
@@ -16,6 +17,7 @@ const ACTION = 'inline-flex items-center gap-1.5 rounded-control border border-b
  * ledger, plus a line about your own growth that only goes into the copy. Copy and print.
  */
 export function ImpactSummary({ onClose }: { onClose: () => void }) {
+  const { t } = useTranslation()
   const { ledger } = useProLedger()
   const portfolio = usePortfolio()
   const people = usePersonLabels()
@@ -29,7 +31,7 @@ export function ImpactSummary({ onClose }: { onClose: () => void }) {
 
   const copy = async () => {
     await api.writeClipboardRich(impact.text, impact.html)
-    toast.success('Impact summary copied')
+    toast.success(t('pro.impact.copied'))
   }
   const print = async () => {
     const result = await api.printHtml(impact.html)
@@ -37,10 +39,10 @@ export function ImpactSummary({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <Dialog open label="Quarterly impact" onClose={onClose} className="w-[560px] max-w-[92vw] p-5">
+    <Dialog open label={t('pro.impact.label')} onClose={onClose} className="w-[560px] max-w-[92vw] p-5">
       <div className="mb-3 flex items-center gap-2">
-        <h2 className="min-w-0 flex-1 text-card-title text-text">Impact, {quarter.name}</h2>
-        <div role="radiogroup" aria-label="Quarter" className="flex rounded-control border border-border p-0.5">
+        <h2 className="min-w-0 flex-1 text-card-title text-text">{t('pro.impact.title', { quarter: quarter.name })}</h2>
+        <div role="radiogroup" aria-label={t('pro.impact.quarter')} className="flex rounded-control border border-border p-0.5">
           {[0, 1].map((value) => (
             <button
               key={value}
@@ -50,7 +52,7 @@ export function ImpactSummary({ onClose }: { onClose: () => void }) {
               onClick={() => setBack(value)}
               className={back === value ? 'rounded-control bg-bg-selected px-2 py-0.5 text-meta text-text' : 'rounded-control px-2 py-0.5 text-meta text-text-secondary hover:bg-bg-hover'}
             >
-              {value === 0 ? 'This quarter' : 'Last quarter'}
+              {value === 0 ? t('pro.impact.thisQuarter') : t('pro.impact.lastQuarter')}
             </button>
           ))}
         </div>
@@ -65,23 +67,23 @@ export function ImpactSummary({ onClose }: { onClose: () => void }) {
           </section>
         ))}
         {impact.sections.every((section) => section.heading === 'Growth') && (
-          <p className="text-meta text-text-secondary">Nothing recorded this quarter. Value notes, decisions and verdicts show here.</p>
+          <p className="text-meta text-text-secondary">{t('pro.impact.empty')}</p>
         )}
       </div>
       <label className="mt-4 block">
-        <span className="mb-1 block text-meta text-text-secondary">Growth (only in the copy)</span>
+        <span className="mb-1 block text-meta text-text-secondary">{t('pro.impact.growth')}</span>
         <textarea
           value={growth}
           onChange={(event) => setGrowth(event.target.value)}
           rows={2}
-          placeholder="One thing you learned or got better at"
+          placeholder={t('pro.impact.growthPlaceholder')}
           className="w-full resize-y rounded-control border border-border bg-bg-page px-2 py-1 text-meta text-text"
         />
       </label>
       <div className="mt-4 flex justify-end gap-2">
-        <button type="button" className={ACTION} onClick={() => void copy()}><Copy className="h-3.5 w-3.5" aria-hidden /> Copy</button>
-        <button type="button" className={ACTION} onClick={() => void print()}><Printer className="h-3.5 w-3.5" aria-hidden /> Print</button>
-        <button type="button" className="rounded-control bg-accent-fill px-3 py-1.5 text-meta font-medium text-on-accent" onClick={onClose}>Close</button>
+        <button type="button" className={ACTION} onClick={() => void copy()}><Copy className="h-3.5 w-3.5" aria-hidden /> {t('pro.impact.copy')}</button>
+        <button type="button" className={ACTION} onClick={() => void print()}><Printer className="h-3.5 w-3.5" aria-hidden /> {t('pro.impact.print')}</button>
+        <button type="button" className="rounded-control bg-accent-fill px-3 py-1.5 text-meta font-medium text-on-accent" onClick={onClose}>{t('pro.common.close')}</button>
       </div>
     </Dialog>
   )

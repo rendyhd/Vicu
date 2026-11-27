@@ -29,7 +29,7 @@ export function PortfolioView() {
   const [parking, setParking] = useState<number | null>(null)
   const [impactOpen, setImpactOpen] = useState(false)
   const powerOn = pro.layer('power')
-  if (!pro.layer('portfolio')) return <ProOffNotice title="Portfolio" />
+  if (!pro.layer('portfolio')) return <ProOffNotice title={t('pro.portfolioView.title')} />
 
   const others = Object.keys(portfolio.ledger.initiatives).flatMap((id) => {
     const value = recordValue(portfolio.ledger.initiatives, id)
@@ -37,17 +37,17 @@ export function PortfolioView() {
   })
   const parked = others.filter((entry) => entry.value.status === 'parked')
   const closed = others.filter((entry) => entry.value.status === 'closed')
-  const name = (id: number | null | undefined) => (typeof id === 'number' ? people.get(id)?.title ?? 'someone' : null)
+  const name = (id: number | null | undefined) => (typeof id === 'number' ? people.get(id)?.title ?? t('pro.portfolioView.someone') : null)
   const open = (id: number) => navigate({ to: '/project/$projectId', params: { projectId: String(id) } })
 
   return (
     <ReadingScroll className="bg-[var(--bg-primary)]" columnClassName="flex flex-col">
       <PageHeader
-        title="Portfolio"
+        title={t('pro.portfolioView.title')}
         inScroll
         actions={powerOn ? (
           <button type="button" className="inline-flex items-center gap-1.5 rounded-control border border-border px-2.5 py-1 text-meta text-text hover:bg-bg-hover" onClick={() => setImpactOpen(true)}>
-            Quarterly impact
+            {t('pro.impact.label')}
           </button>
         ) : undefined}
       />
@@ -55,8 +55,8 @@ export function PortfolioView() {
       <div className="mx-auto w-full max-w-reading px-6 pb-10">
         <div className="mb-4" data-pro-cap>
           <div className="mb-1 flex items-center justify-between text-meta text-text">
-            <span>{portfolio.cap.unlimited ? t('pro.groundwork.activeNoLimit', { count: portfolio.cap.active }) : `${portfolio.cap.active} of ${portfolio.cap.cap} active${portfolio.cap.agreed ? ', agreed' : ', not agreed yet'}`}</span>
-            {portfolio.cap.full && <span className="text-status-overdue">At the cap: park one before starting another</span>}
+            <span>{portfolio.cap.unlimited ? t('pro.groundwork.activeNoLimit', { count: portfolio.cap.active }) : t(portfolio.cap.agreed ? 'pro.portfolioView.capAgreed' : 'pro.portfolioView.capNotAgreed', { active: portfolio.cap.active, cap: portfolio.cap.cap })}</span>
+            {portfolio.cap.full && <span className="text-status-overdue">{t('pro.portfolioView.atCap')}</span>}
           </div>
           <div className="flex h-2 gap-1" aria-hidden>
             {Array.from({ length: portfolio.cap.unlimited ? portfolio.cap.active : Math.max(portfolio.cap.cap, portfolio.cap.active) }, (_, index) => (
@@ -66,7 +66,7 @@ export function PortfolioView() {
         </div>
 
         {portfolio.ranked.length === 0 && (
-          <p className="py-6 text-sm text-text-secondary">No initiatives yet. Open a project&apos;s menu and choose Make this an initiative.</p>
+          <p className="py-6 text-sm text-text-secondary">{t('pro.portfolioView.none')}</p>
         )}
         <ol className="divide-y divide-border rounded-card border border-border" data-pro-portfolio>
           {portfolio.ranked.map((entry, index) => {
@@ -77,11 +77,11 @@ export function PortfolioView() {
                 <button type="button" className="min-w-0 flex-1 truncate text-left text-task-title text-text hover:underline" onClick={() => open(entry.projectId)}>
                   {portfolio.titleOf(entry.projectId)}
                 </button>
-                <span className="hidden text-meta text-text-secondary sm:inline">{name(entry.value.owner) ? `Owner ${name(entry.value.owner)}` : 'No owner'}</span>
-                <span className={cn('text-meta', ready.ready ? 'text-text-secondary' : 'text-status-overdue')}>Ready {ready.done}/{ready.total}</span>
-                <button type="button" aria-label="Move up" disabled={index === 0} className={ICON} onClick={() => void portfolio.move(entry.projectId, index - 1)}><ArrowUp className="h-3.5 w-3.5" /></button>
-                <button type="button" aria-label="Move down" disabled={index === portfolio.ranked.length - 1} className={ICON} onClick={() => void portfolio.move(entry.projectId, index + 1)}><ArrowDown className="h-3.5 w-3.5" /></button>
-                <button type="button" aria-label="Park" className={ICON} onClick={() => setParking(entry.projectId)}><PauseCircle className="h-3.5 w-3.5" /></button>
+                <span className="hidden text-meta text-text-secondary sm:inline">{name(entry.value.owner) ? t('pro.portfolioView.owner', { name: name(entry.value.owner) }) : t('pro.portfolioView.noOwner')}</span>
+                <span className={cn('text-meta', ready.ready ? 'text-text-secondary' : 'text-status-overdue')}>{t('pro.initiative.ready', { done: ready.done, total: ready.total })}</span>
+                <button type="button" aria-label={t('pro.portfolioView.moveUp')} disabled={index === 0} className={ICON} onClick={() => void portfolio.move(entry.projectId, index - 1)}><ArrowUp className="h-3.5 w-3.5" /></button>
+                <button type="button" aria-label={t('pro.portfolioView.moveDown')} disabled={index === portfolio.ranked.length - 1} className={ICON} onClick={() => void portfolio.move(entry.projectId, index + 1)}><ArrowDown className="h-3.5 w-3.5" /></button>
+                <button type="button" aria-label={t('pro.portfolioView.park')} className={ICON} onClick={() => setParking(entry.projectId)}><PauseCircle className="h-3.5 w-3.5" /></button>
               </li>
             )
           })}
@@ -89,20 +89,20 @@ export function PortfolioView() {
 
         {parked.length > 0 && (
           <section className="mt-6">
-            <h2 className="mb-2 text-section text-text">Parked</h2>
+            <h2 className="mb-2 text-section text-text">{t('pro.portfolioView.parked')}</h2>
             <ul className="divide-y divide-border">
               {parked.map(({ id, value }) => (
                 <li key={id} className="flex items-center gap-3 px-2 py-2">
                   <button type="button" className="min-w-0 flex-1 truncate text-left text-task-title text-text hover:underline" onClick={() => open(id)}>{portfolio.titleOf(id)}</button>
-                  <span className="min-w-0 truncate text-meta text-text-secondary">{value.parked?.reason || 'No reason given'}</span>
+                  <span className="min-w-0 truncate text-meta text-text-secondary">{value.parked?.reason || t('pro.portfolioView.noReason')}</span>
                   <button
                     type="button"
                     disabled={portfolio.cap.full}
-                    title={portfolio.cap.full ? 'At the cap: park one first' : undefined}
+                    title={portfolio.cap.full ? t('pro.park.atCap') : undefined}
                     className="inline-flex items-center gap-1 rounded-control border border-border px-2 py-0.5 text-meta text-text hover:bg-bg-hover disabled:opacity-40"
                     onClick={() => void portfolio.unpark(id)}
                   >
-                    <Play className="h-3 w-3" aria-hidden /> Make active
+                    <Play className="h-3 w-3" aria-hidden /> {t('pro.portfolioView.makeActive')}
                   </button>
                 </li>
               ))}
@@ -111,9 +111,9 @@ export function PortfolioView() {
         )}
         {closed.length > 0 && (
           <section className="mt-6">
-            <h2 className="mb-2 text-section text-text">Closed</h2>
+            <h2 className="mb-2 text-section text-text">{t('pro.portfolioView.closed')}</h2>
             <ul className="space-y-1 px-2 text-meta text-text-secondary">
-              {closed.map(({ id, value }) => <li key={id}>{portfolio.titleOf(id)}{value.closed_on ? `, ${value.closed_on}` : ''}</li>)}
+              {closed.map(({ id, value }) => <li key={id}>{value.closed_on ? t('pro.portfolioView.closedOn', { title: portfolio.titleOf(id), date: value.closed_on }) : portfolio.titleOf(id)}</li>)}
             </ul>
           </section>
         )}

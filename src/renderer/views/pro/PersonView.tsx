@@ -56,7 +56,7 @@ export function PersonView() {
     if (addingTopic) topicInput.current?.focus()
   }, [addingTopic])
   const label = labels?.find((entry) => entry.id === id)
-  const name = label?.title ?? 'Person'
+  const name = label?.title ?? t('pro.personView.fallbackName')
   const today = toLocalDate(new Date())
 
   const sections = useMemo(() => {
@@ -99,9 +99,9 @@ export function PersonView() {
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 text-center">
         <h1 className="text-lg font-semibold text-text">{name}</h1>
-        <p className="text-sm text-text-secondary">This label is not marked as a person.</p>
+        <p className="text-sm text-text-secondary">{t('pro.personView.notPerson')}</p>
         <button type="button" className="mt-2 text-sm font-medium text-accent-blue hover:underline" onClick={() => void prefs.setPerson(id, true)}>
-          This is a person
+          {t('pro.personView.makePerson')}
         </button>
       </div>
     )
@@ -110,12 +110,12 @@ export function PersonView() {
   const projectTitle = (projectId: number) => projects?.all.find((project) => project.id === projectId)?.title ?? null
   const copyAgenda = async () => {
     await api.writeClipboardRich(agenda.text, agenda.html)
-    toast.success('Agenda copied')
+    toast.success(t('pro.personView.agendaCopied'))
   }
   const copyForCopilot = async () => {
     const json = exportOpen(name, today, openPromises(world, projectTitle, (_task, person) => person === id))
     await api.writeClipboardRich(json)
-    toast.success('Open promises copied for Copilot')
+    toast.success(t('pro.personView.copiedForCopilot'))
   }
 
   // Without a group and with nothing promised to anyone else, the page is as it was.
@@ -159,17 +159,17 @@ export function PersonView() {
             <p className="text-meta text-text-secondary" data-pro-pattern>{patternText(counts)}</p>
           </div>
           <div className="flex flex-wrap gap-1.5">
-            <button type="button" className={ACTION} onClick={() => void copyAgenda()}><Copy className="h-3.5 w-3.5" aria-hidden /> Copy agenda</button>
-            <button type="button" className={ACTION} onClick={() => openDialog('pro-recap', { personId: id })}><Send className="h-3.5 w-3.5" aria-hidden /> Recap</button>
-            <button type="button" className={ACTION} onClick={() => openDialog('pro-copilot', { personId: id })}><MessageSquareQuote className="h-3.5 w-3.5" aria-hidden /> Ask Copilot</button>
-            <button type="button" className={ACTION} onClick={() => openDialog('pro-import', { personId: id })}><FileInput className="h-3.5 w-3.5" aria-hidden /> Import</button>
-            <button type="button" className={ACTION} onClick={() => void copyForCopilot()}><Copy className="h-3.5 w-3.5" aria-hidden /> Copy for Copilot</button>
+            <button type="button" className={ACTION} onClick={() => void copyAgenda()}><Copy className="h-3.5 w-3.5" aria-hidden /> {t('pro.personView.copyAgenda')}</button>
+            <button type="button" className={ACTION} onClick={() => openDialog('pro-recap', { personId: id })}><Send className="h-3.5 w-3.5" aria-hidden /> {t('pro.personView.recap')}</button>
+            <button type="button" className={ACTION} onClick={() => openDialog('pro-copilot', { personId: id })}><MessageSquareQuote className="h-3.5 w-3.5" aria-hidden /> {t('pro.copilot.title')}</button>
+            <button type="button" className={ACTION} onClick={() => openDialog('pro-import', { personId: id })}><FileInput className="h-3.5 w-3.5" aria-hidden /> {t('pro.import.title')}</button>
+            <button type="button" className={ACTION} onClick={() => void copyForCopilot()}><Copy className="h-3.5 w-3.5" aria-hidden /> {t('pro.personView.copyForCopilot')}</button>
           </div>
         </div>
       }
     >
       <div>
-        <ListSectionHeader level={1} title="Next 1:1" count={agenda.items.length} />
+        <ListSectionHeader level={1} title={t('pro.personView.nextOneOnOne')} count={agenda.items.length} />
         <ul className="space-y-1 px-6 py-2 text-task-title text-text" data-pro-agenda>
           {agenda.items.map((item) => (
             <li key={item} className="flex gap-2"><span className="text-text-secondary" aria-hidden>-</span>{item}</li>
@@ -198,7 +198,7 @@ export function PersonView() {
       </div>
       {plain && sections.theirs.length > 0 && (
         <div>
-          <ListSectionHeader level={1} title={`From ${name}`} count={sections.theirs.length} />
+          <ListSectionHeader level={1} title={t('pro.promise.from', { name })} count={sections.theirs.length} />
           <TaskRowGroup>{sections.theirs.map((task) => <TaskRow key={task.id} task={task} />)}</TaskRowGroup>
         </div>
       )}
@@ -206,13 +206,13 @@ export function PersonView() {
       {!plain && promisedPart('to-others', t('pro.person.toOthers'), promised.toOthers)}
       {sections.mine.length > 0 && (
         <div>
-          <ListSectionHeader level={1} title={`You owe ${name}`} count={sections.mine.length} />
+          <ListSectionHeader level={1} title={t('pro.personView.youOwe', { name })} count={sections.mine.length} />
           <TaskRowGroup>{sections.mine.map((task) => <TaskRow key={task.id} task={task} />)}</TaskRowGroup>
         </div>
       )}
       {sections.confirm.length > 0 && (
         <div>
-          <ListSectionHeader level={1} title="To confirm" count={sections.confirm.length} />
+          <ListSectionHeader level={1} title={t('pro.personView.toConfirm')} count={sections.confirm.length} />
           <TaskRowGroup>{sections.confirm.map((task) => <TaskRow key={task.id} task={task} />)}</TaskRowGroup>
         </div>
       )}
