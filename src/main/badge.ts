@@ -20,7 +20,7 @@ function registerMacNotifications(): void {
   if (macNotificationsRegistered) return
   macNotificationsRegistered = true
   try {
-    if (Notification.isSupported()) new Notification({ title: 'Vicu', silent: true })
+    if (Notification.isSupported()) new Notification({ title: 'Vicu', silent: true }) // i18n-ignore: never shown, registers the Dock badge
   } catch (err) {
     console.warn('Could not register for notifications (Dock badge):', err)
   }

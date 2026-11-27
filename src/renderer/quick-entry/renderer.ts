@@ -95,7 +95,8 @@ import { followColorScheme } from '../lib/theme'
 import { parseChips } from '../lib/parse-chips'
 import { motionMs, motionSpringCurve, travelStart } from '../lib/motion'
 import { initDateFormat, subscribeDateFormat } from '../lib/date-format'
-import { initLanguage } from '../lib/language'
+import { initLanguage, subscribeLanguageInfo } from '../lib/language'
+import { t } from '../../shared/i18n'
 import type { ParseResult, ParserConfig, ParsedToken, TokenType } from '../lib/task-parser'
 import type { Person } from '../../shared/pro/people'
 import { getClipboardImages, getTitlePasteImages, fileToUint8Array, type ClipboardImage } from '../lib/clipboard-images'
@@ -206,6 +207,42 @@ document.querySelectorAll('.obsidian-hint-key, .browser-hint-key').forEach((el) 
   el.textContent = linkKeyLabel
 })
 
+// The window's fixed text: index.html holds the English it starts with, this draws it in the
+// language shown, and again when that changes. A sentence with an element inside (the project
+// name, the key and the page name) is one text with marks where the elements go.
+const MARKS = ['\u0001', '\u0002']
+const obsidianHintKey = obsidianHint.querySelector('.obsidian-hint-key')!
+const browserHintKey = browserHint.querySelector('.browser-hint-key')!
+
+function placeIn(container: HTMLElement, text: string, elements: Element[]): void {
+  const nodes: Array<Node | string> = []
+  for (const part of text.split(/([\u0001\u0002])/)) {
+    const index = MARKS.indexOf(part)
+    if (index >= 0 && elements[index]) nodes.push(elements[index])
+    else if (part) nodes.push(part)
+  }
+  container.replaceChildren(...nodes)
+}
+
+function drawFixedText(): void {
+  placeIn(projectHint, t('quickEntry.projectHint', { project: MARKS[0] }), [projectName])
+  input.placeholder = t('quickEntry.placeholder')
+  descriptionHint.textContent = t('quickEntry.descriptionHint')
+  todayHintInline.textContent = t('quickEntry.todayHint')
+  todayHintBelow.textContent = t('quickEntry.todayHint')
+  descriptionInput.placeholder = t('quickEntry.descriptionPlaceholder')
+  placeIn(obsidianHint, t('quickEntry.linkHint', { key: MARKS[0], name: MARKS[1] }), [obsidianHintKey, obsidianHintName])
+  placeIn(browserHint, t('quickEntry.linkHint', { key: MARKS[0], name: MARKS[1] }), [browserHintKey, browserHintName])
+  obsidianBadgeRemove.title = t('quickEntry.removeLink')
+  browserBadgeRemove.title = t('quickEntry.removeLink')
+}
+
+drawFixedText()
+subscribeLanguageInfo(() => {
+  drawFixedText()
+  void updatePendingIndicator()
+})
+
 function showError(msg: string, visibleMs = 3000): void {
   errorMessage.textContent = msg
   errorMessage.hidden = false
@@ -219,7 +256,7 @@ function showError(msg: string, visibleMs = 3000): void {
   }, visibleMs)
 }
 
-function showOfflineMessage(message = 'Saved offline \u2014 will sync when connected', visibleMs = 1200): void {
+function showOfflineMessage(message = t('quickEntry.savedOffline'), visibleMs = 1200): void {
   errorMessage.textContent = message
   errorMessage.hidden = false
   errorMessage.classList.add('offline')
@@ -301,8 +338,8 @@ async function updatePendingIndicator(): Promise<void> {
   const { pending, failed } = await window.quickEntryApi.getQueueCounts()
   if (pending > 0 || failed > 0) {
     const parts: string[] = []
-    if (pending > 0) parts.push(`${pending} change(s) pending sync`)
-    if (failed > 0) parts.push(`${failed} failed \u2014 open Vicu to review`)
+    if (pending > 0) parts.push(t('quickEntry.pending', { count: pending }))
+    if (failed > 0) parts.push(t('quickEntry.failed', { count: failed }))
     pendingCountEl.textContent = parts.join(' \u00b7 ')
     pendingIndicator.classList.toggle('has-failed', failed > 0)
     pendingIndicator.classList.remove('hidden')
@@ -374,7 +411,7 @@ function updateObsidianUI(): void {
     obsidianBadge.classList.remove('hidden')
     obsidianHint.classList.add('hidden')
   } else {
-    obsidianHintName.textContent = `"${obsidianContext.noteName}"`
+    obsidianHintName.textContent = obsidianContext.noteName
     obsidianHint.classList.remove('hidden')
     obsidianBadge.classList.add('hidden')
   }
@@ -391,7 +428,7 @@ function updateBrowserUI(): void {
     browserBadge.classList.remove('hidden')
     browserHint.classList.add('hidden')
   } else {
-    browserHintName.textContent = `"${browserContext.displayTitle}"`
+    browserHintName.textContent = browserContext.displayTitle
     browserHint.classList.remove('hidden')
     browserBadge.classList.add('hidden')
   }
@@ -580,7 +617,7 @@ function renderImageGallery(): void {
     const del = document.createElement('button')
     del.type = 'button'
     del.className = 'image-gallery-delete'
-    del.title = 'Remove image'
+    del.title = t('quickEntry.removeImage')
     del.innerHTML = '&times;'
     del.addEventListener('mousedown', (e) => e.preventDefault())
     del.addEventListener('click', (e) => {
@@ -769,15 +806,15 @@ async function saveTask(): Promise<void> {
 
     if (personNotMade) {
       // The task is saved; the person could not be made, so the name stayed in the title.
-      showOfflineMessage(`Task saved — ${personNotMade} could not be made a person, so the name stays in the title`, 4000)
+      showOfflineMessage(t('quickEntry.personNotMade', { name: personNotMade }), 4000)
     } else if (result.cached || queuedFollowUps) {
-      showOfflineMessage(queuedFollowUps && !result.cached ? 'Task saved \u2014 labels and images will sync when connected' : undefined)
+      showOfflineMessage(queuedFollowUps && !result.cached ? t('quickEntry.followUpsQueued') : undefined)
     } else {
       window.quickEntryApi.closeWindow()
     }
   } else {
     // "The task may already exist" is a sentence to read, not a flash: it stays up longer.
-    showError(result.error || 'Failed to save task', result.mayExist ? 10_000 : 3000)
+    showError(result.error || t('quickEntry.saveFailed'), result.mayExist ? 10_000 : 3000)
     input.disabled = false
     descriptionInput.disabled = false
     input.focus()
@@ -1001,7 +1038,7 @@ async function handleImagePaste(e: ClipboardEvent, images: ClipboardImage[]): Pr
         mime: img.mime,
       })
     } catch {
-      showError('Failed to read pasted image')
+      showError(t('quickEntry.pasteFailed'))
     }
   }
 }

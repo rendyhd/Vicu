@@ -1,26 +1,25 @@
 import { NOT_API_RESPONSE_MESSAGE, isNotApiErrorAnswer, notApiErrorMessage } from '../shared/error-classify'
 import type { ApiError, ApiResult } from './api-result'
+import { t, type TranslationKey } from '../shared/i18n'
 
 // How an HTTP answer of the Vikunja server reads as an `ApiResult`. Pure, so the Electron
 // transport (host/http.ts) and the browser one (src/web/host/http.ts) read answers the same way.
 
 // Friendly error overrides for known unhelpful server messages
-const FRIENDLY_ERROR_OVERRIDES: { pattern: RegExp; message: string }[] = [
+const FRIENDLY_ERROR_OVERRIDES: { pattern: RegExp; message: TranslationKey }[] = [
   {
     pattern: /missing,?\s*malformed,?\s*expired\s*or\s*otherwise\s*invalid\s*token/i,
-    message:
-      'API token is invalid or expired. Generate a new token in Vikunja (Settings > API Tokens).',
+    message: 'system.api.tokenInvalid',
   },
   {
     pattern: /token.*(?:lacks?|insufficient|no)\s*permission/i,
-    message:
-      'API token has insufficient permissions. Create a new token with read/write access to tasks and projects.',
+    message: 'system.api.tokenPermissions',
   },
 ]
 
 function getFriendlyError(serverMessage: string): string | null {
   for (const { pattern, message } of FRIENDLY_ERROR_OVERRIDES) {
-    if (pattern.test(serverMessage)) return message
+    if (pattern.test(serverMessage)) return t(message)
   }
   return null
 }

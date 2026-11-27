@@ -56,6 +56,7 @@ export function googleEvent(event: GoogleEvent, freeBusyOnly = false): AccountEv
   const busy = event.transparency !== 'transparent'
   return {
     id: event.id,
+    // i18n-ignore: the Busy-only titles of contract 20.8 (src/shared/calendar-events.ts)
     title: freeBusyOnly ? (busy ? 'Busy' : 'Free') : event.summary,
     location: event.location,
     start,

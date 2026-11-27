@@ -173,7 +173,7 @@ function toEvent(
   return {
     id: `${calendarId}:${item.uid}:${startDate.toISOString()}`,
     calendarId,
-    title: (typeof item.summary === 'string' ? item.summary.trim() : '') || '(No title)',
+    title: (typeof item.summary === 'string' ? item.summary.trim() : '') || '(No title)', // i18n-ignore: stored with the event, as UNTITLED_EVENT in src/shared/ics-import.ts
     location: typeof location === 'string' && location.trim() ? location.trim() : undefined,
     start: startDate.toISOString(),
     end: endDate.toISOString(),
@@ -226,7 +226,7 @@ export function occurrencesBetween(
     out.push({
       id: `${calendarId}:freebusy:${start}:${period.end.toISOString()}`,
       calendarId,
-      title: 'Busy',
+      title: 'Busy', // i18n-ignore: the Busy-only title of contract 20.8 (src/shared/calendar-events.ts)
       start,
       end: period.end.toISOString(),
       allDay: false,

@@ -1514,5 +1514,128 @@
     "tomorrow": "Tomorrow",
     "nextWeek": "Next week",
     "moveBy": "Move by"
+  },
+  "system": {
+    "notifications": {
+      "testTitle": "Vicu — Test Notification",
+      "testBody": "Notifications are working! You will receive task reminders at your scheduled times.",
+      "planNudgeTitle": "Plan tomorrow",
+      "planNudgeBody": "Set up tomorrow in Plan my day.",
+      "routineFollowUpTitle": "Still pending: {{name}}",
+      "routineFollowUpBody": "A gentle follow-up",
+      "routineBody": "Routine reminder",
+      "taskTitle": "Reminder: {{title}}",
+      "taskBody": "Task reminder",
+      "summaryTitle_one": "Vicu — {{count}} task need attention",
+      "summaryTitle_other": "Vicu — {{count}} tasks need attention",
+      "summaryDueToday_one": "{{count}} due today",
+      "summaryDueToday_other": "{{count}} due today",
+      "summaryOverdue_one": "{{count}} overdue",
+      "summaryOverdue_other": "{{count}} overdue",
+      "summaryDueTomorrow_one": "{{count}} due tomorrow",
+      "summaryDueTomorrow_other": "{{count}} due tomorrow"
+    },
+    "ai": {
+      "proAssistantOff": "Turn on Pro's assistant in Settings, Pro.",
+      "requestFailed": "The request failed."
+    },
+    "api": {
+      "tokenInvalid": "API token is invalid or expired. Generate a new token in Vikunja (Settings > API Tokens).",
+      "tokenPermissions": "API token has insufficient permissions. Create a new token with read/write access to tasks and projects."
+    },
+    "auth": {
+      "signInWindow": "Sign in",
+      "stateMismatch": "The sign-in response did not match this login attempt (state mismatch), so it was ignored. Please try again."
+    },
+    "dialogs": {
+      "importCalendarTitle": "Import a calendar file",
+      "open": "Open",
+      "chooseCalendarTitle": "Choose a calendar file",
+      "choose": "Choose",
+      "calendarFiles": "Calendar files",
+      "allFiles": "All files",
+      "chooseSoundTitle": "Choose task completion sound",
+      "audioFiles": "Audio"
+    },
+    "voice": {
+      "stopped": "Voice input stopped.",
+      "couldNotStart": "Voice input could not start: {{reason}}",
+      "stoppedBecause": "Voice input stopped: {{reason}}"
+    },
+    "sync": {
+      "configNotLoaded": "Configuration not loaded"
+    }
+  },
+  "quickView": {
+    "ago": {
+      "justNow": "just now",
+      "minutes_one": "{{count}}m ago",
+      "minutes_other": "{{count}}m ago",
+      "hours_one": "{{count}}h ago",
+      "hours_other": "{{count}}h ago",
+      "days_one": "{{count}}d ago",
+      "days_other": "{{count}}d ago"
+    },
+    "task": {
+      "markDone": "Mark as done",
+      "completed": "Completed",
+      "openNote": "Open \"{{name}}\" in Obsidian",
+      "openPage": "Open \"{{title}}\"",
+      "toggleDescription": "Toggle description",
+      "queuedUndo": "Queued offline — press Enter to undo",
+      "completedUndo": "Task completed — press Enter to undo",
+      "fallbackTitle": "Task"
+    },
+    "list": {
+      "empty": "No open tasks",
+      "loading": "Loading tasks..."
+    },
+    "edit": {
+      "titlePlaceholder": "Task title",
+      "richPlaceholder": "Open in Vicu to edit rich description",
+      "descriptionPlaceholder": "Description (optional)",
+      "richTitle": "Open the main Vicu window to edit rich formatting",
+      "hint": "Enter to save · Shift+Enter for new line · Esc to cancel",
+      "richHint": "Rich description is preserved · click it to edit in Vicu · Enter saves the title"
+    },
+    "errors": {
+      "complete": "Failed to complete task",
+      "undo": "Failed to undo completion",
+      "removeDueDate": "Failed to remove due date",
+      "schedule": "Failed to schedule task",
+      "emptyTitle": "Title cannot be empty",
+      "update": "Failed to update task",
+      "load": "Failed to load tasks"
+    },
+    "status": {
+      "refreshFailed": "Could not refresh (cached {{ago}})",
+      "offline": "Offline — cached {{ago}}",
+      "standalone": "Standalone mode",
+      "pending_one": "{{count}} action(s) pending sync",
+      "pending_other": "{{count}} action(s) pending sync",
+      "failed_one": "{{count}} failed — open Vicu to review",
+      "failed_other": "{{count}} failed — open Vicu to review",
+      "pendingAndFailed_one": "{{pending}}, {{count}} failed — open Vicu to review",
+      "pendingAndFailed_other": "{{pending}}, {{count}} failed — open Vicu to review"
+    }
+  },
+  "quickEntry": {
+    "projectHint": "saving to {{project}}",
+    "placeholder": "Add a task...",
+    "descriptionHint": "Press TAB to add a description",
+    "todayHint": "scheduling for Today",
+    "descriptionPlaceholder": "Description...",
+    "linkHint": "{{key}} to link \"{{name}}\"",
+    "removeLink": "Remove link",
+    "removeImage": "Remove image",
+    "savedOffline": "Saved offline — will sync when connected",
+    "pending_one": "{{count}} change(s) pending sync",
+    "pending_other": "{{count}} change(s) pending sync",
+    "failed_one": "{{count}} failed — open Vicu to review",
+    "failed_other": "{{count}} failed — open Vicu to review",
+    "personNotMade": "Task saved — {{name}} could not be made a person, so the name stays in the title",
+    "followUpsQueued": "Task saved — labels and images will sync when connected",
+    "saveFailed": "Failed to save task",
+    "pasteFailed": "Failed to read pasted image"
   }
 }

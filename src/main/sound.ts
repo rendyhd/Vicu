@@ -1,4 +1,5 @@
 import { app, dialog, BrowserWindow } from 'electron'
+import { t } from '../shared/i18n'
 import * as fs from 'fs'
 import * as path from 'path'
 import { loadConfig, saveConfig } from './config'
@@ -44,11 +45,11 @@ export async function pickAndCopySoundFile(
     app.getPath('documents')
   )
   const dialogOptions = {
-    title: 'Choose task completion sound',
+    title: t('system.dialogs.chooseSoundTitle'),
     properties: ['openFile'] as Array<'openFile'>,
     defaultPath,
     filters: [
-      { name: 'Audio', extensions: ['mp3', 'wav', 'ogg', 'm4a', 'aac', 'flac'] },
+      { name: t('system.dialogs.audioFiles'), extensions: ['mp3', 'wav', 'ogg', 'm4a', 'aac', 'flac'] },
     ],
   }
   const dialogResult = parent

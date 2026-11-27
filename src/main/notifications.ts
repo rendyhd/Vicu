@@ -14,6 +14,7 @@ import { notificationCategory, notificationFilters, overdueDays } from './notifi
 import { addLocalDays, startOfLocalDay, toLocalDate } from '../shared/due-dates'
 import { isSharedRoutine, parseRoutineEnvelope, preferOwnRoutineCarriers, routineOccurrenceKey, scheduledDateOn, type RoutinePayload } from '../shared/routines'
 import { isPlannerEnabled, isRoutinesEnabled } from '../shared/config-types'
+import { t } from '../shared/i18n'
 
 const NULL_DATE = '0001-01-01T00:00:00Z'
 
@@ -155,8 +156,8 @@ export function refreshTaskRemindersOnFocus(): void {
 export function sendTestNotification(): void {
   const config = loadConfig()
   showNotification({
-    title: 'Vicu — Test Notification',
-    body: 'Notifications are working! You will receive task reminders at your scheduled times.',
+    title: t('system.notifications.testTitle'),
+    body: t('system.notifications.testBody'),
     silent: !(config?.notifications_sound ?? true),
     persistent: !!config?.notifications_persistent,
     tag: `test:${Date.now()}`,
@@ -184,8 +185,8 @@ function schedulePlannerNudge(): void {
     const current = loadConfig()
     if (current?.notifications_enabled && isPlannerEnabled(current) && current.planner_nudge === time) {
       showNotification({
-        title: 'Plan tomorrow',
-        body: 'Set up tomorrow in Plan my day.',
+        title: t('system.notifications.planNudgeTitle'),
+        body: t('system.notifications.planNudgeBody'),
         silent: !current.notifications_sound,
         tag: `plan-nudge:${toLocalDate(new Date())}`,
         context: 'plan nudge',
@@ -290,8 +291,8 @@ async function fireRoutineReminder(
   if (!config.notifications_enabled || !isRoutinesEnabled(config)) return
   const definition = payload.definition
   showNotification({
-    title: followUp ? `Still pending: ${definition.name}` : definition.name,
-    body: followUp ? 'A gentle follow-up' : 'Routine reminder',
+    title: followUp ? t('system.notifications.routineFollowUpTitle', { name: definition.name }) : definition.name,
+    body: followUp ? t('system.notifications.routineFollowUpBody') : t('system.notifications.routineBody'),
     silent: !(config.notifications_task_reminder_sound ?? config.notifications_sound),
     persistent: !!(config.notifications_task_reminder_persistent ?? config.notifications_persistent),
     tag: `routine:${target.occurrenceKey}:${followUp ? 'followup' : 'primary'}`,
@@ -312,8 +313,8 @@ function fireTaskReminder(taskId: number, title: string, configSnapshot: AppConf
   if (!config.notifications_enabled) return
 
   showNotification({
-    title: `Reminder: ${title}`,
-    body: 'Task reminder',
+    title: t('system.notifications.taskTitle', { title }),
+    body: t('system.notifications.taskBody'),
     silent: !(config.notifications_task_reminder_sound ?? config.notifications_sound),
     persistent: !!(config.notifications_task_reminder_persistent ?? config.notifications_persistent),
     tag: `task:${taskId}`,
@@ -542,12 +543,12 @@ function showSummaryNotification(tasks: NotificationTasks, config: AppConfig, sl
   const total = overdueCount + dueTodayCount + upcomingCount
 
   const parts: string[] = []
-  if (dueTodayCount > 0) parts.push(`${dueTodayCount} due today`)
-  if (overdueCount > 0) parts.push(`${overdueCount} overdue`)
-  if (upcomingCount > 0) parts.push(`${upcomingCount} due tomorrow`)
+  if (dueTodayCount > 0) parts.push(t('system.notifications.summaryDueToday', { count: dueTodayCount }))
+  if (overdueCount > 0) parts.push(t('system.notifications.summaryOverdue', { count: overdueCount }))
+  if (upcomingCount > 0) parts.push(t('system.notifications.summaryDueTomorrow', { count: upcomingCount }))
 
   showNotification({
-    title: `Vicu — ${total} task${total === 1 ? '' : 's'} need attention`,
+    title: t('system.notifications.summaryTitle', { count: total }),
     body: parts.join(', '),
     silent: !config.notifications_sound,
     persistent: !!config.notifications_persistent,

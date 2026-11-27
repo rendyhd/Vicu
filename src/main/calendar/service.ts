@@ -30,6 +30,7 @@
 // - Nothing leaves the device: no Vikunja, no synced preferences, no assistant (it gets free time).
 
 import { BrowserWindow, dialog, net } from 'electron'
+import { t } from '../../shared/i18n'
 import { randomUUID } from 'crypto'
 import { watch, type FSWatcher } from 'fs'
 import { readFile, stat } from 'fs/promises'
@@ -711,11 +712,11 @@ async function rereadFile(connectionId: string): Promise<void> {
 async function addCalendarFile(event: Electron.IpcMainInvokeEvent, input: AddCalendarFileInput) {
   const parent = BrowserWindow.fromWebContents(event.sender)
   const options: Electron.OpenDialogOptions = {
-    title: 'Choose a calendar file',
-    buttonLabel: 'Choose',
+    title: t('system.dialogs.chooseCalendarTitle'),
+    buttonLabel: t('system.dialogs.choose'),
     filters: [
-      { name: 'Calendar files', extensions: ['ics', 'ical', 'icalendar', 'ifb'] },
-      { name: 'All files', extensions: ['*'] },
+      { name: t('system.dialogs.calendarFiles'), extensions: ['ics', 'ical', 'icalendar', 'ifb'] },
+      { name: t('system.dialogs.allFiles'), extensions: ['*'] },
     ],
     properties: ['openFile'],
   }

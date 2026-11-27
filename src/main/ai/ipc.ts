@@ -132,7 +132,7 @@ export function registerAiIpc(): void {
   // Pro (ai-assistant 11.1, 11.2): only while Pro's assistant switch is on.
   const proRequest = async (run: typeof aiProImport, input: { requestId?: unknown; user?: unknown }) => {
     if (!isProAssistantOn(loadConfig())) {
-      return { success: false as const, error: { kind: 'not_set_up' as const, message: "Turn on Pro's assistant in Settings, Pro." } }
+      return { success: false as const, error: { kind: 'not_set_up' as const, message: t('system.ai.proAssistantOff') } }
     }
     const id = typeof input?.requestId === 'string' ? input.requestId : ''
     const controller = new AbortController()

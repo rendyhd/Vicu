@@ -1,4 +1,5 @@
 import { BrowserWindow, net, screen } from 'electron'
+import { t } from '../../shared/i18n'
 import { getMainWindow } from '../quick-entry-state'
 import { randomUUID } from 'crypto'
 import { hostname } from 'node:os'
@@ -190,7 +191,7 @@ export async function loginWithOIDC(
     y: Math.round(wy + (dh - winHeight) / 2),
     show: true,
     parent: mainWin ?? undefined,
-    title: 'Sign in',
+    title: t('system.auth.signInWindow'),
     webPreferences: {
       partition: AUTH_WINDOW_PARTITION,
       nodeIntegration: false,

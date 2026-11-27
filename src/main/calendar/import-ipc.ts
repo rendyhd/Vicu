@@ -4,6 +4,7 @@
 // reaches a window; nothing stays linked to the file.
 
 import { BrowserWindow, dialog } from 'electron'
+import { t } from '../../shared/i18n'
 import { readFile, stat } from 'fs/promises'
 import { basename } from 'path'
 import { handleTrusted } from '../secure-ipc'
@@ -21,11 +22,11 @@ export function registerCalendarImportIpc(): void {
   handleTrusted('calendar:import-file', async (event): Promise<ImportResult> => {
     const parent = BrowserWindow.fromWebContents(event.sender)
     const options: Electron.OpenDialogOptions = {
-      title: 'Import a calendar file',
-      buttonLabel: 'Open',
+      title: t('system.dialogs.importCalendarTitle'),
+      buttonLabel: t('system.dialogs.open'),
       filters: [
-        { name: 'Calendar files', extensions: ['ics', 'ical', 'icalendar', 'ifb'] },
-        { name: 'All files', extensions: ['*'] },
+        { name: t('system.dialogs.calendarFiles'), extensions: ['ics', 'ical', 'icalendar', 'ifb'] },
+        { name: t('system.dialogs.allFiles'), extensions: ['*'] },
       ],
       properties: ['openFile'],
     }

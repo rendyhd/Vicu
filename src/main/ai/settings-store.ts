@@ -31,7 +31,7 @@ function settingsStore(): JsonFileStore<AiSettings> {
     store = new JsonFileStore<AiSettings>({
       path: join(app.getPath('userData'), 'ai-settings.json'),
       backup: true,
-      label: 'AI settings',
+      label: 'AI settings', // i18n-ignore: log label
       empty: () => normaliseAiSettings(DEFAULT_AI_SETTINGS),
       parse: (json) => normaliseAiSettings(json),
     })

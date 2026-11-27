@@ -1,3 +1,4 @@
+import { t } from '../../shared/i18n'
 /**
  * URL handling for the interactive OIDC login, free of Electron so it can be tested.
  */
@@ -110,8 +111,7 @@ export function interpretRedirect(
   if (!state || state !== expectedState) {
     return {
       kind: 'error',
-      message:
-        'The sign-in response did not match this login attempt (state mismatch), so it was ignored. Please try again.',
+      message: t('system.auth.stateMismatch'),
     }
   }
   return { kind: 'code', code }

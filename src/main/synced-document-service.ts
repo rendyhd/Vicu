@@ -1,4 +1,5 @@
 import { sendToAllWindows } from '@host/windows'
+import { t } from '../shared/i18n'
 import { createTask, deleteTask, fetchTaskById, updateTask } from './api-client'
 import type { ApiResult } from './api-result'
 import { OWNER_UNKNOWN_ERROR, forgetDeletedTask, rememberCreatedTask } from './carrier-service'
@@ -256,7 +257,7 @@ export function createSyncedDocumentService<Doc>(options: SyncedDocumentOptions<
   async function runSync(): Promise<SyncedDocumentStatus> {
     let config = loadConfig()
     options.beforeChange?.(config)
-    if (!config) return setStatus({ state: 'error', message: 'Configuration not loaded' })
+    if (!config) return setStatus({ state: 'error', message: t('system.sync.configNotLoaded') })
     if (config.standalone_mode) return setStatus({ state: 'local_only' })
     if (!config.vikunja_url) return setStatus({ state: 'pending', message: messages.connect })
     const syncUrl = config.vikunja_url.replace(/\/+$/, '')

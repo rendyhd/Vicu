@@ -206,7 +206,7 @@ export function registerChromeHost(extensionId: string): void {
     if (!hostPath) return
     const manifest = {
       name: HOST_NAME,
-      description: 'Vicu Browser Link native messaging bridge',
+      description: 'Vicu Browser Link native messaging bridge', // i18n-ignore: native-messaging manifest field
       path: hostPath,
       type: 'stdio',
       allowed_origins: extensionId ? [`chrome-extension://${extensionId}/`] : [],
@@ -229,7 +229,7 @@ export function registerChromeHost(extensionId: string): void {
     if (!hostPath) return
     const manifest = {
       name: HOST_NAME,
-      description: 'Vicu Browser Link native messaging bridge',
+      description: 'Vicu Browser Link native messaging bridge', // i18n-ignore: native-messaging manifest field
       path: hostPath,
       type: 'stdio',
       allowed_origins: extensionId ? [`chrome-extension://${extensionId}/`] : [],
@@ -251,7 +251,7 @@ export function registerChromeHost(extensionId: string): void {
   const manifestPath = getChromeHostManifestPath()
   const manifest = {
     name: HOST_NAME,
-    description: 'Vicu Browser Link native messaging bridge',
+    description: 'Vicu Browser Link native messaging bridge', // i18n-ignore: native-messaging manifest field
     path: hostPath,
     type: 'stdio',
     allowed_origins: extensionId ? [`chrome-extension://${extensionId}/`] : [],
@@ -273,7 +273,7 @@ export function registerFirefoxHost(): void {
     // Vicu's own future Firefox extension
     const vicuManifest = {
       name: HOST_NAME,
-      description: 'Vicu Browser Link native messaging bridge',
+      description: 'Vicu Browser Link native messaging bridge', // i18n-ignore: native-messaging manifest field
       path: hostPath,
       type: 'stdio',
       allowed_extensions: ['browser-link@vicu.app'],
@@ -283,7 +283,7 @@ export function registerFirefoxHost(): void {
     // vikunja-quick-entry's signed Firefox extension (already on AMO)
     const vqeManifest = {
       name: VQE_HOST_NAME,
-      description: 'Vicu Browser Link native messaging bridge (vikunja-quick-entry compat)',
+      description: 'Vicu Browser Link native messaging bridge (vikunja-quick-entry compat)', // i18n-ignore: native-messaging manifest field
       path: hostPath,
       type: 'stdio',
       allowed_extensions: ['browser-link@vikunja-quick-entry.app'],
@@ -303,7 +303,7 @@ export function registerFirefoxHost(): void {
     // Vicu's own future Firefox extension
     const vicuManifest = {
       name: HOST_NAME,
-      description: 'Vicu Browser Link native messaging bridge',
+      description: 'Vicu Browser Link native messaging bridge', // i18n-ignore: native-messaging manifest field
       path: hostPath,
       type: 'stdio',
       allowed_extensions: ['browser-link@vicu.app'],
@@ -315,7 +315,7 @@ export function registerFirefoxHost(): void {
     // vikunja-quick-entry's signed Firefox extension (already on AMO)
     const vqeManifest = {
       name: VQE_HOST_NAME,
-      description: 'Vicu Browser Link native messaging bridge (vikunja-quick-entry compat)',
+      description: 'Vicu Browser Link native messaging bridge (vikunja-quick-entry compat)', // i18n-ignore: native-messaging manifest field
       path: hostPath,
       type: 'stdio',
       allowed_extensions: ['browser-link@vikunja-quick-entry.app'],
@@ -334,7 +334,7 @@ export function registerFirefoxHost(): void {
   const vicuManifestPath = getFirefoxHostManifestPath(HOST_NAME)
   const vicuManifest = {
     name: HOST_NAME,
-    description: 'Vicu Browser Link native messaging bridge',
+    description: 'Vicu Browser Link native messaging bridge', // i18n-ignore: native-messaging manifest field
     path: hostPath,
     type: 'stdio',
     allowed_extensions: ['browser-link@vicu.app'],
@@ -348,7 +348,7 @@ export function registerFirefoxHost(): void {
   const vqeManifestPath = getFirefoxHostManifestPath(VQE_HOST_NAME)
   const vqeManifest = {
     name: VQE_HOST_NAME,
-    description: 'Vicu Browser Link native messaging bridge (vikunja-quick-entry compat)',
+    description: 'Vicu Browser Link native messaging bridge (vikunja-quick-entry compat)', // i18n-ignore: native-messaging manifest field
     path: hostPath,
     type: 'stdio',
     allowed_extensions: ['browser-link@vikunja-quick-entry.app'],

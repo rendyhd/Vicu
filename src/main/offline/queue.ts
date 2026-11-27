@@ -129,7 +129,7 @@ export class OfflineQueue {
       path: options.queuePath,
       backup: true,
       quarantineCorrupt: true,
-      label: 'offline queue',
+      label: 'offline queue', // i18n-ignore: log label
       empty: emptyQueueData,
       parse: parseQueueData,
     })

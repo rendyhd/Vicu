@@ -4,6 +4,7 @@
  * process. Nothing is sent before a provider is set up and, for a cloud provider, the user agreed
  * (7.1).
  */
+import { t } from '../../shared/i18n'
 import {
   AI_LIMITS,
   AI_MESSAGES,
@@ -63,7 +64,7 @@ export function setAiTransport(next: Transport | null): void {
 
 export function toAiError(err: unknown): AiError {
   if (err instanceof AiFailure) return { kind: err.kind, message: err.message, ...(err.status ? { status: err.status } : {}) }
-  return { kind: 'network', message: err instanceof Error ? err.message : 'The request failed.' }
+  return { kind: 'network', message: err instanceof Error ? err.message : t('system.ai.requestFailed') }
 }
 
 function connectionOf(settings: AiSettings): ProviderConnection {

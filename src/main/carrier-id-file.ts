@@ -14,7 +14,7 @@ export function createFileCarrierIdStore(path: string): CarrierIdStore {
   const file = new JsonFileStore<CarrierIdFile>({
     path,
     backup: false,
-    label: 'carrier ids',
+    label: 'carrier ids', // i18n-ignore: log label
     empty: emptyCarrierIdFile,
     parse: parseCarrierIdFile,
   })
