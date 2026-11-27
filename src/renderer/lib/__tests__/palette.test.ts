@@ -19,13 +19,13 @@ const ids = (list: { id: string }[]) => list.map((i) => i.id)
 
 describe('buildPaletteItems', () => {
   it('lists actions first, then smart lists, guided sessions, projects and labels', () => {
-    expect(ids(items).map((id) => id.split(':')[0])).toEqual(['cmd', 'cmd', 'cmd', 'cmd', 'cmd', 'cmd', 'cmd', 'cmd', 'cmd', 'cmd', 'list', 'list', 'list', 'guided', 'guided', 'guided', 'guided', 'guided', 'project', 'project', 'label'])
+    expect(ids(items).map((id) => id.split(':')[0])).toEqual(['cmd', 'cmd', 'cmd', 'cmd', 'cmd', 'cmd', 'cmd', 'cmd', 'cmd', 'cmd', 'cmd', 'list', 'list', 'list', 'guided', 'guided', 'guided', 'guided', 'guided', 'project', 'project', 'label'])
   })
 
   it('leaves out Say a task and the assistant entries on a host without voice or the assistant', () => {
     const base = { smartLists: [], projects: [], labels: [] }
     const web = ids(buildPaletteItems({ ...base, voice: false, assistant: false }))
-    expect(web).toEqual(['cmd:new-task', 'cmd:refresh', 'cmd:toggle-theme', 'cmd:settings', ...web.filter((id) => id.startsWith('guided:'))])
+    expect(web).toEqual(['cmd:new-task', 'cmd:refresh', 'cmd:toggle-theme', 'cmd:toggle-sidebar', 'cmd:settings', ...web.filter((id) => id.startsWith('guided:'))])
     expect(ids(buildPaletteItems({ ...base, voice: true, assistant: false }))).toContain('cmd:voice')
     expect(ids(buildPaletteItems({ ...base, voice: false, assistant: true }))).toEqual(expect.arrayContaining(['cmd:ask', 'cmd:dictate', 'cmd:brain-dump', 'cmd:make-tasks', 'cmd:notes']))
     expect(ids(buildPaletteItems({ ...base, voice: false, assistant: true }))).not.toContain('cmd:voice')
@@ -39,8 +39,8 @@ describe('buildPaletteItems', () => {
     expect(rankPalette(planner, 'meeting', []).map((i) => i.id)).toContain('cmd:new-event')
   })
 
-  it('has the New task, Say a task, Dictate tasks, Brain dump, Ask, Make tasks, Make tasks from notes, Refresh, Toggle theme and Settings actions', () => {
-    expect(items.filter((i) => i.kind === 'Action').map((i) => i.title)).toEqual(['New task', 'Say a task', 'Dictate tasks', 'Brain dump', 'Ask Vicu', 'Make tasks from text', 'Make tasks from notes', 'Refresh', 'Toggle theme', 'Settings'])
+  it('has the New task, Say a task, Dictate tasks, Brain dump, Ask, Make tasks, Make tasks from notes, Refresh, Toggle theme, Show or hide the sidebar and Settings actions', () => {
+    expect(items.filter((i) => i.kind === 'Action').map((i) => i.title)).toEqual(['New task', 'Say a task', 'Dictate tasks', 'Brain dump', 'Ask Vicu', 'Make tasks from text', 'Make tasks from notes', 'Refresh', 'Toggle theme', 'Show or hide the sidebar', 'Settings'])
   })
 
   it('orders Personal then Work in the palette and offers All only when showAll is on', () => {
@@ -67,6 +67,7 @@ describe('rankPalette', () => {
     expect(rankPalette(items, 'reno', [])[0].id).toBe('project:2')
     expect(rankPalette(items, 'errand', [])[0].id).toBe('label:5')
     expect(rankPalette(items, 'theme', [])[0].id).toBe('cmd:toggle-theme')
+    expect(rankPalette(items, 'sidebar', [])[0].id).toBe('cmd:toggle-sidebar')
   })
 
   it('matches hidden keywords only when the title does not match', () => {

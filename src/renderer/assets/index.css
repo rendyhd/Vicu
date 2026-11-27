@@ -311,6 +311,43 @@ html[data-platform="win32"],
 }
 
 /*
+ * A narrow window's sidebar drawer (rendyhd/Vicu#73) enters from the left the way the comments pane
+ * enters from the right, over a scrim that fades in. Neither has an exit animation. Reduced motion:
+ * the drawer fades over fade.fast. Forced colours: the scrim is gone (the drawer has its border).
+ */
+@keyframes vicu-drawer-in {
+  from {
+    opacity: 0;
+    translate: -16px 0;
+  }
+}
+
+.vicu-drawer-in {
+  animation: vicu-drawer-in var(--dur-move) var(--spring-move);
+}
+
+.vicu-scrim {
+  background: rgb(0 0 0 / 0.24);
+  animation: vicu-bar-fade var(--dur-fade-fast) var(--ease-standard);
+}
+
+.dark .vicu-scrim {
+  background: rgb(0 0 0 / 0.48);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vicu-drawer-in {
+    animation: vicu-bar-fade var(--dur-fade-fast) var(--ease-standard);
+  }
+}
+
+@media (forced-colors: active) {
+  .vicu-scrim {
+    background: transparent;
+  }
+}
+
+/*
  * Completing a task (card 4.2c, the same moves as Android). The checkbox ring fills with the pop
  * spring (360 ms, it overshoots a little), the check draws over 220 ms and the title strike draws
  * left to right over 240 ms. They only play when the task was completed while the row is on screen

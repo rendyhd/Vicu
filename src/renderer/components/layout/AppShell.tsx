@@ -95,9 +95,18 @@ import { sanitizeTaskHtml } from '@/lib/sanitize-html'
 import { settingsMenuInSidebar } from '@/lib/settings-menu'
 import { useSettingsNavStore } from '@/stores/settings-nav-store'
 import { SettingsMenu } from '@/components/settings/SettingsMenu'
-
-const MIN_WIDTH = 180
-const MAX_WIDTH = 360
+import { SidebarToggle } from './SidebarToggle'
+import { closeSidebarDrawer, toggleSidebar } from '@/stores/sidebar-store'
+import {
+  clampSidebarWidth,
+  dockedSidebarWidth,
+  drawerWidth,
+  isNarrowWindow,
+  maxDockedWidth,
+  sidebarPlacement,
+  sidebarShown,
+  SIDEBAR_MIN_WIDTH,
+} from '@/lib/sidebar-width'
 
 type AppState = 'loading' | 'setup' | 'ready' | 'reauth'
 
@@ -172,7 +181,19 @@ const DRAG_OVERLAY_MODIFIERS = [overlayBesidePointer]
 export function AppShell() {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
-  const { sidebarWidth, setSidebarWidth } = useSidebarStore()
+  const { sidebarWidth, setSidebarWidth, narrow, drawerOpen, hiddenWhenWide, setNarrow, setHiddenWhenWide } = useSidebarStore()
+  // The window's width decides where the sidebar is and how wide it is drawn (lib/sidebar-width.ts).
+  const [windowWidth, setWindowWidth] = useState(() => window.innerWidth)
+  useEffect(() => {
+    const measure = () => {
+      setWindowWidth(window.innerWidth)
+      setNarrow(isNarrowWindow(window.innerWidth))
+    }
+    measure()
+    window.addEventListener('resize', measure)
+    return () => window.removeEventListener('resize', measure)
+  }, [setNarrow])
+  const placement = sidebarPlacement(narrow, hiddenWhenWide, drawerOpen)
   const { setExpandedTask } = useSelectionStore()
   const updateTask = useUpdateTask()
   const reorderTask = useReorderTask()
@@ -256,9 +277,44 @@ export function AppShell() {
       // to keep tasks in-place, so we sync on navigation instead). Nothing is refetched while
       // offline changes are still queued: that would erase their optimistic state.
       refreshTasks(queryClient, [['tasks'], ['view-tasks'], ['section-tasks']])
+      // A list chosen in the drawer of a narrow window: the drawer has done its job.
+      closeSidebarDrawer()
       prevRouteRef.current = routePath
     }
   }, [routePath, queryClient])
+
+  // Mod+\ shows or hides the sidebar (the drawer in a narrow window), anywhere in the window. The
+  // key is read by its place, so keyboards that put the backslash elsewhere still have it.
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.isComposing || event.altKey || event.shiftKey) return
+      if (!(window.api.platform === 'darwin' ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey)) return
+      if (event.code !== 'Backslash' && event.key !== '\\') return
+      event.preventDefault()
+      toggleSidebar()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
+
+  // An open drawer is modal: the content and the side panes beside it cannot be reached, focus goes
+  // to the list on screen in the drawer, and back to the sidebar button when the drawer closes.
+  const sidebarToggleRef = useRef<HTMLButtonElement>(null)
+  const drawerShown = placement === 'drawer-open'
+  useEffect(() => {
+    const aside = sidebarRef.current
+    const blocked = [contentColumnRef.current, ...document.querySelectorAll<HTMLElement>('[data-side-pane]')]
+    if (!drawerShown || !aside) return
+    for (const element of blocked) if (element) element.inert = true
+    const current = aside.querySelector<HTMLElement>('[aria-current="page"]')
+    const first = aside.querySelector<HTMLElement>('a[href], button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])')
+    ;(current ?? first)?.focus({ preventScroll: false })
+    return () => {
+      for (const element of blocked) if (element) element.inert = false
+      const active = document.activeElement
+      if (!active || active === document.body || aside.contains(active)) sidebarToggleRef.current?.focus()
+    }
+  }, [drawerShown])
 
   // TanStack Query's browser focus manager only observes page visibility. An Electron
   // window can lose and regain focus without becoming hidden, so explicitly refresh
@@ -629,8 +685,9 @@ export function AppShell() {
       applyTheme(t)
 
       if (typeof config?.sidebar_width === 'number') {
-        setSidebarWidth(Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, config.sidebar_width)))
+        setSidebarWidth(clampSidebarWidth(config.sidebar_width))
       }
+      setHiddenWhenWide(config?.sidebar_hidden === true)
 
       if (!config || !config.vikunja_url) {
         setAppState('setup')
@@ -788,13 +845,17 @@ export function AppShell() {
       e.preventDefault()
       dragging.current = true
       startX.current = e.clientX
-      startWidth.current = sidebarWidth
-      let latestWidth = sidebarWidth
+      // The drag starts from the width on screen, which may have given way to a narrow window, and
+      // stops where the content column would get narrower than its minimum.
+      const shown = dockedSidebarWidth(sidebarWidth, window.innerWidth)
+      const widest = maxDockedWidth(window.innerWidth)
+      startWidth.current = shown
+      let latestWidth = shown
 
       const handleMouseMove = (ev: MouseEvent) => {
         if (!dragging.current) return
         const delta = ev.clientX - startX.current
-        latestWidth = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, startWidth.current + delta))
+        latestWidth = Math.min(widest, Math.max(SIDEBAR_MIN_WIDTH, startWidth.current + delta))
         // Mutate the element directly during the drag — committing to the
         // store per mousemove re-renders the entire app tree per pixel.
         if (sidebarRef.current) sidebarRef.current.style.width = `${latestWidth}px`
@@ -872,23 +933,49 @@ export function AppShell() {
       {/* With Mica behind the window the root stays clear so the translucent sidebar shows it; the content column and the splitter carry the page colour themselves. */}
       <div className={`relative flex h-screen w-screen overflow-hidden${window.api.windowMaterial === 'mica' ? '' : ' bg-[var(--bg-primary)]'}`}>
         {/* Window drag region overlay */}
+        {/* The title band: the drag region, the sidebar button and the window controls. It stays
+            above an open drawer, so the button that opened the drawer closes it. */}
         <header
-          className="absolute inset-x-0 top-0 z-30 flex h-8"
+          className="absolute inset-x-0 top-0 z-50 flex h-8 items-center pl-2"
           style={{
             WebkitAppRegion: 'drag',
             ...(window.api.platform === 'darwin' ? { paddingLeft: '80px' } : {}),
           } as React.CSSProperties}
         >
+          <SidebarToggle ref={sidebarToggleRef} shown={sidebarShown(placement)} controls="app-sidebar" />
           <div className="flex-1" />
           {can('windowControls') && <WindowControls />}
         </header>
 
-        {/* Sidebar — bg extends behind drag region */}
+        {/* A narrow window's open drawer dims the content; a click on it closes the drawer. */}
+        {placement === 'drawer-open' && (
+          <div aria-hidden="true" data-sidebar-scrim className="vicu-scrim absolute inset-0 z-40" onClick={closeSidebarDrawer} />
+        )}
+
+        {/* Sidebar — bg extends behind drag region. Hidden, it stays mounted, so what it holds
+            (a folded project, a scrolled list) is as it was when it comes back. */}
         <aside
-          aria-label={t('app.sidebar')}
+          id="app-sidebar"
+          aria-label={t('sidebar.region')}
           ref={sidebarRef}
-          className="flex shrink-0 flex-col overflow-hidden border-r border-[var(--border-color)] bg-[var(--bg-sidebar)]"
-          style={{ width: sidebarWidth }}
+          hidden={placement === 'hidden' || placement === 'drawer-closed'}
+          data-sidebar-placement={placement}
+          onKeyDown={placement === 'drawer-open'
+            ? (event) => {
+                // Escape closes the drawer, unless a menu, picker or dialog in it takes the key.
+                if (event.key !== 'Escape' || event.defaultPrevented) return
+                if ((event.target as Element).closest('[popover], dialog')) return
+                event.preventDefault()
+                closeSidebarDrawer()
+              }
+            : undefined}
+          // The display class would win over the hidden attribute, so a hidden sidebar says so in its class too.
+          className={placement === 'drawer-open'
+            ? 'vicu-drawer-in absolute inset-y-0 left-0 z-40 flex flex-col overflow-hidden border-r border-[var(--border-color)] bg-[var(--bg-secondary)] shadow-xl'
+            : placement === 'docked'
+              ? 'flex shrink-0 flex-col overflow-hidden border-r border-[var(--border-color)] bg-[var(--bg-sidebar)]'
+              : 'hidden'}
+          style={{ width: placement === 'drawer-open' ? drawerWidth(sidebarWidth, windowWidth) : dockedSidebarWidth(sidebarWidth, windowWidth) }}
         >
           <div className="h-8 shrink-0" />
           <div className="flex-1 overflow-hidden">
@@ -896,12 +983,14 @@ export function AppShell() {
           </div>
         </aside>
 
-        <div
-          className="w-1 shrink-0 cursor-col-resize bg-[var(--bg-primary)] transition-colors hover:bg-accent-blue/20"
-          onMouseDown={handleMouseDown}
-          role="separator"
-          aria-orientation="vertical"
-        />
+        {placement === 'docked' && (
+          <div
+            className="w-1 shrink-0 cursor-col-resize bg-[var(--bg-primary)] transition-colors hover:bg-accent-blue/20"
+            onMouseDown={handleMouseDown}
+            role="separator"
+            aria-orientation="vertical"
+          />
+        )}
 
         <div ref={contentColumnRef} className="flex flex-1 flex-col overflow-hidden bg-[var(--bg-primary)]">
           <div className="h-8 shrink-0" />

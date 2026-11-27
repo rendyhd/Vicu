@@ -41,6 +41,7 @@ import { WhenPopover } from '@/components/task-list/WhenPopover'
 import type { ChatMessage } from '../../../shared/ai/types'
 import type { Task } from '@/lib/vikunja-types'
 import type { TranslationKey } from '../../../shared/i18n'
+import { useSidebarStore } from '@/stores/sidebar-store'
 
 /** The user's own words of a stored message (the context block is for the model). */
 function userWords(text: string): string {
@@ -276,11 +277,17 @@ function AskPane({ ready }: { ready: { ask: boolean; talk: boolean } }) {
 
 function AskFrame({ children, onClose, toolbar }: { children: React.ReactNode; onClose: () => void; toolbar?: React.ReactNode }) {
   const { t } = useTranslation()
+  // A narrow window (lib/sidebar-width.ts) has no room beside the content: the pane lies over it.
+  const narrow = useSidebarStore((s) => s.narrow)
   return (
     <aside
       id="ask-pane"
       aria-label={t('ai.askPane.title')}
-      className="vicu-pane-in flex w-[380px] shrink-0 flex-col overflow-hidden border-l border-[var(--border-color)] bg-[var(--bg-sidebar)]"
+      data-side-pane
+      className={cn(
+        'vicu-pane-in flex w-[380px] shrink-0 flex-col overflow-hidden border-l border-[var(--border-color)]',
+        narrow ? 'absolute inset-y-0 right-0 z-40 max-w-full bg-[var(--bg-secondary)] shadow-xl' : 'bg-[var(--bg-sidebar)]',
+      )}
       onKeyDown={(e) => {
         if (e.key === 'Escape' && !e.defaultPrevented) {
           e.preventDefault()

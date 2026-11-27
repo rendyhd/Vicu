@@ -288,7 +288,10 @@ step('work-and-personal', async () => {
     await card.getByRole('switch').first().click()
     await settle(page, 500)
     assert('turning the feature on shows the switch in the sidebar', await switchBox.waitFor({ timeout: 5000 }).then(() => true, () => false))
-    assert('it starts on All', (await page.locator('[data-work-mode="all"]').getAttribute('aria-checked')) === 'true')
+    // All is offered only with Show All on (contract 22.4): the switch is Personal and Work, on Personal.
+    const modes = await page.locator('[data-work-mode-switch] [role="radio"]').evaluateAll((els) => els.map((el) => el.getAttribute('data-work-mode')))
+    assert('the switch has Personal and Work', JSON.stringify(modes) === JSON.stringify(['personal', 'work']), JSON.stringify(modes))
+    assert('it starts on Personal', (await page.locator('[data-work-mode="personal"]').getAttribute('aria-checked')) === 'true')
     await capture(page, 'work-and-personal-settings')
     await goto(page, '/today')
     await page.locator('[data-work-mode="work"]').click()
@@ -297,7 +300,7 @@ step('work-and-personal', async () => {
     await capture(page, 'work-mode-today')
     await page.keyboard.press('Home')
     await settle(page, 300)
-    assert('Home on the switch goes back to All', (await page.locator('[data-work-mode="all"]').getAttribute('aria-checked')) === 'true' && (await mode()) === 'all', await mode())
+    assert('Home on the switch goes to Personal', (await page.locator('[data-work-mode="personal"]').getAttribute('aria-checked')) === 'true' && (await mode()) === 'personal', await mode())
   } finally {
     await page.evaluate(() => window.api.saveConfigPatch({ work_mode_enabled: false, work_mode: 'all' })).catch(() => {})
     await page.reload()

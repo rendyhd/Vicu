@@ -91,6 +91,12 @@ The Quick Entry and Quick View shortcuts work in any app. If another program alr
 | macOS | The usual traffic-light buttons and a translucent sidebar |
 | Linux | Vicu draws its own window buttons |
 
+### Hiding the sidebar and narrow windows
+
+The button at the top left of the window (after the traffic lights on a Mac) hides the sidebar, so the list gets the whole width. Click it again, or press <kbd>Ctrl</kbd>+<kbd>&#92;</kbd> (<kbd>Cmd</kbd>+<kbd>&#92;</kbd> on a Mac), to bring the sidebar back. Vicu remembers the choice on this computer.
+
+The window can be as narrow as 360 pixels, which suits a column of a tiling window manager. When the window gets narrower than about 660 pixels, the sidebar no longer sits beside the list. The same button, or the same keys, then opens it over the list. Choosing a list, or pressing <kbd>Escape</kbd>, closes it again. The comments and Ask panes also open over the list in a narrow window.
+
 ## The command palette
 
 {desktop}

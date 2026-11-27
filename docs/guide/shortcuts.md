@@ -28,6 +28,7 @@ Both Quick shortcuts work from any app and must be turned on first. See [On the 
 |---|---|
 | <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>P</kbd> | Open the command palette |
 | <kbd>Ctrl</kbd>+<kbd>F</kbd> | Go to Quick find |
+| <kbd>Ctrl</kbd>+<kbd>&#92;</kbd> | Show or hide the sidebar (in a narrow window it opens over the list) |
 | <kbd>Ctrl</kbd>+<kbd>N</kbd> | New task (**File, New task**) |
 | <kbd>Ctrl</kbd>+<kbd>J</kbd> | Show or hide Ask |
 | <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>C</kbd> | Show or hide comments |

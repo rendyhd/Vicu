@@ -478,7 +478,7 @@ export function PlanMyDaySession({ onExit, listRef }: { onExit: () => void; list
   const planned = plannedMinutes(session.timelineTasks, session.day)
   return (
     <div className="flex min-h-0 flex-1" data-plan-session>
-      <aside ref={listRef as React.RefObject<HTMLElement>} aria-label={t('planner.planMyDay.title')} className="flex w-[380px] shrink-0 flex-col border-r border-border">
+      <aside ref={listRef as React.RefObject<HTMLElement>} aria-label={t('planner.planMyDay.title')} className="flex w-[45%] min-w-[220px] max-w-[380px] shrink-0 flex-col border-r border-border">
         <div className="grid shrink-0 gap-2 border-b border-border p-3">
           <div className="flex items-center gap-2">
             <Sun className="h-4 w-4 shrink-0" style={{ color: 'var(--status-today)' }} aria-hidden="true" />

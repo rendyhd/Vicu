@@ -54,7 +54,9 @@ export function createMainWindow(
     height: defaultHeight,
     x: fallbackX,
     y: fallbackY,
-    minWidth: 800,
+    // Narrow enough for a column of a tiling window manager (rendyhd/Vicu#73): below 664 px the
+    // sidebar becomes a drawer (renderer lib/sidebar-width.ts), so the content keeps the width.
+    minWidth: 360,
     minHeight: 500,
     ...windowChromeOptions({ platform: chromePlatform, windowsBuild, dark: isDarkChrome(config?.theme, nativeTheme.shouldUseDarkColors) }),
     show: false,

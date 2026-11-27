@@ -620,7 +620,8 @@ function PlanScreen() {
           ref={listRef}
           aria-label={t('planner.view.tasksToPlan')}
           data-plan-panel
-          className="flex w-[340px] shrink-0 flex-col border-r border-border"
+          // A narrow window gives the timeline room: the panel takes a share of the width, at most 340 px.
+          className="flex w-[42%] min-w-[200px] max-w-[340px] shrink-0 flex-col border-r border-border"
         >
           <div className="shrink-0 space-y-2 p-3 pb-2">
             <SourceChips

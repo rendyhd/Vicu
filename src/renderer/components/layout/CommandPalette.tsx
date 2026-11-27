@@ -1,7 +1,7 @@
 import { useEffect, useId, useMemo, useState, type KeyboardEvent } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { useQueryClient } from '@tanstack/react-query'
-import { CalendarPlus, CheckCircle2, Circle, Folder, Layers, Mic, Plus, RefreshCw, Settings, Sparkles, SunMoon, Tag, UsersRound } from 'lucide-react'
+import { CalendarPlus, CheckCircle2, Circle, Folder, Layers, Mic, PanelLeft, Plus, RefreshCw, Settings, Sparkles, SunMoon, Tag, UsersRound } from 'lucide-react'
 import { useAppConfig } from '@/hooks/use-app-config'
 import { formatAcceleratorForDisplay } from '@/lib/accelerator'
 import { Dialog } from '@/components/overlay/Dialog'
@@ -22,6 +22,8 @@ import { WorkModeWord, useOtherModeOf } from '@/components/task-list/WorkMark'
 import { useLabels } from '@/hooks/use-labels'
 import { useIsDark } from '@/hooks/use-is-dark'
 import { refreshNow } from '@/hooks/use-manual-refresh'
+import { toggleSidebar } from '@/stores/sidebar-store'
+import { SIDEBAR_SHORTCUT } from './SidebarToggle'
 import { api } from '@/lib/api'
 import { cn } from '@/lib/cn'
 import { applyTheme } from '@/lib/theme'
@@ -174,6 +176,8 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
       void navigate({ to: '/plan' })
     } else if (command === 'refresh') {
       refreshNow(queryClient)
+    } else if (command === 'toggle-sidebar') {
+      toggleSidebar()
     } else if (command === 'toggle-theme') {
       const next = isDark ? 'light' : 'dark'
       applyTheme(next)
@@ -226,6 +230,7 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
     if (action.type === 'task') return projects?.all.find((p) => p.id === action.task.project_id)?.title ?? kindLabel(kind)
     if (action.type === 'command' && action.command === 'new-task') return shortcutHint(newTaskShortcut(), window.api.platform === 'darwin')
     if (action.type === 'command' && action.command === 'new-event') return shortcutHint(newEventShortcut(), window.api.platform === 'darwin')
+    if (action.type === 'command' && action.command === 'toggle-sidebar') return shortcutHint(SIDEBAR_SHORTCUT, window.api.platform === 'darwin')
     if (action.type === 'command' && action.command === 'refresh') return window.api.platform === 'darwin' ? shortcutHint('Mod+R', true) : 'F5'
     if (action.type === 'command' && action.command === 'voice' && appConfig?.voice_hotkey) return formatAcceleratorForDisplay(appConfig.voice_hotkey, window.api.platform === 'darwin')
     return kindLabel(kind)
@@ -236,6 +241,7 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
     if (action.type === 'command' && action.command === 'settings') return Settings
     if (action.type === 'command' && action.command === 'toggle-theme') return SunMoon
     if (action.type === 'command' && action.command === 'refresh') return RefreshCw
+    if (action.type === 'command' && action.command === 'toggle-sidebar') return PanelLeft
     if (action.type === 'command' && action.command === 'new-event') return CalendarPlus
     if (action.type === 'command' && action.command === 'voice') return Mic
     if (action.type === 'command' && (action.command === 'ask' || action.command === 'make-tasks' || action.command === 'notes' || action.command === 'dictate' || action.command === 'brain-dump')) return Sparkles

@@ -14,6 +14,7 @@ const shortcuts: { category: TranslationKey; items: { keys: string[]; descriptio
     { keys: ['Down'], description: 'settings.shortcuts.items.nextTask' },
     { keys: ['Enter'], description: 'settings.shortcuts.items.openTask' },
     { keys: ['Escape'], description: 'settings.shortcuts.items.collapseTask' },
+    { keys: [mod, '\\'], description: 'settings.shortcuts.items.toggleSidebar' },
   ]},
   { category: 'settings.shortcuts.categories.taskActions', items: [
     { keys: keysOf(newTaskShortcut()), description: 'settings.shortcuts.items.newTask' },
