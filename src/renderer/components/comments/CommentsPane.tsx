@@ -18,6 +18,7 @@ import { useDateFormat } from '@/hooks/use-date-format'
 import { useAppConfig } from '@/hooks/use-app-config'
 import { useDayKey } from '@/stores/day-store'
 import { useUIStore } from '@/stores/ui-store'
+import { useSidebarStore } from '@/stores/sidebar-store'
 import { commentDraft, commentsButtonId, saveCommentDraft, useCommentsPaneStore } from '@/stores/comments-pane-store'
 import { useCollabMe, useProjectAccess, type ProjectAccess } from '@/hooks/use-project-access'
 import {
@@ -67,6 +68,8 @@ export function CommentsPaneHost() {
   const me = useCollabMe()
   const available = !!task
   const [focusComposer, setFocusComposer] = useState(0)
+  // A narrow window (lib/sidebar-width.ts) has no room beside the content: the pane lies over it.
+  const narrow = useSidebarStore((s) => s.narrow)
 
   // Mod+Shift+C shows or hides the pane while a card is open.
   useEffect(() => {
@@ -99,7 +102,11 @@ export function CommentsPaneHost() {
     <aside
       id="comments-pane"
       aria-label="Comments"
-      className="vicu-pane-in flex w-[352px] shrink-0 flex-col overflow-hidden border-l border-[var(--border-color)] bg-[var(--bg-sidebar)]"
+      data-side-pane
+      className={cn(
+        'vicu-pane-in flex w-[352px] shrink-0 flex-col overflow-hidden border-l border-[var(--border-color)]',
+        narrow ? 'absolute inset-y-0 right-0 z-40 max-w-full bg-[var(--bg-secondary)] shadow-xl' : 'bg-[var(--bg-sidebar)]',
+      )}
       onKeyDown={(e) => {
         if (e.key === 'Escape' && !e.defaultPrevented) {
           e.preventDefault()

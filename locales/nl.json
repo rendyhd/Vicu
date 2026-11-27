@@ -16,6 +16,14 @@
     "logbook": "Logboek",
     "bottomLists": "Meer lijsten"
   },
+  "sidebar": {
+    "region": "Zijbalk",
+    "show": "Zijbalk tonen",
+    "hide": "Zijbalk verbergen",
+    "showShortcut": "Zijbalk tonen ({{shortcut}})",
+    "hideShortcut": "Zijbalk verbergen ({{shortcut}})",
+    "palette": "Zijbalk tonen of verbergen"
+  },
   "completion": {
     "toast_one": "Voltooid",
     "toast_other": "{{count}} voltooid",
@@ -513,6 +521,7 @@
         "nextTask": "Naar volgende taak",
         "openTask": "Taak uitklappen / openen",
         "collapseTask": "Taak invouwen / focus wissen",
+        "toggleSidebar": "Zijbalk tonen of verbergen",
         "newTask": "Nieuwe taak",
         "newTaskFromClipboard": "Nieuwe taak van klembord",
         "saveAndClose": "Taak opslaan en sluiten",

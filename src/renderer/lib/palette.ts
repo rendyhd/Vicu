@@ -5,7 +5,7 @@ import type { Label, Project, Task } from './vikunja-types'
 // What the command palette lists and how a query picks from it. Pure: the component turns an
 // action into a navigation or a change.
 
-export type PaletteCommand = 'new-task' | 'new-event' | 'voice' | 'dictate' | 'brain-dump' | 'ask' | 'make-tasks' | 'notes' | 'refresh' | 'toggle-theme' | 'settings'
+export type PaletteCommand = 'new-task' | 'new-event' | 'voice' | 'dictate' | 'brain-dump' | 'ask' | 'make-tasks' | 'notes' | 'refresh' | 'toggle-theme' | 'toggle-sidebar' | 'settings'
   | 'pro-focus' | 'pro-settings' | 'pro-import' | 'pro-copilot' | 'pro-recap' | 'pro-weekly-note'
   | 'work-all' | 'work-work' | 'work-personal'
 
@@ -120,6 +120,7 @@ export function buildPaletteItems({ smartLists, projects, labels, planner = fals
       : []),
     { id: 'cmd:refresh', kind: 'Action', title: 'Refresh', keywords: 'reload sync update', action: { type: 'command', command: 'refresh' } },
     { id: 'cmd:toggle-theme', kind: 'Action', title: 'Toggle theme', keywords: 'dark light mode', action: { type: 'command', command: 'toggle-theme' } },
+    { id: 'cmd:toggle-sidebar', kind: 'Action', title: t('sidebar.palette'), keywords: 'sidebar drawer panel hide show narrow window lists projects', action: { type: 'command', command: 'toggle-sidebar' } },
     { id: 'cmd:settings', kind: 'Action', title: 'Settings', keywords: 'preferences options', action: { type: 'command', command: 'settings' } },
   ]
   return [

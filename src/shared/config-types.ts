@@ -286,6 +286,11 @@ export interface AppConfig {
   sidebar_order?: string[]
   /** Whether Pro's sidebar section is collapsed to its header. Per device, never synced. */
   sidebar_pro_collapsed?: boolean
+  /**
+   * The person hid the sidebar in a wide window (the sidebar button or Mod+\). A narrow window
+   * shows it as a drawer whatever this says (renderer `lib/sidebar-width.ts`). Per device, never synced.
+   */
+  sidebar_hidden?: boolean
   custom_lists?: CustomList[]
   /**
    * What this device knows about the account's Vikunja saved filters (cross-app semantics 3.7):

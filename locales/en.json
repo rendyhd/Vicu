@@ -16,6 +16,14 @@
     "logbook": "Logbook",
     "bottomLists": "More lists"
   },
+  "sidebar": {
+    "region": "Sidebar",
+    "show": "Show sidebar",
+    "hide": "Hide sidebar",
+    "showShortcut": "Show sidebar ({{shortcut}})",
+    "hideShortcut": "Hide sidebar ({{shortcut}})",
+    "palette": "Show or hide the sidebar"
+  },
   "completion": {
     "toast_one": "Completed",
     "toast_other": "{{count}} completed",
@@ -513,6 +521,7 @@
         "nextTask": "Move to next task",
         "openTask": "Expand / open task",
         "collapseTask": "Collapse task / clear focus",
+        "toggleSidebar": "Show or hide the sidebar",
         "newTask": "New task",
         "newTaskFromClipboard": "New task from clipboard",
         "saveAndClose": "Save and close task",

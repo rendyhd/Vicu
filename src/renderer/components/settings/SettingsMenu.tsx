@@ -6,6 +6,7 @@ import { cn } from '@/lib/cn'
 import { settingsGroups, type SettingsTab } from '@/lib/settings-menu'
 import { capabilities } from '@/lib/capabilities'
 import { useSettingsNavStore } from '@/stores/settings-nav-store'
+import { closeSidebarDrawer } from '@/stores/sidebar-store'
 import { SelectionPill } from '@/components/sidebar/SelectionPill'
 
 const TAB_ICONS: Record<SettingsTab, LucideIcon> = {
@@ -89,7 +90,11 @@ export function SettingsMenu({ variant }: { variant: 'column' | 'sidebar' }) {
                   <div key={item.key}>
                     <button
                       type="button"
-                      onClick={() => setTab(item.key)}
+                      onClick={() => {
+                        setTab(item.key)
+                        // In a narrow window's drawer, picking a tab is the drawer's last step.
+                        closeSidebarDrawer()
+                      }}
                       aria-current={active ? 'page' : undefined}
                       className={cn(
                         'relative flex h-8 w-full items-center gap-2.5 rounded-control px-2.5 text-section font-medium text-[var(--text-primary)] transition-colors',
@@ -106,7 +111,10 @@ export function SettingsMenu({ variant }: { variant: 'column' | 'sidebar' }) {
                           <li key={`${index}-${label}`}>
                             <button
                               type="button"
-                              onClick={() => jumpTo?.(index)}
+                              onClick={() => {
+                                jumpTo?.(index)
+                                closeSidebarDrawer()
+                              }}
                               // A section can share its tab's name (Projects, Pro): the name says which it is.
                               aria-label={t('settings.menu.sectionAria', { section: label })}
                               aria-current={index === current ? 'location' : undefined}

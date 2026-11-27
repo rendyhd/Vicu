@@ -34,7 +34,7 @@
   "src/renderer/components/guided/GuidedSortSession.tsx": 12,
   "src/renderer/components/guided/GuidedSummary.tsx": 7,
   "src/renderer/components/guided/ProjectReviewSession.tsx": 25,
-  "src/renderer/components/layout/AppShell.tsx": 3,
+  "src/renderer/components/layout/AppShell.tsx": 2,
   "src/renderer/components/layout/CommandPalette.tsx": 6,
   "src/renderer/components/layout/Sidebar.tsx": 6,
   "src/renderer/components/layout/WindowControls.tsx": 4,
