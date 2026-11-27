@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/shared/Button'
 import { Checkbox } from '@/components/shared/Checkbox'
@@ -14,6 +15,7 @@ export const isMacPlatform = (): boolean => window.api.platform === 'darwin'
 const STATUS_KEY = 'calendar-eventkit-status'
 
 export function MacCalendarsForm({ onDone, onCancel }: { onDone: () => void; onCancel: () => void }) {
+  const { t } = useTranslation()
   const client = useQueryClient()
   const status = useQuery({ queryKey: [STATUS_KEY], queryFn: () => window.api.calendar.eventkit.status() })
   const [found, setFound] = useState<EventKitFoundCalendar[] | null>(null)
@@ -73,7 +75,7 @@ export function MacCalendarsForm({ onDone, onCancel }: { onDone: () => void; onC
           save.mutate()
         }}
       >
-        <p className="text-meta text-text">Pick the calendars to show.</p>
+        <p className="text-meta text-text">{t('calendars.pick.pick')}</p>
         <div className="max-h-64 space-y-2 overflow-y-auto" data-eventkit-found>
           {groupByAccount(found).map((group) => (
             <div key={group.account}>
@@ -96,13 +98,13 @@ export function MacCalendarsForm({ onDone, onCancel }: { onDone: () => void; onC
         </div>
         <label className="flex cursor-pointer items-center gap-2 border-t border-border pt-2">
           <Checkbox checked={busyOnly} onChange={(e) => setBusyOnly(e.target.checked)} />
-          <span className="text-meta text-text">Show only &ldquo;Busy&rdquo;, not titles</span>
+          <span className="text-meta text-text">{t('calendars.feeds.busyOnly')}</span>
         </label>
         {save.error && <p role="alert" className="text-caption text-status-overdue">{(save.error as Error).message}</p>}
         <div className="flex justify-end gap-2 pt-1">
-          <Button variant="secondary" onClick={onCancel}>Cancel</Button>
+          <Button variant="secondary" onClick={onCancel}>{t('calendars.add.cancel')}</Button>
           <Button variant="primary" type="submit" disabled={shown.size === 0 || save.isPending} data-eventkit-save>
-            {shown.size === 1 ? 'Add 1 calendar' : `Add ${shown.size} calendars`}
+            {t('calendars.pick.add', { count: shown.size })}
           </Button>
         </div>
       </form>
@@ -112,21 +114,21 @@ export function MacCalendarsForm({ onDone, onCancel }: { onDone: () => void; onC
   const problem = discover.error ? (discover.error as Error).message : view?.added ? undefined : view?.problem
   return (
     <div className="space-y-2.5">
-      <p className="text-caption text-text-secondary">Vicu only reads them, never changes them.</p>
+      <p className="text-caption text-text-secondary">{t('calendars.mac.readOnly')}</p>
       {view?.added && (
         <p className="text-meta text-text" data-eventkit-added>
-          The calendars of this Mac are already added. Choose which to show in the list of calendars.
+          {t('calendars.mac.added')}
         </p>
       )}
       {!view?.added && view?.access === 'not-determined' && (
-        <p className="text-caption text-text-secondary">macOS asks once whether Vicu may read your calendars.</p>
+        <p className="text-caption text-text-secondary">{t('calendars.mac.asksOnce')}</p>
       )}
       {problem && <p role="alert" className="text-caption text-status-overdue" data-eventkit-error>{problem}</p>}
       <div className="flex justify-end gap-2 pt-1">
-        <Button variant="secondary" onClick={onCancel}>Cancel</Button>
+        <Button variant="secondary" onClick={onCancel}>{t('calendars.add.cancel')}</Button>
         {refused && !view?.added ? (
           <Button variant="primary" onClick={() => void window.api.calendar.eventkit.openSettings()} data-eventkit-settings>
-            Open System Settings
+            {t('calendars.mac.openSettings')}
           </Button>
         ) : (
           <Button
@@ -135,7 +137,7 @@ export function MacCalendarsForm({ onDone, onCancel }: { onDone: () => void; onC
             disabled={!view || view.added || discover.isPending || (!view.access && !!view.problem)}
             data-eventkit-continue
           >
-            {discover.isPending ? 'Waiting for macOS...' : 'Continue'}
+            {discover.isPending ? t('calendars.mac.waiting') : t('calendars.local.continue')}
           </Button>
         )}
       </div>

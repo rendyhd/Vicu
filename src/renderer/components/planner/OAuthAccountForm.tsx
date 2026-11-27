@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import { ChevronDown, ExternalLink } from 'lucide-react'
+import { Trans, useTranslation } from 'react-i18next'
 import { Button } from '@/components/shared/Button'
 import { cn } from '@/lib/cn'
 import { shownError, useCalendarAccountActions, useOAuthClients } from '@/hooks/use-calendar-accounts'
@@ -33,13 +34,14 @@ function OutLink({ href, children, data }: { href: string; children: React.React
 
 /** The org-approval sentence with the page for IT, or a plain error. */
 export function AccountError({ message }: { message: string }) {
+  const { t } = useTranslation()
   if (accountProblem(message) === 'org') {
     return (
       <div role="alert" data-calendar-org-approval className="rounded-control border border-status-overdue/40 bg-status-overdue/8 px-2.5 py-2">
         <p className="text-caption text-text">{message}</p>
         <p className="mt-1 text-caption text-text-secondary">
-          An administrator of your Microsoft 365 organisation can allow it for everyone.{' '}
-          <OutLink href={CALENDAR_IT_ADMIN_URL} data="it-admins">The page for your IT team</OutLink>
+          {t('calendars.oauth.adminNote')}{' '}
+          <OutLink href={CALENDAR_IT_ADMIN_URL} data="it-admins">{t('calendars.oauth.adminPage')}</OutLink>
         </p>
       </div>
     )
@@ -48,6 +50,7 @@ export function AccountError({ message }: { message: string }) {
 }
 
 function OwnClientForm({ provider, state, onSaved }: { provider: CalendarAccountProvider; state: OAuthClientState; onSaved: () => void }) {
+  const { t } = useTranslation()
   const info = CALENDAR_ACCOUNT_PROVIDERS[provider]
   const { setClient } = useCalendarAccountActions()
   const idId = useId()
@@ -77,15 +80,19 @@ function OwnClientForm({ provider, state, onSaved }: { provider: CalendarAccount
       {state.own && (
         <div className="flex items-center gap-2">
           <p className="min-w-0 flex-1 truncate text-caption text-text-secondary">
-            Using your own client <span className="font-medium text-text" data-calendar-own-client-id>{state.ownClientId}</span>
+            <Trans
+              i18nKey="calendars.oauth.usingOwn"
+              values={{ clientId: state.ownClientId }}
+              components={{ id: <span className="font-medium text-text" data-calendar-own-client-id /> }}
+            />
           </p>
           <Button variant="quiet" onClick={() => setClient.mutate({ provider, input: null })} data-calendar-own-client-remove>
-            Remove
+            {t('calendars.oauth.remove')}
           </Button>
         </div>
       )}
       <div>
-        <label htmlFor={idId} className="mb-1 block text-caption text-text-secondary">Client id</label>
+        <label htmlFor={idId} className="mb-1 block text-caption text-text-secondary">{t('calendars.oauth.clientId')}</label>
         <input
           id={idId}
           value={clientId}
@@ -99,7 +106,7 @@ function OwnClientForm({ provider, state, onSaved }: { provider: CalendarAccount
       </div>
       {info.needsSecret && (
         <div>
-          <label htmlFor={secretId} className="mb-1 block text-caption text-text-secondary">Client secret</label>
+          <label htmlFor={secretId} className="mb-1 block text-caption text-text-secondary">{t('calendars.oauth.clientSecret')}</label>
           <input
             id={secretId}
             type="password"
@@ -112,15 +119,13 @@ function OwnClientForm({ provider, state, onSaved }: { provider: CalendarAccount
         </div>
       )}
       <p className="text-caption text-text-secondary">
-        {provider === 'microsoft'
-          ? 'A Microsoft Entra app registration with the "Mobile and desktop applications" platform, redirect URI http://localhost.'
-          : 'A Google Cloud OAuth client of the type Desktop app, with the Google Calendar API turned on.'}{' '}
-        <OutLink href={CALENDAR_OAUTH_SETUP_URL} data="oauth-setup">How to register one</OutLink>
+        {provider === 'microsoft' ? t('calendars.oauth.registerMicrosoft') : t('calendars.oauth.registerGoogle')}{' '}
+        <OutLink href={CALENDAR_OAUTH_SETUP_URL} data="oauth-setup">{t('calendars.oauth.howToRegister')}</OutLink>
       </p>
       {error && <p role="alert" className="text-caption text-status-overdue" data-calendar-client-error>{error}</p>}
       <div className="flex justify-end">
         <Button variant="secondary" onClick={save} disabled={!clientId.trim() || setClient.isPending} data-calendar-client-save>
-          {state.own ? 'Save new client' : 'Save client'}
+          {state.own ? t('calendars.oauth.saveNew') : t('calendars.oauth.save')}
         </Button>
       </div>
     </div>
@@ -128,6 +133,7 @@ function OwnClientForm({ provider, state, onSaved }: { provider: CalendarAccount
 }
 
 export function OAuthAccountForm({ provider, onDone, onCancel }: { provider: CalendarAccountProvider; onDone: () => void; onCancel: () => void }) {
+  const { t } = useTranslation()
   const info = CALENDAR_ACCOUNT_PROVIDERS[provider]
   const clients = useOAuthClients()
   const { signIn, cancel } = useCalendarAccountActions()
@@ -159,7 +165,7 @@ export function OAuthAccountForm({ provider, onDone, onCancel }: { provider: Cal
       />
     )
   }
-  if (!state) return <p className="text-caption text-text-secondary">Loading...</p>
+  if (!state) return <p className="text-caption text-text-secondary">{t('calendars.oauth.loading')}</p>
 
   const error = shownError(signIn.error)
   const start = () => {
@@ -172,13 +178,12 @@ export function OAuthAccountForm({ provider, onDone, onCancel }: { provider: Cal
       {!hasClient ? (
         <div role="note" data-calendar-no-client className="rounded-control border border-status-today/40 bg-status-today/10 px-2.5 py-2">
           <p className="text-caption text-text">
-            This version of Vicu has no {info.label} sign-in registered yet. To connect now, register your own OAuth client and enter it here.
+            {t('calendars.oauth.noClient', { provider: info.label })}
           </p>
         </div>
       ) : (
         <p className="text-caption text-text-secondary">
-          Vicu opens your browser to sign in. It asks only to {info.permission.charAt(0).toLowerCase()}{info.permission.slice(1)} The sign-in is kept
-          encrypted on this computer and never sent to your Vikunja server.
+          {t('calendars.oauth.signInNote', { permission: info.permission.charAt(0).toLowerCase() + info.permission.slice(1) })}
         </p>
       )}
 
@@ -195,7 +200,7 @@ export function OAuthAccountForm({ provider, onDone, onCancel }: { provider: Cal
             className="flex items-center gap-1 rounded-control text-caption text-text-secondary hover:text-text"
           >
             <ChevronDown className={cn('h-3.5 w-3.5 transition-transform duration-fade-fast', !advanced && '-rotate-90')} aria-hidden="true" />
-            {state.own ? 'Advanced: your own OAuth client' : 'Advanced: use my own client'}
+            {state.own ? t('calendars.oauth.advancedOwn') : t('calendars.oauth.advancedUse')}
           </button>
           {advanced && (
             <div id={advancedId} className="mt-2 border-l-2 border-border pl-3">
@@ -207,20 +212,20 @@ export function OAuthAccountForm({ provider, onDone, onCancel }: { provider: Cal
 
       {signIn.isPending && (
         <p role="status" className="text-caption text-text" data-calendar-waiting>
-          Finish signing in in your browser, then come back here.
+          {t('calendars.oauth.finish')}
         </p>
       )}
       {error && <AccountError message={error} />}
 
       <div className="flex justify-end gap-2 pt-1">
         {signIn.isPending ? (
-          <Button variant="secondary" onClick={cancel} data-calendar-oauth-cancel>Stop waiting</Button>
+          <Button variant="secondary" onClick={cancel} data-calendar-oauth-cancel>{t('calendars.feeds.stopWaiting')}</Button>
         ) : (
-          <Button variant="secondary" onClick={onCancel}>Cancel</Button>
+          <Button variant="secondary" onClick={onCancel}>{t('calendars.add.cancel')}</Button>
         )}
         {/* Not disabled while waiting, so focus stays in the dialog; a second press does nothing. */}
         <Button variant="primary" onClick={start} disabled={!hasClient} aria-busy={signIn.isPending || undefined} data-calendar-oauth-sign-in>
-          {signIn.isPending ? 'Waiting for the browser...' : `Sign in with ${info.label}`}
+          {signIn.isPending ? t('calendars.feeds.waitingBrowser') : t('calendars.oauth.signInWith', { provider: info.label })}
         </Button>
       </div>
     </div>

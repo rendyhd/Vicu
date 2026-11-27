@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import type { TFunction } from 'i18next'
+import { useTranslation } from 'react-i18next'
 import { Sparkles, Sun, Undo2 } from 'lucide-react'
 import { Button } from '@/components/shared/Button'
 import { Checkbox } from '@/components/shared/Checkbox'
@@ -16,22 +18,32 @@ import { atClock, blockOf, freeMinutes } from '../../../shared/time-blocks'
 import { dayBusy, type LeftoverAction } from '../../../shared/plan-day'
 import { MY_EVENTS_CALENDAR_ID } from '../../../shared/plan-events'
 import type { CalendarEvent } from '../../../shared/calendar-events'
+import type { TranslationKey } from '../../../shared/i18n'
 import { Timeline } from './Timeline'
 import { BlockPopover } from './BlockPopover'
 import { EventPopover } from './EventPopover'
 
-const LEFTOVER_BUTTONS: { action: LeftoverAction; label: string }[] = [
-  { action: 'today', label: 'Today' },
-  { action: 'tomorrow', label: 'Tomorrow' },
-  { action: 'no_date', label: 'No date' },
-  { action: 'done', label: 'Done' },
+const LEFTOVER_BUTTONS: { action: LeftoverAction; label: TranslationKey }[] = [
+  { action: 'today', label: 'planner.planMyDay.today' },
+  { action: 'tomorrow', label: 'planner.planMyDay.tomorrow' },
+  { action: 'no_date', label: 'planner.planMyDay.noDate' },
+  { action: 'done', label: 'planner.planMyDay.done' },
 ]
+
+const STEP_NAMES: readonly TranslationKey[] = [
+  'planner.planMyDay.stepLeftovers',
+  'planner.planMyDay.stepChoose',
+  'planner.planMyDay.stepArrange',
+  'planner.planMyDay.stepReady',
+]
+
+type Translate = TFunction
 
 const SUGGESTED = 'border-dashed border-accent-blue'
 
-function dayName(day: LocalDate, session: PlanSession, fmt: ReturnType<typeof useDateFormat>): string {
-  if (day === session.today) return 'Today'
-  if (day === session.tomorrow) return 'Tomorrow'
+function dayName(day: LocalDate, session: PlanSession, fmt: ReturnType<typeof useDateFormat>, t: Translate): string {
+  if (day === session.today) return t('planner.planMyDay.today')
+  if (day === session.tomorrow) return t('planner.planMyDay.tomorrow')
   return startOfLocalDay(day).toLocaleDateString(fmt.locale, { weekday: 'long' })
 }
 
@@ -68,10 +80,11 @@ function TaskMeta({ task }: { task: Task }) {
 }
 
 function LeftoversStep({ session }: { session: PlanSession }) {
+  const { t } = useTranslation()
   const suggested = session.leftovers.filter((task) => session.leftoverSuggestion.has(task.id) && !session.handled.has(task.id))
   return (
     <>
-      <p className="text-caption text-text-secondary">Unfinished tasks from before. Nothing moves on its own: decide each one, or skip.</p>
+      <p className="text-caption text-text-secondary">{t('planner.planMyDay.leftoversNote')}</p>
       {session.assistantActive && suggested.length > 1 && (
         <button
           type="button"
@@ -82,10 +95,10 @@ function LeftoversStep({ session }: { session: PlanSession }) {
           className={cn('flex items-center gap-1 justify-self-start rounded-chip border px-2 py-1 text-meta text-accent-blue hover:bg-bg-hover', SUGGESTED)}
         >
           <Sparkles className="h-3 w-3" aria-hidden="true" />
-          Apply the {suggested.length} suggestions
+          {t('planner.planMyDay.applySuggestions', { count: suggested.length })}
         </button>
       )}
-      {session.leftoverRows.length === 0 && <p className="py-4 text-center text-meta text-text-secondary">Nothing left over.</p>}
+      {session.leftoverRows.length === 0 && <p className="py-4 text-center text-meta text-text-secondary">{t('planner.planMyDay.nothingLeft')}</p>}
       {session.leftoverRows.map((task) => {
         const done = session.handled.get(task.id)
         const suggestion = done ? undefined : session.leftoverSuggestion.get(task.id)
@@ -109,7 +122,7 @@ function LeftoversStep({ session }: { session: PlanSession }) {
                       suggestion?.action === action && SUGGESTED,
                     )}
                   >
-                    {label}
+                    {t(label)}
                   </button>
                 ))}
               </div>
@@ -122,6 +135,7 @@ function LeftoversStep({ session }: { session: PlanSession }) {
 }
 
 function LengthChip({ session, id }: { session: PlanSession; id: number }) {
+  const { t } = useTranslation()
   const minutes = session.draftOf.get(id) && session.step === 2
     ? session.draftOf.get(id)!.end - session.draftOf.get(id)!.start
     : session.lengthOf(id)
@@ -130,8 +144,8 @@ function LengthChip({ session, id }: { session: PlanSession; id: number }) {
     <button
       type="button"
       data-plan-length-chip={id}
-      aria-label={`Length ${formatLength(minutes)}. Change it.`}
-      title={suggested ? "The assistant's estimate. Click to change." : 'Click to change the length'}
+      aria-label={t('planner.planMyDay.lengthChip', { length: formatLength(minutes) })}
+      title={suggested ? t('planner.planMyDay.estimateTitle') : t('planner.planMyDay.changeLengthTitle')}
       onClick={(event) => {
         event.stopPropagation()
         event.preventDefault()
@@ -171,12 +185,12 @@ function GroupHeading({ children }: { children: React.ReactNode }) {
 }
 
 function ChooseStep({ session }: { session: PlanSession }) {
+  const { t } = useTranslation()
   const fmt = useDateFormat()
   const { data: projects } = useProjects()
   const { meter } = session
-  const name = dayName(session.day, session, fmt)
-  const lowerName = name.toLowerCase()
-  const nextDay = dayName(addDays(session.day, 1), session, fmt).toLowerCase()
+  const name = dayName(session.day, session, fmt, t)
+  const nextDay = dayName(addDays(session.day, 1), session, fmt, t).toLowerCase()
 
   const on = new Set([...session.onDay, ...session.inboxTasks, ...session.comingUp].map((task) => task.id))
   const suggestedAdds = session.assistantActive
@@ -190,16 +204,18 @@ function ChooseStep({ session }: { session: PlanSession }) {
     <>
       <div className="grid gap-1 rounded-control border border-border p-2" data-plan-meter>
         <p className="text-meta font-medium text-text">
-          {meter.tasks} {meter.tasks === 1 ? 'task' : 'tasks'} · {formatLength(meter.toPlace)} to place · {formatLength(meter.free)} free
+          {t('planner.planMyDay.meter', { count: meter.tasks, place: formatLength(meter.toPlace), free: formatLength(meter.free) })}
         </p>
         <div aria-hidden="true" className="h-2 overflow-hidden rounded-full bg-bg-hover">
           <div className={cn('h-full rounded-full', meter.over > 0 ? 'bg-status-overdue' : 'bg-accent-blue')} style={{ width: percent(meter.toPlace) }} />
         </div>
         {meter.over > 0 ? (
-          <p className="text-caption text-status-overdue">About {formatLength(meter.over)} more than your free time.</p>
+          <p className="text-caption text-status-overdue">{t('planner.planMyDay.overFree', { length: formatLength(meter.over) })}</p>
         ) : (
           <p className="text-caption text-text-secondary">
-            Free time inside your work hours ({session.prefs.hours[0]}–{session.prefs.hours[1]}){session.day === session.today ? ', from now' : ''}.
+            {session.day === session.today
+              ? t('planner.planMyDay.freeInsideFromNow', { from: session.prefs.hours[0], to: session.prefs.hours[1] })
+              : t('planner.planMyDay.freeInside', { from: session.prefs.hours[0], to: session.prefs.hours[1] })}
           </p>
         )}
         {session.assistantActive && meter.over > 0 &&
@@ -210,25 +226,25 @@ function ChooseStep({ session }: { session: PlanSession }) {
               return (
                 <div key={item.task_id} data-plan-can-wait={item.task_id} className="flex items-center gap-1">
                   <span className="min-w-0 flex-1">
-                    <WhyLine text={`Move ${task.title} to ${nextDay}${item.reason ? `: ${item.reason}` : ''}`} />
+                    <WhyLine text={item.reason ? t('planner.planMyDay.moveToReason', { title: task.title, day: nextDay, reason: item.reason }) : t('planner.planMyDay.moveTo', { title: task.title, day: nextDay })} />
                   </span>
                   <button
                     type="button"
                     onClick={() => session.moveToNextDay(task)}
                     className={cn('shrink-0 rounded-chip border px-2 py-0.5 text-caption text-accent-blue', SUGGESTED)}
                   >
-                    Move
+                    {t('planner.planMyDay.move')}
                   </button>
                 </div>
               )
             })}
         {session.assistantActive && (
           <div className="flex items-center gap-2 pt-0.5">
-            {session.suggestions.loading && <span className="text-caption text-text-secondary">Asking for suggestions…</span>}
+            {session.suggestions.loading && <span className="text-caption text-text-secondary">{t('planner.planMyDay.asking')}</span>}
             {session.suggestions.failure && <span className="text-caption text-text-secondary">{session.suggestions.failure}</span>}
             {!session.suggestions.loading && (
               <button type="button" data-plan-ask-again onClick={session.suggestions.askAgain} className="text-caption text-accent-blue hover:underline">
-                Ask again
+                {t('planner.planMyDay.askAgain')}
               </button>
             )}
           </div>
@@ -238,28 +254,28 @@ function ChooseStep({ session }: { session: PlanSession }) {
       {session.focusBlock && (
         <div className="grid gap-1 rounded-control border border-accent-blue/40 bg-accent-blue/8 p-2" data-plan-focus-block>
           <div className="flex items-center gap-2">
-            <p className="min-w-0 flex-1 text-meta font-medium text-text">Focus block · {formatLength(session.focusBlock.minutes)}</p>
+            <p className="min-w-0 flex-1 text-meta font-medium text-text">{t('planner.planMyDay.focusBlock', { length: formatLength(session.focusBlock.minutes) })}</p>
             {session.focusBlock.tasks.every((task) => session.ticked.has(task.id)) ? (
-              <span className="text-caption text-text-secondary">Added</span>
+              <span className="text-caption text-text-secondary">{t('planner.planMyDay.added')}</span>
             ) : (
               <button type="button" onClick={session.addFocusBlock} className="rounded-chip border border-accent-blue px-2 py-0.5 text-caption text-accent-blue hover:bg-accent-blue/12">
-                Add
+                {t('planner.planMyDay.add')}
               </button>
             )}
           </div>
-          <p className="text-caption text-text-secondary">For the work that moves your top initiatives: {session.focusBlock.tasks.map((task) => task.title).join(', ')}</p>
+          <p className="text-caption text-text-secondary">{t('planner.planMyDay.focusNote', { tasks: session.focusBlock.tasks.map((task) => task.title).join(', ') })}</p>
         </div>
       )}
 
       <GroupHeading>{name}</GroupHeading>
-      {session.onDay.length === 0 && <p className="px-1.5 text-caption text-text-secondary">Nothing yet.</p>}
+      {session.onDay.length === 0 && <p className="px-1.5 text-caption text-text-secondary">{t('planner.planMyDay.nothingYet')}</p>}
       {session.onDay.map((task) => (
         <CandidateRow key={task.id} session={session} task={task} reason={session.assistantActive ? session.pickOf.get(task.id)?.reason : undefined} />
       ))}
 
       {suggestedAdds.length > 0 && (
         <>
-          <GroupHeading>Suggested</GroupHeading>
+          <GroupHeading>{t('planner.planMyDay.suggested')}</GroupHeading>
           {suggestedAdds.flatMap((pick) => {
             const task = session.byId.get(pick.task_id)
             return task ? [<CandidateRow key={task.id} session={session} task={task} suggested reason={pick.reason} />] : []
@@ -267,26 +283,26 @@ function ChooseStep({ session }: { session: PlanSession }) {
         </>
       )}
 
-      {session.inboxTasks.some((task) => !suggestedIds.has(task.id)) && <GroupHeading>Inbox</GroupHeading>}
+      {session.inboxTasks.some((task) => !suggestedIds.has(task.id)) && <GroupHeading>{t('planner.planMyDay.inbox')}</GroupHeading>}
       {session.inboxTasks.filter((task) => !suggestedIds.has(task.id)).map((task) => (
         <CandidateRow key={task.id} session={session} task={task} />
       ))}
 
-      {session.comingUp.some((task) => !suggestedIds.has(task.id)) && <GroupHeading>Coming up</GroupHeading>}
+      {session.comingUp.some((task) => !suggestedIds.has(task.id)) && <GroupHeading>{t('planner.planMyDay.comingUp')}</GroupHeading>}
       {session.comingUp.filter((task) => !suggestedIds.has(task.id)).map((task) => (
         <CandidateRow key={task.id} session={session} task={task} />
       ))}
 
       <div className="mt-2 flex items-center gap-2">
-        <p className="text-caption font-medium text-text-secondary">From a project</p>
+        <p className="text-caption font-medium text-text-secondary">{t('planner.planMyDay.fromProject')}</p>
         <select
-          aria-label="Project"
+          aria-label={t('planner.planMyDay.project')}
           data-plan-project
           value={session.projectId ?? ''}
           onChange={(event) => session.setProjectId(event.target.value ? Number(event.target.value) : null)}
           className="min-w-0 flex-1 rounded-control border border-border bg-bg-card px-1.5 py-0.5 text-caption text-text"
         >
-          <option value="">Pick one</option>
+          <option value="">{t('planner.planMyDay.pickOne')}</option>
           {(projects?.flat ?? []).map((project) => (
             <option key={project.id} value={project.id}>
               {project.title}
@@ -295,7 +311,7 @@ function ChooseStep({ session }: { session: PlanSession }) {
         </select>
       </div>
       {session.projectId !== null && session.fromProject.length === 0 && (
-        <p className="px-1.5 text-caption text-text-secondary">Nothing else open in this project.</p>
+        <p className="px-1.5 text-caption text-text-secondary">{t('planner.planMyDay.nothingElse')}</p>
       )}
       {session.fromProject.map((task) => (
         <CandidateRow key={task.id} session={session} task={task} />
@@ -312,16 +328,17 @@ function addDays(day: LocalDate, days: number): LocalDate {
 }
 
 function ArrangeStep({ session }: { session: PlanSession }) {
+  const { t } = useTranslation()
   const fmt = useDateFormat()
-  const name = dayName(session.day, session, fmt).toLowerCase()
+  const name = dayName(session.day, session, fmt, t).toLowerCase()
   const planned = session.chosen.filter((task) => blockOf(task)?.day === session.day)
   return (
     <>
       {session.assistantActive && session.suggestions.result && (
-        <div role="radiogroup" aria-label="Order" className="flex justify-self-start rounded-full border border-border p-0.5">
+        <div role="radiogroup" aria-label={t('planner.planMyDay.order')} className="flex justify-self-start rounded-full border border-border p-0.5">
           {([
-            ['assistant', "Assistant's order"],
-            ['first', 'First free slots'],
+            ['assistant', t('planner.planMyDay.assistantOrder')],
+            ['first', t('planner.planMyDay.firstFree')],
           ] as const).map(([value, label]) => (
             <button
               key={value}
@@ -338,7 +355,7 @@ function ArrangeStep({ session }: { session: PlanSession }) {
         </div>
       )}
       <p className="text-caption text-text-secondary">
-        The dashed blocks are a draft. Drag them, or drag their edges to change the length. Nothing is saved until you accept.
+        {t('planner.planMyDay.draftNote')}
       </p>
       {session.toPlaceAll.map((task) => {
         const placed = session.draftOf.get(task.id)
@@ -348,11 +365,11 @@ function ArrangeStep({ session }: { session: PlanSession }) {
             <span className="grid min-w-0 flex-1 gap-0.5">
               <span className="truncate text-meta text-text">{task.title}</span>
               {kept ? (
-                <span className="text-caption text-text-secondary">No time, on {name}</span>
+                <span className="text-caption text-text-secondary">{t('planner.planMyDay.noTimeOn', { day: name })}</span>
               ) : placed ? (
                 <span className="text-caption text-accent-blue">{formatBlockRange(atClock(session.day, placed.start), atClock(session.day, placed.end), fmt)}</span>
               ) : (
-                <span className="text-caption text-status-overdue">No free slot left</span>
+                <span className="text-caption text-status-overdue">{t('planner.planMyDay.noSlot')}</span>
               )}
               {!kept && placed?.reason && session.assistantActive && <WhyLine text={placed.reason} />}
             </span>
@@ -364,14 +381,14 @@ function ArrangeStep({ session }: { session: PlanSession }) {
               onClick={() => session.toggleKeep(task.id)}
               className={cn('shrink-0 rounded-chip border px-1.5 py-0.5 text-caption', kept ? 'border-accent-blue bg-accent-blue/12 text-accent-blue' : 'border-border text-text-secondary hover:bg-bg-hover')}
             >
-              No time
+              {t('planner.planMyDay.noTime')}
             </button>
           </div>
         )
       })}
       {planned.length > 0 && (
         <>
-          <GroupHeading>Already planned</GroupHeading>
+          <GroupHeading>{t('planner.planMyDay.alreadyPlanned')}</GroupHeading>
           {planned.map((task) => {
             const block = blockOf(task)!
             return (
@@ -388,6 +405,7 @@ function ArrangeStep({ session }: { session: PlanSession }) {
 }
 
 function ReadyStep({ session, onDone }: { session: PlanSession; onDone: () => void }) {
+  const { t } = useTranslation()
   const fmt = useDateFormat()
   const tasks = session.range.tasks.filter((task) => !task.done)
   const withTime = tasks
@@ -397,9 +415,9 @@ function ReadyStep({ session, onDone }: { session: PlanSession; onDone: () => vo
   const free = freeMinutes(new Date(), session.day, session.prefs.hours, dayBusy(session.range.tasks, session.day, session.eventBusy))
   return (
     <div className="grid gap-1.5" data-plan-ready>
-      <p className="text-section text-text">{dayName(session.day, session, fmt)} is planned</p>
+      <p className="text-section text-text">{t('planner.planMyDay.isPlanned', { day: dayName(session.day, session, fmt, t) })}</p>
       <p className="text-caption text-text-secondary">
-        {withTime.length} with a time · {withoutTime.length} without · {formatLength(free)} still free
+        {t('planner.planMyDay.readyCounts', { withTime: withTime.length, without: withoutTime.length, free: formatLength(free) })}
       </p>
       {withTime.map((task) => {
         const block = blockOf(task)!
@@ -418,7 +436,7 @@ function ReadyStep({ session, onDone }: { session: PlanSession; onDone: () => vo
         return (
           <div key={task.id} className="flex items-center gap-2 rounded-control border border-border px-2 py-1">
             <span className="shrink-0 text-caption text-text-secondary">
-              {atTime ? formatDateDisplay('logbook.time', new Date(due), new Date(), false, fmt) : 'Any time'}
+              {atTime ? formatDateDisplay('logbook.time', new Date(due), new Date(), false, fmt) : t('planner.planMyDay.anyTime')}
             </span>
             <span className="min-w-0 flex-1 truncate text-meta text-text">{task.title}</span>
           </div>
@@ -426,19 +444,19 @@ function ReadyStep({ session, onDone }: { session: PlanSession; onDone: () => vo
       })}
       <label className="mt-1 flex cursor-pointer items-center gap-2">
         <Checkbox data-plan-remind checked={session.remindersOn} onChange={(event) => session.setBlockReminders(event.target.checked)} />
-        <span className="text-meta text-text">Remind me when each block starts</span>
+        <span className="text-meta text-text">{t('planner.planMyDay.remind')}</span>
       </label>
       <label className="flex cursor-pointer items-center gap-2">
         <Checkbox data-plan-nudge checked={session.nudgeOn} onChange={(event) => session.setNudge(event.target.checked)} />
-        <span className="text-meta text-text">Ask me to plan tomorrow at {session.nudgeTime}</span>
+        <span className="text-meta text-text">{t('planner.planMyDay.nudge', { time: session.nudgeTime })}</span>
       </label>
       <div className="mt-2 flex items-center gap-2">
         <Button variant="secondary" data-plan-undo-all onClick={session.undoAll}>
           <Undo2 className="h-4 w-4" aria-hidden="true" />
-          Undo all
+          {t('planner.planMyDay.undoAll')}
         </Button>
         <Button variant="primary" data-plan-done onClick={onDone}>
-          Done
+          {t('planner.planMyDay.done')}
         </Button>
       </div>
     </div>
@@ -447,6 +465,7 @@ function ReadyStep({ session, onDone }: { session: PlanSession; onDone: () => vo
 
 /** Plan my day (contract 14.10): a panel in place of the task list, with the timeline next to it. */
 export function PlanMyDaySession({ onExit, listRef }: { onExit: () => void; listRef: React.RefObject<HTMLElement | null> }) {
+  const { t } = useTranslation()
   const session = usePlanSession()
   const [pressed, setPressed] = useState<{ id: number; element: HTMLElement } | null>(null)
   const pressedTask = pressed ? session.timelineTasks.find((task) => task.id === pressed.id) : undefined
@@ -459,32 +478,32 @@ export function PlanMyDaySession({ onExit, listRef }: { onExit: () => void; list
   const planned = plannedMinutes(session.timelineTasks, session.day)
   return (
     <div className="flex min-h-0 flex-1" data-plan-session>
-      <aside ref={listRef as React.RefObject<HTMLElement>} aria-label="Plan my day" className="flex w-[380px] shrink-0 flex-col border-r border-border">
+      <aside ref={listRef as React.RefObject<HTMLElement>} aria-label={t('planner.planMyDay.title')} className="flex w-[380px] shrink-0 flex-col border-r border-border">
         <div className="grid shrink-0 gap-2 border-b border-border p-3">
           <div className="flex items-center gap-2">
             <Sun className="h-4 w-4 shrink-0" style={{ color: 'var(--status-today)' }} aria-hidden="true" />
-            <h2 className="text-section text-text">Plan my day</h2>
-            <div role="radiogroup" aria-label="Day" className="flex rounded-full border border-border p-0.5">
+            <h2 className="text-section text-text">{t('planner.planMyDay.title')}</h2>
+            <div role="radiogroup" aria-label={t('planner.planMyDay.day')} className="flex rounded-full border border-border p-0.5">
               {([
-                [session.today, 'Today'],
-                [session.tomorrow, 'Tomorrow'],
-              ] as const).map(([day, label]) => (
+                [session.today, 'today'],
+                [session.tomorrow, 'tomorrow'],
+              ] as const).map(([day, kind]) => (
                 <button
                   key={day}
                   type="button"
                   role="radio"
                   aria-checked={session.day === day}
                   disabled={step > 1}
-                  data-plan-target={label.toLowerCase()}
+                  data-plan-target={kind}
                   onClick={() => session.setDay(day)}
                   className={cn('rounded-full px-2 py-0.5 text-caption font-medium disabled:opacity-60', session.day === day ? 'bg-bg-selected text-text' : 'text-text-secondary')}
                 >
-                  {label}
+                  {kind === 'today' ? t('planner.planMyDay.today') : t('planner.planMyDay.tomorrow')}
                 </button>
               ))}
             </div>
             <button type="button" data-plan-exit onClick={onExit} className="ml-auto rounded-control px-2 py-0.5 text-meta text-text hover:bg-bg-hover">
-              Exit
+              {t('planner.planMyDay.exit')}
             </button>
           </div>
           <div aria-hidden="true" className="flex gap-1">
@@ -494,13 +513,13 @@ export function PlanMyDaySession({ onExit, listRef }: { onExit: () => void; list
           </div>
           <div className="flex items-center justify-between gap-2">
             <p className="text-caption text-text-secondary" data-plan-step>
-              Step {step + 1} of 4 · {PLAN_STEPS[step]}
+              {t('planner.planMyDay.step', { step: step + 1, name: t(STEP_NAMES[step]) })}
             </p>
             {session.assistantReady && (
               <label className="flex cursor-pointer items-center gap-1 text-caption text-text-secondary">
                 <Checkbox data-plan-assistant checked={session.assistantOn} onChange={(event) => session.setAssistantOn(event.target.checked)} />
                 <Sparkles className="h-3 w-3" aria-hidden="true" />
-                Assistant
+                {t('planner.planMyDay.assistant')}
               </label>
             )}
           </div>
@@ -517,14 +536,14 @@ export function PlanMyDaySession({ onExit, listRef }: { onExit: () => void; list
           <div className="flex shrink-0 items-center gap-2 border-t border-border p-3">
             {step > 0 && (
               <Button variant="secondary" data-plan-back onClick={() => session.setStep(step - 1)}>
-                Back
+                {t('planner.planMyDay.back')}
               </Button>
             )}
             <span className="flex-1 text-caption text-text-secondary">
-              {step === 2 ? `${formatLength(planned)} planned` : ''}
+              {step === 2 ? t('planner.planMyDay.planned', { length: formatLength(planned) }) : ''}
             </span>
             <Button variant="primary" data-plan-next-step onClick={next}>
-              {['Next', 'Arrange', 'Accept the plan'][step]}
+              {t(['planner.planMyDay.next', 'planner.planMyDay.arrange', 'planner.planMyDay.accept'][step] as TranslationKey)}
             </Button>
           </div>
         )}
@@ -550,7 +569,7 @@ export function PlanMyDaySession({ onExit, listRef }: { onExit: () => void; list
         dashedIds={session.dashedIds}
         draft={step === 2}
         reasonOf={session.assistantActive ? (task) => session.reasons.get(task.id) : undefined}
-        note={step === 2 ? 'draft, not saved yet' : undefined}
+        note={step === 2 ? t('planner.planMyDay.timelineNote') : undefined}
         events={session.events}
         eventColor={session.eventColor}
         onPressEvent={(event, element) => {
@@ -583,7 +602,7 @@ export function PlanMyDaySession({ onExit, listRef }: { onExit: () => void; list
           canChange={session.canChange(pressedTask)}
           defaultLength={session.prefs.defaultLength}
           onChange={session.timelineChange}
-          removeLabel={session.dashedIds.has(pressed.id) ? 'No time' : 'Remove time'}
+          removeLabel={session.dashedIds.has(pressed.id) ? t('planner.planMyDay.noTime') : t('planner.blockPopover.removeTime')}
           canComplete={!session.dashedIds.has(pressed.id)}
           onClose={() => setPressed(null)}
         />

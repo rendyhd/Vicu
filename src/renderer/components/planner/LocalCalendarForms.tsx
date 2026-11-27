@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react'
+import { Trans, useTranslation } from 'react-i18next'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/shared/Button'
 import { Checkbox } from '@/components/shared/Checkbox'
@@ -17,6 +18,7 @@ const INPUT =
   'w-full rounded-control border border-border bg-transparent px-2 py-1 text-meta text-text placeholder:text-text-secondary'
 
 export function CalendarFileForm({ onDone, onCancel }: { onDone: () => void; onCancel: () => void }) {
+  const { t } = useTranslation()
   const client = useQueryClient()
   const nameId = useId()
   const [name, setName] = useState('')
@@ -46,26 +48,26 @@ export function CalendarFileForm({ onDone, onCancel }: { onDone: () => void; onC
       }}
     >
       <div>
-        <label htmlFor={nameId} className="mb-1 block text-caption text-text-secondary">Name</label>
-        <input id={nameId} value={name} onChange={(e) => setName(e.target.value)} placeholder="The file's name" data-calendar-file-name data-autofocus className={INPUT} />
+        <label htmlFor={nameId} className="mb-1 block text-caption text-text-secondary">{t('calendars.add.name')}</label>
+        <input id={nameId} value={name} onChange={(e) => setName(e.target.value)} placeholder={t('calendars.local.fileName')} data-calendar-file-name data-autofocus className={INPUT} />
       </div>
       <label className="flex cursor-pointer items-center gap-2">
         <Checkbox checked={busyOnly} onChange={(e) => setBusyOnly(e.target.checked)} data-calendar-busy-only />
-        <span className="text-meta text-text">Show only &ldquo;Busy&rdquo;, not titles</span>
+        <span className="text-meta text-text">{t('calendars.feeds.busyOnly')}</span>
       </label>
       <div className="rounded-control bg-bg-hover px-2.5 py-2">
-        <p className="text-caption font-medium text-text">Good to know</p>
+        <p className="text-caption font-medium text-text">{t('calendars.local.goodToKnow')}</p>
         <ul className="mt-1 list-disc space-y-0.5 pl-4 text-caption text-text-secondary">
-          <li>Vicu only reads the file, never changes it, and reads it again as soon as it changes.</li>
-          <li>Keep the file where it is. If it moves, remove this calendar and add the file again.</li>
-          <li>To copy events into Vicu once instead, use Import calendar file.</li>
+          <li>{t('calendars.local.fileNote1')}</li>
+          <li>{t('calendars.local.fileNote2')}</li>
+          <li>{t('calendars.local.fileNote3')}</li>
         </ul>
       </div>
       {add.error && <p role="alert" className="text-caption text-status-overdue" data-calendar-file-error>{(add.error as Error).message}</p>}
       <div className="flex justify-end gap-2 pt-1">
-        <Button variant="secondary" onClick={onCancel}>Cancel</Button>
+        <Button variant="secondary" onClick={onCancel}>{t('calendars.add.cancel')}</Button>
         <Button variant="primary" type="submit" disabled={add.isPending} data-calendar-file-choose>
-          {add.isPending ? 'Reading...' : 'Choose file...'}
+          {add.isPending ? t('calendars.add.reading') : t('calendars.local.chooseFile')}
         </Button>
       </div>
     </form>
@@ -75,6 +77,7 @@ export function CalendarFileForm({ onDone, onCancel }: { onDone: () => void; onC
 const OUTLOOK_STATUS_KEY = 'calendar-outlook-status'
 
 export function OutlookForm({ onDone, onCancel }: { onDone: () => void; onCancel: () => void }) {
+  const { t } = useTranslation()
   const client = useQueryClient()
   const status = useQuery({ queryKey: [OUTLOOK_STATUS_KEY], queryFn: () => window.api.calendar.outlook.status() })
   const [allowed, setAllowed] = useState(false)
@@ -108,7 +111,7 @@ export function OutlookForm({ onDone, onCancel }: { onDone: () => void; onCancel
     return (
       <PickCalendars
         draft={draft}
-        intro={<>Classic Outlook has these calendars.</>}
+        intro={<>{t('calendars.local.outlookHas')}</>}
         onBack={() => {
           void window.api.calendar.caldavCancel(draft.draftId)
           setDraft(null)
@@ -132,37 +135,30 @@ export function OutlookForm({ onDone, onCancel }: { onDone: () => void; onCancel
       data-calendar-outlook
     >
       <div className="rounded-control bg-bg-hover px-2.5 py-2">
-        <p className="text-caption font-medium text-text">Before you add it</p>
+        <p className="text-caption font-medium text-text">{t('calendars.local.beforeAdd')}</p>
         <ul className="mt-1 list-disc space-y-1 pl-4 text-caption text-text-secondary">
           <li>
-            Only <span className="font-medium text-text">classic Outlook</span> can be read, and only while it is open. Vicu never starts
-            it. The new Outlook has no way for other apps to read it: use a Microsoft 365 account or a calendar link for it.
+            <Trans i18nKey="calendars.local.outlookNote1" components={{ strong: <span className="font-medium text-text" /> }} />
           </li>
-          <li>
-            Outlook may ask whether to allow a program to access its data. Vicu reads only titles, places, times and how you answered,
-            not people or messages.
-          </li>
-          <li>
-            On a work PC, this shows your organisation&rsquo;s calendar in Vicu. It stays on this PC and is never sent anywhere, but
-            check that your organisation allows it.
-          </li>
+          <li>{t('calendars.local.outlookNote2')}</li>
+          <li>{t('calendars.local.outlookNote3')}</li>
         </ul>
       </div>
-      {view?.added && <p className="text-caption text-text-secondary">Classic Outlook is already added. Choose which of its calendars to show in the list.</p>}
+      {view?.added && <p className="text-caption text-text-secondary">{t('calendars.local.outlookAdded')}</p>}
       {view?.problem && !view.added && !discover.error && (
         <p className="text-caption text-status-overdue" data-calendar-outlook-problem>{view.problem}</p>
       )}
       {!missing && !view?.added && (
         <label className="flex cursor-pointer items-start gap-2">
           <Checkbox checked={allowed} onChange={(e) => setAllowed(e.target.checked)} data-calendar-outlook-allowed />
-          <span className="text-meta text-text">These are my calendars, and I may show them in Vicu on this PC</span>
+          <span className="text-meta text-text">{t('calendars.local.mine')}</span>
         </label>
       )}
       {discover.error && <p role="alert" className="text-caption text-status-overdue" data-calendar-outlook-error>{(discover.error as Error).message}</p>}
       <div className="flex justify-end gap-2 pt-1">
-        <Button variant="secondary" onClick={onCancel}>Cancel</Button>
+        <Button variant="secondary" onClick={onCancel}>{t('calendars.add.cancel')}</Button>
         <Button variant="primary" type="submit" disabled={!canContinue} data-calendar-outlook-continue>
-          {discover.isPending ? 'Reading Outlook...' : 'Continue'}
+          {discover.isPending ? t('calendars.local.readingOutlook') : t('calendars.local.continue')}
         </Button>
       </div>
     </form>

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type RefObject } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Popover } from '@/components/overlay/Popover'
 import { cn } from '@/lib/cn'
 import { useDateFormat } from '@/hooks/use-date-format'
@@ -40,6 +41,7 @@ const NO_REPEAT: EventRepeat = { kind: 'none' }
  * 10:00 for 30m": the day, time, length and repeat). Enter adds it; Escape or a press outside drops it.
  */
 export function DrawTitle({ anchorRef, day, start, end, initialKind = 'task', projectName, onSubmit, onCancel }: DrawTitleProps) {
+  const { t } = useTranslation()
   const fmt = useDateFormat()
   const [title, setTitle] = useState('')
   const [kind, setKind] = useState<DrawnKind>(initialKind)
@@ -96,7 +98,7 @@ export function DrawTitle({ anchorRef, day, start, end, initialKind = 'task', pr
   return (
     <Popover
       anchorRef={anchorRef}
-      label={kind === 'task' ? 'New task' : 'New event'}
+      label={kind === 'task' ? t('planner.drawTitle.newTask') : t('planner.drawTitle.newEvent')}
       role="dialog"
       placement="right-start"
       onClose={() => {
@@ -111,7 +113,7 @@ export function DrawTitle({ anchorRef, day, start, end, initialKind = 'task', pr
           submit()
         }}
       >
-        <div role="radiogroup" aria-label="Add as" className="mb-2 flex rounded-full border border-border p-0.5">
+        <div role="radiogroup" aria-label={t('planner.drawTitle.addAs')} className="mb-2 flex rounded-full border border-border p-0.5">
           {(['task', 'event'] as const).map((value) => (
             <button
               key={value}
@@ -128,7 +130,7 @@ export function DrawTitle({ anchorRef, day, start, end, initialKind = 'task', pr
                 kind === value ? 'bg-bg-selected text-text' : 'text-text-secondary hover:text-text',
               )}
             >
-              {value === 'task' ? 'Task' : 'Event'}
+              {value === 'task' ? t('planner.drawTitle.task') : t('planner.drawTitle.event')}
             </button>
           ))}
         </div>
@@ -137,13 +139,14 @@ export function DrawTitle({ anchorRef, day, start, end, initialKind = 'task', pr
           data-autofocus
           value={title}
           onChange={(event) => setTitle(event.target.value)}
-          placeholder={kind === 'task' ? 'New task' : 'Manager call every Tue 10:00 for 30m'}
-          aria-label={kind === 'task' ? 'Task title' : 'Event title'}
+          // i18n-ignore: the second text is a quick-add example
+          placeholder={kind === 'task' ? t('planner.drawTitle.newTask') : 'Manager call every Tue 10:00 for 30m'}
+          aria-label={kind === 'task' ? t('planner.drawTitle.taskTitle') : t('planner.drawTitle.eventTitle')}
           className="w-full rounded-control border border-border bg-transparent px-2 py-1.5 text-task-title text-text placeholder:text-text-secondary"
         />
         {kind === 'event' && (
           <select
-            aria-label="Repeat"
+            aria-label={t('planner.drawTitle.repeat')}
             data-plan-draw-repeat
             value={current}
             onChange={(event) => {
@@ -171,11 +174,11 @@ export function DrawTitle({ anchorRef, day, start, end, initialKind = 'task', pr
           {when}
           {kind === 'task'
             ? projectName ? ` · ${projectName}` : ''
-            : ' · not a task: shows here and counts as busy'}
+            : ` · ${t('planner.drawTitle.eventNote')}`}
         </p>
         {kind === 'event' && read && read.title !== title.trim() && (
           <p className="mt-0.5 truncate text-caption text-text-secondary" data-plan-draw-read>
-            Adds “{read.title}”
+            {t('planner.drawTitle.adds', { title: read.title })}
           </p>
         )}
       </form>

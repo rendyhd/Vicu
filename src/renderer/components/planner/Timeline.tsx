@@ -1,5 +1,6 @@
 import { memo, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { useDraggable, useDroppable } from '@dnd-kit/core'
+import { useTranslation } from 'react-i18next'
 import { CalendarDays, HeartPulse } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { useDateFormat } from '@/hooks/use-date-format'
@@ -204,13 +205,14 @@ function DayTopRow({
 }
 
 function AllDayChip({ event, color, wide, onPress }: { event: CalendarEvent; color?: string; wide: boolean; onPress?: (event: CalendarEvent, element: HTMLElement) => void }) {
+  const { t } = useTranslation()
   return (
     <button
       type="button"
       data-plan-allday-event={event.id}
       onPointerDown={(pointer) => pointer.stopPropagation()}
       onClick={(click) => onPress?.(event, click.currentTarget)}
-      title={`${event.title} (all day)`}
+      title={t('planner.timeline.allDay', { title: event.title })}
       className={cn('flex min-w-0 items-center gap-1 truncate rounded-chip border border-border px-1.5 py-0.5 text-left text-caption text-text', wide && 'max-w-[16rem]')}
       style={{ backgroundColor: color ? `${color}24` : undefined, borderColor: color ?? undefined }}
     >
@@ -254,6 +256,7 @@ const EventView = memo(function EventView({
   onGrab?: (pointer: React.PointerEvent<HTMLElement>) => void
   onKey?: (key: React.KeyboardEvent<HTMLButtonElement>) => void
 }) {
+  const { t } = useTranslation()
   const compact = height < 40
   // A free event is fainter, but only its tint and edge: the words keep their contrast.
   const tint = event.busy ? `${color}29` : `${color}14`
@@ -261,7 +264,7 @@ const EventView = memo(function EventView({
   return (
     <li
       data-plan-event={event.id}
-      title={[event.title, range, event.location, event.tentative ? 'Tentative' : null, event.busy ? null : 'Free'].filter(Boolean).join(' · ')}
+      title={[event.title, range, event.location, event.tentative ? t('planner.timeline.tentative') : null, event.busy ? null : t('planner.timeline.free')].filter(Boolean).join(' · ')}
       // Never starts a drawing; a calendar's never moves, and a press opens it.
       onPointerDown={(pointer) => {
         if (editable && onGrab) {
@@ -309,8 +312,8 @@ const EventView = memo(function EventView({
         <span className={compact ? 'sr-only' : 'block truncate text-caption text-text-secondary'}>
           {range}
           {event.location ? ` · ${event.location}` : ''}
-          {event.tentative ? ' · Tentative' : ''}
-          {event.busy ? '' : ' · Free'}
+          {event.tentative ? ` · ${t('planner.timeline.tentative')}` : ''}
+          {event.busy ? '' : ` · ${t('planner.timeline.free')}`}
         </span>
       </button>
       {editable && (
@@ -349,6 +352,7 @@ const TINY_BLOCK_PX = 20
 const OPENING_MARGIN_PX = 20
 
 const BlockView = memo(function BlockView(props: BlockViewProps) {
+  const { t } = useTranslation()
   const { task, top, height, left, width, range, color, editable, dashed, draft, reason, muted, hidden, instructionsId } = props
   const compact = height < 40
   // Too short for a checkbox: the block's popover has one.
@@ -391,7 +395,7 @@ const BlockView = memo(function BlockView(props: BlockViewProps) {
         >
           <span className={cn('block truncate font-medium text-text', tiny ? 'text-caption leading-none' : 'text-meta', task.done && 'line-through')}>{task.title}</span>
           <span className={compact ? 'sr-only' : 'block truncate text-caption text-text-secondary'}>{range}</span>
-          {task.done && <span className="sr-only">, done</span>}
+          {task.done && <span className="sr-only">{t('planner.timeline.srDone')}</span>}
           {muted && <span className="sr-only">, {muted}</span>}
           {!compact && reason && height >= 58 && <span className="block truncate text-caption text-text-secondary">{reason}</span>}
         </button>
@@ -436,6 +440,7 @@ export function Timeline({
   onChangeEvent,
   pendingEvent,
 }: TimelineProps) {
+  const { t } = useTranslation()
   const fmt = useDateFormat()
   const now = useMinuteClock()
   const today = toLocalDate(now)
@@ -616,7 +621,7 @@ export function Timeline({
       canChange={canChange}
       highlighted={topOver === singleDay}
       wide
-      emptyText="Drop here to remove the time"
+      emptyText={t('planner.timeline.dropToRemove')}
       onDropTasks={(dropped) => {
         for (const task of dropped) onChange(task, planForDay(task, singleDay))
       }}
@@ -624,12 +629,12 @@ export function Timeline({
   )
 
   return (
-    <section aria-label="Day timeline" className="flex min-h-0 min-w-0 flex-1 flex-col">
+    <section aria-label={t('planner.timeline.dayTimeline')} className="flex min-h-0 min-w-0 flex-1 flex-col">
       <p id={instructionsId} className="sr-only">
-        Press Enter for lengths and nudges. Alt+Shift+Up or Down moves the block 15 minutes. Shift+Up or Down changes its length.
+        {t('planner.timeline.blockHelp')}
       </p>
       <p id={eventInstructionsId} className="sr-only">
-        Press Enter to change the event. Alt+Shift+Up or Down moves it 15 minutes. Shift+Up or Down changes its length.
+        {t('planner.timeline.eventHelp')}
       </p>
 
       {multiDay && (
@@ -657,7 +662,7 @@ export function Timeline({
               )
             })}
           </div>
-          <div ref={topRowRef} className="flex border-t border-border" aria-label="Tasks without a time">
+          <div ref={topRowRef} className="flex border-t border-border" aria-label={t('planner.timeline.noTime')}>
             <div className={cn(GUTTER_CLASS, 'flex items-center justify-end pr-2 text-caption text-text-secondary')} />
             {days.map((day) => (
               <DayTopRow
@@ -685,12 +690,12 @@ export function Timeline({
             <h2 className="text-section text-text">{heading}</h2>
             <span className="truncate text-meta text-text-secondary">
               {startOfLocalDay(selectedDay).toLocaleDateString(fmt.locale, { weekday: 'short', day: 'numeric', month: 'short' })}
-              {note ? ` · ${note}` : canPlaceOn(selectedDay, today) && onDraw ? ' · drag on an empty slot to add a task' : ''}
+              {note ? ` · ${note}` : canPlaceOn(selectedDay, today) && onDraw ? ` · ${t('planner.timeline.dragToAdd')}` : ''}
             </span>
           </div>
           {/* Laid over the heading while a drag needs it, so the grid under the pointer does not move. */}
           {dropRowOnly && (
-            <div ref={topRowRef} role="group" aria-label="Tasks without a time" className="absolute inset-0 z-30 flex border-b border-border bg-bg-page pr-[var(--scrollbar-size)]">
+            <div ref={topRowRef} role="group" aria-label={t('planner.timeline.noTime')} className="absolute inset-0 z-30 flex border-b border-border bg-bg-page pr-[var(--scrollbar-size)]">
               <div className={GUTTER_CLASS} />
               {dayTopRowView}
             </div>
@@ -699,7 +704,7 @@ export function Timeline({
       )}
 
       {!multiDay && (singleDayTop.length > 0 || singleDayAllDay.length > 0) && (
-        <div ref={topRowRef} role="group" aria-label="Tasks without a time" className="flex shrink-0 border-b border-border pr-[var(--scrollbar-size)]">
+        <div ref={topRowRef} role="group" aria-label={t('planner.timeline.noTime')} className="flex shrink-0 border-b border-border pr-[var(--scrollbar-size)]">
           <div className={GUTTER_CLASS} />
           {dayTopRowView}
         </div>
@@ -709,7 +714,7 @@ export function Timeline({
         ref={setScroller}
         data-plan-scroller
         role="region"
-        aria-label="Schedule"
+        aria-label={t('planner.timeline.schedule')}
         tabIndex={0}
         onScroll={drop.refresh}
         onKeyDown={(event) => {
@@ -784,7 +789,7 @@ export function Timeline({
                       </div>
                     ))}
 
-                  <ol aria-label="Scheduled tasks" className="absolute inset-0 pointer-events-none">
+                  <ol aria-label={t('planner.timeline.scheduledTasks')} className="absolute inset-0 pointer-events-none">
                     {markers.map(({ task, minute }) => {
                       const editable = canChange(task) && placeable
                       const color = projectColor.get(task.project_id) ?? null
@@ -813,7 +818,7 @@ export function Timeline({
                           <button type="button" data-plan-focus onClick={(event) => {
                               // By keyboard; a press goes through the gesture above.
                               if (event.detail === 0) onPressBlock?.(task, event.currentTarget)
-                            }} aria-label={`${task.title}, due ${formatDateDisplay('logbook.time', start, now, false, fmt)}${mutedIds?.has(task.id) ? `, ${mutedIds.get(task.id)}` : ''}`} className="min-w-0 truncate rounded-control text-caption text-text">
+                            }} aria-label={mutedIds?.has(task.id) ? t('planner.timeline.dueMuted', { title: task.title, time: formatDateDisplay('logbook.time', start, now, false, fmt), muted: mutedIds.get(task.id) }) : t('planner.timeline.due', { title: task.title, time: formatDateDisplay('logbook.time', start, now, false, fmt) })} className="min-w-0 truncate rounded-control text-caption text-text">
                             {task.title}
                           </button>
                         </li>

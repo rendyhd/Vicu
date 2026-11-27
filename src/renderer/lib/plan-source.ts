@@ -1,5 +1,6 @@
 // The left panel of the Plan screen: which list the tasks to plan come from. Pure.
 
+import { t } from '../../shared/i18n'
 import { addLocalDays, isNoDueDate, localDateOf, type LocalDate } from '../../shared/due-dates'
 
 export type PlanSource = 'day' | 'inbox' | 'next7' | 'nodate' | `project:${number}`
@@ -21,9 +22,9 @@ export function sourceProjectId(source: PlanSource, inboxId: number): number | n
 export function sourceLists(dayLabel: string): { source: PlanSource; label: string }[] {
   return [
     { source: 'day', label: dayLabel },
-    { source: 'inbox', label: 'Inbox' },
-    { source: 'next7', label: 'Next 7 days' },
-    { source: 'nodate', label: 'No date' },
+    { source: 'inbox', label: t('planner.source.inbox') },
+    { source: 'next7', label: t('planner.source.next7') },
+    { source: 'nodate', label: t('planner.source.noDate') },
   ]
 }
 

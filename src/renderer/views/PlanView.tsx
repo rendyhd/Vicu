@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Navigate, useNavigate } from '@tanstack/react-router'
 import { ChevronLeft, ChevronRight, Settings2, Sun } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
+import { useTranslation } from 'react-i18next'
+import type { TranslationKey } from '../../shared/i18n'
 import { cn } from '@/lib/cn'
 import { Button } from '@/components/shared/Button'
 import { Popover } from '@/components/overlay/Popover'
@@ -80,10 +82,10 @@ import {
 } from '../../shared/time-blocks'
 import { useWeekStart } from '@/hooks/use-week-start'
 
-const VIEWS: { value: PlanViewKind; label: string }[] = [
-  { value: 'day', label: 'Day' },
-  { value: '3days', label: '3 days' },
-  { value: 'week', label: 'Week' },
+const VIEWS: { value: PlanViewKind; label: TranslationKey }[] = [
+  { value: 'day', label: 'planner.view.day' },
+  { value: '3days', label: 'planner.view.threeDays' },
+  { value: 'week', label: 'planner.view.week' },
 ]
 
 const STEP: Record<PlanViewKind, number> = { day: 1, '3days': 3, week: 7 }
@@ -99,6 +101,7 @@ export function PlanView() {
 }
 
 function PlanScreen() {
+  const { t } = useTranslation()
   const { data: config } = useAppConfig()
   const save = useSavePlannerConfig()
   const fmt = useDateFormat()
@@ -223,9 +226,9 @@ function PlanScreen() {
     const start = proStarts && changes.start_date ? new Date(changes.start_date) : null
     const later = start ? startDateOf(task) : null
     if (start && later && blockReplacesLaterStart(task, start)) {
-      void confirmDelete(`This task starts ${formatWeekdayDate(later, new Date(), dateFormat)}. Planning it earlier replaces that date.`, {
+      void confirmDelete(t('planner.view.laterStart', { date: formatWeekdayDate(later, new Date(), dateFormat) }), {
         force: true,
-        confirmLabel: 'Plan it',
+        confirmLabel: t('planner.view.planIt'),
         destructive: false,
       }).then((ok) => ok && write())
       return
@@ -242,9 +245,9 @@ function PlanScreen() {
     const from = localDateOf(task.due_date)
     const to = localDateOf(changes.due_date)
     if (from === to) return
-    toast.success(`Planned for ${midSentence(dayPhrase(to))}. Due date moved from ${midSentence(dayPhrase(from))}`, {
+    toast.success(t('planner.view.plannedDueMoved', { day: midSentence(dayPhrase(to)), from: midSentence(dayPhrase(from)) }), {
       action: {
-        label: 'Undo',
+        label: t('planner.view.undo'),
         onAction: () => {
           update.mutate({
             id: task.id,
@@ -262,9 +265,9 @@ function PlanScreen() {
     if (!changes) return
     change(task, changes, false)
     selectDay(day)
-    toast.success(`Moved to ${midSentence(dayPhrase(day))}`, {
+    toast.success(t('planner.view.movedTo', { day: midSentence(dayPhrase(day)) }), {
       action: {
-        label: 'Undo',
+        label: t('planner.view.undo'),
         onAction: () => {
           // The patch is the difference with the task as the move left it: back to what it was.
           update.mutate({
@@ -381,7 +384,7 @@ function PlanScreen() {
     create.mutate(
       { projectId: drawProject, task: payload as CreateTaskPayload },
       {
-        onSuccess: () => announce(`Added ${title}`),
+        onSuccess: () => announce(t('planner.view.added', { title })),
         onSettled: () => setDrawn(null),
       },
     )
@@ -459,7 +462,7 @@ function PlanScreen() {
       lengthOf: (task) => blockOf(task)?.minutes ?? prefs.defaultLength,
     })
     if (fitted.length === 0) {
-      toast.info('Nothing fits in the free time left.')
+      toast.info(t('planner.view.nothingFits'))
       return
     }
     const placed = fitted.map(({ task, start, end }) => {
@@ -469,10 +472,10 @@ function PlanScreen() {
     })
     const left = candidates.length - fitted.length
     toast.success(
-      `Planned ${fitted.length} ${fitted.length === 1 ? 'task' : 'tasks'}${left > 0 ? `, ${left} did not fit` : ''}`,
+      left > 0 ? t('planner.view.plannedLeft', { count: fitted.length, left }) : t('planner.view.planned', { count: fitted.length }),
       {
         action: {
-          label: 'Undo',
+          label: t('planner.view.undo'),
           onAction: () => {
             // The patch is the difference with the task as Fit left it: back to what it was.
             for (const { task, changes } of placed) {
@@ -505,9 +508,9 @@ function PlanScreen() {
       <header className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b border-border px-4 pb-3 pt-8">
         <div className="flex items-center gap-2">
           <SmartListIcon list="plan" className="h-5 w-5" />
-          <h1 className="text-page-title text-text">Plan</h1>
+          <h1 className="text-page-title text-text">{t('planner.view.title')}</h1>
         </div>
-        {!inSession && <div role="radiogroup" aria-label="View" className="flex rounded-full border border-border p-0.5">
+        {!inSession && <div role="radiogroup" aria-label={t('planner.view.viewLabel')} className="flex rounded-full border border-border p-0.5">
           {VIEWS.map((option) => (
             <button
               key={option.value}
@@ -521,7 +524,7 @@ function PlanScreen() {
                 view === option.value ? 'bg-bg-selected text-text' : 'text-text-secondary hover:text-text',
               )}
             >
-              {option.label}
+              {t(option.label)}
             </button>
           ))}
         </div>}
@@ -529,7 +532,7 @@ function PlanScreen() {
           <button
             ref={prevRef}
             type="button"
-            aria-label="Back"
+            aria-label={t('planner.view.back')}
             data-plan-prev
             onClick={() => go(-1)}
             className={cn(
@@ -540,12 +543,12 @@ function PlanScreen() {
             <ChevronLeft className="h-4 w-4" aria-hidden="true" />
           </button>
           <button type="button" data-plan-today onClick={goToday} className="rounded-control px-2 py-1 text-meta font-medium text-text hover:bg-bg-hover">
-            Today
+            {t('planner.view.today')}
           </button>
           <button
             ref={nextRef}
             type="button"
-            aria-label="Forward"
+            aria-label={t('planner.view.forward')}
             data-plan-next
             onClick={() => go(1)}
             className={cn(
@@ -563,13 +566,13 @@ function PlanScreen() {
           {!inSession && (
             <Button variant="primary" data-plan-my-day onClick={() => setInSession(true)}>
               <Sun className="h-4 w-4" aria-hidden="true" />
-              Plan my day
+              {t('planner.view.planMyDay')}
             </Button>
           )}
           <button
             ref={gearRef}
             type="button"
-            aria-label="Plan settings"
+            aria-label={t('planner.view.settings')}
             aria-expanded={gearOpen}
             data-plan-gear
             onClick={() => setGearOpen((value) => !value)}
@@ -582,7 +585,7 @@ function PlanScreen() {
             <Popover
               anchorRef={gearRef}
               invokedBy={[gearRef]}
-              label="Plan settings"
+              label={t('planner.view.settings')}
               role="dialog"
               placement="bottom-end"
               onClose={() => setGearOpen(false)}
@@ -598,10 +601,10 @@ function PlanScreen() {
                     fitDay()
                   }}
                 >
-                  Fit {selectedDay === today ? 'today' : dayPhrase(selectedDay)}
+                  {selectedDay === today ? t('planner.view.fitToday') : t('planner.view.fitDay', { day: dayPhrase(selectedDay) })}
                 </Button>
                 <p className="mt-1 text-caption text-text-secondary">
-                  Gives the tasks without a time the next free slots, most urgent first.
+                  {t('planner.view.fitNote')}
                 </p>
               </div>
             </Popover>
@@ -615,7 +618,7 @@ function PlanScreen() {
       <div className="flex min-h-0 flex-1">
         <aside
           ref={listRef}
-          aria-label="Tasks to plan"
+          aria-label={t('planner.view.tasksToPlan')}
           data-plan-panel
           className="flex w-[340px] shrink-0 flex-col border-r border-border"
         >
@@ -632,8 +635,8 @@ function PlanScreen() {
             <input
               value={filter}
               onChange={(event) => setFilter(event.target.value)}
-              placeholder="Filter these tasks"
-              aria-label="Filter these tasks"
+              placeholder={t('planner.view.filter')}
+              aria-label={t('planner.view.filter')}
               data-plan-filter
               className="w-full rounded-control border border-border bg-transparent px-3 py-1.5 text-meta text-text placeholder:text-text-secondary"
             />
@@ -641,17 +644,17 @@ function PlanScreen() {
           <div className="min-h-0 flex-1">
             <RowViewProvider value={rowView}>
               <TaskList
-                title="Tasks to plan"
+                title={t('planner.view.tasksToPlan')}
                 hideHeader
                 tasks={listed}
                 showNewTask={false}
-                emptyTitle={filter ? 'Nothing with that name' : 'Nothing to plan here'}
-                emptySubtitle={filter ? undefined : 'Pick another list, or drag on the timeline to add a task.'}
+                emptyTitle={filter ? t('planner.view.noMatch') : t('planner.view.nothingToPlan')}
+                emptySubtitle={filter ? undefined : t('planner.view.pickAnother')}
               />
             </RowViewProvider>
           </div>
           <p className="shrink-0 border-t border-border px-3 py-2 text-meta text-text-secondary" data-plan-totals>
-            {formatLength(planned)} planned · {formatLength(free)} free
+            {t('planner.view.totals', { planned: formatLength(planned), free: formatLength(free) })}
           </p>
         </aside>
 

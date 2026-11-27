@@ -1,4 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Popover } from '@/components/overlay/Popover'
 import { Button } from '@/components/shared/Button'
 import { Checkbox } from '@/components/shared/Checkbox'
@@ -8,6 +9,7 @@ import { usePlanEventActions } from '@/hooks/use-plan-events'
 import { formatLength } from '@/lib/planner-timeline'
 import { formatBlockRange } from '../../../shared/date-display'
 import { addLocalDays } from '../../../shared/due-dates'
+import type { TranslationKey } from '../../../shared/i18n'
 import type { CalendarEvent } from '../../../shared/calendar-events'
 import {
   choiceIndex,
@@ -26,10 +28,10 @@ const CLOCK = /^([01]\d|2[0-3]):[0-5]\d$/
 /** A new end date starts four weeks after the day pressed; the date field changes it. */
 const NEW_END_DAYS = 28
 
-const SCOPES: { value: EventScope; label: string }[] = [
-  { value: 'this', label: 'This time' },
-  { value: 'following', label: 'This and following' },
-  { value: 'all', label: 'All times' },
+const SCOPES: { value: EventScope; label: TranslationKey }[] = [
+  { value: 'this', label: 'events.popover.scopeThis' },
+  { value: 'following', label: 'events.popover.scopeFollowing' },
+  { value: 'all', label: 'events.popover.scopeAll' },
 ]
 
 interface EventPopoverProps {
@@ -54,11 +56,12 @@ interface EventPopoverProps {
 
 /** A pressed event: your own can be changed or skipped once; a calendar's is read-only. */
 export function EventPopover({ occurrence, element, planEvent, calendarName, defaultLength, onMoved, scope, onScopeChange, onClose }: EventPopoverProps) {
+  const { t } = useTranslation()
   const fmt = useDateFormat()
   const anchorRef = useRef<HTMLElement | null>(element)
   anchorRef.current = element
   const when = occurrence.allDay
-    ? 'All day'
+    ? t('events.popover.allDay')
     : formatBlockRange(new Date(occurrence.start), new Date(occurrence.end), fmt)
 
   return (
@@ -81,7 +84,11 @@ export function EventPopover({ occurrence, element, planEvent, calendarName, def
             {occurrence.location ? ` · ${occurrence.location}` : ''}
           </p>
           <p className="mt-1 text-caption text-text-secondary">
-            {[occurrence.tentative ? 'Tentative' : null, occurrence.busy ? null : 'Free', `From ${calendarName ?? 'a calendar'}, read only`]
+            {[
+              occurrence.tentative ? t('planner.timeline.tentative') : null,
+              occurrence.busy ? null : t('planner.timeline.free'),
+              calendarName ? t('events.popover.fromCalendar', { calendar: calendarName }) : t('events.popover.fromGeneric'),
+            ]
               .filter(Boolean)
               .join(' · ')}
           </p>
@@ -114,6 +121,7 @@ function OwnEvent({
   onScopeChange?: (scope: EventScope) => void
   onClose: () => void
 }) {
+  const { t } = useTranslation()
   const actions = usePlanEventActions()
   const scopeLabel = useId()
   const repeats = planEvent.repeat.kind !== 'none'
@@ -170,7 +178,7 @@ function OwnEvent({
       {repeats && (
         <div className="grid gap-1">
           <span id={scopeLabel} className="text-caption text-text-secondary">
-            Change
+            {t('events.popover.change')}
           </span>
           <div role="radiogroup" aria-labelledby={scopeLabel} className="flex rounded-full border border-border p-0.5" data-plan-event-scope>
             {SCOPES.map((option) => (
@@ -186,7 +194,7 @@ function OwnEvent({
                   scope === option.value ? 'bg-bg-selected text-text' : 'text-text-secondary hover:text-text',
                 )}
               >
-                {option.label}
+                {t(option.label)}
               </button>
             ))}
           </div>
@@ -198,7 +206,7 @@ function OwnEvent({
         onChange={(event) => setTitle(event.target.value)}
         onBlur={commitTitle}
         onKeyDown={onEnter(commitTitle)}
-        aria-label="Event title"
+        aria-label={t('events.popover.title')}
         className="w-full rounded-control border border-border bg-transparent px-2 py-1.5 text-task-title text-text"
       />
 
@@ -207,14 +215,14 @@ function OwnEvent({
           checked={planEvent.time === null}
           onChange={(event) => void save(event.target.checked ? { time: null } : { time: '09:00', minutes: defaultLength })}
         />
-        <span className="text-meta text-text">All day</span>
+        <span className="text-meta text-text">{t('events.popover.allDay')}</span>
       </label>
 
       {planEvent.time !== null && (
         <div className="flex items-center gap-2">
           <input
             type="time"
-            aria-label="Starts at"
+            aria-label={t('events.popover.startsAt')}
             data-plan-event-time
             value={time}
             onChange={(event) => setTime(event.target.value)}
@@ -223,7 +231,7 @@ function OwnEvent({
             className="rounded-control border border-border bg-transparent px-2 py-1 text-meta text-text"
           />
           <select
-            aria-label="Length"
+            aria-label={t('events.popover.length')}
             data-plan-event-length
             value={planEvent.minutes}
             onChange={(event) => void save({ minutes: Number(event.target.value) })}
@@ -239,7 +247,7 @@ function OwnEvent({
       )}
 
       <select
-        aria-label="Repeat"
+        aria-label={t('events.popover.repeat')}
         data-plan-event-repeat
         value={current}
         disabled={thisOnly}
@@ -259,9 +267,9 @@ function OwnEvent({
 
       {repeats && (
         <div className="flex items-center gap-2">
-          <span className="text-meta text-text">Ends</span>
+          <span className="text-meta text-text">{t('events.popover.ends')}</span>
           <select
-            aria-label="Ends"
+            aria-label={t('events.popover.ends')}
             data-plan-event-ends
             value={planEvent.until ? 'date' : 'never'}
             disabled={thisOnly}
@@ -271,13 +279,13 @@ function OwnEvent({
             }}
             className="rounded-control border border-border bg-bg-card px-1.5 py-1 text-meta text-text disabled:opacity-60"
           >
-            <option value="never">Never</option>
-            <option value="date">On a date</option>
+            <option value="never">{t('events.popover.never')}</option>
+            <option value="date">{t('events.popover.onDate')}</option>
           </select>
           {planEvent.until && (
             <input
               type="date"
-              aria-label="Ends on"
+              aria-label={t('events.popover.endsOn')}
               data-plan-event-until
               value={until}
               min={earliestEnd}
@@ -290,16 +298,16 @@ function OwnEvent({
           )}
         </div>
       )}
-      {thisOnly && <p className="text-caption text-text-secondary">The repeat and the end change for this and following, or all times.</p>}
+      {thisOnly && <p className="text-caption text-text-secondary">{t('events.popover.thisOnlyNote')}</p>}
 
       {planEvent.time !== null && (
         <label className="flex cursor-pointer items-center gap-2">
           <Checkbox checked={occurrence.busy} onChange={(event) => void save({ busy: event.target.checked })} />
-          <span className="text-meta text-text">Counts as busy time</span>
+          <span className="text-meta text-text">{t('events.popover.busy')}</span>
         </label>
       )}
 
-      <p className="text-caption text-text-secondary">Shown on Plan only, on all your devices.</p>
+      <p className="text-caption text-text-secondary">{t('events.popover.shownOnPlan')}</p>
 
       <div className="flex flex-wrap gap-2 border-t border-border pt-2">
         {repeats && occurrence.day && (
@@ -311,7 +319,7 @@ function OwnEvent({
               onClose()
             }}
           >
-            Skip this one
+            {t('events.popover.skip')}
           </Button>
         )}
         <Button
@@ -323,7 +331,7 @@ function OwnEvent({
             onClose()
           }}
         >
-          Delete event
+          {t('events.popover.delete')}
         </Button>
       </div>
     </div>

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useNavigate } from '@tanstack/react-router'
 import { Check, ChevronDown, Plus, RefreshCw, Trash2 } from 'lucide-react'
 import { Button } from '@/components/shared/Button'
@@ -13,6 +14,7 @@ import type { CalendarConnectionView, CalendarSecretLevel } from '../../../share
 import { MY_EVENTS_COLOR, repeatText, type ListedEvent } from '../../../shared/plan-events'
 import { useCalendarAccountActions, shownError } from '@/hooks/use-calendar-accounts'
 import { accountProblem } from '../../../shared/calendar-accounts'
+import { t as translate } from '../../../shared/i18n'
 import { AddCalendarDialog } from './AddCalendarDialog'
 import { ImportCalendarFileButton, ImportCalendarHost } from './ImportCalendarFile'
 import { AccountError } from './OAuthAccountForm'
@@ -24,14 +26,14 @@ const ICON_BUTTON = 'flex h-6 w-6 shrink-0 items-center justify-center rounded-c
 
 /** Your own Events, to look over and delete; they are added and changed on the timeline. */
 function MyEvents() {
+  const { t } = useTranslation()
   const { events } = usePlanEvents()
   const actions = usePlanEventActions()
   return (
     <div data-plan-my-events className="mb-3">
-      <p className="text-meta font-medium text-text">Events</p>
+      <p className="text-meta font-medium text-text">{t('calendars.feeds.events')}</p>
       <p className="mt-1 text-caption text-text-secondary">
-        Times you are not available, such as a weekly manager call. Drag on the timeline and pick Event to add one.
-        Shown on Plan only and synced to your devices.
+        {t('calendars.feeds.eventsNote')}
       </p>
       <ImportCalendarFileButton className="mt-2" />
       {events.length > 0 && (
@@ -42,10 +44,10 @@ function MyEvents() {
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-meta text-text">{event.title}</span>
                 <span className="block truncate text-caption text-text-secondary">
-                  {repeatText(event.repeat)} · {event.time === null ? 'all day' : `${event.time}, ${formatLength(event.minutes)}`}
+                  {repeatText(event.repeat)} · {event.time === null ? t('calendars.feeds.allDay') : t('calendars.feeds.timeLength', { time: event.time, length: formatLength(event.minutes) })}
                 </span>
               </span>
-              <button type="button" aria-label={`Delete ${event.title}`} onClick={() => void actions.remove(event)} className={ICON_BUTTON}>
+              <button type="button" aria-label={t('calendars.feeds.deleteEvent', { title: event.title })} onClick={() => void actions.remove(event)} className={ICON_BUTTON}>
                 <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
               </button>
             </li>
@@ -67,31 +69,33 @@ function clock(iso: string): string {
 /** "Updated 4 min ago"; with an error, "Not updated since 10:42" and why (20.9). */
 export function calendarStatus(feed: Pick<CalendarFeedView, 'enabled' | 'fetchedAt' | 'error'>, now = Date.now()): { text: string; problem: boolean } {
   if (feed.error) {
-    return { text: feed.fetchedAt ? `Not updated since ${clock(feed.fetchedAt)}. ${feed.error}` : feed.error, problem: true }
+    return { text: feed.fetchedAt ? translate('calendars.feeds.notUpdatedSinceError', { time: clock(feed.fetchedAt), error: feed.error }) : feed.error, problem: true }
   }
-  if (!feed.enabled) return { text: 'Not shown', problem: false }
-  if (!feed.fetchedAt) return { text: 'Not read yet', problem: false }
+  if (!feed.enabled) return { text: translate('calendars.feeds.notShown'), problem: false }
+  if (!feed.fetchedAt) return { text: translate('calendars.feeds.notReadYet'), problem: false }
   const minutes = Math.round((now - new Date(feed.fetchedAt).getTime()) / 60_000)
-  if (minutes < 1) return { text: 'Updated just now', problem: false }
-  if (minutes < 60) return { text: `Updated ${minutes} min ago`, problem: false }
-  return { text: `Updated at ${clock(feed.fetchedAt)}`, problem: false }
+  if (minutes < 1) return { text: translate('calendars.feeds.updatedJustNow'), problem: false }
+  if (minutes < 60) return { text: translate('calendars.feeds.updatedMinutesAgo', { count: minutes }), problem: false }
+  return { text: translate('calendars.feeds.updatedAt', { time: clock(feed.fetchedAt) }), problem: false }
 }
 
 function StorageNotice({ level }: { level: CalendarSecretLevel }) {
+  const { t } = useTranslation()
   if (level === 'encrypted') return null
   return (
     <p role="note" data-calendar-storage={level} className="mt-2 rounded-control border border-status-today/40 bg-status-today/10 px-2.5 py-1.5 text-caption text-text-secondary">
       {level === 'obfuscated'
-        ? 'This system has no keyring Vicu uses, so calendar links and passwords are only obscured on disk, not encrypted. Anyone who can read your user profile can recover them.'
-        : 'This system offers Vicu no secure storage, so calendar links and passwords are saved as plain text, protected only by the file’s permissions.'}
+        ? t('calendars.feeds.storageObscured')
+        : t('calendars.feeds.storagePlain')}
     </p>
   )
 }
 
 function ColorChoice({ feed }: { feed: CalendarFeedView }) {
+  const { t } = useTranslation()
   const { update } = useCalendarActions()
   return (
-    <div role="radiogroup" aria-label={`Colour of ${feed.name}`} className="flex gap-1.5">
+    <div role="radiogroup" aria-label={t('calendars.feeds.colourOf', { name: feed.name })} className="flex gap-1.5">
       {CALENDAR_COLORS.map((color, index) => (
         <button
           key={color}
@@ -120,6 +124,7 @@ function ColorChoice({ feed }: { feed: CalendarFeedView }) {
  * the organisation), so the row only says since when.
  */
 function CalendarRow({ feed, onRemove, accountSays = false }: { feed: CalendarFeedView; onRemove?: () => void; accountSays?: boolean }) {
+  const { t } = useTranslation()
   const { update } = useCalendarActions()
   const [open, setOpen] = useState(false)
   const [name, setName] = useState(feed.name)
@@ -127,8 +132,8 @@ function CalendarRow({ feed, onRemove, accountSays = false }: { feed: CalendarFe
   const said = accountSays && accountProblem(feed.error) !== null
   const status = said
     ? !feed.enabled
-      ? { text: 'Not shown', problem: false }
-      : { text: feed.fetchedAt ? `Not updated since ${clock(feed.fetchedAt)}.` : 'Not read yet.', problem: true }
+      ? { text: t('calendars.feeds.notShown'), problem: false }
+      : { text: feed.fetchedAt ? t('calendars.feeds.notUpdatedSince', { time: clock(feed.fetchedAt) }) : t('calendars.feeds.notReadYetDot'), problem: true }
     : calendarStatus(feed)
   const commitName = () => {
     const trimmed = name.trim()
@@ -141,7 +146,7 @@ function CalendarRow({ feed, onRemove, accountSays = false }: { feed: CalendarFe
       <div className="flex items-center gap-2">
         <Checkbox
           checked={feed.enabled}
-          aria-label={`Show ${feed.name}`}
+          aria-label={t('calendars.feeds.show', { name: feed.name })}
           data-calendar-shown
           onChange={(event) => set({ enabled: event.target.checked })}
         />
@@ -155,7 +160,7 @@ function CalendarRow({ feed, onRemove, accountSays = false }: { feed: CalendarFe
         </span>
         <button
           type="button"
-          aria-label={`Options for ${feed.name}`}
+          aria-label={t('calendars.feeds.optionsFor', { name: feed.name })}
           aria-expanded={open}
           data-calendar-options
           onClick={() => setOpen((value) => !value)}
@@ -176,23 +181,23 @@ function CalendarRow({ feed, onRemove, accountSays = false }: { feed: CalendarFe
                 commitName()
               }
             }}
-            aria-label="Calendar name"
+            aria-label={t('calendars.feeds.calendarName')}
             data-calendar-rename
             className="w-full rounded-control border border-border bg-transparent px-2 py-1 text-meta text-text"
           />
           <ColorChoice feed={feed} />
           <label className="flex cursor-pointer items-center gap-2">
             <Checkbox checked={feed.countsAsBusy} onChange={(event) => set({ countsAsBusy: event.target.checked })} />
-            <span className="text-meta text-text">Counts as busy time</span>
+            <span className="text-meta text-text">{t('calendars.feeds.busy')}</span>
           </label>
           <label className="flex cursor-pointer items-center gap-2">
             <Checkbox checked={feed.busyOnly} data-calendar-busy-toggle onChange={(event) => set({ busyOnly: event.target.checked })} />
-            <span className="text-meta text-text">Show only &ldquo;Busy&rdquo;, not titles</span>
+            <span className="text-meta text-text">{t('calendars.feeds.busyOnly')}</span>
           </label>
           {onRemove && (
             <Button variant="quiet" danger onClick={onRemove} data-calendar-remove>
               <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
-              Remove calendar
+              {t('calendars.feeds.removeCalendar')}
             </Button>
           )}
         </div>
@@ -203,6 +208,7 @@ function CalendarRow({ feed, onRemove, accountSays = false }: { feed: CalendarFe
 
 /** A Microsoft or Google account the provider no longer lets Vicu read: Sign in again, or the page for IT. */
 function AccountRepair({ connection }: { connection: CalendarConnectionView }) {
+  const { t } = useTranslation()
   const { reconnect, cancel } = useCalendarAccountActions()
   const messages = [connection.error, ...connection.calendars.map((feed) => feed.error)]
   const org = messages.find((message) => accountProblem(message) === 'org')
@@ -217,9 +223,9 @@ function AccountRepair({ connection }: { connection: CalendarConnectionView }) {
       {reason && <p className="text-caption text-status-overdue">{reason}</p>}
       <div className="flex items-center gap-2">
         <Button variant="secondary" onClick={() => reconnect.mutate(connection.id)} disabled={reconnect.isPending} data-calendar-sign-in-again>
-          {reconnect.isPending ? 'Waiting for the browser...' : 'Sign in again'}
+          {reconnect.isPending ? t('calendars.feeds.waitingBrowser') : t('calendars.feeds.signInAgain')}
         </Button>
-        {reconnect.isPending && <Button variant="quiet" onClick={cancel}>Stop waiting</Button>}
+        {reconnect.isPending && <Button variant="quiet" onClick={cancel}>{t('calendars.feeds.stopWaiting')}</Button>}
       </div>
       {error && <AccountError message={error} />}
     </div>
@@ -227,6 +233,7 @@ function AccountRepair({ connection }: { connection: CalendarConnectionView }) {
 }
 
 function ConnectionBlock({ connection }: { connection: CalendarConnectionView }) {
+  const { t } = useTranslation()
   const { remove, refresh } = useCalendarActions()
   if (connection.kind === 'ics' || connection.kind === 'ics-file') {
     const feed = connection.calendars[0]
@@ -242,14 +249,14 @@ function ConnectionBlock({ connection }: { connection: CalendarConnectionView })
         </span>
         <button
           type="button"
-          aria-label={`Read ${connection.name} again`}
+          aria-label={t('calendars.feeds.readAgain', { name: connection.name })}
           onClick={() => refresh.mutate(connection.id)}
           disabled={refresh.isPending}
           className={ICON_BUTTON}
         >
           <RefreshCw className={cn('h-3.5 w-3.5', refresh.isPending && 'animate-spin')} aria-hidden="true" />
         </button>
-        <button type="button" aria-label={`Remove ${connection.name}`} onClick={() => remove.mutate(connection.id)} data-calendar-remove-account className={ICON_BUTTON}>
+        <button type="button" aria-label={t('calendars.feeds.removeAccount', { name: connection.name })} onClick={() => remove.mutate(connection.id)} data-calendar-remove-account className={ICON_BUTTON}>
           <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
         </button>
       </div>
@@ -266,29 +273,30 @@ function ConnectionBlock({ connection }: { connection: CalendarConnectionView })
 
 /** The gear's short version: what is connected and how it is doing, and Manage. */
 function CalendarSummary() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const { events } = usePlanEvents()
   const sources = useCalendarSources()
   const feeds = (sources.data?.connections ?? []).flatMap((connection) => connection.calendars)
   const shown = feeds.filter((feed) => feed.enabled)
   const failing = feeds.filter((feed) => feed.error)
-  const parts = [
-    events.length === 1 ? '1 Event' : `${events.length} Events`,
-    // Connected calendars do not exist in every host (the web version): then only the Events count.
-    ...(can('calendars') ? [shown.length === 1 ? '1 calendar shown' : `${shown.length} calendars shown`] : []),
-  ]
+  const eventsCount = t('calendars.feeds.eventsCount', { count: events.length })
+  // Connected calendars do not exist in every host (the web version): then only the Events count.
+  const summary = can('calendars')
+    ? t('calendars.feeds.summaryBoth', { events: eventsCount, calendars: t('calendars.feeds.shownCount', { count: shown.length }) })
+    : t('calendars.feeds.summaryEvents', { events: eventsCount })
   return (
     <div data-calendar-summary>
-      <p className="text-meta font-medium text-text">Events and calendars</p>
-      <p className="mt-1 text-caption text-text-secondary">{parts.join(', ')}.</p>
+      <p className="text-meta font-medium text-text">{t('calendars.feeds.eventsAndCalendars')}</p>
+      <p className="mt-1 text-caption text-text-secondary">{summary}</p>
       {failing.length > 0 && (
         <p className="mt-1 text-caption text-status-overdue">
-          {failing.length === 1 ? `${failing[0].name} could not be read.` : `${failing.length} calendars could not be read.`}
+          {failing.length === 1 ? t('calendars.feeds.couldNotRead', { name: failing[0].name }) : t('calendars.feeds.couldNotReadMany', { count: failing.length })}
         </p>
       )}
       <div className="mt-2 flex flex-wrap gap-2">
         <Button variant="secondary" data-calendar-manage onClick={() => void navigate({ to: '/settings', search: { section: 'calendars' } })}>
-          Manage
+          {t('calendars.feeds.manage')}
         </Button>
         <ImportCalendarFileButton />
       </div>
@@ -301,6 +309,7 @@ function CalendarSummary() {
  * (`summary`) a line and Manage, so the gear stays short.
  */
 export function CalendarFeeds({ summary = false }: { summary?: boolean }) {
+  const { t } = useTranslation()
   const sources = useCalendarSources()
   const { refresh } = useCalendarActions()
   const [adding, setAdding] = useState(false)
@@ -313,11 +322,11 @@ export function CalendarFeeds({ summary = false }: { summary?: boolean }) {
       {can('calendars') && (
       <>
       <div className="flex items-center gap-2 border-t border-border pt-3">
-        <p className="flex-1 text-meta font-medium text-text">Calendars</p>
+        <p className="flex-1 text-meta font-medium text-text">{t('calendars.feeds.calendars')}</p>
         {connections.length > 0 && (
           <button
             type="button"
-            aria-label="Read the calendars again"
+            aria-label={t('calendars.feeds.readAllAgain')}
             data-calendar-refresh
             onClick={() => refresh.mutate(undefined)}
             disabled={refresh.isPending}
@@ -328,7 +337,7 @@ export function CalendarFeeds({ summary = false }: { summary?: boolean }) {
         )}
       </div>
       <p className="mt-1 text-caption text-text-secondary">
-        Their events show on the timeline and count as busy time. Read on this device only, never changed.
+        {t('calendars.feeds.calendarsNote')}
       </p>
       {sources.data && <StorageNotice level={sources.data.storage} />}
 
@@ -342,7 +351,7 @@ export function CalendarFeeds({ summary = false }: { summary?: boolean }) {
 
       <Button variant="secondary" className="mt-2" onClick={() => setAdding(true)} data-calendar-open-add>
         <Plus className="h-3.5 w-3.5" aria-hidden="true" />
-        Add calendar
+        {t('calendars.feeds.addCalendar')}
       </Button>
       <AddCalendarDialog open={adding} onClose={() => setAdding(false)} />
       </>

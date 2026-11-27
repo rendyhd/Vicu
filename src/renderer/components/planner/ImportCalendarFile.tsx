@@ -1,8 +1,10 @@
 import { useId, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { FileUp } from 'lucide-react'
 import { Dialog } from '@/components/overlay/Dialog'
 import { Button } from '@/components/shared/Button'
 import { Checkbox } from '@/components/shared/Checkbox'
+import { t as translate } from '../../../shared/i18n'
 import { useCalendarImportStore } from '@/stores/calendar-import-store'
 import { usePlanEventActions } from '@/hooks/use-plan-events'
 import { formatLength } from '@/lib/planner-timeline'
@@ -19,18 +21,20 @@ function dayText(day: string): string {
 }
 
 function whenText(event: PlanEvent): string {
-  const time = event.time === null ? 'all day' : `${event.time}, ${formatLength(event.minutes)}`
-  return event.repeat.kind === 'none' ? `${dayText(event.start)}, ${time}` : `${repeatText(event.repeat)} from ${dayText(event.start)}, ${time}`
+  const time = event.time === null ? translate('calendars.feeds.allDay') : translate('calendars.feeds.timeLength', { time: event.time, length: formatLength(event.minutes) })
+  return event.repeat.kind === 'none'
+    ? translate('calendars.import.whenOnce', { day: dayText(event.start), time })
+    : translate('calendars.import.whenRepeating', { repeat: repeatText(event.repeat), day: dayText(event.start), time })
 }
 
 function countText(events: readonly PlanEvent[]): string {
   const repeating = events.filter((event) => event.repeat.kind !== 'none').length
   const single = events.length - repeating
-  const total = events.length === 1 ? '1 Event' : `${events.length} Events`
-  return `${total}: ${repeating} repeating, ${single} single.`
+  return translate('calendars.import.count', { total: translate('calendars.feeds.eventsCount', { count: events.length }), repeating, single })
 }
 
 function PreviewDialog({ preview, onClose }: { preview: IcsImportPreview; onClose: () => void }) {
+  const { t } = useTranslation()
   const titleId = useId()
   const actions = usePlanEventActions()
   const [busyOnly, setBusyOnly] = useState(false)
@@ -48,10 +52,10 @@ function PreviewDialog({ preview, onClose }: { preview: IcsImportPreview; onClos
   return (
     <Dialog open onClose={onClose} labelledBy={titleId} className="w-[480px] max-w-[92vw]">
       <div className="space-y-3 p-5" data-calendar-import-dialog>
-        <h2 id={titleId} className="text-card-title font-semibold text-text">Import {preview.fileName}</h2>
+        <h2 id={titleId} className="text-card-title font-semibold text-text">{t('calendars.import.title', { name: preview.fileName })}</h2>
         {events.length === 0 ? (
           <p className="text-meta text-text" data-calendar-import-empty>
-            Nothing in this file to import. Events that ended before today, cancelled ones and those more than a year ahead are left out.
+            {t('calendars.import.empty')}
           </p>
         ) : (
           <>
@@ -68,16 +72,15 @@ function PreviewDialog({ preview, onClose }: { preview: IcsImportPreview; onClos
         )}
         <label className="flex cursor-pointer items-center gap-2">
           <Checkbox checked={busyOnly} onChange={(e) => setBusyOnly(e.target.checked)} data-calendar-import-busy-only />
-          <span className="text-meta text-text">Show only &ldquo;Busy&rdquo;, not titles</span>
+          <span className="text-meta text-text">{t('calendars.feeds.busyOnly')}</span>
         </label>
         <p className="text-caption text-text-secondary">
-          They become ordinary Events: shown on Plan, changeable, and synced to your devices through your Vikunja server. Nothing stays
-          linked to the file; importing it again makes them again.
+          {t('calendars.import.note')}
         </p>
         <div className="flex justify-end gap-2 pt-1">
-          <Button variant="secondary" onClick={onClose}>Cancel</Button>
+          <Button variant="secondary" onClick={onClose}>{t('calendars.add.cancel')}</Button>
           <Button variant="primary" onClick={() => void importAll()} disabled={saving || events.length === 0} data-calendar-import-confirm>
-            {events.length === 1 ? 'Import 1 Event' : `Import ${events.length} Events`}
+            {t('calendars.import.confirm', { count: events.length })}
           </Button>
         </div>
       </div>
@@ -87,12 +90,13 @@ function PreviewDialog({ preview, onClose }: { preview: IcsImportPreview; onClos
 
 /** "Import calendar file...": the file dialog, then the preview (drawn by ImportCalendarHost). */
 export function ImportCalendarFileButton({ className }: { className?: string }) {
+  const { t } = useTranslation()
   const reading = useCalendarImportStore((state) => state.reading)
   const pick = useCalendarImportStore((state) => state.pick)
   return (
     <Button variant="secondary" className={className} onClick={() => void pick()} disabled={reading} data-calendar-import-open>
       <FileUp className="h-3.5 w-3.5" aria-hidden="true" />
-      Import calendar file...
+      {t('calendars.import.button')}
     </Button>
   )
 }
