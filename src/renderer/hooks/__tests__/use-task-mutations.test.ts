@@ -1,13 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   completeTaskRequest,
+  keepReopenedRow,
   uncompleteTaskRequest,
   updateProjectRequest,
   updateTaskRequest,
+  updateTaskWithResult,
 } from '../use-task-mutations'
 import { PROJECT_WRITABLE_FIELDS } from '@/lib/merge-patches'
 import { NULL_DATE } from '@/lib/constants'
 import { useOfflineStore } from '@/stores/offline-store'
+import { useCompletedTasksStore } from '@/stores/completed-tasks-store'
+import { mergeProjectUndoWindow } from '@/lib/undo-window'
 import type { Project, Task } from '@/lib/vikunja-types'
 
 function task(id: number, overrides: Partial<Task> = {}): Task {
@@ -136,6 +140,29 @@ describe('updateTaskRequest', () => {
     expect(updateTask).toHaveBeenCalledWith(5, { description: '<p>patched</p>' }, expect.objectContaining({ queue: true }))
   })
 
+  it('sends the notes the caller read as the base of a notes change (description format)', async () => {
+    await updateTaskRequest({ id: 1, changes: { description: '<p>mine</p>' }, original: task(1) })
+
+    expect(updateTask).toHaveBeenCalledWith(1, { description: '<p>mine</p>' }, expect.objectContaining({ baseDescription: '<p>notes</p>' }))
+  })
+
+  it('prefers the base the caller passes, and sends none without notes in the patch', async () => {
+    await updateTaskRequest({ id: 1, changes: { description: '<p>mine</p>' }, original: task(1), baseDescription: '<p>loaded</p>' })
+    expect(updateTask).toHaveBeenLastCalledWith(1, { description: '<p>mine</p>' }, expect.objectContaining({ baseDescription: '<p>loaded</p>' }))
+
+    await updateTaskRequest({ id: 1, changes: { priority: 3 }, original: task(1), baseDescription: '<p>loaded</p>' })
+    expect(updateTask.mock.calls[1][2]).not.toHaveProperty('baseDescription')
+  })
+
+  it('reports merged notes with the server task', async () => {
+    updateTask.mockResolvedValueOnce({ success: true, data: { ...task(1), description: '<p>b</p><hr><p>a</p>' }, notesMerged: true })
+
+    const result = await updateTaskWithResult({ id: 1, changes: { description: '<p>a</p>' }, original: task(1) })
+
+    expect(result.notesMerged).toBe(true)
+    expect(result.task?.description).toBe('<p>b</p><hr><p>a</p>')
+  })
+
   it('throws the server error', async () => {
     updateTask.mockResolvedValueOnce({ success: false, error: 'boom' })
 
@@ -199,6 +226,43 @@ describe('uncompleteTaskRequest', () => {
       [10, { done: false }],
       [11, { done: true }],
     ])
+  })
+})
+
+// rendyhd/Vicu#76: a done subtask reopened from its parent's card, or from its row opened under the
+// parent, showed twice: under the parent and again as a top-level task of the project.
+describe('keepReopenedRow', () => {
+  const path = '/project/7'
+  const parent = task(20)
+  const subtask = task(21, { done: true, related_tasks: { parenttask: [parent] } } as Partial<Task>)
+
+  afterEach(() => {
+    useCompletedTasksStore.getState().clear()
+  })
+
+  it('keeps a reopened nested subtask under its parent, not as a top-level row', () => {
+    keepReopenedRow(subtask, path, true, false)
+
+    const list = mergeProjectUndoWindow([parent], useCompletedTasksStore.getState().tasks, path, 7)
+    expect(list.map((t) => t.id)).toEqual([20])
+    expect(useCompletedTasksStore.getState().tasks.get(21)?.task.done).toBe(false)
+  })
+
+  it('still brings back a top-level task reopened from another list until the view is left', () => {
+    keepReopenedRow(task(22, { done: true }), path, false, false)
+
+    const list = mergeProjectUndoWindow([parent], useCompletedTasksStore.getState().tasks, path, 7)
+    expect(list.map((t) => t.id).sort()).toEqual([20, 22])
+  })
+
+  it('turns a held row open where it is, keeping how it was held', () => {
+    useCompletedTasksStore.getState().add({ ...subtask }, path, undefined, true)
+
+    keepReopenedRow(subtask, path, false, true)
+
+    const entry = useCompletedTasksStore.getState().tasks.get(21)
+    expect(entry?.task.done).toBe(false)
+    expect(entry?.suppressTopLevelUndo).toBe(true)
   })
 })
 

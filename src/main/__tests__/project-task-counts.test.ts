@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { ApiResult } from '../api-result'
-import { countCarriersByProject, createProjectCounts, PROJECT_COUNT_TTL_MS } from '../project-task-counts'
+import { CARRIER_FAILURE_RETRY_MS, countCarriersByProject, createProjectCounts, PROJECT_COUNT_TTL_MS } from '../project-task-counts'
 
 function setup(options: { totals?: Record<string, number>; carriers?: ApiResult<ReadonlyMap<number, number>>; server?: string | null } = {}) {
   let clock = 1_000_000
@@ -137,6 +137,22 @@ describe('project task counts', () => {
     expect(await partial.counts.count(1, true)).toEqual({ success: true, data: 5 })
     await partial.counts.count(1, true)
     expect(partial.fetchTotal).toHaveBeenCalledTimes(2)
+  })
+
+  it('asks for a carrier list that failed again only after a minute, not once per row (rendyhd/Vicu#75)', async () => {
+    const { counts, carrierCounts, advance } = setup({ totals: { '1:true': 5, '2:true': 7 }, carriers: { success: false, error: 'timed out' } })
+    await counts.count(1, true)
+    await counts.count(2, true)
+    advance(CARRIER_FAILURE_RETRY_MS - 1)
+    await counts.count(1, true)
+    expect(carrierCounts).toHaveBeenCalledTimes(1)
+    advance(1)
+    await counts.count(2, true)
+    expect(carrierCounts).toHaveBeenCalledTimes(2)
+    // A global invalidation (a carrier was created) asks again at once.
+    counts.invalidate()
+    await counts.count(1, true)
+    expect(carrierCounts).toHaveBeenCalledTimes(3)
   })
 
   it('answers with an error and no request when no server is configured', async () => {

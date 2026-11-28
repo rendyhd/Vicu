@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Groups, sessions and follow-ups · Vicu guide</title>
+    <meta name="description" content="Run the actions of a recurring meeting in Vicu Pro: groups and their action lists, weekly and stand-up sessions, a recap to copy, follow-ups on Today and a weekly note." />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#fbfaf8" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#111113" media="(prefers-color-scheme: dark)" />
+    <link rel="icon" href="../../../assets/img/brand/vicu-32.png" sizes="32x32" type="image/png" />
+    <link rel="apple-touch-icon" href="../../../assets/img/brand/vicu-180.png" />
+    <meta property="og:type" content="article" />
+    <meta property="og:site_name" content="Vicu" />
+    <meta property="og:title" content="Groups, sessions and follow-ups · Vicu guide" />
+    <meta property="og:description" content="Run the actions of a recurring meeting in Vicu Pro: groups and their action lists, weekly and stand-up sessions, a recap to copy, follow-ups on Today and a weekly note." />
+    <meta property="og:url" content="https://vicutodo.app/guide/pro/groups/" />
+    <meta property="og:image" content="https://vicutodo.app/assets/img/og.jpg" />
+    <link rel="canonical" href="https://vicutodo.app/guide/pro/groups/" />
+    <link rel="stylesheet" href="../../../assets/css/site.css" />
+    <script>
+      (function () {
+        var d = document.documentElement;
+        d.className = d.className.replace('no-js', 'js');
+        try {
+          var t = localStorage.getItem('vicu-site-theme');
+          if (t === 'light' || t === 'dark') d.setAttribute('data-theme', t);
+        } catch (e) {}
+      })();
+    </script>
+    <script src="../../../assets/js/site.js" defer></script>
+    <script src="../../../assets/js/guide-index.js" defer></script>
+    <script src="../../../assets/js/guide.js" defer></script>
+  </head>
+  <body class="g-body" data-guide-root="../../">
+    <svg class="sprite" aria-hidden="true" focusable="false">
+      <symbol id="i-inbox" viewBox="0 0 24 24"><path d="M3.5 13.5 6 5.5h12l2.5 8V18a1.5 1.5 0 0 1-1.5 1.5H5A1.5 1.5 0 0 1 3.5 18Z" /><path d="M3.5 13.5h5l1 2.5h5l1-2.5h5" /></symbol>
+      <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4" /><path d="M12 2.5v2M12 19.5v2M4.6 4.6 6 6M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4 6 18M18 6l1.4-1.4" /></symbol>
+      <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4 8.5 8.5 0 1 0 20 14.5Z" /></symbol>
+      <symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5" /><path d="M3.5 10h17M8 3v4M16 3v4" /></symbol>
+      <symbol id="i-layers" viewBox="0 0 24 24"><path d="m12 3.5 8.5 4.5L12 12.5 3.5 8Z" /><path d="m3.5 12 8.5 4.5 8.5-4.5" /><path d="m3.5 16 8.5 4.5 8.5-4.5" /></symbol>
+      <symbol id="i-check" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" /><path d="m8.2 12.2 2.6 2.6 5-5.3" /></symbol>
+      <symbol id="i-review" viewBox="0 0 24 24"><path d="M19.5 12a7.5 7.5 0 0 1-13 5.1M4.5 12a7.5 7.5 0 0 1 13-5.1" /><path d="M17.8 3.5v3.6h-3.6M6.2 20.5v-3.6h3.6" /></symbol>
+      <symbol id="i-heart" viewBox="0 0 24 24"><path d="M12 19.5s-7.5-4.4-7.5-10A4.2 4.2 0 0 1 12 7a4.2 4.2 0 0 1 7.5 2.5c0 5.6-7.5 10-7.5 10Z" /><path d="M7 12h2.5l1.5-2 2 4 1.5-2H17" /></symbol>
+      <symbol id="i-bolt" viewBox="0 0 24 24"><path d="M13 3 5 13.5h6L10.5 21 19 10.5h-6Z" /></symbol>
+      <symbol id="i-mic" viewBox="0 0 24 24"><rect x="9" y="3.5" width="6" height="11" rx="3" /><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v2.5" /></symbol>
+      <symbol id="i-filter" viewBox="0 0 24 24"><path d="M4 6h16M7 12h10M10 18h4" /></symbol>
+      <symbol id="i-tag" viewBox="0 0 24 24"><path d="M3.5 12.2V4.5a1 1 0 0 1 1-1h7.7l8.3 8.3a1.4 1.4 0 0 1 0 2l-6.7 6.7a1.4 1.4 0 0 1-2 0Z" /><circle cx="8" cy="8" r="1.4" /></symbol>
+      <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3.5 7.5v10A1.5 1.5 0 0 0 5 19h14a1.5 1.5 0 0 0 1.5-1.5V9A1.5 1.5 0 0 0 19 7.5h-7L10 5H5a1.5 1.5 0 0 0-1.5 1.5Z" /></symbol>
+      <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8.5" r="3.2" /><path d="M3 19c.8-3.2 3.2-5 6-5s5.2 1.8 6 5" /><path d="M15.5 5.6a3.2 3.2 0 0 1 0 5.8M17.5 14.3c1.7.6 3 2.2 3.5 4.7" /></symbol>
+      <symbol id="i-chat" viewBox="0 0 24 24"><path d="M4 5.5h16v10.5H10l-6 4.5Z" /><path d="M8.5 10.5h7" /></symbol>
+      <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2h-15Z" /><path d="M10 20.5a2 2 0 0 0 4 0" /></symbol>
+      <symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 21s6.5-5.6 6.5-11a6.5 6.5 0 0 0-13 0c0 5.4 6.5 11 6.5 11Z" /><circle cx="12" cy="10" r="2.3" /></symbol>
+      <symbol id="i-cloud-off" viewBox="0 0 24 24"><path d="M8 18.5H6.5a4 4 0 0 1-.6-8 6 6 0 0 1 9.2-4M18.5 9.5a4.5 4.5 0 0 1-1.5 9h-5" /><path d="m4 3.5 16 17" /></symbol>
+      <symbol id="i-sync" viewBox="0 0 24 24"><path d="M4 12a8 8 0 0 1 14-5.3L20 9" /><path d="M20 4v5h-5" /><path d="M20 12a8 8 0 0 1-14 5.3L4 15" /><path d="M4 20v-5h5" /></symbol>
+      <symbol id="i-keyboard" viewBox="0 0 24 24"><rect x="2.5" y="6" width="19" height="12" rx="2" /><path d="M6 9.5h.01M9 9.5h.01M12 9.5h.01M15 9.5h.01M18 9.5h.01M6 12.5h.01M18 12.5h.01M9 12.5h6M7.5 15.3h9" /></symbol>
+      <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.7 0l3.1-3.1a4 4 0 0 0-5.7-5.7l-1 1" /><path d="M14 10a4 4 0 0 0-5.7 0l-3.1 3.1a4 4 0 0 0 5.7 5.7l1-1" /></symbol>
+      <symbol id="i-phone" viewBox="0 0 24 24"><rect x="6.5" y="2.5" width="11" height="19" rx="2.5" /><path d="M10.5 18.5h3" /></symbol>
+      <symbol id="i-monitor" viewBox="0 0 24 24"><rect x="2.5" y="4" width="19" height="12.5" rx="2" /><path d="M8.5 20.5h7M12 16.5v4" /></symbol>
+      <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4v11M7.5 10.5 12 15l4.5-4.5" /><path d="M4.5 19.5h15" /></symbol>
+      <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z" /><circle cx="12" cy="12" r="2.8" /></symbol>
+      <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="10.5" width="14" height="10" rx="2" /><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5" /></symbol>
+      <symbol id="i-grid" viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="7" height="7" rx="1.8" /><rect x="13.5" y="3.5" width="7" height="7" rx="1.8" /><rect x="3.5" y="13.5" width="7" height="7" rx="1.8" /><rect x="13.5" y="13.5" width="7" height="7" rx="1.8" /></symbol>
+      <symbol id="i-swipe" viewBox="0 0 24 24"><path d="M3.5 7.5h11M11 4l3.5 3.5L11 11" /><path d="M9 21v-6.5a1.5 1.5 0 0 1 3 0V17l3.8.7a1.8 1.8 0 0 1 1.5 2V21" /></symbol>
+      <symbol id="i-share" viewBox="0 0 24 24"><path d="M12 3.5v11M8 7.5l4-4 4 4" /><path d="M7 11H5.5v9.5h13V11H17" /></symbol>
+      <symbol id="i-sort" viewBox="0 0 24 24"><path d="M7 4v16M3.5 16.5 7 20l3.5-3.5" /><path d="M13 6h7.5M13 11h5.5M13 16h3" /></symbol>
+      <symbol id="i-repeat" viewBox="0 0 24 24"><path d="M4 11V9.5A3.5 3.5 0 0 1 7.5 6H19" /><path d="m16 3 3 3-3 3" /><path d="M20 13v1.5a3.5 3.5 0 0 1-3.5 3.5H5" /><path d="m8 21-3-3 3-3" /></symbol>
+      <symbol id="i-clip" viewBox="0 0 24 24"><path d="m20 11.5-7.8 7.8a5 5 0 0 1-7-7.1L13 4.4a3.3 3.3 0 0 1 4.7 4.7l-7.8 7.8a1.7 1.7 0 0 1-2.4-2.4l7.2-7.2" /></symbol>
+      <symbol id="i-flag" viewBox="0 0 24 24"><path d="M5 21V4M5 4.5h12l-2 4 2 4H5" /></symbol>
+      <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5" /><path d="m20 20-4.3-4.3" /></symbol>
+      <symbol id="i-command" viewBox="0 0 24 24"><path d="M9 9V6.5A2.5 2.5 0 1 0 6.5 9H9Zm0 0h6m-6 0v6m6-6V6.5A2.5 2.5 0 1 1 17.5 9H15Zm0 0v6m0 0h-6m6 0v2.5a2.5 2.5 0 1 0 2.5-2.5H15Zm-6 0v2.5A2.5 2.5 0 1 1 6.5 15H9Z" /></symbol>
+      <symbol id="i-sparkle" viewBox="0 0 24 24"><path d="M12 3.5c.6 4.6 3.9 7.9 8.5 8.5-4.6.6-7.9 3.9-8.5 8.5-.6-4.6-3.9-7.9-8.5-8.5 4.6-.6 7.9-3.9 8.5-8.5Z" /></symbol>
+      <symbol id="i-person" viewBox="0 0 24 24"><circle cx="12" cy="5.5" r="2" /><path d="M5 9h14M12 9v5.5M8.5 21l3.5-6.5 3.5 6.5" /></symbol>
+      <symbol id="i-hand" viewBox="0 0 24 24"><path d="M8 12V5.5a1.5 1.5 0 0 1 3 0V11M11 10.5V4a1.5 1.5 0 0 1 3 0v6.5M14 10.5V5.5a1.5 1.5 0 0 1 3 0V14a7 7 0 0 1-7 7h-.5a6 6 0 0 1-5-2.8L3 15.3a1.6 1.6 0 0 1 2.6-1.8L8 15.5" /></symbol>
+      <symbol id="i-sections" viewBox="0 0 24 24"><path d="M4 5.5h16M4 12h16M4 18.5h16" /><path d="M4 5.5v13" /></symbol>
+      <symbol id="i-obsidian" viewBox="0 0 24 24"><path d="M9 2.8 4.8 9.6l3 7.7 5.6 3.9 4.1-3.4L19 9.4 14 3Z" /><path d="m9 2.8 1.6 8.1-2.8 6.4M10.6 10.9 19 9.4M10.6 10.9l2.8 10.3" /></symbol>
+      <symbol id="i-tray" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2.5" /><path d="M3 15h18M7 18h.01M10 18h.01" /></symbol>
+      <symbol id="i-windows" viewBox="0 0 24 24"><path d="M3.5 5.5 10.5 4.5v7h-7ZM12.5 4.2l8-1.2v8.5h-8ZM3.5 12.5h7v7l-7-1ZM12.5 12.5h8V21l-8-1.2Z" /></symbol>
+      <symbol id="i-apple" viewBox="0 0 24 24"><path d="M16.4 12.6c0-2.3 1.9-3.4 2-3.5a4.3 4.3 0 0 0-3.4-1.8c-1.4-.2-2.8.8-3.5.8s-1.8-.8-3-.8a4.5 4.5 0 0 0-3.8 2.3c-1.6 2.8-.4 7 1.2 9.3.8 1.1 1.7 2.4 2.9 2.3 1.2 0 1.6-.7 3-.7s1.8.7 3 .7c1.3 0 2.1-1.1 2.8-2.3a10 10 0 0 0 1.3-2.6 4 4 0 0 1-2.5-3.7ZM14.2 5.8A4 4 0 0 0 15.1 3a4.1 4.1 0 0 0-2.7 1.4 3.8 3.8 0 0 0-1 2.7 3.4 3.4 0 0 0 2.8-1.3Z" /></symbol>
+      <symbol id="i-linux" viewBox="0 0 24 24"><path d="M12 3c-2.2 0-3.4 1.8-3.4 4.4 0 1.7-.6 2.6-1.6 4-1.2 1.6-2.4 3.6-2 6 .2 1.4 1.4 2.6 3 2.6h8c1.6 0 2.8-1.2 3-2.6.4-2.4-.8-4.4-2-6-1-1.4-1.6-2.3-1.6-4C15.4 4.8 14.2 3 12 3Z" /><path d="M10.4 7.6h.01M13.6 7.6h.01M10.7 10h2.6" /></symbol>
+      <symbol id="i-android" viewBox="0 0 24 24"><path d="M5 16V11a7 7 0 0 1 14 0v5Z" /><path d="M8 5 6.5 2.8M16 5l1.5-2.2" /><path d="M9 10h.01M15 10h.01" /><path d="M5 16h14v1.5a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2Z" /></symbol>
+      <symbol id="i-github" viewBox="0 0 24 24"><path d="M9 19c-4 1.3-4-2-5.6-2.5M14.6 21v-3.3a2.9 2.9 0 0 0-.8-2.2c2.7-.3 5.6-1.3 5.6-6a4.6 4.6 0 0 0-1.3-3.2 4.3 4.3 0 0 0-.1-3.2s-1-.3-3.4 1.3a11.6 11.6 0 0 0-6 0C6.5 2.8 5.5 3.1 5.5 3.1a4.3 4.3 0 0 0-.1 3.2A4.6 4.6 0 0 0 4 9.5c0 4.6 2.9 5.7 5.6 6a2.9 2.9 0 0 0-.8 2.2V21" /></symbol>
+      <symbol id="i-coffee" viewBox="0 0 24 24"><path d="M4.5 9.5h12v5a5 5 0 0 1-5 5h-2a5 5 0 0 1-5-5Z" /><path d="M16.5 11h1a2.5 2.5 0 0 1 0 5h-1.3" /><path d="M8.5 3.5v2.5M12.5 3.5v2.5" /></symbol>
+      <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M4 12h15M13.5 6.5 19 12l-5.5 5.5" /></symbol>
+    </svg>
+
+    <a class="skip-link" href="#main">Skip to content</a>
+
+    <header class="site-header">
+      <div class="wrap header-row">
+        <a class="brand" href="../../../">
+          <img src="../../../assets/img/brand/vicu-64.png" alt="" width="32" height="32" />
+          <span>Vicu</span>
+        </a>
+        <nav class="nav" aria-label="Site">
+          <a href="../../../">Home</a>
+          <a href="../../">Guide</a>
+          <a href="../../pro/">Vicu Pro</a>
+          <a href="../../../#download">Download</a>
+        </nav>
+        <div class="header-actions">
+          <button class="icon-btn g-menu-toggle" type="button" aria-controls="g-sidebar" aria-expanded="false" aria-label="Guide contents">
+            <svg aria-hidden="true"><use href="#i-sections" /></svg>
+          </button>
+          <button class="icon-btn theme-toggle" type="button" aria-label="Switch between light and dark">
+            <svg class="icon-moon" aria-hidden="true"><use href="#i-moon" /></svg>
+            <svg class="icon-sun" aria-hidden="true"><use href="#i-sun" /></svg>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <div class="wrap g-layout">
+      <aside class="g-sidebar" id="g-sidebar" aria-label="Guide contents">
+        <form class="g-search" role="search" onsubmit="return false">
+          <label class="visually-hidden" for="g-search-input">Search the guide</label>
+          <svg aria-hidden="true"><use href="#i-search" /></svg>
+          <input id="g-search-input" type="search" placeholder="Search the guide" autocomplete="off" aria-describedby="g-search-hint" />
+          <span id="g-search-hint" class="visually-hidden">Results show below as you type.</span>
+        </form>
+        <ul class="g-search-results" id="g-search-results" aria-live="polite" hidden></ul>
+        <nav class="g-nav" aria-label="Guide pages"><details class="g-nav-section"><summary>Start here</summary><ul><li><a href="../../">Guide home</a></li><li><a href="../../getting-started/">Get started</a></li><li><a href="../../basics/">How Vicu is organized</a></li></ul></details><details class="g-nav-section"><summary>Everyday Vicu</summary><ul><li><a href="../../capture/">Add tasks</a></li><li><a href="../../tasks/">Work with tasks</a></li><li><a href="../../lists/">Smart lists</a></li><li><a href="../../projects/">Projects and labels</a></li><li><a href="../../custom-lists/">Custom lists</a></li><li><a href="../../work-and-personal/">Work and Personal</a></li><li><a href="../../routines/">Routines</a></li><li><a href="../../review/">Review and organizing</a></li><li><a href="../../collaboration/">Collaboration</a></li><li><a href="../../assistant/">The assistant</a></li></ul></details><details class="g-nav-section"><summary>Your devices</summary><ul><li><a href="../../desktop/">On the desktop</a></li><li><a href="../../phone/">On your phone</a></li><li><a href="../../web/">In a browser</a></li><li><a href="../../sync/">Sync and offline</a></li><li><a href="../../settings/">Settings</a></li></ul></details><details class="g-nav-section" open><summary>Vicu Pro</summary><ul><li><a href="../../pro/">What Pro is</a></li><li><a href="../../pro/available/">Know what you can do now</a></li><li><a href="../../pro/promises/">Promises and people</a></li><li><a href="../../pro/groups/" aria-current="page">Groups and sessions</a></li><li><a href="../../pro/plans/">90-day plans</a></li><li><a href="../../pro/portfolio/">Portfolio</a></li><li><a href="../../pro/power/">Power tools</a></li><li><a href="../../plan/">Plan your day</a></li><li><a href="../../calendars/">Events and calendars</a></li></ul></details><details class="g-nav-section"><summary>Reference</summary><ul><li><a href="../../quick-add/">Quick add</a></li><li><a href="../../shortcuts/">Keyboard shortcuts</a></li><li><a href="../../faq/">Troubleshooting and FAQ</a></li><li><a href="../../glossary/">Glossary</a></li></ul></details></nav>
+      </aside>
+
+      <main id="main" class="g-main">
+        <article class="g-article">
+          <nav class="g-crumbs" aria-label="Breadcrumb"><a href="../../">Guide</a> <span aria-hidden="true">/</span> <span>Vicu Pro</span></nav>
+          <h1 class="g-title">Groups, sessions and follow-ups</h1>
+          <p class="g-lead">Most of a plan is carried out in a few recurring meetings. A group keeps one meeting's actions, issues and decisions together, a session takes you through them, and Follow-ups tells you what needs a move from you in between.</p>
+          <details class="g-toc-inline"><summary>On this page</summary><ul><li><a href="#in-short">In short</a></li><li><a href="#make-a-group">Make a group</a></li><li><a href="#add-an-action">Add an action</a></li><li><a href="#read-the-groups-page">Read the group's page</a></li><li><a href="#run-a-session">Run a session</a></li><li><a href="#send-the-recap">Send the recap</a></li><li><a href="#work-through-follow-ups">Work through Follow-ups</a></li><li><a href="#write-the-weekly-note">Write the weekly note</a></li><li><a href="#details">Details</a></li><li><a href="#related">Related</a></li></ul></details>
+          <div class="g-content">
+<h2 id="in-short"><a class="g-anchor" href="#in-short" aria-hidden="true" tabindex="-1">#</a>In short</h2>
+<ul><li><strong>A group</strong> is the people who agree actions together: a leadership team, a project team. A task with the group's label is one of its <strong>actions</strong>.</li><li><strong>The group's page</strong> shows every action by owner and by where it stands since the last meeting, and a line of plain counts: how many were delivered on time, how many late. Below are the group's issues, blockers, commitments, decisions and open questions.</li><li><strong>A session</strong> is one meeting of the group. It walks through the actions that need a verdict, the issues, what is new, and a read-back. Ending it gives you a <strong>recap</strong> to copy. <span class="g-badge g-badge--desktop"><svg aria-hidden="true"><use href="#i-monitor" /></svg>Desktop</span></li><li><strong>Follow-ups</strong> at the top of Today lists what needs a move from you: verdicts due, a check with someone before their action is due, a recap you have not sent, the weekly note.</li><li><strong>Text you copy</strong> (agenda, recap, check message, weekly note) is written for the reader, in the language you chose for the group. Paste it into a mail or a chat.</li></ul>
+<aside class="g-callout g-callout--pro"><p class="g-callout-title">Pro</p><p>This page is part of <a href="../../pro/">Vicu Pro</a> and builds on <a href="../../pro/promises/">Promises and people</a>. Turn on Pro and the part <strong>Promises and people</strong> in <strong>Settings, Pro</strong>.</p></aside>
+<h2 id="make-a-group"><a class="g-anchor" href="#make-a-group" aria-hidden="true" tabindex="-1">#</a>Make a group <span class="g-badge g-badge--desktop"><svg aria-hidden="true"><use href="#i-monitor" /></svg>Desktop</span></h2>
+<ol><li>Open <strong>People</strong> and choose <strong>New group</strong>, or choose <strong>New group</strong> under Pro in the sidebar.</li><li>Give it a name, and choose its label: a new label with that name, or one you already have.</li><li>Add the people, in the order they report in the meeting.</li><li>Tick the sessions the group holds: <strong>weekly</strong>, <strong>stand-up</strong>, or both.</li><li>Choose <strong>Save</strong>.</li></ol>
+<p>The group appears under Pro in the sidebar. A meeting you already made can become a group: open it and choose <strong>Make this a group</strong>.</p>
+<p>Two more choices are in the same window. <strong>Check actions before they are due</strong> adds a line to Follow-ups a few working days before an action's date. <strong>Language of copied text</strong> sets the language of the agenda, the recap and the check messages for this group.</p>
+<p><strong>No longer a group</strong> takes the mark off. The label and its tasks stay as they are.</p>
+<h2 id="add-an-action"><a class="g-anchor" href="#add-an-action" aria-hidden="true" tabindex="-1">#</a>Add an action <span class="g-badge g-badge--desktop"><svg aria-hidden="true"><use href="#i-monitor" /></svg>Desktop</span> <span class="g-badge g-badge--phone"><svg aria-hidden="true"><use href="#i-phone" /></svg>Phone</span></h2>
+<p>An action is a task with the group's label. On the group's page, <strong>New task</strong> adds the label for you. Anywhere else, add the label yourself.</p>
+<div class="g-table"><table><thead><tr><th scope="col">You type</th><th scope="col">You get</th></tr></thead><tbody><tr><th scope="row"><code>$Jan site list friday @leadership</code></th><td>Jan's action for the group, due Friday</td></tr><tr><th scope="row"><code>$Jan site list friday for $Priya</code></th><td>Jan's action, promised to Priya</td></tr><tr><th scope="row"><code>$Jan site list friday check on wednesday</code></th><td>The same, and a line in Follow-ups on Wednesday to look at it</td></tr><tr><th scope="row"><code>Draft the on-call rota @leadership</code></th><td>An action without an owner yet</td></tr></tbody></table></div>
+<p><code>@leadership</code> is the label in the default style; in Vikunja style it is <code>*leadership</code> (see <a href="../../quick-add/">Quick add syntax</a>).</p>
+<p>An action has one owner. The owner is the person who promised it; <strong>I own this</strong> on an action without an owner makes it yours. To give it to someone later, open the task and use <strong>Promise</strong>.</p>
+<p>Who an action was promised to shows on its row: "From Jan, for Leadership team", "From Jan, for Priya". You give the verdicts on every action you track, whoever it was promised to.</p>
+<h2 id="read-the-groups-page"><a class="g-anchor" href="#read-the-groups-page" aria-hidden="true" tabindex="-1">#</a>Read the group's page <span class="g-badge g-badge--desktop"><svg aria-hidden="true"><use href="#i-monitor" /></svg>Desktop</span> <span class="g-badge g-badge--phone"><svg aria-hidden="true"><use href="#i-phone" /></svg>Phone</span></h2>
+<p>The actions are in parts, and in each part by owner:</p>
+<ul><li><strong>Overdue since the last session</strong>: due before the last meeting and still open.</li><li><strong>Due now</strong>: due today or earlier.</li><li><strong>New since the last session</strong>.</li><li><strong>Open</strong>: everything else.</li><li><strong>Yours</strong>: your own actions for the group.</li><li><strong>Done since the last session</strong>.</li></ul>
+<p>Above them is one line such as "Last 4 sessions: 9 of 12 on time, 2 late, 1 open past their date." It counts what happened and is never a score of a person.</p>
+<p>Below the actions are short lists. Each is one line per entry, with no owner and no date: who does what is an action.</p>
+<ul><li><strong>Issues</strong>: things to solve, not to do. They are ranked; move one up or down, and tick it when it is solved. An action that is missed a second time is added here by itself.</li><li><strong>Blockers</strong>: what is in the way and the group has to get moved. <strong>Out of the way</strong> closes one.</li><li><strong>Commitments</strong>: what the group as a whole said it will reach. <strong>Close</strong> one when it is met or let go.</li><li><strong>Decisions</strong>, with the day and who decided.</li><li><strong>Stopped</strong>: what the group agreed to stop doing, so it stays said. <strong>Close</strong> one when it no longer needs saying.</li><li><strong>Open questions</strong>, to tick when they are answered.</li></ul>
+<p>A group's <a href="../../pro/plans/">90-day plans</a> are listed on its page too.</p>
+<h2 id="run-a-session"><a class="g-anchor" href="#run-a-session" aria-hidden="true" tabindex="-1">#</a>Run a session <span class="g-badge g-badge--desktop"><svg aria-hidden="true"><use href="#i-monitor" /></svg>Desktop</span></h2>
+<p>On the group's page choose <strong>Start weekly</strong> or <strong>Start stand-up</strong>, then <strong>Start session</strong>. Nothing is timed.</p>
+<ol><li><strong>Actions.</strong> The actions that need a verdict come first, by owner. Click the person's mark on a row, or press 1 to 5, to say what happened: Delivered, Late, Not yet, New date or Dropped. A stand-up shows only what is due this week. Mark who is not here.</li><li><strong>Issues</strong> (weekly only). Add issues, rank them, tick the ones you solved, or make an action of one. Blockers are here too: add what is in the way, close what is not any more.</li><li><strong>New actions and decisions.</strong> Type new actions as people commit to them; add what was decided, what the group committed to, what it stops doing, and questions nobody could answer.</li><li><strong>Read back.</strong> The decisions and new actions of this session, to read aloud before you close, so everyone leaves with the same list. Tick <strong>Read back to the room</strong> when you did. You can give the session a score from 1 to 10 for yourself; it is never copied.</li></ol>
+<p><strong>End session</strong> writes the session and opens its recap. <strong>Leave without saving</strong> drops the session; verdicts and tasks you already added stay.</p>
+<aside class="g-callout g-callout--tip"><p class="g-callout-title">Tip</p><p>Before the meeting, <strong>Copy weekly agenda</strong> on the group's page gives you the actions due, the other open actions, the open issues and the open blockers as text to send round.</p></aside>
+<h2 id="send-the-recap"><a class="g-anchor" href="#send-the-recap" aria-hidden="true" tabindex="-1">#</a>Send the recap <span class="g-badge g-badge--desktop"><svg aria-hidden="true"><use href="#i-monitor" /></svg>Desktop</span></h2>
+<p>The recap holds this session only: decisions, commitments, what was stopped, new actions, what was delivered, what changed, issues solved, open issues, blockers, open questions, and who was absent.</p>
+<ol><li>Check the text. Change <strong>Language</strong> if this one should go out in another language.</li><li>Choose <strong>Copy</strong> for formatted text (mail, Teams, Word) or <strong>Copy as Markdown</strong>.</li><li>Paste it where the group reads it.</li></ol>
+<p>Copying marks the actions in the recap as sent and the decisions as shared; <strong>Undo</strong> on the message takes that back. Choose <strong>Later</strong> to do it another time: the recap waits in Follow-ups for two weeks.</p>
+<h2 id="work-through-follow-ups"><a class="g-anchor" href="#work-through-follow-ups" aria-hidden="true" tabindex="-1">#</a>Work through Follow-ups <span class="g-badge g-badge--desktop"><svg aria-hidden="true"><use href="#i-monitor" /></svg>Desktop</span> <span class="g-badge g-badge--phone"><svg aria-hidden="true"><use href="#i-phone" /></svg>Phone</span></h2>
+<p><strong>Follow-ups</strong> is at the top of Today while something needs you. In order:</p>
+<ul><li><strong>Verdicts due.</strong> A promise whose date has come: give the verdict on the row.</li><li><strong>Checks.</strong> A few working days before someone's actions are due, one line per person. <strong>Copy message</strong> gives you a short note ("Hi Jan, checking one thing: ...") to paste into a chat, and marks the actions as checked.</li><li><strong>Look at.</strong> A date you set with <code>check on</code> or <strong>Check on</strong> in the task's Promise. <strong>Checked</strong> clears it.</li><li><strong>Recap not copied</strong>, for a session you ended without sending its recap. <span class="g-badge g-badge--desktop"><svg aria-hidden="true"><use href="#i-monitor" /></svg>Desktop</span></li><li><strong>The weekly note is due</strong>, on the day you chose. <span class="g-badge g-badge--desktop"><svg aria-hidden="true"><use href="#i-monitor" /></svg>Desktop</span></li></ul>
+<p><strong>Dismiss for today</strong> hides a line until tomorrow, on this device. Follow-ups never sends a notification.</p>
+<p>How many working days before the date a check appears, which days are working days, and the note's day are in <strong>Settings, Pro, Follow-ups</strong>. A group can turn its checks off, and a single action can: open it, choose <strong>Promise</strong> and tick <strong>No check before due</strong>.</p>
+<h2 id="write-the-weekly-note"><a class="g-anchor" href="#write-the-weekly-note" aria-hidden="true" tabindex="-1">#</a>Write the weekly note <span class="g-badge g-badge--desktop"><svg aria-hidden="true"><use href="#i-monitor" /></svg>Desktop</span></h2>
+<p>The weekly note is a short status for the people above you: per group, how many actions were delivered on time and late, each date that slipped and why, what was decided, the open issues and blockers, and what is due next week.</p>
+<ol><li>Open the command palette and choose <strong>Weekly note</strong>, or choose <strong>Write it</strong> in Follow-ups.</li><li>Read it, change the language if needed, and choose <strong>Copy</strong> or <strong>Copy as Markdown</strong>.</li></ol>
+<p>The next note starts the day after this one was copied. It is a draft for you to edit before you send it: add the two sentences only you can write.</p>
+<h2 id="details"><a class="g-anchor" href="#details" aria-hidden="true" tabindex="-1">#</a>Details</h2>
+<ul><li><strong>Where it is stored.</strong> A group is a meeting in Pro's hidden record on your server, with the label's id. Sessions, issues and decisions are in the same record. Actions are ordinary tasks with the label, so a device or app without Pro still sees them.</li><li><strong>Older history moves out of the way.</strong> Records of a group older than 90 days move to Pro's archive; the counts and the pages read the last sessions.</li><li><strong>Languages.</strong> The text for other people comes from Vicu's translations. A sentence that is not translated yet is written in English. See <a href="https://github.com/rendyhd/Vicu/blob/main/docs/translating.md">translating Vicu</a>.</li><li><strong>On the phone.</strong> <span class="g-badge g-badge--phone"><svg aria-hidden="true"><use href="#i-phone" /></svg>Phone</span> The phone has <strong>Follow-ups</strong> in the drawer and the group's page (from <strong>People</strong>, or a group label's menu), with verdicts. Groups are made on the desktop or the web, and sessions, the recap and the weekly note are there too; the phone says so on those lines. A check message shared from the phone is written in the language the phone shows Vicu in.</li><li><strong>Turning Promises and people off</strong> hides groups, sessions and Follow-ups. The labels, the tasks and the record stay.</li></ul>
+<h2 id="related"><a class="g-anchor" href="#related" aria-hidden="true" tabindex="-1">#</a>Related</h2>
+<ul><li><a href="../../pro/promises/">Promises and people</a></li><li><a href="../../pro/plans/">90-day plans</a></li><li><a href="../../pro/portfolio/">Portfolio</a></li><li><a href="../../quick-add/">Quick add syntax</a></li><li><a href="../../pro/">What Pro is</a></li></ul>
+          </div>
+          <nav class="g-pager" aria-label="Previous and next page"><a class="g-pager-prev" href="../../pro/promises/"><span>Previous</span>Promises and people</a><a class="g-pager-next" href="../../pro/plans/"><span>Next</span>90-day plans</a></nav>
+          <p class="g-edit"><a href="https://github.com/rendyhd/Vicu/blob/main/docs/guide/pro/groups.md">Suggest a change to this page</a></p>
+        </article>
+        <nav class="g-toc" aria-label="On this page"><p>On this page</p><ul><li class="g-toc-2"><a href="#in-short">In short</a></li><li class="g-toc-2"><a href="#make-a-group">Make a group</a></li><li class="g-toc-2"><a href="#add-an-action">Add an action</a></li><li class="g-toc-2"><a href="#read-the-groups-page">Read the group's page</a></li><li class="g-toc-2"><a href="#run-a-session">Run a session</a></li><li class="g-toc-2"><a href="#send-the-recap">Send the recap</a></li><li class="g-toc-2"><a href="#work-through-follow-ups">Work through Follow-ups</a></li><li class="g-toc-2"><a href="#write-the-weekly-note">Write the weekly note</a></li><li class="g-toc-2"><a href="#details">Details</a></li><li class="g-toc-2"><a href="#related">Related</a></li></ul></nav>
+      </main>
+    </div>
+
+    <footer class="site-footer">
+      <div class="wrap footer-row">
+        <a class="brand" href="../../../"><img src="../../../assets/img/brand/vicu-64.png" alt="" width="28" height="28" /><span>Vicu</span></a>
+        <nav class="footer-links" aria-label="Footer">
+          <a href="https://github.com/rendyhd/Vicu">Desktop on GitHub</a>
+          <a href="https://github.com/rendyhd/Vicu-Mobile">Mobile on GitHub</a>
+          <a href="https://github.com/rendyhd/Vicu/releases">Release notes</a>
+          <a href="https://github.com/rendyhd/Vicu-Mobile/blob/main/docs/privacy-policy.md">Privacy</a>
+          <a href="https://ko-fi.com/rendyhd">Support on Ko-fi</a>
+        </nav>
+        <p>MIT licensed. Vicu is an independent app, not made by the Vikunja team. Screens show made-up tasks.</p>
+      </div>
+    </footer>
+  </body>
+</html>

@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
+import { t as translate } from '../../shared/i18n'
 import { useTasks } from '@/hooks/use-tasks'
 import { useProjects } from '@/hooks/use-projects'
 import { useFilters } from '@/hooks/use-filters'
@@ -15,6 +17,11 @@ import { formatDateDisplay, type DateFormat } from '@/lib/date-display'
 import { api } from '@/lib/api'
 import type { Task } from '@/lib/vikunja-types'
 import { ListSkeleton } from '@/components/shared/ListSkeleton'
+import { TaskRowGroup } from '@/components/task-list/TaskRowGroup'
+import { TaskRow } from '@/components/task-list/TaskRow'
+import { OPEN_TASKS_PARAMS, useAvailability } from '@/hooks/use-availability'
+import { useParkedFilter } from '@/hooks/use-parked'
+import { dateOnlyStart, startsEntries } from '../../shared/pro/start-dates'
 
 function formatDateHeader(dateStr: string, fmt: DateFormat): string {
   return formatDateDisplay('header.day', new Date(dateStr), new Date(), true, fmt)
@@ -32,7 +39,7 @@ function groupByProject(tasks: Task[], projectsFlat?: { id: number; title: strin
     if (!activeIds.has(pid)) continue
     if (!byProject.has(pid)) {
       byProject.set(pid, {
-        name: projectsFlat?.find((p) => p.id === pid)?.title ?? 'Unknown Project',
+        name: projectsFlat?.find((p) => p.id === pid)?.title ?? translate('views.unknownProject'),
         color: projectsFlat?.find((p) => p.id === pid)?.hex_color,
         tasks: [],
       })
@@ -46,15 +53,24 @@ interface DateGroup {
   key: string
   label: string
   tasks: Task[]
+  /** Pro (21.3): open tasks whose start date is this day. */
+  starts: Task[]
 }
 
 export function UpcomingView() {
+  const { t } = useTranslation()
   const params = useFilters({ view: 'upcoming' })
   // Recomputes the groups when the local day rolls over (Today / Tomorrow / weekday headings).
   const dayKey = useDayKey()
   const dateFormat = useDateFormat()
-  const { data: tasks = [], isLoading } = useTasks(params)
+  const { data: loadedTasks = [], isLoading } = useTasks(params, true, true)
+  // Pro (21.10): a parked initiative's tasks wait; off, every task.
+  const withoutParked = useParkedFilter()
+  const tasks = useMemo(() => withoutParked(loadedTasks), [withoutParked, loadedTasks])
   const { data: projects } = useProjects()
+  // Pro: the day a task starts is listed too (cross-app semantics 21.3). Off, nothing is fetched.
+  const proOn = useAvailability().on
+  const { data: openTasks = [] } = useTasks(OPEN_TASKS_PARAMS, proOn, true)
   const [inboxProjectId, setInboxProjectId] = useState<number | undefined>()
 
   useEffect(() => {
@@ -79,52 +95,75 @@ export function UpcomingView() {
           key,
           label: formatDateHeader(task.due_date, dateFormat),
           tasks: [],
+          starts: [],
         })
       }
       grouped.get(key)!.tasks.push(task)
     }
+    if (proOn) {
+      const byId = new Map(openTasks.map((task) => [task.id, task]))
+      for (const entry of startsEntries(openTasks, now)) {
+        const task = byId.get(entry.id)
+        if (!task || !activeIds.has(task.project_id)) continue
+        const group = grouped.get(entry.day) ?? { key: entry.day, label: formatDateHeader(dateOnlyStart(entry.day), dateFormat), tasks: [], starts: [] }
+        if (group.tasks.some((due) => due.id === task.id)) continue
+        group.starts.push(task)
+        grouped.set(entry.day, group)
+      }
+    }
     return Array.from(grouped.values()).sort((a, b) => a.key.localeCompare(b.key))
-  }, [tasks, projects?.flat, dayKey, dateFormat])
+  }, [tasks, projects?.flat, dayKey, dateFormat, proOn, openTasks])
 
   usePrintable(
     useMemo(
       () => ({
-        viewTitle: 'Upcoming',
+        viewTitle: t('views.upcoming.title'),
         sections: groups.map((g) => ({
           heading: g.label,
-          groups: groupByProject(g.tasks, projects?.flat).map((pg) => ({
-            heading: pg.name,
-            tasks: pg.tasks,
-          })),
+          groups: [
+            ...groupByProject(g.tasks, projects?.flat).map((pg) => ({
+              heading: pg.name,
+              tasks: pg.tasks,
+            })),
+            ...(g.starts.length > 0 ? [{ heading: t('views.upcoming.starts'), tasks: g.starts }] : []),
+          ],
         })),
       }),
-      [groups, projects?.flat]
+      [groups, projects?.flat, t]
     )
   )
 
   if (isLoading) {
-    return <ListSkeleton title="Upcoming" identity="upcoming" />
+    return <ListSkeleton title={t('views.upcoming.title')} identity="upcoming" />
   }
 
   return (
     <DueDateContextProvider value="row.inDayGroup">
       <TaskList
-        title="Upcoming"
+        title={t('views.upcoming.title')}
         identity="upcoming"
         tasks={[]}
         projectId={inboxProjectId}
         showNewTask={!!inboxProjectId && projects?.flat.some((project) => project.id === inboxProjectId)}
-        emptyTitle="Nothing upcoming"
-        emptySubtitle="Tasks with future due dates appear here"
+        emptyTitle={t('views.upcoming.emptyTitle')}
+        emptySubtitle={t('views.upcoming.emptySubtitle')}
       >
         {groups.map((group) => {
           const projectGroups = groupByProject(group.tasks, projects?.flat)
           return (
             <div key={group.key}>
-              <ListSectionHeader level={1} title={group.label} count={openCount(group.tasks)} />
+              <ListSectionHeader level={1} title={group.label} count={openCount(group.tasks) + group.starts.length} />
               {projectGroups.map((pg) => (
                 <ProjectTaskGroup key={pg.name} level={2} name={pg.name} color={pg.color} tasks={pg.tasks} />
               ))}
+              {group.starts.length > 0 && (
+                <div data-pro-starts>
+                  <ListSectionHeader level={2} title={t('views.upcoming.starts')} count={group.starts.length} />
+                  <TaskRowGroup>
+                    {group.starts.map((task) => <TaskRow key={`starts-${task.id}`} task={task} />)}
+                  </TaskRowGroup>
+                </div>
+              )}
             </div>
           )
         })}

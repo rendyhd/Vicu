@@ -3,6 +3,7 @@ import { spawn, execFile, type ChildProcess } from 'child_process'
 import { join } from 'path'
 import type { BrowserContext } from './browser-client'
 import { isMac, isWindows, isLinux } from './platform'
+import { OSASCRIPT_PATH, powershellPath } from './system-tools'
 import { decodeUtf8Chunks } from './response-body'
 
 export const BROWSER_PROCESSES = new Set(
@@ -64,7 +65,7 @@ function getBrowserUrlMacOS(appName: string): Promise<BrowserContext | null> {
       return
     }
 
-    execFile('osascript', ['-e', script], { timeout: 3000 }, (err, stdout) => {
+    execFile(OSASCRIPT_PATH, ['-e', script], { timeout: 3000 }, (err, stdout) => {
       if (err) { resolve(null); return }
       const line = stdout.trim()
       if (!line) { resolve(null); return }
@@ -104,7 +105,7 @@ export function getBrowserUrlFromWindow(processName: string, hwnd?: number): Pro
   return new Promise((resolve) => {
     try {
       const scriptPath = getScriptPath()
-      const child = spawn('powershell.exe', [
+      const child = spawn(powershellPath(), [
         '-NoProfile',
         '-NonInteractive',
         '-ExecutionPolicy', 'Bypass',
@@ -143,7 +144,7 @@ export function getBrowserUrlFromWindow(processName: string, hwnd?: number): Pro
 export function prewarmUrlReader(): void {
   if (!isWindows) return
   try {
-    prewarmProcess = spawn('powershell.exe', [
+    prewarmProcess = spawn(powershellPath(), [
       '-NoProfile',
       '-NonInteractive',
       '-Command',

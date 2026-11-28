@@ -11,7 +11,9 @@ import {
 import { useSelectionStore } from '@/stores/selection-store'
 import { confirmDelete } from '@/lib/confirm-bridge'
 import { copySelectedTitles, isTaskNestedInCurrentList } from '@/lib/task-selection'
-import { dueNextWeek, dueToday, dueTomorrow } from '@/lib/due-dates'
+import { addLocalDays, dueToday, isNoDueDate, nextWeekDay, toLocalDate, type LocalDate } from '@/lib/due-dates'
+import { dueOfWhenValue, whenValueOfDue, withDate } from '@/lib/when-logic'
+import { moveBy, type MoveStepId } from '../../shared/when-choices'
 import { NULL_DATE } from '@/lib/constants'
 import type { Task, Label } from '@/lib/vikunja-types'
 import { taskDescendants, unfinishedDescendants } from '@/lib/task-hierarchy'
@@ -48,14 +50,41 @@ export function useTaskActions(tasks: Task[], options: { returnFocusTo?: HTMLEle
 
   const setDueDateIso = useCallback((iso: string) => patch({ due_date: iso }), [patch])
 
-  const postponeTomorrow = useCallback(
-    () => patch({ due_date: dueTomorrow() }),
-    [patch]
+  /**
+   * Postpone to a day (cross-app semantics 23.3): each task gets that day and keeps its own time of
+   * day; a date-only or undated task becomes date-only.
+   */
+  const postponeToDay = useCallback(
+    (date: LocalDate) => {
+      tasks.forEach((t) => {
+        const due = dueOfWhenValue(withDate(whenValueOfDue(t.due_date), date))
+        if (due && due !== t.due_date) updateTask.mutate({ id: t.id, changes: { due_date: due }, original: t })
+      })
+    },
+    [tasks, updateTask]
   )
 
-  const postponeNextMonday = useCallback(
-    () => patch({ due_date: dueNextWeek() }),
-    [patch]
+  const postponeTomorrow = useCallback(
+    () => postponeToDay(addLocalDays(toLocalDate(new Date()), 1)),
+    [postponeToDay]
+  )
+
+  /** The Monday in next week, or the day the account's weeks start on (section 2.1). */
+  const postponeNextWeek = useCallback(
+    () => postponeToDay(nextWeekDay(toLocalDate(new Date()))),
+    [postponeToDay]
+  )
+
+  /** Move by a step (23.3): each task from its own due date; a task without one is left alone. */
+  const moveTasksBy = useCallback(
+    (step: MoveStepId) => {
+      const today = toLocalDate(new Date())
+      tasks.forEach((t) => {
+        if (isNoDueDate(t.due_date)) return
+        updateTask.mutate({ id: t.id, changes: { due_date: moveBy(t.due_date, step, today) }, original: t })
+      })
+    },
+    [tasks, updateTask]
   )
 
   const clearDate = useCallback(() => patch({ due_date: NULL_DATE }), [patch])
@@ -179,7 +208,8 @@ export function useTaskActions(tasks: Task[], options: { returnFocusTo?: HTMLEle
     setUrgentPriority,
     setDueDateIso,
     postponeTomorrow,
-    postponeNextMonday,
+    postponeNextWeek,
+    moveTasksBy,
     clearDate,
     setPriority,
     clearPriority,

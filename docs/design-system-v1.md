@@ -166,6 +166,37 @@ the status: overdue `status.overdue`, due today `status.today`, anything else `t
 A done row shows the check and a struck title. States: hover
 `bg.hover`, selected `bg.selected`, keyboard focus `focus.ring`.
 
+### 4.2 Events and calendar events
+
+Events and calendar events (`cross-app-semantics-v1.md` section 20) are on the Plan screen only. They
+must never read as tasks: no checkbox, no priority mark, and a striped surface instead of a block's
+flat tint.
+
+- **Colour.** Each calendar has one colour: your own Events `#12a594`, a connected calendar the one
+  chosen for it, by default the next of `#7c6cf2`, `#0a84ff`, `#30a46c`, `#e5484d`, `#f76b15`,
+  `#12a594`. These are fixed values on both themes, not roles, and they only tint, edge and mark: no
+  text is ever set in them.
+- **A timed event** on the timeline: a `bg.page` surface with diagonal stripes of the calendar
+  colour (135 degrees, 6 px each, at 16 % and 8 %), a `border` hairline, a 3 px left edge in the
+  calendar colour and the `control` radius. Line 1 is a calendar icon (12 px desktop, 14 dp Android)
+  in the calendar colour and the title (`meta`, weight 500, `text`); line 2 the time range, then
+  " · " and the place (`caption`, `text.secondary`). An event shorter than 40 px keeps line 2 for
+  screen readers only. Its name is the title, the range, the place, and "Tentative" or "Free" when
+  they apply.
+- **Tentative**: the hairline is dashed, and line 2 adds "Tentative".
+- **Free**: the stripes at 8 % and 4 % and the left edge at 60 %; the words keep their colours, and
+  line 2 adds "Free". Never fade the text: at 60 % it falls under 4.5:1.
+- **All day**: a chip in the day's top row, before the tasks: the calendar colour at 14 % with a
+  1 px border in the calendar colour, the `chip` radius, the calendar icon (12 px) and the title
+  (`caption`, `text`). On the 3 days and Week views a chip is at most 16 rem wide on desktop.
+- **Busy only** events read "Busy" or "Free" like any title.
+- **Contrast.** `text` and `text.secondary` keep 4.5:1 on `bg.page` under the strongest tint (16 %
+  of any calendar colour) in both themes; the stripes and the edge are decoration.
+- **Forced colours**: the hairline and the left edge become `CanvasText`, the icon follows the text
+  colour, and tentative and free keep their words, so nothing depends on the tint.
+- **States**: keyboard focus `focus.ring` inside the event. A read-only event shows no grab cursor
+  and no resize edges; your own Events have the block's.
+
 ## 5. Headers
 
 - Page title: `pageTitle` (desktop 26 px bold; Android 28 sp bold in a large top app bar that
@@ -268,7 +299,27 @@ Haptics follow the system touch feedback setting.
   `surfaceContainerLow` and, for priority, `surfaceContainer`. On `surfaceContainerHigh` and
   above, set text in `onSurface` or `onSurfaceVariant` instead.
 
-## 9. Files and tests
+## 9. Pro
+
+Pro (cross-app semantics section 21) uses the existing roles; it adds no token.
+
+- **Promise rows.** A promise of theirs shows the person's mark (a circle with their initials, the
+  avatar size of section 4) where the checkbox is, because it is not yours to tick; tapping it opens
+  the verdict buttons. Below the title: the effective due phrase, then the person's quote in
+  `text.secondary` italics when there is one, and an "In recap" mark (a chip in `accent` tint)
+  once it was sent. Your own promise keeps its checkbox and shows "For Jan" on the meta line.
+- **Verdict buttons** are text buttons in a row: Delivered, Late, Not yet, New date, Dropped, Ask
+  me tomorrow; keys 1 to 6 on desktop. Not yet opens a date and a blocker inline. Colour never
+  carries the meaning alone: each button has its word.
+- **Unavailable rows** (Remaining and All views) keep the normal row with the title in
+  `text.secondary` and one reason on the meta line ("Starts Mon 17 Nov", "After: Budget draft",
+  "Waiting", "On hold"); the first task of a sequential project shows a "Next" chip.
+- **Flags** are a filled flag icon in `accent-orange` after the title, with the accessible name
+  "Flagged".
+- **The Pro sidebar section** sits between the smart lists and the projects, with the same row
+  anatomy as smart lists.
+
+## 10. Files and tests
 
 | File | Role |
 |---|---|

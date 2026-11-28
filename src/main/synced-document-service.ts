@@ -1,4 +1,5 @@
-import { BrowserWindow } from 'electron'
+import { sendToAllWindows } from '@host/windows'
+import { t } from '../shared/i18n'
 import { createTask, deleteTask, fetchTaskById, updateTask } from './api-client'
 import type { ApiResult } from './api-result'
 import { OWNER_UNKNOWN_ERROR, forgetDeletedTask, rememberCreatedTask } from './carrier-service'
@@ -144,13 +145,9 @@ function looksOffline(message: string): boolean {
   return /offline|network|connect|timed?\s*out|ENOTFOUND|ECONN|ERR_/i.test(message)
 }
 
-function sendToWindows(send: (win: BrowserWindow) => void): void {
-  for (const win of BrowserWindow.getAllWindows()) {
-    if (win.isDestroyed()) continue
-    try {
-      send(win)
-    } catch { /* window may close between enumeration and send */ }
-  }
+function sendToWindows(send: (win: { webContents: { send(channel: string, ...args: unknown[]): void } }) => void): void {
+  // One stand-in window whose send reaches every window (see @host/windows).
+  send({ webContents: { send: sendToAllWindows } })
 }
 
 const sameServer = (config: AppConfig | null, url: string): boolean =>
@@ -260,7 +257,7 @@ export function createSyncedDocumentService<Doc>(options: SyncedDocumentOptions<
   async function runSync(): Promise<SyncedDocumentStatus> {
     let config = loadConfig()
     options.beforeChange?.(config)
-    if (!config) return setStatus({ state: 'error', message: 'Configuration not loaded' })
+    if (!config) return setStatus({ state: 'error', message: t('system.sync.configNotLoaded') })
     if (config.standalone_mode) return setStatus({ state: 'local_only' })
     if (!config.vikunja_url) return setStatus({ state: 'pending', message: messages.connect })
     const syncUrl = config.vikunja_url.replace(/\/+$/, '')

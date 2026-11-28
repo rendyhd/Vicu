@@ -115,6 +115,11 @@ const settingsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/settings',
   component: lazyRouteComponent(() => import('@/views/SettingsView'), 'SettingsView'),
+  // `section=calendars` opens Pro at the Plan settings' calendars (the Plan gear's Manage).
+  // `section=pro` opens the Pro tab (the palette's Pro settings); `section=assistant` the Assistant
+  // tab (the notes screen, when no model reads pictures).
+  validateSearch: (search: Record<string, unknown>): { section?: 'calendars' | 'pro' | 'assistant' } =>
+    search.section === 'calendars' ? { section: 'calendars' } : search.section === 'pro' ? { section: 'pro' } : search.section === 'assistant' ? { section: 'assistant' } : {},
 })
 
 const searchRoute = createRoute({
@@ -124,6 +129,67 @@ const searchRoute = createRoute({
   validateSearch: (search: Record<string, unknown>) => ({
     q: (search.q as string) || '',
   }),
+})
+
+// Pro (cross-app semantics 21): every page its own chunk, so Pro adds nothing to the first chunk.
+const flaggedRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/flagged',
+  component: lazyRouteComponent(() => import('@/views/pro/FlaggedView'), 'FlaggedView'),
+})
+
+const waitingOnRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/waiting-on',
+  component: lazyRouteComponent(() => import('@/views/pro/WaitingOnView'), 'WaitingOnView'),
+})
+
+const peopleRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/people',
+  component: lazyRouteComponent(() => import('@/views/pro/PeopleView'), 'PeopleView'),
+})
+
+const personRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/person/$labelId',
+  component: lazyRouteComponent(() => import('@/views/pro/PersonView'), 'PersonView'),
+})
+
+const meetingRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/meeting/$meetingId',
+  component: lazyRouteComponent(() => import('@/views/pro/MeetingView'), 'MeetingView'),
+})
+
+const groupRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/group/$labelId',
+  component: lazyRouteComponent(() => import('@/views/pro/GroupView'), 'GroupView'),
+})
+
+const sessionRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/session/$meetingId/$kind',
+  component: lazyRouteComponent(() => import('@/views/pro/SessionView'), 'SessionView'),
+})
+
+const projectPlanRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/project-plan/$projectId',
+  component: lazyRouteComponent(() => import('@/views/pro/ProjectPlanView'), 'ProjectPlanView'),
+})
+
+const portfolioRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/portfolio',
+  component: lazyRouteComponent(() => import('@/views/pro/PortfolioView'), 'PortfolioView'),
+})
+
+const sponsorRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/sponsor',
+  component: lazyRouteComponent(() => import('@/views/pro/SponsorView'), 'SponsorView'),
 })
 
 const routeTree = rootRoute.addChildren([
@@ -143,6 +209,16 @@ const routeTree = rootRoute.addChildren([
   customListRoute,
   settingsRoute,
   searchRoute,
+  flaggedRoute,
+  waitingOnRoute,
+  peopleRoute,
+  personRoute,
+  meetingRoute,
+  groupRoute,
+  sessionRoute,
+  projectPlanRoute,
+  portfolioRoute,
+  sponsorRoute,
 ])
 
 // Use hash history for Electron compatibility (file:// URLs don't support browser history)

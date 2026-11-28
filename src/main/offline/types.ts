@@ -46,6 +46,19 @@ export interface UpdateAction extends ActionBase {
   taskId: number
   /** A `TaskPatch`: complete = `{ done }`, schedule = `{ due_date }`, clear date = `{ due_date: null }`. */
   patch: Record<string, unknown>
+  /**
+   * Set with `patch.done === true` when the app held the task as repeating: the due date it completed
+   * (`null` for none). The replay reads the task first and sends the completion only when the server
+   * still holds that occurrence (cross-app semantics 7.5). Missing: sent as before.
+   */
+  completedDue?: string | null
+  /**
+   * Set while `patch` holds `description` and the edit knew the description it started from (the
+   * base, as the server stored it). The replay reads the task first and keeps both versions when the
+   * server's notes changed since (description format, "Notes changed in two places"). When edits fold
+   * into one action the first base stays. Missing: sent as it is.
+   */
+  baseDescription?: string
 }
 
 export interface DeleteAction extends ActionBase {
@@ -129,6 +142,25 @@ export interface DeleteCommentAction extends ActionBase {
 
 export type CommentAction = CreateCommentAction | UpdateCommentAction | DeleteCommentAction
 
+/**
+ * A relation between two tasks, Pro's "after" (`blocked`, cross-app semantics 21.2 and decision 24).
+ * Either id may be a temp id of a create still in the queue; the replay rewrites both.
+ */
+export interface AddRelationAction extends ActionBase {
+  type: 'add-relation'
+  taskId: number
+  otherTaskId: number
+  /** Vikunja's relation kind, such as `blocked`. */
+  kind: string
+}
+
+export interface RemoveRelationAction extends ActionBase {
+  type: 'remove-relation'
+  taskId: number
+  otherTaskId: number
+  kind: string
+}
+
 export type QueuedAction =
   | CreateAction
   | UpdateAction
@@ -141,6 +173,8 @@ export type QueuedAction =
   | CreateCommentAction
   | UpdateCommentAction
   | DeleteCommentAction
+  | AddRelationAction
+  | RemoveRelationAction
 
 export type DependentAction = Exclude<QueuedAction, CreateAction>
 

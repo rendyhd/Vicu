@@ -146,14 +146,15 @@ When [Pro](guide:pro) is on, a few more words are read. With Pro off they stay i
 
 | You type | What you get |
 |---|---|
-| `Jan: send the deck friday` | A promise from Jan to you. Jan must be someone you marked as a person. |
-| `for Jan: review the budget` | Your promise to Jan |
+| `$Jan send the deck friday` | A promise from Jan to you. Typing `$` suggests your people; a new name becomes a person when you save. |
+| `for $Jan review the budget` | Your promise to Jan |
+| `Jan: send the deck friday` | A promise from Jan to you, at the very start of the title. Jan must already be a person. |
 | `starts monday` | A start date. The task stays out of Available until then. |
 | `~30m`, `~1h30`, `~45min` | An estimate of 30 minutes, 1 hour 30 minutes or 45 minutes |
 | `!flag` | Flags the task |
 | `req: can you add a report` | Marks a request for triage. The triage tools are on the desktop. |
 
-Names for people are matched by their name, a name they go by, or an unambiguous first name. An unknown or ambiguous name stays in the title. See [Promises and people](guide:pro/promises).
+Names for people are matched by their name, a name they go by, or an unambiguous first name. An ambiguous name stays in the title; an unknown name after `$` makes a new person, while after `Jan:` it stays in the title. `$` works in both syntax styles; `$50` is not a person. See [Promises and people](guide:pro/promises).
 
 ## Examples
 

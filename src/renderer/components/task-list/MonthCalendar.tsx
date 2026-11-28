@@ -1,10 +1,13 @@
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { startOfLocalDay, type LocalDate } from '@/lib/due-dates'
 import { formatFullDateWithYear, formatMonthYear, formatWeekdayShort } from '@/lib/date-display'
 import { useDateFormat } from '@/hooks/use-date-format'
 import { addMonths, monthGrid, monthStart, moveGridFocus } from '@/lib/when-logic'
+import { useWeekStart } from '@/hooks/use-week-start'
+import { weekdaysOf } from '../../../shared/week-start'
+import { useTranslation } from 'react-i18next'
 
 interface MonthCalendarProps {
   /** The picked day, ringed in the accent fill. */
@@ -18,6 +21,18 @@ interface MonthCalendarProps {
   onPick: (date: LocalDate) => void
   /** A day that cannot be picked (a past day for a time block). */
   isDisabled?: (date: LocalDate) => boolean
+  /**
+   * For a calendar that shows something about each day (a routine's history): how the day's number
+   * is drawn, a small dot under it, and words read after the date. The picked day then stands on a
+   * soft ground and today is outlined, so neither hides the day's own mark.
+   */
+  dayMark?: (date: LocalDate, inMonth: boolean) => DayMark
+}
+
+export interface DayMark {
+  style?: CSSProperties
+  dot?: boolean
+  note?: string
 }
 
 const MONDAY = new Date(2026, 9, 5)
@@ -26,7 +41,8 @@ const MONDAY = new Date(2026, 9, 5)
  * A month of six Monday-first weeks (`monthGrid`, the same grid as Android's MonthCalendar) with the
  * month arrows and arrow-key movement. The When panel and the planner's day picker use it.
  */
-export function MonthCalendar({ selected, today, reveal, onPick, isDisabled }: MonthCalendarProps) {
+export function MonthCalendar({ selected, today, reveal, onPick, isDisabled, dayMark }: MonthCalendarProps) {
+  const { t } = useTranslation()
   const fmt = useDateFormat()
   const opening = reveal?.date ?? selected ?? today
   const [viewMonth, setViewMonth] = useState(() => monthStart(opening))
@@ -50,10 +66,12 @@ export function MonthCalendar({ selected, today, reveal, onPick, isDisabled }: M
     gridRef.current?.querySelector<HTMLElement>(`[data-date="${focusDate}"]`)?.focus()
   }, [focusDate, viewMonth])
 
-  const grid = useMemo(() => monthGrid(viewMonth), [viewMonth])
+  const weekStart = useWeekStart()
+  const grid = useMemo(() => monthGrid(viewMonth, weekStart), [viewMonth, weekStart])
+  // The column names in the order of the account's week (contract section 2.1).
   const weekdayNames = useMemo(
-    () => Array.from({ length: 7 }, (_, i) => formatWeekdayShort(new Date(MONDAY.getFullYear(), MONDAY.getMonth(), MONDAY.getDate() + i), fmt)),
-    [fmt],
+    () => weekdaysOf(weekStart).map((iso) => formatWeekdayShort(new Date(MONDAY.getFullYear(), MONDAY.getMonth(), MONDAY.getDate() + iso - 1), fmt)),
+    [fmt, weekStart],
   )
 
   const showDay = (date: LocalDate) => {
@@ -84,7 +102,7 @@ export function MonthCalendar({ selected, today, reveal, onPick, isDisabled }: M
         <div className="flex gap-0.5">
           <button
             type="button"
-            aria-label="Previous month"
+            aria-label={t('task.calendar.previousMonth')}
             onClick={() => shiftMonth(-1)}
             className="flex h-7 w-7 items-center justify-center rounded-control text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
           >
@@ -92,7 +110,7 @@ export function MonthCalendar({ selected, today, reveal, onPick, isDisabled }: M
           </button>
           <button
             type="button"
-            aria-label="Next month"
+            aria-label={t('task.calendar.nextMonth')}
             onClick={() => shiftMonth(1)}
             className="flex h-7 w-7 items-center justify-center rounded-control text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
           >
@@ -115,33 +133,48 @@ export function MonthCalendar({ selected, today, reveal, onPick, isDisabled }: M
               const isSelected = day.date === selected
               const isToday = day.date === today
               const disabled = isDisabled?.(day.date) === true
+              const mark = dayMark?.(day.date, day.inMonth)
+              const fullDate = formatFullDateWithYear(startOfLocalDay(day.date), fmt)
               return (
-                <div key={day.date} role="gridcell" aria-selected={isSelected} className="flex justify-center">
-                  <button
-                    type="button"
-                    data-date={day.date}
-                    tabIndex={day.date === focusDate ? 0 : -1}
-                    aria-label={formatFullDateWithYear(startOfLocalDay(day.date), fmt)}
-                    aria-current={isToday ? 'date' : undefined}
-                    aria-disabled={disabled || undefined}
-                    onClick={() => {
-                      setFocusDate(day.date)
-                      if (!disabled) onPick(day.date)
-                    }}
+                <div key={day.date} role="gridcell" aria-selected={isSelected} className={cn('flex justify-center', dayMark && 'py-0.5')}>
+                  <span
                     className={cn(
-                      'flex h-7 w-7 items-center justify-center rounded-full text-meta transition-colors',
-                      disabled && 'cursor-not-allowed opacity-50',
-                      isSelected
-                        ? 'bg-accent-fill text-on-accent'
-                        : cn(
-                            !disabled && 'hover:bg-[var(--bg-hover)]',
-                            day.inMonth ? 'text-[var(--text-primary)]' : 'text-[var(--text-secondary)]',
-                          ),
-                      isToday && 'ring-1 ring-inset ring-[var(--accent-blue)]',
+                      dayMark && 'flex h-9 w-9 items-center justify-center rounded-control',
+                      dayMark && isSelected && 'bg-[var(--bg-hover)]',
                     )}
                   >
-                    {Number(day.date.slice(8, 10))}
-                  </button>
+                    <button
+                      type="button"
+                      data-date={day.date}
+                      tabIndex={day.date === focusDate ? 0 : -1}
+                      aria-label={mark?.note ? `${fullDate}, ${mark.note}` : fullDate}
+                      aria-current={isToday ? 'date' : undefined}
+                      aria-disabled={disabled || undefined}
+                      onClick={() => {
+                        setFocusDate(day.date)
+                        if (!disabled) onPick(day.date)
+                      }}
+                      style={mark?.style}
+                      className={cn(
+                        'relative flex h-7 w-7 items-center justify-center rounded-full text-meta transition-colors',
+                        disabled && 'cursor-not-allowed opacity-50',
+                        dayMark
+                          ? cn('text-[var(--text-primary)]', isToday && 'outline outline-1 outline-offset-2 outline-[var(--text-primary)]')
+                          : cn(
+                              isSelected
+                                ? 'bg-accent-fill text-on-accent'
+                                : cn(
+                                    !disabled && 'hover:bg-[var(--bg-hover)]',
+                                    day.inMonth ? 'text-[var(--text-primary)]' : 'text-[var(--text-secondary)]',
+                                  ),
+                              isToday && 'ring-1 ring-inset ring-[var(--accent-blue)]',
+                            ),
+                      )}
+                    >
+                      {Number(day.date.slice(8, 10))}
+                      {mark?.dot && <span aria-hidden className="absolute -bottom-0.5 h-1 w-1 rounded-full bg-[var(--text-secondary)]" />}
+                    </button>
+                  </span>
                 </div>
               )
             })}

@@ -9,6 +9,7 @@ import { buildCreateExtras } from '@/lib/composer-queue'
 import { isTempTaskId } from '@/lib/pending-cache'
 import { voiceConfirmation, voiceTaskDraft, type VoiceListDefaults } from '@/lib/voice/voice-task'
 import { toast } from '@/stores/toast-store'
+import { t } from '../../shared/i18n'
 import type { Label } from '@/lib/vikunja-types'
 
 /**
@@ -64,7 +65,7 @@ export function useAddVoiceTask(): (text: string, list?: VoiceListDefaults | nul
           failed++
         }
       }
-      if (failed > 0) toast.error(failed === 1 ? 'The task was added, but a label could not be added.' : 'The task was added, but some labels could not be added.')
+      if (failed > 0) toast.error(failed === 1 ? t('voice.messages.labelFailed') : t('voice.messages.labelsFailed'))
     }
     toast.success(voiceConfirmation(draft, new Date(), dateFormat))
     return true

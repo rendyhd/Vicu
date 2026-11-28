@@ -14,8 +14,10 @@ contextBridge.exposeInMainWorld('quickViewApi', {
     ipcRenderer.invoke('qv:schedule-task-today', taskId, taskData),
   removeDueDate: (taskId: number | string, taskData: Record<string, unknown>) =>
     ipcRenderer.invoke('qv:remove-due-date', taskId, taskData),
-  updateTask: (taskId: number | string, patch: TaskPatch) =>
-    ipcRenderer.invoke('qv:update-task', taskId, patch),
+  // `baseDescription`: with a notes edit, the description the row was loaded with (description
+  // format, "Notes changed in two places").
+  updateTask: (taskId: number | string, patch: TaskPatch, baseDescription?: string) =>
+    ipcRenderer.invoke('qv:update-task', taskId, patch, baseDescription),
   openTaskInBrowser: (taskId: number) => ipcRenderer.invoke('qv:open-task-in-browser', taskId),
   openTaskInApp: (taskId: number) => ipcRenderer.invoke('qv:open-task-in-app', taskId),
   closeWindow: () => ipcRenderer.invoke('qv:close-window'),
@@ -26,6 +28,10 @@ contextBridge.exposeInMainWorld('quickViewApi', {
   getDateFormat: () => ipcRenderer.invoke('get-date-format'),
   onDateFormatChanged: (callback: (format: { locale: string; hour12: boolean }) => void) => {
     ipcRenderer.on('date-format-changed', (_event, format: { locale: string; hour12: boolean }) => callback(format))
+  },
+  getLanguage: () => ipcRenderer.invoke('get-language'),
+  onLanguageChanged: (callback: (info: { language: string; system: string }) => void) => {
+    ipcRenderer.on('language-changed', (_event, info: { language: string; system: string }) => callback(info))
   },
   onShowWindow: (callback: () => void) => {
     ipcRenderer.on('viewer-shown', () => callback())

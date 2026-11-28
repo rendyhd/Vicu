@@ -54,6 +54,8 @@ is the point: something has to give, and Vicu makes it a decision instead of a d
 
 To change the cap, open **Settings, Pro, Portfolio**: set **Active initiatives at most**, and record who
 you **Agreed with** and when. A cap is only useful when the person who sponsors your work agreed to it.
+If your work has no such limit, tick **No limit**: Portfolio then shows how many are active and never
+asks you to park one first.
 
 ### Park an initiative
 

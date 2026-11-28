@@ -1,5 +1,5 @@
-import { BrowserWindow } from 'electron'
-import { randomUUID } from 'crypto'
+import { sendToAllWindows } from '@host/windows'
+import { WHEN_DAYS_KEY, WHEN_MOVE_BY_KEY, WHEN_TIMES_KEY, readDays, readMoveBy, readTimes, writeTimes } from '../shared/when-choices'
 import { searchTasksAt } from './api-client'
 import { loadPrefsCarriers } from './carrier-service'
 import { loadConfig, saveConfig, type AppConfig } from './config'
@@ -11,7 +11,22 @@ import { createSyncedDocumentService, type SyncedDocumentCodec, type SyncedDocum
 import { PREFS_CARRIER_SEARCH, PREFS_CARRIER_TITLE, encodePrefsEnvelope, hasPrefsMarker, parsePrefsEnvelope } from './synced-prefs-protocol'
 import { canonicalJson, isOwnTask } from '../shared/hidden-tasks'
 import { TEMPLATE_KEY_PREFIX, readTemplate } from '../shared/task-templates'
+import { DEFAULT_WEEK_START, WEEK_START_KEY, readWeekStart, setWeekStart } from '../shared/week-start'
+import { EVENT_KEY_PREFIX, readPlanEvent } from '../shared/plan-events'
 import { readSubtaskOrder } from '../shared/subtask-order'
+import { PRO_AREA_KEY, readProArea } from '../shared/pro/settings'
+import { WORK_LABEL_KEY, isWorkProArea, isWritableWorkValue, workProjectIdOfKey } from '../shared/work-scope'
+import { readPlan } from '../shared/pro/project-plan'
+import {
+  LABEL_KIND_KEY_PREFIX,
+  LABEL_STATUS_KEY_PREFIX,
+  PROJECT_MODE_KEY_PREFIX,
+  PROJECT_PLAN_KEY_PREFIX,
+  PROJECT_STATUS_KEY_PREFIX,
+  REPEAT_RULE_KEY_PREFIX,
+  idOfProKey,
+  readRepeatRule,
+} from '../shared/pro/prefs'
 import {
   INBOX_PROJECT_ID_KEY,
   emptySyncedPrefs,
@@ -31,6 +46,7 @@ import {
   validateSyncedPrefs,
   readWeeklyReviewLast,
   WEEKLY_REVIEW_LAST_KEY,
+  PROJECTS_SHOW_DONE_KEY,
   PLANNER_DEFAULT_LENGTH_KEY,
   PLANNER_HOURS_KEY,
   ICON_NONE,
@@ -90,20 +106,27 @@ function applySyncedValues(config: AppConfig, document: SyncedPrefsDocument): vo
 let lastBroadcast: string | null = null
 let pendingAdoptedInbox: number | undefined
 
+/** A random id (the Web Crypto global, in Node, Electron and browsers alike). */
+const randomUUID = (): string => crypto.randomUUID()
+
 function sendToWindows(channel: string, payload: unknown): void {
-  for (const win of BrowserWindow.getAllWindows()) {
-    if (win.isDestroyed()) continue
-    try {
-      win.webContents.send(channel, payload)
-    } catch { /* window may close between enumeration and send */ }
-  }
+  sendToAllWindows(channel, payload)
 }
 
 function snapshotOf(config: AppConfig): SyncedPrefsSnapshot {
+  const values = syncedPrefValues(ensureState(config).document)
+  // The week helpers of this process follow the setting (section 2.1): the Quick View's lists.
+  setWeekStart(readWeekStart(values[WEEK_START_KEY]))
   return {
-    values: syncedPrefValues(ensureState(config).document),
+    values,
     inboxProjectId: config.inbox_project_id,
   }
+}
+
+/** Reads the account's week start into this process, at start: before any window asked for the preferences. */
+export function applyWeekStart(): void {
+  const config = loadConfig()
+  setWeekStart(config ? readWeekStart(syncedPrefValues(ensureState(config).document)[WEEK_START_KEY]) : DEFAULT_WEEK_START)
 }
 
 function rememberBaseline(config: AppConfig | null): void {
@@ -239,8 +262,16 @@ export function isWritablePref(key: unknown, value: unknown): key is string {
   // The planner's default length and work hours (section 16).
   if (key === PLANNER_DEFAULT_LENGTH_KEY) return value === null || (BLOCK_LENGTHS as readonly unknown[]).includes(value)
   if (key === PLANNER_HOURS_KEY) return value === null || canonicalJson(readPlannerHours(value)) === canonicalJson(value)
+  // The When choices (section 23): only a value that keeps the rules, in the form a device writes.
+  if (key === WHEN_TIMES_KEY) return value === null || (Array.isArray(value) && canonicalJson(writeTimes(readTimes(value))) === canonicalJson(value))
+  if (key === WHEN_DAYS_KEY) return value === null || (Array.isArray(value) && canonicalJson(readDays(value)) === canonicalJson(value))
+  if (key === WHEN_MOVE_BY_KEY) return value === null || (Array.isArray(value) && canonicalJson(readMoveBy(value)) === canonicalJson(value))
+  // The day weeks start on (section 2.1): Monday is the default, written as null.
+  if (key === WEEK_START_KEY) return value === null || value === 'sunday' || value === 'saturday'
   // The day the last weekly review was finished (section 14.7).
   if (key === WEEKLY_REVIEW_LAST_KEY) return value === null || readWeeklyReviewLast(value) !== null
+  // Completed tasks in a project (section 12.6): `true`, or null when turned off.
+  if (key === PROJECTS_SHOW_DONE_KEY) return value === null || value === true
   // A task's location reminder at a place a phone saved (section 11.7). The desktop never creates,
   // renames or deletes a place: that needs its position, which only the phone has.
   if (taskIdOfLocationReminderKey(key) !== null) {
@@ -260,6 +291,18 @@ export function isWritablePref(key: unknown, value: unknown): key is string {
   // A task template (section 18) and the order of a task's subtasks (section 19).
   if (key.startsWith(TEMPLATE_KEY_PREFIX) && key.length > TEMPLATE_KEY_PREFIX.length) return value === null || readTemplate(value) !== null
   if (/^subtask_order\.\d+$/.test(key)) return value === null || (Array.isArray(value) && readSubtaskOrder(value).length === value.length)
+  // An Event of the Plan screen (proof of concept, plan-events.ts).
+  if (key.startsWith(EVENT_KEY_PREFIX) && key.length > EVENT_KEY_PREFIX.length) return value === null || readPlanEvent(value) !== null
+  // Work and Personal (section 22): the work label and the projects that are work.
+  if (key === WORK_LABEL_KEY || workProjectIdOfKey(key) !== null) return isWritableWorkValue(key, value)
+  // Pro (section 21): the area, project types and statuses, label statuses and kinds, repeat rules.
+  if (key === PRO_AREA_KEY) return value === null || isWorkProArea(value) || (Array.isArray(value) && readProArea(value).length === value.length)
+  if (idOfProKey(key, PROJECT_MODE_KEY_PREFIX) !== null) return value === null || value === 'sequential' || value === 'single'
+  if (idOfProKey(key, PROJECT_STATUS_KEY_PREFIX) !== null || idOfProKey(key, LABEL_STATUS_KEY_PREFIX) !== null) return value === null || value === 'on_hold'
+  if (idOfProKey(key, LABEL_KIND_KEY_PREFIX) !== null) return value === null || value === 'person' || value === 'group' || value === 'private'
+  // A 90-day plan (contract 21.20): its two days, in order; other fields are kept as they are.
+  if (idOfProKey(key, PROJECT_PLAN_KEY_PREFIX) !== null) return value === null || readPlan(value) !== null
+  if (idOfProKey(key, REPEAT_RULE_KEY_PREFIX) !== null) return value === null || readRepeatRule(value) !== null
   return false
 }
 

@@ -1,0 +1,171 @@
+# Vicu Pro
+
+Pro is an optional set of tools for people who lead work with others: what you can do right now,
+what people promised you and what you promised them, the initiatives you are steering, and faster
+ways to work through a lot of tasks. It is free and built into Vicu. Everything it stores lives on
+your own Vikunja server, next to your tasks.
+
+Pro only adds. With Pro off, Vicu looks and behaves exactly as it did, and turning Pro off writes
+nothing: what Pro stored stays on your server, untouched, until you turn it on again. Another device
+or the Vikunja web app keeps Pro's data safe even where Pro is off.
+
+## Turning it on
+
+Settings, Pro. Turn on **Turn on Pro on this device**, then choose the parts you want. Each part works on its own:
+
+| Part | What it adds |
+|---|---|
+| **Know what you can do now** | Available, Remaining and All on your lists; start dates; "After" (wait for another task); sequential projects; projects and labels on hold; flags; Focus |
+| **Promises and people** | People, promises both ways, verdicts, Waiting on, the person page, recaps, meetings, import from Copilot |
+| **Portfolio** | Initiatives with a cap, ranking and parking; readiness; escalations; the Sponsor desk; request triage |
+| **Power tools** | Pro conditions and grouping in custom lists, the table, the inspector, estimates in Plan my day, the daily focus block, the weekly execution review, the quarterly impact |
+
+**Assistant help in Pro** (off by default) lets the assistant see Pro's data: Ask gets tools for
+promises, people and the portfolio, the import can convert plain notes, and a meeting card can
+draft promises from what was said. With it off, the assistant sees your tasks as before and none
+of Pro's data.
+
+## Know what you can do now
+
+- **Available, Remaining, All.** Lists show what you can act on now. A task is not available while
+  it starts later, waits on another task ("After"), is not the next step of a sequential project, or
+  sits in a project or under a label on hold. The row says why, and a line at the end says how many
+  are hidden, with Show.
+- **Start dates.** Type `starts monday` in quick add, or use Start on an open task. A task with a
+  start date is hidden from Available until that day. A time block is its own start.
+- **After.** On an open task, After picks the tasks it waits on.
+- **Project type and status.** In a project's menu: Parallel, Sequential (only the first open task
+  is available) or Single actions; Active or On hold.
+- **Flags.** `!flag` in quick add, Mod+Shift+F on a row, or the flag on an open task. Flagged lists
+  them all.
+- **Estimates.** `~30m` or `~1h30` in quick add, or Estimate on an open task.
+- **Focus** (Mod+Shift+O). Shows one area of your projects everywhere until you leave it.
+- **Repeat rules.** A repeating task can end after a number of times or on a date.
+
+## Promises and people
+
+- **People.** Right-click a label in the sidebar and choose This is a person. A person can have
+  other names they go by.
+- **Capture.** `$Jan send the deck friday` (anywhere in the title, suggestions after `$`) or
+  `Jan: send the deck friday` is Jan's promise to you; `for $Jan` or `for Jan:` makes it your promise
+  to Jan. A `$` name that is nobody yet becomes a person when you save (Quick Entry too). On a promise, the row shows the person instead of a checkbox, because it is
+  not yours to tick.
+- **Verdicts.** When a promise is due, give it a verdict: Delivered, Late, Not yet (with a date to
+  ask again), New date, or Dropped, or Ask me tomorrow. Keys 1 to 6 on the row. A promise the person
+  completed themselves asks once: delivered by them, or I did it. Promises due today are at the
+  top of Today. Undo works on every verdict.
+- **Waiting on** lists what others owe you, by person.
+- **The person page** has their open promises both ways, how the last 90 days went in plain words
+  (never a score), and a 1:1 agenda you can copy.
+- **Recap.** Copy what was agreed as text for mail or chat; the promises in it are marked as sent.
+- **Import** (Mod+Shift+M, or paste anywhere in a list or in Quick Entry). Copy the Copilot prompt
+  (Ask Copilot, on a person's page or in the command palette), run it in Microsoft 365 Copilot or another assistant on
+  your meeting notes or a mail thread, and paste its answer. Vicu shows every item with what it
+  will do; nothing is added until you choose Add. Mod+Shift+I stays the developer tools.
+- **Meetings.** On People, New meeting: a name, the people in their order and a rhythm. Start round
+  goes through the people one card at a time, in any order and without a timer (Enter next, S skip,
+  A absent); verdicts and new promises are written as they happen. End meeting writes the round and
+  opens its recap.
+
+## Groups, sessions and follow-ups
+
+For work that is agreed in a recurring meeting: a leadership team, a project team.
+
+- **Groups.** A group is the people who agree actions together. On People, New group (or the
+  sidebar's New group, or Make this a group on a meeting): a name, a label, the people in the order
+  they report, the sessions it holds (weekly, stand-up), and the language of text copied for it. A
+  task with the group's label is an action of the group. `$Jan site list friday @leadership` (`*leadership` in Vikunja style) is
+  Jan's action for the group; `$Jan site list for $Priya` says who it was promised to; `check on
+  wednesday` adds a day to look at it before it is due.
+- **The group's page** lists the actions by where they stand since the last session (overdue, due
+  now, new, open, yours, done) and by owner, with a line of counts over the last four sessions:
+  how many were delivered on time, late, and are open past their date. Counts, never a score. Below
+  are the group's issues (ranked), decisions and open questions.
+- **Sessions.** Start weekly or Start stand-up on the group's page. A session goes through its
+  steps without a timer: the actions that need a verdict, the issues (weekly), new actions and
+  decisions, and a read-back of what was decided to read aloud before you close. End session writes
+  it and opens a recap of that session only, to copy as formatted text or Markdown; copying marks
+  the actions in it as sent. Your own score for the session, if you give one, is never copied. An
+  action that is missed a second time is added to the group's issues.
+- **Follow-ups** at the top of Today is everything that needs a move from you, in order: verdicts
+  due, a check with each owner a few working days before their actions are due (with a message to
+  copy), dates you set to look at something again, recaps not copied yet, and the weekly note. Each
+  line can be dismissed for today. Nothing here is a notification.
+- **The weekly note** (command palette, or the weekly review's step) is per group what was
+  delivered, what slipped, what was decided and what is still open, to paste into a mail. Set its
+  day in Settings, Pro.
+- **Language.** Text copied for other people is written in the language chosen for the group, else
+  the default in Settings, Pro, whatever language you read Vicu in.
+- **Blockers, commitments and stops.** Three more lists on the group's page and in a session, next
+  to issues, decisions and open questions: what is in the way, what the group as a whole said it
+  will reach, and what it agreed to stop doing. One line each, no owner and no date, open until you
+  close it. The agenda, the recap and the weekly note name them.
+- **Phone.** The phone has Follow-ups and the group's page (read, with verdicts); groups are made
+  and sessions run on the desktop and the web. A check message shared from the phone is written in
+  the language the phone shows Vicu in.
+
+## 90-day plans and 1:1 topics
+
+- **90-day plans.** In a project's menu, 90-day plan: a start day, an end day (13 weeks unless you
+  change it) and, if you like, the group it belongs to. The project's tasks are the plan's items and
+  their subtasks the milestones; a milestone is a promise with one owner and a date. The plan's view
+  has a row per item and a column per week, and each cell counts what happened: due, delivered,
+  delivered late, moved to a new date, dropped. No status is filled in or worked out. Close plan can
+  carry the open items and milestones into a new project that is the next plan; the tasks move, so
+  their promises and history go with them. The phone shows a plan; plans are made and closed on the
+  desktop and the web.
+- **1:1 topics.** A task with a person's label and no promise is a topic for your next 1:1. The
+  person's page lists them under Topics, with a field to add one, and Copy agenda includes them. A
+  repeating task is a topic for every 1:1. Mark a label as a Private label (the label's menu) and
+  topics that carry it stay out of the agenda you copy.
+
+## Portfolio
+
+- **Initiatives.** In a project's menu, Initiative, Make this an initiative. The portfolio has a cap (four unless you
+  agree on another, or No limit in Settings, Pro), a rank you change with the arrows, and Park with a reason. A parked
+  initiative's tasks leave Today and Upcoming until you start it again.
+- **Readiness.** An initiative's panel (on its project page) has nine items: sponsor, owner, why,
+  what done looks like, the smallest next result, what you are not doing, who decides, capacity
+  agreed, and when to stop. Adding a task to an initiative that is not
+  ready asks first ("Log anyway") and counts it.
+- **Escalations.** A promise missed twice drafts an escalation for the sponsor. Put it on the agenda,
+  copy it, resolve it with what was decided, or dismiss it.
+- **Sponsor desk.** Escalations, decisions you are owed, initiatives without agreed capacity, and the
+  one-pager to copy or print.
+- **Requests.** `req:` in quick add, or Treat as request on a row, opens triage next to the ranked
+  portfolio: Accept into an initiative, Delegate, Decline (logged), or Ask the sponsor. The reply to
+  send back is copied.
+
+## Power tools
+
+- **Pro lists.** The list editor has a Pro section: Show (Available now, Remaining), Flagged,
+  Estimate at most, Project status, Promise, People, Group by and Rows show, with a live count of
+  the open tasks that match. On a new list, Start from offers Next actions, Waiting on, Quick wins
+  and Flagged by project. These conditions are kept and read by every device, Pro on or off.
+- **Table.** A list can show as a table (Rows or Table at the top): click a column to sort, Shift and
+  click for a second key. Rows select like list rows.
+- **Inspector** (Mod+I with two or more tasks selected, or Inspector in the selection bar): set the
+  start date, the estimate and the flag of all of them at once.
+- **Plan my day** uses estimates as lengths and proposes a **focus block** first: 60 to 90 minutes
+  for the tasks that move your top initiatives.
+- **Weekly review.** Before the usual steps: give verdicts, send what was agreed, escalations and
+  decisions, check the portfolio, note the value delivered; and the mirror, a line about your last
+  seven days.
+- **Quarterly impact** (on Portfolio): the value delivered, initiatives closed, decisions and
+  promises of this or the last quarter, with a line about your own growth. Copy or print.
+
+## Links
+
+`vicu://` links open a task, a view or Quick Entry from other apps and scripts: `vicu://task/123`,
+`vicu://view/flagged`, `vicu://view/waiting`, `vicu://add?title=...&project=...&due=...` (fills
+Quick Entry in, never creates on its own). Links work in the installed app.
+
+## Where Pro's data lives
+
+Pro keeps its records (promises and verdicts, initiatives, logs, meetings, estimates and its
+settings) in one hidden task in your Inbox, titled "Vicu Pro ledger (sync metadata — do not
+delete)", like Vicu's other synced data. Older records move to hidden archive tasks. Start dates,
+flags, labels and task relations are Vikunja's own fields, so the web app shows them too.
+
+Work data on a personal server, and the assistant's provider, may fall under your employer's
+policy. Check it before you use Pro for work.

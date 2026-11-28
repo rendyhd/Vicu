@@ -60,6 +60,8 @@ function fakeApi(script: Script = {}) {
     findRecentCreate: (projectId, fields, since) => record('findRecentCreate', [projectId, fields.title, since], () => ok(null)),
     addTaskAssignee: (taskId, userId) => record('addTaskAssignee', [taskId, userId], () => ok(null)),
     removeTaskAssignee: (taskId, userId) => record('removeTaskAssignee', [taskId, userId], () => ok(undefined)),
+    createTaskRelation: (taskId, otherTaskId, kind) => record('createTaskRelation', [taskId, otherTaskId, kind], () => ok(null)),
+    deleteTaskRelation: (taskId, kind, otherTaskId) => record('deleteTaskRelation', [taskId, kind, otherTaskId], () => ok(undefined)),
     createTaskComment: (taskId, html) =>
       record('createTaskComment', [taskId, html], () => {
         const id = nextCommentId++

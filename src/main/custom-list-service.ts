@@ -1,5 +1,4 @@
-import { BrowserWindow } from 'electron'
-import { randomUUID } from 'crypto'
+import { sendToAllWindows } from '@host/windows'
 import { loadCustomListCarriers } from './carrier-service'
 import { loadConfig, saveConfig, type AppConfig } from './config'
 import { onAccountDataCleared } from './known-user'
@@ -53,13 +52,12 @@ function ensureSyncState(config: AppConfig): NonNullable<AppConfig['custom_lists
   return config.custom_lists_sync
 }
 
-function sendToWindows(send: (win: BrowserWindow) => void): void {
-  for (const win of BrowserWindow.getAllWindows()) {
-    if (win.isDestroyed()) continue
-    try {
-      send(win)
-    } catch { /* window may close between enumeration and send */ }
-  }
+/** A random id (the Web Crypto global, in Node, Electron and browsers alike). */
+const randomUUID = (): string => crypto.randomUUID()
+
+function sendToWindows(send: (win: { webContents: { send(channel: string, ...args: unknown[]): void } }) => void): void {
+  // One stand-in window whose send reaches every window (see @host/windows).
+  send({ webContents: { send: sendToAllWindows } })
 }
 
 /** What the windows currently show is what the config holds; call before the lists can change. */
@@ -210,9 +208,17 @@ export function importedSavedFilterIds(): number[] {
   return config.custom_lists_sync?.document.imported_saved_filters ?? []
 }
 
+/** The lists as synced values, unknown fields included (what an import again starts from). */
+export function getCustomListWires(): CustomListWire[] {
+  const config = loadConfig()
+  if (!config) return []
+  return activeLists(ensureSyncState(config).document)
+}
+
 /**
  * Adds `lists` at the end and records `filterIds` as imported, in one change; the change syncs
- * at once. Lists without a name are skipped.
+ * at once. A list whose id is there already is rewritten in place and keeps its place in the order
+ * (importing a source again, section 3.7).
  */
 export function importCustomLists(lists: CustomListWire[], filterIds: number[]): CustomList[] {
   if (lists.length === 0 && filterIds.length === 0) return getCustomLists()
@@ -232,7 +238,31 @@ export function importCustomLists(lists: CustomListWire[], filterIds: number[]):
   return config.custom_lists ?? []
 }
 
-/** Turns lists that repeat another list's saved filter into tombstones; false when there were none. */
+/**
+ * Undo of an import: deletes `removeIds` and writes `restore` back as they were, in one change.
+ */
+export function restoreCustomLists(removeIds: string[], restore: CustomListWire[]): CustomList[] {
+  if (removeIds.length === 0 && restore.length === 0) return getCustomLists()
+  const config = service.mutate((document, deviceId) => {
+    for (const id of removeIds) {
+      document.lists[id] = { value: null, revision: nextRevision(document, deviceId) }
+    }
+    for (const value of restore) {
+      const normalized = normalizeWireList(value)
+      document.lists[normalized.id] = { value: normalized, revision: nextRevision(document, deviceId) }
+    }
+    const removed = new Set(removeIds)
+    const added = restore.map((list) => list.id).filter((id) => !document.order.ids.includes(id))
+    document.order = {
+      ids: [...document.order.ids.filter((id) => !removed.has(id)), ...added],
+      revision: nextRevision(document, deviceId),
+    }
+    return document
+  })
+  return config.custom_lists ?? []
+}
+
+/** Turns lists that repeat another list's source into tombstones; false when there were none. */
 export function dropDuplicateCustomListImports(): boolean {
   const config = loadConfig()
   if (!config?.custom_lists_sync || duplicateImports(config.custom_lists_sync.document).length === 0) return false

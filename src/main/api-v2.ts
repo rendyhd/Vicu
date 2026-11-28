@@ -30,6 +30,17 @@ export function buildProjectTaskCountUrl(baseUrl: string, projectId: number, don
   return url.toString()
 }
 
+/**
+ * The request behind the number of tasks a filter matches (a project's Completed row in a Work or
+ * Personal mode, cross-app semantics 12.6): a page of one task, no subtasks, for the envelope's `total`.
+ */
+export function buildTaskCountUrl(baseUrl: string, filter: string): string {
+  const url = new URL(`${baseUrl.replace(/\/+$/, '')}/api/v2/tasks`)
+  url.searchParams.set('filter', filter)
+  url.searchParams.set('per_page', '1')
+  return url.toString()
+}
+
 /** The `total` of an API v2 list envelope, or null when the response carries no usable one. */
 export function readEnvelopeTotal(body: unknown): number | null {
   const total = (body as { total?: unknown } | null)?.total
@@ -51,6 +62,14 @@ export function buildProjectCollectionUrl(baseUrl: string, includeArchived = fal
  * nothing pays nothing (cross-app semantics 9.4). The server wants `expand` repeated, not joined.
  */
 export const COLLAB_SIGNALS_PARAM = 'collab_signals'
+
+/**
+ * Vicu-only task query option (never sent to the server): `false` leaves out `expand=subtasks`.
+ * For flat listings that never draw a hierarchy (finding the hidden carriers, rendyhd/Vicu#75):
+ * on Vikunja 2.8 and earlier the expansion adds a correlated subquery to every page, which on a
+ * long done history takes longer than the request timeout.
+ */
+export const EXPAND_SUBTASKS_PARAM = 'expand_subtasks'
 
 /** Vikunja error code: the user is already assigned to that task (answered with 400). */
 export const VIKUNJA_ERROR_ALREADY_ASSIGNED = 4021
@@ -115,13 +134,14 @@ export function sniffImageType(bytes: Uint8Array): string | null {
  * Build the query shared by flat task collection endpoints. Vikunja still
  * returns a flat array for this expansion, but guarantees every child rides
  * on the same page as its parent and populates their reciprocal relations.
+ * `expand_subtasks: false` leaves the expansion out (`EXPAND_SUBTASKS_PARAM`).
  */
 export function createTaskCollectionSearchParams(
   params: Record<string, unknown>,
   now: Date = new Date()
 ): URLSearchParams {
   const qs = new URLSearchParams()
-  qs.append('expand', 'subtasks')
+  if (params[EXPAND_SUBTASKS_PARAM] !== false) qs.append('expand', 'subtasks')
   if (params[COLLAB_SIGNALS_PARAM] === true) {
     qs.append('expand', 'comment_count')
     qs.append('expand', 'is_unread')
@@ -131,8 +151,12 @@ export function createTaskCollectionSearchParams(
   // of this very request and is never sent as a parameter.
   const filter = withDueWindow(params.filter ? String(params.filter) : undefined, params.due_window, now)
   if (filter) qs.set('filter', filter)
-  if (params.sort_by) qs.set('sort_by', String(params.sort_by))
-  if (params.order_by) qs.set('order_by', String(params.order_by))
+  // A list of sort keys is repeated, each paired with the `order_by` at the same place (API v2).
+  for (const key of ['sort_by', 'order_by'] as const) {
+    const value = params[key]
+    if (Array.isArray(value)) for (const item of value) qs.append(key, String(item))
+    else if (value) qs.set(key, String(value))
+  }
   const perPage = clampPageSize(params.per_page)
   if (perPage !== null) qs.set('per_page', String(perPage))
   if (params.page) qs.set('page', String(params.page))

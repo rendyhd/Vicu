@@ -1,3 +1,4 @@
+import { base64ToBytes, bytesToBase64Url, bytesToUtf8, utf8Bytes } from '../shared/bytes'
 import { HIDDEN_TASK_READ_MAX_BYTES, HIDDEN_TASK_WRITE_MAX_BYTES, kindMarkerPattern } from '../shared/hidden-tasks'
 import { SYNCED_PREFS_VERSION, validateSyncedPrefs, type SyncedPrefsDocument } from '../shared/synced-prefs'
 
@@ -37,9 +38,9 @@ export function parsePrefsEnvelope(description?: string | null): ParsedPrefsEnve
   }
   if (version !== SYNCED_PREFS_VERSION) return { isCarrier: true, error: `Preferences metadata version ${version} is not supported` }
   try {
-    const bytes = Buffer.from(marker[2].replace(/-/g, '+').replace(/_/g, '/'), 'base64')
+    const bytes = base64ToBytes(marker[2])
     if (bytes.byteLength > HIDDEN_TASK_READ_MAX_BYTES) throw new Error('Preferences metadata is too large')
-    const document = JSON.parse(bytes.toString('utf8')) as unknown
+    const document = JSON.parse(bytesToUtf8(bytes)) as unknown
     const payloadVersion = (document as { version?: unknown } | null)?.version
     if (typeof payloadVersion === 'number' && payloadVersion > SYNCED_PREFS_VERSION) {
       return { isCarrier: true, futureVersion: payloadVersion, error: `Preferences metadata version ${payloadVersion} is not supported` }
@@ -54,7 +55,7 @@ export function parsePrefsEnvelope(description?: string | null): ParsedPrefsEnve
 /** The carrier's description: only the marker. */
 export function encodePrefsEnvelope(document: SyncedPrefsDocument): string {
   validateSyncedPrefs(document)
-  const bytes = Buffer.from(JSON.stringify(document), 'utf8')
+  const bytes = utf8Bytes(JSON.stringify(document))
   if (bytes.byteLength > HIDDEN_TASK_WRITE_MAX_BYTES) throw new Error('Preferences metadata is too large')
-  return `<!-- vicu-prefs:v${SYNCED_PREFS_VERSION}:${bytes.toString('base64url')} -->`
+  return `<!-- vicu-prefs:v${SYNCED_PREFS_VERSION}:${bytesToBase64Url(bytes)} -->`
 }

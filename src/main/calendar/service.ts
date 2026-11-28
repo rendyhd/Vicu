@@ -1,0 +1,850 @@
+// Connected calendars on the Plan screen (contract 20.9 to 20.11), read by this device only.
+//
+// The parts:
+//   sources/types.ts   what a kind of source implements, and how to add one (read it first)
+//   sources/*.ts       the kinds: a calendar link (ics-link.ts), a CalDAV account (caldav.ts),
+//                      Microsoft 365 and Google accounts (microsoft.ts, google.ts on oauth-account.ts),
+//                      the Mac's calendars (eventkit.ts, through ../eventkit.ts and its helper),
+//                      a calendar file on this computer (ics-file.ts, watched here), classic
+//                      Outlook on Windows (outlook.ts, through ../outlook.ts and its script)
+//   oauth.ts           the browser sign-in (PKCE, loopback) and the tokens of those accounts
+//   oauth-clients.ts   Vicu's registered OAuth clients, and "Use my own client" per device
+//   oauth-ipc.ts       their IPC: sign in, cancel, sign in again, the own client
+//   import-ipc.ts      importing a calendar file into Events (20.10), once
+//   store.ts           the connections and their calendars' choices, configs sealed (calendar-feeds.json)
+//   cache.ts           the last good copy of each calendar, encrypted (calendar-cache/)
+//   ics.ts             iCalendar into occurrences, VFREEBUSY, reducing a copy to what may be kept
+//   timezones.ts       zones a file names without defining them (Windows names)
+//   http.ts            the read-only HTTP every kind uses (limits, the sign-in, redirects, messages)
+//   net-fetch.ts       its base: Electron's net.request, handing redirects back to http.ts
+//
+// This file is what is the same for every kind:
+// - Calendars are read when a window asks for days and the last attempt is older than 5 minutes
+//   (20.9), at once on a manual refresh, and when a CalDAV window does not hold the days yet. A
+//   calendar with a copy answers at once from it and reads in the background; the windows hear
+//   `calendar-changed` when something new came in.
+// - Busy only (20.8): a copy is reduced before it is kept, in memory or on disk; turning it on
+//   reduces the copy at once, turning it off reads the calendar again in full.
+// - A calendar that cannot be read keeps its last good copy and says why (20.9).
+// - Secrets never reach a window, a log line or the config: the windows get CalendarSourcesView.
+// - Nothing leaves the device: no Vikunja, no synced preferences, no assistant (it gets free time).
+
+import { BrowserWindow, dialog, net } from 'electron'
+import { t } from '../../shared/i18n'
+import { randomUUID } from 'crypto'
+import { watch, type FSWatcher } from 'fs'
+import { readFile, stat } from 'fs/promises'
+import { basename, dirname } from 'path'
+import { handleTrusted } from '../secure-ipc'
+import { isPlainSecret, openSecret, sealSecret, secretStorageLevel } from '../safe-storage'
+import {
+  busyOnlyEvent,
+  type CalendarEvent,
+  type CalendarEventsResult,
+  type CalendarFeedView,
+} from '../../shared/calendar-events'
+import {
+  OUTLOOK_CLOSED_MESSAGE,
+  OUTLOOK_MISSING_MESSAGE,
+  type AddCalendarFileInput,
+  type OutlookStatusView,
+} from '../../shared/calendar-sources'
+import type {
+  AddCalendarLinkInput,
+  CaldavDiscoverInput,
+  CaldavDraft,
+  CaldavSaveInput,
+  CalendarConnectionView,
+  CalendarSourceKind,
+  CalendarSourcesView,
+} from '../../shared/calendar-sources'
+import { calendarHttp, CalendarReadError } from './http'
+import { manualRedirectFetch, type ClientRequestLike } from './net-fetch'
+import { occurrencesBetween, parseIcsDocuments, reduceIcs, type ParsedFeed } from './ics'
+import { dropCopy, loadCopy, saveCopy } from './cache'
+import {
+  readCalendarStore,
+  takeColor,
+  writeCalendarStore,
+  type CalendarStoreState,
+  type StoredCalendar,
+  type StoredConnection,
+} from './store'
+import { caldavSource } from './sources/caldav'
+import { googleSource } from './sources/google'
+import { icsLinkSource } from './sources/ics-link'
+import { microsoftSource } from './sources/microsoft'
+import type { OAuthAccountConfig } from './sources/oauth-account'
+import { registerCalendarOAuthIpc } from './oauth-ipc'
+import { registerCalendarImportIpc } from './import-ipc'
+import { eventKitHelper, eventKitHelperIfAny, eventkitSource, eventKitStatus, notAskedMessage, openCalendarPrivacySettings } from './eventkit'
+import { foundCalendars } from './sources/eventkit'
+import { EVENTKIT_DENIED_MESSAGE, type EventKitSaveInput } from '../../shared/calendar-eventkit'
+import { isMac, isWindows } from '../platform'
+import { createIcsFileSource, type FileConfig } from './sources/ics-file'
+import { createOutlookSource, outlookState } from './sources/outlook'
+import { powershellOutlookRunner } from './outlook'
+import type { CalendarCopy, CalendarSource, ConnectResult, ReadOutcome, RemoteCalendar, SourceContext } from './sources/types'
+
+const icsFileSource = createIcsFileSource({ stat, readFile: (path) => readFile(path, 'utf8') })
+const outlookSource = createOutlookSource(() => powershellOutlookRunner)
+
+/** Every kind this app has built. A new kind is registered here (see sources/types.ts). */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- each kind has its own config type
+const SOURCES: Record<CalendarSourceKind, CalendarSource<any>> = {
+  ics: icsLinkSource,
+  caldav: caldavSource,
+  microsoft: microsoftSource,
+  google: googleSource,
+  eventkit: eventkitSource,
+  'ics-file': icsFileSource,
+  outlook: outlookSource,
+}
+
+/** The kinds that are one file: their one calendar is the connection. */
+const SINGLE_FILE = new Set<CalendarSourceKind>(['ics', 'ics-file'])
+
+/** A calendar is read at most this often unless a refresh asks (20.9). */
+export const FRESH_MS = 5 * 60_000
+/** Events of one calendar handed to a window per request at most. */
+export const MAX_RANGE_EVENTS = 2000
+/** A copy that only got "not modified" is written again at most this often (for "Not updated since"). */
+const COPY_REWRITE_MS = 60 * 60_000
+/** A signed-in account waits this long for the user's pick. */
+const DRAFT_MS = 10 * 60_000
+const DAY = 24 * 3600_000
+
+interface CalendarState {
+  copy?: CalendarCopy
+  parsed?: ParsedFeed
+  loaded?: Promise<void>
+  attemptedAt?: number
+  savedAt?: number
+  error?: string
+  warning?: string
+  inFlight?: Promise<boolean>
+  lastRange?: { from: Date; to: Date }
+}
+
+const states = new Map<string, CalendarState>()
+/** Unsealed configs, in this process's memory only. */
+const configs = new Map<string, unknown>()
+const connectionErrors = new Map<string, string>()
+const drafts = new Map<string, { kind: CalendarSourceKind; result: ConnectResult<unknown>; expires: number }>()
+
+const ctx: SourceContext = {
+  // net.request rather than net.fetch: http.ts follows redirects itself (see net-fetch.ts).
+  http: (options) => calendarHttp({ base: manualRedirectFetch((request) => net.request(request) as unknown as ClientRequestLike), ...options }),
+  // OAuth token requests (oauth.ts): Node's fetch, so no Origin header goes with them.
+  signInFetch: (url, init) => fetch(url, init),
+  now: () => Date.now(),
+}
+
+function messageOf(error: unknown): string {
+  return error instanceof CalendarReadError ? error.message : 'The calendar could not be read.'
+}
+
+function stateOf(calendarId: string): CalendarState {
+  let state = states.get(calendarId)
+  if (!state) {
+    state = {}
+    states.set(calendarId, state)
+  }
+  return state
+}
+
+let changedTimer: ReturnType<typeof setTimeout> | null = null
+/** Tell the windows to ask again: a background read brought something new. */
+function announceChanged(): void {
+  if (changedTimer) return
+  changedTimer = setTimeout(() => {
+    changedTimer = null
+    for (const win of BrowserWindow.getAllWindows()) {
+      if (!win.isDestroyed()) win.webContents.send('calendar-changed')
+    }
+  }, 150)
+}
+
+// --- Configs (sealed in the store) ----------------------------------------------------------------
+
+async function configOf(connection: StoredConnection): Promise<unknown | null> {
+  if (configs.has(connection.id)) return configs.get(connection.id)!
+  const text = await openSecret(connection.sealed)
+  let config: unknown = null
+  if (text !== null) {
+    let value: unknown = text
+    try {
+      value = JSON.parse(text)
+    } catch {
+      // Version 1 sealed the bare link.
+    }
+    config = SOURCES[connection.kind].parseConfig(value)
+  }
+  if (!config) {
+    connectionErrors.set(connection.id, 'The saved address or sign-in could not be read on this computer. Remove it and add it again.')
+    return null
+  }
+  configs.set(connection.id, config)
+  return config
+}
+
+async function sealConfig(connectionId: string, config: unknown): Promise<string> {
+  configs.set(connectionId, config)
+  return sealSecret(JSON.stringify(config))
+}
+
+// --- Copies ---------------------------------------------------------------------------------------
+
+/** Keep a copy as the calendar's current one; Busy only reduces it first. */
+function setCopy(calendar: StoredCalendar, state: CalendarState, copy: CalendarCopy): void {
+  let kept = copy
+  if (calendar.busyOnly && !copy.busyOnly) {
+    kept = { ...copy, busyOnly: true, documents: reduceDocuments(copy.documents, true, new Set()) }
+  }
+  state.copy = kept
+  try {
+    state.parsed = parseIcsDocuments(kept.documents.map((doc) => doc.ics))
+  } catch {
+    state.parsed = undefined
+    state.error = 'The calendar could not be read: it is not a valid calendar file.'
+  }
+}
+
+/** Reduce documents (ics.ts reduceIcs), except those already kept; one that does not parse is left out. */
+function reduceDocuments(documents: CalendarCopy['documents'], busyOnly: boolean, kept: ReadonlySet<unknown>) {
+  const out: CalendarCopy['documents'] = []
+  for (const doc of documents) {
+    if (kept.has(doc)) {
+      out.push(doc)
+      continue
+    }
+    try {
+      out.push({ ...doc, ics: reduceIcs(doc.ics, busyOnly) })
+    } catch {
+      // Not iCalendar: nothing of it can be shown.
+    }
+  }
+  return out
+}
+
+function ensureLoaded(calendar: StoredCalendar): Promise<void> {
+  const state = stateOf(calendar.id)
+  if (!state.loaded) {
+    state.loaded = loadCopy(calendar.id).then((copy) => {
+      if (copy && !state.copy) {
+        setCopy(calendar, state, copy)
+        state.savedAt = copy.fetchedAt
+      }
+    })
+  }
+  return state.loaded
+}
+
+function keepCopy(calendarId: string, state: CalendarState): void {
+  if (!state.copy) return
+  state.savedAt = Date.now()
+  void saveCopy(calendarId, state.copy)
+}
+
+function defaultRange(): { from: Date; to: Date } {
+  const start = new Date()
+  start.setHours(0, 0, 0, 0)
+  return { from: start, to: new Date(start.getTime() + 7 * DAY) }
+}
+
+/**
+ * Read one calendar when it is due (or `force`), sharing a read already running. Resolves true
+ * when the copy changed.
+ */
+async function refreshCalendar(connection: StoredConnection, calendar: StoredCalendar, range: { from: Date; to: Date } | null, force: boolean): Promise<boolean> {
+  const source = SOURCES[connection.kind]
+  await ensureLoaded(calendar)
+  const state = stateOf(calendar.id)
+  if (state.inFlight) return state.inFlight
+  const { from, to } = range ?? state.lastRange ?? defaultRange()
+  state.lastRange = { from, to }
+  const covered = state.copy ? source.covers(state.copy, from, to) : false
+  const now = Date.now()
+  if (!force && covered && state.attemptedAt !== undefined && now - state.attemptedAt < FRESH_MS) return false
+  state.attemptedAt = now
+  // Set before anything waits, so a second caller shares this read.
+  const run = (async (): Promise<boolean> => {
+    const config = await configOf(connection)
+    if (!config) return false
+    // A copy reduced for Busy only cannot be the base once titles are wanted again.
+    const previous = state.copy && !(state.copy.busyOnly && !calendar.busyOnly) ? state.copy : undefined
+    try {
+      const outcome: ReadOutcome = await source.read(config, calendar.remoteId, { from, to, previous }, ctx)
+      // The choices as they are now: Busy only may have been turned on, or the calendar removed, meanwhile.
+      const current = findCalendar(calendar.id)
+      if (!current || states.get(calendar.id) !== state) return false
+      if (outcome.config) await updateConnection(connection.id, async (c) => ({ ...c, sealed: await sealConfig(c.id, outcome.config) }))
+      state.error = undefined
+      connectionErrors.delete(connection.id)
+      if (outcome.status === 'unchanged' && state.copy) {
+        state.copy = { ...state.copy, validators: { ...state.copy.validators, ...(outcome.validators ?? {}) }, fetchedAt: Date.now() }
+        if (Date.now() - (state.savedAt ?? 0) > COPY_REWRITE_MS) keepCopy(calendar.id, state)
+        return false
+      }
+      if (outcome.status !== 'changed') return false
+      const kept = new Set<unknown>(previous?.busyOnly === current.busyOnly ? previous.documents : [])
+      const documents = reduceDocuments(outcome.documents, current.busyOnly, kept)
+      if (SINGLE_FILE.has(connection.kind) && outcome.documents.length > 0 && documents.length === 0) {
+        throw new CalendarReadError('The calendar could not be read: it is not a valid calendar file.', 'format')
+      }
+      setCopy(current, state, { documents, validators: outcome.validators, fetchedAt: Date.now(), busyOnly: current.busyOnly })
+      keepCopy(calendar.id, state)
+      return true
+    } catch (error) {
+      // The last good copy stays on screen; the error says why it is not newer.
+      state.error = messageOf(error)
+      console.warn(`[Calendar] ${calendar.name}: ${state.error}`)
+      return false
+    }
+  })().finally(() => {
+    state.inFlight = undefined
+  })
+  state.inFlight = run
+  return run
+}
+
+function findCalendar(calendarId: string): StoredCalendar | undefined {
+  for (const connection of readCalendarStore().connections) {
+    const found = connection.calendars.find((calendar) => calendar.id === calendarId)
+    if (found) return found
+  }
+  return undefined
+}
+
+// --- Views ----------------------------------------------------------------------------------------
+
+function feedView(connection: StoredConnection, calendar: StoredCalendar): CalendarFeedView {
+  const state = states.get(calendar.id)
+  return {
+    id: calendar.id,
+    connectionId: connection.id,
+    name: calendar.name,
+    color: calendar.color,
+    enabled: calendar.enabled,
+    busyOnly: calendar.busyOnly,
+    countsAsBusy: calendar.countsAsBusy,
+    fetchedAt: state?.copy ? new Date(state.copy.fetchedAt).toISOString() : undefined,
+    error: state?.error ?? connectionErrors.get(connection.id),
+    warning: state?.warning,
+  }
+}
+
+function allFeeds(store: CalendarStoreState): CalendarFeedView[] {
+  return store.connections.flatMap((connection) => connection.calendars.map((calendar) => feedView(connection, calendar)))
+}
+
+async function connectionView(connection: StoredConnection): Promise<CalendarConnectionView> {
+  const config = await configOf(connection)
+  await Promise.all(connection.calendars.map(ensureLoaded))
+  return {
+    id: connection.id,
+    kind: connection.kind,
+    name: connection.name,
+    detail: config ? SOURCES[connection.kind].describe(config) : '',
+    calendars: connection.calendars.map((calendar) => feedView(connection, calendar)),
+    error: connectionErrors.get(connection.id),
+  }
+}
+
+async function sourcesView(): Promise<CalendarSourcesView> {
+  const store = readCalendarStore()
+  return {
+    connections: await Promise.all(store.connections.map(connectionView)),
+    storage: await secretStorageLevel(store.connections.some((connection) => isPlainSecret(connection.sealed))),
+  }
+}
+
+// --- Changes --------------------------------------------------------------------------------------
+
+async function updateConnection(id: string, change: (connection: StoredConnection) => Promise<StoredConnection>): Promise<void> {
+  const current = readCalendarStore().connections.find((c) => c.id === id)
+  if (!current) return
+  const changed = await change(current)
+  const store = readCalendarStore()
+  await writeCalendarStore({ ...store, connections: store.connections.map((c) => (c.id === id ? { ...c, sealed: changed.sealed, name: changed.name } : c)) })
+}
+
+/** Save a connection made by a kind's `connect`, with the calendars it found. */
+async function addConnection(kind: CalendarSourceKind, result: ConnectResult<unknown>, shown: (calendar: RemoteCalendar) => boolean, busyOnly: boolean): Promise<StoredConnection> {
+  const id = randomUUID()
+  const sealed = await sealConfig(id, result.config)
+  // From here on nothing waits, so no other change can come between reading the store and writing it.
+  let store = readCalendarStore()
+  const calendars: StoredCalendar[] = []
+  for (const remote of result.calendars) {
+    const taken = takeColor(store)
+    store = taken.state
+    calendars.push({
+      id: randomUUID(),
+      remoteId: remote.remoteId,
+      name: remote.name || result.name,
+      color: taken.color,
+      enabled: shown(remote),
+      busyOnly,
+      countsAsBusy: true,
+    })
+  }
+  const connection: StoredConnection = { id, kind, name: result.name, sealed, calendars }
+  for (const calendar of calendars) {
+    const first = result.firstReads?.[calendar.remoteId]
+    if (first?.status !== 'changed') continue
+    const state = stateOf(calendar.id)
+    state.loaded = Promise.resolve()
+    state.attemptedAt = Date.now()
+    setCopy(calendar, state, {
+      documents: reduceDocuments(first.documents, busyOnly, new Set()),
+      validators: first.validators,
+      fetchedAt: Date.now(),
+      busyOnly,
+    })
+    keepCopy(calendar.id, state)
+  }
+  await writeCalendarStore({ ...store, connections: [...store.connections, connection] })
+  return connection
+}
+
+type CalendarPatch = Partial<Pick<StoredCalendar, 'name' | 'color' | 'enabled' | 'busyOnly' | 'countsAsBusy'>>
+
+async function updateCalendar(calendarId: string, patch: CalendarPatch): Promise<void> {
+  const store = readCalendarStore()
+  const connections = store.connections.map((connection) => ({
+    ...connection,
+    calendars: connection.calendars.map((calendar) => {
+      if (calendar.id !== calendarId) return calendar
+      const changed = { ...calendar }
+      if (typeof patch?.name === 'string' && patch.name.trim()) changed.name = patch.name.trim().slice(0, 80)
+      if (typeof patch?.color === 'string' && /^#[0-9a-f]{6}$/i.test(patch.color)) changed.color = patch.color.toLowerCase()
+      if (typeof patch?.enabled === 'boolean') changed.enabled = patch.enabled
+      if (typeof patch?.busyOnly === 'boolean') changed.busyOnly = patch.busyOnly
+      if (typeof patch?.countsAsBusy === 'boolean') changed.countsAsBusy = patch.countsAsBusy
+      const state = stateOf(calendar.id)
+      if (changed.busyOnly && !calendar.busyOnly && state.copy) {
+        // Busy only on: the titles go now, from memory and from disk.
+        setCopy(changed, state, state.copy)
+        keepCopy(calendar.id, state)
+      }
+      if ((!changed.busyOnly && calendar.busyOnly) || (changed.enabled && !calendar.enabled)) state.attemptedAt = undefined
+      return changed
+    }),
+  }))
+  await writeCalendarStore({ ...store, connections })
+}
+
+async function removeConnection(id: string): Promise<void> {
+  const store = readCalendarStore()
+  const connection = store.connections.find((c) => c.id === id || c.calendars.some((calendar) => calendar.id === id))
+  if (!connection) return
+  // Loaded when needed, so a token is revoked also when nothing was read since the app started.
+  const config = SOURCES[connection.kind].disconnect ? await configOf(connection) : null
+  if (config && SOURCES[connection.kind].disconnect) {
+    await SOURCES[connection.kind].disconnect!(config, ctx).catch(() => {})
+  }
+  for (const calendar of connection.calendars) {
+    states.delete(calendar.id)
+    await dropCopy(calendar.id)
+  }
+  configs.delete(connection.id)
+  connectionErrors.delete(connection.id)
+  await writeCalendarStore({ ...readCalendarStore(), connections: readCalendarStore().connections.filter((c) => c.id !== connection.id) })
+  syncEventKitWatch()
+  void syncFileWatches()
+}
+
+/** The calendars an account has now: new ones are added, not shown; gone ones are removed. */
+async function relist(connection: StoredConnection): Promise<void> {
+  const source = SOURCES[connection.kind]
+  const config = await configOf(connection)
+  if (!config || SINGLE_FILE.has(connection.kind)) return
+  let listed: { config: unknown; calendars: RemoteCalendar[] }
+  try {
+    listed = await source.listCalendars(config, ctx)
+  } catch (error) {
+    connectionErrors.set(connection.id, messageOf(error))
+    return
+  }
+  connectionErrors.delete(connection.id)
+  const remoteIds = new Set(listed.calendars.map((c) => c.remoteId))
+  for (const gone of connection.calendars.filter((c) => !remoteIds.has(c.remoteId))) {
+    states.delete(gone.id)
+    await dropCopy(gone.id)
+  }
+  const sealed = await sealConfig(connection.id, listed.config)
+  // From here on nothing waits: read the store and write it in one go.
+  let store = readCalendarStore()
+  const current = store.connections.find((c) => c.id === connection.id)
+  if (!current) return
+  const kept = current.calendars.filter((c) => remoteIds.has(c.remoteId))
+  const known = new Set(kept.map((c) => c.remoteId))
+  const added: StoredCalendar[] = []
+  for (const remote of listed.calendars.filter((c) => !known.has(c.remoteId))) {
+    const taken = takeColor(store)
+    store = taken.state
+    added.push({ id: randomUUID(), remoteId: remote.remoteId, name: remote.name, color: taken.color, enabled: false, busyOnly: false, countsAsBusy: true })
+  }
+  await writeCalendarStore({
+    ...store,
+    connections: store.connections.map((c) => (c.id === connection.id ? { ...c, sealed, calendars: [...kept, ...added] } : c)),
+  })
+}
+
+async function refreshAll(connectionId?: string): Promise<void> {
+  const store = readCalendarStore()
+  const chosen = store.connections.filter((c) => !connectionId || c.id === connectionId)
+  await Promise.all(chosen.map(relist))
+  const now = readCalendarStore()
+  const reads: Promise<boolean>[] = []
+  for (const connection of now.connections.filter((c) => !connectionId || c.id === connectionId)) {
+    for (const calendar of connection.calendars.filter((c) => c.enabled)) reads.push(refreshCalendar(connection, calendar, null, true))
+  }
+  await Promise.all(reads)
+}
+
+async function eventsBetween(from: Date, to: Date): Promise<CalendarEventsResult> {
+  const store = readCalendarStore()
+  syncEventKitWatch()
+  void syncFileWatches()
+  const shown = store.connections.flatMap((connection) => connection.calendars.filter((c) => c.enabled).map((calendar) => ({ connection, calendar })))
+  await Promise.all(shown.map(({ calendar }) => ensureLoaded(calendar)))
+  const waits: Promise<boolean>[] = []
+  for (const { connection, calendar } of shown) {
+    const state = stateOf(calendar.id)
+    const holds = state.copy ? SOURCES[connection.kind].covers(state.copy, from, to) : false
+    const read = refreshCalendar(connection, calendar, { from, to }, false)
+    // With a copy that holds the days, answer now and let the read finish in the background.
+    if (holds) void read.then((changed) => changed && announceChanged())
+    else waits.push(read)
+  }
+  await Promise.all(waits)
+
+  const events: CalendarEvent[] = []
+  for (const { calendar } of shown) {
+    const state = stateOf(calendar.id)
+    if (!state.parsed) continue
+    try {
+      const found = occurrencesBetween(state.parsed, calendar.id, from, to, MAX_RANGE_EVENTS + 1)
+      state.warning = found.length > MAX_RANGE_EVENTS ? `Shows the first ${MAX_RANGE_EVENTS} events of these days only.` : undefined
+      for (const event of found.slice(0, MAX_RANGE_EVENTS)) {
+        // Busy only: the title and place never reach a window.
+        events.push(calendar.busyOnly ? busyOnlyEvent(event) : event)
+      }
+    } catch {
+      state.error = 'The calendar could not be read: it is not a valid calendar file.'
+    }
+  }
+  return { events, feeds: allFeeds(readCalendarStore()) }
+}
+
+function pruneDrafts(): void {
+  const now = Date.now()
+  for (const [id, draft] of drafts) if (draft.expires < now) drafts.delete(id)
+}
+
+/** Keep a signed-in account (CalDAV, Microsoft 365, Google) until the user picks its calendars. */
+function saveDraft(kind: CalendarSourceKind, result: ConnectResult<unknown>): CaldavDraft {
+  pruneDrafts()
+  const draftId = randomUUID()
+  drafts.set(draftId, { kind, result, expires: Date.now() + DRAFT_MS })
+  return { draftId, name: result.name, detail: SOURCES[kind].describe(result.config), calendars: result.calendars }
+}
+
+/** New tokens for a connection after "Sign in again": seal them, forget the errors, read it now. */
+async function replaceConfig(connectionId: string, config: OAuthAccountConfig): Promise<void> {
+  await updateConnection(connectionId, async (c) => ({ ...c, sealed: await sealConfig(c.id, config) }))
+  connectionErrors.delete(connectionId)
+  await refreshAll(connectionId)
+  announceChanged()
+}
+
+// --- The Mac's calendars (EventKit) ---------------------------------------------------------------
+// The Mac says when its calendars changed (20.9): while a Mac connection exists the helper watches,
+// and a change reads every shown Mac calendar again at once, past the 5-minute rule. A calendar
+// added or removed on the Mac updates the connection's list as a manual refresh would.
+
+const EVENTKIT_SETTLE_MS = 1500
+let eventKitChangeTimer: ReturnType<typeof setTimeout> | null = null
+
+function syncEventKitWatch(): void {
+  if (!isMac) return
+  const watched = readCalendarStore().connections.some((connection) => connection.kind === 'eventkit')
+  const helper = eventKitHelperIfAny()
+  if (!helper) return
+  if (watched && !helper.watching) helper.watch(onEventKitChanged)
+  else if (!watched && helper.watching) helper.unwatch()
+}
+
+/** Changes come in bursts (a sync of an account): read once they settle. */
+function onEventKitChanged(): void {
+  if (eventKitChangeTimer) clearTimeout(eventKitChangeTimer)
+  eventKitChangeTimer = setTimeout(() => {
+    eventKitChangeTimer = null
+    void rereadEventKit()
+  }, EVENTKIT_SETTLE_MS)
+}
+
+async function rereadEventKit(): Promise<void> {
+  let changed = false
+  for (const connection of readCalendarStore().connections.filter((c) => c.kind === 'eventkit')) {
+    try {
+      const listed = await eventkitSource.listCalendars({ accounts: [] }, ctx)
+      const now = new Set(listed.calendars.map((calendar) => calendar.remoteId))
+      const known = new Set(connection.calendars.map((calendar) => calendar.remoteId))
+      if (now.size !== known.size || [...now].some((id) => !known.has(id))) {
+        await relist(connection)
+        changed = true
+      }
+    } catch {
+      // A read below says why.
+    }
+    const current = readCalendarStore().connections.find((c) => c.id === connection.id)
+    if (!current) continue
+    const reads = current.calendars.filter((c) => c.enabled).map((calendar) => refreshCalendar(current, calendar, null, true))
+    if ((await Promise.all(reads)).some(Boolean)) changed = true
+  }
+  if (changed) announceChanged()
+}
+
+function registerEventKitIpc(): void {
+  const added = () => readCalendarStore().connections.some((connection) => connection.kind === 'eventkit')
+
+  handleTrusted('calendar:eventkit-status', () => eventKitStatus(added()))
+
+  // Asks macOS for the permission when it has not been asked, then lists the calendars to pick.
+  handleTrusted('calendar:eventkit-discover', async () => {
+    try {
+      if (added()) return { success: false, error: 'The calendars of this Mac are already added. Choose which to show in the list.' }
+      const helper = eventKitHelper()
+      const access = await helper.request()
+      if (access === 'not-determined') return { success: false, error: notAskedMessage() }
+      if (access !== 'full') return { success: false, error: (await eventKitStatus(false)).problem ?? EVENTKIT_DENIED_MESSAGE }
+      const calendars = foundCalendars(await helper.calendars())
+      if (calendars.length === 0) return { success: false, error: 'This Mac has no calendars with events. Add an account in System Settings, Internet Accounts.' }
+      return { success: true, data: calendars }
+    } catch (error) {
+      return { success: false, error: messageOf(error) }
+    }
+  })
+
+  handleTrusted('calendar:eventkit-save', async (_event, input: EventKitSaveInput) => {
+    try {
+      if (added()) return { success: false, error: 'The calendars of this Mac are already added.' }
+      const result = await eventkitSource.connect(undefined, ctx)
+      const shown = new Set(Array.isArray(input?.shown) ? input.shown.map(String) : [])
+      const connection = await addConnection('eventkit', result, (calendar) => shown.has(calendar.remoteId), input?.busyOnly === true)
+      syncEventKitWatch()
+      announceChanged()
+      return { success: true, data: await connectionView(connection) }
+    } catch (error) {
+      return { success: false, error: messageOf(error) }
+    }
+  })
+
+  handleTrusted('calendar:eventkit-open-settings', () => openCalendarPrivacySettings())
+}
+
+// --- Calendar files on this computer -------------------------------------------------------------
+// A calendar file is read again when it changes (20.9), past the 5-minute rule. The folder is watched,
+// not the file: an editor or an export often writes a new file and renames it over the old one,
+// which a watch on the file itself would not survive. Changes come in bursts: read once they settle.
+
+const FILE_SETTLE_MS = 800
+const fileWatches = new Map<string, { watcher: FSWatcher; timer?: ReturnType<typeof setTimeout> }>()
+let syncingFiles: Promise<void> | null = null
+
+function syncFileWatches(): Promise<void> {
+  if (!syncingFiles) {
+    syncingFiles = doSyncFileWatches().finally(() => {
+      syncingFiles = null
+    })
+  }
+  return syncingFiles
+}
+
+async function doSyncFileWatches(): Promise<void> {
+  const files = readCalendarStore().connections.filter((connection) => connection.kind === 'ics-file')
+  const ids = new Set(files.map((connection) => connection.id))
+  for (const [id, entry] of fileWatches) {
+    if (ids.has(id)) continue
+    entry.watcher.close()
+    if (entry.timer) clearTimeout(entry.timer)
+    fileWatches.delete(id)
+  }
+  for (const connection of files) {
+    if (fileWatches.has(connection.id)) continue
+    const config = (await configOf(connection)) as FileConfig | null
+    if (!config || fileWatches.has(connection.id)) continue
+    const name = basename(config.path)
+    const same = (changed: string) => (isWindows ? changed.toLowerCase() === name.toLowerCase() : changed === name)
+    try {
+      const entry: { watcher: FSWatcher; timer?: ReturnType<typeof setTimeout> } = {
+        watcher: watch(dirname(config.path), { persistent: false }, (_event, changed) => {
+          if (changed && !same(String(changed))) return
+          if (entry.timer) clearTimeout(entry.timer)
+          entry.timer = setTimeout(() => {
+            entry.timer = undefined
+            void rereadFile(connection.id)
+          }, FILE_SETTLE_MS)
+        }),
+      }
+      entry.watcher.on('error', () => {
+        entry.watcher.close()
+        fileWatches.delete(connection.id)
+      })
+      fileWatches.set(connection.id, entry)
+    } catch {
+      // The folder is gone: the next read says so, and a later sync watches it again.
+    }
+  }
+}
+
+async function rereadFile(connectionId: string): Promise<void> {
+  const connection = readCalendarStore().connections.find((c) => c.id === connectionId)
+  if (!connection) return
+  await Promise.all(connection.calendars.filter((c) => c.enabled).map((calendar) => refreshCalendar(connection, calendar, null, true)))
+  // Also when the read failed: the windows show why.
+  announceChanged()
+}
+
+async function addCalendarFile(event: Electron.IpcMainInvokeEvent, input: AddCalendarFileInput) {
+  const parent = BrowserWindow.fromWebContents(event.sender)
+  const options: Electron.OpenDialogOptions = {
+    title: t('system.dialogs.chooseCalendarTitle'),
+    buttonLabel: t('system.dialogs.choose'),
+    filters: [
+      { name: t('system.dialogs.calendarFiles'), extensions: ['ics', 'ical', 'icalendar', 'ifb'] },
+      { name: t('system.dialogs.allFiles'), extensions: ['*'] },
+    ],
+    properties: ['openFile'],
+  }
+  const picked = parent ? await dialog.showOpenDialog(parent, options) : await dialog.showOpenDialog(options)
+  const path = picked.canceled ? undefined : picked.filePaths[0]
+  if (!path) return { success: true as const, data: null }
+  try {
+    for (const connection of readCalendarStore().connections.filter((c) => c.kind === 'ics-file')) {
+      const config = (await configOf(connection)) as FileConfig | null
+      if (config && (isWindows ? config.path.toLowerCase() === path.toLowerCase() : config.path === path)) {
+        return { success: false as const, error: `${basename(path)} is already added as ${connection.name}.` }
+      }
+    }
+    const result = await icsFileSource.connect({ path, name: input?.name }, ctx)
+    const connection = await addConnection('ics-file', result, () => true, input?.busyOnly === true)
+    void syncFileWatches()
+    announceChanged()
+    return { success: true as const, data: await connectionView(connection) }
+  } catch (error) {
+    return { success: false as const, error: messageOf(error) }
+  }
+}
+
+// --- Classic Outlook (Windows) --------------------------------------------------------------------
+// Read while Outlook is open, through its script. One connection holds its calendars, picked like an
+// account's: a draft, then calendar:caldav-save.
+
+const outlookAdded = () => readCalendarStore().connections.some((connection) => connection.kind === 'outlook')
+
+async function outlookStatus(): Promise<OutlookStatusView> {
+  if (!isWindows) return { state: 'unsupported', added: false }
+  const state = await outlookState(powershellOutlookRunner)
+  return {
+    state,
+    added: outlookAdded(),
+    problem: state === 'missing' ? OUTLOOK_MISSING_MESSAGE : state === 'closed' ? OUTLOOK_CLOSED_MESSAGE : undefined,
+  }
+}
+
+async function discoverOutlook() {
+  pruneDrafts()
+  if (!isWindows) return { success: false as const, error: 'Classic Outlook can only be read on Windows.' }
+  if (outlookAdded()) return { success: false as const, error: 'Classic Outlook is already added. Choose which of its calendars to show in the list.' }
+  try {
+    const result = await outlookSource.connect(undefined, ctx)
+    return { success: true as const, data: saveDraft('outlook', result) }
+  } catch (error) {
+    return { success: false as const, error: messageOf(error) }
+  }
+}
+
+// --- IPC ------------------------------------------------------------------------------------------
+
+export function registerCalendarIpc(): void {
+  handleTrusted('calendar:list', () => sourcesView())
+
+  registerCalendarOAuthIpc({
+    ctx,
+    sources: { microsoft: microsoftSource, google: googleSource },
+    saveDraft,
+    connection: (id) => readCalendarStore().connections.find((c) => c.id === id),
+    configOf,
+    replaceConfig,
+    messageOf,
+    view: sourcesView,
+  })
+  registerCalendarImportIpc()
+
+  handleTrusted('calendar:events', (_event, range: { from: string; to: string }) => {
+    const from = new Date(range?.from)
+    const to = new Date(range?.to)
+    if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime()) || to <= from) return { events: [], feeds: allFeeds(readCalendarStore()) }
+    return eventsBetween(from, to)
+  })
+
+  handleTrusted('calendar:add', async (_event, input: AddCalendarLinkInput) => {
+    try {
+      const result = await icsLinkSource.connect(input, ctx)
+      const connection = await addConnection('ics', result, () => true, input?.busyOnly === true)
+      return { success: true, data: await connectionView(connection) }
+    } catch (error) {
+      return { success: false, error: messageOf(error) }
+    }
+  })
+
+  handleTrusted('calendar:caldav-discover', async (_event, input: CaldavDiscoverInput) => {
+    pruneDrafts()
+    try {
+      const result = await caldavSource.connect(input, ctx)
+      return { success: true, data: saveDraft('caldav', result) }
+    } catch (error) {
+      return { success: false, error: messageOf(error) }
+    }
+  })
+
+  handleTrusted('calendar:caldav-save', async (_event, draftId: string, input: CaldavSaveInput) => {
+    pruneDrafts()
+    const draft = drafts.get(String(draftId))
+    if (!draft) return { success: false, error: 'The sign-in has expired. Sign in again.' }
+    drafts.delete(String(draftId))
+    const shown = new Set(Array.isArray(input?.shown) ? input.shown.map(String) : [])
+    const connection = await addConnection(draft.kind, draft.result, (calendar) => shown.has(calendar.remoteId), input?.busyOnly === true)
+    announceChanged()
+    return { success: true, data: await connectionView(connection) }
+  })
+
+  handleTrusted('calendar:caldav-cancel', (_event, draftId: string) => {
+    drafts.delete(String(draftId))
+  })
+
+  handleTrusted('calendar:update', async (_event, calendarId: string, patch: CalendarPatch) => {
+    await updateCalendar(String(calendarId), patch ?? {})
+    return sourcesView()
+  })
+
+  handleTrusted('calendar:remove', async (_event, id: string) => {
+    await removeConnection(String(id))
+    return sourcesView()
+  })
+
+  handleTrusted('calendar:refresh', async (_event, connectionId?: string) => {
+    await refreshAll(typeof connectionId === 'string' ? connectionId : undefined)
+    return sourcesView()
+  })
+
+  registerEventKitIpc()
+
+  handleTrusted('calendar:file-add', (event, input: AddCalendarFileInput) => addCalendarFile(event, input))
+  handleTrusted('calendar:outlook-status', () => outlookStatus())
+  handleTrusted('calendar:outlook-discover', () => discoverOutlook())
+}

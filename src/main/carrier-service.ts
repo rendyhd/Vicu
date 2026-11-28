@@ -1,14 +1,14 @@
-import { app } from 'electron'
+import { openCarrierIdStore } from '@host/storage'
 import type { ApiResult } from './api-result'
 import { fetchTaskById, fetchTasks } from './api-client'
 import {
   CUSTOM_LIST_CARRIER_SPEC,
   PREFS_CARRIER_SPEC,
+  PRO_ARCHIVE_SPEC,
+  PRO_LEDGER_SPEC,
   ROUTINE_ARCHIVE_SPEC,
   ROUTINE_CARRIER_SPEC,
-  carrierIdsPath,
   createCarrierLoader,
-  createFileCarrierIdStore,
   type CarrierLoader,
   type CarrierSpec,
   type CarrierTask,
@@ -30,7 +30,7 @@ function getLoader(): CarrierLoader {
     loader = createCarrierLoader({
       fetchTasks,
       fetchTaskById,
-      store: createFileCarrierIdStore(carrierIdsPath(app.getPath('userData'))),
+      store: openCarrierIdStore(),
       now: () => Date.now(),
     })
   }
@@ -84,7 +84,15 @@ export function loadPrefsCarriers(): Promise<ApiResult<CarrierTask[]>> {
   return loadKind(PREFS_CARRIER_SPEC)
 }
 
-const REMEMBERED_SPECS: readonly CarrierSpec[] = [ROUTINE_CARRIER_SPEC, ROUTINE_ARCHIVE_SPEC, CUSTOM_LIST_CARRIER_SPEC, PREFS_CARRIER_SPEC]
+export function loadProLedgerCarriers(): Promise<ApiResult<CarrierTask[]>> {
+  return loadKind(PRO_LEDGER_SPEC)
+}
+
+export function loadProArchiveParts(): Promise<ApiResult<CarrierTask[]>> {
+  return loadKind(PRO_ARCHIVE_SPEC)
+}
+
+const REMEMBERED_SPECS: readonly CarrierSpec[] = [ROUTINE_CARRIER_SPEC, ROUTINE_ARCHIVE_SPEC, CUSTOM_LIST_CARRIER_SPEC, PREFS_CARRIER_SPEC, PRO_LEDGER_SPEC, PRO_ARCHIVE_SPEC]
 
 /**
  * A task this app just created through the API: if it is a carrier, fetch it directly from now on.

@@ -1,12 +1,29 @@
+import { resolveSetupInbox, setupResume } from '@/lib/setup-resume'
 import { useEffect, useRef, useState } from 'react'
+import { Trans, useTranslation } from 'react-i18next'
 import { Button } from '@/components/shared/Button'
+import { Checkbox } from '@/components/shared/Checkbox'
 import { BrowserSignIn } from '@/components/auth/BrowserSignIn'
 import { api, type OIDCProvider, type ServerAuthInfo } from '@/lib/api'
 import { cn } from '@/lib/cn'
+import { can, isWebHost } from '@/lib/capabilities'
 import type { Project } from '@/lib/vikunja-types'
 import type { OidcSignInMode } from '../../shared/oidc-browser'
+import type { TranslationKey } from '../../shared/i18n'
+
+/** The route groups and permissions an API token needs: Vikunja's own names, the same in every language. */
+const TOKEN_PERMISSIONS: { route: string; permission: string; use: TranslationKey }[] = [
+  { route: 'tasks', permission: 'read_all, create, update, delete', use: 'settings.tokenPermissions.uses.tasks' },
+  { route: 'projects', permission: 'read_all, create, update, delete', use: 'settings.tokenPermissions.uses.projects' },
+  { route: 'labels', permission: 'read_all, create, update, delete', use: 'settings.tokenPermissions.uses.labels' },
+  { route: 'task_labels', permission: 'create, delete', use: 'settings.tokenPermissions.uses.taskLabels' },
+  { route: 'task_relations', permission: 'create, delete', use: 'settings.tokenPermissions.uses.taskRelations' },
+  { route: 'task_attachments', permission: 'read_all, create, delete', use: 'settings.tokenPermissions.uses.taskAttachments' },
+  { route: 'project_views', permission: 'read_all', use: 'settings.tokenPermissions.uses.projectViews' },
+]
 
 function TokenPermissionsInfo() {
+  const { t } = useTranslation()
   const [open, setOpen] = useState(false)
 
   return (
@@ -20,59 +37,31 @@ function TokenPermissionsInfo() {
             ? 'bg-accent-fill text-on-accent'
             : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:bg-accent-blue/20 hover:text-accent-blue'
         )}
-        aria-label="Token permissions info"
+        aria-label={t('settings.tokenPermissions.label')}
       >
         i
       </button>
       {open && (
         <div className="absolute left-0 top-6 z-10 w-80 rounded-popover border border-[var(--border-color)] bg-[var(--bg-primary)] p-3 shadow-lg">
           <p className="mb-2 text-xs text-[var(--text-secondary)]">
-            Your API token needs these permissions:
+            {t('settings.tokenPermissions.intro')}
           </p>
           <table className="w-full text-xs">
             <thead>
               <tr className="border-b border-[var(--border-color)] text-left text-[var(--text-secondary)]">
-                <th className="pb-1.5 pr-2 font-medium">Route</th>
-                <th className="pb-1.5 pr-2 font-medium">Permission</th>
-                <th className="pb-1.5 font-medium">Used for</th>
+                <th className="pb-1.5 pr-2 font-medium">{t('settings.tokenPermissions.route')}</th>
+                <th className="pb-1.5 pr-2 font-medium">{t('settings.tokenPermissions.permission')}</th>
+                <th className="pb-1.5 font-medium">{t('settings.tokenPermissions.usedFor')}</th>
               </tr>
             </thead>
             <tbody className="text-[var(--text-primary)]">
-              <tr className="border-b border-border/50">
-                <td className="py-1.5 pr-2 font-mono text-caption">tasks</td>
-                <td className="py-1.5 pr-2">read_all, create, update, delete</td>
-                <td className="py-1.5">Task CRUD</td>
-              </tr>
-              <tr className="border-b border-border/50">
-                <td className="py-1.5 pr-2 font-mono text-caption">projects</td>
-                <td className="py-1.5 pr-2">read_all, create, update, delete</td>
-                <td className="py-1.5">Project CRUD</td>
-              </tr>
-              <tr className="border-b border-border/50">
-                <td className="py-1.5 pr-2 font-mono text-caption">labels</td>
-                <td className="py-1.5 pr-2">read_all, create, update, delete</td>
-                <td className="py-1.5">Label CRUD</td>
-              </tr>
-              <tr className="border-b border-border/50">
-                <td className="py-1.5 pr-2 font-mono text-caption">task_labels</td>
-                <td className="py-1.5 pr-2">create, delete</td>
-                <td className="py-1.5">Adding/removing labels</td>
-              </tr>
-              <tr className="border-b border-border/50">
-                <td className="py-1.5 pr-2 font-mono text-caption">task_relations</td>
-                <td className="py-1.5 pr-2">create, delete</td>
-                <td className="py-1.5">Subtasks & relations</td>
-              </tr>
-              <tr className="border-b border-border/50">
-                <td className="py-1.5 pr-2 font-mono text-caption">task_attachments</td>
-                <td className="py-1.5 pr-2">read_all, create, delete</td>
-                <td className="py-1.5">File attachments</td>
-              </tr>
-              <tr>
-                <td className="py-1.5 pr-2 font-mono text-caption">project_views</td>
-                <td className="py-1.5 pr-2">read_all</td>
-                <td className="py-1.5">Position sorting</td>
-              </tr>
+              {TOKEN_PERMISSIONS.map((row, index) => (
+                <tr key={row.route} className={index < TOKEN_PERMISSIONS.length - 1 ? 'border-b border-border/50' : undefined}>
+                  <td className="py-1.5 pr-2 font-mono text-caption">{row.route}</td>
+                  <td className="py-1.5 pr-2">{row.permission}</td>
+                  <td className="py-1.5">{t(row.use)}</td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
@@ -82,6 +71,18 @@ function TokenPermissionsInfo() {
 }
 
 export { TokenPermissionsInfo }
+
+/** The web version's "Remember on this browser" choice for an API token; its host reads the key when it saves the connection. */
+const REMEMBER_TOKEN_KEY = 'vicu-web-remember-token'
+
+function rememberTokenChoice(remember: boolean): void {
+  try {
+    if (remember) localStorage.setItem(REMEMBER_TOKEN_KEY, '1')
+    else localStorage.removeItem(REMEMBER_TOKEN_KEY)
+  } catch {
+    // Storage is blocked: the token is then simply not remembered.
+  }
+}
 
 type Step = 'url' | 'auth-method' | 'oidc-login' | 'oidc-totp' | 'password-login' | 'totp' | 'api-token' | 'project'
 
@@ -93,13 +94,20 @@ interface SetupViewProps {
 }
 
 export function SetupView({ onComplete }: SetupViewProps) {
+  const { t } = useTranslation()
+  // The web version is served next to its server, so the server is this page's own origin and no
+  // address is asked for; its SSO sign-in leaves the page and comes back (api.pendingSignIn).
+  const web = isWebHost()
+  const ownServer = !can('serverChoice')
   const [step, setStep] = useState<Step>('url')
   // Which way the step slid (card 4.11a), read while rendering so the new step starts sliding in its first frame.
   const shown = useRef<{ step: Step; direction: 'forward' | 'back' | null }>({ step: 'url', direction: null })
   if (shown.current.step !== step) {
     shown.current = { step, direction: STEP_ORDER.indexOf(step) >= STEP_ORDER.indexOf(shown.current.step) ? 'forward' : 'back' }
   }
-  const [url, setUrl] = useState('')
+  const [url, setUrl] = useState(ownServer ? window.location.origin : '')
+  // Web: keep an API token on this browser between visits (off: it is forgotten when the browser closes).
+  const [rememberToken, setRememberToken] = useState(false)
   const [token, setToken] = useState('')
   const [showToken, setShowToken] = useState(false)
   const [inboxProjectId, setInboxProjectId] = useState(0)
@@ -143,31 +151,83 @@ export function SetupView({ onComplete }: SetupViewProps) {
 
   const DEFAULT_URL = 'https://app.vikunja.cloud'
 
-  const autoSelectInbox = (projectList: Project[]) => {
-    const inbox = projectList.find((p) => p.title.toLowerCase() === 'inbox')
-    if (inbox) setInboxProjectId(inbox.id)
-  }
-
-  /**
-   * The Inbox syncs (cross-app semantics 11.4): before asking, read the account's synced Inbox and
-   * preselect it; without one, Vikunja's default project; else a project called Inbox. An API-token
-   * setup passes its token, a sign-in uses the session it just stored. Offline it works as before.
-   */
-  const preselectInbox = async (projectList: Project[], apiToken?: string) => {
-    autoSelectInbox(projectList)
+  const completeSetup = async (
+    chosenInboxId: number,
+    method: 'api_token' | 'oidc' | 'password',
+    apiToken?: string,
+    isLive: () => boolean = () => true,
+  ) => {
+    setSaving(true)
     try {
-      const prefs = await api.readSetupPreferences(url.replace(/\/+$/, ''), apiToken)
-      const exists = (id: number | null): id is number => !!id && projectList.some((project) => project.id === id)
-      if (exists(prefs.inboxProjectId)) setInboxProjectId(prefs.inboxProjectId)
-      else if (exists(prefs.defaultProjectId)) setInboxProjectId(prefs.defaultProjectId)
-    } catch {
-      // Nothing synced could be read: the user chooses as before.
+      const effectiveToken = method === 'api_token' ? (apiToken ?? token) : ''
+      if (web && method === 'api_token' && effectiveToken) rememberTokenChoice(rememberToken)
+      // Main merges the connection details into the existing config, so app preferences
+      // are preserved. If the server URL changed it also resets account-specific data
+      // (project IDs, custom lists, etc.), since those belong to the previous server/account.
+      await api.saveConnectionConfig({
+        vikunja_url: url.replace(/\/+$/, ''),
+        api_token: effectiveToken,
+        inbox_project_id: chosenInboxId,
+        auth_method: method,
+      })
+      // If the user is coming from standalone mode, push their local tasks to
+      // the freshly chosen inbox so nothing is stranded in offline-cache.json.
+      if (can('standalone')) {
+        try {
+          const standaloneCount = await api.getStandaloneTaskCount()
+          if (standaloneCount > 0 && chosenInboxId) {
+            await api.uploadStandaloneTasks(chosenInboxId)
+          }
+        } catch {
+          // Best effort — tasks stay in the local store and upload can be retried
+          // by re-running setup.
+        }
+      }
+      if (isLive()) onComplete()
+    } finally {
+      if (isLive()) setSaving(false)
     }
   }
 
-  const handleUrlContinue = async () => {
-    const effectiveUrl = url.trim() || DEFAULT_URL
-    if (!url.trim()) setUrl(effectiveUrl)
+  /**
+   * The Inbox syncs (cross-app semantics 11.4): before asking, read the account's synced Inbox.
+   * When it exists in the user's projects, reuse it and finish setup straight away; otherwise
+   * ask with Vikunja's default project or a project called Inbox preselected. An API-token setup
+   * passes its token, a sign-in uses the session it just stored. Offline it works as before.
+   */
+  const advanceAfterAuth = async (
+    projectList: Project[],
+    method: 'api_token' | 'oidc' | 'password',
+    apiToken?: string,
+    isLive: () => boolean = () => true,
+  ) => {
+    setAuthMethod(method)
+    setProjects(projectList)
+    let prefs: { inboxProjectId: number | null; defaultProjectId: number | null } | null = null
+    try {
+      prefs = await api.readSetupPreferences(url.replace(/\/+$/, ''), apiToken)
+    } catch {
+      // Nothing synced could be read: the user chooses as before.
+    }
+    if (!isLive()) return
+    const resolved = resolveSetupInbox(projectList, prefs)
+    if (resolved.kind === 'synced') {
+      setInboxProjectId(resolved.inboxProjectId)
+      try {
+        await completeSetup(resolved.inboxProjectId, method, apiToken, isLive)
+        return
+      } catch {
+        // Could not finish automatically: fall back to the Inbox step with it preselected.
+        if (!isLive()) return
+      }
+    } else {
+      setInboxProjectId(resolved.preselectedId)
+    }
+    setStep('project')
+  }
+
+  /** Ask the server how it signs people in, and go to the step that follows. */
+  const discoverServer = async (effectiveUrl: string): Promise<ServerAuthInfo> => {
     setDiscovering(true)
     const authInfo = await api.discoverAuthMethods(effectiveUrl.replace(/\/+$/, ''))
     setServerAuth(authInfo)
@@ -179,7 +239,54 @@ export function SetupView({ onComplete }: SetupViewProps) {
     } else {
       setStep('api-token')
     }
+    return authInfo
   }
+
+  const handleUrlContinue = async () => {
+    const effectiveUrl = url.trim() || DEFAULT_URL
+    if (!url.trim()) setUrl(effectiveUrl)
+    await discoverServer(effectiveUrl)
+  }
+
+  // Without a server to choose (the web version) setup starts by asking the page's own server how it
+  // signs in. On the web an SSO sign-in leaves the page and returns here: its outcome is read once,
+  // and a session that already exists goes straight to choosing the Inbox.
+  useEffect(() => {
+    if (!ownServer) return
+    let live = true
+    const begin = async () => {
+      const pending = web ? await api.pendingSignIn().catch(() => null) : null
+      if (!live) return
+      // A sign-in that came back and worked, or a session that is already there (a reload half way).
+      if (web && setupResume(pending) === 'try-session') {
+        const projectsResult = await api.fetchProjects().catch(() => null)
+        if (!live) return
+        if (projectsResult?.success) {
+          const config = await api.getConfig().catch(() => null)
+          if (!live) return
+          const method = config?.auth_method === 'password' ? 'password' : config?.auth_method === 'api_token' ? 'api_token' : 'oidc'
+          await advanceAfterAuth(projectsResult.data, method, undefined, () => live)
+          return
+        }
+      }
+      const authInfo = await discoverServer(window.location.origin)
+      if (!live || !pending) return
+      const provider = authInfo.oidc_providers.find((p) => p.key === pending.providerKey)
+      if (provider) setSelectedOidcProvider(provider)
+      if (pending.totpRequired && provider) {
+        setOidcMode('window')
+        setTotpCode('')
+        setStep('oidc-totp')
+      } else if (pending.error) {
+        setOidcError(pending.error)
+      }
+    }
+    void begin()
+    return () => {
+      live = false
+    }
+    // Once, when the view opens.
+  }, [])
 
   const showBrowserSignIn = (provider: OIDCProvider, prompted: boolean) => {
     setSelectedOidcProvider(provider)
@@ -212,13 +319,10 @@ export function SetupView({ onComplete }: SetupViewProps) {
       )
 
       if (result.success) {
-        setAuthMethod('oidc')
         // Fetch projects using the now-stored OIDC token
         const projectsResult = await api.fetchProjects()
         if (projectsResult.success) {
-          setProjects(projectsResult.data)
-          await preselectInbox(projectsResult.data)
-          setStep('project')
+          await advanceAfterAuth(projectsResult.data, 'oidc')
         } else {
           setOidcError(projectsResult.error)
         }
@@ -232,7 +336,7 @@ export function SetupView({ onComplete }: SetupViewProps) {
         setOidcError(result.error)
       }
     } catch {
-      setOidcError('Login failed unexpectedly. Please try again.')
+      setOidcError(t('setup.loginFailed'))
     } finally {
       setOidcLogging(false)
     }
@@ -258,12 +362,9 @@ export function SetupView({ onComplete }: SetupViewProps) {
       )
 
       if (result.success) {
-        setAuthMethod('password')
         const projectsResult = await api.fetchProjects()
         if (projectsResult.success) {
-          setProjects(projectsResult.data)
-          await preselectInbox(projectsResult.data)
-          setStep('project')
+          await advanceAfterAuth(projectsResult.data, 'password')
         } else {
           setPasswordError(projectsResult.error)
         }
@@ -275,7 +376,7 @@ export function SetupView({ onComplete }: SetupViewProps) {
         setPasswordError(result.error)
       }
     } catch {
-      setPasswordError('Login failed unexpectedly. Please try again.')
+      setPasswordError(t('setup.loginFailed'))
     } finally {
       setPasswordLogging(false)
     }
@@ -284,13 +385,12 @@ export function SetupView({ onComplete }: SetupViewProps) {
   const handleTestConnection = async () => {
     setTestStatus('testing')
     setTestError('')
+    // The web version reads this when the connection is saved: a remembered token stays on this browser.
+    if (web) rememberTokenChoice(rememberToken)
     const result = await api.testConnection(url.replace(/\/+$/, ''), token)
     if (result.success) {
       setTestStatus('success')
-      setProjects(result.data)
-      await preselectInbox(result.data, token)
-      setAuthMethod('api_token')
-      setStep('project')
+      await advanceAfterAuth(result.data, 'api_token', token)
     } else {
       setTestStatus('error')
       setTestError(result.error)
@@ -298,29 +398,7 @@ export function SetupView({ onComplete }: SetupViewProps) {
   }
 
   const handleSave = async () => {
-    setSaving(true)
-    // Main merges the connection details into the existing config, so app preferences
-    // are preserved. If the server URL changed it also resets account-specific data
-    // (project IDs, custom lists, etc.), since those belong to the previous server/account.
-    await api.saveConnectionConfig({
-      vikunja_url: url.replace(/\/+$/, ''),
-      api_token: authMethod === 'api_token' ? token : '',
-      inbox_project_id: inboxProjectId,
-      auth_method: authMethod,
-    })
-    // If the user is coming from standalone mode, push their local tasks to
-    // the freshly chosen inbox so nothing is stranded in offline-cache.json.
-    try {
-      const standaloneCount = await api.getStandaloneTaskCount()
-      if (standaloneCount > 0 && inboxProjectId) {
-        await api.uploadStandaloneTasks(inboxProjectId)
-      }
-    } catch {
-      // Best effort — tasks stay in the local store and upload can be retried
-      // by re-running setup.
-    }
-    setSaving(false)
-    onComplete()
+    await completeSetup(inboxProjectId, authMethod)
   }
 
   return (
@@ -336,31 +414,33 @@ export function SetupView({ onComplete }: SetupViewProps) {
           {logoUrl && <img src={logoUrl} alt="" className="h-12 w-12" />}
         </div>
         <h1 className="mb-1 text-page-title text-[var(--text-primary)]">
-          Welcome to Vicu
+          {t('setup.welcome')}
         </h1>
         <p className="mb-6 text-sm text-text-secondary">
-          {step === 'url' && 'Enter your Vikunja server URL to get started.'}
-          {step === 'auth-method' && 'Choose how to sign in.'}
-          {step === 'oidc-login' && 'Complete sign-in in your browser.'}
-          {step === 'oidc-totp' && 'Enter your two-factor code to complete SSO.'}
-          {step === 'password-login' && 'Sign in with your credentials.'}
-          {step === 'totp' && 'Enter your two-factor authentication code.'}
-          {step === 'api-token' && 'Enter your API token to connect.'}
-          {step === 'project' && 'Choose your inbox project.'}
+          {step === 'url' && !ownServer && t('setup.intro.url')}
+          {step === 'auth-method' && t('setup.intro.authMethod')}
+          {step === 'oidc-login' && t('setup.intro.oidcLogin')}
+          {step === 'oidc-totp' && t('setup.intro.oidcTotp')}
+          {step === 'password-login' && t('setup.intro.passwordLogin')}
+          {step === 'totp' && t('setup.intro.totp')}
+          {step === 'api-token' && t('setup.intro.apiToken')}
+          {step === 'project' && t('setup.intro.project')}
         </p>
 
         <div key={step} data-step={step} data-step-direction={shown.current.direction ?? undefined} className={cn('space-y-4', shown.current.direction === 'forward' && 'vicu-step-forward', shown.current.direction === 'back' && 'vicu-step-back')}>
           {/* Step 1: URL Input */}
-          {step === 'url' && (
+          {/* With the server fixed (the web version) this step has nothing to ask: discovery is already running. */}
+          {step === 'url' && !ownServer && (
             <>
               <div>
                 <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">
-                  Server URL
+                  {t('setup.serverUrl')}
                 </label>
                 <input
                   type="url"
                   value={url}
                   onChange={(e) => setUrl(e.target.value)}
+                  // i18n-ignore: an example address
                   placeholder="https://app.vikunja.cloud"
                   className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-text-secondary/50"
                   onKeyDown={(e) => {
@@ -375,18 +455,22 @@ export function SetupView({ onComplete }: SetupViewProps) {
                 disabled={discovering}
                 className="w-full"
               >
-                {discovering ? 'Checking...' : 'Continue'}
+                {discovering ? t('setup.checking') : t('setup.continue')}
               </Button>
 
               <p className="text-center text-xs text-[var(--text-secondary)]">
-                Don't have an account?{' '}
-                <button
-                  type="button"
-                  onClick={() => window.api.openDeepLink('https://vikunja.cloud/register')}
-                  className="text-accent-blue hover:underline"
-                >
-                  Sign up
-                </button>
+                <Trans
+                  i18nKey="setup.noAccount"
+                  components={{
+                    signUp: (
+                      <button
+                        type="button"
+                        onClick={() => window.api.openDeepLink('https://vikunja.cloud/register')}
+                        className="text-accent-blue hover:underline"
+                      />
+                    ),
+                  }}
+                />
               </p>
             </>
           )}
@@ -402,18 +486,18 @@ export function SetupView({ onComplete }: SetupViewProps) {
                   disabled={oidcLogging}
                   className="w-full"
                 >
-                  {oidcLogging ? 'Waiting for sign-in...' : `Sign in with ${provider.name}`}
+                  {oidcLogging ? t('setup.waitingForSignIn') : t('setup.signInWith', { provider: provider.name })}
                 </Button>
               ))}
 
-              {oidcProviders.length > 0 && (
+              {oidcProviders.length > 0 && !web && (
                 <Button
                   variant="quiet"
                   onClick={() => showBrowserSignIn(oidcProviders.find((p) => p.key === selectedOidcProvider?.key) ?? oidcProviders[0], false)}
                   disabled={oidcLogging}
                   className="w-full"
                 >
-                  Uses a passkey? Sign in through your browser
+                  {t('setup.passkeyBrowser')}
                 </Button>
               )}
 
@@ -422,7 +506,7 @@ export function SetupView({ onComplete }: SetupViewProps) {
                   {oidcProviders.length > 0 && (
                     <div className="flex items-center gap-3">
                       <div className="h-px flex-1 bg-[var(--border-color)]" />
-                      <span className="text-xs text-[var(--text-secondary)]">or</span>
+                      <span className="text-xs text-[var(--text-secondary)]">{t('setup.or')}</span>
                       <div className="h-px flex-1 bg-[var(--border-color)]" />
                     </div>
                   )}
@@ -435,7 +519,7 @@ export function SetupView({ onComplete }: SetupViewProps) {
                     }}
                     className="w-full"
                   >
-                    Sign in with username & password
+                    {t('setup.signInWithPassword')}
                   </Button>
                 </>
               )}
@@ -446,27 +530,29 @@ export function SetupView({ onComplete }: SetupViewProps) {
 
               <div className="flex items-center gap-3">
                 <div className="h-px flex-1 bg-[var(--border-color)]" />
-                <span className="text-xs text-[var(--text-secondary)]">or</span>
+                <span className="text-xs text-[var(--text-secondary)]">{t('setup.or')}</span>
                 <div className="h-px flex-1 bg-[var(--border-color)]" />
               </div>
 
               <Button variant="secondary" onClick={() => setStep('api-token')} className="w-full">
-                Use API Token instead
+                {t('setup.useApiToken')}
               </Button>
 
-              <Button variant="quiet" onClick={() => setStep('url')} className="w-full">
-                Back
-              </Button>
+              {!ownServer && (
+                <Button variant="quiet" onClick={() => setStep('url')} className="w-full">
+                  {t('setup.back')}
+                </Button>
+              )}
             </>
           )}
 
           {/* Step 2a: OIDC sign-in in the browser */}
-          {step === 'oidc-login' && selectedOidcProvider && (
+          {step === 'oidc-login' && !web && selectedOidcProvider && (
             <>
               {oidcProviders.length > 1 && (
                 <div>
                   <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">
-                    Provider
+                    {t('setup.provider')}
                   </label>
                   <select
                     value={selectedOidcProvider.key}
@@ -504,7 +590,7 @@ export function SetupView({ onComplete }: SetupViewProps) {
                 }}
                 className="w-full"
               >
-                Back
+                {t('setup.back')}
               </Button>
             </>
           )}
@@ -514,7 +600,7 @@ export function SetupView({ onComplete }: SetupViewProps) {
             <>
               <div>
                 <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">
-                  Two-Factor Code
+                  {t('setup.twoFactorCode')}
                 </label>
                 <input
                   type="text"
@@ -532,7 +618,7 @@ export function SetupView({ onComplete }: SetupViewProps) {
                   }}
                 />
                 <p className="mt-1.5 text-xs text-[var(--text-secondary)]">
-                  Enter the 6-digit code from your authenticator app. Vikunja requires a fresh SSO authorization after the challenge.
+                  {t('setup.totpHintSso')}
                 </p>
               </div>
 
@@ -542,12 +628,12 @@ export function SetupView({ onComplete }: SetupViewProps) {
                 disabled={totpCode.length !== 6 || oidcLogging}
                 className="w-full"
               >
-                {oidcLogging ? 'Waiting for sign-in...' : 'Continue with SSO'}
+                {oidcLogging ? t('setup.waitingForSignIn') : t('setup.continueWithSso')}
               </Button>
 
               {oidcLogging && oidcMode === 'browser' && (
                 <Button variant="secondary" onClick={() => api.cancelOidcBrowserLogin()} className="w-full">
-                  Cancel
+                  {t('setup.cancel')}
                 </Button>
               )}
 
@@ -565,7 +651,7 @@ export function SetupView({ onComplete }: SetupViewProps) {
                 }}
                 className="w-full"
               >
-                Back
+                {t('setup.back')}
               </Button>
             </>
           )}
@@ -575,13 +661,13 @@ export function SetupView({ onComplete }: SetupViewProps) {
             <>
               <div>
                 <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">
-                  Username or Email
+                  {t('setup.usernameOrEmail')}
                 </label>
                 <input
                   type="text"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  placeholder="Enter your username or email"
+                  placeholder={t('setup.usernamePlaceholder')}
                   autoComplete="username"
                   className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-text-secondary/50"
                   onKeyDown={(e) => {
@@ -592,14 +678,14 @@ export function SetupView({ onComplete }: SetupViewProps) {
 
               <div>
                 <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">
-                  Password
+                  {t('setup.password')}
                 </label>
                 <div className="relative">
                   <input
                     type={showPassword ? 'text' : 'password'}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Enter your password"
+                    placeholder={t('setup.passwordPlaceholder')}
                     autoComplete="current-password"
                     className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2 pr-16 text-sm text-[var(--text-primary)] placeholder:text-text-secondary/50"
                     onKeyDown={(e) => {
@@ -611,7 +697,7 @@ export function SetupView({ onComplete }: SetupViewProps) {
                     onClick={() => setShowPassword(!showPassword)}
                     className="absolute right-2 top-1/2 -translate-y-1/2 rounded-control px-2 py-0.5 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                   >
-                    {showPassword ? 'Hide' : 'Show'}
+                    {showPassword ? t('setup.hide') : t('setup.show')}
                   </button>
                 </div>
               </div>
@@ -622,7 +708,7 @@ export function SetupView({ onComplete }: SetupViewProps) {
                 disabled={!username || !password || passwordLogging}
                 className="w-full"
               >
-                {passwordLogging ? 'Signing in...' : 'Sign In'}
+                {passwordLogging ? t('setup.signingIn') : t('setup.signIn')}
               </Button>
 
               {passwordError && (
@@ -633,11 +719,11 @@ export function SetupView({ onComplete }: SetupViewProps) {
                 variant="quiet"
                 onClick={() => {
                   setPasswordError('')
-                  setStep(serverAuth?.oidc_enabled ? 'auth-method' : 'url')
+                  setStep(serverAuth?.oidc_enabled || ownServer ? 'auth-method' : 'url')
                 }}
                 className="w-full"
               >
-                Back
+                {t('setup.back')}
               </Button>
             </>
           )}
@@ -647,7 +733,7 @@ export function SetupView({ onComplete }: SetupViewProps) {
             <>
               <div>
                 <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">
-                  Two-Factor Code
+                  {t('setup.twoFactorCode')}
                 </label>
                 <input
                   type="text"
@@ -662,7 +748,7 @@ export function SetupView({ onComplete }: SetupViewProps) {
                   }}
                 />
                 <p className="mt-1.5 text-xs text-[var(--text-secondary)]">
-                  Enter the 6-digit code from your authenticator app.
+                  {t('setup.totpHint')}
                 </p>
               </div>
 
@@ -672,7 +758,7 @@ export function SetupView({ onComplete }: SetupViewProps) {
                 disabled={totpCode.length !== 6 || passwordLogging}
                 className="w-full"
               >
-                {passwordLogging ? 'Verifying...' : 'Verify'}
+                {passwordLogging ? t('setup.verifying') : t('setup.verify')}
               </Button>
 
               {passwordError && (
@@ -688,7 +774,7 @@ export function SetupView({ onComplete }: SetupViewProps) {
                 }}
                 className="w-full"
               >
-                Back
+                {t('setup.back')}
               </Button>
             </>
           )}
@@ -696,18 +782,20 @@ export function SetupView({ onComplete }: SetupViewProps) {
           {/* Step 3b: API Token */}
           {step === 'api-token' && (
             <>
+              {!ownServer && (
               <div>
                 <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">
-                  Server URL
+                  {t('setup.serverUrl')}
                 </label>
                 <div className="rounded-control border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-secondary)]">
                   {url}
                 </div>
               </div>
+              )}
 
               <div>
                 <label className="mb-1 flex items-center text-xs font-medium text-[var(--text-secondary)]">
-                  API Token
+                  {t('setup.apiToken')}
                   <TokenPermissionsInfo />
                 </label>
                 <div className="relative">
@@ -715,7 +803,7 @@ export function SetupView({ onComplete }: SetupViewProps) {
                     type={showToken ? 'text' : 'password'}
                     value={token}
                     onChange={(e) => setToken(e.target.value)}
-                    placeholder="Enter your API token"
+                    placeholder={t('setup.apiTokenPlaceholder')}
                     className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2 pr-16 text-sm text-[var(--text-primary)] placeholder:text-text-secondary/50"
                   />
                   <button
@@ -723,10 +811,20 @@ export function SetupView({ onComplete }: SetupViewProps) {
                     onClick={() => setShowToken(!showToken)}
                     className="absolute right-2 top-1/2 -translate-y-1/2 rounded-control px-2 py-0.5 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                   >
-                    {showToken ? 'Hide' : 'Show'}
+                    {showToken ? t('setup.hide') : t('setup.show')}
                   </button>
                 </div>
               </div>
+
+              {web && (
+                <label className="flex cursor-pointer items-start gap-2">
+                  <Checkbox checked={rememberToken} onChange={(e) => setRememberToken(e.target.checked)} />
+                  <span>
+                    <span className="block text-sm text-[var(--text-primary)]">{t('settings.webToken.remember')}</span>
+                    <span className="block text-xs text-[var(--text-secondary)]">{t('settings.webToken.rememberHint')}</span>
+                  </span>
+                </label>
+              )}
 
               <Button
                 variant="primary"
@@ -734,11 +832,11 @@ export function SetupView({ onComplete }: SetupViewProps) {
                 disabled={!token || testStatus === 'testing'}
                 className="w-full"
               >
-                {testStatus === 'testing' ? 'Testing...' : 'Test Connection'}
+                {testStatus === 'testing' ? t('setup.testing') : t('setup.testConnection')}
               </Button>
 
               {testStatus === 'error' && (
-                <p className="text-xs text-danger">{testError || 'Connection failed'}</p>
+                <p className="text-xs text-danger">{testError || t('setup.connectionFailed')}</p>
               )}
 
               <Button
@@ -750,7 +848,7 @@ export function SetupView({ onComplete }: SetupViewProps) {
                 }}
                 className="w-full"
               >
-                Back
+                {t('setup.back')}
               </Button>
             </>
           )}
@@ -759,25 +857,25 @@ export function SetupView({ onComplete }: SetupViewProps) {
           {step === 'project' && (
             <>
               {authMethod === 'oidc' && (
-                <p className="text-xs text-status-done">Signed in via SSO</p>
+                <p className="text-xs text-status-done">{t('setup.signedInSso')}</p>
               )}
               {authMethod === 'password' && (
-                <p className="text-xs text-status-done">Signed in successfully</p>
+                <p className="text-xs text-status-done">{t('setup.signedIn')}</p>
               )}
               {authMethod === 'api_token' && (
-                <p className="text-xs text-status-done">Connected successfully</p>
+                <p className="text-xs text-status-done">{t('setup.connected')}</p>
               )}
 
               <div>
                 <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">
-                  Inbox Project
+                  {t('setup.inboxProject')}
                 </label>
                 <select
                   value={inboxProjectId}
                   onChange={(e) => setInboxProjectId(Number(e.target.value))}
                   className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)]"
                 >
-                  <option value={0}>Select a project...</option>
+                  <option value={0}>{t('setup.selectProject')}</option>
                   {projects.map((p) => (
                     <option key={p.id} value={p.id}>{p.title}</option>
                   ))}
@@ -790,7 +888,7 @@ export function SetupView({ onComplete }: SetupViewProps) {
                 disabled={!inboxProjectId || saving}
                 className="w-full"
               >
-                {saving ? 'Saving...' : 'Save & Continue'}
+                {saving ? t('setup.saving') : t('setup.saveContinue')}
               </Button>
             </>
           )}

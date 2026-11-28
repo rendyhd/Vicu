@@ -1,4 +1,5 @@
 import { isAuthError, isRetriableError } from './error-classify'
+import { t } from '../../shared/i18n'
 
 /**
  * An API failure that keeps the HTTP status, so the message shown to the user can say what kind of
@@ -10,18 +11,21 @@ export class ApiError extends Error {
   readonly mayExist: boolean
   /** The API token lacks the permission for this request (cross-app semantics 9.7): the message says which. */
   readonly tokenPermission: boolean
+  /** Something in front of Vikunja (a sign-in proxy) answered with a web page: the message says what to do. */
+  readonly notApiResponse: boolean
 
-  constructor(message: string, statusCode?: number, mayExist = false, tokenPermission = false) {
+  constructor(message: string, statusCode?: number, mayExist = false, tokenPermission = false, notApiResponse = false) {
     super(message)
     this.name = 'ApiError'
     this.statusCode = statusCode
     this.mayExist = mayExist
     this.tokenPermission = tokenPermission
+    this.notApiResponse = notApiResponse
   }
 }
 
-export function apiError(result: { error: string; statusCode?: number; mayExist?: boolean; tokenPermission?: boolean }): ApiError {
-  return new ApiError(result.error, result.statusCode, result.mayExist === true, result.tokenPermission === true)
+export function apiError(result: { error: string; statusCode?: number; mayExist?: boolean; tokenPermission?: boolean; notApiResponse?: boolean }): ApiError {
+  return new ApiError(result.error, result.statusCode, result.mayExist === true, result.tokenPermission === true, result.notApiResponse === true)
 }
 
 export type FailureKind = 'offline' | 'auth' | 'forbidden' | 'not-found' | 'rate-limit' | 'server' | 'rejected' | 'unknown'
@@ -54,21 +58,23 @@ export function describeMutationError(error: unknown): MutationFailure {
   if (error instanceof ApiError && error.mayExist && text) return { kind: 'unknown', message: text }
   // The session works; the token lacks this one permission, and the message says how to give it.
   if (error instanceof ApiError && error.tokenPermission && text) return { kind: 'forbidden', message: text }
+  // A sign-in page in front of Vikunja answered: like being offline, with the message that says to sign in there.
+  if (error instanceof ApiError && error.notApiResponse && text) return { kind: 'offline', message: text }
 
   if (status === 401 || isAuthError(raw)) {
-    return { kind: 'auth', message: 'Your session has expired. Sign in again to keep syncing.' }
+    return { kind: 'auth', message: t('errors.sessionExpired') }
   }
-  if (status === 403) return { kind: 'forbidden', message: "You don't have permission to do that." }
-  if (status === 404) return { kind: 'not-found', message: 'That item no longer exists. It may have been deleted elsewhere.' }
-  if (status === 429) return { kind: 'rate-limit', message: 'The server is busy. Try again in a moment.' }
+  if (status === 403) return { kind: 'forbidden', message: t('errors.forbidden') }
+  if (status === 404) return { kind: 'not-found', message: t('errors.notFound') }
+  if (status === 429) return { kind: 'rate-limit', message: t('errors.busy') }
   if (status !== undefined && status >= 500) {
-    return { kind: 'server', message: `The server had a problem (HTTP ${status}). Try again in a moment.` }
+    return { kind: 'server', message: t('errors.serverProblem', { status }) }
   }
   if (status === undefined && isRetriableError(raw)) {
-    return { kind: 'offline', message: "Can't reach the server. Check your connection and try again." }
+    return { kind: 'offline', message: t('errors.offline') }
   }
-  if (status !== undefined) return { kind: 'rejected', message: text || `The server refused the change (HTTP ${status}).` }
-  return { kind: 'unknown', message: text || 'Something went wrong. Try again.' }
+  if (status !== undefined) return { kind: 'rejected', message: text || t('errors.refused', { status }) }
+  return { kind: 'unknown', message: text || t('errors.unknown') }
 }
 
 /** What a mutation can say about itself to the global error handler. */
@@ -95,6 +101,6 @@ export function toastForMutationError(error: unknown, meta: MutationMeta | undef
   const action = typeof meta?.action === 'string' && meta.action ? meta.action : null
   return {
     kind: failure.kind,
-    message: action ? `Could not ${action}: ${failure.message}` : failure.message,
+    message: action ? t('errors.couldNot', { action, message: failure.message }) : failure.message,
   }
 }

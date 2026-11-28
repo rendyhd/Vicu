@@ -10,6 +10,7 @@
  * stays pure and import-light.
  */
 import { addLocalDays, type LocalDate } from '../due-dates'
+import { getWeekStart } from '../week-start'
 import { AI_LIMITS, DICTATION_FIELDS, type DraftField } from './contract'
 import type { BrainDumpDraft } from './brain-dump'
 
@@ -236,6 +237,8 @@ export interface TaskCheckOptions {
   noDefaultDue?: boolean
   /** A brain dump: where a non-empty `project_ref` leads, decided before step 5. */
   projectRef?: (ref: string) => ProjectRefTarget
+  /** Notes (4.9): fields of its own added to the end of each kept draft, from the task as answered. */
+  extendDraft?: (task: Record<string, unknown>) => Record<string, unknown>
 }
 
 /**
@@ -402,6 +405,7 @@ export function checkTasks(
       place,
       subtasks,
       guessed: sortedFields(guessed),
+      ...(options.extendDraft ? options.extendDraft(task as unknown as Record<string, unknown>) : {}),
     })
   })
 
@@ -450,7 +454,7 @@ export function dictationContextJson(input: DictationContextInput): string {
     now,
     weekday: weekdayName(now.slice(0, 10)),
     time_zone: input.timeZone,
-    week_starts: 'monday',
+    week_starts: getWeekStart(),
     list: input.list,
     default_project_id: input.default_project_id,
     projects: [...input.projects]

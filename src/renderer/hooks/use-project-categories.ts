@@ -22,6 +22,7 @@ import {
   type CategoryWrites,
 } from '../../shared/project-categories'
 import type { SyncedPrefsSnapshot } from '../../shared/synced-prefs'
+import { t } from '../../shared/i18n'
 
 const DELETE_TOAST_KEY = 'category-delete'
 
@@ -93,7 +94,7 @@ export function useProjectCategoryActions() {
     async (name: string): Promise<string | null> => {
       const id = newCategoryId()
       if (!(await write(planNewCategory(valuesOf(qc), id, name)))) return null
-      announce(`Created category “${name.trim()}”`)
+      announce(t('projects.categoryActions.created', { name: name.trim() }))
       return id
     },
     [qc, write],
@@ -112,7 +113,7 @@ export function useProjectCategoryActions() {
       const index = order.indexOf(categoryId)
       if (index < 0) return
       void write(planMoveCategory(values, categoryId, index + delta))
-      announce(`Moved “${nameOf(values, categoryId)}” ${delta < 0 ? 'up' : 'down'}`)
+      announce(t(delta < 0 ? 'projects.categoryActions.movedUp' : 'projects.categoryActions.movedDown', { name: nameOf(values, categoryId) }))
     },
     [qc, write],
   )
@@ -126,11 +127,11 @@ export function useProjectCategoryActions() {
       const previous: CategoryWrites = {}
       for (const key of Object.keys(writes)) previous[key] = values[key] ?? null
       if (!(await write(writes))) return
-      const message = `Deleted category “${name}”`
+      const message = t('projects.categoryActions.deleted', { name })
       toast.success(message, {
         key: DELETE_TOAST_KEY,
         durationMs: UNDO_TOAST_MS,
-        action: { label: 'Undo', onAction: () => void write(previous) },
+        action: { label: t('app.undo'), onAction: () => void write(previous) },
       })
       announce(message)
     },
@@ -171,7 +172,7 @@ export function useProjectCategoryActions() {
   const addAbove = useCallback(
     async (project: Pick<Project, 'id'>, name: string) => {
       const writes = planAddCategoryAbove(activeProjects(qc), inboxOf(qc), valuesOf(qc), project.id, newCategoryId(), name)
-      if (writes && (await write(writes))) announce(`Created category “${name.trim()}”`)
+      if (writes && (await write(writes))) announce(t('projects.categoryActions.created', { name: name.trim() }))
     },
     [qc, write],
   )

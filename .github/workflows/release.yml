@@ -157,6 +157,11 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      # The browser link's host on macOS (native/bridge-macos), built before the tests so they run
+      # against the real tool; the afterPack hook refuses a Mac build without it.
+      - name: Build the browser link helper
+        run: npm run bridge:helper
+
       - name: Test
         run: npm test
 
@@ -184,9 +189,10 @@ jobs:
         run: |
           for asset in dist/*.blockmap; do
             name=$(basename "$asset")
-            gh release delete-asset "${{ github.ref_name }}" "$name" --yes || true
+            gh release delete-asset "$TAG" "$name" --yes || true
           done
         env:
+          TAG: ${{ github.ref_name }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   build-linux:
@@ -239,8 +245,9 @@ jobs:
       # off the release. Pre-releases get the latest-all channel, so they are
       # offered newer pre-releases and the next stable, never an older stable.
       - name: Add update information and publish (${{ matrix.arch }})
-        run: node scripts/appimage-update-info.mjs --channel "$CHANNEL" --upload "${{ github.ref_name }}"
+        run: node scripts/appimage-update-info.mjs --channel "$CHANNEL" --upload "$TAG"
         env:
+          TAG: ${{ github.ref_name }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CHANNEL: ${{ needs.create-release.outputs.prerelease == 'true' && 'latest-all' || 'latest' }}
 

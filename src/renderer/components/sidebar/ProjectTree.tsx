@@ -1,5 +1,6 @@
 import { Fragment, useMemo, useRef, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
+import { useTranslation } from 'react-i18next'
 import { ChevronRight, FolderOpen, MoreHorizontal, RotateCcw } from 'lucide-react'
 import { buildProjectTree, useProjects, type ProjectTreeNode } from '@/hooks/use-projects'
 import { useOpenTaskCounts } from '@/hooks/use-project-progress'
@@ -19,6 +20,9 @@ import { CategoryHeader, type OpenCategoryMenu } from './CategoryHeader'
 import type { Project } from '@/lib/vikunja-types'
 import type { ProjectCategory } from '../../../shared/project-categories'
 import { useProjectsWithoutIcon } from '@/hooks/use-project-icons'
+import { useFocus } from '@/hooks/use-focus'
+import { useWorkMode } from '@/hooks/use-work-mode'
+import { categoryHeaderListed, pruneToListed } from '@/lib/work-sidebar'
 
 interface MenuState {
   project: Project
@@ -48,6 +52,7 @@ function ArchivedGroup({
   onOpenMenu: (project: Project, at: { point: { x: number; y: number } } | { anchor: HTMLElement }, opener: HTMLElement | null) => void
   menuOpenFor: number | null
 }) {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const open = useSidebarStore((s) => s.archivedProjectsOpen)
   const setOpen = useSidebarStore((s) => s.setArchivedProjectsOpen)
@@ -69,7 +74,7 @@ function ArchivedGroup({
             strokeWidth={2}
           />
         </span>
-        Archived
+        {t('sidebarNav.projects.archived')}
         <span className="ml-1.5 font-semibold normal-case tracking-normal">{archived.length}</span>
       </button>
       {open &&
@@ -103,6 +108,7 @@ function ArchivedRow({
   onRestore: () => void
   onOpenMenu: (project: Project, at: { point: { x: number; y: number } } | { anchor: HTMLElement }, opener: HTMLElement | null) => void
 }) {
+  const { t } = useTranslation()
   const rowRef = useRef<HTMLButtonElement>(null)
   const moreRef = useRef<HTMLButtonElement>(null)
   const color = normalizeHex(project.hex_color)
@@ -136,15 +142,15 @@ function ArchivedRow({
         {showIcon && <FolderOpen aria-hidden="true" className="mr-2 h-3.5 w-3.5 shrink-0 opacity-60" style={{ color: color || 'var(--text-secondary)' }} strokeWidth={1.8} />}
         <span className="min-w-0 flex-1 truncate text-xs text-[var(--text-secondary)]">
           {project.title}
-          <span className="sr-only"> (archived)</span>
+          <span className="sr-only"> {t('sidebarNav.projects.archivedSuffix')}</span>
         </span>
       </button>
       <span className={cn('mx-1.5 items-center gap-0.5', menuOpen ? 'flex' : 'hidden group-hover:flex group-focus-within:flex')}>
         <button
           type="button"
           tabIndex={-1}
-          aria-label={`Restore ${project.title}`}
-          title="Restore"
+          aria-label={t('sidebarNav.projects.restoreLabel', { title: project.title })}
+          title={t('sidebarNav.projects.restore')}
           onClick={onRestore}
           className="flex h-5 w-5 items-center justify-center rounded-control text-[var(--text-secondary)] hover:bg-[var(--bg-selected)] hover:text-[var(--accent-blue)]"
         >
@@ -154,7 +160,7 @@ function ArchivedRow({
           ref={moreRef}
           type="button"
           tabIndex={-1}
-          aria-label={`${project.title} actions`}
+          aria-label={t('projects.menu.actions', { title: project.title })}
           aria-haspopup="menu"
           aria-expanded={menuOpen}
           onClick={openMenuAtButton}
@@ -168,6 +174,7 @@ function ArchivedRow({
 }
 
 export function ProjectTree() {
+  const { t } = useTranslation()
   const { data, isLoading } = useProjects()
   const openCounts = useOpenTaskCounts()
   const { collapsed, setCollapsed } = useSidebarCollapsed()
@@ -188,13 +195,23 @@ export function ProjectTree() {
   // The top-level projects come from the category layout (cross-app semantics 13.2: the Inbox's
   // subprojects are top-level too), each drawn with its subtree.
   const nodesById = useMemo(() => new Map(flatten(data?.tree ?? []).map(({ node }) => [node.id, node])), [data?.tree])
-  const groups = useMemo(
-    () => layout.map((group) => ({
-      category: group.category,
-      nodes: group.projectIds.flatMap((id) => nodesById.get(id) ?? []),
-    })),
-    [layout, nodesById],
-  )
+  // Pro's focus (21.14): only the projects in focus and their ancestors; without one, all.
+  const { shownProjects } = useFocus()
+  // Work and Personal (22.5): the projects the mode lists, and the tree above a listed one.
+  const { shownProjects: workShown, mode: workMode } = useWorkMode()
+  const groups = useMemo(() => {
+    const narrowed = !!shownProjects || !!workShown
+    const prune = (node: ProjectTreeNode): ProjectTreeNode[] => pruneToListed(node, shownProjects).flatMap((kept) => pruneToListed(kept, workShown))
+    return layout
+      .map((group) => ({
+        category: group.category,
+        nodes: group.projectIds.flatMap((id) => nodesById.get(id) ?? []).flatMap(prune),
+        total: group.projectIds.length,
+      }))
+      .filter((group) => !narrowed || (group.category
+        ? categoryHeaderListed({ listed: group.nodes.length, total: group.total, mode: workMode, focusActive: !!shownProjects })
+        : group.nodes.length > 0))
+  }, [layout, nodesById, shownProjects, workShown, workMode])
   const archived = data?.archived ?? []
 
   const openMenu = (project: Project, at: { point: { x: number; y: number } } | { anchor: HTMLElement }, opener: HTMLElement | null) => {
@@ -216,7 +233,7 @@ export function ProjectTree() {
   }
 
   if (isLoading || configLoading || !data) {
-    return <div className="px-4 py-2 text-xs text-[var(--text-secondary)]">Loading...</div>
+    return <div className="px-4 py-2 text-xs text-[var(--text-secondary)]">{t('sidebarNav.projects.loading')}</div>
   }
 
   const renamingId = renaming?.surface === 'sidebar' ? renaming.id : null
@@ -243,7 +260,7 @@ export function ProjectTree() {
     <>
       <div className="flex flex-col gap-0.5 px-2">
         {noProjects && creating?.parentId !== 0 && (
-          <div className="px-2 py-2 text-xs text-[var(--text-secondary)]">No projects</div>
+          <div className="px-2 py-2 text-xs text-[var(--text-secondary)]">{t('sidebarNav.projects.none')}</div>
         )}
         {groups.map(({ category, nodes }) => {
           if (!category) return <Fragment key="no-category">{nodes.map(projectItem)}</Fragment>

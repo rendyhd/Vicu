@@ -28,6 +28,7 @@ import type { TaskPatch } from './merge-patches'
 import type { JsonPatchOperation } from '../../shared/routines'
 import type { SyncedPrefsSnapshot } from '../../shared/synced-prefs'
 import type { OidcSignInMode } from '../../shared/oidc-browser'
+import { can } from './capabilities'
 import { withCollabSignals } from './collab-signals'
 import { announceAccountChanged } from './account-events'
 import type {
@@ -43,6 +44,17 @@ import type {
   QueuedWriteReply,
   TaskWriteOptions,
 } from '../../shared/offline-queue-types'
+
+/** What `notificationPermission` answers: the desktop is always 'granted'. */
+export type NotificationPermissionState = 'granted' | 'denied' | 'default' | 'unsupported'
+
+/** A reminder shown inside the page (the web version, when the browser shows no notification). */
+export interface InPageNotice {
+  title: string
+  body: string
+  taskId?: number
+  route?: string
+}
 
 export type {
   OIDCProvider,
@@ -65,6 +77,8 @@ export type OidcLoginResult =
     }
 
 function queueOptions(title?: string): TaskWriteOptions {
+  // A host without the offline queue (the web version) never asks main to queue a change.
+  if (!can('offlineQueue')) return title ? { title } : {}
   return title ? { queue: true, title } : { queue: true }
 }
 
@@ -88,8 +102,13 @@ export const api = {
   updateTask: (id: number, task: UpdateTaskPayload) =>
     window.api.updateTask(id, task) as Promise<ApiResult<Task>>,
 
-  updateTaskOrQueue: (id: number, task: UpdateTaskPayload, title?: string) =>
-    window.api.updateTask(id, task, queueOptions(title)) as Promise<ApiResult<Task> | QueuedWriteReply>,
+  /**
+   * `extra.completedDue`: the due date a repeating task's completion completed (cross-app semantics
+   * 7.5). `extra.baseDescription`: the description a notes edit started from (description format,
+   * "Notes changed in two places"); the answer then may carry `notesMerged`.
+   */
+  updateTaskOrQueue: (id: number, task: UpdateTaskPayload, title?: string, extra: Pick<TaskWriteOptions, 'completedDue' | 'baseDescription'> = {}) =>
+    window.api.updateTask(id, task, { ...queueOptions(title), ...extra }) as Promise<ApiResult<Task> | QueuedWriteReply>,
 
   deleteTask: (id: number) =>
     window.api.deleteTask(id) as Promise<ApiResult<void>>,
@@ -138,6 +157,18 @@ export const api = {
   fetchAvatar: (username: string, size: number) =>
     window.api.fetchAvatar(username, size) as Promise<ApiResult<string>>,
 
+  /** Pro's "after" (cross-app semantics 21.2): `taskId` waits on `otherTaskId`; queued offline (decision 24). */
+  addAfter: (taskId: number, otherTaskId: number, taskTitle?: string) =>
+    window.api.addAfter(taskId, otherTaskId, queueOptions(taskTitle)) as Promise<ApiResult<unknown> | QueuedWriteReply>,
+  removeAfter: (taskId: number, otherTaskId: number, taskTitle?: string) =>
+    window.api.removeAfter(taskId, otherTaskId, queueOptions(taskTitle)) as Promise<ApiResult<unknown> | QueuedWriteReply>,
+
+  /** Cross-app semantics 24: `taskId` becomes (or stops being) a subtask of `parentId`; queued offline. */
+  attachSubtask: (parentId: number, taskId: number, parentTitle?: string) =>
+    window.api.attachSubtask(parentId, taskId, queueOptions(parentTitle)) as Promise<ApiResult<unknown> | QueuedWriteReply>,
+  detachSubtask: (parentId: number, taskId: number, parentTitle?: string) =>
+    window.api.detachSubtask(parentId, taskId, queueOptions(parentTitle)) as Promise<ApiResult<unknown> | QueuedWriteReply>,
+
   addTaskAssigneeOrQueue: (taskId: number, user: PersonRef, taskTitle?: string) =>
     window.api.addTaskAssignee(taskId, user.id, { ...queueOptions(taskTitle), username: user.username }) as Promise<
       ApiResult<unknown> | QueuedWriteReply
@@ -172,6 +203,10 @@ export const api = {
   /** Tasks of a project that are done (or open), hidden carriers excluded; cached in main for ten minutes. */
   countProjectTasks: (projectId: number, done: boolean) =>
     window.api.countProjectTasks(projectId, done) as Promise<ApiResult<number>>,
+
+  /** How many tasks a filter matches (the envelope's `total` of a one-task page); not cached in main. */
+  countTasks: (filter: string) =>
+    window.api.countTasks(filter) as Promise<ApiResult<number>>,
 
   fetchProjects: (includeArchived = false) =>
     window.api.fetchProjects(includeArchived) as Promise<ApiResult<Project[]>>,
@@ -245,13 +280,25 @@ export const api = {
   getCustomListSyncStatus: () => window.api.getCustomListSyncStatus(),
   getSavedFilterState: () => window.api.getSavedFilterState(),
   previewSavedFilters: (ids?: number[]) => window.api.previewSavedFilters(ids),
-  importSavedFilters: (ids: number[]) => window.api.importSavedFilters(ids),
-  dismissSavedFilters: (ids: number[]) => window.api.dismissSavedFilters(ids),
+  previewProjectViews: () => window.api.previewProjectViews(),
+  applySavedFilterImport: (request: { add: string[]; answers: Array<{ key: string; answer: import('../../shared/saved-filter-import').ImportAnswer }> }) =>
+    window.api.applySavedFilterImport(request),
+  undoSavedFilterImport: (undoId: string) => window.api.undoSavedFilterImport(undoId),
+  dismissSavedFilters: (ids: number[], changed?: number[]) => window.api.dismissSavedFilters(ids, changed),
   closeSavedFilterNotice: (listId: string) => window.api.closeSavedFilterNotice(listId),
   onSavedFiltersChanged: (cb: (state: import('../../shared/saved-filter-import').SavedFilterState) => void) =>
     window.api.onSavedFiltersChanged(cb),
   onSavedFiltersImported: (cb: (outcome: import('../../shared/saved-filter-import').SavedFilterImportOutcome) => void) =>
     window.api.onSavedFiltersImported(cb),
+  // Pro (cross-app semantics section 21)
+  getProLedger: () => window.api.getProLedger(),
+  mutateProLedger: (operations: import('../../shared/pro/ledger-ipc').ProLedgerOperation[]) => window.api.mutateProLedger(operations),
+  ensurePerson: (name: string) => window.api.ensurePerson(name),
+  syncProLedger: () => window.api.syncProLedger(),
+  readProArchive: () => window.api.readProArchive(),
+  onProLedgerChanged: (cb: (snapshot: import('../../shared/pro/ledger-ipc').ProLedgerSnapshot) => void) => window.api.onProLedgerChanged(cb),
+  writeClipboardRich: (text: string, html?: string) => window.api.writeClipboardRich(text, html),
+  writeClipboardImage: (bytes: Uint8Array) => window.api.writeClipboardImage(bytes) as Promise<ApiResult<void>>,
   getUnsyncedDocuments: () => window.api.getUnsyncedDocuments(),
   discardUnsyncedDocuments: () => window.api.discardUnsyncedDocuments(),
   onSyncedPrefsStatus: (cb: (status: import('./vikunja-types').CustomListSyncStatus) => void) =>
@@ -263,6 +310,7 @@ export const api = {
 
   setTaskBadge: (count: number, dataUrl: string | null) =>
     window.api.setTaskBadge(count, dataUrl) as Promise<void>,
+  openBadgeNotificationSettings: () => window.api.openBadgeNotificationSettings() as Promise<void>,
 
   testConnection: (url: string, token: string) =>
     window.api.testConnection(url, token) as Promise<ApiResult<Project[]>>,
@@ -283,6 +331,7 @@ export const api = {
 
   /** How the last OIDC sign-in ran and with which provider, so signing in again starts the same way. */
   getOidcSignIn: () => window.api.getOidcSignIn() as Promise<{ mode: OidcSignInMode; providerKey: string | null }>,
+  pendingSignIn: () => window.api.pendingSignIn(),
 
   loginPassword: (url: string, username: string, password: string, totpPasscode?: string) =>
     window.api.loginPassword(url, username, password, totpPasscode) as Promise<PasswordLoginResult>,
@@ -294,7 +343,7 @@ export const api = {
     window.api.checkAuth() as Promise<AuthCheckResult>,
 
   logout: () =>
-    window.api.logout() as Promise<void>,
+    window.api.logout() as Promise<{ providerSignOutUrl?: string } | void>,
 
   testNotification: () =>
     window.api.testNotification() as Promise<void>,
@@ -307,6 +356,12 @@ export const api = {
 
   refreshRoutineReminders: () =>
     window.api.refreshRoutineReminders() as Promise<void>,
+
+  notificationPermission: () =>
+    window.api.notificationPermission() as Promise<NotificationPermissionState>,
+
+  requestNotificationPermission: () =>
+    window.api.requestNotificationPermission() as Promise<NotificationPermissionState>,
 
   applyQuickEntrySettings: () =>
     window.api.applyQuickEntrySettings() as Promise<{ entry: boolean; viewer: boolean; waylandLimited: boolean }>,
@@ -363,6 +418,10 @@ export const api = {
     window.api.saveTaskAttachment(taskId, attachmentId, fileName) as Promise<ApiResult<{ saved: boolean; path?: string }>>,
   pickAndUploadAttachment: (taskId: number) =>
     window.api.pickAndUploadAttachment(taskId) as Promise<ApiResult<{ count: number; attachments: TaskAttachment[]; queued?: string[]; error?: string }>>,
+  pickAttachmentFiles: () =>
+    window.api.pickAttachmentFiles() as Promise<ApiResult<{ token: string; name: string; size: number }[]>>,
+  uploadPickedAttachment: (taskId: number, token: string) =>
+    window.api.uploadPickedAttachment(taskId, token) as Promise<ApiResult<{ attachments: TaskAttachment[]; queued?: string }>>,
 
   // Offline queue (main process). Changes that fail for network or server reasons are queued here
   // and replayed in order; see src/main/offline/ and src/shared/offline-queue-types.ts.
@@ -415,6 +474,8 @@ export const api = {
     window.api.onRefreshView?.(cb) ?? (() => {}),
   onAppResumed: (cb: () => void) =>
     window.api.onAppResumed?.(cb) ?? (() => {}),
+  onInPageNotification: (cb: (notice: InPageNotice) => void) =>
+    window.api.onInPageNotification?.(cb) ?? (() => {}),
   printHtml: (html: string) =>
     window.api.printHtml(html) as Promise<{ success: true } | { success: false; error: string }>,
   onPrintView: (cb: () => void) =>

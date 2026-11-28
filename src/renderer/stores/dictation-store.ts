@@ -21,11 +21,25 @@ import {
   type CheckedProject,
 } from '../../shared/ai/brain-dump'
 import { AI_LIMITS, DICTATION_FIELDS, type DraftField } from '../../shared/ai/contract'
+import {
+  checkNotesAnswer,
+  notesPlanAsAnswer,
+  notesUserMessage,
+  type NotesAnswer,
+  type NotesDecisionAnswer,
+  type NotesDraft,
+  type NotesFilter,
+  type NotesPage,
+  type NotesPlan,
+  type NotesQuestionAnswer,
+  type OwnerAction,
+} from '../../shared/ai/notes'
 import type { AiError, KeptTranscript } from '../../shared/ai/types'
 import { joinWords } from '../../shared/ai/turns'
 import { contextProjects, defaultProjectFor, dictationContextFor, type AiWorkspace, type ListInfo } from '@/lib/ai/workspace'
 import { readSaid } from '@/lib/ai/said-parser'
 import { cancelOpenMic, setOpenMicDump, startOpenMic, useOpenMicStore, type AdoptedSession, type OpenMicClient } from '@/lib/ai/open-mic'
+import { t } from '../../shared/i18n'
 import { announce } from '@/stores/announcer-store'
 import { useVoiceStore } from '@/stores/voice-store'
 
@@ -42,8 +56,40 @@ import { useVoiceStore } from '@/stores/voice-store'
 // add new projects; what is said or typed after it waits in a field until Update sends it as an
 // edit (4.8.4). The switch is offered while nothing has been sent and is remembered on the device.
 
-/** A card's draft: a brain dump's may go in a new project of the plan (`project_ref`); dictation's never do. */
-export type CardDraft = BrainDumpDraft
+/**
+ * A card's draft: a brain dump's may go in a new project of the plan (`project_ref`); dictation's
+ * never do. A card of notes (4.9) also has who it is for and the line it came from.
+ */
+export type CardDraft = BrainDumpDraft & Partial<Pick<NotesDraft, 'owner' | 'page' | 'from'>>
+
+/** What the person chose on a card of notes (4.9.9); unset parts follow the defaults and the filter. */
+export interface NotesChoice {
+  ticked?: boolean
+  action?: OwnerAction
+}
+
+/** The plan of notes (4.9) under review: what the notes screen handed over, and the choices made. */
+export interface NotesMode {
+  title: string
+  /** The notes' date, `YYYY-MM-DD`. */
+  date: string
+  /** How many batches the plan came from (Update needs one, 4.9.8). */
+  batches: number
+  /** The transcript's pages, for an Update. */
+  pages: NotesPage[]
+  /** The context JSON the plan was made with (4.9.4), for an Update. */
+  contextJson: string
+  me: string | null
+  decisions: NotesDecisionAnswer[]
+  questions: NotesQuestionAnswer[]
+  /** Drafts left out as repeats, or over the limit (4.9.7). */
+  repeated: number
+  overLimit: number
+  filter: NotesFilter
+  /** "Agreed in the meeting" (4.9.9). */
+  agreed: boolean
+  choices: Record<string, NotesChoice>
+}
 
 export interface DraftCard {
   draft: CardDraft
@@ -62,7 +108,7 @@ export interface DictationParent {
   project_id: number
 }
 
-export type DictationSource = 'voice' | 'text' | 'steps'
+export type DictationSource = 'voice' | 'text' | 'steps' | 'notes'
 
 interface DictationState {
   phase: DictationPhase
@@ -97,6 +143,18 @@ interface DictationState {
   more: string
   /** Why Add stopped: no connection for new projects, or a project that could not be created. */
   addError: string | null
+  /** A plan of notes (4.9) under review, or null. */
+  notes: NotesMode | null
+  /** Opens the plan the notes screen made (4.9.3), to review and add. */
+  openNotesPlan: (input: {
+    plan: NotesPlan
+    reference: string
+    list: ListInfo | null
+    mode: Omit<NotesMode, 'decisions' | 'questions' | 'repeated' | 'overLimit' | 'filter' | 'agreed' | 'choices'> & Partial<Pick<NotesMode, 'filter' | 'agreed' | 'choices'>>
+  }) => void
+  setNotesFilter: (filter: NotesFilter) => void
+  setNotesAgreed: (agreed: boolean) => void
+  setNotesChoice: (ref: string, choice: NotesChoice) => void
   open: (input: { transcript: string; list: ListInfo | null; source: DictationSource; parent?: DictationParent | null; reference?: string; keptId?: string | null }) => void
   /**
    * Spoken smart dictation: opens the panel listening (or keeps the one open) with the microphone
@@ -155,18 +213,18 @@ export function setDictationDeps(next: DictationDeps | null): void {
 
 export function errorText(error: AiError): string {
   switch (error.kind) {
-    case 'timeout': return 'The model did not answer in time.'
-    case 'network': return 'Could not reach the model.'
-    case 'auth': return 'The provider refused the key.'
-    case 'bad_answer': return 'The model’s answer could not be used.'
-    default: return error.message || 'The request failed.'
+    case 'timeout': return t('ai.errors.timeout')
+    case 'network': return t('ai.errors.network')
+    case 'auth': return t('ai.errors.auth')
+    case 'bad_answer': return t('ai.errors.badAnswer')
+    default: return error.message || t('ai.errors.failed')
   }
 }
 
 const EMPTY_EDIT = { phase: 'idle' as const, words: '', error: null }
 
 /** No brain dump: the state a closed or a plain dictation sheet starts from. */
-const NO_DUMP = { brainDump: false, dump: '', dumpFull: false, projects: [], changedProjects: [], projectNotes: [], more: '', addError: null }
+const NO_DUMP = { brainDump: false, dump: '', dumpFull: false, projects: [], changedProjects: [], projectNotes: [], more: '', addError: null, notes: null }
 
 /** The fields a brain dump's checks report for its projects (4.8.3). */
 const PROJECT_DROPS = new Set(['project', 'project_title', 'parent'])
@@ -174,10 +232,10 @@ const PROJECT_DROPS = new Set(['project', 'project_title', 'parent'])
 /** The plan's notes for what the checks left out of its new projects (4.8.3), as the phone words them. */
 function projectNotesOf(dropped: readonly DroppedField[], projects: readonly CheckedProject[]): string[] {
   return dropped.filter((d) => PROJECT_DROPS.has(d.field)).map((d) => {
-    if (d.field === 'project') return `More than ${AI_LIMITS.brain_dump_projects_max} new projects: the rest were left out`
-    if (d.field === 'project_title') return 'Skipped a new project without a name'
+    if (d.field === 'project') return t('ai.dictation.projectsLimit', { max: AI_LIMITS.brain_dump_projects_max })
+    if (d.field === 'project_title') return t('ai.dictation.projectNoName')
     const title = projects.find((p) => p.ref === d.ref)?.title
-    return title ? `“${title}”: its parent project was not found, so it goes at the top level` : 'A parent project was not found, so a new project goes at the top level'
+    return title ? t('ai.dictation.parentMissingNamed', { title }) : t('ai.dictation.parentMissing')
   })
 }
 
@@ -191,14 +249,14 @@ function stopMicAtLimit(): void {
   setTimeout(() => {
     if (useOpenMicStore.getState().owner === 'dictation') cancelOpenMic()
   }, 0)
-  announce('That is as long as it can be, so the microphone turned off.')
+  announce(t('ai.dictation.micAtLimit'))
 }
 
 /** "2 new projects and 14 tasks" for the announcement of a plan. */
 function planSummary(projects: number, tasks: number): string {
-  const taskText = tasks === 1 ? '1 task' : `${tasks} tasks`
+  const taskText = t('ai.counts.tasks', { count: tasks })
   if (projects === 0) return taskText
-  return `${projects === 1 ? '1 new project' : `${projects} new projects`} and ${taskText}`
+  return t('ai.dictation.planSummary', { projects: t('ai.counts.newProjects', { count: projects }), tasks: taskText })
 }
 
 export const useDictationStore = create<DictationState>((set, get) => {
@@ -213,10 +271,13 @@ export const useDictationStore = create<DictationState>((set, get) => {
     const contextJson = dictationContextFor(ws, state.list, state.reference)
     const placeName = (placeId: string) => ws.places.find((p) => p.id === placeId)?.name ?? null
     const drafts = state.cards.map((card) => card.draft)
-    const user = dumping
-      ? brainDumpUserMessage(contextJson, edit ?? state.transcript, edit !== null ? planAsAnswer(state.projects, drafts, placeName) : undefined)
-      : dictationUserMessage(contextJson, edit ?? state.transcript, edit !== null ? draftsAsAnswer(drafts, placeName) : undefined)
-    const result = await window.api.ai.dictate({ requestId: id, edit: edit !== null, user, ...(dumping ? { brainDump: true } : {}) })
+    const notes = state.notes
+    const user = notes && edit !== null
+      ? notesUserMessage(notes.contextJson, notes.pages, { plan: notesPlanAsAnswer(state.projects, drafts.map(asNotesDraft), placeName), words: edit })
+      : dumping
+        ? brainDumpUserMessage(contextJson, edit ?? state.transcript, edit !== null ? planAsAnswer(state.projects, drafts, placeName) : undefined)
+        : dictationUserMessage(contextJson, edit ?? state.transcript, edit !== null ? draftsAsAnswer(drafts, placeName) : undefined)
+    const result = await window.api.ai.dictate({ requestId: id, edit: edit !== null, user, ...(notes ? { notes: true } : dumping ? { brainDump: true } : {}) })
     // Closed, cancelled by talking on, or replaced while it ran.
     if (activeRequest !== id) return
     activeRequest = null
@@ -244,7 +305,7 @@ export const useDictationStore = create<DictationState>((set, get) => {
       }
       void window.api.ai.keepTranscript(kept)
       set({ phase: 'failed', error: kept.error, keptId, ...(dumping ? { transcript, dump: transcript, more: '' } : {}) })
-      announce(dumping ? 'The dump could not be organized. It is kept.' : 'The tasks could not be made. The transcript is kept.')
+      announce(dumping ? t('ai.dictation.dumpFailedKept') : t('ai.dictation.tasksFailedKept'))
       return
     }
 
@@ -257,7 +318,15 @@ export const useDictationStore = create<DictationState>((set, get) => {
       places: ws.places,
       readSaid: (said: string) => readSaid(said, now.reference, deps?.locale()),
     }
-    const checked = dumping
+    const checked = notes
+      ? (() => {
+          // An Update of notes (4.9.8): one batch, numbered from the start; the owners' choices go
+          // back to their defaults.
+          const answer = checkNotesAnswer(result.data as NotesAnswer, context, { pages: notes.pages, me: notes.me })
+          set({ notes: { ...notes, decisions: answer.decisions, questions: answer.questions, choices: {} } })
+          return answer
+        })()
+      : dumping
       ? checkBrainDumpAnswer(result.data as BrainDumpAnswer, context)
       : (() => {
           const answer = checkDictationAnswer(result.data as DictationAnswer, context)
@@ -289,7 +358,7 @@ export const useDictationStore = create<DictationState>((set, get) => {
     })
     if (cards.length === 0 && checked.projects.length === 0) {
       set({ phase: 'empty', cards: [], projects: [], unclear: checked.unclear, error: null, edit: EMPTY_EDIT })
-      announce('Nothing to add')
+      announce(t('ai.dictation.nothingToAdd'))
       return
     }
     // The kept transcript has served its purpose once there are cards.
@@ -306,7 +375,7 @@ export const useDictationStore = create<DictationState>((set, get) => {
       edit: EMPTY_EDIT,
       addError: null,
     })
-    announce(dumping ? `${planSummary(checked.projects.length, cards.length)} to check` : cards.length === 1 ? '1 task to check' : `${cards.length} tasks to check`)
+    announce(dumping ? t('ai.dictation.planToCheck', { summary: planSummary(checked.projects.length, cards.length) }) : t('ai.dictation.tasksToCheck', { count: cards.length }))
   }
 
   /** A brain dump's turn: added to the dump, or after Organize to the Update field; never sent. */
@@ -414,8 +483,8 @@ export const useDictationStore = create<DictationState>((set, get) => {
       if (!input.adopt) useVoiceStore.getState().cancel()
       startOpenMic('dictation', client, input.adopt, { dump: get().brainDump })
       announce(get().brainDump
-        ? 'Listening. Talk as long as you like; nothing is sent until you choose Organize.'
-        : 'Listening. Say your tasks; pause and they appear as cards.')
+        ? t('ai.dictation.listeningDump')
+        : t('ai.dictation.listeningCards'))
     },
 
     listen: () => {
@@ -491,7 +560,7 @@ export const useDictationStore = create<DictationState>((set, get) => {
         return
       }
       set({ brainDump: on, dumpFull: false })
-      announce(on ? 'Brain dump on. Nothing is sent until you choose Organize.' : 'Brain dump off. Each pause turns what you said into task cards.')
+      announce(on ? t('ai.dictation.dumpOn') : t('ai.dictation.dumpOff'))
     },
 
     setDump: (text) => {
@@ -564,6 +633,52 @@ export const useDictationStore = create<DictationState>((set, get) => {
 
     setAddError: (message) => set({ addError: message }),
 
+    openNotesPlan: ({ plan, reference, list, mode }) => {
+      if (activeRequest) void window.api.ai.cancelDictation(activeRequest)
+      activeRequest = null
+      if (useOpenMicStore.getState().owner === 'dictation') cancelOpenMic()
+      set({
+        ...NO_DUMP,
+        phase: 'cards',
+        source: 'notes',
+        brainDump: true,
+        sent: true,
+        transcript: '',
+        reference,
+        list,
+        parent: null,
+        cards: plan.drafts.map((draft): DraftCard => ({ draft, changed: [], dropped: plan.dropped.filter((d) => d.ref !== '' && d.ref === draft.ref) })),
+        projects: plan.projects,
+        projectNotes: projectNotesOf(plan.dropped, plan.projects),
+        unclear: plan.unclear,
+        error: null,
+        keptId: null,
+        edit: EMPTY_EDIT,
+        notes: {
+          ...mode,
+          decisions: plan.decisions,
+          questions: plan.questions,
+          repeated: plan.dropped.filter((d) => d.field === 'duplicate').length,
+          overLimit: plan.dropped.filter((d) => d.field === 'task' && d.ref === '').length,
+          filter: mode.filter ?? 'mine_and_waiting',
+          agreed: mode.agreed ?? false,
+          choices: mode.choices ?? {},
+        },
+      })
+      announce(t('notes.plan.ready', { count: plan.drafts.length }))
+    },
+
+    setNotesFilter: (filter) => set((state) => (state.notes
+      // A filter sets every card's tick again (4.9.9).
+      ? { notes: { ...state.notes, filter, choices: Object.fromEntries(Object.entries(state.notes.choices).map(([ref, choice]) => [ref, { action: choice.action }])) } }
+      : {})),
+
+    setNotesAgreed: (agreed) => set((state) => (state.notes ? { notes: { ...state.notes, agreed } } : {})),
+
+    setNotesChoice: (ref, choice) => set((state) => (state.notes
+      ? { notes: { ...state.notes, choices: { ...state.notes.choices, [ref]: { ...state.notes.choices[ref], ...choice } } } }
+      : {})),
+
     setPhase: (phase) => set({ phase }),
 
     close: (options) => {
@@ -576,6 +691,11 @@ export const useDictationStore = create<DictationState>((set, get) => {
     },
   }
 })
+
+/** A card of notes as a checked notes draft (a card made otherwise has none of the three). */
+function asNotesDraft(draft: CardDraft): NotesDraft {
+  return { ...draft, owner: draft.owner ?? null, page: draft.page ?? null, from: draft.from ?? null }
+}
 
 /** The draft fields a hand edit touched (they are no longer guessed). */
 function touched(change: Partial<CardDraft>): DraftField[] {

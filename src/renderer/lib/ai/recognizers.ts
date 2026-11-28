@@ -1,6 +1,7 @@
 import { createRecognizer, type RecognizerHandlers, type RecognizerStartOptions, type VoiceRecognizer } from '../voice/recognizer'
 import type { SpeechStartOptions } from '../../../shared/ai/types'
 import { createLocalRecognizer } from './local-recognizer'
+import { can } from '../capabilities'
 
 /**
  * Which recogniser a capture uses (docs/ai-assistant-v1.md sections 3 and 3.6): local speech when
@@ -30,10 +31,20 @@ export function setSpeechStartOptions(provider: () => SpeechStartOptions): void 
   startOptions = provider
 }
 
+const NO_RECOGNIZER: VoiceRecognizer = {
+  availability: async () => ({ available: false, engine: 'none', onDevice: false }),
+  start: async () => false,
+  stop: () => {},
+  cancel: () => {},
+}
+
 let shared: VoiceRecognizer | null = null
 
 /** The app's recogniser: one for the main window, shared by voice input, dictation and Talk. */
 export function appRecognizer(): VoiceRecognizer {
+  // A host with neither voice input nor the assistant (the web version) listens to nothing and
+  // never reaches for window.api.voice or window.api.speech.
+  if (!can('voice') && !can('assistant')) return NO_RECOGNIZER
   if (!shared) {
     const platform = createRecognizer(window.api.voice, () => navigator.language)
     const local = createLocalRecognizer(window.api.speech, { startOptions: () => startOptions() })

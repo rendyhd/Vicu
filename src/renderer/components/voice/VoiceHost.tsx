@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { useNavigate, useRouterState } from '@tanstack/react-router'
+import { useTranslation } from 'react-i18next'
 import { Mic, Sparkles } from 'lucide-react'
 import { useAppConfig } from '@/hooks/use-app-config'
 import { useAddVoiceTask } from '@/hooks/use-add-voice-task'
@@ -129,6 +130,7 @@ function segmentsOf(text: string, tokens: readonly ParsedToken[]): Segment[] {
 }
 
 function VoiceCard({ hotkey, context }: { hotkey?: string; context: VoiceTaskContext }) {
+  const { t } = useTranslation()
   const phase = useVoiceStore((s) => s.phase)
   const source = useVoiceStore((s) => s.source)
   const mode = useVoiceStore((s) => s.mode)
@@ -146,34 +148,34 @@ function VoiceCard({ hotkey, context }: { hotkey?: string; context: VoiceTaskCon
 
   const listening = phase === 'starting' || phase === 'listening'
   const status = phase === 'starting'
-    ? 'Starting…'
+    ? t('voice.card.starting')
     : phase === 'finishing' || phase === 'adding'
-      ? 'Adding…'
-      : cancelArmed ? 'Release to cancel' : 'Listening…'
+      ? t('voice.card.adding')
+      : cancelArmed ? t('voice.card.releaseToCancel') : t('voice.card.listening')
 
   const shortcutName = hotkey ? formatAcceleratorForDisplay(hotkey, isMac) : ''
   // Holding +: sliding up hands the words to smart dictation (press-gesture.ts).
   const showLock = lockable && listening && mode === 'hold' && source === 'button' && !cancelArmed
   const hint = cancelArmed
-    ? 'Move back to keep it · Esc to cancel'
+    ? t('voice.card.moveBack')
     : mode === 'latched'
-    ? `${source === 'shortcut' && shortcutName ? `${shortcutName} or Enter` : 'Enter'} to add · Esc to cancel`
+    ? (source === 'shortcut' && shortcutName ? t('voice.card.shortcutOrEnter', { shortcut: shortcutName }) : t('voice.card.enterToAdd'))
     : source === 'button'
-      ? 'Release to add · Esc to cancel'
-      : 'Let go to add · Esc to cancel'
+      ? t('voice.card.releaseToAdd')
+      : t('voice.card.letGoToAdd')
 
   return (
     <div className="pointer-events-none fixed inset-x-0 bottom-6 z-[55] flex flex-col items-center gap-2 px-4">
       {showLock && (
         <p className="vicu-voice-card flex items-center gap-1.5 rounded-chip border border-[var(--border-color)] bg-[var(--bg-primary)] px-2.5 py-1 text-caption text-[var(--text-secondary)] shadow-sm" data-voice-lock="">
           <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
-          Slide up for smart dictation
+          {t('voice.card.slideUp')}
         </p>
       )}
       <section
         role="dialog"
         aria-modal="false"
-        aria-label="Say a task"
+        aria-label={t('voice.card.label')}
         data-voice-card=""
         data-phase={phase}
         data-cancel-armed={cancelArmed ? '' : undefined}
@@ -215,7 +217,7 @@ function VoiceCard({ hotkey, context }: { hotkey?: string; context: VoiceTaskCon
                   ),
                 )
               ) : (
-                <span className="text-[var(--text-secondary)]">Say a task, like “Call mom tomorrow 3pm”</span>
+                <span className="text-[var(--text-secondary)]">{t('voice.card.placeholder')}</span>
               )}
             </p>
             {chips.length > 0 && (
@@ -231,8 +233,8 @@ function VoiceCard({ hotkey, context }: { hotkey?: string; context: VoiceTaskCon
 
         {mode === 'latched' && (phase === 'starting' || phase === 'listening') && (
           <div className="mt-3 flex justify-end gap-2">
-            <Button variant="quiet" onClick={() => useVoiceStore.getState().cancel()}>Cancel</Button>
-            <Button variant="primary" onClick={() => useVoiceStore.getState().finish()}>Add</Button>
+            <Button variant="quiet" onClick={() => useVoiceStore.getState().cancel()}>{t('voice.card.cancel')}</Button>
+            <Button variant="primary" onClick={() => useVoiceStore.getState().finish()}>{t('voice.card.add')}</Button>
           </div>
         )}
       </section>

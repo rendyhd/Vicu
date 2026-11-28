@@ -4,6 +4,7 @@ import { appRecognizer } from '@/lib/ai/recognizers'
 import { cancelOpenMic, type AdoptedSession } from '@/lib/ai/open-mic'
 import { toast } from '@/stores/toast-store'
 import { announce } from '@/stores/announcer-store'
+import { t } from '../../shared/i18n'
 import type { VoiceErrorCode } from '../../shared/voice-types'
 import { joinWords } from '../../shared/ai/turns'
 import type { VoiceListDefaults } from '@/lib/voice/voice-task'
@@ -96,10 +97,10 @@ const IDLE = { phase: 'idle' as const, text: '', cancelArmed: false, finalText: 
 
 function errorToast(code: VoiceErrorCode, message: string): void {
   if (code === 'unsupported') {
-    toast.info('Voice input is not available on this system')
+    toast.info(t('voice.messages.unavailable'))
     return
   }
-  toast.error(message || 'Voice input stopped.')
+  toast.error(message || t('voice.messages.stopped'))
 }
 
 export const useVoiceStore = create<VoiceState>((set, get) => ({
@@ -116,7 +117,7 @@ export const useVoiceStore = create<VoiceState>((set, get) => ({
     cancelOpenMic()
     // The list is read once: navigating while talking does not move the task.
     set({ ...IDLE, phase: 'starting', source, mode, list: useVoiceListStore.getState().defaults })
-    announce('Listening. Say the task.')
+    announce(t('voice.messages.listeningAnnounce'))
     const own: RecognizerHandlers = {
       onReady: () => {
         if (get().phase === 'starting') set({ phase: 'listening' })
@@ -130,7 +131,7 @@ export const useVoiceStore = create<VoiceState>((set, get) => ({
         const heard = text.trim() || get().text.trim()
         if (!heard) {
           set(IDLE)
-          toast.info('Nothing was heard')
+          toast.info(t('voice.messages.nothingHeardToast'))
           return
         }
         set({ phase: 'adding', text: heard, finalText: heard, cancelArmed: false })
@@ -219,7 +220,7 @@ export const useVoiceStore = create<VoiceState>((set, get) => ({
     capture = null
     getRecognizer().cancel()
     set(IDLE)
-    announce('Voice input cancelled')
+    announce(t('voice.messages.cancelled'))
   },
 
   done: () => {

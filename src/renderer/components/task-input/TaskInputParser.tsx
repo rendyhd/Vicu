@@ -8,6 +8,7 @@ import { AutocompleteDropdown } from './AutocompleteDropdown'
 import type { AutocompleteAria, AutocompleteHandle } from './AutocompleteDropdown'
 import { cn } from '@/lib/cn'
 import { useDateFormat } from '@/hooks/use-date-format'
+import { useTranslation } from 'react-i18next'
 
 interface AutocompleteItem {
   id: number
@@ -27,6 +28,8 @@ interface TaskInputParserProps {
   enabled: boolean
   projects: AutocompleteItem[]
   labels: AutocompleteItem[]
+  /** Pro's people for `$` (contract 5.5); left out while Pro's promises are off. */
+  people?: AutocompleteItem[]
   inputRef?: React.Ref<HTMLInputElement | HTMLTextAreaElement>
   placeholder?: string
   onBlur?: (e: React.FocusEvent) => void
@@ -56,6 +59,7 @@ export function TaskInputParser({
   enabled,
   projects,
   labels,
+  people,
   inputRef,
   placeholder,
   onBlur,
@@ -68,6 +72,7 @@ export function TaskInputParser({
   onDismissChip,
   onDismissContextChip,
 }: TaskInputParserProps) {
+  const { t } = useTranslation()
   const dateFormat = useDateFormat()
   const autocompleteRef = useRef<AutocompleteHandle>(null)
   const internalInputRef = useRef<HTMLInputElement | HTMLTextAreaElement>(null)
@@ -109,9 +114,13 @@ export function TaskInputParser({
 
       autocompleteSelectedRef.current = true
 
-      // Find end of the current token
+      // Find end of the current token; a quoted one (`$"Jan de`) runs to its closing quote or the cursor.
       let tokenEnd = value.indexOf(' ', triggerStart)
       if (tokenEnd === -1) tokenEnd = value.length
+      if (value[triggerStart + prefix.length] === '"') {
+        const close = value.indexOf('"', triggerStart + prefix.length + 1)
+        tokenEnd = close === -1 ? Math.max(cursorPosition, triggerStart + prefix.length + 1) : close + 1
+      }
 
       const hasSpaces = item.title.includes(' ')
       const replacement = hasSpaces ? `${prefix}"${item.title}" ` : `${prefix}${item.title} `
@@ -127,7 +136,7 @@ export function TaskInputParser({
         el.focus()
       })
     },
-    [value, onChange],
+    [value, onChange, cursorPosition],
   )
 
   const handleKeyDown = useCallback(
@@ -252,6 +261,7 @@ export function TaskInputParser({
             prefixes={prefixes}
             projects={projects}
             labels={labels}
+            people={people}
             onSelect={handleAutocompleteSelect}
             enabled={enabled}
             inputElement={inputElement}
@@ -263,7 +273,7 @@ export function TaskInputParser({
       {/* Bang-today hint (parser off): same rule as the save path, a `!` inside the text is not a date */}
       {showBangTodayHint && extractBangToday(value).dueDate && (
         <span className="absolute right-0 top-1/2 -translate-y-1/2 shrink-0 text-[11px] font-medium text-accent-blue">
-          Today
+          {t('composer.chip.today')}
         </span>
       )}
 

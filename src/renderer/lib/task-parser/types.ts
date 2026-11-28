@@ -1,3 +1,4 @@
+import type { WeekStart } from '../../../shared/week-start'
 import type { PlaceMatch } from './place-phrases'
 
 export type SyntaxMode = 'todoist' | 'vikunja'
@@ -6,7 +7,22 @@ export type SyntaxMode = 'todoist' | 'vikunja'
  * `place` is "when I get home" for a saved place (section 5.3), read only when the caller passes
  * places. `length` is `for 30m` when it makes a time block (section 5.4).
  */
-export type TokenType = 'label' | 'project' | 'priority' | 'recurrence' | 'date' | 'length' | 'place'
+export type TokenType =
+  | 'label'
+  | 'project'
+  | 'priority'
+  | 'recurrence'
+  | 'date'
+  | 'length'
+  | 'place'
+  // Pro (section 5.5), only with `pro` on
+  | 'person'
+  | 'requester'
+  | 'checkOn'
+  | 'start'
+  | 'estimate'
+  | 'flag'
+  | 'request'
 
 export interface ParsedToken {
   type: TokenType
@@ -20,6 +36,12 @@ export interface ParsedRecurrence {
   interval: number
   unit: 'day' | 'week' | 'month' | 'year'
 }
+
+/** A known person (`id`), or a new one a `$` phrase names (`id` null, made when the task is saved). */
+export type ParsedPerson = { id: number; mine: boolean } | { id: null; name: string; mine: boolean }
+
+/** Who a promise was made to: a known person, or a new one made when the task is saved. */
+export type ParsedRequester = { id: number } | { id: null; name: string }
 
 export interface ParseResult {
   title: string
@@ -41,6 +63,27 @@ export interface ParseResult {
   recurrence: ParsedRecurrence | null
   /** A saved place the text names with "when I get home", for a location reminder. */
   place: PlaceMatch | null
+  // Pro (section 5.5): always present, set only while `config.pro` is on.
+  /**
+   * `Jan:` at the start or `$Jan` anywhere: that person's promise to you; `for Jan:` / `for $Jan`:
+   * yours to them. A `$` name that matches nobody is a new person (`id` null, `name`), made on save.
+   */
+  person: ParsedPerson | null
+  /**
+   * Who the promise was made to, when the text has two `$` phrases and one follows `for`
+   * (`$Jan site list for $Priya`): a known person or a new one. Null otherwise.
+   */
+  requester: ParsedRequester | null
+  /** `check on 3 feb`, only with a person: the local day to look at the promise (YYYY-MM-DD). */
+  checkOn: string | null
+  /** `starts monday`: a start date (local midnight without a time). Null when a block holds the start. */
+  start: Date | null
+  /** `~1h30`: minutes. */
+  estimate: number | null
+  /** `!flag` */
+  flag: boolean
+  /** `req:` at the start: a request to triage. */
+  request: boolean
   tokens: ParsedToken[]
 }
 
@@ -59,6 +102,10 @@ export interface ParserConfig {
    * en-GB). Defaults to the system locale (`navigator.language`).
    */
   locale?: string
+  /** Pro's phrases (section 5.5). Off unless true; with it off the text is read as before. */
+  pro?: boolean
+  /** The day weeks start on (section 2.1): which week `next week` means. Defaults to the account's. */
+  weekStart?: WeekStart
 }
 
 const SYNTAX_PREFIXES: Record<SyntaxMode, SyntaxPrefixes> = {

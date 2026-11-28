@@ -1,0 +1,114 @@
+# Vicu web: the built page at the root and the Vikunja API on the same origin.
+#
+# The page and the API must share one origin: the app sends its requests to its own address, and
+# the session cookie Vikunja sets is only sent back there. So /api/ is forwarded to VIKUNJA_URL and
+# everything else is the app. Put TLS in front of this container (your reverse proxy); it listens on
+# plain HTTP, port 8080, as an unprivileged user.
+
+# The scheme the visitor used, as the proxy in front reports it (plain HTTP without one).
+map $http_x_forwarded_proto $vicu_forwarded_proto {
+  default $http_x_forwarded_proto;
+  ""      $scheme;
+}
+
+# Only for a visitor who came over HTTPS: the browser is told to never use plain HTTP for this
+# address again, and the session cookie Vikunja sets is marked Secure, so it is never sent over
+# plain HTTP (Vikunja does not always mark it itself). Over plain HTTP, as in a test on your own
+# machine, both are left out and everything still works.
+map $vicu_forwarded_proto $vicu_hsts {
+  default "";
+  https   "max-age=31536000";
+}
+map $vicu_forwarded_proto $vicu_cookie_secure {
+  default "";
+  https   "; Secure";
+}
+
+server {
+  listen 8080;
+  listen [::]:8080;
+  server_name _;
+  server_tokens off;
+
+  root /usr/share/nginx/html;
+  index index.html;
+
+  # The largest attachment that may be uploaded; keep it at or above Vikunja's own limit
+  # (files.maxsize, 20 MB by default).
+  client_max_body_size ${VICU_MAX_UPLOAD};
+
+  gzip on;
+  gzip_types text/css text/javascript application/javascript application/json image/svg+xml;
+  gzip_min_length 1024;
+
+  include /etc/nginx/vicu/security-headers.conf;
+
+  # For the container's health check and your monitoring: answers without touching Vikunja.
+  location = /healthz {
+    access_log off;
+    default_type text/plain;
+    return 200 "ok\n";
+  }
+
+  # Vikunja's address is looked up again while running (the container's own DNS, filled in by the
+  # image's entry point), so Vikunja can be restarted or recreated without restarting this container.
+  resolver ${NGINX_LOCAL_RESOLVERS} valid=30s ipv6=off;
+
+  # The Vikunja API, as the server itself answers it.
+  location /api/ {
+    set $vikunja ${VIKUNJA_URL};
+    proxy_pass $vikunja;
+    proxy_http_version 1.1;
+    proxy_set_header Host $http_host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $vicu_forwarded_proto;
+    proxy_set_header Connection "";
+    # Appended to the cookie's Path attribute, which is the one place nginx lets a variable in.
+    proxy_cookie_path ~^(.+)$ "$1$vicu_cookie_secure";
+
+    # The app and the API are one origin, so no other site has a reason to read the API through
+    # this address: whatever cross-origin permission Vikunja is configured to give is not passed on.
+    proxy_hide_header Access-Control-Allow-Origin;
+    proxy_hide_header Access-Control-Allow-Credentials;
+    proxy_hide_header Access-Control-Allow-Headers;
+    proxy_hide_header Access-Control-Allow-Methods;
+    proxy_hide_header Access-Control-Expose-Headers;
+
+    # An answer of the API is data. Opened as a page (a link someone made to an attachment's
+    # address), it may load and run nothing at all.
+    include /etc/nginx/vicu/security-headers.conf;
+    add_header Content-Security-Policy "default-src 'none'; frame-ancestors 'none'; sandbox" always;
+    # An upload goes straight through instead of being written to disk here first.
+    proxy_request_buffering off;
+    proxy_connect_timeout 10s;
+    proxy_read_timeout 120s;
+    proxy_send_timeout 120s;
+  }
+
+  # Built files carry a hash of their content in their name: cached for good, and a name that does
+  # not exist is an error, never the app's page (a stale tab then reloads itself).
+  location /assets/ {
+    include /etc/nginx/vicu/security-headers.conf;
+    add_header Cache-Control "public, max-age=31536000, immutable" always;
+    try_files $uri =404;
+  }
+
+  # The address an OIDC sign-in comes back to carries a one-time code in its query. It is the app's
+  # page like any other address, but it is kept out of the access log.
+  location /auth/openid/ {
+    access_log off;
+    include /etc/nginx/vicu/security-headers.conf;
+    add_header Cache-Control "no-store" always;
+    try_files /index.html =404;
+  }
+
+  # Everything else is the app: its own files, and its page for any other address (an OIDC sign-in
+  # comes back to /auth/openid/<provider>). The page itself is never cached, so a new version shows
+  # on the next load.
+  location / {
+    include /etc/nginx/vicu/security-headers.conf;
+    add_header Cache-Control "no-cache" always;
+    try_files $uri /index.html;
+  }
+}

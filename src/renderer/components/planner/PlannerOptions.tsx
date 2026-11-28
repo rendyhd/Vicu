@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Checkbox } from '@/components/shared/Checkbox'
 import { cn } from '@/lib/cn'
 import { useAppConfig } from '@/hooks/use-app-config'
@@ -6,9 +7,14 @@ import { usePlannerPrefs, useSavePlannerConfig } from '@/hooks/use-planner'
 import { formatLength } from '@/lib/planner-timeline'
 import { isRoutinesEnabled } from '@/lib/vikunja-types'
 import { BLOCK_LENGTHS, readPlannerHours } from '../../../shared/time-blocks'
+import { CalendarFeeds } from './CalendarFeeds'
 
-/** The planner's settings, shared by the Plan screen's gear and Settings. */
-export function PlannerOptions() {
+/**
+ * The planner's settings, shared by the Plan screen's gear and Settings. In the gear (`compact`)
+ * the Events and calendars are a summary with Manage, which opens them in Settings.
+ */
+export function PlannerOptions({ compact = false }: { compact?: boolean }) {
+  const { t } = useTranslation()
   const prefs = usePlannerPrefs()
   const { data: config } = useAppConfig()
   const save = useSavePlannerConfig()
@@ -33,8 +39,8 @@ export function PlannerOptions() {
   return (
     <div className="space-y-3">
       <div>
-        <p className="text-meta font-medium text-text">Default length</p>
-        <div className="mt-1 flex flex-wrap gap-1" role="radiogroup" aria-label="Default length">
+        <p className="text-meta font-medium text-text">{t('planner.options.defaultLength')}</p>
+        <div className="mt-1 flex flex-wrap gap-1" role="radiogroup" aria-label={t('planner.options.defaultLength')}>
           {BLOCK_LENGTHS.map((minutes) => (
             <button
               key={minutes}
@@ -54,31 +60,31 @@ export function PlannerOptions() {
             </button>
           ))}
         </div>
-        <p className="mt-1 text-caption text-text-secondary">What a task takes when you drop it on a time. Synced to your other devices.</p>
+        <p className="mt-1 text-caption text-text-secondary">{t('planner.options.defaultLengthNote')}</p>
       </div>
 
       <div>
-        <p className="text-meta font-medium text-text">Work hours</p>
+        <p className="text-meta font-medium text-text">{t('planner.options.workHours')}</p>
         <div className="mt-1 flex items-center gap-2">
           <input
             type="time"
-            aria-label="Work hours start"
+            aria-label={t('planner.options.workStart')}
             value={from}
             onChange={(event) => setFrom(event.target.value)}
             onBlur={commitHours}
             className="rounded-control border border-border bg-transparent px-2 py-1 text-meta text-text"
           />
-          <span className="text-meta text-text-secondary">to</span>
+          <span className="text-meta text-text-secondary">{t('planner.options.to')}</span>
           <input
             type="time"
-            aria-label="Work hours end"
+            aria-label={t('planner.options.workEnd')}
             value={to}
             onChange={(event) => setTo(event.target.value)}
             onBlur={commitHours}
             className="rounded-control border border-border bg-transparent px-2 py-1 text-meta text-text"
           />
         </div>
-        <p className="mt-1 text-caption text-text-secondary">Used for free time, Fit and Plan my day. Synced to your other devices.</p>
+        <p className="mt-1 text-caption text-text-secondary">{t('planner.options.workHoursNote')}</p>
       </div>
 
       <div>
@@ -88,12 +94,12 @@ export function PlannerOptions() {
             checked={typeof config?.planner_nudge === 'string'}
             onChange={(event) => save({ planner_nudge: event.target.checked ? '21:30' : null })}
           />
-          <span className="text-meta text-text">Ask me to plan tomorrow</span>
+          <span className="text-meta text-text">{t('planner.options.nudge')}</span>
         </label>
         {typeof config?.planner_nudge === 'string' && (
           <input
             type="time"
-            aria-label="Ask at"
+            aria-label={t('planner.options.askAt')}
             value={config.planner_nudge}
             onChange={(event) => {
               if (event.target.value) save({ planner_nudge: event.target.value })
@@ -109,9 +115,13 @@ export function PlannerOptions() {
             checked={config?.planner_show_routines !== false}
             onChange={(event) => save({ planner_show_routines: event.target.checked })}
           />
-          <span className="text-meta text-text">Show routines on the timeline</span>
+          <span className="text-meta text-text">{t('planner.options.showRoutines')}</span>
         </label>
       )}
+
+      <div className="border-t border-border pt-3">
+        <CalendarFeeds summary={compact} />
+      </div>
     </div>
   )
 }

@@ -5,12 +5,21 @@ import { api } from '@/lib/api'
 import { useCompletedTasksStore } from '@/stores/completed-tasks-store'
 import type { Task, TaskQueryParams } from '@/lib/vikunja-types'
 import { hasVicuMetadataMarker } from '@/lib/metadata-tasks'
+import { useFocusFilter } from './use-focus'
+import { parentTaskId, useWorkMode } from './use-work-mode'
 import { asksForOpenTasksOnly, dropReleasedCompletions, mergeSmartListUndoWindow } from '@/lib/undo-window'
 
-export function useTasks(params: TaskQueryParams, enabled = true) {
+/**
+ * `scoped` makes the list follow Work and Personal (cross-app semantics 22.4): only tasks the mode shows.
+ * The query cache stays unfiltered. Lists and counts pass it; a caller that needs every task (Pro's
+ * availability, reminders) does not. In All the list is returned as it is.
+ */
+export function useTasks(params: TaskQueryParams, enabled = true, scoped = false) {
   const matches = useMatches()
   const pathname = matches[matches.length - 1]?.pathname ?? ''
   const completedTasks = useCompletedTasksStore((s) => s.tasks)
+  const focusFilter = useFocusFilter()
+  const workFilter = useWorkMode().filter
 
   const query = useQuery({
     queryKey: ['tasks', params],
@@ -39,8 +48,11 @@ export function useTasks(params: TaskQueryParams, enabled = true) {
     const tasks = asksForOpenTasksOnly(params.filter) ? dropReleasedCompletions(loaded, completedTasks, pathname) : loaded
     const merged = mergeSmartListUndoWindow(tasks, completedTasks, pathname, previous.current)
     previous.current = merged
-    return merged
-  }, [query.data, completedTasks, pathname, params])
+    // Pro's focus (21.14): only tasks of projects in focus. Without a focus this is the list itself.
+    const inFocus = focusFilter(merged)
+    // Work and Personal (22.4): the mode's tasks only, on display, after the focus and before counting.
+    return scoped ? workFilter(inFocus, parentTaskId) : inFocus
+  }, [query.data, completedTasks, pathname, params, focusFilter, scoped, workFilter])
 
   return { ...query, data }
 }

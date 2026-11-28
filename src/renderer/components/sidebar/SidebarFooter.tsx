@@ -1,10 +1,13 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
+import { useTranslation } from 'react-i18next'
 import { Settings } from 'lucide-react'
 import { api } from '@/lib/api'
+import { can } from '@/lib/capabilities'
 import { SyncStatusButton } from '@/components/sync/SyncStatusButton'
 
 export function SidebarFooter() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const [updateAvailable, setUpdateAvailable] = useState(false)
   const [checking, setChecking] = useState(false)
@@ -12,6 +15,8 @@ export function SidebarFooter() {
   const [releaseUrl, setReleaseUrl] = useState('')
 
   useEffect(() => {
+    // A host without the update check (the web version) is updated by its server.
+    if (!can('updates')) return
     api.getUpdateStatus().then((status) => {
       if (status?.available) {
         api.getConfig().then((config) => {
@@ -49,8 +54,11 @@ export function SidebarFooter() {
           className="flex h-7 flex-1 items-center gap-2 rounded-control px-2.5 text-xs text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
         >
           <Settings className="h-3.5 w-3.5" strokeWidth={1.8} />
-          <span>Settings</span>
+          <span>{t('sidebarNav.footer.settings')}</span>
         </button>
+        {!can('updates') ? (
+          <span className="flex h-7 items-center px-2 text-caption text-[var(--text-secondary)]">{`v${__APP_VERSION__}`}</span>
+        ) : (
         <button
           type="button"
           onClick={async () => {
@@ -68,13 +76,14 @@ export function SidebarFooter() {
             }
           }}
           className="relative flex h-7 items-center rounded-control px-2 text-caption text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
-          title={updateAvailable ? `v${latestVersion} available — click to download` : 'Click to check for updates'}
+          title={updateAvailable ? t('sidebarNav.footer.updateAvailable', { version: latestVersion }) : t('sidebarNav.footer.checkForUpdates')}
         >
-          {checking ? 'checking…' : `v${__APP_VERSION__}`}
+          {checking ? t('sidebarNav.footer.checking') : `v${__APP_VERSION__}`}
           {updateAvailable && (
             <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-[var(--accent-blue)]" />
           )}
         </button>
+        )}
       </div>
     </div>
   )

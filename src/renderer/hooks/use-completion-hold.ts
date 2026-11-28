@@ -6,6 +6,7 @@ import { completionHold } from '@/stores/completion-hold-store'
 import { announce } from '@/stores/announcer-store'
 import { useSelectionStore } from '@/stores/selection-store'
 import { focusCheckboxWhenShown } from '@/lib/next-row'
+import { t } from '../../shared/i18n'
 
 /**
  * Pointer and keyboard-focus engagement of one task row, for the completion hold. A completed row is
@@ -57,7 +58,7 @@ export function useUndoCompletedTasks() {
       mutate(entry.task)
     }
     if (entries.length === 0) return
-    announce(entries.length === 1 ? `Reopened ${entries[0].task.title}` : `Reopened ${entries.length} tasks`)
+    announce(entries.length === 1 ? t('taskActions.reopenedOne', { title: entries[0].task.title }) : t('taskActions.reopenedMany', { count: entries.length }))
     // The toast (and the button that was pressed) is gone: focus goes to the first restored row.
     const first = entries[0].task.id
     useSelectionStore.getState().setFocusedTask(first)

@@ -7,14 +7,15 @@ import {
   CUSTOM_LIST_CARRIER_SPEC,
   DISCOVERY_INTERVAL_MS,
   FULL_SCAN_INTERVAL_MS,
+  PREFS_CARRIER_SPEC,
   ROUTINE_CARRIER_SPEC,
-  carrierIdsPath,
+  SCAN_RETRY_DELAYS_MS,
   createCarrierLoader,
-  createFileCarrierIdStore,
   createMemoryCarrierIdStore,
   type CarrierIdStore,
   type CarrierTask,
 } from '../carrier-discovery'
+import { carrierIdsPath, createFileCarrierIdStore } from '../carrier-id-file'
 import { encodeRoutineEnvelope, type RoutinePayload } from '../../shared/routines'
 
 const SERVER = 'https://tasks.example.com'
@@ -54,6 +55,8 @@ function fakeServer(initial: CarrierTask[]) {
   const calls = { list: [] as Array<Record<string, unknown>>, byId: [] as number[] }
   const failing = {
     list: null as null | string,
+    /** The answer to every listing of all done tasks (a scan that times out on a long history). */
+    scan: null as null | string,
     byId: null as null | { id: number; statusCode?: number; error: string },
     /** The answer to every `q` search, the way a server whose search is broken answers it. */
     search: null as null | { statusCode?: number; error: string },
@@ -62,6 +65,7 @@ function fakeServer(initial: CarrierTask[]) {
   const fetchTasks = async (params: Record<string, unknown>): Promise<ApiResult<unknown[]>> => {
     calls.list.push(params)
     if (failing.list) return { success: false, error: failing.list }
+    if (failing.scan && params.filter === 'done = true' && params.q === undefined) return { success: false, error: failing.scan }
     if (failing.search && typeof params.q === 'string') return { success: false, ...failing.search }
     let result = [...tasks.values()]
     if (params.filter === 'done = true') result = result.filter((task) => task.done)
@@ -435,6 +439,115 @@ describe('carrier discovery (D-NOTIF-3, D-RT-2)', () => {
     const [a, b] = await Promise.all([t.loader.load(ROUTINE_CARRIER_SPEC, SERVER, ME), t.loader.load(ROUTINE_CARRIER_SPEC, SERVER, ME)])
     expect(a).toEqual(b)
     expect(t.server.calls.list).toHaveLength(1)
+  })
+
+  const isScan = (params: Record<string, unknown>) => params.filter === 'done = true' && params.q === undefined
+  const prefsCarrier = (id: number): CarrierTask => ({ id, title: 'Vicu preferences', done: true, description: '<!-- vicu-prefs:v1:e30 -->', ...mine })
+
+  it('lists flat: no subtask expansion, nested subtasks kept, the scan by id (rendyhd/Vicu#75)', async () => {
+    const t = setup([routineCarrier(10)])
+    await t.ids()
+    t.advance(DISCOVERY_INTERVAL_MS + 1)
+    await t.ids()
+    const [scan, search] = t.server.calls.list
+    expect(scan).toMatchObject({ filter: 'done = true', sort_by: 'id', order_by: 'asc', expand_subtasks: false, keep_nested_subtasks: true })
+    expect(search).toMatchObject({ q: 'vicu-routine:v', expand_subtasks: false, keep_nested_subtasks: true })
+  })
+
+  it('lets one scan answer for every kind, so a kind loaded later does not scan again that day', async () => {
+    const t = setup([routineCarrier(10), listCarrier(40), prefsCarrier(45), plainDone(1)])
+    expect(await t.ids()).toEqual([10])
+    expect(t.store.get(SERVER, 'custom-lists')).toMatchObject({ ids: [40] })
+    expect(t.store.get(SERVER, 'prefs')).toMatchObject({ ids: [45] })
+
+    t.reset()
+    t.advance(60 * 60_000)
+    expect(await t.ids(CUSTOM_LIST_CARRIER_SPEC)).toEqual([40])
+    expect(await t.ids(PREFS_CARRIER_SPEC)).toEqual([45])
+    expect(t.server.calls.list.some(isScan)).toBe(false)
+    expect(t.server.calls.byId.sort()).toEqual([40, 45])
+  })
+
+  it('keeps a remembered carrier of another kind that the scan did not list (reopened)', async () => {
+    const t = setup([listCarrier(40), routineCarrier(10)])
+    await t.ids(CUSTOM_LIST_CARRIER_SPEC)
+    t.server.tasks.set(40, { ...listCarrier(40), done: false })
+    t.advance(FULL_SCAN_INTERVAL_MS)
+    await t.ids() // the routine load scans; the reopened list carrier is not in it
+    expect(t.store.get(SERVER, 'custom-lists').ids).toEqual([40])
+  })
+
+  it('searches when the scan fails, and waits longer before each new scan', async () => {
+    const t = setup([routineCarrier(10), plainDone(1)])
+    t.server.failing.scan = 'Request timed out (no answer for 10s)'
+
+    // The first scan fails: the search finds the carrier all the same.
+    expect(await t.ids()).toEqual([10])
+    expect(t.server.calls.list.map(isScan)).toEqual([true, false])
+    expect(t.store.get(SERVER, 'routine').lastFullScanAt).toBe(0)
+
+    // Every sync in the next minutes searches, and none starts the scan again from page one.
+    for (const delay of SCAN_RETRY_DELAYS_MS) {
+      t.reset()
+      t.advance(delay - 1_000)
+      await t.ids()
+      expect(t.server.calls.list.some(isScan)).toBe(false)
+      t.reset()
+      t.advance(1_000)
+      expect(await t.ids()).toEqual([10])
+      expect(t.server.calls.list.filter(isScan)).toHaveLength(1)
+    }
+    // The last wait repeats.
+    t.reset()
+    t.advance(SCAN_RETRY_DELAYS_MS[SCAN_RETRY_DELAYS_MS.length - 1] - 1_000)
+    await t.ids()
+    expect(t.server.calls.list.some(isScan)).toBe(false)
+
+    // Once a scan gets through, the day's interval holds again and the waits start over.
+    t.server.failing.scan = null
+    t.advance(1_000)
+    await t.ids()
+    const scannedAt = t.store.get(SERVER, 'routine').lastFullScanAt
+    expect(scannedAt).toBeGreaterThan(0)
+    t.server.failing.scan = 'Request timed out (no answer for 10s)'
+    t.advance(FULL_SCAN_INTERVAL_MS)
+    t.reset()
+    await t.ids()
+    t.reset()
+    t.advance(SCAN_RETRY_DELAYS_MS[0])
+    await t.ids()
+    expect(t.server.calls.list.filter(isScan)).toHaveLength(1)
+  })
+
+  it('shares the wait between the kinds: a failed scan is not started again by the next kind', async () => {
+    const t = setup([routineCarrier(10), listCarrier(40)])
+    t.server.failing.scan = 'Request timed out (no answer for 10s)'
+    await t.ids()
+    t.reset()
+    t.advance(1_000)
+    expect(await t.ids(CUSTOM_LIST_CARRIER_SPEC)).toEqual([40])
+    expect(t.server.calls.list.some(isScan)).toBe(false)
+  })
+
+  it('reports the error when the scan fails and the search finds nothing it can trust', async () => {
+    const t = setup([routineCarrier(10)])
+    t.server.failing.scan = 'Request timed out (no answer for 10s)'
+    t.server.failing.search = brokenSearch
+    expect(await t.loader.load(ROUTINE_CARRIER_SPEC, SERVER, ME)).toMatchObject({ success: false, error: 'Request timed out (no answer for 10s)' })
+
+    // In the wait no scan stands for the broken search either: still an error, never "none".
+    t.advance(1_000)
+    expect(await t.loader.load(ROUTINE_CARRIER_SPEC, SERVER, ME)).toMatchObject({ success: false })
+  })
+
+  it('goes by the remembered carriers when a carrier is gone, the scan waits and the search is broken', async () => {
+    const t = setup([routineCarrier(10), routineCarrier(11)])
+    await t.ids()
+    t.server.tasks.delete(10)
+    t.server.failing.scan = 'Request timed out (no answer for 10s)'
+    t.server.failing.search = brokenSearch
+    t.advance(1_000)
+    expect(await t.ids()).toEqual([11])
   })
 
   it('fetches a carrier this app just created directly, and forgets one it deleted', async () => {

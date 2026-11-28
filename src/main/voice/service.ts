@@ -4,6 +4,7 @@ import { existsSync } from 'fs'
 import { join } from 'path'
 import { handleTrusted } from '../secure-ipc'
 import { isLinux, isMac, isWindows } from '../platform'
+import { powershellPath } from '../system-tools'
 import type {
   VoiceAvailability,
   VoiceErrorCode,
@@ -45,7 +46,7 @@ function helperCommand(extra: string[] = []): HelperCommand | null {
     const path = resourcePath('voice', 'voice-windows.ps1')
     if (!existsSync(path)) return null
     return {
-      command: 'powershell.exe',
+      command: powershellPath(),
       args: ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', path, ...extra.map((a) => (a === '--check' ? '-Check' : a))],
       engine: 'windows-speech',
     }

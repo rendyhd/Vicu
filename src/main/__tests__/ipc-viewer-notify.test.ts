@@ -146,6 +146,23 @@ describe('Quick View refresh after label, relation, attachment and project chang
     expect(hoisted.send).not.toHaveBeenCalled()
   })
 
+  it('a picked file is uploaded by its token once, and only a picked one', async () => {
+    const picked = (await call('pick-attachment-files')) as { success: true; data: { token: string; name: string; size: number }[] }
+    expect(picked.success).toBe(true)
+    expect(picked.data).toHaveLength(1)
+    expect(picked.data[0].name).toMatch(/a\.txt$/)
+    expect(hoisted.send).not.toHaveBeenCalled()
+
+    const token = picked.data[0].token
+    expect(await call('upload-picked-attachment', 1, token)).toMatchObject({ success: true })
+    expect(hoisted.send).toHaveBeenCalledWith('sync-completed')
+
+    hoisted.send.mockClear()
+    expect(await call('upload-picked-attachment', 1, token)).toMatchObject({ success: false })
+    expect(await call('upload-picked-attachment', 1, 'C:\files\a.txt')).toMatchObject({ success: false })
+    expect(hoisted.send).not.toHaveBeenCalled()
+  })
+
   it('returns the API result unchanged', async () => {
     hoisted.result.current = { success: true, data: { id: 5 } }
     expect(await call('add-label-to-task', 1, 2)).toEqual({ success: true, data: { id: 5 } })

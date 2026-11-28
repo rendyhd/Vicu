@@ -10,6 +10,8 @@ import type {
   RemoveLabelAction,
   UpdateAction,
   UpdateCommentAction,
+  AddRelationAction,
+  RemoveRelationAction,
 } from './types'
 import { hasTaskId } from './types'
 
@@ -83,6 +85,28 @@ function replaceAt(actions: QueuedAction[], index: number, next: QueuedAction): 
 }
 
 /**
+ * An update with the completed due of a repeating task's completion (cross-app semantics 7.5): kept
+ * only while the patch still completes the task.
+ */
+function withCompletedDue(action: UpdateAction, completedDue: string | null | undefined): UpdateAction {
+  const next = { ...action }
+  if (completedDue !== undefined && next.patch.done === true) next.completedDue = completedDue
+  else delete next.completedDue
+  return next
+}
+
+/**
+ * An update with the description a notes edit started from (description format, "Notes changed in
+ * two places"): kept only while the patch still holds `description`.
+ */
+function withBaseDescription(action: UpdateAction, baseDescription: string | undefined): UpdateAction {
+  const next = { ...action }
+  if (typeof baseDescription === 'string' && 'description' in next.patch) next.baseDescription = baseDescription
+  else delete next.baseDescription
+  return next
+}
+
+/**
  * Queue a change to a task's fields.
  *
  * - Pending create: fold into it (update + create = create with merged fields; a completion
@@ -105,7 +129,15 @@ export function mergeUpdate(actions: QueuedAction[], next: UpdateAction, inFligh
   const existingIndex = actions.findIndex((a) => a.type === 'update' && a.taskId === next.taskId && a.id !== inFlightId)
   if (existingIndex !== -1) {
     const existing = actions[existingIndex] as UpdateAction
-    const merged: UpdateAction = { ...existing, patch: { ...existing.patch, ...next.patch } }
+    // The completed due belongs to the newest `done` in the patch (cross-app semantics 7.5).
+    const completedDue = 'done' in next.patch ? next.completedDue : existing.completedDue
+    // Edits of the notes that fold into one change keep the base of the first (description format,
+    // "Notes changed in two places"); a first edit without a base keeps none.
+    const baseDescription = 'description' in existing.patch ? existing.baseDescription : next.baseDescription
+    const merged: UpdateAction = withBaseDescription(
+      withCompletedDue({ ...existing, patch: { ...existing.patch, ...next.patch } }, completedDue),
+      baseDescription
+    )
     if (next.title !== undefined) merged.title = next.title
     return outcome(replaceAt(actions, existingIndex, merged), { foldedInto: existing.id })
   }
@@ -314,7 +346,7 @@ export function cancelPatchKeys(
       }
       cancelled = true
       if (Object.keys(patch).length === 0) removed.push(action)
-      else next.push({ ...action, patch })
+      else next.push(withBaseDescription(withCompletedDue({ ...action, patch }, 'done' in patch ? action.completedDue : undefined), action.baseDescription))
     } else if (action.type === 'create') {
       const fields = { ...action.fields }
       let touched = false
@@ -343,9 +375,30 @@ export function cancelPatchKeys(
  */
 export function remapTempId(actions: QueuedAction[], tempId: number, realId: number, title?: string): QueuedAction[] {
   return actions.map((a) => {
-    if (!hasTaskId(a) || a.taskId !== tempId) return a
-    const remapped = { ...a, taskId: realId } as QueuedAction
-    if (title && !remapped.title) remapped.title = title
+    // A relation names a second task, which may be the one just created.
+    const other = (a.type === 'add-relation' || a.type === 'remove-relation') && a.otherTaskId === tempId
+    if (!hasTaskId(a) || (a.taskId !== tempId && !other)) return a
+    const remapped = { ...a, ...(a.taskId === tempId ? { taskId: realId } : {}), ...(other ? { otherTaskId: realId } : {}) } as QueuedAction
+    if (title && !remapped.title && a.taskId === tempId) remapped.title = title
     return remapped
   })
+}
+
+const sameRelation = (a: { taskId: number; otherTaskId: number; kind: string }, b: { taskId: number; otherTaskId: number; kind: string }) =>
+  a.taskId === b.taskId && a.otherTaskId === b.otherTaskId && a.kind === b.kind
+
+/** Queue a relation. Cancels a queued removal of the same relation (decision 24). */
+export function mergeAddRelation(actions: QueuedAction[], next: AddRelationAction, inFlightId: string | null): MergeOutcome {
+  if (actions.some((a) => a.type === 'add-relation' && sameRelation(a, next))) return outcome(actions, {})
+  const removal = actions.find((a): a is RemoveRelationAction => a.type === 'remove-relation' && sameRelation(a, next) && a.id !== inFlightId)
+  if (removal) return outcome(actions.filter((a) => a.id !== removal.id), { removed: [removal] })
+  return outcome([...actions, next], { appended: true })
+}
+
+/** Queue a relation's removal. Cancels a queued add of the same relation. */
+export function mergeRemoveRelation(actions: QueuedAction[], next: RemoveRelationAction, inFlightId: string | null): MergeOutcome {
+  if (actions.some((a) => a.type === 'remove-relation' && sameRelation(a, next))) return outcome(actions, {})
+  const addition = actions.find((a): a is AddRelationAction => a.type === 'add-relation' && sameRelation(a, next) && a.id !== inFlightId)
+  if (addition) return outcome(actions.filter((a) => a.id !== addition.id), { removed: [addition] })
+  return outcome([...actions, next], { appended: true })
 }

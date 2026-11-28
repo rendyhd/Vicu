@@ -132,3 +132,10 @@ describe('createAppQueryClient', () => {
     expect(report).not.toHaveBeenCalled()
   })
 })
+
+describe('a web page instead of the API (C-1)', () => {
+  it('reads as offline and keeps the message that says what to do', () => {
+    const message = 'The server answered with a web page instead of the Vikunja API.'
+    expect(describeMutationError(apiError({ error: message, notApiResponse: true }))).toEqual({ kind: 'offline', message })
+  })
+})

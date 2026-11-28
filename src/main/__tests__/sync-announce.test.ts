@@ -28,7 +28,7 @@ vi.mock('../offline/duplicate-match', () => ({}))
 vi.mock('../offline/replay', () => ({ createReplayRunner: () => async () => null, replayQueue: async () => null }))
 vi.mock('../offline/task-writes', () => ({ sendSerially: async (fn: () => unknown) => fn() }))
 vi.mock('../offline/replay-retry', () => ({ createReplayRetry: () => ({ afterReplay: () => undefined }) }))
-vi.mock('../api-v2', () => ({ KEEP_NESTED_SUBTASKS_PARAM: 'k' }))
+vi.mock('../api-v2', () => ({ KEEP_NESTED_SUBTASKS_PARAM: 'k', EXPAND_SUBTASKS_PARAM: 'e', MAX_PAGE_SIZE: 1000 }))
 vi.mock('../quick-entry/viewer-caches', () => ({ invalidateViewerCaches: () => undefined }))
 vi.mock('../project-counts-service', () => ({
   invalidateProjectCounts: (...args: unknown[]) => {

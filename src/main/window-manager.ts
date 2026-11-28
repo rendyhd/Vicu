@@ -25,7 +25,10 @@ function boundsAreVisible(bounds: NonNullable<AppConfig['window_bounds']>): bool
   })
 }
 
-export function createMainWindow(config: AppConfig | null, options: { startHidden?: boolean } = {}): BrowserWindow {
+export function createMainWindow(
+  config: AppConfig | null,
+  options: { startHidden?: boolean; startMinimized?: boolean } = {},
+): BrowserWindow {
   const saved = config?.window_bounds
   const bounds = saved && boundsAreVisible(saved) ? saved : undefined
 
@@ -51,7 +54,9 @@ export function createMainWindow(config: AppConfig | null, options: { startHidde
     height: defaultHeight,
     x: fallbackX,
     y: fallbackY,
-    minWidth: 800,
+    // Narrow enough for a column of a tiling window manager (rendyhd/Vicu#73): below 664 px the
+    // sidebar becomes a drawer (renderer lib/sidebar-width.ts), so the content keeps the width.
+    minWidth: 360,
     minHeight: 500,
     ...windowChromeOptions({ platform: chromePlatform, windowsBuild, dark: isDarkChrome(config?.theme, nativeTheme.shouldUseDarkColors) }),
     show: false,
@@ -110,6 +115,13 @@ export function createMainWindow(config: AppConfig | null, options: { startHidde
       // Launched at login into the tray: stay hidden. The first show comes later (tray, dock or a
       // second launch) and gets the same Linux bounds fix then.
       win.once('show', fixLinuxBounds)
+      return
+    }
+    if (options.startMinimized) {
+      // Launched at login with "Minimize to taskbar": a taskbar button (with the count badge),
+      // no window in the way. The bounds fix waits for the first restore.
+      win.minimize()
+      win.once('restore', fixLinuxBounds)
       return
     }
     win.show()

@@ -1,0 +1,203 @@
+# Pro branch builds
+#
+# Every push to the pro branch (or a manual run) builds the installers, keeps them as workflow
+# artifacts for 30 days, and puts them on one rolling pre-release, tag `pro-alpha`, replaced on every
+# build: https://github.com/rendyhd/Vicu/releases/tag/pro-alpha. It is never offered as an update:
+# the app's update check reads releases/latest, which never returns a pre-release; release.yml only
+# runs for `v*` tags; the AppImage carries no update information. electron-builder runs with
+# --publish never. The version becomes 3.0.0-pro.<run number> for the build only, so Settings shows
+# which build is installed; package.json is not changed.
+
+name: Pro branch builds
+
+on:
+  push:
+    branches: [pro]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: pro-build-${{ github.ref_name }}
+  cancel-in-progress: true
+
+env:
+  PRO_VERSION: 3.0.0-pro.${{ github.run_number }}
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Cache Electron
+        uses: actions/cache@v4
+        with:
+          path: ~/AppData/Local/electron/Cache
+          key: electron-x64-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            electron-x64-
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
+
+      - name: Set the build version
+        run: npm version "$env:PRO_VERSION" --no-git-tag-version --allow-same-version
+
+      - name: Build
+        run: npm run build && npm run speech:lib && npx electron-builder --win --publish never
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vicu-${{ env.PRO_VERSION }}-windows
+          path: dist/*.exe
+          retention-days: 30
+          if-no-files-found: error
+
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # Signed and notarized like a release when the secrets exist (release.yml), else unsigned.
+      - name: Import signing certificate
+        if: env.BUILD_CERTIFICATE_BASE64 != ''
+        env:
+          BUILD_CERTIFICATE_BASE64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
+          P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        run: |
+          CERTIFICATE_PATH=$RUNNER_TEMP/build_certificate.p12
+          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+
+          echo -n "$BUILD_CERTIFICATE_BASE64" | base64 --decode -o $CERTIFICATE_PATH
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+
+          security import $CERTIFICATE_PATH -P "$P12_PASSWORD" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
+          security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          security list-keychain -d user -s $KEYCHAIN_PATH
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      # The browser link's host on macOS (native/bridge-macos), built before the tests so they run
+      # against the real tool; the afterPack hook refuses a Mac build without it.
+      - name: Build the browser link helper
+        run: npm run bridge:helper
+
+      - name: Test
+        run: npm test
+
+      - name: Set the build version
+        run: npm version "$PRO_VERSION" --no-git-tag-version --allow-same-version
+
+      - name: Build
+        run: npm run dist:mac -- --publish never
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: ${{ secrets.BUILD_CERTIFICATE_BASE64 != '' && 'true' || 'false' }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+
+      - name: Cleanup keychain
+        if: always()
+        run: |
+          if [ -f "$RUNNER_TEMP/app-signing.keychain-db" ]; then
+            security delete-keychain $RUNNER_TEMP/app-signing.keychain-db
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vicu-${{ env.PRO_VERSION }}-macos
+          path: dist/*.dmg
+          retention-days: 30
+          if-no-files-found: error
+
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
+
+      - name: Set the build version
+        run: npm version "$PRO_VERSION" --no-git-tag-version --allow-same-version
+
+      # No update information: an AppImage manager would point it at the releases, which this
+      # build is not one of.
+      - name: Build
+        run: npm run build && npm run speech:lib && npx electron-builder --linux AppImage:x64 --publish never
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vicu-${{ env.PRO_VERSION }}-linux-x64
+          path: dist/*.AppImage
+          retention-days: 30
+          if-no-files-found: error
+
+  # The rolling pre-release: deleted with its tag and made again at this commit, so the link stays
+  # the same and only the newest build is there.
+  publish-alpha:
+    needs: [windows, macos, linux]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: builds
+          merge-multiple: true
+
+      - name: Replace the pro-alpha pre-release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+        run: |
+          ls -la builds
+          gh release delete pro-alpha --repo "$REPO" --cleanup-tag --yes || true
+          cat > notes.md <<NOTES
+          Alpha builds of Vicu Pro from the \`pro\` branch: version $PRO_VERSION, commit ${SHA::7}.
+
+          This is not an update. Vicu never offers this pre-release; install it by hand. It is replaced by every new alpha build, so this page always has the newest one.
+
+          - Windows: the \`.exe\` installer (unsigned, so Windows may ask before it runs).
+          - macOS: the \`.dmg\`.
+          - Linux: the x64 \`.AppImage\`.
+          - Android: https://github.com/rendyhd/Vicu-Mobile/releases/tag/pro-alpha
+
+          How Pro works: https://vicutodo.app/guide/pro/
+
+          Keep your Vikunja server backed up while you try it. Feedback: https://github.com/rendyhd/Vicu/issues
+          NOTES
+          gh release create pro-alpha builds/* --repo "$REPO" --target "$SHA" --prerelease --latest=false --title "Vicu Pro alpha ($PRO_VERSION)" --notes-file notes.md

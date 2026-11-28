@@ -13,6 +13,7 @@ import type { Project } from '@/lib/vikunja-types'
 import { useQueryClient } from '@tanstack/react-query'
 import { sharedRoutineNamesIn } from '@/hooks/use-routines'
 import { projectDeleteQuestion } from '@/lib/routine-sharing'
+import { useTranslation } from 'react-i18next'
 
 interface SectionHeaderProps {
   project: Project
@@ -28,6 +29,7 @@ const sectionAnimateLayoutChanges: AnimateLayoutChanges = (args) => {
 }
 
 export function SectionHeader({ project, siblings, onAddTask }: SectionHeaderProps) {
+  const { t } = useTranslation()
   const [isRenaming, setIsRenaming] = useState(false)
   const [renameValue, setRenameValue] = useState(project.title)
   const [showMenu, setShowMenu] = useState(false)
@@ -102,7 +104,7 @@ export function SectionHeader({ project, siblings, onAddTask }: SectionHeaderPro
     setShowMenu(false)
     // Deleting the project deletes the shared routines in it, for everyone (section 6.9).
     const question = projectDeleteQuestion(
-      'Delete this project? All tasks in it will be deleted. This cannot be undone.',
+      t('task.confirm.deleteProject'),
       await sharedRoutineNamesIn(queryClient, project.id),
     )
     const ok = await confirmDelete(question.message, { force: question.force })
@@ -158,7 +160,7 @@ export function SectionHeader({ project, siblings, onAddTask }: SectionHeaderPro
             onAddTask()
           }}
           className="flex h-5 w-5 items-center justify-center rounded-control text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--accent-blue)]"
-          aria-label="Add task to section"
+          aria-label={t('task.section.addTask')}
         >
           <Plus className="h-3.5 w-3.5" />
         </button>
@@ -172,7 +174,7 @@ export function SectionHeader({ project, siblings, onAddTask }: SectionHeaderPro
               setShowMenu((s) => !s)
             }}
             className="flex h-5 w-5 items-center justify-center rounded-control text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
-            aria-label="Section menu"
+            aria-label={t('task.section.menu')}
           >
             <MoreHorizontal className="h-3.5 w-3.5" />
           </button>
@@ -193,7 +195,7 @@ export function SectionHeader({ project, siblings, onAddTask }: SectionHeaderPro
                 className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-[var(--text-primary)] hover:bg-[var(--bg-hover)]"
               >
                 <Pencil className="h-3 w-3" />
-                Rename
+                {t('task.section.rename')}
               </button>
               <button
                 type="button"
@@ -204,7 +206,7 @@ export function SectionHeader({ project, siblings, onAddTask }: SectionHeaderPro
                 className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-danger hover:bg-[var(--bg-hover)]"
               >
                 <Trash2 className="h-3 w-3" />
-                Delete
+                {t('task.section.delete')}
               </button>
             </div>
           )}

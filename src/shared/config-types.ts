@@ -9,8 +9,10 @@
 // --- Custom lists ----------------------------------------------------------------------------
 
 /** The sort keys a custom list may use, in the order the editor offers them (same as Android). */
+import type { ProLedger } from './pro/ledger'
 import type { SyncedPrefsDocument } from './synced-prefs'
 import type { TodayRoutinesLimit } from './today-routines'
+import type { ImportBase } from './saved-filter-import'
 
 export const CUSTOM_LIST_SORT_FIELDS = [
   'due_date',
@@ -75,6 +77,10 @@ export interface CustomListWire {
   filter: CustomListWireFilter
   /** The Vikunja saved filter the list was imported from (section 3.7). */
   saved_filter_id?: number
+  /** The Vikunja project view the list was imported from (section 3.9). */
+  project_view?: { project_id: number; view_id: number }
+  /** What the last import took from Vikunja (section 3.7, "The import base"). */
+  import_base?: ImportBase
   [unknownField: string]: unknown
 }
 
@@ -125,6 +131,22 @@ export interface CustomListFilter {
   rule_include_nulls?: boolean
   /** Sort keys after sort_by (section 3.6). */
   then_by?: Array<{ sort_by: string; order_by: string }>
+  // Pro (section 3.8): written only when set, evaluated Pro on or off, kept by every version.
+  /** 'available', 'remaining' or 'all'. */
+  availability?: string
+  flagged?: boolean
+  /** Minutes; a whole number of 1 or more. */
+  estimate_max?: number
+  /** 'active', 'on_hold' or 'any'. */
+  project_status?: string
+  /** 'project', 'label', 'person', 'due', 'start', 'flagged' or 'none'. */
+  group_by?: string
+  /** What rows show, in order: 'project', 'labels', 'due', 'start', 'estimate', 'flag', 'notes'. */
+  row_fields?: string[]
+  /** 'theirs', 'mine' or 'any'. */
+  promise?: string
+  /** Label ids of people. */
+  person?: number[]
   [unknownField: string]: unknown
 }
 
@@ -135,6 +157,10 @@ export interface CustomList {
   filter: CustomListFilter
   /** The Vikunja saved filter the list was imported from (section 3.7). */
   saved_filter_id?: number
+  /** The Vikunja project view the list was imported from (section 3.9). */
+  project_view?: { project_id: number; view_id: number }
+  /** What the last import took from Vikunja (section 3.7, "The import base"). */
+  import_base?: ImportBase
   [unknownField: string]: unknown
 }
 
@@ -154,6 +180,8 @@ export type CustomListSyncStatus =
 export interface UnsyncedDocuments {
   customLists: CustomListSyncStatus | null
   preferences: CustomListSyncStatus | null
+  /** The Pro ledger (cross-app semantics 21.7); null while Pro is off. */
+  proLedger?: CustomListSyncStatus | null
 }
 
 // --- Quick View, review, connection ----------------------------------------------------------
@@ -222,6 +250,12 @@ export interface AppConfig {
    */
   clock_format?: 'system' | '12h' | '24h'
   /**
+   * The language the app shows (src/shared/i18n): 'system' follows the computer's preferred
+   * languages, else the BCP 47 tag of a catalog in `locales/` ("nl", "pt-BR"). Per device, never
+   * synced. Missing means 'system'.
+   */
+  language?: string
+  /**
    * How much of a task a row shows (design-system section 4). Per device, never synced: a desktop
    * window and a phone differ in width. Missing means 'compact'.
    */
@@ -244,17 +278,35 @@ export interface AppConfig {
    * and stays in the command palette. A name this version does not know (a newer one wrote it) is kept.
    */
   sidebar_hidden_lists?: string[]
+  /**
+   * The person's order of the sidebar: the smart lists and its blocks (`src/shared/sidebar-layout.ts`,
+   * Settings → General → Sidebar). Missing or empty is the default order, with the Logbook in its own
+   * row at the bottom. Per device and kept through sign-out, never synced.
+   */
+  sidebar_order?: string[]
+  /** Whether Pro's sidebar section is collapsed to its header. Per device, never synced. */
+  sidebar_pro_collapsed?: boolean
+  /**
+   * The person hid the sidebar in a wide window (the sidebar button or Mod+\). A narrow window
+   * shows it as a drawer whatever this says (renderer `lib/sidebar-width.ts`). Per device, never synced.
+   */
+  sidebar_hidden?: boolean
   custom_lists?: CustomList[]
   /**
    * What this device knows about the account's Vikunja saved filters (cross-app semantics 3.7):
    * the filters the last project read found, whether the first connect imported them, the ones
-   * put off with Not now, and the imported lists whose first-open notice was closed. Owned by main.
+   * put off with Not now, and the imported lists whose first-open notice was closed; and, per
+   * filter id, the `updated` this device last read an imported filter at (`checked`), found it
+   * changed in Vikunja at (`changed`) and put that change off at (`changed_dismissed`). Owned by main.
    */
   saved_filters?: {
-    known: Array<{ id: number; title: string }>
+    known: Array<{ id: number; title: string; updated?: string }>
     first_connect_done?: boolean
     dismissed?: number[]
     notice_closed?: string[]
+    checked?: Record<string, string>
+    changed?: Record<string, string>
+    changed_dismissed?: Record<string, string>
   }
   /** Owned by the custom list service in the main process; the renderer never writes it. */
   custom_lists_sync?: {
@@ -276,6 +328,15 @@ export interface AppConfig {
     carrier_task_id?: number
     last_synced_at?: string
     moved?: boolean
+  }
+  /** The Pro ledger's local copy (cross-app semantics 21.7; owned by main, `src/main/pro-ledger-service.ts`). */
+  pro_ledger_sync?: {
+    device_id: string
+    document: ProLedger
+    dirty: boolean
+    carrier_task_id?: number
+    last_synced_at?: string
+    synced_document?: ProLedger
   }
   /**
    * The signed-in Vikunja user, as `GET user` answered it (owned by main, `src/main/known-user.ts`).
@@ -311,6 +372,12 @@ export interface AppConfig {
   start_hidden?: boolean
   standalone_mode?: boolean
   show_today_overdue_badge?: boolean
+  /**
+   * What the main window's close button does on Windows and Linux (`closeAction`): minimize to
+   * the taskbar (the taskbar button and its count badge stay), hide to the tray, or quit. Missing
+   * keeps the old rule: the tray while Quick Entry or Quick View is on, else quit. Per device.
+   */
+  close_action?: CloseAction
   /** Progress rings next to the projects in the sidebar. Missing means on. */
   show_project_progress?: boolean
   /** Each project's number of open tasks in the sidebar, beside the ring when both are on. Missing means off. */
@@ -383,6 +450,36 @@ export interface AppConfig {
   planner_show_routines?: boolean
   /** A notification in the evening to plan tomorrow; off unless true. Local time, `HH:MM`. */
   planner_nudge?: string | null
+  // Pro (cross-app semantics section 21): per device, never synced.
+  /** The switch; off by default and never on in standalone mode (`isProEnabled`). */
+  pro_enabled?: boolean
+  /** The layers; a missing one is on. */
+  pro_layers?: Partial<Record<'availability' | 'promises' | 'portfolio' | 'power', boolean>>
+  /** Available, Remaining or All, per list key (`anytime`, `project:12`, `tag:4`, `list:<id>`). */
+  pro_list_views?: Record<string, 'available' | 'remaining' | 'all'>
+  /** Rows or columns per list key, with the visible columns. */
+  pro_list_layouts?: Record<string, { layout: 'rows' | 'columns'; columns?: string[] }>
+  /** Focus (section 21.14). */
+  pro_focus?: { categories: string[]; projects: number[] } | null
+  /** Pro data reaches the assistant only while this is on (decision 20). */
+  pro_assistant?: boolean
+  /** "Ask me tomorrow", once per due day (section 21.6). */
+  pro_verdict_snooze?: Record<string, { due: string; until: string }>
+  /** Follow-up lines dismissed for today (section 21.18): a line's key and the local day it shows again. */
+  pro_followup_dismissed?: Record<string, string>
+  /** The first-run notice about existing start dates was shown. */
+  pro_onboarding_seen?: boolean
+  // Work and Personal (cross-app semantics section 22): per device, never synced.
+  /** The feature; off by default (`effectiveWorkMode`). Off, every list is as without it. */
+  work_mode_enabled?: boolean
+  /** Personal, Work or All; kept while the feature is off. */
+  work_mode?: 'all' | 'work' | 'personal'
+  /** Show All as a third option in the Personal/Work switch (off by default). */
+  work_mode_show_all?: boolean
+  /** Show the work label chip on task rows while in Work mode (off by default: hidden as noise). */
+  work_mode_show_work_label?: boolean
+  /** With this on, a device in Personal mode acts as one with Pro off (section 22.8). */
+  pro_only_in_work?: boolean
 }
 
 // --- Defaults every reader shares -------------------------------------------------------------
@@ -400,6 +497,26 @@ export function isQuickViewEnabled(config: Pick<AppConfig, 'quick_view_enabled'>
   return config?.quick_view_enabled === true
 }
 
+/** What the main window's close button does on Windows and Linux (macOS always hides it to the dock). */
+export type CloseAction = 'minimize' | 'tray' | 'quit'
+
+type CloseActionConfig = Pick<AppConfig, 'close_action' | 'quick_entry_enabled' | 'quick_view_enabled'>
+
+/**
+ * The close button's action. Unset keeps the behaviour from before the setting: hide to the tray
+ * while there is one (Quick Entry or Quick View is on), else quit.
+ */
+export function closeAction(config: CloseActionConfig | null | undefined): CloseAction {
+  const chosen = config?.close_action
+  if (chosen === 'minimize' || chosen === 'tray' || chosen === 'quit') return chosen
+  return isQuickEntryEnabled(config) || isQuickViewEnabled(config) ? 'tray' : 'quit'
+}
+
+/** The tray icon exists while Quick Entry or Quick View is on, or closing hides the window to it. */
+export function wantsTray(config: CloseActionConfig | null | undefined): boolean {
+  return isQuickEntryEnabled(config) || isQuickViewEnabled(config) || config?.close_action === 'tray'
+}
+
 /** Routines are on unless the user turned them off (configs from before the setting have none). */
 export function isRoutinesEnabled(config: Pick<AppConfig, 'routines_enabled'> | null | undefined): boolean {
   return config?.routines_enabled !== false
@@ -409,7 +526,6 @@ export function isRoutinesEnabled(config: Pick<AppConfig, 'routines_enabled'> | 
 export const SIDEBAR_HIDEABLE_LISTS = ['today', 'plan', 'routines', 'upcoming', 'anytime', 'review', 'logbook'] as const
 export type SidebarHideableList = (typeof SIDEBAR_HIDEABLE_LISTS)[number]
 
-/** Whether the person took `list` out of the sidebar (Settings → General → Sidebar). */
 export type PlannerView = 'day' | '3days' | 'week'
 
 /** Standalone tasks have no start and end date, so the planner needs a server. */
@@ -417,6 +533,7 @@ export function isPlannerEnabled(config: Pick<AppConfig, 'planner_enabled' | 'st
   return config?.planner_enabled === true && config.standalone_mode !== true
 }
 
+/** Whether the person took `list` out of the sidebar (Settings → General → Sidebar). */
 export function isHiddenFromSidebar(config: Pick<AppConfig, 'sidebar_hidden_lists'> | null | undefined, list: string): boolean {
   return config?.sidebar_hidden_lists?.includes(list) === true
 }

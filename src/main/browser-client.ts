@@ -19,7 +19,8 @@ export function getBrowserContext(): BrowserContext | null {
     const raw = readFileSync(getContextFilePath(), 'utf-8')
     const data = JSON.parse(raw) as { url?: string; title?: string; timestamp?: number }
     if (!data.url || typeof data.url !== 'string') return null
-    if (typeof data.timestamp === 'number' && Date.now() - data.timestamp > MAX_AGE_MS) return null
+    // Without a numeric timestamp there is no telling how old the context is, so it is not fresh.
+    if (typeof data.timestamp !== 'number' || !Number.isFinite(data.timestamp) || Date.now() - data.timestamp > MAX_AGE_MS) return null
 
     const title = typeof data.title === 'string' ? data.title : data.url
     const displayTitle = title.length > 40 ? title.slice(0, 37) + '...' : title

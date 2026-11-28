@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
+import { t as translate } from '../../shared/i18n'
 import { useTasks } from '@/hooks/use-tasks'
 import { useProjects } from '@/hooks/use-projects'
 import { useFilters } from '@/hooks/use-filters'
@@ -7,6 +9,10 @@ import { useDayKey } from '@/stores/day-store'
 import { splitTodayOverdue } from '@/lib/today-overdue'
 import { TaskList } from '@/components/task-list/TaskList'
 import { ListSectionHeader } from '@/components/task-list/ListSectionHeader'
+import { FollowUps } from '@/components/pro/FollowUps'
+import { useFollowUps } from '@/hooks/use-follow-ups'
+import { usePromisesDue } from '@/hooks/use-promises'
+import { useParkedFilter } from '@/hooks/use-parked'
 import { ProjectTaskGroup } from '@/components/task-list/ProjectTaskGroup'
 import { openCount } from '@/lib/list-sections'
 import { DueDateContextProvider } from '@/components/task-list/TaskDueBadge'
@@ -29,7 +35,7 @@ function groupByProject(tasks: Task[], projectsFlat?: { id: number; title: strin
     if (!activeIds.has(pid)) continue
     if (!byProject.has(pid)) {
       byProject.set(pid, {
-        name: projectsFlat?.find((p) => p.id === pid)?.title ?? 'Unknown Project',
+        name: projectsFlat?.find((p) => p.id === pid)?.title ?? translate('views.unknownProject'),
         color: projectsFlat?.find((p) => p.id === pid)?.hex_color,
         tasks: [],
       })
@@ -40,8 +46,9 @@ function groupByProject(tasks: Task[], projectsFlat?: { id: number; title: strin
 }
 
 export function TodayView() {
+  const { t } = useTranslation()
   const params = useFilters({ view: 'today' })
-  const { data: tasks = [], isLoading } = useTasks(params)
+  const { data: tasks = [], isLoading } = useTasks(params, true, true)
   const { data: projects } = useProjects()
   const { data: config } = useAppConfig()
   // Wait for the config, so a turned-off section does not flash in (and fetch routines) on start.
@@ -63,13 +70,23 @@ export function TodayView() {
     })
   }, [])
 
-  const { overdueTasks, todayTasks } = useMemo(() => {
+  const withoutParked = useParkedFilter()
+  const split = useMemo(() => {
     const activeIds = new Set(projects?.flat.map((project) => project.id) ?? [])
     // Local calendar date: overdue is before today, Today is today whatever the time of day. The
     // same split feeds the app icon badge, so the two cannot disagree.
-    const { overdue, today } = splitTodayOverdue(tasks, activeIds, new Date())
-    return { overdueTasks: overdue, todayTasks: today }
-  }, [tasks, projects?.flat, dayKey])
+    const { overdue, today } = splitTodayOverdue(withoutParked(tasks), activeIds, new Date())
+    return { overdue, today }
+  }, [tasks, projects?.flat, dayKey, withoutParked])
+  // Pro (21.6, decision 10): promises of theirs that are due come first, to get a verdict. Off,
+  // there are none and the lists are as before.
+  const promises = usePromisesDue(useMemo(() => [...split.overdue, ...split.today], [split]))
+  const followUps = useFollowUps()
+  const { overdueTasks, todayTasks } = useMemo(() => {
+    if (promises.due.length === 0) return { overdueTasks: split.overdue, todayTasks: split.today }
+    const asked = new Set(promises.due.map((task) => task.id))
+    return { overdueTasks: split.overdue.filter((task) => !asked.has(task.id)), todayTasks: split.today.filter((task) => !asked.has(task.id)) }
+  }, [split, promises.due])
 
   const overdueGroups = useMemo(
     () => groupByProject(overdueTasks, projects?.flat),
@@ -83,17 +100,17 @@ export function TodayView() {
   usePrintable(
     useMemo(
       () => ({
-        viewTitle: 'Today',
+        viewTitle: t('views.today.title'),
         sections: [
           ...(overdueGroups.length > 0
-            ? [{ heading: 'Overdue', groups: overdueGroups.map((g) => ({ heading: g.name, tasks: g.tasks })) }]
+            ? [{ heading: t('views.today.overdue'), groups: overdueGroups.map((g) => ({ heading: g.name, tasks: g.tasks })) }]
             : []),
           ...(todayGroups.length > 0
-            ? [{ heading: overdueGroups.length > 0 ? 'Today' : undefined, groups: todayGroups.map((g) => ({ heading: g.name, tasks: g.tasks })) }]
+            ? [{ heading: overdueGroups.length > 0 ? t('views.today.title') : undefined, groups: todayGroups.map((g) => ({ heading: g.name, tasks: g.tasks })) }]
             : []),
         ],
       }),
-      [overdueGroups, todayGroups]
+      [overdueGroups, todayGroups, t]
     )
   )
 
@@ -103,19 +120,19 @@ export function TodayView() {
 
   // Empty after having had tasks in this visit (the last one was done): All clear warms in and offers
   // the next upcoming task. Empty from the start it simply shows.
-  const empty = overdueTasks.length === 0 && todayTasks.length === 0 && !routinesLeft
+  const empty = overdueTasks.length === 0 && todayTasks.length === 0 && promises.due.length === 0 && followUps.count === 0 && !routinesLeft
   const hadTasks = useRef(false)
   if (!empty) hadTasks.current = true
   const justCleared = empty && hadTasks.current
 
   if (isLoading) {
-    return <ListSkeleton title="Today" identity="today" subtitle={dateStr} />
+    return <ListSkeleton title={t('views.today.title')} identity="today" subtitle={dateStr} />
   }
 
   return (
     <DueDateContextProvider value="row.inToday">
       <TaskList
-        title="Today"
+        title={t('views.today.title')}
         identity="today"
         tasks={[]}
         projectId={inboxProjectId}
@@ -123,15 +140,16 @@ export function TodayView() {
         defaultDueDate={today}
         subtitle={dateStr}
         empty={empty}
-        emptyTitle="All clear"
-        emptySubtitle="Nothing is due today"
+        emptyTitle={t('views.today.emptyTitle')}
+        emptySubtitle={t('views.today.emptySubtitle')}
         emptyWarm={justCleared}
         emptyExtra={empty ? <NextUpcomingOffer /> : undefined}
       >
+        <FollowUps />
         {routinesShown && <RoutineTodaySection onToday />}
         {overdueTasks.length > 0 && (
           <div>
-            <ListSectionHeader level={1} title="Overdue" count={openCount(overdueTasks)} tone="overdue" />
+            <ListSectionHeader level={1} title={t('views.today.overdue')} count={openCount(overdueTasks)} tone="overdue" />
             {overdueGroups.map((group) => (
               <ProjectTaskGroup key={group.name} level={2} name={group.name} color={group.color} tasks={group.tasks} />
             ))}
@@ -141,7 +159,7 @@ export function TodayView() {
         {todayTasks.length > 0 && (
           <div>
             {overdueTasks.length > 0 && (
-              <ListSectionHeader level={1} title="Today" count={openCount(todayTasks)} />
+              <ListSectionHeader level={1} title={t('views.today.title')} count={openCount(todayTasks)} />
             )}
             {/* Without an Overdue section above, the projects are the top level of the list. */}
             {todayGroups.map((group) => (

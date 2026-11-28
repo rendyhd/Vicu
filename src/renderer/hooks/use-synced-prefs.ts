@@ -5,6 +5,7 @@ import { toast } from '@/stores/toast-store'
 import { APP_CONFIG_QUERY_KEY } from './use-app-config'
 import type { AppConfig, Project } from '@/lib/vikunja-types'
 import type { SyncedPrefsSnapshot } from '../../shared/synced-prefs'
+import { t } from '../../shared/i18n'
 
 /**
  * The synced preferences (cross-app semantics section 11), as the main process keeps them: every
@@ -58,7 +59,7 @@ export async function writeSyncedPrefs(queryClient: QueryClient, values: Record<
   } catch (error) {
     if (previous) queryClient.setQueryData(SYNCED_PREFS_QUERY_KEY, previous)
     const reason = error instanceof Error ? error.message : ''
-    toast.error(reason ? `Could not save the change: ${reason}` : 'Could not save the change')
+    toast.error(reason ? t('sync.prefs.saveFailedReason', { reason }) : t('sync.prefs.saveFailed'))
     return false
   }
 }
@@ -80,7 +81,7 @@ export function useSyncedPrefsEvents(): void {
     if (snapshot.adoptedInbox !== undefined) {
       const projects = queryClient.getQueryData<Project[]>(['projects'])
       const name = projects?.find((project) => project.id === snapshot.adoptedInbox)?.title
-      toast.info(name ? `Inbox now syncs: using ${name}` : 'Inbox now syncs across your devices')
+      toast.info(name ? t('sync.prefs.inboxSyncsUsing', { name }) : t('sync.prefs.inboxSyncs'))
     }
   }), [queryClient])
 }

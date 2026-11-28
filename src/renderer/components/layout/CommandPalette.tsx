@@ -1,33 +1,60 @@
 import { useEffect, useId, useMemo, useState, type KeyboardEvent } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { useQueryClient } from '@tanstack/react-query'
-import { CheckCircle2, Circle, Folder, Layers, Mic, Plus, RefreshCw, Settings, Sparkles, SunMoon, Tag } from 'lucide-react'
+import { CalendarPlus, CheckCircle2, Circle, Folder, Layers, Mic, PanelLeft, Plus, RefreshCw, Settings, Sparkles, SunMoon, Tag, UsersRound } from 'lucide-react'
 import { useAppConfig } from '@/hooks/use-app-config'
 import { formatAcceleratorForDisplay } from '@/lib/accelerator'
 import { Dialog } from '@/components/overlay/Dialog'
 import { nextOptionIndex } from '@/components/overlay/popover-logic'
 import { useSmartLists } from '@/components/sidebar/SmartListNav'
+import { useProNavItems, type ProNavItem } from '@/components/sidebar/ProNav'
+import { useGroups } from '@/hooks/use-groups'
+import { useSetWorkMode, useWorkMode } from '@/hooks/use-work-mode'
+import { announce } from '@/stores/announcer-store'
+import { usePro } from '@/hooks/use-pro'
+import { useProUiStore } from '@/stores/pro-ui-store'
 import { SmartListIcon } from '@/components/shared/SmartListIcon'
 import type { SmartListId } from '@/lib/smart-list-identity'
 import { useQuickFindTasks } from '@/hooks/use-quick-find'
 import { useOpenTask } from '@/hooks/use-open-task'
 import { useProjects } from '@/hooks/use-projects'
+import { WorkModeWord, useOtherModeOf } from '@/components/task-list/WorkMark'
 import { useLabels } from '@/hooks/use-labels'
 import { useIsDark } from '@/hooks/use-is-dark'
 import { refreshNow } from '@/hooks/use-manual-refresh'
+import { toggleSidebar } from '@/stores/sidebar-store'
+import { SIDEBAR_SHORTCUT } from './SidebarToggle'
 import { api } from '@/lib/api'
 import { cn } from '@/lib/cn'
 import { applyTheme } from '@/lib/theme'
 import { useAskStore } from '@/stores/ask-store'
 import { useAiUiStore } from '@/stores/ai-ui-store'
 import { useDictationStore } from '@/stores/dictation-store'
+import { useNotesStore } from '@/stores/notes-store'
+import { useTranslation } from 'react-i18next'
+import { t, type TranslationKey } from '../../../shared/i18n'
 import { toast } from '@/stores/toast-store'
 import { useAiReady } from '@/hooks/use-ai'
+import { can } from '@/lib/capabilities'
 import { buildPaletteItems, rankPalette, type PaletteCommand, type PaletteItem, type PaletteKind } from '@/lib/palette'
 import { shortcutHint } from '@/lib/shortcut-hint'
+import { newEventShortcut, newTaskShortcut } from '@/lib/host-shortcuts'
 import { useUIStore } from '@/stores/ui-store'
 import { useNewTaskRequestStore } from '@/stores/new-task-request-store'
+import { useNewEventRequestStore } from '@/stores/new-event-request-store'
+import { isPlannerEnabled } from '@/lib/vikunja-types'
 import { useVoiceStore } from '@/stores/voice-store'
+
+const KIND_LABELS: Record<PaletteKind, TranslationKey> = {
+  Action: 'palette.kind.action',
+  List: 'palette.kind.list',
+  Guided: 'palette.kind.guided',
+  Project: 'palette.kind.project',
+  Label: 'palette.kind.label',
+  Task: 'palette.kind.task',
+}
+
+const kindLabel = (kind: PaletteKind): string => t(KIND_LABELS[kind])
 
 const ICONS: Record<PaletteKind, typeof Circle> = {
   Action: Plus,
@@ -45,6 +72,7 @@ const ICONS: Record<PaletteKind, typeof Circle> = {
  * focus returns to where it was. It sits on the modal Dialog.
  */
 export function CommandPalette() {
+  const { t } = useTranslation()
   const open = useUIStore((s) => s.commandPaletteOpen)
   const toggle = useUIStore((s) => s.toggleCommandPalette)
 
@@ -60,13 +88,16 @@ export function CommandPalette() {
   }, [toggle])
 
   return (
-    <Dialog open={open} onClose={toggle} label="Command palette" className="mt-[12vh] w-[560px]">
+    <Dialog open={open} onClose={toggle} label={t('palette.title')} className="mt-[12vh] w-[560px]">
       <PaletteBody onClose={toggle} />
     </Dialog>
   )
 }
 
 function PaletteBody({ onClose }: { onClose: () => void }) {
+  // The items are built with the language shown, so they are built again when it changes.
+  const { i18n } = useTranslation()
+  const language = i18n.language
   const [query, setQuery] = useState('')
   const [active, setActive] = useState(0)
   const navigate = useNavigate()
@@ -74,16 +105,36 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
   const openTask = useOpenTask()
   const smartLists = useSmartLists()
   const { data: projects } = useProjects()
+  const otherModeOf = useOtherModeOf()
   const { data: labels } = useLabels()
   const { data: appConfig } = useAppConfig()
   const { tasks } = useQuickFindTasks(query, 20)
   const listId = useId()
   const isDark = useIsDark()
   const ai = useAiReady()
+  const pro = usePro()
+  const proNavLists = useProNavItems()
+  const groups = useGroups()
+  const workMode = useWorkMode()
+  const setWorkMode = useSetWorkMode()
+  // A group's page is found by its name, like Pro's lists.
+  const proLists = useMemo<ProNavItem[]>(
+    () => [...proNavLists, ...groups.groups.map((group): ProNavItem => ({ id: `group-${group.label}`, label: group.name, path: `/group/${group.label}`, layer: 'promises', icon: UsersRound, tone: 'text-accent-teal' }))],
+    [proNavLists, groups.groups],
+  )
 
   const items = useMemo(
-    () => buildPaletteItems({ smartLists, projects: projects?.flat ?? [], labels: labels ?? [] }),
-    [smartLists, projects?.flat, labels],
+    () => buildPaletteItems({
+      smartLists,
+      projects: projects?.flat ?? [],
+      labels: labels ?? [],
+      planner: isPlannerEnabled(appConfig),
+      voice: can('voice'),
+      assistant: can('assistant'),
+      pro: pro.on ? { lists: proLists, focus: pro.layer('availability'), promises: pro.layer('promises') } : undefined,
+      workMode: workMode.enabled ? { showAll: workMode.showAll } : false,
+    }),
+    [smartLists, projects?.flat, labels, appConfig, pro, proLists, workMode.enabled, workMode.showAll, language],
   )
   const shown = useMemo(() => rankPalette(items, query, tasks), [items, query, tasks])
   const activeIndex = shown.length === 0 ? -1 : Math.min(active, shown.length - 1)
@@ -95,19 +146,38 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
   }, [activeIndex, listId])
 
   const runCommand = (command: PaletteCommand) => {
-    if (command === 'settings') {
+    if (command === 'work-all' || command === 'work-work' || command === 'work-personal') {
+      const next = command === 'work-work' ? 'work' : command === 'work-personal' ? 'personal' : 'all'
+      setWorkMode(next)
+      announce(next === 'work' ? t('workMode.announceWork') : next === 'personal' ? t('workMode.announcePersonal') : t('workMode.announceAll'))
+    } else if (command === 'settings') {
       void navigate({ to: '/settings' })
+    } else if (command === 'pro-settings') {
+      void navigate({ to: '/settings', search: { section: 'pro' } })
+    } else if (command === 'pro-focus') {
+      useProUiStore.getState().setFocusPickerOpen(true)
+    } else if (command === 'pro-import' || command === 'pro-copilot' || command === 'pro-recap' || command === 'pro-weekly-note') {
+      useProUiStore.getState().open(command)
     } else if (command === 'voice') {
       useVoiceStore.getState().begin('command', 'latched')
     } else if (command === 'dictate' || command === 'brain-dump') {
       if (ai.dictation) useDictationStore.getState().startLive(command === 'brain-dump' ? { brainDump: true } : {})
-      else toast.info('Smart dictation is off. Turn it on in Settings, Assistant.')
+      else toast.info(t('palette.dictationOff'))
     } else if (command === 'ask') {
       useAskStore.getState().setOpen(true)
     } else if (command === 'make-tasks') {
       useAiUiStore.getState().openMakeTasks()
+    } else if (command === 'notes') {
+      if (ai.dictation) useNotesStore.getState().openNotes()
+      else toast.info(t('notes.notReady'))
+    } else if (command === 'new-event') {
+      // The Plan screen takes it once it is on screen.
+      useNewEventRequestStore.getState().request()
+      void navigate({ to: '/plan' })
     } else if (command === 'refresh') {
       refreshNow(queryClient)
+    } else if (command === 'toggle-sidebar') {
+      toggleSidebar()
     } else if (command === 'toggle-theme') {
       const next = isDark ? 'light' : 'dark'
       applyTheme(next)
@@ -157,11 +227,13 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
   }
 
   const detailOf = ({ action, kind }: PaletteItem): string => {
-    if (action.type === 'task') return projects?.all.find((p) => p.id === action.task.project_id)?.title ?? kind
-    if (action.type === 'command' && action.command === 'new-task') return shortcutHint('Mod+N', window.api.platform === 'darwin')
+    if (action.type === 'task') return projects?.all.find((p) => p.id === action.task.project_id)?.title ?? kindLabel(kind)
+    if (action.type === 'command' && action.command === 'new-task') return shortcutHint(newTaskShortcut(), window.api.platform === 'darwin')
+    if (action.type === 'command' && action.command === 'new-event') return shortcutHint(newEventShortcut(), window.api.platform === 'darwin')
+    if (action.type === 'command' && action.command === 'toggle-sidebar') return shortcutHint(SIDEBAR_SHORTCUT, window.api.platform === 'darwin')
     if (action.type === 'command' && action.command === 'refresh') return window.api.platform === 'darwin' ? shortcutHint('Mod+R', true) : 'F5'
     if (action.type === 'command' && action.command === 'voice' && appConfig?.voice_hotkey) return formatAcceleratorForDisplay(appConfig.voice_hotkey, window.api.platform === 'darwin')
-    return kind
+    return kindLabel(kind)
   }
 
   const iconOf = ({ action, kind }: PaletteItem): typeof Circle => {
@@ -169,8 +241,10 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
     if (action.type === 'command' && action.command === 'settings') return Settings
     if (action.type === 'command' && action.command === 'toggle-theme') return SunMoon
     if (action.type === 'command' && action.command === 'refresh') return RefreshCw
+    if (action.type === 'command' && action.command === 'toggle-sidebar') return PanelLeft
+    if (action.type === 'command' && action.command === 'new-event') return CalendarPlus
     if (action.type === 'command' && action.command === 'voice') return Mic
-    if (action.type === 'command' && (action.command === 'ask' || action.command === 'make-tasks' || action.command === 'dictate' || action.command === 'brain-dump')) return Sparkles
+    if (action.type === 'command' && (action.command === 'ask' || action.command === 'make-tasks' || action.command === 'notes' || action.command === 'dictate' || action.command === 'brain-dump')) return Sparkles
     return ICONS[kind]
   }
 
@@ -181,7 +255,7 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
           data-autofocus
           type="text"
           role="combobox"
-          aria-label="Command palette"
+          aria-label={t('palette.title')}
           aria-expanded="true"
           aria-controls={listId}
           aria-activedescendant={activeIndex >= 0 ? optionId(activeIndex) : undefined}
@@ -189,7 +263,7 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
           autoComplete="off"
           spellCheck={false}
           value={query}
-          placeholder="Type a task, project, label, list or action"
+          placeholder={t('palette.placeholder')}
           onChange={(event) => {
             setQuery(event.target.value)
             setActive(0)
@@ -198,9 +272,12 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
           className="h-9 w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]"
         />
       </div>
-      <div id={listId} role="listbox" aria-label="Results" className="max-h-80 overflow-y-auto py-1">
+      <div id={listId} role="listbox" aria-label={t('palette.results')} className="max-h-80 overflow-y-auto py-1">
         {shown.map((item, index) => {
           const Icon = iconOf(item)
+          // A Pro list has its own icon and colour; only the smart lists are in the identity table.
+          const listId = item.kind === 'List' ? item.id.slice('list:'.length) : null
+          const proList = listId ? proLists.find((list) => list.id === listId) : undefined
           return (
             <div
               key={item.id}
@@ -211,19 +288,25 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
               onClick={() => run(item)}
               className={cn('flex cursor-default items-center gap-3 px-4 py-2 text-sm', index === activeIndex && 'bg-[var(--bg-hover)]')}
             >
-              {item.kind === 'List' ? (
-                <SmartListIcon list={item.id.slice('list:'.length) as SmartListId} className="h-4 w-4 shrink-0" />
+              {proList ? (
+                <proList.icon aria-hidden="true" className={cn('h-4 w-4 shrink-0', proList.tone)} />
+              ) : listId ? (
+                <SmartListIcon list={listId as SmartListId} className="h-4 w-4 shrink-0" />
               ) : (
                 <Icon aria-hidden="true" className="h-4 w-4 shrink-0 text-[var(--text-secondary)]" />
               )}
               <span className="min-w-0 flex-1 truncate">{item.title}</span>
+              {(() => {
+                const other = item.action.type === 'task' ? otherModeOf({ task: item.action.task }) : item.action.type === 'project' ? otherModeOf({ projectId: item.action.id }) : null
+                return other ? <WorkModeWord other={other} /> : null
+              })()}
               <span className="max-w-[40%] shrink-0 truncate text-caption text-[var(--text-secondary)]">{detailOf(item)}</span>
             </div>
           )
         })}
-        {shown.length === 0 && <div className="px-4 py-3 text-sm text-[var(--text-secondary)]">Nothing matches</div>}
+        {shown.length === 0 && <div className="px-4 py-3 text-sm text-[var(--text-secondary)]">{t('palette.nothing')}</div>}
       </div>
-      <div role="status" className="sr-only">{`${shown.length} ${shown.length === 1 ? 'result' : 'results'}`}</div>
+      <div role="status" className="sr-only">{t('palette.resultCount', { count: shown.length })}</div>
     </div>
   )
 }

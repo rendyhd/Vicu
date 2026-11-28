@@ -1,12 +1,15 @@
 import { useEffect } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
+import { can } from '@/lib/capabilities'
 import { handleReplayed } from '@/lib/replay-handler'
 import { insertPendingTask, pendingTaskFromCreate } from '@/lib/pending-cache'
 import { useOfflineStore } from '@/stores/offline-store'
 import { useSelectionStore } from '@/stores/selection-store'
 import { useCompletedTasksStore } from '@/stores/completed-tasks-store'
 import { toast } from '@/stores/toast-store'
+import { sayNotesMerged } from '@/lib/offline-mutations'
+import { t } from '../../shared/i18n'
 
 /** The queue sends one change event per step of a replay; the full snapshot is fetched at most this often. */
 const SNAPSHOT_DEBOUNCE_MS = 150
@@ -20,6 +23,8 @@ export function useOfflineQueueSync(): void {
   const qc = useQueryClient()
 
   useEffect(() => {
+    // A host without the queue (the web version) has nothing to subscribe to; the counts stay zero.
+    if (!can('offlineQueue')) return
     let disposed = false
     let timer: ReturnType<typeof setTimeout> | null = null
 
@@ -44,7 +49,7 @@ export function useOfflineQueueSync(): void {
     void loadSnapshot().then((snapshot) => {
       if (!snapshot) return
       if (snapshot.loadStatus === 'corrupt') {
-        toast.error('The saved offline changes could not be read, so changes made while offline before now are lost.')
+        toast.error(t('sync.queue.corrupt'))
       }
       // Tasks created offline in an earlier session: make sure the lists restored from the last
       // session show them (the copy may have been saved just before they were created).
@@ -62,7 +67,7 @@ export function useOfflineQueueSync(): void {
       useOfflineStore.getState().applyChange(change)
       // The first change to start waiting is the moment the user needs to hear that it was kept.
       if (before === 0 && change.counts.pending > 0) {
-        toast.info('Saved on this computer. Changes sync automatically when the server is reachable.')
+        toast.info(t('sync.queue.savedLocally'))
       }
       scheduleSnapshot()
     })
@@ -76,6 +81,7 @@ export function useOfflineQueueSync(): void {
         refreshReminders: () => {
           void api.refreshTaskReminders()
         },
+        notesMerged: () => sayNotesMerged(),
       })
       scheduleSnapshot()
     })

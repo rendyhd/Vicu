@@ -1,5 +1,6 @@
 import { Button } from '@/components/shared/Button'
 import { useState, useEffect, useCallback } from 'react'
+import { Trans, useTranslation } from 'react-i18next'
 import type { AppConfig } from '@/lib/vikunja-types'
 
 interface BrowserSettingsProps {
@@ -9,6 +10,7 @@ interface BrowserSettingsProps {
 }
 
 export function BrowserSettings({ config, onChange, disabled }: BrowserSettingsProps) {
+  const { t } = useTranslation()
   const [expanded, setExpanded] = useState(false)
   const [showSetupInfo, setShowSetupInfo] = useState(false)
   const [regStatus, setRegStatus] = useState<{ chrome: boolean; firefox: boolean } | null>(null)
@@ -48,7 +50,7 @@ export function BrowserSettings({ config, onChange, disabled }: BrowserSettingsP
         onClick={() => !disabled && setExpanded(!expanded)}
       >
         <h2 className="text-sm font-semibold text-[var(--text-primary)]">
-          Browser Integration{disabled ? ' (requires Quick Entry)' : ''}
+          {disabled ? t('settings.browser.titleDisabled') : t('settings.browser.title')}
         </h2>
         {!disabled && <span className="text-xs text-[var(--text-secondary)]">{expanded ? '\u25B2' : '\u25BC'}</span>}
       </button>
@@ -56,27 +58,28 @@ export function BrowserSettings({ config, onChange, disabled }: BrowserSettingsP
       {!disabled && expanded && (
         <div className="mt-4 space-y-3">
           <div>
-            <label className="mb-1 block text-xs text-[var(--text-secondary)]">Page Linking</label>
+            <label className="mb-1 block text-xs text-[var(--text-secondary)]">{t('settings.browser.pageLinking.label')}</label>
             <select
               value={mode}
               onChange={(e) => onChange({ browser_link_mode: e.target.value as 'off' | 'ask' | 'always' })}
               className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)]"
             >
-              <option value="off">Off</option>
-              <option value="ask">Ask ({window.api.platform === 'darwin' ? '\u2318L' : 'Ctrl+L'})</option>
-              <option value="always">Always auto-link</option>
+              <option value="off">{t('settings.browser.pageLinking.off')}</option>
+              {/* i18n-ignore: keyboard shortcut */}
+              <option value="ask">{t('settings.browser.pageLinking.ask', { shortcut: window.api.platform === 'darwin' ? '\u2318L' : 'Ctrl+L' })}</option>
+              <option value="always">{t('settings.browser.pageLinking.always')}</option>
             </select>
           </div>
 
           {mode !== 'off' && (
             <>
               <div>
-                <label className="mb-1 block text-xs text-[var(--text-secondary)]">Chrome Extension ID (optional)</label>
+                <label className="mb-1 block text-xs text-[var(--text-secondary)]">{t('settings.browser.extensionId.label')}</label>
                 <input
                   type="text"
                   value={config.browser_extension_id ?? ''}
                   onChange={(e) => onChange({ browser_extension_id: e.target.value })}
-                  placeholder="For instant detection — leave blank to use auto-detect"
+                  placeholder={t('settings.browser.extensionId.placeholder')}
                   className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]"
                 />
               </div>
@@ -86,18 +89,18 @@ export function BrowserSettings({ config, onChange, disabled }: BrowserSettingsP
                   {config.browser_extension_id && (
                     <span className="flex items-center gap-1">
                       <span className={`inline-block h-2 w-2 rounded-full ${regStatus.chrome ? 'bg-status-done' : 'bg-[var(--text-secondary)]'}`} />
-                      Chrome bridge: {regStatus.chrome ? 'Registered' : 'Not registered'}
+                      {regStatus.chrome ? t('settings.browser.bridge.chromeRegistered') : t('settings.browser.bridge.chromeNotRegistered')}
                     </span>
                   )}
                   <span className="flex items-center gap-1">
                     <span className={`inline-block h-2 w-2 rounded-full ${regStatus.firefox ? 'bg-status-done' : 'bg-[var(--text-secondary)]'}`} />
-                    Firefox bridge: {regStatus.firefox ? 'Registered' : 'Not registered'}
+                    {regStatus.firefox ? t('settings.browser.bridge.firefoxRegistered') : t('settings.browser.bridge.firefoxNotRegistered')}
                   </span>
                 </div>
               )}
 
               <Button variant="secondary" onClick={handleRegister} disabled={registering}>
-                {registering ? 'Registering...' : 'Re-register Bridge'}
+                {registering ? t('settings.browser.bridge.registering') : t('settings.browser.bridge.reRegister')}
               </Button>
 
               <div>
@@ -106,75 +109,59 @@ export function BrowserSettings({ config, onChange, disabled }: BrowserSettingsP
                   onClick={() => setShowSetupInfo(!showSetupInfo)}
                   className="text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                 >
-                  How to set up {showSetupInfo ? '\u25BC' : '\u25B6'}
+                  {t('settings.browser.setup.toggle', { arrow: showSetupInfo ? '\u25BC' : '\u25B6' })}
                 </button>
                 {showSetupInfo && (
                   <div className="mt-2 rounded-card bg-[var(--bg-secondary)] p-3 text-xs text-[var(--text-secondary)]">
-                    <p className="mb-2 font-semibold">How it works</p>
+                    <p className="mb-2 font-semibold">{t('settings.browser.setup.howItWorks')}</p>
                     <p className="mb-3">
-                      {window.api.platform === 'darwin'
-                        ? 'Vicu reads the URL from the active browser tab using AppleScript when Quick Entry opens. This works with Chrome, Safari, Edge, Brave, Opera, Vivaldi, and Arc. Firefox has limited support.'
-                        : 'Vicu automatically reads the URL bar from the active browser window when Quick Entry opens. This works with Chrome, Firefox, Edge, Brave, Opera, and Vivaldi.'}
-                      {' '}Browser extensions provide instant (&lt;1ms) detection; without them Vicu falls back to{' '}
-                      {window.api.platform === 'darwin' ? 'AppleScript' : 'Windows accessibility APIs'} (~300ms).
+                      {window.api.platform === 'darwin' ? t('settings.browser.setup.introMac') : t('settings.browser.setup.introOther')}
                     </p>
                     {window.api.platform === 'darwin' && (
                       <p className="mb-3">
-                        No setup needed for Chrome, Safari, Edge, Brave, Vivaldi, and Arc. On first use, macOS will ask you to allow Vicu to control the browser.
+                        {t('settings.browser.setup.macNoSetup')}
                       </p>
                     )}
 
-                    <p className="mb-2 font-semibold">Firefox (extension for instant detection)</p>
+                    <p className="mb-2 font-semibold">{t('settings.browser.firefox.title')}</p>
                     {window.api.platform === 'darwin' && (
                       <p className="mb-2">
-                        Firefox fallback detection via AppleScript is unreliable on macOS. Installing the extension is strongly recommended for Firefox support.
+                        {t('settings.browser.firefox.macWarning')}
                       </p>
                     )}
-                    <p>
-                      Open the{' '}
-                      <button
+                    <p><Trans i18nKey="settings.browser.firefox.step1" components={{ folder: <button
                         type="button"
                         onClick={() => window.api.openBrowserExtensionFolder()}
                         className="inline cursor-pointer text-accent-blue underline hover:text-accent-blue/80"
-                      >extensions/browser</button>
-                      {' '}folder and locate the <code className="rounded-control bg-[var(--bg-primary)] px-1">.xpi</code> file
-                    </p>
-                    <p>Open Firefox and go to <code className="rounded-control bg-[var(--bg-primary)] px-1">about:addons</code></p>
-                    <p>Click the gear icon &rarr; &ldquo;Install Add-on From File&hellip;&rdquo;</p>
-                    <p>Select the <code className="rounded-control bg-[var(--bg-primary)] px-1">.xpi</code> file and click &ldquo;Add&rdquo;</p>
-                    <p className="mb-3">Then click &ldquo;Re-register Bridge&rdquo; above</p>
+                      />, code: <code className="rounded-control bg-[var(--bg-primary)] px-1" /> }} /></p>
+                    <p><Trans i18nKey="settings.browser.firefox.step2" components={{ code: <code className="rounded-control bg-[var(--bg-primary)] px-1" /> }} /></p>
+                    <p>{t('settings.browser.firefox.step3')}</p>
+                    <p><Trans i18nKey="settings.browser.firefox.step4" components={{ code: <code className="rounded-control bg-[var(--bg-primary)] px-1" /> }} /></p>
+                    <p className="mb-3">{t('settings.browser.reRegisterHint')}</p>
 
-                    <p className="mb-2 font-semibold">Chrome (optional extension for instant detection)</p>
+                    <p className="mb-2 font-semibold">{t('settings.browser.chrome.title')}</p>
                     <p>
-                      Chrome works without the extension, but installing it provides instant (&lt;1ms)
-                      detection instead of the ~300ms fallback.
+                      {t('settings.browser.chrome.intro')}
                     </p>
-                    <p>Open <code className="rounded-control bg-[var(--bg-primary)] px-1">chrome://extensions</code></p>
-                    <p>Enable &ldquo;Developer mode&rdquo; (top-right toggle)</p>
-                    <p>
-                      Click &ldquo;Load unpacked&rdquo; &rarr; select the{' '}
-                      <button
+                    <p><Trans i18nKey="settings.browser.chrome.step1" components={{ code: <code className="rounded-control bg-[var(--bg-primary)] px-1" /> }} /></p>
+                    <p>{t('settings.browser.chrome.step2')}</p>
+                    <p><Trans i18nKey="settings.browser.chrome.step3" components={{ folder: <button
                         type="button"
                         onClick={() => window.api.openBrowserExtensionFolder()}
                         className="inline cursor-pointer text-accent-blue underline hover:text-accent-blue/80"
-                      >extensions/browser</button>
-                      {' '}folder
-                    </p>
-                    <p>Copy the Extension ID shown on the card and paste it in the field above</p>
-                    <p className="mb-3">Then click &ldquo;Re-register Bridge&rdquo; above</p>
+                      /> }} /></p>
+                    <p>{t('settings.browser.chrome.step4')}</p>
+                    <p className="mb-3">{t('settings.browser.reRegisterHint')}</p>
 
                     <p className="mb-2 font-semibold">
-                      {window.api.platform === 'darwin'
-                        ? 'Safari, Arc, Edge, Brave, Opera, Vivaldi'
-                        : 'Edge, Brave, Opera, Vivaldi'}
+                      {window.api.platform === 'darwin' ? t('settings.browser.others.titleMac') : t('settings.browser.others.titleOther')}
                     </p>
                     <p className="mb-3">
-                      No setup needed. Vicu detects URLs automatically via{' '}
-                      {window.api.platform === 'darwin' ? 'AppleScript' : 'accessibility APIs'}.
+                      {window.api.platform === 'darwin' ? t('settings.browser.others.autoMac') : t('settings.browser.others.autoOther')}
                     </p>
 
                     <p className="mt-2 border-t border-[var(--border-color)] pt-2">
-                      Open Quick Entry while a browser tab is active to see the link hint.
+                      {t('settings.browser.setup.hint')}
                     </p>
                   </div>
                 )}

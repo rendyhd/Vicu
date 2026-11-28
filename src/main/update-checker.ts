@@ -33,6 +33,13 @@ function fetchLatestRelease(): Promise<UpdateStatus> {
       const bodyChunks: Buffer[] = []
 
       req.on('response', (response) => {
+        // A network error after the headers also reaches the response; unheard it is an uncaught
+        // exception in main. The request's own error listener settles the check.
+        response.on('error', () => {
+          clearTimeout(timeout)
+          resolve(fallback)
+        })
+
         response.on('data', (chunk) => {
           bodyChunks.push(Buffer.from(chunk))
         })

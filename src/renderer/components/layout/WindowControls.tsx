@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { api } from '@/lib/api'
 
 /**
@@ -10,6 +11,7 @@ export function WindowControls() {
 }
 
 function LinuxWindowControls() {
+  const { t } = useTranslation()
   const [maximized, setMaximized] = useState(false)
 
   useEffect(() => {
@@ -31,7 +33,7 @@ function LinuxWindowControls() {
         type="button"
         className={`${btnBase} hover:bg-[var(--bg-hover)]`}
         onClick={handleMinimize}
-        aria-label="Minimize"
+        aria-label={t('app.window.minimize')}
       >
         <svg width="10" height="1" viewBox="0 0 10 1" fill="currentColor">
           <rect width="10" height="1" />
@@ -42,7 +44,7 @@ function LinuxWindowControls() {
         type="button"
         className={`${btnBase} hover:bg-[var(--bg-hover)]`}
         onClick={handleMaximize}
-        aria-label={maximized ? 'Restore' : 'Maximize'}
+        aria-label={maximized ? t('app.window.restore') : t('app.window.maximize')}
       >
         {maximized ? (
           // Restore icon (overlapping rectangles)
@@ -62,7 +64,7 @@ function LinuxWindowControls() {
         type="button"
         className={`${btnBase} hover:bg-danger hover:text-[var(--bg-primary)]`}
         onClick={handleClose}
-        aria-label="Close"
+        aria-label={t('app.window.close')}
       >
         <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.2">
           <path d="M1 1l8 8M9 1l-8 8" />

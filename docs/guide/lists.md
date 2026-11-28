@@ -71,21 +71,25 @@ Besides the five smart lists, the sidebar or drawer can show:
 - **Custom lists** you make yourself. See [Custom lists](guide:custom-lists).
 - Pro lists such as Flagged and Waiting on, when Pro is on. See [Vicu Pro](guide:pro).
 
-## Hide the lists you do not use
+## Hide and arrange the lists
 
 ### On the desktop {desktop}
 
-1. Open **Settings, General, Sidebar**.
+1. Open **Settings, General, Sidebar**. It is one list: your smart lists and the sidebar's sections (Projects, Custom lists, Labels, and Pro while it is on).
 2. Clear the checkbox of each list you want to hide.
+3. Drag a row by its grip to move it, or use the arrows at the end of the row. **Reset order** brings the default back.
 
-You can hide Today, Upcoming, Anytime and Logbook, plus Routines and Review while they are on. The Inbox always stays. A hidden list still opens from the command palette. The setting is per computer.
+You can hide Today, Upcoming, Anytime and Logbook, plus Routines, Review and Plan while they are on. The Inbox always stays. A hidden list still opens from the command palette. The setting is per computer.
+
+Lists you place under the last section stay in view at the bottom of the sidebar while the rest scrolls. That is where the Logbook is until you move it.
 
 ### On a phone {phone}
 
-1. Open **Settings, General, Drawer**.
+1. Open **Settings, General, Drawer**. It is one list: the views and the Projects, Lists and Labels blocks.
 2. Turn off the views you do not want.
+3. Hold and drag a row to move it. **Reset order** brings the default back.
 
-You can hide Today, Upcoming and Anytime (while the bottom bar does not hold them), Logbook, Routines, Review, and Ask once it is set up. Reminders, widgets and notifications do not change. The setting is per device.
+You can hide Today, Upcoming, Anytime, Logbook, Routines, Review, and Ask once it is set up. A view the bottom bar holds is not in the drawer until you turn it on here. Reminders, widgets and notifications do not change. The setting is per device.
 
 ## Search
 

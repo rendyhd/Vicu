@@ -7,6 +7,7 @@ import { announce } from '@/stores/announcer-store'
 import { errorText } from '@/stores/dictation-store'
 import type { Task } from '@/lib/vikunja-types'
 import { useAiReady, useAiWorkspace } from './use-ai'
+import { can } from '@/lib/capabilities'
 
 // Suggestions in a guided session (docs/ai-assistant-v1.md section 9): with Ask set up, the queue
 // is sent in batches of `organize_batch_max`, the first when the session starts and the next
@@ -59,7 +60,7 @@ export function useOrganizeSuggestions({ session, listName, defaultProjectId, id
     setLoading(new Set())
     setNextStep(null)
     return () => {
-      for (const id of inFlight.current) void window.api.ai.cancelDictation(id)
+      if (can('assistant')) for (const id of inFlight.current) void window.api.ai.cancelDictation(id)
       inFlight.current.clear()
     }
   }, [resetKey])
@@ -67,6 +68,7 @@ export function useOrganizeSuggestions({ session, listName, defaultProjectId, id
   const size = AI_LIMITS.organize_batch_max
 
   const ask = useCallback(async (batch: number) => {
+    if (!can('assistant')) return
     const { ws, session, listName, defaultProjectId, ids, task, resetKey: key } = live.current
     const batchIds = ids.slice(batch * size, (batch + 1) * size)
     const tasks = batchIds.map(task).filter((t): t is Task => t !== undefined)
@@ -100,7 +102,7 @@ export function useOrganizeSuggestions({ session, listName, defaultProjectId, id
   }, [size])
 
   useEffect(() => {
-    if (!ready.ask || failure !== null || ids.length === 0) return
+    if (!can('assistant') || !ready.ask || failure !== null || ids.length === 0) return
     const ensure = (batch: number) => {
       if (batch * size >= ids.length || requested.current.has(batch)) return
       requested.current.add(batch)

@@ -1,3 +1,4 @@
+import { t } from '../../shared/i18n'
 /**
  * URL handling for the interactive OIDC login, free of Electron so it can be tested.
  */
@@ -55,7 +56,7 @@ export function buildAuthorizationUrl(
 export type RedirectOutcome =
   | { kind: 'ignore' }
   | { kind: 'code'; code: string }
-  | { kind: 'error'; message: string }
+  | { kind: 'error'; message: string; error?: string; description?: string }
 
 function stripTrailingSlashes(path: string): string {
   return path.replace(/\/+$/, '')
@@ -95,6 +96,8 @@ export function interpretRedirect(
   if (error) {
     return {
       kind: 'error',
+      error,
+      description: parsed.searchParams.get('error_description') ?? undefined,
       message:
         `${wording.errorPrefix ?? 'OIDC login failed'}: ${error} — ` +
         (parsed.searchParams.get('error_description') ?? wording.defaultErrorDescription ?? 'unknown error'),
@@ -108,8 +111,7 @@ export function interpretRedirect(
   if (!state || state !== expectedState) {
     return {
       kind: 'error',
-      message:
-        'The sign-in response did not match this login attempt (state mismatch), so it was ignored. Please try again.',
+      message: t('system.auth.stateMismatch'),
     }
   }
   return { kind: 'code', code }

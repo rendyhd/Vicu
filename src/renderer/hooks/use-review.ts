@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import { isRetriableError } from '@/lib/error-classify'
 import { useProjects } from './use-projects'
+import { useWorkMode } from './use-work-mode'
 import type { ProjectTreeNode } from './use-projects'
 import { useAppConfig } from './use-app-config'
 import { useDayKey } from '@/stores/day-store'
@@ -55,9 +56,11 @@ export function useProjectsNeedingReview() {
   const { data: cfg, isLoading: cfgLoading } = useAppConfig()
   // Review due dates are measured against today, so the day is a dependency.
   const dayKey = useDayKey()
+  // Work and Personal (22.4): only the projects the mode lists are due for review.
+  const shownProjects = useWorkMode().shownProjects
   const data = useMemo(
-    () => selectProjects(projectsData?.flat, cfg, (s) => s.isOverdue),
-    [projectsData, cfg, dayKey],
+    () => selectProjects(shownProjects ? projectsData?.flat.filter((project) => shownProjects.has(project.id)) : projectsData?.flat, cfg, (s) => s.isOverdue),
+    [projectsData, cfg, dayKey, shownProjects],
   )
   return { data, isLoading: projectsLoading || cfgLoading }
 }

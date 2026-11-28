@@ -11,11 +11,19 @@
 import type { ApiResult } from './api-result'
 
 export const PROJECT_COUNT_TTL_MS = 10 * 60_000
+/**
+ * A carrier list that could not be read is asked for again only after this long: every sidebar
+ * row's done count asks for it, and each ask may mean requests to the server (rendyhd/Vicu#75).
+ */
+export const CARRIER_FAILURE_RETRY_MS = 60_000
 
 export interface ProjectCountDeps {
   /** The `total` of a one-task page for the project and done flag. */
   fetchTotal(projectId: number, done: boolean): Promise<ApiResult<number>>
-  /** Known hidden carrier tasks (done) per project id. A failure counts as "none known". */
+  /**
+   * Known hidden carrier tasks (done) per project id. A failure counts as "none known" and is
+   * asked for again after `CARRIER_FAILURE_RETRY_MS`.
+   */
   carrierCounts(): Promise<ApiResult<ReadonlyMap<number, number>>>
   /** The signed-in server, or null (standalone mode, signed out). */
   server(): string | null
@@ -50,11 +58,13 @@ export function createProjectCounts(deps: ProjectCountDeps): ProjectCounts {
   let carrierGeneration = 0
 
   async function knownCarriers(server: string): Promise<ApiResult<ReadonlyMap<number, number>>> {
-    if (carriers && carriers.server === server && carriers.result.success && deps.now() - carriers.at < ttl) return carriers.result
+    if (carriers && carriers.server === server && deps.now() - carriers.at < (carriers.result.success ? ttl : CARRIER_FAILURE_RETRY_MS)) {
+      return carriers.result
+    }
     if (!carriersInFlight) {
       const startedIn = carrierGeneration
       const started: Promise<ApiResult<ReadonlyMap<number, number>>> = deps.carrierCounts().then((result) => {
-        if (result.success && startedIn === carrierGeneration) carriers = { server, at: deps.now(), result }
+        if (startedIn === carrierGeneration) carriers = { server, at: deps.now(), result }
         return result
       }).finally(() => { if (carriersInFlight === started) carriersInFlight = null })
       carriersInFlight = started

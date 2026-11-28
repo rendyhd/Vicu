@@ -23,19 +23,35 @@ export const TOKEN_CHIP_ROLE = {
   project: 'accent-blue',
   recurrence: 'accent-purple',
   place: 'accent-teal',
+  // Pro (section 5.5)
+  person: 'accent-teal',
+  requester: 'accent-teal',
+  checkOn: 'accent-green',
+  start: 'accent-green',
+  estimate: 'accent-green',
+  flag: 'accent-orange',
+  request: 'accent-blue',
 } as const satisfies Record<TokenType, string>
 
 export const TOKEN_CHIP_CLASSES: Record<Exclude<TokenType, 'priority'>, string> = {
   date: 'bg-accent-green/12 dark:bg-accent-green/20 text-[color:color-mix(in_srgb,rgb(var(--accent-green-rgb)),var(--text-primary))]',
   length: 'bg-accent-green/12 dark:bg-accent-green/20 text-[color:color-mix(in_srgb,rgb(var(--accent-green-rgb)),var(--text-primary))]',
+  // i18n-ignore: class names
   label: 'bg-accent-orange/12 dark:bg-accent-orange/20 text-[color:color-mix(in_srgb,rgb(var(--accent-orange-rgb)),var(--text-primary))]',
   project: 'bg-accent-blue/12 dark:bg-accent-blue/20 text-[color:color-mix(in_srgb,rgb(var(--accent-blue-rgb)),var(--text-primary))]',
   recurrence: 'bg-accent-purple/12 dark:bg-accent-purple/20 text-[color:color-mix(in_srgb,rgb(var(--accent-purple-rgb)),var(--text-primary))]',
   place: 'bg-accent-teal/12 dark:bg-accent-teal/20 text-[color:color-mix(in_srgb,rgb(var(--accent-teal-rgb))_40%,var(--text-primary))]',
+  person: 'bg-accent-teal/12 dark:bg-accent-teal/20 text-[color:color-mix(in_srgb,rgb(var(--accent-teal-rgb))_40%,var(--text-primary))]',
+  requester: 'bg-accent-teal/12 dark:bg-accent-teal/20 text-[color:color-mix(in_srgb,rgb(var(--accent-teal-rgb))_40%,var(--text-primary))]',
+  checkOn: 'bg-accent-green/12 dark:bg-accent-green/20 text-[color:color-mix(in_srgb,rgb(var(--accent-green-rgb)),var(--text-primary))]',
+  start: 'bg-accent-green/12 dark:bg-accent-green/20 text-[color:color-mix(in_srgb,rgb(var(--accent-green-rgb)),var(--text-primary))]',
+  estimate: 'bg-accent-green/12 dark:bg-accent-green/20 text-[color:color-mix(in_srgb,rgb(var(--accent-green-rgb)),var(--text-primary))]',
+  flag: 'bg-accent-orange/12 dark:bg-accent-orange/20 text-[color:color-mix(in_srgb,rgb(var(--accent-orange-rgb)),var(--text-primary))]',
+  request: 'bg-accent-blue/12 dark:bg-accent-blue/20 text-[color:color-mix(in_srgb,rgb(var(--accent-blue-rgb)),var(--text-primary))]',
 }
 
 /** The share of the role in a chip's text colour (the rest is `text`); half unless listed. */
-export const TOKEN_CHIP_TEXT_SHARE: Partial<Record<TokenType, number>> = { place: 0.4 }
+export const TOKEN_CHIP_TEXT_SHARE: Partial<Record<TokenType, number>> = { place: 0.4, person: 0.4, requester: 0.4 }
 
 /** The alpha of the fill, per theme. */
 export const TOKEN_CHIP_ALPHA = { light: 0.12, dark: 0.2 } as const

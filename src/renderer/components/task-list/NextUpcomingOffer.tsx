@@ -6,6 +6,9 @@ import { useFilters } from '@/hooks/use-filters'
 import { useDateFormat } from '@/hooks/use-date-format'
 import { formatDateDisplay } from '@/lib/date-display'
 import { isUpcoming } from '@/lib/due-dates'
+import { useWorkMode } from '@/hooks/use-work-mode'
+import { workModeClause } from '../../../shared/work-scope'
+import { useTranslation } from 'react-i18next'
 
 /**
  * What Today offers when it is empty (card 4.11a): the next task that is due after today, with its
@@ -13,11 +16,18 @@ import { isUpcoming } from '@/lib/due-dates'
  * only while Today is empty. Renders nothing while it loads or when nothing is upcoming.
  */
 export function NextUpcomingOffer() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const dateFormat = useDateFormat()
   const upcoming = useFilters({ view: 'upcoming' })
-  const params = useMemo(() => ({ ...upcoming, page: 1, per_page: 1 }), [upcoming])
-  const { data: tasks = [] } = useTasks(params)
+  // Work and Personal (22.4): the one task asked for is the next one the mode shows.
+  const { scope, mode } = useWorkMode()
+  const { clause, empty } = useMemo(() => workModeClause(scope, mode), [scope, mode])
+  const params = useMemo(
+    () => ({ ...upcoming, ...(clause && upcoming.filter ? { filter: `(${upcoming.filter}) && ${clause}` } : {}), page: 1, per_page: 1 }),
+    [upcoming, clause],
+  )
+  const { data: tasks = [] } = useTasks(params, !empty, true)
   const next = tasks.find((task) => isUpcoming(task.due_date, new Date()))
   if (!next) return null
   const day = formatDateDisplay('header.day', new Date(next.due_date), new Date(), true, dateFormat)
@@ -28,7 +38,7 @@ export function NextUpcomingOffer() {
       onClick={() => navigate({ to: '/upcoming' })}
       className="flex max-w-full items-center gap-2 rounded-control px-3 py-1.5 text-meta text-text-secondary hover:bg-[var(--bg-hover)] hover:text-text"
     >
-      <span className="shrink-0">Next up</span>
+      <span className="shrink-0">{t('task.nextUp')}</span>
       <span className="min-w-0 truncate font-medium text-text">{next.title}</span>
       <span className="shrink-0">{day}</span>
       <ArrowRight aria-hidden className="h-3.5 w-3.5 shrink-0" />

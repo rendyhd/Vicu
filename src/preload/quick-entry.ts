@@ -21,9 +21,12 @@ contextBridge.exposeInMainWorld('quickEntryApi', {
     ipcRenderer.invoke('upload-task-attachment', taskId, fileData, fileName, mimeType),
   fetchTaskAttachments: (taskId: number) =>
     ipcRenderer.invoke('fetch-task-attachments', taskId),
-  updateTask: (taskId: number, task: Record<string, unknown>) =>
-    ipcRenderer.invoke('update-task', taskId, task),
+  // `options.baseDescription`: the notes the change started from (description format, "Notes
+  // changed in two places"). Without `queue` the change needs the server's answer.
+  updateTask: (taskId: number, task: Record<string, unknown>, options?: { baseDescription?: string }) =>
+    ipcRenderer.invoke('update-task', taskId, task, typeof options?.baseDescription === 'string' ? { baseDescription: options.baseDescription } : undefined),
   closeWindow: () => ipcRenderer.invoke('qe:close-window'),
+  openImport: (text: string) => ipcRenderer.invoke('qe:open-import', text),
   setHeight: (height: number) => ipcRenderer.invoke('qe:set-height', height),
   getConfig: () => ipcRenderer.invoke('qe:get-config'),
   getPendingCount: () => ipcRenderer.invoke('qe:get-pending-count'),
@@ -36,14 +39,23 @@ contextBridge.exposeInMainWorld('quickEntryApi', {
   fetchLabels: () => ipcRenderer.invoke('fetch-labels'),
   fetchProjects: () => ipcRenderer.invoke('fetch-projects', false),
   fetchPlaces: () => ipcRenderer.invoke('qe:get-places'),
+  fetchPeople: () => ipcRenderer.invoke('qe:get-people'),
+  ensurePerson: (name: string) => ipcRenderer.invoke('pro:ensure-person', name),
+  addPromise: (taskId: number, person: number, mine: boolean, extra?: { to?: { person?: number; text?: string } | null; check_on?: string | null }) =>
+    ipcRenderer.invoke('qe:add-promise', taskId, person, mine, extra),
   addLabelToTask: (taskId: number, labelId: number) => ipcRenderer.invoke('add-label-to-task', taskId, labelId),
   createLabel: (label: { title: string; hex_color?: string }) => ipcRenderer.invoke('create-label', label),
   getDateFormat: () => ipcRenderer.invoke('get-date-format'),
   onDateFormatChanged: (callback: (format: { locale: string; hour12: boolean }) => void) => {
     ipcRenderer.on('date-format-changed', (_event, format: { locale: string; hour12: boolean }) => callback(format))
   },
-  onShowWindow: (callback: () => void) => {
-    ipcRenderer.on('window-shown', () => callback())
+  getLanguage: () => ipcRenderer.invoke('get-language'),
+  onLanguageChanged: (callback: (info: { language: string; system: string }) => void) => {
+    ipcRenderer.on('language-changed', (_event, info: { language: string; system: string }) => callback(info))
+  },
+  // `prefill` is the text of a `vicu://add` link, else null.
+  onShowWindow: (callback: (prefill: string | null) => void) => {
+    ipcRenderer.on('window-shown', (_event, prefill: unknown) => callback(typeof prefill === 'string' ? prefill : null))
   },
   onHideWindow: (callback: () => void) => {
     ipcRenderer.on('window-hidden', () => callback())

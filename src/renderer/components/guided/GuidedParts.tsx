@@ -1,4 +1,6 @@
 import { useMemo, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
+import type { TranslationKey } from '../../../shared/i18n'
 import { CalendarDays, CalendarX2, ChevronDown, FolderOpen, Loader2, Sparkles } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { NULL_DATE } from '@/lib/constants'
@@ -10,6 +12,7 @@ import { useDayKey } from '@/stores/day-store'
 import { Button } from '@/components/shared/Button'
 import { WhenPopover } from '@/components/task-list/WhenPopover'
 import { ProjectPickerPopover } from '@/components/task-list/ProjectPickerPopover'
+import { useWeekStart } from '@/hooks/use-week-start'
 
 // The pieces every guided session draws (docs/cross-app-semantics-v1.md section 14; the focus
 // stepper of design_handoff_review_flow, Direction C): a header with how far along the person is,
@@ -27,11 +30,12 @@ interface FrameProps {
   status?: React.ReactNode
   exitLabel?: string
   onExit: () => void
-  hints?: ReadonlyArray<readonly [string, string]>
+  hints?: ReadonlyArray<readonly [string, TranslationKey]>
   children: React.ReactNode
 }
 
-export function GuidedFrame({ title, icon, position, status, exitLabel = 'Exit', onExit, hints, children }: FrameProps) {
+export function GuidedFrame({ title, icon, position, status, exitLabel, onExit, hints, children }: FrameProps) {
+  const { t } = useTranslation()
   const progress = position && position.total > 0 ? Math.min(1, (position.current - 1) / position.total) : 1
   return (
     <div className="flex h-full min-h-0 flex-col bg-[var(--bg-secondary)]">
@@ -42,10 +46,10 @@ export function GuidedFrame({ title, icon, position, status, exitLabel = 'Exit',
           <span className="flex-1" />
           {position && (
             <span className="text-meta tabular-nums text-[var(--text-secondary)]" aria-live="polite">
-              {Math.min(position.current, position.total)} of {position.total}
+              {t('guided.position', { current: Math.min(position.current, position.total), total: position.total })}
             </span>
           )}
-          <Button variant="secondary" onClick={onExit}>{exitLabel}</Button>
+          <Button variant="secondary" onClick={onExit}>{exitLabel ?? t('guided.exit')}</Button>
         </div>
         <div className="mt-2.5 h-1 overflow-hidden rounded-full bg-[var(--bg-hover)]" aria-hidden="true">
           <div className="h-full bg-accent-purple transition-[width] duration-fade-base ease-standard" style={{ width: `${progress * 100}%` }} />
@@ -57,11 +61,11 @@ export function GuidedFrame({ title, icon, position, status, exitLabel = 'Exit',
       </div>
       {hints && hints.length > 0 && (
         <div className="shrink-0 border-t border-[var(--border-color)] bg-[var(--bg-primary)] px-6 py-2.5">
-          <ul className="flex flex-wrap justify-center gap-x-4 gap-y-1 text-caption text-[var(--text-secondary)]" aria-label="Keyboard shortcuts">
+          <ul className="flex flex-wrap justify-center gap-x-4 gap-y-1 text-caption text-[var(--text-secondary)]" aria-label={t('guided.keyboardShortcuts')}>
             {hints.map(([keys, label]) => (
               <li key={label} className="flex items-center gap-1.5">
                 {keys.split(' ').map((key) => <kbd key={key} className="rounded-chip border border-[var(--border-color)] bg-[var(--bg-hover)] px-1.5 font-mono text-caption">{key}</kbd>)}
-                <span>{label}</span>
+                <span>{t(label)}</span>
               </li>
             ))}
           </ul>
@@ -88,18 +92,19 @@ export function FieldLabel({ children }: { children: React.ReactNode }) {
 
 /** The model's reason under the title, or that it is on its way. */
 export function SuggestionLine({ reason, pending }: { reason?: string | null; pending?: boolean }) {
+  const { t } = useTranslation()
   if (reason) {
     return (
       <p className="mt-2 flex items-start gap-1.5 text-meta text-[var(--text-secondary)]">
         <Sparkles aria-hidden="true" className="mt-0.5 h-3.5 w-3.5 shrink-0 text-accent-blue" />
-        <span><span className="sr-only">Suggestion: </span>{reason}</span>
+        <span><span className="sr-only">{t('guided.suggestionPrefix')} </span>{reason}</span>
       </p>
     )
   }
   if (pending) {
     return (
       <p className="mt-2 flex items-center gap-1.5 text-meta text-[var(--text-secondary)]" role="status">
-        <Loader2 aria-hidden="true" className="h-3.5 w-3.5 animate-spin" /> A suggestion is on its way
+        <Loader2 aria-hidden="true" className="h-3.5 w-3.5 animate-spin" /> {t('guided.suggestionPending')}
       </p>
     )
   }
@@ -123,7 +128,8 @@ interface WhenChoicesProps {
  * The When panel's quick choices (Today, Tomorrow, This weekend, Next week), a date picked in the
  * When panel, and No date when there is one (section 14.3). The one chosen is pressed.
  */
-export function WhenChoices({ value, onChange, suggested, pickerOpen, onPickerOpenChange, compact, label = 'When' }: WhenChoicesProps) {
+export function WhenChoices({ value, onChange, suggested, pickerOpen, onPickerOpenChange, compact, label }: WhenChoicesProps) {
+  const { t } = useTranslation()
   const fmt = useDateFormat()
   const dayKey = useDayKey()
   const today = useMemo(() => toLocalDate(new Date()), [dayKey])
@@ -132,14 +138,14 @@ export function WhenChoices({ value, onChange, suggested, pickerOpen, onPickerOp
   const open = pickerOpen ?? ownOpen
   const setOpen = onPickerOpenChange ?? setOwnOpen
   const day = localDateOf(value)
-  const choices = quickChoices(today, fmt)
+  const choices = quickChoices(today, fmt, useWeekStart())
   const quick = choices.find((choice) => choice.date === day)
   const hasDate = day !== ''
   const size = compact ? 'min-h-7 px-2.5 text-meta' : ''
   const pressed = (on: boolean) => cn(size, on && 'border-accent-blue bg-accent-blue/12 text-[var(--text-primary)]', on && suggested && SUGGESTED)
 
   return (
-    <div role="group" aria-label={label} className="flex flex-wrap gap-1.5">
+    <div role="group" aria-label={label ?? t('guided.when')} className="flex flex-wrap gap-1.5">
       {choices.map((choice, i) => (
         <Button
           key={choice.id}
@@ -162,16 +168,16 @@ export function WhenChoices({ value, onChange, suggested, pickerOpen, onPickerOp
         className={pressed(hasDate && !quick)}
       >
         <CalendarDays aria-hidden="true" className="h-3.5 w-3.5" />
-        {hasDate && !quick ? formatDateChip(new Date(value), isDateOnly(value), new Date(), fmt) : 'Pick a date'}
+        {hasDate && !quick ? formatDateChip(new Date(value), isDateOnly(value), new Date(), fmt) : t('guided.pickDate')}
       </Button>
       {hasDate && (
         <Button aria-keyshortcuts={compact ? undefined : '0'} onClick={() => onChange(NULL_DATE)} className={size}>
-          <CalendarX2 aria-hidden="true" className="h-3.5 w-3.5" /> No date
+          <CalendarX2 aria-hidden="true" className="h-3.5 w-3.5" /> {t('guided.noDate')}
         </Button>
       )}
       {!hasDate && suggested && (
         <span className={cn('inline-flex min-h-7 items-center gap-1 rounded-control border px-2.5 text-meta text-[var(--text-secondary)]', SUGGESTED)}>
-          <CalendarX2 aria-hidden="true" className="h-3.5 w-3.5" /> No date
+          <CalendarX2 aria-hidden="true" className="h-3.5 w-3.5" /> {t('guided.noDate')}
         </span>
       )}
       {open && (
@@ -198,6 +204,7 @@ interface ProjectChoiceProps {
 
 /** The project the task goes to, picked from the project picker. */
 export function ProjectChoice({ projectId, path, onChange, suggested, pickerOpen, onPickerOpenChange, compact }: ProjectChoiceProps) {
+  const { t } = useTranslation()
   const ref = useRef<HTMLButtonElement>(null)
   const [ownOpen, setOwnOpen] = useState(false)
   const open = pickerOpen ?? ownOpen
@@ -209,7 +216,7 @@ export function ProjectChoice({ projectId, path, onChange, suggested, pickerOpen
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-keyshortcuts={compact ? undefined : 'P'}
-        aria-label={`Project: ${path}`}
+        aria-label={t('guided.projectLabel', { path })}
         onClick={() => setOpen(!open)}
         className={cn('max-w-full', compact && 'min-h-7 px-2.5 text-meta', suggested && SUGGESTED)}
       >

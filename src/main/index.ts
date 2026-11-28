@@ -2,21 +2,24 @@ import { app, BrowserWindow, globalShortcut, nativeTheme, powerMonitor, screen }
 import { createMainWindow, createQuickEntryWindow, createQuickViewWindow } from './window-manager'
 import { registerIpcHandlers } from './ipc-handlers'
 import { loadConfig, saveConfigQuietly, type AppConfig, DEFAULT_QUICK_ENTRY_HOTKEY, DEFAULT_QUICK_VIEW_HOTKEY } from './config'
-import { isQuickEntryEnabled, isQuickViewEnabled } from '../shared/config-types'
+import { closeAction, isQuickEntryEnabled, isQuickViewEnabled, wantsTray } from '../shared/config-types'
 import { authManager } from './auth/auth-manager'
-import { createTray, destroyTray, hasTray } from './tray'
-import { returnFocusToPreviousWindow, destroyDummyWindow } from './focus'
+import { createTray, destroyTray, hasTray, updateTrayMenu } from './tray'
+import { destroyDummyWindow, forgetForegroundWindow, giveFocusBack, nudgeFocusAway, prewarmFocusReturn, rememberForegroundWindow, type PopupKind } from './focus'
 import { registerQuickEntryState } from './quick-entry-state'
-import { initNotifications, refreshTaskRemindersOnFocus, rescheduleNotifications, stopNotifications, setNotificationsMainWindow } from './notifications'
+import { initNotifications, refreshTaskRemindersOnFocus, rescheduleNotifications, stopNotifications } from './notifications'
+import { setNotificationsMainWindow } from './host/notify'
 import { getObsidianContext, getForegroundProcessName, getForegroundWindowHandle, prewarmForegroundCheck, rememberShownObsidianContext, type ObsidianNoteContext } from './obsidian-client'
 import { foregroundNeeds, lookUpForeground } from './quick-entry/foreground-gate'
 import { getBrowserContext, type BrowserContext } from './browser-client'
 import { getBrowserUrlFromWindow, prewarmUrlReader, shutdownUrlReader, BROWSER_PROCESSES } from './window-url-reader'
-import { isRegistered, unregisterHosts, registerHosts } from './browser-host-registration'
+import { isRegistered, unregisterHosts, registerHosts, removeBridgeWrapper } from './browser-host-registration'
+import { isStaleBridgeLaunch } from './browser-host-wrapper'
 import { checkForUpdates } from './update-checker'
 import { startUpdateChecks, type UpdateChecksHandle } from './update-schedule'
 import { isMac, isWindows, isLinux } from './platform'
 import { setupApplicationMenu } from './app-menu'
+import { applyLanguage, onMainLanguageChange } from './i18n'
 import { storeAPIToken, getAPIToken, API_TOKEN_NO_EXPIRY } from './auth/token-store'
 import { clearTaskBadge, reapplyTaskBadge } from './badge'
 import { replayPendingActions } from './sync'
@@ -24,8 +27,11 @@ import { flushOfflineQueue } from './offline/service'
 import { flushTaskCache } from './cache'
 import { syncCustomLists } from './custom-list-service'
 import { startSavedFilterImport } from './saved-filter-service'
-import { syncSyncedPrefs } from './synced-preferences'
-import { parseHiddenArg, shouldStartHidden } from './login-item-settings'
+import { applyWeekStart, syncSyncedPrefs } from './synced-preferences'
+import { syncProLedger } from './pro-ledger-service'
+import { DEEP_LINK_SCHEME, deepLinkFromArgv, parseDeepLink, quickEntryText, routeOfView, type DeepLink } from './deep-link'
+import { isProEnabled } from '../shared/pro/settings'
+import { parseHiddenArg, startWindowState } from './login-item-settings'
 import { applyLaunchOnStartup } from './launch-on-startup'
 import { startupEnv } from './startup-env'
 import { buildShortcutStatus } from './shortcut-status'
@@ -33,7 +39,7 @@ import { handleTrusted } from './secure-ipc'
 import { cleanAttachmentTempDir } from './attachment-temp'
 import { registerWebSecurity } from './web-security'
 import { registerTextContextMenu } from './text-context-menu'
-import { APP_ID } from './app-id'
+import { APP_ID, appUserModelId } from './app-id'
 import { cancelVoiceSession } from './voice/service'
 import { shutdownAi } from './ai/ipc'
 
@@ -113,8 +119,10 @@ let quickViewShowTime = 0
 const BLUR_DEBOUNCE_MS = 300
 
 // --- Quick Entry show/hide ---
-async function showQuickEntry(): Promise<void> {
+async function showQuickEntry(prefill?: string): Promise<void> {
   if (!quickEntryWindow) return
+  // The window to give focus back to when it hides (Windows; before anything can move focus).
+  if (!quickEntryWindow.isVisible()) rememberForegroundWindow('entry')
   const config = loadConfig()
 
   // 1. Detect foreground app — must happen before we steal focus, so it cannot move after show().
@@ -185,7 +193,7 @@ async function showQuickEntry(): Promise<void> {
   quickEntryWindow.show()
   quickEntryWindow.focus()
   quickEntryShowTime = Date.now()
-  quickEntryWindow.webContents.send('window-shown')
+  quickEntryWindow.webContents.send('window-shown', prefill ?? null)
   startDragHoverPolling()
 
   // 8. Await PowerShell result (already running in background with correct HWND)
@@ -222,13 +230,38 @@ function centerQuickEntry(): void {
   quickEntryWindow.setPosition(Math.round((sw - winW) / 2), Math.round(sh * 0.3))
 }
 
+/** A popup being hidden: giving focus back makes it lose focus, and its blur handler must not hide it again. */
+const hidingPopups = new Set<PopupKind>()
+
+/**
+ * Hide a popup and give focus back to the window that was in front before it showed, but only
+ * when the popup still has focus (Escape, Enter, the hotkey); after a click elsewhere focus is
+ * already where the user put it. Giving it back first, while our process owns the foreground, is
+ * what keeps Windows from bringing the main window forward instead (focus.ts).
+ */
+function hidePopup(kind: PopupKind, win: BrowserWindow, hide: () => void): void {
+  if (hidingPopups.has(kind)) return
+  hidingPopups.add(kind)
+  try {
+    const hadFocus = win.isVisible() && win.isFocused()
+    const focusReturned = hadFocus && giveFocusBack(kind)
+    if (!hadFocus) forgetForegroundWindow(kind)
+    hide()
+    if (hadFocus && !focusReturned) nudgeFocusAway()
+  } finally {
+    hidingPopups.delete(kind)
+  }
+}
+
 function hideQuickEntry(): void {
-  if (!quickEntryWindow) return
-  rememberShownObsidianContext(null)
-  quickEntryWindow.webContents.send('window-hidden')
-  quickEntryWindow.hide()
-  stopDragHoverPolling()
-  returnFocusToPreviousWindow()
+  const win = quickEntryWindow
+  if (!win) return
+  hidePopup('entry', win, () => {
+    rememberShownObsidianContext(null)
+    win.webContents.send('window-hidden')
+    win.hide()
+    stopDragHoverPolling()
+  })
 }
 
 function toggleQuickEntry(): void {
@@ -249,6 +282,7 @@ function setQuickEntryHeight(height: number): void {
 // --- Quick View show/hide ---
 function showQuickView(): void {
   if (!quickViewWindow) return
+  if (!quickViewWindow.isVisible()) rememberForegroundWindow('viewer')
   const config = loadConfig()
 
   // Pre-size to desired height
@@ -289,11 +323,13 @@ function centerQuickView(): void {
 }
 
 function hideQuickView(): void {
-  if (!quickViewWindow) return
-  quickViewWindow.webContents.send('viewer-hidden')
-  quickViewWindow.hide()
-  stopDragHoverPolling()
-  returnFocusToPreviousWindow()
+  const win = quickViewWindow
+  if (!win) return
+  hidePopup('viewer', win, () => {
+    win.webContents.send('viewer-hidden')
+    win.hide()
+    stopDragHoverPolling()
+  })
 }
 
 function toggleQuickView(): void {
@@ -374,7 +410,10 @@ function registerQuickEntryShortcuts(config: AppConfig): { entry: boolean; viewe
 // --- Main window creation + wiring ---
 // Everything window-instance-specific lives here so the window can be
 // recreated on demand (tray "Show Vicu" / second-instance after a close).
-function createAndWireMainWindow(config: AppConfig | null, options: { startHidden?: boolean } = {}): BrowserWindow {
+function createAndWireMainWindow(
+  config: AppConfig | null,
+  options: { startHidden?: boolean; startMinimized?: boolean } = {},
+): BrowserWindow {
   const win = createMainWindow(config, options)
 
   win.on('maximize', () => win.webContents.send('window-maximized-change', true))
@@ -422,16 +461,36 @@ function createAndWireMainWindow(config: AppConfig | null, options: { startHidde
     lastCustomListFocusSync = Date.now()
     void syncCustomLists()
     void syncSyncedPrefs()
+    void syncProLedger()
   })
 
-  // Unified close policy, evaluated at close time (not startup time):
-  // hide instead of closing whenever that leaves the user a way back —
-  // always on macOS (dock), elsewhere when the tray is active.
+  // Close policy, evaluated at close time (not startup time). macOS always hides to the dock.
+  // Elsewhere the "When closing the window" setting decides (closeAction): minimize keeps the
+  // taskbar button and its count badge, tray hides the window (only while there is a tray icon to
+  // bring it back), quit ends the app even while the tray and the Quick Entry windows are there.
   win.on('close', (e) => {
     if (appIsQuitting) return
-    if (isMac || hasTray()) {
+    if (isMac) {
       e.preventDefault()
       win.hide()
+      return
+    }
+    const action = closeAction(loadConfig())
+    if (action === 'minimize') {
+      e.preventDefault()
+      win.minimize()
+      return
+    }
+    if (action === 'tray' && hasTray()) {
+      e.preventDefault()
+      win.hide()
+      return
+    }
+    // Quit. The hidden Quick Entry and Quick View windows would keep the app alive after this
+    // window closed, so quit explicitly; before-quit then lets this close through.
+    if (hasTray() || BrowserWindow.getAllWindows().some((w) => w !== win && !w.isDestroyed())) {
+      e.preventDefault()
+      app.quit()
     }
   })
 
@@ -557,9 +616,10 @@ function applyQuickEntrySettings(): { entry: boolean; viewer: boolean; waylandLi
   globalShortcut.unregisterAll()
 
   const eitherEnabled = isQuickEntryEnabled(config) || isQuickViewEnabled(config)
+  // "Hide to system tray" on close needs the tray icon even with Quick Entry and View off.
+  if (wantsTray(config)) setupTray()
 
   if (eitherEnabled) {
-    setupTray()
     initQuickEntryWindows(config)
     const result = registerQuickEntryShortcuts(config)
 
@@ -585,7 +645,7 @@ function applyQuickEntrySettings(): { entry: boolean; viewer: boolean; waylandLi
       quickViewWindow.destroy()
       quickViewWindow = null
     }
-    destroyTray()
+    if (!wantsTray(config)) destroyTray()
     if (dragHoverTimer) {
       clearInterval(dragHoverTimer)
       dragHoverTimer = null
@@ -609,6 +669,17 @@ app.setName('vicu')
 // write or lock against the real one. Must run before the single-instance lock.
 if (process.env.VICU_USER_DATA_DIR) {
   app.setPath('userData', process.env.VICU_USER_DATA_DIR)
+}
+
+// A browser that still has the wrapper of an older version starts this binary with the bridge
+// script as its argument. Where the app no longer runs as Node (macOS, scripts/electron-fuses.mjs)
+// that would open Vicu every time the extension reconnects. Remove the wrapper and leave at once;
+// the next real start writes manifests that name the bridge tool. Before the instance lock, so a
+// running Vicu is not brought to the front either.
+if (isStaleBridgeLaunch(process.argv)) {
+  removeBridgeWrapper()
+  app.exit(0)
+  process.exit(0)
 }
 
 // Navigation, window-open and webview guards for every WebContents (D-SEC-1).
@@ -640,6 +711,43 @@ function parseIntent(argv: readonly string[]): 'quick-entry' | 'quick-view' | nu
   return null
 }
 let startupIntent: 'quick-entry' | 'quick-view' | null = parseIntent(process.argv)
+// A `vicu://` link the app was started with (Windows and Linux pass it in argv), acted on once the
+// windows exist; macOS sends `open-url`, which can arrive before `ready`.
+let startupLink: DeepLink | null = deepLinkFromArgv(process.argv)
+let appReady = false
+
+/** Acts on a `vicu://` link (deep-link.ts). Never creates anything: an add link only fills Quick Entry. */
+function handleDeepLink(link: DeepLink): void {
+  const config = loadConfig()
+  if (link.kind === 'add') {
+    if (!quickEntryWindow) return
+    const prefix = config?.nlp_syntax_mode === 'vikunja' ? '+' : '#'
+    void showQuickEntry(quickEntryText(link, prefix))
+    return
+  }
+  // Pro's own lists answer only while Pro is on (21.1, O1).
+  if (link.kind === 'view' && (link.view === 'flagged' || link.view === 'waiting') && !isProEnabled(config)) return
+  if (!mainWindow || mainWindow.isDestroyed()) mainWindow = createAndWireMainWindow(config)
+  const win = mainWindow
+  const send = () => {
+    if (win.isDestroyed()) return
+    if (link.kind === 'task') win.webContents.send('navigate-to-task', link.id)
+    else win.webContents.send('navigate', routeOfView(link.view))
+  }
+  if (win.webContents.isLoading()) win.webContents.once('did-finish-load', send)
+  else send()
+  win.show()
+  if (win.isMinimized()) win.restore()
+  win.focus()
+}
+
+app.on('open-url', (event, url) => {
+  event.preventDefault()
+  const link = parseDeepLink(url)
+  if (!link) return
+  if (appReady) handleDeepLink(link)
+  else startupLink = link
+})
 
 // Single instance lock — quit if another instance is already running
 const gotLock = app.requestSingleInstanceLock()
@@ -650,6 +758,12 @@ if (!gotLock) {
     // If the second instance was launched with --quick-entry/--quick-view
     // (typically from a DE keyboard-shortcut binding on Wayland), show that
     // window and do NOT raise the main window.
+    const link = deepLinkFromArgv(argv)
+    if (link) {
+      if (appReady) handleDeepLink(link)
+      else startupLink = link
+      return
+    }
     const intent = parseIntent(argv)
     if (intent === 'quick-entry') {
       showQuickEntry()
@@ -684,15 +798,24 @@ if (!gotLock) {
     callback(false)
   })
 
-  app.setAppUserModelId(APP_ID)
+  app.setAppUserModelId(appUserModelId({ packaged: app.isPackaged, userDataOverride: !!process.env.VICU_USER_DATA_DIR }))
 
   app.whenReady().then(async () => {
     // Attachments opened in a previous session (D-IPC-2). Only the primary
     // instance gets here, so nothing else is using the folder.
     cleanAttachmentTempDir(app.getPath('temp'))
+    // The language first: the menus below and every window read it.
+    await applyLanguage()
     setupApplicationMenu(() => mainWindow)
+    onMainLanguageChange(() => {
+      setupApplicationMenu(() => mainWindow)
+      updateTrayMenu()
+    })
     registerIpcHandlers()
-    if (isWindows) prewarmForegroundCheck()
+    if (isWindows) {
+      prewarmForegroundCheck()
+      prewarmFocusReturn()
+    }
     // Don't block window creation on auth recovery (up to 15s offline).
     // authManager has single-flight refresh, so the renderer's auth:check
     // joins any in-flight recovery instead of racing it; AppShell already
@@ -725,18 +848,25 @@ if (!gotLock) {
     }
 
     const config = loadConfig()
+    // The account's week start (contract section 2.1), before anything computes a week.
+    applyWeekStart()
     // Start in the tray when launched at login with "Start hidden" (or with --hidden), but only
-    // when there is a way back: the tray icon exists when Quick Entry or Quick View is on, and
-    // macOS always has the dock.
-    const trayWillExist = !!config && (isQuickEntryEnabled(config) || isQuickViewEnabled(config))
-    const startHidden = !!config && shouldStartHidden({
+    // when there is a way back: the tray icon exists when Quick Entry or Quick View is on or the
+    // close button hides to the tray, and macOS always has the dock. With "Minimize to taskbar"
+    // the window starts minimized instead, so its taskbar button (and count badge) are there.
+    const trayWillExist = !!config && wantsTray(config)
+    const startState = !config ? 'shown' : startWindowState({
       hiddenArg: parseHiddenArg(process.argv),
       openedAtLogin: isMac && app.getLoginItemSettings().wasOpenedAtLogin,
       startHiddenSetting: config.start_hidden === true,
       isMac,
       canComeBack: isMac || trayWillExist,
+      minimizeOnClose: closeAction(config) === 'minimize',
     })
-    mainWindow = createAndWireMainWindow(config, { startHidden })
+    mainWindow = createAndWireMainWindow(config, {
+      startHidden: startState === 'hidden',
+      startMinimized: startState === 'minimized',
+    })
     startupComplete = true
 
     // Sync Electron's native theme with the user's config setting
@@ -753,7 +883,8 @@ if (!gotLock) {
     handleTrusted('window-is-maximized', () => mainWindow?.isMaximized() ?? false)
 
     // Initialize notification scheduler
-    initNotifications(mainWindow)
+    setNotificationsMainWindow(mainWindow)
+    initNotifications()
     powerMonitor.on('resume', () => {
       // The main window's timers (midnight, polling) may have been paused by sleep.
       if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('app-resumed')
@@ -762,6 +893,7 @@ if (!gotLock) {
       void replayPendingActions()
       void syncCustomLists()
       void syncSyncedPrefs()
+      void syncProLedger()
     })
 
     // Replay any offline-queued actions: once shortly after startup, then
@@ -775,6 +907,9 @@ if (!gotLock) {
     // The synced preferences (the Inbox, the task order) sync whenever custom lists do.
     setTimeout(() => { void syncSyncedPrefs() }, 12_000)
     setInterval(() => { void syncSyncedPrefs() }, 5 * 60_000)
+    // The Pro ledger, only while Pro is on (syncProLedger does nothing otherwise).
+    setTimeout(() => { void syncProLedger() }, 12_000)
+    setInterval(() => { void syncProLedger() }, 5 * 60_000)
 
     // Auto-register browser native messaging hosts on startup so manifests
     // always point to the current app's bridge (important when switching
@@ -808,8 +943,8 @@ if (!gotLock) {
     // Quick Entry/View: if either enabled, set up tray + windows + hotkeys.
     // Require config to be non-null: on first launch loadConfig() returns null, and
     // initQuickEntryWindows(null) would throw before the user finished setup.
+    if (wantsTray(config)) setupTray()
     if (config && (isQuickEntryEnabled(config) || isQuickViewEnabled(config))) {
-      setupTray()
       initQuickEntryWindows(config)
       globalShortcut.unregisterAll() // Clear stale registrations from crashes
       registerQuickEntryShortcuts(config)
@@ -829,6 +964,17 @@ if (!gotLock) {
       showQuickView()
     }
     startupIntent = null
+    appReady = true
+    // Registered only for an installed build with the real profile: a dev run or a throwaway
+    // profile (VICU_USER_DATA_DIR) must not take the scheme from the installed app.
+    if (app.isPackaged && !process.env.VICU_USER_DATA_DIR && !app.isDefaultProtocolClient(DEEP_LINK_SCHEME)) {
+      app.setAsDefaultProtocolClient(DEEP_LINK_SCHEME)
+    }
+    if (startupLink) {
+      const link = startupLink
+      startupLink = null
+      handleDeepLink(link)
+    }
   })
 
   app.on('window-all-closed', () => {
@@ -836,8 +982,8 @@ if (!gotLock) {
     // may close before the main window is created, which would quit the app.
     if (!startupComplete) return
     // macOS: never quit on window-all-closed (standard macOS behavior)
-    // Windows: only quit if tray is not active
-    if (!isMac && !hasTray()) {
+    // Windows and Linux: stay in the tray only while closing hides to it
+    if (!isMac && !(hasTray() && closeAction(loadConfig()) === 'tray')) {
       app.quit()
     }
   })

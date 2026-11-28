@@ -5,14 +5,15 @@
 
 This contract defines how Vicu desktop and Vicu mobile (Android and iOS) use a language model the
 user brings: smart dictation, Ask (chat with tasks) and Talk (Ask by voice), and the local speech
-recognition dictation runs on. Both apps must send the same prompts, schemas and context for the
+recognition dictation runs on, and turning written notes (text, PDFs, photos of pages) into tasks.
+Both apps must send the same prompts, schemas and context for the
 same state, and apply the same checks to what comes back, so the same words give the same tasks on
 every device. The file is kept identical in both repos (`docs/ai-assistant-v1.md`), next to
 `cross-app-semantics-v1.md`.
 
 | Fixture | Covers |
 |---|---|
-| `ai-tools-v1.json` | provider presets, the speech models and settings, the vocabulary hint, the draft task, dictation, brain dump and guided suggestion answer schemas, the Ask tools and starters, the prompts, the limits, the spoken confirmation words, and vectors for the checks |
+| `ai-tools-v1.json` | provider presets, the speech models and settings, the vocabulary hint, the draft task, dictation, brain dump, notes and guided suggestion answer schemas, the image probe, the Ask tools and starters, the prompts, the limits, the spoken confirmation words, and vectors for the checks |
 | `ai-dictation-corpus-v1.json` (planned) | transcripts with the tasks they should give, run against real models by an eval script; not a CI gate |
 
 The shared-contract identity tests keep both copies equal, and both apps' test suites run the
@@ -114,6 +115,14 @@ fixture, with the answer each must give). When the structured answer fails with
 `json_schema`, it is tried again with `prompt`, and the one that works is kept for that model.
 Dictation needs the structured answer; Ask and Talk also need the tool call. The settings show
 which features the model can run.
+
+Test connection also asks once whether the model **reads images** (`probe.vision`): a user message
+with the fixture's small PNG before the text `probe.vision.user` (4.9.2), answered with
+`probe.vision.schema` in the structured mode that worked. It passes when `word` equals
+`expect.word` ignoring case and spaces at either end, and `number` equals `expect.number`. The
+result is kept with the model's other capabilities (`vision`: true or false). A model tested before
+this check has no `vision` result: it is asked the first time a page image needs reading, and by the
+next Test connection. Reading images is never needed to switch a feature on.
 
 A typed address without its version path usually answers 404 or 405. When a request to a typed
 address (the model list, Load models or a probe) answers one of those, and no path segment of the
@@ -289,7 +298,7 @@ Voice has two ways in, and both stay available:
 | `now` | the reference time: when the recording ended, `YYYY-MM-DDTHH:mm` |
 | `weekday` | the reference day's English weekday name |
 | `time_zone` | the IANA zone name |
-| `week_starts` | `"monday"` |
+| `week_starts` | the account's week start: `"monday"`, `"sunday"` or `"saturday"` (contract section 2.1) |
 | `list` | the name of the list the user is in (`"Today"`, a project's title, ...) |
 | `default_project_id` | the project the list gives a new task, else the Inbox |
 | `projects` | `[{"id", "title", "path"}]`: projects the user can write to, not archived, ordered by lowercased `path`; `path` is the titles from the top, joined with ` / ` |
@@ -543,6 +552,186 @@ A checked project has `ref`, `title`, `parent_id` and `parent_ref`, at most one 
 As in 4.6, the dump is kept with **Retry**, and it survives the app closing until it is added or
 discarded; **Edit** goes back to the dump to change or extend it. There is no Add as one task.
 
+### 4.9 Notes
+
+Written notes turned into tasks: meeting notes, a long text, PDFs, photos or scans of handwritten
+pages. It is a brain dump (4.8) whose words were written instead of spoken, read page by page, and
+whose action items may name who they are for. It runs on the dictation model with dictation's
+agreement, and needs smart dictation to be ready; pages that are images also need a model that reads
+images (4.9.1).
+
+Three steps:
+
+1. **Add sources**: text typed or pasted, text files (`.txt`, `.md`), PDFs, images, and on a phone
+   the camera's document scanner. At most `limits.notes_pages_max` pages; a file over
+   `limits.notes_file_max_mb` MB is refused. Every source becomes one page or more, in order; pages
+   can be reordered and removed. A **date** (the file's or photo's date, else today) and an optional
+   **title**.
+2. **Read**: every page becomes text (4.9.2). The person sees the transcript page by page next to
+   its picture and can correct it before anything is organized.
+3. **Organize and review**: the transcript goes out in batches (4.9.3, 4.9.4); the checked plan is
+   shown like a brain dump's (4.8.5) with each card's owner (4.9.9) and the line it came from.
+
+Nothing is sent before Read (for images) or Organize, and nothing is written before Add. The pages
+and files stay on the device only while the notes are open (so they survive the app closing) and are
+deleted on Add or Discard; they are never uploaded to the Vikunja server.
+
+#### 4.9.1 Which model reads images
+
+Pages are read by the dictation model when it reads images (2.4), else by Ask's model when that one
+does, else by the model the person picks for it in the settings (stored per preset like the other
+two, offered when neither reads images). All three are on the same provider and key, so this sends
+nothing to anyone new. The notes screen says which model reads the pages. Organizing always uses the
+dictation model.
+
+#### 4.9.2 Reading a page
+
+- A text source is one page of its text. A PDF gives one page per PDF page: its text layer, read on
+  the device; a PDF page with fewer than 20 letters or digits of text is drawn as an image instead,
+  and the person can turn any PDF page into an image ("Read as image") when its text layer is junk.
+  An image is one page.
+- An image is prepared on the device before it is sent: turned upright by its orientation, scaled
+  so its long edge is at most `limits.notes_image_long_edge` pixels, re-encoded as JPEG, without any
+  metadata.
+- One `notesRead` request per image page, at most `limits.notes_read_parallel` at a time, with
+  progress. System: the `notesRead` prompt. One user message: the image, then the text
+  `<page>N of M</page>`, and when the notes have a title a line break and `<title>…</title>`
+  (`readPageUserText`). Deterministic as in 2.5, at most `limits.notes_read_max_tokens` tokens on
+  `anthropic-messages`, the idle timeout of an Ask turn. The answer is plain text: line ends as
+  `\n`, trimmed, and a code fence around the whole answer removed (`notes.read` vectors).
+- A page that fails keeps its picture and says why, with Retry; the other pages go on.
+- On the wire, a user message with images is a list of parts, the images first, then the text
+  (`notes.wire` vectors): on `openai-chat` `{"type": "image_url", "image_url": {"url":
+  "data:image/jpeg;base64,…", "detail": "high"}}` (a 400 naming `detail` leaves it out for that
+  model, as in 2.5); on `anthropic-messages` `{"type": "image", "source": {"type": "base64",
+  "media_type": "image/jpeg", "data": "…"}}`. PDFs are never sent as documents.
+
+#### 4.9.3 Batches
+
+The transcript is organized in batches of at most `limits.notes_batch_chars` characters (UTF-16
+units of the pages' texts): the pages in order, empty pages left out, packed while the next one
+fits; a page longer than the limit is cut at the last line break at or before it (else the last
+space, else at the limit), each part keeping the page's number and starting a new batch when it
+does not fit (`notes.batches` vectors).
+
+Batches go out one after another. Each batch after the first gets a `<projects_so_far>` block with
+the plan's new projects so far, `[{"ref", "title", "path"}]` (`path` as in 4.8.3 step 4), so the
+batches share projects. The checks number every kept project and draft after the plan's (4.9.6), so
+refs stay unique over the whole plan: the first free draft number of a batch is one more than the
+drafts the earlier batches' checks kept. A batch that fails stops the run: the plan so far is kept,
+with Retry for the rest.
+
+#### 4.9.4 Request
+
+- System: the `dictation` prompt, a blank line, the `brainDump` prompt, a blank line, the `notes`
+  prompt.
+- The context JSON (`notes.contextKeys`): the keys of 4.1 with `now` at the notes' date (noon local
+  when only a date is known), then `me` (the account's name, or null), `people` (names the person
+  knows: the members of projects someone else can see, and the Pro people while Pro's assistant is
+  on; once each ignoring case, the first spelling kept, spacing collapsed, ordered by lowercased
+  name) and `notes_title` (trimmed, or empty).
+- One user message, each block's tag on a line of its own: `<context>`, then `<projects_so_far>`
+  when it has projects, then `<notes>` with each page as `<page n="N">`, its text, `</page>` (in the
+  text `</page>` is written `</ page>` and `</notes>` `</ notes>`). `notes.requests` vectors.
+- At most `limits.brain_dump_max_tokens` tokens.
+
+#### 4.9.5 Answer
+
+`notes.answerSchema`: the brain dump answer (4.8.2) with `owner`, `page` and `from` after each
+task's `project_ref`, and `decisions` and `questions` before `unclear`:
+
+| Field | Meaning |
+|---|---|
+| `tasks[].owner` | who the item is for as written (a name, initials, a team), `"me"` for the person, or `null` |
+| `tasks[].page` | the `n` of the page the item is on, or `null` |
+| `tasks[].from` | the line of that page it comes from, copied, or `null` |
+| `decisions[]` | `{"what", "by", "page"}`: what was decided, who decided (as written, or null) |
+| `questions[]` | `{"what", "ask", "page"}`: an open question, who should answer (as written, or null) |
+
+#### 4.9.6 Checks
+
+On one batch, given its pages, `me`, the projects so far, and the first free project and draft
+numbers:
+
+1. **4.8.3**, with two differences: a `parent_ref` or `project_ref` that names no project of this
+   answer may name one of `<projects_so_far>` (a ref names a project of this answer first); a new
+   project whose path equals one of `<projects_so_far>` (ignoring case) is merged into it. Every
+   kept project is numbered `p<first free>`, `p<next>`, … whatever ref it was given.
+2. **Page**: an integer that is the number of one of the batch's pages, else `null` (reported,
+   `field` `"page"`).
+3. **From**: line breaks and runs of spaces as one space, trimmed, cut at
+   `limits.notes_from_max_chars` at a space. It must be found in the text of its page, both
+   compared in lower case with whitespace as single spaces; with no page it is looked for in the
+   batch's pages in order and gives the first page it is found on. Not found: `null` (reported,
+   `field` `"from"`).
+4. **Owner**: a string, line breaks and runs of spaces as one space, trimmed, cut at
+   `limits.notes_owner_max_chars` at a space; empty or not a string is `null`. It is `"me"` when it
+   is `me` or `I` (any case), when it matches the account's name by semantics 21.5 (title or unique
+   first name), or when it equals the initials of an account name of two words or more (dots and
+   spaces ignored, any case). Otherwise the name as given (`notes.owners` vectors).
+5. **Numbers**: the kept drafts are numbered `d<first free>`, `d<next>`, … in order; an entry of a
+   kept draft takes its new ref, an entry of a draft the checks left out (`task`, `title`) has the
+   ref `""`.
+6. **Decisions and questions**: `what` flattened and trimmed, cut at `title_max_chars`, empty ones
+   left out, at most `brain_dump_tasks_max` of each; `by` and `ask` cleaned like an owner in step 4
+   without `"me"`; `page` as in step 2 without a report.
+
+A checked draft is the brain dump draft with `owner`, `page` and `from` at the end. `notes.checks`
+vectors, with the context of `dictation.context`.
+
+#### 4.9.7 The plan of all batches
+
+Each checked batch is added to the plan (`notes.merge` vectors): its projects after the plan's; a
+draft whose title and owner (both compared in lower case, whitespace as one space) are already in
+the plan is left out (`field` `"duplicate"`, ref `""`); at most `limits.notes_tasks_max` drafts in
+all (`field` `"task"`, ref `""`); decisions and questions whose `what` is already there are left
+out; the rest after the plan's.
+
+#### 4.9.8 Update
+
+An Update (4.8.4) sends the whole plan and gets it all back, which only fits a small plan: it is
+offered while the plan came from one batch and has at most `limits.brain_dump_tasks_max` drafts.
+System: the system text of 4.9.4, a blank line and the `brainDumpEdit` prompt. User message:
+`<context>`, `<plan>` (the plan as answers, each task with `owner`, `page` and `from` after
+`project_ref`), `<notes>` as in 4.9.4, then `<transcript>` with the words (`</transcript>` written
+`</ transcript>`). A larger plan is changed by hand on the cards.
+
+#### 4.9.9 Owners
+
+On the device the owner is matched by semantics 21.5 (title, alias, unique first name; ambiguous is
+no match) and never taken from the model. Each card gets a default (`notes.actions` vectors):
+
+| Owner | Default |
+|---|---|
+| `null` or `"me"` | a task of mine |
+| a member of the task's project, when someone else can see that project (name, or username as an alias) | assigned to them (semantics 9.2) |
+| a Pro person, while Pro's promises layer is on | my task "Confirm with <name>: <title>" with the person's label (semantics 21.6, decision 31); with the review's **Agreed in the meeting** switch on, a promise of theirs instead |
+| any other name | the name kept in the title, "<name>: <title>", at most `title_max_chars`; not ticked |
+
+The person can change each card's choice (mine, assigned, their promise, confirm, name in the
+title) and tick or untick it. A filter sets the ticks of all cards (`ticked` in the vectors):
+**Mine only**, **Mine and people I know** (everything but a kept name; the default) and
+**Everything**.
+
+Decisions and questions are listed under the plan with Copy. While Pro's promises layer is on they
+can be added too: a decision as a `decision` log entry, a question as an "Ask <name>: <what>" task
+with the person's label when `ask` matches a person, else an `unknown` log entry (semantics 21.12).
+
+#### 4.9.10 Adding
+
+Add works as in 4.8.5 for the ticked cards, and creates only the new projects that hold a ticked
+card or are a parent of one (`projectsInUse`). Each task's notes end, after a blank line, with
+`From <title>, page <n>: <from>` (`notes.sourceLines` vectors; without a title `Notes <date>`,
+without a page or line those parts left out). Assignees go through the assignee path (queued
+offline); a promise's ledger record is written once the task has its id. One message with Undo,
+which deletes the tasks and the projects and takes the ledger records back.
+
+#### 4.9.11 Failures
+
+A page that cannot be read keeps its picture with Retry. A batch that fails keeps the plan so far
+with Retry. The notes (pages, title, date, the plan) survive the app closing until they are added or
+discarded.
+
 ---
 
 ## 5. Ask
@@ -693,14 +882,18 @@ without phrases in the fixture confirms by tap only. Vectors: `talk.confirmVecto
 | Feature | Sent to the chosen model |
 |---|---|
 | Dictation, brain dump | the transcript (never audio), the context of 4.1: project, label and place names, the list's name, date, time and zone |
+| Notes (4.9) | the pages the person adds: their text, or an image of a page without text (downscaled, re-encoded as JPEG, without metadata such as location); the notes' title and date; the context of 4.1 with `me` and `people` (4.9.4) |
 | Ask, Talk | the user's messages, the overview (counts, project, label and custom list names), and the tasks the tools return, with the names in `by` and `assignees` |
 | Suggestions in guided sessions (section 9) | the context of 4.1, and the session's tasks: their summaries (5.2), dates added and changed, and the start of their notes |
 
 Never sent: audio (unless the user chose a provider's transcription), hidden tasks, comment
-texts, attachments, the Vikunja token, the server address, place positions.
+texts, task attachments, the Vikunja token, the server address, place positions.
 
 Before a cloud provider is used, a consent sheet names what each feature sends and asks for
-agreement; a local server (Ollama or Open WebUI at a local address) skips it.
+agreement; a local server (Ollama or Open WebUI at a local address) skips it. The agreement is kept
+per provider and address (`<provider>|<address>`). Images of pages need an agreement of their own,
+`<provider>|<address>|images`, asked before the first page image goes to that provider (also from
+someone who agreed before images existed); notes with text only stay under the first agreement.
 
 ### 7.2 Where settings live
 
@@ -741,6 +934,8 @@ agreement; a local server (Ollama or Open WebUI at a local address) skips it.
 - `brainDump` 1 and `brainDumpEdit` 1 are new with the brain dump (4.8).
 - `organize` 1 is new with the suggestions in guided sessions (section 9).
 - `planDay` 1 is new with Plan my day (section 10).
+- `notes` 1 and `notesRead` 1 are new with notes to tasks (4.9), with the `notes` block, the
+  `probe.vision` check (2.4) and the `notes_*` limits.
 
 ---
 
@@ -914,3 +1109,43 @@ order. Vectors: `planDay.checks`.
 - *Ready*: nothing.
 - A failed request is said once ("No suggestions: …") and the session goes on with first free slots
   and the default length. With the switch off, nothing is sent and nothing is shown.
+
+## 11. Pro
+
+Pro (cross-app semantics section 21) adds three uses of the assistant. All of them, and every piece
+of Pro data in any request (promise words, verdicts, patterns, people, initiatives, logs), need the
+person's **Pro assistant** switch (`pro_assistant`, per device, off by default) on top of the usual
+set-up and consent (section 7). With it off, Ask still sees tasks as before but no ledger data, and
+the Pro tools below are not offered. Any configured provider may be used (decision 20).
+
+### 11.1 Converting pasted text to an import
+
+When pasted text is not a `vicu-import/1` document, the import screen offers "Convert with the
+assistant". The request uses Ask's model, the prompt `pro.proImport.prompt` (with `{items_max}` from
+`pro.limits.import_items_max`) and the schema `pro.proImport.answerSchema`, at most
+`pro.limits.import_max_tokens` tokens, deterministic. The user message holds `<me>`, `<people>`,
+`<initiatives>`, `<open>` (open promises with `t-<taskId>` ids) and `<text>`. The answer's items
+(null fields dropped) become a `vicu-import/1` document with the source the person chose and go
+through the same reading, matching and review (cross-app semantics 21.12); nothing is written
+without Add.
+
+### 11.2 Promise drafts in a meeting
+
+Dictation on a meeting card (desktop) uses `pro.promiseDrafts.prompt` and its schema, with
+`<person>`, `<me>` and `<mine>` (your open promises to that person). Each draft is checked like a
+dictation draft (section 4): `due_said` is read by the quick-add date rules in dates-only mode, a
+`words` value that does not appear in the transcript is dropped, at most
+`pro.limits.promise_drafts_max` drafts. Drafts are shown on the card and added only on a tap.
+
+### 11.3 Ask's Pro tools
+
+While the switch is on, Ask also has the read tools `pro.askTools` (`get_promises`, `get_person`,
+`get_portfolio`, `get_initiative`), run on the device against its own data, and the starters
+`pro.starters` in an empty conversation. `get_promises` returns at most
+`pro.limits.get_promises_max` promises.
+
+### 11.4 The Copilot prompt
+
+The text the person copies to Microsoft 365 Copilot (or any other assistant) is not a request of
+Vicu's: it is `pro.copilotPrompt`, filled on the device (cross-app semantics 21.12).
+

@@ -53,7 +53,7 @@ Each part works on its own. Start with one and add more when you feel the need.
 | Part | What it adds | Complexity | Where |
 |---|---|---|---|
 | [Know what you can do now](guide:pro/available) | Available, Remaining and All on your lists; start dates; waiting on other tasks; step-by-step projects; on hold; flags; estimates; Focus | Low: a few new fields and a filter | {desktop} {phone} |
-| [Promises and people](guide:pro/promises) | People, promises both ways, verdicts, Waiting on, the person page, 1:1 agendas, recaps, meetings, import from Copilot | Medium: a habit of giving verdicts | {desktop} {phone} (meetings and import on the desktop) |
+| [Promises and people](guide:pro/promises) | People, promises both ways, verdicts, Waiting on, the person page, 1:1 agendas, recaps, meetings, import from Copilot; [groups, sessions and Follow-ups](guide:pro/groups) for recurring meetings; [90-day plans](guide:pro/plans) | Medium: a habit of giving verdicts | {desktop} {phone} (meetings, sessions and import on the desktop) |
 | [Portfolio](guide:pro/portfolio) | Initiatives with a cap, rank and parking; readiness; escalations; the Sponsor desk; request triage | High: a way of running your work | {desktop} |
 | [Power tools](guide:pro/power) | Pro conditions and grouping in custom lists, a table view, the inspector, estimates and a focus block in Plan my day, the weekly execution review, a quarterly impact summary | Medium: power tools | {desktop} |
 
@@ -77,7 +77,8 @@ my day also uses your estimates and proposes a focus block.
 3. Choose the parts you want. Every part is on until you turn it off.
 4. Optional: turn on **Assistant help in Pro** if you use the assistant and want it to see Pro's data.
 5. Optional: under **Work area**, tick the project categories that are your work, so promises count only
-   there. With none ticked, every project counts.
+   there. With none ticked, every project counts. If you use [Work and Personal](guide:work-and-personal),
+   you can choose **Work projects** here instead, and show Pro only while you are in Work.
 :::
 
 Pro is per device: turn it on on each device where you want it. What Pro stores is shared through your
@@ -108,9 +109,9 @@ Pro does not work in standalone mode: it needs a Vikunja server.
 
 The phone app has **Know what you can do now** and **Promises and people**: the view switch and
 reasons on every list, Pro's fields in the task editor, Flagged, Waiting on, People and the person page,
-promises due on Today with verdicts, and capture of promise words.
+promises due on Today with verdicts, capture of promise words, and [Follow-ups and a group's page](guide:pro/groups).
 
-Meetings, import, the Portfolio and the Power tools are on the desktop. The phone still honors their
+Meetings, sessions, import, the Portfolio and the Power tools are on the desktop. The phone still honors their
 data: a parked initiative's tasks stay out of the way, and a custom list's Pro conditions work there too.
 
 ## Where Pro keeps its data
@@ -143,6 +144,8 @@ Links work in the installed app. The Pro lists (`flagged`, `waiting`) open only 
 
 - [Know what you can do now](guide:pro/available)
 - [Promises and people](guide:pro/promises)
+- [Groups, sessions and follow-ups](guide:pro/groups)
+- [90-day plans](guide:pro/plans)
 - [Portfolio](guide:pro/portfolio)
 - [Power tools](guide:pro/power)
 - [Keyboard shortcuts](guide:shortcuts)

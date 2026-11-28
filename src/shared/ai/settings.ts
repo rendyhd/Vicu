@@ -4,7 +4,7 @@
  * which features can run). Used by the main process, which owns them, and by Settings.
  */
 import { AI_LIMITS, PROVIDER_PRESETS, providerPreset, speechModel, type ProviderId } from './contract'
-import type { AiSettings, ConnectionTestResult, ModelCapabilities, ProviderSetup } from './types'
+import type { AiModels, AiSettings, ConnectionTestResult, ModelCapabilities, ProviderSetup } from './types'
 
 export const DEFAULT_AI_SETTINGS: AiSettings = {
   provider: null,
@@ -28,7 +28,7 @@ const withoutSlash = (address: string): string => address.trim().replace(/\/+$/,
 function normaliseSetup(raw: unknown): ProviderSetup | null {
   if (!isObject(raw)) return null
   const models = isObject(raw.models) ? raw.models : {}
-  return { address: withoutSlash(str(raw.address)), models: { dictation: str(models.dictation).trim(), ask: str(models.ask).trim() } }
+  return { address: withoutSlash(str(raw.address)), models: modelsOf(models) }
 }
 
 const isProviderId = (id: string): id is ProviderId => !!providerPreset(id)
@@ -45,7 +45,7 @@ export function normaliseAiSettings(raw: unknown): AiSettings {
     for (const [key, value] of Object.entries(o.tested)) {
       if (!isObject(value)) continue
       const structured = value.structured === 'json_schema' || value.structured === 'prompt' ? value.structured : null
-      tested[key] = { structured, tools: value.tools === true }
+      tested[key] = { structured, tools: value.tools === true, ...(typeof value.vision === 'boolean' ? { vision: value.vision } : {}) }
     }
   }
   const refusedFields: Record<string, string[]> = {}
@@ -74,7 +74,7 @@ export function normaliseAiSettings(raw: unknown): AiSettings {
   return {
     provider,
     address: withoutSlash(str(o.address)),
-    models: { dictation: str(models.dictation).trim(), ask: str(models.ask).trim() },
+    models: modelsOf(models),
     features: { dictation: features.dictation === true, ask: features.ask === true, talk: features.talk === true },
     tested,
     consented: Array.isArray(o.consented) ? o.consented.filter((v): v is string => typeof v === 'string') : [],
@@ -163,7 +163,7 @@ export function choosingProvider(settings: AiSettings, id: ProviderId | null): A
     ...settings,
     provider: preset.id,
     address: preset.addressEditable ? back?.address ?? '' : preset.address ?? '',
-    models: { dictation: back?.models.dictation || model, ask: back?.models.ask || model },
+    models: { dictation: back?.models.dictation || model, ask: back?.models.ask || model, ...(back?.models.read ? { read: back.models.read } : {}) },
     features: { dictation: false, ask: false, talk: false },
     remembered,
   }
@@ -245,6 +245,35 @@ export function hasConsent(settings: Pick<AiSettings, 'provider' | 'address' | '
   return !needsConsent(settings) || settings.consented.includes(consentKey(settings))
 }
 
+/** The agreement to send images of pages (7.1, 4.9): `<provider>|<address>|images`. */
+export function imagesConsentKey(settings: Pick<AiSettings, 'provider' | 'address'>): string {
+  return `${consentKey(settings)}|images`
+}
+
+export function hasImagesConsent(settings: Pick<AiSettings, 'provider' | 'address' | 'consented'>): boolean {
+  return !needsConsent(settings) || (hasConsent(settings) && settings.consented.includes(imagesConsentKey(settings)))
+}
+
+/**
+ * The model that reads page images (4.9.1): the one picked for it, else the dictation model when it
+ * reads images, else Ask's when it does. `untested` lists the models in that order whose image
+ * reading was never asked (to ask before deciding); null with none of them: the person picks one.
+ */
+export function readingModel(settings: AiSettings): { model: string | null; untested: string[] } {
+  const picked = (settings.models.read ?? '').trim()
+  if (picked) {
+    const caps = capabilitiesOf(settings, picked)
+    return { model: caps?.vision === false ? null : picked, untested: caps?.vision === undefined ? [picked] : [] }
+  }
+  const untested: string[] = []
+  for (const model of modelsInUse(settings)) {
+    const vision = capabilitiesOf(settings, model)?.vision
+    if (vision === true) return { model, untested }
+    if (vision === undefined) untested.push(model)
+  }
+  return { model: null, untested }
+}
+
 /** The provider is chosen with an address and, where the preset needs one, a key. */
 export function isSetUp(settings: AiSettings, hasKey: boolean): boolean {
   const preset = settings.provider ? providerPreset(settings.provider) : undefined
@@ -307,4 +336,10 @@ export function featureProblem(feature: ModelFeature, result: ConnectionTestResu
   const first = problems.find((problem) => problem && problem.trim())
   if (first && result.hint) return `${first.trim()} ${result.hint}`
   return first?.trim() ?? featureNeeds(feature, { structured: result.structured.ok ? result.structured.mode : null, tools: result.tool.ok })
+}
+
+/** The models as stored: `read` only when one was picked for reading pictures (4.9.1). */
+function modelsOf(models: Record<string, unknown>): AiModels {
+  const read = str(models.read).trim()
+  return { dictation: str(models.dictation).trim(), ask: str(models.ask).trim(), ...(read ? { read } : {}) }
 }

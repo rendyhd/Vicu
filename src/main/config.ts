@@ -1,7 +1,5 @@
-import { app } from 'electron'
-import { join } from 'path'
-import { isMac } from './platform'
-import { readFileWithBackup, writeFileAtomic } from './atomic-file'
+import { isMac } from '@host/env'
+import { readStoredConfig, writeStoredConfig } from '@host/storage'
 import type {
   AppConfig,
   ConnectionFields,
@@ -11,6 +9,26 @@ import type {
 } from '../shared/config-types'
 import { isCategoryId } from '../shared/project-categories'
 import { todayRoutinesLimit } from '../shared/today-routines'
+import { readProFocus } from '../shared/pro/focus'
+import { PRO_LAYERS } from '../shared/pro/settings'
+import { parseWorkMode } from '../shared/work-scope'
+import { normalizeLanguageSetting } from '../shared/i18n/languages'
+
+/** Stored layers: only `false` is kept (a missing layer is on). */
+function normalizeProLayers(value: unknown): AppConfig['pro_layers'] {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined
+  const layers: NonNullable<AppConfig['pro_layers']> = {}
+  for (const layer of PRO_LAYERS) if ((value as Record<string, unknown>)[layer] === false) layers[layer] = false
+  return Object.keys(layers).length ? layers : undefined
+}
+
+/** A map of string keys whose values pass `keep`; undefined when empty. */
+function normalizeStringMap<T>(value: unknown, keep: (value: unknown) => boolean): Record<string, T> | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined
+  const kept: Record<string, T> = {}
+  for (const [key, entry] of Object.entries(value as Record<string, unknown>)) if (keep(entry)) kept[key] = entry as T
+  return Object.keys(kept).length ? kept : undefined
+}
 
 // The config types are shared with the renderer (src/shared/config-types.ts).
 export type {
@@ -26,14 +44,13 @@ export type {
 export const DEFAULT_QUICK_ENTRY_HOTKEY = isMac ? 'Command+Shift+Space' : 'Alt+Shift+V'
 export const DEFAULT_QUICK_VIEW_HOTKEY = isMac ? 'Command+Shift+B' : 'Alt+Shift+B'
 
-const CONFIG_FILENAME = 'config.json'
-
 const DEFAULT_CONFIG: AppConfig = {
   vikunja_url: '',
   api_token: '',
   inbox_project_id: 0,
   theme: 'system',
   clock_format: 'system',
+  language: 'system',
   row_density: 'compact',
   subtask_display: 'inside_task',
   review: {
@@ -43,14 +60,18 @@ const DEFAULT_CONFIG: AppConfig = {
   },
 }
 
-function getConfigPath(): string {
-  return join(app.getPath('userData'), CONFIG_FILENAME)
-}
-
 // In-memory cache: the config file is only ever written through saveConfig,
 // so disk reads after the first are redundant. Callers receive clones —
 // mutating a returned config object must not leak into the cache.
 let cachedConfig: AppConfig | null | undefined
+
+/**
+ * Forget the in-memory copy, so the next `loadConfig` reads the stored config again. For a host
+ * where someone else can write it: on the web another tab of the same browser does.
+ */
+export function dropConfigCache(): void {
+  cachedConfig = undefined
+}
 
 export function loadConfig(): AppConfig | null {
   if (cachedConfig === undefined) {
@@ -69,7 +90,7 @@ function parseConfigFile(raw: string): AppConfig {
 
 function readConfigFromDisk(): AppConfig | null {
   // Falls back to config.json.bak (and logs it) when the file does not parse.
-  const loaded = readFileWithBackup(getConfigPath(), parseConfigFile)
+  const loaded = readStoredConfig(parseConfigFile)
   if (!loaded) return null
   const config = loaded.value
 
@@ -120,6 +141,12 @@ function normalizeCategoryIds(raw: unknown): string[] | undefined {
   return [...new Set(raw.filter(isCategoryId))].sort()
 }
 
+/** The sidebar's order: the same names, each once, in the order they were saved. */
+function normalizeListOrder(raw: unknown): string[] | undefined {
+  if (!Array.isArray(raw)) return undefined
+  return [...new Set(raw.filter((id): id is string => typeof id === 'string' && /^[a-z][a-z_]{0,31}$/.test(id)))]
+}
+
 /** Smart list names: lower case words, so one a newer version adds is kept too. */
 function normalizeListNames(raw: unknown): string[] | undefined {
   if (!Array.isArray(raw)) return undefined
@@ -142,12 +169,16 @@ export function normalizeConfig(raw: Record<string, unknown>): AppConfig {
       ? raw.theme
       : DEFAULT_CONFIG.theme,
     clock_format: raw.clock_format === '12h' || raw.clock_format === '24h' ? raw.clock_format : 'system',
+    language: normalizeLanguageSetting(raw.language),
     row_density: raw.row_density === 'comfortable' ? 'comfortable' : 'compact',
     window_bounds: isWindowBounds(raw.window_bounds) ? raw.window_bounds : undefined,
     sidebar_width: typeof raw.sidebar_width === 'number' ? raw.sidebar_width : undefined,
     sidebar_collapsed_projects: normalizeProjectIds(raw.sidebar_collapsed_projects),
     sidebar_collapsed_categories: normalizeCategoryIds(raw.sidebar_collapsed_categories),
     sidebar_hidden_lists: normalizeListNames(raw.sidebar_hidden_lists),
+    sidebar_order: normalizeListOrder(raw.sidebar_order),
+    sidebar_pro_collapsed: raw.sidebar_pro_collapsed === true,
+    sidebar_hidden: raw.sidebar_hidden === true,
     custom_lists: Array.isArray(raw.custom_lists) ? raw.custom_lists as AppConfig['custom_lists'] : undefined,
     custom_lists_sync: raw.custom_lists_sync && typeof raw.custom_lists_sync === 'object'
       ? raw.custom_lists_sync as AppConfig['custom_lists_sync']
@@ -187,6 +218,9 @@ export function normalizeConfig(raw: Record<string, unknown>): AppConfig {
     start_hidden: raw.start_hidden === true,
     standalone_mode: raw.standalone_mode === true,
     show_today_overdue_badge: raw.show_today_overdue_badge === true,
+    close_action: raw.close_action === 'minimize' || raw.close_action === 'tray' || raw.close_action === 'quit'
+      ? raw.close_action
+      : undefined,
     show_project_progress: raw.show_project_progress !== false,
     show_project_task_count: raw.show_project_task_count === true,
     // Obsidian
@@ -248,6 +282,27 @@ export function normalizeConfig(raw: Record<string, unknown>): AppConfig {
     planner_source: typeof raw.planner_source === 'string' ? raw.planner_source : undefined,
     planner_show_routines: raw.planner_show_routines !== false,
     planner_nudge: typeof raw.planner_nudge === 'string' && /^\d{2}:\d{2}$/.test(raw.planner_nudge) ? raw.planner_nudge : null,
+    // Pro (cross-app semantics section 21), per device.
+    pro_enabled: raw.pro_enabled === true,
+    pro_layers: normalizeProLayers(raw.pro_layers),
+    pro_list_views: normalizeStringMap(raw.pro_list_views, (value) => value === 'available' || value === 'remaining' || value === 'all'),
+    pro_list_layouts: normalizeStringMap(raw.pro_list_layouts, (value) =>
+      !!value && typeof value === 'object' && ((value as { layout?: unknown }).layout === 'rows' || (value as { layout?: unknown }).layout === 'columns')),
+    pro_focus: readProFocus(raw.pro_focus),
+    pro_assistant: raw.pro_assistant === true,
+    pro_verdict_snooze: normalizeStringMap(raw.pro_verdict_snooze, (value) =>
+      !!value && typeof value === 'object' && typeof (value as { due?: unknown }).due === 'string' && typeof (value as { until?: unknown }).until === 'string'),
+    pro_followup_dismissed: normalizeStringMap(raw.pro_followup_dismissed, (value) => typeof value === 'string'),
+    pro_onboarding_seen: raw.pro_onboarding_seen === true,
+    // Work and Personal (cross-app semantics section 22), per device.
+    work_mode_enabled: raw.work_mode_enabled === true,
+    work_mode: parseWorkMode(raw.work_mode),
+    work_mode_show_all: raw.work_mode_show_all === true,
+    work_mode_show_work_label: raw.work_mode_show_work_label === true,
+    pro_only_in_work: raw.pro_only_in_work === true,
+    pro_ledger_sync: raw.pro_ledger_sync && typeof raw.pro_ledger_sync === 'object'
+      ? raw.pro_ledger_sync as AppConfig['pro_ledger_sync']
+      : undefined,
   }
 }
 
@@ -283,7 +338,7 @@ function isWindowBounds(v: unknown): v is { x: number; y: number; width: number;
 export function saveConfig(config: AppConfig): void {
   const snapshot = structuredClone(config)
   // Temp file + rename, keeping config.json.bak (see atomic-file.ts)
-  writeFileAtomic(getConfigPath(), JSON.stringify(config, null, 2), { backup: true })
+  writeStoredConfig(JSON.stringify(config, null, 2))
   // The cache follows the disk: after a failed write it still holds what is on disk, so a caller
   // that is told the save failed does not keep seeing the unsaved values until the next restart.
   cachedConfig = snapshot
@@ -319,6 +374,7 @@ const ACCOUNT_SPECIFIC_KEYS = [
   'custom_lists_sync',
   'saved_filters',
   'synced_prefs_sync',
+  'pro_ledger_sync',
   'known_user',
   'account_owner',
   'quick_entry_default_project_id',
@@ -344,7 +400,7 @@ export function connectionKeysIn(patch: object): string[] {
 }
 
 /** Owned by main (the custom list service with its own IPCs and sync, the known user); never taken from a renderer patch. */
-const MAIN_OWNED_KEYS: ReadonlySet<string> = new Set(['custom_lists', 'custom_lists_sync', 'saved_filters', 'synced_prefs_sync', 'known_user', 'account_owner'])
+const MAIN_OWNED_KEYS: ReadonlySet<string> = new Set(['custom_lists', 'custom_lists_sync', 'saved_filters', 'synced_prefs_sync', 'pro_ledger_sync', 'known_user', 'account_owner'])
 
 /** Every key of AppConfig, derived from the normalizer so the two cannot drift apart. */
 const CONFIG_KEYS: ReadonlySet<string> = new Set(Object.keys(normalizeConfig({})))

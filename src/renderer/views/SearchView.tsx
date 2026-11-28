@@ -1,4 +1,5 @@
 import { useSearch } from '@tanstack/react-router'
+import { useTranslation } from 'react-i18next'
 import { useSearchTasks } from '@/hooks/use-search-tasks'
 import { useProjects } from '@/hooks/use-projects'
 import { useMemo, useState } from 'react'
@@ -8,9 +9,11 @@ import { SearchFilterBar } from '@/components/search/SearchFilterBar'
 import { searchFiltersActive, type SearchFilters } from '../../shared/search-filters'
 
 // Results come from every project and have no group headers, so each row names its project.
-const ROW_VIEW = { showProject: true }
+// Search is not filtered by Work and Personal: a task of the other mode names its mode (22.4).
+const ROW_VIEW = { showProject: true, showWorkMark: true }
 
 export function SearchView() {
+  const { t } = useTranslation()
   const { q } = useSearch({ from: '/search' })
 
   // They last while this page is open (contract section 17).
@@ -29,12 +32,12 @@ export function SearchView() {
   return (
     <RowViewProvider value={ROW_VIEW}>
       <TaskList
-        title={q ? `Search: "${q}"` : 'Search'}
+        title={q ? t('views.search.titleWithQuery', { query: q }) : t('views.search.title')}
         tasks={asked ? visibleTasks : []}
         showNewTask={false}
         headerContent={<div className="px-4 pb-2"><SearchFilterBar filters={filters} onChange={setFilters} /></div>}
-        emptyTitle={!asked ? 'Enter a search query' : isLoading ? 'Searching...' : 'No tasks found'}
-        emptySubtitle={!asked ? 'Use the search bar to find tasks, or a filter above' : isLoading ? undefined : filtered ? 'Try fewer filters' : `No results for "${q}"`}
+        emptyTitle={!asked ? t('views.search.enterQuery') : isLoading ? t('views.search.searching') : t('views.search.noTasks')}
+        emptySubtitle={!asked ? t('views.search.useSearchBar') : isLoading ? undefined : filtered ? t('views.search.tryFewerFilters') : t('views.search.noResults', { query: q })}
       />
     </RowViewProvider>
   )

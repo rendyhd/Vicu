@@ -17,6 +17,7 @@ import {
   movedRange,
   openingMinute,
   plannedMinutes,
+  inPlanRange,
   planRangeFilter,
   snapMinutes,
   startEdgeRange,
@@ -215,6 +216,20 @@ describe('the request for a view', () => {
 
       const later = compileServerFilter(planRangeFilter(['2026-10-07'], '2026-10-06'))
       expect(later(row(dateOnlyDue('2026-10-01')))).toBe(false) // overdue stays out of another day
+    })
+
+    it(`keeps a lone start date out of the view (${zone})`, () => {
+      process.env.TZ = zone
+      const days = ['2026-10-06', '2026-10-07']
+      const row = (due: string, start = NULL_DATE, end = NULL_DATE, done = false) => ({ done, project_id: 1, due_date: due, start_date: start, end_date: end })
+      const lone = row(NULL_DATE, iso('2026-10-07T00:00:00'))
+      expect(compileServerFilter(planRangeFilter(days, '2026-10-06'))(lone)).toBe(true) // the server matches it
+      expect(inPlanRange(lone, days, '2026-10-06')).toBe(false)
+      expect(inPlanRange(row(NULL_DATE, iso('2026-10-07T00:00:00'), NULL_DATE, true), days, '2026-10-06')).toBe(false)
+      expect(inPlanRange(row(dateOnlyDue('2026-10-07'), iso('2026-10-07T00:00:00')), days, '2026-10-06')).toBe(true) // due in range
+      expect(inPlanRange(row(dateOnlyDue('2026-10-07'), iso('2026-10-07T09:00:00'), iso('2026-10-07T09:30:00'), true), days, '2026-10-06')).toBe(true)
+      expect(inPlanRange(row(dateOnlyDue('2026-10-01')), days, '2026-10-06')).toBe(true)
+      expect(inPlanRange(row(dateOnlyDue('2026-10-01')), ['2026-10-07'], '2026-10-06')).toBe(false)
     })
   }
 })

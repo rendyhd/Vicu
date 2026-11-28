@@ -1,4 +1,5 @@
 import { useNavigate, useParams, useRouter, useSearch } from '@tanstack/react-router'
+import { useTranslation } from 'react-i18next'
 import { GuidedSortSession } from '@/components/guided/GuidedSortSession'
 import { ProjectReviewSession } from '@/components/guided/ProjectReviewSession'
 import { useWeeklyReviewStore } from '@/stores/weekly-review-store'
@@ -19,6 +20,7 @@ export function isGuidedSession(value: string): value is GuidedSessionId {
 }
 
 export function GuidedView() {
+  const { t } = useTranslation()
   const { session } = useParams({ from: '/guided/$session' })
   const { from } = useSearch({ from: '/guided/$session' })
   const navigate = useNavigate()
@@ -38,7 +40,7 @@ export function GuidedView() {
     leave()
   }
 
-  const doneLabel = weekly ? 'Back to the weekly review' : 'Done'
+  const doneLabel = weekly ? t('guided.backToWeekly') : t('guided.done')
   if (id === 'review') return <ProjectReviewSession key={id} onExit={leave} onDone={done} doneLabel={doneLabel} />
   return <GuidedSortSession key={id} queueId={id as GuidedQueueId} onExit={leave} onDone={done} doneLabel={doneLabel} />
 }

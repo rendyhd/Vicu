@@ -1,6 +1,9 @@
 import { useState, useRef, useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import type { PopoverCloseReason } from '../overlay/Popover'
 import {
+  Flag,
+  Inbox as InboxIcon,
   ArrowDown,
   ArrowUp,
   CalendarClock,
@@ -9,6 +12,8 @@ import {
   CheckCircle2,
   Copy,
   CopyPlus,
+  CornerDownRight,
+  CornerLeftUp,
   FileText,
   FlagOff,
   Folder,
@@ -36,6 +41,8 @@ import { resolveSelectedTasks } from '@/lib/task-selection'
 import type { Task } from '@/lib/vikunja-types'
 import { DatePickerPopover } from './DatePickerPopover'
 import { ProjectPickerPopover } from './ProjectPickerPopover'
+import { SubtaskPickerPopover } from './SubtaskPickerPopover'
+import { parentIdOf, useSubtaskAttach } from '@/hooks/use-subtask-attach'
 import { BulkAssignPopover } from './BulkAssignPopover'
 import { useProjectAccessMap } from '@/hooks/use-project-access'
 import { canAssignSelection } from '@/lib/bulk-assign'
@@ -46,6 +53,14 @@ import { Menu, MenuHeading, MenuItem, MenuRadioItem, MenuSeparator } from '../ov
 import { shortcutHint } from '@/lib/shortcut-hint'
 import { useAiReady } from '@/hooks/use-ai'
 import { breakIntoSteps } from '@/lib/ai/break-into-steps'
+import { usePro } from '@/hooks/use-pro'
+import { flagActionLabel, useToggleFlags } from '@/hooks/use-flag'
+import { useProUiStore } from '@/stores/pro-ui-store'
+import { useWhenChoices } from '@/hooks/use-when-choices'
+import { useDateFormat } from '@/hooks/use-date-format'
+import { formatWeekdayDay } from '@/lib/date-display'
+import { localDateOf, startOfLocalDay, toLocalDate } from '@/lib/due-dates'
+import { moveDay, moveStep, type MoveStepId } from '../../../shared/when-choices'
 
 interface TaskContextMenuProps {
   /** The right-clicked row — guarantees at least one target if the cache can't resolve the selection. */
@@ -57,11 +72,16 @@ interface TaskContextMenuProps {
   onClose: () => void
 }
 
-type SubMenu = 'date' | 'project' | 'label' | 'assign' | null
+type SubMenu = 'postpone' | 'date' | 'project' | 'label' | 'assign' | 'parent' | null
 
 export function TaskContextMenu({ fallbackTask, x, y, reorderable = false, onClose }: TaskContextMenuProps) {
   const scheduleRef = useRef<HTMLButtonElement>(null)
+  const postponeRef = useRef<HTMLButtonElement>(null)
+  const whenChoices = useWhenChoices()
+  const { t } = useTranslation()
   const projectRef = useRef<HTMLButtonElement>(null)
+  const parentRef = useRef<HTMLButtonElement>(null)
+  const subtaskAttach = useSubtaskAttach()
   const assignRef = useRef<HTMLButtonElement>(null)
   const access = useProjectAccessMap()
   const labelRef = useRef<HTMLButtonElement>(null)
@@ -89,6 +109,10 @@ export function TaskContextMenu({ fallbackTask, x, y, reorderable = false, onClo
   const stepTask = useTaskStep()
   const duplicate = useDuplicateTasks()
   const templateActions = useTemplateActions()
+  // Pro's flag (21.4), in the availability layer.
+  const flagsOn = usePro().layer('availability')
+  const triageOn = usePro().layer('portfolio')
+  const toggleFlags = useToggleFlags()
   const clearSelection = useSelectionStore((s) => s.clearSelection)
 
   // A picker closes the menu too once something was chosen. When the browser dismissed the picker
@@ -125,34 +149,66 @@ export function TaskContextMenu({ fallbackTask, x, y, reorderable = false, onClo
   )
 
   const hint = (spec: string) => shortcutHint(spec, window.api.platform === 'darwin')
+  const fmt = useDateFormat()
+  // "+1 week" for a selection (each moves from its own date), "+1 week · Fri 27" for one task.
+  const moveByLabel = (step: MoveStepId) => {
+    const label = moveStep(step).label
+    if (multi || isNullDate(tasks[0].due_date)) return label
+    const day = moveDay(localDateOf(tasks[0].due_date), step, toLocalDate(new Date()))
+    return `${label} \u00b7 ${formatWeekdayDay(startOfLocalDay(day), fmt)}`
+  }
   // The assistant's "Break into steps" (docs/ai-assistant-v1.md section 4): one saved task.
   const ai = useAiReady()
   const canBreak = ai.dictation && !multi && fallbackTask.id > 0 && !fallbackTask.done
+  // Cross-app semantics 24: under another task, or out of the one it is under.
+  const currentParent = multi ? null : parentIdOf(fallbackTask)
 
   return (
     <Menu
       anchorPoint={{ x, y }}
-      label={multi ? `${tasks.length} tasks` : 'Task actions'}
+      label={multi ? t('task.menu.count', { count: tasks.length }) : t('task.menu.actions')}
       onClose={onClose}
     >
-      {multi && <MenuHeading>{tasks.length} tasks</MenuHeading>}
+      {multi && <MenuHeading>{t('task.menu.count', { count: tasks.length })}</MenuHeading>}
 
       {/* When: the top entry follows the "What does urgent mean?" setting */}
       {urgencyImportant ? (
         <MenuItem icon={<Star />} onSelect={actions.setUrgentPriority}>
-          Set Important
+          {t('task.menu.setImportant')}
         </MenuItem>
       ) : (
         <MenuItem icon={<Sun />} shortcut={hint('Mod+T')} onSelect={actions.setDueToday}>
-          Set Today
+          {t('task.menu.setToday')}
         </MenuItem>
       )}
-      <MenuItem icon={<Sunrise />} onSelect={actions.postponeTomorrow}>
-        Postpone to tomorrow
+      <MenuItem
+        ref={postponeRef}
+        icon={<Sunrise />}
+        popup="menu"
+        expanded={sub === 'postpone'}
+        onSelect={() => setSub((s) => (s === 'postpone' ? null : 'postpone'))}
+      >
+        {t('when.postpone')}
       </MenuItem>
-      <MenuItem icon={<CalendarRange />} onSelect={actions.postponeNextMonday}>
-        Postpone to next Monday
-      </MenuItem>
+      {sub === 'postpone' && (
+        // Tomorrow and Next week keep each task's time; Move by moves each from its own due date
+        // (cross-app semantics 23.3). Rendered inside the menu, so it is a nested layer.
+        <Menu anchorRef={postponeRef} placement="right-start" label={t('when.postpone')} onClose={closeSubAndMenu}>
+          <MenuItem icon={<Sunrise />} onSelect={actions.postponeTomorrow}>
+            {t('when.tomorrow')}
+          </MenuItem>
+          <MenuItem icon={<CalendarRange />} onSelect={actions.postponeNextWeek}>
+            {t('when.nextWeek')}
+          </MenuItem>
+          {anyHasDate && whenChoices.moveBy.length > 0 && <MenuSeparator />}
+          {anyHasDate &&
+            whenChoices.moveBy.map((step) => (
+              <MenuItem key={step} icon={<CalendarClock />} onSelect={() => actions.moveTasksBy(step)}>
+                {moveByLabel(step)}
+              </MenuItem>
+            ))}
+        </Menu>
+      )}
       <MenuItem
         ref={scheduleRef}
         icon={<CalendarClock />}
@@ -160,20 +216,21 @@ export function TaskContextMenu({ fallbackTask, x, y, reorderable = false, onClo
         expanded={sub === 'date'}
         onSelect={() => setSub((s) => (s === 'date' ? null : 'date'))}
       >
-        Schedule
+        {t('task.menu.schedule')}
       </MenuItem>
       {sub === 'date' && (
         <DatePickerPopover
           anchorRef={scheduleRef}
           placement="right-start"
           currentDate={datePickerCurrent}
+          offerMoveBy={!multi}
           onDateChange={actions.setDueDateIso}
           onClose={closeSubAndMenu}
         />
       )}
       {anyHasDate && (
         <MenuItem icon={<CalendarX />} onSelect={actions.clearDate}>
-          Clear date
+          {t('task.menu.clearDate')}
         </MenuItem>
       )}
 
@@ -187,12 +244,12 @@ export function TaskContextMenu({ fallbackTask, x, y, reorderable = false, onClo
           checked={tasks.every((t) => t.priority === option.value)}
           onSelect={() => actions.setPriority(option.value)}
         >
-          {option.label}
+          {t(option.label)}
         </MenuRadioItem>
       ))}
       {anyHasPriority && (
         <MenuItem icon={<FlagOff />} onSelect={actions.clearPriority}>
-          Clear priority
+          {t('task.menu.clearPriority')}
         </MenuItem>
       )}
 
@@ -209,7 +266,7 @@ export function TaskContextMenu({ fallbackTask, x, y, reorderable = false, onClo
           }
           onSelect={() => actions.applyLabel(lastLabel.id)}
         >
-          {`Apply "${lastLabel.title}"`}
+          {t('task.menu.applyLabel', { label: lastLabel.title })}
         </MenuItem>
       )}
       <MenuItem
@@ -219,7 +276,7 @@ export function TaskContextMenu({ fallbackTask, x, y, reorderable = false, onClo
         expanded={sub === 'label'}
         onSelect={() => setSub((s) => (s === 'label' ? null : 'label'))}
       >
-        Apply label
+        {t('task.menu.applyLabelMore')}
       </MenuItem>
       {sub === 'label' && (
         <LabelPickerPopover
@@ -242,7 +299,7 @@ export function TaskContextMenu({ fallbackTask, x, y, reorderable = false, onClo
             actions.recordLastProject(lastProject.id)
           }}
         >
-          {`Move to "${lastProject.title}"`}
+          {t('task.menu.moveTo', { project: lastProject.title })}
         </MenuItem>
       )}
       <MenuItem
@@ -252,7 +309,7 @@ export function TaskContextMenu({ fallbackTask, x, y, reorderable = false, onClo
         expanded={sub === 'project'}
         onSelect={() => setSub((s) => (s === 'project' ? null : 'project'))}
       >
-        Move to project
+        {t('task.menu.moveToProject')}
       </MenuItem>
       {sub === 'project' && (
         <ProjectPickerPopover
@@ -266,6 +323,29 @@ export function TaskContextMenu({ fallbackTask, x, y, reorderable = false, onClo
           onClose={closeSubAndMenu}
         />
       )}
+      <MenuItem
+        ref={parentRef}
+        icon={<CornerDownRight />}
+        popup="dialog"
+        expanded={sub === 'parent'}
+        onSelect={() => setSub((s) => (s === 'parent' ? null : 'parent'))}
+      >
+        {t('task.attach.makeSubtaskOf')}
+      </MenuItem>
+      {sub === 'parent' && (
+        <SubtaskPickerPopover
+          anchorRef={parentRef}
+          mode="parent"
+          tasks={tasks}
+          onPick={(parent) => subtaskAttach.attach(tasks, parent)}
+          onClose={closeSubAndMenu}
+        />
+      )}
+      {currentParent !== null && (
+        <MenuItem icon={<CornerLeftUp />} onSelect={() => subtaskAttach.detach(fallbackTask, currentParent)}>
+          {t('task.attach.removeFromParent')}
+        </MenuItem>
+      )}
 
       {canAssign && (
         <MenuItem
@@ -275,7 +355,7 @@ export function TaskContextMenu({ fallbackTask, x, y, reorderable = false, onClo
           expanded={sub === 'assign'}
           onSelect={() => setSub((s) => (s === 'assign' ? null : 'assign'))}
         >
-          Assign
+          {t('task.menu.assign')}
         </MenuItem>
       )}
       {sub === 'assign' && (
@@ -284,18 +364,18 @@ export function TaskContextMenu({ fallbackTask, x, y, reorderable = false, onClo
 
       {canMoveUp && (
         <MenuItem icon={<ArrowUp />} shortcut={hint('Alt+Shift+↑')} onSelect={() => stepTask(fallbackTask.id, 'up')}>
-          Move up
+          {t('task.menu.moveUp')}
         </MenuItem>
       )}
       {canMoveDown && (
         <MenuItem icon={<ArrowDown />} shortcut={hint('Alt+Shift+↓')} onSelect={() => stepTask(fallbackTask.id, 'down')}>
-          Move down
+          {t('task.menu.moveDown')}
         </MenuItem>
       )}
 
       {canBreak && (
         <MenuItem icon={<Sparkles />} onSelect={() => breakIntoSteps(fallbackTask, projectData?.all.find((p) => p.id === fallbackTask.project_id)?.title)}>
-          Break into steps
+          {t('task.menu.breakIntoSteps')}
         </MenuItem>
       )}
 
@@ -303,7 +383,7 @@ export function TaskContextMenu({ fallbackTask, x, y, reorderable = false, onClo
 
       {/* Bulk-friendly actions */}
       <MenuItem icon={<Copy />} shortcut={hint('Mod+C')} onSelect={actions.copyAll}>
-        {multi ? 'Copy tasks' : 'Copy task'}
+        {t('task.menu.copyTask', { count: multi ? 2 : 1 })}
       </MenuItem>
       <MenuItem
         icon={<CopyPlus />}
@@ -313,11 +393,21 @@ export function TaskContextMenu({ fallbackTask, x, y, reorderable = false, onClo
           clearSelection()
         }}
       >
-        {multi ? 'Duplicate tasks' : 'Duplicate task'}
+        {t('task.menu.duplicateTask', { count: multi ? 2 : 1 })}
       </MenuItem>
       {anyNotDone && (
         <MenuItem icon={<CheckCircle2 />} shortcut={hint('Mod+K')} onSelect={actions.completeAll}>
-          {multi ? 'Complete tasks' : 'Complete task'}
+          {t('task.menu.completeTask', { count: multi ? 2 : 1 })}
+        </MenuItem>
+      )}
+      {triageOn && !multi && !fallbackTask.done && (
+        <MenuItem icon={<InboxIcon />} onSelect={() => useProUiStore.getState().setTriageTask(fallbackTask)}>
+          {t('task.menu.treatAsRequest')}
+        </MenuItem>
+      )}
+      {flagsOn && (
+        <MenuItem icon={<Flag />} shortcut={hint('Mod+Shift+F')} onSelect={() => toggleFlags(tasks)}>
+          {flagActionLabel(tasks)}
         </MenuItem>
       )}
 
@@ -331,11 +421,11 @@ export function TaskContextMenu({ fallbackTask, x, y, reorderable = false, onClo
             clearSelection()
           }}
         >
-          Save as template
+          {t('task.menu.saveAsTemplate')}
         </MenuItem>
       )}
       <MenuItem icon={<Trash2 />} danger shortcut={hint('Delete')} onSelect={actions.deleteAll}>
-        {multi ? 'Delete tasks' : 'Delete task'}
+        {t('task.menu.deleteTask', { count: multi ? 2 : 1 })}
       </MenuItem>
     </Menu>
   )

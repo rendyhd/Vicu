@@ -1,8 +1,12 @@
 import { handleTrusted } from '../secure-ipc'
+import { loadConfig } from '../config'
+import { isProAssistantOn } from '../../shared/pro/settings'
 import type { AiSettingsPatch, AskTurnRequest, KeptTranscript } from '../../shared/ai/types'
+import { t } from '../../shared/i18n'
 import { clearAiAccountData, dropKeptTranscript, flushAiLocalData, getConversations, getKeptTranscripts, keepTranscript, saveConversations } from './local-data'
-import { aiAskTurn, aiBrainDump, aiDictate, aiListModels, aiOrganize,
-  aiPlanDay, aiTestConnection, cancelAllAskTurns, cancelAskTurn } from './service'
+import { aiAskTurn, aiBrainDump, aiDictate, aiListModels, aiNotes, aiOrganize, aiProImport, aiPromiseDrafts,
+  aiPlanDay, aiReadPage, aiTestConnection, aiTestVision, cancelAllAskTurns, cancelAskTurn } from './service'
+import { clearNotesSession, flushNotesSession, registerNotesImportIpc } from '../notes-import'
 import { providerPreset, type ProviderId } from '../../shared/ai/contract'
 import {
   aiSettingsView,
@@ -62,18 +66,41 @@ export function registerAiIpc(): void {
   })
   handleTrusted('ai:list-models', () => aiListModels())
   handleTrusted('ai:test-connection', (_event, model: unknown) => aiTestConnection(typeof model === 'string' ? model : ''))
-  // A brain dump (4.8) is a dictation request with its own prompts and schema (`brainDump`).
-  handleTrusted('ai:dictate', async (_event, input: { requestId?: unknown; edit?: unknown; user?: unknown; brainDump?: unknown }) => {
+  // A brain dump (4.8) and notes (4.9) are dictation requests with their own prompts and schemas.
+  handleTrusted('ai:dictate', async (_event, input: { requestId?: unknown; edit?: unknown; user?: unknown; brainDump?: unknown; notes?: unknown }) => {
     const id = typeof input?.requestId === 'string' ? input.requestId : ''
     const controller = new AbortController()
     if (id) dictations.set(id, controller)
     try {
       const request = { edit: input?.edit === true, user: typeof input?.user === 'string' ? input.user : '' }
+      if (input?.notes === true) return await aiNotes(request, controller.signal)
       return await (input?.brainDump === true ? aiBrainDump(request, controller.signal) : aiDictate(request, controller.signal))
     } finally {
       if (id) dictations.delete(id)
     }
   })
+  // One page image read as text (4.9.2), cancelled like a dictation.
+  handleTrusted('ai:read-page', async (_event, input: { requestId?: unknown; image?: { media_type?: unknown; data?: unknown }; page?: unknown; pages?: unknown; title?: unknown }) => {
+    const image = input?.image
+    if (!image || typeof image.data !== 'string' || (image.media_type !== 'image/jpeg' && image.media_type !== 'image/png')) {
+      return { success: false as const, error: { kind: 'bad_request' as const, message: t('notes.notImage') } }
+    }
+    const id = typeof input?.requestId === 'string' ? input.requestId : ''
+    const controller = new AbortController()
+    if (id) dictations.set(id, controller)
+    try {
+      return await aiReadPage({
+        image: { media_type: image.media_type, data: image.data },
+        page: typeof input?.page === 'number' ? input.page : 1,
+        pages: typeof input?.pages === 'number' ? input.pages : 1,
+        title: typeof input?.title === 'string' ? input.title : '',
+      }, controller.signal)
+    } finally {
+      if (id) dictations.delete(id)
+    }
+  })
+  handleTrusted('ai:test-vision', (_event, model: unknown) => aiTestVision(typeof model === 'string' ? model : ''))
+  registerNotesImportIpc()
   handleTrusted('ai:cancel-dictation', (_event, id: unknown) => {
     const controller = typeof id === 'string' ? dictations.get(id) : undefined
     controller?.abort()
@@ -102,12 +129,28 @@ export function registerAiIpc(): void {
       if (id) dictations.delete(id)
     }
   })
+  // Pro (ai-assistant 11.1, 11.2): only while Pro's assistant switch is on.
+  const proRequest = async (run: typeof aiProImport, input: { requestId?: unknown; user?: unknown }) => {
+    if (!isProAssistantOn(loadConfig())) {
+      return { success: false as const, error: { kind: 'not_set_up' as const, message: t('system.ai.proAssistantOff') } }
+    }
+    const id = typeof input?.requestId === 'string' ? input.requestId : ''
+    const controller = new AbortController()
+    if (id) dictations.set(id, controller)
+    try {
+      return await run({ user: typeof input?.user === 'string' ? input.user : '' }, controller.signal)
+    } finally {
+      if (id) dictations.delete(id)
+    }
+  }
+  handleTrusted('ai:pro-import', (_event, input: { requestId?: unknown; user?: unknown }) => proRequest(aiProImport, input))
+  handleTrusted('ai:promise-drafts', (_event, input: { requestId?: unknown; user?: unknown }) => proRequest(aiPromiseDrafts, input))
   handleTrusted('ai:ask-start', (event, request: AskTurnRequest) => {
     const sender = event.sender
     if (!request || typeof request.turnId !== 'string' || !Array.isArray(request.messages)) return false
     void aiAskTurn(request, (turnEvent) => {
       if (!sender.isDestroyed()) sender.send('ai:ask-event', { turnId: request.turnId, event: turnEvent })
-    })
+    }, { proTools: isProAssistantOn(loadConfig()) })
     return true
   })
   handleTrusted('ai:ask-cancel', (_event, turnId: unknown) => typeof turnId === 'string' && cancelAskTurn(turnId))
@@ -137,12 +180,12 @@ export function registerAiIpc(): void {
 /** Sign-out and account switch (7.2): conversations and kept transcripts go; device settings stay. */
 export async function forgetAiAccountData(): Promise<void> {
   cancelAllAskTurns()
-  await clearAiAccountData()
+  await Promise.all([clearAiAccountData(), clearNotesSession()])
 }
 
 /** At quit: writes finished, native speech handles closed. */
 export async function shutdownAi(): Promise<void> {
   cancelAllAskTurns()
   for (const controller of dictations.values()) controller.abort()
-  await Promise.all([flushAiSettings(), flushAiLocalData(), shutdownSpeech()])
+  await Promise.all([flushAiSettings(), flushAiLocalData(), flushNotesSession(), shutdownSpeech()])
 }

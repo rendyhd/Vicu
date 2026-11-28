@@ -1,0 +1,448 @@
+import { useMemo, useRef, useState, type ReactNode, type RefObject } from 'react'
+import { useTranslation } from 'react-i18next'
+import { usePortfolio } from '@/hooks/use-portfolio'
+import { useQueryClient } from '@tanstack/react-query'
+import { CalendarClock, Flag, Handshake, Hourglass, Link2, Plus, Search, X } from 'lucide-react'
+import { cn } from '@/lib/cn'
+import { Popover } from '@/components/overlay/Popover'
+import { Tooltip } from '@/components/overlay/Tooltip'
+import { MonthCalendar } from '@/components/task-list/MonthCalendar'
+import { useToggleFlags } from '@/hooks/use-flag'
+import { blockersOf, useToggleAfter } from '@/hooks/use-relations'
+import { setRecord, useProLedger, writeLedger } from '@/hooks/use-pro-ledger'
+import { usePro } from '@/hooks/use-pro'
+import { usePromiseOf } from '@/hooks/use-promises'
+import { usePeople, usePersonLabels } from '@/hooks/use-people'
+import { useAddLabel, useUpdateTask } from '@/hooks/use-task-mutations'
+import { checkOnOf, promiseOf, readConfirmTitle } from '../../../shared/pro/promises'
+import { matchPerson } from '../../../shared/pro/people'
+import type { PromiseValue } from '../../../shared/pro/ledger'
+import { useTasks } from '@/hooks/use-tasks'
+import { OPEN_TASKS_PARAMS, useAvailability } from '@/hooks/use-availability'
+import { useDateFormat } from '@/hooks/use-date-format'
+import { formatLength } from '@/lib/planner-timeline'
+import { NULL_DATE } from '@/lib/constants'
+import type { Task } from '@/lib/vikunja-types'
+import { addLocalDays, nextWeekDay, toLocalDate } from '../../../shared/due-dates'
+import { dateOnlyStart, startDateOf, startDayOf } from '../../../shared/pro/start-dates'
+import { estimateOf } from '../../../shared/pro/ledger'
+import { formatWeekdayDate } from '../../../shared/date-display'
+import { blockOf } from '../../../shared/time-blocks'
+
+const BUTTON = 'inline-flex min-h-7 shrink-0 items-center gap-1 rounded-control px-2 text-meta transition-colors duration-fade-fast'
+const SET = 'border border-[var(--border-color)] text-text hover:bg-bg-hover'
+const UNSET = 'border border-transparent text-text-secondary hover:bg-bg-hover hover:text-text'
+const OPEN = 'border border-transparent bg-bg-selected text-accent-blue'
+
+type Open = 'start' | 'estimate' | 'after' | 'promise' | null
+
+function Chip({ prop, name, value, isSet, open, buttonRef, onClick, icon, unsetLabel, tip, shortcut }: {
+  prop: string
+  name: string
+  value?: string
+  isSet: boolean
+  open: boolean
+  buttonRef?: RefObject<HTMLButtonElement>
+  onClick: () => void
+  icon: ReactNode
+  unsetLabel: string
+  tip?: string
+  shortcut?: string
+}) {
+  const { t } = useTranslation()
+  return (
+    <Tooltip label={tip ?? name} shortcut={shortcut}>
+      <button
+        ref={buttonRef}
+        type="button"
+        data-prop={prop}
+        aria-label={isSet && value ? t('pro.cardChips.nameValue', { name, value }) : name}
+        aria-expanded={buttonRef ? open : undefined}
+        onClick={onClick}
+        className={cn(BUTTON, open ? OPEN : isSet ? SET : UNSET)}
+      >
+        {isSet ? (
+          <>
+            {icon}
+            {value && <span className="max-w-[12rem] truncate">{value}</span>}
+          </>
+        ) : (
+          <>
+            <Plus className="h-3 w-3" aria-hidden="true" />
+            <span>{unsetLabel}</span>
+          </>
+        )}
+      </button>
+    </Tooltip>
+  )
+}
+
+/**
+ * Pro's chips on an open card (cross-app semantics 21.2 to 21.4, plan 7.2.3): start date, estimate,
+ * after and flag. Shown only while the availability layer is on.
+ */
+export function ProCardChips({ task }: { task: Task }) {
+  const { t } = useTranslation()
+  const { on: availabilityOn } = useAvailability()
+  const promisesOn = usePro().layer('promises')
+  const promiseRef = useRef<HTMLButtonElement>(null)
+  const promise = usePromiseOf()(task)
+  const people = usePersonLabels()
+  const [open, setOpen] = useState<Open>(null)
+  const startRef = useRef<HTMLButtonElement>(null)
+  const estimateRef = useRef<HTMLButtonElement>(null)
+  const afterRef = useRef<HTMLButtonElement>(null)
+  const fmt = useDateFormat()
+  const toggleFlags = useToggleFlags()
+  const { ledger } = useProLedger()
+  if (!availabilityOn && !promisesOn) return null
+
+  const now = new Date()
+  const block = blockOf(task)
+  const start = startDateOf(task)
+  const estimate = estimateOf(ledger, task.id)
+  const blockers = blockersOf(task)
+  const toggle = (which: Exclude<Open, null>) => setOpen((current) => (current === which ? null : which))
+  const close = () => setOpen(null)
+
+  const promiseName = promise?.person != null ? people.get(promise.person)?.title ?? t('pro.cardChips.someone') : null
+  const promiseText = promise ? (promise.dir === 'mine' ? t('pro.promise.for', { name: promiseName }) : t('pro.promise.from', { name: promiseName })) : undefined
+
+  return (
+    <>
+      {promisesOn && (
+        <Chip
+          prop="pro-promise"
+          name={t('pro.cardChips.promise')}
+          tip={t('pro.cardChips.promiseTip')}
+          value={promiseText}
+          isSet={!!promise}
+          open={open === 'promise'}
+          buttonRef={promiseRef}
+          onClick={() => toggle('promise')}
+          icon={<Handshake className="h-3.5 w-3.5" aria-hidden="true" />}
+          unsetLabel={t('pro.cardChips.promise')}
+        />
+      )}
+      {open === 'promise' && <PromisePopover anchorRef={promiseRef} task={task} onClose={close} />}
+      {availabilityOn && (<>
+      {/* A block holds the start (21.3): no separate start date while the task has one. */}
+      {!block && (
+        <Chip
+          prop="pro-start"
+          name={t('pro.cardChips.startDate')}
+          tip={t('pro.cardChips.startTip')}
+          value={start ? t('pro.cardChips.starts', { date: formatWeekdayDate(start, now, fmt) }) : undefined}
+          isSet={!!start}
+          open={open === 'start'}
+          buttonRef={startRef}
+          onClick={() => toggle('start')}
+          icon={<CalendarClock className="h-3.5 w-3.5" aria-hidden="true" />}
+          unsetLabel={t('pro.cardChips.start')}
+        />
+      )}
+      {open === 'start' && <StartPopover anchorRef={startRef} task={task} onClose={close} />}
+
+      <Chip
+        prop="pro-estimate"
+        name={t('pro.cardChips.estimate')}
+        value={estimate !== null ? formatLength(estimate) : undefined}
+        isSet={estimate !== null}
+        open={open === 'estimate'}
+        buttonRef={estimateRef}
+        onClick={() => toggle('estimate')}
+        icon={<Hourglass className="h-3.5 w-3.5" aria-hidden="true" />}
+        unsetLabel={t('pro.cardChips.estimate')}
+      />
+      {open === 'estimate' && <EstimatePopover anchorRef={estimateRef} task={task} current={estimate} onClose={close} />}
+
+      <Chip
+        prop="pro-after"
+        name={t('pro.cardChips.after')}
+        tip={t('pro.cardChips.afterTip')}
+        value={blockers.length === 0 ? undefined : blockers.length === 1 ? t('pro.cardChips.afterOne', { title: blockers[0].title ?? t('pro.cardChips.aTask') }) : t('pro.cardChips.afterMany', { count: blockers.length })}
+        isSet={blockers.length > 0}
+        open={open === 'after'}
+        buttonRef={afterRef}
+        onClick={() => toggle('after')}
+        icon={<Link2 className="h-3.5 w-3.5" aria-hidden="true" />}
+        unsetLabel={t('pro.cardChips.after')}
+      />
+      {open === 'after' && <AfterPopover anchorRef={afterRef} task={task} onClose={close} />}
+
+      <Chip
+        prop="pro-flag"
+        name={t('pro.cardChips.flag')}
+        tip={task.is_favorite ? t('pro.cardChips.removeFlag') : t('pro.cardChips.flag')}
+        shortcut="Mod+Shift+F"
+        value={t('pro.cardChips.flagged')}
+        isSet={task.is_favorite === true}
+        open={false}
+        onClick={() => toggleFlags([task])}
+        icon={<Flag className="h-3.5 w-3.5 fill-accent-orange text-accent-orange" aria-hidden="true" />}
+        unsetLabel={t('pro.cardChips.flag')}
+      />
+      </>)}
+    </>
+  )
+}
+
+/**
+ * Makes the task a promise (21.6): from someone (theirs) or for someone (yours), with their words and
+ * how you will see it is done. A "Confirm with Jan: ..." task offers to become Jan's promise
+ * (decision 31): the title loses the prefix.
+ */
+function PromisePopover({ anchorRef, task, onClose }: { anchorRef: RefObject<HTMLElement | null>; task: Task; onClose: () => void }) {
+  const { t } = useTranslation()
+  const portfolio = usePortfolio()
+  const queryClient = useQueryClient()
+  const update = useUpdateTask()
+  const addLabel = useAddLabel()
+  const people = usePeople()
+  const personLabels = usePersonLabels()
+  const { ledger } = useProLedger()
+  const existing = promiseOf(ledger, task.id)
+  const confirm = readConfirmTitle(task.title)
+  const confirmPerson = confirm ? matchPerson(confirm.name, people).id : null
+  const [dir, setDir] = useState<'theirs' | 'mine'>(existing?.dir === 'mine' ? 'mine' : 'theirs')
+  const [person, setPerson] = useState<number | null>(existing?.person ?? confirmPerson)
+  const [words, setWords] = useState(existing?.words ?? '')
+  const [doneWhen, setDoneWhen] = useState(existing?.done_when ?? '')
+  const [initiative, setInitiative] = useState<number | null>(existing?.initiative ?? null)
+  const [checkOn, setCheckOn] = useState<string>(checkOnOf(existing) ?? '')
+  const [noCheck, setNoCheck] = useState(existing?.no_check === true)
+
+  const save = (retitle: boolean) => {
+    if (person === null) return
+    const value: PromiseValue = { ...(existing ?? {}), dir, person }
+    value.words = words.trim() || null
+    value.done_when = doneWhen.trim() || null
+    if (/^\d{4}-\d{2}-\d{2}$/.test(checkOn)) value.check_on = checkOn
+    else delete value.check_on
+    if (noCheck) value.no_check = true
+    else delete value.no_check
+    if (initiative === null) delete value.initiative
+    else value.initiative = initiative
+    void writeLedger(queryClient, [setRecord('promises', task.id, value)])
+    if (!(task.labels ?? []).some((label) => label.id === person)) addLabel.mutate({ taskId: task.id, labelId: person })
+    if (retitle && confirm) update.mutate({ id: task.id, changes: { title: confirm.what }, original: task })
+    onClose()
+  }
+
+  return (
+    <Popover anchorRef={anchorRef} onClose={onClose} label={t('pro.cardChips.promise')} role="dialog" className="w-80 space-y-2 p-3">
+      {confirm && confirmPerson !== null && !existing && (
+        <button type="button" className="w-full rounded-control bg-accent-blue/12 px-2 py-1.5 text-left text-meta font-medium text-accent-blue" onClick={() => save(true)}>
+          {t('pro.cardChips.makeTheirPromise', { name: confirm.name })}
+        </button>
+      )}
+      <div className="flex gap-1" role="radiogroup" aria-label={t('pro.cardChips.direction')}>
+        {(['theirs', 'mine'] as const).map((value) => (
+          <button
+            key={value}
+            type="button"
+            role="radio"
+            aria-checked={dir === value}
+            onClick={() => setDir(value)}
+            className={dir === value ? 'rounded-chip border border-accent-blue bg-accent-blue/12 px-2 py-0.5 text-meta text-accent-blue' : 'rounded-chip border border-border px-2 py-0.5 text-meta text-text-secondary hover:bg-bg-hover'}
+          >
+            {value === 'theirs' ? t('pro.cardChips.theyPromised') : t('pro.cardChips.iPromised')}
+          </button>
+        ))}
+      </div>
+      <select value={person ?? ''} onChange={(event) => setPerson(event.target.value ? Number(event.target.value) : null)} aria-label={t('pro.cardChips.person')} className="w-full rounded-control border border-border bg-bg-page px-2 py-1 text-meta text-text">
+        <option value="">{t('pro.cardChips.choosePerson')}</option>
+        {[...personLabels.values()].map((label) => <option key={label.id} value={label.id}>{label.title}</option>)}
+      </select>
+      {personLabels.size === 0 && <p className="text-caption text-text-secondary">{t('pro.cardChips.markPersonFirst')}</p>}
+      <input value={words} onChange={(event) => setWords(event.target.value)} placeholder={dir === 'theirs' ? t('pro.cardChips.inTheirWords') : t('pro.cardChips.whatYouSaid')} aria-label={t('pro.cardChips.words')} className="w-full rounded-control border border-border bg-bg-page px-2 py-1 text-meta text-text" />
+      <input value={doneWhen} onChange={(event) => setDoneWhen(event.target.value)} placeholder={t('pro.cardChips.doneWhenPlaceholder')} aria-label={t('pro.cardChips.doneWhen')} className="w-full rounded-control border border-border bg-bg-page px-2 py-1 text-meta text-text" />
+      {(portfolio.ranked.length > 0 || initiative !== null) && (
+        <select value={initiative ?? ''} onChange={(event) => setInitiative(event.target.value ? Number(event.target.value) : null)} aria-label={t('pro.groundwork.initiative')} className="w-full rounded-control border border-border bg-bg-page px-2 py-1 text-meta text-text">
+          <option value="">{t('pro.groundwork.initiative')}: {t('pro.groundwork.initiativeNone')}</option>
+          {initiative !== null && !portfolio.ranked.some((entry) => entry.projectId === initiative) && <option value={initiative}>{portfolio.titleOf(initiative)}</option>}
+          {portfolio.ranked.map((entry) => <option key={entry.projectId} value={entry.projectId}>{portfolio.titleOf(entry.projectId)}</option>)}
+        </select>
+      )}
+      <label className="flex items-center gap-2 text-meta text-text-secondary">
+        <span className="shrink-0">{t('pro.followUps.promise.checkOn')}</span>
+        <input type="date" value={checkOn} onChange={(event) => setCheckOn(event.target.value)} aria-label={t('pro.followUps.promise.checkOn')} data-pro-check-on className="min-w-0 flex-1 rounded-control border border-border bg-bg-page px-2 py-1 text-meta text-text" />
+      </label>
+      <label className="flex items-center gap-2 text-meta text-text-secondary">
+        <input type="checkbox" checked={noCheck} onChange={(event) => setNoCheck(event.target.checked)} data-pro-no-check />
+        {t('pro.followUps.promise.noCheck')}
+      </label>
+      <div className="flex justify-between gap-2">
+        {existing ? (
+          <button type="button" className="rounded-control px-2 py-1 text-meta text-danger hover:bg-danger/10" onClick={() => { void writeLedger(queryClient, [setRecord('promises', task.id, null)]); onClose() }}>
+            {t('pro.cardChips.notAPromise')}
+          </button>
+        ) : <span />}
+        <button type="button" disabled={person === null} className="rounded-control bg-accent-fill px-3 py-1 text-meta font-medium text-on-accent disabled:opacity-40" onClick={() => save(false)}>{t('pro.common.save')}</button>
+      </div>
+    </Popover>
+  )
+}
+
+function StartPopover({ anchorRef, task, onClose }: { anchorRef: RefObject<HTMLElement | null>; task: Task; onClose: () => void }) {
+  const { t } = useTranslation()
+  const update = useUpdateTask()
+  const today = toLocalDate(new Date())
+  const current = startDayOf(task)
+  const set = (day: string | null) => {
+    update.mutate({ id: task.id, changes: { start_date: day ? dateOnlyStart(day) : NULL_DATE }, original: task })
+    onClose()
+  }
+  const nextMonday = nextWeekDay(today)
+  const choices: Array<{ label: string; day: string }> = [
+    { label: t('pro.cardChips.tomorrow'), day: addLocalDays(today, 1) },
+    { label: t('pro.cardChips.nextWeek'), day: nextMonday },
+    { label: t('pro.cardChips.inTwoWeeks'), day: addLocalDays(today, 14) },
+  ]
+  return (
+    <Popover anchorRef={anchorRef} onClose={onClose} label={t('pro.cardChips.startDate')} role="dialog" className="w-72 p-2">
+      <div className="mb-2 flex flex-wrap gap-1">
+        {choices.map((choice) => (
+          <button key={choice.label} type="button" className="rounded-chip border border-border px-2 py-0.5 text-meta text-text hover:bg-bg-hover" onClick={() => set(choice.day)}>
+            {choice.label}
+          </button>
+        ))}
+      </div>
+      <MonthCalendar selected={current} today={today} onPick={(day) => set(day)} />
+      {current && (
+        <button type="button" className="mt-2 w-full rounded-control px-2 py-1 text-left text-meta text-danger hover:bg-danger/10" onClick={() => set(null)}>
+          {t('pro.cardChips.removeStart')}
+        </button>
+      )}
+      <p className="mt-2 text-caption text-text-secondary">{t('pro.cardChips.startNote')}</p>
+    </Popover>
+  )
+}
+
+const ESTIMATES = [5, 15, 30, 60, 90, 120, 240]
+
+function EstimatePopover({ anchorRef, task, current, onClose }: { anchorRef: RefObject<HTMLElement | null>; task: Task; current: number | null; onClose: () => void }) {
+  const { t } = useTranslation()
+  const queryClient = useQueryClient()
+  const [typed, setTyped] = useState('')
+  const set = (minutes: number | null) => {
+    void writeLedger(queryClient, [{ op: 'estimate', taskId: task.id, minutes }])
+    onClose()
+  }
+  return (
+    <Popover anchorRef={anchorRef} onClose={onClose} label={t('pro.cardChips.estimate')} role="dialog" className="w-64 p-2">
+      <div className="flex flex-wrap gap-1">
+        {ESTIMATES.map((minutes) => (
+          <button
+            key={minutes}
+            type="button"
+            aria-pressed={current === minutes}
+            className={cn('rounded-chip border px-2 py-0.5 text-meta', current === minutes ? 'border-accent-blue bg-accent-blue/12 text-accent-blue' : 'border-border text-text hover:bg-bg-hover')}
+            onClick={() => set(minutes)}
+          >
+            {formatLength(minutes)}
+          </button>
+        ))}
+      </div>
+      <form
+        className="mt-2 flex items-center gap-1"
+        onSubmit={(event) => {
+          event.preventDefault()
+          const minutes = Math.round(Number(typed))
+          if (minutes >= 1 && minutes <= 24 * 60) set(minutes)
+        }}
+      >
+        <input
+          type="number"
+          min={1}
+          max={1440}
+          value={typed}
+          onChange={(event) => setTyped(event.target.value)}
+          placeholder={t('pro.cardChips.minutes')}
+          aria-label={t('pro.cardChips.minutes')}
+          className="w-24 rounded-control border border-border bg-bg-page px-2 py-1 text-meta text-text"
+        />
+        <button type="submit" className="rounded-control px-2 py-1 text-meta font-medium text-accent-blue hover:bg-bg-hover">{t('pro.cardChips.set')}</button>
+      </form>
+      {current !== null && (
+        <button type="button" className="mt-2 w-full rounded-control px-2 py-1 text-left text-meta text-danger hover:bg-danger/10" onClick={() => set(null)}>
+          {t('pro.cardChips.removeEstimate')}
+        </button>
+      )}
+    </Popover>
+  )
+}
+
+function AfterPopover({ anchorRef, task, onClose }: { anchorRef: RefObject<HTMLElement | null>; task: Task; onClose: () => void }) {
+  const { t } = useTranslation()
+  const toggle = useToggleAfter()
+  const { data: open = [] } = useTasks(OPEN_TASKS_PARAMS)
+  const { cycles } = useAvailability()
+  const [query, setQuery] = useState('')
+  const blockers = blockersOf(task)
+  const blockerIds = new Set(blockers.map((entry) => entry.id))
+  const matches = useMemo(() => {
+    const words = query.trim().toLowerCase()
+    if (!words) return []
+    return open
+      .filter((other) => other.id !== task.id && !blockerIds.has(other.id) && other.title.toLowerCase().includes(words))
+      .slice(0, 8)
+  }, [open, query, task.id, blockerIds])
+
+  return (
+    <Popover anchorRef={anchorRef} onClose={onClose} label={t('pro.cardChips.after')} role="dialog" className="w-80 p-2" initialFocus="input">
+      <p className="mb-2 text-caption text-text-secondary">{t('pro.cardChips.afterIntro')}</p>
+      {blockers.length > 0 && (
+        <ul className="mb-2 space-y-0.5">
+          {blockers.map((entry) => (
+            <li key={entry.id} className="flex items-center gap-2 rounded-control px-1 py-0.5 text-meta text-text">
+              <Link2 className="h-3 w-3 shrink-0 text-text-secondary" aria-hidden="true" />
+              <span className="min-w-0 flex-1 truncate">{entry.title ?? t('pro.cardChips.taskFallback', { id: entry.id })}</span>
+              <button
+                type="button"
+                aria-label={t('pro.cardChips.stopWaiting', { title: entry.title ?? t('pro.cardChips.thisTask') })}
+                className="rounded-control p-0.5 text-text-secondary hover:bg-bg-hover hover:text-text"
+                onClick={() => toggle.mutate({ task, other: { id: entry.id, title: entry.title ?? '', done: !!entry.done }, add: false })}
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {cycles.includes(task.id) && (
+        <p className="mb-2 text-caption text-status-overdue">{t('pro.cardChips.loop')}</p>
+      )}
+      <label className="flex items-center gap-1.5 rounded-control border border-border px-2 py-1">
+        <Search className="h-3 w-3 text-text-secondary" aria-hidden="true" />
+        <input
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder={t('pro.cardChips.findTask')}
+          aria-label={t('pro.cardChips.findTaskToWait')}
+          className="min-w-0 flex-1 bg-transparent text-meta text-text outline-none"
+        />
+      </label>
+      {matches.length > 0 && (
+        <ul className="mt-1 max-h-56 overflow-y-auto" role="listbox" aria-label={t('pro.cardChips.tasks')}>
+          {matches.map((other) => (
+            <li key={other.id}>
+              <button
+                type="button"
+                role="option"
+                aria-selected={false}
+                className="w-full truncate rounded-control px-2 py-1 text-left text-meta text-text hover:bg-bg-hover"
+                onClick={() => {
+                  toggle.mutate({ task, other: { id: other.id, title: other.title, done: other.done }, add: true })
+                  setQuery('')
+                }}
+              >
+                {other.title}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Popover>
+  )
+}

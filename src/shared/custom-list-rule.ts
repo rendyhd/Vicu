@@ -7,8 +7,10 @@
  * terms Vicu does not support (`withoutTerms`) before `checkRule` decides whether it is valid.
  * `compileRule` turns a valid rule into a predicate for one moment, in the process time zone.
  *
- * No imports, so any tsconfig can include it.
+ * It imports only `week-start.ts`, a sibling without imports, so any tsconfig can include it.
  */
+
+import { daysIntoWeek, getWeekStart, type WeekStart } from './week-start'
 
 export const MAX_RULE_BYTES = 16 * 1024
 export const MAX_RULE_DEPTH = 100
@@ -455,7 +457,7 @@ function add(date: Date, amount: number, unit: string): Date | null {
   }
 }
 
-function roundDown(date: Date, unit: string): Date | null {
+function roundDown(date: Date, unit: string, weekStart: WeekStart): Date | null {
   const y = date.getFullYear()
   const mo = date.getMonth()
   const d = date.getDate()
@@ -465,8 +467,8 @@ function roundDown(date: Date, unit: string): Date | null {
     case 'M':
       return new Date(y, mo, 1)
     case 'w':
-      // Weeks start on Monday.
-      return new Date(y, mo, d - ((date.getDay() + 6) % 7))
+      // Weeks start on Monday, or on the account's week start (section 2.1).
+      return new Date(y, mo, d - daysIntoWeek(date.getDay() || 7, weekStart))
     case 'd':
       return new Date(y, mo, d)
     case 'h':
@@ -482,7 +484,7 @@ function roundDown(date: Date, unit: string): Date | null {
 }
 
 /** A date value of section 3.5 at the moment `now`, in the process time zone; null when it does not read. */
-export function parseRuleDate(text: string, now: Date): Date | null {
+export function parseRuleDate(text: string, now: Date, weekStart: WeekStart = getWeekStart()): Date | null {
   const t = text.trim()
   let moment: Date | null
   let steps: string
@@ -503,7 +505,7 @@ export function parseRuleDate(text: string, now: Date): Date | null {
     if (sign === '/') {
       const unit = steps[i + 1]
       if (unit === undefined || unit === 'b') return null
-      moment = roundDown(moment, unit)
+      moment = roundDown(moment, unit, weekStart)
       if (moment === null) return null
       i += 2
       continue
@@ -642,9 +644,9 @@ const assigneesOf = (task: RuleTask) => (task.assignees ?? []).map((person) => p
 const remindersOf = (task: RuleTask) =>
   (task.reminders ?? []).map((r) => instantOf(r.reminder)).filter((ms): ms is number => ms !== null)
 
-function datesOf(term: RuleTerm, now: Date): number[] {
+function datesOf(term: RuleTerm, now: Date, weekStart: WeekStart = getWeekStart()): number[] {
   const texts = isList(term.op) ? termItems(term) : [term.value]
-  return texts.map((text) => (parseRuleDate(text, now) as Date).getTime())
+  return texts.map((text) => (parseRuleDate(text, now, weekStart) as Date).getTime())
 }
 
 function many<T extends number | string>(op: RuleOp, nulls: boolean, wanted: T[], of: (task: RuleTask) => T[]): Check {
@@ -658,7 +660,7 @@ function many<T extends number | string>(op: RuleOp, nulls: boolean, wanted: T[]
   }
 }
 
-function manyRange(kind: Kind, run: RuleTerm[], nulls: boolean, now: Date): Check {
+function manyRange(kind: Kind, run: RuleTerm[], nulls: boolean, now: Date, weekStart: WeekStart = getWeekStart()): Check {
   if (kind === 'labels') {
     const wanted = run.map((t) => [t.op, parseWhole(t.value)] as const)
     return (task) => {
@@ -673,14 +675,14 @@ function manyRange(kind: Kind, run: RuleTerm[], nulls: boolean, now: Date): Chec
       return values.some((v) => wanted.every(([op, w]) => compare(op, v, w))) || (nulls && values.length === 0)
     }
   }
-  const wanted = run.map((t) => [t.op, datesOf(t, now)[0]] as const)
+  const wanted = run.map((t) => [t.op, datesOf(t, now, weekStart)[0]] as const)
   return (task) => {
     const values = remindersOf(task)
     return values.some((v) => wanted.every(([op, w]) => compare(op, v, w))) || (nulls && values.length === 0)
   }
 }
 
-function compileTerm(term: RuleTerm, kind: Kind, nulls: boolean, now: Date): Check {
+function compileTerm(term: RuleTerm, kind: Kind, nulls: boolean, now: Date, weekStart: WeekStart = getWeekStart()): Check {
   const { op, field } = term
   const texts = isList(op) ? termItems(term) : [term.value]
   switch (kind) {
@@ -700,7 +702,7 @@ function compileTerm(term: RuleTerm, kind: Kind, nulls: boolean, now: Date): Che
       return (task) => passes(op, task.percent_done ?? 0, wanted)
     }
     case 'date': {
-      const wanted = datesOf(term, now)
+      const wanted = datesOf(term, now, weekStart)
       return (task) => {
         const value = dateOf(task, field)
         return value === null ? nulls : passes(op, value, wanted)
@@ -717,7 +719,7 @@ function compileTerm(term: RuleTerm, kind: Kind, nulls: boolean, now: Date): Che
     case 'users':
       return many(op, nulls, termItems(term).filter((item) => item !== ''), assigneesOf)
     case 'reminders':
-      return many(op, nulls, datesOf(term, now), remindersOf)
+      return many(op, nulls, datesOf(term, now, weekStart), remindersOf)
     case 'creator': {
       const wanted = termItems(term).filter((item) => item !== '')
       return (task) => {
@@ -729,14 +731,14 @@ function compileTerm(term: RuleTerm, kind: Kind, nulls: boolean, now: Date): Che
 }
 
 /** Null when nothing in the group counts (every term skipped). */
-function compileGroup(group: RuleGroup, nulls: boolean, now: Date): Check | null {
+function compileGroup(group: RuleGroup, nulls: boolean, now: Date, weekStart: WeekStart = getWeekStart()): Check | null {
   const parts: Array<[RuleJoin, Check]> = []
   const items = group.items
   for (let i = 0; i < items.length; i++) {
     const item = items[i]
     const node = item.node
     if (node.kind === 'group') {
-      const inner = compileGroup(node, nulls, now)
+      const inner = compileGroup(node, nulls, now, weekStart)
       if (inner) parts.push([item.join, inner])
       continue
     }
@@ -751,9 +753,9 @@ function compileGroup(group: RuleGroup, nulls: boolean, now: Date): Check | null
         run.push(next.node)
         i++
       }
-      parts.push([item.join, manyRange(kind, run, nulls, now)])
+      parts.push([item.join, manyRange(kind, run, nulls, now, weekStart)])
     } else {
-      parts.push([item.join, compileTerm(node, kind, nulls, now)])
+      parts.push([item.join, compileTerm(node, kind, nulls, now, weekStart)])
     }
   }
   if (parts.length === 0) return null
@@ -771,11 +773,11 @@ function compileGroup(group: RuleGroup, nulls: boolean, now: Date): Check | null
  * The predicate of a rule at `now` (in the process time zone). `includeNulls` is the list's
  * `rule_include_nulls`. An invalid rule matches no task; an empty one every task.
  */
-export function compileRule(text: string | null | undefined, includeNulls: boolean, now: Date): (task: RuleTask) => boolean {
+export function compileRule(text: string | null | undefined, includeNulls: boolean, now: Date, weekStart: WeekStart = getWeekStart()): (task: RuleTask) => boolean {
   if (!text || text.trim() === '') return () => true
   const parsed = parseRule(text)
   if (!parsed.ok || checkRule(parsed.root) !== null) return () => false
-  return compileGroup(parsed.root, includeNulls, now) ?? (() => true)
+  return compileGroup(parsed.root, includeNulls, now, weekStart) ?? (() => true)
 }
 
 // --- Writing ------------------------------------------------------------------------------
@@ -837,6 +839,15 @@ export function ruleTerms(text: string): RuleTerm[] {
 }
 
 /** Whether `text` has a `like` term (the server cannot be asked for it, section 3.5). */
+/**
+ * Whether the rule rounds a date to a week (`/w`). With a week start other than Monday the server
+ * cannot be asked for such a rule: it has its own week (section 3.5).
+ */
+export function ruleUsesWeekRounding(text: string | null | undefined): boolean {
+  if (!text || text.trim() === '') return false
+  return ruleTerms(text).some((term) => term.value.includes('/w'))
+}
+
 export function ruleUsesLike(text: string | null | undefined): boolean {
   if (!text || text.trim() === '') return false
   return ruleTerms(text).some((term) => term.op === 'like')

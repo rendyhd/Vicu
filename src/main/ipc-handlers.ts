@@ -1,48 +1,27 @@
-import { shell, dialog, app, nativeTheme } from 'electron'
+import { getProLedger, mutateProLedger, syncProLedger } from './pro-ledger-service'
+import { shell, dialog, app, nativeTheme, nativeImage, clipboard as electronClipboard, ClipboardItem as ElectronClipboardItem } from 'electron'
+import { currentWorkMode, currentWorkScope } from './work-scope-service'
+import { isProEnabled } from '../shared/pro/settings'
+import { quickPromiseValue } from '../shared/pro/quick-promise'
+import { personLabelIds } from '../shared/pro/prefs'
+import { recordValue } from '../shared/pro/ledger'
 import { handleTrusted } from './secure-ipc'
 import { tokenForConnectionTest } from './connection-test-token'
-import { isExternalAllowed } from './web-security-policy'
+import { isDeepLinkAllowed, safeExternalUrl } from './web-security-policy'
+import { markFromInternet } from './attachment-origin'
 import { readUploadAnswer } from '../shared/attachment-upload'
 import { isRiskyAttachment, sanitizeAttachmentFileName } from './attachment-safety'
 import { ensureAttachmentTempDir } from './attachment-temp'
 import { saveAttachment } from './attachment-save'
 import * as fs from 'fs'
 import * as path from 'path'
-import {
-  fetchTasks,
-  createTask,
-  updateTask,
-  patchTaskJson,
-  deleteTask,
-  fetchTaskById,
-  createTaskRelation,
-  deleteTaskRelation,
-  fetchProjects,
-  fetchProjectsAndSavedFilters,
-  fetchProjectById,
-  createProject,
-  updateProject,
-  deleteProject,
-  fetchLabels,
-  addLabelToTask,
-  removeLabelFromTask,
-  createLabel,
-  updateLabel,
-  deleteLabel,
-  testConnection,
-  fetchProjectViews,
-  fetchViewTasks,
-  updateTaskPosition,
-  fetchTaskAttachments,
-  uploadTaskAttachment,
-  checkUploadSize as checkSize,
-  deleteTaskAttachment,
-  downloadTaskAttachment,
-} from './api-client'
+import { fetchTasks, createTask, updateTask, fetchTaskById, testConnection, fetchProjectViews, fetchViewTasks, uploadTaskAttachment, checkUploadSize as checkSize, downloadTaskAttachment } from './api-client'
 import { loadFileForUpload } from './upload-file'
+import { PickedFiles } from './picked-files'
 import { getLaunchOnStartupSupport } from './launch-on-startup'
 import { startupEnv } from './startup-env'
 import { announceDateFormatIfChanged, dateFormatForWindow } from './date-format'
+import { applyLanguage, languageForWindow } from './i18n'
 import {
   applyConfigPatch,
   applyConnectionFields,
@@ -54,60 +33,28 @@ import {
   type ConnectionFields,
 } from './config'
 import { directoryFromSelectedFile, resolveDialogDefaultPath } from './dialog-path'
-import {
-  deleteCustomList,
-  getCustomLists,
-  discardUnsyncedCustomListChanges,
-  getCustomListSyncStatus,
-  hasUnsyncedCustomListChanges,
-  reorderCustomLists,
-  syncCustomLists,
-  upsertCustomList,
-} from './custom-list-service'
-import {
-  discardUnsyncedPreferenceChanges,
-  getSyncedPrefs,
-  getSyncedPrefsStatus,
-  hasUnsyncedPreferenceChanges,
-  inboxChosenAtSetup,
-  readSetupPreferences,
-  setSyncedPreference,
-  setSyncedPreferences,
-  syncSyncedPrefs,
-} from './synced-preferences'
+import { syncCustomLists } from './custom-list-service'
+import { getSyncedPrefs, inboxChosenAtSetup, readSetupPreferences, setSyncedPreference } from './synced-preferences'
 import { readSyncedPlaces } from '../shared/synced-prefs'
 import { quickEntryLocationReminder } from './quick-entry/location-reminder'
-import type { CustomListWire } from './custom-list-protocol'
-import {
-  closeImportNotice,
-  dismissSavedFilters,
-  getSavedFilterState,
-  importSavedFilters,
-  previewSavedFilters,
-  recordKnownSavedFilters,
-} from './saved-filter-service'
 
-/** A list of saved-filter ids from the renderer: at most 500 whole numbers of 0 or more. */
-function isIdList(value: unknown): value is number[] {
-  return Array.isArray(value) && value.length <= 500 && value.every((id) => typeof id === 'number' && Number.isInteger(id) && id >= 0)
-}
-import type { UnsyncedDocuments } from '../shared/config-types'
 import { hasVicuMetadataMarker } from './custom-list-protocol'
 import { discoverProviders, discoverAuthMethods } from './auth/oidc-discovery'
 import { fetchCurrentUser } from './auth/user-info'
+import { WEEK_START_KEY, readWeekStart } from '../shared/week-start'
+import { WHEN_TIMES_KEY, readTimes } from '../shared/when-choices'
 import { authManager } from './auth/auth-manager'
 import { OidcPasskeyUnavailableError, OidcTotpRequiredError } from './auth/oidc-login'
 import { cancelBrowserLogin } from './auth/oidc-browser-login'
 import { BrowserSignInCancelledError } from './auth/loopback-callback'
 import { buildViewerFilterParams } from './quick-entry/filter-builder'
-import { forgetDeletedTask, loadRoutineCarriers, rememberCreatedTask } from './carrier-service'
-import { countProjectTasks, invalidateProjectCounts } from './project-counts-service'
+import { invalidateProjectCounts } from './project-counts-service'
 import { dueToday } from '../shared/due-dates'
 import { withDueChangeRules } from '../shared/time-blocks'
 import { COLLAB_SIGNALS_PARAM, KEEP_NESTED_SUBTASKS_PARAM } from './api-v2'
 import { hasCollaborationCondition, needsCommentSignals, type CustomListContext } from '../shared/custom-list-filter'
 import { fetchPositionSortedTasks } from './quick-entry/position-sort'
-import { activeProjects, invalidateViewerCaches, projectListViewIds, viewerCollab } from './quick-entry/viewer-caches'
+import { activeProjects, projectListViewIds, viewerCollab } from './quick-entry/viewer-caches'
 import { cachedFallback } from './quick-entry/fetch-fallback'
 import { resolveViewerFilter, selectQuickViewTasks } from './quick-entry/viewer-filter'
 import {
@@ -122,8 +69,7 @@ import {
   getLastShortcutStatus,
 } from './quick-entry-state'
 import { getAPIToken, getOidcSignInMode, getProviderKey, getSecretStorageStatus, storeAPIToken, API_TOKEN_NO_EXPIRY } from './auth/token-store'
-import { sendTestNotification, rescheduleNotifications, refreshTaskRemindersSoon, refreshRoutineReminders } from './notifications'
-import { setTaskBadge, clearTaskBadge } from './badge'
+import { setTaskBadge, clearTaskBadge, openBadgeNotificationSettings } from './badge'
 import { resolveShownObsidianLink, testObsidianConnection } from './obsidian-client'
 import { isRegistered, registerHosts } from './browser-host-registration'
 import { checkForUpdates, getCachedUpdateStatus } from './update-checker'
@@ -139,20 +85,23 @@ import { uploadStandaloneTasks } from './standalone-upload'
 import { getOfflineQueue, knownUserIdFor, rememberKnownUser } from './offline/service'
 import { registerOfflineQueueIpc } from './offline/ipc'
 import { registerCollaborationIpc } from './collab-ipc'
+import { registerPortableHandlers } from './handlers/portable'
 import { registerVoiceIpc } from './voice/service'
 import { forgetAiAccountData, registerAiIpc } from './ai/ipc'
+import { registerCalendarIpc } from './calendar/service'
 import { accountChanged, refreshKnownUser, replayPendingActions } from './sync'
-import { claimAccountData, ensureKnownUserId } from './known-user'
+import { claimAccountData } from './known-user'
 import {
   createFromQuickEntry,
   quickEntryTaskPayload,
+  withWorkLabel,
   queueQuickEntryFollowUps,
   quickViewComplete,
   quickViewPatch,
   quickViewReopen,
   type QuickActionDeps,
 } from './offline/quick-actions'
-import { parseTaskWriteOptions, sendSerially, taskWriteReply, taskWrites, writeTask } from './offline/task-writes'
+import { taskWrites, writeTask } from './offline/task-writes'
 import {
   setCachedTasks,
   getCachedTasks,
@@ -183,7 +132,7 @@ function requestReplay(): void {
 function quickActionDeps(): QuickActionDeps {
   return {
     queue: getOfflineQueue(),
-    api: { createTask, updateTask },
+    api: { createTask, updateTask, fetchTaskById },
     notifyMainWindow: () => {
       // Every Quick Entry create and Quick View completion or reopening ends here on success, and
       // each one moves a project's counts; the project is not known at this level.
@@ -194,19 +143,15 @@ function quickActionDeps(): QuickActionDeps {
   }
 }
 
-const JSON_PATCH_OPS: ReadonlySet<string> = new Set(['test', 'replace', 'add', 'remove'])
-
-/** A JSON Patch the renderer may send: a short list of `test`/`replace`/`add`/`remove` on top-level fields. */
-function isJsonPatch(value: unknown): value is Array<{ op: string; path: string; value?: unknown }> {
-  return Array.isArray(value) && value.length > 0 && value.length <= 32 && value.every((op) =>
-    !!op && typeof op === 'object' && !Array.isArray(op) &&
-    JSON_PATCH_OPS.has((op as { op?: unknown }).op as string) &&
-    typeof (op as { path?: unknown }).path === 'string' && /^\/[a-z_]+$/.test((op as { path: string }).path))
-}
-
 /** Every change to an existing task goes through the write gate (see offline/task-writes.ts). */
 function taskWriteDeps() {
   return { queue: getOfflineQueue(), requestReplay }
+}
+
+/** What work is on this account right now, from the cached project list (never a request per task). */
+async function currentScopeFor(config: AppConfig) {
+  const projects = (await activeProjects.list(config.vikunja_url)) ?? []
+  return currentWorkScope(getSyncedPrefs().values, projects, config.inbox_project_id)
 }
 
 // Config keys that only record UI state. Changing just these needs no badge refresh,
@@ -216,6 +161,9 @@ const QUIET_PATCH_KEYS: ReadonlySet<string> = new Set([
   'sidebar_collapsed_projects',
   'sidebar_collapsed_categories',
   'sidebar_hidden_lists',
+  'sidebar_order',
+  'sidebar_pro_collapsed',
+  'sidebar_hidden',
   'window_bounds',
   'last_used_project_id',
   'last_used_label_id',
@@ -236,6 +184,8 @@ function persistConfig(config: AppConfig, announce = true): void {
   saveConfig(config)
   // The clock choice changes how every window phrases dates.
   announceDateFormatIfChanged(config)
+  // So does the language, for the windows, the menus and the tray.
+  void applyLanguage(config)
   // Sync native theme when config changes
   if (config.theme) {
     nativeTheme.themeSource = config.theme === 'system' ? 'system' : config.theme
@@ -272,205 +222,23 @@ async function claimAccountDataFor(connection: ConnectionFields): Promise<void> 
   if (user) claimAccountData(url, user.id)
 }
 
-/** The project of a task as the server returned it, or undefined (then every project is asked again). */
-function projectIdOf(task: unknown): number | undefined {
-  const id = (task as { project_id?: unknown } | null)?.project_id
-  return typeof id === 'number' && Number.isInteger(id) && id > 0 ? id : undefined
-}
-
 export function registerIpcHandlers(): void {
   registerOfflineQueueIpc()
-  registerCollaborationIpc()
+  // The handlers that need nothing from Electron or Node (handlers/portable.ts, collab-ipc.ts).
+  registerPortableHandlers(handleTrusted, { taskWriteDeps, notifyViewerSync, notifyMainWindow })
+  registerCollaborationIpc(handleTrusted, {
+    taskWriteDeps,
+    currentUserId: () => {
+      const config = loadConfig()
+      return config?.vikunja_url ? knownUserIdFor(config.vikunja_url) : undefined
+    },
+  })
   registerVoiceIpc()
   registerAiIpc()
-
-  // Tasks
-  handleTrusted('fetch-tasks', (_event, params: Record<string, unknown>) => {
-    return fetchTasks(params)
-  })
-
-  // The routine carriers (hidden done tasks): fetched by their remembered ids, new ones found with
-  // a marker search, never by listing every done task (D-NOTIF-3, D-RT-2).
-  handleTrusted('fetch-routine-carriers', () => {
-    return loadRoutineCarriers()
-  })
-
-  // Hidden tasks are read and written only when the signed-in user created them (cross-app
-  // semantics 10.3); the renderer's routine archive asks who that is.
-  handleTrusted('account:own-user-id', async () => (await ensureKnownUserId()) ?? null)
-
-  handleTrusted('create-task', async (_event, projectId: number, task: Record<string, unknown>) => {
-    const result = await sendSerially(() => createTask(projectId, task))
-    if (result.success) {
-      notifyViewerSync()
-      // A new routine or custom-list carrier changes what the counts subtract: everything is asked again.
-      invalidateProjectCounts(rememberCreatedTask(result.data) ? undefined : projectId)
-    }
-    return result
-  })
-
-  // `patch` holds only the writable fields that changed (see src/shared/merge-patches.ts);
-  // the API client reduces it to the PATCH schema once more before sending. Like the other task
-  // writes below, it goes through the write gate: while changes for the task wait in the offline
-  // queue a newer one joins the queue instead of overtaking them, and with `options.queue` a change
-  // the server cannot take is queued here (see offline/task-writes.ts).
-  handleTrusted('update-task', async (event, id: number, patch: Record<string, unknown>, options?: unknown) => {
-    const { queue, title } = parseTaskWriteOptions(options)
-    const deps = taskWriteDeps()
-    const outcome = await writeTask(deps, taskWrites.update(deps.queue, { updateTask }, id, patch, title), { queue })
-    if (outcome.kind === 'sent') {
-      notifyViewerSync()
-      notifyMainWindow(event.sender.id)
-      // A completion, a reopening or a move changes the progress of the task's project (both
-      // projects after a move, which the response does not tell: everything is asked again).
-      if ('project_id' in patch) invalidateProjectCounts()
-      else if ('done' in patch) invalidateProjectCounts(projectIdOf(outcome.result.data))
-    }
-    return taskWriteReply(outcome)
-  })
-
-  // A JSON Patch of a routine carrier or archive part (cross-app semantics 6.8): a test of the
-  // description the renderer read, then the new values. It needs the server's answer (a 422 means
-  // another device wrote the task since, and the renderer reads, merges and sends again), so it is
-  // never queued and is refused while changes for the task wait in the queue.
-  handleTrusted('patch-task-json', async (event, id: unknown, operations: unknown) => {
-    if (typeof id !== 'number' || !Number.isInteger(id) || id <= 0 || !isJsonPatch(operations)) {
-      return { success: false as const, error: 'Invalid task patch' }
-    }
-    const deps = taskWriteDeps()
-    const outcome = await writeTask(deps, {
-      taskId: id,
-      send: () => patchTaskJson(id, operations),
-      enqueue: () => Promise.reject(new Error('A routine write is never queued')),
-    })
-    if (outcome.kind === 'sent') {
-      notifyViewerSync()
-      notifyMainWindow(event.sender.id)
-      // A routine that moved between projects changes what both projects' counts subtract.
-      invalidateProjectCounts(operations.some((op) => op.path === '/project_id') ? undefined : projectIdOf(outcome.result.data))
-    }
-    return taskWriteReply(outcome)
-  })
-
-  handleTrusted('delete-task', async (_event, id: number, options?: unknown) => {
-    const { queue, title } = parseTaskWriteOptions(options)
-    const deps = taskWriteDeps()
-    const outcome = await writeTask(deps, taskWrites.delete(deps.queue, { deleteTask }, id, title), { queue })
-    if (outcome.kind === 'sent') {
-      notifyViewerSync()
-      forgetDeletedTask(id)
-      invalidateProjectCounts()
-    }
-    return taskWriteReply(outcome)
-  })
-
-  handleTrusted('fetch-task-by-id', (_event, id: number) => {
-    return fetchTaskById(id)
-  })
+  registerCalendarIpc()
 
   // Print
   handleTrusted('print-html', (_event, html: string) => printHtml(html))
-
-  // Relations, labels, attachments and projects all change what Quick View shows (subtasks that
-  // block completing, label filters, hidden projects), so each successful change refreshes it the
-  // same way a task change does (D-IPC-4).
-  handleTrusted('create-task-relation', async (_event, taskId: number, otherTaskId: number, relationKind: string) => {
-    return refreshViewerOnSuccess(await sendSerially(() => createTaskRelation(taskId, otherTaskId, relationKind)))
-  })
-
-  handleTrusted('delete-task-relation', async (_event, taskId: number, relationKind: string, otherTaskId: number) => {
-    return refreshViewerOnSuccess(await sendSerially(() => deleteTaskRelation(taskId, relationKind, otherTaskId)))
-  })
-
-  // Sidebar progress rings: how many tasks of a project are (not) done, from one one-task page
-  // (the envelope's `total`), minus the known hidden carrier tasks; cached for ten minutes.
-  handleTrusted('count-project-tasks', (_event, projectId: unknown, done: unknown) => {
-    if (typeof projectId !== 'number' || !Number.isInteger(projectId) || projectId <= 0 || typeof done !== 'boolean') {
-      return { success: false as const, error: 'Invalid project count request' }
-    }
-    return countProjectTasks(projectId, done)
-  })
-
-  // Projects
-  handleTrusted('fetch-projects', async (_event, includeArchived = false) => {
-    // The read also lists the saved filters (negative ids), which are kept apart and never shown
-    // as projects (cross-app semantics 3.7).
-    const result = await fetchProjectsAndSavedFilters(includeArchived === true)
-    if (!result.success) return result
-    recordKnownSavedFilters(result.data.pseudo)
-    return { success: true as const, data: result.data.projects }
-  })
-
-  handleTrusted('fetch-project', (_event, id: number) => {
-    return fetchProjectById(id)
-  })
-
-  // Quick View remembers the active projects and their list views for a moment; a project change
-  // makes that out of date.
-  handleTrusted('create-project', async (_event, project: Record<string, unknown>) => {
-    const result = await createProject(project)
-    if (result.success) invalidateViewerCaches()
-    return refreshViewerOnSuccess(result)
-  })
-
-  handleTrusted('update-project', async (_event, id: number, project: Record<string, unknown>) => {
-    const result = await updateProject(id, project)
-    if (result.success) invalidateViewerCaches()
-    return refreshViewerOnSuccess(result)
-  })
-
-  handleTrusted('delete-project', async (_event, id: number) => {
-    const result = await deleteProject(id)
-    if (result.success) invalidateViewerCaches()
-    return refreshViewerOnSuccess(result)
-  })
-
-  // Labels
-  handleTrusted('fetch-labels', () => {
-    return fetchLabels()
-  })
-
-  handleTrusted('add-label-to-task', async (_event, taskId: number, labelId: number, options?: unknown) => {
-    const { queue, title, labelTitle } = parseTaskWriteOptions(options)
-    const deps = taskWriteDeps()
-    const label = labelTitle ? { id: labelId, title: labelTitle } : { id: labelId }
-    const outcome = await writeTask(deps, taskWrites.addLabel(deps.queue, { addLabelToTask }, taskId, label, title), { queue })
-    if (outcome.kind === 'sent') notifyViewerSync()
-    return taskWriteReply(outcome)
-  })
-
-  handleTrusted('remove-label-from-task', async (_event, taskId: number, labelId: number, options?: unknown) => {
-    const { queue, title } = parseTaskWriteOptions(options)
-    const deps = taskWriteDeps()
-    const outcome = await writeTask(deps, taskWrites.removeLabel(deps.queue, { removeLabelFromTask }, taskId, labelId, title), { queue })
-    if (outcome.kind === 'sent') notifyViewerSync()
-    return taskWriteReply(outcome)
-  })
-
-  handleTrusted('create-label', async (_event, label: Record<string, unknown>) => {
-    return refreshViewerOnSuccess(await createLabel(label))
-  })
-
-  handleTrusted('update-label', async (_event, id: number, label: Record<string, unknown>) => {
-    return refreshViewerOnSuccess(await updateLabel(id, label))
-  })
-
-  handleTrusted('delete-label', async (_event, id: number) => {
-    return refreshViewerOnSuccess(await deleteLabel(id))
-  })
-
-  // Project Views
-  handleTrusted('fetch-project-views', (_event, projectId: number) => {
-    return fetchProjectViews(projectId)
-  })
-
-  handleTrusted('fetch-view-tasks', (_event, projectId: number, viewId: number, params: Record<string, unknown>) => {
-    return fetchViewTasks(projectId, viewId, params)
-  })
-
-  handleTrusted('update-task-position', (_event, taskId: number, viewId: number, position: number) => {
-    return sendSerially(() => updateTaskPosition(taskId, viewId, position))
-  })
 
   // Config
   handleTrusted('get-config', () => {
@@ -479,6 +247,9 @@ export function registerIpcHandlers(): void {
 
   // The locale and clock for dates; all three windows ask when they load and listen for changes.
   handleTrusted('get-date-format', () => dateFormatForWindow())
+
+  // The language in use (src/main/i18n.ts); all three windows ask when they load and listen for changes.
+  handleTrusted('get-language', () => languageForWindow())
 
   // The renderer never saves a whole config: its copy can be stale (main changes window bounds,
   // sidebar width, popup positions... on its own). Preferences go through save-config-patch and
@@ -506,6 +277,8 @@ export function registerIpcHandlers(): void {
     if ('inbox_project_id' in patch && next.inbox_project_id > 0 && next.inbox_project_id !== latest.inbox_project_id && !next.standalone_mode && next.vikunja_url) {
       setSyncedPreference('inbox_project_id', next.inbox_project_id)
     }
+    // Pro was just turned on: read the account's ledger.
+    if (next.pro_enabled && !latest.pro_enabled) void syncProLedger()
   })
 
   // Setup, OIDC/password login and disconnect: only the connection fields change, every
@@ -523,63 +296,45 @@ export function registerIpcHandlers(): void {
     if (connection.vikunja_url && connection.inbox_project_id) inboxChosenAtSetup(connection.vikunja_url, connection.inbox_project_id)
   })
 
-  handleTrusted('custom-lists:get', () => getCustomLists())
-  handleTrusted('custom-lists:upsert', (_event, list: CustomListWire) => upsertCustomList(list))
-  handleTrusted('custom-lists:delete', (_event, id: string) => deleteCustomList(id))
-  handleTrusted('custom-lists:reorder', (_event, ids: string[]) => reorderCustomLists(ids))
-  handleTrusted('custom-lists:sync', () => {
-    // The synced preferences sync whenever custom lists do.
-    void syncSyncedPrefs()
-    return syncCustomLists()
+  // A recap copied with both a plain text and an HTML version (cross-app semantics 21.8).
+  handleTrusted('clipboard:write-rich', async (_event, text: unknown, html: unknown) => {
+    if (typeof text !== 'string' || text.length > 1_000_000) throw new Error('Invalid text')
+    if (typeof html === 'string' && html.length <= 2_000_000) {
+      await electronClipboard.write([new ElectronClipboardItem({ 'text/plain': text, 'text/html': html })])
+    } else {
+      await electronClipboard.writeText(text)
+    }
+    return true
   })
-  handleTrusted('custom-lists:status', () => getCustomListSyncStatus())
-
-  // Vikunja saved filters as custom lists (cross-app semantics 3.7).
-  handleTrusted('saved-filters:state', () => getSavedFilterState())
-  handleTrusted('saved-filters:preview', (_event, ids: unknown) => {
-    if (ids !== undefined && !isIdList(ids)) return null
-    return previewSavedFilters(ids as number[] | undefined)
+  // An image attachment copied from the viewer: PNG or JPEG bytes (the window converts other
+  // formats to PNG first), put on the clipboard as a picture.
+  handleTrusted('clipboard:write-image', async (_event, bytes: unknown) => {
+    if (!(bytes instanceof Uint8Array) || bytes.byteLength === 0 || bytes.byteLength > 100 * 1024 * 1024) {
+      return { success: false, error: 'Invalid image' }
+    }
+    const image = nativeImage.createFromBuffer(Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength))
+    if (image.isEmpty()) return { success: false, error: 'This image cannot be copied' }
+    // The clipboard takes a picture as PNG; a JPEG is decoded and encoded again here.
+    const png = new Blob([new Uint8Array(image.toPNG())],{ type: 'image/png' })
+    await electronClipboard.write([new ElectronClipboardItem({ 'image/png': png })])
+    return { success: true, data: undefined }
   })
-  handleTrusted('saved-filters:import', (_event, ids: unknown) => (isIdList(ids) ? importSavedFilters(ids) : null))
-  handleTrusted('saved-filters:dismiss', (_event, ids: unknown) => (isIdList(ids) ? dismissSavedFilters(ids) : getSavedFilterState()))
-  handleTrusted('saved-filters:close-notice', (_event, listId: unknown) =>
-    (typeof listId === 'string' && listId !== '' ? closeImportNotice(listId) : getSavedFilterState()))
-
-  // Synced preferences (cross-app semantics section 11): the Inbox and the task order.
-  handleTrusted('synced-prefs:get', () => getSyncedPrefs())
-  handleTrusted('synced-prefs:set', (_event, key: unknown, value: unknown) => {
-    if (typeof key !== 'string') throw new Error('Invalid synced preference')
-    return setSyncedPreference(key, value)
-  })
-  handleTrusted('synced-prefs:set-many', (_event, values: unknown) => {
-    if (!values || typeof values !== 'object' || Array.isArray(values)) throw new Error('Invalid synced preferences')
-    return setSyncedPreferences(values as Record<string, unknown>)
-  })
-  handleTrusted('synced-prefs:sync', () => syncSyncedPrefs())
-  handleTrusted('synced-prefs:status', () => getSyncedPrefsStatus())
-
-  // Custom-list and settings changes that have not reached the server (they are not in the offline
-  // queue). The sync panel shows them and can discard them: each goes back to the server's copy.
-  handleTrusted('synced-documents:unsynced', (): UnsyncedDocuments => ({
-    customLists: hasUnsyncedCustomListChanges() ? getCustomListSyncStatus() : null,
-    preferences: hasUnsyncedPreferenceChanges() ? getSyncedPrefsStatus() : null,
-  }))
-  handleTrusted('synced-documents:discard', () => ({
-    customLists: discardUnsyncedCustomListChanges(),
-    preferences: discardUnsyncedPreferenceChanges(),
-  }))
   // Setup reads the account's synced Inbox before it asks for one (section 11.4). An API-token
   // setup passes its token (nothing is saved yet); a sign-in uses the session it just stored.
   handleTrusted('synced-prefs:read-for-setup', async (_event, url: unknown, token: unknown) => {
     if (typeof url !== 'string' || !url) return { inboxProjectId: null, defaultProjectId: null }
-    let useToken = typeof token === 'string' ? token : ''
-    if (!useToken) {
-      const config = loadConfig()
-      if (config?.auth_method === 'api_token') useToken = getAPIToken() || config.api_token
-      else useToken = authManager.getTokenSync() ?? (await authManager.getToken().catch(() => '')) ?? ''
+    // The saved token or session only goes to the server it was saved for, as in test-connection (S-14).
+    const config = loadConfig()
+    const typed = typeof token === 'string' ? token : ''
+    let saved: string | null = null
+    if (!typed.trim() && config?.vikunja_url) {
+      if (config.auth_method === 'api_token') saved = getAPIToken() || config.api_token || null
+      else saved = authManager.getTokenSync() ?? (await authManager.getToken().catch(() => '')) ?? null
     }
-    return readSetupPreferences(url, useToken)
+    return readSetupPreferences(url, tokenForConnectionTest(url, typed, config?.vikunja_url ?? '', saved))
   })
+
+  handleTrusted('open-badge-notification-settings', () => openBadgeNotificationSettings())
 
   handleTrusted('set-task-badge', (_event, count: number, dataUrl: string | null) => {
     const cfg = loadConfig()
@@ -631,6 +386,9 @@ export function registerIpcHandlers(): void {
   })
 
   handleTrusted('auth:oidc-sign-in', () => ({ mode: getOidcSignInMode(), providerKey: getProviderKey() }))
+
+  // Only the web version's sign-in leaves the page and comes back (src/web/session.ts).
+  handleTrusted('auth:pending-sign-in', () => null)
 
   handleTrusted('auth:discover-methods', (_event, url: string) => {
     return discoverAuthMethods(url)
@@ -713,7 +471,19 @@ export function registerIpcHandlers(): void {
 
     // The create is queued with everything the user set when the server cannot be reached; see
     // createFromQuickEntry for what may be queued and why.
-    const result = await createFromQuickEntry(quickActionDeps(), targetProjectId, taskPayload, extras)
+    // Work mode (contract 22.6): a task that would not be work gets the work label, like a typed one.
+    let queuedExtras = extras
+    let workLabel: number | null = null
+    if (currentWorkMode(config) === 'work') {
+      const withLabel = withWorkLabel(extras?.labels, targetProjectId, await currentScopeFor(config), 'work')
+      if (withLabel.added !== null) {
+        workLabel = withLabel.added
+        queuedExtras = { ...extras, labels: withLabel.labels }
+      }
+    }
+    const created = await createFromQuickEntry(quickActionDeps(), targetProjectId, taskPayload, queuedExtras)
+    // The window applies the label after an online create, with the labels it typed.
+    const result = workLabel !== null ? { ...created, workLabel } : created
     if (result.success && !('cached' in result)) {
       notifyViewerSync()
       // "When I get home" for a saved place: the reminder goes on the server id (contract 5.3).
@@ -726,8 +496,42 @@ export function registerIpcHandlers(): void {
   // The places saved on a phone, by name, for "when I get home" in Quick Entry.
   handleTrusted('qe:get-places', () => readSyncedPlaces(getSyncedPrefs().values))
 
+  // Pro's people for `$` and `Jan:` in Quick Entry (5.5): the person labels and their aliases;
+  // none while the promises layer is off. The window has the labels' titles.
+  handleTrusted('qe:get-people', () => {
+    const config = loadConfig()
+    if (!isProEnabled(config, 'promises') || config?.standalone_mode) return []
+    const ledger = getProLedger().ledger
+    return [...personLabelIds(getSyncedPrefs().values)].map((id) => ({ id, aliases: recordValue(ledger.people, id)?.aliases ?? [] }))
+  })
+  // The promise a Quick Entry capture names (21.6), once the task has an id (a temporary one
+  // offline: the ledger is remapped when the create replays).
+  handleTrusted('qe:add-promise', (_event, taskId: unknown, person: unknown, mine: unknown, extra: unknown) => {
+    const config = loadConfig()
+    if (!isProEnabled(config, 'promises') || config?.standalone_mode) return false
+    if (typeof taskId !== 'number' || !Number.isInteger(taskId) || taskId === 0) return false
+    // Who it was promised to and the check day (5.5) come along when the text named them.
+    const value = quickPromiseValue(person, mine, extra)
+    if (!value) return false
+    mutateProLedger([{ op: 'set', collection: 'promises', id: String(taskId), value }])
+    return true
+  })
+
   handleTrusted('qe:close-window', () => {
     hideQuickEntry()
+  })
+
+  // Pro (plan 7.1.9): an import pasted in Quick Entry opens its review in the main window.
+  handleTrusted('qe:open-import', (_event, text: unknown) => {
+    if (typeof text !== 'string' || !text.trim() || !isProEnabled(loadConfig(), 'promises')) return false
+    const win = getMainWindow()
+    if (!win || win.isDestroyed()) return false
+    if (win.isMinimized()) win.restore()
+    win.show()
+    win.focus()
+    win.webContents.send('pro:open-import', text)
+    hideQuickEntry()
+    return true
   })
 
   handleTrusted('qe:get-config', () => {
@@ -743,6 +547,9 @@ export function registerIpcHandlers(): void {
       standalone_mode: config.standalone_mode === true,
       nlp_enabled: config.nlp_enabled,
       nlp_syntax_mode: config.nlp_syntax_mode,
+      pro_import: isProEnabled(config, 'promises'),
+      week_start: readWeekStart(getSyncedPrefs().values[WEEK_START_KEY]),
+      when_times: readTimes(getSyncedPrefs().values[WHEN_TIMES_KEY]),
     }
   })
 
@@ -833,12 +640,16 @@ export function registerIpcHandlers(): void {
         const me = knownUserIdFor(config.vikunja_url) ?? null
         context = await viewerCollab.contextFor(config.vikunja_url, me, fetched.map((task) => task.project_id))
       }
+      // Work and Personal (contract 22.4): the mode narrows the list after the viewer's own rules.
+      const mode = currentWorkMode(config)
+      const work = mode === 'all' ? undefined : { mode, scope: await currentScopeFor(config) }
       const tasks = selectQuickViewTasks(
         fetched,
         resolved,
         {
           now,
           context,
+          work,
           inboxProjectId: config.inbox_project_id,
           keep: (task) => !hasVicuMetadataMarker(task.description)
             && (!activeProjectIds || activeProjectIds.has(task.project_id)),
@@ -893,13 +704,15 @@ export function registerIpcHandlers(): void {
     return quickViewPatch(quickActionDeps(), rawTaskId, withDueChangeRules(taskData, { due_date: null }, new Date()), taskData)
   })
 
-  handleTrusted('qv:update-task', async (_event, rawTaskId: number | string, patch: Record<string, unknown>) => {
+  handleTrusted('qv:update-task', async (_event, rawTaskId: number | string, patch: Record<string, unknown>, baseDescription?: unknown) => {
     const config = loadConfig()
     if (config?.standalone_mode) {
       const task = updateStandaloneTask(String(rawTaskId), patch)
       return task ? { success: true, task } : { success: false, error: 'Task not found' }
     }
-    return quickViewPatch(quickActionDeps(), rawTaskId, patch)
+    // A notes edit carries the description the row was loaded with (description format, "Notes
+    // changed in two places").
+    return quickViewPatch(quickActionDeps(), rawTaskId, patch, undefined, typeof baseDescription === 'string' ? { baseDescription } : {})
   })
 
   handleTrusted('qv:open-task-in-browser', (_event, taskId: number) => {
@@ -948,25 +761,6 @@ export function registerIpcHandlers(): void {
       standalone_mode: config.standalone_mode === true,
       theme: config.theme,
     }
-  })
-
-  // --- Notifications IPC ---
-  handleTrusted('notifications:test', () => {
-    sendTestNotification()
-  })
-
-  handleTrusted('notifications:reschedule', () => {
-    rescheduleNotifications()
-  })
-
-  // Every completed, deleted or edited task asks for this; a bulk change asks many times in a row,
-  // so main waits for a quiet second and refreshes once.
-  handleTrusted('notifications:refresh-task-reminders', () => {
-    refreshTaskRemindersSoon()
-  })
-
-  handleTrusted('notifications:refresh-routine-reminders', () => {
-    refreshRoutineReminders()
   })
 
   // --- Apply Quick Entry Settings (called from renderer settings page) ---
@@ -1031,41 +825,6 @@ export function registerIpcHandlers(): void {
   })
 
   // --- Attachments IPC ---
-  handleTrusted('fetch-task-attachments', (_event, taskId: number) => {
-    return fetchTaskAttachments(taskId)
-  })
-
-  handleTrusted('upload-task-attachment', async (_event, taskId: number, fileData: Uint8Array, fileName: string, mimeType: string, options?: unknown) => {
-    const { queue, title } = parseTaskWriteOptions(options)
-    if (!queue) return refreshViewerOnSuccess(await uploadTaskAttachment(taskId, Buffer.from(fileData), fileName, mimeType))
-    // The editor's drop and paste: offline, the file waits in the queue (issue 104).
-    const inline = !!options && typeof options === 'object' && (options as { inline?: unknown }).inline === true
-    const deps = taskWriteDeps()
-    const outcome = await writeTask(
-      deps,
-      taskWrites.upload(deps.queue, { uploadTaskAttachment }, taskId, { bytes: fileData, name: fileName, mime: mimeType }, { inline, title }),
-      { queue: true }
-    )
-    return outcome.kind === 'sent' ? refreshViewerOnSuccess(outcome.result) : taskWriteReply(outcome)
-  })
-
-  handleTrusted('delete-task-attachment', async (_event, taskId: number, attachmentId: number) => {
-    return refreshViewerOnSuccess(await deleteTaskAttachment(taskId, attachmentId))
-  })
-
-  handleTrusted('fetch-task-attachment-bytes', async (_event, taskId: number, attachmentId: number, size?: unknown) => {
-    // Inline task-note images only need a bounded preview. Fetching full-size
-    // phone photos here can exhaust the renderer/IPC budget before <img> decodes.
-    // The image viewer asks for the original of the one image it shows.
-    const original = size === 'original'
-    const result = await downloadTaskAttachment(taskId, attachmentId, original ? undefined : 'lg')
-    if (!result.success) return result
-    if (result.data.length === 0) {
-      return { success: false, error: original ? 'Attachment was empty' : 'Attachment preview was empty' }
-    }
-    return { success: true, data: new Uint8Array(result.data) }
-  })
-
   handleTrusted('open-task-attachment', async (_event, taskId: number, attachmentId: number, fileName: string) => {
     if (!Number.isSafeInteger(taskId) || !Number.isSafeInteger(attachmentId)) {
       return { success: false, error: 'Invalid attachment' }
@@ -1083,9 +842,11 @@ export function registerIpcHandlers(): void {
         return { success: false, error: 'Invalid attachment filename' }
       }
       fs.writeFileSync(filePath, result.data, { mode: 0o600 })
+      // The copy came from the server: mark it so the system treats it as a download (S-3).
+      await markFromInternet(filePath, loadConfig()?.vikunja_url)
 
-      // The copy has no Mark-of-the-Web, so executables, scripts, shortcuts and
-      // macro documents are shown in the file manager instead of being run.
+      // Executables, scripts, shortcuts and macro documents are shown in the file manager
+      // instead of being run: the mark above is not kept by every file system or honoured by every app.
       if (isRiskyAttachment(safeName)) {
         shell.showItemInFolder(filePath)
         return { success: true, data: undefined }
@@ -1113,26 +874,15 @@ export function registerIpcHandlers(): void {
       },
       download: () => downloadTaskAttachment(taskId, attachmentId),
       writeFile: (filePath, data) => fs.promises.writeFile(filePath, data),
+      markFile: (filePath) => markFromInternet(filePath, loadConfig()?.vikunja_url),
     })
   })
 
+  // The attach dialog: the files picked, uploaded one after the other in this call (comments).
   handleTrusted('pick-and-upload-attachment', async (_event, taskId: number) => {
-    const win = getMainWindow()
-    const config = loadConfig()
-    const dialogResult = await dialog.showOpenDialog(win!, {
-      properties: ['openFile', 'multiSelections'],
-      defaultPath: resolveDialogDefaultPath(
-        config?.last_file_dialog_directory,
-        app.getPath('documents')
-      ),
-    })
-    if (dialogResult.canceled || dialogResult.filePaths.length === 0) {
+    const filePaths = await pickAttachmentPaths()
+    if (filePaths.length === 0) {
       return { success: true, data: { count: 0, attachments: [] } }
-    }
-
-    if (config) {
-      config.last_file_dialog_directory = directoryFromSelectedFile(dialogResult.filePaths[0])
-      saveConfig(config)
     }
 
     let count = 0
@@ -1140,47 +890,44 @@ export function registerIpcHandlers(): void {
     const attachments: unknown[] = []
     // Files kept for later because the server could not be reached (issue 104).
     const queued: string[] = []
-    const deps = taskWriteDeps()
-    for (const filePath of dialogResult.filePaths) {
-      // Size is checked against the server's limit from stat, before the file is read, and the read
-      // is asynchronous: picking a huge file neither freezes the app nor fills memory (D-IPC-5).
-      const loaded = await loadFileForUpload(filePath, { checkSize })
-      if (!loaded.ok) {
-        lastError = loaded.error
-        continue
+    for (const filePath of filePaths) {
+      const sent = await uploadAttachmentFile(taskId, filePath)
+      if (sent.kind === 'queued') queued.push(sent.name)
+      else if (sent.kind === 'failed') lastError = sent.error
+      else {
+        attachments.push(...sent.attachments)
+        count++
       }
-      const fileName = path.basename(filePath)
-      const mimeType = getMimeType(fileName)
-      const outcome = await writeTask(
-        deps,
-        taskWrites.upload(deps.queue, { uploadTaskAttachment }, taskId, { bytes: loaded.buffer, name: fileName, mime: mimeType }),
-        { queue: true }
-      )
-      if (outcome.kind === 'queued') {
-        queued.push(fileName)
-        continue
-      }
-      if (outcome.kind === 'refused') {
-        lastError = outcome.result.error
-        continue
-      }
-      // The server answers 201 even for a file it refused.
-      const answer = readUploadAnswer(outcome.result.data)
-      attachments.push(...answer.attachments)
-      if (answer.error && answer.attachments.length === 0) lastError = answer.error
-      else count++
     }
-    if (count === 0 && queued.length === 0 && dialogResult.filePaths.length > 0) {
+    if (count === 0 && queued.length === 0) {
       return { success: false, error: lastError || 'Upload failed' }
     }
     if (count > 0) notifyViewerSync()
     return { success: true, data: { count, attachments, queued, ...(lastError ? { error: lastError } : {}) } }
   })
 
+  // The attach dialog for the task's attachments: the files picked, each named by a token, so the
+  // renderer can show each one uploading while it sends them with 'upload-picked-attachment'.
+  handleTrusted('pick-attachment-files', async () => {
+    const filePaths = await pickAttachmentPaths()
+    return { success: true, data: await pickedFiles.remember(filePaths) }
+  })
+
+  handleTrusted('upload-picked-attachment', async (_event, taskId: number, token: string) => {
+    if (!Number.isSafeInteger(taskId)) return { success: false, error: 'Invalid task' }
+    const filePath = pickedFiles.take(token)
+    if (!filePath) return { success: false, error: 'The picked file is no longer available. Pick it again.' }
+    const sent = await uploadAttachmentFile(taskId, filePath)
+    if (sent.kind === 'failed') return { success: false, error: sent.error }
+    if (sent.kind === 'queued') return { success: true, data: { attachments: [], queued: sent.name } }
+    notifyViewerSync()
+    return { success: true, data: { attachments: sent.attachments } }
+  })
+
   // --- Obsidian IPC ---
   handleTrusted('open-deep-link', (_event, url: string) => {
-    if (isExternalAllowed(url)) {
-      shell.openExternal(url).catch(() => { /* no handler for the scheme */ })
+    if (isDeepLinkAllowed(url)) {
+      shell.openExternal(safeExternalUrl(url)).catch(() => { /* no handler for the scheme */ })
     }
   })
 
@@ -1300,10 +1047,52 @@ function notifyMainWindow(excludeWebContentsId?: number): void {
   } catch { /* ignore */ }
 }
 
-// Helper: tell Quick View to refresh after a change that went through, and pass the result on.
-function refreshViewerOnSuccess<T extends { success: boolean }>(result: T): T {
-  if (result.success) notifyViewerSync()
-  return result
+const pickedFiles = new PickedFiles()
+
+/** The attach dialog (several files), starting in the folder of the last pick; empty when cancelled. */
+async function pickAttachmentPaths(): Promise<string[]> {
+  const win = getMainWindow()
+  const config = loadConfig()
+  const dialogResult = await dialog.showOpenDialog(win!, {
+    properties: ['openFile', 'multiSelections'],
+    defaultPath: resolveDialogDefaultPath(
+      config?.last_file_dialog_directory,
+      app.getPath('documents')
+    ),
+  })
+  if (dialogResult.canceled || dialogResult.filePaths.length === 0) return []
+  if (config) {
+    config.last_file_dialog_directory = directoryFromSelectedFile(dialogResult.filePaths[0])
+    saveConfig(config)
+  }
+  return dialogResult.filePaths
+}
+
+type SentAttachment =
+  | { kind: 'uploaded'; attachments: unknown[] }
+  | { kind: 'queued'; name: string }
+  | { kind: 'failed'; error: string }
+
+/** Uploads one picked file to the task, or keeps it for later when the server cannot be reached. */
+async function uploadAttachmentFile(taskId: number, filePath: string): Promise<SentAttachment> {
+  // Size is checked against the server's limit from stat, before the file is read, and the read
+  // is asynchronous: picking a huge file neither freezes the app nor fills memory (D-IPC-5).
+  const loaded = await loadFileForUpload(filePath, { checkSize })
+  if (!loaded.ok) return { kind: 'failed', error: loaded.error }
+  const fileName = path.basename(filePath)
+  const mimeType = getMimeType(fileName)
+  const deps = taskWriteDeps()
+  const outcome = await writeTask(
+    deps,
+    taskWrites.upload(deps.queue, { uploadTaskAttachment }, taskId, { bytes: loaded.buffer, name: fileName, mime: mimeType }),
+    { queue: true }
+  )
+  if (outcome.kind === 'queued') return { kind: 'queued', name: fileName }
+  if (outcome.kind === 'refused') return { kind: 'failed', error: outcome.result.error }
+  // The server answers 201 even for a file it refused.
+  const answer = readUploadAnswer(outcome.result.data)
+  if (answer.error && answer.attachments.length === 0) return { kind: 'failed', error: answer.error }
+  return { kind: 'uploaded', attachments: answer.attachments }
 }
 
 // Helper: notify Quick View to refresh

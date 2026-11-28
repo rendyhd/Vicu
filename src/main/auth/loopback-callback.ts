@@ -5,7 +5,7 @@
  */
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
 import type { AddressInfo } from 'node:net'
-import { interpretRedirect } from './oidc-url'
+import { interpretRedirect, type RedirectWording } from './oidc-url'
 
 export interface LoopbackCallbackOptions {
   /** 0 picks a free port (tests). */
@@ -14,6 +14,16 @@ export interface LoopbackCallbackOptions {
   expectedState: string
   timeoutMs: number
   signal?: AbortSignal
+  /** How a provider's error is worded (the calendar sign-in is not an OIDC login). */
+  wording?: RedirectWording
+}
+
+/** The provider's error from the redirect (`error`, `error_description`), for a caller to classify. */
+export class ProviderRedirectError extends Error {
+  constructor(message: string, readonly error: string, readonly description?: string) {
+    super(message)
+    this.name = 'ProviderRedirectError'
+  }
 }
 
 export interface LoopbackCallback {
@@ -120,17 +130,19 @@ export function listenForCallback(options: LoopbackCallbackOptions): Promise<Loo
       return
     }
     const state = url.searchParams.get('state')
-    if (state !== null && state !== expectedState) {
+    // A redirect that carries an error but not this login's state could be anyone's: it must not
+    // end the sign-in, or any page could cancel it with one request to this port.
+    if ((state !== null || url.searchParams.has('error')) && state !== expectedState) {
       // A tab left over from an earlier attempt: answer it, but keep waiting for this one.
       send(res, 400, callbackPage('Sign-in expired', 'This page belongs to an earlier sign-in. Use the newest sign-in tab, or start again in Vicu.'))
       return
     }
-    const outcome = interpretRedirect(url.toString(), redirectUri, expectedState)
+    const outcome = interpretRedirect(url.toString(), redirectUri, expectedState, options.wording)
     if (outcome.kind === 'code') {
       finish({ code: outcome.code })
       send(res, 200, callbackPage('Signed in', 'You can close this tab and go back to Vicu.'), stop)
     } else if (outcome.kind === 'error') {
-      finish({ error: new Error(outcome.message) })
+      finish({ error: outcome.error ? new ProviderRedirectError(outcome.message, outcome.error, outcome.description) : new Error(outcome.message) })
       send(res, 400, callbackPage('Sign-in failed', outcome.message), stop)
     } else {
       // The right path without a code or an error: not a redirect from the provider.

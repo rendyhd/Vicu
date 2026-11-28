@@ -5,6 +5,7 @@ import { useSelectionStore } from '@/stores/selection-store'
 import { announce } from '@/stores/announcer-store'
 import { toast } from '@/stores/toast-store'
 import { planTaskStep, taskStepRefusal, type TaskStep } from '@/lib/reorder-positions'
+import { t } from '../../shared/i18n'
 
 /** Whether the task can take a step in the list that holds it now (the row menu shows only those that can). */
 export function canStepTask(taskId: number, step: TaskStep): boolean {
@@ -42,7 +43,7 @@ export function useTaskStep() {
       useSelectionStore.getState().setFocusedTask(taskId)
       reorderTask.mutate(
         { taskId, viewId: ctx.viewId, position: result.plan.position, renumbered: result.plan.renumbered },
-        { onSuccess: () => announce(`Moved “${task.title}” ${step}`) },
+        { onSuccess: () => announce(t(step === 'up' ? 'taskActions.movedUp' : 'taskActions.movedDown', { title: task.title })) },
       )
       requestAnimationFrame(() => {
         const row = document.querySelector<HTMLElement>(`[data-task-id="${taskId}"]`)

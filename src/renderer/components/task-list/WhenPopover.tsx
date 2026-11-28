@@ -7,6 +7,7 @@ import { Button } from '../shared/Button'
 import { Popover, type PopoverCloseReason } from '../overlay/Popover'
 import { RecurrencePickerPopover } from './RecurrencePickerPopover'
 import { WhenPanel } from './WhenPanel'
+import { useTranslation } from 'react-i18next'
 
 interface WhenPopoverProps {
   anchorRef: RefObject<HTMLElement | null>
@@ -24,6 +25,8 @@ interface WhenPopoverProps {
    * have different ones) and must still be able to clear them all.
    */
   allowClear?: boolean
+  /** The popover edits one existing task: offer Move by from `currentDate` (section 23.3). */
+  offerMoveBy?: boolean
 }
 
 /**
@@ -41,7 +44,9 @@ export function WhenPopover({
   repeatMode = 0,
   onRecurrenceChange,
   allowClear = false,
+  offerMoveBy = false,
 }: WhenPopoverProps) {
+  const { t } = useTranslation()
   const repeatButtonRef = useRef<HTMLButtonElement>(null)
   const [value, setValue] = useState<WhenValue>(() => whenValueOfDue(currentDate))
   const [showRecurrence, setShowRecurrence] = useState(false)
@@ -62,8 +67,8 @@ export function WhenPopover({
   }
 
   return (
-    <Popover anchorRef={anchorRef} onClose={onClose} placement={placement} label="Schedule" className="w-72 p-3">
-      <WhenPanel value={value} onChange={change} />
+    <Popover anchorRef={anchorRef} onClose={onClose} placement={placement} label={t('when.schedule')} className="w-72 p-3">
+      <WhenPanel value={value} onChange={change} moveFrom={offerMoveBy ? currentDate : null} />
 
       {(hasDate || allowClear || onRecurrenceChange) && (
         <div className="relative mt-2 flex items-center justify-between gap-1 border-t border-[var(--border-color)] pt-2">
@@ -77,7 +82,7 @@ export function WhenPopover({
               className="px-2"
             >
               <Repeat className="h-3.5 w-3.5" />
-              <span>Repeat</span>
+              <span>{t('when.repeat')}</span>
               {hasRecurrence && (
                 <span className="text-caption text-[var(--accent-blue)]">{formatRecurrenceLabel(repeatAfter, repeatMode)}</span>
               )}
@@ -88,7 +93,7 @@ export function WhenPopover({
           {(hasDate || allowClear) && (
             <Button variant="quiet" danger onClick={clear} className="px-2">
               <X className="h-3.5 w-3.5" />
-              Clear date
+              {t('when.clearDate')}
             </Button>
           )}
 

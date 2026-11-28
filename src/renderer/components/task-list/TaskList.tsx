@@ -7,6 +7,8 @@ import { DEFAULT_TASK_ORDER, canReorderTask, type TaskOrderKey } from '../../../
 import { verticalListSortingStrategyForeignSafe } from '@/lib/sortable-strategy'
 import { useCompleteTask, useUpdateTask, useDeleteTask } from '@/hooks/use-task-mutations'
 import { useDuplicateTasks } from '@/hooks/use-duplicate-tasks'
+import { useToggleFlags } from '@/hooks/use-flag'
+import { usePro } from '@/hooks/use-pro'
 import { usePasteTasks } from '@/hooks/use-paste-tasks'
 import { useTaskStep } from '@/hooks/use-task-step'
 import { currentExpandedTaskId, useSelectionStore } from '@/stores/selection-store'
@@ -29,8 +31,10 @@ import { confirmTaskCompletion } from '@/lib/task-completion'
 import { SmartListIcon } from '@/components/shared/SmartListIcon'
 import { ReadingScroll } from '@/components/layout/ReadingScroll'
 import { useHoldToTalk } from '@/hooks/use-hold-to-talk'
+import { can } from '@/lib/capabilities'
 import { useVoiceListStore } from '@/stores/voice-list-store'
 import type { SmartListId } from '@/lib/smart-list-identity'
+import { useTranslation } from 'react-i18next'
 
 interface TaskListProps {
   title: string
@@ -62,6 +66,8 @@ interface TaskListProps {
   insertIndex?: number
   /** When set, new tasks get this due date by default. Shown as a dismissible chip. */
   defaultDueDate?: Date
+  /** Labels a task made here starts with (a group's page). */
+  defaultLabelIds?: readonly number[]
   /** Content rendered inside the scroll area above the task input (e.g. date subtitle) */
   headerContent?: React.ReactNode
   /** Buttons at the right of the title, before New task (a project's … menu). */
@@ -83,7 +89,7 @@ export function TaskList({
   subtitle,
   tasks,
   projectId,
-  emptyTitle = 'No tasks',
+  emptyTitle,
   emptySubtitle,
   emptyWarm,
   emptyExtra,
@@ -96,12 +102,14 @@ export function TaskList({
   empty,
   insertIndex,
   defaultDueDate,
+  defaultLabelIds,
   headerContent,
   headerActions,
   onTaskCreated,
   newTaskPlacement = 'after-children',
   hideHeader = false,
 }: TaskListProps) {
+  const { t } = useTranslation()
   const [isAdding, setIsAdding] = useState(false)
   // Holding the header + says a task instead of typing it (docs/voice-input.md). A voice task gets
   // the defaults this list gives its composer, from wherever the capture is started.
@@ -124,6 +132,8 @@ export function TaskList({
   const pasteTasks = usePasteTasks({ projectId, defaultDueDate })
   const completeTask = useCompleteTask()
   const duplicate = useDuplicateTasks()
+  const toggleFlags = useToggleFlags()
+  const flagsOn = usePro().layer('availability')
   const updateTask = useUpdateTask()
   const deleteTask = useDeleteTask()
   const stepTask = useTaskStep()
@@ -265,6 +275,16 @@ export function TaskList({
         return
       }
 
+      // Ctrl+Shift+F / Cmd+Shift+F: Pro's flag on the selection or the focused row (21.4).
+      if (flagsOn && (e.ctrlKey || e.metaKey) && e.shiftKey && !e.altKey && e.key.toLowerCase() === 'f') {
+        const ids = selectedTaskIds.size > 0 ? selectedTaskIds : focusedTaskId ? new Set([focusedTaskId]) : null
+        if (ids) {
+          e.preventDefault()
+          toggleFlags(resolveSelectedTasks(qc, ids))
+        }
+        return
+      }
+
       // Escape clears an active multi-selection first.
       if (e.key === 'Escape' && selectedTaskIds.size > 0) {
         e.preventDefault()
@@ -282,8 +302,13 @@ export function TaskList({
         void (async () => {
           if (descendantCount > 0) {
             const ok = await confirmDelete(
-              `Complete ${targets.length} ${targets.length === 1 ? 'task' : 'tasks'} and ${descendantCount} unfinished ${descendantCount === 1 ? 'subtask' : 'subtasks'}?`,
-              { force: true, confirmLabel: 'Complete all', destructive: false },
+              t(
+                targets.length === 1
+                  ? (descendantCount === 1 ? 'task.confirm.completeTaskSubtask' : 'task.confirm.completeTaskSubtasks')
+                  : (descendantCount === 1 ? 'task.confirm.completeTasksSubtask' : 'task.confirm.completeTasksSubtasks'),
+                { tasks: targets.length, subtasks: descendantCount },
+              ),
+              { force: true, confirmLabel: t('task.confirm.completeAll'), destructive: false },
             )
             if (!ok) return
           }
@@ -304,15 +329,15 @@ export function TaskList({
         if (targets.length === 0) return
         if (targets.some((task) => taskDescendants(task).length > 0)) {
           void confirmDelete(
-            'This selection includes a parent task. Open that parent to choose whether its subtasks should be deleted or kept.',
-            { force: true, confirmLabel: 'Close', destructive: false },
+            t('task.confirm.selectionHasParent'),
+            { force: true, confirmLabel: t('task.confirm.close'), destructive: false },
           )
           return
         }
         const message =
           targets.length > 1
-            ? `Delete ${targets.length} tasks? This cannot be undone.`
-            : 'Delete this task? This cannot be undone.'
+            ? t('task.confirm.deleteTasks', { count: targets.length })
+            : t('task.confirm.deleteTask')
         void confirmDelete(message).then((ok) => {
           if (!ok) return
           targets.forEach((t) => deleteTask.mutate({ task: t }))
@@ -477,6 +502,8 @@ export function TaskList({
       setSelectedRange,
       setExpandedTask,
       clearSelection,
+      toggleFlags,
+      flagsOn,
     ]
   )
 
@@ -528,6 +555,7 @@ export function TaskList({
       <NewTaskComposer
         projectId={projectId!}
         defaultDueDate={defaultDueDate}
+        defaultLabelIds={defaultLabelIds}
         inputRef={inputRef}
         onCancel={() => setIsAdding(false)}
         onCreated={(task) => {
@@ -580,8 +608,8 @@ export function TaskList({
               onClick={startAdding}
               {...holdToTalk}
               className="flex h-7 w-7 select-none items-center justify-center rounded-control text-[var(--text-secondary)] transition-colors duration-fade-fast hover:bg-[var(--bg-hover)] hover:text-[var(--accent-blue)]"
-              aria-label="New task"
-              title="Click to type a task, hold to say it"
+              aria-label={t('task.list.newTask')}
+              title={can('voice') ? t('task.list.holdToTalk') : undefined}
             >
               <Plus className="h-4 w-4" />
             </button>
@@ -600,15 +628,15 @@ export function TaskList({
           <EmptyState
             icon={Inbox}
             identity={identity}
-            title={emptyTitle}
+            title={emptyTitle ?? t('task.list.noTasks')}
             subtitle={emptySubtitle}
             warm={emptyWarm}
             extra={emptyExtra}
             action={
               showNewTask && projectId ? (
-                <Button variant="secondary" onClick={startAdding} {...holdToTalk} title="Click to type a task, hold to say it">
+                <Button variant="secondary" onClick={startAdding} {...holdToTalk} title={can('voice') ? t('task.list.holdToTalk') : undefined}>
                   <Plus className="h-4 w-4" />
-                  Add task
+                  {t('task.list.addTask')}
                 </Button>
               ) : undefined
             }

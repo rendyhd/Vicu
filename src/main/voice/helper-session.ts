@@ -1,3 +1,4 @@
+import { t } from '../../shared/i18n'
 import type { VoiceEvent } from '../../shared/voice-types'
 import { createLineSplitter, parseHelperLine } from './helper-protocol'
 
@@ -73,12 +74,12 @@ export function runHelperSession(
   child.stderr?.on('data', (chunk) => { stderr = (stderr + chunk.toString()).slice(-500) })
   // Writing to a helper that already exited is not an error worth surfacing.
   child.stdin?.on?.('error', () => {})
-  child.on('error', (err) => end({ type: 'error', code: 'failed', message: `Voice input could not start: ${err.message}` }))
+  child.on('error', (err) => end({ type: 'error', code: 'failed', message: t('system.voice.couldNotStart', { reason: err.message }) }))
   child.on('exit', () => {
     exited = true
     for (const line of lines.flush()) handleLine(line)
     if (stopping) end({ type: 'final', text: lastText })
-    else end({ type: 'error', code: 'failed', message: stderr.trim() ? `Voice input stopped: ${stderr.trim().split('\n').pop()}` : 'Voice input stopped.' })
+    else end({ type: 'error', code: 'failed', message: stderr.trim() ? t('system.voice.stoppedBecause', { reason: stderr.trim().split('\n').pop() }) : t('system.voice.stopped') })
   })
 
   const send = (command: string) => {

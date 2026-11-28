@@ -1,3 +1,4 @@
+import { remapProLedgerTask } from './pro-ledger-service'
 import { loadConfig } from './config'
 import {
   fetchTasks,
@@ -13,10 +14,13 @@ import {
   uploadTaskAttachment,
   addTaskAssignee,
   removeTaskAssignee,
+  createTaskRelation,
+  deleteTaskRelation,
   createTaskComment,
   updateTaskComment,
   deleteTaskComment,
   fetchTaskComments,
+  connectionState,
 } from './api-client'
 import { findQueuedComment } from './offline/comment-overlay'
 import { OFFLINE_EVENTS, forgetKnownUser, getOfflineQueue, knownUserIdFor, rememberKnownUser, sendToAppWindows } from './offline/service'
@@ -57,6 +61,8 @@ const api: ReplayApi = {
   },
   addTaskAssignee: (taskId, userId) => sendSerially(() => addTaskAssignee(taskId, userId)),
   removeTaskAssignee: (taskId, userId) => sendSerially(() => removeTaskAssignee(taskId, userId)),
+  createTaskRelation: (taskId, otherTaskId, kind) => sendSerially(() => createTaskRelation(taskId, otherTaskId, kind)),
+  deleteTaskRelation: (taskId, kind, otherTaskId) => sendSerially(() => deleteTaskRelation(taskId, kind, otherTaskId)),
   createTaskComment: (taskId, html) => sendSerially(() => createTaskComment(taskId, html)),
   updateTaskComment: (taskId, commentId, html) => sendSerially(() => updateTaskComment(taskId, commentId, html)),
   deleteTaskComment: (taskId, commentId) => sendSerially(() => deleteTaskComment(taskId, commentId)),
@@ -67,6 +73,7 @@ const api: ReplayApi = {
     const me = config?.vikunja_url ? knownUserIdFor(config.vikunja_url) : undefined
     return { success: true, data: findQueuedComment(page.data.items, html, since, me) }
   },
+  connectionState: () => connectionState(),
 }
 
 // After a replay stopped on a server or network problem, try again soon instead of waiting for the
@@ -77,6 +84,8 @@ const retry = createReplayRetry(() => {
 
 const runReplay = createReplayRunner(async () => {
   const event = await replayQueue(getOfflineQueue(), api)
+  // Tasks created offline that the Pro ledger names under their temporary id (section 21.7).
+  for (const [tempId, realId] of Object.entries(event.idMap)) remapProLedgerTask(Number(tempId), realId)
   announce(event)
   return event
 })

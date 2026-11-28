@@ -14,9 +14,33 @@ export interface RowView {
    * `projectMeta` to the row.
    */
   showProject?: boolean
+  /**
+   * What the rows show (a custom list's `row_fields`, cross-app semantics 3.8): `project`, `labels`,
+   * `due`, `start`, `estimate`, `flag`, `notes`. Absent, rows show what they always did.
+   */
+  fields?: readonly string[]
+  /**
+   * The list is not filtered by Work and Personal (Search): a row the mode would not list names its
+   * mode (cross-app semantics 22.4).
+   */
+  showWorkMark?: boolean
+  /**
+   * The rows are a project's Completed list (cross-app semantics 12.6): a done row shows the day it
+   * was completed, as the Logbook groups it (`logbook.group`), in place of its due date and block.
+   */
+  doneDay?: boolean
 }
 
 export const NO_ROW_VIEW: RowView = {}
+
+/**
+ * Whether a row shows a field. Without `fields` every usual field shows and the Pro extras (`start`,
+ * `estimate`) do not; with them, exactly the listed ones.
+ */
+export function rowFieldShown(view: RowView, field: string): boolean {
+  if (!view.fields) return field !== 'start' && field !== 'estimate'
+  return view.fields.includes(field)
+}
 
 /** Where the project on a row comes from, if it shows at all. */
 export type RowProjectSource = 'group' | 'lookup' | 'none'

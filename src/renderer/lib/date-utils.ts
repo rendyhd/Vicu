@@ -10,7 +10,7 @@ import {
   addLocalDays,
   isDateOnly,
   localDateOf,
-  nextWeekStart,
+  nextWeekDay,
   toLocalDate,
 } from './due-dates'
 
@@ -80,7 +80,7 @@ export function datePickerPresets(now: Date = new Date()): {
   return {
     today,
     tomorrow: addLocalDays(today, 1),
-    // The Monday after today; on a Sunday that is the next day.
-    nextWeek: nextWeekStart(today),
+    // The Monday in next week (contract section 2.1); with Monday weeks, on a Sunday that is the next day.
+    nextWeek: nextWeekDay(today),
   }
 }

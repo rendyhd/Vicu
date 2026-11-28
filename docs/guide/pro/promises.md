@@ -10,7 +10,8 @@ lead: Work with others runs on promises: "I'll send it Friday." This part of Pro
 - **People** are labels you mark as a person. Nothing new to set up: the labels you already use for
   people work.
 - **A promise** is a task with a direction: someone promised it to you, or you promised it to them. Type
-  `Jan: send the deck friday` or `for Jan: review the budget`.
+  `$Jan send the deck friday` or `for $Jan review the budget`. A name Vicu does not know yet becomes a
+  person when you save.
 - **When a promise is due**, Vicu asks for a **verdict**: Delivered, Late, Not yet, New date or Dropped.
   Promises due are at the top of Today.
 - **Waiting on** lists what others owe you; **the person page** has everything with one person and the
@@ -36,16 +37,24 @@ place.
 
 ## Note a promise {desktop} {phone}
 
-The quickest way is the title, with the person's name and a colon at the very start:
+The quickest way is the title. Type `$` and the person's name anywhere in it. As soon as you type
+`$`, the people you have are suggested; pick one with Tab or Enter.
 
 | You type | You get |
 |---|---|
-| `Jan: send the deck friday` | Jan's promise to you, due Friday |
-| `for Jan: review the budget` | Your promise to Jan |
-| `Priya de Boer: share the numbers tomorrow` | Priya's promise, due tomorrow |
+| `$Jan send the deck friday` | Jan's promise to you, due Friday. It shows under **Waiting on**. |
+| `review the budget for $Jan` | Your promise to Jan |
+| `$"Priya de Boer" share the numbers tomorrow` | Priya's promise, due tomorrow. Quotes keep a name with spaces together. |
+| `$Lalith: follow up on printing` | Lalith's promise. If Lalith is not a person yet, Vicu makes Lalith one when you save. |
 
-The name must be a person Vicu knows (a label marked as a person, one of their other names, or a first
-name only one person has). An unknown name stays in the title. The person's label is added to the task.
+A name is matched to the people you have by their name, one of their other names, or a first name
+only one person has. A name that matches nobody makes a new person when you save: a label with that
+name is marked as a person, or a new label is made. Making a person needs a connection; offline, the
+task is saved with the name left in its title. A first name two people share stays in the title, so
+pick the one you mean from the suggestions. The person's label is added to the task.
+
+The older form still works for people Vicu already knows: the name and a colon at the very start, as
+in `Jan: send the deck friday` or `for Jan: review the budget`. It never makes a new person.
 
 You can also turn any task into a promise: open it and use **Promise**. Choose **They promised me** or
 **I promised them**, the person, and optionally:
@@ -100,7 +109,8 @@ first. Tasks with a label on hold (for example "waiting for budget") are listed 
 Click a person under **People** to open their page:
 
 - **Next 1:1**: an agenda made from what is open between you: "What's still unclear?", their promises
-  that are due or missed, what you owe them, and decisions they owe.
+  that are due or missed, what you owe them, decisions they owe, and your topics.
+- **Topics**: what you want to talk about with them (see below).
 - **From** them: what they promised you.
 - **You owe** them: what you promised.
 - **To confirm**: tasks named "Confirm with" them, made by an import or a triage when something they
@@ -110,6 +120,22 @@ Click a person under **People** to open their page:
 
 On the desktop, **Copy agenda** puts the agenda on the clipboard for a meeting invite or chat. On the
 phone, share the agenda instead.
+
+## Keep topics for a 1:1 {desktop} {phone}
+
+A topic is something to talk about with a person, not something anyone delivers: "How the vendor work
+is going", "Feedback on the board paper".
+
+- **Add one** with **Add a topic** on the person's page. Anywhere else, a task with the person's label and
+  no promise is a topic: `How the vendor work is going @Jan` (`*Jan` in Vikunja style).
+- **Tick it** when you talked about it.
+- **A date** puts a topic in order; one dated more than a week ahead waits under **Later**.
+- **A topic for every 1:1**, such as "Development", is a repeating task: tick it and it comes back.
+- **A private label** keeps a topic to yourself. In a label's menu choose **Private label** (on the
+  phone, **Mark as private**); a topic
+  with that label shows on the page, marked **Private**, and is left out of the agenda you copy.
+
+A topic is an ordinary task, so it is on every device and in every app that reads your server.
 
 ## Send a recap {desktop} {phone}
 
@@ -184,6 +210,7 @@ With **Assistant help in Pro** on, Import can also read plain notes that are not
 ## Related
 
 - [What Pro is](guide:pro)
+- [Groups, sessions and follow-ups](guide:pro/groups)
 - [Know what you can do now](guide:pro/available)
 - [Portfolio](guide:pro/portfolio)
 - [Quick add syntax](guide:quick-add)

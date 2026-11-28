@@ -1,4 +1,5 @@
-import { Fragment, useEffect, useMemo, useState } from 'react'
+import { Fragment, useEffect, useId, useMemo, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useParams } from '@tanstack/react-router'
 import { useDndMonitor } from '@dnd-kit/core'
 import { SortableContext } from '@dnd-kit/sortable'
@@ -18,6 +19,16 @@ import { ListSkeleton } from '@/components/shared/ListSkeleton'
 import { Button } from '@/components/shared/Button'
 import { ProjectHeaderMenu } from '@/components/projects/ProjectHeaderMenu'
 import { useSharedProjectActions } from '@/hooks/use-project-actions'
+import { useAvailabilityView } from '@/hooks/use-availability'
+import { HiddenSummary, ViewSwitch } from '@/components/pro/ViewSwitch'
+import { InitiativePanel } from '@/components/pro/InitiativePanel'
+import { ProjectPlanLink } from '@/components/pro/ProjectPlanLink'
+import { parentTaskId, useWorkMode } from '@/hooks/use-work-mode'
+import { WorkModeMore } from '@/components/task-list/WorkModeMore'
+import { ProjectCompletedRow } from '@/components/projects/ProjectCompletedRow'
+import { LabelFilterBar, LabelFilterButton, LabelFilterMore } from '@/components/projects/ProjectLabelFilter'
+import { useLabels } from '@/hooks/use-labels'
+import { labelFilterChoices, shownWithLabels } from '../../shared/project-label-filter'
 
 function findSectionForTask(
   sections: SectionData[],
@@ -32,6 +43,19 @@ function findSectionForTask(
   return null
 }
 
+/** The sections with only the tasks `keep` lets through, and how many tasks it took out in all. */
+function filterSections(sections: SectionData[], keep: (tasks: Task[]) => Task[]): { sections: SectionData[]; removed: number } {
+  let removed = 0
+  const walk = (list: SectionData[]): SectionData[] =>
+    list.map((section) => {
+      const tasks = keep(section.tasks)
+      removed += section.tasks.length - tasks.length
+      return { ...section, tasks, children: walk(section.children) }
+    })
+  const result = walk(sections)
+  return { sections: result, removed }
+}
+
 function flattenForPrint(
   secs: SectionData[]
 ): { heading: string; groups: { tasks: Task[] }[] }[] {
@@ -41,12 +65,28 @@ function flattenForPrint(
   ])
 }
 
+/** Every task of the sections, at any depth. */
+function sectionTasks(sections: SectionData[]): Task[] {
+  return sections.flatMap((section) => [...section.tasks, ...sectionTasks(section.children)])
+}
+
+/** The sections that still hold a task, in themselves or in their own sections (17.2). */
+function withoutEmptySections(sections: SectionData[]): SectionData[] {
+  return sections.flatMap((section) => {
+    const children = withoutEmptySections(section.children)
+    return section.tasks.length > 0 || children.length > 0 ? [{ ...section, children }] : []
+  })
+}
+
+const NO_LABELS: number[] = []
+
 interface InsertIndicator {
   containerId: string // 'parent' or section project ID as string
   index: number
 }
 
 export function ProjectView() {
+  const { t } = useTranslation()
   const { projectId } = useParams({ from: '/project/$projectId' })
   const pid = Number(projectId)
   const { restore } = useSharedProjectActions()
@@ -55,10 +95,59 @@ export function ProjectView() {
   const { data: projectData, isLoading: projectsLoading } = useProjects()
   const activeProject = projectData?.flat.find((p) => p.id === pid)
   const archivedProject = projectData?.archived.find((p) => p.id === pid)
-  const projectName = activeProject?.title ?? archivedProject?.title ?? 'Project'
+  const projectName = activeProject?.title ?? archivedProject?.title ?? t('views.project.fallbackName')
 
-  const { data: tasks = [], isLoading: tasksLoading, viewId, order: taskOrder } = useProjectTasks(activeProject?.id)
-  const { sections, hasSections, isLoading: sectionsLoading } = useProjectSections(pid)
+  const { data: everyTask = [], isLoading: tasksLoading, viewId, order: taskOrder } = useProjectTasks(activeProject?.id)
+  const { sections: everySection, hasSections, isLoading: sectionsLoading } = useProjectSections(pid)
+  // Work and Personal (22.4): the screen lists the tasks the mode shows, and says how many it holds
+  // back (a task of the project can carry the work label), with a way to show them until it is left.
+  const work = useWorkMode()
+  const [shownAllFor, setShownAllFor] = useState<number | null>(null)
+  const showAll = shownAllFor === pid
+  const { allTasks, allSections, workHidden } = useMemo(() => {
+    if (showAll || work.mode === 'all') return { allTasks: everyTask, allSections: everySection, workHidden: 0 }
+    const own = work.filter(everyTask, parentTaskId)
+    const inSections = filterSections(everySection, (tasks) => work.filter(tasks, parentTaskId))
+    return { allTasks: own, allSections: inSections.sections, workHidden: everyTask.length - own.length + inSections.removed }
+  }, [everyTask, everySection, work.filter, work.mode, showAll])
+  // Pro: Available, Remaining or All (cross-app semantics 21.2). Off, `filter` keeps every task.
+  const availability = useAvailabilityView(`project.${pid}`)
+  const viewTasks = useMemo(() => availability.filter(allTasks), [availability, allTasks])
+  const viewSections = useMemo(() => {
+    if (!availability.on) return allSections
+    const keep = (section: SectionData): SectionData => ({ ...section, tasks: availability.filter(section.tasks), children: section.children.map(keep) })
+    return allSections.map(keep)
+  }, [availability, allSections])
+  // Labels (cross-app semantics 17.2): a filter for while the page is open, after everything else
+  // that decides what it lists. Leaving the project forgets it.
+  const { data: knownLabels = [] } = useLabels()
+  const [labelFilter, setLabelFilter] = useState<{ pid: number; picked: number[]; open: boolean }>({ pid, picked: NO_LABELS, open: false })
+  // Another project: the filter of the last one is forgotten, not kept for coming back to it.
+  // A new project forgets the label filter and the other mode's tasks shown (17.2, 22.4: until the view is left).
+  if (labelFilter.pid !== pid) {
+    setLabelFilter({ pid, picked: NO_LABELS, open: false })
+    if (shownAllFor !== null) setShownAllFor(null)
+  }
+  const pickedLabels = labelFilter.pid === pid ? labelFilter.picked : NO_LABELS
+  const labelBarOpen = labelFilter.pid === pid && labelFilter.open
+  const setPickedLabels = (picked: number[]) => setLabelFilter({ pid, picked, open: labelBarOpen })
+  const labelBarId = useId()
+  const labelButtonRef = useRef<HTMLButtonElement>(null)
+  const labelChoices = useMemo(
+    () => labelFilterChoices([...viewTasks, ...sectionTasks(viewSections)], pickedLabels, knownLabels),
+    [viewTasks, viewSections, pickedLabels, knownLabels],
+  )
+  const { tasks, sections, labelHidden } = useMemo(() => {
+    if (pickedLabels.length === 0) return { tasks: viewTasks, sections: viewSections, labelHidden: 0 }
+    const own = shownWithLabels(viewTasks, pickedLabels, parentTaskId)
+    const inSections = filterSections(viewSections, (list) => shownWithLabels(list, pickedLabels, parentTaskId))
+    return { tasks: own, sections: withoutEmptySections(inSections.sections), labelHidden: viewTasks.length - own.length + inSections.removed }
+  }, [viewTasks, viewSections, pickedLabels])
+  const hiddenCount = useMemo(() => {
+    if (!availability.on) return 0
+    const count = (list: SectionData[]): number => list.reduce((sum, section) => sum + availability.hidden(section.tasks) + count(section.children), 0)
+    return availability.hidden(allTasks) + count(allSections)
+  }, [availability, allTasks, allSections])
   const setReorderContext = useReorderStore((s) => s.setReorderContext)
   const clearSectionContexts = useReorderStore((s) => s.clearSectionContexts)
 
@@ -184,16 +273,16 @@ export function ProjectView() {
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 text-center">
         <h1 className="text-lg font-semibold text-[var(--text-primary)]">
-          {archivedProject ? 'Project archived' : 'Project unavailable'}
+          {archivedProject ? t('views.project.archived') : t('views.project.unavailable')}
         </h1>
         <p className="max-w-sm text-sm text-[var(--text-secondary)]">
           {archivedProject
-            ? 'Restore it to see its tasks again.'
-            : 'This project may have been deleted or you may no longer have access.'}
+            ? t('views.project.archivedHint')
+            : t('views.project.unavailableHint')}
         </p>
         {archivedProject && (
           <Button variant="primary" className="mt-2" onClick={() => restore(archivedProject)}>
-            Restore project
+            {t('views.project.restore')}
           </Button>
         )}
       </div>
@@ -213,10 +302,43 @@ export function ProjectView() {
       sortable
       taskOrder={taskOrder}
       viewId={viewId}
-      empty={tasks.length === 0 && !hasSections}
-      emptyTitle="No tasks in this project"
-      emptySubtitle="Create a new task to get started"
-      headerActions={activeProject && <ProjectHeaderMenu project={activeProject} />}
+      empty={tasks.length === 0 && !hasSections && hiddenCount === 0 && labelHidden === 0}
+      headerContent={availability.on || activeProject ? (
+        <>
+          {labelBarOpen && labelChoices.length > 0 && (
+            <LabelFilterBar
+              id={labelBarId}
+              choices={labelChoices}
+              picked={pickedLabels}
+              onToggle={(id) => setPickedLabels(pickedLabels.includes(id) ? pickedLabels.filter((x) => x !== id) : [...pickedLabels, id])}
+              onClear={() => setPickedLabels([])}
+              onClose={() => {
+                setLabelFilter({ pid, picked: pickedLabels, open: false })
+                labelButtonRef.current?.focus()
+              }}
+            />
+          )}
+          <InitiativePanel projectId={pid} />
+          <ProjectPlanLink projectId={pid} />
+          {availability.on && <ViewSwitch view={availability.view} onChange={availability.setView} />}
+        </>
+      ) : undefined}
+      emptyTitle={t('views.project.emptyTitle')}
+      emptySubtitle={t('views.project.emptySubtitle')}
+      headerActions={activeProject && (
+        <>
+          {labelChoices.length > 0 && (
+            <LabelFilterButton
+              ref={labelButtonRef}
+              picked={pickedLabels.length}
+              open={labelBarOpen}
+              controls={labelBarId}
+              onToggle={() => setLabelFilter({ pid, picked: pickedLabels, open: !labelBarOpen })}
+            />
+          )}
+          <ProjectHeaderMenu project={activeProject} />
+        </>
+      )}
       insertIndex={parentInsertIndex}
       newTaskPlacement="after-tasks"
     >
@@ -246,6 +368,13 @@ export function ProjectView() {
         )}
         <AddSectionButton parentProjectId={pid} siblings={sectionProjects} index={sectionProjects.length} />
       </div>
+      {pickedLabels.length > 0 && <LabelFilterMore count={labelHidden} onShowAll={() => setPickedLabels([])} />}
+      <WorkModeMore count={workHidden} mode={work.mode} onShow={() => setShownAllFor(pid)} />
+      {availability.on && availability.view === 'available' && (
+        <HiddenSummary count={hiddenCount} onShow={() => availability.setView('remaining')} />
+      )}
+      {/* Completed tasks (12.6): the project's own, by the mode, never by the label filter. */}
+      <ProjectCompletedRow key={pid} projectId={pid} shownAbove={everyTask} showAll={showAll} />
     </TaskList>
     </RowViewProvider>
   )

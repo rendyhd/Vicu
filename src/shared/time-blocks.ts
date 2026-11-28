@@ -426,7 +426,7 @@ function wallMinutes(block: TimeBlock): number {
     : minutesOfDay(block.end) - minutesOfDay(block.start)
 }
 
-/** The days of a view: one, three from the selected day, or the Monday-start week holding it. */
+/** The days of a view: one, three from the selected day, or the week holding it (`weekStart` gives its first day). */
 export function viewDays(view: PlanViewKind, day: LocalDate, weekStart: (d: LocalDate) => LocalDate): LocalDate[] {
   if (view === 'day') return [day]
   const first = view === 'week' ? weekStart(day) : day

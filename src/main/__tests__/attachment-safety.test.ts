@@ -27,10 +27,29 @@ describe('isRiskyAttachment', () => {
     expect(isRiskyAttachment(name)).toBe(true)
   })
 
+  it.each([
+    'old.doc', 'old.dot', 'old.xls', 'old.xlt', 'binary.xlsb', 'addin.xla', 'macro.xlm', 'old.ppt', 'old.pot',
+    'show.pps', 'addin.ppa', 'letter.rtf', 'page.mht', 'page.mhtml', 'Setup.appinstaller', 'x.theme',
+    'x.themepack', 'x.search-ms', 'sandbox.wsb', 'x.xbap', 'x.vsto', 'x.ppkg', 'x.msh', 'x.msh1xml',
+    'x.fileloc', 'x.inetloc',
+  ])('blocks %s (gaps from review S-3)', (name) => {
+    expect(isRiskyAttachment(name, 'win32')).toBe(true)
+    expect(isRiskyAttachment(name, 'darwin')).toBe(true)
+  })
+
   it.each(['photo.png', 'photo.JPG', 'notes.txt', 'report.pdf', 'sheet.xlsx', 'doc.docx', 'archive.zip', 'song.mp3', 'clip.mp4'])(
     'allows %s',
     (name) => {
-      expect(isRiskyAttachment(name)).toBe(false)
+      expect(isRiskyAttachment(name, 'win32')).toBe(false)
+      expect(isRiskyAttachment(name, 'linux')).toBe(false)
+    }
+  )
+
+  it.each(['archive.zip', 'App.xip', 'x.tar.gz', 'x.tgz', 'x.7z', 'x.rar', 'x.cpgz'])(
+    'blocks the archive %s on macOS only',
+    (name) => {
+      expect(isRiskyAttachment(name, 'darwin')).toBe(true)
+      expect(isRiskyAttachment(name, 'win32')).toBe(false)
     }
   )
 

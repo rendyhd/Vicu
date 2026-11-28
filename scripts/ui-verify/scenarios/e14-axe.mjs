@@ -66,7 +66,7 @@ export default async function run(h) {
         await h.page.getByRole('button', { name: section, exact: true }).click()
         await h.wait(600)
       },
-      ready: () => h.page.getByRole('button', { name: section, exact: true }).evaluate((b) => b.className.includes('border-b-2')),
+      ready: () => h.page.getByRole('button', { name: section, exact: true }).evaluate((b) => b.getAttribute('aria-current') === 'page'),
     })),
   ]
 

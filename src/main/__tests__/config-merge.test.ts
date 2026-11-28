@@ -30,6 +30,9 @@ function userConfig(overrides: Partial<AppConfig> = {}): AppConfig {
     sidebar_collapsed_projects: [4, 9],
     sidebar_collapsed_categories: ['work'],
     sidebar_hidden_lists: ['logbook', 'anytime'],
+    sidebar_order: ['inbox', 'logbook', 'projects'],
+    sidebar_pro_collapsed: true,
+    sidebar_hidden: true,
     quick_entry_enabled: true,
     quick_view_enabled: true,
     quick_entry_hotkey: 'Ctrl+Alt+N',
@@ -77,6 +80,9 @@ const PREFERENCE_KEYS = [
   'window_bounds',
   'sidebar_width',
   'sidebar_hidden_lists',
+  'sidebar_order',
+  'sidebar_pro_collapsed',
+  'sidebar_hidden',
   'quick_entry_enabled',
   'quick_view_enabled',
   'quick_entry_hotkey',
@@ -209,6 +215,13 @@ describe('applyConnectionFields: another server or account', () => {
     expect(normalizeConfig({ sidebar_hidden_lists: ['logbook', 'anytime', 'logbook', 'calendar', 'Today', '', 3, null] }).sidebar_hidden_lists)
       .toEqual(['anytime', 'calendar', 'logbook'])
     expect(normalizeConfig({ sidebar_hidden_lists: 'nope' }).sidebar_hidden_lists).toBeUndefined()
+  })
+
+  it('sidebar_order keeps the names in the order saved, once each', () => {
+    expect(normalizeConfig({ sidebar_order: ['logbook', 'inbox', 'logbook', 'calendar', 'Today', '', 3, null, 'projects'] }).sidebar_order)
+      .toEqual(['logbook', 'inbox', 'calendar', 'projects'])
+    expect(normalizeConfig({ sidebar_order: 'nope' }).sidebar_order).toBeUndefined()
+    expect(normalizeConfig({}).sidebar_order).toBeUndefined()
   })
 
   it('does not carry the old inbox project over', () => {
@@ -529,5 +542,41 @@ describe('voice shortcut', () => {
     const recorded = applyConfigPatch(userConfig(), { voice_hotkey: 'Alt+Shift+M' })
     expect(recorded.voice_hotkey).toBe('Alt+Shift+M')
     expect(applyConfigPatch(recorded, { voice_hotkey: '' }).voice_hotkey).toBe('')
+  })
+})
+
+describe('Work and Personal device settings (contract 22.4)', () => {
+  it('defaults to off, All hidden, work label hidden in Work, and Pro everywhere', () => {
+    const config = normalizeConfig({})
+    expect(config.work_mode_enabled).toBe(false)
+    expect(config.work_mode).toBe('all')
+    expect(config.work_mode_show_all).toBe(false)
+    expect(config.work_mode_show_work_label).toBe(false)
+    expect(config.pro_only_in_work).toBe(false)
+  })
+
+  it('keeps a valid mode and reads an unknown one as all', () => {
+    expect(
+      normalizeConfig({
+        work_mode_enabled: true,
+        work_mode: 'work',
+        work_mode_show_all: true,
+        work_mode_show_work_label: true,
+        pro_only_in_work: true,
+      }),
+    ).toMatchObject({
+      work_mode_enabled: true,
+      work_mode: 'work',
+      work_mode_show_all: true,
+      work_mode_show_work_label: true,
+      pro_only_in_work: true,
+    })
+    expect(normalizeConfig({ work_mode: 'personal' }).work_mode).toBe('personal')
+    expect(normalizeConfig({ work_mode: 'home' }).work_mode).toBe('all')
+    expect(normalizeConfig({ work_mode_enabled: 'yes' }).work_mode_enabled).toBe(false)
+    expect(normalizeConfig({ work_mode_show_all: 'yes', work_mode_show_work_label: 1 })).toMatchObject({
+      work_mode_show_all: false,
+      work_mode_show_work_label: false,
+    })
   })
 })

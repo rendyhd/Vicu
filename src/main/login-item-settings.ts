@@ -56,3 +56,18 @@ export function shouldStartHidden(input: StartHiddenInput): boolean {
   if (input.hiddenArg) return true
   return input.isMac && input.openedAtLogin && input.startHiddenSetting
 }
+
+/**
+ * How the main window opens at start: hidden in the tray, minimized to the taskbar, or shown.
+ * A hidden start (`shouldStartHidden`) becomes a minimized one on Windows and Linux when the close
+ * button minimizes to the taskbar, so the taskbar button and its count badge are there from the
+ * start; that also works without a tray icon, because the taskbar button brings the window back.
+ */
+export function startWindowState(
+  input: Omit<StartHiddenInput, 'canComeBack'> & { canComeBack: boolean; minimizeOnClose: boolean },
+): 'hidden' | 'minimized' | 'shown' {
+  if (!input.isMac && input.minimizeOnClose) {
+    return shouldStartHidden({ ...input, canComeBack: true }) ? 'minimized' : 'shown'
+  }
+  return shouldStartHidden(input) ? 'hidden' : 'shown'
+}

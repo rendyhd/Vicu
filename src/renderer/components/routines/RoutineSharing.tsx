@@ -1,4 +1,5 @@
 import { useId, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Info } from 'lucide-react'
 import { useCollabMe, useProjectAccess, useProjectAccessMap } from '@/hooks/use-project-access'
 import { useMembersPermissions } from '@/hooks/use-project-shares'
@@ -58,6 +59,7 @@ export function RoutineShareField({
   carrier?: RoutineCarrier<Task>
   onChange: (choice: RoutineShareChoice | null) => void
 }) {
+  const { t } = useTranslation()
   const me = useCollabMe()
   const myId = me?.id
   const accessMap = useProjectAccessMap()
@@ -97,8 +99,8 @@ export function RoutineShareField({
     // Someone else's routine: only its owner shares, moves or stops it.
     return (
       <div>
-        <div className={cn(LABEL, 'mb-1.5')}>Share with</div>
-        <p className="text-sm text-[var(--text-primary)]">{sharing.owner ? sharedByText(sharing.owner) : 'Shared with you'}</p>
+        <div className={cn(LABEL, 'mb-1.5')}>{t('routines.sharing.shareWith')}</div>
+        <p className="text-sm text-[var(--text-primary)]">{sharing.owner ? sharedByText(sharing.owner) : t('routines.sharing.sharedWithYou')}</p>
         {sharing.shared && <p className="mt-0.5 text-xs text-[var(--text-secondary)]">{visibleToText([...(accessMap.get(currentProjectId ?? 0)?.members ?? [])], myId)}</p>}
       </div>
     )
@@ -107,10 +109,10 @@ export function RoutineShareField({
   return (
     <div>
       <div className="mb-1.5 flex items-center gap-1.5">
-        <label htmlFor={fieldId} className={LABEL}>Share with</label>
+        <label htmlFor={fieldId} className={LABEL}>{t('routines.sharing.shareWith')}</label>
         <button
           type="button"
-          aria-label="About sharing a routine"
+          aria-label={t('routines.sharing.about')}
           aria-expanded={showInfo}
           aria-controls={infoId}
           onClick={() => setShowInfo(!showInfo)}
@@ -132,16 +134,16 @@ export function RoutineShareField({
           report(next, person ? defaultShareProject(person, currentProjectId) : null)
         }}
       >
-        <option value="">Only you</option>
+        <option value="">{t('routines.sharing.onlyYou')}</option>
         {people.map((entry) => (
           <option key={entry.person.id} value={entry.person.id} disabled={!entry.canWrite}>
-            {entry.canWrite ? displayName(entry.person) : `${displayName(entry.person)} (Can view only)`}
+            {entry.canWrite ? displayName(entry.person) : t('routines.sharing.canViewOnly', { name: displayName(entry.person) })}
           </option>
         ))}
       </select>
       {chosen && choices.length > 1 && (
         <fieldset className="mt-3">
-          <legend className={cn(LABEL, 'mb-1.5')}>Keep in</legend>
+          <legend className={cn(LABEL, 'mb-1.5')}>{t('routines.sharing.keepIn')}</legend>
           <div className="space-y-1.5">
             {choices.map((project) => (
               <label key={project.id} className={cn('flex cursor-pointer items-start gap-2 rounded-card border p-2.5', chosenProjectId === project.id ? 'border-accent-blue bg-accent-blue/10' : 'border-[var(--border-color)]')}>
@@ -155,7 +157,7 @@ export function RoutineShareField({
                 <span className="min-w-0 flex-1">
                   <span className="flex items-center gap-2 text-sm text-[var(--text-primary)]">
                     <span className="truncate">{project.title}</span>
-                    {project.ownedByMe && <span className="shrink-0 text-caption text-[var(--text-secondary)]">Yours</span>}
+                    {project.ownedByMe && <span className="shrink-0 text-caption text-[var(--text-secondary)]">{t('routines.sharing.yours')}</span>}
                   </span>
                   <span className="block text-xs text-[var(--text-secondary)]">{visibleToText([...project.members], myId)}</span>
                 </span>
@@ -167,7 +169,7 @@ export function RoutineShareField({
       {chosen && chosenProject && (
         <p className="mt-2 text-xs text-[var(--text-secondary)]">
           {visibleToText([...chosenProject.members], myId)}
-          {choices.length === 1 && <> · Kept in {chosenProject.title}</>}
+          {choices.length === 1 && <> · {t('routines.sharing.keptIn', { title: chosenProject.title })}</>}
         </p>
       )}
     </div>

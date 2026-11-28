@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildLoginItemSettings, parseHiddenArg, shouldStartHidden, START_HIDDEN_ARG } from '../login-item-settings'
+import { buildLoginItemSettings, parseHiddenArg, shouldStartHidden, startWindowState, START_HIDDEN_ARG } from '../login-item-settings'
 
 describe('buildLoginItemSettings', () => {
   it('returns openAtLogin only on non-macOS', () => {
@@ -79,3 +79,38 @@ describe('shouldStartHidden', () => {
     expect(shouldStartHidden({ ...base, isMac: false, openedAtLogin: true, startHiddenSetting: true })).toBe(false)
   })
 })
+
+describe('startWindowState', () => {
+  const base = {
+    hiddenArg: false,
+    openedAtLogin: false,
+    startHiddenSetting: false,
+    isMac: false,
+    canComeBack: true,
+    minimizeOnClose: false,
+  }
+
+  it('shows the window on a normal start', () => {
+    expect(startWindowState(base)).toBe('shown')
+    expect(startWindowState({ ...base, minimizeOnClose: true })).toBe('shown')
+  })
+
+  it('starts hidden in the tray with --hidden', () => {
+    expect(startWindowState({ ...base, hiddenArg: true })).toBe('hidden')
+  })
+
+  it('starts minimized instead when the close button minimizes, so the taskbar badge is there', () => {
+    expect(startWindowState({ ...base, hiddenArg: true, minimizeOnClose: true })).toBe('minimized')
+  })
+
+  it('starts minimized without a tray icon, because the taskbar button brings it back', () => {
+    expect(startWindowState({ ...base, hiddenArg: true, minimizeOnClose: true, canComeBack: false })).toBe('minimized')
+    expect(startWindowState({ ...base, hiddenArg: true, canComeBack: false })).toBe('shown')
+  })
+
+  it('keeps the macOS rule: the close action does not apply there', () => {
+    const mac = { ...base, isMac: true, openedAtLogin: true, startHiddenSetting: true, minimizeOnClose: true }
+    expect(startWindowState(mac)).toBe('hidden')
+  })
+})
+

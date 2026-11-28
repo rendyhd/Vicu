@@ -83,6 +83,16 @@ describe('handleReplayed', () => {
     expect(deps.refreshReminders).toHaveBeenCalledTimes(1)
   })
 
+  it('says once when queued notes edits went out with both versions (description format)', () => {
+    const { qc, deps } = setup()
+    const notesMerged = vi.fn()
+    handleReplayed(qc, event(), { ...deps, notesMerged })
+    expect(notesMerged).not.toHaveBeenCalled()
+    handleReplayed(qc, event({ applied: 2, notesMerged: [5, 9] }), { ...deps, notesMerged })
+    expect(notesMerged).toHaveBeenCalledTimes(1)
+    expect(notesMerged).toHaveBeenCalledWith([5, 9])
+  })
+
   it('ignores ids that are not temp ids', () => {
     const { qc, deps } = setup()
     handleReplayed(qc, event({ idMap: { '5': 6, '-2': 0 } }), deps)

@@ -1,13 +1,16 @@
 import { forwardRef, memo, useState, useRef, useEffect, useCallback, useImperativeHandle, useMemo } from 'react'
-import { ListChecks, Bell, Repeat, Paperclip, AlignLeft, ChevronRight, MessageSquare } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
+import { ListChecks, Bell, Repeat, Paperclip, AlignLeft, ChevronRight, MessageSquare, Flag } from 'lucide-react'
 import type { Editor } from '@tiptap/react'
-import { useDraggable } from '@dnd-kit/core'
+import { useDndContext, useDraggable, useDroppable } from '@dnd-kit/core'
 import { useSortable, defaultAnimateLayoutChanges } from '@dnd-kit/sortable'
 import type { AnimateLayoutChanges } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { cn } from '@/lib/cn'
 import { useSelectionStore } from '@/stores/selection-store'
 import { orderedTaskIds } from '@/lib/task-selection'
+import { hasUnsavedNotes, notesAfterServerChange, notesBaseAfterSave, notesBaseAfterServerChange } from '@/lib/notes-sync'
+import { isTempTaskId } from '@/lib/pending-cache'
 import { useUpdateTask, useCompleteTask, useDeleteTask, useUploadAttachmentFromDrop, useAddLabel, useCreateLabel } from '@/hooks/use-task-mutations'
 import { useCompletionHoldEngagement } from '@/hooks/use-completion-hold'
 import { useCompletionCollapse } from '@/hooks/use-completion-collapse'
@@ -17,18 +20,19 @@ import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { dueToday, parsedDue } from '@/lib/due-dates'
 import { labelChipStyle } from '@/lib/label-style'
 import { normalizeHex } from '@/lib/constants'
-import { checklistLabel, rowLabels, rowProjectSource } from '@/lib/row-anatomy'
+import { checklistLabel, rowFieldShown, rowLabels, rowProjectSource } from '@/lib/row-anatomy'
 import { useIsDark } from '@/hooks/use-is-dark'
 import type { Task, TaskReminder } from '@/lib/vikunja-types'
 import { TaskCheckbox } from './TaskCheckbox'
 import { FoldedNotes } from '../rich-text/FoldedNotes'
 import { TaskCardBar, type CardPopover } from './TaskCardBar'
-import { TaskBlockBadge, TaskDueBadge } from './TaskDueBadge'
+import { TaskBlockBadge, TaskDoneDay, TaskDueBadge } from './TaskDueBadge'
 import { blockOf, dueRepeatsBlockDay } from '../../../shared/time-blocks'
 import { useRowView } from './RowViewContext'
 import { PriorityMark } from '@/components/shared/PriorityMark'
 import { SubtaskList } from './SubtaskList'
-import { TaskDescription } from './TaskDescription'
+import { TaskDescription, type TaskDescriptionImages } from './TaskDescription'
+import { getTitlePasteImages, type ClipboardImage } from '@/lib/clipboard-images'
 import { TaskContextMenu } from './TaskContextMenu'
 import { TaskLinkIcon } from '@/components/TaskLinkIcon'
 import { TaskSyncIcon } from '@/components/task-list/TaskSyncIcon'
@@ -39,8 +43,23 @@ import { useProjects } from '@/hooks/use-projects'
 import { blockFields, extractBangToday, recurrenceToVikunja } from '@/lib/task-parser'
 import { TaskInputParser } from '@/components/task-input/TaskInputParser'
 import { useAppConfig } from '@/hooks/use-app-config'
+import { useWorkMode } from '@/hooks/use-work-mode'
 import { useSubtasks } from '@/hooks/use-subtasks'
 import { useHasLocationReminder } from '@/hooks/use-location-reminders'
+import { WorkMark, useWorkMark } from './WorkMark'
+import { useAvailability, useReasonText } from '@/hooks/use-availability'
+import { usePromiseOf } from '@/hooks/use-promises'
+import { PromiseLine } from '@/components/pro/PromiseLine'
+import { usePersonLabels } from '@/hooks/use-people'
+import { PersonMark } from '@/components/pro/PersonMark'
+import { VerdictBar, verdictForKey } from '@/components/pro/VerdictBar'
+import { canSnooze, isSent, readVerdictSnoozes } from '../../../shared/pro/promises'
+import { estimateOf, finalVerdictOf } from '../../../shared/pro/ledger'
+import { useProLedger } from '@/hooks/use-pro-ledger'
+import { formatLength } from '@/lib/planner-timeline'
+import { useDateFormat } from '@/hooks/use-date-format'
+import { formatWeekdayDate } from '../../../shared/date-display'
+import { startDateOf } from '../../../shared/pro/start-dates'
 import {
   parentTitle,
   subtaskProgress,
@@ -143,6 +162,29 @@ function useDraggableRow(task: Task): DragBehavior {
   }
 }
 
+// Dropping a dragged task on the middle of a row makes it that row's subtask (cross-app semantics
+// 24.6); the top and bottom quarter still reorder. The target exists only while another task is
+// being dragged, so a list registers no extra droppables the rest of the time.
+function NestTarget({ task }: { task: Task }) {
+  const { active } = useDndContext()
+  const selected = useSelectionStore((s) => s.selectedTaskIds)
+  const data = active?.data.current as { type?: string; task?: Task } | undefined
+  if (data?.type !== 'task' || !data.task || task.done || task.id <= 0) return null
+  // Not the dragged row, nor another row of a dragged selection.
+  if (data.task.id === task.id || (selected.has(data.task.id) && selected.has(task.id))) return null
+  return <NestBand task={task} />
+}
+
+function NestBand({ task }: { task: Task }) {
+  const { setNodeRef, isOver } = useDroppable({ id: `nest-${task.id}`, data: { type: 'task-nest', task } })
+  return (
+    <>
+      <div ref={setNodeRef} aria-hidden="true" data-nest-target={task.id} className="pointer-events-none absolute inset-x-0 bottom-1/4 top-1/4" />
+      {isOver && <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-accent-blue/8 ring-2 ring-inset ring-accent-blue" />}
+    </>
+  )
+}
+
 interface TaskTitleEditorHandle {
   save: () => boolean
 }
@@ -152,10 +194,13 @@ interface TaskTitleEditorProps {
   onSave: (changes: Partial<Task>) => void
   onSubmit: () => void
   onCancel: () => void
+  /** An image pasted in the title goes to the notes. */
+  onPasteImages: (images: ClipboardImage[]) => void
 }
 
 const TaskTitleEditor = forwardRef<TaskTitleEditorHandle, TaskTitleEditorProps>(
-  function TaskTitleEditor({ task, onSave, onSubmit, onCancel }, ref) {
+  function TaskTitleEditor({ task, onSave, onSubmit, onCancel, onPasteImages }, ref) {
+    const { t } = useTranslation()
     const addLabel = useAddLabel()
     const createLabel = useCreateLabel()
     const parser = useTaskParser()
@@ -297,6 +342,12 @@ const TaskTitleEditor = forwardRef<TaskTitleEditorHandle, TaskTitleEditorProps>(
           if (e.currentTarget.contains(e.relatedTarget as Node)) return
           save()
         }}
+        onPaste={(e) => {
+          const images = getTitlePasteImages(e)
+          if (images.length === 0) return
+          e.preventDefault()
+          onPasteImages(images)
+        }}
       >
         <TaskInputParser
           value={title}
@@ -322,7 +373,7 @@ const TaskTitleEditor = forwardRef<TaskTitleEditorHandle, TaskTitleEditorProps>(
           projects={projectItems}
           labels={labelItems}
           inputRef={inputRef}
-          placeholder="Task title"
+          placeholder={t('task.row.titlePlaceholder')}
           showBangTodayHint={isDirty && !parser.enabled && !!parser.parserConfig.bangToday}
           inputClassName="font-medium leading-snug"
           multiline
@@ -347,6 +398,23 @@ function RowProject({ title, color }: { title: string; color?: string }) {
 }
 
 /** The project of a row in a list that mixes projects without headers (Search, custom lists). */
+/** A list's `row_fields` asked for the start date (21.3); a block is its own start and shows already. */
+function RowStart({ task }: { task: Task }) {
+  const { t } = useTranslation()
+  const fmt = useDateFormat()
+  const start = startDateOf(task)
+  if (!start) return null
+  return <span className="shrink-0" data-row-start>{t('task.row.starts', { date: formatWeekdayDate(start, new Date(), fmt) })}</span>
+}
+
+/** A list's `row_fields` asked for the estimate (21.7). */
+function RowEstimate({ taskId }: { taskId: number }) {
+  const { ledger } = useProLedger()
+  const minutes = estimateOf(ledger, taskId)
+  if (minutes === null) return null
+  return <span className="shrink-0" data-row-estimate>{formatLength(minutes)}</span>
+}
+
 function RowProjectLookup({ projectId }: { projectId: number }) {
   const { data } = useProjects()
   const project = data?.flat.find((candidate) => candidate.id === projectId)
@@ -361,11 +429,29 @@ function TaskRowInner({
   drag,
   reorderable = false,
 }: Omit<TaskRowProps, 'sortable'> & { drag: DragBehavior; reorderable?: boolean }) {
+  const { t } = useTranslation()
   // Per-field subscriptions: each row re-renders only when *its own* derived
   // state flips, not on every focus/selection change anywhere in the list.
   const isExpanded = useSelectionStore((s) => s.expandedTaskId === task.id)
   const hasPlaceReminder = useHasLocationReminder(task.id)
   const block = useMemo(() => blockOf(task), [task.start_date, task.end_date])
+  // Pro's availability (cross-app semantics 21.2, design system 9): off, all of this is null.
+  const pro = useAvailability()
+  const reasonText = useReasonText()
+  const availability = pro.on && !task.done ? pro.of(task) : null
+  const unavailableReason = availability && !availability.available ? reasonText(task, availability) : null
+  const isNext = availability?.next === true
+  const flagged = pro.on && task.is_favorite === true
+  // Pro's promises (21.6, design system 9): a promise of theirs shows the person instead of a checkbox.
+  const promise = usePromiseOf()(task)
+  const personLabels = usePersonLabels()
+  const [verdictOpen, setVerdictOpen] = useState(false)
+  // A digit pressed on the row: the verdict bar opens and acts on it (it holds the actions).
+  const [verdictKey, setVerdictKey] = useState<string | null>(null)
+  const promisePerson = promise?.person != null ? personLabels.get(promise.person) : undefined
+  const promiseName = promisePerson?.title ?? t('task.row.someone')
+  const theirs = promise?.dir === 'theirs' && !finalVerdictOf(promise)
+  const mine = promise?.dir === 'mine' && !finalVerdictOf(promise)
   const isFocused = useSelectionStore((s) => s.focusedTaskId === task.id)
   const isSelected = useSelectionStore((s) => s.selectedTaskIds.has(task.id))
   // Main asked for this task to be shown (a clicked reminder): expand once the row is on screen.
@@ -454,19 +540,42 @@ function TaskRowInner({
   const titleEditorRef = useRef<TaskTitleEditorHandle>(null)
   const descEditorRef = useRef<Editor | null>(null)
   const descBaselineRef = useRef<string | null>(null)
+  const descImagesRef = useRef<TaskDescriptionImages | null>(null)
+  // Images pasted in the title land in the notes after their upload; the notes are saved then,
+  // because the title's own save only sends the notes when the title changed too.
+  const [saveNotesAfterPaste, setSaveNotesAfterPaste] = useState(0)
 
   // Flash red border briefly when drag-drop upload fails, show error message
   useEffect(() => {
     if (uploadFromDrop.isError) {
-      setDropError(uploadFromDrop.error?.message || 'Upload failed')
+      setDropError(uploadFromDrop.error?.message || t('task.row.uploadFailed'))
       const timer = setTimeout(() => setDropError(null), 4000)
       return () => clearTimeout(timer)
     }
   }, [uploadFromDrop.isError, uploadFromDrop.failureCount, uploadFromDrop.error])
 
+  // Newer notes in the cache reach the editor only while it holds no unsaved text; unsaved text
+  // and its baseline stay, so the next save still goes out (notes-sync.ts, review C-5).
+  const editDescriptionRef = useRef(editDescription)
+  editDescriptionRef.current = editDescription
+  // The base of a notes save: the raw description the editor's text was loaded from, kept while the
+  // editor holds unsaved text, then what the server answered (notes-sync.ts; description format,
+  // "Notes changed in two places").
+  const descBaseRef = useRef<string>(task.description ?? '')
+  const rawDescriptionRef = useRef<string>(task.description ?? '')
+  rawDescriptionRef.current = task.description ?? ''
   useEffect(() => {
-    setEditDescription(stripPageLink(stripNoteLink(task.description)))
+    const state = { edit: editDescriptionRef.current, baseline: descBaselineRef.current }
+    descBaseRef.current = notesBaseAfterServerChange(state, descBaseRef.current, task.description ?? '')
+    const next = notesAfterServerChange(state, stripPageLink(stripNoteLink(task.description)))
+    descBaselineRef.current = next.baseline
+    setEditDescription(next.edit)
   }, [task.description])
+  // A closed card has no editor: its baseline is set again by the editor's onReady when it opens,
+  // and until then newer notes are always taken.
+  useEffect(() => {
+    if (!isExpanded) descBaselineRef.current = null
+  }, [isExpanded])
 
   const saveTaskChanges = useCallback((titleChanges: Partial<Task> = {}) => {
     const changes: Partial<Task> = { ...titleChanges }
@@ -474,15 +583,32 @@ function TaskRowInner({
     // opening a task shouldn't trigger a save just because TipTap re-serializes whitespace.
     const baseline = descBaselineRef.current
     const descChanged = baseline !== null && editDescription !== baseline
+    let saved: string | null = null
     if (descChanged) {
       const fullDescription = noteLinkHtml
         ? (editDescription ? editDescription + noteLinkHtml : noteLinkHtml)
         : editDescription
       changes.description = fullDescription
       descBaselineRef.current = editDescription
+      saved = fullDescription
     }
     if (Object.keys(changes).length > 0) {
-      updateTask.mutate({ id: task.id, changes, original: task })
+      if (saved === null) {
+        updateTask.mutate({ id: task.id, changes, original: task })
+        return
+      }
+      const sent = saved
+      updateTask.mutate(
+        // The base the editor kept: if the server's notes changed since, main keeps both versions.
+        { id: task.id, changes, original: task, baseDescription: descBaseRef.current },
+        {
+          onSuccess: (answer) => {
+            const answered = answer && typeof answer.description === 'string' && !isTempTaskId(answer.id) ? answer.description : null
+            const unsaved = hasUnsavedNotes({ edit: editDescriptionRef.current, baseline: descBaselineRef.current })
+            descBaseRef.current = notesBaseAfterSave(answered, sent, unsaved)
+          },
+        },
+      )
     }
   }, [editDescription, noteLinkHtml, task, updateTask])
 
@@ -491,6 +617,16 @@ function TaskRowInner({
       saveTaskChanges()
     }
   }, [saveTaskChanges])
+
+  const pasteImagesFromTitle = useCallback((images: ClipboardImage[]) => {
+    const notes = descImagesRef.current
+    if (!notes) return
+    void notes.addImages(images).then(() => setSaveNotesAfterPaste((n) => n + 1))
+  }, [])
+  // Runs after the render that holds the new notes, so the save sees them; only when a paste finished.
+  useEffect(() => {
+    if (saveNotesAfterPaste > 0) saveTaskChanges()
+  }, [saveNotesAfterPaste])
 
   const handleDateChange = useCallback(
     (isoDate: string) => {
@@ -598,14 +734,24 @@ function TaskRowInner({
     [task.id, uploadFromDrop]
   )
 
+  const { hiddenLabelId } = useWorkMode()
   const labels = task.labels ?? []
-  const metaLabels = rowLabels(labels, rowView)
-  const projectSource = rowProjectSource(task.project_id, rowView, projectMeta !== undefined)
+  // A promise names its person on the meta line: the person's label chip would say it twice.
+  // In Work mode the work label chip is also hidden by default to avoid repeating it on every row.
+  const metaLabels = rowFieldShown(rowView, 'labels')
+    ? rowLabels(labels, rowView).filter((label) => (!promise || label.id !== promise.person) && label.id !== hiddenLabelId)
+    : []
+  const projectSource = rowFieldShown(rowView, 'project') ? rowProjectSource(task.project_id, rowView, projectMeta !== undefined) : 'none'
+  const showStart = rowFieldShown(rowView, 'start') && startDateOf(task) !== null
+  const showEstimate = rowFieldShown(rowView, 'estimate')
   const isRepeating = (task.repeat_after ?? 0) > 0 || (task.repeat_mode ?? 0) > 0
   // Comfortable, the notes show as a line of text, which takes the place of their icon (design system section 4).
   const comfortable = appConfig?.row_density === 'comfortable'
-  const notesLine = comfortable ? notesPreview(task.description) : ''
-  const showNotesIcon = notesLine === '' && hasNotesContent(task.description)
+  // A list that names its row fields shows the notes line only when it lists `notes` (3.8).
+  const notesShown = rowView.fields ? rowView.fields.includes('notes') : true
+  const notesLine = notesShown && (comfortable || rowView.fields !== undefined) ? notesPreview(task.description) : ''
+  const showNotesIcon = notesShown && notesLine === '' && hasNotesContent(task.description)
+  const workMark = useWorkMark(task, rowView.showWorkMark === true)
   const hasMeta =
     projectSource !== 'none' ||
     metaLabels.length > 0 ||
@@ -615,7 +761,13 @@ function TaskRowInner({
     (task.attachments?.length ?? 0) > 0 ||
     commentCount > 0 ||
     (nestedDepth === 0 && !!parentTitle(task)) ||
-    (nestedDepth > 0 && parentProjectId !== undefined && parentProjectId !== task.project_id)
+    (nestedDepth > 0 && parentProjectId !== undefined && parentProjectId !== task.project_id) ||
+    unavailableReason !== null ||
+    isNext ||
+    workMark ||
+    showStart ||
+    showEstimate ||
+    !!promise
 
   // Collapsed row — entire row is draggable (PointerSensor distance:8 distinguishes click vs drag)
   if (!isExpanded) {
@@ -637,7 +789,7 @@ function TaskRowInner({
         onPointerEnter={holdEngagement.onPointerEnter}
         onPointerLeave={holdEngagement.onPointerLeave}
         className={cn(
-          'vicu-task-fade group grid cursor-default grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-x-3 border-b border-[var(--border-color)] px-4 py-2.5 transition-colors hover:bg-[var(--bg-hover)]',
+          'vicu-task-fade group relative grid cursor-default grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-x-3 border-b border-[var(--border-color)] px-4 py-2.5 transition-colors hover:bg-[var(--bg-hover)]',
           isSelected && 'bg-bg-selected ring-1 ring-inset ring-accent-blue/40',
           isFocused && !isSelected && !isExpanded && 'bg-accent-blue/8 ring-1 ring-inset ring-accent-blue/30',
           isDragging && 'opacity-30',
@@ -684,6 +836,14 @@ function TaskRowInner({
         }}
         onKeyDown={(e) => {
           if (e.key === 'Enter') toggleExpandedTask(task.id)
+          // Keys 1 to 6 give a verdict on a promise of theirs (design system 9).
+          if (theirs && !task.done && e.target === e.currentTarget && !e.ctrlKey && !e.metaKey && !e.altKey) {
+            if (verdictForKey(e.key)) {
+              e.preventDefault()
+              setVerdictKey(e.key)
+              setVerdictOpen(true)
+            }
+          }
         }}
         onDragOver={handleFileDragOver}
         onDragLeave={handleFileDragLeave}
@@ -699,7 +859,12 @@ function TaskRowInner({
         }}
         {...listeners}
       >
-        <TaskCheckbox task={task} suppressTopLevelUndo={nestedDepth > 0} />
+        <NestTarget task={task} />
+        {theirs ? (
+          <PersonMark name={promiseName} color={promisePerson?.hex_color} expanded={verdictOpen} onClick={() => setVerdictOpen((open) => !open)} />
+        ) : (
+          <TaskCheckbox task={task} suppressTopLevelUndo={nestedDepth > 0} />
+        )}
 
         {/* Line 1 is the title, level with the checkbox; line 2 is the meta line, when there is one. */}
         <div className="min-w-0">
@@ -707,7 +872,7 @@ function TaskRowInner({
             className={cn(
               'text-task-title',
               comfortable ? 'line-clamp-3 break-words' : 'block truncate',
-              task.done ? 'text-text-secondary' : 'text-text'
+              task.done || (unavailableReason && !theirs) ? 'text-text-secondary' : 'text-text'
             )}
           >
             {dropError ? (
@@ -716,14 +881,31 @@ function TaskRowInner({
               // The strike is drawn behind the text left to right when the task has just been completed.
               <span className={cn(task.done && 'vicu-strike', task.done && strikePlay && 'vicu-strike-play')}>{task.title}</span>
             )}
+            {flagged && rowFieldShown(rowView, 'flag') && (
+              <Flag role="img" aria-label={t('task.row.flagged')} className="ml-1.5 inline h-3 w-3 -translate-y-px fill-accent-orange text-accent-orange" />
+            )}
           </span>
           {notesLine && <p className="mt-0.5 truncate text-meta font-normal text-text-secondary">{notesLine}</p>}
           {hasMeta && (
             <div className="mt-0.5 flex min-w-0 items-center gap-x-2 overflow-hidden whitespace-nowrap text-meta text-text-secondary">
+              {workMark && <WorkMark task={task} />}
+              {isNext && (
+                <span className="vicu-chip shrink-0 rounded-chip bg-accent-blue/12 px-2 py-px text-chip leading-tight text-accent-blue" data-pro-next>
+                  {t('task.row.next')}
+                </span>
+              )}
+              {unavailableReason && !theirs && <span className="min-w-0 shrink truncate" data-pro-reason>{unavailableReason}</span>}
+              {promise && (theirs || mine) && <PromiseLine promise={promise} personName={promiseName} theirs={theirs} />}
+              {promise?.words && <span className="min-w-0 shrink truncate italic">{t('task.row.promiseWords', { words: promise.words })}</span>}
+              {promise && isSent(promise) && (
+                <span className="vicu-chip shrink-0 rounded-chip bg-accent-blue/12 px-2 py-px text-chip leading-tight text-accent-blue">{t('task.row.inRecap')}</span>
+              )}
               {projectSource === 'group' && projectMeta && (
                 <RowProject title={projectMeta.title} color={projectMeta.color} />
               )}
               {projectSource === 'lookup' && <RowProjectLookup projectId={task.project_id} />}
+              {showStart && <RowStart task={task} />}
+              {showEstimate && <RowEstimate taskId={task.id} />}
               {metaLabels.map((l) => (
                 <span
                   key={l.id}
@@ -734,10 +916,10 @@ function TaskRowInner({
                 </span>
               ))}
               {nestedDepth === 0 && parentTitle(task) && (
-                <span className="min-w-0 truncate">Subtask of {parentTitle(task)}</span>
+                <span className="min-w-0 truncate">{t('task.row.subtaskOf', { title: parentTitle(task) })}</span>
               )}
               {nestedDepth > 0 && parentProjectId !== undefined && parentProjectId !== task.project_id && (
-                <span className="shrink-0">Different project</span>
+                <span className="shrink-0">{t('task.row.differentProject')}</span>
               )}
               {subtaskCount > 0 && (
                 <button
@@ -751,7 +933,7 @@ function TaskRowInner({
                     'flex min-h-6 shrink-0 items-center justify-center gap-0.5',
                     canExpandSubtasks && 'rounded-control px-0.5 hover:bg-bg-hover hover:text-text',
                   )}
-                  aria-label={`${checklistLabel(progress.completed, progress.total)} subtasks complete`}
+                  aria-label={t('task.row.subtasksComplete', { progress: checklistLabel(progress.completed, progress.total) })}
                   aria-expanded={canExpandSubtasks ? subtasksExpanded : undefined}
                 >
                   {canExpandSubtasks && (
@@ -762,9 +944,9 @@ function TaskRowInner({
                 </button>
               )}
               {showNotesIcon && (
-                <AlignLeft className="h-3 w-3 shrink-0" aria-label="Has notes" />
+                <AlignLeft className="h-3 w-3 shrink-0" aria-label={t('task.row.hasNotes')} />
               )}
-              {isRepeating && <Repeat className="h-3 w-3 shrink-0" aria-label="Repeats" />}
+              {isRepeating && <Repeat className="h-3 w-3 shrink-0" aria-label={t('task.row.repeats')} />}
               {(task.attachments?.length ?? 0) > 0 && (
                 <button
                   type="button"
@@ -774,7 +956,7 @@ function TaskRowInner({
                     setActivePopover('attachment')
                   }}
                   className="relative shrink-0 after:absolute after:-inset-1.5 after:content-[''] hover:text-text"
-                  aria-label="Attachments"
+                  aria-label={t('task.row.attachments')}
                 >
                   <Paperclip className="h-3 w-3" />
                 </button>
@@ -823,14 +1005,35 @@ function TaskRowInner({
           )}
           <TaskSyncIcon taskId={task.id} />
           <TaskLinkIcon description={task.description} />
-          {/* A date-only due date on the block's own day would repeat its day phrase (contract 16.4). */}
-          {!(block && dueRepeatsBlockDay(task.due_date, block)) && <TaskDueBadge dueDate={task.due_date} />}
-          {block && <TaskBlockBadge block={block} />}
+          {rowView.doneDay && task.done ? (
+            // A project's Completed list says the day of the completion instead (contract 12.6).
+            <TaskDoneDay doneAt={task.done_at} />
+          ) : (
+            <>
+              {/* A date-only due date on the block's own day would repeat its day phrase (contract 16.4). */}
+              {rowFieldShown(rowView, 'due') && !(block && dueRepeatsBlockDay(task.due_date, block)) && <TaskDueBadge dueDate={task.due_date} />}
+              {block && <TaskBlockBadge block={block} />}
+            </>
+          )}
           {((task.reminders?.length ?? 0) > 0 || hasPlaceReminder) && (
-            <Bell className="h-3 w-3 text-text-secondary" aria-label="Has a reminder" />
+            <Bell className="h-3 w-3 text-text-secondary" aria-label={t('task.row.hasReminder')} />
           )}
           <PriorityMark priority={task.priority} />
         </div>
+        {theirs && verdictOpen && (
+          <div className="col-span-3 pb-1 pl-8 pt-2">
+            <VerdictBar
+              task={task}
+              personName={promiseName}
+              canSnooze={canSnooze(task, promise, readVerdictSnoozes(appConfig?.pro_verdict_snooze)[String(task.id)])}
+              pendingKey={verdictKey}
+              onDone={() => {
+                setVerdictKey(null)
+                setVerdictOpen(false)
+              }}
+            />
+          </div>
+        )}
       </div>
       {contextMenu && (
         <TaskContextMenu
@@ -887,6 +1090,7 @@ function TaskRowInner({
           onSave={saveTaskChanges}
           onSubmit={() => descEditorRef.current?.commands.focus('end')}
           onCancel={collapseAll}
+          onPasteImages={pasteImagesFromTitle}
         />
         <TaskSyncIcon taskId={task.id} />
         <TaskLinkIcon description={task.description} />
@@ -898,7 +1102,7 @@ function TaskRowInner({
             aria-expanded={activePopover === 'attachment'}
             onClick={() => togglePopover('attachment')}
             className="relative shrink-0 text-[var(--text-secondary)] after:absolute after:-inset-1.5 after:content-['']"
-            title="Attachments"
+            title={t('task.row.attachments')}
           >
             <Paperclip className="h-3.5 w-3.5" />
           </button>
@@ -926,10 +1130,13 @@ function TaskRowInner({
           }}
           onReady={(normalized) => {
             descBaselineRef.current = normalized
+            // The editor's text was loaded from these notes: they are the base of its next save.
+            descBaseRef.current = rawDescriptionRef.current
             setEditDescription(normalized)
           }}
           editorRef={descEditorRef}
-          placeholder="Notes"
+          imagesRef={descImagesRef}
+          placeholder={t('task.row.notes')}
         />
         </FoldedNotes>
       </div>
@@ -959,7 +1166,7 @@ function TaskRowInner({
             setStructuralDeleteOpen(true)
             return
           }
-          const ok = await confirmDelete('Delete this task? This cannot be undone.')
+          const ok = await confirmDelete(t('task.confirm.deleteTask'))
           if (ok) {
             deleteTask.mutate({ task })
             collapseAll()
@@ -970,14 +1177,14 @@ function TaskRowInner({
       <ConfirmDialog {...dialogProps} />
       <ConfirmDialog
         open={structuralDeleteOpen}
-        message={`This task has ${taskDescendants(task).length} ${taskDescendants(task).length === 1 ? 'subtask' : 'subtasks'}. Delete them too, or keep them as standalone tasks?`}
-        confirmLabel="Delete all"
+        message={t('task.confirm.taskHasSubtasks', { count: taskDescendants(task).length })}
+        confirmLabel={t('task.confirm.deleteAll')}
         onConfirm={() => {
           setStructuralDeleteOpen(false)
           deleteTask.mutate({ task, deleteSubtasks: true })
           collapseAll()
         }}
-        secondaryLabel="Keep subtasks"
+        secondaryLabel={t('task.confirm.keepSubtasks')}
         onSecondary={() => {
           setStructuralDeleteOpen(false)
           deleteTask.mutate({ task, deleteSubtasks: false })

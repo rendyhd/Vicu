@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { CheckCircle2, Undo2 } from 'lucide-react'
 import { canUndoAll, undoPlan, type SessionLog } from '@/lib/guided/cards'
 import { useUncompleteTask, useUpdateTask } from '@/hooks/use-task-mutations'
@@ -27,7 +28,8 @@ interface Props {
  * The end of a guided session (14.3): what it changed, Undo all (every change back except deletes)
  * and Done.
  */
-export function GuidedSummary({ empty, emptyText, log, summary, extra, onUndoMore, canUndoMore = false, doneLabel = 'Done', onDone }: Props) {
+export function GuidedSummary({ empty, emptyText, log, summary, extra, onUndoMore, canUndoMore = false, doneLabel, onDone }: Props) {
+  const { t } = useTranslation()
   const updateTask = useUpdateTask()
   const reopen = useUncompleteTask()
   const [undone, setUndone] = useState(false)
@@ -51,8 +53,8 @@ export function GuidedSummary({ empty, emptyText, log, summary, extra, onUndoMor
     }
     setBusy(false)
     setUndone(true)
-    if (failed > 0) toast.error(failed === 1 ? 'One change could not be put back.' : `${failed} changes could not be put back.`)
-    else announce('Every change was put back, except deletes.')
+    if (failed > 0) toast.error(t('guided.summary.failed', { count: failed }))
+    else announce(t('guided.summary.allPutBack'))
   }
 
   return (
@@ -61,20 +63,20 @@ export function GuidedSummary({ empty, emptyText, log, summary, extra, onUndoMor
         <>
           {!empty && (canUndoAll(log) || canUndoMore) && (
             <Button onClick={() => void undoAll()} disabled={busy || undone}>
-              <Undo2 aria-hidden="true" className="h-4 w-4" /> {undone ? 'Put back' : 'Undo all'}
+              <Undo2 aria-hidden="true" className="h-4 w-4" /> {undone ? t('guided.summary.putBack') : t('guided.summary.undoAll')}
             </Button>
           )}
           <span className="flex-1" />
-          <Button variant="primary" onClick={onDone} autoFocus>{doneLabel}</Button>
+          <Button variant="primary" onClick={onDone} autoFocus>{doneLabel ?? t('guided.done')}</Button>
         </>
       }
     >
       <div className="flex flex-col items-center gap-3 py-4 text-center">
         <CheckCircle2 aria-hidden="true" className="h-10 w-10 text-accent-green" strokeWidth={1.5} />
-        <p className="text-card-title text-[var(--text-primary)]" role="status">{empty ? emptyText : undone ? 'Put back, except deletes' : summary}</p>
+        <p className="text-card-title text-[var(--text-primary)]" role="status">{empty ? emptyText : undone ? t('guided.summary.putBackExceptDeletes') : summary}</p>
         {!empty && !undone && extra}
         {!empty && !undone && (canUndoAll(log) || canUndoMore) && (
-          <p className="text-meta text-[var(--text-secondary)]">Undo all puts every change back, except deletes.</p>
+          <p className="text-meta text-[var(--text-secondary)]">{t('guided.summary.undoAllHint')}</p>
         )}
       </div>
     </GuidedCardShell>

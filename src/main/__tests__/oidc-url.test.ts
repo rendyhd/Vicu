@@ -108,7 +108,11 @@ describe('interpretRedirect', () => {
 
   it('reports an error from the provider', () => {
     const result = interpretRedirect(`${REDIRECT}?error=access_denied&error_description=User%20said%20no&state=s`, REDIRECT, 's')
-    expect(result).toEqual({ kind: 'error', message: 'OIDC login failed: access_denied — User said no' })
+    expect(result).toEqual({ kind: 'error', error: 'access_denied', description: 'User said no', message: 'OIDC login failed: access_denied — User said no' })
+  })
+
+  it('still reports an error in the sign-in window whatever state it carries (the loopback listener decides for itself)', () => {
+    expect(interpretRedirect(`${REDIRECT}?error=access_denied&state=other`, REDIRECT, 's').kind).toBe('error')
   })
 
   it('reports an error without a description', () => {
@@ -121,6 +125,7 @@ describe('interpretRedirect', () => {
     const silent = { errorPrefix: 'Silent reauth failed', defaultErrorDescription: 'session expired' }
     expect(interpretRedirect(`${REDIRECT}?error=login_required`, REDIRECT, 's', silent)).toEqual({
       kind: 'error',
+      error: 'login_required',
       message: 'Silent reauth failed: login_required — session expired',
     })
   })

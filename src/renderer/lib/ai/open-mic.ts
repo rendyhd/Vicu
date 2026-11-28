@@ -3,6 +3,7 @@ import { OpenMic, openMicSettings, type OpenMicEffect, type OpenMicStart } from 
 import type { VoiceErrorCode } from '../../../shared/voice-types'
 import type { RecognizerHandlers, VoiceRecognizer } from '../voice/recognizer'
 import { toast } from '@/stores/toast-store'
+import { t } from '../../../shared/i18n'
 import { appRecognizer } from './recognizers'
 
 /**
@@ -100,8 +101,8 @@ function run(effects: OpenMicEffect[]): void {
 }
 
 function errorToast(code: VoiceErrorCode, message: string): void {
-  if (code === 'unsupported') toast.info('Voice input is not available on this system')
-  else toast.error(message || 'Voice input stopped.')
+  if (code === 'unsupported') toast.info(t('voice.messages.unavailable'))
+  else toast.error(message || t('voice.messages.stopped'))
 }
 
 function handlersFor(id: number, turns = false): RecognizerHandlers {

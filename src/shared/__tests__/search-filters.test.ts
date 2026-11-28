@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { buildSearchServerFilter, matchesSearchFilters, searchFiltersActive, type SearchFilters } from '../search-filters'
+import { readWeekStart } from '../week-start'
 
 interface FixtureTask {
   id: number
@@ -14,7 +15,7 @@ interface FixtureTask {
 
 const fixture = JSON.parse(readFileSync(join(process.cwd(), 'test-fixtures', 'cross-app-semantics-v1.json'), 'utf8')) as {
   tasks: FixtureTask[]
-  searchFilters: Array<{ name: string; today: string; filters: SearchFilters; expect: number[] }>
+  searchFilters: Array<{ name: string; today: string; filters: SearchFilters; expect: number[]; weekStart?: string }>
 }
 
 const tasks = fixture.tasks.map((task) => ({
@@ -33,7 +34,7 @@ describe('searchFilters (contract section 17)', () => {
 
   for (const vector of fixture.searchFilters) {
     it(vector.name, () => {
-      expect(tasks.filter((task) => matchesSearchFilters(task, vector.filters, vector.today)).map((task) => task.id)).toEqual(vector.expect)
+      expect(tasks.filter((task) => matchesSearchFilters(task, vector.filters, vector.today, readWeekStart(vector.weekStart))).map((task) => task.id)).toEqual(vector.expect)
     })
   }
 

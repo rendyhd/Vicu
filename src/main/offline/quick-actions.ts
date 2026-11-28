@@ -1,6 +1,8 @@
 import { withDefaultReminder, type DefaultReminderSettings } from '../../shared/default-reminder'
 import { isQueueableFailure, maybeCreatedMessage } from '../../shared/error-classify'
 import { isTimeBlock } from '../../shared/time-blocks'
+import { workLabelForNewTask, type WorkMode, type WorkScope } from '../../shared/work-scope'
+import { completedDueFor } from '../../shared/repeat-completion'
 import type { ApiResult } from '../api-result'
 import type { OfflineQueue } from './queue'
 import { parseQueuedImages, parseQueuedLabels } from './parse-input'
@@ -14,6 +16,8 @@ import { sendSerially, taskWrites, writeTask } from './task-writes'
 export interface QuickActionApi {
   createTask(projectId: number, payload: Record<string, unknown>): Promise<ApiResult<unknown>>
   updateTask(id: number, patch: Record<string, unknown>): Promise<ApiResult<unknown>>
+  /** Reads a repeating task before its completion is sent (cross-app semantics 7.5). */
+  fetchTaskById?(id: number): Promise<ApiResult<unknown>>
 }
 
 export interface QuickActionDeps {
@@ -66,6 +70,28 @@ export function quickEntryTaskPayload(input: QuickEntryTaskInput, settings: Defa
   if (input.repeatAfter !== undefined) payload.repeat_after = input.repeatAfter
   if (input.repeatMode !== undefined) payload.repeat_mode = input.repeatMode
   return withDefaultReminder(payload, settings)
+}
+
+/**
+ * Work and Personal (contract 22.6): in Work mode a task that would not be work gets the work
+ * label, added like a label typed in Quick Entry (it joins `labels`, so a queued create keeps it and
+ * the window applies it after an online create). Returns the labels to use and the id added, or
+ * null when nothing is added (any other mode, no work label, or the task is work already).
+ */
+export function withWorkLabel(
+  labels: unknown,
+  projectId: number,
+  scope: WorkScope,
+  mode: WorkMode,
+): { labels: unknown; added: number | null } {
+  const named = parseQueuedLabels(labels)
+  const added = workLabelForNewTask(
+    { project_id: projectId, labels: named.filter((l) => l.id !== undefined).map((l) => ({ id: l.id as number })) },
+    scope,
+    mode,
+  )
+  if (added === null) return { labels, added: null }
+  return { labels: [...named, { id: added }], added }
 }
 
 /**
@@ -201,17 +227,21 @@ export async function quickViewPatch(
   deps: QuickActionDeps,
   rawTaskId: number | string,
   patch: Record<string, unknown>,
-  taskData?: Record<string, unknown>
+  taskData?: Record<string, unknown>,
+  /** `baseDescription`: with a notes edit, the description it started from (description format, "Notes changed in two places"). */
+  checks: { baseDescription?: string } = {}
 ): Promise<QuickActionResult> {
   const target = targetOf(deps.queue, rawTaskId)
   if (target.kind === 'unknown') return STALE_QUEUED_TASK
   const meta = titleMeta(taskData ?? patch)
   if (target.kind === 'queued') {
+    // A task that is not on the server yet has no other version of its notes.
     await deps.queue.enqueueUpdate(target.ref, patch, meta)
     return { success: true, cached: true }
   }
 
-  const outcome = await writeTask(deps, taskWrites.update(deps.queue, deps.api, target.id, patch, meta.title), { queue: true })
+  const options = checks.baseDescription !== undefined ? { baseDescription: checks.baseDescription } : {}
+  const outcome = await writeTask(deps, taskWrites.update(deps.queue, deps.api, target.id, patch, meta.title, options), { queue: true })
   if (outcome.kind === 'sent') {
     deps.notifyMainWindow()
     return outcome.result
@@ -242,8 +272,10 @@ export async function quickViewComplete(
   const cleanTask = withoutCompletionMetadata(taskData)
   const autoCompleted = taskDescendants(cleanTask).filter((task) => task.done !== true)
   const changed: Array<{ task: Record<string, unknown>; queued: boolean }> = []
+  // A repeating task's completion carries the due date this list showed, so it is not sent again
+  // for an occurrence another device completed already (cross-app semantics 7.5).
   const complete = (id: number, task: Record<string, unknown>) =>
-    writeTask(deps, taskWrites.update(queue, api, id, { done: true }, titleMeta(task).title), { queue: true })
+    writeTask(deps, taskWrites.update(queue, api, id, { done: true }, titleMeta(task).title, { completedDue: completedDueFor(task) }), { queue: true })
   const undoChanged = async () => {
     for (const entry of changed.reverse()) {
       const id = entry.task.id as number

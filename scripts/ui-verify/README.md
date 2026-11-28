@@ -83,6 +83,7 @@ npm run ui:verify -- --scenario baseline --theme dark
 | `--run NAME` | Folder name under `out/` (default: time stamp, scenarios, theme). |
 | `--build` | Run `npm run build` first. |
 | `--list` | List the scenarios with their ids and waves. |
+| `--video` | Record the main window to `<run>/video/*.webm` (written when the app closes). `pro-intro-video` (PROV) is the Vicu Pro walkthrough made this way: it writes the start and end times to `video-times.json` for cutting with ffmpeg. |
 
 With neither `--scenario` nor `--wave`, `baseline` runs. Scenarios mutate the shared test server
 (they complete, move, reschedule and delete tasks), so a `--wave N` run re-seeds first by default
@@ -123,6 +124,11 @@ leaving copy, then repeats with `--motion reduce` and asserts no scale, transfor
 the skeleton shimmer (it pauses the test server with `docker pause`, resumes it afterwards), rolling counts, a token travelling
 into its chip, the stuck-header hairline and Today turning into All clear. Run seed.mjs before it (it completes every Today
 task) and after it; it runs with `--motion reduce` too.
+`calendar-sources` (id CALS) covers connected calendars: calendar links served on a local port (ETag and 304, a link
+that starts failing, a VFREEBUSY share, a Windows time zone name without VTIMEZONE) and a CalDAV account typed into the
+Add calendar dialog against a local Radicale. It needs Docker: `node scripts/ui-verify/radicale.mjs` creates or starts
+`vicu-test-radicale` on 127.0.0.1:5232 and seeds its calendars (the scenario does that itself; credentials in
+`.local/radicale.json`), `node scripts/ui-verify/radicale.mjs --stop` stops it.
 Scenario code computes dates from the run day (`lib.mjs`: `localDate`, `comingWeekday`, `at`).
 
 The helpers on `h`:
@@ -146,7 +152,36 @@ The helpers on `h`:
 A text target matches visible text exactly; anything that looks like a selector (`[data-task-id]`,
 `.class`, `css=...`, `role=...`) is used as a selector.
 
-## 5. Tools
+## 5. The web version
+
+`web.mjs` does for Vicu web (`src/web`, `docs/web.md`) what `desktop.mjs` does for the app, in a
+real browser (`playwright-core` with the Chrome or Edge that is installed) against the same seeded
+server:
+
+```
+npm run build:web
+node scripts/ui-verify/web.mjs [--build] [--run NAME] [--theme light|dark] [--size 1280x820]
+                               [--browser chrome|msedge|<path>] [--headed] [--only step,step]
+                               [--url http://127.0.0.1:8087]
+```
+
+It serves `out/web` itself (`web-server.mjs`: the page at the root, `/api/` forwarded to the test
+server, the headers of `docker/web/security-headers.conf`), signs in with the seeded account
+(password, then API token), walks the views, makes and completes a task, and checks a second tab, a
+reload, reminders without permission, links, the print frame and what the web version hides.
+Captures and `results.jsonl` go to `out/<run>/`; exit code 1 when a check failed or the page threw.
+With `--url` it tests a page that is already served, such as the container:
+
+```
+docker build -f docker/web/Dockerfile -t vicu-web:dev .
+docker run -d --name vicu-web-try -p 8087:8080 -e VIKUNJA_URL=http://host.docker.internal:3456 vicu-web:dev
+node scripts/ui-verify/web.mjs --url http://127.0.0.1:8087
+```
+
+The steps live in `web.mjs` itself; the desktop scenarios are not run against the web version. An
+OIDC sign-in is not covered (the test server has no provider).
+
+## 6. Tools
 
 - `tools/contrast.mjs`: WCAG contrast of colour pairs from the command line or a JSON list.
 - `tools/springs.mjs`: damping and stiffness to a CSS `linear()` easing curve and duration.

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useTasks } from '@/hooks/use-tasks'
 import { useFilters } from '@/hooks/use-filters'
 import { useProjects } from '@/hooks/use-projects'
@@ -12,10 +13,17 @@ import { openCount, showsGroupHeader } from '@/lib/list-sections'
 import { api } from '@/lib/api'
 import type { Task } from '@/lib/vikunja-types'
 import { ListSkeleton } from '@/components/shared/ListSkeleton'
+import { useAvailabilityView } from '@/hooks/use-availability'
+import { HiddenSummary, ViewSwitch } from '@/components/pro/ViewSwitch'
 
 export function AnytimeView() {
+  const { t } = useTranslation()
   const params = useFilters({ view: 'anytime' })
-  const { data: tasks = [], isLoading } = useTasks(params)
+  const { data: loaded = [], isLoading } = useTasks(params, true, true)
+  // Pro: Available, Remaining or All (cross-app semantics 21.2); off, every task as before.
+  const availability = useAvailabilityView('anytime')
+  const tasks = useMemo(() => availability.filter(loaded), [availability, loaded])
+  const hiddenCount = availability.hidden(loaded)
   const { data: projectData, isLoading: projectsLoading } = useProjects()
   const [inboxProjectId, setInboxProjectId] = useState<number | undefined>()
 
@@ -79,7 +87,7 @@ export function AnytimeView() {
   usePrintable(
     useMemo(
       () => ({
-        viewTitle: 'Anytime',
+        viewTitle: t('views.anytime.title'),
         sections: groups.map((group) => ({
           heading: group.projectName,
           groups: group.subGroups.map((sub) => ({
@@ -93,18 +101,20 @@ export function AnytimeView() {
   )
 
   if (isLoading || projectsLoading) {
-    return <ListSkeleton title="Anytime" identity="anytime" />
+    return <ListSkeleton title={t('views.anytime.title')} identity="anytime" />
   }
 
   return (
     <TaskList
-      title="Anytime"
+      title={t('views.anytime.title')}
       identity="anytime"
       tasks={[]}
       projectId={inboxProjectId}
       showNewTask={!!inboxProjectId && projectData?.flat.some((project) => project.id === inboxProjectId)}
-      emptyTitle="Nothing here"
-      emptySubtitle="Open tasks from all projects"
+      emptyTitle={t('views.anytime.emptyTitle')}
+      emptySubtitle={t('views.anytime.emptySubtitle')}
+      empty={availability.on ? groups.length === 0 && hiddenCount === 0 : undefined}
+      headerContent={availability.on ? <ViewSwitch view={availability.view} onChange={availability.setView} /> : undefined}
     >
       {groups.map((group) => {
         const groupTasks = group.subGroups.flatMap((sub) => sub.tasks)
@@ -133,6 +143,9 @@ export function AnytimeView() {
           </div>
         )
       })}
+      {availability.on && availability.view === 'available' && (
+        <HiddenSummary count={hiddenCount} onShow={() => availability.setView('remaining')} />
+      )}
     </TaskList>
   )
 }

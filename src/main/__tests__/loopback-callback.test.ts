@@ -39,6 +39,17 @@ describe('listenForCallback', () => {
     await expect(callback.code).resolves.toBe('new')
   })
 
+  it('keeps waiting when an error arrives without the state of this login', async () => {
+    const callback = await listen()
+    const noState = await fetch(`${callback.redirectUri}?error=access_denied`)
+    expect(noState.status).toBe(400)
+    expect(await noState.text()).toContain('earlier sign-in')
+    const wrongState = await fetch(`${callback.redirectUri}?error=access_denied&state=other`)
+    expect(await wrongState.text()).toContain('earlier sign-in')
+    await fetch(`${callback.redirectUri}?code=ok&state=state-1`)
+    await expect(callback.code).resolves.toBe('ok')
+  })
+
   it("passes the provider's error on", async () => {
     const callback = await listen()
     const res = await fetch(`${callback.redirectUri}?error=access_denied&error_description=No%20access&state=state-1`)

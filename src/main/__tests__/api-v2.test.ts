@@ -3,6 +3,7 @@ import {
   buildTaskAttachmentDownloadUrl,
   buildProjectCollectionUrl,
   buildProjectTaskCountUrl,
+  buildTaskCountUrl,
   createTaskCollectionSearchParams,
   finishTaskCollection,
   readEnvelopeTotal,
@@ -23,6 +24,15 @@ describe('project collection URL', () => {
 })
 
 describe('collaboration requests', () => {
+  it('leaves out the subtask expansion when told to, and never sends the option (rendyhd/Vicu#75)', () => {
+    const flat = createTaskCollectionSearchParams({ filter: 'done = true', expand_subtasks: false })
+    expect(flat.getAll('expand')).toEqual([])
+    expect([...flat.keys()]).toEqual(['filter'])
+    expect(createTaskCollectionSearchParams({ expand_subtasks: true }).getAll('expand')).toEqual(['subtasks'])
+    expect(createTaskCollectionSearchParams({ [COLLAB_SIGNALS_PARAM]: true, expand_subtasks: false }).getAll('expand'))
+      .toEqual(['comment_count', 'is_unread'])
+  })
+
   it('asks for comment counts and unread flags only when told to, as repeated expands', () => {
     expect(createTaskCollectionSearchParams({}).getAll('expand')).toEqual(['subtasks'])
     const params = createTaskCollectionSearchParams({ [COLLAB_SIGNALS_PARAM]: true, filter: 'done = false' })
@@ -137,5 +147,24 @@ describe('project task count request', () => {
     expect(readEnvelopeTotal({ total: -1 })).toBeNull()
     expect(readEnvelopeTotal([])).toBeNull()
     expect(readEnvelopeTotal(null)).toBeNull()
+  })
+})
+
+describe('task counts and sort keys (cross-app semantics 12.6)', () => {
+  it('counts a filter with a page of one task', () => {
+    const url = new URL(buildTaskCountUrl('https://vikunja.example/', 'done = true && project = 7 && labels = 3'))
+    expect(url.pathname).toBe('/api/v2/tasks')
+    expect(url.searchParams.get('filter')).toBe('done = true && project = 7 && labels = 3')
+    expect(url.searchParams.get('per_page')).toBe('1')
+    expect(url.searchParams.has('expand')).toBe(false)
+  })
+
+  it('repeats several sort keys in order, each with its order', () => {
+    const params = createTaskCollectionSearchParams({ sort_by: ['done_at', 'id'], order_by: ['desc', 'desc'] })
+    expect(params.getAll('sort_by')).toEqual(['done_at', 'id'])
+    expect(params.getAll('order_by')).toEqual(['desc', 'desc'])
+    const single = createTaskCollectionSearchParams({ sort_by: 'due_date', order_by: 'asc' })
+    expect(single.getAll('sort_by')).toEqual(['due_date'])
+    expect(single.getAll('order_by')).toEqual(['asc'])
   })
 })

@@ -1,7 +1,9 @@
-import { isQueueableFailure, isRetriableError } from '../../shared/error-classify'
+import { isQueueableFailure, isUnreachableFailure } from '../../shared/error-classify'
+import { oneWriterAtATime } from '@host/serial'
 import type { QueuedWriteReply, TaskWriteOptions } from '../../shared/offline-queue-types'
 import type { ApiError, ApiResult, ApiSuccess } from '../api-result'
-import type { OfflineQueue } from './queue'
+import type { WriteQueue } from '../handlers/write-queue'
+import { needsRead, planTaskUpdate, type TaskUpdateChecks } from './notes-save-step'
 
 // The one place where a change to an existing task decides between "send it now" and "queue it".
 //
@@ -30,7 +32,21 @@ export interface TaskWriteSpec {
    * provably never reached the server, as for a task create. Default 'change'.
    */
   kind?: 'change' | 'create'
+  /**
+   * Run before sending, inside the task's turn: it may answer without sending (the server already
+   * has the change), send something else, or fail like the change would (a repeating task's
+   * completion reads the task first, cross-app semantics 7.5).
+   */
+  beforeSend?: () => Promise<BeforeSend>
 }
+
+export type BeforeSend =
+  /** Send; `send` replaces the spec's own request when given. */
+  | { kind: 'send'; send?: () => Promise<ApiResult<unknown>> }
+  /** Nothing to send: this is the answer. */
+  | { kind: 'answer'; result: ApiSuccess<unknown> }
+  /** Could not decide: handled like a failure of the change (queued when the server cannot be reached). */
+  | { kind: 'failed'; result: ApiError }
 
 export type TaskWriteOutcome =
   /** The server took the change. */
@@ -48,7 +64,7 @@ export const WAITING_TO_SYNC_ERROR =
   'This task has changes waiting to sync, so it was not changed on the server. Try again once they have synced.'
 
 export interface TaskWriteDeps {
-  queue: OfflineQueue
+  queue: WriteQueue
   /** Ask for a replay soon: the server just answered, or a change joined a queue that is waiting. */
   requestReplay?: () => void
 }
@@ -57,21 +73,62 @@ const titleMeta = (title?: string): { title?: string } => (title ? { title } : {
 
 /** Specs for the writes the app makes to an existing task (its fields, labels, assignees and comments). */
 export const taskWrites = {
+  /**
+   * A change to a task's fields. `completedDue` (string or null) says the app holds the task as
+   * repeating and the patch completes it: the task is read first and the completion is sent only
+   * when the server still holds that occurrence, else skipped (cross-app semantics 7.5).
+   * `baseDescription` is the description a notes edit started from: the task is read first and,
+   * when the server's notes changed since, both versions are sent (description format, "Notes
+   * changed in two places"). A queued change keeps both for the replay, which decides the same way.
+   */
   update(
-    queue: OfflineQueue,
-    api: { updateTask(id: number, patch: Record<string, unknown>): Promise<ApiResult<unknown>> },
+    queue: WriteQueue,
+    api: {
+      updateTask(id: number, patch: Record<string, unknown>): Promise<ApiResult<unknown>>
+      fetchTaskById?(id: number): Promise<ApiResult<unknown>>
+    },
     taskId: number,
     patch: Record<string, unknown>,
-    title?: string
+    title?: string,
+    options: TaskUpdateChecks = {}
   ): TaskWriteSpec {
+    const { completedDue, baseDescription } = options
+    // A task that is not on the server yet (a temp id) has no other version to read.
+    const checks = taskId > 0 && needsRead(patch, options) && !!api.fetchTaskById
     return {
       taskId,
       send: () => api.updateTask(taskId, patch),
-      enqueue: () => queue.enqueueUpdate(taskId, patch, titleMeta(title)),
+      enqueue: () =>
+        queue.enqueueUpdate(taskId, patch, {
+          ...titleMeta(title),
+          ...(completedDue !== undefined ? { completedDue } : {}),
+          ...(baseDescription !== undefined ? { baseDescription } : {}),
+        }),
+      ...(checks
+        ? {
+            beforeSend: async (): Promise<BeforeSend> => {
+              const plan = await planTaskUpdate(patch, options, () => api.fetchTaskById!(taskId))
+              if (plan.kind === 'failed') return { kind: 'failed', result: plan.failure }
+              if (plan.kind === 'answer') {
+                return { kind: 'answer', result: { success: true, data: plan.task, ...(plan.repeatSkipped ? { repeatSkipped: true as const } : {}) } }
+              }
+              if (plan.notesMerged) {
+                return {
+                  kind: 'send',
+                  send: async () => {
+                    const result = await api.updateTask(taskId, plan.patch)
+                    return result.success ? { ...result, notesMerged: true as const } : result
+                  },
+                }
+              }
+              return plan.patch === patch ? { kind: 'send' } : { kind: 'send', send: () => api.updateTask(taskId, plan.patch) }
+            },
+          }
+        : {}),
     }
   },
   delete(
-    queue: OfflineQueue,
+    queue: WriteQueue,
     api: { deleteTask(id: number): Promise<ApiResult<unknown>> },
     taskId: number,
     title?: string
@@ -83,7 +140,7 @@ export const taskWrites = {
     }
   },
   addLabel(
-    queue: OfflineQueue,
+    queue: WriteQueue,
     api: { addLabelToTask(taskId: number, labelId: number): Promise<ApiResult<unknown>> },
     taskId: number,
     label: { id: number; title?: string },
@@ -95,8 +152,36 @@ export const taskWrites = {
       enqueue: () => queue.enqueueAddLabel(taskId, label.title ? { id: label.id, title: label.title } : { id: label.id }, titleMeta(title)),
     }
   },
+  addRelation(
+    queue: WriteQueue,
+    api: { createTaskRelation(taskId: number, otherTaskId: number, kind: string): Promise<ApiResult<unknown>> },
+    taskId: number,
+    otherTaskId: number,
+    kind: string,
+    title?: string
+  ): TaskWriteSpec {
+    return {
+      taskId,
+      send: () => api.createTaskRelation(taskId, otherTaskId, kind),
+      enqueue: () => queue.enqueueAddRelation(taskId, otherTaskId, kind, titleMeta(title)),
+    }
+  },
+  removeRelation(
+    queue: WriteQueue,
+    api: { deleteTaskRelation(taskId: number, kind: string, otherTaskId: number): Promise<ApiResult<unknown>> },
+    taskId: number,
+    otherTaskId: number,
+    kind: string,
+    title?: string
+  ): TaskWriteSpec {
+    return {
+      taskId,
+      send: () => api.deleteTaskRelation(taskId, kind, otherTaskId),
+      enqueue: () => queue.enqueueRemoveRelation(taskId, otherTaskId, kind, titleMeta(title)),
+    }
+  },
   addAssignee(
-    queue: OfflineQueue,
+    queue: WriteQueue,
     api: { addTaskAssignee(taskId: number, userId: number): Promise<ApiResult<unknown>> },
     taskId: number,
     user: { id: number; username?: string },
@@ -109,7 +194,7 @@ export const taskWrites = {
     }
   },
   removeAssignee(
-    queue: OfflineQueue,
+    queue: WriteQueue,
     api: { removeTaskAssignee(taskId: number, userId: number): Promise<ApiResult<unknown>> },
     taskId: number,
     user: { id: number; username?: string },
@@ -122,7 +207,7 @@ export const taskWrites = {
     }
   },
   createComment(
-    queue: OfflineQueue,
+    queue: WriteQueue,
     api: { createTaskComment(taskId: number, html: string): Promise<ApiResult<unknown>> },
     taskId: number,
     html: string,
@@ -136,7 +221,7 @@ export const taskWrites = {
     }
   },
   updateComment(
-    queue: OfflineQueue,
+    queue: WriteQueue,
     api: { updateTaskComment(taskId: number, commentId: number, html: string): Promise<ApiResult<unknown>> },
     taskId: number,
     commentId: number,
@@ -150,7 +235,7 @@ export const taskWrites = {
     }
   },
   deleteComment(
-    queue: OfflineQueue,
+    queue: WriteQueue,
     api: { deleteTaskComment(taskId: number, commentId: number): Promise<ApiResult<unknown>> },
     taskId: number,
     commentId: number,
@@ -163,7 +248,7 @@ export const taskWrites = {
     }
   },
   removeLabel(
-    queue: OfflineQueue,
+    queue: WriteQueue,
     api: { removeLabelFromTask(taskId: number, labelId: number): Promise<ApiResult<unknown>> },
     taskId: number,
     labelId: number,
@@ -181,8 +266,8 @@ export const taskWrites = {
    * create. `inline` puts the image at the end of the notes once the queued upload goes through.
    */
   upload(
-    queue: OfflineQueue,
-    api: { uploadTaskAttachment(taskId: number, bytes: Buffer, name: string, mime: string): Promise<ApiResult<unknown>> },
+    queue: WriteQueue,
+    api: { uploadTaskAttachment(taskId: number, bytes: Uint8Array, name: string, mime: string): Promise<ApiResult<unknown>> },
     taskId: number,
     file: { bytes: Uint8Array; name: string; mime: string },
     options: { inline?: boolean; title?: string } = {}
@@ -190,7 +275,7 @@ export const taskWrites = {
     return {
       taskId,
       kind: 'create',
-      send: () => api.uploadTaskAttachment(taskId, Buffer.from(file.bytes), file.name, file.mime),
+      send: () => api.uploadTaskAttachment(taskId, file.bytes, file.name, file.mime),
       enqueue: () =>
         queue.enqueueUpload(taskId, { name: file.name, mime: file.mime, bytes: file.bytes }, { addImageToken: options.inline === true, ...titleMeta(options.title) }),
     }
@@ -220,11 +305,12 @@ export const NOT_SENT_AFTER_NETWORK_FAILURE: ApiError = {
   error: 'Network error: the server could not be reached, so this change was not sent (ENETUNREACH)',
 }
 
-/** Whether a result is a failure to reach the server (no HTTP status, a retriable error text). */
+/** Whether a result is a failure to reach the server (no HTTP status and a retriable error, or a web page instead of the API). */
 function isNetworkFailure(result: unknown): boolean {
   if (!result || typeof result !== 'object') return false
   const r = result as { success?: unknown; error?: unknown; statusCode?: unknown }
-  return r.success === false && typeof r.error === 'string' && r.statusCode === undefined && isRetriableError(r.error)
+  if (r.success !== false || typeof r.error !== 'string') return false
+  return isUnreachableFailure(r as { error: string; statusCode?: number; notApiResponse?: boolean })
 }
 
 /**
@@ -241,7 +327,7 @@ export async function sendSerially<T>(send: () => Promise<T>): Promise<T> {
   }
   let unreachable = false
   try {
-    const result = await send()
+    const result = await oneWriterAtATime(send)
     unreachable = isNetworkFailure(result)
     return result
   } finally {
@@ -257,9 +343,9 @@ export async function sendSerially<T>(send: () => Promise<T>): Promise<T> {
 }
 
 // One chain of pending writes per task and queue. Entries remove themselves when the chain drains.
-const chains = new WeakMap<OfflineQueue, Map<number, Promise<void>>>()
+const chains = new WeakMap<WriteQueue, Map<number, Promise<void>>>()
 
-function runInOrder<T>(queue: OfflineQueue, taskId: number, step: () => Promise<T>): Promise<T> {
+function runInOrder<T>(queue: WriteQueue, taskId: number, step: () => Promise<T>): Promise<T> {
   let byTask = chains.get(queue)
   if (!byTask) {
     byTask = new Map()
@@ -311,9 +397,25 @@ export function writeTask(deps: TaskWriteDeps, spec: TaskWriteSpec, options: Pic
       return enqueue('behind-queue')
     }
 
+    let send = spec.send
+    if (spec.beforeSend) {
+      let before: BeforeSend
+      try {
+        before = await spec.beforeSend()
+      } catch (err) {
+        before = { kind: 'failed', result: { success: false, error: err instanceof Error ? err.message : String(err) } }
+      }
+      if (before.kind === 'answer') return { kind: 'sent', result: before.result }
+      if (before.kind === 'failed') {
+        if (canQueue && isQueueableFailure(before.result, spec.kind ?? 'change')) return enqueue('unreachable', before.result)
+        return { kind: 'refused', result: before.result }
+      }
+      if (before.send) send = before.send
+    }
+
     let result: ApiResult<unknown>
     try {
-      result = await sendSerially(spec.send)
+      result = await sendSerially(send)
     } catch (err) {
       result = { success: false, error: err instanceof Error ? err.message : String(err) }
     }
@@ -343,5 +445,7 @@ export function parseTaskWriteOptions(value: unknown): TaskWriteOptions {
   if (typeof raw.title === 'string' && raw.title) options.title = raw.title
   if (typeof raw.labelTitle === 'string' && raw.labelTitle) options.labelTitle = raw.labelTitle
   if (typeof raw.username === 'string' && raw.username) options.username = raw.username
+  if (typeof raw.completedDue === 'string' || raw.completedDue === null) options.completedDue = raw.completedDue
+  if (typeof raw.baseDescription === 'string') options.baseDescription = raw.baseDescription
   return options
 }

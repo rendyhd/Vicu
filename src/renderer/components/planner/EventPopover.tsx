@@ -1,0 +1,339 @@
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
+import { Popover } from '@/components/overlay/Popover'
+import { Button } from '@/components/shared/Button'
+import { Checkbox } from '@/components/shared/Checkbox'
+import { cn } from '@/lib/cn'
+import { useDateFormat } from '@/hooks/use-date-format'
+import { usePlanEventActions } from '@/hooks/use-plan-events'
+import { formatLength } from '@/lib/planner-timeline'
+import { formatBlockRange } from '../../../shared/date-display'
+import { addLocalDays } from '../../../shared/due-dates'
+import type { TranslationKey } from '../../../shared/i18n'
+import type { CalendarEvent } from '../../../shared/calendar-events'
+import {
+  choiceIndex,
+  repeatChoiceDay,
+  repeatChoices,
+  repeatText,
+  type EventEdit,
+  type EventScope,
+  type ListedEvent,
+} from '../../../shared/plan-events'
+
+const LENGTHS = [15, 30, 45, 60, 90, 120, 180, 240]
+const DAY = /^\d{4}-\d{2}-\d{2}$/
+const CLOCK = /^([01]\d|2[0-3]):[0-5]\d$/
+
+/** A new end date starts four weeks after the day pressed; the date field changes it. */
+const NEW_END_DAYS = 28
+
+const SCOPES: { value: EventScope; label: TranslationKey }[] = [
+  { value: 'this', label: 'events.popover.scopeThis' },
+  { value: 'following', label: 'events.popover.scopeFollowing' },
+  { value: 'all', label: 'events.popover.scopeAll' },
+]
+
+interface EventPopoverProps {
+  occurrence: CalendarEvent
+  element: HTMLElement
+  /** Set for one of your own Events: it can be changed. */
+  planEvent?: ListedEvent
+  /** The calendar a read-only event comes from. */
+  calendarName?: string
+  /** The length an Event gets when it is given a time (planner.default_length). */
+  defaultLength: number
+  /** A change moved the occurrence to another Event or day (this time only, this and following). */
+  onMoved?: (occurrenceId: string) => void
+  /**
+   * Which times a change is for, when the page keeps it: the popover opens again at the new place
+   * after a change moved the occurrence, and the choice stays.
+   */
+  scope?: EventScope
+  onScopeChange?: (scope: EventScope) => void
+  onClose: () => void
+}
+
+/** A pressed event: your own can be changed or skipped once; a calendar's is read-only. */
+export function EventPopover({ occurrence, element, planEvent, calendarName, defaultLength, onMoved, scope, onScopeChange, onClose }: EventPopoverProps) {
+  const { t } = useTranslation()
+  const fmt = useDateFormat()
+  const anchorRef = useRef<HTMLElement | null>(element)
+  anchorRef.current = element
+  const when = occurrence.allDay
+    ? t('events.popover.allDay')
+    : formatBlockRange(new Date(occurrence.start), new Date(occurrence.end), fmt)
+
+  return (
+    <Popover anchorRef={anchorRef} label={occurrence.title} role="dialog" placement="right-start" onClose={onClose} className="w-80 p-3">
+      {planEvent ? (
+        <OwnEvent
+          planEvent={planEvent}
+          occurrence={occurrence}
+          defaultLength={defaultLength}
+          onMoved={onMoved}
+          scope={scope}
+          onScopeChange={onScopeChange}
+          onClose={onClose}
+        />
+      ) : (
+        <div data-plan-event-details>
+          <p className="text-card-title text-text">{occurrence.title}</p>
+          <p className="mt-1 text-meta text-text-secondary">
+            {when}
+            {occurrence.location ? ` · ${occurrence.location}` : ''}
+          </p>
+          <p className="mt-1 text-caption text-text-secondary">
+            {[
+              occurrence.tentative ? t('planner.timeline.tentative') : null,
+              occurrence.busy ? null : t('planner.timeline.free'),
+              calendarName ? t('events.popover.fromCalendar', { calendar: calendarName }) : t('events.popover.fromGeneric'),
+            ]
+              .filter(Boolean)
+              .join(' · ')}
+          </p>
+        </div>
+      )}
+    </Popover>
+  )
+}
+
+/**
+ * Your own Event. A repeating one says at the top which times a change is for (contract 20.6): All
+ * times by default, This time, or This and following. One choice for the whole popover, instead of a
+ * question after each field, because a change is usually several fields at once (a new time and a
+ * new length) and the choice stays in view while they are made.
+ */
+function OwnEvent({
+  planEvent,
+  occurrence,
+  defaultLength,
+  onMoved,
+  scope: keptScope,
+  onScopeChange,
+  onClose,
+}: {
+  planEvent: ListedEvent
+  occurrence: CalendarEvent
+  defaultLength: number
+  onMoved?: (occurrenceId: string) => void
+  scope?: EventScope
+  onScopeChange?: (scope: EventScope) => void
+  onClose: () => void
+}) {
+  const { t } = useTranslation()
+  const actions = usePlanEventActions()
+  const scopeLabel = useId()
+  const repeats = planEvent.repeat.kind !== 'none'
+  const [ownScope, setOwnScope] = useState<EventScope>('all')
+  const scope = keptScope ?? ownScope
+  const setScope = (next: EventScope) => {
+    setOwnScope(next)
+    onScopeChange?.(next)
+  }
+  const [title, setTitle] = useState(planEvent.title)
+  const [time, setTime] = useState(planEvent.time ?? '')
+  const [until, setUntil] = useState(planEvent.until ?? '')
+  const day = occurrence.day ?? planEvent.start
+  // The choices of the day the changed rule starts on (20.6): the first day for all times, the day
+  // pressed for this and following.
+  const choiceDay = repeatChoiceDay(planEvent, day, repeats ? scope : 'all') ?? planEvent.start
+  const choices = useMemo(() => repeatChoices(choiceDay), [choiceDay])
+  const current = choiceIndex(choices, planEvent.repeat)
+  // Changing the repeat or the end is never "this time only" (20.6).
+  const thisOnly = repeats && scope === 'this'
+  // The earliest end: the first day, or the day pressed for this and following.
+  const earliestEnd = repeats && scope === 'following' ? day : planEvent.start
+  // A change from elsewhere (a drag, Undo, another device) shows here too.
+  useEffect(() => setTitle(planEvent.title), [planEvent.title])
+  useEffect(() => setTime(planEvent.time ?? ''), [planEvent.time])
+  useEffect(() => setUntil(planEvent.until ?? ''), [planEvent.until])
+
+  const save = async (edit: EventEdit) => {
+    const id = await actions.change(planEvent, day, edit, repeats ? scope : 'all')
+    if (id && id !== occurrence.id) onMoved?.(id)
+  }
+  const commitTitle = () => {
+    const text = title.trim()
+    if (text && text !== planEvent.title) void save({ title: text })
+    else setTitle(planEvent.title)
+  }
+  const commitTime = () => {
+    if (CLOCK.test(time) && time !== planEvent.time) void save({ time })
+    else setTime(planEvent.time ?? '')
+  }
+  const commitUntil = () => {
+    if (DAY.test(until) && until >= earliestEnd && until !== planEvent.until) void save({ until })
+    else setUntil(planEvent.until ?? '')
+  }
+  const onEnter = (commit: () => void) => (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'Enter') {
+      event.preventDefault()
+      commit()
+    }
+  }
+
+  return (
+    <div data-plan-event-editor={planEvent.id} className="space-y-2">
+      {repeats && (
+        <div className="grid gap-1">
+          <span id={scopeLabel} className="text-caption text-text-secondary">
+            {t('events.popover.change')}
+          </span>
+          <div role="radiogroup" aria-labelledby={scopeLabel} className="flex rounded-full border border-border p-0.5" data-plan-event-scope>
+            {SCOPES.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                role="radio"
+                aria-checked={scope === option.value}
+                data-plan-event-scope-option={option.value}
+                onClick={() => setScope(option.value)}
+                className={cn(
+                  'flex-auto whitespace-nowrap rounded-full px-2 py-0.5 text-caption font-medium',
+                  scope === option.value ? 'bg-bg-selected text-text' : 'text-text-secondary hover:text-text',
+                )}
+              >
+                {t(option.label)}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <input
+        value={title}
+        onChange={(event) => setTitle(event.target.value)}
+        onBlur={commitTitle}
+        onKeyDown={onEnter(commitTitle)}
+        aria-label={t('events.popover.title')}
+        className="w-full rounded-control border border-border bg-transparent px-2 py-1.5 text-task-title text-text"
+      />
+
+      <label className="flex cursor-pointer items-center gap-2">
+        <Checkbox
+          checked={planEvent.time === null}
+          onChange={(event) => void save(event.target.checked ? { time: null } : { time: '09:00', minutes: defaultLength })}
+        />
+        <span className="text-meta text-text">{t('events.popover.allDay')}</span>
+      </label>
+
+      {planEvent.time !== null && (
+        <div className="flex items-center gap-2">
+          <input
+            type="time"
+            aria-label={t('events.popover.startsAt')}
+            data-plan-event-time
+            value={time}
+            onChange={(event) => setTime(event.target.value)}
+            onBlur={commitTime}
+            onKeyDown={onEnter(commitTime)}
+            className="rounded-control border border-border bg-transparent px-2 py-1 text-meta text-text"
+          />
+          <select
+            aria-label={t('events.popover.length')}
+            data-plan-event-length
+            value={planEvent.minutes}
+            onChange={(event) => void save({ minutes: Number(event.target.value) })}
+            className="rounded-control border border-border bg-bg-card px-1.5 py-1 text-meta text-text"
+          >
+            {(LENGTHS.includes(planEvent.minutes) ? LENGTHS : [...LENGTHS, planEvent.minutes].sort((a, b) => a - b)).map((minutes) => (
+              <option key={minutes} value={minutes}>
+                {formatLength(minutes)}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      <select
+        aria-label={t('events.popover.repeat')}
+        data-plan-event-repeat
+        value={current}
+        disabled={thisOnly}
+        onChange={(event) => {
+          const index = Number(event.target.value)
+          if (index >= 0) void save({ repeat: choices[index].repeat })
+        }}
+        className="w-full rounded-control border border-border bg-bg-card px-1.5 py-1 text-meta text-text disabled:opacity-60"
+      >
+        {current === -1 && <option value={-1}>{repeatText(planEvent.repeat)}</option>}
+        {choices.map((option, index) => (
+          <option key={option.label} value={index}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+
+      {repeats && (
+        <div className="flex items-center gap-2">
+          <span className="text-meta text-text">{t('events.popover.ends')}</span>
+          <select
+            aria-label={t('events.popover.ends')}
+            data-plan-event-ends
+            value={planEvent.until ? 'date' : 'never'}
+            disabled={thisOnly}
+            onChange={(event) => {
+              if (event.target.value === 'never') void save({ until: null })
+              else void save({ until: addLocalDays(day, NEW_END_DAYS) })
+            }}
+            className="rounded-control border border-border bg-bg-card px-1.5 py-1 text-meta text-text disabled:opacity-60"
+          >
+            <option value="never">{t('events.popover.never')}</option>
+            <option value="date">{t('events.popover.onDate')}</option>
+          </select>
+          {planEvent.until && (
+            <input
+              type="date"
+              aria-label={t('events.popover.endsOn')}
+              data-plan-event-until
+              value={until}
+              min={earliestEnd}
+              disabled={thisOnly}
+              onChange={(event) => setUntil(event.target.value)}
+              onBlur={commitUntil}
+              onKeyDown={onEnter(commitUntil)}
+              className="min-w-0 flex-1 rounded-control border border-border bg-transparent px-2 py-1 text-meta text-text disabled:opacity-60"
+            />
+          )}
+        </div>
+      )}
+      {thisOnly && <p className="text-caption text-text-secondary">{t('events.popover.thisOnlyNote')}</p>}
+
+      {planEvent.time !== null && (
+        <label className="flex cursor-pointer items-center gap-2">
+          <Checkbox checked={occurrence.busy} onChange={(event) => void save({ busy: event.target.checked })} />
+          <span className="text-meta text-text">{t('events.popover.busy')}</span>
+        </label>
+      )}
+
+      <p className="text-caption text-text-secondary">{t('events.popover.shownOnPlan')}</p>
+
+      <div className="flex flex-wrap gap-2 border-t border-border pt-2">
+        {repeats && occurrence.day && (
+          <Button
+            variant="secondary"
+            data-plan-event-skip
+            onClick={() => {
+              void actions.skip(planEvent, occurrence.day!)
+              onClose()
+            }}
+          >
+            {t('events.popover.skip')}
+          </Button>
+        )}
+        <Button
+          variant="secondary"
+          danger
+          data-plan-event-delete
+          onClick={() => {
+            void actions.remove(planEvent)
+            onClose()
+          }}
+        >
+          {t('events.popover.delete')}
+        </Button>
+      </div>
+    </div>
+  )
+}

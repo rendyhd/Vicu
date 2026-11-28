@@ -1,3 +1,4 @@
+import { t } from '../../shared/i18n'
 import type { VoiceErrorCode, VoiceEvent } from '../../shared/voice-types'
 
 // The line protocol of the speech helpers (native/voice-macos/VicuSpeech.swift,
@@ -49,7 +50,7 @@ export function parseHelperLine(line: string): HelperMessage | null {
         event: {
           type: 'error',
           code: errorCode(message.code),
-          message: typeof message.message === 'string' && message.message ? message.message : 'Voice input stopped.',
+          message: typeof message.message === 'string' && message.message ? message.message : t('system.voice.stopped'),
         },
       }
     case 'check':

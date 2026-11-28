@@ -19,6 +19,8 @@ import { isSameOwner, type OfflineOwner } from './owner'
 import {
   cancelPatchKeys,
   mergeAddAssignee,
+  mergeAddRelation,
+  mergeRemoveRelation,
   mergeAddLabel,
   mergeCreateComment,
   mergeDelete,
@@ -39,6 +41,8 @@ import {
   hasTaskId,
   pendingIdFor,
   type AddAssigneeAction,
+  type AddRelationAction,
+  type RemoveRelationAction,
   type AddLabelAction,
   type CreateAction,
   type CreateCommentAction,
@@ -125,7 +129,7 @@ export class OfflineQueue {
       path: options.queuePath,
       backup: true,
       quarantineCorrupt: true,
-      label: 'offline queue',
+      label: 'offline queue', // i18n-ignore: log label
       empty: emptyQueueData,
       parse: parseQueueData,
     })
@@ -295,9 +299,26 @@ export class OfflineQueue {
    * task, or into the task's pending create (an edit of a task that was never created is just a
    * better create).
    */
-  async enqueueUpdate(ref: number | string, patch: Record<string, unknown>, meta: Meta = {}): Promise<OfflineEnqueueResult> {
+  async enqueueUpdate(
+    ref: number | string,
+    patch: Record<string, unknown>,
+    meta: Meta & {
+      /** The due date a completion of a repeating task completed (cross-app semantics 7.5). */
+      completedDue?: string | null
+      /** The description a notes edit started from (description format, "Notes changed in two places"). */
+      baseDescription?: string
+    } = {}
+  ): Promise<OfflineEnqueueResult> {
     const taskId = this.requireTask(ref)
-    const action: UpdateAction = { ...this.stamp(meta), type: 'update', taskId, patch: { ...sanitizeTaskPatch(patch) } }
+    const clean = { ...sanitizeTaskPatch(patch) }
+    const action: UpdateAction = {
+      ...this.stamp(meta),
+      type: 'update',
+      taskId,
+      patch: clean,
+      ...(meta.completedDue !== undefined && clean.done === true ? { completedDue: meta.completedDue } : {}),
+      ...(typeof meta.baseDescription === 'string' && 'description' in clean ? { baseDescription: meta.baseDescription } : {}),
+    }
     const outcome = mergeUpdate(this.data.actions, action, this.inFlightId)
     if (outcome.noop && outcome.removed.length === 0) return { actionId: '', taskId, folded: true }
     await this.apply(outcome)
@@ -305,7 +326,7 @@ export class OfflineQueue {
   }
 
   /** Complete or reopen a task: `enqueueUpdate(ref, { done })`. */
-  enqueueComplete(ref: number | string, done: boolean, meta: Meta = {}): Promise<OfflineEnqueueResult> {
+  enqueueComplete(ref: number | string, done: boolean, meta: Meta & { completedDue?: string | null } = {}): Promise<OfflineEnqueueResult> {
     return this.enqueueUpdate(ref, { done }, meta)
   }
 
@@ -339,6 +360,28 @@ export class OfflineQueue {
     const taskId = this.requireTask(ref)
     const action: RemoveLabelAction = { ...this.stamp(meta), type: 'remove-label', taskId, labelId }
     const outcome = mergeRemoveLabel(this.data.actions, action, this.inFlightId)
+    if (outcome.noop && outcome.removed.length === 0) return { actionId: '', taskId, folded: true }
+    await this.apply(outcome)
+    return { actionId: action.id, taskId, folded: !outcome.appended }
+  }
+
+  /** A relation between two tasks (decision 24); either may be a temp id. Cancels a queued removal of it. */
+  async enqueueAddRelation(ref: number | string, otherRef: number | string, kind: string, meta: Meta = {}): Promise<OfflineEnqueueResult> {
+    const taskId = this.requireTask(ref)
+    const otherTaskId = this.requireTask(otherRef)
+    const action: AddRelationAction = { ...this.stamp(meta), type: 'add-relation', taskId, otherTaskId, kind }
+    const outcome = mergeAddRelation(this.data.actions, action, this.inFlightId)
+    if (outcome.noop && outcome.removed.length === 0) return { actionId: '', taskId, folded: true }
+    await this.apply(outcome)
+    return { actionId: action.id, taskId, folded: !outcome.appended }
+  }
+
+  /** A relation's removal. Cancels a queued add of it. */
+  async enqueueRemoveRelation(ref: number | string, otherRef: number | string, kind: string, meta: Meta = {}): Promise<OfflineEnqueueResult> {
+    const taskId = this.requireTask(ref)
+    const otherTaskId = this.requireTask(otherRef)
+    const action: RemoveRelationAction = { ...this.stamp(meta), type: 'remove-relation', taskId, otherTaskId, kind }
+    const outcome = mergeRemoveRelation(this.data.actions, action, this.inFlightId)
     if (outcome.noop && outcome.removed.length === 0) return { actionId: '', taskId, folded: true }
     await this.apply(outcome)
     return { actionId: action.id, taskId, folded: !outcome.appended }
@@ -557,14 +600,21 @@ export class OfflineQueue {
     return outcome.cancelled
   }
 
-  /** Remove pending actions the user no longer wants. Removing a create removes what depends on it. */
+  /**
+   * Remove pending actions the user no longer wants. Removing a create removes what depends on it
+   * (every change folded onto or queued after it for its temp id). The action being sent right now
+   * is already on the wire and stays.
+   */
   async discardPending(ids: readonly string[]): Promise<number> {
     const wanted = new Set(ids)
-    const roots = this.data.actions.filter((a) => wanted.has(a.id))
+    const roots = this.data.actions.filter((a) => wanted.has(a.id) && a.id !== this.inFlightId)
     const doomed = new Set(roots.map((a) => a.id))
     for (const a of roots) {
       if (a.type === 'create') {
-        for (const d of this.data.actions) if (hasTaskId(d) && d.taskId === a.tempId) doomed.add(d.id)
+        for (const d of this.data.actions) {
+          const relatesToIt = (d.type === 'add-relation' || d.type === 'remove-relation') && d.otherTaskId === a.tempId
+          if ((hasTaskId(d) && d.taskId === a.tempId) || relatesToIt) doomed.add(d.id)
+        }
       }
     }
     const removed = this.data.actions.filter((a) => doomed.has(a.id))

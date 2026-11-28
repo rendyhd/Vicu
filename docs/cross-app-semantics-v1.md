@@ -8,9 +8,10 @@ Test vectors live in `test-fixtures/` in both repos and must stay byte-identical
 
 | Fixture | Covers |
 |---|---|
-| `cross-app-semantics-v1.json` | due-date rules, smart lists, weeks, custom-list windows, rules and sorting, saved-filter import, review math, completion hold, date display, collaboration, hidden tasks, synced preferences, task order, project categories, guided organizing, routines on Today, time blocks |
+| `cross-app-semantics-v1.json` | due-date rules, smart lists, weeks, custom-list windows, rules and sorting, saved-filter import, review math, completion hold, date display, collaboration, hidden tasks, synced preferences, task order, project categories, guided organizing, routines on Today, time blocks, Events and calendars, Pro, Work and Personal, When choices, making a task a subtask |
 | `nlp-corpus-v1.json` | quick-add parsing |
 | `routine-archive-v1.json` | routine merge, pruning and archive rules |
+| `ai-tools-v1.json` | the assistant (see `ai-assistant-v1.md`) and Pro's Copilot prompt (section 21.12) |
 | `design-tokens-v1.json` | colour roles, type, radii and motion (see `design-system-v1.md`) |
 
 Both test suites load these files. When behavior changes, change the fixture first, in both
@@ -51,10 +52,10 @@ Every place that sets a date-only due date uses one helper per app (desktop
 |---|---|
 | Today | 2026-10-06 23:59:59 |
 | Tomorrow | 2026-10-07 23:59:59 |
-| Next week | Monday of next week, 2026-10-12 23:59:59 (on a Sunday: the next day) |
+| Next week | Monday of next week, 2026-10-12 23:59:59 (on a Sunday: the next day). With another week start, the Monday in next week (section 2.1) |
 | Pick a date (calendar) | that local date at 23:59:59, built from the local calendar date, never from UTC millis |
 | "!" shortcut | today, 23:59:59 |
-| Postpone / move by N days | adds N calendar days and keeps the time of day; a legacy 00:00 value becomes 23:59:59 |
+| Postpone / move by N days | adds N calendar days and keeps the time of day; a legacy 00:00 value becomes 23:59:59. The When pickers' Move by counts an overdue task from today (section 22.3) |
 
 Reminders relative to the due date ("1 hour before") are computed from the stored value, so
 "1 hour before" a date-only task fires at 22:59:59 that day.
@@ -65,7 +66,8 @@ Reminders relative to the due date ("1 hour before") are computed from the store
 
 - "Today" is the device's local calendar date. A task is due today when the local date of its
   due date equals today, whatever the time of day.
-- Weeks start on **Monday** and end on **Sunday**.
+- Weeks start on **Monday** and end on **Sunday**, unless the account chose another week start
+  (section 2.1).
 - **Today list**: open tasks with a due date whose local date is today or earlier, and open tasks
   with a time block that starts today (section 16), whatever their due date.
   - Overdue section: a due date whose local date is before today.
@@ -78,6 +80,38 @@ Reminders relative to the due date ("1 hour before") are computed from the store
   more than the window (the client filters exactly), never less. The Today list's filter is
   `done = false && ((due_date != '<null date>' && due_date < '<local tomorrow>') || (start_date >= '<local today>' && start_date < '<local tomorrow>'))`.
 - Every count of the Today list (badges, widgets) uses the same rule.
+
+### 2.1 Week start
+
+- The synced preference `week_start` (section 11.3) is the day a week starts on: `"monday"` (the
+  default, written as `null`), `"sunday"` or `"saturday"`. Any other value acts as the default and
+  is kept. A week is that day and the six days after it. It is the same on every device of the
+  account and never follows the device's region.
+- It decides:
+  - the first column of every month calendar and the order of the weekday buttons in an editor;
+  - the `this_week` window (sections 3.1 and 17) and `/w` in a rule (section 3.5);
+  - which week "next week" is: the Next week setter (section 1.3) and the quick-add phrases
+    `next week`, `next <weekday>` and `<weekday> next week` (section 5);
+  - the weeks of a routine's trend (section 6.11) and of the planner's week view;
+  - `week_starts` in what the assistant is told (`docs/ai-assistant-v1.md`).
+- **Next week as a date** is the Monday in next week: the first Monday on or after the first day
+  of the week after today's. With `monday` that is the rule of section 1.3 unchanged. With
+  `sunday`, on Wed 2026-11-18 it is Mon 2026-11-23, and on Sun 2026-11-22, whose week has just
+  started, Mon 2026-11-30.
+- **It never changes a schedule.** "Every 2 weeks" in a routine (section 6.5) and in an Event
+  (section 20.4), and the `WKST` of an imported calendar file (section 20.10), count their weeks
+  as before, whatever the setting: a shared routine falls on the same days for everyone, and
+  nothing moves when the setting changes. Workdays are Monday to Friday. Text that counts days
+  ("3 weeks ago", the weekly review's 7 days) does not read it.
+- **Vikunja's own setting** (`settings.week_start` of `GET user`: 0 Sunday, 1 Monday, up to 6
+  Saturday) is never written and never followed by itself: an account that never set it reads 0.
+  An app may read it to offer it. While it names one of the three days and differs from the week
+  start in use, the setting shows "Vikunja is set to Sunday." with "Use Sunday", which writes the
+  preference. Nothing changes until the person chooses.
+- Vectors: the `weekStart` block of the fixture (reading the value, the offer, the month grid,
+  the order of weekdays), and every vector of `weeks`, `dueDates.setters`, `customLists`,
+  `searchFilters` and `customListRule`, every corpus case and every `trend` case that has a
+  `weekStart`. A vector without one runs with Monday.
 
 ---
 
@@ -98,12 +132,15 @@ these fields:
 | `then_by` | array, optional | Further sort keys after `sort_by` and `order_by`, each `{ "sort_by", "order_by" }` (section 3.6). Absent means none. |
 
 The list value (next to `id`, `name`, `icon` and `filter`) gains `saved_filter_id`, a whole
-number, when the list was imported from a Vikunja saved filter (section 3.7). The custom-list
-document gains `imported_saved_filters` at its top level: the ids of every saved filter any device
-imported, as an array of whole numbers (section 3.7).
+number, when the list was imported from a Vikunja saved filter (section 3.7); `project_view`, an
+object `{ "project_id", "view_id" }` of whole numbers, when it was imported from a project view
+(section 3.9); and `import_base`, an object, what the import took from Vikunja (section 3.7). The
+custom-list document gains `imported_saved_filters` at its top level: the ids of every saved filter
+any device imported, as an array of whole numbers (section 3.7).
 
 Apps write `assigned`, `comments`, `shared_only`, `changed_within_days`, `rule`,
-`rule_include_nulls`, `then_by` and `saved_filter_id` only when they are set. A string value of `assigned` or `comments` that this version does not know is kept as it
+`rule_include_nulls`, `then_by`, `saved_filter_id`, `project_view` and `import_base` only when they
+are set. A string value of `assigned` or `comments` that this version does not know is kept as it
 is and is no condition, like a `due_date_filter` from a newer app.
 
 Both apps' protocol normalizers must **preserve unknown fields** in list values and filters
@@ -123,7 +160,7 @@ With today = T (local date):
 | `all` | no date condition |
 | `overdue` | local due date < T |
 | `today` | local due date = T |
-| `this_week` | T ≤ local due date ≤ Sunday of T's week (on a Sunday: T only) |
+| `this_week` | T ≤ local due date ≤ the last day of T's week: Sunday (on a Sunday: T only), or the day before the week start of section 2.1 |
 | `this_month` | T ≤ local due date ≤ last day of T's month |
 | `has_due_date` | any due date |
 | `no_due_date` | null date (or empty) |
@@ -256,8 +293,8 @@ server but not here (section 3.7 drops them on import).
   of steps. A step is `+N<unit>` or `-N<unit>` (N whole, 1 when left out) or `/<unit>`, which
   rounds down to the start of that unit. Units: `y` year, `M` month, `w` week, `d` day, `h` or
   `H` hour, `m` minute, `s` second, and `b` business day (Monday to Friday, only after `+` or
-  `-`: each step moves one day and skips Saturdays and Sundays). Weeks start on Monday. A value
-  with `||` must be quoted.
+  `-`: each step moves one day and skips Saturdays and Sundays). Weeks start on Monday, or on the
+  week start of section 2.1. A value with `||` must be quoted.
 
 `now` and local wall-clock times are read in the **device's time zone**, so `now/d` is the start
 of the local day. (The server reads them in the filter's time zone; section 2 rules here.)
@@ -273,7 +310,8 @@ condition.
 **The server.** When a list asks the server for tasks, apps send `(<the usual superset>) &&
 (<rule>)` as `filter`, with `filter_timezone` set to the device's zone and `filter_include_nulls`
 set from `rule_include_nulls`, unless the rule uses `like`: the server's case rules depend on its
-database, so such a rule is left to the device. The device's check stays the exact one.
+database, so such a rule is left to the device. So is a rule that rounds to a week (`/w`) while
+the week start is not Monday: the server has its own week. The device's check stays the exact one.
 
 Vectors: the `customListRule` block of the fixture. `tasks` use local wall-clock times; each
 vector gives `now`, the `rule`, `includeNulls` and the ids that match, in task order. `invalid`
@@ -330,14 +368,120 @@ syncing the custom lists, and adds their ids there. After that, a saved filter n
 `imported_saved_filters` is offered, and the person may import any filter again.
 
 **Duplicates.** `imported_saved_filters` merges as the union of both sides, in ascending order.
-When two lists with values hold the same `saved_filter_id`, the one whose `id` sorts first (as a
-string) is the list; apps hide the others and write a tombstone for each at their next write.
-An imported list is an ordinary list: changing it never changes the saved filter, and the saved
-filter is never changed or deleted.
+When two lists with values hold the same `saved_filter_id`, or the same `project_view.view_id`
+(section 3.9), the one whose `id` sorts first (as a string) is the list; apps hide the others and
+write a tombstone for each at their next write. An imported list is an ordinary list: changing it
+never changes the saved filter, and the saved filter is never changed or deleted.
+
+**The import base.** Every import writes `import_base` on the list it makes, and keeps it up to
+date as below (written only when set; a version that does not know it keeps it as an unknown
+field, section 10.8). It holds what the import took from Vikunja: `updated`, the source's `updated`
+exactly as the server wrote it (empty when the server sent none), and the four **parts** as the
+import made them:
+
+| Part | Base keys | Equal when |
+|---|---|---|
+| `name` | `name` | the strings are equal |
+| `rule` | `rule`, absent when none | both are absent, or the strings are equal |
+| `include_nulls` | `rule_include_nulls`, written only when true | both are true or both are not |
+| `sort` | `sort_by`, `order_by`, `then_by` (only when not empty) | all three are equal; an absent `then_by` equals an empty one |
+
+A list imported by a version without this has no base.
+
+**Importing again.** Importing a source that already has a list never adds a second list. The app
+makes a *new import* of the source (the list and base an import would make now) and compares it
+with the list, part by part, giving each part a state:
+
+- `same`: the list's value equals the new import's;
+- otherwise, with a base: `vicu` when the new import's value equals the base (only the list
+  changed), `vikunja` when the list's value equals the base (only the source changed), and `both`
+  when neither does;
+- otherwise, without a base: `differs`.
+
+The source's **status** is `same` when every part is `same`; else `differs` when a part is
+`differs`; else `both` when a part is `both`, or one part is `vikunja` and another is `vicu`; else
+`vikunja` when a part is `vikunja`; else `vicu`. The other conditions of a list (projects, labels,
+dates, Pro's keys, ...) are not parts and never change a status.
+
+The review sheet shows each source that has a list with its status. `vikunja`, `both` and `differs`
+start ticked, `vicu` starts unticked, and `same` cannot be ticked. A ticked source that was imported
+before but has no list now (it was deleted) imports a new list as on first import. For each ticked
+source that has a list, the app shows the parts that are not `same`, with their state and both
+values, and asks:
+
+- **Overwrite**: the four parts take the new import's values and `import_base` becomes the new
+  import's. Everything else stays: the list's `id`, `icon`, place in the order, its other conditions,
+  Pro's keys and unknown fields.
+- **Skip**: the list stays as it is and `import_base` becomes the new import's, so the same change
+  is not offered again. A part that differs then reads `vicu`.
+
+One answer can be given for every remaining source. The answers are written as one change, with
+one Undo that puts every list and base back as it was.
+
+**Changed in Vikunja.** `GET projects` moves a saved filter's pseudo-project `updated` with every
+change of the filter. After a sync, a device reads each saved filter that has a list with a base
+whose `updated` differs from the pseudo-project's, once per new `updated` value, and offers the
+filters whose status is `vikunja` or `both` (with the new filters, when there are any). Not now hides
+the offer until a filter changes again. A list without a base is never offered this way; the review
+sheet still shows it.
 
 Vectors: `savedFilterImport.filters` gives saved filters as `GET filters/{n}` returns them and
-the list each becomes (`filter`, `savedFilterId`, `status`, `reasons`), and
-`savedFilterImport.duplicates` gives lists with `savedFilterId` and the ids kept.
+the list each becomes (`filter`, `savedFilterId`, `status`, `reasons`, and `importBase` where it is
+checked), `savedFilterImport.duplicates` gives lists with `savedFilterId` or `projectViewId` and the
+ids kept, `savedFilterImport.compare` gives a list (with or without `importBase`) and a new import,
+and the state of each part and the status, and `savedFilterImport.answers` gives a list, a new
+import, and the list after Overwrite and after Skip.
+
+### 3.8 Pro conditions
+
+Lists can hold Pro's conditions (section 21). They are written only when set, evaluated by every
+version that knows them whether Pro is on or off (decision 23), kept unchanged by versions that do
+not (section 10.8), and never sent to the server: the server filter stays a superset.
+
+| Key | Values | Matches |
+|---|---|---|
+| `availability` | `available`, `remaining`, `all` | `available`: open tasks without a reason of section 21.2; `remaining`: open tasks; `all` (or another value): no condition |
+| `flagged` | `true`, `false` | `is_favorite` equals it; another type is no condition |
+| `estimate_max` | minutes, a whole number of 1 or more | tasks with an estimate (21.7) of at most that; no estimate does not match |
+| `project_status` | `active`, `on_hold`, `any` | the task's project is not on hold, or is (21.2, by status only) |
+| `promise` | `theirs`, `mine`, `any` | an open promise of that direction (`any`: either) |
+| `person` | label ids | the open promise's person, or one of the task's labels, is one of them |
+| `group_by` | `project`, `label`, `person`, `due`, `start`, `flagged`, `none` | how the list groups its rows; another value is `none` |
+| `row_fields` | an array of `project`, `labels`, `due`, `start`, `estimate`, `flag`, `notes` | what rows show, in that order; unknown entries are left out |
+
+A device that does not have what a condition reads yet (the ledger, the synced preferences) treats
+it as no condition, like a version that does not know it (O5). The list editor shows the Pro section
+for a list that has any of these conditions, also on a device with Pro off. Vectors:
+`customListPro` (the matches with and without that data, `hasCondition`, `rowFields`, `groupBy`).
+
+### 3.9 Project views
+
+A Vikunja project has views (`GET projects/{id}/views`), each with its own filter and sort. Vicu's
+project screen shows a project's open tasks and does not read them; instead the review sheet of
+section 3.7 also offers views, which import as custom lists.
+
+**Offered.** A view is offered when its project is a real project (id 1 or more) that is not
+archived, its `view_kind` is `list`, `table` or `gantt` (never `kanban`), and it is not one Vikunja
+makes by default. The defaults are a `list` view whose `filter.filter` is `done = false` (trimmed)
+and a `table` or `gantt` view whose `filter.filter` is empty; in both, `filter.s` is empty, there is
+no `sort_by` and `filter_include_nulls` is false. A view whose `filter` is absent or null reads as an
+empty one. Views are offered only in the review sheet: never on first connect and never after a
+sync.
+
+**Importing.** A view becomes a list as a saved filter does (section 3.7, with the view's `filter`
+in place of `filters`, and the same status and reasons), and:
+
+- `name` is the project's title, `: ` and the view's title (both trimmed): `Shopping: All items`;
+- `project_ids` is the view's project with `project_filter_mode` `include` (a view shows its own
+  project's tasks, not its subprojects'), and `add_to_project_id` is that project;
+- `project_view` is `{"project_id": p, "view_id": v}`, in place of `saved_filter_id`;
+- the base's `updated` is the view's.
+
+Importing a view again works as in section 3.7. No document records imported views: a view is
+imported while a list holds its `project_view.view_id`.
+
+Vectors: `savedFilterImport.views` gives a project, a view as the server returns it, whether it is
+offered, and the list it becomes with its status and reasons.
 
 ---
 
@@ -383,10 +527,11 @@ the date and recurrence rules.
 - Weekdays:
   - A bare weekday or `this <weekday>` is the next occurrence on or after today (today
     included). `<weekday> this week` is the same as `this <weekday>`.
-  - `next <weekday>` is that weekday in the following Monday-start week. On Tue 2026-10-06,
-    `next friday` is 2026-10-16; on Sun 2026-10-04, `next monday` is 2026-10-05.
-    `<weekday> next week` is the same as `next <weekday>`.
-  - `next week` is the Monday of the following week.
+  - `next <weekday>` is that weekday in the following week (Monday-start, or by the week start
+    of section 2.1). On Tue 2026-10-06, `next friday` is 2026-10-16; on Sun 2026-10-04,
+    `next monday` is 2026-10-05. With `sunday`, on Tue 2026-10-06 `next sunday` is 2026-10-11,
+    not 2026-10-18. `<weekday> next week` is the same as `next <weekday>`.
+  - `next week` is the Monday in the following week (section 2.1).
   - A weekday directly followed by another date (only spaces or a comma between them) is part
     of the title, and the other date is the due date: "Call Ana about Saturday tomorrow at 3pm"
     is due tomorrow at 15:00 with the title "Call Ana about Saturday", and "Party Saturday
@@ -489,6 +634,75 @@ off, the words stay in the title. The corpus parses every case with its `places`
 - `for` with a number and `days`, `nights`, `weeks`, `months` or `years` is never a date phrase and
   stays in the title. "Pay for 3 months" has no due date.
 - A time without a length is still a due time. "Call at 3pm" is due at 15:00 and has no start date.
+
+### 5.5 Pro phrases
+
+Only with Pro on (decision 26, the parser option `pro`). With Pro off the same text is read as
+before: these words stay in the title.
+
+- **A person** (decision 8): the title starts with a known person's name and a colon, then a space:
+  `Jan: send the plan`. The name is one to three words and is matched by section 21.5 (title, alias,
+  unique first name); an unknown or ambiguous name stays in the title. The prefix leaves the title,
+  the result has `person` (the label id) and the task becomes that person's promise to you.
+  `for Jan:` at the start makes it your promise to them (`personMine`). An unknown name here stays
+  in the title; only `$` (below) makes a new person.
+- **A person with `$`**, in both syntax modes and anywhere in the text: `$` right after the start or
+  a space, then a name that starts with a letter (`$Lalith`) or a quoted name (`$"Jan de Vries"`),
+  ending at a space, the end or one of `. , ; : ! ? )`; a `:` right after the name belongs to the
+  phrase (`$Lalith: call back` is "call back"). `$50` and `US$` stay. `for` and spaces just
+  before it (`for $Priya`) make it your promise to them; otherwise it is their promise to you. The
+  name is matched by section 21.5: one match gives `person` with that id; no match gives a **new
+  person**, `person` with `id` null and `name` (the name as written, quotes removed, spacing
+  collapsed), made when the task is saved (section 21.5); an ambiguous name stays in the title.
+  Only the first `$` phrase is read, and none after a `Jan:` prefix; the rest stay in the title.
+  The phrase leaves the title. Apps offer the people as suggestions after a typed `$`; picking one
+  writes `$Name`, or `$"Full Name"` when it has a space.
+- **Who it was promised to** (section 21.6): when the text has exactly two `$` phrases and exactly
+  one of them follows `for`, both are read: the plain one is the owner (`person`, their promise)
+  and the `for` one is who it was promised to (`requester`, with `id`, or `id` null and
+  `name` for a new person). `$Jan site list for $Priya` is Jan's promise to Priya. An ambiguous
+  name in either place leaves the text read without this rule (the first phrase only). Any other
+  number or mix of `$` phrases is read as before.
+- **A check date:** `check on` and a date phrase (`check on 3 feb`, `check on monday`), only in a
+  text that also has a person, gives `checkOn`: that local day (a time of day in the phrase is
+  dropped). The phrase is not read as a due date and leaves the title. Without a person the words
+  stay in the title and the date is read as usual.
+- **A start date:** `starts` and a date phrase (`starts monday`, `starts next week`, `starts 3 Nov
+  9am`) gives `start`: the date, at local midnight without a time. The phrase is not read as a due
+  date and leaves the title. A start date and a length (section 5.4) in one text: the length's block
+  wins and `start` is the block's start.
+- **An estimate:** `~` and a length without spaces: `~10m`, `~45min`, `~1h`, `~1h30`, `~1h30m`, `~2h`
+  (1 minute to 24 hours) gives `estimate` in minutes and leaves the title. `~` before anything else
+  stays.
+- **A flag:** the word `!flag` (any case) gives `flag: true` and leaves the title.
+- **A request:** `req:` at the very start gives `request: true` (triage, section 21.10) and leaves
+  the title.
+
+### 5.6 Times of day
+
+The names of the account's times of day (section 23.1, `Morning`, `Noon`, `Afternoon` and `Evening`
+by default) are time words. A name is matched without regard to case, as whole words (a name of
+more than one word matches those words with single spaces between them).
+
+- **After a date:** a name directly after a date phrase (only spaces between, or `at`) is that
+  date's time: "Gym tomorrow morning" is due tomorrow at 09:00 with the title "Gym", and "Lunch
+  friday at noon" is due on Friday at 12:00. A bare or `this` weekday whose day is today moves to
+  next week when that time has passed, as with "friday 9am" (section 5.1).
+- **After `at`:** `at <name>` without a date is a time, like "at 3pm": "Call at noon" is today at
+  12:00 when that is still ahead, otherwise tomorrow. It can stand before a date: "at noon
+  tomorrow".
+- **`this <name>`** is today at that time, also when it has passed: "Call this afternoon" is due
+  today at 15:00.
+- **`tonight`** is today at the evening time (section 23.1). Without an evening time it is a word
+  of the title.
+- **On its own** a name is a word of the title: "Morning run" and "Call mom evening" have no due
+  date. A name after a phrase that already has a time stays in the title too: "Call tomorrow 3pm
+  evening" is due tomorrow at 15:00 with the title "Call evening".
+- A name that is also a word of section 5.1 (`today`, `tomorrow`, `tonight`, `now`, a weekday or a
+  month, `next`, `this`, `last`, `in`, `at`, `on`, `by`, `due`) is never read as a time of day.
+- No other word is a time of day: `midnight`, `midday` and `night`, and `noon` or `morning` once
+  they are no longer names, are words of the title.
+- Cases in `nlp-corpus-v1.json` are parsed with the default times of day unless they give `times`.
 
 ---
 
@@ -723,6 +937,56 @@ per time), so a day with many routines stays short:
   syncs, like the other folding sections (13.3).
 - The `todayRoutines` vectors of the fixture pin the rows, their order, the limit and the line.
 
+### 6.11 Routine trend
+
+A routine's history (opened from the routine; nothing of it shows on the routine's card or on
+Today) starts with a summary line and a month of days, one mark per day, and for a `calendar`
+routine twelve weekly bars. Both apps work it out from the definition as it is now, the routine's
+whole history (section 6.4) and the local day:
+
+- **The day of a record.** A record counts on its `scheduledDate`. For an `after_completion`
+  routine a `COMPLETED` record counts on its completion date instead (section 6.5): the day it
+  was done, which may be later than the day it fell due.
+- **What a day holds, `calendar`.** On a day up to today: one occurrence for each slot of the
+  definition when the schedule runs that day and the day is not before `activeFrom`, and one for
+  any other slot with a record that day. An occurrence has its record's status; without a record,
+  or still `PENDING`, it is missed before today (Not logged, section 6.7) and open on today. A
+  day after today holds nothing.
+- **The state of a day, `calendar`**, from its occurrences:
+  - `none`: no occurrences.
+  - `skipped`: every occurrence was skipped.
+  - `done`: at least one was completed, and none is missed or open (a skipped time beside a
+    completed one does not count against the day).
+  - `part`: at least one was completed and at least one is missed or open.
+  - `open`: none completed and at least one open (today, still to do).
+  - `missed`: none completed and at least one missed.
+- **The state of a day, `after_completion`**: `done` when a completion counts on it; else
+  `skipped` when a `SKIPPED` record does; else `open` when the day is today, the due date (6.5)
+  is today or earlier and no `SKIPPED` record is scheduled on that due date; else `none`. There
+  is no `missed` and no `part`.
+- **In a row** (`calendar` only): walk back from today to the routine's first day (the earlier
+  of `activeFrom` and its earliest record). A `done` day adds one. A `none`, `skipped` or `open`
+  day, and today while it is `part`, is passed over. A `missed` day, or a `part` day before
+  today, ends the walk. An `after_completion` routine has no run.
+- **The last 30 days** (today and the 29 days before it): `done` is the number of completed
+  occurrences, `expected` is `done` plus the missed ones. Skipped and open occurrences are in
+  neither. For an `after_completion` routine `done` is the number of completions that count on
+  those days, and nothing is expected.
+- **Weeks** (`calendar` only): the twelve weeks that end with today's week (Monday weeks, or by
+  the week start of section 2.1; a case's `weekStart` in the vectors), each with the
+  same `done` and `expected`. A bar is `done / expected` high; a week that expects nothing has
+  none.
+- **The summary line**, `calendar`: `No history yet` while `done` and `expected` are both 0;
+  else `{done} of {expected} in the last 30 days`, with `{n} in a row · ` before it when the run
+  is 2 or more. `after_completion`: `No history yet` while it was never completed; else
+  `Not done in the last 30 days`, `Done once in the last 30 days` or
+  `Done {n} times in the last 30 days`.
+- Marks use the routine's own colour (the Routines colour without one): filled for `done`, a pale
+  fill for `part`, a ring for `skipped`, a small neutral dot for `missed`, nothing for `open` and
+  `none`. Today is outlined. The day picked lists its occurrences under the month, in time order.
+- The `trend` vectors of `routine-archive-v1.json` pin the day states, the run, the counts, the
+  weeks and the line.
+
 ---
 
 ## 7. Completion hold
@@ -777,6 +1041,31 @@ of the sequence. Events: `complete`, `hoverStart`, `hoverEnd`, `focusIn`, `focus
 `at`, with the timers due at that time already fired; a timer due at the same instant as an event
 fires first. `held` and `collapsed` are row ids in ascending order, `toast` is the text shown or
 `null`. Rows in the vectors start open.
+
+### 7.5 A repeating task completed on two devices
+
+Vikunja moves a repeating task on (a new due date, open again) from the dates it holds when
+`{ done: true }` arrives. A second completion of the same occurrence, sent later by a device that
+was offline or showed an old copy, would move it on again and skip an occurrence. So:
+
+- A completion remembers the **completed due**: the task's `due_date` as the app held it when
+  the user completed it. A queued completion stores it with the change.
+- Before the completion of a task the app holds as repeating (`repeat_after` above 0, or
+  `repeat_mode` not 0) is sent, directly or from the queue, the app reads the task and decides
+  (`repeatCompletion` vectors):
+  - the server's task is done: **skip**;
+  - the server's task does not repeat: **send**;
+  - the server's `due_date` is the same instant as the completed due (no date on both sides is
+    the same): **send**;
+  - otherwise: **skip**. Another device completed this occurrence already.
+- **Skip** sends nothing, counts the change as done, and the app shows the server's task. It is
+  not an error and is not reported to the user.
+- When the task cannot be read because the server cannot be reached, a direct completion is
+  queued and a queued one waits, as for any change. A 404 is handled as for any change.
+- A task the app holds as not repeating is completed without the read. A queued completion
+  without a completed due (written by an older version) is sent as before.
+- Dates are compared as instants, never as text. `null`, an empty string and
+  `0001-01-01T00:00:00Z` are all "no date".
 
 ---
 
@@ -1099,7 +1388,8 @@ usernames and, when `pick` is set, the text and caret after picking that usernam
 
 Vicu keeps the data that must reach every device in ordinary Vikunja tasks that both apps hide
 ("hidden tasks", "carriers"): the custom-list carrier (section 3), routine carriers and archive
-parts (section 6) and the preferences carrier (section 11). These rules hold for every kind.
+parts (section 6), the preferences carrier (section 11) and the Pro ledger and its archive parts
+(section 21.7). These rules hold for every kind.
 
 ### 10.1 Marker and hiding
 
@@ -1241,6 +1531,7 @@ A key is added here, in both repos, in the release that starts writing it.
 | `inbox_project_id` | the Inbox project id, a whole number above 0 | none: the app asks during setup |
 | `task_order` | a task order key (section 12.1) | `due_date_first` |
 | `task_order.project.<id>` | a task order key, or `null` | follows the parent project, then `task_order` (section 12.3) |
+| `projects.show_done` | `true`: every project ends with its Completed row; or `null`. Any other value acts as the default and is kept; section 12.6 | no Completed row |
 | `place.<placeId>` | a saved place's name, `{"name": "Home"}`, or `null` (deleted); section 11.7 | none |
 | `location_reminder.<taskId>` | a task's location reminder, `{"place", "trigger", "radius_m"}`, or `null`; section 11.7 | none |
 | `routine_reminders.<routineId>` | `"off"`: no reminders of that shared routine on this account; or `null`. Any other value acts as the default and is kept; section 6.9 | on: the routine's own reminder settings |
@@ -1250,9 +1541,23 @@ A key is added here, in both repos, in the release that starts writing it.
 | `project_icon.<projectId>` | `"none"`: the project is drawn without its folder icon and its name starts where the icon would be; or `null`. Any other value acts as the default and is kept | the folder |
 | `template.<id>` | a task template, or `null` (removed); section 18 | none |
 | `subtask_order.<taskId>` | the ids of a task's subtasks in the order the person dragged them, or `null`; section 19 | the server's order |
+| `event.<id>` | one of your Events (`title`, `start`, `time`, `minutes`, `repeat`, `until`, `skips`, `busy`), or `null` (deleted); section 20.3 | none |
+| `week_start` | `"sunday"` or `"saturday"`: the day weeks start on, or `null`. Any other value acts as the default and is kept; section 2.1 | `"monday"` |
 | `weekly_review.last` | the local date the last weekly review was finished, `"YYYY-MM-DD"`; section 14.7 | never done |
 | `planner.default_length` | the length of a new block in minutes: 15, 30, 45, 60, 75 or 90. Any other value acts as the default and is kept; section 16.2 | 30 |
 | `planner.hours` | the work hours, `["HH:mm", "HH:mm"]` in 24-hour local time, the start before the end. Any other value acts as the default and is kept; section 16.6 | `["08:00", "18:00"]` |
+| `pro.area` | Pro's area: an array of project category ids, `"work"` (the work projects, section 22.8), or `null`; section 21.1 | every project |
+| `project_mode.<projectId>` | `"sequential"` or `"single"`, or `null`. Any other value acts as the default and is kept; section 21.2 | parallel |
+| `project_status.<projectId>` | `"on_hold"`, or `null`; section 21.2 | active |
+| `label_status.<labelId>` | `"on_hold"`, or `null`; section 21.2 | active |
+| `label_kind.<labelId>` | `"person"` (section 21.5), `"group"` (section 21.16) or `"private"` (section 21.21), or `null` | a label |
+| `project_plan.<projectId>` | `{"start", "end", "group"?, "closed"?, "from"?}`, or `null`. A value without both days in order is no plan and is kept; section 21.20 | a project |
+| `repeat_rule.<taskId>` | `{"until"?, "count"?, "catch_up"?}`, or `null`; section 21.13 | no end |
+| `work.label` | the id of the work label, a whole number above 0, or `null`. Any other value acts as the default and is kept; section 22.1 | no work label |
+| `work.project.<projectId>` | `true` (work) or `false` (not work), or `null`. Any other value acts as the default and is kept; section 22.1 | follows the parent project, then not work (section 22.2) |
+| `when.times` | the times of day, `[{"name", "time"}]`, or `null`. Any other value acts as the default and is kept; section 23.1 | Morning 09:00, Noon 12:00, Afternoon 15:00, Evening 18:00 |
+| `when.days` | the When pickers' day choices, an array of choice ids, or `null`. Any other value acts as the default and is kept; section 23.2 | `["today", "this_evening", "tomorrow", "this_weekend", "next_week"]` |
+| `when.move_by` | the When pickers' Move by steps, an array of step ids, or `null`. Any other value acts as the default and is kept; section 23.3 | `["1d", "2d", "1w", "1m"]` |
 
 ### 11.4 The Inbox
 
@@ -1365,6 +1670,18 @@ the other orders none. The Move up and Move down actions follow the same rule.
 `priority`, `position` (absent: 0), `created` as a UTC instant or `null`). `taskOrder.sort` gives an
 order and the expected ids. `taskOrder.resolve` gives parents, entries and, per project, the order
 used. `taskOrder.drag` gives an order and the ids that can be dragged.
+
+### 12.6 Completed tasks in a project
+
+While `projects.show_done` is `true` (Settings, Projects: "Show completed tasks"), a project's list,
+the Inbox included, ends with a folded row: "Completed" and how many done tasks the project has
+itself (not its subprojects'). Opened, it lists them by completion, newest first (`done_at`, then
+the higher id), 20 at a time with "Show more"; each row is struck through and shows the day it was
+completed as the Logbook groups it (`logbook.group`, section 8.3). A done subtask is a row of its
+own, not nested under its parent, so the rows add up to the count. Ticking a row reopens the task,
+as anywhere else. The row follows the Work and Personal mode as the Logbook does (section 22), and
+not a project's label filter (section 17.2). Whether it is open is per device and forgotten when
+the project is left. Smart lists, labels, custom lists and widgets do not have it.
 
 ---
 
@@ -1584,6 +1901,9 @@ A checklist of steps in this order:
 - The weekly review is **due** when `weekly_review.last` is missing, unreadable, or at least
   `weekly_due_days` days before today.
 
+With Pro on, Pro's steps come first (section 21.11). A project review session offers On hold
+beside Keep and Archive while Pro's availability layer is on (`project_status.<id>`).
+
 ### 14.8 Ask's agenda
 
 When Ask opens on a conversation without messages, it lists these, in this order, each only when
@@ -1711,7 +2031,9 @@ task without a block is a complete task, and nothing moves on its own.
   and the end is no later than the midnight that ends the start's local day.
 - The block's day is the local date of its start.
 - Anything else in those fields (a start date alone, several days, a Gantt bar from Vikunja's web
-  app) is not a block. It is ignored by this section and never rewritten.
+  app) is not a block. It is ignored by this section and never rewritten. With Pro, a start date
+  alone means the task is not available before it (section 21.3); every reader of `start_date`
+  goes through this test first.
 
 ### 16.2 Changing a block
 
@@ -1769,8 +2091,8 @@ A block on any other day stays, and so does a block when only the due date's tim
 
 ### 16.6 Free time and fitting
 
-- **Busy** is the day's open blocks and any calendar events. Routine times and due-time markers have
-  no length and are never busy.
+- **Busy** is the day's open blocks and the busy events of section 20.2 (your Events and connected
+  calendars). Routine times and due-time markers have no length and are never busy.
 - **Free time** is the work hours (`planner.hours`; today, from now) minus busy time, with overlaps
   counted once.
 - **The next free slot** is the first 15-minute line from the start of the work hours (today, from
@@ -1826,6 +2148,32 @@ and, when there is no text to narrow the read, `labels in` and `priority in`.
 ### 17.1 Vectors
 
 `searchFilters` in `cross-app-semantics-v1.json` runs over the same `tasks` as `customLists`.
+
+### 17.2 Labels on a project page
+
+A project's page can be narrowed to some of its labels, to see part of a project without making a
+custom list. Like the search filters it is for the person reading: nothing is saved or synced, and
+the choice goes when the page is left (another project, another screen). A filter button sits next
+to the project's menu and opens a bar under the page header with one choice per label.
+
+- **The labels offered** are those of the tasks the page lists, its own and its sections', after
+  everything else that decides what the page holds (hidden tasks, Pro's availability view, Work and
+  Personal of section 22.4). Each shows how many of those tasks carry it. They are ordered by title,
+  compared in lowercase character by character (UTF-16 code units), then by id. A picked label that
+  no listed task carries any more stays in the bar with 0 until it is unpicked. With no label to
+  offer and none picked there is no button.
+- **What shows.** With labels picked, a task shows when it has at least one of them (`label_ids` of
+  section 17). Where the page shows subtasks under their parent, a row under a shown row is shown
+  with it; a subtask that matches while its parent does not is listed as the page would list it
+  without its parent (the rule of 22.4). A section with no task left, in itself or in its own
+  sections, is not drawn while labels are picked.
+- **What is said.** While labels are picked the button carries their number, also with the bar
+  closed, and one line under the list says how many of the page's tasks are left out, with Show all,
+  which unpicks every label.
+
+`projectLabelFilter` in `cross-app-semantics-v1.json`: `choices` gives the labels offered in order
+with their counts, `shown` the ids shown in the list's order. `parent` is the task a row is nested
+under on the page.
 
 ## 18. Task templates
 
@@ -1911,3 +2259,1224 @@ order.
 Done subtasks stay where they are in the order.
 
 `subtaskOrder` in `cross-app-semantics-v1.json` holds the vectors.
+
+## 20. Events and calendars
+
+The Plan screen (section 16.9) shows everything that takes your time: your tasks' blocks, your own
+**Events**, typed by hand, and the events of the **calendars** you connect. Events and calendar
+events appear on the Plan screen only: its Day, 3 days and Week views and Plan my day (14.10). They
+are never on Today (the phone's Today Day view included), in lists, in Quick View, in notifications
+or reminders, and never in the task caches.
+
+- Vicu never writes to a connected calendar. Only your own Events are Vicu's to change.
+- Your Events sync (20.3). Connected calendars and their settings belong to the device and never
+  sync; their addresses, passwords and tokens never leave it (20.9, 20.11).
+- The assistant only ever gets free time (20.2), never an event's title, place or calendar.
+
+### 20.1 An event
+
+An event is one occurrence, its recurrence already expanded.
+
+| Field | Meaning |
+|---|---|
+| `calendar` | where it comes from: a connected calendar's id on this device, or `vicu:events` for your own Events |
+| `start`, `end` | instants. An all-day event runs from the local midnight of its first day to the local midnight after its last day |
+| `allDay` | a date without a time |
+| `busy` | busy (iCalendar opaque, the default) or free (`TRANSP:TRANSPARENT`, a calendar's "show as free") |
+| `tentative` | not yet accepted (`STATUS:TENTATIVE`, a calendar's own tentative state) |
+| `title`, `place` | as the calendar has them; Busy only drops them (20.8) |
+
+**On a day.** A timed event covers, on a local day, the part between that day's midnight and the
+next, in wall-clock minutes from the day's midnight; 1440 is the midnight that ends the day. An event
+that crosses midnight is on both days, and one that runs for several days covers the whole of the
+days between. Minutes are wall-clock minutes, so the timeline's hour lines stay right on the day of a
+clock change. An event that ends where it starts has no length and is on no day's timeline. An
+all-day event is on each day from its first to its last.
+
+### 20.2 Busy time
+
+This extends section 16.6. The busy time of a day is:
+
+- the day's open blocks (16.6), and
+- the busy, timed events of calendars that count, each clipped to the day (20.1).
+
+Not busy: all-day events (a holiday or a birthday does not fill the day), free events, events with
+no length, and the events of a calendar whose **Counts as busy** is off or that is not shown.
+Tentative events are busy. Your own Events always count as a calendar: each one is busy unless its
+`busy` is false, and an all-day Event never is (20.3).
+
+Overlaps are counted once. Free time, the next free slot and Fit (16.6), and Plan my day (14.10: the
+meter's free time, the draft's busy time, the free time the assistant gets) all use this busy time.
+The assistant is sent the free ranges only.
+
+### 20.3 Your Events
+
+An Event is a time you are not available that is not a task: nothing to tick, nothing to track. A
+weekly manager call, a monthly review, a month-end close. Each Event is one entry in the synced
+preferences (`event.<id>`, section 11.3), so it reaches every device of the account and nobody
+else. `<id>` is a random id made by the device that created it. Events are not hidden tasks and are
+never written to a task.
+
+| Field | Value | Left out means |
+|---|---|---|
+| `title` | text, required; read trimmed | the entry is not an Event |
+| `start` | the first day, `YYYY-MM-DD`, required | the entry is not an Event |
+| `time` | the start, `HH:mm` in 24-hour local time | all-day |
+| `minutes` | the length, a whole number from 1 to 1440; required with a `time` | (with a `time`: the entry is not an Event) |
+| `repeat` | the repeat rule (20.4) | does not repeat |
+| `until` | the last day it may happen on, `YYYY-MM-DD` | no end |
+| `skips` | days left out, `YYYY-MM-DD` | none |
+| `busy` | `false`: a timed Event that does not count as busy | a timed Event is busy; an all-day Event never is |
+
+- **Wall-clock times.** An Event at 10:00 is at 10:00 local time on each of its days, through a
+  clock change and on a device in another time zone. It ends `minutes` later on the clock, on the
+  next day when that is past midnight: an Event at 00:30 for 180 minutes on the night the clock goes
+  back ends at 03:30.
+- **What is not an Event.** A value of the wrong type, without a required field, with a field
+  outside its values, or with a repeat kind this version does not read is not an Event: it is not
+  shown and not busy, and it is kept unchanged. Wrong optional values read as their default: an
+  `until` that is not a date is no end, a skip that is not a date is dropped, a `busy` that is not
+  true or false is the default.
+- **What is written.** The fields without their defaults: `time` and `minutes` only for a timed
+  Event, `busy` only when it is false on a timed Event, `repeat` only when it repeats, `until` only
+  when set, `skips` only when not empty, sorted and each day once. Inside `repeat` every field is
+  written, `every` included.
+- **Unknown fields** are kept and written back when the Event is changed.
+- Deleting an Event writes `null` (section 11.2). Lists of Events (the Plan gear, Settings) are by
+  title, then id.
+
+### 20.4 The repeat rule
+
+Vicu's own small rule, not iCalendar's RRULE, so both apps read it exactly the same. `repeat` is an
+object with a `kind` and `every`, a whole number from 1 to 99 (left out, it reads as 1). Weekdays
+are numbered 0 (Sunday) to 6 (Saturday).
+
+| `kind` | Other fields | Happens on |
+|---|---|---|
+| `none` | | the first day only |
+| `daily` | | every `every` days from the first day |
+| `weekly` | `days`: one or more weekdays | those weekdays, in every `every`th week counted from the week of the first day. Weeks start on Monday, whatever the week start of section 2.1 |
+| `monthly-date` | `date`, 1 to 31 | that date, in every `every`th month counted from the first day's month. A month without the date (the 31st in April, the 30th in February) has none |
+| `monthly-weekday` | `week`: 1 to 4, or -1; `weekday` | the `week`th such weekday of the month (the 1st to 7th are the first week, the 8th to 14th the second, and so on), or with -1 the last one, in the month's last seven days; in every `every`th month |
+| `yearly` | | the first day's month and date, every `every` years. 29 February happens only in leap years |
+
+- The first day is the earliest day, and the weeks, months and years count from it. It is a day the
+  Event happens on only when the rule gives it: weekly on Monday and Thursday from a Sunday starts on
+  the Monday after.
+- No day after `until`, and none of the `skips`.
+- The rule has no time: each day it gives has the Event's `time` and `minutes`.
+
+### 20.5 The repeat choices
+
+Making an Event on a day offers these repeat choices, in this order:
+
+| Choice | Rule | Offered |
+|---|---|---|
+| Does not repeat | `none` | always |
+| Every day | `daily`, every 1 | always |
+| Every weekday | `weekly`, every 1, Monday to Friday | when the day is Monday to Friday |
+| Every Tuesday | `weekly`, every 1, the day's weekday | always |
+| Every 2 weeks on Tuesday | `weekly`, every 2, the day's weekday | always |
+| Monthly on the 24th | `monthly-date`, the day's date | always |
+| Monthly on the fourth Tuesday | `monthly-weekday`, the day's week (first, second, third, fourth) and weekday | when the day is the 1st to the 28th |
+| Monthly on the last Tuesday | `monthly-weekday`, week -1, the day's weekday | when the day is in its month's last seven days |
+| Every year on November 24 | `yearly`, every 1 | always |
+
+Every choice happens on the day it is offered for. A day can have both the fourth and the last
+weekday (24 November 2026); the 29th to the 31st have only the last. Changing an Event offers the
+choices of the day its changed rule starts on (20.6).
+
+How a rule reads, in the list and the popover:
+
+| Rule | Text |
+|---|---|
+| `none` | Does not repeat |
+| `daily` | Every day; Every 3 days |
+| `weekly`, every 1, Monday to Friday | Every weekday |
+| `weekly` | Every Monday, Wednesday; Every 2 weeks on Tuesday. Days are named Monday first, Sunday last |
+| `monthly-date` | Monthly on the 31st; Every 2 months on the 15th |
+| `monthly-weekday` | Monthly on the second Tuesday; Monthly on the last Friday; Every 3 months on the first Monday |
+| `yearly` | Every year; Every 2 years |
+
+Ordinals: 1st, 2nd, 3rd, 4th to 20th (11th, 12th and 13th included), 21st, 22nd, 23rd, 24th to
+30th, 31st.
+
+### 20.6 Changing an Event
+
+The Event's popover or sheet (title, all day, time, length, repeat, ends on, counts as busy) and the
+timeline (20.7) change an Event. A change sets any of `title`, `time` (null: all-day), `minutes`,
+`busy`, `repeat` and `until`, and may move the occurrence to another day. When the Event repeats the
+app asks **All times**, **This time only** or **This and following**; an Event that does not repeat
+is changed for all times without asking.
+
+| Choice | Writes |
+|---|---|
+| All times | The Event's own entry with the changes. A move to another day, n days away, moves the first day, `until` and each skip by n days, and the rule with it (below). |
+| This time only | The occurrence's day joins the Event's skips. A new Event with a new id that does not repeat: the Event's fields, unknown ones included, with the changes, on the occurrence's day or the day it moved to, without `until` and skips. The two are not linked: changing either later leaves the other alone. Changing the repeat or the end is never "this time only". |
+| This and following | The Event's `until` becomes the day before the occurrence, and its skips after that are dropped. A new Event with a new id starts on the occurrence's day, or the day it moved to: the Event's fields, unknown ones included, with the changes, the Event's `until`, and its skips from the occurrence's day on (both moved by n days when it moved). When the Event has no occurrence before that day (skipped days do not count), this is "all times". |
+| Skip this one | The day joins the skips. |
+| Delete | The entry becomes `null`. |
+
+**The rule moved with an occurrence** n days: `none`, `daily` and `yearly` follow the first day.
+`weekly` moves each of its weekdays by n days. `monthly-date` takes the new day's date.
+`monthly-weekday` takes the new day's weekday and week: the last when the new day is a fifth
+weekday, or when the rule said last and the new day is in its month's last seven days. A repeat set
+in the same change is used as it is.
+
+**The repeat choices of a change** are those of 20.5 for the day the changed rule starts on, so the
+times a change is for are chosen before its repeat:
+
+| The change is for | Choices of |
+|---|---|
+| All times, and an Event that does not repeat | the Event's first day (`start`) |
+| This and following | the occurrence's day; the Event's first day when this is "all times" (no occurrence before) |
+| This time only | none: the repeat is not changed this time only |
+
+The rule the Event already has may not be among them; it is shown as it reads (20.5) until another
+choice is made.
+
+Switching to all-day leaves out `time`, `minutes` and `busy` (20.3). An Event given a time without a
+length gets `planner.default_length`.
+
+**Undo** (after any change, Skip this one and Delete) writes back each entry the change wrote, as it
+was stored, unknown fields included, or `null` for an entry the change made. Changes are synced
+preference writes (section 11) and work offline like any setting.
+
+### 20.7 On the timeline
+
+- Timed events sit on the timeline with the blocks, clipped to each day (20.1). Events and blocks
+  share one overlap layout, so neither hides the other: things that overlap sit side by side in
+  columns, and where an event and a block tie for a column the event takes the left one. It was
+  there first; a block is what you place around it.
+- An event is drawn at least as tall as the shortest block, so its title fits. Busy time keeps its
+  real length.
+- All-day events sit in the day's top row (16.4), before the day's tasks without a time, on every
+  view.
+- An event of a connected calendar is read-only. It is never a target: drawing never starts on it, a
+  task dropped over it is placed at that time as anywhere on the timeline, and it cannot be dragged.
+  A press, or Enter, opens it: title, time, place, calendar.
+- Your own Events open the same way, with their fields to change (20.6), and can be moved and their
+  edges dragged with the block gestures (16.2): 15-minute steps, at least 15 minutes, Escape
+  cancels. When the Event repeats, letting go asks All times, This time only or This and following.
+  An Event cannot be dropped on the task panel or a list.
+- How events look: `design-system-v1.md` section 4.2.
+
+### 20.8 Busy only
+
+Every connected calendar has **Show only Busy, not titles** ("Busy only"), off by default, per
+device. When it is on, each event of that calendar is changed before it is stored, cached or drawn:
+its title becomes "Busy", or "Free" for a free event, and its place, description and people are
+dropped. The calendar's name and colour stay. The desktop does it in the main process, Android
+before its repository, so no window, cache or log ever holds the title. Importing a file (20.10)
+can do the same.
+
+A calendar that is shared with you as free and busy only gives no titles. Its events read as with
+Busy only, "Busy", or "Free" for a free event, whatever the setting: VFREEBUSY periods in a file or
+on a CalDAV server, a Google calendar whose access is free/busy only, an Android calendar whose
+access level is free/busy. Any other event without a title is "(No title)".
+
+### 20.9 Connected calendars
+
+- A connected calendar is a setting of the device, never synced: its id differs per device, and its
+  address or sign-in is a secret.
+- Kinds: a **calendar link** (an `https://` or `http://` address of an iCalendar file; `webcal://`
+  is read as `https://`), a **CalDAV account** (server, user name, app password), the **device's own
+  calendars** (Android's calendar provider, `CalendarContract` instances, with whatever the phone
+  syncs; iOS and macOS EventKit), **Microsoft 365** and **Google** accounts with read-only
+  access, a **calendar file on this computer** (an iCalendar file another program keeps up to date,
+  read again when it changes; desktop), and **classic Outlook** on Windows (read through Outlook's
+  own automation only while it is open, never started by Vicu; the new Outlook cannot be read this
+  way). Each app offers the kinds it has built.
+- The calendar's reader expands recurrence: RRULE, RDATE, EXDATE, overrides (RECURRENCE-ID) and the
+  file's own time zones. Cancelled events are left out.
+- **Your own answer.** Where the source tells your own answer to an invitation (the device's
+  calendars, Microsoft 365, Google, classic Outlook), an event you declined is left out, and one you accepted as
+  tentative or have not answered yet is tentative. A calendar link or a CalDAV account does not say
+  which attendee is you, so its events are read as they are. An event is also tentative when the
+  calendar marks it so: `STATUS:TENTATIVE`, a tentative availability (Android, EventKit), Microsoft's
+  "show as" Tentative or Google's status tentative.
+- **Microsoft 365 and classic Outlook "show as"**: Free and Working elsewhere are free (Outlook's scheduling counts both
+  as available), Tentative is tentative and busy, Busy and Away are busy.
+- Each calendar has: a name; **Shown** (default on; off, it is not read and counts for nothing);
+  **Colour**, by default the next of `#7c6cf2`, `#0a84ff`, `#30a46c`, `#e5484d`, `#f76b15`,
+  `#12a594` in the order calendars were added; **Counts as busy** (default on); **Busy only**
+  (default off, 20.8).
+- Calendars are read when the Plan screen opens and at most every 5 minutes per calendar while it
+  stays open, and at once on a manual refresh. A calendar the device itself keeps (Android's
+  provider, EventKit) is read again when it says it changed, and a calendar file when the file
+  changes.
+- A calendar that cannot be read keeps its last good copy on screen, says when it was last read and
+  why the read failed. An error never empties it.
+- Read-only: Vicu never adds, changes or deletes a calendar's events, never answers an invitation,
+  and never asks for write access.
+
+### 20.10 Importing a calendar file into Events
+
+Once, from a file (`.ics`): a preview lists the Events it becomes, and Import writes each as a new
+Event with a new id. Afterwards they are ordinary Events, synced and changeable; nothing stays linked
+to the file, and importing it again makes them again. The preview can be Busy only (20.8). The
+import day is the local day of the import.
+
+Times become the importing device's local time: a time with a zone (UTC or a `TZID`) is converted at
+its first occurrence; a time without a zone and an all-day date are taken as written.
+
+**A series becomes one repeating Event** when it has one RRULE, no RDATE and no overrides
+(RECURRENCE-ID), is not an all-day event of several days, its rule fits, and its first day (DTSTART)
+is a day the rule gives:
+
+| RRULE | Repeat rule |
+|---|---|
+| `FREQ=DAILY;INTERVAL=n`, no BY parts | `daily`, every n |
+| `FREQ=DAILY;BYDAY=MO,TU,...`, weekdays without a number, INTERVAL 1 | `weekly`, every 1, on those days |
+| `FREQ=WEEKLY;INTERVAL=n`, BYDAY weekdays without a number | `weekly`, every n, on those days; without BYDAY, the first day's weekday |
+| `FREQ=MONTHLY;INTERVAL=n;BYMONTHDAY=d`, one d from 1 to 31 | `monthly-date`, every n, date d; without BYMONTHDAY, the first day's date |
+| `FREQ=MONTHLY;INTERVAL=n;BYDAY=kXX` (k 1 to 4 or -1), or `BYDAY=XX;BYSETPOS=k` | `monthly-weekday`, every n, week k |
+| `FREQ=YEARLY;INTERVAL=n`, no BY parts, or BYMONTH and BYMONTHDAY equal to the first day's | `yearly`, every n |
+
+INTERVAL is 1 when left out and must be 1 to 99. Anything else does not fit: other BY parts
+(BYHOUR, BYWEEKNO, BYYEARDAY ...), BYMONTH outside FREQ=YEARLY, several or negative BYMONTHDAY
+values, a fifth weekday, BYSETPOS with weekly or with several values, WKST other than MO with an
+INTERVAL above 1, any other FREQ.
+
+- `UNTIL` gives `until`: its local day, or the day before when UNTIL has a time earlier than the
+  Event's start time.
+- `COUNT` gives `until`: the day of the COUNTth day the rule gives from the first day. EXDATE days
+  count, as in iCalendar.
+- `EXDATE` gives `skips`: the local days among the days the rule gives.
+- A series whose `until` is before the import day is not imported.
+
+**Everything else becomes single Events.** The reader expands the series, with its overrides
+applied, cancelled occurrences dropped and EXDATE left out, and each occurrence becomes an Event that
+does not repeat. An event without a rule is one occurrence. An occurrence is imported when it ends
+after the import day begins (an event from the evening before that runs past midnight is kept, one
+that ends at midnight is not) and starts on or before the 365th day after the import day.
+
+**Fields:**
+
+- Title: SUMMARY, trimmed; "(No title)" when there is none. Busy only: "Busy", or "Free" for a free
+  event.
+- A timed event: `time` is the local start (seconds dropped), `minutes` the length (end less start)
+  rounded to whole minutes, at least 1 and at most 1440.
+- An all-day event becomes an all-day Event. One of several days becomes an all-day Event that
+  repeats daily until its last day.
+- `TRANSP:TRANSPARENT` gives a timed Event `busy: false`; an all-day Event never has `busy`.
+- `STATUS:CANCELLED`: not imported.
+- LOCATION, DESCRIPTION, attendees, alarms and UID are not imported.
+
+The preview and the vectors list Events by first day, all-day first, then time, then title.
+
+### 20.11 Privacy
+
+| Data | Where | Synced |
+|---|---|---|
+| Your Events (`event.<id>`: title, first day, time, length, repeat, until, skips, busy), imported ones included | the synced preferences carrier on your Vikunja server (section 11) | yes, every device of the account |
+| Which calendars are connected; their addresses, user names, passwords and tokens | the device, encrypted (desktop `safeStorage`, Android Keystore) | no |
+| Each calendar's choices: shown, colour, counts as busy, Busy only | the device | no |
+| Calendar events | the device's memory and a last good copy on the device, already Busy only where it is on | no |
+| Event titles in tasks, task caches, logs or the assistant | never: the assistant gets free time only | - |
+
+No address, password or token is ever written to a log, the config file, the synced carrier or a
+task.
+
+### 20.12 Vectors
+
+In `cross-app-semantics-v1.json`, run in three time zones like the other date suites:
+
+- `planEvents`: `read` (stored values and what is written back), `list`, `days` (the days an Event
+  happens on over a range, across month ends and leap years), `times` (wall-clock starts and ends
+  across clock changes and midnight), `choices` (20.5 for a day), `choiceDays` (the day whose
+  choices a change offers, 20.6) and `text`.
+- `eventBusy`: events of several calendars, what each day shows and its busy time, `free` (16.6 with
+  events and a block) and `busyOnly`.
+- `eventChanges`: stored entries, a change to one occurrence, the entries written and Undo.
+- `icsImport`: calendar files as lines of text, an import day and the Events made; `expectByZone`
+  for times with a zone. The desktop reads them with ical.js, Android with its own reader.
+
+---
+
+## 21. Pro
+
+Pro is an optional layer for people who run work they do not control: what can be done now,
+promises other people made, a portfolio of initiatives, and fast views. It only adds. A device with
+Pro off shows exactly what a version without Pro shows, and every device keeps Pro's data safe.
+
+**Server checks (Vikunja 2.4.0, 2026-11-12).** `is_favorite` is per user, set by merge patch, present
+in collection responses, and setting it moves `updated`. A lone `start_date` is stored with
+`end_date` at the null date, survives a due-date patch, and `null` clears it. Completing a repeating
+task moves a lone start date with the due date in repeat modes 0, 1 and 2. A `blocked` relation
+creates the inverse `blocking`; related entries carry `done` and come with collection responses;
+deleting a task removes its relations. Adding the same relation twice answers 409 (code 4008),
+removing a missing one 404. A server filter on `start_date` with `filter_include_nulls` answers 400,
+so availability is decided on the device. A 512 KB description is stored intact on SQLite.
+
+### 21.1 The switch, layers and area
+
+- **The switch** is per device (desktop `pro_enabled`, mobile the same key in its behaviour
+  settings), off by default, and never on in standalone mode. It is not synced: each device decides.
+- **Layers**, per device, all on while Pro is on until turned off: `availability` (start dates,
+  on hold, after, sequential projects, flags, focus, estimates, repeat ends), `promises` (people,
+  promises, verdicts, recaps, meetings, import), `portfolio` (initiatives, cap, readiness,
+  escalations, sponsor desk, triage, logs) and `power` (Pro list conditions in the editor, columns,
+  the batch inspector, the focus block, the weekly execution review).
+- **The area** is the synced key `pro.area`: an array of project category ids (section 13).
+  Promises and the portfolio apply to projects whose top-level project is in one of those
+  categories; no area (absent, `null`, empty or unreadable) means every project. Availability
+  applies everywhere. The value `"work"` means the work projects of section 22.2 instead (section
+  22.8).
+- **Off.** With the switch off (O1) every list, count, card, parser result, reminder and screen is
+  what a version without Pro shows. Turning Pro off never writes anything (O2). Pro writes only
+  `is_favorite`, a lone `start_date`, `blocked` relations, the synced keys of section 11.3 marked
+  Pro, the ledger (21.7), custom-list keys of section 3.8 and device settings (O3). It never writes
+  a description marker in a task or project, and never changes a due date, position or order on
+  its own (a verdict with a new date moves the due date because the person chose it).
+- **Others keep Pro data safe** (O4): merge patches send changed fields only, so a lone start date,
+  a favourite and relations survive edits from any device; unknown synced keys, list keys and
+  documents are kept (sections 10.8, 11.2).
+- **Unknown shows more** (O5): a version that does not know a Pro list condition ignores it.
+
+### 21.2 Availability
+
+An open task is **available** when none of these reasons applies; a row shows the first one.
+
+| Reason | When |
+|---|---|
+| `starts` | It has a start date (21.3) later than now. |
+| `on_hold` | Its project or an ancestor is on hold (`project_status.<id>` is `"on_hold"`), or is an initiative whose ledger status is `parked` (21.10). |
+| `waiting` | One of its labels is on hold (`label_status.<id>` is `"on_hold"`). |
+| `after` | It is blocked by (`related_tasks.blocked`) a task that is open. The device's own copy of that task decides when it has one, else the relation's `done`. |
+| `sequence` | Its project is sequential (`project_mode.<id>` is `"sequential"`) and it is not the project's first task. |
+| `theirs` | It is an open promise of someone else's (21.6). |
+
+- **Sequential first:** among the project's open tasks that are not hidden, those whose parent
+  (`related_tasks.parenttask`) is not an open task of the same project are the top-level ones. They
+  are sorted by the project's task order (section 12.3, positions of the project's list view); the
+  first is the project's first task and shows "Next". A subtask follows its top-level ancestor in
+  the project: available (sequence-wise) only under the first. `single` projects (single actions)
+  and projects without a mode (parallel) have no `sequence` reason.
+- **Loops.** Blocked-by relations that form a loop among open tasks (including a task blocked by
+  itself) are ignored for those tasks, which are reported so the person can fix them.
+- **Views:** Available (open tasks without a reason), Remaining (open tasks), All (open and the done
+  tasks the list loaded). Anytime, project, label and custom-list screens offer them while the
+  availability layer is on; the default is Available, per device and list.
+- A done task never blocks. A hidden task is never a project's first task.
+
+### 21.3 Start dates and blocks
+
+- A **start date** is `start_date` when the task's dates are not a time block (section 16.1). A
+  block is not a start date: a task with a block is available whatever the block's time.
+- "Starts Monday" without a time stores that day's local midnight; with a time, that moment.
+- **A block replaces a start date** (decision 17): placing a block writes its start to
+  `start_date`. When the task has a start date later than the block's start, Pro warns before
+  placing ("This task starts Mon 17 Nov. Planning it earlier replaces that date."). Removing the
+  time of a block clears `start_date` and `end_date` (section 16.2), so the start date is gone too.
+- Repeating tasks: the server moves a lone start date with the due date (no app code).
+- **Upcoming** (Pro on) also lists, on the day it starts, each open task whose start day is after
+  today ("Starts").
+- A start date already set in Vikunja's web app counts the same. On first turning Pro on, the app
+  says how many open tasks have one, with a way to see them.
+
+### 21.4 Flags
+
+A flag is the task's `is_favorite`, which is per user. Flagging writes `{ "is_favorite": true }`
+only. It moves `updated`, so the "Changed" list condition (section 3.3) counts it. The Flagged list
+shows open flagged tasks; Vikunja's own Favorites pseudo-project (-1) is not used.
+
+### 21.5 People
+
+- A **person** is a label with `label_kind.<id>` = `"person"`. Its title is the name.
+- **Aliases** live in the ledger (`people.<labelId>.aliases`), added when an import or capture maps
+  a name to that person (decision 32).
+- **Matching a name** (`pro.personMatch`): spacing and case are ignored; the title first, then an
+  alias, then a unique first name (the name's first word equals the first word of exactly one
+  person's title, and the name is one word or the start of that title). Two people with that title
+  or alias, or that first word, is ambiguous: no match.
+- **Making a person from quick add** (`$Lalith`, section 5.5): when the task is saved, the label whose
+  title equals the name (spacing and case ignored; the lowest id when there are several) becomes the
+  person (`label_kind.<id>` = `"person"`); without one, a label with that title is created and
+  marked. The task then gets that label and the promise like any capture. It needs the server: with
+  no connection the task is saved with the `$` phrase back in its title and the app says the person
+  was not made.
+- **Counts over 90 days** (decision 9, `pro.personPattern`): over the local days from today back 89
+  days, the person's promises of theirs closed by a final verdict in the window (delivered on time,
+  late, dropped, done by you), and their `renegotiated` and `not_yet` verdicts given in the window;
+  plus the open promises both ways. No score: the **pattern** is two plain sentences, "Kept 5 of 7
+  on time in the last 90 days, 2 late." and "Asked for a new date twice and missed a date once."
+  (counts as once, twice, N times); "No promises closed in the last 90 days." when none closed.
+
+- **A person's page** (`pro.personPage`) splits their open promises of theirs into **promised to
+  you** (no `to`, section 21.6) and **promised to others**, and each of those by group (the
+  promise's `to.group`, else the lowest group label id on the task, else none): the part without a
+  group first, then groups by label id; tasks by effective due day (none last), then id.
+
+### 21.6 Promises
+
+- A **promise** is an ordinary task with a ledger record keyed by the task id: `dir` `theirs`
+  (someone promised it to you) or `mine` (you owe it to them), `person`, the optional `words` (their
+  words of a clear yes), `done_when`, `initiative` (a project id), `needs` (task ids of your
+  promises it waits on), `sent` and `verdicts`. The task carries the person's label, so devices
+  without Pro still see who it is about.
+- **Who it was promised to** is `to`: `{ "group": <labelId> }` (a group, section 21.16),
+  `{ "person": <labelId> }` (another person) or `{ "text": "…" }` (anyone else, named in words).
+  Read in that order: the first of `group` (a whole number above 0), `person` (the same) and
+  `text` (not blank) counts; without one of them, and without `to`, it was promised to you. You
+  track every promise and give its verdicts, whoever it was promised to; a version that does not
+  know `to` reads the promise as promised to you. The requester is never a label on the task.
+  Your own action for a group is `dir` `mine` with `person` null and `to.group`.
+- **Checks** (section 21.18): `check_on` is a local day to look at the promise before it is due;
+  `checked` holds when a check was made (UTC instants, added by copying a check message or by
+  "Checked"); `no_check` true leaves the promise out of checks before due.
+- **No stages** (decision 6): a promise is promised, then it gets a verdict.
+- **Verdicts:** `delivered`, `late` (delivered after the date), `not_yet` (with an optional new
+  date and blocker), `renegotiated` (a new date agreed before it was due), `dropped`, and
+  `taken_over` ("I did it myself"). Final verdicts (`delivered`, `late`, `dropped`, `taken_over`)
+  close the promise. A verdict has an `id`, `at` (UTC) and its fields; Undo marks it `undone: true`
+  (it stays, so merging cannot bring it back).
+- **What a verdict writes to the task:** a final verdict on an open task completes it with
+  `{ "done": true }`; a new date sets the due date to that day, date-only, through the usual due
+  change (section 16.3), unless it is already that date. `taken_over` on a done task writes nothing.
+- **Misses** are the active `not_yet` verdicts, counted, never stored.
+- **Effective due day:** the last active verdict's `new_due` when it is `not_yet` or
+  `renegotiated`; a `not_yet` without a date asks again the day after it was given; otherwise the
+  task's due day.
+- **A verdict is due** (decision 10) for an open promise of theirs without a final verdict whose
+  effective due day is today or earlier. Today shows these before its other tasks.
+- **Ask me tomorrow:** once per effective due day, per device (`pro_verdict_snooze`:
+  `{ "<taskId>": { "due", "until" } }`); not asked again until `until`.
+- **Completed elsewhere:** a promise of theirs whose task is done without a final verdict is asked
+  about once: "Delivered by Jan, or did you do it?" (`delivered` or `taken_over`).
+- **Sent** (decision 7): copying a recap that holds the promise adds the time to `sent`. The weekly
+  review counts open promises without one.
+- **Confirm tasks** (decision 31): when a promise has no clear yes, the person's own task is titled
+  `Confirm with <name>: <what>` and carries the person's label.
+- **Waiting on** (`pro.waitingOn`): open promises of theirs and open tasks with an on-hold label,
+  grouped by person (the promise's person, else the task's first person label, else none), groups
+  by their earliest effective due day (none last) then label id, the group without a person last;
+  tasks by effective due day (none last) then id.
+
+### 21.7 The ledger
+
+- One hidden carrier per account (section 10): title `Vicu Pro ledger (sync metadata — do not
+  delete)`, marker `vicu-pro:v1`, search text `vicu-pro:v` (so the search does not also find the
+  archive parts, `vicu-pro-archive`). Created in the Inbox only when it holds something.
+- Payload:
+
+```json
+{
+  "version": 1,
+  "promises": { "<taskId>": { "value": { "dir": "theirs", "person": 42, "verdicts": [] }, "revision": {} } },
+  "initiatives": { "<projectId>": { "value": { "rank": 1, "status": "active" }, "revision": {} } },
+  "log": { "<id>": { "value": { "kind": "decision", "text": "", "at": "YYYY-MM-DD" }, "revision": {} } },
+  "owed": { "<id>": { "value": { "what": "", "opened": "YYYY-MM-DD", "resolved": null }, "revision": {} } },
+  "escalations": { "<id>": { "value": { "promise": 0, "a": 0, "b": null, "status": "drafted", "draft": "", "opened": "YYYY-MM-DD" }, "revision": {} } },
+  "meetings": { "<id>": { "value": { "name": "", "people": [], "initiatives": [], "rhythm": null }, "revision": {} } },
+  "rounds": { "<id>": { "value": { "meeting": "<id>", "at": "YYYY-MM-DD", "discussed": [], "skipped": [], "absent": [], "not_discussed": [] }, "revision": {} } },
+  "people": { "<labelId>": { "value": { "aliases": [] }, "revision": {} } },
+  "estimates": { "<taskId>": [45, 1794421060] },
+  "settings": { "value": { "cap": 4, "cap_agreed": null, "rule_agreed_on": null, "threshold": 2 }, "revision": {} }
+}
+```
+
+- Records are `{ value, revision }` (section 10.6); `"value": null` is a tombstone. Unknown fields
+  are kept at every level (section 10.8). Ids of log, owed, escalation, meeting and round records
+  are random strings.
+- **Merge** (`pro.ledgerMerge`): per record the newer revision wins and equal revisions keep the
+  server's; when both sides hold a value of the same promise, the result's `verdicts` are the union
+  by `id` (an undone verdict wins over the same verdict not undone, else the winner's), sorted by
+  `at` then `id`, and `sent` the sorted union. `estimates`: per task the entry with the later wall
+  time (seconds) wins, equal keeps the server's; `[null, t]` clears an estimate. `settings` is one
+  record. Unknown top-level fields: the union, the server's kept.
+- **More fields, all optional** (sections 21.6 and 21.16 to 21.19): a promise's `to`,
+  `check_on`, `checked` and `no_check`; a meeting's `label`, `sessions`, `checks` and
+  `language`; a round's `kind`, `started`, `ended`, `read_back`, `score` and `recap_sent`;
+  a log entry's `group`, `session`, `rank`, `task`, `shared`, `solved_in` and the kind
+  `issue`; the settings `cap_off`, `check_days`, `workdays`, `note_day`, `note_sent`,
+  `text_language` and `weekly_done`. A promise's `checked` is merged like `sent`: the sorted
+  union of both sides. A union cannot lose a mark, so a mark that is taken back (the Undo of a
+  copy) is also named in the promise's `unmarked`, itself a sorted union: a mark in `unmarked`
+  is in neither `sent` nor `checked`, after every merge and for every reader.
+- **Pruning:** tombstones and cleared estimates older than 90 days (section 10.6). Pro devices
+  remove the promise and estimate of a task that is gone or done for 30 days.
+- **A task created offline** has a temporary id until the replay creates it; its ledger keys and the
+  ids in `needs`, escalations and log tasks are renamed then.
+- **Archive parts** (`pro.archive`): a record closed more than 180 days ago moves to an archive part
+  of the quarter it closed in: marker `vicu-pro-archive:v1`, title `Vicu Pro archive <quarter>
+  (sync metadata — do not delete)`, search `vicu-pro-archive`, payload `{ "version": 1, "quarter":
+  "2026-Q2", "promises": {...}, ... }` with the record collections only. The part is written first,
+  then the records are tombstoned in the ledger. Closed: a promise on its final verdict's local day,
+  an initiative with status `closed` on `closed_on`, a log entry of kind `unknown`, `issue`,
+  `blocker`, `commitment` or `stop` on `resolved` and any other on `at`, owed decisions and escalations on `resolved`, a round on `at`.
+  Meetings and people never close. A group's records move after **90 days**, not 180: a promise
+  with `to`, a log entry with `group`, and every round (two groups' weekly actions would fill the
+  ledger otherwise). A version from before issues closes an open issue on `at`; only versions
+  with this rule run next to each other. Archive parts are read on demand (the quarterly summary), never by the person
+  page.
+- **Size:** the ledger's JSON stays within the 384 KiB write cap; the sync status warns from 70
+  percent.
+
+### 21.8 Recaps
+
+- **Items** (`pro.recapText`), for a range of local days and an ordered list of people: a promise
+  of theirs is **Delivered** when its final verdict, `delivered` or `late`, was given in the range;
+  **Agreed** when its task was created in the range and it has no verdict; **Changed** when its last
+  verdict, `not_yet` or `renegotiated`, was given in the range; else **Open** while its task is open.
+  With "include what I owe", open promises of yours to those people are **I owe**. A promise is in
+  one section.
+- **Order:** the sections in that order; in a section by the people's order, then effective due day
+  (none last), then task id.
+- **Text:** `<title>, <weekday date>` (section 8's weekday date, the year only when not this year),
+  a blank line when anything follows, then each section's title and its items as `- <name>: <task
+  title>`: Delivered adds ` (late)`; Changed adds `, new date <weekday date>` or `, not yet`, then
+  ` (<blocker>)` when there is one; the others add `, by <weekday date>` when there is a due day.
+  With quotes, the promise's words follow on the next line, indented two spaces, in double quotes.
+  Then `Not discussed: <names>` and `Absent: <names>` when there are any.
+- **HTML:** the same, the title in `<strong>`, section titles as `<p><strong>`, items in `<ul><li>`,
+  quotes as `<br><em>"…"</em>`; text escaped (`&`, `<`, `>`, `"`). Copying puts both on the
+  clipboard (decision 13) and marks the promises in it as sent.
+
+### 21.9 Meeting rounds
+
+- A meeting (ledger `meetings`) has a name, its people in order, initiatives and a rhythm. A round
+  goes through the people in any order, with your own card last (decision 12; no timer).
+- **Steps** (`pro.meetingRound`): Next marks the person on screen discussed and goes to the next
+  person in the order (wrapping) who is not discussed, skipped or absent; Skip marks them skipped and
+  goes on; Absent marks anyone absent (and goes on when it is the person on screen); picking someone
+  shows them and takes them out of skipped, absent and discussed. A name twice counts once.
+- **End:** the person on screen counts as discussed. The round record holds discussed, skipped,
+  absent and not discussed (everyone else), in the meeting's order, without your own card.
+- Everything is written as it happens (promises, verdicts, tasks), so ending early loses nothing.
+
+### 21.10 Portfolio
+
+- An **initiative** is a project in the area with a ledger record: `rank`, `status` (`active`,
+  `parked`, `closed`), `sponsor` and `owner` (person label ids), readiness items, `parked` (`on`,
+  `reason`), `closed_on`, `log_anyway`.
+- **Rank** (`pro.portfolio`): active initiatives by `rank`, then project id; shown as 1 to n. A move
+  renumbers every active initiative 1 to n. Parking drops the rank; making it active again puts it
+  last.
+- **The cap** is the ledger setting `cap` (4 until agreed; a whole number of 1 or more), with
+  `cap_agreed` `{ by, on }` when the sponsor agreed it (decision 14). At the cap, making another
+  initiative active asks to park one first. The setting `cap_off` true is **no limit**
+  (`pro.capOff`): nothing is ever at or over the cap, `cap` is kept for when the limit comes back,
+  and rank and park work as before. A version that does not know `cap_off` keeps the cap.
+- **Readiness** (`pro.readiness`, decision 16): nine items: sponsor, owner, why, done looks like,
+  smallest useful step, not doing, who decides what, capacity agreed (`{ by, on }`), stop if. Text
+  counts when not blank. Capturing into an initiative that is not ready asks "Log anyway?" and counts
+  `log_anyway`.
+- **Parked initiatives** put their tasks on hold (21.2) and leave Today, Upcoming and meetings.
+- **Escalation** (decision 15, `pro.escalationDraft`): when an open promise of theirs reaches
+  `threshold` misses (2 unless set) and has no escalation, a draft is made: option A is that
+  promise; option B is the same person's other open promise of theirs in another initiative, the
+  best-ranked first (then earliest effective due day, then lowest id). The draft text is fixed by
+  the vectors; with no B it asks for help with A. It is only a draft until the person accepts it
+  (status `accepted`), and `resolved` with a decision.
+- **Owed decisions** (`owed`) and the **log** (`decision`, `value`, `unknown` with who to ask)
+  belong to an initiative or none.
+
+### 21.11 Weekly execution review and the focus block
+
+- With Pro on, the weekly review (section 14.7) starts with Pro's steps for the layers that are on
+  (`pro.weeklyPro`): Give verdicts (verdicts due), Send what was agreed (open promises never sent),
+  Escalations and decisions (drafted or accepted escalations plus open owed decisions), Check the
+  portfolio (initiatives not ready, one more when over the cap, and active initiatives with no
+  available task), Note the value delivered (initiatives closed in the last 7 days without a value
+  entry). A step with nothing is listed with 0. With promises on, a step **Send the weekly note**
+  follows "Send what was agreed": 1 while the weekly note is due (section 21.18), else 0.
+- **Marked done:** the steps marked done by hand are the setting `weekly_done`, `{ "week": "<the
+  local day the week starts on>", "steps": [ids] }`; it counts only in that week (section 2.1).
+- **The mirror:** over the last 7 local days, promises you took over, workdays (Monday to Friday)
+  with a focus block, open tasks you hold against open promises others hold, and open confirm tasks,
+  in the sentence the vectors fix.
+- **The focus block** (`pro.focusBlock`): one block of 60 to 90 minutes a day for the top
+  initiatives. Candidates are tasks available now in ranked initiatives (best rank first), then
+  flagged tasks outside them; within that flagged first, then due day (none last), priority (high
+  first), id; at most five. Its length is the candidates' estimates added up, rounded up to 15
+  minutes, held between 60 and 90 (60 without estimates). A day had one when a task of a ranked
+  initiative had a block of at least 60 minutes that day and is done.
+
+### 21.12 Import and export
+
+- **Format** `vicu-import/1`: `{ "format", "source": { "kind", "title", "date" }, "items": [...] }`.
+  Item types and their fields: `promise` (`owner`, `what`, `due`, `initiative`, `in_their_words`,
+  `done_when`, `needs`), `action` (`owner` "me", `what`, `due`, `for`, `initiative`), `update` (`id`
+  `t-<taskId>`, or `owner` with `about`; `status` `delivered`, `late`, `not_yet`, `renegotiated`,
+  `dropped`; `new_due`, `blocker`), `open_item` (`what`, `ask`, `initiative`), `decision` (`what`,
+  `by`, `initiative`, `date`), `decision_needed` (`what`, `from`, `initiative`), `value` (`what`,
+  `where`, `initiative`).
+- **Reading** (`pro.importRead`): code fences are removed, the text between the first `{` and the
+  last `}` is taken, and a comma before `}` or `]` outside a string is dropped. Not JSON, or no
+  items, is "not readable". A different or missing format, an unknown type (left out), unknown
+  fields (ignored), an item without `what` (left out, except updates) and dates that are not read
+  are reported in fixed sentences; the rest is read. Statuses are read without case, spaces or
+  hyphens (`done`, `completed` are delivered; `delayed`, `missed` not yet; `cancelled` dropped).
+- **Dates** (`pro.importDates`), relative to the source date (else today): `YYYY-MM-DD` (a time
+  after it is ignored), `today`, `tomorrow`, a weekday (full or three letters, optionally after
+  `on`, `this` or `next`: the first such day after the reference), `next week` (Monday of next
+  week, always counted from Monday: an import reads the same on every account), `end of week` (the first Friday on or after it), `end of month`, `in N days`, `in N weeks`.
+- **Matching** (`pro.importMatch`): people by 21.5 (`me` is you); initiatives by project title
+  (case ignored) among the area's initiatives; an update by its id among open promises, else among
+  the owner's open promises by wording: the share of the `about` (or `what`) words of two or more
+  letters or digits found in the promise title, at least 0.6, the highest (then the lowest id), shown
+  as "check". A promise without `in_their_words` becomes a confirm task (21.6). Rows that need a
+  person, a target or a status start unticked. **Not mentioned:** open promises of theirs, of people
+  the import names, that no update is about.
+- **Nothing changes until Add** (decision 30): tasks are created through the usual create path, then
+  ledger records once they have ids (queued offline with temporary ids); updates become verdicts;
+  open items become `unknown` log entries with an "Ask <name>: <what>" task; decisions and values
+  log entries; decisions needed owed records. One Undo takes back the whole import.
+- **Export** (`pro.exportOpen`, decision 33): open promises as `vicu-import/1` with `"kind":
+  "export"` and ids `t-<taskId>`, sorted by id.
+- **The Copilot prompt** is `pro.copilotPrompt` of `ai-tools-v1.json` (`pro.copilotPrompt` vectors
+  here): fixed lines with placeholders; an optional block is left out when one of its placeholders
+  is empty.
+
+### 21.13 Repeat rules
+
+- `repeat_rule.<taskId>`: `{ "until"?: "YYYY-MM-DD", "count"?: n, "catch_up"?: true }`, beside
+  Vikunja's own repeat; a value without any of the three reads as none (`pro.prefs.repeatRule`).
+  `count` is the occurrences left, this one included.
+- **Completing** (`pro.repeatRule`): the end is reached when `count` is 1 or the next due day is
+  after `until` (mode 0 adds the interval, mode 1 a month, mode 2 counts from now). Then the app
+  sends `{ "repeat_after": 0, "repeat_mode": 0 }` first and `{ "done": true }` second, and removes
+  the rule. Otherwise `{ "done": true }` only, with `count` lowered by one.
+- **Catching up:** after the server moved the task, while its due day is before today it moves again
+  (mode 0 by the interval, mode 1 by a month; never mode 2), start and end by the same amount, in one
+  patch; not past `until`.
+- A device without Pro keeps repeating past the end; the next Pro device that completes it applies
+  the rule.
+
+### 21.14 Focus
+
+`pro_focus` (device only, never synced): `{ "categories": [...], "projects": [...] }`. A project is
+in focus when it or an ancestor is a focused project or its top-level project's category is a
+focused category; the Inbox always is. The sidebar shows the projects in focus and their ancestors;
+lists, counts, the palette and Quick View show tasks of projects in focus only (`pro.focus`).
+
+### 21.15 The assistant
+
+Pro data (promise words, verdicts, patterns, initiatives, people) reaches the assistant only while
+the person turned on Pro's assistant switch (decision 20), with any configured provider. Tasks
+themselves are visible to Ask as before. The prompts, schemas and Ask tools are `pro` in
+`ai-tools-v1.json`.
+
+### 21.16 Groups and their actions
+
+- A **group** is the people who agree actions together: a leadership team, a project team. It is a
+  meeting (ledger `meetings`) with a `label`: an ordinary label marked `label_kind.<id>` =
+  `"group"`. The meeting's `name` is the group's name and its `people` the members, in order. A
+  meeting without a label is a meeting as before. When two meetings name one label, the one with
+  the lower id (compared as text) is the group. Groups are listed by name (case ignored), then id.
+  Taking the mark off leaves the label and its tasks as they are.
+- More fields of a group: `sessions`, the recurring meetings it holds, `[{ "id", "kind",
+  "rhythm" }]` (section 21.17); `checks` false turns checks before due off for its actions;
+  `language`, the language of text copied for it (section 21.19).
+- An **action** of a group is a task that carries the group's label. Its **owner** is the promise's
+  `person` when the promise is theirs, you when it is yours (`dir` `mine`), and nobody otherwise
+  ("No owner"). An action has one owner. A task captured with a person and a group's label is that
+  person's promise to the group (`to.group`, the lowest group label id when it has several),
+  unless the text names who it was promised to (section 5.5); captured with a group's label and no
+  person it has no promise and no owner.
+- **The group's page** (`pro.groupPage`) puts every action in one part. `since` is when the group's
+  last session ended (the latest `ended` of its rounds; none when it had no session) and `due` is
+  the action's effective due day (section 21.6; the task's due day without a promise). Open
+  actions, the first that fits: **yours** (your own promise); **overdue** (`due` on or before the
+  local day of `since`); **due** (`due` today or earlier); **new** (the task was created after
+  `since`); **open** (the rest). Without `since` nothing is overdue or new. Done actions are
+  **done** when they were completed after `since`, or in the last 7 local days without one. Each
+  part lists owners in the group's order, then other people by id, then you, then no owner; an
+  owner's actions by `due` (none last), then id. Your open actions are their own part, by `due`,
+  then id; open actions without an owner are also listed on their own.
+- **Reliability** (`pro.reliability`), in counts, never a score: over the group's last four ended
+  sessions (fewer when it had fewer; nothing without one). The window is the local days from the
+  day after the fifth-last session's day (its `at`), or from the earliest of them when there are
+  fewer than five, through today. Counted are the group's actions with a promise of theirs: final
+  verdicts given in the window (`delivered` on time, `late`, `dropped`, `taken_over`) and open
+  ones whose `due` is before today (open past due).
+- **A second miss** (`pro.missIssue`): when a `not_yet` verdict brings an action of a group to the
+  escalation threshold of misses (section 21.10), an issue is added to that group's list: kind
+  `issue`, `group`, `task` (the action), `text` (the task's title) and `at`; not when an open
+  issue of that group already names the task.
+- **Decisions, open questions and issues** of a group are log entries (section 21.10) with `group`
+  (the label id): kinds `decision`, `unknown` and `issue`. An issue is something to solve, not to
+  do: `rank` orders the open ones (lowest first, without a rank last, then `at`, then id);
+  `resolved` is the day it was solved and `solved_in` the session. A decision's `shared` holds
+  when a recap with it was copied.
+- **Blockers, commitments and stops** (`pro.logKinds`) are log entries with `group` too: kinds
+  `blocker` (something in the way that the group has to get moved), `commitment` (what the group
+  as a whole said it will reach) and `stop` (what the group agreed to stop doing). Each stays open
+  until `resolved` (a local day): a blocker when it is out of the way, a commitment when it is met
+  or let go, a stop when it no longer needs saying. Open ones are listed oldest first (`at`, then
+  id). They hold no owner and no date: who does what is an action. A version from before these
+  kinds keeps them, shows none of them, and archives them by `at`.
+
+### 21.17 Sessions
+
+- A **session** is one meeting of a group, of a kind: `weekly` or `standup`. Other kinds are kept
+  and run as `weekly`. It is a round (ledger `rounds`) with `kind`, `started` and `ended` (UTC
+  instants), `read_back` and `score`; `discussed`, `skipped` and `not_discussed` stay empty and
+  `absent` holds who was not there. Its id is chosen when it starts, so what is captured in it can
+  name it (`session`) before the round is written at the end.
+- **Steps** (`pro.sessions`): `weekly` is actions, issues, new, read-back; `standup` is actions,
+  new, read-back.
+- **The actions step** goes through the group's open actions: first those that need a verdict
+  (section 21.6), then the others; in `standup` only actions whose `due` is on or before the last
+  day of this week (section 2.1). Each list is in the owner order of section 21.16 (the group's
+  people, other people, you, no owner), then `due` (none last), then id. Nothing is stored as carried forward: an action that
+  stays open is in the next session because it is still open.
+- **What a session held** is worked out, not stored: the verdicts given from `started` through
+  `ended` on the group's actions; the group's actions created in that time; the log entries whose
+  `session` is the round, by kind (decisions, questions, issues, blockers, commitments, stops);
+  the issues whose `solved_in` is the round.
+- **Read-back** is the last step: the session's decisions and new actions with owner, who they were
+  promised to and date, read aloud; `read_back` true records that it happened.
+- **Score:** a private whole number from 1 to 10 for how useful the session was. Never copied.
+- **End** writes the round. The recap (section 21.19) is for this session only; copying it adds the
+  time to the round's `recap_sent`, to `sent` of the promises in it and to `shared` of its
+  decisions. Undo of the copy takes those times out again.
+
+### 21.18 Follow-ups
+
+Everything that needs a move from you, as one list (`pro.followUps`), in this order. Nothing here
+is a system notification.
+
+1. **Verdict due:** one line per promise that needs a verdict (section 21.6), by effective due day,
+   then task id. Key `verdict:<taskId>`.
+2. **Check before due:** one line per owner, for their open promises of theirs on actions of a
+   group (the task carries a group's label) that are due later than today, when today is on or
+   after the check day: `check_days` working days (2 unless set, 0 to 10) before the effective due
+   day. Left out: a promise with `no_check`, an action whose every group has `checks` false, and a
+   promise with a `checked` time on or after its check day. The line holds all of that owner's
+   promises that fit, by effective due day then id. Lines by their first due day, then owner id.
+   Key `check:<personId>`. Copying the line's message adds the time to `checked` of each.
+3. **Bring back:** one line per open promise with `check_on` today or earlier and no `checked`
+   time on or after that day, unless the promise has a verdict line or is in a check line. By
+   `check_on`, then task id.
+   Key `bring:<taskId>`.
+4. **Recap not copied:** one line per session of a group that ended in the last 14 local days
+   without a `recap_sent` time, oldest first. Key `recap:<roundId>`.
+5. **Weekly note:** when the setting `note_day` (1 Monday to 7 Sunday) is set: one line from the
+   latest such weekday, today included, until a `note_sent` time on or after that day. Key
+   `note:<that day>`.
+
+- **Working days** (`pro.workingDays`) are the setting `workdays` (ISO weekdays; Monday to Friday
+  unless set, and when the list is empty). `n` working days before a day counts back from the day
+  before it; 0 is the day itself. Public holidays are not known.
+- **Dismissed for today:** per device (`pro_followup_dismissed`: `{ "<key>": "<local day>" }`); a
+  line is left out while today is before that day.
+
+### 21.19 Text for other people
+
+Recaps, agendas, messages and notes are copied into other programs, for people who do not use
+Vicu. They state what happened in counts and events and never judge.
+
+- **A document** (`pro.documents`) is `{ "title"?, "blocks" }`. A block has an optional `heading`,
+  an optional `text` (a paragraph) and optional `items` (a list), written in that order. The
+  title, a heading, an item and a paragraph are each one **line**: `{ "key", "params" }`. The key names a sentence in the catalog
+  (`proText.<key>` on desktop, `pro_text_<key with dots as underscores>` on mobile); parameters
+  are names and titles (never translated), `count` (which picks the plural form) and days
+  (`{ "day": "YYYY-MM-DD" }`, written as the weekday date of section 8 in the text's language).
+  The key `literal` is its parameter `text` as it is.
+- **The English text** of every key is fixed by `pro.documents.messages`; each app's English
+  catalog must equal it. Other languages come from translators and fall back to English per key.
+- **Rendering** gives three forms. Plain text: the title, an empty line, then each block: its
+  heading, its paragraph, its items as `- ` lines; an empty line between blocks. HTML: the title
+  as `<p><strong>`, a heading as `<p><strong>`, items in `<ul><li>`, a paragraph as `<p>`; text
+  escaped (`&`, `<`, `>`, `"`). Markdown: the title as `## `, a heading as `### `, items as
+  `- `, an empty line between parts. Copying puts HTML and plain text on the clipboard.
+- **Language:** the group's `language`, else the setting `text_language`, else `en`; a language
+  without a catalog reads as `en`. It is separate from the language the app is shown in. The phone
+  cannot read its strings in a second language yet, so for now it writes its check message in the
+  language the app is shown in; the desktop and the web follow the rule.
+- **The documents:** a session's **agenda** (actions due, other open actions, open issues, open
+  blockers, the closing line), its **read-back** (decisions, new actions), its **recap**
+  (decisions, the session's commitments and stops, new actions, delivered, changed, issues solved,
+  open issues, the session's blockers, open questions, who was absent), the **check message** to
+  one person (one thing as a sentence, more as a list), and the **weekly note** (per group: counts
+  of actions delivered on time, late and dropped, each date that slipped, decisions, open issues,
+  open blockers, actions open past their date and due in the next 7 days). The weekly note covers the
+  local days from the day after the last `note_sent` (at most 14 days back, 7 without one) through
+  today. Which lines each holds, and in what order, is fixed by the vectors.
+
+### 21.20 90-day plans
+
+A plan is a project with a start and an end. What it shows is counted from its tasks and the
+verdicts given on them (`pro.plans`); no status and no progress is ever stored or worked out, and
+nobody fills in a weekly reading by hand.
+
+- **A plan** is the synced preference `project_plan.<projectId>` (section 11.3): `start` and `end`
+  are local days, `group` a group's label id (section 21.16; left out for a plan of your own),
+  `closed` the local day it was closed, `from` the project of the plan it carries on from. Other
+  fields are kept. A new plan runs 13 weeks: its `end` is `start` plus 90 days. Plans are listed
+  open ones first by `end`, then closed ones by `closed`, newest first; ties by project id.
+- **Items and milestones.** The plan's **items** are the project's tasks that are no subtask of
+  another task of the project, in the order the project shows them. An item's **milestones** are
+  its direct subtasks; an item without subtasks is its own one milestone. What hangs under a
+  milestone is not counted. Hidden tasks (section 10) are neither. A milestone is a task like any
+  other, and its promise (section 21.6) is what names its owner and takes its verdicts.
+- **Weeks** are blocks of seven days from `start`, whatever the week start; the last one ends on
+  `end`. A plan shows 53 weeks at most.
+- **A milestone's date** is its effective due day (section 21.6), the task's due day without a
+  promise. It is **delivered** by a final verdict of `delivered`, `late` or `taken_over`, and
+  without a final verdict when its task is done. A final `dropped` takes it out of the count.
+- **A cell** (one item, one week) holds counts of facts: `due`, the milestones not dropped whose
+  date is in the week; `delivered`, those delivered in the week (the final verdict's local day,
+  else the task's completion day), of which `late`; `slipped`, every `not_yet` and `renegotiated`
+  verdict (not undone) given in the week; `dropped`, those dropped in the week.
+- **An item** holds `total` (milestones not dropped), `delivered`, `dropped`, `overdue` (open
+  milestones whose date is before today), `next` (the open milestone that is due first, without a
+  date last, then id) and its milestones by date (none last), then id. Its **owner** is the owner
+  of its own promise (section 21.16); without one, the owner every promise of its milestones
+  shares; else nobody.
+- **Closing** a plan writes `closed`. It may carry the open work on: the items that are not done,
+  each with its milestones that are not done, move to another project, which becomes a plan with
+  `from`, the same group and 13 weeks from the day after the old `end` (from today when that has
+  passed). Tasks move, so their promises and history go with them. A done milestone whose item
+  moved on stays behind as an item of its own, so the closed plan still shows what it delivered.
+- A plan is shown while the promises layer is on. Off, and on a version from before plans, the
+  project is a project and the preference is kept.
+
+### 21.21 1:1 topics
+
+- A **topic** (`pro.topics`) is something to talk about with a person, not something anyone
+  delivers: an open task that carries the person's label (section 21.5), has no promise (a
+  tombstoned record is none) and is not a "Confirm with" task (section 21.6). It is an ordinary
+  task on every device, with or without Pro; discussing it is completing it, and a topic that
+  comes back every time is a repeating task.
+- **Order:** dated topics by day, then the undated ones oldest first (`created`), then id. Topics
+  without a date or dated up to 7 days from today are for the next 1:1 (`now`); those dated later
+  wait (`later`).
+- **A private label** is a label with `label_kind.<id>` = `"private"`. A topic that carries one is
+  shown in the app and left out of every text copied for other people (`hidden`). A label has one
+  kind, so a person or a group is never private.
+- Text copied for a 1:1 names the topics for the next 1:1 after the promises.
+
+### 21.22 Vectors
+
+`pro` in `cross-app-semantics-v1.json`, run in three time zones: `settings`, `prefs`, `availability`,
+`startVsBlock`, `ledgerMerge`, `ledgerPrune`, `archive`, `promises`, `waitingOn`, `personMatch`,
+`personPattern`, `recapText`, `meetingRound`, `portfolio`, `readiness`, `escalationDraft`,
+`importDates`, `importRead`, `importMatch`, `exportOpen`, `copilotPrompt`, `repeatRule`, `focus`,
+`focusBlock`, `weeklyPro`, `capOff`, `ledgerMergeGroups`, `archiveGroups`, `weeklyNote`,
+`workingDays`, `requester`, `groups`, `groupPage`, `reliability`, `missIssue`, `personPage`,
+`sessions`, `followUps`, `documents` (the last eight read the world in `groupWorld`), `plans`,
+`topics`, `logKinds` (each with a small world of its own); and `customListPro` (section 3.8). `nlp-corpus-v1.json` covers section
+5.5 with cases marked `"pro": true`.
+
+---
+
+## 22. Work and Personal
+
+A person who keeps work and private life in one account can look at one of them at a time. They
+say what is work once: a label, and the projects that are work. Each device then has a mode,
+**Personal**, **Work**, and optionally **All**: Work shows what is work, Personal shows everything
+else, and All (when offered) shows everything. The feature is optional and off until turned on;
+off, every list, count and screen is what a version without this section shows.
+
+It is for focus, not for privacy: nothing is locked away, reminders still come, and search finds
+everything. What work is belongs to the account and syncs through the preferences carrier (section
+11); the mode belongs to the device and never syncs, so a work computer can stay in Work while the
+phone stays in Personal. Other people on a shared project see nothing of it, and Vikunja knows
+nothing of it.
+
+### 22.1 Keys
+
+- `work.label`: the id of the **work label**, a whole number above 0, or `null` (none). A value of
+  another shape is no work label and is kept. A work label whose label no longer exists is no work
+  label; the entry is kept, and the app that deletes the label writes `null`.
+- `work.project.<projectId>`: `true` (the project is work) or `false` (it is not), or `null` (no
+  entry). `<projectId>` is the server's project id, a whole number above 0. A value of another
+  shape is no entry and is kept.
+- There is one key per project, so two devices that mark different projects never undo each
+  other's change. Entries of deleted projects are not used; the app that deletes a project may
+  write `null` to its entry.
+- The work label is an ordinary label in every other way: it can be put on and taken off by hand,
+  and has no `label_kind` of its own (it may be a label with a kind). In Work mode its chip is
+  hidden on task rows by default so every row does not repeat it (section 22.4,
+  `work_mode_show_work_label`); it still shows in the task editor so it can be seen and changed.
+
+### 22.2 Work projects
+
+A project is **work** by its own entry, else by the entry of its nearest ancestor that has one
+(walking `parent_project_id`; a parent that is not listed and a loop end the walk), else it is
+not work. So marking a project marks everything below it, a subproject can be taken out with
+`false`, and one below that can be put back with `true`.
+
+- The Inbox is never work. Its own entry is not used, also not by its subprojects, which follow
+  their own entry or are not work.
+- Archived projects follow the same rule.
+- Nothing follows from a project's category (section 13): marking every project of a category is
+  a convenience an app may offer, written as one entry per top-level project of that category.
+
+### 22.3 Work tasks
+
+A task is **work** when its project is work or it carries the work label. Every other task is
+**personal**. There is no third kind and nothing is stored on the task: moving a task to a work
+project, or putting the label on it, makes it work on every device at once.
+
+- A subtask is judged by its own project and labels, like any task.
+- Hidden tasks (section 10) are never listed and are not judged.
+- Routines, your own Events and connected calendars are neither work nor personal: they show in
+  every mode.
+
+### 22.4 The mode
+
+Device settings, never synced: `work_mode_enabled` (off by default), `work_mode` (`"personal"`,
+`"work"` or `"all"`; anything else parses as `"all"`), `work_mode_show_all` (off by default:
+whether the switch offers **All** as a third option after **Personal** and **Work**),
+`work_mode_show_work_label` (off by default: whether task rows show the work label chip while in
+**Work** mode) and `pro_only_in_work` (section 22.8). The switch orders its options **Personal**,
+**Work**, and (only when `work_mode_show_all` is on) **All**. The **mode in effect** is `all`
+while the feature is off or the device is in standalone mode; while the feature is on, a stored
+mode of `all` (or none) acts as `personal` unless `work_mode_show_all` is on. Turning
+`work_mode_enabled` or `work_mode_show_all` off keeps the stored mode for the next time. Changing
+the mode writes nothing but that setting.
+
+In Work a list shows the tasks that are work, in Personal the tasks that are not, in All every
+task. The mode is applied after everything else that decides what a list holds (the list's own
+conditions, hidden tasks, Pro's availability view), and before counting. While the mode in effect
+is Work and `work_mode_show_work_label` is off, task rows hide the work label chip (the task
+editor and expanded card still show it).
+
+- **Nested subtasks.** Where a list shows subtasks under their parent, a row under a shown row is
+  shown with it, whatever it is itself, so a task never loses part of its steps. A subtask that
+  passes while its parent does not is listed as that list would list it without its parent.
+- **Follows the mode:** the Inbox, Today, Upcoming, Anytime, the Logbook, label and project
+  screens, custom lists, the tasks of the Plan screen's list and of Plan my day, Review and the
+  guided sessions (their queues, and the projects reviewed: section 22.5), every count and badge
+  made from those lists, widgets, and Quick View.
+- **Never follows the mode:** reminders and notifications of any kind; search and the command
+  palette, which find everything and say for a task or project of the other mode which one it is
+  in; routines, Events and calendars; settings; and a task opened by a link or a notification,
+  which opens whatever the mode.
+- **Time blocks.** On a timeline a block of the other mode stays where it is and counts as busy
+  time, so nothing is planned over it; the app may draw it muted. The list beside the timeline
+  follows the mode.
+- **A screen opened on purpose.** A project or label screen reached while the mode hides some of
+  its tasks says how many it leaves out and shows them on request, until the screen is left.
+- The assistant's tools answer as the screens do: a list by the mode, a search across both.
+
+### 22.5 The project list
+
+In Work the project list (drawer, sidebar, and the lists of Settings that are not for marking
+projects) holds the work projects; in Personal the others; in both, also every project above a
+listed one, so a tree is never cut. The Inbox is always listed. All lists everything.
+
+- A category header (section 13) shows when one of its top-level projects is listed. A category
+  without any project is nobody's work yet: it shows in All and in Personal.
+- Labels and custom lists are listed in every mode; what they hold follows the mode.
+- Project pickers are not pinned here. An app that narrows a picker to the mode must still let
+  the person reach every project from it, because moving a task is how it changes sides.
+
+### 22.6 New tasks
+
+A task made on a device in Work mode must not vanish from the list it was made in. So when the
+person makes a task in Work mode and it would not be work (its project is not work and it does not
+name the work label itself), the app adds the work label to it. This holds for every way of making
+a task for the person: the composer in any view, quick entry, voice and dictation, pasted lines,
+templates, drafts of the assistant the person accepts, and a new subtask.
+
+- Personal and All add nothing, and no mode ever takes a label off or moves a task.
+- A duplicate (section 15) is a copy and gets what its original has, nothing more.
+- Hidden carriers and anything else an app makes for itself get nothing.
+- Where the create is queued for later, the label goes with it, like any label the task names.
+- With no work label set, nothing can be added: the task is made as it is, stays Personal, and the
+  app says so at once with a way to see it. Settings makes clear that the Inbox cannot be a work
+  project and requires a work label to work in Work mode, and warns visibly while none is chosen.
+
+### 22.7 Marking
+
+- A project's menu has "Work project" as a tick. A change writes the project's own entry and
+  nothing else: `null` when the project would be what the person wants without an entry (its
+  parent is work and they want work, or its parent is not work and they want not work), else
+  `true` or `false`. Entries below it are left alone. Not offered on the Inbox.
+- Settings has the work label (any label, or none) and the list of projects with their ticks.
+- Marking is offered in every mode and needs the feature to be on on that device. The entries are
+  kept and used by every device whatever its own switch.
+
+### 22.8 Pro
+
+- **Pro only in Work** (`pro_only_in_work`, per device, off by default): while it is on and the
+  mode in effect is Personal, the device acts as a device with Pro off, exactly as section 21.1
+  describes it (O1, O2): nothing of Pro shows and nothing is written. In Work and All, and with
+  the feature off, Pro follows its own switch.
+- **Pro's area** (`pro.area`, section 21.1) may be the string `"work"`: promises and the
+  portfolio then apply to the work projects of section 22.2, on every device, whatever its mode
+  and whether or not this feature is on there. A version that does not know the value reads it as
+  no area, which is every project.
+
+### 22.9 Server filters
+
+The rule is decided on the device. A listing that is paged by the server (the Logbook) may add a
+clause, as long as the clause never leaves out a task the mode shows:
+
+- Work: `project in <ids>` for the work projects, or `labels = <work label>`, joined with `||`
+  inside brackets when there are both. With neither, the mode shows nothing and nothing is asked.
+- Personal: `project not in <ids>` for the work projects, and the device drops the tasks that
+  carry the work label. Without a work project, no clause.
+- The ids are every work project, the inherited ones included, in ascending order: the server
+  knows no inheritance.
+
+### 22.10 Vectors
+
+`workMode` in `cross-app-semantics-v1.json`. `keys` gives a key and the project id it names;
+`writable` a key, a value and whether an app may write it; `label` a stored value and the label id
+used. `resolve` runs on `workMode.projects` (`id`, `parent`; `title` is only for the reader) with
+`inboxProjectId` and gives entries and the work project ids. `classify` gives entries and the ids
+of `workMode.tasks` (`project`, `labels` as label ids or `null`) that are work. `modes` and
+`effective` give a stored mode or device settings and the mode; `options` gives the switch order
+with and without `work_mode_show_all`; `hiddenLabel` gives the label id hidden on task rows in
+each mode. `rows` gives a list in order
+(`parent`: the row a task is nested under), a mode, whether the list nests, and the ids shown in
+the list's order. `projectList` gives entries and, per mode, the projects listed. `newTask` gives
+a mode, the work label, the work project ids and a task, with the label the app adds
+(`expectAdd`) and whether the task stays Personal for want of a label. `proOnly` gives device
+settings and whether Pro may show; `mark` whether the parent is work, what the person wants and
+the entry written; `proArea` a value of `pro.area` and whether it means the work
+projects. `clause` gives the server clause of section 22.9, and `expectEmpty` when nothing is
+asked.
+
+## 23. When choices
+
+What the When pickers offer (the quick-add When tray and the When sheet on the phone, the When
+panel and the task menu's Postpone on the desktop) is the account's choice, synced as three
+preferences (section 11.3). Each one only changes what is offered: a due date is still stored by
+section 1. A guided session's When step keeps its four quick choices (section 14.3).
+
+### 23.1 Times of day (`when.times`)
+
+- One to five entries `{"name": "Morning", "time": "09:00"}`. `name` is one to twenty characters
+  (letters, digits and single spaces, no space at either end); `time` is `HH:mm`, 24-hour local
+  time. No two entries share a name (ignoring case) or a time.
+- Any other value (not an array, empty, more than five entries, an entry that breaks the rules
+  above) acts as the default and is kept. A device writes only a value that keeps the rules, in time
+  order; choosing the default writes `null`.
+- Default: Morning 09:00, Noon 12:00, Afternoon 15:00, Evening 18:00, the four times both apps
+  offered before.
+- The pickers show them in time order as chips that say both: "Morning 9:00" (section 8 clock).
+- **The morning time** is the earliest time before 12:00, and **the evening time** the latest time
+  at 17:00 or later. Either can be missing. This evening, Tomorrow morning and `tonight` (section
+  5.6) use them.
+
+### 23.2 Day choices (`when.days`)
+
+- An array of at most six choice ids, without duplicates, in the order they are shown. An id this
+  version does not know is skipped, and left out when this version writes the setting. An empty
+  array offers no day choices. Any other value acts as the default and is kept.
+- Default: `["today", "this_evening", "tomorrow", "this_weekend", "next_week"]`.
+- The choices, from today's local date and the local time now:
+
+| Id | Label | Day | Time | Offered |
+|---|---|---|---|---|
+| `today` | Today | today | kept | always |
+| `this_evening` | This evening | today | the evening time | while there is an evening time and now is before it |
+| `tomorrow` | Tomorrow | today + 1 | kept | always |
+| `tomorrow_morning` | Tomorrow morning | today + 1 | the morning time | while there is a morning time |
+| `this_weekend` | This weekend | the coming Saturday; on a Saturday, the next one | kept | always |
+| `next_week` | Next week | the Monday in next week (section 2.1) | kept | always |
+| `in_2_days` | In 2 days | today + 2 | kept | always |
+| `in_3_days` | In 3 days | today + 3 | kept | always |
+| `next_month` | Next month | the same day next month; a day the month lacks is its last day | kept | always |
+
+- "Kept" means the choice sets the day and keeps the time already picked, as the quick choices did
+  before; a choice with a time sets both.
+- The quick-add When tray ends with No date, which is not a day choice and is always there.
+
+### 23.3 Move by (`when.move_by`)
+
+- An array of at most four step ids, without duplicates, in the order shown: `1d`, `2d`, `3d`
+  (days), `1w`, `2w` (weeks), `1m` (a month). An unknown id is skipped, as in 23.2; any other value
+  acts as the default and is kept. Default: `["1d", "2d", "1w", "1m"]`.
+- Move by is offered only for a task that has a due date, next to the day choices, and each step
+  says the day it lands on ("+1 week · Fri 27"). It is never offered while a new task is entered.
+- **From:** the local day of the due date, or today when that day is before today: an overdue task
+  moves from today.
+- **By:** days and weeks add calendar days (seven per week). A month adds one calendar month; a day
+  the new month lacks becomes its last day (31 January + 1 month is 28 or 29 February).
+- **Time:** a date-only due date stays date-only (23:59:59, a legacy 00:00 included); a timed one
+  keeps its local clock time, also across a daylight saving change.
+- The desktop's task menu has Postpone with Tomorrow and Next week (the day choices `tomorrow` and
+  `next_week`, the time kept), then the Move by steps. For several selected tasks each moves from
+  its own due date; a task without one is left alone by Move by.
+
+### 23.4 Vectors
+
+`whenChoices` in `cross-app-semantics-v1.json`, run in three time zones: `readTimes` (a stored value
+and the times it gives), `readDays` and `readMoveBy` (a stored value and the ids used),
+`morningEvening` (times of day and the morning and evening times), `days` (a reference time, times of
+day and ids, and each offered choice's day and time), and `moveBy` (a due date, today and a step,
+and the due date after). `nlp-corpus-v1.json` covers section 5.6.
+
+## 24. Making a task a subtask
+
+A person can put a task that already exists under another task, and take it out again. Both use
+Vikunja's `subtask` relation: `PUT tasks/{parent}/relations` with `relation_kind: "subtask"` and the
+task as `other_task_id` (the server adds the `parenttask` relation on the task itself), and
+`DELETE tasks/{parent}/relations/subtask/{task}`. The two tasks need not share a project; the person
+needs write access to the parent. The server refuses a change that would make a loop.
+
+### 24.1 Attaching one task
+
+- **One parent.** In Vicu a task has at most one parent. Attaching it first adds the new parent, then
+  removes every other parent it had. Adding first means that a refusal leaves the task as it was.
+- **Refused before anything is sent:** the parent is the task itself (`self`); the parent is already
+  its only parent (`already`); the parent is below the task, so the task would end up below itself
+  (`cycle`: walk up from the parent through the parents; a loop in the data ends the walk). When the
+  new parent is one of several parents, nothing is added and the others are removed.
+- **Project.** When the parent is in another project, the task moves to the parent's project, where a
+  new subtask would be made. When the parent's project is not known, the task stays. Its own
+  subtasks stay its subtasks and stay where they are, as with any project move.
+- **Order.** The parent's subtask order (section 19) is not written: the task is not listed in it, so
+  it comes after the subtasks that are.
+- **Undo** puts back what was sent: it deletes the new relation (when one was added), adds the old
+  parents back, and moves the task back to its project (when it moved).
+
+### 24.2 Several tasks
+
+Several selected tasks go under one parent, each as in 24.1, in the order of the selection. A
+selected task below another selected task keeps its parent and goes along with it (`kept`). A task
+that is refused is skipped and the others still go; the person is told how many were not moved.
+
+### 24.3 Which tasks are offered as the parent
+
+Open tasks that are not hidden (section 10), are in a project the person can write to, are not one
+of the tasks being attached or below one of them, and are not already the only parent of every task
+being attached. With nothing typed, only tasks of the first task's project are offered. A search
+matches a part of the title, ignoring case, in every project; tasks of the first task's project come
+first, then the others in the order they are listed.
+
+"Add existing task" under a parent offers the other way round: open tasks that are not hidden, are
+in a project the person can write to, and could go under the parent by 24.1 (not the parent, not
+above it, not already under it alone). Nothing typed offers the parent's project; a search, every
+project with the parent's first.
+
+### 24.4 Removing a task from its parent
+
+"Remove from parent" deletes the relation between that parent and the task. The task stays in its
+project with its own subtasks and is listed as a task of its own. Undo adds the relation back.
+
+### 24.5 Offline and the write gate
+
+Each relation change is one request on the parent through the task write gate, like Pro's After
+(section 21.2): queued offline as `add-relation` or `remove-relation` with kind `subtask`, a queued
+add and removal of the same relation cancel each other, and a 404 on a removal or a 409 on an add
+counts as done. The project move is an ordinary task update. A task or parent that exists only on
+this device is related once its create has reached the server.
+
+### 24.6 Where it is offered
+
+- **Desktop:** "Make subtask of..." in a task's context menu (one task or a selection) and in the open
+  card's More menu; "Add existing task" under the open card's subtasks; "Remove from parent" in a
+  subtask's menu in the card and in the task menu of a task that has a parent. Dragging a row onto
+  the middle of another row makes it that row's subtask: the row under the pointer is outlined and
+  the dragged chip says whose subtask it becomes; the top and bottom quarter of a row still reorder.
+- **Mobile:** "Make subtask of..." in a task's long-press menu and the task sheet, "Remove from
+  parent" where a task shows its parent.
+
+### 24.7 Vectors
+
+`subtaskAttach` in `cross-app-semantics-v1.json`. `world` holds each task's parents and project
+(a vector's own `world` replaces it). `plan`: a task and a parent, and the plan (`add`, `remove`,
+`project`) or the refusal. `selection`: several tasks and a parent, and the plans, `kept` and
+`refused`. `undo`: a plan and the project the task came from, and what Undo sends. `candidates`:
+tasks with their title and project (`done` and `hidden` when true), the writable projects, the tasks
+being attached and the search, and the ids offered in order; `candidates.children` the same for
+"Add existing task", with the parent instead of the tasks being attached.

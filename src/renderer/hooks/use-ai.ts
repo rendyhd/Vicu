@@ -10,6 +10,7 @@ import { useCollabMe, useProjectAccessMap } from './use-project-access'
 import { useProjects } from './use-projects'
 import { useSyncedPrefs } from './use-synced-prefs'
 import type { AiWorkspace } from '@/lib/ai/workspace'
+import { can } from '@/lib/capabilities'
 
 // The assistant's state in a window (docs/ai-assistant-v1.md): its device settings (read from the
 // main process, which owns them and the key), what can run now, the local speech status, and the
@@ -22,6 +23,7 @@ export function useAiSettings() {
   return useQuery<AiSettingsView>({
     queryKey: AI_SETTINGS_QUERY_KEY,
     queryFn: () => window.api.ai.getSettings(),
+    enabled: can('assistant'),
     staleTime: Infinity,
   })
 }
@@ -38,13 +40,14 @@ export function useSaveAiSettings() {
 /** Which features can run: set up, consent given, switched on, model tested (7.1, 2.4). */
 export function useAiReady(): { dictation: boolean; ask: boolean; talk: boolean } {
   const { data } = useAiSettings()
-  return useMemo(() => (data ? readyFeatures(data, data.hasKey) : { dictation: false, ask: false, talk: false }), [data])
+  return useMemo(() => (data && can('assistant') ? readyFeatures(data, data.hasKey) : { dictation: false, ask: false, talk: false }), [data])
 }
 
 export function useSpeechStatus() {
   return useQuery<SpeechStatus>({
     queryKey: SPEECH_STATUS_QUERY_KEY,
     queryFn: () => window.api.speech.status(),
+    enabled: can('assistant'),
     staleTime: 30_000,
   })
 }

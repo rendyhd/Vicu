@@ -4,6 +4,7 @@ import {
   ASK_TOOLS,
   BRAIN_DUMP_ANSWER_SCHEMA,
   DICTATION_ANSWER_SCHEMA,
+  NOTES_ANSWER_SCHEMA,
   ORGANIZE_ANSWER_SCHEMA,
   PLAN_DAY_ANSWER_SCHEMA,
   PROBE,
@@ -12,6 +13,7 @@ import {
   brainDumpSystemPrompt,
   dictationSystemPrompt,
   enabledAskTools,
+  notesSystemPrompt,
   promptModeSystem,
   promptText,
   repairMessage,
@@ -25,6 +27,8 @@ describe('model-facing schemas obey schemaSubset', () => {
   const schemas: Array<[string, unknown]> = [
     ['dictation.answerSchema', DICTATION_ANSWER_SCHEMA],
     ['brainDump.answerSchema', BRAIN_DUMP_ANSWER_SCHEMA],
+    ['notes.answerSchema', NOTES_ANSWER_SCHEMA],
+    ['probe.vision.schema', PROBE.vision.schema],
     ['organize.answerSchema', ORGANIZE_ANSWER_SCHEMA],
     ['planDay.answerSchema', PLAN_DAY_ANSWER_SCHEMA],
     ['probe.structured.schema', PROBE.structured.schema],
@@ -40,6 +44,7 @@ describe('model-facing schemas obey schemaSubset', () => {
   it('reads the schemas from the fixture itself', () => {
     expect(DICTATION_ANSWER_SCHEMA).toEqual(aiFixture.dictation.answerSchema)
     expect(BRAIN_DUMP_ANSWER_SCHEMA).toEqual(aiFixture.brainDump.answerSchema)
+    expect(NOTES_ANSWER_SCHEMA).toEqual(aiFixture.notes.answerSchema)
     expect(ORGANIZE_ANSWER_SCHEMA).toEqual(aiFixture.organize.answerSchema)
     expect(PLAN_DAY_ANSWER_SCHEMA).toEqual(aiFixture.planDay.answerSchema)
     expect(ASK_STARTERS).toEqual(aiFixture.ask.starters)
@@ -74,6 +79,13 @@ describe('answer validation', () => {
     expect(firstSchemaProblem(broken, BRAIN_DUMP_ANSWER_SCHEMA)).toBe('tasks[0] is missing "project_ref"')
   })
 
+  it('accepts every notes vector answer (4.9.5), whose tasks have owner, page and from after project_ref', () => {
+    for (const vector of aiFixture.notes.checks) expect(firstSchemaProblem(vector.answer, NOTES_ANSWER_SCHEMA)).toBeNull()
+    const tasks = aiFixture.notes.answerSchema.properties.tasks.items.required as string[]
+    expect(tasks.slice(tasks.indexOf('project_ref'), tasks.indexOf('project_ref') + 4)).toEqual(['project_ref', 'owner', 'page', 'from'])
+    expect(aiFixture.notes.answerSchema.required).toEqual(['projects', 'tasks', 'decisions', 'questions', 'unclear'])
+  })
+
   it('accepts every organize vector answer (section 9.2)', () => {
     for (const vector of aiFixture.organize.checks) expect(firstSchemaProblem(vector.answer, ORGANIZE_ANSWER_SCHEMA)).toBeNull()
   })
@@ -98,7 +110,7 @@ describe('answer validation', () => {
 
 describe('prompts', () => {
   it('joins the lines with \\n and sends them exactly', () => {
-    for (const name of ['dictation', 'dictationEdit', 'brainDump', 'brainDumpEdit', 'ask', 'talk', 'organize'] as const) {
+    for (const name of ['dictation', 'dictationEdit', 'brainDump', 'brainDumpEdit', 'notes', 'notesRead', 'ask', 'talk', 'organize'] as const) {
       expect(promptText(name)).toBe(aiFixture.prompts[name].lines.join('\n'))
       expect(PROMPTS[name].version).toBe(aiFixture.prompts[name].version)
     }
@@ -113,6 +125,18 @@ describe('prompts', () => {
     expect(dictationSystemPrompt(true)).toBe(`${promptText('dictation')}\n\n${promptText('dictationEdit')}`)
     expect(brainDumpSystemPrompt(false)).toBe(`${promptText('dictation')}\n\n${promptText('brainDump')}`)
     expect(brainDumpSystemPrompt(true)).toBe(`${promptText('dictation')}\n\n${promptText('brainDump')}\n\n${promptText('brainDumpEdit')}`)
+    expect(notesSystemPrompt(false)).toBe(`${promptText('dictation')}
+
+${promptText('brainDump')}
+
+${promptText('notes')}`)
+    expect(notesSystemPrompt(true)).toBe(`${promptText('dictation')}
+
+${promptText('brainDump')}
+
+${promptText('notes')}
+
+${promptText('brainDumpEdit')}`)
     expect(askSystemPrompt(false)).toBe(promptText('ask'))
     expect(askSystemPrompt(true)).toBe(`${promptText('ask')}\n\n${promptText('talk')}`)
   })

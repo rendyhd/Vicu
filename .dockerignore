@@ -1,0 +1,24 @@
+# Only what `npm run build:web` reads goes into the build context.
+.git
+.github
+node_modules
+out
+dist
+release
+reports
+research_notes
+site
+native
+extensions
+build
+scripts/ui-verify/.local
+scripts/ui-verify/out
+resources/speech
+resources/voice
+resources/calendar
+resources/bridge
+*.log
+docs
+design_handoff_review_flow
+api-docs.json
+*.tsbuildinfo

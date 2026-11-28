@@ -102,6 +102,36 @@ describe('createFreshness (D-FRESH-1)', () => {
       expect(refresh).toHaveBeenCalledTimes(1)
     })
 
+    it('goes on polling while hidden when the badge shows the data, with the hidden refresh only', () => {
+      const refreshHidden = vi.fn()
+      let badge = true
+      freshness.stop()
+      freshness = createFreshness({
+        now: () => new Date(),
+        refresh: refresh as () => void,
+        onDayChange: onDayChange as (key: string) => void,
+        isVisible: () => visible,
+        showsDataWhileHidden: () => badge,
+        refreshHidden,
+      })
+      freshness.start()
+      visible = false
+
+      vi.advanceTimersByTime(POLL_INTERVAL_MS * 2)
+      expect(refreshHidden).toHaveBeenCalledTimes(2)
+      expect(refresh).not.toHaveBeenCalled()
+
+      // A hidden refresh does not count for the focus throttle: coming back refreshes everything.
+      visible = true
+      freshness.onVisible()
+      expect(refresh).toHaveBeenCalledTimes(1)
+
+      badge = false
+      visible = false
+      vi.advanceTimersByTime(POLL_INTERVAL_MS * 2)
+      expect(refreshHidden).toHaveBeenCalledTimes(2)
+    })
+
     it('stops polling after stop()', () => {
       freshness.start()
       freshness.stop()

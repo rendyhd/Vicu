@@ -7,6 +7,7 @@ import { groupsWithInbox } from '@/lib/project-groups'
 import type { ProjectTreeNode } from '@/hooks/use-projects'
 import { Popover, type PopoverCloseReason } from '../overlay/Popover'
 import { useProjectsWithoutIcon } from '@/hooks/use-project-icons'
+import { useTranslation } from 'react-i18next'
 
 interface ProjectPickerPopoverProps {
   anchorRef: RefObject<HTMLElement | null>
@@ -31,6 +32,7 @@ export function flattenTree(nodes: ProjectTreeNode[], depth = 0): { node: Projec
 }
 
 export function ProjectPickerPopover({ anchorRef, placement = 'bottom-start', currentProjectId, onSelect, onClose }: ProjectPickerPopoverProps) {
+  const { t } = useTranslation()
   const { data } = useProjects()
   const { data: config } = useAppConfig()
   const { categories, layout } = useProjectCategories()
@@ -79,9 +81,9 @@ export function ProjectPickerPopover({ anchorRef, placement = 'bottom-start', cu
     ))
 
   return (
-    <Popover anchorRef={anchorRef} onClose={onClose} placement={placement} role="listbox" label="Move to project" className="w-56 py-1">
+    <Popover anchorRef={anchorRef} onClose={onClose} placement={placement} role="listbox" label={t('task.picker.moveToProject')} className="w-56 py-1">
       {empty ? (
-        <div className="px-3 py-2 text-xs text-[var(--text-secondary)]">No projects</div>
+        <div className="px-3 py-2 text-xs text-[var(--text-secondary)]">{t('task.picker.noProjects')}</div>
       ) : (
         <div className="max-h-60 overflow-y-auto">
           {groups.map(({ category, nodes }) =>

@@ -98,6 +98,7 @@ A label is a colored tag with its own page. Chip text always stays readable agai
 
 - Put labels on a task in its card, or type `@errand` in quick add. See [Quick add](guide:quick-add).
 - Open a label from **Tags** in the sidebar, or **Labels** in the phone drawer, to see all its tasks.
+- To see part of a project, tap the filter button next to the project's menu. A bar opens with the labels its tasks carry and how many tasks have each. Pick one or more: the page shows the tasks with any of them, and sections without such tasks step aside. The button keeps a count while labels are picked, and **Show all** under the list puts everything back. Nothing is saved: leaving the project clears it. For a view you keep, make a [custom list](guide:custom-lists).
 - Drag a task onto a label in the sidebar to apply it. {desktop}
 - On a phone, create labels from the picker. Tapping **Create** when a search finds nothing makes the label. Drag labels in the drawer to reorder them; the order stays on that device. {phone}
 
@@ -113,6 +114,10 @@ The choices are **Due date, then manual**, **Due date, then priority**, **Manual
 - For all projects, open **Settings, Projects, Display** and use **Sort project tasks by**. It shows how many projects have their own order, with **Reset**.
 
 A subproject follows its parent's order unless it has one of its own. The order syncs, and phone widgets follow it.
+
+## Completed tasks
+
+Turn on **Show completed tasks** in **Settings, Projects, Display** and every project, the Inbox too, ends with a folded **Completed** row with the number of its done tasks. Open it to see them, newest first, 20 at a time with **Show more**; each shows the day it was completed. Tick one to reopen it. The setting syncs; whether the row is open is not kept. Done tasks of subprojects are in the subproject itself.
 
 ### Drag to reorder
 

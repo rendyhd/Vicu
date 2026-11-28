@@ -49,7 +49,7 @@ function taskCache(): JsonFileStore<TaskCacheData> {
   const store = new JsonFileStore<TaskCacheData>({
     path: join(dir, TASK_CACHE_FILENAME),
     backup: false,
-    label: 'task cache',
+    label: 'task cache', // i18n-ignore: log label
     empty: () => ({ cachedTasks: null, cachedTasksTimestamp: null }),
     parse: (json) => {
       if (!isRecord(json)) throw new Error('Not a task cache')
@@ -72,7 +72,7 @@ function standalone(): JsonFileStore<StandaloneData> {
     path: join(dir, STANDALONE_FILENAME),
     backup: true,
     quarantineCorrupt: true,
-    label: 'standalone tasks',
+    label: 'standalone tasks', // i18n-ignore: log label
     empty: () => ({ standaloneTasks: [] }),
     parse: (json) => {
       if (!isRecord(json) || !Array.isArray(json.standaloneTasks)) throw new Error('Not a standalone task file')

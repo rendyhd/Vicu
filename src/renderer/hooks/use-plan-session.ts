@@ -8,15 +8,23 @@ import { useProjectTasks } from './use-project-tasks'
 import { useTasks } from './use-tasks'
 import { useCompleteTask, useUncompleteTask, useUpdateTask } from './use-task-mutations'
 import { usePlanSuggestions } from './use-plan-suggestions'
+import { usePlanBusy } from './use-plan-busy'
+import { usePro } from './use-pro'
+import { useProLedger } from './use-pro-ledger'
+import { useFocusBlock } from './use-focus-block'
+import { useWorkMode } from './use-work-mode'
+import { useWorkMuted } from './use-work-muted'
+import { estimateOf, type ProLedger } from '../../shared/pro/ledger'
 import { NULL_DATE } from '@/lib/constants'
 import type { Task, TaskQueryParams } from '@/lib/vikunja-types'
 import { addLocalDays, startOfLocalDay, toLocalDate, type LocalDate } from '../../shared/due-dates'
-import { blockOf, busyOfDay, atClock, freeRanges, minutesOfDay, clockMinutes, type BlockChanges } from '../../shared/time-blocks'
+import { blockOf, atClock, freeRanges, minutesOfDay, clockMinutes, type BlockChanges } from '../../shared/time-blocks'
 import {
   PROJECT_GROUP_MAX,
   acceptChanges,
   canWaitChanges,
   comingUpTasks,
+  dayBusy,
   draftBlocks,
   inboxCandidates,
   leftoverChanges,
@@ -47,6 +55,15 @@ interface LogEntry {
   before: Task
   after: Partial<Task>
   completed: boolean
+}
+
+function estimatesOf(tasks: readonly Task[], ledger: ProLedger): Map<number, number> {
+  const map = new Map<number, number>()
+  for (const task of tasks) {
+    const minutes = estimateOf(ledger, task.id)
+    if (minutes !== null) map.set(task.id, minutes)
+  }
+  return map
 }
 
 function leftoversFilter(today: LocalDate): string {
@@ -85,7 +102,10 @@ export function usePlanSession() {
   const [remindersOn, setRemindersOn] = useState(false)
   const log = useRef(new Map<number, LogEntry>())
 
-  const canChange = useCallback((task: Task) => (access.get(task.project_id)?.permission ?? 1) > 0, [access])
+  // Work and Personal (22.4): Plan my day lists and plans the tasks the mode shows. A block of the
+  // other mode stays on the timeline and counts as busy time, but is never moved or planned here.
+  const work = useWorkMode()
+  const canChange = useCallback((task: Task) => (access.get(task.project_id)?.permission ?? 1) > 0 && work.passes(task), [access, work.passes])
 
   // The tasks.
   const days = useMemo(() => [day], [day])
@@ -94,12 +114,24 @@ export function usePlanSession() {
     () => ({ filter: leftoversFilter(today), sort_by: 'due_date', order_by: 'asc', per_page: 1000, keep_nested_subtasks: true }),
     [today],
   )
-  const leftoverQuery = useTasks(leftoverParams)
-  const inbox = useProjectTasks(inboxId || undefined)
+  const leftoverQuery = useTasks(leftoverParams, true, true)
+  const inbox = useProjectTasks(inboxId || undefined, true, true)
   const upcomingParams = useFilters({ view: 'upcoming' })
-  const upcoming = useTasks(upcomingParams)
-  const pickedProject = useProjectTasks(projectId ?? undefined)
+  const upcoming = useTasks(upcomingParams, true, true)
+  const pickedProject = useProjectTasks(projectId ?? undefined, true, true)
+  const mutedIds = useWorkMuted(range.tasks)
   const routines = usePlanRoutines(days)
+  // The day's events (contract 20.2): drawn on the timeline and busy time for the meter, the draft
+  // and the free time the assistant gets. Never their titles.
+  const busy = usePlanBusy(days)
+  const eventBusy = useMemo(() => busy.eventBusyOn(day), [busy, day])
+
+  // Pro (plan 7.7.3 and 7.7.4): estimates give a task its length and the focus block comes first.
+  // Off, neither is read.
+  const powerOn = usePro().layer('power')
+  const { ledger } = useProLedger()
+  const estimateFor = useCallback((id: number) => (powerOn ? estimateOf(ledger, id) : null), [powerOn, ledger])
+  const focusBlock = useFocusBlock(canChange)
 
   const leftovers = useMemo(() => leftoversQueue(leftoverQuery.data.filter(canChange), now), [leftoverQuery.data, canChange, today])
   const onDay = useMemo(() => onDayTasks(range.tasks.filter(canChange), day, now), [range.tasks, canChange, day, today])
@@ -113,15 +145,15 @@ export function usePlanSession() {
 
   const byId = useMemo(() => {
     const map = new Map<number, Task>()
-    for (const list of [fromProject, inboxTasks, comingUp, leftovers, onDay]) for (const task of list) map.set(task.id, task)
+    for (const list of [focusBlock?.tasks ?? [], fromProject, inboxTasks, comingUp, leftovers, onDay]) for (const task of list) map.set(task.id, task)
     return map
-  }, [fromProject, inboxTasks, comingUp, leftovers, onDay])
+  }, [focusBlock, fromProject, inboxTasks, comingUp, leftovers, onDay])
 
   // The assistant.
   const assistantReady = ready.ask
   const assistantActive = assistantReady && assistantOn
   // Fresh, not only there: a copy saved earlier would give the model a free time that has changed.
-  const dataReady = !range.isFetching && !leftoverQuery.isFetching && !upcoming.isFetching
+  const dataReady = !range.isFetching && !leftoverQuery.isFetching && !upcoming.isFetching && !busy.isFetching
   const suggestions = usePlanSuggestions({
     enabled: assistantActive,
     dataReady,
@@ -130,10 +162,11 @@ export function usePlanSession() {
       day,
       defaultLength: prefs.defaultLength,
       hours: prefs.hours,
-      free: freeRanges(new Date(), day, prefs.hours, busyOfDay(range.tasks, day)),
+      free: freeRanges(new Date(), day, prefs.hours, dayBusy(range.tasks, day, eventBusy)),
       routineMinutes: routines.map((routine) => routine.minute),
       leftovers,
       candidates: [...onDay, ...inboxTasks, ...comingUp],
+      ...(powerOn ? { estimates: estimatesOf([...onDay, ...inboxTasks, ...comingUp, ...leftovers], ledger) } : {}),
     }),
   })
   const answer = suggestions.result
@@ -148,8 +181,8 @@ export function usePlanSession() {
   )
 
   const lengthOf = useCallback(
-    (id: number) => lengths.get(id) ?? pickOf.get(id)?.minutes ?? prefs.defaultLength,
-    [lengths, pickOf, prefs.defaultLength],
+    (id: number) => lengths.get(id) ?? pickOf.get(id)?.minutes ?? estimateFor(id) ?? prefs.defaultLength,
+    [lengths, pickOf, estimateFor, prefs.defaultLength],
   )
   const lengthIsSuggested = useCallback((id: number) => !lengths.has(id) && typeof pickOf.get(id)?.minutes === 'number', [lengths, pickOf])
 
@@ -167,6 +200,7 @@ export function usePlanSession() {
     lengths: mergedLengths,
     pins,
     keep,
+    eventBusy,
   }
   const meter = planMeter(chosen, range.tasks, choices)
 
@@ -202,6 +236,12 @@ export function usePlanSession() {
       write(task, leftoverChanges(task, action, new Date()))
     }
     setHandled((prev) => new Map(prev).set(task.id, { task, label: HANDLED_LABEL[action] }))
+  }
+
+  /** Ticks the focus block's tasks (21.11). */
+  const addFocusBlock = () => {
+    if (!focusBlock) return
+    setPicked(new Set([...ticked, ...focusBlock.tasks.map((task) => task.id)]))
   }
 
   const toggleTick = (id: number) => {
@@ -381,6 +421,8 @@ export function usePlanSession() {
     setProjectId,
     ticked,
     toggleTick,
+    focusBlock,
+    addFocusBlock,
     chosen,
     meter,
     pickOf,
@@ -404,7 +446,13 @@ export function usePlanSession() {
     nudgeTime: config?.planner_nudge ?? '21:30',
     range,
     routines,
+    events: busy.events,
+    planEvents: busy.planEvents,
+    feeds: busy.feeds,
+    eventColor: busy.eventColor,
+    eventBusy,
     timelineTasks,
+    mutedIds,
     timelineChange,
     dashedIds,
     reasons,

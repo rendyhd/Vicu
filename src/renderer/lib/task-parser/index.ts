@@ -9,6 +9,9 @@ import { extractDate, extractBangToday } from './extract-dates'
 import { findForPhrases } from './extract-length'
 import { matchPlacePhrase, type PlaceRef } from './place-phrases'
 import { isTimeBlock } from '../../../shared/time-blocks'
+import type { Person } from '../../../shared/pro/people'
+import { extractDollarPerson, extractEstimate, extractFlag, extractOwnerAndRequester, extractPersonPrefix, extractRequest, findCheckOnWords, findStartsWords } from './extract-pro'
+import { toLocalDate } from '../../../shared/due-dates'
 
 export type { ParseResult, ParserConfig, ParsedToken, ParsedRecurrence, SyntaxMode, TokenType, SyntaxPrefixes } from './types'
 export { DEFAULT_PARSER_CONFIG, getPrefixes } from './types'
@@ -32,12 +35,14 @@ export type { PlaceMatch, PlaceRef } from './place-phrases'
  * @param config - Parser configuration (enabled, syntax mode, suppress types, locale)
  * @param reference - "Now" for relative dates; the current time unless a test passes one
  * @param places - The saved places "when I get home" may name (section 5.3); none means no place is read
+ * @param people - Pro's people `Jan:` may name (section 5.5); read only with `config.pro`
  */
 export function parse(
   rawInput: string,
   config: ParserConfig = DEFAULT_PARSER_CONFIG,
   reference: Date = new Date(),
   places: readonly PlaceRef[] = [],
+  people: readonly Person[] = [],
 ): ParseResult {
   const result: ParseResult = {
     title: rawInput,
@@ -49,6 +54,13 @@ export function parse(
     project: null,
     recurrence: null,
     place: null,
+    person: null,
+    requester: null,
+    checkOn: null,
+    start: null,
+    estimate: null,
+    flag: false,
+    request: false,
     tokens: [],
   }
 
@@ -69,6 +81,47 @@ export function parse(
   const prefixes = getPrefixes(config.syntaxMode)
   const consumed: Array<{ start: number; end: number }> = []
   const suppress = new Set(config.suppressTypes ?? [])
+  const pro = config.pro === true
+
+  // Pro: `req:` and a person's name at the very start, `!flag` and `~1h30` (section 5.5), before
+  // anything else reads those words.
+  if (pro) {
+    if (!suppress.has('request')) {
+      const found = extractRequest(rawInput, consumed)
+      result.request = found.request
+      result.tokens.push(...found.tokens)
+    }
+    if (!suppress.has('person')) {
+      const found = extractPersonPrefix(rawInput, people, consumed)
+      if (found.person) result.person = { id: found.person.id, mine: found.person.mine }
+      result.tokens.push(...found.tokens)
+      if (!found.person) {
+        // Two `$` phrases with one after `for`: the owner and who it was promised to.
+        const pair = extractOwnerAndRequester(rawInput, people, consumed)
+        if (pair) {
+          const { person, requester } = pair
+          result.person = person.id !== null ? { id: person.id, mine: false } : { id: null, name: person.name, mine: false }
+          result.requester = requester.id !== null ? { id: requester.id } : { id: null, name: requester.name }
+          result.tokens.push(...pair.tokens)
+        } else {
+          const dollar = extractDollarPerson(rawInput, people, consumed)
+          const person = dollar.person
+          if (person) result.person = person.id !== null ? { id: person.id, mine: person.mine } : { id: null, name: person.name, mine: person.mine }
+          result.tokens.push(...dollar.tokens)
+        }
+      }
+    }
+    if (!suppress.has('flag')) {
+      const found = extractFlag(rawInput, consumed)
+      result.flag = found.flag
+      result.tokens.push(...found.tokens)
+    }
+    if (!suppress.has('estimate')) {
+      const found = extractEstimate(rawInput, consumed)
+      result.estimate = found.estimate
+      result.tokens.push(...found.tokens)
+    }
+  }
 
   // 0. A saved place ("when I get home"), first, so no word of the phrase is read as a date.
   if (!suppress.has('place')) {
@@ -116,8 +169,39 @@ export function parse(
     recurrenceToken = extracted.tokens[0]
   }
 
+  // Pro: `starts <date>` is a start date, read before the due date and never as one.
+  const dateOptions = { reference, locale: config.locale, hidden: forPhrases.hidden, weekStart: config.weekStart }
+  if (pro && !suppress.has('start')) {
+    for (const words of findStartsWords(rawInput, consumed)) {
+      const before = { start: 0, end: words.phrase }
+      const found = extractDate(rawInput, [...consumed, before], dateOptions)
+      const token = found.tokens[0]
+      if (!found.dueDate || !token || rawInput.slice(words.phrase, token.start).trim() !== '') continue
+      const start = new Date(found.dueDate.getTime())
+      if (!found.hasTime) start.setHours(0, 0, 0, 0)
+      else start.setSeconds(0, 0)
+      result.start = start
+      consumed.push({ start: words.start, end: token.end })
+      result.tokens.push({ type: 'start', start: words.start, end: token.end, value: start, raw: rawInput.slice(words.start, token.end) })
+      break
+    }
+  }
+
+  // Pro: `check on <date>` in a text with a person is a check date, never a due date.
+  if (pro && result.person && !suppress.has('checkOn')) {
+    for (const words of findCheckOnWords(rawInput, consumed)) {
+      const before = { start: 0, end: words.phrase }
+      const found = extractDate(rawInput, [...consumed, before], dateOptions)
+      const token = found.tokens[0]
+      if (!found.dueDate || !token || rawInput.slice(words.phrase, token.start).trim() !== '') continue
+      result.checkOn = toLocalDate(found.dueDate)
+      consumed.push({ start: words.start, end: token.end })
+      result.tokens.push({ type: 'checkOn', start: words.start, end: token.end, value: result.checkOn, raw: rawInput.slice(words.start, token.end) })
+      break
+    }
+  }
+
   // 5. Dates
-  const dateOptions = { reference, locale: config.locale, hidden: forPhrases.hidden }
   if (!suppress.has('date')) {
     let found: ReturnType<typeof extractDate> | null = null
     if (weekday) {
@@ -160,6 +244,8 @@ export function parse(
       result.dueHasTime = false
       consumed.push({ start: length.start, end: length.end })
       result.tokens.push({ type: 'length', start: length.start, end: length.end, value: length.minutes, raw: rawInput.slice(length.start, length.end) })
+      // A block holds the start: it replaces a start date (section 21.3).
+      result.start = null
     }
   }
 

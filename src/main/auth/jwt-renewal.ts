@@ -2,6 +2,7 @@ import { net } from 'electron'
 import { getRefreshToken, storeRenewedSession } from './token-store'
 import { extractRefreshToken } from './cookie-utils'
 import { vikunjaUserAgent } from '../user-agent'
+import { isNotApiErrorAnswer, notApiErrorMessage } from '../../shared/error-classify'
 
 const RENEWAL_TIMEOUT = 10_000
 
@@ -93,6 +94,11 @@ export async function renewJWT(vikunjaUrl: string): Promise<string> {
 
   if (!response.ok) {
     const text = await response.text().catch(() => '')
+    // A network's sign-in page or a firewall answered, not Vikunja: whatever its status, it says
+    // nothing about the refresh token, so the session stays and the renewal is tried again.
+    if (isNotApiErrorAnswer(response.status, text)) {
+      throw new JWTRenewalError(notApiErrorMessage(response.status), 'network-error', response.status)
+    }
     const kind = classifyHttpStatus(response.status)
     const retryAfterSec =
       kind === 'rate-limited' ? parseRetryAfter(response.headers.get('Retry-After')) : undefined

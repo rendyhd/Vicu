@@ -41,7 +41,7 @@ vi.mock('../secure-ipc', () => ({
   },
 }))
 vi.mock('../api-client', () => {
-  const entries = Object.fromEntries(['updateTask', 'deleteTask', 'addLabelToTask', 'removeLabelFromTask', 'createTask', 'updateTaskPosition', 'createTaskRelation', 'deleteTaskRelation'].map((name) => {
+  const entries = Object.fromEntries(['updateTask', 'fetchTaskById', 'deleteTask', 'addLabelToTask', 'removeLabelFromTask', 'createTask', 'updateTaskPosition', 'createTaskRelation', 'deleteTaskRelation'].map((name) => {
     const fn = vi.fn(async (..._args: unknown[]): Promise<unknown> => ({ success: true, data: { id: 5 } }))
     hoisted.api[name] = fn
     return [name, fn]

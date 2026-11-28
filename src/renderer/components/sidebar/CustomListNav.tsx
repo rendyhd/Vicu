@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { SelectionPill } from './SelectionPill'
 import { useNavigate, useMatches } from '@tanstack/react-router'
 import { Plus, List, Pencil, Trash2, CloudOff, Loader2, RefreshCw } from 'lucide-react'
@@ -75,6 +76,7 @@ function CustomListItem({
 }
 
 export function CustomListNav() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const matches = useMatches()
   const currentPath = matches[matches.length - 1]?.pathname ?? ''
@@ -139,7 +141,7 @@ export function CustomListNav() {
       <div className="px-4 pb-1 pt-3">
         <div className="flex items-center justify-between">
           <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
-            Lists
+            {t('sidebarNav.lists.title')}
           </span>
           <div className="flex items-center gap-0.5">
             {syncStatus && !['idle', 'local_only'].includes(syncStatus.state) && (
@@ -153,8 +155,8 @@ export function CustomListNav() {
                     ? 'text-danger'
                     : 'text-[var(--text-secondary)]',
                 )}
-                title={'message' in syncStatus ? syncStatus.message : syncStatus.state === 'pending' ? 'Custom-list sync pending' : 'Syncing custom lists'}
-                aria-label="Retry custom-list sync"
+                title={'message' in syncStatus ? syncStatus.message : syncStatus.state === 'pending' ? t('sidebarNav.lists.syncPending') : t('sidebarNav.lists.syncing')}
+                aria-label={t('sidebarNav.lists.retrySync')}
               >
                 {syncStatus.state === 'syncing' ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
                   : syncStatus.state === 'offline' ? <CloudOff className="h-3.5 w-3.5" />
@@ -168,7 +170,7 @@ export function CustomListNav() {
                 setDialogOpen(true)
               }}
               className="flex h-5 w-5 items-center justify-center rounded-control text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
-              aria-label="New list"
+              aria-label={t('sidebarNav.lists.newList')}
             >
               <Plus className="h-3.5 w-3.5" />
             </button>
@@ -176,7 +178,7 @@ export function CustomListNav() {
         </div>
       </div>
 
-      <nav aria-label="Custom lists" className="flex flex-col gap-0.5 px-2 pb-2">
+      <nav aria-label={t('sidebarNav.lists.customLists')} className="flex flex-col gap-0.5 px-2 pb-2">
         <SortableContext items={sortableIds} strategy={verticalListSortingStrategy}>
           {lists.map((item) => {
             const path = `/list/${item.id}`
@@ -195,7 +197,7 @@ export function CustomListNav() {
 
         {lists.length === 0 && (
           <p className="px-2.5 py-1 text-[11px] text-[var(--text-secondary)]">
-            No custom lists yet
+            {t('sidebarNav.lists.none')}
           </p>
         )}
       </nav>
@@ -205,7 +207,7 @@ export function CustomListNav() {
         <Menu
           key={`${contextMenu.list.id}:${contextMenu.x}:${contextMenu.y}`}
           anchorPoint={{ x: contextMenu.x, y: contextMenu.y }}
-          label={`${contextMenu.list.name} actions`}
+          label={t('sidebarNav.lists.actions', { name: contextMenu.list.name })}
           onClose={() => setContextMenu(null)}
         >
           <MenuItem
@@ -215,10 +217,10 @@ export function CustomListNav() {
               setDialogOpen(true)
             }}
           >
-            Edit
+            {t('sidebarNav.lists.edit')}
           </MenuItem>
           <MenuItem icon={<Trash2 />} danger onSelect={() => void handleDelete(contextMenu.list.id)}>
-            Delete
+            {t('sidebarNav.lists.delete')}
           </MenuItem>
         </Menu>
       )}

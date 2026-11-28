@@ -11,6 +11,7 @@ import { useToggleAssignee } from './use-assignee-mutations'
 import { useOpenTask } from './use-open-task'
 import { useProjectAccessMap } from './use-project-access'
 import { useAddLabel, useCreateTask, useDeleteTask } from './use-task-mutations'
+import { t } from '../../shared/i18n'
 
 /** The task as the server has it now (labels, reminders, assignees, subtasks), or the cached copy offline. */
 async function fullTask(task: Task): Promise<Task> {
@@ -43,6 +44,8 @@ export function useDuplicateTasks(): (tasks: readonly Task[]) => Promise<Task[]>
             projectId,
             task: payload,
             extras: { labels: labels.map((l) => ({ id: l.id, title: l.title })), displayLabels: labels },
+            // A copy gets what its original has, nothing more (cross-app semantics 22.6).
+            workLabel: false,
           }),
           addLabel: (copy, label) => addLabel.mutateAsync({ taskId: copy.id, labelId: label.id }),
           assign: (copy, person) => toggleAssignee.mutateAsync({ task: copy, person, assign: true }),
@@ -56,7 +59,7 @@ export function useDuplicateTasks(): (tasks: readonly Task[]) => Promise<Task[]>
         results.push(result)
         problems.push(...result.problems)
       } catch {
-        problems.push(`“${task.title}” could not be duplicated.`)
+        problems.push(t('taskActions.duplicateFailed', { title: task.title }))
       }
     }
     refreshTasks(qc)
@@ -69,7 +72,7 @@ export function useDuplicateTasks(): (tasks: readonly Task[]) => Promise<Task[]>
     // Subtasks before their parents, so a copy's own subtasks go first and no original is touched.
     const made = results.flatMap((r) => r.made).reverse()
     const undo: ToastAction = {
-      label: 'Undo',
+      label: t('app.undo'),
       onAction: () => {
         void (async () => {
           for (const task of made) {
@@ -84,7 +87,7 @@ export function useDuplicateTasks(): (tasks: readonly Task[]) => Promise<Task[]>
     }
     // A copy saved offline has no task to show yet.
     const single = results.length === 1 && !isTempTaskId(results[0].copy.id) ? results[0].copy : null
-    const open: ToastAction | null = single ? { label: 'Open', onAction: () => openTask(single.id) } : null
+    const open: ToastAction | null = single ? { label: t('app.open'), onAction: () => openTask(single.id) } : null
     useToastStore.getState().push(problems.length > 0 ? 'error' : 'success', message, {
       action: open ?? undo,
       secondAction: open ? undo : undefined,

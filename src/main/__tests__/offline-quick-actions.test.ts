@@ -10,6 +10,7 @@ import {
   quickViewComplete,
   quickViewPatch,
   quickViewReopen,
+  withWorkLabel,
   type QuickActionDeps,
 } from '../offline/quick-actions'
 import type { ApiResult } from '../api-result'
@@ -87,6 +88,29 @@ describe('Quick Entry and Quick View with the offline queue', () => {
       expect(pending[2]).toMatchObject({ labelTitle: 'Garden' })
       expect(pending[3]).toMatchObject({ name: 'shot.png', mime: 'image/png' })
       expect(notified).toBe(0)
+    })
+
+    it('Work mode: the work label joins the labels, and a queued create keeps it (contract 22.6)', async () => {
+      const scope = { label: 40, projects: new Set([9]) }
+      const personal = withWorkLabel([{ id: 3, title: 'Home' }], 7, scope, 'work')
+      expect(personal.added).toBe(40)
+      expect(personal.labels).toEqual([{ id: 3, title: 'Home' }, { id: 40 }])
+
+      createTask.mockResolvedValue(err('net::ERR_INTERNET_DISCONNECTED'))
+      await createFromQuickEntry(deps(), 7, payload, { labels: personal.labels })
+      expect(queue.getPending().map((a) => a.type)).toEqual(['create', 'add-label', 'add-label'])
+      expect(queue.getPending()[2]).toMatchObject({ labelId: 40 })
+    })
+
+    it('Work mode adds nothing for a work project, a typed work label, no work label, or another mode', () => {
+      const scope = { label: 40, projects: new Set([9]) }
+      expect(withWorkLabel([], 9, scope, 'work').added).toBeNull()
+      expect(withWorkLabel([{ id: 40, title: 'Work' }], 7, scope, 'work').added).toBeNull()
+      expect(withWorkLabel([], 7, { label: null, projects: new Set<number>() }, 'work').added).toBeNull()
+      expect(withWorkLabel([], 7, scope, 'personal').added).toBeNull()
+      expect(withWorkLabel([], 7, scope, 'all').added).toBeNull()
+      const same = [{ id: 1 }]
+      expect(withWorkLabel(same, 7, scope, 'all').labels).toBe(same)
     })
 
     it('builds the payload with a time block, whose start the default reminder follows, and a queued create keeps it', async () => {

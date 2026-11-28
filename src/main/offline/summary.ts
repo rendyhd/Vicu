@@ -58,6 +58,11 @@ export function describeAction(action: QueuedAction, titles: ReadonlyMap<number,
       return `Assign ${action.username ? `@${action.username}` : `user #${action.userId}`} to ${name}`
     case 'remove-assignee':
       return `Unassign ${action.username ? `@${action.username}` : `user #${action.userId}`} from ${name}`
+    case 'add-relation':
+      // A subtask relation is written on the parent (cross-app semantics 24).
+      return action.kind === 'subtask' ? `Add a subtask to ${name}` : `Set what ${name} waits on`
+    case 'remove-relation':
+      return action.kind === 'subtask' ? `Remove a subtask from ${name}` : `Remove what ${name} waits on`
     case 'create-comment':
       return `Comment on ${name}`
     case 'update-comment':

@@ -5,6 +5,7 @@
  */
 import { AI_LIMITS } from './contract'
 import { weekdayName } from './dictation'
+import { getWeekStart } from '../week-start'
 import type { ChatMessage, StoredConversation } from './types'
 
 export interface AskListContext {
@@ -23,7 +24,7 @@ export function askContextJson(now: string, timeZone: string, list: AskListConte
     now: minute(now),
     weekday: weekdayName(now.slice(0, 10)),
     time_zone: timeZone,
-    week_starts: 'monday',
+    week_starts: getWeekStart(),
     list: list.name,
   }
   if (list.projectId !== undefined) context.list_project_id = list.projectId

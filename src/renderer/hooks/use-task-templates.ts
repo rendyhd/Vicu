@@ -29,6 +29,7 @@ import { useLabels } from './use-labels'
 import { useProjects } from './use-projects'
 import { useSyncedPrefs, writeSyncedPrefs } from './use-synced-prefs'
 import { useAddLabel, useCreateTask } from './use-task-mutations'
+import { t } from '../../shared/i18n'
 
 /** The account's templates, oldest first (section 18). */
 export function useTaskTemplates(): ListedTemplate[] {
@@ -77,7 +78,7 @@ export function useTemplateActions() {
   /** Writes `template` under its id; false when it is too large to keep. */
   const write = useCallback(async (id: string, template: TaskTemplate): Promise<boolean> => {
     if (isTemplateTooLarge(template)) {
-      toast.error('This template is too long to save')
+      toast.error(t('templates.templateTooLong'))
       return false
     }
     return writeSyncedPrefs(queryClient, { [templateKey(id)]: encodeTemplate(template) })
@@ -88,12 +89,12 @@ export function useTemplateActions() {
     const source = await sourceOf(task, new Set([task.id]), snapshot.values)
     const template = { ...captureTemplate(source, toLocalDate(new Date())), created_ms: Date.now() }
     if (isTemplateTooLarge(template)) {
-      toast.error('This task is too long to save as a template')
+      toast.error(t('templates.taskTooLong'))
       return
     }
     const id = crypto.randomUUID()
     if (await write(id, template)) {
-      toast.success('Saved as a template', { action: { label: 'Edit', onAction: () => openEdit(id) } })
+      toast.success(t('templates.saved'), { action: { label: t('templates.edit'), onAction: () => openEdit(id) } })
     }
   }, [write, openEdit, snapshot.values])
 
@@ -101,9 +102,9 @@ export function useTemplateActions() {
   const remove = useCallback(async (template: ListedTemplate) => {
     const { id } = template
     if (await writeSyncedPrefs(queryClient, { [templateKey(id)]: null })) {
-      useToastStore.getState().push('info', `Removed “${template.title}”`, {
+      useToastStore.getState().push('info', t('templates.removed', { title: template.title }), {
         durationMs: UNDO_TOAST_MS,
-        action: { label: 'Undo', onAction: () => { void write(id, template) } },
+        action: { label: t('app.undo'), onAction: () => { void write(id, template) } },
       })
     }
   }, [queryClient, write])
@@ -132,21 +133,21 @@ export function useTemplateActions() {
           try {
             await addLabel.mutateAsync({ taskId: task.id, labelId: label.id })
           } catch {
-            problems.push(`A label could not be added to “${task.title}”.`)
+            problems.push(t('templates.labelFailed', { title: task.title }))
           }
         }
       }
       for (const subtask of node.subtasks ?? []) {
         if (isTempTaskId(task.id)) {
-          problems.push(`“${task.title}” was saved offline, so its subtasks were not added.`)
+          problems.push(t('templates.offlineNoSubtasks', { title: task.title }))
           break
         }
         try {
           const child = await create(subtask, projectId, payloadOf(subtask, today))
           const relation = isTempTaskId(child.id) ? null : await api.createTaskRelation(task.id, child.id, 'subtask')
-          if (!relation?.success) problems.push(`A subtask of “${task.title}” could not be added.`)
+          if (!relation?.success) problems.push(t('templates.subtaskFailed', { title: task.title }))
         } catch {
-          problems.push(`A subtask of “${task.title}” could not be added.`)
+          problems.push(t('templates.subtaskFailed', { title: task.title }))
         }
       }
       return task
@@ -157,11 +158,11 @@ export function useTemplateActions() {
     try {
       task = await create(template, projectId, withDefaultReminder(payloadOf(template, today), appConfig))
     } catch (cause) {
-      toast.error(cause instanceof Error ? cause.message : 'Could not make the task')
+      toast.error(cause instanceof Error ? cause.message : t('templates.couldNotMake'))
       return
     }
     refreshTasks(queryClient)
-    if (problems.length > 0) toast.error(problems.length === 1 ? problems[0] : `${problems[0]} (and ${problems.length - 1} more)`)
+    if (problems.length > 0) toast.error(problems.length === 1 ? problems[0] : t('templates.andMore', { first: problems[0], count: problems.length - 1 }))
     const selection = useSelectionStore.getState()
     selection.selectTitleOf(task.id)
     selection.requestOpenTask(task.id)

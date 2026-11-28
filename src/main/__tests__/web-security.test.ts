@@ -109,15 +109,15 @@ describe('web security guards (production layout)', () => {
     const open = (url: string) => c.windowOpenHandler!({ url })
 
     expect(open('https://example.com/').action).toBe('deny')
-    expect(open('obsidian://open?vault=V').action).toBe('deny')
+    expect(open('obsidian://open?vault=V&file=a').action).toBe('deny')
     expect(open('mailto:a@b.c').action).toBe('deny')
     expect(open('file:///C:/Windows/System32/calc.exe').action).toBe('deny')
     expect(open('javascript:alert(1)').action).toBe('deny')
     expect(open('about:blank').action).toBe('deny')
 
+    // An Obsidian address is never opened from a link in a page, only from a task's link button.
     expect(mocks.openExternal.mock.calls.map((a: unknown[]) => a[0])).toEqual([
       'https://example.com/',
-      'obsidian://open?vault=V',
       'mailto:a@b.c',
     ])
   })

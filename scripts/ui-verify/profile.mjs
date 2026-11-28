@@ -43,6 +43,8 @@ export async function writeProfile(theme, { size = { width: 1280, height: 820 } 
     auth_method: 'api_token',
     inbox_project_id: ids.inbox,
     theme,
+    // The scenarios find things by their English text, whatever this computer prefers.
+    language: 'en',
     window_bounds: { x: 0, y: 0, width: size.width, height: size.height },
     subtask_display: 'expandable',
     review: { enabled: true, default_cadence_days: 7, exclude_inbox: true },

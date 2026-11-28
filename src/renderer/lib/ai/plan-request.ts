@@ -22,6 +22,8 @@ export interface PlanRequestInput {
   routineMinutes: readonly number[]
   leftovers: readonly Task[]
   candidates: readonly Task[]
+  /** Pro's estimates in minutes (plan 7.7.3), only while the power layer is on. */
+  estimates?: ReadonlyMap<number, number>
 }
 
 /** The one user message of the request. */
@@ -31,7 +33,14 @@ export function planRequestUser(ws: AiWorkspace, input: PlanRequestInput): strin
     { name: 'Plan', projectId: ws.inboxProjectId || null, defaultDue: null },
     input.reference,
   )
-  const entry = (task: Task) => ({ ...summariseTask(task, ws), notes: organizeNotes(notesPlainText(task.description)) })
+  const entry = (task: Task) => {
+    const estimate = input.estimates?.get(task.id)
+    return {
+      ...summariseTask(task, ws),
+      notes: organizeNotes(notesPlainText(task.description)),
+      ...(estimate !== undefined ? { estimate_minutes: estimate } : {}),
+    }
+  }
   return planDayUserMessage(
     contextJson,
     {

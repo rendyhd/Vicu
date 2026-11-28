@@ -3,6 +3,7 @@ import { join } from 'path'
 import { describe, expect, it } from 'vitest'
 import { checkBrainDumpAnswer, type BrainDumpAnswer } from '../../../../shared/ai/brain-dump'
 import { checkDictationAnswer, type CheckContext, type DictationAnswer } from '../../../../shared/ai/dictation'
+import { checkNotesAnswer, type NotesAnswer, type NotesCheckInput } from '../../../../shared/ai/notes'
 import { checkOrganizeAnswer, type OrganizeAnswer, type OrganizeSession } from '../../../../shared/ai/organize'
 import { readSaid } from '../said-parser'
 
@@ -76,6 +77,21 @@ describe(`dictation checks (fixture vectors, real parser, ${zone})`, () => {
   for (const vector of fixture.brainDump.checks as BrainDumpVector[]) {
     it(`brain dump: ${vector.name}`, () => {
       expect(checkBrainDumpAnswer(vector.answer, contextFor(vector))).toEqual(vector.expect)
+    })
+  }
+
+  // Notes (4.9.6): the brain dump checks with the projects of earlier batches, then page, from, owner.
+  for (const vector of fixture.notes.checks as Array<BrainDumpVector & NotesCheckInput & { answer: NotesAnswer }>) {
+    it(`notes: ${vector.name}`, () => {
+      const result = checkNotesAnswer(vector.answer, contextFor({ ...vector, defaultDue: null }), {
+        pages: vector.pages,
+        me: vector.me,
+        known: vector.known,
+        firstProjectNumber: vector.firstProjectNumber,
+        firstDraftNumber: vector.firstDraftNumber,
+      })
+      expect(result).toEqual(vector.expect)
+      for (const draft of result.drafts) expect(Object.keys(draft).slice(-4)).toEqual(['guessed', 'owner', 'page', 'from'])
     })
   }
 

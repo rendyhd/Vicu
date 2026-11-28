@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { BrowserSignIn } from '@/components/auth/BrowserSignIn'
 import { api } from '@/lib/api'
 import { cn } from '@/lib/cn'
+import { isWebHost } from '@/lib/capabilities'
 import type { OidcSignInMode } from '../../shared/oidc-browser'
 
 interface ReauthViewProps {
@@ -19,6 +21,7 @@ export function ReauthView({
   onSuccess,
   onSwitchAccount,
 }: ReauthViewProps) {
+  const { t } = useTranslation()
   const [username, setUsername] = useState(lastUsername ?? '')
   const [password, setPassword] = useState('')
   const [totpCode, setTotpCode] = useState('')
@@ -31,6 +34,31 @@ export function ReauthView({
   const [oidcMode, setOidcMode] = useState<OidcSignInMode>('window')
   const [passkeyPrompted, setPasskeyPrompted] = useState(false)
   const [providerName, setProviderName] = useState<string | undefined>()
+  // The web version signs in to SSO by leaving the page, so there is no "in the browser instead" mode.
+  const web = isWebHost()
+  // The provider a sign-in that left the page came back from (it asked for a two-factor code).
+  const [pendingProvider, setPendingProvider] = useState('')
+
+  // The web version: what the sign-in that left the page came back with, read once.
+  useEffect(() => {
+    if (!web) return
+    let live = true
+    void api.pendingSignIn()
+      .then((pending) => {
+        if (!live || !pending) return
+        if (pending.totpRequired) {
+          setPendingProvider(pending.providerKey)
+          setNeedsOidcTotp(true)
+          setTotpCode('')
+        } else if (pending.error) {
+          setError(pending.error)
+        }
+      })
+      .catch(() => {})
+    return () => {
+      live = false
+    }
+  }, [web])
 
   useEffect(() => {
     if (authMethod !== 'oidc') return
@@ -38,14 +66,14 @@ export function ReauthView({
     void Promise.all([api.getOidcSignIn(), api.discoverOidc(vikunjaUrl)])
       .then(([last, providers]) => {
         if (!live) return
-        setOidcMode(last.mode)
+        setOidcMode(web ? 'window' : last.mode)
         setProviderName((providers.find((p) => p.key === last.providerKey) ?? providers[0])?.name)
       })
       .catch(() => {})
     return () => {
       live = false
     }
-  }, [authMethod, vikunjaUrl])
+  }, [authMethod, vikunjaUrl, web])
 
   const handlePasswordLogin = async (totpPasscode?: string) => {
     setLoading(true)
@@ -69,7 +97,7 @@ export function ReauthView({
         setError(result.error)
       }
     } catch {
-      setError('Login failed unexpectedly. Please try again.')
+      setError(t('reauth.loginFailed'))
     } finally {
       setLoading(false)
     }
@@ -82,8 +110,8 @@ export function ReauthView({
 
     try {
       // No provider key: main signs in with the provider used last time.
-      const signIn = mode === 'browser' ? api.oidcBrowserLogin : api.oidcLogin
-      const result = await signIn(vikunjaUrl, '', totpPasscode)
+      const signIn = mode === 'browser' && !web ? api.oidcBrowserLogin : api.oidcLogin
+      const result = await signIn(vikunjaUrl, pendingProvider, totpPasscode)
       if (result.success) {
         onSuccess()
       } else if (result.totpRequired) {
@@ -97,7 +125,7 @@ export function ReauthView({
         setError(result.error)
       }
     } catch {
-      setError('Login failed unexpectedly. Please try again.')
+      setError(t('reauth.loginFailed'))
     } finally {
       setLoading(false)
     }
@@ -107,10 +135,10 @@ export function ReauthView({
     <div className="flex h-screen w-screen items-center justify-center bg-[var(--bg-primary)]">
       <div className="w-full max-w-md rounded-card border border-[var(--border-color)] bg-[var(--bg-secondary)] p-8 shadow-lg">
         <h1 className="mb-1 text-xl font-bold text-[var(--text-primary)]">
-          Session Expired
+          {t('reauth.title')}
         </h1>
         <p className="mb-2 text-sm text-[var(--text-secondary)]">
-          Please sign in again to continue.
+          {t('reauth.intro')}
         </p>
         <p className="mb-6 text-xs text-[var(--text-secondary)]">
           {vikunjaUrl}
@@ -129,8 +157,9 @@ export function ReauthView({
                   'disabled:cursor-not-allowed disabled:opacity-50'
                 )}
               >
-                {loading ? 'Waiting for sign-in...' : providerName ? `Sign in with ${providerName}` : 'Sign in with SSO'}
+                {loading ? t('reauth.waitingForSignIn') : providerName ? t('reauth.signInWith', { provider: providerName }) : t('reauth.signInWithSso')}
               </button>
+              {!web && (
               <button
                 type="button"
                 onClick={() => {
@@ -140,12 +169,13 @@ export function ReauthView({
                 disabled={loading}
                 className="w-full text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] disabled:opacity-50"
               >
-                Uses a passkey? Sign in through your browser
+                {t('reauth.passkeyBrowser')}
               </button>
+              )}
             </>
           )}
 
-          {authMethod === 'oidc' && !needsOidcTotp && oidcMode === 'browser' && (
+          {authMethod === 'oidc' && !web && !needsOidcTotp && oidcMode === 'browser' && (
             <>
               <BrowserSignIn
                 providerName={providerName}
@@ -165,7 +195,7 @@ export function ReauthView({
                 }}
                 className="w-full text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
               >
-                Sign in in Vicu's window instead
+                {t('reauth.useWindow')}
               </button>
             </>
           )}
@@ -174,7 +204,7 @@ export function ReauthView({
             <>
               <div>
                 <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">
-                  Two-Factor Code
+                  {t('reauth.twoFactorCode')}
                 </label>
                 <input
                   type="text"
@@ -190,7 +220,7 @@ export function ReauthView({
                   }}
                 />
                 <p className="mt-1.5 text-xs text-[var(--text-secondary)]">
-                  Enter the 6-digit code from your authenticator app, then complete SSO once more.
+                  {t('reauth.totpHintSso')}
                 </p>
               </div>
 
@@ -204,7 +234,7 @@ export function ReauthView({
                   'disabled:cursor-not-allowed disabled:opacity-50'
                 )}
               >
-                {loading ? 'Waiting for sign-in...' : 'Continue with SSO'}
+                {loading ? t('reauth.waitingForSignIn') : t('reauth.continueWithSso')}
               </button>
 
               {loading && oidcMode === 'browser' && (
@@ -213,7 +243,7 @@ export function ReauthView({
                   onClick={() => api.cancelOidcBrowserLogin()}
                   className="w-full text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                 >
-                  Cancel
+                  {t('reauth.cancel')}
                 </button>
               )}
 
@@ -227,7 +257,7 @@ export function ReauthView({
                 }}
                 className="w-full text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
               >
-                Back
+                {t('reauth.back')}
               </button>
             </>
           )}
@@ -236,13 +266,13 @@ export function ReauthView({
             <>
               <div>
                 <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">
-                  Username or Email
+                  {t('reauth.usernameOrEmail')}
                 </label>
                 <input
                   type="text"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  placeholder="Enter your username or email"
+                  placeholder={t('reauth.usernamePlaceholder')}
                   autoComplete="username"
                   className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-text-secondary/50"
                   onKeyDown={(e) => {
@@ -253,14 +283,14 @@ export function ReauthView({
 
               <div>
                 <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">
-                  Password
+                  {t('reauth.password')}
                 </label>
                 <div className="relative">
                   <input
                     type={showPassword ? 'text' : 'password'}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Enter your password"
+                    placeholder={t('reauth.passwordPlaceholder')}
                     autoComplete="current-password"
                     className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2 pr-16 text-sm text-[var(--text-primary)] placeholder:text-text-secondary/50"
                     onKeyDown={(e) => {
@@ -272,7 +302,7 @@ export function ReauthView({
                     onClick={() => setShowPassword(!showPassword)}
                     className="absolute right-2 top-1/2 -translate-y-1/2 rounded-control px-2 py-0.5 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                   >
-                    {showPassword ? 'Hide' : 'Show'}
+                    {showPassword ? t('reauth.hide') : t('reauth.show')}
                   </button>
                 </div>
               </div>
@@ -287,7 +317,7 @@ export function ReauthView({
                   'disabled:cursor-not-allowed disabled:opacity-50'
                 )}
               >
-                {loading ? 'Signing in...' : 'Sign In'}
+                {loading ? t('reauth.signingIn') : t('reauth.signIn')}
               </button>
             </>
           )}
@@ -296,7 +326,7 @@ export function ReauthView({
             <>
               <div>
                 <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">
-                  Two-Factor Code
+                  {t('reauth.twoFactorCode')}
                 </label>
                 <input
                   type="text"
@@ -311,7 +341,7 @@ export function ReauthView({
                   }}
                 />
                 <p className="mt-1.5 text-xs text-[var(--text-secondary)]">
-                  Enter the 6-digit code from your authenticator app.
+                  {t('reauth.totpHint')}
                 </p>
               </div>
 
@@ -325,7 +355,7 @@ export function ReauthView({
                   'disabled:cursor-not-allowed disabled:opacity-50'
                 )}
               >
-                {loading ? 'Verifying...' : 'Verify'}
+                {loading ? t('reauth.verifying') : t('reauth.verify')}
               </button>
 
               <button
@@ -337,7 +367,7 @@ export function ReauthView({
                 }}
                 className="w-full text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
               >
-                Back
+                {t('reauth.back')}
               </button>
             </>
           )}
@@ -351,7 +381,7 @@ export function ReauthView({
             onClick={onSwitchAccount}
             className="w-full text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
           >
-            Use a different account
+            {t('reauth.differentAccount')}
           </button>
         </div>
       </div>

@@ -8,8 +8,10 @@ import { toLocalDate } from '../../../shared/due-dates'
 import { templateDueDate, type ListedTemplate } from '../../../shared/task-templates'
 import { Menu, MenuItem } from '../overlay/Menu'
 import { Popover } from '../overlay/Popover'
+import { useTranslation } from 'react-i18next'
 
 function TemplateRow({ template, onUse, onClose }: { template: ListedTemplate; onUse: () => void; onClose: () => void }) {
+  const { t } = useTranslation()
   const arrow = useRef<HTMLButtonElement>(null)
   const [menuOpen, setMenuOpen] = useState(false)
   const openEdit = useTemplateEditStore((state) => state.open)
@@ -19,7 +21,7 @@ function TemplateRow({ template, onUse, onClose }: { template: ListedTemplate; o
   const count = template.subtasks?.length ?? 0
   const details = [
     dueDate ? formatDateChip(new Date(dueDate), !template.due?.time, new Date(), dateFormat) : null,
-    count ? `${count} subtask${count === 1 ? '' : 's'}` : null,
+    count ? t('task.template.subtaskCount', { count }) : null,
   ].filter(Boolean).join(', ')
   return (
     <div className="group flex items-center rounded-control hover:bg-[var(--bg-hover)] focus-within:bg-[var(--bg-hover)]">
@@ -30,7 +32,7 @@ function TemplateRow({ template, onUse, onClose }: { template: ListedTemplate; o
       <button
         ref={arrow}
         type="button"
-        aria-label={`Edit or remove ${template.title}`}
+        aria-label={t('task.template.editOrRemove', { title: template.title })}
         aria-haspopup="menu"
         aria-expanded={menuOpen}
         onClick={() => setMenuOpen((open) => !open)}
@@ -40,8 +42,8 @@ function TemplateRow({ template, onUse, onClose }: { template: ListedTemplate; o
       </button>
       {menuOpen && (
         <Menu anchorRef={arrow} onClose={() => setMenuOpen(false)} label={template.title}>
-          <MenuItem icon={<Pencil />} onSelect={() => { onClose(); openEdit(template.id) }}>Edit</MenuItem>
-          <MenuItem icon={<Trash2 />} onSelect={() => { void remove(template) }}>Remove</MenuItem>
+          <MenuItem icon={<Pencil />} onSelect={() => { onClose(); openEdit(template.id) }}>{t('task.template.editItem')}</MenuItem>
+          <MenuItem icon={<Trash2 />} onSelect={() => { void remove(template) }}>{t('task.template.remove')}</MenuItem>
         </Menu>
       )}
     </div>
@@ -55,10 +57,11 @@ export function TemplatePickerPopover({ anchorRef, fallbackProjectId, onUsed, on
   onUsed: () => void
   onClose: () => void
 }) {
+  const { t } = useTranslation()
   const templates = useTaskTemplates()
   const { make } = useTemplateActions()
   return (
-    <Popover anchorRef={anchorRef} label="Templates" onClose={onClose} className="max-h-80 w-64 overflow-y-auto p-1">
+    <Popover anchorRef={anchorRef} label={t('task.template.title')} onClose={onClose} className="max-h-80 w-64 overflow-y-auto p-1">
       {templates.map((template) => (
         <TemplateRow
           key={template.id}

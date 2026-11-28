@@ -1,5 +1,7 @@
 import * as chrono from 'chrono-node'
-import { nextWeekStart, startOfLocalDay, toLocalDate } from '../due-dates'
+import { inNextWeek, nextWeekDay, startOfLocalDay, toLocalDate } from '../due-dates'
+import { getWeekStart, type WeekStart } from '../../../shared/week-start'
+import { eveningTime, getTimesOfDay, isReadableTimeName, type TimeOfDay } from '../../../shared/when-choices'
 import type { ParsedToken } from './types'
 
 /**
@@ -28,8 +30,15 @@ import type { ParsedToken } from './types'
  * - a day and month that are today stay today when the time typed with them has passed ("oct 7 at
  *   9am" at 10:30 on 7 October), instead of moving to next year;
  * - an amount of time is a date only right after `in` (chrono also reads "call 30m", "rest 3 days",
- *   "for 3 months" and "plan the week" as that long from now); sections 5.1 and 5.4.
+ *   "for 3 months" and "plan the week" as that long from now); sections 5.1 and 5.4;
+ * - the times of day are the account's (section 5.6): a name after a date is its time ("tomorrow
+ *   morning"), `at <name>` is a time, `this <name>` and `tonight` are today at that time, and a name
+ *   on its own is a word of the title. chrono's own words (morning, noon, tonight, midnight, ...)
+ *   are never read.
  */
+
+/** A weekday phrase that means the following week: "next friday", "on next fri", "friday next week". */
+const NEXT_WEEKDAY_RE = /^(?:on\s+)?next\b|\bnext\s+week\b/i
 
 export interface ExtractDateOptions {
   /** "Now" for relative phrases. Defaults to the current time. */
@@ -47,6 +56,10 @@ export interface ExtractDateOptions {
    * text is nothing but a date; in a task's text those words are the title (section 5.1).
    */
   bareAmounts?: boolean
+  /** The day weeks start on: which week `next week` and `next friday` mean (section 2.1). Defaults to the account's. */
+  weekStart?: WeekStart
+  /** The account's times of day: their names are time words (section 5.6). Defaults to the account's. */
+  timesOfDay?: readonly TimeOfDay[]
 }
 
 /** The locale of the running app: the renderer's, falling back to en-US (tests, main process). */
@@ -106,22 +119,103 @@ export function extractDate(
   // chrono reads a copy in which consumed text and range words are marks instead: a date phrase
   // never continues across text another extractor took ("tomorrow @home 3pm"), and "friday to
   // sunday" is two dates, not a range.
-  const marked = markRangeWords(markRegions(working, consumed))
+  // The times of day (section 5.6) are read here, not by chrono: chrono sees its own time words and
+  // the names as marks, so "tomorrow noon" is no date at noon unless Noon is a time of day.
+  const timesOfDay = options.timesOfDay ?? getTimesOfDay()
+  const names = findTimeNames(working, consumed, timesOfDay)
+  const timeWords = [...names, ...findCasualTimeWords(working)]
+  const marked = markRangeWords(markRegions(working, [...consumed, ...timeWords]))
   const chronoText = options.bareAmounts ? marked : markBareAmounts(marked)
   const parser = chronoFor(isDayFirstLocale(options.locale ?? systemLocale()), working)
 
   const results = parser.parse(chronoText, reference, chronoOptions)
 
-  // Use the first result that isn't a standalone "now": chrono treats "now" as the current
+  // Use the first phrase that isn't a standalone "now": chrono treats "now" as the current
   // time, but a casual "do this now" must not get a due date.
-  const usable = (r: (typeof results)[number]): boolean =>
-    r.text.trim().toLowerCase() !== 'now' && !(options.skipTimeOnly && namesNoDate(r.start))
+  const phrases = timePhrases(results.filter((r) => r.text.trim().toLowerCase() !== 'now'), names, working)
+  const usable = (p: TimePhrase): boolean => {
+    if (!p.result && p.name?.kind === 'bare') return false
+    if (!options.skipTimeOnly) return true
+    return p.result ? !namesNoDate(p.result.start) || p.name !== undefined : p.name?.kind !== 'at'
+  }
   const prefer = options.prefer
-  const result =
-    (prefer && results.find((r) => usable(r) && r.index < prefer.end && r.index + r.text.length > prefer.start)) ||
-    results.find(usable)
-  if (!result) return none
+  const chosen =
+    (prefer && phrases.find((p) => usable(p) && p.start < prefer.end && p.end > prefer.start)) ||
+    phrases.find(usable)
+  if (!chosen) return none
 
+  const weekStart = options.weekStart ?? getWeekStart()
+  let dueDate: Date
+  let hasTime: boolean
+  const result = chosen.result
+  if (result) {
+    const read = dateOfResult(result, parser, chronoText, reference, weekStart)
+    dueDate = read.dueDate
+    hasTime = read.hasTime
+    if (chosen.name) {
+      // A date and a time of day's name: that day at that time. A bare or `this` weekday that is
+      // today moves to next week when the time has passed, as "friday 9am" does.
+      dueDate = atClock(dueDate, chosen.name.time)
+      hasTime = true
+      if (result.start.isCertain('weekday') && !result.start.isCertain('day') && !NEXT_WEEKDAY_RE.test(result.text) && dueDate < reference && sameDay(dueDate, reference)) {
+        dueDate = new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate() + 7, dueDate.getHours(), dueDate.getMinutes(), 0, 0)
+      }
+    }
+  } else {
+    // `this <name>` and `tonight` are today at that time, passed or not; `at <name>` alone is the
+    // next time the clock shows it, as "at 3pm" is.
+    const name = chosen.name!
+    dueDate = atClock(reference, name.time)
+    hasTime = true
+    if (name.kind === 'at' && dueDate <= reference) {
+      dueDate = new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate() + 1, dueDate.getHours(), dueDate.getMinutes(), 0, 0)
+    }
+  }
+
+  const span = chosen
+  let start = span.start
+  const end = span.end
+
+  // Connector words directly before the date go with it: "report by friday", "taxes due tomorrow",
+  // and `at` with a time ("call at 9am"). Only after a space, as on Android ("Meet (on friday)"
+  // keeps "(on"), and never across text another extractor took ("pay rent by @money friday"
+  // keeps "by").
+  const startsWithTime = !chosen.name && hasTime && /^(?:\d|noon\b|midnight\b)/i.test(working.slice(start, end))
+  const connectors = startsWithTime ? 'on|by|due|at' : 'on|by|due'
+  const connectorMatch = new RegExp(`(?:^|\\s)((?:(?:${connectors})\\s+)+)$`, 'i').exec(working.slice(0, start))
+  if (connectorMatch) {
+    const extended = start - connectorMatch[1].length
+    if (!consumed.some((c) => extended < c.end && end > c.start)) start = extended
+  }
+
+  // Verify the matched region doesn't overlap with already-consumed regions
+  if (consumed.some((c) => start < c.end && end > c.start)) return none
+
+  // Hidden words inside the phrase ("tomorrow for 1h at 9am") are not part of it, so it can be two
+  // pieces: tokens never overlap, and the words are the title's unless the caller takes them.
+  for (const piece of withoutHidden({ start, end }, options.hidden ?? [], input)) {
+    consumed.push(piece)
+    tokens.push({
+      type: 'date',
+      start: piece.start,
+      end: piece.end,
+      value: dueDate,
+      raw: input.slice(piece.start, piece.end),
+    })
+  }
+
+  return { dueDate, hasTime, tokens }
+}
+
+/** The date a chrono result names, with the contract's rules over chrono's (section 5.1). */
+function dateOfResult(
+  result: chrono.ParsedResult,
+  parser: chrono.Chrono,
+  chronoText: string,
+  reference: Date,
+  weekStart: WeekStart,
+): { dueDate: Date; hasTime: boolean } {
+  const chronoOptions = { forwardDate: true }
   const hasTime = result.start.isCertain('hour')
   let dueDate = result.start.date()
 
@@ -153,45 +247,120 @@ export function extractDate(
     )
   }
 
-  // "next week" is the Monday of the following week (chrono says "in 7 days").
+  // "next week" is the Monday in the following week (chrono says "in 7 days").
   if (/^next\s+week\b/i.test(result.text) && !result.start.isCertain('weekday')) {
-    const [y, m, d] = nextWeekStart(toLocalDate(reference)).split('-').map(Number)
+    const [y, m, d] = nextWeekDay(toLocalDate(reference), weekStart).split('-').map(Number)
     dueDate = new Date(y, m - 1, d, dueDate.getHours(), dueDate.getMinutes(), dueDate.getSeconds(), 0)
   }
 
-  const span = phraseSpan(result)
-  let start = span.start
-  const end = span.end
-
-  // Connector words directly before the date go with it: "report by friday", "taxes due tomorrow",
-  // and `at` with a time ("call at 9am"). Only after a space, as on Android ("Meet (on friday)"
-  // keeps "(on"), and never across text another extractor took ("pay rent by @money friday"
-  // keeps "by").
-  const startsWithTime = hasTime && /^(?:\d|noon\b|midnight\b)/i.test(working.slice(start, end))
-  const connectors = startsWithTime ? 'on|by|due|at' : 'on|by|due'
-  const connectorMatch = new RegExp(`(?:^|\\s)((?:(?:${connectors})\\s+)+)$`, 'i').exec(working.slice(0, start))
-  if (connectorMatch) {
-    const extended = start - connectorMatch[1].length
-    if (!consumed.some((c) => extended < c.end && end > c.start)) start = extended
+  // "next friday" and "friday next week" are that weekday in the following week. chrono counts
+  // Monday weeks, which is the contract's rule for a Monday week start; any other week start
+  // (section 2.1) is counted here.
+  if (weekStart !== 'monday' && result.start.isCertain('weekday') && NEXT_WEEKDAY_RE.test(result.text)) {
+    const weekday = result.start.get('weekday')
+    if (typeof weekday === 'number') {
+      const [y, m, d] = inNextWeek(toLocalDate(reference), weekday === 0 ? 7 : weekday, weekStart).split('-').map(Number)
+      dueDate = new Date(y, m - 1, d, dueDate.getHours(), dueDate.getMinutes(), dueDate.getSeconds(), 0)
+    }
   }
 
-  // Verify the matched region doesn't overlap with already-consumed regions
-  if (consumed.some((c) => start < c.end && end > c.start)) return none
+  return { dueDate, hasTime }
+}
 
-  // Hidden words inside the phrase ("tomorrow for 1h at 9am") are not part of it, so it can be two
-  // pieces: tokens never overlap, and the words are the title's unless the caller takes them.
-  for (const piece of withoutHidden({ start, end }, options.hidden ?? [], input)) {
-    consumed.push(piece)
-    tokens.push({
-      type: 'date',
-      start: piece.start,
-      end: piece.end,
-      value: dueDate,
-      raw: input.slice(piece.start, piece.end),
-    })
+// --- Times of day (section 5.6) -----------------------------------------------------------------
+
+/** A time of day's name in the text: bare ("morning"), after `at`, after `this`, or `tonight`. */
+interface TimeName {
+  start: number
+  end: number
+  kind: 'bare' | 'at' | 'this' | 'tonight'
+  /** "HH:mm". */
+  time: string
+}
+
+/** A date phrase: a chrono result, a time of day's name, or a result and the name with it. */
+interface TimePhrase {
+  start: number
+  end: number
+  result?: chrono.ParsedResult
+  name?: TimeName
+}
+
+const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+/**
+ * The names of the times of day in `working`, longest names first where two overlap, and `tonight`
+ * while there is an evening time. Text another extractor took is never part of one.
+ */
+function findTimeNames(working: string, consumed: ReadonlyArray<{ start: number; end: number }>, times: readonly TimeOfDay[]): TimeName[] {
+  const found: TimeName[] = []
+  const readable = times.filter((t) => isReadableTimeName(t.name)).sort((a, b) => b.name.length - a.name.length)
+  for (const { name, time } of readable) {
+    const words = name.split(' ').map(escapeRegExp).join('\\s+')
+    const re = new RegExp(`(?<![\\p{L}\\p{N}_])(?:(at|this)\\s+)?${words}(?![\\p{L}\\p{N}_])`, 'giu')
+    for (const m of working.matchAll(re)) {
+      const kind = (m[1]?.toLowerCase() as 'at' | 'this' | undefined) ?? 'bare'
+      found.push({ start: m.index!, end: m.index! + m[0].length, kind, time })
+    }
   }
+  const evening = eveningTime(times)
+  if (evening) {
+    for (const m of working.matchAll(/\btonight\b/gi)) found.push({ start: m.index!, end: m.index! + m[0].length, kind: 'tonight', time: evening })
+  }
+  // Left to right; where two overlap the earlier (then the longer) one wins.
+  found.sort((a, b) => a.start - b.start || b.end - a.end)
+  const kept: TimeName[] = []
+  for (const name of found) {
+    if (consumed.some((c) => name.start < c.end && name.end > c.start)) continue
+    const last = kept[kept.length - 1]
+    if (last && name.start < last.end) continue
+    kept.push(name)
+  }
+  return kept
+}
 
-  return { dueDate, hasTime, tokens }
+// chrono's own time words: no date and no time in the contract unless a time of day is so named.
+const CASUAL_TIME_RE = /\b(?:morning|afternoon|evening|night|tonight|noon|midday|midnight)\b/gi
+
+function findCasualTimeWords(working: string): Array<{ start: number; end: number }> {
+  return [...working.matchAll(CASUAL_TIME_RE)].map((m) => ({ start: m.index!, end: m.index! + m[0].length }))
+}
+
+/**
+ * The phrases in text order: a date with a name right after it ("tomorrow morning", "friday at
+ * noon") is one phrase, as is `at <name>` right before a date ("at noon tomorrow"). A date that
+ * already has a time keeps it, and its name is a word of the title.
+ */
+function timePhrases(results: chrono.ParsedResult[], names: TimeName[], working: string): TimePhrase[] {
+  const items: TimePhrase[] = [
+    ...results.map((result) => ({ ...phraseSpan(result), result })),
+    ...names.map((name) => ({ start: name.start, end: name.end, name })),
+  ].sort((a, b) => a.start - b.start)
+  const phrases: TimePhrase[] = []
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i]
+    const next = items[i + 1]
+    const takesTime = (r: chrono.ParsedResult) => !namesNoDate(r.start) && !r.start.isCertain('hour')
+    if (next && item.result && next.name && (next.name.kind === 'bare' || next.name.kind === 'at') && takesTime(item.result) && /^[\s,]*$/.test(working.slice(item.end, next.start))) {
+      phrases.push({ start: item.start, end: next.end, result: item.result, name: next.name })
+      i++
+    } else if (next && item.name?.kind === 'at' && next.result && takesTime(next.result) && /^[\s,]*(?:on[\s,]+)?$/i.test(working.slice(item.end, next.start))) {
+      phrases.push({ start: item.start, end: next.end, result: next.result, name: item.name })
+      i++
+    } else {
+      phrases.push(item)
+    }
+  }
+  return phrases
+}
+
+/** `day`'s local date at the clock time "HH:mm". */
+function atClock(day: Date, time: string): Date {
+  return new Date(day.getFullYear(), day.getMonth(), day.getDate(), Number(time.slice(0, 2)), Number(time.slice(3, 5)), 0, 0)
+}
+
+function sameDay(a: Date, b: Date): boolean {
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
 }
 
 /** `span` without the hidden regions and the spaces next to them. */

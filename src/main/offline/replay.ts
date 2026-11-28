@@ -6,7 +6,8 @@ import type {
 } from '../../shared/offline-queue-types'
 import type { ApiResult } from '../api-result'
 import { isQueueableFailure } from '../../shared/error-classify'
-import { classifyReplayFailure } from './classify'
+import { classifyReplayFailure, refusedWhileSignedIn, type ReplayDecision } from './classify'
+import { planTaskUpdate } from './notes-save-step'
 import { createFields, type OfflineQueue } from './queue'
 import { hasTaskId, type QueuedAction } from './types'
 
@@ -28,6 +29,8 @@ export interface ReplayApi {
    */
   findRecentCreate(projectId: number, fields: Record<string, unknown>, since: string): Promise<ApiResult<{ id: number } | null>>
   addTaskAssignee(taskId: number, userId: number): Promise<ApiResult<unknown>>
+  createTaskRelation(taskId: number, otherTaskId: number, kind: string): Promise<ApiResult<unknown>>
+  deleteTaskRelation(taskId: number, kind: string, otherTaskId: number): Promise<ApiResult<unknown>>
   removeTaskAssignee(taskId: number, userId: number): Promise<ApiResult<unknown>>
   createTaskComment(taskId: number, html: string): Promise<ApiResult<unknown>>
   updateTaskComment(taskId: number, commentId: number, html: string): Promise<ApiResult<unknown>>
@@ -37,6 +40,11 @@ export interface ReplayApi {
    * created since `since`. Null when there is none.
    */
   findRecentComment(taskId: number, html: string, since: string): Promise<ApiResult<{ id: number } | null>>
+  /**
+   * Whether the saved session or token still works (one project read). Asked when a change is
+   * answered 403: `works` means only that change was refused (C-2). Without it a 403 stops the replay.
+   */
+  connectionState?(): Promise<'works' | 'refused' | 'unknown'>
 }
 
 /** Replays that stop on the same action with an error that is neither network nor auth, before it is moved to the failed log. */
@@ -46,21 +54,42 @@ export const MAX_UNKNOWN_ATTEMPTS = 5
 const imageToken = (attachmentId: number): string => `[[image:${attachmentId}]]`
 
 type Step =
-  | { kind: 'ok'; realId?: number; /** An earlier, unconfirmed attempt had already created the task. */ adopted?: boolean }
+  | {
+      kind: 'ok'
+      realId?: number
+      /** An earlier, unconfirmed attempt had already created the task. */
+      adopted?: boolean
+      /** The task whose notes went out with both versions (another device changed them too). */
+      notesMerged?: number
+    }
   | { kind: 'failure'; failure: FailureLike }
   /** Removed from the queue while the replay was preparing its request: nothing was sent. */
   | { kind: 'cancelled' }
   /** Can never be sent (its task was never created, its image file is gone). */
   | { kind: 'broken'; reason: OfflineFailureReason; error: string }
 
-const fail = (result: { error: string; statusCode?: number; tokenPermission?: boolean }): Step => ({
+const fail = (result: { error: string; statusCode?: number; tokenPermission?: boolean; notApiResponse?: boolean }): Step => ({
   kind: 'failure',
   failure: {
     error: result.error,
     statusCode: result.statusCode,
     ...(result.tokenPermission ? { tokenPermission: true } : {}),
+    ...(result.notApiResponse ? { notApiResponse: true } : {}),
   },
 })
+
+/** `classifyReplayFailure`, plus the session check for a change answered 403 (C-2). */
+async function decideFailure(api: ReplayApi, failure: FailureLike, actionType: QueuedAction['type']): Promise<ReplayDecision> {
+  const decision = classifyReplayFailure(failure, actionType)
+  if (decision.kind !== 'stop' || decision.why !== 'auth' || failure.statusCode !== 403 || !api.connectionState) return decision
+  let connection: 'works' | 'refused' | 'unknown'
+  try {
+    connection = await api.connectionState()
+  } catch {
+    connection = 'unknown'
+  }
+  return refusedWhileSignedIn(failure, connection) ?? decision
+}
 
 /**
  * Replay the queue from the front, in order, against the server (D-SYNC-1, D-SYNC-4).
@@ -75,6 +104,7 @@ const fail = (result: { error: string; statusCode?: number; tokenPermission?: bo
  */
 export async function replayQueue(queue: OfflineQueue, api: ReplayApi): Promise<OfflineReplayEvent> {
   const idMap: Record<string, number> = {}
+  const notesMerged: number[] = []
   const startFailed = queue.counts().failed
   let applied = 0
   let stopped: OfflineReplayStop | null = null
@@ -100,6 +130,7 @@ export async function replayQueue(queue: OfflineQueue, api: ReplayApi): Promise<
         if (step.kind === 'ok') {
           await queue.completeAction(action.id, { realId: step.realId, adopted: step.adopted })
           if (action.type === 'create' && step.realId !== undefined) idMap[String(action.tempId)] = step.realId
+          if (step.notesMerged !== undefined && !notesMerged.includes(step.notesMerged)) notesMerged.push(step.notesMerged)
           applied++
           queue.setAuthProblem(null)
         } else if (step.kind === 'cancelled') {
@@ -107,7 +138,7 @@ export async function replayQueue(queue: OfflineQueue, api: ReplayApi): Promise<
         } else if (step.kind === 'broken') {
           await queue.failAction(action.id, { error: step.error, reason: step.reason })
         } else {
-          const decision = classifyReplayFailure(step.failure, action.type)
+          const decision = await decideFailure(api, step.failure, action.type)
           if (decision.kind === 'done') {
             await queue.completeAction(action.id)
             applied++
@@ -162,6 +193,7 @@ export async function replayQueue(queue: OfflineQueue, api: ReplayApi): Promise<
     ...(stopError ? { error: stopError } : {}),
     idMap,
     counts: queue.counts(),
+    ...(notesMerged.length > 0 ? { notesMerged } : {}),
   }
 }
 
@@ -208,8 +240,24 @@ async function sendAction(queue: OfflineQueue, api: ReplayApi, action: QueuedAct
 
   switch (action.type) {
     case 'update': {
-      const result = await api.updateTask(taskId, action.patch)
-      return result.success ? { kind: 'ok' } : fail(result)
+      // A queued completion of a repeating task goes out only while the server still holds the
+      // occurrence it completed (cross-app semantics 7.5); a queued notes edit keeps both versions
+      // when the server's notes changed since its base (description format, "Notes changed in two
+      // places"). A read that fails on the network waits like the change.
+      const plan = await planTaskUpdate(
+        action.patch,
+        {
+          ...(action.completedDue !== undefined ? { completedDue: action.completedDue } : {}),
+          ...(action.baseDescription !== undefined ? { baseDescription: action.baseDescription } : {}),
+        },
+        () => api.fetchTaskById(taskId)
+      )
+      if (plan.kind === 'failed') return fail(plan.failure)
+      if (plan.kind === 'answer') return { kind: 'ok' }
+      if (!queue.isQueued(action.id)) return { kind: 'cancelled' }
+      const result = await api.updateTask(taskId, plan.patch)
+      if (!result.success) return fail(result)
+      return plan.notesMerged ? { kind: 'ok', notesMerged: taskId } : { kind: 'ok' }
     }
     case 'delete': {
       const result = await api.deleteTask(taskId)
@@ -233,6 +281,17 @@ async function sendAction(queue: OfflineQueue, api: ReplayApi, action: QueuedAct
     }
     case 'upload-attachment':
       return sendUpload(queue, api, action, taskId)
+    case 'add-relation':
+    case 'remove-relation': {
+      // The other task was created offline and its create never made it: nothing to relate to.
+      if (action.otherTaskId < 0) {
+        return { kind: 'broken', reason: 'dependency-failed', error: 'The other task was never created' }
+      }
+      const result = action.type === 'add-relation'
+        ? await api.createTaskRelation(taskId, action.otherTaskId, action.kind)
+        : await api.deleteTaskRelation(taskId, action.kind, action.otherTaskId)
+      return result.success ? { kind: 'ok' } : fail(result)
+    }
     case 'add-assignee': {
       const result = await api.addTaskAssignee(taskId, action.userId)
       return result.success ? { kind: 'ok' } : fail(result)

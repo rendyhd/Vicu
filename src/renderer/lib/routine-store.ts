@@ -173,9 +173,12 @@ async function fetchParts(
   // Until the app knows who is signed in it cannot tell its own parts from someone else's in a
   // shared project (cross-app semantics 10.3), and a write must not guess.
   if (!me) throw new Error('Vicu could not confirm the signed-in account; try again when connected')
-  const scan = { filter: 'done = true', per_page: PAGE_SIZE }
+  // Flat: no subtask expansion, which makes every page of a long done history slow on Vikunja 2.8
+  // and earlier (rendyhd/Vicu#75), and nested subtasks kept, since a part is a part wherever it is.
+  const flat = { expand_subtasks: false, keep_nested_subtasks: true }
+  const scan = { filter: 'done = true', sort_by: 'id', order_by: 'asc', per_page: PAGE_SIZE, ...flat }
   // The search has no done filter: a part someone reopened in the web UI is still a part (10.4).
-  const listing = await api.fetchTasks(fullScan ? scan : { q: ROUTINE_ARCHIVE_SEARCH, per_page: PAGE_SIZE })
+  const listing = await api.fetchTasks(fullScan ? scan : { q: ROUTINE_ARCHIVE_SEARCH, per_page: PAGE_SIZE, ...flat })
   // The server answered the search with an error: the scan finds the parts without it.
   const brokenSearch = !fullScan && !listing.success && isBrokenSearch(listing)
   const tasks = unwrap(brokenSearch ? await api.fetchTasks(scan) : listing)

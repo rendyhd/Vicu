@@ -2,7 +2,7 @@
 
 This document defines the exact parser behavior that BOTH Vicu (desktop) and Vicu Android must implement identically. Both apps must produce the same `ParseResult` for the same input string and the same `ParserConfig`.
 
-The date and recurrence rules are the contract in `docs/cross-app-semantics-v1.md` section 5, and the test is the shared corpus `test-fixtures/nlp-corpus-v1.json` (154 cases, reference time Tue 2026-10-06 10:00 local; both apps run the same file). If this document and the corpus disagree, the corpus wins. The desktop implementation is `src/renderer/lib/task-parser/`: there is one parser (the main window, the task title editor and Quick Entry all call it), and the date work is done by chrono-node plus the rules below.
+The date and recurrence rules are the contract in `docs/cross-app-semantics-v1.md` section 5, and the test is the shared corpus `test-fixtures/nlp-corpus-v1.json` (241 cases, reference time Tue 2026-10-06 10:00 local; both apps run the same file). If this document and the corpus disagree, the corpus wins. The desktop implementation is `src/renderer/lib/task-parser/`: there is one parser (the main window, the task title editor and Quick Entry all call it), and the date work is done by chrono-node plus the rules below.
 
 ---
 
@@ -10,7 +10,8 @@ The date and recurrence rules are the contract in `docs/cross-app-semantics-v1.m
 
 ```typescript
 type SyntaxMode = 'todoist' | 'vikunja'
-type TokenType = 'date' | 'priority' | 'label' | 'project' | 'recurrence'
+type TokenType = 'date' | 'priority' | 'label' | 'project' | 'recurrence' | 'length' | 'place'
+  | 'person' | 'start' | 'estimate' | 'flag' | 'request'   // Pro only
 
 interface ParserConfig {
   enabled: boolean        // Master toggle — when false, parse() returns raw input as title, nothing extracted
@@ -18,6 +19,7 @@ interface ParserConfig {
   bangToday?: boolean     // The `!` -> today shortcut (setting "exclamation_today", default on)
   locale?: string         // Slash-date order; defaults to the device/system locale
   suppressTypes?: TokenType[]  // Token types the user dismissed: that extractor is skipped
+  pro?: boolean           // Pro's phrases (contract section 5.5); off unless true, and then nothing changes
 }
 
 const DEFAULT_PARSER_CONFIG: ParserConfig = {
@@ -46,6 +48,7 @@ When `enabled` is `false`:
 | **Recurrence** | `every X`, `daily`, `weekly` (identical) | `every X`, `daily`, `weekly` (identical) |
 | **`!` today shortcut** | `!` alone → today | `!` alone → today |
 | **Autocomplete triggers** | `#` projects, `@` labels | `+` projects, `*` labels |
+| **People (Pro)** | `$name` or `$"multi word"` | `$name` or `$"multi word"` |
 
 ### Why two modes?
 
@@ -93,6 +96,16 @@ interface ParseResult {
     place: { id: string; name: string }
     trigger: 'arrive' | 'leave'
   } | null
+  // Pro (contract section 5.5), only with config.pro; otherwise null / false
+  person: { id: number; mine: boolean }        // "Jan:" or "$Jan" (theirs), "for Jan:" or "for $Jan" (mine)
+    | { id: null; name: string; mine: boolean }  // "$Lalith" naming nobody yet: a new person, made on save
+    | null
+  requester: { id: number } | { id: null; name: string } | null  // "$Jan site list for $Priya": who it was promised to
+  checkOn: string | null     // "check on 3 feb" with a person: the local day to look at the promise (YYYY-MM-DD)
+  start: Date | null         // "starts monday": a start date, local midnight without a time
+  estimate: number | null    // "~1h30": minutes
+  flag: boolean              // "!flag"
+  request: boolean           // "req:" at the start
   rawInput: string           // Original input for debugging
   tokens: ParsedToken[]      // All detected tokens with positions (for highlighting)
 }
@@ -115,7 +128,8 @@ export function parse(
   input: string,
   config: ParserConfig = DEFAULT_PARSER_CONFIG,
   reference: Date = new Date(),  // "now": relative dates and the `!` shortcut; tests pass the corpus reference
-  places: { id: string; name: string }[] = []   // saved places a place phrase may name; none reads no place
+  places: { id: string; name: string }[] = [],  // saved places a place phrase may name; none reads no place
+  people: { id: number; title: string; aliases?: string[] }[] = []  // Pro's people "Jan:" and "$Jan" may name
 ): ParseResult
 ```
 
@@ -203,11 +217,13 @@ function buildPriorityPatterns(mode: SyntaxMode): Array<{ regex: RegExp; value: 
 
 The parser MUST extract tokens in this exact order:
 
+0. **Pro** (only with `config.pro`, contract section 5.5): `req:` at the start, then a person's `Jan:` / `for Jan:` at the start (else two `$` phrases of which exactly one follows `for`: the owner and who it was promised to; else the first `$Jan` / `for $Jan`), then `!flag`, then `~1h30`
 0. **Place** ("when I get home" for a saved place, contract section 5.3) — only when places are passed
 1. **Labels** (prefix-based: `@` or `*`) — extract and remove first
 2. **Projects** (prefix-based: `#` or `+`) — extract and remove
 3. **Priority** (mode-dependent short form + shared word form) — extract and remove
 4. **Recurrence** (`every ...`, `daily`, `weekly`, etc.) — extract and remove
+5. **Start date** (Pro only): `starts` and the date phrase right after it, read by the date rules and never as the due date. Then, only when a person was read, **check date**: `check on` and the date phrase right after it, kept as a local day and never as the due date
 5. **Dates** (the date rules below on the remaining text) — extract and remove
 6. **`!` today shortcut** — on the title that is left, when no date was found
 7. **Title** — everything remaining, trimmed and collapsed whitespace
@@ -234,12 +250,19 @@ Contract: `docs/cross-app-semantics-v1.md` section 5.1; corpus: `test-fixtures/n
 ### Weekdays
 
 - A bare weekday or `this <weekday>` is the next occurrence on or after today (today included). A date-only phrase is judged against the start of the day, so "tuesday" typed on a Tuesday afternoon is today, not next week.
-- `next <weekday>` is that weekday in the following Monday-start week (Tue 2026-10-06: `next friday` = 2026-10-16; Sun 2026-10-04: `next monday` = 2026-10-05).
+- `next <weekday>` is that weekday in the following week: a Monday-start week, or the account's week start (contract section 2.1; a corpus case's `weekStart`). Tue 2026-10-06: `next friday` = 2026-10-16; Sun 2026-10-04: `next monday` = 2026-10-05; with weeks that start on Sunday, Tue 2026-10-06: `next sunday` = 2026-10-11. chrono counts Monday weeks, so any other week start is counted in `extract-dates.ts` (`inNextWeek`).
 - `<weekday> this week` and `<weekday> next week` are one phrase, the same as `this <weekday>` and `next <weekday>` ("Meet friday next week" is 2026-10-16). chrono reads them that way itself.
-- `next week` is the Monday of the following week (chrono itself says "in 7 days"; do not use that). `next month` is the same day next month.
+- `next week` is the Monday in the following week, counted by the week start (`nextWeekDay`; chrono itself says "in 7 days"; do not use that). `next month` is the same day next month.
 - **Three-letter abbreviations** (`mon`, `tue`, `tues`, `wed`, `thu`, `thur`, `thurs`, `fri`, `sat`, `sun`) only count as dates when the previous word is `on`, `next`, `this`, `by` or `due`, or when a time follows (`mon 9am`, `wed at 3pm`, `fri 14:00`). Otherwise they are plain words: "Buy sun cream", "Notes we sat on" and "Plan wed anniversary" have no date. Full weekday names always count.
 - `weekend` and `weekday` are words, not dates: "Plan the weekend" has no date. (chrono reads them as Saturday and the next working day; desktop blanks them before chrono runs.)
 - An amount of time is a date only right after `in`. "Call 30m", "Rest 3 days", "Plan the week", "Renew within 3 days" and "Review 3 days from now" keep their words and have no date. (chrono reads them all as that long from now; desktop marks them before chrono runs, so they also keep two date phrases apart. The When field is the exception on desktop: typed text there is nothing but a date, so "3 days" means that.)
+
+### Times of day
+
+- The account's times of day (contract sections 5.6 and 23.1; Morning 09:00, Noon 12:00, Afternoon 15:00 and Evening 18:00 by default, a corpus case's `times`) are time words. A name right after a date is its time ("Gym tomorrow morning" is tomorrow at 09:00; "Lunch friday at noon"), `at <name>` is a time like `at 3pm` ("Call at noon", "at noon tomorrow"), `this <name>` is today at that time even when it has passed, and `tonight` is today at the evening time. A bare or `this` weekday that is today moves to next week when the time has passed ("Tuesday morning standup" at 10:00 on a Tuesday).
+- A name on its own ("Morning run"), before a date ("Call MORNING tomorrow") or after a phrase that has a time ("Call tomorrow 3pm evening") is a word of the title. A name that is a date word of section 5.1 is never read.
+- chrono's own words (`morning`, `afternoon`, `evening`, `night`, `tonight`, `noon`, `midday`, `midnight`) are never read by chrono: desktop marks them and the names before chrono runs and reads the names itself (`findTimeNames`, `timePhrases` in `extract-dates.ts`), so "Read at midnight" has no date and "Lunch tomorrow noon" without a Noon is date-only.
+- The times come from `getTimesOfDay` (`src/shared/when-choices.ts`), which `useWhenChoices` and the Quick Entry window's config keep in step with the synced setting.
 
 ### Words that are not dates
 
@@ -270,6 +293,19 @@ text also has a time of day. Contract section 5.4 has the rules; the corpus pins
 label, project or priority, a length does not split a date phrase: "Call tomorrow for 1h at 9am" is
 tomorrow at 09:00. chrono reads `for 30m` as 30 minutes from now and `for 3 months` as a date, so
 desktop blanks these words before chrono runs.
+
+### Pro phrases
+
+Only with `config.pro` (contract section 5.5; the corpus cases marked `"pro": true`, parsed with the
+corpus `people`). A person's name and a colon at the very start (`Jan: send the plan`, `for Priya:
+review`) names a known person by contract section 21.5; an unknown or ambiguous name stays. In both
+syntax modes `$` names a person anywhere (`$Lalith`, `$"Jan de Vries"`, `for $Priya` for your promise
+to them; a `:` right after the name goes with it): a known person by 21.5, an ambiguous name stays,
+and any other name is a new person (`{ id: null, name }`) that the app makes when the task is saved.
+`$50` is not a person. Only the first `$` phrase is read, and none after a `Jan:` prefix. `starts`
+and a date phrase is a start date; a block made by `for 30m` wins over it. `~10m`, `~1h30` are
+estimates; `!flag` flags; `req:` at the start marks a request. With Pro off all of these stay in the
+title, exactly as before.
 
 ### Slash dates
 
@@ -454,6 +490,8 @@ interface VikunjaTaskPayload {
 |------|------------------------------|---------------------------|
 | Todoist | typing `#` | typing `@` |
 | Vikunja | typing `+` | typing `*` |
+
+With Pro's promises on, typing `$` opens the people in both modes.
 
 ---
 

@@ -1,4 +1,5 @@
 import { useId, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Dialog } from '@/components/overlay/Dialog'
 import { Button } from '@/components/shared/Button'
 import { useAppConfig } from '@/hooks/use-app-config'
@@ -19,6 +20,7 @@ function ReviewCadenceDialog({
   returnFocusTo: HTMLElement | null
   onClose: () => void
 }) {
+  const { t } = useTranslation()
   const titleId = useId()
   const inputId = useId()
   const helpId = useId()
@@ -45,10 +47,10 @@ function ReviewCadenceDialog({
         }}
       >
         <h2 id={titleId} className="text-sm font-semibold text-[var(--text-primary)]">
-          Review cadence for “{project.title}”
+          {t('projects.cadence.title', { title: project.title })}
         </h2>
         <div>
-          <label htmlFor={inputId} className="mb-1 block text-xs text-[var(--text-secondary)]">Review every (days)</label>
+          <label htmlFor={inputId} className="mb-1 block text-xs text-[var(--text-secondary)]">{t('projects.cadence.every')}</label>
           <input
             id={inputId}
             type="number"
@@ -63,12 +65,12 @@ function ReviewCadenceDialog({
             className="w-24 rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-1.5 text-sm text-[var(--text-primary)]"
           />
           <p id={helpId} className={valid ? 'mt-1 text-xs text-[var(--text-secondary)]' : 'mt-1 text-xs text-danger'}>
-            {valid ? `Leave empty to use the default of ${defaultDays} days.` : 'Enter a number from 1 to 365.'}
+            {valid ? t('projects.cadence.help', { days: defaultDays }) : t('projects.cadence.invalid')}
           </p>
         </div>
         <div className="flex justify-end gap-2">
-          <Button variant="secondary" onClick={onClose}>Cancel</Button>
-          <Button variant="primary" type="submit" disabled={!valid}>Save</Button>
+          <Button variant="secondary" onClick={onClose}>{t('projects.cadence.cancel')}</Button>
+          <Button variant="primary" type="submit" disabled={!valid}>{t('projects.cadence.save')}</Button>
         </div>
       </form>
     </Dialog>
@@ -91,6 +93,7 @@ function CategoryNameDialog({
   onSubmit: (name: string) => void
   onClose: () => void
 }) {
+  const { t } = useTranslation()
   const titleId = useId()
   const inputId = useId()
   const errorId = useId()
@@ -118,7 +121,7 @@ function CategoryNameDialog({
       >
         <h2 id={titleId} className="text-sm font-semibold text-[var(--text-primary)]">{title}</h2>
         <div>
-          <label htmlFor={inputId} className="mb-1 block text-xs text-[var(--text-secondary)]">Name</label>
+          <label htmlFor={inputId} className="mb-1 block text-xs text-[var(--text-secondary)]">{t('projects.categoryDialog.name')}</label>
           <input
             id={inputId}
             value={name}
@@ -131,10 +134,10 @@ function CategoryNameDialog({
             data-autofocus
             className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-1.5 text-sm text-[var(--text-primary)]"
           />
-          {blank && <p id={errorId} className="mt-1 text-xs text-danger">Enter a name</p>}
+          {blank && <p id={errorId} className="mt-1 text-xs text-danger">{t('projects.categoryDialog.enterName')}</p>}
         </div>
         <div className="flex justify-end gap-2">
-          <Button variant="secondary" onClick={onClose}>Cancel</Button>
+          <Button variant="secondary" onClick={onClose}>{t('projects.categoryDialog.cancel')}</Button>
           <Button variant="primary" type="submit">{confirmLabel}</Button>
         </div>
       </form>
@@ -150,13 +153,14 @@ function CategoryDialog({
   dialog: Extract<ProjectDialogRequest, { kind: 'category-new' | 'category-rename' }>
   returnFocusTo: HTMLElement | null
 }) {
+  const { t } = useTranslation()
   const categories = useProjectCategoryActions()
   if (dialog.kind === 'category-rename') {
     return (
       <CategoryNameDialog
-        title="Rename category"
+        title={t('projects.categoryDialog.rename')}
         initialName={dialog.name}
-        confirmLabel="Save"
+        confirmLabel={t('projects.categoryDialog.save')}
         returnFocusTo={returnFocusTo}
         onSubmit={(name) => categories.rename(dialog.categoryId, name)}
         onClose={projectActions.closeDialog}
@@ -166,9 +170,9 @@ function CategoryDialog({
   const { project, above } = dialog
   return (
     <CategoryNameDialog
-      title="New category"
+      title={t('projects.categoryDialog.new')}
       initialName=""
-      confirmLabel="Create"
+      confirmLabel={t('projects.categoryDialog.create')}
       returnFocusTo={returnFocusTo}
       onSubmit={(name) => {
         if (above) void categories.addAbove(above, name)

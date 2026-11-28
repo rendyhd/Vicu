@@ -6,6 +6,7 @@ import {
   type ActiveNote,
   type ObsidianLinkDeps,
 } from '../obsidian-link'
+import { isAllowedNoteLink } from '../../shared/note-links'
 
 const VAULT = 'My Vault'
 
@@ -118,5 +119,19 @@ describe('resolveLinkForSave (the only place a uid is written)', () => {
     const ctx = shown()
     expect(await resolveLinkForSave(ctx, deps)).toBe(ctx)
     expect(deps.injectUid).not.toHaveBeenCalled()
+  })
+})
+
+describe('the links Vicu writes are the links it opens', () => {
+  it('passes the note link rule for a path and for a uid', () => {
+    for (const [vault, path, uid] of [
+      ['Personal', 'Tasks/Runbook.md', ''],
+      ['Work & Home', 'Projects/Q4 plan #2 (draft).md', ''],
+      ['', 'Inbox.md', ''],
+      ['Personal', 'Tasks/Runbook.md', '7f3c2a10-0b1e-4d6a-9c55-2f8e1d4b6a90'],
+      ['Wörk "vault"', 'a.md', 'id with spaces & <marks>'],
+    ] as const) {
+      expect(isAllowedNoteLink(buildObsidianDeepLink(vault, path, uid))).toBe(true)
+    }
   })
 })

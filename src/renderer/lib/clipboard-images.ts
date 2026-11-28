@@ -28,6 +28,16 @@ export function getClipboardImages(event: ClipboardEvent | React.ClipboardEvent)
   return out
 }
 
+/**
+ * Images pasted in a task title. Only a paste without text counts: Office apps (Word, Excel)
+ * put a picture of copied text next to the text, and that paste is the text.
+ */
+export function getTitlePasteImages(event: ClipboardEvent | React.ClipboardEvent): ClipboardImage[] {
+  const data = 'clipboardData' in event ? event.clipboardData : null
+  if (!data || data.getData('text/plain').trim()) return []
+  return getClipboardImages(event)
+}
+
 export async function fileToUint8Array(file: File): Promise<Uint8Array> {
   const buffer = await file.arrayBuffer()
   return new Uint8Array(buffer)

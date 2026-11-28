@@ -4,6 +4,7 @@ import { filterCustomList, type CustomListContext, type CustomListTask } from '.
 import { sortCustomListTasks, type CustomListSortable } from '../../shared/custom-list-sort'
 import { isUpcoming, toLocalDate } from '../../shared/due-dates'
 import { withoutNestedSubtasks } from '../../shared/nested-subtasks'
+import { passesWorkMode, type WorkMode, type WorkScope } from '../../shared/work-scope'
 import { blockStartsOn, type BlockFields } from '../../shared/time-blocks'
 
 export interface ResolvedViewerFilter {
@@ -98,6 +99,8 @@ export function selectViewerTasks<T extends CustomListTask>(
 export interface SelectQuickViewTasksOptions<T> extends SelectViewerTasksOptions {
   /** Extra conditions (archived projects, hidden metadata tasks), applied before subtasks are hidden. */
   keep?: (task: T) => boolean
+  /** Work and Personal (contract 22.4): the mode and what work is. Leave out for All (today's list). */
+  work?: { mode: WorkMode; scope: WorkScope }
 }
 
 /**
@@ -113,7 +116,10 @@ export function selectQuickViewTasks<T extends CustomListTask & CustomListSortab
   options: SelectQuickViewTasksOptions<T> = {},
 ): T[] {
   const selected = selectViewerTasks(tasks, resolved.filter, options)
-  const kept = options.keep ? selected.filter(options.keep) : selected
+  const afterKeep = options.keep ? selected.filter(options.keep) : selected
+  // Applied after the viewer's own rule and the hidden-task rule, before the sort and nested subtasks.
+  const work = options.work
+  const kept = work && work.mode !== 'all' ? afterKeep.filter((task) => passesWorkMode(task, work.scope, work.mode)) : afterKeep
   if (!resolved.fromCustomList) return kept
   // A custom list has its own sort, applied here like the main window does: tasks without the
   // date last in both directions and ties in the order they came in. Plain filters keep the

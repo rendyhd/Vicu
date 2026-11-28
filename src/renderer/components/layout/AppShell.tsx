@@ -14,6 +14,7 @@ import type { CollisionDetection, DragStartEvent, DragEndEvent, DragMoveEvent } 
 import { useSidebarStore } from '@/stores/sidebar-store'
 import { useSelectionStore } from '@/stores/selection-store'
 import { useUpdateTask, useReorderTask, useReorderProject, useAddLabel, applyReorderToCache } from '@/hooks/use-task-mutations'
+import { useSubtaskAttach } from '@/hooks/use-subtask-attach'
 import { ProjectActionsContext, useProjectActions } from '@/hooks/use-project-actions'
 import { dropZone } from '@/lib/project-moves'
 import { projectDropMove } from '@/lib/project-category-moves'
@@ -32,8 +33,14 @@ import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { registerConfirm } from '@/lib/confirm-bridge'
 import { resolveSelectedTasks } from '@/lib/task-selection'
 import { useSyncedPrefsEvents } from '@/hooks/use-synced-prefs'
+import { useWhenChoices } from '@/hooks/use-when-choices'
+import { useWeekStart } from '@/hooks/use-week-start'
+import { useProLedgerEvents } from '@/hooks/use-pro-ledger'
+import { useProShortcuts } from '@/hooks/use-pro-shortcuts'
+import { useRepeatRuleBridge } from '@/hooks/use-repeat-rules'
 import { useReorderStore } from '@/stores/reorder-store'
 import { api } from '@/lib/api'
+import { can } from '@/lib/capabilities'
 import { applyTheme } from '@/lib/theme'
 import type { ThemeOption } from '@/lib/theme'
 import type { Task, Project, CustomList, AppConfig } from '@/lib/vikunja-types'
@@ -58,12 +65,21 @@ import { VoiceHost } from '@/components/voice/VoiceHost'
 import { CommentsPaneHost } from '@/components/comments/CommentsPane'
 import { AskHost } from '@/components/ai/AskPane'
 import { DictationHost } from '@/components/ai/DictationHost'
+import { NotesHost } from '@/components/ai/NotesImportDialog'
 import { MakeTasksDialog } from '@/components/ai/MakeTasksDialog'
 import { AiHost } from '@/components/ai/AiHost'
 import { ProjectAccessProvider } from '@/hooks/use-project-access'
+import { AvailabilityProvider } from '@/hooks/use-availability'
+import { WorkModeProvider } from '@/hooks/use-work-mode'
+import { FocusPickerHost } from '@/components/pro/FocusBanner'
+import { ProDialogHost } from '@/components/pro/ProDialogHost'
 import { APP_CONFIG_QUERY_KEY, useAppConfig } from '@/hooks/use-app-config'
 import { openTaskInApp } from '@/lib/open-task'
+import { useInPageNotifications } from '@/hooks/use-in-page-notifications'
 import { toast } from '@/stores/toast-store'
+import { useTranslation } from 'react-i18next'
+import { t as translate } from '../../../shared/i18n'
+import { importOutcomeText } from '../../../shared/saved-filter-import'
 import { useOfflineQueueSync } from '@/hooks/use-offline-queue'
 import { useFreshness } from '@/hooks/use-freshness'
 import { useManualRefresh } from '@/hooks/use-manual-refresh'
@@ -77,9 +93,21 @@ import { canReorderTask, type TaskOrderKey } from '../../../shared/task-order'
 import { usePrintStore } from '@/stores/print-store'
 import { buildPrintHtml } from '@/lib/print-template'
 import { sanitizeTaskHtml } from '@/lib/sanitize-html'
-
-const MIN_WIDTH = 180
-const MAX_WIDTH = 360
+import { settingsMenuInSidebar } from '@/lib/settings-menu'
+import { useSettingsNavStore } from '@/stores/settings-nav-store'
+import { SettingsMenu } from '@/components/settings/SettingsMenu'
+import { SidebarToggle } from './SidebarToggle'
+import { closeSidebarDrawer, toggleSidebar } from '@/stores/sidebar-store'
+import {
+  clampSidebarWidth,
+  dockedSidebarWidth,
+  drawerWidth,
+  isNarrowWindow,
+  maxDockedWidth,
+  sidebarPlacement,
+  sidebarShown,
+  SIDEBAR_MIN_WIDTH,
+} from '@/lib/sidebar-width'
 
 type AppState = 'loading' | 'setup' | 'ready' | 'reauth'
 
@@ -152,16 +180,37 @@ function GlobalConfirm() {
 const DRAG_OVERLAY_MODIFIERS = [overlayBesidePointer]
 
 export function AppShell() {
+  const { t } = useTranslation()
   const queryClient = useQueryClient()
-  const { sidebarWidth, setSidebarWidth } = useSidebarStore()
+  const { sidebarWidth, setSidebarWidth, narrow, drawerOpen, hiddenWhenWide, setNarrow, setHiddenWhenWide } = useSidebarStore()
+  // The window's width decides where the sidebar is and how wide it is drawn (lib/sidebar-width.ts).
+  const [windowWidth, setWindowWidth] = useState(() => window.innerWidth)
+  useEffect(() => {
+    const measure = () => {
+      setWindowWidth(window.innerWidth)
+      setNarrow(isNarrowWindow(window.innerWidth))
+    }
+    measure()
+    window.addEventListener('resize', measure)
+    return () => window.removeEventListener('resize', measure)
+  }, [setNarrow])
+  const placement = sidebarPlacement(narrow, hiddenWhenWide, drawerOpen)
   const { setExpandedTask } = useSelectionStore()
   const updateTask = useUpdateTask()
   const reorderTask = useReorderTask()
   const reorderProject = useReorderProject()
   const projectActionsApi = useProjectActions()
   const addLabel = useAddLabel()
+  const subtaskAttach = useSubtaskAttach()
   // Another device's synced settings (the Inbox, the task order) arrive here.
   useSyncedPrefsEvents()
+  // The account's week start, for every week this window computes (contract section 2.1).
+  useWeekStart()
+  // The times of day the quick-add parser reads (section 5.6).
+  useWhenChoices()
+  useProLedgerEvents()
+  useProShortcuts()
+  useRepeatRuleBridge()
   const reducedMotion = useReducedMotion()
   // The drop travels into the slot over fade.base with the enter curve; reduced motion has none. A
   // task sent somewhere else lands there instead: handleDragEnd says where, before the animation runs.
@@ -179,7 +228,21 @@ export function AppShell() {
   const startX = useRef(0)
   const startWidth = useRef(0)
   const sidebarRef = useRef<HTMLDivElement>(null)
+  // A narrow Settings page puts its menu in the sidebar's place (lib/settings-menu.ts). The region
+  // right of the sidebar is measured: it keeps its width when the menu moves, and a side pane counts.
+  const contentColumnRef = useRef<HTMLDivElement>(null)
+  const settingsMenuHere = useSettingsNavStore((s) => s.inSidebar)
   const [appState, setAppState] = useState<AppState>('loading')
+  useEffect(() => {
+    const column = contentColumnRef.current
+    if (!column) return
+    const observer = new ResizeObserver(([entry]) => {
+      useSettingsNavStore.getState().setInSidebar(settingsMenuInSidebar(entry.contentRect.width))
+    })
+    observer.observe(column)
+    return () => observer.disconnect()
+    // The column exists only once the app is ready (setup and sign-in draw other pages).
+  }, [appState])
   const [reauthInfo, setReauthInfo] = useState<ReauthInfo | null>(null)
   const [dragItem, setDragItem] = useState<DragItem | null>(null)
   // The grabbing cursor, over everything, while something is dragged (index.css).
@@ -216,9 +279,44 @@ export function AppShell() {
       // to keep tasks in-place, so we sync on navigation instead). Nothing is refetched while
       // offline changes are still queued: that would erase their optimistic state.
       refreshTasks(queryClient, [['tasks'], ['view-tasks'], ['section-tasks']])
+      // A list chosen in the drawer of a narrow window: the drawer has done its job.
+      closeSidebarDrawer()
       prevRouteRef.current = routePath
     }
   }, [routePath, queryClient])
+
+  // Mod+\ shows or hides the sidebar (the drawer in a narrow window), anywhere in the window. The
+  // key is read by its place, so keyboards that put the backslash elsewhere still have it.
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.isComposing || event.altKey || event.shiftKey) return
+      if (!(window.api.platform === 'darwin' ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey)) return
+      if (event.code !== 'Backslash' && event.key !== '\\') return
+      event.preventDefault()
+      toggleSidebar()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
+
+  // An open drawer is modal: the content and the side panes beside it cannot be reached, focus goes
+  // to the list on screen in the drawer, and back to the sidebar button when the drawer closes.
+  const sidebarToggleRef = useRef<HTMLButtonElement>(null)
+  const drawerShown = placement === 'drawer-open'
+  useEffect(() => {
+    const aside = sidebarRef.current
+    const blocked = [contentColumnRef.current, ...document.querySelectorAll<HTMLElement>('[data-side-pane]')]
+    if (!drawerShown || !aside) return
+    for (const element of blocked) if (element) element.inert = true
+    const current = aside.querySelector<HTMLElement>('[aria-current="page"]')
+    const first = aside.querySelector<HTMLElement>('a[href], button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])')
+    ;(current ?? first)?.focus({ preventScroll: false })
+    return () => {
+      for (const element of blocked) if (element) element.inert = false
+      const active = document.activeElement
+      if (!active || active === document.body || aside.contains(active)) sidebarToggleRef.current?.focus()
+    }
+  }, [drawerShown])
 
   // TanStack Query's browser focus manager only observes page visibility. An Electron
   // window can lose and regain focus without becoming hidden, so explicitly refresh
@@ -265,6 +363,11 @@ export function AppShell() {
       // The Plan screen's timeline and top rows go by the pointer too.
       const planDrop = pointerCollisions.find((c) => c.data?.droppableContainer?.data?.current?.type === 'plan-drop')
       if (planDrop) return [planDrop]
+
+      // The middle of another row makes the task its subtask (cross-app semantics 24.6); the row's
+      // own droppable around it still reorders.
+      const nestDrop = pointerCollisions.find((c) => c.data?.droppableContainer?.data?.current?.type === 'task-nest')
+      if (nestDrop) return [nestDrop]
 
       // A row, section header or section end goes by the pointer too: the overlay is drawn beside it,
       // so its box says nothing about where the task is going.
@@ -371,7 +474,11 @@ export function AppShell() {
         }
         const leavesFor = (projectId: number) => dragTasks.some((t) => t.project_id !== projectId)
 
-        if (overData?.type === 'plan-drop') {
+        if (overData?.type === 'task-nest') {
+          // Dropped on the middle of a row: under that task (cross-app semantics 24).
+          landOnTarget()
+          subtaskAttach.attach(dragTasks, overData.task as Task)
+        } else if (overData?.type === 'plan-drop') {
           dropLanding.current = { into: null }
           ;(overData.drop as (tasks: Task[]) => void)(dragTasks)
           clearIfMulti()
@@ -579,7 +686,7 @@ export function AppShell() {
 
       setDragItem(null)
     },
-    [dragItem, updateTask, reorderTask, reorderProject, addLabel, queryClient, projectActionsApi]
+    [dragItem, updateTask, reorderTask, reorderProject, addLabel, subtaskAttach, queryClient, projectActionsApi]
   )
 
   useEffect(() => {
@@ -589,8 +696,9 @@ export function AppShell() {
       applyTheme(t)
 
       if (typeof config?.sidebar_width === 'number') {
-        setSidebarWidth(Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, config.sidebar_width)))
+        setSidebarWidth(clampSidebarWidth(config.sidebar_width))
       }
+      setHiddenWhenWide(config?.sidebar_hidden === true)
 
       if (!config || !config.vikunja_url) {
         setAppState('setup')
@@ -641,18 +749,30 @@ export function AppShell() {
     })
   }, [navigate])
 
-  // Saved filters imported as lists (first connect or Settings, cross-app semantics 3.7): say so,
-  // with Open for the first one.
+  // Saved filters and project views imported as lists (first connect or Settings, cross-app
+  // semantics 3.7 and 3.9): say so, with Open for the first one, or with Undo when lists that were
+  // imported before were updated or skipped.
   useEffect(() => {
-    return api.onSavedFiltersImported(({ count, list_id: listId }) => {
-      if (count < 1) return
-      const message = count === 1 ? 'Imported 1 saved filter as a list' : `Imported ${count} saved filters as lists`
+    return api.onSavedFiltersImported((outcome) => {
+      const { count, list_id: listId, undo_id: undoId } = outcome
+      if (count < 1 && !undoId) return
+      const message = importOutcomeText(outcome)
+      if (undoId) {
+        toast.success(message, {
+          key: 'saved-filters-imported',
+          action: { label: translate('app.undo'), onAction: () => void api.undoSavedFilterImport(undoId) },
+        })
+        return
+      }
       toast.success(message, {
         key: 'saved-filters-imported',
-        ...(listId ? { action: { label: 'Open', onAction: () => navigate({ to: '/list/$listId', params: { listId } }) } } : {}),
+        ...(listId ? { action: { label: translate('app.open'), onAction: () => navigate({ to: '/list/$listId', params: { listId } }) } } : {}),
       })
     })
   }, [navigate])
+
+  // The web version's reminders that are not browser notifications.
+  useInPageNotifications()
 
   // A clicked task reminder or Quick View's "open in app": show that task in this window.
   useEffect(() => {
@@ -736,13 +856,17 @@ export function AppShell() {
       e.preventDefault()
       dragging.current = true
       startX.current = e.clientX
-      startWidth.current = sidebarWidth
-      let latestWidth = sidebarWidth
+      // The drag starts from the width on screen, which may have given way to a narrow window, and
+      // stops where the content column would get narrower than its minimum.
+      const shown = dockedSidebarWidth(sidebarWidth, window.innerWidth)
+      const widest = maxDockedWidth(window.innerWidth)
+      startWidth.current = shown
+      let latestWidth = shown
 
       const handleMouseMove = (ev: MouseEvent) => {
         if (!dragging.current) return
         const delta = ev.clientX - startX.current
-        latestWidth = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, startWidth.current + delta))
+        latestWidth = Math.min(widest, Math.max(SIDEBAR_MIN_WIDTH, startWidth.current + delta))
         // Mutate the element directly during the drag — committing to the
         // store per mousemove re-renders the entire app tree per pixel.
         if (sidebarRef.current) sidebarRef.current.style.width = `${latestWidth}px`
@@ -793,7 +917,13 @@ export function AppShell() {
   if (appState === 'setup') {
     return (
       <Suspense fallback={<div className="flex h-screen w-screen items-center justify-center bg-[var(--bg-primary)]" />}>
-        <SetupView onComplete={() => setAppState('ready')} />
+        <SetupView
+          onComplete={() => {
+            // Setup just saved the connection and the Inbox: the config read before it is out of date.
+            void queryClient.invalidateQueries({ queryKey: APP_CONFIG_QUERY_KEY })
+            setAppState('ready')
+          }}
+        />
       </Suspense>
     )
   }
@@ -801,6 +931,8 @@ export function AppShell() {
   return (
     <ProjectActionsContext.Provider value={projectActionsApi}>
     <ProjectAccessProvider>
+    <WorkModeProvider>
+    <AvailabilityProvider>
     <DndContext
       sensors={sensors}
       collisionDetection={collisionDetection}
@@ -812,56 +944,91 @@ export function AppShell() {
       {/* With Mica behind the window the root stays clear so the translucent sidebar shows it; the content column and the splitter carry the page colour themselves. */}
       <div className={`relative flex h-screen w-screen overflow-hidden${window.api.windowMaterial === 'mica' ? '' : ' bg-[var(--bg-primary)]'}`}>
         {/* Window drag region overlay */}
+        {/* The title band: the drag region, the sidebar button and the window controls. It stays
+            above an open drawer, so the button that opened the drawer closes it. */}
         <header
-          className="absolute inset-x-0 top-0 z-30 flex h-8"
+          className="absolute inset-x-0 top-0 z-50 flex h-8 items-center pl-2"
           style={{
             WebkitAppRegion: 'drag',
             ...(window.api.platform === 'darwin' ? { paddingLeft: '80px' } : {}),
           } as React.CSSProperties}
         >
+          <SidebarToggle ref={sidebarToggleRef} shown={sidebarShown(placement)} controls="app-sidebar" />
           <div className="flex-1" />
-          <WindowControls />
+          {can('windowControls') && <WindowControls />}
         </header>
 
-        {/* Sidebar — bg extends behind drag region */}
+        {/* A narrow window's open drawer dims the content; a click on it closes the drawer. */}
+        {placement === 'drawer-open' && (
+          <div aria-hidden="true" data-sidebar-scrim className="vicu-scrim absolute inset-0 z-40" onClick={closeSidebarDrawer} />
+        )}
+
+        {/* Sidebar — bg extends behind drag region. Hidden, it stays mounted, so what it holds
+            (a folded project, a scrolled list) is as it was when it comes back. */}
         <aside
-          aria-label="Sidebar"
+          id="app-sidebar"
+          aria-label={t('sidebar.region')}
           ref={sidebarRef}
-          className="flex shrink-0 flex-col overflow-hidden border-r border-[var(--border-color)] bg-[var(--bg-sidebar)]"
-          style={{ width: sidebarWidth }}
+          hidden={placement === 'hidden' || placement === 'drawer-closed'}
+          data-sidebar-placement={placement}
+          onKeyDown={placement === 'drawer-open'
+            ? (event) => {
+                // Escape closes the drawer, unless a menu, picker or dialog in it takes the key.
+                if (event.key !== 'Escape' || event.defaultPrevented) return
+                if ((event.target as Element).closest('[popover], dialog')) return
+                event.preventDefault()
+                closeSidebarDrawer()
+              }
+            : undefined}
+          // The display class would win over the hidden attribute, so a hidden sidebar says so in its class too.
+          className={placement === 'drawer-open'
+            ? 'vicu-drawer-in absolute inset-y-0 left-0 z-40 flex flex-col overflow-hidden border-r border-[var(--border-color)] bg-[var(--bg-secondary)] shadow-xl'
+            : placement === 'docked'
+              ? 'flex shrink-0 flex-col overflow-hidden border-r border-[var(--border-color)] bg-[var(--bg-sidebar)]'
+              : 'hidden'}
+          style={{ width: placement === 'drawer-open' ? drawerWidth(sidebarWidth, windowWidth) : dockedSidebarWidth(sidebarWidth, windowWidth) }}
         >
           <div className="h-8 shrink-0" />
           <div className="flex-1 overflow-hidden">
-            <Sidebar />
+            {settingsMenuHere && routePath === '/settings' ? <SettingsMenu variant="sidebar" /> : <Sidebar />}
           </div>
         </aside>
 
-        <div
-          className="w-1 shrink-0 cursor-col-resize bg-[var(--bg-primary)] transition-colors hover:bg-accent-blue/20"
-          onMouseDown={handleMouseDown}
-          role="separator"
-          aria-orientation="vertical"
-        />
+        {placement === 'docked' && (
+          <div
+            className="w-1 shrink-0 cursor-col-resize bg-[var(--bg-primary)] transition-colors hover:bg-accent-blue/20"
+            onMouseDown={handleMouseDown}
+            role="separator"
+            aria-orientation="vertical"
+          />
+        )}
 
-        <div className="flex flex-1 flex-col overflow-hidden bg-[var(--bg-primary)]">
+        <div ref={contentColumnRef} className="flex flex-1 flex-col overflow-hidden bg-[var(--bg-primary)]">
           <div className="h-8 shrink-0" />
-          <UpdateBanner />
+          {can('updates') && <UpdateBanner />}
           <ContentArea>
             <Outlet />
           </ContentArea>
         </div>
         <CommentsPaneHost />
-        <AskHost />
-        <BadgeSync />
+        {can('assistant') && <AskHost />}
+        {can('badge') && <BadgeSync />}
         <CompletionSoundSync />
         <GlobalConfirm />
         <ProjectActionsHost />
         <TemplateEditHost />
+        <FocusPickerHost />
+        <ProDialogHost />
         <ToastHost />
-        <VoiceHost />
-        <DictationHost />
-        <MakeTasksDialog />
-        <AiHost />
+        {can('voice') && <VoiceHost />}
+        {can('assistant') && (
+          <>
+            <DictationHost />
+            <NotesHost />
+            <MakeTasksDialog />
+            <AiHost />
+          </>
+        )}
         <CommandPalette />
       </div>
 
@@ -880,6 +1047,8 @@ export function AppShell() {
         )}
       </DragOverlay>
     </DndContext>
+    </AvailabilityProvider>
+    </WorkModeProvider>
     </ProjectAccessProvider>
     </ProjectActionsContext.Provider>
   )

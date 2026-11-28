@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useQueryClient } from '@tanstack/react-query'
 import { FolderOpen } from 'lucide-react'
 import { useAppConfig } from '@/hooks/use-app-config'
@@ -9,6 +10,7 @@ import { useCreateProject, useUpdateProject } from '@/hooks/use-task-mutations'
 import { cn } from '@/lib/cn'
 import { keyboardProjectMove } from '@/lib/project-category-moves'
 import { type DropZone, type KeyboardMove } from '@/lib/project-moves'
+import { t, type TranslationKey } from '../../../shared/i18n'
 import { projectActions, type ProjectSurface } from '@/stores/project-actions-store'
 import type { Project } from '@/lib/vikunja-types'
 import type { SyncedPrefsSnapshot } from '../../../shared/synced-prefs'
@@ -24,11 +26,11 @@ const KEY_MOVES: Record<string, KeyboardMove> = {
   ArrowLeft: 'out',
 }
 
-const SPOKEN: Record<KeyboardMove, string> = {
-  up: 'up',
-  down: 'down',
-  in: 'into the project above',
-  out: 'out one level',
+const SPOKEN: Record<KeyboardMove, TranslationKey> = {
+  up: 'projects.row.movedUp',
+  down: 'projects.row.movedDown',
+  in: 'projects.row.movedIn',
+  out: 'projects.row.movedOut',
 }
 
 /**
@@ -60,7 +62,7 @@ export function useProjectRowKeys(project: Project, surface: ProjectSurface, ope
     const values = qc.getQueryData<SyncedPrefsSnapshot>(SYNCED_PREFS_QUERY_KEY)?.values ?? {}
     const planned = keyboardProjectMove(projects, inboxId, values, project.id, keyMove)
     if (!planned) return true
-    const spoken = planned.placement?.parentChanged ? undefined : `Moved “${project.title}” ${SPOKEN[keyMove]}`
+    const spoken = planned.placement?.parentChanged ? undefined : t(SPOKEN[keyMove], { title: project.title })
     commitProjectMove(qc, move, project, planned, spoken)
     // The row may be drawn again elsewhere in the tree: keep the focus on it.
     requestAnimationFrame(() => {
@@ -97,6 +99,7 @@ export function ProjectRenameInput({
   surface: ProjectSurface
   className?: string
 }) {
+  const { t } = useTranslation()
   const [title, setTitle] = useState(project.title)
   const updateProject = useUpdateProject()
   const done = useRef(false)
@@ -125,7 +128,7 @@ export function ProjectRenameInput({
     <input
       ref={inputRef}
       value={title}
-      aria-label={`Rename ${project.title}`}
+      aria-label={t('projects.row.rename', { title: project.title })}
       onChange={(event) => setTitle(event.target.value)}
       onKeyDown={(event) => {
         event.stopPropagation()
@@ -151,6 +154,7 @@ export function ProjectRenameInput({
  * project, Escape cancels, leaving the field creates it when something was typed.
  */
 export function ProjectCreateRow({ parentId, depth }: { parentId: number; depth: number }) {
+  const { t } = useTranslation()
   const [title, setTitle] = useState('')
   const createProject = useCreateProject()
   const done = useRef(false)
@@ -173,8 +177,8 @@ export function ProjectCreateRow({ parentId, depth }: { parentId: number; depth:
         <input
           autoFocus
           value={title}
-          placeholder={parentId ? 'Subproject name' : 'Project name'}
-          aria-label={parentId ? 'New subproject name' : 'New project name'}
+          placeholder={parentId ? t('projects.row.subprojectName') : t('projects.row.projectName')}
+          aria-label={parentId ? t('projects.row.newSubprojectName') : t('projects.row.newProjectName')}
           onChange={(event) => setTitle(event.target.value)}
           onKeyDown={(event) => {
             event.stopPropagation()
@@ -191,7 +195,7 @@ export function ProjectCreateRow({ parentId, depth }: { parentId: number; depth:
         />
       </div>
       <p className="pb-1 text-caption text-[var(--text-secondary)]" style={{ paddingLeft: `${depth * 16 + 46}px` }}>
-        Enter to create · Esc to cancel
+        {t('projects.row.createHint')}
       </p>
     </div>
   )

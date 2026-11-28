@@ -6,6 +6,8 @@ import { useFilters } from '@/hooks/use-filters'
 import { useCompletedTasksStore } from '@/stores/completed-tasks-store'
 import { logbookHasMore, logbookPageParams, logbookTasks } from '@/lib/logbook'
 import { mergeSmartListUndoWindow } from '@/lib/undo-window'
+import { parentTaskId, useWorkMode } from './use-work-mode'
+import { workModeClause } from '../../shared/work-scope'
 import type { Task } from '@/lib/vikunja-types'
 
 function combinePages(results: UseQueryResult<Task[], Error>[]) {
@@ -25,7 +27,16 @@ function combinePages(results: UseQueryResult<Task[], Error>[]) {
  * the offline cache, the optimistic updates and every invalidation treat it like the other lists.
  */
 export function useLogbookTasks() {
-  const base = useFilters({ view: 'logbook' })
+  const filtered = useFilters({ view: 'logbook' })
+  // Work and Personal (22.4): the server narrows each page to a superset of what the mode shows and
+  // the device applies the rule to what comes back. Mode and scope are part of the query key, and a
+  // mode that shows nothing asks for nothing.
+  const work = useWorkMode()
+  const { clause, empty } = useMemo(() => workModeClause(work.scope, work.mode), [work.scope, work.mode])
+  const base = useMemo(
+    () => (clause && filtered.filter ? { ...filtered, filter: `(${filtered.filter}) && ${clause}` } : filtered),
+    [filtered, clause],
+  )
   const matches = useMatches()
   const pathname = matches[matches.length - 1]?.pathname ?? ''
   const completedTasks = useCompletedTasksStore((s) => s.tasks)
@@ -36,6 +47,7 @@ export function useLogbookTasks() {
       const params = logbookPageParams(base, index + 1)
       return {
         queryKey: ['tasks', params] as const,
+        enabled: !empty,
         queryFn: async (): Promise<Task[]> => {
           const result = await api.fetchTasks(params)
           if (!result.success) throw new Error(result.error)
@@ -52,8 +64,8 @@ export function useLogbookTasks() {
   const tasks = useMemo(() => {
     const merged = mergeSmartListUndoWindow(logbookTasks(pages), completedTasks, pathname, previous.current)
     previous.current = merged
-    return merged
-  }, [pages, completedTasks, pathname])
+    return empty ? [] : work.filter(merged, parentTaskId)
+  }, [pages, completedTasks, pathname, empty, work.filter])
 
   const hasMore = logbookHasMore(pages)
   const loadMore = useCallback(() => {

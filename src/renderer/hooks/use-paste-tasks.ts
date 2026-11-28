@@ -17,6 +17,10 @@ import { useLabels } from './use-labels'
 import { useParserConfig } from './use-parser-config'
 import { useProjects } from './use-projects'
 import { useAddLabel, useCreateLabel, useCreateTask } from './use-task-mutations'
+import { usePro } from './use-pro'
+import { useProUiStore } from '@/stores/pro-ui-store'
+import { readImport } from '../../shared/pro/import'
+import { t } from '../../shared/i18n'
 
 interface UsePasteTasksOptions {
   /** The project of the list; pasting does nothing without one. */
@@ -40,11 +44,12 @@ export function usePasteTasks({ projectId, defaultDueDate }: UsePasteTasksOption
   const createTask = useCreateTask({ silent: true })
   const addLabel = useAddLabel({ silent: true })
   const createLabel = useCreateLabel({ silent: true })
+  const promisesOn = usePro().layer('promises')
 
   // The handler lives in a document listener: read the latest values when it runs.
-  const latest = useRef({ projectId, defaultDueDate, parserConfig, labels, projects, appConfig, createTask, addLabel, createLabel })
+  const latest = useRef({ projectId, defaultDueDate, parserConfig, labels, projects, appConfig, createTask, addLabel, createLabel, promisesOn })
   useEffect(() => {
-    latest.current = { projectId, defaultDueDate, parserConfig, labels, projects, appConfig, createTask, addLabel, createLabel }
+    latest.current = { projectId, defaultDueDate, parserConfig, labels, projects, appConfig, createTask, addLabel, createLabel, promisesOn }
   })
   const running = useRef(false)
 
@@ -59,6 +64,12 @@ export function usePasteTasks({ projectId, defaultDueDate }: UsePasteTasksOption
       try {
         text = await navigator.clipboard.readText()
       } catch {
+        return
+      }
+      // Pro (plan 7.1.9): an import (Copilot's JSON, a Vicu export) opens its review instead of
+      // becoming tasks line by line.
+      if (current.promisesOn && readImport(text, toLocalDate(new Date())).ok) {
+        useProUiStore.getState().open('pro-import', { text })
         return
       }
       const context = {
@@ -119,11 +130,11 @@ export function usePasteTasks({ projectId, defaultDueDate }: UsePasteTasksOption
         const reason = describeMutationError(result.failed[0].error).message
         toast.error(
           plans.length === 1
-            ? `Could not create the task. ${reason}`
-            : `Created ${result.created} of ${plans.length} tasks. ${reason}`,
+            ? t('taskActions.pasteCouldNotCreate', { reason })
+            : t('taskActions.pasteCreatedSome', { created: result.created, total: plans.length, reason }),
         )
       } else if (result.labelsFailed > 0) {
-        toast.error('Tasks were created, but some labels could not be added.')
+        toast.error(t('taskActions.pasteLabelsFailed'))
       }
     } finally {
       running.current = false

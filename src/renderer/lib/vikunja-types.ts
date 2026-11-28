@@ -48,6 +48,8 @@ export interface Task {
   repeat_after: number
   repeat_mode: number // 0=default, 1=monthly, 2=from current date
   hex_color: string
+  /** Your favourite mark, per user; Pro's flag (cross-app semantics 21.4). */
+  is_favorite?: boolean
   /** Who the task is assigned to. Read only: changed through the assignee endpoints, never a patch. */
   assignees?: PersonRef[] | null
   /** Only with the collaboration expand (cross-app semantics 9.4); absent means 0. */
@@ -184,8 +186,9 @@ export interface TaskQueryParams {
   per_page?: number
   q?: string
   filter?: string
-  sort_by?: string
-  order_by?: string
+  /** One sort key, or several in order (each paired with the `order_by` at the same place). */
+  sort_by?: string | string[]
+  order_by?: string | string[]
   filter_include_nulls?: boolean
   filter_timezone?: string
   /**
@@ -193,6 +196,11 @@ export interface TaskQueryParams {
    * filter first and hide them afterwards (Tag view, custom lists).
    */
   keep_nested_subtasks?: boolean
+  /**
+   * Vicu option, never sent to the server: `false` leaves out `expand=subtasks`, for a flat listing
+   * that draws no hierarchy (rendyhd/Vicu#75).
+   */
+  expand_subtasks?: boolean
   /**
    * Vicu option, never sent to the server: add the due-date clause of the Today or Upcoming list,
    * built in the main process from the local-day boundary at request time.
@@ -213,6 +221,7 @@ export type ApiResult<T> =
 export type {
   AppConfig,
   AuthMethod,
+  CloseAction,
   CustomList,
   CustomListFilter,
   CustomListSortField,
@@ -227,6 +236,7 @@ export type {
 export {
   CUSTOM_LIST_SORT_FIELDS,
   SIDEBAR_HIDEABLE_LISTS,
+  closeAction,
   isHiddenFromSidebar,
   isQuickEntryEnabled,
   isQuickViewEnabled,
@@ -267,6 +277,8 @@ export interface VikunjaUser {
   username: string
   email: string
   name: string
+  /** Vikunja's own week start, 0 Sunday to 6 Saturday; only read, for the "Week starts on" offer. */
+  week_start?: number
 }
 
 export type AuthCheckResult =

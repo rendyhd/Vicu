@@ -1,10 +1,13 @@
 import { fuzzyRank } from './fuzzy'
+import { t } from '../../shared/i18n'
 import type { Label, Project, Task } from './vikunja-types'
 
 // What the command palette lists and how a query picks from it. Pure: the component turns an
 // action into a navigation or a change.
 
-export type PaletteCommand = 'new-task' | 'voice' | 'dictate' | 'brain-dump' | 'ask' | 'make-tasks' | 'refresh' | 'toggle-theme' | 'settings'
+export type PaletteCommand = 'new-task' | 'new-event' | 'voice' | 'dictate' | 'brain-dump' | 'ask' | 'make-tasks' | 'notes' | 'refresh' | 'toggle-theme' | 'toggle-sidebar' | 'settings'
+  | 'pro-focus' | 'pro-settings' | 'pro-import' | 'pro-copilot' | 'pro-recap' | 'pro-weekly-note'
+  | 'work-all' | 'work-work' | 'work-personal'
 
 export type PaletteAction =
   | { type: 'command'; command: PaletteCommand }
@@ -22,6 +25,8 @@ export interface PaletteItem {
   /** Extra words the query may match without being shown ("go to"). */
   keywords: string
   action: PaletteAction
+  /** Found by typing its name only: not listed while the query is empty (the work mode entries). */
+  byNameOnly?: boolean
 }
 
 /** Most commands the palette lists, and most tasks added after them. */
@@ -32,37 +37,100 @@ export interface PaletteSources {
   smartLists: readonly { id: string; label: string; path: string }[]
   projects: readonly Pick<Project, 'id' | 'title'>[]
   labels: readonly Pick<Label, 'id' | 'title'>[]
+  /** The Plan screen is on: "New event" is listed (calendar plan, phase 1). */
+  planner?: boolean
+  /** The host has voice input; "Say a task" is listed (default true: the desktop). */
+  voice?: boolean
+  /** The host has the assistant; its entries are listed (default true: the desktop). */
+  assistant?: boolean
+  /** Pro's lists and actions while Pro is on (plan 7.1.11); absent while it is off. */
+  pro?: ProPaletteSources
+  /** Work and Personal is on: the mode entries are listed (cross-app semantics 22.4). */
+  workMode?: boolean | { showAll?: boolean }
+}
+
+export interface ProPaletteSources {
+  lists: readonly { id: string; label: string; path: string }[]
+  focus: boolean
+  promises: boolean
+}
+
+/** Pro's actions, by layer. */
+export function proPaletteItems(pro: ProPaletteSources): PaletteItem[] {
+  return [
+    ...(pro.focus
+      ? [{ id: 'cmd:pro-focus', kind: 'Action', title: t('palette.items.focus'), keywords: 'pro show only projects categories narrow hide', action: { type: 'command', command: 'pro-focus' } } satisfies PaletteItem]
+      : []),
+    ...(pro.promises
+      ? ([
+          { id: 'cmd:pro-import', kind: 'Action', title: t('palette.items.importNotes'), keywords: 'pro paste copilot json promises actions decisions', action: { type: 'command', command: 'pro-import' } },
+          { id: 'cmd:pro-copilot', kind: 'Action', title: t('palette.items.askCopilot'), keywords: 'pro prompt meeting mail chat summary export', action: { type: 'command', command: 'pro-copilot' } },
+          { id: 'cmd:pro-recap', kind: 'Action', title: t('palette.items.recap'), keywords: 'pro summary send people promises meeting', action: { type: 'command', command: 'pro-recap' } },
+          { id: 'cmd:pro-weekly-note', kind: 'Action', title: t('pro.note.title'), keywords: 'pro weekly note leadership report summary groups status', action: { type: 'command', command: 'pro-weekly-note' } },
+        ] satisfies PaletteItem[])
+      : []),
+    { id: 'cmd:pro-settings', kind: 'Action', title: t('palette.items.proSettings'), keywords: 'pro preferences layers area cap', action: { type: 'command', command: 'pro-settings' } },
+    ...pro.lists.map((list): PaletteItem => ({ id: `list:${list.id}`, kind: 'List', title: list.label, keywords: 'go to pro', action: { type: 'path', path: list.path } })),
+  ]
+}
+
+/** Work and Personal (22.4): switching the mode by name. No shortcut, and not listed with an empty query. */
+export function workModePaletteItems(showAll = false): PaletteItem[] {
+  return [
+    { id: 'cmd:work-personal', kind: 'Action', title: t('workMode.palettePersonal'), keywords: 'work personal mode private home', action: { type: 'command', command: 'work-personal' }, byNameOnly: true },
+    { id: 'cmd:work-work', kind: 'Action', title: t('workMode.paletteWork'), keywords: 'work personal mode job office', action: { type: 'command', command: 'work-work' }, byNameOnly: true },
+    ...(showAll
+      ? [{ id: 'cmd:work-all', kind: 'Action', title: t('workMode.paletteAll'), keywords: 'work personal mode all everything show', action: { type: 'command', command: 'work-all' }, byNameOnly: true } satisfies PaletteItem]
+      : []),
+  ]
 }
 
 /** The guided sessions (cross-app semantics 14): found by name, not listed with an empty query. */
-export const GUIDED_PALETTE_ITEMS: readonly PaletteItem[] = [
-  { id: 'guided:inbox', kind: 'Guided', title: 'Sort the Inbox', keywords: 'guided organize organise process triage one at a time session', action: { type: 'path', path: '/guided/inbox' } },
-  { id: 'guided:overdue', kind: 'Guided', title: 'Sort out overdue', keywords: 'guided organize organise late reschedule session', action: { type: 'path', path: '/guided/overdue' } },
-  { id: 'guided:waiting', kind: 'Guided', title: 'Waiting a long time', keywords: 'guided organize organise old stale untouched session', action: { type: 'path', path: '/guided/waiting' } },
-  { id: 'guided:review', kind: 'Guided', title: 'Start review', keywords: 'guided projects review one at a time session', action: { type: 'path', path: '/guided/review' } },
-  { id: 'guided:weekly', kind: 'Guided', title: 'Weekly review', keywords: 'guided gtd checklist week session', action: { type: 'path', path: '/weekly-review' } },
-]
+export function guidedPaletteItems(): readonly PaletteItem[] {
+  return [
+    { id: 'guided:inbox', kind: 'Guided', title: t('palette.guided.inbox'), keywords: 'guided organize organise process triage one at a time session', action: { type: 'path', path: '/guided/inbox' } },
+    { id: 'guided:overdue', kind: 'Guided', title: t('palette.guided.overdue'), keywords: 'guided organize organise late reschedule session', action: { type: 'path', path: '/guided/overdue' } },
+    { id: 'guided:waiting', kind: 'Guided', title: t('palette.guided.waiting'), keywords: 'guided organize organise old stale untouched session', action: { type: 'path', path: '/guided/waiting' } },
+    { id: 'guided:review', kind: 'Guided', title: t('palette.guided.review'), keywords: 'guided projects review one at a time session', action: { type: 'path', path: '/guided/review' } },
+    { id: 'guided:weekly', kind: 'Guided', title: t('palette.guided.weekly'), keywords: 'guided gtd checklist week session', action: { type: 'path', path: '/weekly-review' } },
+  ]
+}
 
 /** Everything the palette can run except tasks: actions, smart lists, guided sessions, projects and labels, in that order. */
-export function buildPaletteItems({ smartLists, projects, labels }: PaletteSources): PaletteItem[] {
+export function buildPaletteItems({ smartLists, projects, labels, planner = false, voice = true, assistant = true, pro, workMode = false }: PaletteSources): PaletteItem[] {
   const actions: PaletteItem[] = [
-    { id: 'cmd:new-task', kind: 'Action', title: 'New task', keywords: 'add create', action: { type: 'command', command: 'new-task' } },
+    { id: 'cmd:new-task', kind: 'Action', title: t('palette.items.newTask'), keywords: 'add create', action: { type: 'command', command: 'new-task' } },
+    // An Event on the Plan screen (contract 20.3), at the selected day's next free time.
+    ...(planner
+      ? [{ id: 'cmd:new-event', kind: 'Action', title: t('palette.items.newEvent'), keywords: 'add create calendar meeting busy plan', action: { type: 'command', command: 'new-event' } } satisfies PaletteItem]
+      : []),
     // Voice input that needs no holding (docs/voice-input.md): listening until Enter, Esc cancels.
-    { id: 'cmd:voice', kind: 'Action', title: 'Say a task', keywords: 'voice dictate speak speech microphone add', action: { type: 'command', command: 'voice' } },
+    ...(voice
+      ? [{ id: 'cmd:voice', kind: 'Action', title: t('palette.items.sayTask'), keywords: 'voice dictate speak speech microphone add', action: { type: 'command', command: 'voice' } } satisfies PaletteItem]
+      : []),
     // The AI assistant (docs/ai-assistant-v1.md): smart dictation with the microphone open, its
     // brain dump (organized at the end, 4.8), Ask, and dictation's "Make tasks from this".
-    { id: 'cmd:dictate', kind: 'Action', title: 'Dictate tasks', keywords: 'assistant ai voice smart dictation speak several microphone', action: { type: 'command', command: 'dictate' } },
-    { id: 'cmd:brain-dump', kind: 'Action', title: 'Brain dump', keywords: 'assistant ai voice dictation ramble organize organise projects think type', action: { type: 'command', command: 'brain-dump' } },
-    { id: 'cmd:ask', kind: 'Action', title: 'Ask Vicu', keywords: 'assistant ai chat question talk', action: { type: 'command', command: 'ask' } },
-    { id: 'cmd:make-tasks', kind: 'Action', title: 'Make tasks from text', keywords: 'assistant ai paste notes email split', action: { type: 'command', command: 'make-tasks' } },
-    { id: 'cmd:refresh', kind: 'Action', title: 'Refresh', keywords: 'reload sync update', action: { type: 'command', command: 'refresh' } },
-    { id: 'cmd:toggle-theme', kind: 'Action', title: 'Toggle theme', keywords: 'dark light mode', action: { type: 'command', command: 'toggle-theme' } },
-    { id: 'cmd:settings', kind: 'Action', title: 'Settings', keywords: 'preferences options', action: { type: 'command', command: 'settings' } },
+    ...(assistant
+      ? ([
+          { id: 'cmd:dictate', kind: 'Action', title: t('palette.items.dictate'), keywords: 'assistant ai voice smart dictation speak several microphone', action: { type: 'command', command: 'dictate' } },
+          { id: 'cmd:brain-dump', kind: 'Action', title: t('palette.items.brainDump'), keywords: 'assistant ai voice dictation ramble organize organise projects think type', action: { type: 'command', command: 'brain-dump' } },
+          { id: 'cmd:ask', kind: 'Action', title: t('palette.items.ask'), keywords: 'assistant ai chat question talk', action: { type: 'command', command: 'ask' } },
+          { id: 'cmd:make-tasks', kind: 'Action', title: t('palette.items.makeTasks'), keywords: 'assistant ai paste notes email split', action: { type: 'command', command: 'make-tasks' } },
+          // Notes, PDFs and pictures of pages made into tasks (docs/ai-assistant-v1.md 4.9).
+          { id: 'cmd:notes', kind: 'Action', title: t('notes.palette'), keywords: 'assistant ai notes meeting offsite pdf picture photo scan handwriting pages action items', action: { type: 'command', command: 'notes' } },
+        ] satisfies PaletteItem[])
+      : []),
+    { id: 'cmd:refresh', kind: 'Action', title: t('palette.items.refresh'), keywords: 'reload sync update', action: { type: 'command', command: 'refresh' } },
+    { id: 'cmd:toggle-theme', kind: 'Action', title: t('palette.items.toggleTheme'), keywords: 'dark light mode', action: { type: 'command', command: 'toggle-theme' } },
+    { id: 'cmd:toggle-sidebar', kind: 'Action', title: t('sidebar.palette'), keywords: 'sidebar drawer panel hide show narrow window lists projects', action: { type: 'command', command: 'toggle-sidebar' } },
+    { id: 'cmd:settings', kind: 'Action', title: t('palette.items.settings'), keywords: 'preferences options', action: { type: 'command', command: 'settings' } },
   ]
   return [
     ...actions,
     ...smartLists.map((list): PaletteItem => ({ id: `list:${list.id}`, kind: 'List', title: list.label, keywords: 'go to', action: { type: 'path', path: list.path } })),
-    ...GUIDED_PALETTE_ITEMS,
+    ...(pro ? proPaletteItems(pro) : []),
+    ...(workMode ? workModePaletteItems(typeof workMode === 'object' ? workMode.showAll === true : false) : []),
+    ...guidedPaletteItems(),
     ...projects.map((project): PaletteItem => ({ id: `project:${project.id}`, kind: 'Project', title: project.title, keywords: 'go to', action: { type: 'project', id: project.id } })),
     ...labels.map((label): PaletteItem => ({ id: `label:${label.id}`, kind: 'Label', title: label.title, keywords: 'go to tag', action: { type: 'label', id: label.id } })),
   ]
@@ -78,7 +146,7 @@ export function taskItem(task: Task): PaletteItem {
  */
 export function rankPalette(items: readonly PaletteItem[], query: string, tasks: readonly Task[]): PaletteItem[] {
   if (query.trim() === '') {
-    return items.filter((item) => item.kind === 'Action' || item.kind === 'List').slice(0, PALETTE_COMMAND_LIMIT + PALETTE_TASK_LIMIT)
+    return items.filter((item) => (item.kind === 'Action' || item.kind === 'List') && !item.byNameOnly).slice(0, PALETTE_COMMAND_LIMIT + PALETTE_TASK_LIMIT)
   }
   // The title carries the match; the hidden keywords only help when the title does not match at all.
   const byTitle = fuzzyRank(items, query, (item) => item.title)

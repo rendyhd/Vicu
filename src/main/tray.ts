@@ -1,6 +1,7 @@
 import { app, Tray, Menu, nativeImage } from 'electron'
 import { join } from 'path'
 import { isMac } from './platform'
+import { t } from '../shared/i18n'
 
 let tray: Tray | null = null
 
@@ -91,15 +92,16 @@ export function createTray(cbs: TrayCallbacks): void {
   }
 }
 
+/** Builds the tray's menu in the language in use; called again when the language changes. */
 export function updateTrayMenu(): void {
   if (!tray || !callbacks) return
 
   const contextMenu = Menu.buildFromTemplate([
-    { label: 'Show Vicu', click: () => callbacks!.onShowMainWindow() },
-    { label: 'Quick Entry', click: () => callbacks!.onShowQuickEntry() },
-    { label: 'Quick View', click: () => callbacks!.onShowQuickView() },
+    { label: t('tray.show'), click: () => callbacks!.onShowMainWindow() },
+    { label: t('tray.quickEntry'), click: () => callbacks!.onShowQuickEntry() },
+    { label: t('tray.quickView'), click: () => callbacks!.onShowQuickView() },
     { type: 'separator' },
-    { label: 'Quit', click: () => callbacks!.onQuit() },
+    { label: t('tray.quit'), click: () => callbacks!.onQuit() },
   ])
 
   tray.setContextMenu(contextMenu)

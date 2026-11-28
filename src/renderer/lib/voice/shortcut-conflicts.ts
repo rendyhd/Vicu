@@ -21,7 +21,13 @@ const APP_SHORTCUTS: Array<{ keys: string; name: string }> = [
   { keys: 'Mod+R', name: 'Refresh' },
   { keys: 'Mod+Shift+R', name: 'Reload' },
   { keys: 'Mod+Shift+C', name: 'Comments' },
+  { keys: 'Mod+Shift+N', name: 'New event' },
   { keys: 'Mod+P', name: 'Print' },
+  // Pro (plan 7.1.11); they act only while Pro is on.
+  { keys: 'Mod+Shift+O', name: 'Focus (Pro)' },
+  { keys: 'Mod+Shift+F', name: 'Flag (Pro)' },
+  { keys: 'Mod+Shift+M', name: 'Import meeting notes (Pro)' },
+  { keys: 'Mod+I', name: 'Inspector (Pro)' },
   { keys: 'Mod+,', name: 'Settings' },
 ]
 

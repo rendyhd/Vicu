@@ -1,10 +1,36 @@
-import { app, nativeImage } from 'electron'
+import { app, nativeImage, Notification, shell } from 'electron'
 import { isMac, isWindows } from './platform'
+import { APP_ID } from './app-id'
 import { getMainWindow } from './quick-entry-state'
 
 let lastKey = ''
 let lastCount = 0
 let lastDataUrl: string | null = null
+
+let macNotificationsRegistered = false
+
+/**
+ * macOS draws a Dock badge only for an app that may show notifications with badges. Electron asks
+ * for that permission (alert, sound and badge) when its notification presenter is made, which is
+ * the first time a Notification is constructed; until then Vicu is not listed under System
+ * Settings, Notifications, and the count never shows, for example with reminders off. Constructing
+ * one (never shown) makes the presenter and asks once.
+ */
+function registerMacNotifications(): void {
+  if (macNotificationsRegistered) return
+  macNotificationsRegistered = true
+  try {
+    if (Notification.isSupported()) new Notification({ title: 'Vicu', silent: true }) // i18n-ignore: never shown, registers the Dock badge
+  } catch (err) {
+    console.warn('Could not register for notifications (Dock badge):', err)
+  }
+}
+
+/** System Settings, Notifications, Vicu: where macOS keeps "Badge application icon". */
+export function openBadgeNotificationSettings(): void {
+  if (!isMac) return
+  void shell.openExternal(`x-apple.systempreferences:com.apple.Notifications-Settings.extension?id=${APP_ID}`)
+}
 
 function labelFor(count: number): string {
   if (count >= 100) return '99+'
@@ -40,6 +66,7 @@ export function setTaskBadge(count: number, dataUrl: string | null): void {
   }
 
   if (isMac) {
+    registerMacNotifications()
     app.setBadgeCount(count)
     return
   }

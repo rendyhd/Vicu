@@ -113,6 +113,22 @@ Turn pasted notes or an email into task cards.
 - **Desktop:** choose **Make tasks from text** in the command palette. Press <kbd>Ctrl</kbd>+<kbd>Enter</kbd> to make the tasks.
 - **Phone:** share the text to Vicu and choose **Make tasks**.
 
+## Make tasks from notes
+
+Turn meeting notes, handwritten pages, PDFs and photos of whiteboards into tasks. It uses smart dictation's model, so turn that on first.
+
+- **Desktop:** choose **Make tasks from notes** in the command palette, or drop files on the Vicu window. Add typed or pasted text, PDFs, and pictures (JPEG, PNG, WebP; HEIC on a Mac only).
+- **Phone:** choose **Make tasks from notes** in the drawer, or share pictures, PDFs or text to Vicu and choose **Tasks from notes**. **Scan pages** uses the camera: a document scanner where the phone has one, else one photo per page.
+
+Give the notes a title and the date they were written: a date in the notes such as "Friday" is read from that day. Each file or picture becomes a page you can reorder, edit or remove.
+
+1. **Read the pictures.** Photos and scanned PDF pages are sent to your provider as pictures, made smaller and without their location. You are asked once before the first one goes. A PDF page with its own text is sent as text; choose **Read as image** when that text is wrong. If neither of your models can read pictures, Vicu asks you to pick one under **Settings, Assistant**.
+2. **Organize.** The pages go out as text, in parts for long notes, and come back as a plan like a brain dump: tasks under their projects, new projects where none fit, plus the decisions and open questions it found.
+3. **Check the plan.** Each card shows the page and line it came from and who it is for. **Tick** chooses which cards are ticked: your own, yours and the people Vicu knows (the default), or everything. A name Vicu does not know stays in the title, as in "Lalith: send the budget". Someone who shares the project can be assigned. In [Pro](guide:pro) a person can be a promise or a task to confirm with them; **Agreed in the meeting** makes the promises the default.
+4. **Add** creates the ticked tasks, and only the new projects that hold one. Each task's notes end with where it came from, such as "From Offsite Q4, page 2: Lalith: send the budget". One message has Undo.
+
+Nothing is kept of the pages after you add or discard them. Until then they survive a restart, and Vicu offers to open them again.
+
 ## Break a task into steps
 
 The assistant proposes subtasks for a task, and you check them before they are added.
@@ -165,6 +181,7 @@ Voice normally uses the system's speech recognizer. Under **Settings, Assistant,
 Sent to your provider:
 
 - **Dictation and brain dump:** the words (never audio), the names of your projects, labels and places, and the date and time.
+- **Notes:** the text of the pages, their title and date, the same names, and the people you share projects with. Pictures of pages only after you agree to that separately.
 - **Ask:** your messages and what its tools look up.
 - **Guided sessions:** the same names and date, plus the session's tasks (title, project, dates, labels, priority, when they were added and changed, and the first 500 characters of notes).
 - **Plan my day:** the same names and date, the candidate tasks, your free time and your routines' times without their names.
@@ -190,6 +207,7 @@ The key is stored encrypted on the device and never written to a log.
 | Smart dictation | Tap the voice shortcut, slide up from **+**, **Dictate tasks** | Slide up from **+**, app icon **Dictate** |
 | Ask | Button next to Search, <kbd>Ctrl</kbd>+<kbd>J</kbd>, **Ask Vicu** | Sparkle next to Search on any list |
 | Make tasks from text | Command palette | Share text to Vicu |
+| Make tasks from notes | Command palette, or drop files on the window | Drawer, or share pictures, PDFs or text to Vicu |
 | Break into steps | Right-click a task | Task menu |
 | Speech models | Whisper Turbo suggested | Parakeet suggested |
 

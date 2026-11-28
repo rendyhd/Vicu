@@ -1,5 +1,6 @@
 import type { EventEmitter } from 'node:events'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { isAnswerCutOff, isQueueableFailure, maybeCreatedMessage } from '../../shared/error-classify'
 
 // A scripted stand-in for Electron's net.request. Each request is recorded; the test decides
 // when and how the "server" answers.
@@ -286,5 +287,78 @@ describe('merge patches the server answers with 304 Not Modified', () => {
     expect(result.success).toBe(false)
     if (!result.success) expect(result.statusCode).toBe(422)
     expect(sent()).toHaveLength(1)
+  })
+})
+
+// What Electron does when the network fails after the answer began (ERR_NETWORK_CHANGED when a Mac
+// wakes or Wi-Fi switches): it destroys the response with the error, then fails the request. The
+// fake's EventEmitter throws an error nobody listens for, as Node does in the main process, where
+// it became the "JavaScript error occurred in the main process" dialog.
+function cutOff(req: FakeRequest, status: number, partialBody = '{"id":'): void {
+  const res = req.respond(status, { 'content-type': 'application/json' })
+  res.emit('data', Buffer.from(partialBody))
+  const error = new Error('net::ERR_NETWORK_CHANGED')
+  res.emit('error', error)
+  req.emit('error', error)
+}
+
+describe('a network error after the answer began', () => {
+  beforeEach(() => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+  })
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('is a failure, not an uncaught exception, and a create cut off this way is not queued', async () => {
+    const client = await loadClient()
+    serve((req) => cutOff(req, 201))
+
+    const result = await client.createTask(5, { title: 'Call Sam' })
+
+    expect(result.success).toBe(false)
+    if (result.success) return
+    expect(isAnswerCutOff(result.error)).toBe(true)
+    expect(result.error).toContain('ERR_NETWORK_CHANGED')
+    // The server had begun answering, so it has the task: replaying the create would add it twice.
+    expect(isQueueableFailure(result, 'create')).toBe(false)
+    expect(maybeCreatedMessage(result)).toContain('may already have been created')
+    // A change is safe to send again.
+    expect(isQueueableFailure(result, 'change')).toBe(true)
+  })
+
+  it('a network change before any answer still queues a create', async () => {
+    const client = await loadClient()
+    serve((req) => req.emit('error', new Error('net::ERR_NETWORK_CHANGED')))
+
+    const result = await client.createTask(5, { title: 'Call Sam' })
+
+    expect(result.success).toBe(false)
+    if (result.success) return
+    expect(result.error).toBe('net::ERR_NETWORK_CHANGED')
+    expect(isQueueableFailure(result, 'create')).toBe(true)
+  })
+
+  it('an upload cut off this way is a failure that says the server had begun', async () => {
+    const client = await loadClient()
+    serve((req) => {
+      if (req.url.endsWith('/api/v2/info')) answerJson(req, 200, { max_file_size: '1MB' })
+      else cutOff(req, 201)
+    })
+
+    const result = await client.uploadTaskAttachment(7, Buffer.alloc(1000), 'a.txt', 'text/plain')
+
+    expect(result.success).toBe(false)
+    if (!result.success) expect(isAnswerCutOff(result.error)).toBe(true)
+  })
+
+  it('a download cut off this way is a failure', async () => {
+    const client = await loadClient()
+    serve((req) => cutOff(req, 200, 'part of a file'))
+
+    const result = await client.downloadTaskAttachment(1, 2)
+
+    expect(result.success).toBe(false)
+    if (!result.success) expect(result.error).toContain('ERR_NETWORK_CHANGED')
   })
 })

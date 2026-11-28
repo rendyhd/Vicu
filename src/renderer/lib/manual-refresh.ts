@@ -3,8 +3,9 @@ import { DATE_QUERY_KEYS, refreshTaskData, type RefreshDeps } from './task-refre
 
 // Refresh on request (F5, Mod+R, View → Refresh, the command palette): read the page again from the
 // server without leaving it. The automatic refreshes (lib/freshness.ts) only refetch tasks and are
-// throttled; this one is not throttled and also rereads projects, labels, sharing and the synced
-// documents (custom lists, synced preferences), so a change made on another device shows at once.
+// throttled; this one is not throttled and also rereads projects, labels, sharing, the synced
+// documents (custom lists, synced preferences) and the connected calendars, so a change made on
+// another device or in a calendar shows at once.
 
 /** What a refresh rereads besides the tasks. */
 export const MANUAL_REFRESH_KEYS: readonly QueryKey[] = [
@@ -19,6 +20,8 @@ export const MANUAL_REFRESH_KEYS: readonly QueryKey[] = [
 export interface ManualRefreshDeps extends RefreshDeps {
   /** Ask main to sync the custom lists and the synced preferences; fire and forget. */
   syncDocuments(): void
+  /** Ask main to read the connected calendars now (contract 20.9), then the Plan screen again. */
+  refreshCalendars(): void
 }
 
 /**
@@ -28,6 +31,7 @@ export interface ManualRefreshDeps extends RefreshDeps {
 export function manualRefresh(qc: QueryClient, deps: ManualRefreshDeps): 'refreshed' | 'deferred' {
   for (const queryKey of MANUAL_REFRESH_KEYS) void qc.invalidateQueries({ queryKey })
   deps.syncDocuments()
+  deps.refreshCalendars()
   return refreshTaskData(qc, deps, DATE_QUERY_KEYS)
 }
 

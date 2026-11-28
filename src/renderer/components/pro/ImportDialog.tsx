@@ -1,0 +1,376 @@
+import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
+import type { TranslationKey } from '../../../shared/i18n'
+import { useQueryClient } from '@tanstack/react-query'
+import { Dialog } from '@/components/overlay/Dialog'
+import { Checkbox } from '@/components/shared/Checkbox'
+import { usePromiseWorld } from '@/hooks/use-promise-world'
+import { useGroups } from '@/hooks/use-groups'
+import { useProjects } from '@/hooks/use-projects'
+import { useAppConfig } from '@/hooks/use-app-config'
+import { useProPrefs } from '@/hooks/use-pro-prefs'
+import { useAddLabel, useCompleteTask, useCreateLabel, useCreateTask, useDeleteTask, useUncompleteTask, useUpdateTask } from '@/hooks/use-task-mutations'
+import { currentLedger, newLedgerId, restoreRecords, setRecord, writeLedger } from '@/hooks/use-pro-ledger'
+import { useProUiStore } from '@/stores/pro-ui-store'
+import { useProAssistantOn } from '@/hooks/use-pro-assistant'
+import { useAiReady } from '@/hooks/use-ai'
+import { useCollabMe } from '@/hooks/use-project-access'
+import { proImportDocument, proImportUser } from '../../../shared/ai/pro-import'
+import { toast } from '@/stores/toast-store'
+import { isTempTaskId } from '@/lib/pending-cache'
+import { NULL_DATE } from '@/lib/constants'
+import type { Label, Task } from '@/lib/vikunja-types'
+import { dateOnlyDue, toLocalDate } from '../../../shared/due-dates'
+import { matchImport, readImport, type ImportRow } from '../../../shared/pro/import'
+import { buildVerdict, promiseOf, withVerdict } from '../../../shared/pro/promises'
+import { recordValue, type LedgerCollection, type PromiseValue, type VerdictKind } from '../../../shared/pro/ledger'
+import { withAlias } from '../../../shared/pro/people'
+import type { ProLedgerOperation } from '../../../shared/pro/ledger-ipc'
+
+const ACTION_TEXT: Record<ImportRow['action'], TranslationKey> = {
+  their_promise: 'pro.import.action.theirPromise',
+  confirm: 'pro.import.action.confirm',
+  my_task: 'pro.import.action.myTask',
+  verdict: 'pro.import.action.verdict',
+  open_item: 'pro.import.action.openItem',
+  decision: 'pro.import.action.decision',
+  owed: 'pro.import.action.owed',
+  value: 'pro.import.action.value',
+}
+
+const GROUPS: Array<{ title: TranslationKey; actions: ImportRow['action'][] }> = [
+  { title: 'pro.import.group.updates', actions: ['verdict'] },
+  { title: 'pro.import.group.newPromises', actions: ['their_promise', 'confirm'] },
+  { title: 'pro.import.group.yourActions', actions: ['my_task'] },
+  { title: 'pro.import.group.openItems', actions: ['open_item', 'decision', 'owed', 'value'] },
+]
+
+interface RowChoice {
+  on: boolean
+  title: string
+  /** A person picked for a name that matched none. */
+  person: number | null
+  rememberAlias: boolean
+}
+
+/**
+ * Import (cross-app semantics 21.12, plan 7.4.2): paste the JSON Copilot gave (or a Vicu export),
+ * review every row, then add the ticked ones at once with one Undo.
+ */
+export function ImportDialog({ onClose, initialText = '', groupLabel }: { onClose: () => void; initialText?: string; groupLabel?: number }) {
+  const { t } = useTranslation()
+  const queryClient = useQueryClient()
+  const world = usePromiseWorld()
+  const groups = useGroups()
+  const groupTag = groupLabel !== undefined ? groups.labelOf(groupLabel) : undefined
+  const { data: projects } = useProjects()
+  const { data: config } = useAppConfig()
+  const prefs = useProPrefs()
+  const createTask = useCreateTask({ silent: true })
+  const addLabel = useAddLabel({ silent: true })
+  const createLabel = useCreateLabel()
+  const deleteTask = useDeleteTask()
+  const complete = useCompleteTask()
+  const uncomplete = useUncompleteTask()
+  const update = useUpdateTask()
+  const openRecap = useProUiStore((s) => s.open)
+  const [text, setText] = useState(initialText)
+  const [choices, setChoices] = useState<Record<number, RowChoice>>({})
+  const [working, setWorking] = useState(false)
+  // Converting plain text with the assistant (ai-assistant 11.1): only with Pro's assistant on and Ask ready.
+  const assistantOn = useProAssistantOn()
+  const aiReady = useAiReady()
+  const canConvert = assistantOn && aiReady.ask
+  const me = useCollabMe()
+  const [sourceKind, setSourceKind] = useState<'meeting' | 'mail' | 'chat'>('meeting')
+  const [converting, setConverting] = useState(false)
+  const [convertProblem, setConvertProblem] = useState<string | null>(null)
+  const today = toLocalDate(new Date())
+
+  const read = useMemo(() => (text.trim() ? readImport(text, today) : null), [text, today])
+  const match = useMemo(() => {
+    if (!read?.ok) return null
+    const people = [...world.people.values()].map((label) => ({ id: label.id, title: label.title, aliases: recordValue(world.ledger.people, label.id)?.aliases ?? [] }))
+    const initiatives = Object.keys(world.ledger.initiatives).flatMap((id) => {
+      const project = projects?.all.find((entry) => entry.id === Number(id))
+      return project ? [{ id: project.id, title: project.title }] : []
+    })
+    const openPromises = world.open.flatMap((task) => {
+      const promise = world.promiseFor(task)
+      return promise && promise.person !== null ? [{ taskId: task.id, person: promise.person, title: task.title, dir: String(promise.dir) }] : []
+    })
+    return matchImport(read, { people, initiatives, openPromises })
+  }, [read, world, projects?.all])
+
+  const choiceOf = (row: ImportRow): RowChoice => choices[row.index] ?? { on: row.ready, title: row.title ?? row.item.what, person: row.person.id, rememberAlias: false }
+  const setChoice = (row: ImportRow, change: Partial<RowChoice>) => setChoices((all) => ({ ...all, [row.index]: { ...choiceOf(row), ...change } }))
+  const ticked = match?.rows.filter((row) => choiceOf(row).on) ?? []
+
+  const convert = async () => {
+    setConverting(true)
+    setConvertProblem(null)
+    const people = [...world.people.values()].map((label) => label.title)
+    const initiatives = Object.keys(world.ledger.initiatives).flatMap((id) => projects?.all.find((entry) => entry.id === Number(id))?.title ?? [])
+    const open = world.open.flatMap((task) => {
+      const promise = world.promiseFor(task)
+      return promise ? [{ taskId: task.id, title: task.title, person: world.nameOf(promise.person), dir: String(promise.dir) }] : []
+    })
+    const user = proImportUser({ me: me?.name || me?.username || 'me', people, initiatives, open, text })
+    const result = await window.api.ai.proImport({ requestId: `pro-import-${Date.now()}`, user })
+    setConverting(false)
+    if (!result.success) {
+      setConvertProblem(result.error.message)
+      return
+    }
+    const document = proImportDocument(result.data, { kind: sourceKind, title: '', date: today })
+    if (!document) {
+      setConvertProblem(t('pro.import.nothingToImport'))
+      return
+    }
+    setText(document)
+    setChoices({})
+  }
+
+  const apply = async () => {
+    if (!match) return
+    setWorking(true)
+    const inboxId = config?.inbox_project_id ?? 0
+    const created: Task[] = []
+    const verdicts: Array<{ task: Task; kind: VerdictKind; oldDue: string }> = []
+    const touched: Array<{ collection: LedgerCollection; id: string }> = []
+    const before = currentLedger(queryClient)
+    const operations: ProLedgerOperation[] = []
+    const set = (collection: LedgerCollection, id: string, value: unknown) => {
+      touched.push({ collection, id })
+      operations.push(setRecord(collection, id, value))
+    }
+    // Your own open promises: what an imported promise's `needs` may name (`t-<id>` or the id).
+    const ownOpen = new Set(world.open.filter((task) => {
+      const promise = world.promiseFor(task)
+      return promise !== null && promise !== undefined && String(promise.dir) === 'mine'
+    }).map((task) => task.id))
+    const needsOf = (needs: string[] | undefined): number[] => {
+      const ids: number[] = []
+      for (const need of needs ?? []) {
+        const found = /^t-(\d+)$/.exec(need) ?? /^(\d+)$/.exec(need)
+        const id = found ? Number(found[1]) : NaN
+        if (ownOpen.has(id) && !ids.includes(id)) ids.push(id)
+      }
+      return ids
+    }
+    const inGroup = groupLabel !== undefined ? { group: groupLabel } : {}
+    const make = async (title: string, due: string | null, projectId: number, person: number | null): Promise<Task> => {
+      const payload = { title, ...(due ? { due_date: dateOnlyDue(due) } : {}) }
+      const label = person !== null ? world.people.get(person) : undefined
+      // Opened for a group (21.16): what the import adds is an action of that group.
+      const labels = [label, groupTag].filter((entry): entry is Label => !!entry)
+      const task = await createTask.mutateAsync({ projectId, task: payload, extras: labels.length ? { labels: labels.map((entry) => ({ id: entry.id, title: entry.title })), displayLabels: labels } : undefined })
+      if (!isTempTaskId(task.id)) for (const entry of labels) await addLabel.mutateAsync({ taskId: task.id, labelId: entry.id }).catch(() => undefined)
+      created.push(task)
+      return task
+    }
+    try {
+      for (const row of ticked) {
+        const choice = choiceOf(row)
+        const person = choice.person
+        const projectId = row.initiative ?? inboxId
+        if (person !== null && row.name && choice.rememberAlias && person !== row.person.id) {
+          const current = recordValue(currentLedger(queryClient).people, person)
+          set('people', String(person), { ...(current ?? {}), aliases: withAlias(current?.aliases, row.name) })
+        }
+        switch (row.action) {
+          case 'their_promise': {
+            const task = await make(choice.title, row.due, projectId, person)
+            const value: PromiseValue = { dir: 'theirs', person }
+            if (groupLabel !== undefined) value.to = { group: groupLabel }
+            if (row.item.in_their_words) value.words = row.item.in_their_words
+            if (row.item.done_when) value.done_when = row.item.done_when
+            if (row.initiative) value.initiative = row.initiative
+            const needs = needsOf(row.item.needs)
+            if (needs.length) value.needs = needs
+            set('promises', String(task.id), value)
+            break
+          }
+          case 'confirm':
+            await make(choice.title, row.due, projectId, person)
+            break
+          case 'my_task': {
+            const task = await make(choice.title, row.due, projectId, null)
+            // With no one named it is still your own promise, to the group when opened for one.
+            set('promises', String(task.id), { dir: 'mine', person, ...(person === null && groupLabel !== undefined ? { to: { group: groupLabel } } : {}), ...(row.initiative ? { initiative: row.initiative } : {}) })
+            break
+          }
+          case 'verdict': {
+            const task = row.target !== null ? world.openById.get(row.target) : undefined
+            const promise = task ? promiseOf(currentLedger(queryClient), task.id) : null
+            const kind = row.item.status as VerdictKind | undefined
+            if (!task || !promise || !kind) break
+            const change = buildVerdict(task, kind, { id: newLedgerId(), at: new Date().toISOString(), newDue: row.item.new_due ?? null, blocker: row.item.blocker ?? null })
+            set('promises', String(task.id), withVerdict(promise, change.verdict))
+            if (change.taskPatch?.done) complete.mutate(task)
+            else if (typeof change.taskPatch?.due_date === 'string') update.mutate({ id: task.id, changes: { due_date: change.taskPatch.due_date }, original: task })
+            verdicts.push({ task, kind, oldDue: task.due_date })
+            break
+          }
+          case 'open_item':
+            if (row.item.ask) {
+              const task = await make(choice.title, null, projectId, person)
+              set('log', newLedgerId(), { kind: 'unknown', text: row.item.what, at: today, initiative: row.initiative, ask: person, task: task.id, ...inGroup })
+            } else set('log', newLedgerId(), { kind: 'unknown', text: row.item.what, at: today, initiative: row.initiative, ask: null, ...inGroup })
+            break
+          case 'decision':
+            set('log', newLedgerId(), { kind: 'decision', text: row.item.what, by: person, at: row.item.date ?? today, initiative: row.initiative, ...inGroup })
+            break
+          case 'owed':
+            set('owed', newLedgerId(), { what: row.item.what, from: person, initiative: row.initiative, opened: today })
+            break
+          case 'value':
+            set('log', newLedgerId(), { kind: 'value', text: row.item.where ? `${row.item.what} (${row.item.where})` : row.item.what, at: today, initiative: row.initiative })
+            break
+        }
+      }
+      if (operations.length) await writeLedger(queryClient, operations)
+      const people = [...new Set(ticked.map((row) => choiceOf(row).person).filter((id): id is number => id !== null))]
+      toast.success(t('pro.import.added', { count: ticked.length }), {
+        action: {
+          label: t('pro.import.undo'),
+          onAction: () => {
+            for (const task of created) deleteTask.mutate({ task })
+            for (const { task, oldDue } of verdicts) {
+              if (task.done === false && world.openById.has(task.id)) uncomplete.mutate({ ...task, done: true })
+              update.mutate({ id: task.id, changes: { due_date: oldDue || NULL_DATE }, original: task })
+            }
+            void writeLedger(queryClient, restoreRecords(before, touched))
+          },
+        },
+        secondAction: people.length ? { label: t('pro.import.recap'), onAction: () => openRecap('pro-recap', { personId: people[0] }) } : undefined,
+      })
+      onClose()
+    } catch (error) {
+      toast.error(error instanceof Error ? t('pro.import.stoppedWith', { message: error.message }) : t('pro.import.stopped'))
+    } finally {
+      setWorking(false)
+    }
+  }
+
+  const addPerson = async (row: ImportRow) => {
+    if (!row.name) return
+    const label = await createLabel.mutateAsync({ title: row.name })
+    if (!label) return
+    await prefs.setPerson(label.id, true)
+    setChoice(row, { person: label.id })
+  }
+
+  return (
+    <Dialog open label={t('pro.import.title')} onClose={onClose} className="w-[760px] max-w-[94vw] p-5">
+      <h2 className="mb-1 text-card-title text-text">{t('pro.import.title')}</h2>
+      <p className="mb-3 text-meta text-text-secondary">{t('pro.import.intro')}</p>
+      <textarea
+        value={text}
+        onChange={(event) => {
+          setText(event.target.value)
+          setChoices({})
+        }}
+        rows={match ? 3 : 10}
+        // i18n-ignore: the import format, the same in every language
+        placeholder='{"format":"vicu-import/1", ...}'
+        aria-label={t('pro.import.pastedText')}
+        className="w-full rounded-control border border-border bg-bg-page p-2 font-mono text-meta text-text"
+        autoFocus
+      />
+      {read && !read.ok && (
+        <p className="mt-2 text-meta text-status-overdue">
+          {read.problems[0] ?? t('pro.import.notReadable')}
+        </p>
+      )}
+      {read && !read.ok && canConvert && (
+        <div className="mt-2 flex flex-wrap items-center gap-2" data-pro-import-convert>
+          <select value={sourceKind} onChange={(event) => setSourceKind(event.target.value as typeof sourceKind)} aria-label={t('pro.import.textIs')} className="rounded-control border border-border bg-bg-page px-2 py-1 text-meta text-text">
+            <option value="meeting">{t('pro.import.kindMeeting')}</option>
+            <option value="mail">{t('pro.import.kindMail')}</option>
+            <option value="chat">{t('pro.import.kindChat')}</option>
+          </select>
+          <button type="button" disabled={converting} onClick={() => void convert()} className="rounded-control bg-accent-fill px-3 py-1 text-meta font-medium text-on-accent disabled:opacity-40">
+            {converting ? t('pro.import.converting') : t('pro.import.convert')}
+          </button>
+          {convertProblem && <span className="text-meta text-status-overdue">{convertProblem}</span>}
+        </div>
+      )}
+      {read?.ok && read.problems.length > 0 && <p className="mt-2 text-meta text-text-secondary">{read.problems.join(' ')}</p>}
+      {match && (
+        <div className="mt-3 max-h-[52vh] space-y-4 overflow-y-auto" data-pro-import-rows>
+          {GROUPS.map((group) => {
+            const rows = match.rows.filter((row) => group.actions.includes(row.action))
+            if (!rows.length) return null
+            return (
+              <section key={group.title}>
+                <h3 className="mb-1 text-group text-text-secondary">{t(group.title)}</h3>
+                <ul className="divide-y divide-border rounded-card border border-border">
+                  {rows.map((row) => {
+                    const choice = choiceOf(row)
+                    const unknownName = row.name && row.person.id === null && row.action !== 'my_task' ? row.name : null
+                    const target = row.target !== null ? world.openById.get(row.target) : undefined
+                    return (
+                      <li key={row.index} className="flex items-start gap-2 px-3 py-2" data-pro-import-row={row.action}>
+                        <Checkbox checked={choice.on} onChange={(event) => setChoice(row, { on: event.target.checked })} aria-label={t('pro.import.addItem', { what: row.item.what })} />
+                        <div className="min-w-0 flex-1 space-y-1">
+                          <div className="flex items-center gap-2">
+                            <span className="shrink-0 rounded-chip bg-bg-hover px-2 py-px text-chip text-text-secondary">{t(ACTION_TEXT[row.action])}</span>
+                            {row.title !== null ? (
+                              <input value={choice.title} onChange={(event) => setChoice(row, { title: event.target.value })} aria-label={t('pro.import.rowTitle')} className="min-w-0 flex-1 rounded-control border border-transparent bg-transparent px-1 text-task-title text-text hover:border-border focus:border-border" />
+                            ) : (
+                              <span className="min-w-0 flex-1 truncate text-task-title text-text">{row.item.what}</span>
+                            )}
+                            {row.due && <span className="shrink-0 text-meta text-text-secondary">{row.due}</span>}
+                          </div>
+                          {row.action === 'verdict' && (
+                            <p className="text-meta text-text-secondary">
+                              {target ? t('pro.import.verdictFor', { status: row.item.status ?? '?', title: target.title }) : t('pro.import.noMatch')}
+                              {row.check && ` ${t('pro.import.checkRight')}`}
+                            </p>
+                          )}
+                          {row.name && row.action !== 'verdict' && (
+                            <div className="flex flex-wrap items-center gap-2 text-meta text-text-secondary">
+                              <span>{row.name}</span>
+                              {unknownName && (
+                                <>
+                                  <select value={choice.person ?? ''} onChange={(event) => setChoice(row, { person: event.target.value ? Number(event.target.value) : null, on: !!event.target.value })} aria-label={t('pro.import.whoIsName', { name: row.name })} className="rounded-control border border-border bg-bg-page px-1.5 py-0.5">
+                                    <option value="">{t('pro.import.whoIsThis')}</option>
+                                    {[...world.people.values()].map((label) => <option key={label.id} value={label.id}>{label.title}</option>)}
+                                  </select>
+                                  {choice.person !== null ? (
+                                    <label className="flex items-center gap-1"><Checkbox checked={choice.rememberAlias} onChange={(event) => setChoice(row, { rememberAlias: event.target.checked })} /> {t('pro.import.remember')}</label>
+                                  ) : (
+                                    <button type="button" className="text-accent-blue hover:underline" onClick={() => void addPerson(row)}>{t('pro.import.addAsPerson', { name: row.name })}</button>
+                                  )}
+                                </>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </li>
+                    )
+                  })}
+                </ul>
+              </section>
+            )
+          })}
+          {match.notMentioned.length > 0 && (
+            <section>
+              <h3 className="mb-1 text-group text-text-secondary">{t('pro.import.notMentioned')}</h3>
+              <ul className="space-y-0.5 text-meta text-text-secondary">
+                {match.notMentioned.map((id) => <li key={id}>{world.openById.get(id)?.title ?? t('pro.import.taskFallback', { id })}</li>)}
+              </ul>
+            </section>
+          )}
+        </div>
+      )}
+      <div className="mt-4 flex justify-end gap-2">
+        <button type="button" className="rounded-control px-3 py-1.5 text-meta text-text hover:bg-bg-hover" onClick={onClose}>{t('pro.common.cancel')}</button>
+        <button type="button" disabled={!ticked.length || working} className="rounded-control bg-accent-fill px-3 py-1.5 text-meta font-medium text-on-accent disabled:opacity-40" onClick={() => void apply()} data-pro-import-add>
+          {ticked.length ? t('pro.import.addCount', { count: ticked.length }) : t('pro.import.add')}
+        </button>
+      </div>
+    </Dialog>
+  )
+}

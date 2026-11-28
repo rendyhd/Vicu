@@ -1,12 +1,14 @@
 import { useDroppable } from '@dnd-kit/core'
 import { useDndContext } from '@dnd-kit/core'
 import { cn } from '@/lib/cn'
+import { useTranslation } from 'react-i18next'
 
 interface ParentDropZoneProps {
   projectId: number
 }
 
 export function ParentDropZone({ projectId }: ParentDropZoneProps) {
+  const { t } = useTranslation()
   const { active } = useDndContext()
   const { isOver, setNodeRef } = useDroppable({
     id: `parent-project-${projectId}`,
@@ -29,7 +31,7 @@ export function ParentDropZone({ projectId }: ParentDropZoneProps) {
           : 'border-[var(--border-color)] text-[var(--text-secondary)]'
       )}
     >
-      Move to unsectioned
+      {t('task.section.moveToUnsectioned')}
     </div>
   )
 }

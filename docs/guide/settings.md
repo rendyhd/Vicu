@@ -6,7 +6,7 @@ lead: A reference to each settings section on the desktop and on the phone. Ever
 
 ## In short
 
-- **Open Settings** from the sidebar (desktop) or the drawer (phone). The desktop has tabs: **General**, **Projects**, **Quick Entry / View**, **Notifications**, **Assistant**, **Pro** and **Keyboard Shortcuts**. The phone has **General**, **Projects**, **Notifications**, **Gestures** and **Assistant**.
+- **Open Settings** from the sidebar (desktop) or the drawer (phone). The desktop has a menu on the left: **General**, **Projects** and **Notifications**, then the features **Quick Entry / View**, **Assistant**, **Pro** and **Keyboard Shortcuts**. The page you are on lists its sections under its name; click one to go to it. In a narrow window the menu takes the sidebar's place, and **Back to app** brings your lists back. The phone has **General**, **Projects**, **Notifications**, **Gestures** and **Assistant**.
 - **Most settings are per device.** Look, behavior, notification and shortcut choices stay on the device where you set them. Setting the theme on your phone does not change your computer.
 - **Some settings are synced.** They live on your server and appear on every device you sign in on: your Inbox, task order, custom lists, categories, templates, planner defaults, and a few more. Tables below mark them **Synced**.
 - **Settings save as you change them.** There is no Save button.
@@ -40,14 +40,23 @@ How to read the tables: **Synced** follows you to every device. **This device** 
 |---|---|---|
 | Launch on startup | Starts Vicu when you sign in to your computer | This device |
 | Start hidden | Starts without a window. Needs the tray icon. | This device |
+| When closing the window | Windows and Linux: minimize to the taskbar (the task count stays), hide to the tray, or quit | This device |
 | Confirm before deleting | Asks before deleting tasks, projects, labels and lists | This device |
 | Subtasks in task lists | **Inside task** keeps them in the task, **Expandable** shows them under the parent | This device |
-| Show today & overdue count on app icon | A badge with the number of tasks due today and overdue | This device |
+| Show today & overdue count on app icon | A badge with the number of tasks due today and overdue. On a Mac it needs notifications with badges allowed for Vicu in System Settings, Notifications. | This device |
 | What does urgent mean? | **Schedule for Today** or **Mark Important**: what the top action in a task's right-click menu does | This device |
 
 #### Sidebar
 
-Tick the smart lists you want above your projects. The Inbox always stays. A hidden list still opens from the [command palette](guide:desktop#the-command-palette). This choice is per computer.
+One list of your smart lists and the sidebar's sections (Projects, Custom lists, Labels, and Pro while it is on). Tick the smart lists you want. The Inbox always stays. A hidden list still opens from the [command palette](guide:desktop#the-command-palette).
+
+Drag a row by its grip to put the sidebar in your own order, or use the arrows at the end of the row. Lists under the last section stay in view at the bottom of the sidebar; the Logbook is there until you move it. **Reset order** brings the default back. These choices are per computer.
+
+With Pro on, the **Pro** header in the sidebar folds Pro's lists away and opens them again; they stay in the command palette.
+
+#### Work and Personal
+
+Turns on the Personal and Work switch at the top of the sidebar (with an optional All position), holds the work label and work projects, and lets you choose whether the work label shows on rows in Work mode. See [Work and Personal](guide:work-and-personal). The switch and display options are per computer; the label and the projects are shared with your other devices.
 
 #### Task Completion Sound
 
@@ -87,7 +96,7 @@ See [Quick add](guide:quick-add).
 | Default review cadence (days) | How often projects are due for review. 14 to start. | This device |
 | Exclude Inbox from review list | Leaves the Inbox out | This device |
 | Excluded from review | Projects you left out, with **Include again** | Synced (stored with the project) |
-| Import saved filters | Turns your Vikunja saved filters into custom lists | Synced (the lists) |
+| Import saved filters and views | Turns your Vikunja saved filters and project views into custom lists, and updates lists imported before | Synced (the lists) |
 
 See [Projects and labels](guide:projects), [Custom lists](guide:custom-lists) and [Review and guided organizing](guide:review).
 
@@ -166,7 +175,7 @@ Settings are in the drawer. Everything on the phone is per device unless marked.
 | Bottom Bar | The last three slots, **Smart list colours**, **Reset to Defaults** | This device |
 | Plan | **Show Plan in the drawer**, and the Plan options (default length and work hours sync, the evening nudge does not) | Switch: this device. Length and hours: Synced |
 | Pro | **Turn on Pro on this device** and its parts | This device |
-| Drawer | Which views the drawer lists | This device |
+| Drawer | Which views the drawer lists and in what order, with the Projects, Lists and Labels blocks; **Reset order** | This device |
 | Widget | **Smart add button**, **Context navigation** | This device |
 | Routines | **Enable routines**, **Show routines in Today**, **Routines shown on Today**, **Hidden shared routines** | This device. Hidden shared routines: Synced |
 | Logbook | **Hide old completed tasks** and **Keep completed tasks for** a number of days. Nothing is deleted. | This device |
@@ -179,7 +188,7 @@ Settings are in the drawer. Everything on the phone is per device unless marked.
 | Section | What it holds | Follows you |
 |---|---|---|
 | Inbox Project | **Choose inbox project**, and **Move dated tasks out of Inbox** | Inbox: Synced. The move option: This device |
-| Display | **Task order** (and **Sort tasks** per project), **Subprojects in project views**, **Show project progress**, **Show task count** | Order: Synced. The rest: This device |
+| Display | **Task order** (and **Sort tasks** per project), **Subprojects in project views**, **Show project progress**, **Show task count**, **Show completed tasks** | Order and Show completed tasks: Synced. The rest: This device |
 | Review | **Enable project review tracking**, **Default review cadence**, **Exclude Inbox from review**, and the list of excluded projects | This device |
 | Projects, Labels | Your projects (tap to edit, hold to drag, ⋮ for more) and labels | Synced |
 | Custom Lists | Your custom lists, and the import of saved filters | Synced |

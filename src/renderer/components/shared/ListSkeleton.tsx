@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { PageHeader } from './PageHeader'
 import { ReadingScroll } from '@/components/layout/ReadingScroll'
 import { SmartListIcon } from './SmartListIcon'
@@ -20,11 +21,12 @@ const TITLE_WIDTHS = ['w-3/5', 'w-2/5', 'w-1/2', 'w-1/3'] as const
  * a few placeholder rows shaped like task rows. A light sweeps across them once (`vicu-shimmer`); reduced motion fades them in instead.
  */
 export function ListSkeleton({ title, subtitle, identity, rows = 4 }: ListSkeletonProps) {
+  const { t } = useTranslation()
   return (
     <div className="flex h-full flex-col" aria-busy="true">
       <PageHeader title={title} subtitle={subtitle} icon={identity && <SmartListIcon list={identity} className="h-5 w-5" />} />
       <ReadingScroll>
-        <div role="status" aria-label={`Loading ${title}`} data-skeleton="list">
+        <div role="status" aria-label={t('app.loading', { title })} data-skeleton="list">
           {TITLE_WIDTHS.slice(0, rows).map((width) => (
             <div key={width} data-skeleton-row className="flex items-center gap-3 border-b border-[var(--border-color)] px-4 py-2.5" aria-hidden="true">
               <span className="vicu-shimmer h-5 w-5 shrink-0 rounded-full bg-bg-hover" />

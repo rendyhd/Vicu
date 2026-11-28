@@ -2,8 +2,10 @@ import { Button } from '@/components/shared/Button'
 import { Checkbox } from '@/components/shared/Checkbox'
 import { Play } from 'lucide-react'
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { api } from '@/lib/api'
 import { cn } from '@/lib/cn'
+import { can } from '@/lib/capabilities'
 import { reloadCompletionSound, previewCompletionSound } from '@/lib/completion-sound'
 import type { AppConfig } from '@/lib/vikunja-types'
 
@@ -18,6 +20,7 @@ interface Props {
 }
 
 export function CompletionSoundSettings({ config, onChange }: Props) {
+  const { t } = useTranslation()
   const enabled = config.task_completion_sound_enabled !== false
   const [info, setInfo] = useState<SoundInfo | null>(null)
   const [busy, setBusy] = useState(false)
@@ -62,12 +65,12 @@ export function CompletionSoundSettings({ config, onChange }: Props) {
 
   const handlePlay = async () => {
     setError(null)
-    if (!(await previewCompletionSound())) setError('This sound cannot be played. Choose another file.')
+    if (!(await previewCompletionSound())) setError(t('settings.completionSound.cannotPlay'))
   }
 
   return (
     <div className="rounded-card border border-[var(--border-color)] bg-[var(--bg-primary)] p-5">
-      <h2 className="mb-4 text-sm font-semibold text-[var(--text-primary)]">Task Completion Sound</h2>
+      <h2 className="mb-4 text-sm font-semibold text-[var(--text-primary)]">{t('settings.completionSound.title')}</h2>
 
       <div className="space-y-3">
         <label className="flex cursor-pointer items-center gap-2">
@@ -76,40 +79,45 @@ export function CompletionSoundSettings({ config, onChange }: Props) {
             onChange={(e) => onChange({ task_completion_sound_enabled: e.target.checked })}
           />
           <span className="text-sm text-[var(--text-primary)]">
-            Play a sound when completing a task
+            {t('settings.completionSound.enable')}
           </span>
         </label>
 
         <div className={cn('space-y-2 transition-opacity', !enabled && 'pointer-events-none opacity-50')}>
           <div className="text-xs text-[var(--text-secondary)]">
-            Current sound:{' '}
+            {t('settings.completionSound.current')}{' '}
             <span className="font-mono text-[var(--text-primary)]">
               {info ? info.fileName : '...'}
             </span>
             {info?.isDefault && (
-              <span className="ml-1 text-[var(--text-secondary)]">(default)</span>
+              <span className="ml-1 text-[var(--text-secondary)]">{t('settings.completionSound.default')}</span>
             )}
           </div>
 
           <div className="flex flex-wrap gap-2">
-            <Button variant="secondary" onClick={() => void handlePlay()} disabled={busy} aria-label="Play the completion sound">
-              <Play className="h-4 w-4" aria-hidden="true" /> Play
+            <Button variant="secondary" onClick={() => void handlePlay()} disabled={busy} aria-label={t('settings.completionSound.playLabel')}>
+              <Play className="h-4 w-4" aria-hidden="true" /> {t('settings.completionSound.play')}
             </Button>
-            <Button variant="secondary" onClick={handleChooseFile} disabled={busy}>
-              Choose file...
-            </Button>
-            {info && !info.isDefault && (
+            {/* Choosing a file by its path needs the desktop; the built-in sound and its switch stay. */}
+            {can('openFiles') && (
+              <Button variant="secondary" onClick={handleChooseFile} disabled={busy}>
+                {t('settings.completionSound.choose')}
+              </Button>
+            )}
+            {can('openFiles') && info && !info.isDefault && (
               <Button variant="secondary" onClick={handleReset} disabled={busy}>
-                Reset to default
+                {t('settings.completionSound.reset')}
               </Button>
             )}
           </div>
 
           {error && <p className="text-xs text-danger">{error}</p>}
 
-          <p className="text-xs text-[var(--text-secondary)]">
-            Supported: MP3, WAV, OGG, M4A, AAC, FLAC (max 10MB)
-          </p>
+          {can('openFiles') && (
+            <p className="text-xs text-[var(--text-secondary)]">
+              {t('settings.completionSound.supported')}
+            </p>
+          )}
         </div>
       </div>
     </div>

@@ -6,7 +6,7 @@ import {
   endOfWeek,
   isDateOnly,
   isNoDueDate,
-  nextWeekStart,
+  nextWeekDay,
   startOfLocalDay,
   startOfWeek,
   toLocalDate,
@@ -19,7 +19,10 @@ import {
   type DateFormat,
 } from './date-display'
 import { formatMinutesOfDay } from './date-utils'
+import { getWeekStart, type WeekStart } from '../../shared/week-start'
+import { t } from '../../shared/i18n'
 import { extractDate } from './task-parser/extract-dates'
+import type { DayChoice } from '../../shared/when-choices'
 
 // The pure rules of the When panel (card 3.4a1): what a picked day and time mean as a due date,
 // the month grid and its keyboard moves, the quick choices, and how typed text becomes a
@@ -34,7 +37,7 @@ export interface WhenValue {
 
 export const EMPTY_WHEN: WhenValue = { date: null, time: null }
 
-/** The times offered under the grid. */
+/** The default times of day (section 23.1); the panel offers the account's own. */
 export const TIME_CHOICES = ['09:00', '12:00', '15:00', '18:00'] as const
 
 /** The time a reminder gets when only a day was picked. */
@@ -154,10 +157,13 @@ export interface GridDay {
   inMonth: boolean
 }
 
-/** Six weeks starting on Monday that cover the month of `month`; always six rows so the grid keeps its height. */
-export function monthGrid(month: LocalDate): GridDay[][] {
+/**
+ * Six weeks that cover the month of `month`; always six rows so the grid keeps its height. Weeks
+ * start on the account's week start (contract section 2.1), Monday by default.
+ */
+export function monthGrid(month: LocalDate, weekStart: WeekStart = getWeekStart()): GridDay[][] {
   const first = monthStart(month)
-  const start = startOfWeek(first)
+  const start = startOfWeek(first, weekStart)
   const prefix = first.slice(0, 7)
   const rows: GridDay[][] = []
   for (let r = 0; r < 6; r++) {
@@ -216,21 +222,36 @@ export function comingSaturday(today: LocalDate): LocalDate {
 
 function diffWeekdayFromMonday(date: LocalDate): number {
   // 0 = Monday ... 6 = Sunday
-  return diffLocalDays(startOfWeek(date), date)
+  return diffLocalDays(startOfWeek(date, 'monday'), date)
 }
 
-/** Today, Tomorrow, This weekend (the coming Saturday) and Next week (the coming Monday), from `today`. */
-export function quickChoices(today: LocalDate, fmt: DateFormat): QuickChoice[] {
+/**
+ * Today, Tomorrow, This weekend (the coming Saturday) and Next week (the Monday in next week,
+ * `nextWeekDay`), from `today`.
+ */
+export function quickChoices(today: LocalDate, fmt: DateFormat, weekStart: WeekStart = getWeekStart()): QuickChoice[] {
   const tomorrow = addLocalDays(today, 1)
   const weekend = comingSaturday(today)
-  const nextWeek = nextWeekStart(today)
+  const nextWeek = nextWeekDay(today, weekStart)
   const day = (date: LocalDate) => startOfLocalDay(date)
   return [
-    { id: 'today', label: 'Today', hint: formatWeekdayShort(day(today), fmt), date: today },
-    { id: 'tomorrow', label: 'Tomorrow', hint: formatWeekdayShort(day(tomorrow), fmt), date: tomorrow },
-    { id: 'weekend', label: 'This weekend', hint: formatWeekdayShort(day(weekend), fmt), date: weekend },
-    { id: 'nextWeek', label: 'Next week', hint: formatWeekdayDay(day(nextWeek), fmt), date: nextWeek },
+    { id: 'today', label: t('when.today'), hint: formatWeekdayShort(day(today), fmt), date: today },
+    { id: 'tomorrow', label: t('when.tomorrow'), hint: formatWeekdayShort(day(tomorrow), fmt), date: tomorrow },
+    { id: 'weekend', label: t('when.thisWeekend'), hint: formatWeekdayShort(day(weekend), fmt), date: weekend },
+    { id: 'nextWeek', label: t('when.nextWeek'), hint: formatWeekdayDay(day(nextWeek), fmt), date: nextWeek },
   ]
+}
+
+/**
+ * What a day choice (section 23.2) says next to its label: "Wed"; "Mon 12" for next week and next
+ * month; "18:00" for This evening; "Thu 9:00" for another choice with a time.
+ */
+export function dayChoiceHint(choice: DayChoice, fmt: DateFormat): string {
+  const day = startOfLocalDay(choice.date)
+  if (choice.time && choice.id === 'this_evening') return timeLabel(choice.time, fmt)
+  if (choice.time) return `${formatWeekdayShort(day, fmt)} ${timeLabel(choice.time, fmt)}`
+  if (choice.id === 'next_week' || choice.id === 'next_month') return formatWeekdayDay(day, fmt)
+  return formatWeekdayShort(day, fmt)
 }
 
 // --- Text -------------------------------------------------------------------------------------

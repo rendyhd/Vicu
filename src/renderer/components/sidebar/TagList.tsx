@@ -2,18 +2,22 @@ import { useState, useEffect, useId } from 'react'
 import { SelectionPill } from './SelectionPill'
 import { useNavigate, useMatches } from '@tanstack/react-router'
 import { useDroppable } from '@dnd-kit/core'
-import { Pencil, Trash2, X } from 'lucide-react'
+import { Pencil, Trash2, X, PauseCircle, User, UsersRound, Lock } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
+import { GroupDialog } from '@/components/pro/GroupDialog'
 import { useLabels } from '@/hooks/use-labels'
 import { useCreateLabel, useUpdateLabel, useDeleteLabel } from '@/hooks/use-task-mutations'
 import { useConfirmDelete } from '@/hooks/use-confirm-delete'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { Dialog } from '@/components/overlay/Dialog'
-import { Menu, MenuItem } from '@/components/overlay/Menu'
+import { Menu, MenuItem, MenuRadioItem, MenuSeparator } from '@/components/overlay/Menu'
 import { useSidebarStore } from '@/stores/sidebar-store'
 import { cn } from '@/lib/cn'
 import { focusTargetOf } from '@/lib/focus-target'
 import type { Label } from '@/lib/vikunja-types'
 import { normalizeHex } from '@/lib/constants'
+import { usePro } from '@/hooks/use-pro'
+import { useProPrefs } from '@/hooks/use-pro-prefs'
 
 function LabelDialog({
   open,
@@ -24,6 +28,7 @@ function LabelDialog({
   label: Label | null
   onClose: () => void
 }) {
+  const { t } = useTranslation()
   const titleId = useId()
   const [title, setTitle] = useState('')
   const [hexColor, setHexColor] = useState('')
@@ -61,12 +66,12 @@ function LabelDialog({
       <div>
         <div className="flex items-center justify-between border-b border-[var(--border-color)] px-5 py-3">
           <h2 id={titleId} className="text-sm font-semibold text-[var(--text-primary)]">
-            {label ? 'Edit Label' : 'New Label'}
+            {label ? t('labels.dialog.edit') : t('labels.dialog.new')}
           </h2>
           <button
             type="button"
             onClick={onClose}
-            aria-label="Close"
+            aria-label={t('labels.dialog.close')}
             className="rounded-control p-1 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
           >
             <X className="h-4 w-4" />
@@ -75,12 +80,12 @@ function LabelDialog({
 
         <div className="space-y-4 p-5">
           <div>
-            <label className="mb-1 block text-xs text-[var(--text-secondary)]">Name</label>
+            <label className="mb-1 block text-xs text-[var(--text-secondary)]">{t('labels.dialog.name')}</label>
             <input
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="Label name"
+              placeholder={t('labels.dialog.namePlaceholder')}
               data-autofocus
               className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]"
               onKeyDown={(e) => {
@@ -90,7 +95,7 @@ function LabelDialog({
           </div>
 
           <div>
-            <label className="mb-1 block text-xs text-[var(--text-secondary)]">Color</label>
+            <label className="mb-1 block text-xs text-[var(--text-secondary)]">{t('labels.dialog.color')}</label>
             <div className="flex flex-wrap gap-1.5">
               {['#e74c3c', '#e67e22', '#f1c40f', '#2ecc71', '#1abc9c', '#3498db', '#9b59b6', '#e91e63', '#795548', '#607d8b', '#34495e', '#000000'].map((c) => (
                 <button
@@ -114,6 +119,7 @@ function LabelDialog({
                 type="text"
                 value={hexColor}
                 onChange={(e) => setHexColor(e.target.value)}
+                // i18n-ignore: hex colour format example
                 placeholder="#hex"
                 className="flex-1 rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-1.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]"
               />
@@ -123,7 +129,7 @@ function LabelDialog({
                   onClick={() => setHexColor('')}
                   className="text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                 >
-                  Clear
+                  {t('labels.dialog.clear')}
                 </button>
               )}
             </div>
@@ -136,7 +142,7 @@ function LabelDialog({
             onClick={onClose}
             className="rounded-control border border-[var(--border-color)] px-4 py-1.5 text-xs font-medium text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-hover)]"
           >
-            Cancel
+            {t('labels.dialog.cancel')}
           </button>
           <button
             type="button"
@@ -148,7 +154,7 @@ function LabelDialog({
               'disabled:cursor-not-allowed disabled:opacity-50'
             )}
           >
-            {label ? 'Save' : 'Create'}
+            {label ? t('labels.dialog.save') : t('labels.dialog.create')}
           </button>
         </div>
       </div>
@@ -204,8 +210,15 @@ export function TagList() {
   const deleteLabel = useDeleteLabel()
   const { confirmDelete, dialogProps: deleteDialogProps } = useConfirmDelete()
   const { labelDialogOpen, setLabelDialogOpen } = useSidebarStore()
+  // Pro (21.2, 21.5): a label on hold makes its tasks wait; a person label is someone you work with.
+  const pro = usePro()
+  const proPrefs = useProPrefs()
+  const navigate = useNavigate()
 
   const [editingLabel, setEditingLabel] = useState<Label | null>(null)
+  // Pro (21.16): a label that becomes a group opens the group's dialog.
+  const [groupLabel, setGroupLabel] = useState<number | null>(null)
+  const { t } = useTranslation()
   const [contextMenu, setContextMenu] = useState<{
     x: number
     y: number
@@ -239,7 +252,7 @@ export function TagList() {
         <Menu
           key={`${contextMenu.label.id}:${contextMenu.x}:${contextMenu.y}`}
           anchorPoint={{ x: contextMenu.x, y: contextMenu.y }}
-          label={`${contextMenu.label.title} actions`}
+          label={t('labels.menu.actions', { title: contextMenu.label.title })}
           onClose={() => setContextMenu(null)}
         >
           <MenuItem
@@ -249,14 +262,52 @@ export function TagList() {
               setLabelDialogOpen(true)
             }}
           >
-            Edit
+            {t('labels.menu.edit')}
           </MenuItem>
+          {pro.layer('availability') && (
+            <MenuItem
+              icon={<PauseCircle />}
+              onSelect={() => void proPrefs.setLabelOnHold(contextMenu.label.id, !proPrefs.labelOnHold(contextMenu.label.id))}
+            >
+              {proPrefs.labelOnHold(contextMenu.label.id) ? t('labels.menu.makeActive') : t('labels.menu.putOnHold')}
+            </MenuItem>
+          )}
+          {pro.layer('promises') && !proPrefs.isPerson(contextMenu.label.id) && !proPrefs.isPrivate(contextMenu.label.id) && (
+            <MenuItem
+              icon={<UsersRound />}
+              onSelect={() => {
+                const id = contextMenu.label.id
+                if (proPrefs.isGroup(id)) void navigate({ to: '/group/$labelId', params: { labelId: String(id) } })
+                else setGroupLabel(id)
+              }}
+            >
+              {proPrefs.isGroup(contextMenu.label.id) ? t('pro.group.open') : t('pro.group.makeGroup')}
+            </MenuItem>
+          )}
+          {pro.layer('promises') && !proPrefs.isGroup(contextMenu.label.id) && !proPrefs.isPrivate(contextMenu.label.id) && (
+            <MenuItem
+              icon={<User />}
+              onSelect={() => void proPrefs.setPerson(contextMenu.label.id, !proPrefs.isPerson(contextMenu.label.id))}
+            >
+              {proPrefs.isPerson(contextMenu.label.id) ? t('labels.menu.notPerson') : t('labels.menu.isPerson')}
+            </MenuItem>
+          )}
+          {pro.layer('promises') && !proPrefs.isPerson(contextMenu.label.id) && !proPrefs.isGroup(contextMenu.label.id) && (
+            <MenuRadioItem
+              icon={<Lock />}
+              checked={proPrefs.isPrivate(contextMenu.label.id)}
+              onSelect={() => void proPrefs.setPrivate(contextMenu.label.id, !proPrefs.isPrivate(contextMenu.label.id))}
+            >
+              {t('pro.topics.privateLabel')}
+            </MenuRadioItem>
+          )}
+          {pro.on && <MenuSeparator />}
           <MenuItem
             icon={<Trash2 />}
             danger
             onSelect={async () => {
               const label = contextMenu.label
-              const ok = await confirmDelete('Delete this label? It will be removed from all tasks. This cannot be undone.', {
+              const ok = await confirmDelete(t('labels.menu.confirmDelete'), {
                 returnFocusTo: contextMenu.opener,
               })
               if (ok) {
@@ -264,7 +315,7 @@ export function TagList() {
               }
             }}
           >
-            Delete
+            {t('labels.menu.delete')}
           </MenuItem>
         </Menu>
       )}
@@ -275,6 +326,13 @@ export function TagList() {
         onClose={handleCloseDialog}
       />
       <ConfirmDialog {...deleteDialogProps} />
+      {groupLabel !== null && (
+        <GroupDialog
+          label={groupLabel}
+          onClose={() => setGroupLabel(null)}
+          onSaved={(labelId) => void navigate({ to: '/group/$labelId', params: { labelId: String(labelId) } })}
+        />
+      )}
     </>
   )
 }

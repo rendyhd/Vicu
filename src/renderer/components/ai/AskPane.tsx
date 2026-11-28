@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useRouterState } from '@tanstack/react-router'
+import { useTranslation } from 'react-i18next'
 import { Loader2, Mic, MessageSquarePlus, Send, Sparkles, Square, Volume2, VolumeX, X } from 'lucide-react'
 import { Button } from '@/components/shared/Button'
 import { AskAgenda } from './AskAgenda'
@@ -13,6 +14,8 @@ import { useAppConfig } from '@/hooks/use-app-config'
 import { useDateFormat } from '@/hooks/use-date-format'
 import { useOpenTask } from '@/hooks/use-open-task'
 import { useSyncedPrefs } from '@/hooks/use-synced-prefs'
+import { useWorkMode } from '@/hooks/use-work-mode'
+import { useProToolData } from '@/hooks/use-pro-assistant'
 import {
   useAddLabel,
   useCompleteTask,
@@ -37,6 +40,8 @@ import { NULL_DATE } from '@/lib/constants'
 import { WhenPopover } from '@/components/task-list/WhenPopover'
 import type { ChatMessage } from '../../../shared/ai/types'
 import type { Task } from '@/lib/vikunja-types'
+import type { TranslationKey } from '../../../shared/i18n'
+import { useSidebarStore } from '@/stores/sidebar-store'
 
 /** The user's own words of a stored message (the context block is for the model). */
 function userWords(text: string): string {
@@ -66,8 +71,11 @@ export function AskHost() {
   const reopen = useUncompleteTask()
   const open = useAskStore((s) => s.open)
 
-  const live = useRef({ ws, config, snapshot, pathname, aiSettings })
-  live.current = { ws, config, snapshot, pathname, aiSettings }
+  const proData = useProToolData()
+  // Ask's list tools answer by the Work and Personal mode, as the screens do (22.4).
+  const { scope: workScope, mode: workModeNow } = useWorkMode()
+  const live = useRef({ ws, config, snapshot, pathname, aiSettings, proData, workScope, workModeNow })
+  live.current = { ws, config, snapshot, pathname, aiSettings, proData, workScope, workModeNow }
   const mutations = useRef({ addDrafts, deleteTask, updateTask, createLabel, addLabel, removeLabel, complete, reopen })
   mutations.current = { addDrafts, deleteTask, updateTask, createLabel, addLabel, removeLabel, complete, reopen }
 
@@ -95,6 +103,8 @@ export function AskHost() {
           return result.success ? result.data : null
         },
         syncedValues: live.current.snapshot.values,
+        pro: live.current.proData,
+        work: { scope: live.current.workScope, mode: live.current.workModeNow },
         review: {
           enabled: live.current.config?.review?.enabled === true,
           defaultCadenceDays: live.current.config?.review?.default_cadence_days ?? 14,
@@ -139,6 +149,7 @@ export function AskHost() {
 }
 
 function AskPane({ ready }: { ready: { ask: boolean; talk: boolean } }) {
+  const { t } = useTranslation()
   const state = useAskStore()
   const { conversations, currentId, busy, streaming, status, pending, lingering, error, talk } = state
   const conversation = conversations.find((c) => c.id === currentId) ?? null
@@ -175,7 +186,7 @@ function AskPane({ ready }: { ready: { ask: boolean; talk: boolean } }) {
     return (
       <AskFrame onClose={close}>
         <div className="p-4 text-meta text-[var(--text-secondary)]">
-          Ask needs a provider and a model that passed Test connection. Set it up in Settings, Assistant.
+          {t('ai.askPane.needsSetup')}
         </div>
       </AskFrame>
     )
@@ -188,19 +199,19 @@ function AskPane({ ready }: { ready: { ask: boolean; talk: boolean } }) {
         <>
           {conversations.length > 0 && (
             <select
-              aria-label="Conversation"
+              aria-label={t('ai.askPane.conversation')}
               value={currentId ?? ''}
               onChange={(e) => (e.target.value ? state.select(e.target.value) : state.newChat())}
               disabled={busy}
               className="min-w-0 max-w-[9rem] rounded-control border border-[var(--border-color)] bg-transparent px-1 py-0.5 text-caption text-[var(--text-primary)]"
             >
-              <option value="">New chat</option>
-              {conversations.map((c) => <option key={c.id} value={c.id}>{c.title || 'Conversation'}</option>)}
+              <option value="">{t('ai.askPane.newChat')}</option>
+              {conversations.map((c) => <option key={c.id} value={c.id}>{c.title || t('ai.askPane.conversation')}</option>)}
             </select>
           )}
-          <IconButton label="New chat" onClick={() => state.newChat()} disabled={busy}><MessageSquarePlus className="h-4 w-4" /></IconButton>
+          <IconButton label={t('ai.askPane.newChat')} onClick={() => state.newChat()} disabled={busy}><MessageSquarePlus className="h-4 w-4" /></IconButton>
           {ready.talk && (
-            <IconButton label={talk ? 'Talk is on' : 'Talk is off'} pressed={talk} onClick={() => state.setTalk(!talk)}>
+            <IconButton label={talk ? t('ai.askPane.talkOn') : t('ai.askPane.talkOff')} pressed={talk} onClick={() => state.setTalk(!talk)}>
               {talk ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
             </IconButton>
           )}
@@ -212,8 +223,7 @@ function AskPane({ ready }: { ready: { ask: boolean; talk: boolean } }) {
           <>
             <AskAgenda onSend={(text) => void state.send(text)} disabled={busy} />
             <p className="text-meta text-[var(--text-secondary)]">
-              Or ask anything about your tasks, such as “Move the dentist to Friday”.
-              {ready.talk && ' Or turn on the microphone and just talk.'}
+              {ready.talk ? t('ai.askPane.emptyHintTalk') : t('ai.askPane.emptyHint')}
             </p>
           </>
         ) : (
@@ -234,10 +244,10 @@ function AskPane({ ready }: { ready: { ask: boolean; talk: boolean } }) {
         <div className="flex items-end gap-2">
           <textarea
             ref={inputRef}
-            aria-label="Message"
+            aria-label={t('ai.askPane.message')}
             rows={2}
             value={draft}
-            placeholder="Ask about your tasks"
+            placeholder={t('ai.askPane.placeholder')}
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
@@ -249,15 +259,15 @@ function AskPane({ ready }: { ready: { ask: boolean; talk: boolean } }) {
           />
           {ready.talk && <MicButton />}
           {busy && !pending ? (
-            <IconButton label="Stop" onClick={() => state.cancel()}><Square className="h-4 w-4" /></IconButton>
+            <IconButton label={t('ai.askPane.stop')} onClick={() => state.cancel()}><Square className="h-4 w-4" /></IconButton>
           ) : (
-            <IconButton label="Send" onClick={submit} disabled={!draft.trim()}><Send className="h-4 w-4" /></IconButton>
+            <IconButton label={t('ai.askPane.send')} onClick={submit} disabled={!draft.trim()}><Send className="h-4 w-4" /></IconButton>
           )}
         </div>
         {aiSettings && talk && (
           <label className="mt-2 flex items-center gap-2 text-caption text-[var(--text-secondary)]">
             <Checkbox checked={aiSettings.speakAnswers} onChange={(e) => void saveAi({ speakAnswers: e.target.checked })} />
-            Read answers aloud
+            {t('ai.askPane.readAloud')}
           </label>
         )}
       </div>
@@ -266,11 +276,18 @@ function AskPane({ ready }: { ready: { ask: boolean; talk: boolean } }) {
 }
 
 function AskFrame({ children, onClose, toolbar }: { children: React.ReactNode; onClose: () => void; toolbar?: React.ReactNode }) {
+  const { t } = useTranslation()
+  // A narrow window (lib/sidebar-width.ts) has no room beside the content: the pane lies over it.
+  const narrow = useSidebarStore((s) => s.narrow)
   return (
     <aside
       id="ask-pane"
-      aria-label="Ask"
-      className="vicu-pane-in flex w-[380px] shrink-0 flex-col overflow-hidden border-l border-[var(--border-color)] bg-[var(--bg-sidebar)]"
+      aria-label={t('ai.askPane.title')}
+      data-side-pane
+      className={cn(
+        'vicu-pane-in flex w-[380px] shrink-0 flex-col overflow-hidden border-l border-[var(--border-color)]',
+        narrow ? 'absolute inset-y-0 right-0 z-40 max-w-full bg-[var(--bg-secondary)] shadow-xl' : 'bg-[var(--bg-sidebar)]',
+      )}
       onKeyDown={(e) => {
         if (e.key === 'Escape' && !e.defaultPrevented) {
           e.preventDefault()
@@ -282,9 +299,9 @@ function AskFrame({ children, onClose, toolbar }: { children: React.ReactNode; o
       <div className="h-8 shrink-0" />
       <header className="flex items-center gap-1 border-b border-[var(--border-color)] px-3 pb-2">
         <Sparkles className="h-4 w-4 text-accent-blue" aria-hidden="true" />
-        <h2 className="mr-auto text-card-title text-[var(--text-primary)]">Ask</h2>
+        <h2 className="mr-auto text-card-title text-[var(--text-primary)]">{t('ai.askPane.title')}</h2>
         {toolbar}
-        <IconButton label="Close Ask" onClick={onClose}><X className="h-4 w-4" /></IconButton>
+        <IconButton label={t('ai.askPane.close')} onClick={onClose}><X className="h-4 w-4" /></IconButton>
       </header>
       {children}
     </aside>
@@ -339,6 +356,7 @@ function AssistantText({ text, knownIds }: { text: string; knownIds: ReadonlySet
 }
 
 function AskTaskRow({ taskId }: { taskId: number }) {
+  const { t } = useTranslation()
   const { data: task } = useQuery({
     queryKey: ['ai-task', taskId],
     queryFn: async () => {
@@ -359,7 +377,7 @@ function AskTaskRow({ taskId }: { taskId: number }) {
   return (
     <div className="flex items-center gap-2 rounded-control border border-[var(--border-color)] bg-[var(--bg-primary)] px-2 py-1.5">
       <Checkbox
-        aria-label={isDone ? `Reopen ${task.title}` : `Complete ${task.title}`}
+        aria-label={isDone ? t('ai.askPane.reopenTask', { title: task.title }) : t('ai.askPane.completeTask', { title: task.title })}
         checked={isDone}
         onChange={(e) => {
           setDone(e.target.checked)
@@ -379,17 +397,21 @@ function AskTaskRow({ taskId }: { taskId: number }) {
   )
 }
 
-const SKIP_TEXT: Record<string, string> = { not_found: 'not found', read_only: 'read only', invalid: 'no change' }
-const PRIORITY_NAMES = ['no priority', 'low', 'medium', 'high', 'urgent', 'do now']
+const SKIP_TEXT: Record<string, TranslationKey> = { not_found: 'ai.proposal.skipNotFound', read_only: 'ai.proposal.skipReadOnly', invalid: 'ai.proposal.skipInvalid' }
+const PRIORITY_NAMES: TranslationKey[] = [
+  'ai.proposal.priorityNone', 'ai.proposal.priorityLow', 'ai.proposal.priorityMedium',
+  'ai.proposal.priorityHigh', 'ai.proposal.priorityUrgent', 'ai.proposal.priorityDoNow',
+]
 
 function ProposalCard({ card, which }: { card: PendingProposal; which: 'pending' | 'lingering' }) {
+  const { t } = useTranslation()
   const ws = useAiWorkspace()
   const fmt = useDateFormat()
   const decide = useAskStore((s) => s.decide)
   const qc = useQueryClient()
   const { proposal } = card
   // A skipped task by its title when a row of this conversation loaded it, else by its id.
-  const skippedName = (id: number) => qc.getQueryData<Task>(['ai-task', id])?.title ?? `task ${id}`
+  const skippedName = (id: number) => qc.getQueryData<Task>(['ai-task', id])?.title ?? t('ai.proposal.skippedTaskFallback', { id })
   const nothingToApply = proposalSize(proposal) === 0
   const editCard = useAskStore((s) => s.editCard)
   const editDue = (key: number | string, due: string | null) => editCard(which, withEditedDue(proposal, key, due))
@@ -397,37 +419,37 @@ function ProposalCard({ card, which }: { card: PendingProposal; which: 'pending'
   let title: string
   let rows: React.ReactNode
   if (proposal.tool === 'propose_create_tasks') {
-    title = proposal.drafts.length === 1 ? 'Add 1 task' : `Add ${proposal.drafts.length} tasks`
+    title = t('ai.proposal.addTasks', { count: proposal.drafts.length })
     rows = proposal.drafts.map((draft) => (
       <li key={draft.ref} className="space-y-0.5">
         <p className="text-task-title text-[var(--text-primary)]">{draft.title}</p>
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-caption text-[var(--text-secondary)]">
           <CardDueChip due={draft.due} guessed={draft.guessed.includes('when')} onChange={(due) => editDue(draft.ref, due)} />
-          <span>{[pathOf(ws, draft.project_id), ...draft.labels.map((l) => `#${l.title}`), draft.subtasks.length ? `${draft.subtasks.length} steps` : ''].filter(Boolean).join(' · ')}</span>
+          <span>{[pathOf(ws, draft.project_id), ...draft.labels.map((l) => `#${l.title}`), draft.subtasks.length ? t('ai.proposal.steps', { count: draft.subtasks.length }) : ''].filter(Boolean).join(' · ')}</span>
         </div>
       </li>
     ))
   } else if (proposal.tool === 'propose_complete_tasks') {
-    title = proposal.done ? 'Mark done' : 'Open again'
+    title = proposal.done ? t('ai.proposal.markDone') : t('ai.proposal.openAgain')
     rows = proposal.tasks.map((task) => <li key={task.id} className="text-task-title text-[var(--text-primary)]">{task.title}</li>)
   } else {
-    title = proposal.updates.length === 1 ? 'Change 1 task' : `Change ${proposal.updates.length} tasks`
+    title = t('ai.proposal.changeTasks', { count: proposal.updates.length })
     rows = proposal.updates.map((item) => (
       <li key={item.task.id} className="space-y-0.5">
         <p className="text-task-title text-[var(--text-primary)]">{item.task.title}</p>
         <ul className="text-caption text-[var(--text-secondary)]">
-          {item.title !== undefined && <li>Title: {item.title}</li>}
+          {item.title !== undefined && <li>{t('ai.proposal.fieldTitle', { value: item.title })}</li>}
           {item.due !== undefined && (
             <li className="flex items-center gap-1.5 py-0.5">
-              Due
+              {t('ai.proposal.fieldDue')}
               <CardDueChip due={item.due} guessed={item.dueGuessed} onChange={(due) => editDue(item.task.id, due)} />
             </li>
           )}
-          {item.projectId !== undefined && <li>Project: {pathOf(ws, item.projectId)}</li>}
-          {item.priority !== undefined && <li>Priority: {PRIORITY_NAMES[item.priority] ?? item.priority}</li>}
-          {item.labelsAdd.length > 0 && <li>Add labels: {item.labelsAdd.map((l) => l.title).join(', ')}</li>}
-          {item.labelsRemove.length > 0 && <li>Remove labels: {item.labelsRemove.map((l) => l.title).join(', ')}</li>}
-          {item.appendNotes !== undefined && <li>Add to notes: {item.appendNotes}</li>}
+          {item.projectId !== undefined && <li>{t('ai.proposal.fieldProject', { value: pathOf(ws, item.projectId) })}</li>}
+          {item.priority !== undefined && <li>{t('ai.proposal.fieldPriority', { value: PRIORITY_NAMES[item.priority] ? t(PRIORITY_NAMES[item.priority]) : item.priority })}</li>}
+          {item.labelsAdd.length > 0 && <li>{t('ai.proposal.fieldAddLabels', { value: item.labelsAdd.map((l) => l.title).join(', ') })}</li>}
+          {item.labelsRemove.length > 0 && <li>{t('ai.proposal.fieldRemoveLabels', { value: item.labelsRemove.map((l) => l.title).join(', ') })}</li>}
+          {item.appendNotes !== undefined && <li>{t('ai.proposal.fieldAddNotes', { value: item.appendNotes })}</li>}
         </ul>
       </li>
     ))
@@ -435,24 +457,24 @@ function ProposalCard({ card, which }: { card: PendingProposal; which: 'pending'
 
   return (
     <section aria-label={title} className="rounded-card border border-accent-blue/40 bg-[var(--bg-primary)] p-3" data-proposal={proposal.tool}>
-      <h3 className="text-card-title text-[var(--text-primary)]">{nothingToApply ? 'Nothing to change' : title}</h3>
+      <h3 className="text-card-title text-[var(--text-primary)]">{nothingToApply ? t('ai.proposal.nothingToChange') : title}</h3>
       <ul className="mt-2 space-y-2">{rows}</ul>
       {proposal.skipped.length > 0 && (
         <p className="mt-2 text-caption text-[var(--text-secondary)]">
-          Skipped: {proposal.skipped.map((s) => `${skippedName(s.task_id)} (${SKIP_TEXT[s.reason]})`).join(', ')}
+          {t('ai.proposal.skipped', { list: proposal.skipped.map((s) => t('ai.proposal.skippedItem', { name: skippedName(s.task_id), reason: SKIP_TEXT[s.reason] ? t(SKIP_TEXT[s.reason]) : s.reason })).join(', ') })}
         </p>
       )}
       {proposal.tool === 'propose_create_tasks' && proposal.dropped.length > 0 && (
-        <p className="mt-1 text-caption text-[var(--text-secondary)]">Not used: {proposal.dropped.map((d) => d.field).join(', ')}</p>
+        <p className="mt-1 text-caption text-[var(--text-secondary)]">{t('ai.proposal.notUsed', { list: proposal.dropped.map((d) => d.field).join(', ') })}</p>
       )}
       <div className="mt-3 flex justify-end gap-2">
         {nothingToApply ? (
           // Answered as applied-with-nothing (status failed, the skipped list), so the model learns why.
-          <Button variant="primary" onClick={() => void decide(true, which)}>OK</Button>
+          <Button variant="primary" onClick={() => void decide(true, which)}>{t('ai.proposal.ok')}</Button>
         ) : (
           <>
-            <Button variant="quiet" onClick={() => void decide(false, which)}>Decline</Button>
-            <Button variant="primary" onClick={() => void decide(true, which)}>Apply</Button>
+            <Button variant="quiet" onClick={() => void decide(false, which)}>{t('ai.proposal.decline')}</Button>
+            <Button variant="primary" onClick={() => void decide(true, which)}>{t('ai.proposal.apply')}</Button>
           </>
         )}
       </div>
@@ -462,17 +484,18 @@ function ProposalCard({ card, which }: { card: PendingProposal; which: 'pending'
 
 /** A date on a proposal card: opens the When panel, and the date chosen is the one applied (5.4). */
 function CardDueChip({ due, guessed, onChange }: { due: string | null; guessed: boolean; onChange: (due: string | null) => void }) {
+  const { t } = useTranslation()
   const fmt = useDateFormat()
   const anchor = useRef<HTMLButtonElement>(null)
   const [open, setOpen] = useState(false)
-  const text = due ? formatDateChip(instantOfLocal(due), due.endsWith('T23:59:59'), new Date(), fmt) : 'No date'
+  const text = due ? formatDateChip(instantOfLocal(due), due.endsWith('T23:59:59'), new Date(), fmt) : t('ai.proposal.noDate')
   return (
     <>
       <button
         ref={anchor}
         type="button"
         onClick={() => setOpen((o) => !o)}
-        aria-label={`Change the date, ${text}`}
+        aria-label={t('ai.proposal.changeDate', { date: text })}
         className={cn(
           'rounded-control border border-[var(--border-color)] px-1.5 py-0.5 text-caption text-[var(--text-primary)] transition-colors duration-fade-fast hover:bg-[var(--bg-hover)]',
           guessed && 'border-dashed',
@@ -499,16 +522,17 @@ function CardDueChip({ due, guessed, onChange }: { due: string | null; guessed: 
  * voice and listens at once.
  */
 function MicButton() {
+  const { t } = useTranslation()
   const status = useOpenMicStore((m) => (m.owner === 'ask' ? m.status : 'off'))
   const on = status !== 'off'
-  const title = status === 'paused' ? 'Stop reading and listen' : on ? 'Turn off the microphone' : 'Turn on the microphone and talk'
+  const title = status === 'paused' ? t('ai.askPane.micStopReading') : on ? t('ai.askPane.micOff') : t('ai.askPane.micOn')
   const toggle = () => {
     if (status === 'paused') stopSpeaking()
     else if (on) stopOpenMic()
     else startTalk()
   }
   return (
-    <IconButton label="Microphone" title={title} pressed={on} onClick={toggle}>
+    <IconButton label={t('ai.askPane.microphone')} title={title} pressed={on} onClick={toggle}>
       <Mic className="h-4 w-4" />
     </IconButton>
   )
@@ -516,9 +540,10 @@ function MicButton() {
 
 /** What the open microphone hears, or why it waits. */
 function HeardLine() {
+  const { t } = useTranslation()
   const { owner, status, words } = useOpenMicStore()
   if (owner !== 'ask') return null
-  const text = words || (status === 'starting' ? 'Starting…' : status === 'paused' ? 'Reading the answer…' : 'Listening…')
+  const text = words || (status === 'starting' ? t('ai.askPane.heardStarting') : status === 'paused' ? t('ai.askPane.heardReading') : t('ai.askPane.heardListening'))
   return (
     <p className="mb-2 flex items-start gap-2 text-caption" role="status" data-heard-line="">
       <span className="relative mt-0.5 flex h-3.5 w-3.5 shrink-0 items-center justify-center" aria-hidden="true">

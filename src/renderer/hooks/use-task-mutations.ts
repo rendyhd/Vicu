@@ -23,6 +23,8 @@ import { removeFromTaskDetail, restoreTaskDetail, updateTaskDetailDone, updateTa
 import { projectPatch, taskPatch } from '@/lib/merge-patches'
 import { NULL_DATE } from '@/lib/constants'
 import { rememberRepeatCompletion, repeatUndoPatch, takeRepeatSnapshot } from '@/lib/repeat-undo'
+import { afterRepeatCompletion, repeatCompletionFor } from '@/lib/pro/repeat-completion'
+import { completedDueFor } from '../../shared/repeat-completion'
 import {
   addLabelOrQueue,
   createTaskOrQueue,
@@ -49,7 +51,16 @@ import {
   readPositionHints,
 } from '@/lib/new-task-position'
 import { useOfflineStore } from '@/stores/offline-store'
+import { can } from '@/lib/capabilities'
+import { useUploadingStore } from '@/stores/uploading-store'
 import { toast } from '@/stores/toast-store'
+import { t } from '../../shared/i18n'
+import { namedLabelIds, planNewTaskWork } from '@/lib/work-new-task'
+import { useWorkMode } from './use-work-mode'
+import { useOpenTask } from './use-open-task'
+import { SYNCED_PREFS_QUERY_KEY, writeSyncedPrefs } from './use-synced-prefs'
+import type { SyncedPrefsSnapshot } from '../../shared/synced-prefs'
+import { WORK_LABEL_KEY, readWorkLabel, readWorkProjectEntry, workProjectKey } from '../../shared/work-scope'
 import { queuedUploadText, queuedUploadsText } from '@/lib/waiting-uploads'
 import type {
   Task,
@@ -178,8 +189,18 @@ export function useRemoveLabel(options?: MutationHookOptions) {
   return useLabelMutation('remove', options)
 }
 
+/**
+ * Work and Personal (cross-app semantics 22.6): once a task made in Work mode exists, the notice
+ * that it stays Personal (no work label is set) with a way to see it; a temp id has nothing to open.
+ */
+function tellStaysPersonal(taskId: number, open: (taskId: number) => void): void {
+  toast.info(t('workMode.addedToPersonal'), isTempTaskId(taskId) ? undefined : { action: { label: t('workMode.showTask'), onAction: () => open(taskId) } })
+}
+
 export function useCreateSubtask() {
   const qc = useQueryClient()
+  const workMode = useWorkMode()
+  const openTask = useOpenTask()
 
   return useMutation({
     mutationFn: async ({
@@ -191,12 +212,29 @@ export function useCreateSubtask() {
     }) => {
       // The relation needs both tasks on the server; the offline queue has no relations yet.
       if (isTempTaskId(parentTask.id)) {
-        throw new ApiError('This task has not synced yet. Add subtasks once it has been saved.')
+        throw new ApiError(t('taskActions.notSyncedSubtasks'))
       }
       // Create the child task in the same project
       const createResult = await api.createTask(parentTask.project_id, { title })
       if (!createResult.success) throw apiError(createResult)
-      const childTask = createResult.data as Task
+      let childTask = createResult.data as Task
+      // Work mode (22.6): a new subtask is judged by its own project and labels, like any task.
+      const work = planNewTaskWork({
+        projectId: parentTask.project_id,
+        named: [],
+        labelForNewTask: workMode.labelForNewTask,
+        staysPersonal: workMode.staysPersonal,
+      })
+      if (work.labelId !== null) {
+        try {
+          const label = qc.getQueryData<Label[]>(['labels'])?.find((l) => l.id === work.labelId)
+          await addLabelOrQueue(childTask.id, { id: work.labelId, title: label?.title || undefined }, title)
+          childTask = { ...childTask, labels: [...(childTask.labels ?? []), label ?? { id: work.labelId, title: '', hex_color: '', created: '', updated: '' }] }
+        } catch {
+          // The subtask exists; it only misses the label.
+        }
+      }
+      if (work.staysPersonal) tellStaysPersonal(childTask.id, openTask)
       // In the background; the mutation's own refresh below shows the subtask inside its parent.
       placeNewTaskAtEnd(qc, parentTask.project_id, childTask.id, false)
 
@@ -219,23 +257,62 @@ export function useCreateSubtask() {
 
 export function useCreateTask(options?: MutationHookOptions) {
   const qc = useQueryClient()
+  const workMode = useWorkMode()
+  const openTask = useOpenTask()
 
   return useMutation({
     mutationFn: async ({
       projectId,
       task,
       extras,
+      workLabel,
     }: {
       projectId: number
       task: CreateTaskPayload
       /** Labels and images the queue keeps with the create if it has to be queued offline. */
       extras?: CreateExtras
+      /**
+       * `false` for a copy or anything the app makes for itself: Work mode adds nothing to it
+       * (cross-app semantics 22.6). Left out, a task the person makes in Work mode that would not
+       * be work gets the work label, the way a label they picked would be added.
+       */
+      workLabel?: false
     }) => {
-      const outcome = await createTaskOrQueue(projectId, task, extras)
+      const knownLabels = qc.getQueryData<Label[]>(['labels'])
+      const work = planNewTaskWork({
+        projectId,
+        named: namedLabelIds(extras?.labels, knownLabels),
+        optOut: workLabel === false,
+        labelForNewTask: workMode.labelForNewTask,
+        staysPersonal: workMode.staysPersonal,
+      })
+      const label = work.labelId !== null ? knownLabels?.find((l) => l.id === work.labelId) : undefined
+      const labelObject: Label | null = work.labelId !== null
+        ? label ?? { id: work.labelId, title: '', hex_color: '', created: '', updated: '' }
+        : null
+      // A queued create carries the label as a follow-up action, like any label the task names.
+      const sentExtras: CreateExtras | undefined = work.labelId !== null && labelObject
+        ? {
+            ...extras,
+            labels: [...(extras?.labels ?? []), { id: work.labelId, ...(label?.title ? { title: label.title } : {}) }],
+            displayLabels: [...(extras?.displayLabels ?? []), labelObject],
+          }
+        : extras
+      const outcome = await createTaskOrQueue(projectId, task, sentExtras)
+      let created = outcome.task
+      if (!outcome.queued && work.labelId !== null && labelObject) {
+        try {
+          await addLabelOrQueue(created.id, { id: work.labelId, title: label?.title || undefined }, created.title)
+          created = { ...created, labels: [...(created.labels ?? []), labelObject] }
+        } catch {
+          // The task exists; it only misses the label.
+        }
+      }
       // A queued create has no real id yet; its stand-in carries a temp id. The position update
       // does not hold the create back; the project's lists refresh once it has landed.
-      if (!outcome.queued) placeNewTaskAtEnd(qc, projectId, outcome.task.id)
-      return outcome.task
+      if (!outcome.queued) placeNewTaskAtEnd(qc, projectId, created.id)
+      if (work.staysPersonal) tellStaysPersonal(created.id, openTask)
+      return created
     },
     onSuccess: (task) => {
       if (isTempTaskId(task.id)) insertPendingTask(qc, task)
@@ -265,14 +342,33 @@ export interface UpdateTaskVariables {
   // view-tasks/section-tasks invalidation. Don't read it here; it's
   // consumed in onSettled.
   deferInvalidation?: boolean
+  /**
+   * With a notes change: the description the edit started from, as the server stored it
+   * (description format, "Notes changed in two places"). Defaults to `original.description`, the
+   * notes the caller read; the open card passes the base its editor keeps.
+   */
+  baseDescription?: string
 }
 
-/** Send an edit as a minimal merge patch; skip the request when nothing differs. */
-export async function updateTaskRequest({
+/** What an update did: the task to show, and whether its notes were merged with another device's. */
+export interface UpdateTaskResult {
+  task: Task | null
+  notesMerged: boolean
+}
+
+/** The base a notes change carries: the caller's own, else the notes of the task it read. */
+function notesBaseOf({ baseDescription, original }: Pick<UpdateTaskVariables, 'baseDescription' | 'original'>): string | undefined {
+  if (baseDescription !== undefined) return baseDescription
+  return typeof original?.description === 'string' ? original.description : undefined
+}
+
+/** `updateTaskRequest`, also saying whether the notes were merged with another device's. */
+export async function updateTaskWithResult({
   id,
   changes,
   original,
-}: Pick<UpdateTaskVariables, 'id' | 'changes' | 'original'>): Promise<Task | null> {
+  baseDescription,
+}: Pick<UpdateTaskVariables, 'id' | 'changes' | 'original' | 'baseDescription'>): Promise<UpdateTaskResult> {
   // Position is per-view in Vikunja and only honored by /tasks/{id}/position
   // (see useReorderTask). Strip it from the regular update body so it
   // can't be written to an unintended view; we still keep it on `changes`
@@ -281,11 +377,30 @@ export async function updateTaskRequest({
   const patch = taskPatch(original ?? null, writable)
   // Nothing differs from what the server already has (e.g. setting today's
   // date on a task that is already due today): skip the request.
-  if (Object.keys(patch).length === 0) return original ?? null
+  if (Object.keys(patch).length === 0) return { task: original ?? null, notesMerged: false }
   const title = original?.title ?? (typeof changes.title === 'string' ? changes.title : undefined)
-  const outcome = await sendTaskPatch(id, patch, title)
+  const base = 'description' in patch ? notesBaseOf({ baseDescription, original }) : undefined
+  const outcome = await sendTaskPatch(id, patch, title, base !== undefined ? { baseDescription: base } : {})
   // A queued change has no server response; the optimistic cache already holds its result.
-  return outcome.task ?? (original ? { ...original, ...changes } : null)
+  return { task: outcome.task ?? (original ? { ...original, ...changes } : null), notesMerged: outcome.notesMerged === true }
+}
+
+/** Send an edit as a minimal merge patch; skip the request when nothing differs. */
+export async function updateTaskRequest(
+  variables: Pick<UpdateTaskVariables, 'id' | 'changes' | 'original' | 'baseDescription'>,
+): Promise<Task | null> {
+  return (await updateTaskWithResult(variables)).task
+}
+
+/**
+ * The server answered a notes save with other notes than were sent (merged with another device's):
+ * every cache gets the server's notes at once (a refetch may wait for the offline queue), so an open
+ * card without unsaved text shows them.
+ */
+function applyServerNotes(qc: ReturnType<typeof useQueryClient>, id: number, task: Task | null): void {
+  if (!task || typeof task.description !== 'string') return
+  const description = task.description
+  mapTaskInCaches(qc, id, (cached) => ({ ...cached, description }))
 }
 
 
@@ -293,7 +408,16 @@ export function useUpdateTask(options?: MutationHookOptions) {
   const qc = useQueryClient()
 
   return useMutation({
-    mutationFn: (variables: UpdateTaskVariables) => updateTaskRequest(withDueRules(variables)),
+    mutationFn: async (variables: UpdateTaskVariables) => {
+      const result = await updateTaskWithResult(withDueRules(variables))
+      // The server's notes differ from the ones saved (merged with another device's, or it already
+      // held all of them): the caches take the server's at once.
+      const sent = variables.changes.description
+      if (result.notesMerged || (typeof sent === 'string' && typeof result.task?.description === 'string' && result.task.description !== sent)) {
+        applyServerNotes(qc, variables.id, result.task)
+      }
+      return result.task
+    },
     onMutate: async (variables) => {
       const { id, changes, original } = withDueRules(variables)
       await qc.cancelQueries({ queryKey: ['tasks'] })
@@ -530,7 +654,7 @@ export function useReorderTask() {
     }) => {
       // Positions are per view and are not queued offline.
       if (isTempTaskId(taskId) || renumbered.some((update) => isTempTaskId(update.taskId))) {
-        throw new ApiError('This task has not synced yet. Reorder it once it has been saved.')
+        throw new ApiError(t('taskActions.notSyncedReorder'))
       }
       await sendPositionUpdates(
         async (update) => {
@@ -572,7 +696,7 @@ export function useReorderTask() {
 
 /** Take a done flag back: a completion still waiting in the queue is cancelled, anything else is reversed with a request. */
 async function reverseDone(entry: { task: Task; queued: boolean }, done: boolean): Promise<void> {
-  if (entry.queued) {
+  if (entry.queued && can('offlineQueue')) {
     const cancelled = await api.offlineQueue.cancelChange(entry.task.id, ['done'])
     if (cancelled.success && cancelled.data) return
   }
@@ -592,12 +716,28 @@ export async function completeTaskRequest(task: Task): Promise<Task> {
     // Children first prevents the server from ever exposing them as standalone
     // work while the parent completion is in flight.
     for (const child of [...autoCompleted].reverse()) {
-      const outcome = await sendTaskPatch(child.id, { done: true }, child.title)
+      const outcome = await sendTaskPatch(child.id, { done: true }, child.title, { completedDue: completedDueFor(child) })
       completed.push({ task: child, queued: outcome.queued })
     }
-    const outcome = await sendTaskPatch(task.id, { done: true }, task.title)
+    // Pro's repeat rule (21.13): at its end the repeat goes off first, so the server completes it.
+    const repeatRule = repeatCompletionFor(task)
+    if (repeatRule && repeatRule.plan.patches.length > 1) await sendTaskPatch(task.id, repeatRule.plan.patches[0], task.title)
+    // A repeating task's completion carries the due date it completed, so main sends it only while
+    // the server still holds that occurrence (cross-app semantics 7.5); otherwise the answer is the
+    // server's task, already moved on by another device.
+    const outcome = await sendTaskPatch(task.id, { done: true }, task.title, { completedDue: completedDueFor(task) })
+    // Skipped: nothing was completed here, so there is nothing to undo and no rule to apply. The
+    // server's task is shown as it is (the hold and the next refresh bring the list up to date).
+    if (outcome.repeatSkipped && outcome.task) return outcome.task
     // A repeating task comes back open with its next dates: remember how it was, for Undo.
     rememberRepeatCompletion(task, outcome.task)
+    if (repeatRule) {
+      const catchUp = afterRepeatCompletion(repeatRule, task, outcome.task ?? null)
+      if (catchUp && outcome.task) {
+        const moved = await sendTaskPatch(task.id, catchUp, task.title)
+        return moved.task ?? { ...outcome.task, ...catchUp }
+      }
+    }
     return outcome.task ?? { ...task, done: true }
   } catch (error) {
     await Promise.allSettled(completed.map((entry) => reverseDone(entry, false)))
@@ -613,7 +753,7 @@ export async function completeTaskRequest(task: Task): Promise<Task> {
 export async function uncompleteTaskRequest(task: Task, autoCompleted: readonly Task[]): Promise<Task> {
   const restored: Array<{ task: Task; queued: boolean }> = []
   const reopen = async (item: Task): Promise<Task | null> => {
-    if (useOfflineStore.getState().counts.pending > 0) {
+    if (can('offlineQueue') && useOfflineStore.getState().counts.pending > 0) {
       const cancelled = await api.offlineQueue.cancelChange(item.id, ['done'])
       if (cancelled.success && cancelled.data) {
         restored.push({ task: item, queued: false })
@@ -672,7 +812,7 @@ export function useCompleteTask() {
       // the pointer or focus leaves it, or until the user leaves the view); then the hold removes it.
       addCompleted(mapTaskDoneByIds(task, doneById), currentPathname(router), autoCompleted, suppressTopLevelUndo)
       completionHold.complete(task.id)
-      announce(`Completed ${task.title}`)
+      announce(t('taskActions.completed', { title: task.title }))
 
       await qc.cancelQueries({ queryKey: ['tasks'] })
       await qc.cancelQueries({ queryKey: ['view-tasks'] })
@@ -739,24 +879,50 @@ export function useCompleteTask() {
   })
 }
 
+/**
+ * What a reopen is given: the task, or the task with `suppressTopLevelUndo` when the checkbox is on a
+ * nested row (the same flag a completion from that row carries).
+ */
+export type ReopenInput = Task | { task: Task; suppressTopLevelUndo?: boolean }
+
+function reopenInput(input: ReopenInput): { task: Task; suppressTopLevelUndo: boolean } {
+  return 'task' in input
+    ? { task: input.task, suppressTopLevelUndo: input.suppressTopLevelUndo === true }
+    : { task: input, suppressTopLevelUndo: false }
+}
+
+/**
+ * Keep a reopened task on screen until the view is left: a held row turns open where it is; any other
+ * gets an entry in the completed-tasks store, which the lists merge back in. A nested row's entry is
+ * marked `suppressTopLevelUndo`, so it stays under its parent and is not drawn as a top-level row as
+ * well (rendyhd/Vicu#76).
+ */
+export function keepReopenedRow(task: Task, path: string, suppressTopLevelUndo: boolean, wasInStore: boolean): void {
+  const store = useCompletedTasksStore.getState()
+  if (wasInStore) store.update(task.id, { done: false })
+  else store.add({ ...task, done: false }, path, undefined, suppressTopLevelUndo)
+}
+
 export function useUncompleteTask() {
   const qc = useQueryClient()
   const router = useRouter()
-  const addToStore = useCompletedTasksStore((s) => s.add)
   const updateCompleted = useCompletedTasksStore((s) => s.update)
   const removeCompleted = useCompletedTasksStore((s) => s.remove)
 
   return useMutation({
     meta: metaFor('reopen the task'),
-    mutationFn: async (task: Task) => {
+    mutationFn: async (input: ReopenInput) => {
+      const { task } = reopenInput(input)
       const autoCompleted = useCompletedTasksStore.getState().tasks
         .get(task.id)?.autoCompletedSubtasks ?? []
       return uncompleteTaskRequest(task, autoCompleted)
     },
-    onMutate: async (task) => {
+    onMutate: async (input) => {
+      const { task, suppressTopLevelUndo } = reopenInput(input)
       // If task was recently completed (in store), update to done:false.
       // Otherwise (e.g. logbook uncomplete), add a new store entry so it
-      // stays visible without strikethrough until navigation.
+      // stays visible without strikethrough until navigation. A nested row (a subtask in its parent's
+      // card or opened under its parent) says so: its entry must not come back as a top-level row too.
       const wasInStore = useCompletedTasksStore.getState().tasks.has(task.id)
       const autoCompleted = useCompletedTasksStore.getState().tasks
         .get(task.id)?.autoCompletedSubtasks ?? []
@@ -766,11 +932,7 @@ export function useUncompleteTask() {
         [task.id, false],
         ...autoCompleted.map((child) => [child.id, false] as const),
       ])
-      if (wasInStore) {
-        updateCompleted(task.id, { done: false })
-      } else {
-        addToStore({ ...task, done: false }, currentPathname(router))
-      }
+      keepReopenedRow(task, currentPathname(router), suppressTopLevelUndo, wasInStore)
 
       await qc.cancelQueries({ queryKey: ['tasks'] })
       await qc.cancelQueries({ queryKey: ['view-tasks'] })
@@ -798,7 +960,8 @@ export function useUncompleteTask() {
 
       return { previousTaskQueries, previousViewQueries, previousSectionQueries, previousTaskDetailQueries, wasInStore }
     },
-    onError: (_err, task, context) => {
+    onError: (_err, input, context) => {
+      const { task } = reopenInput(input)
       if (context?.wasInStore) {
         updateCompleted(task.id, { done: true })
         // The reopen failed: the row is done again, so it is held again.
@@ -1044,6 +1207,9 @@ export function useDeleteProject(options?: MutationHookOptions) {
     },
     onSuccess: (_data, id) => {
       newTaskPlacer.invalidate(id)
+      // Work and Personal (22.1): a deleted project's entry goes too, when it has one.
+      const prefs = qc.getQueryData<SyncedPrefsSnapshot>(SYNCED_PREFS_QUERY_KEY)
+      if (readWorkProjectEntry(prefs?.values[workProjectKey(id)]) !== null) void writeSyncedPrefs(qc, { [workProjectKey(id)]: null })
       const currentPath = matches[matches.length - 1]?.pathname ?? ''
       if (currentPath === `/project/${id}`) {
         navigate({ to: '/inbox' })
@@ -1104,6 +1270,9 @@ export function useDeleteLabel() {
       if (!result.success) throw apiError(result)
     },
     onSuccess: (_data, id) => {
+      // Work and Personal (22.1): when this was the work label, the entry says no label.
+      const prefs = qc.getQueryData<SyncedPrefsSnapshot>(SYNCED_PREFS_QUERY_KEY)
+      if (readWorkLabel(prefs?.values[WORK_LABEL_KEY]) === id) void writeSyncedPrefs(qc, { [WORK_LABEL_KEY]: null })
       const currentPath = matches[matches.length - 1]?.pathname ?? ''
       if (currentPath === `/tag/${id}`) {
         navigate({ to: '/inbox' })
@@ -1130,24 +1299,74 @@ export function useTaskAttachments(taskId: number, enabled: boolean) {
   })
 }
 
+let uploadKeys = 0
+
+/**
+ * The attach dialog for a task's attachments: every picked file shows as uploading at once and is
+ * sent one after the other; each one's attachment goes into the list as soon as the server names
+ * it, in the place its uploading row had (the phone's editor does the same).
+ */
 export function useUploadAttachment() {
   const qc = useQueryClient()
 
   return useMutation({
     meta: metaFor('upload the attachment'),
     mutationFn: async (taskId: number) => {
-      const result = await api.pickAndUploadAttachment(taskId)
-      if (!result.success) throw apiError(result)
-      return result.data
+      const picked = await api.pickAttachmentFiles()
+      if (!picked.success) throw apiError(picked)
+      return sendPickedFiles(qc, taskId, picked.data)
     },
     onSuccess: (data) => {
-      if (data.queued?.length) toast.info(queuedUploadsText(data.queued))
+      if (data.queued.length) toast.info(queuedUploadsText(data.queued))
     },
     onSettled: (_data, _err, taskId) => {
       qc.invalidateQueries({ queryKey: ['task-attachments', taskId] })
       refreshTasks(qc, [['tasks'], ['view-tasks']])
     },
   })
+}
+
+export async function sendPickedFiles(
+  qc: ReturnType<typeof useQueryClient>,
+  taskId: number,
+  files: readonly { token: string; name: string; size: number }[],
+): Promise<{ count: number; queued: string[] }> {
+  const store = useUploadingStore.getState()
+  const knownIds = (qc.getQueryData<TaskAttachment[]>(['task-attachments', taskId]) ?? []).map((a) => a.id)
+  const uploads = files.map((file) => ({ key: ++uploadKeys, taskId, name: file.name, size: file.size, knownIds }))
+  store.add(uploads)
+  let count = 0
+  let lastError = ''
+  const queued: string[] = []
+  for (const [index, file] of files.entries()) {
+    const { key } = uploads[index]
+    const result = await api.uploadPickedAttachment(taskId, file.token).catch((err: unknown) => ({
+      success: false as const,
+      error: err instanceof Error ? err.message : t('taskActions.uploadFailed'),
+    }))
+    if (!result.success) {
+      store.remove(key)
+      lastError = result.error
+      continue
+    }
+    if (result.data.queued) {
+      store.remove(key)
+      queued.push(result.data.queued)
+      continue
+    }
+    const made = result.data.attachments
+    count++
+    if (made.length === 0) {
+      store.remove(key)
+      continue
+    }
+    qc.setQueryData<TaskAttachment[]>(['task-attachments', taskId], (old) =>
+      old ? [...old, ...made.filter((m) => !old.some((o) => o.id === m.id))] : old)
+    store.land(key, Math.max(...made.map((m) => m.id)))
+    store.announce(taskId, t('taskActions.attached', { name: file.name }))
+  }
+  if (count === 0 && queued.length === 0 && files.length > 0) throw new Error(lastError || t('taskActions.uploadFailed'))
+  return { count, queued }
 }
 
 export function useUploadAttachmentFromDrop() {

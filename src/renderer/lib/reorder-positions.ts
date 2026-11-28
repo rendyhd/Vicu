@@ -13,7 +13,9 @@
 
 import { NULL_DATE } from './constants'
 import type { Task } from './vikunja-types'
-import { canReorderTask, orderAllowsReorder, parseTaskOrder, TASK_ORDER_LABELS } from '../../shared/task-order'
+import { canReorderTask, orderAllowsReorder, parseTaskOrder } from '../../shared/task-order'
+import { t } from '../../shared/i18n'
+import { TASK_ORDER_LABEL_KEYS } from './task-order-labels'
 
 /** The distance Vikunja keeps between neighbouring positions. */
 export const POSITION_STEP = 2 ** 16
@@ -151,16 +153,16 @@ export function taskStepRefusal(
       return null
     case 'sorted':
       return {
-        message: `Tasks here are sorted by ${TASK_ORDER_LABELS[parseTaskOrder(order)]}. Choose Manual in Sort tasks to move them.`,
+        message: t('taskActions.sortedBy', { order: t(TASK_ORDER_LABEL_KEYS[parseTaskOrder(order)]) }),
         toast: true,
       }
     case 'dated':
-      return { message: 'Tasks with a due date stay in date order. Choose Manual in Sort tasks to move them.', toast: true }
+      return { message: t('taskActions.datedOrder'), toast: true }
     case 'edge':
       return {
         message: datedEdge
-          ? `“${title}” is already the first task without a due date`
-          : `“${title}” is already ${step === 'up' ? 'first' : 'last'}`,
+          ? t('taskActions.alreadyFirstUndated', { title })
+          : t(step === 'up' ? 'taskActions.alreadyFirst' : 'taskActions.alreadyLast', { title }),
         toast: false,
       }
   }

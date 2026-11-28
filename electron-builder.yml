@@ -2,6 +2,13 @@ appId: com.rendyhd.vicu
 productName: Vicu
 copyright: Copyright (c) 2024-2026 rendyhd
 
+# vicu:// links (src/main/deep-link.ts): the Windows installer registers the scheme, macOS reads it
+# from CFBundleURLTypes, and the Linux desktop entry gets MimeType=x-scheme-handler/vicu.
+protocols:
+  - name: Vicu
+    schemes:
+      - vicu
+
 directories:
   buildResources: build
   output: dist
@@ -32,6 +39,13 @@ extraResources:
 
 asarUnpack:
   - "node_modules/koffi/**"
+
+# Electron fuses, set right before signing (review 2026-11-13, S-4). On macOS the packaged app does
+# not run as Node, ignores NODE_OPTIONS and --inspect, and loads only the checked app.asar; the
+# hook refuses a Mac build without the browser link tool (resources/bridge/, npm run
+# bridge:helper). Windows and Linux are unchanged until their browser bridge stops running the app
+# binary as Node. The hook says what it did in the build log.
+afterPack: ./scripts/electron-fuses.mjs
 
 win:
   icon: build/icon.ico
@@ -72,6 +86,11 @@ mac:
     # Voice input (docs/voice-input.md): asked for on the first hold of + or the voice shortcut.
     NSMicrophoneUsageDescription: "Vicu listens while you hold + or the voice shortcut, to turn what you say into a task."
     NSSpeechRecognitionUsageDescription: "Vicu turns what you say into a task. Speech is recognized on this Mac when your language allows it."
+    # The Mac's calendars on the Plan screen (docs/calendar-plan.md 2d): asked for when they are
+    # added. The helper (resources/calendar/vicu-calendar-macos, signed with the app through
+    # extraResources) asks; macOS attributes it to Vicu and shows these strings.
+    NSCalendarsFullAccessUsageDescription: "Vicu shows the events of your calendars on the Plan screen and counts them as busy time. It only reads them, never changes them, and they stay on this Mac."
+    NSCalendarsUsageDescription: "Vicu shows the events of your calendars on the Plan screen and counts them as busy time. It only reads them, never changes them, and they stay on this Mac."
 
 linux:
   icon: build/icon.png

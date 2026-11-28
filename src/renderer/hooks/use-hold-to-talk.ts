@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react'
 import { HOLD_MS, PRESS_IDLE, pressStep, type PressEvent, type PressState } from '@/lib/voice/press-gesture'
 import { useVoiceStore } from '@/stores/voice-store'
+import { can } from '@/lib/capabilities'
 
 /**
  * True from the moment a hold starts listening until the next press: the click that follows it
@@ -21,7 +22,9 @@ export interface HoldToTalkProps {
  * starts listening, letting go adds, moving well away and letting go (or Escape) cancels, and
  * sliding up locks it into smart dictation when that is ready.
  */
-export function useHoldToTalk(): HoldToTalkProps {
+const NO_HOLD: Partial<HoldToTalkProps> = {}
+
+export function useHoldToTalk(): Partial<HoldToTalkProps> {
   const state = useRef<PressState>(PRESS_IDLE)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const detach = useRef<(() => void) | null>(null)
@@ -99,5 +102,6 @@ export function useHoldToTalk(): HoldToTalkProps {
     if (state.current.phase !== 'idle' && state.current.phase !== 'passive') event.preventDefault()
   }, [])
 
-  return { onPointerDown, onClickCapture, onContextMenu }
+  // A host without voice input (the web version) has a button that only clicks.
+  return can('voice') ? { onPointerDown, onClickCapture, onContextMenu } : NO_HOLD
 }

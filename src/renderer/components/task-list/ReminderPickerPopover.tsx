@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState, type RefObject } from 'react'
 import { MapPin, X } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
+import { t as translate, type TranslationKey } from '../../../shared/i18n'
 import type { Task, TaskReminder } from '@/lib/vikunja-types'
 import { NULL_DATE } from '@/lib/constants'
 import { formatDateChip } from '@/lib/date-utils'
@@ -25,14 +27,15 @@ interface ReminderPickerPopoverProps {
   onClose: (reason?: PopoverCloseReason) => void
 }
 
-const RELATIVE_PRESETS = [
-  { label: 'At due time', offset: 0 },
-  { label: '15 min before', offset: -900 },
-  { label: '1 hour before', offset: -3600 },
-  { label: '1 day before', offset: -86400 },
+const RELATIVE_PRESETS: ReadonlyArray<{ label: TranslationKey; offset: number }> = [
+  { label: 'task.reminder.atDue', offset: 0 },
+  { label: 'task.reminder.min15', offset: -900 },
+  { label: 'task.reminder.hour1', offset: -3600 },
+  { label: 'task.reminder.day1', offset: -86400 },
 ]
 
 export function ReminderPickerPopover({ anchorRef, task, dueDate, reminders: controlledReminders, onReminderChange, onClose }: ReminderPickerPopoverProps) {
+  const { t } = useTranslation()
   // The day and time picked in the panel and not added yet; a quick choice or Enter adds at once.
   const [staged, setStaged] = useState<WhenValue>(EMPTY_WHEN)
   const [panelKey, setPanelKey] = useState(0)
@@ -89,7 +92,7 @@ export function ReminderPickerPopover({ anchorRef, task, dueDate, reminders: con
   }
 
   return (
-    <Popover anchorRef={anchorRef} onClose={onClose} label="Reminders" className="w-72 p-3">
+    <Popover anchorRef={anchorRef} onClose={onClose} label={t('task.reminder.title')} className="w-72 p-3">
       {/* Existing reminders */}
       {reminders.length > 0 && (
         <div className="mb-2 flex flex-col gap-1">
@@ -102,8 +105,8 @@ export function ReminderPickerPopover({ anchorRef, task, dueDate, reminders: con
               <button
                 type="button"
                 onClick={() => removeReminder(i)}
-                aria-label={`Remove reminder ${formatReminder(r)}`}
-                title="Remove reminder"
+                aria-label={t('task.reminder.removeNamed', { reminder: formatReminder(r) })}
+                title={t('task.reminder.remove')}
                 className="ml-2 text-[var(--text-secondary)] hover:text-danger"
               >
                 <X className="h-3 w-3" />
@@ -117,7 +120,7 @@ export function ReminderPickerPopover({ anchorRef, task, dueDate, reminders: con
       {hasDueDate && (
         <div className="mb-2 flex flex-col gap-1">
           <span className="px-2 text-caption font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
-            Relative to due date
+            {t('task.reminder.relativeHeading')}
           </span>
           {RELATIVE_PRESETS.map((p) => (
             <button
@@ -126,7 +129,7 @@ export function ReminderPickerPopover({ anchorRef, task, dueDate, reminders: con
               onClick={() => addRelativeReminder(p.offset)}
               className="rounded-control px-2 py-1.5 text-left text-xs text-[var(--text-primary)] hover:bg-[var(--bg-hover)]"
             >
-              {p.label}
+              {t(p.label)}
             </button>
           ))}
         </div>
@@ -134,7 +137,7 @@ export function ReminderPickerPopover({ anchorRef, task, dueDate, reminders: con
 
       {hasDueDate && (
         <span className="mb-1 block px-2 text-caption font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
-          Absolute
+          {t('task.reminder.absoluteHeading')}
         </span>
       )}
       {/* A quick choice or Enter in the text field adds the reminder; a day or time picked in the grid
@@ -150,10 +153,10 @@ export function ReminderPickerPopover({ anchorRef, task, dueDate, reminders: con
         <Button
           variant="primary"
           onClick={() => addPicked(staged)}
-          aria-label={`Add reminder, ${whenText({ date: staged.date, time: staged.time ?? DEFAULT_REMINDER_TIME }, now, dateFormat)}`}
+          aria-label={t('task.reminder.addNamed', { when: whenText({ date: staged.date, time: staged.time ?? DEFAULT_REMINDER_TIME }, now, dateFormat) })}
           className="mt-2 w-full"
         >
-          Add reminder
+          {t('task.reminder.add')}
         </Button>
       )}
       {/* A new task has no id yet: a location reminder is set once it exists. */}
@@ -167,6 +170,7 @@ export function ReminderPickerPopover({ anchorRef, task, dueDate, reminders: con
  * The phone reminds there; the desktop only chooses the place, the trigger and the distance.
  */
 function PlaceReminderSection({ taskId }: { taskId: number }) {
+  const { t } = useTranslation()
   const { places, reminderFor, setReminder, removeReminder } = useLocationReminders()
   const current = reminderFor(taskId)
   const [trigger, setTrigger] = useState<LocationTrigger>(current?.trigger ?? 'arrive')
@@ -179,7 +183,7 @@ function PlaceReminderSection({ taskId }: { taskId: number }) {
   return (
     <div className="mt-3 flex flex-col gap-1 border-t border-[var(--border-color)] pt-2">
       <span className="px-2 text-caption font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
-        At a place
+        {t('task.reminder.atPlace')}
       </span>
       {current && (
         <div className="flex items-center justify-between rounded-control bg-[var(--bg-hover)] px-2 py-1 text-xs text-[var(--text-primary)]">
@@ -190,8 +194,8 @@ function PlaceReminderSection({ taskId }: { taskId: number }) {
           <button
             type="button"
             onClick={() => removeReminder(taskId)}
-            aria-label={`Remove location reminder ${locationReminderLabel(current.trigger, current.placeName)}`}
-            title="Remove location reminder"
+            aria-label={t('task.reminder.removeLocationNamed', { reminder: locationReminderLabel(current.trigger, current.placeName) })}
+            title={t('task.reminder.removeLocation')}
             className="ml-2 text-[var(--text-secondary)] hover:text-danger"
           >
             <X className="h-3 w-3" />
@@ -200,18 +204,18 @@ function PlaceReminderSection({ taskId }: { taskId: number }) {
       )}
       {places.length === 0 ? (
         <p className="px-2 text-xs text-[var(--text-secondary)]">
-          Save places in Vicu on your phone: Settings &gt; Notifications &gt; Places. The phone reminds you there.
+          {t('task.reminder.noPlaces')}
         </p>
       ) : (
         <>
-          <div className="flex gap-1 px-1" role="group" aria-label="Remind me">
+          <div className="flex gap-1 px-1" role="group" aria-label={t('task.reminder.remindMe')}>
             {(['arrive', 'leave'] as const).map((value) => (
               <button key={value} type="button" aria-pressed={trigger === value} onClick={() => setTrigger(value)} className={chosen(trigger === value)}>
-                {value === 'arrive' ? 'When I arrive' : 'When I leave'}
+                {value === 'arrive' ? t('task.reminder.whenArrive') : t('task.reminder.whenLeave')}
               </button>
             ))}
           </div>
-          <div className="flex gap-1 px-1" role="group" aria-label="Distance">
+          <div className="flex gap-1 px-1" role="group" aria-label={t('task.reminder.distance')}>
             {LOCATION_RADIUS_OPTIONS.map((meters) => (
               <button key={meters} type="button" aria-pressed={radius === meters} onClick={() => setRadius(meters)} className={chosen(radius === meters)}>
                 {meters} m
@@ -233,7 +237,7 @@ function PlaceReminderSection({ taskId }: { taskId: number }) {
               </button>
             )
           })}
-          <p className="px-2 text-caption text-[var(--text-secondary)]">Your phone reminds you there.</p>
+          <p className="px-2 text-caption text-[var(--text-secondary)]">{t('task.reminder.phoneReminds')}</p>
         </>
       )}
     </div>
@@ -246,22 +250,20 @@ function formatRelativeReminder(
 ): string {
   const target =
     relativeTo === 'start_date'
-      ? 'start date'
+      ? translate('task.reminder.targetStart')
       : relativeTo === 'end_date'
-        ? 'end date'
-        : 'due date'
+        ? translate('task.reminder.targetEnd')
+        : translate('task.reminder.targetDue')
 
-  if (period === 0) return `At ${target}`
+  if (period === 0) return translate('task.reminder.relAt', { target })
 
   const absSec = Math.abs(period)
-  const direction = period < 0 ? 'before' : 'after'
+  const before = period < 0
 
-  if (absSec < 60) return `${absSec}s ${direction} ${target}`
-  if (absSec < 3600) return `${Math.round(absSec / 60)} min ${direction} ${target}`
+  if (absSec < 60) return translate(before ? 'task.reminder.secBefore' : 'task.reminder.secAfter', { amount: absSec, target })
+  if (absSec < 3600) return translate(before ? 'task.reminder.minBefore' : 'task.reminder.minAfter', { amount: Math.round(absSec / 60), target })
   if (absSec < 86400) {
-    const hours = Math.round(absSec / 3600)
-    return `${hours}h ${direction} ${target}`
+    return translate(before ? 'task.reminder.hourBefore' : 'task.reminder.hourAfter', { amount: Math.round(absSec / 3600), target })
   }
-  const days = Math.round(absSec / 86400)
-  return `${days}d ${direction} ${target}`
+  return translate(before ? 'task.reminder.dayBefore' : 'task.reminder.dayAfter', { amount: Math.round(absSec / 86400), target })
 }

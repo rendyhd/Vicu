@@ -31,7 +31,7 @@ function settingsStore(): JsonFileStore<AiSettings> {
     store = new JsonFileStore<AiSettings>({
       path: join(app.getPath('userData'), 'ai-settings.json'),
       backup: true,
-      label: 'AI settings',
+      label: 'AI settings', // i18n-ignore: log label
       empty: () => normaliseAiSettings(DEFAULT_AI_SETTINGS),
       parse: (json) => normaliseAiSettings(json),
     })
@@ -102,7 +102,7 @@ export function useSavedAddress(address: string): Promise<AiSettings> {
     return savingAddress({
       ...kept,
       address: entry.address,
-      models: { dictation: entry.models.dictation || kept.models.dictation, ask: entry.models.ask || kept.models.ask },
+      models: { dictation: entry.models.dictation || kept.models.dictation, ask: entry.models.ask || kept.models.ask, ...((entry.models.read || kept.models.read) ? { read: entry.models.read || kept.models.read } : {}) },
     })
   })
 }

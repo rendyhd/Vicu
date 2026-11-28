@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/shared/Button'
 import { BROWSER_SIGN_IN_REDIRECT_URI } from '../../../shared/oidc-browser'
 
@@ -19,6 +20,7 @@ interface BrowserSignInProps {
  * the panel shows it with a Copy button, then starts the sign-in and waits for it.
  */
 export function BrowserSignIn({ providerName, passkeyPrompted, waiting, error, onStart, onCancel }: BrowserSignInProps) {
+  const { t } = useTranslation()
   const [copied, setCopied] = useState(false)
 
   const copy = () => {
@@ -32,13 +34,13 @@ export function BrowserSignIn({ providerName, passkeyPrompted, waiting, error, o
     <>
       {passkeyPrompted && (
         <p className="text-sm text-text">
-          {providerName ?? 'The sign-in page'} asked for a passkey. Passkeys can't be used in Vicu's sign-in window, so sign in through your browser instead.
+          {providerName ? t('setup.browserSignIn.passkeyNamed', { provider: providerName }) : t('setup.browserSignIn.passkeyUnnamed')}
         </p>
       )}
 
       <div>
         <p className="mb-1.5 text-xs text-text-secondary">
-          Your browser returns to Vicu at the address below. Add it once as a redirect URL (callback URL) of the Vikunja client in {providerName ?? 'your identity provider'}:
+          {providerName ? t('setup.browserSignIn.addressNamed', { provider: providerName }) : t('setup.browserSignIn.addressUnnamed')}
         </p>
         <div className="flex items-center gap-2">
           <code
@@ -48,8 +50,8 @@ export function BrowserSignIn({ providerName, passkeyPrompted, waiting, error, o
           >
             {BROWSER_SIGN_IN_REDIRECT_URI}
           </code>
-          <Button variant="secondary" onClick={copy} aria-label="Copy the redirect URL">
-            {copied ? 'Copied' : 'Copy'}
+          <Button variant="secondary" onClick={copy} aria-label={t('setup.browserSignIn.copyLabel')}>
+            {copied ? t('setup.browserSignIn.copied') : t('setup.browserSignIn.copy')}
           </Button>
         </div>
       </div>
@@ -57,15 +59,15 @@ export function BrowserSignIn({ providerName, passkeyPrompted, waiting, error, o
       {waiting ? (
         <>
           <p className="text-xs text-text-secondary" role="status">
-            Finish signing in in your browser. Vicu continues once you're done.
+            {t('setup.browserSignIn.waiting')}
           </p>
           <Button variant="secondary" onClick={onCancel} className="w-full">
-            Cancel
+            {t('setup.browserSignIn.cancel')}
           </Button>
         </>
       ) : (
         <Button variant="primary" onClick={onStart} className="w-full">
-          Continue in browser
+          {t('setup.browserSignIn.continue')}
         </Button>
       )}
 

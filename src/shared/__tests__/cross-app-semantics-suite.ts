@@ -13,9 +13,13 @@ import {
   isDueToday,
   isOverdue,
   isUpcoming,
+  isoWeekday,
+  nextWeekDay,
   nextWeekStart,
   postponeDays,
+  startOfWeek,
 } from '../due-dates'
+import { daysIntoWeek, readWeekStart } from '../week-start'
 import {
   buildCustomListServerFilter,
   filterCustomList,
@@ -26,7 +30,17 @@ import {
 import { computeStatus, type ReviewMetadata } from '../review-metadata'
 import { compileRule, validateRule, type RuleTask } from '../custom-list-rule'
 import { sortCustomListTasks } from '../custom-list-sort'
-import { convertSavedFilter, type SavedFilterDto } from '../saved-filter-import'
+import {
+  compareImport,
+  convertProjectView,
+  convertSavedFilter,
+  isViewOffered,
+  overwriteImport,
+  skipImport,
+  type ImportResult,
+  type ProjectViewDto,
+  type SavedFilterDto,
+} from '../saved-filter-import'
 import {
   activeLists,
   documentFromLists,
@@ -56,9 +70,19 @@ interface SetterVector {
   date?: string
   days?: number
   from?: string
+  /** The week start the vector runs with (section 2.1); Monday when absent. */
+  weekStart?: string
   expect: string
 }
-interface WeekVector { today: string; thisWeekEnd: string; thisMonthEnd: string; nextWeekStart: string }
+interface WeekVector {
+  today: string
+  thisWeekEnd: string
+  thisMonthEnd: string
+  nextWeekStart: string
+  /** The day "Next week" gives: the Monday in next week. */
+  nextWeek: string
+  weekStart?: string
+}
 interface FixtureTask {
   id: number
   projectId: number
@@ -72,6 +96,7 @@ interface CustomListVector {
   today: string
   filter: CustomListFilterInput
   expect: number[]
+  weekStart?: string
 }
 interface ActivityTask {
   id: number
@@ -117,23 +142,54 @@ interface RuleFixtureTask {
 }
 interface RuleBlock {
   tasks: RuleFixtureTask[]
-  vectors: Array<{ name: string; now: string; rule: string; includeNulls: boolean; expect: number[] }>
+  vectors: Array<{ name: string; now: string; rule: string; includeNulls: boolean; expect: number[]; weekStart?: string }>
   invalid: string[]
 }
 interface SortBlock {
   tasks: Array<{ id: number; title: string; done: boolean; priority: number; due: string | null; position: number }>
   vectors: Array<{ name: string; filter: { sort_by: string; order_by: string; then_by?: Array<{ sort_by: string; order_by: string }> }; expect: number[] }>
 }
+interface ImportedListVector {
+  name: string
+  icon: string
+  savedFilterId?: number
+  projectView?: { project_id: number; view_id: number }
+  filter: Record<string, unknown>
+  importBase?: Record<string, unknown>
+}
 interface ImportBlock {
   filters: Array<{
     name: string
     savedFilter: SavedFilterDto
-    list: { name: string; icon: string; savedFilterId: number; filter: Record<string, unknown> } | null
+    list: ImportedListVector | null
     status: string
     reasons: string[]
   }>
-  duplicates: Array<{ name: string; lists: Array<{ id: string; savedFilterId?: number }>; kept: string[] }>
+  duplicates: Array<{ name: string; lists: Array<{ id: string; savedFilterId?: number; projectViewId?: number }>; kept: string[] }>
   union: Array<{ left: number[]; right: number[]; merged: number[] }>
+  compare: Array<{
+    name: string
+    list: Record<string, unknown>
+    fresh: Record<string, unknown>
+    parts: Record<string, string>
+    status: string
+  }>
+  answers: Array<{
+    name: string
+    list: Record<string, unknown>
+    fresh: Record<string, unknown>
+    overwrite: Record<string, unknown>
+    skip: Record<string, unknown>
+  }>
+  views: Array<{
+    name: string
+    project: { id: number; title: string; archived: boolean }
+    view: ProjectViewDto
+    offered: boolean
+    list?: ImportedListVector | null
+    status?: string
+    reasons?: string[]
+  }>
 }
 interface Fixture {
   contractVersion: number
@@ -192,7 +248,7 @@ export function runCrossAppSemanticsSuite(options: { zone: string; expectedOffse
 
     describe('dueDates.setters', () => {
       for (const vector of fixture.dueDates.setters) {
-        const label = `${vector.action}${vector.days ? ` ${vector.days}d` : ''}${vector.date ? ` ${vector.date}` : ''} from ${vector.from ?? vector.reference} -> ${vector.expect}`
+        const label = `${vector.action}${vector.days ? ` ${vector.days}d` : ''}${vector.date ? ` ${vector.date}` : ''} from ${vector.from ?? vector.reference}${vector.weekStart ? ` (weeks start on ${vector.weekStart})` : ''} -> ${vector.expect}`
         it(label, () => {
           const now = local(vector.reference)
           let result: string
@@ -205,7 +261,7 @@ export function runCrossAppSemanticsSuite(options: { zone: string; expectedOffse
               result = dueTomorrow(now)
               break
             case 'nextWeek':
-              result = dueNextWeek(now)
+              result = dueNextWeek(now, readWeekStart(vector.weekStart))
               break
             case 'pickDate':
               result = dateOnlyDue(vector.date!)
@@ -220,12 +276,19 @@ export function runCrossAppSemanticsSuite(options: { zone: string; expectedOffse
     })
 
     describe('weeks', () => {
+      it('has vectors for every week start', () => {
+        expect(fixture.weeks.some((vector) => vector.weekStart === 'sunday')).toBe(true)
+        expect(fixture.weeks.some((vector) => vector.weekStart === 'saturday')).toBe(true)
+      })
       for (const vector of fixture.weeks) {
-        it(`week and month ends for ${vector.today}`, () => {
-          expect(endOfWeek(vector.today)).toBe(vector.thisWeekEnd)
+        const weekStart = readWeekStart(vector.weekStart)
+        it(`week and month ends for ${vector.today}, weeks start on ${weekStart}`, () => {
+          expect(endOfWeek(vector.today, weekStart)).toBe(vector.thisWeekEnd)
           expect(endOfMonth(vector.today)).toBe(vector.thisMonthEnd)
-          expect(nextWeekStart(vector.today)).toBe(vector.nextWeekStart)
+          expect(nextWeekStart(vector.today, weekStart)).toBe(vector.nextWeekStart)
+          expect(nextWeekDay(vector.today, weekStart)).toBe(vector.nextWeek)
           expect(addLocalDays(vector.thisWeekEnd, 1)).toBe(vector.nextWeekStart)
+          expect(daysIntoWeek(isoWeekday(startOfWeek(vector.today, weekStart)), weekStart)).toBe(0)
         })
       }
     })
@@ -272,13 +335,15 @@ export function runCrossAppSemanticsSuite(options: { zone: string; expectedOffse
           it(`${vector.name} at ${clock}`, () => {
             const now = local(`${vector.today}T${clock}`)
             const tasks = fixture.tasks.map(asTask)
+            const weekStart = readWeekStart(vector.weekStart)
+            const context = { weekStart }
 
-            expect(filterCustomList(tasks, vector.filter, now).map((task) => task.id)).toEqual(vector.expect)
-            expect(filterCustomList(tasks, vector.filter, vector.today).map((task) => task.id)).toEqual(vector.expect)
+            expect(filterCustomList(tasks, vector.filter, now, context).map((task) => task.id)).toEqual(vector.expect)
+            expect(filterCustomList(tasks, vector.filter, vector.today, context).map((task) => task.id)).toEqual(vector.expect)
 
             // The server filter is a superset: it never drops a task the list accepts.
-            const serverFilter = buildCustomListServerFilter(vector.filter, now)
-            for (const task of filterCustomList(tasks, vector.filter, now)) {
+            const serverFilter = buildCustomListServerFilter(vector.filter, now, weekStart)
+            for (const task of filterCustomList(tasks, vector.filter, now, context)) {
               expect(evaluateServerFilter(serverFilter, task), `task ${task.id} vs ${serverFilter}`).toBe(true)
             }
           })
@@ -360,10 +425,11 @@ export function runCrossAppSemanticsSuite(options: { zone: string; expectedOffse
       for (const vector of fixture.customListRule.vectors) {
         it(vector.name, () => {
           expect(validateRule(vector.rule)).toBeNull()
-          const match = compileRule(vector.rule, vector.includeNulls, local(vector.now))
+          const weekStart = readWeekStart(vector.weekStart)
+          const match = compileRule(vector.rule, vector.includeNulls, local(vector.now), weekStart)
           expect(ruleTasks().filter(match).map((task) => task.id), vector.rule).toEqual(vector.expect)
           const filter = { include_done: true, rule: vector.rule, rule_include_nulls: vector.includeNulls }
-          const viaList = filterCustomList(ruleTasks() as unknown as Parameters<typeof filterCustomList>[0], filter, vector.now.slice(0, 10), {}, local(vector.now))
+          const viaList = filterCustomList(ruleTasks() as unknown as Parameters<typeof filterCustomList>[0], filter, vector.now.slice(0, 10), { weekStart }, local(vector.now))
           expect(viaList.map((task) => task.id)).toEqual(vector.expect)
         })
       }
@@ -392,8 +458,29 @@ export function runCrossAppSemanticsSuite(options: { zone: string; expectedOffse
       }
     })
 
-    describe('savedFilterImport (section 3.7)', () => {
+    describe('savedFilterImport (sections 3.7 and 3.9)', () => {
       const defaults = normalizeWireList({ id: 'new', name: 'x', icon: '', filter: {} } as unknown as CustomListWire).filter
+      /** A vector's list (only what it reads, the rest a new list's defaults) as a synced value. */
+      const wire = (value: Record<string, unknown>, id = 'x'): CustomListWire => normalizeWireList({
+        id,
+        icon: '',
+        ...value,
+        filter: { ...defaults, ...(value.filter as Record<string, unknown> | undefined) },
+      } as unknown as CustomListWire)
+      const checkImported = (result: ImportResult, vector: ImportedListVector) => {
+        expect(result.list?.name).toBe(vector.name)
+        expect(result.list?.icon).toBe(vector.icon)
+        expect(result.list?.saved_filter_id).toBe(vector.savedFilterId)
+        expect(result.list?.project_view).toEqual(vector.projectView)
+        const made = normalizeWireList({ id: 'new', name: 'x', icon: '', filter: { ...result.list?.filter } } as unknown as CustomListWire).filter
+        const want = normalizeWireList({ id: 'new', name: 'x', icon: '', filter: { ...defaults, ...vector.filter } } as unknown as CustomListWire).filter
+        expect(made).toEqual(want)
+        if (vector.importBase) {
+          expect(result.list?.import_base).toEqual(vector.importBase)
+          // The base survives the protocol's normalizer unchanged.
+          expect(wire(result.list as unknown as Record<string, unknown>).import_base).toEqual(vector.importBase)
+        }
+      }
       for (const vector of fixture.savedFilterImport.filters) {
         it(vector.name, () => {
           const result = convertSavedFilter(vector.savedFilter, 'new')
@@ -403,14 +490,14 @@ export function runCrossAppSemanticsSuite(options: { zone: string; expectedOffse
             expect(result.list).toBeNull()
             return
           }
-          expect(result.list?.name).toBe(vector.list.name)
-          expect(result.list?.icon).toBe(vector.list.icon)
-          expect(result.list?.saved_filter_id).toBe(vector.list.savedFilterId)
-          const made = normalizeWireList({ id: 'new', name: 'x', icon: '', filter: { ...result.list?.filter } } as unknown as CustomListWire).filter
-          const want = normalizeWireList({ id: 'new', name: 'x', icon: '', filter: { ...defaults, ...vector.list.filter } } as unknown as CustomListWire).filter
-          expect(made).toEqual(want)
+          checkImported(result, vector.list)
+          // Every import records its base, whether or not the vector spells it out.
+          expect(result.list?.import_base).toBeDefined()
         })
       }
+      it('the base is checked by at least two vectors', () => {
+        expect(fixture.savedFilterImport.filters.filter((vector) => vector.list?.importBase).length).toBeGreaterThanOrEqual(2)
+      })
       for (const vector of fixture.savedFilterImport.duplicates) {
         it(vector.name, () => {
           const lists = vector.lists.map((list) => ({
@@ -419,6 +506,7 @@ export function runCrossAppSemanticsSuite(options: { zone: string; expectedOffse
             icon: '',
             filter: { ...defaults },
             ...(list.savedFilterId !== undefined ? { saved_filter_id: list.savedFilterId } : {}),
+            ...(list.projectViewId !== undefined ? { project_view: { project_id: 1, view_id: list.projectViewId } } : {}),
           }) as CustomListWire)
           const document = documentFromLists(lists, 'device', 1000)
           expect(activeLists(document).map((list) => list.id)).toEqual(vector.kept)
@@ -438,6 +526,45 @@ export function runCrossAppSemanticsSuite(options: { zone: string; expectedOffse
             ...(ids.length ? { imported_saved_filters: ids } : {}),
           })
           expect(mergeCustomListDocuments(doc(vector.left), doc(vector.right)).imported_saved_filters).toEqual(vector.merged)
+        })
+      }
+      it('has the compare, answers and views vectors', () => {
+        expect(fixture.savedFilterImport.compare.length).toBeGreaterThanOrEqual(10)
+        expect(fixture.savedFilterImport.answers.length).toBeGreaterThanOrEqual(2)
+        expect(fixture.savedFilterImport.views.length).toBeGreaterThanOrEqual(10)
+      })
+      for (const vector of fixture.savedFilterImport.compare) {
+        it(`compare: ${vector.name}`, () => {
+          const result = compareImport(wire(vector.list), wire(vector.fresh))
+          expect(result.parts).toEqual(vector.parts)
+          expect(result.status).toBe(vector.status)
+        })
+      }
+      for (const vector of fixture.savedFilterImport.answers) {
+        it(`answers: ${vector.name}`, () => {
+          const list = wire(vector.list)
+          const fresh = wire(vector.fresh, list.id)
+          const overwritten = normalizeWireList(overwriteImport(list, fresh))
+          expect(overwritten).toEqual(wire(vector.overwrite))
+          expect(normalizeWireList(skipImport(list, fresh))).toEqual(wire(vector.skip))
+          // Unknown fields of the list and of its filter are kept.
+          expect(overwritten.pinned).toEqual(list.pinned)
+          expect(overwritten.filter.availability).toEqual(list.filter.availability)
+          expect(compareImport(overwritten, fresh).status).toBe('same')
+        })
+      }
+      for (const vector of fixture.savedFilterImport.views) {
+        it(`views: ${vector.name}`, () => {
+          expect(isViewOffered(vector.project, vector.view)).toBe(vector.offered)
+          if (!vector.offered) return
+          const result = convertProjectView(vector.project, vector.view, 'new')
+          expect(result.status).toBe(vector.status)
+          expect(result.reasons).toEqual(vector.reasons ?? [])
+          if (!vector.list) {
+            expect(result.list).toBeNull()
+            return
+          }
+          checkImported(result, vector.list)
         })
       }
     })

@@ -23,6 +23,7 @@ import {
   newId,
   normalizeRoutineSlots,
   parseRoutineEnvelope,
+  preferOwnRoutineCarriers,
   readRoutineHistory,
   routineDay,
   statusRecord,
@@ -71,13 +72,17 @@ export async function fetchCarriers(): Promise<RoutineLoad> {
   if (!result.success) throw new Error(result.error)
   let updateRequired = 0
   let unreadable = 0
-  const carriers = result.data.flatMap((task) => {
+  const parsedCarriers = result.data.flatMap((task) => {
     const parsed = parseRoutineEnvelope(task.description)
     if (parsed.payload) return [{ task, payload: parsed.payload }]
     if (parsed.updateRequired) updateRequired += 1
     else if (parsed.isCarrier) unreadable += 1
     return []
-  }).sort((left, right) => left.payload.definition.createdAt.localeCompare(right.payload.definition.createdAt))
+  })
+  // Another member's carrier with the id of one of the user's own routines is never shown or
+  // written (review S-5); the user's own carrier wins.
+  const carriers = preferOwnRoutineCarriers(parsedCarriers, await api.ownUserId())
+    .sort((left, right) => left.payload.definition.createdAt.localeCompare(right.payload.definition.createdAt))
   // A carrier that lost this device's recent changes to a write made at the same moment gets them
   // written again (section 6.8). One whose write fails keeps its last known copy, to try next time.
   const device = deviceId()

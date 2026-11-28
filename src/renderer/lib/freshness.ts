@@ -3,7 +3,8 @@
 // nothing polls. So the app does it explicitly:
 //
 //   - on window focus (throttled to one refetch per 30 s),
-//   - every 5 minutes while the window is visible,
+//   - every 5 minutes while the window is visible, and while it is hidden or minimized only when
+//     something outside it still shows the data (the count badge on the taskbar or Dock icon),
 //   - when the computer resumes from sleep,
 //   - and at local midnight, when the date-dependent views (Today, Upcoming, custom lists with date
 //     windows, the overdue badge) have to be recomputed even though no data changed.
@@ -38,6 +39,13 @@ export interface FreshnessDeps {
   onDayChange(dayKey: string): void
   /** Whether the window is visible (not hidden to the tray or minimized). */
   isVisible(): boolean
+  /**
+   * Whether the data is still on show while the window is hidden or minimized: the count badge on
+   * the taskbar or Dock icon. The poll then goes on with `refreshHidden`. Missing means no.
+   */
+  showsDataWhileHidden?(): boolean
+  /** The poll's refresh while hidden: only what the badge reads. It does not count as a refresh for the focus throttle. */
+  refreshHidden?(): void
 }
 
 export interface Freshness {
@@ -87,6 +95,7 @@ export function createFreshness(deps: FreshnessDeps): Freshness {
       dayKey = localDayKey(deps.now())
       poll = setInterval(() => {
         if (deps.isVisible()) doRefresh()
+        else if (deps.showsDataWhileHidden?.()) (deps.refreshHidden ?? deps.refresh)()
       }, POLL_INTERVAL_MS)
       armMidnight()
     },

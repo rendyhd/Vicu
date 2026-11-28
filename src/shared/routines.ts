@@ -375,7 +375,7 @@ function laterDate(left: string, right: string): string {
 export function isCalendarScheduled(schedule: Extract<RoutineSchedule, { type: 'calendar' }>, date: string): boolean {
   if (date < schedule.anchorDate) return false
   if (schedule.weekdays.length > 0 && !schedule.weekdays.includes(isoWeekday(date))) return false
-  const weeks = Math.floor(diffLocalDays(startOfWeek(schedule.anchorDate), startOfWeek(date)) / 7)
+  const weeks = Math.floor(diffLocalDays(startOfWeek(schedule.anchorDate, 'monday'), startOfWeek(date, 'monday')) / 7)
   return weeks % Math.max(1, schedule.weekInterval) === 0
 }
 
@@ -675,6 +675,34 @@ export function isSharedRoutine(payload: Pick<RoutinePayload, 'definition'>): bo
 export function routineCarrierReadable(createdBy: number | null, shared: boolean, me: number | null | undefined): boolean {
   if (typeof me !== 'number' || me <= 0) return false
   return createdBy === me || shared
+}
+
+/**
+ * The carriers to show when several carry the same routine id (review S-5): a member of a shared
+ * project can make a carrier with someone else's routine id and `shared: true`, and a tick on it
+ * would go into their task. So where the user has a carrier of that id, every other user's carrier
+ * of it is left out; where only other users have one, the oldest task (lowest id) stays, as a copy
+ * made later cannot be older than the routine. The user's own carriers are all kept, as before.
+ * The order of `carriers` is kept.
+ */
+export function preferOwnRoutineCarriers<T extends { task: { id: number; created_by?: { id?: unknown } | null }; payload: Pick<RoutinePayload, 'definition'> }>(
+  carriers: readonly T[],
+  me: number | null | undefined,
+): T[] {
+  const isOwn = (carrier: T) => typeof me === 'number' && me > 0 && carrier.task.created_by?.id === me
+  const ownIds = new Set(carriers.filter(isOwn).map((carrier) => carrier.payload.definition.id))
+  const oldestOther = new Map<string, number>()
+  for (const carrier of carriers) {
+    if (isOwn(carrier)) continue
+    const id = carrier.payload.definition.id
+    const kept = oldestOther.get(id)
+    if (kept === undefined || carrier.task.id < kept) oldestOther.set(id, carrier.task.id)
+  }
+  return carriers.filter((carrier) => {
+    if (isOwn(carrier)) return true
+    const id = carrier.payload.definition.id
+    return !ownIds.has(id) && oldestOther.get(id) === carrier.task.id
+  })
 }
 
 /**

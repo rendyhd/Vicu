@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/shared/Button'
 import { Popover } from '@/components/overlay/Popover'
 import { TaskCheckbox } from '@/components/task-list/TaskCheckbox'
@@ -50,10 +51,11 @@ export function BlockPopover({
   onChange,
   onOpenTask,
   onMoveToDay,
-  removeLabel = 'Remove time',
+  removeLabel,
   canComplete = true,
   onClose,
 }: BlockPopoverProps) {
+  const { t } = useTranslation()
   const fmt = useDateFormat()
   const anchorRef = useRef<HTMLElement | null>(element)
   const block = blockOf(task)
@@ -82,7 +84,7 @@ export function BlockPopover({
   return (
     <Popover
       anchorRef={anchorRef}
-      label={`Time for ${task.title}`}
+      label={t('planner.blockPopover.label', { title: task.title })}
       role="dialog"
       placement="right-start"
       onClose={onClose}
@@ -100,15 +102,15 @@ export function BlockPopover({
         ) : (
           hasDueTime && (
             <p className="mt-0.5 text-meta text-text-secondary">
-              Due {formatDateDisplay('row', new Date(task.due_date as string), new Date(), false, fmt)}
+              {t('planner.blockPopover.due', { when: formatDateDisplay('row', new Date(task.due_date as string), new Date(), false, fmt) })}
             </p>
           )
         )}
 
         {block && canChange && onMoveToDay && (
           <>
-            <p className="mt-3 text-caption text-text-secondary">Day</p>
-            <div className="mt-1 flex flex-wrap gap-1" role="group" aria-label="Move to day">
+            <p className="mt-3 text-caption text-text-secondary">{t('planner.blockPopover.day')}</p>
+            <div className="mt-1 flex flex-wrap gap-1" role="group" aria-label={t('planner.blockPopover.moveToDay')}>
               {dayChips.map((day) => (
                 <button
                   key={day}
@@ -137,7 +139,7 @@ export function BlockPopover({
                   picking ? 'border-accent-blue text-accent-blue' : 'border-border text-text-secondary hover:bg-bg-hover',
                 )}
               >
-                Pick a date
+                {t('planner.blockPopover.pickDate')}
               </button>
             </div>
             {picking && (
@@ -162,8 +164,8 @@ export function BlockPopover({
 
         {block && canChange && (
           <>
-            <p className="mt-3 text-caption text-text-secondary">Length</p>
-            <div className="mt-1 flex flex-wrap gap-1" role="group" aria-label="Length">
+            <p className="mt-3 text-caption text-text-secondary">{t('planner.blockPopover.length')}</p>
+            <div className="mt-1 flex flex-wrap gap-1" role="group" aria-label={t('planner.blockPopover.length')}>
               {LENGTHS.map((minutes) => (
                 <button
                   key={minutes}
@@ -182,20 +184,20 @@ export function BlockPopover({
               ))}
             </div>
             <div className="mt-2 flex items-center gap-1">
-              <Button variant="secondary" onClick={() => setLength(Math.max(15, block.minutes - 15))} aria-label="15 minutes shorter">
-                Shorter
+              <Button variant="secondary" onClick={() => setLength(Math.max(15, block.minutes - 15))} aria-label={t('planner.blockPopover.shorterLabel')}>
+                {t('planner.blockPopover.shorter')}
               </Button>
-              <Button variant="secondary" onClick={() => setLength(block.minutes + 15)} aria-label="15 minutes longer">
-                Longer
+              <Button variant="secondary" onClick={() => setLength(block.minutes + 15)} aria-label={t('planner.blockPopover.longerLabel')}>
+                {t('planner.blockPopover.longer')}
               </Button>
             </div>
-            <p className="mt-3 text-caption text-text-secondary">Move</p>
+            <p className="mt-3 text-caption text-text-secondary">{t('planner.blockPopover.move')}</p>
             <div className="mt-1 flex items-center gap-1">
-              <Button variant="secondary" onClick={() => move(-15)} aria-label="15 minutes earlier">
-                Earlier
+              <Button variant="secondary" onClick={() => move(-15)} aria-label={t('planner.blockPopover.earlierLabel')}>
+                {t('planner.blockPopover.earlier')}
               </Button>
-              <Button variant="secondary" onClick={() => move(15)} aria-label="15 minutes later">
-                Later
+              <Button variant="secondary" onClick={() => move(15)} aria-label={t('planner.blockPopover.laterLabel')}>
+                {t('planner.blockPopover.later')}
               </Button>
             </div>
           </>
@@ -211,7 +213,7 @@ export function BlockPopover({
                 onClose()
               }}
             >
-              Add {formatLength(defaultLength)} block
+              {t('planner.blockPopover.addBlock', { length: formatLength(defaultLength) })}
             </Button>
           )}
           {block && canChange && (
@@ -222,7 +224,7 @@ export function BlockPopover({
                 onClose()
               }}
             >
-              {removeLabel}
+              {removeLabel ?? t('planner.blockPopover.removeTime')}
             </Button>
           )}
           {onOpenTask && (
@@ -233,7 +235,7 @@ export function BlockPopover({
                 onClose()
               }}
             >
-              Open task
+              {t('planner.blockPopover.openTask')}
             </Button>
           )}
         </div>

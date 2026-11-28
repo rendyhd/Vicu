@@ -1,8 +1,10 @@
 import { useMemo, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Check, ChevronDown } from 'lucide-react'
 import { Popover } from '@/components/overlay/Popover'
 import { flattenTree } from '@/components/task-list/ProjectPickerPopover'
 import { useProjects } from '@/hooks/use-projects'
+import { useWorkMode } from '@/hooks/use-work-mode'
 import { cn } from '@/lib/cn'
 import { normalizeHex } from '@/lib/constants'
 import { sourceLists, sourceProjectId, type PlanSource } from '@/lib/plan-source'
@@ -36,17 +38,25 @@ function Count({ value, selected }: { value: number | undefined; selected: boole
  * Project, which opens a search over every project.
  */
 export function SourceChips({ source, dayLabel, counts, projectLabel, projectCount, inboxId, onChange }: SourceChipsProps) {
+  const { t } = useTranslation()
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const anchorRef = useRef<HTMLButtonElement>(null)
   const { data: projects } = useProjects()
+  const { shownProjects } = useWorkMode()
+
+  const isProject = source.startsWith('project:')
+  const current = isProject ? sourceProjectId(source, 0) : null
 
   const needle = query.trim().toLowerCase()
   const rows = useMemo(() => {
-    const all = flattenTree(projects?.tree ?? []).filter(({ node }) => node.id !== inboxId)
+    // Only the projects of the mode (22.5); the one already chosen stays selectable.
+    const all = flattenTree(projects?.tree ?? []).filter(
+      ({ node }) => node.id !== inboxId && (shownProjects === null || shownProjects.has(node.id) || node.id === current),
+    )
     if (!needle) return all
     return all.filter(({ node }) => node.title.toLowerCase().includes(needle)).map((row) => ({ ...row, depth: 0 }))
-  }, [projects, inboxId, needle])
+  }, [projects, inboxId, needle, shownProjects, current])
 
   const close = () => {
     setOpen(false)
@@ -56,11 +66,9 @@ export function SourceChips({ source, dayLabel, counts, projectLabel, projectCou
     onChange(next)
     close()
   }
-  const isProject = source.startsWith('project:')
-  const current = isProject ? sourceProjectId(source, 0) : null
 
   return (
-    <div role="group" aria-label="Tasks to plan from" className="flex flex-wrap gap-1.5" data-plan-source>
+    <div role="group" aria-label={t('planner.source.plansFrom')} className="flex flex-wrap gap-1.5" data-plan-source>
       {sourceLists(dayLabel).map((item) => {
         const selected = source === item.source
         const count = counts[item.source as ListSource]
@@ -89,8 +97,8 @@ export function SourceChips({ source, dayLabel, counts, projectLabel, projectCou
         onClick={() => setOpen((value) => !value)}
         className={cn(CHIP, chipState(isProject))}
       >
-        {isProject && projectLabel && <span className="sr-only">Project: </span>}
-        <span className="min-w-0 truncate">{isProject && projectLabel ? projectLabel : 'Project'}</span>{' '}
+        {isProject && projectLabel && <span className="sr-only">{t('planner.source.projectPrefix')} </span>}
+        <span className="min-w-0 truncate">{isProject && projectLabel ? projectLabel : t('planner.source.project')}</span>{' '}
         {isProject && <Count value={projectCount} selected />}
         <ChevronDown className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
       </button>
@@ -98,7 +106,7 @@ export function SourceChips({ source, dayLabel, counts, projectLabel, projectCou
         <Popover
           anchorRef={anchorRef}
           invokedBy={[anchorRef]}
-          label="Plan from a project"
+          label={t('planner.source.planFromProject')}
           role="dialog"
           onClose={close}
           className="max-h-[420px] w-80 overflow-y-auto p-1.5"
@@ -106,8 +114,8 @@ export function SourceChips({ source, dayLabel, counts, projectLabel, projectCou
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Find a project"
-            aria-label="Find a project"
+            placeholder={t('planner.source.findProject')}
+            aria-label={t('planner.source.findProject')}
             className="mb-1 w-full rounded-control border border-border bg-transparent px-2 py-1.5 text-meta text-text placeholder:text-text-secondary"
           />
           {rows.map(({ node, depth }) => (
@@ -128,7 +136,7 @@ export function SourceChips({ source, dayLabel, counts, projectLabel, projectCou
               {current === node.id && <Check className="h-3.5 w-3.5 shrink-0 text-accent-blue" aria-hidden="true" />}
             </button>
           ))}
-          {rows.length === 0 && <p className="px-2 py-2 text-meta text-text-secondary">No project with that name.</p>}
+          {rows.length === 0 && <p className="px-2 py-2 text-meta text-text-secondary">{t('planner.source.noProject')}</p>}
         </Popover>
       )}
     </div>

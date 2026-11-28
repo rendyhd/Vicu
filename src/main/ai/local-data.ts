@@ -45,7 +45,7 @@ function conversationStore(): JsonFileStore<LocalData> {
     conversations = new JsonFileStore<LocalData>({
       path: join(app.getPath('userData'), 'ai-conversations.json'),
       backup: false,
-      label: 'AI conversations',
+      label: 'AI conversations', // i18n-ignore: log label
       empty: () => ({ conversations: [] }),
       parse: (json) => ({ conversations: normaliseConversations(isObject(json) ? json.conversations : []) }),
     })
@@ -59,7 +59,7 @@ function keptStore(): JsonFileStore<KeptTranscript[]> {
     kept = new JsonFileStore<KeptTranscript[]>({
       path: join(app.getPath('userData'), 'ai-kept-transcripts.json'),
       backup: true,
-      label: 'Kept transcripts',
+      label: 'Kept transcripts', // i18n-ignore: log label
       empty: () => [],
       parse: (json) => (Array.isArray(json) ? json.filter((k): k is KeptTranscript => isObject(k) && typeof k.id === 'string' && typeof k.transcript === 'string') : []),
     })

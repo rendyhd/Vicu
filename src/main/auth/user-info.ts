@@ -1,5 +1,4 @@
-import { net } from 'electron'
-import { vikunjaUserAgent } from '../user-agent'
+import { hostFetch } from '@host/http'
 
 export interface VikunjaUser {
   id: number
@@ -8,6 +7,11 @@ export interface VikunjaUser {
   name: string
   /** Vikunja's own default project (user settings); only ever read, a suggestion for the Inbox. */
   default_project_id?: number
+  /**
+   * Vikunja's own week start, 0 Sunday to 6 Saturday. Only ever read: the "Week starts on" setting
+   * offers it. Never followed by itself, because an account that never set it reads 0 (contract 2.1).
+   */
+  week_start?: number
 }
 
 const FETCH_TIMEOUT = 10_000
@@ -26,8 +30,8 @@ export async function fetchCurrentUser(
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT)
 
-    const response = await net.fetch(`${baseUrl}/api/v2/user`, {
-      headers: { Authorization: `Bearer ${token}`, 'User-Agent': vikunjaUserAgent() },
+    const response = await hostFetch(`${baseUrl}/api/v2/user`, {
+      headers: { Authorization: `Bearer ${token}` },
       signal: controller.signal,
     })
     clearTimeout(timer)
@@ -39,9 +43,10 @@ export async function fetchCurrentUser(
       username: string
       email?: string
       name?: string
-      settings?: { default_project_id?: unknown } | null
+      settings?: { default_project_id?: unknown; week_start?: unknown } | null
     }
     const defaultProject = data.settings?.default_project_id
+    const weekStart = data.settings?.week_start
     return {
       id: data.id,
       username: data.username,
@@ -49,6 +54,9 @@ export async function fetchCurrentUser(
       name: data.name ?? data.username,
       ...(typeof defaultProject === 'number' && Number.isInteger(defaultProject) && defaultProject > 0
         ? { default_project_id: defaultProject }
+        : {}),
+      ...(typeof weekStart === 'number' && Number.isInteger(weekStart) && weekStart >= 0 && weekStart <= 6
+        ? { week_start: weekStart }
         : {}),
     }
   } catch {

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { useNavigate, useRouter } from '@tanstack/react-router'
+import { Trans, useTranslation } from 'react-i18next'
+import { useNavigate, useRouter, useSearch } from '@tanstack/react-router'
 import { api, type VikunjaUser } from '@/lib/api'
 import { APP_CONFIG_QUERY_KEY } from '@/hooks/use-app-config'
 import { cn } from '@/lib/cn'
@@ -20,7 +21,12 @@ import { AssistantSettings } from '@/components/settings/AssistantSettings'
 import { NotificationSettings } from '@/components/settings/NotificationSettings'
 import { CompletionSoundSettings } from '@/components/settings/CompletionSoundSettings'
 import { SidebarSettings } from '@/components/settings/SidebarSettings'
+import { WorkModeSettings } from '@/components/settings/WorkModeSettings'
+import { WhenChoicesSettings } from '@/components/settings/WhenChoicesSettings'
 import { PlannerSettings } from '@/components/settings/PlannerSettings'
+import { WeekStartSetting } from '@/components/settings/WeekStartSetting'
+import { CloseActionSetting } from '@/components/settings/CloseActionSetting'
+import { LanguageSetting } from '@/components/settings/LanguageSetting'
 import { RoutinesSettingsPanel } from '@/components/routines/RoutinesSettingsPanel'
 import { ProjectSettings } from '@/components/settings/ProjectSettings'
 import { useProjects } from '@/hooks/use-projects'
@@ -28,20 +34,34 @@ import { toast } from '@/stores/toast-store'
 import { connectionAfterTest } from '@/lib/connection-settings'
 import { confirmDelete } from '@/lib/confirm-bridge'
 import { checkUnsyncedWork, signOutWarning } from '@/lib/sign-out-check'
-import type { AppConfig, Project } from '@/lib/vikunja-types'
+import { closeAction, type AppConfig, type Project } from '@/lib/vikunja-types'
 
 import type { ThemeOption } from '@/lib/theme'
+import { ProSettings } from '@/components/settings/ProSettings'
+import { SettingsMenu, SETTINGS_TAB_LABELS } from '@/components/settings/SettingsMenu'
+import { currentSectionIndex, SETTINGS_MENU_WIDTH, settingsGroups } from '@/lib/settings-menu'
+import { useSettingsNavStore } from '@/stores/settings-nav-store'
+import type { TranslationKey } from '../../shared/i18n'
+import { can, capabilities, isWebHost } from '@/lib/capabilities'
 
-type SettingsTab = 'general' | 'projects' | 'integrations' | 'notifications' | 'assistant' | 'shortcuts'
-
-/** Every tab's content sits in the same column, left-aligned with the tab bar. */
+/** Every tab's content sits in the same column, left-aligned with the page title. */
 const SETTINGS_COLUMN = 'mx-6 max-w-[640px] space-y-6 pb-8 pt-4'
 
+const THEME_OPTIONS: { value: ThemeOption; label: TranslationKey }[] = [
+  { value: 'light', label: 'settings.appearance.themeLight' },
+  { value: 'dark', label: 'settings.appearance.themeDark' },
+  { value: 'system', label: 'settings.appearance.themeSystem' },
+]
+
 export function SettingsView() {
+  const { t } = useTranslation()
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const router = useRouter()
-  const [activeTab, setActiveTab] = useState<SettingsTab>('general')
+  const activeTab = useSettingsNavStore((s) => s.tab)
+  const setActiveTab = useSettingsNavStore((s) => s.setTab)
+  const menuInSidebar = useSettingsNavStore((s) => s.inSidebar)
+  const { section } = useSearch({ from: '/settings' })
   const [url, setUrl] = useState('')
   const [token, setToken] = useState('')
   // The token itself never reaches this page: only whether one is saved, so Test Connection can use it.
@@ -64,6 +84,81 @@ export function SettingsView() {
 
   // Config as loaded, plus the edits made here. Used to render the controls only.
   const [fullConfig, setFullConfig] = useState<AppConfig | null>(null)
+
+  // Manage in the Plan gear: the calendars of the Plan settings, once they are drawn.
+  useEffect(() => {
+    if (section === 'pro') setActiveTab('pro')
+    if (section === 'assistant' && can('assistant')) setActiveTab('assistant')
+  }, [section])
+  // A tab the host does not offer (the web version has no Assistant) is never the open one.
+  useEffect(() => {
+    if (!settingsGroups(capabilities()).some((group) => group.tabs.some((tab) => tab.key === activeTab))) setActiveTab('general')
+  }, [activeTab, setActiveTab])
+  useEffect(() => {
+    if (section !== 'calendars' || !fullConfig) return
+    setActiveTab('pro')
+    const frame = requestAnimationFrame(() => {
+      const target = document.querySelector<HTMLElement>('[data-calendar-feeds]')
+      // Only the settings column scrolls: scrollIntoView would also shift the window's own layout.
+      let scroller = target?.parentElement ?? null
+      while (scroller && !(scroller.scrollHeight > scroller.clientHeight && /(auto|scroll)/.test(getComputedStyle(scroller).overflowY))) {
+        scroller = scroller.parentElement
+      }
+      if (target && scroller) scroller.scrollTop += target.getBoundingClientRect().top - scroller.getBoundingClientRect().top - 16
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [section, fullConfig])
+
+  // The menu lists the open tab's section headings (h2, not those of a dialog), marks the one being
+  // read and scrolls to one on a click. Read from the page, so a section that comes and goes (Pro on
+  // or off, a setting that needs another) is followed without a list to keep in step.
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const contentRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const scroller = scrollRef.current
+    const content = contentRef.current
+    if (!scroller || !content) return
+    const { setSections, setCurrent, setJumpTo } = useSettingsNavStore.getState()
+    let headings: HTMLElement[] = []
+    const follow = (): void => {
+      const top = scroller.getBoundingClientRect().top
+      const atEnd = scroller.scrollTop > 0 && scroller.scrollTop >= scroller.scrollHeight - scroller.clientHeight - 2
+      setCurrent(currentSectionIndex(headings.map((h) => h.getBoundingClientRect().top - top), atEnd))
+    }
+    const collect = (): void => {
+      headings = Array.from(content.querySelectorAll<HTMLElement>('h2')).filter((h) => !h.closest('dialog, [popover]'))
+      setSections(headings.map((h) => h.textContent?.trim() || t('settings.sectionFallback')))
+      follow()
+    }
+    let frame = 0
+    const schedule = (): void => {
+      if (!frame) frame = requestAnimationFrame(() => { frame = 0; collect() })
+    }
+    collect()
+    const observer = new MutationObserver(schedule)
+    observer.observe(content, { childList: true, subtree: true, characterData: true })
+    scroller.addEventListener('scroll', follow, { passive: true })
+    setJumpTo((index) => {
+      const heading = headings[index]
+      if (!heading) return
+      // Only the settings scroll: scrollIntoView would also shift the window's own layout.
+      scroller.scrollTop += heading.getBoundingClientRect().top - scroller.getBoundingClientRect().top - 16
+      heading.tabIndex = -1
+      heading.focus({ preventScroll: true })
+    })
+    return () => {
+      cancelAnimationFrame(frame)
+      observer.disconnect()
+      scroller.removeEventListener('scroll', follow)
+      setJumpTo(null)
+      setSections([])
+      setCurrent(-1)
+    }
+  }, [activeTab])
+  // A tab opens at its top.
+  useEffect(() => {
+    if (scrollRef.current) scrollRef.current.scrollTop = 0
+  }, [activeTab])
   const configLoadedRef = useRef(false)
 
   // Auto-save with debounce. Only the keys edited since the last save are sent: main
@@ -75,6 +170,9 @@ export function SettingsView() {
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key !== 'Escape' || event.defaultPrevented || event.isComposing) return
+      // A modal dialog (Add a calendar, a confirmation) closes on Escape itself, also when focus
+      // fell to the page behind it (a button disabled while it works).
+      if (document.querySelector('dialog[open]')) return
 
       event.preventDefault()
       if (router.history.canGoBack()) {
@@ -110,8 +208,8 @@ export function SettingsView() {
     })
     // Pull current global-shortcut registration state so the banner shows on
     // cold start, not only after the user edits a hotkey.
-    api.getGlobalShortcutStatus().then(setHotkeyWarnings).catch(() => {})
-    api.getLaunchOnStartupSupport().then((result) => setLaunchOnStartupSupported(result.supported)).catch(() => {})
+    if (can('quickWindows')) api.getGlobalShortcutStatus().then(setHotkeyWarnings).catch(() => {})
+    if (can('windowControls')) api.getLaunchOnStartupSupport().then((result) => setLaunchOnStartupSupported(result.supported)).catch(() => {})
   }, [])
 
   useEffect(() => {
@@ -146,7 +244,7 @@ export function SettingsView() {
       } catch (err) {
         console.error('Failed to save the connection', err)
         setTestStatus('error')
-        setTestError('Connected, but the connection settings could not be saved. Try again.')
+        setTestError(t('settings.connection.notSaved'))
       }
     } else {
       setTestStatus('error')
@@ -161,10 +259,10 @@ export function SettingsView() {
     setSaveStatus('saving')
     try {
       await api.saveConfigPatch(patch)
-      const result = await api.applyQuickEntrySettings()
+      const result = can('quickWindows') ? await api.applyQuickEntrySettings() : null
       await api.rescheduleNotifications()
       queryClient.invalidateQueries({ queryKey: APP_CONFIG_QUERY_KEY })
-      setHotkeyWarnings(result)
+      if (result) setHotkeyWarnings(result)
       setSaveStatus('saved')
       setTimeout(() => setSaveStatus('idle'), 2000)
     } catch (err) {
@@ -174,9 +272,9 @@ export function SettingsView() {
       pendingPatchRef.current = { ...patch, ...pendingPatchRef.current }
       setSaveStatus('error')
       const reason = err instanceof Error ? err.message.replace(/^Error invoking remote method '[^']*': (Error: )?/, '') : ''
-      toast.error(reason ? `Could not save settings: ${reason}` : 'Could not save settings')
+      toast.error(reason ? t('settings.save.failedWithReason', { reason }) : t('settings.save.failed'))
     }
-  }, [queryClient])
+  }, [queryClient, t])
 
   const scheduleSave = useCallback(() => {
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
@@ -200,15 +298,25 @@ export function SettingsView() {
       warning = signOutWarning(await checkUnsyncedWork({
         syncCustomLists: api.syncCustomLists,
         syncSyncedPrefs: api.syncSyncedPrefs,
-        replayNow: api.offlineQueue.replayNow,
-        snapshot: api.offlineQueue.snapshot,
+        // Without an offline queue (the web version) nothing is waiting.
+        replayNow: can('offlineQueue') ? api.offlineQueue.replayNow : async () => ({ success: false as const, error: 'No offline queue' }),
+        snapshot: can('offlineQueue') ? api.offlineQueue.snapshot : async () => ({ success: false as const, error: 'No offline queue' }),
         getConfig: api.getConfig,
       }))
     } finally {
       setSigningOut(false)
     }
-    if (warning && !(await confirmDelete(warning, { force: true, confirmLabel: 'Sign Out' }))) return
-    await api.logout()
+    if (warning && !(await confirmDelete(warning, { force: true, confirmLabel: t('settings.connection.signOut') }))) return
+    let signedOut: { providerSignOutUrl?: string } | void
+    try {
+      signedOut = await api.logout()
+    } catch (err) {
+      // Only the web version refuses: there the session lives in the browser and would still work
+      // for the next person if the server never heard of the sign-out.
+      if (!isWebHost()) throw err
+      toast.error(t('settings.connection.signOutNotReached'))
+      return
+    }
     // Main keeps app preferences (theme, hotkeys, window bounds, notifications, etc.)
     // and clears the connection and account-specific data (project IDs, custom lists, etc.)
     await api.saveConnectionConfig({
@@ -217,50 +325,41 @@ export function SettingsView() {
       auth_method: 'api_token',
       inbox_project_id: 0,
     })
-    window.location.reload()
+    // A single sign-on session also lives at the identity provider: the browser goes there to end it.
+    const providerSignOut = isWebHost() ? signedOut?.providerSignOutUrl : undefined
+    if (typeof providerSignOut === 'string' && /^https?:\/\//i.test(providerSignOut)) window.location.assign(providerSignOut)
+    else window.location.reload()
   }
 
   return (
-    <ReadingScroll className="bg-[var(--bg-primary)]" columnClassName="flex flex-col">
-      <PageHeader title="Settings" inScroll />
+    <div className="flex min-h-0 flex-1">
+      {/* The menu: a column here, or the app sidebar's place when the page is narrow (AppShell). */}
+      {!menuInSidebar && (
+        <div className="shrink-0 border-r border-[var(--border-color)]" style={{ width: SETTINGS_MENU_WIDTH }}>
+          <SettingsMenu variant="column" />
+        </div>
+      )}
+    <ReadingScroll ref={scrollRef} className="bg-[var(--bg-primary)]" columnClassName="mx-0 flex flex-col">
+      <PageHeader title={t(SETTINGS_TAB_LABELS[activeTab])} inScroll />
 
-      {/* Tab bar */}
-      <div className="flex gap-1 border-b border-[var(--border-color)] px-6">
-        {([
-          { key: 'general' as const, label: 'General' },
-          { key: 'projects' as const, label: 'Projects' },
-          { key: 'integrations' as const, label: 'Quick Entry / View' },
-          { key: 'notifications' as const, label: 'Notifications' },
-          { key: 'assistant' as const, label: 'Assistant' },
-          { key: 'shortcuts' as const, label: 'Keyboard Shortcuts' },
-        ]).map((tab) => (
-          <button
-            key={tab.key}
-            type="button"
-            onClick={() => setActiveTab(tab.key)}
-            className={cn(
-              'px-3 py-2 text-sm font-medium transition-colors',
-              activeTab === tab.key
-                ? 'border-b-2 border-accent-blue text-accent-blue'
-                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-            )}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
-
+      <div ref={contentRef}>
       {/* One column width for every tab (SETTINGS_COLUMN). */}
       {activeTab === 'shortcuts' ? (
         <div className={SETTINGS_COLUMN}>
-          {fullConfig && <VoiceSettings config={fullConfig} onChange={handleQuickEntryChange} />}
+          {fullConfig && can('voice') && <VoiceSettings config={fullConfig} onChange={handleQuickEntryChange} />}
           <KeyboardShortcuts />
         </div>
       ) : activeTab === 'projects' ? (
         <div className={SETTINGS_COLUMN}>
           {fullConfig && <ProjectSettings config={fullConfig} onChange={handleQuickEntryChange} />}
         </div>
-      ) : activeTab === 'assistant' ? (
+      ) : activeTab === 'pro' ? (
+        <div className={SETTINGS_COLUMN}>
+          <ProSettings />
+          {/* Plan lives with Pro's tools, but works whether Pro is on or off. */}
+          {fullConfig && !fullConfig.standalone_mode && <PlannerSettings config={fullConfig} onChange={handleQuickEntryChange} />}
+        </div>
+      ) : activeTab === 'assistant' && can('assistant') ? (
         <div className={SETTINGS_COLUMN}>
           <AssistantSettings />
         </div>
@@ -276,48 +375,55 @@ export function SettingsView() {
       ) : activeTab === 'general' ? (
       <div className={SETTINGS_COLUMN}>
         <div className="rounded-card border border-[var(--border-color)] bg-[var(--bg-primary)] p-5">
-          <h2 className="mb-4 text-sm font-semibold text-[var(--text-primary)]">Connection</h2>
+          <h2 className="mb-4 text-sm font-semibold text-[var(--text-primary)]">{t('settings.connection.title')}</h2>
 
           {authMethod === 'oidc' || authMethod === 'password' ? (
             <div className="space-y-3">
+              {/* The web version is served next to its server: there is no address to show. */}
+              {can('serverChoice') && (
               <div>
-                <label className="mb-1 block text-xs text-[var(--text-secondary)]">Vikunja URL</label>
+                <label className="mb-1 block text-xs text-[var(--text-secondary)]">{t('settings.connection.url')}</label>
                 <div className="rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-secondary)]">
                   {url}
                 </div>
               </div>
+              )}
 
               <div className="flex items-center gap-2">
                 <span className="inline-block h-2 w-2 rounded-full bg-status-done" />
                 <span className="text-xs text-status-done">
                   {authMethod === 'oidc'
-                    ? 'Signed in via SSO'
+                    ? t('settings.connection.signedInSso')
                     : currentUser
-                      ? `Signed in as ${currentUser.name || currentUser.username}`
-                      : 'Signed in'}
+                      ? t('settings.connection.signedInAs', { name: currentUser.name || currentUser.username })
+                      : t('settings.connection.signedIn')}
                 </span>
               </div>
 
               <Button variant="secondary" danger onClick={handleLogout} disabled={signingOut}>
-                {signingOut ? 'Syncing...' : 'Sign Out'}
+                {signingOut ? t('settings.connection.syncing') : t('settings.connection.signOut')}
               </Button>
             </div>
           ) : (
             <div className="space-y-3">
+              {/* The web version is served next to its server: there is no address to change. */}
+              {can('serverChoice') && (
               <div>
-                <label className="mb-1 block text-xs text-[var(--text-secondary)]">Vikunja URL</label>
+                <label className="mb-1 block text-xs text-[var(--text-secondary)]">{t('settings.connection.url')}</label>
                 <input
                   type="url"
                   value={url}
                   onChange={(e) => setUrl(e.target.value)}
+                  // i18n-ignore: an address example, the same in every language
                   placeholder="https://vikunja.example.com"
                   className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]"
                 />
               </div>
+              )}
 
               <div>
                 <label className="mb-1 flex items-center text-xs text-[var(--text-secondary)]">
-                  API Token
+                  {t('settings.connection.apiToken')}
                   <TokenPermissionsInfo />
                 </label>
                 <div className="relative">
@@ -325,7 +431,7 @@ export function SettingsView() {
                     type={showToken ? 'text' : 'password'}
                     value={token}
                     onChange={(e) => setToken(e.target.value)}
-                    placeholder="Enter your API token"
+                    placeholder={t('settings.connection.tokenPlaceholder')}
                     className="w-full rounded-control border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2 pr-16 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]"
                   />
                   <button
@@ -333,12 +439,12 @@ export function SettingsView() {
                     onClick={() => setShowToken(!showToken)}
                     className="absolute right-2 top-1/2 inline-flex min-h-6 -translate-y-1/2 items-center rounded-control px-2 py-0.5 text-meta text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                   >
-                    {showToken ? 'Hide' : 'Show'}
+                    {showToken ? t('settings.connection.hideToken') : t('settings.connection.showToken')}
                   </button>
                 </div>
                 {hasSavedToken && (
                   <p className="mt-1 text-meta text-[var(--text-secondary)]">
-                    Uses the saved token. Paste a new one to replace it.
+                    {t('settings.connection.savedToken')}
                   </p>
                 )}
               </div>
@@ -348,19 +454,19 @@ export function SettingsView() {
                 onClick={handleTestConnection}
                 disabled={!url || (!token && !hasSavedToken) || testStatus === 'testing'}
               >
-                {testStatus === 'testing' ? 'Testing...' : 'Test Connection'}
+                {testStatus === 'testing' ? t('settings.connection.testing') : t('settings.connection.test')}
               </Button>
 
               {testStatus === 'success' && (
-                <p className="text-xs text-status-done">Connected successfully</p>
+                <p className="text-xs text-status-done">{t('settings.connection.success')}</p>
               )}
               {testStatus === 'error' && (
-                <p className="text-xs text-danger">{testError || 'Connection failed'}</p>
+                <p className="text-xs text-danger">{testError || t('settings.connection.failed')}</p>
               )}
 
               <div className="border-t border-[var(--border-color)] pt-3">
                 <Button variant="secondary" danger onClick={handleLogout} disabled={signingOut}>
-                  {signingOut ? 'Syncing...' : 'Disconnect'}
+                  {signingOut ? t('settings.connection.syncing') : t('settings.connection.disconnect')}
                 </Button>
               </div>
             </div>
@@ -369,13 +475,13 @@ export function SettingsView() {
         </div>
 
         <div className="rounded-card border border-[var(--border-color)] bg-[var(--bg-primary)] p-5">
-          <h2 className="mb-4 text-sm font-semibold text-[var(--text-primary)]">Appearance</h2>
+          <h2 className="mb-4 text-sm font-semibold text-[var(--text-primary)]">{t('settings.appearance.title')}</h2>
 
           <div className="space-y-3">
             <div>
-              <label className="mb-2 block text-xs text-[var(--text-secondary)]">Theme</label>
+              <label className="mb-2 block text-xs text-[var(--text-secondary)]">{t('settings.appearance.theme')}</label>
               <div className="flex gap-3">
-                {(['light', 'dark', 'system'] as ThemeOption[]).map((opt) => (
+                {THEME_OPTIONS.map(({ value: opt, label }) => (
                   <label
                     key={opt}
                     className={cn(
@@ -393,19 +499,19 @@ export function SettingsView() {
                       onChange={() => { setTheme(opt); applyTheme(opt); handleQuickEntryChange({ theme: opt }) }}
                       className="sr-only"
                     />
-                    {opt.charAt(0).toUpperCase() + opt.slice(1)}
+                    {t(label)}
                   </label>
                 ))}
               </div>
             </div>
 
             <div>
-              <label className="mb-2 block text-xs text-[var(--text-secondary)]">Clock</label>
-              <div className="flex gap-3" role="radiogroup" aria-label="Clock">
+              <label className="mb-2 block text-xs text-[var(--text-secondary)]">{t('settings.appearance.clock')}</label>
+              <div className="flex gap-3" role="radiogroup" aria-label={t('settings.appearance.clock')}>
                 {([
-                  { value: 'system' as const, label: 'System' },
-                  { value: '12h' as const, label: '12-hour' },
-                  { value: '24h' as const, label: '24-hour' },
+                  { value: 'system' as const, label: t('settings.appearance.clockSystem') },
+                  { value: '12h' as const, label: t('settings.appearance.clock12') },
+                  { value: '24h' as const, label: t('settings.appearance.clock24') },
                 ]).map((opt) => {
                   const current = fullConfig?.clock_format ?? 'system'
                   return (
@@ -432,16 +538,16 @@ export function SettingsView() {
                 })}
               </div>
               <p className="mt-1.5 text-xs text-[var(--text-secondary)]">
-                System follows your region. Pick 12-hour or 24-hour if your system uses a custom time format. Applies to every Vicu window.
+                {t('settings.appearance.clockNote')}
               </p>
             </div>
 
             <div>
-              <label className="mb-2 block text-xs text-[var(--text-secondary)]">Task rows</label>
-              <div className="flex gap-3" role="radiogroup" aria-label="Task rows">
+              <label className="mb-2 block text-xs text-[var(--text-secondary)]">{t('settings.appearance.rows')}</label>
+              <div className="flex gap-3" role="radiogroup" aria-label={t('settings.appearance.rows')}>
                 {([
-                  { value: 'compact' as const, label: 'Compact' },
-                  { value: 'comfortable' as const, label: 'Comfortable' },
+                  { value: 'compact' as const, label: t('settings.appearance.rowsCompact') },
+                  { value: 'comfortable' as const, label: t('settings.appearance.rowsComfortable') },
                 ]).map((opt) => {
                   const current = fullConfig?.row_density ?? 'compact'
                   return (
@@ -468,7 +574,7 @@ export function SettingsView() {
                 })}
               </div>
               <p className="mt-1.5 text-xs text-[var(--text-secondary)]">
-                Comfortable shows longer titles and a line of notes.
+                {t('settings.appearance.rowsNote')}
               </p>
             </div>
 
@@ -476,10 +582,10 @@ export function SettingsView() {
         </div>
 
         <div className="rounded-card border border-[var(--border-color)] bg-[var(--bg-primary)] p-5">
-          <h2 className="mb-4 text-sm font-semibold text-[var(--text-primary)]">Preferences</h2>
+          <h2 className="mb-4 text-sm font-semibold text-[var(--text-primary)]">{t('settings.preferences.title')}</h2>
 
           <div className="space-y-3">
-            {launchOnStartupSupported && (
+            {launchOnStartupSupported && can('windowControls') && (
               <>
                 <label className="flex cursor-pointer items-center gap-2">
                   <Checkbox
@@ -487,9 +593,9 @@ export function SettingsView() {
                     onChange={(e) => handleQuickEntryChange({ launch_on_startup: e.target.checked })}
                   />
                   <span className="text-sm text-[var(--text-primary)]">
-                    Launch on startup
+                    {t('settings.preferences.launchOnStartup')}
                   </span>
-                  <span className="text-xs text-[var(--text-secondary)]">(advised for Quick Entry / View)</span>
+                  <span className="text-xs text-[var(--text-secondary)]">{t('settings.preferences.launchOnStartupNote')}</span>
                 </label>
 
                 {fullConfig?.launch_on_startup === true && (
@@ -499,12 +605,22 @@ export function SettingsView() {
                       onChange={(e) => handleQuickEntryChange({ start_hidden: e.target.checked })}
                     />
                     <span className="text-sm text-[var(--text-primary)]">
-                      Start hidden
+                      {t('settings.preferences.startHidden')}
                     </span>
-                    <span className="text-xs text-[var(--text-secondary)]">(no window at login; needs the tray icon from Quick Entry / View)</span>
+                    <span className="text-xs text-[var(--text-secondary)]">
+                      {window.api.platform === 'darwin'
+                        ? t('settings.preferences.startHiddenMac')
+                        : closeAction(fullConfig) === 'minimize'
+                          ? t('settings.preferences.startHiddenMinimized')
+                          : t('settings.preferences.startHiddenTray')}
+                    </span>
                   </label>
                 )}
               </>
+            )}
+
+            {window.api.platform !== 'darwin' && can('windowControls') && (
+              <CloseActionSetting config={fullConfig} onChange={handleQuickEntryChange} />
             )}
 
             <label className="flex cursor-pointer items-center gap-2">
@@ -513,15 +629,19 @@ export function SettingsView() {
                 onChange={(e) => handleQuickEntryChange({ confirm_before_delete: e.target.checked })}
               />
               <span className="text-sm text-[var(--text-primary)]">
-                Confirm before deleting
+                {t('settings.preferences.confirmDelete')}
               </span>
             </label>
 
+            <WeekStartSetting />
+
+            <LanguageSetting config={fullConfig} onChange={handleQuickEntryChange} />
+
             <label className="flex items-center justify-between gap-4">
               <span>
-                <span className="block text-sm text-[var(--text-primary)]">Subtasks in task lists</span>
+                <span className="block text-sm text-[var(--text-primary)]">{t('settings.preferences.subtasks')}</span>
                 <span className="block text-xs text-[var(--text-secondary)]">
-                  Keep them in task details, or expand them below the parent.
+                  {t('settings.preferences.subtasksNote')}
                 </span>
               </span>
               <select
@@ -531,27 +651,41 @@ export function SettingsView() {
                 })}
                 className="rounded-control border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-1.5 text-sm text-[var(--text-primary)]"
               >
-                <option value="inside_task">Inside task</option>
-                <option value="expandable">Expandable</option>
+                <option value="inside_task">{t('settings.preferences.subtasksInside')}</option>
+                <option value="expandable">{t('settings.preferences.subtasksExpandable')}</option>
               </select>
             </label>
 
+            {can('badge') && (
             <label className="flex cursor-pointer items-center gap-2">
               <Checkbox
                 checked={fullConfig?.show_today_overdue_badge === true}
                 onChange={(e) => handleQuickEntryChange({ show_today_overdue_badge: e.target.checked })}
               />
               <span className="text-sm text-[var(--text-primary)]">
-                Show today &amp; overdue count on app icon
+                {t('settings.preferences.badge')}
               </span>
             </label>
+            )}
+            {can('badge') && window.api.platform === 'darwin' && fullConfig?.show_today_overdue_badge === true && (
+              <p className="ml-6 text-xs text-[var(--text-secondary)]">
+                {t('settings.preferences.badgeMacNote')}{' '}
+                <button
+                  type="button"
+                  onClick={() => { void api.openBadgeNotificationSettings() }}
+                  className="text-accent-blue hover:underline"
+                >
+                  {t('settings.preferences.notificationSettings')}
+                </button>
+              </p>
+            )}
 
             <div>
-              <label className="mb-2 block text-xs text-[var(--text-secondary)]">What does urgent mean?</label>
+              <label className="mb-2 block text-xs text-[var(--text-secondary)]">{t('settings.preferences.urgent')}</label>
               <div className="flex gap-3">
                 {([
-                  { value: 'today' as const, label: 'Schedule for Today' },
-                  { value: 'important' as const, label: 'Mark Important' },
+                  { value: 'today' as const, label: t('settings.preferences.urgentToday') },
+                  { value: 'important' as const, label: t('settings.preferences.urgentImportant') },
                 ]).map((opt) => {
                   const current = fullConfig?.urgency_mode ?? 'today'
                   return (
@@ -578,16 +712,16 @@ export function SettingsView() {
                 })}
               </div>
               <p className="mt-1.5 text-xs text-[var(--text-secondary)]">
-                Sets what the top action in a task&rsquo;s right-click menu does.
+                {t('settings.preferences.urgentNote')}
               </p>
             </div>
 
           </div>
         </div>
 
-        {fullConfig && !fullConfig.standalone_mode && <PlannerSettings config={fullConfig} onChange={handleQuickEntryChange} />}
-
         {fullConfig && <SidebarSettings config={fullConfig} onChange={handleQuickEntryChange} />}
+
+        <WorkModeSettings />
 
         {fullConfig && (
           <CompletionSoundSettings
@@ -603,9 +737,11 @@ export function SettingsView() {
           />
         )}
 
+        <WhenChoicesSettings />
+
         {/* Task Parser */}
         <div className="rounded-card border border-[var(--border-color)] bg-[var(--bg-primary)] p-5">
-          <h2 className="mb-4 text-sm font-semibold text-[var(--text-primary)]">Task Parser</h2>
+          <h2 className="mb-4 text-sm font-semibold text-[var(--text-primary)]">{t('settings.parser.title')}</h2>
 
           <div className="space-y-3">
             <label className="flex cursor-pointer items-center gap-2">
@@ -615,10 +751,10 @@ export function SettingsView() {
               />
               <div>
                 <span className="text-sm text-[var(--text-primary)]">
-                  Parse task metadata from text
+                  {t('settings.parser.parse')}
                 </span>
                 <p className="text-xs text-[var(--text-secondary)]">
-                  Extract labels, projects, priority, dates, and recurrence from your input
+                  {t('settings.parser.parseNote')}
                 </p>
               </div>
             </label>
@@ -627,7 +763,7 @@ export function SettingsView() {
               <>
                 <div>
                   <div className="mb-2 block text-xs text-[var(--text-secondary)]">
-                    Syntax Mode
+                    {t('settings.parser.syntaxMode')}
                   </div>
                   <div role="radiogroup" className="grid grid-cols-2 gap-3">
                     <button
@@ -642,12 +778,15 @@ export function SettingsView() {
                           : 'border-[var(--border-color)]'
                       )}
                     >
+                      {/* i18n-ignore: a product name */}
                       <div className="text-sm font-medium text-[var(--text-primary)]">Todoist</div>
                       <p className="mt-0.5 text-xs text-[var(--text-secondary)]">
-                        Familiar Todoist-style prefixes
+                        {t('settings.parser.todoistNote')}
                       </p>
                       <p className="mt-1.5 font-mono text-xs">
+                        {/* i18n-ignore: the quick-add syntax stays English */}
                         <code className="text-blue-500">#project</code>{' '}
+                        {/* i18n-ignore: the quick-add syntax stays English */}
                         <code className="text-orange-500">@label</code>{' '}
                         <code className="text-danger">p1-p4</code>
                       </p>
@@ -664,12 +803,15 @@ export function SettingsView() {
                           : 'border-[var(--border-color)]'
                       )}
                     >
+                      {/* i18n-ignore: a product name */}
                       <div className="text-sm font-medium text-[var(--text-primary)]">Vikunja</div>
                       <p className="mt-0.5 text-xs text-[var(--text-secondary)]">
-                        Native Vikunja-style prefixes
+                        {t('settings.parser.vikunjaNote')}
                       </p>
                       <p className="mt-1.5 font-mono text-xs">
+                        {/* i18n-ignore: the quick-add syntax stays English */}
                         <code className="text-blue-500">+project</code>{' '}
+                        {/* i18n-ignore: the quick-add syntax stays English */}
                         <code className="text-orange-500">*label</code>{' '}
                         <code className="text-danger">!1-!4</code>
                       </p>
@@ -685,10 +827,13 @@ export function SettingsView() {
                   />
                   <div>
                     <span className="text-sm text-[var(--text-primary)]">
-                      <code className="rounded-control bg-[var(--bg-secondary)] px-1 py-0.5 text-xs font-mono text-green-600">!</code> in task title sets due date to today
+                      <Trans
+                        i18nKey="settings.parser.exclamation"
+                        components={{ mark: <code className="rounded-control bg-[var(--bg-secondary)] px-1 py-0.5 text-xs font-mono text-green-600" /> }}
+                      />
                     </span>
                     <p className="text-xs text-[var(--text-secondary)]">
-                      Add ! before or after a task title to set it due today (e.g. "buy groceries !" or "! buy groceries")
+                      {t('settings.parser.exclamationNote')}
                     </p>
                   </div>
                 </label>
@@ -698,16 +843,16 @@ export function SettingsView() {
         </div>
 
         {saveStatus === 'saving' && (
-          <p className="text-xs text-[var(--text-secondary)]">Saving...</p>
+          <p className="text-xs text-[var(--text-secondary)]">{t('settings.save.saving')}</p>
         )}
         {saveStatus === 'saved' && (
-          <p className="text-xs text-status-done">Settings saved</p>
+          <p className="text-xs text-status-done">{t('settings.save.saved')}</p>
         )}
         {saveStatus === 'error' && (
-          <p className="text-xs text-danger">Settings could not be saved. Your changes are kept and are saved again with the next change.</p>
+          <p className="text-xs text-danger">{t('settings.save.failedNote')}</p>
         )}
       </div>
-      ) : activeTab === 'integrations' ? (
+      ) : activeTab === 'integrations' && can('quickWindows') ? (
       <div className={SETTINGS_COLUMN}>
         {fullConfig && (
           <QuickEntrySettings
@@ -718,7 +863,7 @@ export function SettingsView() {
           />
         )}
 
-        {fullConfig && (
+        {fullConfig && can('browserLink') && (
           <BrowserSettings
             config={fullConfig}
             onChange={handleQuickEntryChange}
@@ -729,7 +874,7 @@ export function SettingsView() {
         {/* Obsidian integration is unavailable on Linux (Wayland blocks the
             foreground-process detection it relies on) — hide the section
             entirely so users aren't offered a dead setting. */}
-        {fullConfig && window.api.platform !== 'linux' && (
+        {fullConfig && can('obsidian') && window.api.platform !== 'linux' && (
           <ObsidianSettings
             config={fullConfig}
             onChange={handleQuickEntryChange}
@@ -738,16 +883,18 @@ export function SettingsView() {
         )}
 
         {saveStatus === 'saving' && (
-          <p className="text-xs text-[var(--text-secondary)]">Saving...</p>
+          <p className="text-xs text-[var(--text-secondary)]">{t('settings.save.saving')}</p>
         )}
         {saveStatus === 'saved' && (
-          <p className="text-xs text-status-done">Settings saved</p>
+          <p className="text-xs text-status-done">{t('settings.save.saved')}</p>
         )}
         {saveStatus === 'error' && (
-          <p className="text-xs text-danger">Settings could not be saved. Your changes are kept and are saved again with the next change.</p>
+          <p className="text-xs text-danger">{t('settings.save.failedNote')}</p>
         )}
       </div>
       ) : null}
+      </div>
     </ReadingScroll>
+    </div>
   )
 }

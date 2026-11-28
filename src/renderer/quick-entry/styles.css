@@ -136,6 +136,10 @@ body {
   background: rgba(20, 184, 166, 0.15);
   border-radius: 3px;
 }
+.token-person {
+  background: rgba(236, 72, 153, 0.15);
+  border-radius: 3px;
+}
 
 /* Task input */
 #task-input {
@@ -205,6 +209,17 @@ body {
   height: 8px;
   border-radius: 50%;
   background: rgba(249, 115, 22, 0.5);
+  margin-right: 8px;
+  vertical-align: middle;
+}
+
+.autocomplete-item-person::before {
+  content: '';
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(236, 72, 153, 0.5);
   margin-right: 8px;
   vertical-align: middle;
 }
@@ -472,6 +487,10 @@ body {
   background: rgba(20, 184, 166, 0.12);
   color: #0d9488;
 }
+.parse-chip-person {
+  background: rgba(236, 72, 153, 0.12);
+  color: #be185d;
+}
 
 .parse-chip-dismiss {
   background: none;
@@ -534,18 +553,21 @@ button:focus-visible {
   .token-project { background: rgba(59, 130, 246, 0.25); }
   .token-recurrence { background: rgba(168, 85, 247, 0.25); }
   .token-place { background: rgba(20, 184, 166, 0.25); }
+  .token-person { background: rgba(236, 72, 153, 0.25); }
 
   .parse-chip-date, .parse-chip-length { background: rgba(34, 197, 94, 0.2); color: #4ade80; }
   .parse-chip-label { background: rgba(249, 115, 22, 0.2); color: #fb923c; }
   .parse-chip-project { background: rgba(59, 130, 246, 0.2); color: #60a5fa; }
   .parse-chip-recurrence { background: rgba(168, 85, 247, 0.2); color: #c084fc; }
   .parse-chip-place { background: rgba(20, 184, 166, 0.2); color: #2dd4bf; }
+  .parse-chip-person { background: rgba(236, 72, 153, 0.2); color: #f472b6; }
 
   .autocomplete-container { border-top-color: rgba(255, 255, 255, 0.06); }
   .autocomplete-item.active { background: rgba(59, 130, 246, 0.20); }
   .autocomplete-item:hover { background: rgba(59, 130, 246, 0.12); }
   .autocomplete-item-project::before { background: rgba(59, 130, 246, 0.7); }
   .autocomplete-item-label::before { background: rgba(249, 115, 22, 0.7); }
+  .autocomplete-item-person::before { background: rgba(236, 72, 153, 0.7); }
 }
 
 /* Reduced motion (card 1.5): the rules of the base layer in assets/index.css, which this window does
@@ -615,7 +637,8 @@ button:focus-visible {
   }
 
   .autocomplete-item-project::before,
-  .autocomplete-item-label::before {
+  .autocomplete-item-label::before,
+  .autocomplete-item-person::before {
     background: currentColor;
   }
 

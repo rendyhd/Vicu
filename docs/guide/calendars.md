@@ -68,8 +68,28 @@ The kinds you can add on the desktop:
 | **Microsoft 365** | Outlook.com and work or school accounts | Sign in in your browser, then pick calendars. |
 | **Google** | Google Calendar, personal or Workspace | Sign in in your browser, then pick calendars. |
 | **Mac calendars** {desktop} | The calendars in macOS Calendar | macOS asks once whether Vicu may read them. No sign-in in Vicu. |
+| **Classic Outlook** {desktop} | The calendars of classic Outlook on a Windows PC | Read the warnings, tick that you may show them, then pick calendars. |
+| **Calendar file** | An `.ics` file another program keeps up to date | Name it and choose the file. |
 
 **Mac calendars** is offered on macOS only. It lists everything you added in System Settings, Internet Accounts, and picks up a change at once.
+
+### A calendar file on this computer
+
+Any program that can write an `.ics` file can feed Plan: Thunderbird, a script, a scheduled export. Choose **Calendar file**, give it a name and choose the file. Vicu reads it again as soon as the file changes, and never writes to it.
+
+- Keep the file where it is. If it moves or is deleted, the calendar keeps its last copy and says the file is no longer there. Remove the calendar and add the file again from its new place.
+- A file is read whole, up to 15 MB.
+- To copy a file's events into your own Events once instead, use [Import a calendar file](#import-a-calendar-file).
+
+### Classic Outlook on Windows
+
+**Classic Outlook** is offered on Windows only. It reads the calendars of the desktop Outlook on this PC, and the data stays on the PC. Before you add it:
+
+- Only classic Outlook can be read, and only while it is open. Vicu never starts it. The new Outlook has no way for other apps to read it: add that account as **Microsoft 365** or a **Calendar link** instead.
+- Outlook may ask whether to allow a program to access its data. Vicu reads only titles, places, times, "show as" and how you answered, not people or messages.
+- On a work PC, this shows your organisation's calendar in Vicu. Check that your organisation allows it.
+
+The form asks you to tick **These are my calendars, and I may show them in Vicu on this PC** before it reads Outlook. While Outlook is closed, the calendars keep their last copy and say "Open classic Outlook to read its calendars".
 
 ### Microsoft 365 and Google
 

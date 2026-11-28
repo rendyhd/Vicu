@@ -1,5 +1,6 @@
 import { Fragment, useRef, type ReactNode, type RefObject } from 'react'
-import { Calendar, Bell, Repeat, Paperclip, ListChecks, FolderOpen, MoreHorizontal, Info, CopyPlus, FileText, Trash2, Plus, MessageSquare } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
+import { Calendar, Bell, Repeat, Paperclip, ListChecks, FolderOpen, MoreHorizontal, Info, CopyPlus, CornerDownRight, CornerLeftUp, FileText, Trash2, Plus, MessageSquare } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { isNullDate } from '@/lib/date-utils'
 import { labelChipSolidStyle } from '@/lib/label-style'
@@ -31,8 +32,13 @@ import { RecurrencePickerPopover } from './RecurrencePickerPopover'
 import { AttachmentPickerPopover } from './AttachmentPickerPopover'
 import { ProjectPickerPopover } from './ProjectPickerPopover'
 import { InfoPopover } from './InfoPopover'
+import { SubtaskPickerPopover } from './SubtaskPickerPopover'
+import { parentIdOf, useSubtaskAttach } from '@/hooks/use-subtask-attach'
 import { AssignPopover } from './AssignPopover'
 import { AvatarStack } from '../shared/Avatar'
+import { ProCardChips } from '../pro/ProCardChips'
+import { useUploadingStore } from '@/stores/uploading-store'
+import { uploadsToShow } from '@/lib/uploading-files'
 
 /** The one editor of the card that is open, if any. */
 export type CardPopover =
@@ -47,6 +53,7 @@ export type CardPopover =
   | 'assign'
   | 'more'
   | 'info'
+  | 'parent'
   | null
 
 type OpenPopover = Exclude<CardPopover, null>
@@ -109,13 +116,14 @@ interface PropertyButtonProps {
 }
 
 function PropertyButton({ prop, name, value, unsetName, tip, shortcut, isSet, open, haspopup, buttonRef, onClick, unsetLabel, iconOnly, icon, children, className }: PropertyButtonProps) {
+  const { t } = useTranslation()
   return (
     <Tooltip label={tip ?? name} shortcut={shortcut}>
       <button
         ref={buttonRef}
         type="button"
         data-prop={prop}
-        aria-label={isSet && value ? `${name}: ${value}` : !isSet && !iconOnly ? (unsetName ?? name) : name}
+        aria-label={isSet && value ? t('task.card.named', { name, value }) : !isSet && !iconOnly ? (unsetName ?? name) : name}
         aria-haspopup={haspopup}
         aria-expanded={haspopup ? open : undefined}
         onClick={onClick}
@@ -159,12 +167,15 @@ export function TaskCardBar({
   onDelete,
   collab,
 }: TaskCardBarProps) {
+  const { t } = useTranslation()
   const isDark = useIsDark()
   const dateFormat = useDateFormat()
   const { data: projects } = useProjects()
   const { reminderFor } = useLocationReminders()
   const duplicate = useDuplicateTasks()
   const templateActions = useTemplateActions()
+  const subtaskAttach = useSubtaskAttach()
+  const currentParent = parentIdOf(task)
   const dateRef = useRef<HTMLButtonElement>(null)
   const priorityRef = useRef<HTMLButtonElement>(null)
   const labelRef = useRef<HTMLButtonElement>(null)
@@ -183,14 +194,16 @@ export function TaskCardBar({
   const placeReminder = reminderFor(task.id)
   const reminderCount = (task.reminders?.length ?? 0) + (placeReminder ? 1 : 0)
   const repeats = (task.repeat_after ?? 0) > 0 || (task.repeat_mode ?? 0) > 0
-  const attachmentCount = task.attachments?.length ?? 0
+  // Files on their way from the attach dialog count at once (the popover lists them as uploading).
+  const uploads = useUploadingStore((state) => state.uploads)
+  const attachmentCount = (task.attachments?.length ?? 0) + uploadsToShow(uploads, task.id, task.attachments ?? []).length
   const project = projects?.flat.find((p) => p.id === task.project_id)
   const dueText = hasDate ? (formatDueDate(task.due_date, new Date(), dateFormat, 'chip') ?? '') : ''
   const repeatText = formatRecurrenceLabel(task.repeat_after ?? 0, task.repeat_mode ?? 0)
   // A location reminder alone reads as its place ("Arrive: Home"), as on the phone.
   const reminderText = placeReminder && reminderCount === 1
     ? locationReminderLabel(placeReminder.trigger, placeReminder.placeName)
-    : reminderCount === 1 ? '1 reminder' : `${reminderCount} reminders`
+    : t('composer.reminderCount', { count: reminderCount })
   const is = (p: OpenPopover) => active === p
   const shared = !!collab?.access.shared
   const me = collab?.me ?? null
@@ -203,16 +216,16 @@ export function TaskCardBar({
     <div className="col-start-2 flex flex-wrap items-center gap-1 pb-3 pt-2">
       <PropertyButton
         prop="schedule"
-        name="Schedule"
+        name={t('task.card.schedule')}
         value={dueText}
-        unsetName="Schedule date"
+        unsetName={t('task.card.scheduleDate')}
         shortcut="Mod+T"
         isSet={hasDate}
         open={is('date')}
         haspopup="dialog"
         buttonRef={dateRef}
         onClick={() => onToggle('date')}
-        unsetLabel="Date"
+        unsetLabel={t('task.card.date')}
         icon={<Calendar className="h-3.5 w-3.5" aria-hidden="true" />}
       >
         <DueDateContextProvider value="chip">
@@ -223,6 +236,7 @@ export function TaskCardBar({
         <WhenPopover
           anchorRef={dateRef}
           currentDate={task.due_date}
+          offerMoveBy={task.id > 0}
           onDateChange={onDateChange}
           onClose={onClose}
           repeatAfter={task.repeat_after ?? 0}
@@ -231,13 +245,13 @@ export function TaskCardBar({
         />
       )}
 
-      <PropertyButton prop="priority" name="Priority" value={mark?.name.replace(' priority', '')} isSet={!!mark} open={is('priority')} haspopup="listbox" buttonRef={priorityRef} onClick={() => onToggle('priority')} unsetLabel="Priority">
+      <PropertyButton prop="priority" name={t('task.card.priority')} value={mark?.name.replace(' priority', '')} isSet={!!mark} open={is('priority')} haspopup="listbox" buttonRef={priorityRef} onClick={() => onToggle('priority')} unsetLabel={t('task.card.priority')}>
         <PriorityMark priority={task.priority} decorative />
         <span>{mark?.name.replace(' priority', '')}</span>
       </PropertyButton>
       {is('priority') && <PriorityPickerPopover anchorRef={priorityRef} currentPriority={task.priority} onPriorityChange={onPriorityChange} onClose={onClose} />}
 
-      <PropertyButton prop="labels" name="Labels" unsetName="Add label" value={labels.map((l) => l.title).join(' ')} isSet={labels.length > 0} open={is('label')} haspopup="dialog" buttonRef={labelRef} onClick={() => onToggle('label')} unsetLabel="Label" className="gap-1.5 px-1.5">
+      <PropertyButton prop="labels" name={t('task.card.labels')} unsetName={t('task.card.addLabel')} value={labels.map((l) => l.title).join(' ')} isSet={labels.length > 0} open={is('label')} haspopup="dialog" buttonRef={labelRef} onClick={() => onToggle('label')} unsetLabel={t('task.card.label')} className="gap-1.5 px-1.5">
         {labels.map((l) => (
           <Fragment key={l.id}>
             <span className="vicu-chip rounded-chip px-2 py-px text-chip leading-tight" style={labelChipSolidStyle(l.hex_color, isDark)}>
@@ -252,26 +266,26 @@ export function TaskCardBar({
 
       <PropertyButton
         prop="checklist"
-        name="Subtasks"
+        name={t('task.card.subtasks')}
         value={checklistLabel(progress.completed, progress.total)}
-        unsetName="Add subtask"
-        tip={progress.total > 0 ? 'Subtasks' : 'Add subtask'}
+        unsetName={t('task.card.addSubtask')}
+        tip={progress.total > 0 ? t('task.card.subtasks') : t('task.card.addSubtask')}
         isSet={progress.total > 0}
         open={is('subtasks')}
         buttonRef={subtasksRef}
         onClick={() => onToggle('subtasks')}
-        unsetLabel="Subtasks"
+        unsetLabel={t('task.card.subtasks')}
         icon={<ListChecks className="h-3.5 w-3.5" aria-hidden="true" />}
       >
         <span>{checklistLabel(progress.completed, progress.total)}</span>
       </PropertyButton>
 
-      <PropertyButton prop="reminders" name="Reminders" unsetName="Add reminder" value={reminderText} isSet={reminderCount > 0} open={is('reminder')} haspopup="dialog" buttonRef={reminderRef} onClick={() => onToggle('reminder')} unsetLabel="Reminder" icon={<Bell className="h-3.5 w-3.5" aria-hidden="true" />}>
+      <PropertyButton prop="reminders" name={t('task.card.reminders')} unsetName={t('task.card.addReminder')} value={reminderText} isSet={reminderCount > 0} open={is('reminder')} haspopup="dialog" buttonRef={reminderRef} onClick={() => onToggle('reminder')} unsetLabel={t('task.card.reminder')} icon={<Bell className="h-3.5 w-3.5" aria-hidden="true" />}>
         <span>{reminderText}</span>
       </PropertyButton>
       {is('reminder') && <ReminderPickerPopover anchorRef={reminderRef} task={task} onReminderChange={onReminderChange} onClose={onClose} />}
 
-      <PropertyButton prop="repeat" name="Repeat" value={repeatText} isSet={repeats} open={is('repeat')} haspopup="dialog" buttonRef={repeatRef} onClick={() => onToggle('repeat')} unsetLabel="Repeat" icon={<Repeat className="h-3.5 w-3.5" aria-hidden="true" />}>
+      <PropertyButton prop="repeat" name={t('task.card.repeat')} value={repeatText} isSet={repeats} open={is('repeat')} haspopup="dialog" buttonRef={repeatRef} onClick={() => onToggle('repeat')} unsetLabel={t('task.card.repeat')} icon={<Repeat className="h-3.5 w-3.5" aria-hidden="true" />}>
         <span>{repeatText}</span>
       </PropertyButton>
       {is('repeat') && (
@@ -281,28 +295,32 @@ export function TaskCardBar({
           repeatMode={task.repeat_mode ?? 0}
           onRecurrenceChange={onRecurrenceChange}
           onClose={onClose}
+          taskId={task.id}
         />
       )}
 
       {/* A task always has a project, so this one is always a chip. */}
-      <PropertyButton prop="project" name="Move to project" value={project?.title ?? 'Project'} isSet open={is('project')} haspopup="listbox" buttonRef={projectRef} onClick={() => onToggle('project')} icon={<FolderOpen className="h-3.5 w-3.5" aria-hidden="true" />}>
-        <span className="max-w-[10rem] truncate">{project?.title ?? 'Project'}</span>
+      <PropertyButton prop="project" name={t('task.card.moveToProject')} value={project?.title ?? t('task.card.project')} isSet open={is('project')} haspopup="listbox" buttonRef={projectRef} onClick={() => onToggle('project')} icon={<FolderOpen className="h-3.5 w-3.5" aria-hidden="true" />}>
+        <span className="max-w-[10rem] truncate">{project?.title ?? t('task.card.project')}</span>
       </PropertyButton>
       {is('project') && <ProjectPickerPopover anchorRef={projectRef} currentProjectId={task.project_id} onSelect={onProjectChange} onClose={onClose} />}
+
+      {/* Pro (cross-app semantics 21): start date, estimate, after and flag; nothing while it is off. */}
+      <ProCardChips task={task} />
 
       {canAssign && (
         <PropertyButton
           prop="assign"
-          name="Assigned"
-          unsetName="Assign"
+          name={t('task.card.assigned')}
+          unsetName={t('task.card.assign')}
           value={nameList(assignees, me?.id)}
-          tip={assignees.length > 0 ? assignChipLabel(assignees, me?.id) : 'Assign'}
+          tip={assignees.length > 0 ? assignChipLabel(assignees, me?.id) : t('task.card.assign')}
           isSet={assignees.length > 0}
           open={is('assign')}
           haspopup="listbox"
           buttonRef={assignRef}
           onClick={() => onToggle('assign')}
-          unsetLabel="Assign"
+          unsetLabel={t('task.card.assign')}
           className={assignees.length > 0 ? 'gap-1.5 pl-1' : undefined}
           icon={<AvatarStack people={assignees} size={16} max={3} surface="card" />}
         >
@@ -316,14 +334,14 @@ export function TaskCardBar({
         </span>
       )}
       {is('assign') && collab && (
-        <AssignPopover anchorRef={assignRef} task={task} members={collab.access.members} me={me} projectTitle={project?.title ?? 'this project'} onClose={onClose} />
+        <AssignPopover anchorRef={assignRef} task={task} members={collab.access.members} me={me} projectTitle={project?.title ?? t('task.card.thisProject')} onClose={onClose} />
       )}
 
       <PropertyButton
         prop="attachments"
-        name="Attachments"
+        name={t('task.card.attachments')}
         value={String(attachmentCount)}
-        tip={attachmentCount > 0 ? 'Attachments' : 'Attach a file'}
+        tip={attachmentCount > 0 ? t('task.card.attachments') : t('task.card.attachFile')}
         isSet={attachmentCount > 0}
         open={is('attachment')}
         haspopup="dialog"
@@ -338,12 +356,12 @@ export function TaskCardBar({
 
       <div className="ml-auto flex items-center gap-1">
         {collab && <CommentsButton taskId={task.id} count={commentCount} unread={shared && !!task.is_unread} open={collab.commentsOpen} onClick={collab.onToggleComments} />}
-        <PropertyButton prop="more" name="More" isSet={false} open={is('more') || is('info')} haspopup="menu" buttonRef={moreRef} onClick={() => onToggle('more')} iconOnly icon={<MoreHorizontal className="h-4 w-4" aria-hidden="true" />} />
+        <PropertyButton prop="more" name={t('task.card.more')} isSet={false} open={is('more') || is('info') || is('parent')} haspopup="menu" buttonRef={moreRef} onClick={() => onToggle('more')} iconOnly icon={<MoreHorizontal className="h-4 w-4" aria-hidden="true" />} />
       </div>
       {is('more') && (
-        <Popover anchorRef={moreRef} onClose={onClose} label="More" role="menu" placement="bottom-end" className="w-44 p-1">
+        <Popover anchorRef={moreRef} onClose={onClose} label={t('task.card.more')} role="menu" placement="bottom-end" className="w-44 p-1">
           <MenuItem icon={<Info className="h-3.5 w-3.5" aria-hidden="true" />} onSelect={() => onOpen('info')}>
-            Task info
+            {t('task.card.taskInfo')}
           </MenuItem>
           <MenuItem
             icon={<CopyPlus className="h-3.5 w-3.5" aria-hidden="true" />}
@@ -352,7 +370,7 @@ export function TaskCardBar({
               void duplicate([task])
             }}
           >
-            Duplicate task
+            {t('task.card.duplicateTask')}
           </MenuItem>
           <MenuItem
             icon={<FileText className="h-3.5 w-3.5" aria-hidden="true" />}
@@ -361,14 +379,31 @@ export function TaskCardBar({
               void templateActions.saveFrom(task)
             }}
           >
-            Save as template
+            {t('task.card.saveAsTemplate')}
           </MenuItem>
+          <MenuItem icon={<CornerDownRight className="h-3.5 w-3.5" aria-hidden="true" />} onSelect={() => onOpen('parent')}>
+            {t('task.attach.makeSubtaskOf')}
+          </MenuItem>
+          {currentParent !== null && (
+            <MenuItem
+              icon={<CornerLeftUp className="h-3.5 w-3.5" aria-hidden="true" />}
+              onSelect={() => {
+                onClose()
+                subtaskAttach.detach(task, currentParent)
+              }}
+            >
+              {t('task.attach.removeFromParent')}
+            </MenuItem>
+          )}
           <MenuItem icon={<Trash2 className="h-3.5 w-3.5" aria-hidden="true" />} danger onSelect={onDelete}>
-            Delete task
+            {t('task.card.deleteTask')}
           </MenuItem>
         </Popover>
       )}
       {is('info') && <InfoPopover anchorRef={moreRef} task={task} onClose={onClose} />}
+      {is('parent') && (
+        <SubtaskPickerPopover anchorRef={moreRef} placement="bottom-end" mode="parent" tasks={[task]} onPick={(parent) => subtaskAttach.attach([task], parent)} onClose={onClose} />
+      )}
     </div>
   )
 }
@@ -379,9 +414,10 @@ export function TaskCardBar({
  * shows until the pane is open.
  */
 function CommentsButton({ taskId, count, unread, open, onClick }: { taskId: number; count: number; unread: boolean; open: boolean; onClick: () => void }) {
-  const label = count === 0 ? 'Comments' : `Comments, ${count}${unread ? ', new' : ''}`
+  const { t } = useTranslation()
+  const label = count === 0 ? t('task.card.comments') : unread ? t('task.card.commentsCountNew', { number: count }) : t('task.card.commentsCount', { number: count })
   return (
-    <Tooltip label="Comments" shortcut="Mod+Shift+C">
+    <Tooltip label={t('task.card.comments')} shortcut="Mod+Shift+C">
       <button
         id={commentsButtonId(taskId)}
         type="button"

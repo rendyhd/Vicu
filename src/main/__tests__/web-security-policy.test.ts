@@ -5,10 +5,35 @@ import { pathToFileURL } from 'url'
 import {
   decideNavigation,
   isAppUrl,
+  isDeepLinkAllowed,
   isExternalAllowed,
   isTrustedSender,
+  safeExternalUrl,
   type AppOrigin,
 } from '../web-security-policy'
+
+describe('safeExternalUrl', () => {
+  it('keeps the address, subject, body, cc and bcc of a mail link exactly as written', () => {
+    expect(safeExternalUrl('mailto:a@example.com')).toBe('mailto:a@example.com')
+    expect(safeExternalUrl('mailto:a@example.com?subject=Hi%20there&body=Line%0A2&cc=b@x.org&bcc=c@x.org'))
+      .toBe('mailto:a@example.com?subject=Hi%20there&body=Line%0A2&cc=b@x.org&bcc=c@x.org')
+  })
+
+  it('drops every other parameter, whatever its case', () => {
+    expect(safeExternalUrl('mailto:a@example.com?subject=Hi&attach=C:%5CUsers%5Cme%5Csecret.txt'))
+      .toBe('mailto:a@example.com?subject=Hi')
+    expect(safeExternalUrl('MAILTO:a@example.com?Attachment=/etc/passwd&BODY=x&to=evil@x.org'))
+      .toBe('MAILTO:a@example.com?BODY=x')
+    expect(safeExternalUrl('mailto:a@example.com?attach=x')).toBe('mailto:a@example.com')
+    expect(safeExternalUrl('mailto:a@example.com?%61ttach=x&%62ody=y')).toBe('mailto:a@example.com?%62ody=y')
+    expect(safeExternalUrl('mailto:a@example.com?subject=x#frag')).toBe('mailto:a@example.com?subject=x')
+    expect(safeExternalUrl('mailto:a@example.com?%E0%A4%A=x')).toBe('mailto:a@example.com')
+  })
+
+  it('leaves web addresses alone', () => {
+    expect(safeExternalUrl('https://example.com/?attach=1')).toBe('https://example.com/?attach=1')
+  })
+})
 
 const rendererDir = join(tmpdir(), 'vicu-app', 'out', 'renderer')
 const rendererDirUrl = `${pathToFileURL(rendererDir).href}/`
@@ -117,11 +142,15 @@ describe('isAppUrl (development)', () => {
 })
 
 describe('isExternalAllowed', () => {
-  it('allows web, mail and Obsidian links', () => {
+  it('allows web and mail links', () => {
     expect(isExternalAllowed('https://vikunja.io/docs')).toBe(true)
     expect(isExternalAllowed('http://example.com')).toBe(true)
     expect(isExternalAllowed('mailto:someone@example.com')).toBe(true)
-    expect(isExternalAllowed('obsidian://open?vault=Notes&file=Inbox')).toBe(true)
+  })
+
+  it('never allows an Obsidian address, whatever its shape', () => {
+    expect(isExternalAllowed('obsidian://open?vault=Notes&file=Inbox')).toBe(false)
+    expect(isExternalAllowed('obsidian://advanced-uri?vault=Notes&commandid=app%3Adelete-file')).toBe(false)
   })
 
   it('drops schemes that can run local code or read local files', () => {
@@ -138,6 +167,31 @@ describe('isExternalAllowed', () => {
     expect(isExternalAllowed('example.com')).toBe(false)
     expect(isExternalAllowed(42)).toBe(false)
     expect(isExternalAllowed(undefined)).toBe(false)
+  })
+})
+
+describe('isDeepLinkAllowed', () => {
+  it('opens web and mail links and the note links Vicu writes', () => {
+    expect(isDeepLinkAllowed('https://example.com/page')).toBe(true)
+    expect(isDeepLinkAllowed('mailto:someone@example.com')).toBe(true)
+    expect(isDeepLinkAllowed('obsidian://open?vault=Notes&file=Inbox')).toBe(true)
+    expect(isDeepLinkAllowed('obsidian://advanced-uri?vault=Notes&uid=42')).toBe(true)
+  })
+
+  it('refuses an Obsidian address that does more than open a note', () => {
+    expect(isDeepLinkAllowed('obsidian://advanced-uri?vault=Notes&commandid=shell-commands%3Arun')).toBe(false)
+    expect(isDeepLinkAllowed('obsidian://advanced-uri?vault=Notes&uid=42&commandid=app%3Adelete-file')).toBe(false)
+    expect(isDeepLinkAllowed('obsidian://advanced-uri?vault=Notes&filepath=a.md&data=x&mode=overwrite')).toBe(false)
+    expect(isDeepLinkAllowed('obsidian://new?vault=Notes&file=Inbox')).toBe(false)
+    expect(isDeepLinkAllowed('obsidian://open?vault=Notes&path=%2Fetc%2Fpasswd')).toBe(false)
+  })
+
+  it('refuses what no link button holds', () => {
+    expect(isDeepLinkAllowed('file:///C:/Windows/System32/calc.exe')).toBe(false)
+    expect(isDeepLinkAllowed('javascript:alert(1)')).toBe(false)
+    expect(isDeepLinkAllowed('vicu://task/1')).toBe(false)
+    expect(isDeepLinkAllowed('')).toBe(false)
+    expect(isDeepLinkAllowed(undefined)).toBe(false)
   })
 })
 

@@ -1,4 +1,5 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { CalendarClock, CheckCircle2, FolderInput, Tag, Trash2, UserPlus, X } from 'lucide-react'
 import { useSelectionStore } from '@/stores/selection-store'
 import { useSelectedTasks } from '@/hooks/use-selected-tasks'
@@ -12,6 +13,10 @@ import { WhenPopover } from './WhenPopover'
 import { ProjectPickerPopover } from './ProjectPickerPopover'
 import { LabelPickerPopover } from './LabelPickerPopover'
 import { BulkAssignPopover } from './BulkAssignPopover'
+import { BatchInspector } from '@/components/pro/BatchInspector'
+import { usePro } from '@/hooks/use-pro'
+import { useProUiStore } from '@/stores/pro-ui-store'
+import { SlidersHorizontal } from 'lucide-react'
 
 type Picker = 'date' | 'project' | 'label' | 'assign' | null
 
@@ -24,6 +29,7 @@ const BUTTON =
  * menu, so offline queueing and undo behave the same. Escape clears the selection (TaskList).
  */
 export function SelectionBar() {
+  const { t } = useTranslation()
   const selectedTaskIds = useSelectionStore((s) => s.selectedTaskIds)
   const clearSelection = useSelectionStore((s) => s.clearSelection)
   const tasks = useSelectedTasks(selectedTaskIds)
@@ -34,6 +40,16 @@ export function SelectionBar() {
   const labelRef = useRef<HTMLButtonElement>(null)
   const assignRef = useRef<HTMLButtonElement>(null)
   const access = useProjectAccessMap()
+  // Pro's inspector (plan 7.7.2): start, estimate and flag for the selection; off, the bar is as it was.
+  const powerOn = usePro().layer('power')
+  const inspectorOpen = useProUiStore((s) => s.inspectorOpen)
+  const setInspectorOpen = useProUiStore((s) => s.setInspectorOpen)
+  const inspectorRef = useRef<HTMLButtonElement>(null)
+  // The inspector closes with the selection, so it does not come back on the next one.
+  const enough = selectedTaskIds.size >= 2
+  useEffect(() => {
+    if (!enough && inspectorOpen) setInspectorOpen(false)
+  }, [enough, inspectorOpen, setInspectorOpen])
 
   const setFocusedTask = useSelectionStore((s) => s.setFocusedTask)
 
@@ -68,14 +84,14 @@ export function SelectionBar() {
 
   return (
     <div className="vicu-bar-rise shrink-0 border-t border-[var(--border-color)] bg-bg-card px-4 py-2">
-      <div role="toolbar" aria-label="Selected tasks" className="mx-auto flex max-w-reading flex-wrap items-center gap-1">
+      <div role="toolbar" aria-label={t('task.selection.toolbar')} className="mx-auto flex max-w-reading flex-wrap items-center gap-1">
         <span role="status" className="mr-2 text-meta font-medium text-text">
-          {count} selected
+          {t('task.selection.selected', { count })}
         </span>
 
         <button ref={dateRef} type="button" className={cn(BUTTON, picker === 'date' && 'bg-bg-selected')} aria-haspopup="dialog" aria-expanded={picker === 'date'} onClick={() => toggle('date')}>
           <CalendarClock className="h-3.5 w-3.5" aria-hidden="true" />
-          Schedule
+          {t('task.selection.schedule')}
         </button>
         {picker === 'date' && (
           <WhenPopover anchorRef={dateRef} currentDate={NULL_DATE} allowClear onDateChange={actions.setDueDateIso} onClose={() => setPicker(null)} />
@@ -83,12 +99,12 @@ export function SelectionBar() {
 
         <button type="button" className={BUTTON} disabled={!anyNotDone} onClick={() => void actions.completeAll()}>
           <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
-          Complete
+          {t('task.selection.complete')}
         </button>
 
         <button ref={projectRef} type="button" className={cn(BUTTON, picker === 'project' && 'bg-bg-selected')} aria-haspopup="listbox" aria-expanded={picker === 'project'} onClick={() => toggle('project')}>
           <FolderInput className="h-3.5 w-3.5" aria-hidden="true" />
-          Move
+          {t('task.selection.move')}
         </button>
         {picker === 'project' && (
           <ProjectPickerPopover
@@ -104,7 +120,7 @@ export function SelectionBar() {
 
         <button ref={labelRef} type="button" className={cn(BUTTON, picker === 'label' && 'bg-bg-selected')} aria-haspopup="dialog" aria-expanded={picker === 'label'} onClick={() => toggle('label')}>
           <Tag className="h-3.5 w-3.5" aria-hidden="true" />
-          Tag
+          {t('task.selection.tag')}
         </button>
         {picker === 'label' && (
           <LabelPickerPopover anchorRef={labelRef} tasks={tasks} onApplied={(label) => void actions.recordLastLabel(label)} onClose={() => setPicker(null)} />
@@ -113,19 +129,29 @@ export function SelectionBar() {
         {canAssign && (
           <button ref={assignRef} type="button" className={cn(BUTTON, picker === 'assign' && 'bg-bg-selected')} aria-haspopup="menu" aria-expanded={picker === 'assign'} onClick={() => toggle('assign')}>
             <UserPlus className="h-3.5 w-3.5" aria-hidden="true" />
-            Assign
+            {t('task.selection.assign')}
           </button>
         )}
         {picker === 'assign' && canAssign && (
           <BulkAssignPopover anchorRef={assignRef} taskIds={selectedTaskIds} onClose={() => setPicker(null)} />
         )}
 
+        {powerOn && (
+          <button ref={inspectorRef} type="button" className={cn(BUTTON, inspectorOpen && 'bg-bg-selected')} aria-haspopup="dialog" aria-expanded={inspectorOpen} onClick={() => setInspectorOpen(!inspectorOpen)}>
+            <SlidersHorizontal className="h-3.5 w-3.5" aria-hidden="true" />
+            {t('task.selection.inspector')}
+          </button>
+        )}
+        {powerOn && inspectorOpen && (
+          <BatchInspector anchorRef={inspectorRef} tasks={tasks} onClose={() => setInspectorOpen(false)} />
+        )}
+
         <button type="button" className={cn(BUTTON, 'text-danger hover:bg-danger/10')} onClick={() => void deleteSelected()}>
           <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
-          Delete
+          {t('task.selection.delete')}
         </button>
 
-        <button type="button" className={cn(BUTTON, 'ml-auto w-7 justify-center px-0 text-text-secondary')} aria-label="Clear selection" title="Clear selection (Esc)" onClick={clearSelection}>
+        <button type="button" className={cn(BUTTON, 'ml-auto w-7 justify-center px-0 text-text-secondary')} aria-label={t('task.selection.clear')} title={t('task.selection.clearEsc')} onClick={clearSelection}>
           <X className="h-3.5 w-3.5" aria-hidden="true" />
         </button>
       </div>
