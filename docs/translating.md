@@ -95,7 +95,7 @@ npm run i18n:status
 
 The file is the Android string format, which the iPhone app reads too.
 
-A second, smaller file holds the text that only Android shows outside the app: the names of the widgets, the quick-add tile and the shortcuts, the notification channels and the buttons on notifications. Its English source is `app/src/main/res/values/strings.xml`; translate it as `app/src/main/res/values-<tag>/strings.xml`, in the same format and with the same rules. `app_name` stays `Vicu`.
+A second, smaller file holds the text that only Android shows outside the app: the names of the widgets, the quick-add tile and the shortcuts, the notification channels and the buttons on notifications. Its English source is `app/src/main/res/values/strings.xml`; translate it as `app/src/main/res/values-<tag>/strings.xml`, in the same format and with the same rules, with one difference: in this file an apostrophe is written `\'` (see below). `app_name` stays `Vicu`.
 
 ```xml
 <resources>
@@ -118,7 +118,7 @@ Translate the text between the tags. Keep every `name` as it is. A comment above
 
 **Plurals.** Give an `<item>` for every quantity your language has (`zero`, `one`, `two`, `few`, `many`, `other`), and no other. The table above applies here too.
 
-**Special characters.** Write an apostrophe as `\'` and a double quote as `\"`. Write `&` as `&amp;` and `<` as `&lt;`.
+**Special characters.** Write apostrophes and quotes as they are (`'`, `"`, or the typographic `’`), without a backslash: a backslash would show on screen. Write `&` as `&amp;` and `<` as `&lt;`. Only in the Android file `app/src/main/res/values-<tag>/strings.xml` is an apostrophe written `\'`.
 
 **List the language.** After adding a new `values-<tag>` folder, run:
 
