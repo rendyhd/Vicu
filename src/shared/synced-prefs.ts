@@ -164,6 +164,22 @@ export function readTaskOrderPref(value: unknown): TaskOrderKey {
   return parseTaskOrder(value)
 }
 
+/**
+ * Completed tasks in a project (section 12.6): `true` ends every project's list, the Inbox's
+ * included, with a folded Completed row. Off is no entry or `null`; any other value acts as off.
+ */
+export const PROJECTS_SHOW_DONE_KEY = 'projects.show_done'
+
+/** Whether projects end with their Completed row: only `true` turns it on. */
+export function readProjectsShowDone(value: unknown): boolean {
+  return value === true
+}
+
+/** The value a device writes for the switch: `true` on, `null` off (the default is never written). */
+export function projectsShowDoneValue(on: boolean): true | null {
+  return on ? true : null
+}
+
 /** The local date the last weekly review was finished (section 14.7): `"YYYY-MM-DD"`. */
 export const WEEKLY_REVIEW_LAST_KEY = 'weekly_review.last'
 
@@ -349,6 +365,7 @@ export function readSyncedPref(values: Readonly<Record<string, unknown>>, key: s
   if (key === INBOX_PROJECT_ID_KEY) return readInboxProjectId(value)
   if (key === GLOBAL_TASK_ORDER_KEY) return readTaskOrderPref(value)
   if (key === WEEKLY_REVIEW_LAST_KEY) return readWeeklyReviewLast(value)
+  if (key === PROJECTS_SHOW_DONE_KEY) return readProjectsShowDone(value)
   if (key === WEEK_START_KEY) return readWeekStart(value)
   if (key === PLANNER_DEFAULT_LENGTH_KEY) return readDefaultLength(value)
   if (key === PLANNER_HOURS_KEY) return readPlannerHours(value)

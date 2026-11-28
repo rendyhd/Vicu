@@ -3,10 +3,26 @@ import { cn } from '@/lib/cn'
 import { isNullDate, formatDueDate } from '@/lib/date-utils'
 import { isDueToday, isOverdue } from '@/lib/due-dates'
 import { useDateFormat } from '@/hooks/use-date-format'
-import { formatBlockRow } from '@/lib/date-display'
+import { formatBlockRow, formatDateDisplay } from '@/lib/date-display'
 import type { TimeBlock } from '../../../shared/time-blocks'
 
 type DueDateContext = 'row' | 'row.inToday' | 'row.inDayGroup' | 'chip'
+
+/**
+ * The day a task was completed, as the Logbook groups it (`logbook.group`, contract section 8.3):
+ * "Today", "Yesterday", "Mon 5 Oct", "September 2026". A project's Completed list (section 12.6).
+ */
+export function TaskDoneDay({ doneAt, className }: { doneAt: string; className?: string }) {
+  const fmt = useDateFormat()
+  if (isNullDate(doneAt)) return null
+  const completed = new Date(doneAt)
+  if (Number.isNaN(completed.getTime())) return null
+  return (
+    <span className={cn('shrink-0 rounded-control px-1.5 py-0.5 text-meta tabular-nums text-text-secondary', className)}>
+      {formatDateDisplay('logbook.group', completed, new Date(), false, fmt)}
+    </span>
+  )
+}
 
 /** A task's time block on a row (`row.block`, contract section 8.3): "15:00–15:30", "Fri, 15:00–15:30". */
 export function TaskBlockBadge({ block, className }: { block: TimeBlock; className?: string }) {

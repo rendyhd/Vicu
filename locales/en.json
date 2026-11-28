@@ -703,7 +703,9 @@
       "display": {
         "title": "Display",
         "progress": "Show project progress in the sidebar",
-        "taskCount": "Show task count in the sidebar"
+        "taskCount": "Show task count in the sidebar",
+        "showDone": "Show completed tasks",
+        "showDoneNote": "Each project ends with a Completed row you can open."
       }
     },
     "savedFilters": {
@@ -3139,7 +3141,15 @@
       "unavailableHint": "This project may have been deleted or you may no longer have access.",
       "restore": "Restore project",
       "emptyTitle": "No tasks in this project",
-      "emptySubtitle": "Create a new task to get started"
+      "emptySubtitle": "Create a new task to get started",
+      "completed": {
+        "title": "Completed",
+        "loading": "Loading...",
+        "empty": "No completed tasks yet",
+        "failed": "Could not load the completed tasks.",
+        "retry": "Try again",
+        "showMore": "Show more"
+      }
     },
     "search": {
       "titleWithQuery": "Search: \"{{query}}\"",

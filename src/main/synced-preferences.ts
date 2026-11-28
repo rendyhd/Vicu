@@ -46,6 +46,7 @@ import {
   validateSyncedPrefs,
   readWeeklyReviewLast,
   WEEKLY_REVIEW_LAST_KEY,
+  PROJECTS_SHOW_DONE_KEY,
   PLANNER_DEFAULT_LENGTH_KEY,
   PLANNER_HOURS_KEY,
   ICON_NONE,
@@ -269,6 +270,8 @@ export function isWritablePref(key: unknown, value: unknown): key is string {
   if (key === WEEK_START_KEY) return value === null || value === 'sunday' || value === 'saturday'
   // The day the last weekly review was finished (section 14.7).
   if (key === WEEKLY_REVIEW_LAST_KEY) return value === null || readWeeklyReviewLast(value) !== null
+  // Completed tasks in a project (section 12.6): `true`, or null when turned off.
+  if (key === PROJECTS_SHOW_DONE_KEY) return value === null || value === true
   // A task's location reminder at a place a phone saved (section 11.7). The desktop never creates,
   // renames or deletes a place: that needs its position, which only the phone has.
   if (taskIdOfLocationReminderKey(key) !== null) {

@@ -24,6 +24,11 @@ export interface RowView {
    * mode (cross-app semantics 22.4).
    */
   showWorkMark?: boolean
+  /**
+   * The rows are a project's Completed list (cross-app semantics 12.6): a done row shows the day it
+   * was completed, as the Logbook groups it (`logbook.group`), in place of its due date and block.
+   */
+  doneDay?: boolean
 }
 
 export const NO_ROW_VIEW: RowView = {}

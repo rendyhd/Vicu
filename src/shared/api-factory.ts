@@ -102,6 +102,8 @@ export function createApi(bridge: ApiBridge) {
   // Projects
   countProjectTasks: (projectId: number, done: boolean) =>
     invoke('count-project-tasks', projectId, done),
+  countTasks: (filter: string) =>
+    invoke('count-tasks', filter),
   fetchProjects: (includeArchived = false) =>
     invoke('fetch-projects', includeArchived),
   fetchProject: (id: number) =>

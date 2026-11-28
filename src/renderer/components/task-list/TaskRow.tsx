@@ -26,7 +26,7 @@ import type { Task, TaskReminder } from '@/lib/vikunja-types'
 import { TaskCheckbox } from './TaskCheckbox'
 import { FoldedNotes } from '../rich-text/FoldedNotes'
 import { TaskCardBar, type CardPopover } from './TaskCardBar'
-import { TaskBlockBadge, TaskDueBadge } from './TaskDueBadge'
+import { TaskBlockBadge, TaskDoneDay, TaskDueBadge } from './TaskDueBadge'
 import { blockOf, dueRepeatsBlockDay } from '../../../shared/time-blocks'
 import { useRowView } from './RowViewContext'
 import { PriorityMark } from '@/components/shared/PriorityMark'
@@ -981,9 +981,16 @@ function TaskRowInner({
           )}
           <TaskSyncIcon taskId={task.id} />
           <TaskLinkIcon description={task.description} />
-          {/* A date-only due date on the block's own day would repeat its day phrase (contract 16.4). */}
-          {rowFieldShown(rowView, 'due') && !(block && dueRepeatsBlockDay(task.due_date, block)) && <TaskDueBadge dueDate={task.due_date} />}
-          {block && <TaskBlockBadge block={block} />}
+          {rowView.doneDay && task.done ? (
+            // A project's Completed list says the day of the completion instead (contract 12.6).
+            <TaskDoneDay doneAt={task.done_at} />
+          ) : (
+            <>
+              {/* A date-only due date on the block's own day would repeat its day phrase (contract 16.4). */}
+              {rowFieldShown(rowView, 'due') && !(block && dueRepeatsBlockDay(task.due_date, block)) && <TaskDueBadge dueDate={task.due_date} />}
+              {block && <TaskBlockBadge block={block} />}
+            </>
+          )}
           {((task.reminders?.length ?? 0) > 0 || hasPlaceReminder) && (
             <Bell className="h-3 w-3 text-text-secondary" aria-label={t('task.row.hasReminder')} />
           )}

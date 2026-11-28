@@ -143,6 +143,7 @@ export interface ElectronAPI {
 
   // Projects
   countProjectTasks(projectId: number, done: boolean): Promise<ApiResult<number>>
+  countTasks(filter: string): Promise<ApiResult<number>>
   fetchProjects(includeArchived?: boolean): Promise<ApiResult<Project[]>>
   fetchProject(id: number): Promise<ApiResult<Project>>
   createProject(project: CreateProjectPayload): Promise<ApiResult<Project>>

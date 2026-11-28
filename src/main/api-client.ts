@@ -4,6 +4,7 @@ import {
   buildTaskAttachmentDownloadUrl,
   buildProjectCollectionUrl,
   buildProjectTaskCountUrl,
+  buildTaskCountUrl,
   readEnvelopeTotal,
   createTaskCollectionSearchParams,
   type AttachmentPreviewSize,
@@ -254,6 +255,22 @@ export async function fetchProjectTaskTotal(projectId: number, done: boolean): P
   if ('success' in c) return c
 
   const result = await requestWithRetry<unknown>('GET', buildProjectTaskCountUrl(c.url, projectId, done), c.token)
+  if (!result.success) return result
+  const total = readEnvelopeTotal(result.data)
+  return total === null
+    ? { success: false, error: 'The server did not report a task total' }
+    : { success: true, data: total }
+}
+
+/**
+ * How many tasks a filter matches: the `total` of the API v2 envelope of a page of one task, never
+ * a listing (a project's Completed row in a Work or Personal mode, cross-app semantics 12.6).
+ */
+export async function fetchTaskTotal(filter: string): Promise<ApiResult<number>> {
+  const c = await getConfigOrFail()
+  if ('success' in c) return c
+
+  const result = await requestWithRetry<unknown>('GET', buildTaskCountUrl(c.url, filter), c.token)
   if (!result.success) return result
   const total = readEnvelopeTotal(result.data)
   return total === null

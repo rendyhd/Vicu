@@ -115,6 +115,10 @@ The choices are **Due date, then manual**, **Due date, then priority**, **Manual
 
 A subproject follows its parent's order unless it has one of its own. The order syncs, and phone widgets follow it.
 
+## Completed tasks
+
+Turn on **Show completed tasks** in **Settings, Projects, Display** and every project, the Inbox too, ends with a folded **Completed** row with the number of its done tasks. Open it to see them, newest first, 20 at a time with **Show more**; each shows the day it was completed. Tick one to reopen it. The setting syncs; whether the row is open is not kept. Done tasks of subprojects are in the subproject itself.
+
 ### Drag to reorder
 
 What you can drag depends on the order:

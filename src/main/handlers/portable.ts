@@ -11,6 +11,7 @@ import { isProEnabled } from '../../shared/pro/settings'
 import { ensurePerson } from '../pro-people'
 import {
   fetchTasks,
+  fetchTaskTotal,
   createTask,
   updateTask,
   patchTaskJson,
@@ -247,6 +248,15 @@ export function registerPortableHandlers(handle: Handle, deps: PortableDeps): vo
       return { success: false as const, error: 'Invalid project count request' }
     }
     return countProjectTasks(projectId, done)
+  })
+
+  // How many tasks a filter matches, from one one-task page (a project's Completed row in a Work or
+  // Personal mode, cross-app semantics 12.6). Not cached here: the renderer's query is.
+  handle('count-tasks', (_event, filter: unknown) => {
+    if (typeof filter !== 'string' || filter.trim() === '' || filter.length > 2000) {
+      return { success: false as const, error: 'Invalid task count request' }
+    }
+    return fetchTaskTotal(filter)
   })
 
   // Projects

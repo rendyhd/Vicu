@@ -198,6 +198,10 @@ export const api = {
   countProjectTasks: (projectId: number, done: boolean) =>
     window.api.countProjectTasks(projectId, done) as Promise<ApiResult<number>>,
 
+  /** How many tasks a filter matches (the envelope's `total` of a one-task page); not cached in main. */
+  countTasks: (filter: string) =>
+    window.api.countTasks(filter) as Promise<ApiResult<number>>,
+
   fetchProjects: (includeArchived = false) =>
     window.api.fetchProjects(includeArchived) as Promise<ApiResult<Project[]>>,
 

@@ -186,8 +186,9 @@ export interface TaskQueryParams {
   per_page?: number
   q?: string
   filter?: string
-  sort_by?: string
-  order_by?: string
+  /** One sort key, or several in order (each paired with the `order_by` at the same place). */
+  sort_by?: string | string[]
+  order_by?: string | string[]
   filter_include_nulls?: boolean
   filter_timezone?: string
   /**

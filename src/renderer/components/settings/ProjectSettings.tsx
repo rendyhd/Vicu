@@ -20,6 +20,7 @@ import { buildProjectTree, useProjects, type ProjectTreeNode } from '@/hooks/use
 import { useSharedProjectActions } from '@/hooks/use-project-actions'
 import { useProjectCategories } from '@/hooks/use-project-categories'
 import { useTaskOrderSettings } from '@/hooks/use-task-order'
+import { useShowDoneSetting } from '@/hooks/use-project-completed'
 import { cn } from '@/lib/cn'
 import { normalizeHex } from '@/lib/constants'
 import { groupsWithInbox } from '@/lib/project-groups'
@@ -531,6 +532,32 @@ function TaskOrderSetting() {
   )
 }
 
+/**
+ * "Show completed tasks" (cross-app semantics 12.6, synced as `projects.show_done`): every project's
+ * list, the Inbox's included, ends with a folded Completed row. Off by default.
+ */
+function ShowDoneSetting() {
+  const { t } = useTranslation()
+  const noteId = useId()
+  const { on, setOn } = useShowDoneSetting()
+  return (
+    <div className="mt-4">
+      <label className="flex cursor-pointer items-center gap-2">
+        <Checkbox
+          checked={on}
+          aria-describedby={noteId}
+          data-show-done
+          onChange={(event) => setOn(event.target.checked)}
+        />
+        <span className="text-sm text-[var(--text-primary)]">{t('settings.projects.display.showDone')}</span>
+      </label>
+      <p id={noteId} className="mt-1 text-xs text-[var(--text-secondary)]">
+        {t('settings.projects.display.showDoneNote')}
+      </p>
+    </div>
+  )
+}
+
 /** Settings → Projects: the Inbox, the project list, how projects show in the sidebar, Review. */
 export function ProjectSettings({ config, onChange }: ProjectSettingsProps) {
   const { t } = useTranslation()
@@ -556,6 +583,7 @@ export function ProjectSettings({ config, onChange }: ProjectSettingsProps) {
           <span className="text-sm text-[var(--text-primary)]">{t('settings.projects.display.taskCount')}</span>
         </label>
         <TaskOrderSetting />
+        <ShowDoneSetting />
       </div>
 
       <ReviewSettingsPanel config={config} onChange={onChange} />

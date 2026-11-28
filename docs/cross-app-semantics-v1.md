@@ -1531,6 +1531,7 @@ A key is added here, in both repos, in the release that starts writing it.
 | `inbox_project_id` | the Inbox project id, a whole number above 0 | none: the app asks during setup |
 | `task_order` | a task order key (section 12.1) | `due_date_first` |
 | `task_order.project.<id>` | a task order key, or `null` | follows the parent project, then `task_order` (section 12.3) |
+| `projects.show_done` | `true`: every project ends with its Completed row; or `null`. Any other value acts as the default and is kept; section 12.6 | no Completed row |
 | `place.<placeId>` | a saved place's name, `{"name": "Home"}`, or `null` (deleted); section 11.7 | none |
 | `location_reminder.<taskId>` | a task's location reminder, `{"place", "trigger", "radius_m"}`, or `null`; section 11.7 | none |
 | `routine_reminders.<routineId>` | `"off"`: no reminders of that shared routine on this account; or `null`. Any other value acts as the default and is kept; section 6.9 | on: the routine's own reminder settings |
@@ -1669,6 +1670,18 @@ the other orders none. The Move up and Move down actions follow the same rule.
 `priority`, `position` (absent: 0), `created` as a UTC instant or `null`). `taskOrder.sort` gives an
 order and the expected ids. `taskOrder.resolve` gives parents, entries and, per project, the order
 used. `taskOrder.drag` gives an order and the ids that can be dragged.
+
+### 12.6 Completed tasks in a project
+
+While `projects.show_done` is `true` (Settings, Projects: "Show completed tasks"), a project's list,
+the Inbox included, ends with a folded row: "Completed" and how many done tasks the project has
+itself (not its subprojects'). Opened, it lists them by completion, newest first (`done_at`, then
+the higher id), 20 at a time with "Show more"; each row is struck through and shows the day it was
+completed as the Logbook groups it (`logbook.group`, section 8.3). A done subtask is a row of its
+own, not nested under its parent, so the rows add up to the count. Ticking a row reopens the task,
+as anywhere else. The row follows the Work and Personal mode as the Logbook does (section 22), and
+not a project's label filter (section 17.2). Whether it is open is per device and forgotten when
+the project is left. Smart lists, labels, custom lists and widgets do not have it.
 
 ---
 

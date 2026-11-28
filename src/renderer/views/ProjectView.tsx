@@ -25,6 +25,7 @@ import { InitiativePanel } from '@/components/pro/InitiativePanel'
 import { ProjectPlanLink } from '@/components/pro/ProjectPlanLink'
 import { parentTaskId, useWorkMode } from '@/hooks/use-work-mode'
 import { WorkModeMore } from '@/components/task-list/WorkModeMore'
+import { ProjectCompletedRow } from '@/components/projects/ProjectCompletedRow'
 import { LabelFilterBar, LabelFilterButton, LabelFilterMore } from '@/components/projects/ProjectLabelFilter'
 import { useLabels } from '@/hooks/use-labels'
 import { labelFilterChoices, shownWithLabels } from '../../shared/project-label-filter'
@@ -372,6 +373,8 @@ export function ProjectView() {
       {availability.on && availability.view === 'available' && (
         <HiddenSummary count={hiddenCount} onShow={() => availability.setView('remaining')} />
       )}
+      {/* Completed tasks (12.6): the project's own, by the mode, never by the label filter. */}
+      <ProjectCompletedRow key={pid} projectId={pid} shownAbove={everyTask} showAll={showAll} />
     </TaskList>
     </RowViewProvider>
   )

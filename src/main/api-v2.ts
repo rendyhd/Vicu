@@ -30,6 +30,17 @@ export function buildProjectTaskCountUrl(baseUrl: string, projectId: number, don
   return url.toString()
 }
 
+/**
+ * The request behind the number of tasks a filter matches (a project's Completed row in a Work or
+ * Personal mode, cross-app semantics 12.6): a page of one task, no subtasks, for the envelope's `total`.
+ */
+export function buildTaskCountUrl(baseUrl: string, filter: string): string {
+  const url = new URL(`${baseUrl.replace(/\/+$/, '')}/api/v2/tasks`)
+  url.searchParams.set('filter', filter)
+  url.searchParams.set('per_page', '1')
+  return url.toString()
+}
+
 /** The `total` of an API v2 list envelope, or null when the response carries no usable one. */
 export function readEnvelopeTotal(body: unknown): number | null {
   const total = (body as { total?: unknown } | null)?.total
@@ -140,8 +151,12 @@ export function createTaskCollectionSearchParams(
   // of this very request and is never sent as a parameter.
   const filter = withDueWindow(params.filter ? String(params.filter) : undefined, params.due_window, now)
   if (filter) qs.set('filter', filter)
-  if (params.sort_by) qs.set('sort_by', String(params.sort_by))
-  if (params.order_by) qs.set('order_by', String(params.order_by))
+  // A list of sort keys is repeated, each paired with the `order_by` at the same place (API v2).
+  for (const key of ['sort_by', 'order_by'] as const) {
+    const value = params[key]
+    if (Array.isArray(value)) for (const item of value) qs.append(key, String(item))
+    else if (value) qs.set(key, String(value))
+  }
   const perPage = clampPageSize(params.per_page)
   if (perPage !== null) qs.set('per_page', String(perPage))
   if (params.page) qs.set('page', String(params.page))

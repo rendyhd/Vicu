@@ -9,6 +9,7 @@ import { useReorderStore } from '@/stores/reorder-store'
 import { usePrintable } from '@/stores/print-store'
 import { TaskList } from '@/components/task-list/TaskList'
 import { RowViewProvider } from '@/components/task-list/RowViewContext'
+import { ProjectCompletedRow } from '@/components/projects/ProjectCompletedRow'
 import { ListSkeleton } from '@/components/shared/ListSkeleton'
 import { TaskOrderMenu } from '@/components/projects/TaskOrderMenu'
 import { Button } from '@/components/shared/Button'
@@ -93,7 +94,12 @@ export function InboxView() {
         )}
         emptyTitle={inboxProjectId && !activeInboxId ? t('views.inbox.archivedTitle') : t('views.inbox.emptyTitle')}
         emptySubtitle={inboxProjectId && !activeInboxId ? t('views.inbox.archivedSubtitle') : t('views.inbox.emptySubtitle')}
-      />
+        // The Completed row (12.6) comes after the new-task row and does not make the list non-empty.
+        empty={tasks.length === 0}
+        newTaskPlacement="after-tasks"
+      >
+        {activeInboxId && <ProjectCompletedRow key={activeInboxId} projectId={activeInboxId} shownAbove={tasks} />}
+      </TaskList>
     </RowViewProvider>
   )
 }

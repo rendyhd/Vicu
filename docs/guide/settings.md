@@ -188,7 +188,7 @@ Settings are in the drawer. Everything on the phone is per device unless marked.
 | Section | What it holds | Follows you |
 |---|---|---|
 | Inbox Project | **Choose inbox project**, and **Move dated tasks out of Inbox** | Inbox: Synced. The move option: This device |
-| Display | **Task order** (and **Sort tasks** per project), **Subprojects in project views**, **Show project progress**, **Show task count** | Order: Synced. The rest: This device |
+| Display | **Task order** (and **Sort tasks** per project), **Subprojects in project views**, **Show project progress**, **Show task count**, **Show completed tasks** | Order and Show completed tasks: Synced. The rest: This device |
 | Review | **Enable project review tracking**, **Default review cadence**, **Exclude Inbox from review**, and the list of excluded projects | This device |
 | Projects, Labels | Your projects (tap to edit, hold to drag, ⋮ for more) and labels | Synced |
 | Custom Lists | Your custom lists, and the import of saved filters | Synced |

@@ -372,3 +372,13 @@ describe('project icons (section 11.3)', () => {
     expect(isWritablePref('project_icon.x', 'none')).toBe(false)
   })
 })
+
+describe('completed tasks in a project (section 12.6)', () => {
+  it('takes true or null for projects.show_done and nothing else', async () => {
+    const { isWritablePref } = await loadService()
+    expect(isWritablePref('projects.show_done', true)).toBe(true)
+    expect(isWritablePref('projects.show_done', null)).toBe(true)
+    expect(isWritablePref('projects.show_done', false)).toBe(false)
+    expect(isWritablePref('projects.show_done', 'true')).toBe(false)
+  })
+})
