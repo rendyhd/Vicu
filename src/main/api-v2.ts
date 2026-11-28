@@ -52,6 +52,14 @@ export function buildProjectCollectionUrl(baseUrl: string, includeArchived = fal
  */
 export const COLLAB_SIGNALS_PARAM = 'collab_signals'
 
+/**
+ * Vicu-only task query option (never sent to the server): `false` leaves out `expand=subtasks`.
+ * For flat listings that never draw a hierarchy (finding the hidden carriers, rendyhd/Vicu#75):
+ * on Vikunja 2.8 and earlier the expansion adds a correlated subquery to every page, which on a
+ * long done history takes longer than the request timeout.
+ */
+export const EXPAND_SUBTASKS_PARAM = 'expand_subtasks'
+
 /** Vikunja error code: the user is already assigned to that task (answered with 400). */
 export const VIKUNJA_ERROR_ALREADY_ASSIGNED = 4021
 /** Vikunja error code: already subscribed (answered with 412). */
@@ -115,13 +123,14 @@ export function sniffImageType(bytes: Uint8Array): string | null {
  * Build the query shared by flat task collection endpoints. Vikunja still
  * returns a flat array for this expansion, but guarantees every child rides
  * on the same page as its parent and populates their reciprocal relations.
+ * `expand_subtasks: false` leaves the expansion out (`EXPAND_SUBTASKS_PARAM`).
  */
 export function createTaskCollectionSearchParams(
   params: Record<string, unknown>,
   now: Date = new Date()
 ): URLSearchParams {
   const qs = new URLSearchParams()
-  qs.append('expand', 'subtasks')
+  if (params[EXPAND_SUBTASKS_PARAM] !== false) qs.append('expand', 'subtasks')
   if (params[COLLAB_SIGNALS_PARAM] === true) {
     qs.append('expand', 'comment_count')
     qs.append('expand', 'is_unread')

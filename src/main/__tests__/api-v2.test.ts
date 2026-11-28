@@ -23,6 +23,15 @@ describe('project collection URL', () => {
 })
 
 describe('collaboration requests', () => {
+  it('leaves out the subtask expansion when told to, and never sends the option (rendyhd/Vicu#75)', () => {
+    const flat = createTaskCollectionSearchParams({ filter: 'done = true', expand_subtasks: false })
+    expect(flat.getAll('expand')).toEqual([])
+    expect([...flat.keys()]).toEqual(['filter'])
+    expect(createTaskCollectionSearchParams({ expand_subtasks: true }).getAll('expand')).toEqual(['subtasks'])
+    expect(createTaskCollectionSearchParams({ [COLLAB_SIGNALS_PARAM]: true, expand_subtasks: false }).getAll('expand'))
+      .toEqual(['comment_count', 'is_unread'])
+  })
+
   it('asks for comment counts and unread flags only when told to, as repeated expands', () => {
     expect(createTaskCollectionSearchParams({}).getAll('expand')).toEqual(['subtasks'])
     const params = createTaskCollectionSearchParams({ [COLLAB_SIGNALS_PARAM]: true, filter: 'done = false' })

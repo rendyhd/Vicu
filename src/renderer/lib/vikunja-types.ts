@@ -196,6 +196,11 @@ export interface TaskQueryParams {
    */
   keep_nested_subtasks?: boolean
   /**
+   * Vicu option, never sent to the server: `false` leaves out `expand=subtasks`, for a flat listing
+   * that draws no hierarchy (rendyhd/Vicu#75).
+   */
+  expand_subtasks?: boolean
+  /**
    * Vicu option, never sent to the server: add the due-date clause of the Today or Upcoming list,
    * built in the main process from the local-day boundary at request time.
    */
