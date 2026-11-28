@@ -8,7 +8,7 @@ Test vectors live in `test-fixtures/` in both repos and must stay byte-identical
 
 | Fixture | Covers |
 |---|---|
-| `cross-app-semantics-v1.json` | due-date rules, smart lists, weeks, custom-list windows, rules and sorting, saved-filter import, review math, completion hold, date display, collaboration, hidden tasks, synced preferences, task order, project categories, guided organizing, routines on Today, time blocks, Events and calendars, Pro, Work and Personal, When choices |
+| `cross-app-semantics-v1.json` | due-date rules, smart lists, weeks, custom-list windows, rules and sorting, saved-filter import, review math, completion hold, date display, collaboration, hidden tasks, synced preferences, task order, project categories, guided organizing, routines on Today, time blocks, Events and calendars, Pro, Work and Personal, When choices, making a task a subtask |
 | `nlp-corpus-v1.json` | quick-add parsing |
 | `routine-archive-v1.json` | routine merge, pruning and archive rules |
 | `ai-tools-v1.json` | the assistant (see `ai-assistant-v1.md`) and Pro's Copilot prompt (section 21.12) |
@@ -3404,3 +3404,79 @@ and the times it gives), `readDays` and `readMoveBy` (a stored value and the ids
 `morningEvening` (times of day and the morning and evening times), `days` (a reference time, times of
 day and ids, and each offered choice's day and time), and `moveBy` (a due date, today and a step,
 and the due date after). `nlp-corpus-v1.json` covers section 5.6.
+
+## 24. Making a task a subtask
+
+A person can put a task that already exists under another task, and take it out again. Both use
+Vikunja's `subtask` relation: `PUT tasks/{parent}/relations` with `relation_kind: "subtask"` and the
+task as `other_task_id` (the server adds the `parenttask` relation on the task itself), and
+`DELETE tasks/{parent}/relations/subtask/{task}`. The two tasks need not share a project; the person
+needs write access to the parent. The server refuses a change that would make a loop.
+
+### 24.1 Attaching one task
+
+- **One parent.** In Vicu a task has at most one parent. Attaching it first adds the new parent, then
+  removes every other parent it had. Adding first means that a refusal leaves the task as it was.
+- **Refused before anything is sent:** the parent is the task itself (`self`); the parent is already
+  its only parent (`already`); the parent is below the task, so the task would end up below itself
+  (`cycle`: walk up from the parent through the parents; a loop in the data ends the walk). When the
+  new parent is one of several parents, nothing is added and the others are removed.
+- **Project.** When the parent is in another project, the task moves to the parent's project, where a
+  new subtask would be made. When the parent's project is not known, the task stays. Its own
+  subtasks stay its subtasks and stay where they are, as with any project move.
+- **Order.** The parent's subtask order (section 19) is not written: the task is not listed in it, so
+  it comes after the subtasks that are.
+- **Undo** puts back what was sent: it deletes the new relation (when one was added), adds the old
+  parents back, and moves the task back to its project (when it moved).
+
+### 24.2 Several tasks
+
+Several selected tasks go under one parent, each as in 24.1, in the order of the selection. A
+selected task below another selected task keeps its parent and goes along with it (`kept`). A task
+that is refused is skipped and the others still go; the person is told how many were not moved.
+
+### 24.3 Which tasks are offered as the parent
+
+Open tasks that are not hidden (section 10), are in a project the person can write to, are not one
+of the tasks being attached or below one of them, and are not already the only parent of every task
+being attached. With nothing typed, only tasks of the first task's project are offered. A search
+matches a part of the title, ignoring case, in every project; tasks of the first task's project come
+first, then the others in the order they are listed.
+
+"Add existing task" under a parent offers the other way round: open tasks that are not hidden, are
+in a project the person can write to, and could go under the parent by 24.1 (not the parent, not
+above it, not already under it alone). Nothing typed offers the parent's project; a search, every
+project with the parent's first.
+
+### 24.4 Removing a task from its parent
+
+"Remove from parent" deletes the relation between that parent and the task. The task stays in its
+project with its own subtasks and is listed as a task of its own. Undo adds the relation back.
+
+### 24.5 Offline and the write gate
+
+Each relation change is one request on the parent through the task write gate, like Pro's After
+(section 21.2): queued offline as `add-relation` or `remove-relation` with kind `subtask`, a queued
+add and removal of the same relation cancel each other, and a 404 on a removal or a 409 on an add
+counts as done. The project move is an ordinary task update. A task or parent that exists only on
+this device is related once its create has reached the server.
+
+### 24.6 Where it is offered
+
+- **Desktop:** "Make subtask of..." in a task's context menu (one task or a selection) and in the open
+  card's More menu; "Add existing task" under the open card's subtasks; "Remove from parent" in a
+  subtask's menu in the card and in the task menu of a task that has a parent. Dragging a row onto
+  the middle of another row makes it that row's subtask: the row under the pointer is outlined and
+  the dragged chip says whose subtask it becomes; the top and bottom quarter of a row still reorder.
+- **Mobile:** "Make subtask of..." in a task's long-press menu and the task sheet, "Remove from
+  parent" where a task shows its parent.
+
+### 24.7 Vectors
+
+`subtaskAttach` in `cross-app-semantics-v1.json`. `world` holds each task's parents and project
+(a vector's own `world` replaces it). `plan`: a task and a parent, and the plan (`add`, `remove`,
+`project`) or the refusal. `selection`: several tasks and a parent, and the plans, `kept` and
+`refused`. `undo`: a plan and the project the task came from, and what Undo sends. `candidates`:
+tasks with their title and project (`done` and `hidden` when true), the writable projects, the tasks
+being attached and the search, and the ids offered in order; `candidates.children` the same for
+"Add existing task", with the parent instead of the tasks being attached.

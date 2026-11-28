@@ -90,8 +90,8 @@ export default async function run(h) {
     await h.wait(350)
     const items = await page.locator('[role="menu"] [role="menuitem"]').allTextContents()
     // The second of two subtasks can also move up (subtask order, contract section 19).
-    await h.assert('B: right-click offers Rename, Open subtask, Move up and Delete subtask', {
-      ok: JSON.stringify(items.map((s) => s.trim())) === JSON.stringify(['Rename', 'Open subtask', 'Move up', 'Delete subtask']),
+    await h.assert('B: right-click offers Rename, Open subtask, Move up, Remove from parent and Delete subtask', {
+      ok: JSON.stringify(items.map((s) => s.trim())) === JSON.stringify(['Rename', 'Open subtask', 'Move up', 'Remove from parent', 'Delete subtask']),
       detail: items.join(' | '),
     })
     await h.capture('subtask-menu')

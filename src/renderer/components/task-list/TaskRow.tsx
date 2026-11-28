@@ -2,7 +2,7 @@ import { forwardRef, memo, useState, useRef, useEffect, useCallback, useImperati
 import { useTranslation } from 'react-i18next'
 import { ListChecks, Bell, Repeat, Paperclip, AlignLeft, ChevronRight, MessageSquare, Flag } from 'lucide-react'
 import type { Editor } from '@tiptap/react'
-import { useDraggable } from '@dnd-kit/core'
+import { useDndContext, useDraggable, useDroppable } from '@dnd-kit/core'
 import { useSortable, defaultAnimateLayoutChanges } from '@dnd-kit/sortable'
 import type { AnimateLayoutChanges } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
@@ -160,6 +160,29 @@ function useDraggableRow(task: Task): DragBehavior {
     isDragging: draggable.isDragging,
     style: NO_STYLE,
   }
+}
+
+// Dropping a dragged task on the middle of a row makes it that row's subtask (cross-app semantics
+// 24.6); the top and bottom quarter still reorder. The target exists only while another task is
+// being dragged, so a list registers no extra droppables the rest of the time.
+function NestTarget({ task }: { task: Task }) {
+  const { active } = useDndContext()
+  const selected = useSelectionStore((s) => s.selectedTaskIds)
+  const data = active?.data.current as { type?: string; task?: Task } | undefined
+  if (data?.type !== 'task' || !data.task || task.done || task.id <= 0) return null
+  // Not the dragged row, nor another row of a dragged selection.
+  if (data.task.id === task.id || (selected.has(data.task.id) && selected.has(task.id))) return null
+  return <NestBand task={task} />
+}
+
+function NestBand({ task }: { task: Task }) {
+  const { setNodeRef, isOver } = useDroppable({ id: `nest-${task.id}`, data: { type: 'task-nest', task } })
+  return (
+    <>
+      <div ref={setNodeRef} aria-hidden="true" data-nest-target={task.id} className="pointer-events-none absolute inset-x-0 bottom-1/4 top-1/4" />
+      {isOver && <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-accent-blue/8 ring-2 ring-inset ring-accent-blue" />}
+    </>
+  )
 }
 
 interface TaskTitleEditorHandle {
@@ -766,7 +789,7 @@ function TaskRowInner({
         onPointerEnter={holdEngagement.onPointerEnter}
         onPointerLeave={holdEngagement.onPointerLeave}
         className={cn(
-          'vicu-task-fade group grid cursor-default grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-x-3 border-b border-[var(--border-color)] px-4 py-2.5 transition-colors hover:bg-[var(--bg-hover)]',
+          'vicu-task-fade group relative grid cursor-default grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-x-3 border-b border-[var(--border-color)] px-4 py-2.5 transition-colors hover:bg-[var(--bg-hover)]',
           isSelected && 'bg-bg-selected ring-1 ring-inset ring-accent-blue/40',
           isFocused && !isSelected && !isExpanded && 'bg-accent-blue/8 ring-1 ring-inset ring-accent-blue/30',
           isDragging && 'opacity-30',
@@ -836,6 +859,7 @@ function TaskRowInner({
         }}
         {...listeners}
       >
+        <NestTarget task={task} />
         {theirs ? (
           <PersonMark name={promiseName} color={promisePerson?.hex_color} expanded={verdictOpen} onClick={() => setVerdictOpen((open) => !open)} />
         ) : (

@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ArrowDown, ArrowUp, ArrowUpRight, GripVertical, Pencil, Trash2 } from 'lucide-react'
+import { ArrowDown, ArrowUp, ArrowUpRight, CornerLeftUp, GripVertical, ListPlus, Pencil, Trash2 } from 'lucide-react'
 import { DndContext, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core'
 import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
@@ -19,6 +19,8 @@ import { confirmTaskCompletion } from '@/lib/task-completion'
 import { useSelectionStore } from '@/stores/selection-store'
 import { Menu, MenuItem, MenuSeparator } from '../overlay/Menu'
 import { Tooltip } from '../overlay/Tooltip'
+import { SubtaskPickerPopover } from './SubtaskPickerPopover'
+import { useSubtaskAttach } from '@/hooks/use-subtask-attach'
 
 interface SubtaskListProps {
   parentTask: Task
@@ -59,6 +61,10 @@ export function SubtaskList({ parentTask, showInput = false }: SubtaskListProps)
   const deleteTask = useDeleteTask()
   const openSubtask = useSelectionStore((s) => s.openSubtask)
   const [newTitle, setNewTitle] = useState('')
+  // Cross-app semantics 24: an existing task put under this one, or a subtask taken out.
+  const subtaskAttach = useSubtaskAttach()
+  const [pickingExisting, setPickingExisting] = useState(false)
+  const existingRef = useRef<HTMLButtonElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
 
@@ -146,6 +152,7 @@ export function SubtaskList({ parentTask, showInput = false }: SubtaskListProps)
               onRename={(draft) => rename(st, draft)}
               onOpen={() => openSubtask(parentTask.id, st.id)}
               onDelete={(returnFocusTo) => void remove(st, returnFocusTo)}
+              onDetach={() => subtaskAttach.detach(st, parentTask.id)}
             />
           ))}
           </SortableContext>
@@ -179,6 +186,29 @@ export function SubtaskList({ parentTask, showInput = false }: SubtaskListProps)
             placeholder={t('task.subtask.addPlaceholder')}
             className="flex-1 bg-transparent text-xs text-[var(--text-primary)] placeholder:text-[var(--text-secondary)] focus:outline-none"
           />
+          <Tooltip label={t('task.attach.addExisting')}>
+            <button
+              ref={existingRef}
+              type="button"
+              aria-label={t('task.attach.addExistingNamed', { title: parentTask.title })}
+              aria-haspopup="dialog"
+              aria-expanded={pickingExisting}
+              onClick={() => setPickingExisting((open) => !open)}
+              className={ACTION_BUTTON}
+            >
+              <ListPlus className="h-3.5 w-3.5" aria-hidden="true" />
+            </button>
+          </Tooltip>
+          {pickingExisting && (
+            <SubtaskPickerPopover
+              anchorRef={existingRef}
+              placement="bottom-end"
+              mode="child"
+              parent={parentTask}
+              onPick={(task) => subtaskAttach.attach([task], parentTask)}
+              onClose={() => setPickingExisting(false)}
+            />
+          )}
         </div>
       )}
     </div>
@@ -194,13 +224,14 @@ interface SubtaskRowProps {
   onRename: (draft: string) => void
   onOpen: () => void
   onDelete: (returnFocusTo: HTMLElement | null) => void
+  onDetach: () => void
 }
 
 /**
  * One subtask in the open card: complete it, click the title to rename it in place, open it as its
  * own task, or delete it (the buttons at the end, or the right-click menu).
  */
-function SubtaskRow({ subtask: st, canMove, onMoveUp, onMoveDown, onComplete, onRename, onOpen, onDelete }: SubtaskRowProps) {
+function SubtaskRow({ subtask: st, canMove, onMoveUp, onMoveDown, onComplete, onRename, onOpen, onDelete, onDetach }: SubtaskRowProps) {
   const { t } = useTranslation()
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({ id: st.id, disabled: !canMove })
   const [editing, setEditing] = useState(false)
@@ -348,6 +379,7 @@ function SubtaskRow({ subtask: st, canMove, onMoveUp, onMoveDown, onComplete, on
           <MenuItem icon={<ArrowUpRight />} onSelect={onOpen}>{t('task.subtask.open')}</MenuItem>
           {canMove && onMoveUp && <MenuItem icon={<ArrowUp />} onSelect={onMoveUp}>{t('task.subtask.moveUp')}</MenuItem>}
           {canMove && onMoveDown && <MenuItem icon={<ArrowDown />} onSelect={onMoveDown}>{t('task.subtask.moveDown')}</MenuItem>}
+          <MenuItem icon={<CornerLeftUp />} onSelect={onDetach}>{t('task.attach.removeFromParent')}</MenuItem>
           <MenuSeparator />
           <MenuItem icon={<Trash2 />} danger onSelect={() => onDelete(titleRef.current)}>{t('task.subtask.delete')}</MenuItem>
         </Menu>

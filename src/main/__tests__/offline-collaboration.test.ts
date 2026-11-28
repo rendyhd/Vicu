@@ -116,6 +116,12 @@ describe('parsing and summaries', () => {
     expect(describeAction(editComment(5, 9, '<p>a</p>'))).toBe('Edit a comment on task #5')
     expect(describeAction(deleteComment(5, 9))).toBe('Delete a comment on task #5')
   })
+  it('names a relation by its kind (cross-app semantics 24)', () => {
+    const relation = { id: nextId(), createdAt: T0, attempts: 0, taskId: 5, otherTaskId: 6, title: 'Trip' }
+    expect(describeAction({ ...relation, type: 'add-relation', kind: 'subtask' })).toBe('Add a subtask to "Trip"')
+    expect(describeAction({ ...relation, type: 'remove-relation', kind: 'subtask' })).toBe('Remove a subtask from "Trip"')
+    expect(describeAction({ ...relation, type: 'add-relation', kind: 'blocked' })).toBe('Set what "Trip" waits on')
+  })
 })
 
 describe('replay failures', () => {

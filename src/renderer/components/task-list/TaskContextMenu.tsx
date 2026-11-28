@@ -12,6 +12,8 @@ import {
   CheckCircle2,
   Copy,
   CopyPlus,
+  CornerDownRight,
+  CornerLeftUp,
   FileText,
   FlagOff,
   Folder,
@@ -39,6 +41,8 @@ import { resolveSelectedTasks } from '@/lib/task-selection'
 import type { Task } from '@/lib/vikunja-types'
 import { DatePickerPopover } from './DatePickerPopover'
 import { ProjectPickerPopover } from './ProjectPickerPopover'
+import { SubtaskPickerPopover } from './SubtaskPickerPopover'
+import { parentIdOf, useSubtaskAttach } from '@/hooks/use-subtask-attach'
 import { BulkAssignPopover } from './BulkAssignPopover'
 import { useProjectAccessMap } from '@/hooks/use-project-access'
 import { canAssignSelection } from '@/lib/bulk-assign'
@@ -68,7 +72,7 @@ interface TaskContextMenuProps {
   onClose: () => void
 }
 
-type SubMenu = 'postpone' | 'date' | 'project' | 'label' | 'assign' | null
+type SubMenu = 'postpone' | 'date' | 'project' | 'label' | 'assign' | 'parent' | null
 
 export function TaskContextMenu({ fallbackTask, x, y, reorderable = false, onClose }: TaskContextMenuProps) {
   const scheduleRef = useRef<HTMLButtonElement>(null)
@@ -76,6 +80,8 @@ export function TaskContextMenu({ fallbackTask, x, y, reorderable = false, onClo
   const whenChoices = useWhenChoices()
   const { t } = useTranslation()
   const projectRef = useRef<HTMLButtonElement>(null)
+  const parentRef = useRef<HTMLButtonElement>(null)
+  const subtaskAttach = useSubtaskAttach()
   const assignRef = useRef<HTMLButtonElement>(null)
   const access = useProjectAccessMap()
   const labelRef = useRef<HTMLButtonElement>(null)
@@ -154,6 +160,8 @@ export function TaskContextMenu({ fallbackTask, x, y, reorderable = false, onClo
   // The assistant's "Break into steps" (docs/ai-assistant-v1.md section 4): one saved task.
   const ai = useAiReady()
   const canBreak = ai.dictation && !multi && fallbackTask.id > 0 && !fallbackTask.done
+  // Cross-app semantics 24: under another task, or out of the one it is under.
+  const currentParent = multi ? null : parentIdOf(fallbackTask)
 
   return (
     <Menu
@@ -314,6 +322,29 @@ export function TaskContextMenu({ fallbackTask, x, y, reorderable = false, onClo
           }}
           onClose={closeSubAndMenu}
         />
+      )}
+      <MenuItem
+        ref={parentRef}
+        icon={<CornerDownRight />}
+        popup="dialog"
+        expanded={sub === 'parent'}
+        onSelect={() => setSub((s) => (s === 'parent' ? null : 'parent'))}
+      >
+        {t('task.attach.makeSubtaskOf')}
+      </MenuItem>
+      {sub === 'parent' && (
+        <SubtaskPickerPopover
+          anchorRef={parentRef}
+          mode="parent"
+          tasks={tasks}
+          onPick={(parent) => subtaskAttach.attach(tasks, parent)}
+          onClose={closeSubAndMenu}
+        />
+      )}
+      {currentParent !== null && (
+        <MenuItem icon={<CornerLeftUp />} onSelect={() => subtaskAttach.detach(fallbackTask, currentParent)}>
+          {t('task.attach.removeFromParent')}
+        </MenuItem>
       )}
 
       {canAssign && (

@@ -1,3 +1,6 @@
+import { useDndContext } from '@dnd-kit/core'
+import { useTranslation } from 'react-i18next'
+import { CornerDownRight } from 'lucide-react'
 import type { Task } from '@/lib/vikunja-types'
 
 interface TaskDragOverlayProps {
@@ -7,7 +10,12 @@ interface TaskDragOverlayProps {
 }
 
 export function TaskDragOverlay({ task, count = 1 }: TaskDragOverlayProps) {
+  const { t } = useTranslation()
   const multi = count > 1
+  // Over the middle of another row (cross-app semantics 24.6): the chip says whose subtask it becomes.
+  const { over } = useDndContext()
+  const overData = over?.data.current as { type?: string; task?: Task } | undefined
+  const nestInto = overData?.type === 'task-nest' ? overData.task : undefined
   return (
     <div className="relative w-fit max-w-[min(100%,20rem)]">
       {multi && (
@@ -25,6 +33,12 @@ export function TaskDragOverlay({ task, count = 1 }: TaskDragOverlayProps) {
           </span>
         )}
       </div>
+      {nestInto && (
+        <div data-drop-hint="nest" className="vicu-lift relative mt-1 flex w-fit max-w-full items-center gap-1.5 rounded-chip border border-[var(--accent-blue)] bg-[var(--bg-primary)] px-2 py-0.5 text-caption text-text shadow-md">
+          <CornerDownRight className="h-3 w-3 shrink-0 text-accent-blue" aria-hidden="true" />
+          <span className="truncate">{t('task.attach.dropOnto', { title: nestInto.title })}</span>
+        </div>
+      )}
     </div>
   )
 }

@@ -126,6 +126,9 @@ export interface ElectronAPI {
   /** Pro's "after": `taskId` waits on `otherTaskId` (a `blocked` relation), queued offline. */
   addAfter(taskId: number, otherTaskId: number, options?: TaskWriteOptions): Promise<ApiResult<unknown> | QueuedWriteReply>
   removeAfter(taskId: number, otherTaskId: number, options?: TaskWriteOptions): Promise<ApiResult<unknown> | QueuedWriteReply>
+  /** `taskId` becomes a subtask of `parentId` (a `subtask` relation on the parent), queued offline. */
+  attachSubtask(parentId: number, taskId: number, options?: TaskWriteOptions): Promise<ApiResult<unknown> | QueuedWriteReply>
+  detachSubtask(parentId: number, taskId: number, options?: TaskWriteOptions): Promise<ApiResult<unknown> | QueuedWriteReply>
   addTaskAssignee(taskId: number, userId: number, options?: TaskWriteOptions): Promise<ApiResult<unknown> | QueuedWriteReply>
   removeTaskAssignee(taskId: number, userId: number, options?: TaskWriteOptions): Promise<ApiResult<void> | QueuedWriteReply>
   /** A page of the thread, newest first, with queued comment changes laid over it. */

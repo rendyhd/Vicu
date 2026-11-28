@@ -82,6 +82,9 @@ export function createApi(bridge: ApiBridge) {
   // Pro's "after" (blocked by), through the write gate and the offline queue.
   addAfter: (taskId: number, otherTaskId: number, options?: TaskWriteOptions) => invoke('pro:add-after', taskId, otherTaskId, options),
   removeAfter: (taskId: number, otherTaskId: number, options?: TaskWriteOptions) => invoke('pro:remove-after', taskId, otherTaskId, options),
+  // An existing task made a subtask, or taken out (cross-app semantics 24): the parent first.
+  attachSubtask: (parentId: number, taskId: number, options?: TaskWriteOptions) => invoke('attach-subtask', parentId, taskId, options),
+  detachSubtask: (parentId: number, taskId: number, options?: TaskWriteOptions) => invoke('detach-subtask', parentId, taskId, options),
   addTaskAssignee: (taskId: number, userId: number, options?: TaskWriteOptions) =>
     invoke('add-task-assignee', taskId, userId, options),
   removeTaskAssignee: (taskId: number, userId: number, options?: TaskWriteOptions) =>
