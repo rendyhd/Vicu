@@ -163,6 +163,12 @@ export const api = {
   removeAfter: (taskId: number, otherTaskId: number, taskTitle?: string) =>
     window.api.removeAfter(taskId, otherTaskId, queueOptions(taskTitle)) as Promise<ApiResult<unknown> | QueuedWriteReply>,
 
+  /** Cross-app semantics 24: `taskId` becomes (or stops being) a subtask of `parentId`; queued offline. */
+  attachSubtask: (parentId: number, taskId: number, parentTitle?: string) =>
+    window.api.attachSubtask(parentId, taskId, queueOptions(parentTitle)) as Promise<ApiResult<unknown> | QueuedWriteReply>,
+  detachSubtask: (parentId: number, taskId: number, parentTitle?: string) =>
+    window.api.detachSubtask(parentId, taskId, queueOptions(parentTitle)) as Promise<ApiResult<unknown> | QueuedWriteReply>,
+
   addTaskAssigneeOrQueue: (taskId: number, user: PersonRef, taskTitle?: string) =>
     window.api.addTaskAssignee(taskId, user.id, { ...queueOptions(taskTitle), username: user.username }) as Promise<
       ApiResult<unknown> | QueuedWriteReply

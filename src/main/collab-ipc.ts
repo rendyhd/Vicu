@@ -160,37 +160,36 @@ export function registerCollaborationIpc(handle: Handle, deps: CollabDeps): void
     return taskWriteReply(await writeTask(deps, spec, { queue })) as ApiResult<unknown> | QueuedWriteReply
   })
 
-  // --- Pro's "after" (cross-app semantics 21.2, decision 24): a blocked-by relation through the
-  // write gate, queued offline. Subtask relations keep `create-task-relation`, which is not queued.
+  // --- Relations through the write gate, queued offline: Pro's "after" (cross-app semantics 21.2,
+  // decision 24) is a `blocked` relation, a subtask attached or removed (section 24) a `subtask`
+  // relation on the parent. A new subtask's own relation still goes through `create-task-relation`.
 
-  handle('pro:add-after', async (_event, taskId: unknown, otherTaskId: unknown, options?: unknown) => {
+  const changeRelation = async (add: boolean, kind: 'blocked' | 'subtask', taskId: unknown, otherTaskId: unknown, options?: unknown) => {
     if (!isId(taskId) || !isId(otherTaskId) || taskId === otherTaskId) return invalid('relation')
     const { queue, title } = parseTaskWriteOptions(options)
     const deps = writeDeps()
     const self = taskIdFor(deps.queue, taskId)
     const other = taskIdFor(deps.queue, otherTaskId)
-    const spec = taskWrites.addRelation(deps.queue, { createTaskRelation }, self, other, 'blocked', title)
+    const spec = add
+      ? taskWrites.addRelation(deps.queue, { createTaskRelation }, self, other, kind, title)
+      : taskWrites.removeRelation(deps.queue, { deleteTaskRelation }, self, other, kind, title)
     // A task that exists only offline cannot be related on the server yet: straight to the queue.
     if (self < 0 || other < 0) {
       await spec.enqueue()
       return { success: true as const, data: null, queued: true }
     }
     return taskWriteReply(await writeTask(deps, spec, { queue })) as ApiResult<unknown> | QueuedWriteReply
-  })
+  }
 
-  handle('pro:remove-after', async (_event, taskId: unknown, otherTaskId: unknown, options?: unknown) => {
-    if (!isId(taskId) || !isId(otherTaskId)) return invalid('relation')
-    const { queue, title } = parseTaskWriteOptions(options)
-    const deps = writeDeps()
-    const self = taskIdFor(deps.queue, taskId)
-    const other = taskIdFor(deps.queue, otherTaskId)
-    const spec = taskWrites.removeRelation(deps.queue, { deleteTaskRelation }, self, other, 'blocked', title)
-    if (self < 0 || other < 0) {
-      await spec.enqueue()
-      return { success: true as const, data: null, queued: true }
-    }
-    return taskWriteReply(await writeTask(deps, spec, { queue })) as ApiResult<unknown> | QueuedWriteReply
-  })
+  handle('pro:add-after', (_event, taskId: unknown, otherTaskId: unknown, options?: unknown) =>
+    changeRelation(true, 'blocked', taskId, otherTaskId, options))
+  handle('pro:remove-after', (_event, taskId: unknown, otherTaskId: unknown, options?: unknown) =>
+    changeRelation(false, 'blocked', taskId, otherTaskId, options))
+  // The parent first, then the task that is (or stops being) its subtask.
+  handle('attach-subtask', (_event, parentId: unknown, taskId: unknown, options?: unknown) =>
+    changeRelation(true, 'subtask', parentId, taskId, options))
+  handle('detach-subtask', (_event, parentId: unknown, taskId: unknown, options?: unknown) =>
+    changeRelation(false, 'subtask', parentId, taskId, options))
 
   // --- Comments ---
 

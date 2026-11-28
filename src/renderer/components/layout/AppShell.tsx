@@ -14,6 +14,7 @@ import type { CollisionDetection, DragStartEvent, DragEndEvent, DragMoveEvent } 
 import { useSidebarStore } from '@/stores/sidebar-store'
 import { useSelectionStore } from '@/stores/selection-store'
 import { useUpdateTask, useReorderTask, useReorderProject, useAddLabel, applyReorderToCache } from '@/hooks/use-task-mutations'
+import { useSubtaskAttach } from '@/hooks/use-subtask-attach'
 import { ProjectActionsContext, useProjectActions } from '@/hooks/use-project-actions'
 import { dropZone } from '@/lib/project-moves'
 import { projectDropMove } from '@/lib/project-category-moves'
@@ -200,6 +201,7 @@ export function AppShell() {
   const reorderProject = useReorderProject()
   const projectActionsApi = useProjectActions()
   const addLabel = useAddLabel()
+  const subtaskAttach = useSubtaskAttach()
   // Another device's synced settings (the Inbox, the task order) arrive here.
   useSyncedPrefsEvents()
   // The account's week start, for every week this window computes (contract section 2.1).
@@ -362,6 +364,11 @@ export function AppShell() {
       const planDrop = pointerCollisions.find((c) => c.data?.droppableContainer?.data?.current?.type === 'plan-drop')
       if (planDrop) return [planDrop]
 
+      // The middle of another row makes the task its subtask (cross-app semantics 24.6); the row's
+      // own droppable around it still reorders.
+      const nestDrop = pointerCollisions.find((c) => c.data?.droppableContainer?.data?.current?.type === 'task-nest')
+      if (nestDrop) return [nestDrop]
+
       // A row, section header or section end goes by the pointer too: the overlay is drawn beside it,
       // so its box says nothing about where the task is going.
       const notPlan = (c: { data?: { droppableContainer?: { data?: { current?: { type?: unknown } } } } }) =>
@@ -467,7 +474,11 @@ export function AppShell() {
         }
         const leavesFor = (projectId: number) => dragTasks.some((t) => t.project_id !== projectId)
 
-        if (overData?.type === 'plan-drop') {
+        if (overData?.type === 'task-nest') {
+          // Dropped on the middle of a row: under that task (cross-app semantics 24).
+          landOnTarget()
+          subtaskAttach.attach(dragTasks, overData.task as Task)
+        } else if (overData?.type === 'plan-drop') {
           dropLanding.current = { into: null }
           ;(overData.drop as (tasks: Task[]) => void)(dragTasks)
           clearIfMulti()
@@ -675,7 +686,7 @@ export function AppShell() {
 
       setDragItem(null)
     },
-    [dragItem, updateTask, reorderTask, reorderProject, addLabel, queryClient, projectActionsApi]
+    [dragItem, updateTask, reorderTask, reorderProject, addLabel, subtaskAttach, queryClient, projectActionsApi]
   )
 
   useEffect(() => {

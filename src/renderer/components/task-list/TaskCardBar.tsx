@@ -1,6 +1,6 @@
 import { Fragment, useRef, type ReactNode, type RefObject } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Calendar, Bell, Repeat, Paperclip, ListChecks, FolderOpen, MoreHorizontal, Info, CopyPlus, FileText, Trash2, Plus, MessageSquare } from 'lucide-react'
+import { Calendar, Bell, Repeat, Paperclip, ListChecks, FolderOpen, MoreHorizontal, Info, CopyPlus, CornerDownRight, CornerLeftUp, FileText, Trash2, Plus, MessageSquare } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { isNullDate } from '@/lib/date-utils'
 import { labelChipSolidStyle } from '@/lib/label-style'
@@ -32,6 +32,8 @@ import { RecurrencePickerPopover } from './RecurrencePickerPopover'
 import { AttachmentPickerPopover } from './AttachmentPickerPopover'
 import { ProjectPickerPopover } from './ProjectPickerPopover'
 import { InfoPopover } from './InfoPopover'
+import { SubtaskPickerPopover } from './SubtaskPickerPopover'
+import { parentIdOf, useSubtaskAttach } from '@/hooks/use-subtask-attach'
 import { AssignPopover } from './AssignPopover'
 import { AvatarStack } from '../shared/Avatar'
 import { ProCardChips } from '../pro/ProCardChips'
@@ -51,6 +53,7 @@ export type CardPopover =
   | 'assign'
   | 'more'
   | 'info'
+  | 'parent'
   | null
 
 type OpenPopover = Exclude<CardPopover, null>
@@ -171,6 +174,8 @@ export function TaskCardBar({
   const { reminderFor } = useLocationReminders()
   const duplicate = useDuplicateTasks()
   const templateActions = useTemplateActions()
+  const subtaskAttach = useSubtaskAttach()
+  const currentParent = parentIdOf(task)
   const dateRef = useRef<HTMLButtonElement>(null)
   const priorityRef = useRef<HTMLButtonElement>(null)
   const labelRef = useRef<HTMLButtonElement>(null)
@@ -351,7 +356,7 @@ export function TaskCardBar({
 
       <div className="ml-auto flex items-center gap-1">
         {collab && <CommentsButton taskId={task.id} count={commentCount} unread={shared && !!task.is_unread} open={collab.commentsOpen} onClick={collab.onToggleComments} />}
-        <PropertyButton prop="more" name={t('task.card.more')} isSet={false} open={is('more') || is('info')} haspopup="menu" buttonRef={moreRef} onClick={() => onToggle('more')} iconOnly icon={<MoreHorizontal className="h-4 w-4" aria-hidden="true" />} />
+        <PropertyButton prop="more" name={t('task.card.more')} isSet={false} open={is('more') || is('info') || is('parent')} haspopup="menu" buttonRef={moreRef} onClick={() => onToggle('more')} iconOnly icon={<MoreHorizontal className="h-4 w-4" aria-hidden="true" />} />
       </div>
       {is('more') && (
         <Popover anchorRef={moreRef} onClose={onClose} label={t('task.card.more')} role="menu" placement="bottom-end" className="w-44 p-1">
@@ -376,12 +381,29 @@ export function TaskCardBar({
           >
             {t('task.card.saveAsTemplate')}
           </MenuItem>
+          <MenuItem icon={<CornerDownRight className="h-3.5 w-3.5" aria-hidden="true" />} onSelect={() => onOpen('parent')}>
+            {t('task.attach.makeSubtaskOf')}
+          </MenuItem>
+          {currentParent !== null && (
+            <MenuItem
+              icon={<CornerLeftUp className="h-3.5 w-3.5" aria-hidden="true" />}
+              onSelect={() => {
+                onClose()
+                subtaskAttach.detach(task, currentParent)
+              }}
+            >
+              {t('task.attach.removeFromParent')}
+            </MenuItem>
+          )}
           <MenuItem icon={<Trash2 className="h-3.5 w-3.5" aria-hidden="true" />} danger onSelect={onDelete}>
             {t('task.card.deleteTask')}
           </MenuItem>
         </Popover>
       )}
       {is('info') && <InfoPopover anchorRef={moreRef} task={task} onClose={onClose} />}
+      {is('parent') && (
+        <SubtaskPickerPopover anchorRef={moreRef} placement="bottom-end" mode="parent" tasks={[task]} onPick={(parent) => subtaskAttach.attach([task], parent)} onClose={onClose} />
+      )}
     </div>
   )
 }

@@ -89,8 +89,8 @@ export default async function run(h) {
     await card().getByRole('button', { name: `Rename ${two.title}` }).click({ button: 'right' })
     await h.wait(350)
     const items = await page.locator('[role="menu"] [role="menuitem"]').allTextContents()
-    await h.assert('B: right-click offers Rename, Open subtask and Delete subtask', {
-      ok: JSON.stringify(items.map((s) => s.trim())) === JSON.stringify(['Rename', 'Open subtask', 'Delete subtask']),
+    await h.assert('B: right-click offers Rename, Open subtask, Move up, Remove from parent and Delete subtask', {
+      ok: JSON.stringify(items.map((s) => s.trim())) === JSON.stringify(['Rename', 'Open subtask', 'Move up', 'Remove from parent', 'Delete subtask']),
       detail: items.join(' | '),
     })
     await h.capture('subtask-menu')

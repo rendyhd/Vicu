@@ -6927,5 +6927,63 @@
       { "name": "across a daylight saving change the clock time is kept", "due": "2026-10-30T09:00:00", "today": "2026-10-20", "step": "3d", "expect": "2026-11-02T09:00:00" },
       { "name": "two weeks across a daylight saving change", "due": "2026-03-20T09:00:00", "today": "2026-03-01", "step": "2w", "expect": "2026-04-03T09:00:00" }
     ]
+  },
+  "subtaskAttach": {
+    "about": "Section 24. world: each task's parents (task id to parent ids) and project (task id to project id); a vector's own world replaces it. plan: a task and a parent, and the plan (add: the parent to add or null, remove: the parents to remove, project: the project to move to or null) or the refusal. selection: tasks and a parent, and the plans in order, kept and refused. undo: a plan and the project the task came from, and what Undo sends. candidates: tasks (done and hidden when true), the writable projects, the tasks being attached and the search, and the ids offered in order.",
+    "world": {
+      "parents": { "2": [1], "3": [2], "5": [4], "8": [1, 4] },
+      "projects": { "1": 10, "2": 10, "3": 10, "4": 20, "5": 20, "6": 10, "7": 30, "8": 10 }
+    },
+    "plan": [
+      { "name": "a task without a parent goes under a task of its project", "task": 6, "parent": 1, "expect": { "add": 1, "remove": [], "project": null } },
+      { "name": "a task of another project moves to the parent's project", "task": 7, "parent": 1, "expect": { "add": 1, "remove": [], "project": 10 } },
+      { "name": "a new parent replaces the old one", "task": 5, "parent": 1, "expect": { "add": 1, "remove": [4], "project": 10 } },
+      { "name": "a parent among several stays and the others go", "task": 8, "parent": 1, "expect": { "add": null, "remove": [4], "project": null } },
+      { "name": "an unknown parent's project leaves the task where it is", "task": 6, "parent": 99, "expect": { "add": 99, "remove": [], "project": null } },
+      { "name": "the task itself", "task": 1, "parent": 1, "expect": { "refusal": "self" } },
+      { "name": "already its only parent", "task": 2, "parent": 1, "expect": { "refusal": "already" } },
+      { "name": "under its own subtask is a loop", "task": 1, "parent": 2, "expect": { "refusal": "cycle" } },
+      { "name": "under a subtask further down is a loop", "task": 1, "parent": 3, "expect": { "refusal": "cycle" } },
+      { "name": "a loop in the data ends the walk", "world": { "parents": { "11": [12], "12": [11] }, "projects": { "11": 10, "12": 10, "13": 10 } }, "task": 13, "parent": 11, "expect": { "add": 11, "remove": [], "project": null } }
+    ],
+    "selection": [
+      { "name": "each goes under the parent", "tasks": [6, 7], "parent": 1, "expect": { "plans": [{ "task": 6, "add": 1, "remove": [], "project": null }, { "task": 7, "add": 1, "remove": [], "project": 10 }], "kept": [], "refused": [] } },
+      { "name": "a task below another selected task goes along with it", "tasks": [2, 3], "parent": 6, "expect": { "plans": [{ "task": 2, "add": 6, "remove": [1], "project": null }], "kept": [3], "refused": [] } },
+      { "name": "a refused task is skipped and the others go", "tasks": [1, 6], "parent": 1, "expect": { "plans": [{ "task": 6, "add": 1, "remove": [], "project": null }], "kept": [], "refused": [{ "task": 1, "refusal": "self" }] } },
+      { "name": "a parent below the selection is refused", "tasks": [2, 1], "parent": 3, "expect": { "plans": [], "kept": [2], "refused": [{ "task": 1, "refusal": "cycle" }] } }
+    ],
+    "undo": [
+      { "name": "back to the old parent and project", "plan": { "task": 5, "add": 1, "remove": [4], "project": 10 }, "fromProject": 20, "expect": { "remove": 1, "add": [4], "project": 20 } },
+      { "name": "a parent that was there stays", "plan": { "task": 8, "add": null, "remove": [4], "project": null }, "fromProject": 10, "expect": { "remove": null, "add": [4], "project": null } }
+    ],
+    "candidates": {
+      "tasks": [
+        { "id": 1, "title": "Plan trip", "project": 10 },
+        { "id": 2, "title": "Book flights", "project": 10 },
+        { "id": 3, "title": "Pick seats", "project": 10 },
+        { "id": 4, "title": "Trip budget", "project": 20 },
+        { "id": 5, "title": "Flights refund", "project": 20 },
+        { "id": 6, "title": "Pack", "project": 10 },
+        { "id": 7, "title": "Read", "project": 30 },
+        { "id": 9, "title": "Old trip task", "project": 10, "done": true },
+        { "id": 10, "title": "Trip carrier", "project": 10, "hidden": true },
+        { "id": 14, "title": "Trip notes", "project": 40 }
+      ],
+      "writable": [10, 20, 30],
+      "vectors": [
+        { "name": "nothing typed offers the task's own project", "attaching": [6], "search": "", "expect": [1, 2, 3] },
+        { "name": "a search looks everywhere, the task's project first", "attaching": [7], "search": "trip", "expect": [1, 4] },
+        { "name": "not the task or anything below it", "attaching": [1], "search": "", "expect": [6] },
+        { "name": "not its only parent", "attaching": [2], "search": "", "expect": [6] },
+        { "name": "matching ignores case", "attaching": [6], "search": "FLIGHTS", "expect": [2, 5] },
+        { "name": "a parent of only some of the tasks is offered", "attaching": [2, 6], "search": "", "expect": [1] }
+      ],
+      "children": [
+        { "name": "nothing typed offers the parent's project", "parent": 6, "search": "", "expect": [1, 2, 3] },
+        { "name": "not the parent or anything above it", "parent": 3, "search": "", "expect": [6] },
+        { "name": "not a task whose only parent it is already", "parent": 1, "search": "", "expect": [3, 6] },
+        { "name": "a search looks everywhere, the parent's project first", "parent": 4, "search": "flights", "expect": [2] }
+      ]
+    }
   }
 }

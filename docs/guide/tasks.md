@@ -116,7 +116,20 @@ HEIC and TIFF images open in your default app instead.
 
 ## Subtasks and checklists
 
-Add subtasks in the task card. Add several in a row. Click a subtask's title to rename it. Right-click it for **Rename**, **Open subtask** and **Delete subtask**. **Open subtask** opens it as its own card. Deleting asks whether to delete nested subtasks too, when you have confirmation on.
+Add subtasks in the task card. Add several in a row. Click a subtask's title to rename it. Right-click it for **Rename**, **Open subtask**, **Remove from parent** and **Delete subtask**. **Open subtask** opens it as its own card. Deleting asks whether to delete nested subtasks too, when you have confirmation on.
+
+### Make an existing task a subtask
+
+A task you already have can go under another task:
+
+- **Make subtask of...** in a task's menu (right-click a task, or several selected tasks) or in the card's **More** menu. Pick the parent from the tasks of the same project, or type to find a task in any project.
+- **Add existing task**, the button at the end of the card's subtask field, does the same the other way round: pick a task to put under this one.
+- On the desktop, drag a task onto the middle of another task. The task under the pointer is outlined and the dragged task says whose subtask it becomes. Drop it on the top or bottom edge of a task to reorder instead.
+- On a phone, **Make subtask of...** is in a task's menu.
+
+A task has one parent: moving it under a new parent takes it out of the old one. When the parent is in another project, the task moves to that project too. Its own subtasks go with it. A task cannot go under one of its own subtasks. **Undo** in the message puts everything back.
+
+**Remove from parent** in a subtask's menu, or in the task menu of a task that has a parent, makes it a task of its own again in the same project.
 
 On the desktop, **Settings, General, Subtasks in task lists** chooses whether subtasks show **Inside task** or are **Expandable** in lists.
 
