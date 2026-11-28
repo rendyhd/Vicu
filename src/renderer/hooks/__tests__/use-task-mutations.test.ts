@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   completeTaskRequest,
+  keepReopenedRow,
   uncompleteTaskRequest,
   updateProjectRequest,
   updateTaskRequest,
@@ -9,6 +10,8 @@ import {
 import { PROJECT_WRITABLE_FIELDS } from '@/lib/merge-patches'
 import { NULL_DATE } from '@/lib/constants'
 import { useOfflineStore } from '@/stores/offline-store'
+import { useCompletedTasksStore } from '@/stores/completed-tasks-store'
+import { mergeProjectUndoWindow } from '@/lib/undo-window'
 import type { Project, Task } from '@/lib/vikunja-types'
 
 function task(id: number, overrides: Partial<Task> = {}): Task {
@@ -223,6 +226,43 @@ describe('uncompleteTaskRequest', () => {
       [10, { done: false }],
       [11, { done: true }],
     ])
+  })
+})
+
+// rendyhd/Vicu#76: a done subtask reopened from its parent's card, or from its row opened under the
+// parent, showed twice: under the parent and again as a top-level task of the project.
+describe('keepReopenedRow', () => {
+  const path = '/project/7'
+  const parent = task(20)
+  const subtask = task(21, { done: true, related_tasks: { parenttask: [parent] } } as Partial<Task>)
+
+  afterEach(() => {
+    useCompletedTasksStore.getState().clear()
+  })
+
+  it('keeps a reopened nested subtask under its parent, not as a top-level row', () => {
+    keepReopenedRow(subtask, path, true, false)
+
+    const list = mergeProjectUndoWindow([parent], useCompletedTasksStore.getState().tasks, path, 7)
+    expect(list.map((t) => t.id)).toEqual([20])
+    expect(useCompletedTasksStore.getState().tasks.get(21)?.task.done).toBe(false)
+  })
+
+  it('still brings back a top-level task reopened from another list until the view is left', () => {
+    keepReopenedRow(task(22, { done: true }), path, false, false)
+
+    const list = mergeProjectUndoWindow([parent], useCompletedTasksStore.getState().tasks, path, 7)
+    expect(list.map((t) => t.id).sort()).toEqual([20, 22])
+  })
+
+  it('turns a held row open where it is, keeping how it was held', () => {
+    useCompletedTasksStore.getState().add({ ...subtask }, path, undefined, true)
+
+    keepReopenedRow(subtask, path, false, true)
+
+    const entry = useCompletedTasksStore.getState().tasks.get(21)
+    expect(entry?.task.done).toBe(false)
+    expect(entry?.suppressTopLevelUndo).toBe(true)
   })
 })
 

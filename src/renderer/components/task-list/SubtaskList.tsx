@@ -9,7 +9,7 @@ import { useSyncedPrefs, writeSyncedPrefs } from '@/hooks/use-synced-prefs'
 import { isTempTaskId } from '@/lib/pending-cache'
 import { movedId, readSubtaskOrder, sortSubtasks, subtaskOrderKey } from '../../../shared/subtask-order'
 import { useSubtasks } from '@/hooks/use-subtasks'
-import { useCreateSubtask, useCompleteTask, useDeleteTask, useUpdateTask } from '@/hooks/use-task-mutations'
+import { useCreateSubtask, useCompleteTask, useDeleteTask, useUncompleteTask, useUpdateTask } from '@/hooks/use-task-mutations'
 import { api } from '@/lib/api'
 import { cn } from '@/lib/cn'
 import { confirmDelete } from '@/lib/confirm-bridge'
@@ -54,6 +54,7 @@ export function SubtaskList({ parentTask, showInput = false }: SubtaskListProps)
   }
   const createSubtask = useCreateSubtask()
   const completeTask = useCompleteTask()
+  const uncompleteTask = useUncompleteTask()
   const updateTask = useUpdateTask()
   const deleteTask = useDeleteTask()
   const openSubtask = useSelectionStore((s) => s.openSubtask)
@@ -136,7 +137,9 @@ export function SubtaskList({ parentTask, showInput = false }: SubtaskListProps)
               onMoveUp={index > 0 ? () => moveBy(st.id, -1) : undefined}
               onMoveDown={index < subtasks.length - 1 ? () => moveBy(st.id, 1) : undefined}
               onComplete={async () => {
-                if (!st.done && await confirmTaskCompletion(st)) {
+                // A done subtask reopens here, under its parent: never as a top-level row (rendyhd/Vicu#76).
+                if (st.done) uncompleteTask.mutate({ task: st, suppressTopLevelUndo: true })
+                else if (await confirmTaskCompletion(st)) {
                   completeTask.mutate({ task: st, suppressTopLevelUndo: true })
                 }
               }}

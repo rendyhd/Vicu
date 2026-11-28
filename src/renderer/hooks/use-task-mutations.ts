@@ -879,24 +879,50 @@ export function useCompleteTask() {
   })
 }
 
+/**
+ * What a reopen is given: the task, or the task with `suppressTopLevelUndo` when the checkbox is on a
+ * nested row (the same flag a completion from that row carries).
+ */
+export type ReopenInput = Task | { task: Task; suppressTopLevelUndo?: boolean }
+
+function reopenInput(input: ReopenInput): { task: Task; suppressTopLevelUndo: boolean } {
+  return 'task' in input
+    ? { task: input.task, suppressTopLevelUndo: input.suppressTopLevelUndo === true }
+    : { task: input, suppressTopLevelUndo: false }
+}
+
+/**
+ * Keep a reopened task on screen until the view is left: a held row turns open where it is; any other
+ * gets an entry in the completed-tasks store, which the lists merge back in. A nested row's entry is
+ * marked `suppressTopLevelUndo`, so it stays under its parent and is not drawn as a top-level row as
+ * well (rendyhd/Vicu#76).
+ */
+export function keepReopenedRow(task: Task, path: string, suppressTopLevelUndo: boolean, wasInStore: boolean): void {
+  const store = useCompletedTasksStore.getState()
+  if (wasInStore) store.update(task.id, { done: false })
+  else store.add({ ...task, done: false }, path, undefined, suppressTopLevelUndo)
+}
+
 export function useUncompleteTask() {
   const qc = useQueryClient()
   const router = useRouter()
-  const addToStore = useCompletedTasksStore((s) => s.add)
   const updateCompleted = useCompletedTasksStore((s) => s.update)
   const removeCompleted = useCompletedTasksStore((s) => s.remove)
 
   return useMutation({
     meta: metaFor('reopen the task'),
-    mutationFn: async (task: Task) => {
+    mutationFn: async (input: ReopenInput) => {
+      const { task } = reopenInput(input)
       const autoCompleted = useCompletedTasksStore.getState().tasks
         .get(task.id)?.autoCompletedSubtasks ?? []
       return uncompleteTaskRequest(task, autoCompleted)
     },
-    onMutate: async (task) => {
+    onMutate: async (input) => {
+      const { task, suppressTopLevelUndo } = reopenInput(input)
       // If task was recently completed (in store), update to done:false.
       // Otherwise (e.g. logbook uncomplete), add a new store entry so it
-      // stays visible without strikethrough until navigation.
+      // stays visible without strikethrough until navigation. A nested row (a subtask in its parent's
+      // card or opened under its parent) says so: its entry must not come back as a top-level row too.
       const wasInStore = useCompletedTasksStore.getState().tasks.has(task.id)
       const autoCompleted = useCompletedTasksStore.getState().tasks
         .get(task.id)?.autoCompletedSubtasks ?? []
@@ -906,11 +932,7 @@ export function useUncompleteTask() {
         [task.id, false],
         ...autoCompleted.map((child) => [child.id, false] as const),
       ])
-      if (wasInStore) {
-        updateCompleted(task.id, { done: false })
-      } else {
-        addToStore({ ...task, done: false }, currentPathname(router))
-      }
+      keepReopenedRow(task, currentPathname(router), suppressTopLevelUndo, wasInStore)
 
       await qc.cancelQueries({ queryKey: ['tasks'] })
       await qc.cancelQueries({ queryKey: ['view-tasks'] })
@@ -938,7 +960,8 @@ export function useUncompleteTask() {
 
       return { previousTaskQueries, previousViewQueries, previousSectionQueries, previousTaskDetailQueries, wasInStore }
     },
-    onError: (_err, task, context) => {
+    onError: (_err, input, context) => {
+      const { task } = reopenInput(input)
       if (context?.wasInStore) {
         updateCompleted(task.id, { done: true })
         // The reopen failed: the row is done again, so it is held again.

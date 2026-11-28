@@ -3,7 +3,7 @@
 //
 //   A. Clicking a subtask's title renames it in place: Enter saves (to the server), focus returns to
 //      the title; Escape cancels and leaves the card open.
-//   B. Right-click on a subtask gives Rename, Open subtask and Delete subtask.
+//   B. Right-click on a subtask gives Rename, Open subtask, Move up (it is the second) and Delete subtask.
 //   C. Delete subtask asks first, then the subtask is gone from the card and from the server.
 //   D. Open subtask closes the parent's card and opens the subtask as its own card under the parent's
 //      row; after Escape the subtask's row stays under the parent until another task opens.
@@ -89,8 +89,9 @@ export default async function run(h) {
     await card().getByRole('button', { name: `Rename ${two.title}` }).click({ button: 'right' })
     await h.wait(350)
     const items = await page.locator('[role="menu"] [role="menuitem"]').allTextContents()
-    await h.assert('B: right-click offers Rename, Open subtask and Delete subtask', {
-      ok: JSON.stringify(items.map((s) => s.trim())) === JSON.stringify(['Rename', 'Open subtask', 'Delete subtask']),
+    // The second of two subtasks can also move up (subtask order, contract section 19).
+    await h.assert('B: right-click offers Rename, Open subtask, Move up and Delete subtask', {
+      ok: JSON.stringify(items.map((s) => s.trim())) === JSON.stringify(['Rename', 'Open subtask', 'Move up', 'Delete subtask']),
       detail: items.join(' | '),
     })
     await h.capture('subtask-menu')

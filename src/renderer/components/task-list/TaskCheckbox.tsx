@@ -32,7 +32,7 @@ export function TaskCheckbox({ task, className, suppressTopLevelUndo = false }: 
         // Space and Enter on the focused checkbox click it with detail 0; a pointer click has at least 1.
         const byKeyboard = e.detail === 0
         if (task.done) {
-          uncompleteTask.mutate(task)
+          uncompleteTask.mutate(suppressTopLevelUndo ? { task, suppressTopLevelUndo: true } : task)
         } else if (await confirmTaskCompletion(task)) {
           completeTask.mutate(suppressTopLevelUndo ? { task, suppressTopLevelUndo: true } : task)
           if (byKeyboard) {
